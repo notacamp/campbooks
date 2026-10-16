@@ -115,6 +115,10 @@ pub(crate) struct Response {
     answers: HashMap<String, WireAnswer>,
     #[serde(default)]
     routing: Option<Routing>,
+    /// Tokens, when a hosted decision model reports them (laya-serve
+    /// doesn't).
+    #[serde(default)]
+    pub usage: Option<crate::Usage>,
 }
 
 #[derive(Deserialize)]

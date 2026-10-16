@@ -187,6 +187,7 @@ pub fn module(deps: ConversationsDeps) -> Module {
             .consumer(features::record_send::RecordSend)
             .handler(features::apply_rule::ApplyRules::new(needs.clone()))
             .handler(features::fill_templates::FillTemplates)
+            .handler(features::refresh_need::RefreshNeed::new(needs.clone()))
             .handler(features::apply_changes::ApplyChanges::new(
                 deps.rules,
                 deps.policy.clone(),
@@ -216,6 +217,8 @@ pub fn module(deps: ConversationsDeps) -> Module {
             .on_event::<features::create_inbox::CreateInbox>()
             .on_event::<features::forget_connection::ForgetConnection>()
             .on_event::<features::forget_member::ForgetMember>()
+            .on_event::<features::suspended_authors::PauseSuspendedAuthor>()
+            .on_event::<features::suspended_authors::ResumeUnsuspendedAuthor>()
             .on_event::<features::purge_workspace::ScheduleWorkspacePurge>()
             .job::<features::purge_workspace::PurgeWorkspace>(),
         resources: domain::resources::resources(),
@@ -247,11 +250,13 @@ fn model_may_read_mail(gateway: &Gateway) -> bool {
 fn router() -> OpenApiRouter<AppState> {
     use features::{
         archive, create_draft, get_attachment, get_conversation, get_message_body, labels,
-        list_conversations, list_drafts, list_inboxes, list_streams, mark_read, move_to_stream,
-        needs, rules, send_draft, star, suggest_rules, update_draft,
+        list_conversations, list_drafts, list_inboxes, list_labels, list_senders, list_streams,
+        mark_read, move_to_stream, needs, rules, send_draft, star, suggest_rules, update_draft,
     };
     OpenApiRouter::new()
         .routes(routes!(list_inboxes::handler))
+        .routes(routes!(list_senders::handler))
+        .routes(routes!(list_labels::handler))
         .routes(routes!(list_streams::handler))
         .routes(routes!(list_conversations::handler))
         .routes(routes!(get_conversation::handler))
@@ -321,6 +326,7 @@ mod tests {
             "conversations.check_send",
             "conversations.apply_rule",
             "conversations.fill_templates",
+            "conversations.refresh_need",
             "conversations.backfill_needs",
             "conversations.dispatch_needs_backfills",
         ] {

@@ -249,16 +249,26 @@ async fn load_event<E: DomainEvent>(ctx: &JobContext) -> Result<Event<E>, JobErr
         .info()
         .event_id
         .ok_or_else(|| JobError::fatal("event delivery without an event id"))?;
+    // Read in the delivery's own scope: a workspace's event in that
+    // workspace's transaction, an instance-wide one in the kernel's (no
+    // workspace to work in). A delivery and its event share the workspace.
+    let workspace = ctx.workspace();
+    let mut tx = match workspace {
+        Some(workspace) => crate::db::begin_in(ctx.pool(), workspace).await?,
+        None => crate::db::begin_kernel(ctx.pool()).await?,
+    };
     let row = sqlx::query!(
         r#"
         SELECT name, version, workspace_id, payload, occurred_at
-          FROM kernel.events WHERE id = $1
+          FROM kernel.events WHERE id = $1 AND workspace_id IS NOT DISTINCT FROM $2
         "#,
-        id as EventId
+        id as EventId,
+        workspace,
     )
-    .fetch_optional(ctx.pool())
+    .fetch_optional(&mut *tx)
     .await?
     .ok_or_else(|| JobError::fatal(format!("event {id} is not in the log")))?;
+    tx.commit().await?;
     if row.name != E::NAME {
         return Err(JobError::fatal(format!(
             "event {id} is a `{}`, not a `{}`",

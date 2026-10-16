@@ -283,6 +283,11 @@ pub struct AiConfig {
     /// private addresses, `localhost` and single-label names need no entry.
     #[serde(default, deserialize_with = "host_list")]
     pub internal_hosts: Vec<String>,
+    /// Model calls a workspace may make per UTC day
+    /// (`CAMPBOOKS_AI__DAILY_CALLS_PER_WORKSPACE`); read it through
+    /// [`daily_call_cap`](Self::daily_call_cap), which applies the default.
+    #[serde(default, deserialize_with = "crate::usage::daily_calls")]
+    pub daily_calls_per_workspace: Option<u32>,
 }
 
 /// A comma-separated string or a list, trimmed, lower-cased, blanks dropped.

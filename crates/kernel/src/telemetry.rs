@@ -16,7 +16,7 @@ use std::{collections::HashMap, fmt, sync::Arc, time::Duration};
 use axum::http::{HeaderMap, HeaderName, HeaderValue};
 use opentelemetry::{
     InstrumentationScope, KeyValue, global,
-    metrics::{Gauge, Histogram, Meter},
+    metrics::{Counter, Gauge, Histogram, Meter},
     propagation::{Extractor, Injector, TextMapPropagator as _},
     trace::{SpanContext, TraceContextExt as _},
 };
@@ -259,6 +259,7 @@ struct Instruments {
     job_wait: Histogram<f64>,
     jobs: Gauge<u64>,
     oldest_ready: Gauge<f64>,
+    rate_limit_refusals: Counter<u64>,
 }
 
 impl fmt::Debug for Metrics {
@@ -298,6 +299,13 @@ impl Metrics {
                     .f64_gauge("campbooks.jobs.oldest_ready_age")
                     .with_unit("s")
                     .with_description("Age of the oldest ready job, by queue.")
+                    .build(),
+                rate_limit_refusals: meter
+                    .u64_counter("campbooks.rate_limit.refusals")
+                    .with_description(
+                        "Requests refused by a per-caller API rate limit, by class, \
+                         principal kind and caller kind.",
+                    )
                     .build(),
             }),
             exported,
@@ -367,6 +375,25 @@ impl Metrics {
             &[
                 KeyValue::new("job.queue", queue.to_owned()),
                 KeyValue::new("job.state", state),
+            ],
+        );
+    }
+
+    /// One request refused by a per-caller API rate limit: its `class`
+    /// (`read`, `write`, `send`, `admin`), the principal's kind (`user`,
+    /// `client`) and the caller's (`app`, `automation`, `assistant`).
+    pub(crate) fn rate_limited(
+        &self,
+        class: &'static str,
+        principal: &'static str,
+        via: &'static str,
+    ) {
+        self.instruments.rate_limit_refusals.add(
+            1,
+            &[
+                KeyValue::new("rate_limit.class", class),
+                KeyValue::new("principal.kind", principal),
+                KeyValue::new("rate_limit.caller", via),
             ],
         );
     }

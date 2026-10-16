@@ -496,7 +496,9 @@ async fn a_malformed_batch_fails_without_its_content_in_the_error(db: PgPool) {
         )
         .await
         .unwrap();
-    let mut tx = kit.state.db.begin().await.unwrap();
+    let mut tx = campbooks_kernel::db::BeginFor::begin_for(&kit.state.db, workspace)
+        .await
+        .unwrap();
     campbooks_kernel::jobs::enqueue_to::<super::ApplyChanges>(
         &mut tx,
         &crate::ingest::ApplyChangesPayload { inbox, batch: blob },

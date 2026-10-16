@@ -182,6 +182,9 @@ fn error_type(error: &Error) -> &'static str {
         Error::InvalidResponse(_) => "invalid_response",
         Error::ExternalContentRefused { .. } => "external_content_refused",
         Error::AnswersNotTrusted => "answers_not_trusted",
+        Error::OverDailyCap { .. } => "over_daily_cap",
+        Error::Unattributed => "unattributed",
+        Error::Metering => "metering",
     }
 }
 

@@ -19,7 +19,13 @@ mod access_matrix_tests;
 #[cfg(test)]
 mod admin_tests;
 #[cfg(test)]
+mod ai_usage_tests;
+#[cfg(test)]
+mod assistant_tests;
+#[cfg(test)]
 mod identity_tests;
+#[cfg(test)]
+mod rate_limit_tests;
 #[cfg(test)]
 mod revocation_tests;
 #[cfg(test)]
@@ -128,6 +134,9 @@ pub struct Composition {
     /// The system module's AI gateway and the facts of this composition,
     /// for the admin system overview.
     pub system: campbooks_system::Deps,
+    /// The assistant module's AI gateway (its `complete` role compiles
+    /// members' sentences into rules to check).
+    pub assistant: campbooks_assistant::AssistantDeps,
 }
 
 impl Composition {
@@ -135,17 +144,17 @@ impl Composition {
     /// setting is an error naming it.
     pub fn from_env(config: &campbooks_kernel::Config) -> Result<Self, String> {
         let ai = campbooks_ai::AiConfig::from_env().map_err(|e| e.to_string())?;
-        let gateway = if ai.roles.is_empty() {
-            None
-        } else {
-            Some(campbooks_ai::Gateway::new(ai).map_err(|e| e.to_string())?)
-        };
+        let (gateway, ai_usage) = ai_gateway(ai)?;
         let connectors = campbooks_connectors::Deps::from_env(config)?;
         let identity = campbooks_identity::Deps::from_env(config, &scope_catalogue())?;
+        let assistant = campbooks_assistant::AssistantDeps {
+            ai: gateway.clone(),
+        };
         let system = campbooks_system::Deps {
             ai: gateway.clone(),
             facts: facts(config, &identity, &connectors),
             started_at: chrono::Utc::now(),
+            ai_usage,
         };
         Ok(Self {
             connectors,
@@ -155,8 +164,32 @@ impl Composition {
                 campbooks_conversations::ConversationsConfig::from_env()?,
             ),
             system,
+            assistant,
         })
     }
+}
+
+/// The AI gateway every module calls models through (none when no role is
+/// configured), and the meter it counts every call with, per workspace and
+/// UTC day, under `ai`'s daily cap (campbooks-cloud#152). The admin AI
+/// usage read shows the same meter.
+pub fn ai_gateway(
+    ai: campbooks_ai::AiConfig,
+) -> Result<
+    (
+        Option<campbooks_ai::Gateway>,
+        campbooks_system::AiUsageMeter,
+    ),
+    String,
+> {
+    let meter = campbooks_system::AiUsageMeter::new(ai.daily_call_cap());
+    if ai.roles.is_empty() {
+        return Ok((None, meter));
+    }
+    let gateway = campbooks_ai::Gateway::new(ai)
+        .map_err(|e| e.to_string())?
+        .with_meter(Arc::new(meter.clone()));
+    Ok((Some(gateway), meter))
 }
 
 /// Who signs people in and which providers are set up, by name only: what
@@ -208,6 +241,7 @@ pub fn modules_with(composition: &Composition) -> Vec<Module> {
         campbooks_admin::module(),
         campbooks_attention::module(),
         campbooks_search::module(),
+        campbooks_assistant::module(composition.assistant.clone()),
         // `cargo xtask new-module` inserts above this line.
     ]
 }
@@ -217,7 +251,8 @@ pub fn modules_with(composition: &Composition) -> Vec<Module> {
 /// language each user chose; the `conversations` module, who may see the
 /// change feed's records inside an inbox and search's results, and how
 /// search reads its conversations (ADR 0016); the `admin` module, who is an
-/// administrator, and keeps the trail of what they do.
+/// administrator, and keeps the trail of what they do; the `assistant`
+/// module, whether a member lets Scout act on its own proposals.
 pub fn with_ports(state: AppState) -> AppState {
     state
         .with_resources(resource_catalogue())
@@ -226,6 +261,7 @@ pub fn with_ports(state: AppState) -> AppState {
         .with_locales(campbooks_workspaces::locale_preference())
         .with_invitations(campbooks_workspaces::invitations())
         .with_visibility(campbooks_conversations::visibility())
+        .with_preferences(campbooks_assistant::preferences())
         .with_kept_mail(campbooks_conversations::kept_mail())
         .with_search_sources(SearchSources::new(vec![
             campbooks_conversations::search_source(),
@@ -348,6 +384,10 @@ fn security_scheme() -> SecurityScheme {
         description = "The Campbooks HTTP API. Errors are RFC 9457 `application/problem+json`. \
             Operations require an OAuth 2.1 bearer token with the scope they list \
             (401 without a valid token, 403 without the scope) unless they are public. \
+            Those operations are rate-limited per caller (a person per app, an app on its own) \
+            in classes: reads, writes, and mail sends (`x-campbooks.rate_limit: send`, counted \
+            per person across their apps). Over a limit they answer 429 `rate_limited` with \
+            `Retry-After`, in seconds. \
             The `/bff/*` operations serve the web app only: they authenticate with its \
             session cookie instead of a token.",
         license(name = "Sustainable Use License", identifier = "LicenseRef-Sustainable-Use"),
@@ -376,6 +416,10 @@ fn security_scheme() -> SecurityScheme {
             conversations today. Words in English, Portuguese, Spanish and French with accents \
             ignored, Gmail-style operators, highlights as plain-text segments. Results come only \
             from the containers (inboxes) you may see, checked at query time."),
+        (name = "assistant", description = "What you told Scout about how to act, and turning \
+            a sentence you type into rules to check. Compiling uses the `complete` AI role only \
+            when you ask, and sends it your sentence and your own addresses and label names, never \
+            your mail; nothing is saved until you save a rule through the conversations module."),
         // `cargo xtask new-module` inserts above this line.
         (name = "changes", description = "The change feed: a Server-Sent Events stream per \
             workspace of the records that changed (ids only), so clients refetch only what \
@@ -395,7 +439,8 @@ struct ApiDoc;
             (`x-campbooks-admin.permission`; `super` grants all). Then a token whose last \
             sign-in (`auth_time`) is more than an hour old answers 401 \
             `admin_reauth_required`. Every request past the profile check is recorded in the \
-            audit trail. These operations are not part of the operation catalogue \
+            audit trail. Calls are rate-limited per caller (429 `rate_limited` with \
+            `Retry-After`). These operations are not part of the operation catalogue \
             (`/openapi.json`): automation and the assistant cannot call them. Admin profiles \
             are managed only with the server's CLI (`campbooks-server admin`), never over HTTP. \
             The web app reaches this API through `/bff/admin/*`.",
@@ -446,14 +491,21 @@ fn admin_security_scheme() -> SecurityScheme {
 
 /// The admin API (`/admin/v1/*`) over `state`: not composed into the
 /// operation catalogue, so [`invoke`](operations::invoke) and the
-/// idempotency layer never see it; every route behind the audit middleware,
-/// problems in the caller's language.
+/// idempotency layer never see it; every route behind the audit middleware
+/// and the admin class of the per-caller rate limits, problems in the
+/// caller's language.
 fn admin_routes(state: &AppState, composition: &Composition) -> Router<AppState> {
     let (routes, spec) = admin_api_with(composition).split_for_parts();
     routes
         .route_layer(middleware::from_fn_with_state(
             campbooks_kernel::admin::AuditLayer::new(state, &spec),
             campbooks_kernel::admin::audit,
+        ))
+        // Counted before the profile check: a non-admin hammering it stops
+        // costing a lookup per request, and is answered as an admin would be.
+        .route_layer(middleware::from_fn_with_state(
+            campbooks_kernel::rate_limit::api::CallerLimits::admin(state),
+            campbooks_kernel::rate_limit::api::middleware,
         ))
         .route_layer(middleware::from_fn_with_state(
             state.clone(),
@@ -791,11 +843,11 @@ mod tests {
         );
     }
 
-    /// A transaction that sets no workspace (the scheduler's dispatcher) may
-    /// only read and lease the scheduling index, never insert or delete
-    /// rows of any workspace's: its maintenance policies are `FOR SELECT`
-    /// and `FOR UPDATE`, and no other policy admits a transaction without a
-    /// workspace on a module's table.
+    /// Cross-workspace maintenance on a module's table needs the kernel
+    /// scope (the schedulers' dispatchers), and may only read and lease (or
+    /// start): its maintenance policies are `FOR SELECT` and `FOR UPDATE`.
+    /// No policy admits a transaction merely for setting no workspace
+    /// (campbooks-cloud#129).
     #[sqlx::test(migrations = "../../migrations")]
     async fn maintenance_policies_only_read_and_lease(db: sqlx::PgPool) {
         let rows: Vec<(String, String, String, String)> = sqlx::query_as(
@@ -807,11 +859,21 @@ mod tests {
         .fetch_all(&db)
         .await
         .unwrap();
-        // Policies admitting a transaction that set no workspace.
         let unset = "'campbooks.workspace_id'::text, true), ''::text) IS NULL";
+        let admitting_unset: Vec<&String> = rows
+            .iter()
+            .filter(|(_, _, _, qual)| qual.contains(unset))
+            .map(|(_, name, _, _)| name)
+            .collect();
+        assert!(admitting_unset.is_empty(), "{admitting_unset:?}");
+        // Policies admitting the kernel scope.
+        let kernel = format!(
+            "'{}'::text, true) = 'on'::text",
+            testing::kernel_scope_setting()
+        );
         let policies: Vec<(String, String, String)> = rows
             .into_iter()
-            .filter(|(_, _, _, qual)| qual.contains(unset))
+            .filter(|(_, _, _, qual)| qual.contains(&kernel))
             .map(|(table, name, cmd, _)| (table, name, cmd))
             .collect();
         assert_eq!(

@@ -640,6 +640,7 @@ fn check_meta(
             && key != "undo"
             && key != "query_in"
             && key != "access"
+            && key != "rate_limit"
         {
             violations.push(format!(
                 "OpenAPI operation `{name}`: unknown key `x-campbooks.{key}`"
@@ -701,6 +702,7 @@ fn check_meta(
         }
     };
     check_method(name, method, meta, violations);
+    check_rate_limit(name, meta, violations);
     meta.get("mutates")
         .and_then(serde_json::Value::as_bool)
         .map(|mutates| Meta { mutates, undo })
@@ -735,6 +737,30 @@ fn check_method(
                  marked `Operation::body_query()` when its inputs must stay out of URLs)"
             ));
         }
+    }
+}
+
+/// `rate_limit` may only make a limit tighter: it is `send`, on a mutating
+/// operation (a read declaring a write's or send's class would be
+/// meaningless, and no class looser than its method's exists).
+fn check_rate_limit(
+    name: &str,
+    meta: &serde_json::Map<String, serde_json::Value>,
+    violations: &mut Vec<String>,
+) {
+    let Some(class) = meta.get("rate_limit") else {
+        return;
+    };
+    if class.as_str() != Some("send") {
+        violations.push(format!(
+            "OpenAPI operation `{name}`: `x-campbooks.rate_limit` must be \"send\""
+        ));
+    }
+    if meta.get("mutates").and_then(serde_json::Value::as_bool) != Some(true) {
+        violations.push(format!(
+            "OpenAPI operation `{name}`: `x-campbooks.rate_limit` is only for operations that \
+             mutate"
+        ));
     }
 }
 
@@ -1082,7 +1108,7 @@ pub fn check_admin_sources(files: &[(String, String)]) -> Vec<String> {
         {
             violations.push(format!(
                 "{path}: names `{ADMIN_READS_SETTING}`; only the kernel may (use \
-                 `kernel::db::begin_admin` / `ADMIN_READS_SETTING`)"
+                 `kernel::db::begin_admin`)"
             ));
         }
     }
@@ -1710,6 +1736,35 @@ mod tests {
                 .any(|m| m.contains("`POST /w`: `x-campbooks.query_in` is for reads"))
         );
         assert!(v.iter().any(|m| m.contains("`POST /p` does not mutate")));
+    }
+
+    #[test]
+    fn a_rate_limit_class_is_send_on_a_mutating_operation() {
+        let mut send = meta(true);
+        send["rate_limit"] = serde_json::json!("send");
+        let mut on_a_read = meta(false);
+        on_a_read["rate_limit"] = serde_json::json!("send");
+        let mut looser = meta(true);
+        looser["rate_limit"] = serde_json::json!("read");
+        let spec = serde_json::json!({ "paths": {
+            "/s": { "post": { "operationId": "mail.s", "x-campbooks": send } },
+            "/r": { "get": { "operationId": "mail.r", "x-campbooks": on_a_read } },
+            "/l": { "post": { "operationId": "mail.l", "x-campbooks": looser } },
+        }});
+        let owners = owners(&[
+            ("POST", "/s", "mail"),
+            ("GET", "/r", "mail"),
+            ("POST", "/l", "mail"),
+        ]);
+        let v = check_operations(&spec, &owners);
+        assert_eq!(v.len(), 2, "{v:#?}");
+        assert!(v.iter().any(|m| {
+            m.contains("`GET /r`: `x-campbooks.rate_limit` is only for operations that mutate")
+        }));
+        assert!(
+            v.iter()
+                .any(|m| m.contains("`POST /l`: `x-campbooks.rate_limit` must be \"send\""))
+        );
     }
 
     #[test]

@@ -5,11 +5,12 @@
  * record of that type invalidates the queries keyed by those operationIds.
  */
 export const recordReaders: Readonly<Record<string, readonly string[]>> = {
+  "assistant.profile": ["assistant.get_profile"],
   "attention.item": ["attention.list"],
   "connectors.connection": ["connectors.get_connection", "connectors.list_connections"],
   "conversations.conversation": ["conversations.get", "conversations.list", "conversations.list_streams", "conversations.suggest_rules"],
   "conversations.draft": ["conversations.get_draft", "conversations.list_drafts"],
-  "conversations.inbox": ["conversations.list_inboxes"],
+  "conversations.inbox": ["conversations.list_inboxes", "conversations.list_labels", "conversations.list_senders"],
   "conversations.message": ["conversations.get", "conversations.get_attachment", "conversations.get_message_body"],
   "conversations.rule": ["conversations.get", "conversations.get_rule", "conversations.list", "conversations.list_rules", "conversations.preview_rule", "conversations.suggest_rules"],
   "identity.authorization_code": ["identity.authorize"],

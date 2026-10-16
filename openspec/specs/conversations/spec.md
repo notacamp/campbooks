@@ -901,7 +901,11 @@ preview rules: creating, confirming, changing, removing or restoring one
 answers 403 `rule_needs_member`. A rule SHALL act for every member of its
 inbox. When its author no longer may write in the inbox, or the inbox is kept
 read-only, the rule SHALL be paused (and its running runs stop) until a
-manager adopts or removes it.
+manager adopts or removes it. While its author's account is suspended, the
+rule SHALL be paused the same way (a running apply run is cancelled at its
+next batch, new mail is not changed by it, and previews and suggestions do
+not count it), and lifting the suspension SHALL make it act again with
+nothing to redo; a run it cancelled is not restarted.
 
 #### Scenario: Leo's rule in a shared inbox
 - **WHEN** Leo taught a rule in info@ and Ana, a sender there, tries to remove it
@@ -910,6 +914,14 @@ manager adopts or removes it.
 #### Scenario: The author leaves
 - **WHEN** Leo is removed from info@
 - **THEN** his rules there are paused and stop acting on new mail
+
+#### Scenario: The author is suspended, then the suspension is lifted
+- **WHEN** an administrator suspends Leo, who taught a rule in info@, and later lifts the suspension
+- **THEN** while suspended the rule reads as paused with `paused_reason` `author_unavailable` and leaves new mail alone, and once lifted it is active and acts on new mail again
+
+#### Scenario: A run going when the author is suspended
+- **WHEN** Leo's rule is being applied to existing mail and Leo is suspended before its next batch
+- **THEN** that batch cancels the run and changes nothing
 
 #### Scenario: An app
 - **WHEN** a client token with `conversations:write`, registered by Sam, creates a rule
@@ -1062,9 +1074,10 @@ and kind as creating one does. Otherwise the response SHALL be 409
 
 ### Requirement: Purging rules
 Removing an inbox's mail and purging a workspace SHALL delete its rules,
-runs, applications and dismissals. Keeping an inbox read-only SHALL cancel
-its rules' runs and drop what only served acting again: the members' words
-(`origin_text`), what each rule changed (`before`) and the dismissed
+runs, applications and dismissals; purging a workspace SHALL also delete the
+suspensions it recorded for its members. Keeping an inbox read-only SHALL
+cancel its rules' runs and drop what only served acting again: the members'
+words (`origin_text`), what each rule changed (`before`) and the dismissed
 suggestions. A member leaving SHALL drop the suggestions they dismissed.
 
 #### Scenario: Disconnecting with the mail deleted
@@ -1120,7 +1133,21 @@ may send from it.
 A message in spam or the trash SHALL never raise a need: a conversation's
 need SHALL come from its newest inbound message that is in neither, and a
 need whose own message moves to spam or the trash SHALL be cleared as
-`trashed`.
+`trashed`. Working out a conversation's first need SHALL NOT store an open
+need for a message that another transaction is changing (a move to spam or
+the trash, a template fill, any writer), and SHALL NOT wait for it, so that no
+open need is stored for a message after its move committed and no request
+deadlocks with a sync batch. It SHALL take, before the message, the conversation's row `FOR KEY SHARE`
+(without waiting) so that storing the need cannot wait for a lock a writer
+holds, and SHALL instead enqueue a durable `conversations.refresh_need` job
+for the conversation (one per deferral, a few seconds later; the job waits
+for the locks within a lock timeout, works the need out again once it holds
+them, and retries after a timeout), so that a need skipped for a
+busy message or conversation is still raised once the writer commits, whether or not that
+writer refreshes needs. A message that leaves spam or the trash SHALL raise its need again
+as any message does; a member's Done or Not needed SHALL still hold, and a
+member's confirmation SHALL still make the reopened need theirs (basis
+`member`).
 
 #### Scenario: The lease goes to the trash
 - **WHEN** the message Pedro's `do` need comes from is moved to the trash, while his later message stays
@@ -1129,6 +1156,38 @@ need whose own message moves to spam or the trash SHALL be cleared as
 #### Scenario: A question in spam
 - **WHEN** a question lands in spam inside a conversation whose need comes from an earlier message
 - **THEN** the need still comes from the earlier message
+
+#### Scenario: Not spam after all
+- **WHEN** the message Marta's `reply` need comes from is moved to spam and later back to the inbox
+- **THEN** the need is cleared as `trashed`, then open again from the same message
+
+#### Scenario: A trash round trip
+- **WHEN** a confirmed need's message and a Done need's message are trashed and then restored
+- **THEN** the confirmed need is open with basis `member`, and the Done one stays cleared as `done`
+
+#### Scenario: A move and a refresh at once
+- **WHEN** a decide pass refreshes a conversation while a provider move of its message to spam is not yet committed
+- **THEN** the refresh stores no need for that message, without waiting for the move, and a follow-up job run after the move commits still stores none
+
+#### Scenario: A busy message that is not moving
+- **WHEN** a first need's message is held by another transaction that changes only its subject template, and then commits
+- **THEN** the refresh stores nothing and enqueues a `conversations.refresh_need`, which stores the open need once the other transaction has committed
+
+#### Scenario: An archive in progress
+- **WHEN** a first need's conversation is locked `FOR UPDATE` by another transaction (an archive that will update its messages next)
+- **THEN** the refresh stores nothing, does not wait, enqueues a `conversations.refresh_need`, and the other transaction can update the messages and commit
+
+#### Scenario: Done during a sync batch
+- **WHEN** a member marks a need Done while a sync batch has updated its message and not committed
+- **THEN** Done completes without waiting for the batch
+
+#### Scenario: Archived while the follow-up waits
+- **WHEN** a `conversations.refresh_need` job waits for a conversation whose archive is not yet committed, and the archive then commits
+- **THEN** the job works the need out again once it holds its locks and stores no open need for the archived conversation
+
+#### Scenario: A need stored while the follow-up waits
+- **WHEN** another refresh stores the conversation's first need (or a member's Done on it) while its `conversations.refresh_need` job waits
+- **THEN** the job keeps the stored need and does not overwrite it from what it read before waiting
 
 ### Requirement: Security alerts are a to-do
 The email signals SHALL answer `asks_action` true with the reason
@@ -1231,6 +1290,53 @@ read-only after its connection was removed SHALL be left as it is.
 - **WHEN** an inbox has an open `check` need whose message's accepted answers say it asks nothing
 - **THEN** the backfill clears it with cause `superseded`
 
+### Requirement: Who writes to the caller
+`GET /api/v1/w/{workspace_id}/senders` (`conversations.list_senders`,
+`conversations:read`, callable by the assistant) SHALL list senders of
+inbound mail in the inboxes the caller can read: address, display name,
+messages received and messages the caller's inboxes replied to; never a
+subject or any text. Without `q` it SHALL return the 10 senders the
+caller's inboxes replied to most (then received most); with `q` (2 to 100
+characters) it SHALL return up to 10 senders whose address, display name
+or domain contains each of its words, case- and accent-insensitively, in
+the same order. `limit` SHALL be 1 to 10 (else 400). There SHALL be no
+cursor. A sender seen only in inboxes the caller cannot read SHALL never
+appear. It SHALL read only the newest inbound mail: the last 365 days, at
+most 5,000 messages (through a partial index on received mail), so the
+counts are within that window and its cost doesn't grow with an inbox's
+history. Within one compile, the assistant SHALL ask it at most once per
+`q`.
+
+#### Scenario: Suggestions for "always reach you"
+- **WHEN** a member lists senders without `q`
+- **THEN** the senders they replied to most come first, with their counts and no subjects
+
+#### Scenario: Another member's inbox
+- **WHEN** a sender wrote only to an inbox the caller is not in
+- **THEN** that sender is not listed, for that caller or for a client token without the inbox
+
+#### Scenario: Old mail only
+- **WHEN** a sender's every message is more than a year old
+- **THEN** that sender is not listed
+
+### Requirement: The caller's labels
+`GET /api/v1/w/{workspace_id}/labels` (`conversations.list_labels`,
+`conversations:read`, callable by the assistant) SHALL list the labels of
+the inboxes the caller can read: id, inbox and name.
+
+#### Scenario: Only readable inboxes
+- **WHEN** a member lists labels and another inbox has a label "Board"
+- **THEN** "Board" is not listed
+
+### Requirement: Shared inboxes are marked
+`conversations.list_inboxes` SHALL say of each inbox whether it is
+`shared`: whether anyone other than the caller holds a role on it. It
+SHALL never say who.
+
+#### Scenario: Sam's own inbox and the office inbox
+- **WHEN** Sam lists his inboxes and Ana also reads office@
+- **THEN** his own inbox says `shared` = false and office@ says `shared` = true
+
 ### Requirement: Upgrading from content rules
 On upgrade, every stored rules answer with an envelope version below 3 SHALL
 be marked not acted (kept as a record), and every inbox SHALL be queued for
@@ -1247,3 +1353,31 @@ message.
 #### Scenario: Recent mail is read again
 - **WHEN** the upgrade runs with Jev configured and a conversation's newest inbound message from three days ago has no checked model answer
 - **THEN** the model is asked about it once and its accepted answers sort the conversation and raise its need
+
+### Requirement: Suspended authors
+The module SHALL record, per workspace, whether each member is suspended,
+from `workspaces.member_suspended` and `workspaces.member_unsuspended`
+(`conversations.pause_suspended_author`,
+`conversations.resume_unsuspended_author`), keeping for each member the
+change with the newest `at`: a duplicate, or a change older than the one
+recorded, SHALL change nothing. Whenever it records a change, the module
+SHALL publish `conversations.rule_changed` for each of the member's rules
+that is not removed. A member leaving the workspace SHALL be recorded as not
+suspended as of their departure (they come back only by signing in).
+`RuleView` SHALL carry `paused_reason` when its state is `paused`:
+`inbox_read_only`, else `author_cannot_write`, else `paused_by_member`, else
+`author_unavailable`. A suspension is an administrator's action and SHALL
+not be disclosed to other members, clients or the assistant: no rule
+reason, event or text readable in the workspace names it.
+
+#### Scenario: Delivered out of order
+- **WHEN** the lift (newer `at`) is delivered before the suspension it lifts
+- **THEN** the member is recorded as not suspended and their rules stay active
+
+#### Scenario: Delivered twice
+- **WHEN** the same suspension is delivered twice
+- **THEN** the member is suspended once and `rule_changed` is published once per rule
+
+#### Scenario: Removed while suspended, invited back after
+- **WHEN** a suspended member is removed from the workspace, the suspension is lifted (which no longer reaches that workspace), and they are invited back to the inbox
+- **THEN** their rules act again

@@ -11,8 +11,8 @@ import { caption, signedIn } from "./inbox.ts";
 //   SEARCH_BASE_URL=http://localhost:5181 INBOX_BASE_URL=http://localhost:5181 \
 //   pnpm --dir clients record search --base-url http://localhost:5181
 //
-// Desktop: `/` opens the overlay, typing shows instant rows with the matched
-// words marked and the parsed filter as a chip, ⌘K hands its query over, ⌘↵
+// Desktop: `/` opens the "Search or ask" menu, typing shows instant rows with
+// the matched words marked and the parsed filter as a chip, ⌘↵
 // opens the results page (newest first, "Most relevant" toggle, reader
 // beside, inbox shortcuts), then the empty states. Phone: the top bar's
 // search button, the full-screen page, wrapping chips, the reader as its own
@@ -24,7 +24,7 @@ function isPhone(page: Page): boolean {
 
 async function typeSlowly(page: Page, text: string): Promise<void> {
   await page.keyboard.type(text, { delay: 90 });
-  // The overlay waits ~120 ms after the last key before asking.
+  // The menu waits ~120 ms after the last key before asking.
   await pause(700);
 }
 
@@ -77,10 +77,10 @@ export default async function search({ page }: ScenarioContext): Promise<void> {
   // ── desktop ─────────────────────────────────────────────────────────────
   await caption(page, "Press / to search from anywhere in a workspace");
   await page.keyboard.press("/");
-  const field = page.getByRole("combobox", { name: "Search conversations" });
+  const field = page.getByRole("combobox", { name: "Search, ask, or run a command" });
   await field.waitFor();
-  await caption(page, "Nothing typed yet: the operators, and later your recent searches", 2000);
-  await shot("01-overlay-empty");
+  await caption(page, "Nothing typed yet: the commands, and later your recent searches", 2000);
+  await shot("01-menu-empty");
   await typeSlowly(page, "invoice");
   await page.getByRole("option", { name: /Cloudhost Billing/u }).waitFor();
   await caption(page, "Instant rows by relevance: the matched words are marked", 2200);
@@ -127,20 +127,7 @@ export default async function search({ page }: ScenarioContext): Promise<void> {
   await pause(1200);
   await caption(page, "Z takes it back", 1400);
 
-  // ⌘K hand-off.
-  await page.goto(`/w/${workspace}/inbox/primary`);
-  await page.getByRole("heading", { level: 1, name: "Primary" }).waitFor();
-  await page.keyboard.press("Meta+k");
-  await page.getByRole("combobox", { name: "Search, ask, or run a command" }).waitFor();
-  await typeSlowly(page, "lease");
-  await caption(page, "⌘K: the last row hands the query to search", 2000);
-  await shot("08-command-menu");
-  await page.getByRole("option", { name: /Search conversations for/u }).click();
-  await page.getByRole("option", { name: /Lease for the studio/u }).waitFor();
-  await caption(page, "…and search opens with it", 2000);
-  await shot("09-handoff");
-  await page.keyboard.press("Meta+Enter");
-
+  await page.goto(`/w/${workspace}/search?q=lease`);
   // Recents, nothing found.
   await page.getByRole("region", { name: "Search results" }).waitFor();
   await page.keyboard.press("/");

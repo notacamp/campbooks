@@ -44,8 +44,14 @@ pub async fn handler(
 ) -> Result<Json<AdminAccount>> {
     let now = Utc::now();
     let mut tx = state.db.begin().await?;
-    let outcome =
-        suspension::unsuspend(&mut tx, path.account_id, admin.grant.account(), now).await?;
+    let outcome = suspension::unsuspend(
+        &mut tx,
+        &state.events,
+        path.account_id,
+        admin.grant.account(),
+        now,
+    )
+    .await?;
     if outcome == Outcome::Missing {
         return Err(Error::NotFound);
     }

@@ -26,7 +26,7 @@ pub(crate) fn device() -> Authenticator {
 
 pub(crate) async fn count(kit: &Kit, sql: &'static str) -> i64 {
     sqlx::query_scalar(sql)
-        .fetch_one(&kit.state.db)
+        .fetch_one(&kit.kernel)
         .await
         .unwrap()
 }
@@ -1115,9 +1115,15 @@ async fn a_suspended_account_is_told_so_only_after_its_passkey_verifies(db: PgPo
     assert_eq!(probe.json["code"], "passkey_not_accepted", "{probe:?}");
 
     let mut tx = kit.state.db.begin().await.unwrap();
-    suspension::unsuspend(&mut tx, account, "root", chrono::Utc::now())
-        .await
-        .unwrap();
+    suspension::unsuspend(
+        &mut tx,
+        &kit.state.events,
+        account,
+        "root",
+        chrono::Utc::now(),
+    )
+    .await
+    .unwrap();
     tx.commit().await.unwrap();
     kit.new_browser();
     let (request, _) = waiting_request(&kit).await;

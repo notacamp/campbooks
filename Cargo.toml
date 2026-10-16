@@ -27,6 +27,7 @@ campbooks-identity = { path = "crates/modules/identity" }
 campbooks-admin = { path = "crates/modules/admin" }
 campbooks-attention = { path = "crates/modules/attention" }
 campbooks-search = { path = "crates/modules/search" }
+campbooks-assistant = { path = "crates/modules/assistant" }
 
 # HTTP / async
 axum = { version = "0.8.9", default-features = false, features = ["http1", "http2", "json", "query", "form", "tokio", "tower-log", "tracing", "matched-path"] }
@@ -77,6 +78,9 @@ icu_properties = "2.3.0"
 unicode-security = "0.1.2"
 
 # Errors, observability, misc
+# The Public Suffix List, compiled in (no runtime fetch): the registrable
+# domain of a sender (`decide::signals::facts`).
+psl = "2.1.241"
 thiserror = "2.0.21"
 anyhow = "1.0.104"
 tracing = "0.1.44"

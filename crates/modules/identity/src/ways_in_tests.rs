@@ -30,7 +30,7 @@ pub(crate) fn user(subject: &str) -> TestUser {
 
 async fn count(kit: &Kit, sql: &'static str) -> i64 {
     sqlx::query_scalar(sql)
-        .fetch_one(&kit.state.db)
+        .fetch_one(&kit.kernel)
         .await
         .unwrap()
 }

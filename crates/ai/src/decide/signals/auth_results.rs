@@ -31,9 +31,25 @@ impl MethodResult {
     }
 }
 
+/// The longest `Authentication-Results` value read, in bytes. A real
+/// provider's header is a few hundred bytes; a sender can pad the parts it
+/// echoes (the envelope sender, comments) to make the tokeniser work, and a
+/// padded header is not one a provider wrote. Anything longer reads as no
+/// results.
+pub const MAX_LEN: usize = 8 * 1024;
+
+/// Whether `value` is longer than [`MAX_LEN`]: not read, and not to be taken
+/// for an absent header (see `Facts::authentication_failed`).
+pub fn is_oversized(value: &str) -> bool {
+    value.len() > MAX_LEN
+}
+
 /// The results of `value` after its authserv-id, or `None` when it is
-/// malformed.
+/// malformed or longer than [`MAX_LEN`].
 pub fn parse(value: &str) -> Option<Vec<MethodResult>> {
+    if is_oversized(value) {
+        return None;
+    }
     let segments = tokenise(value)?;
     let mut segments = segments.into_iter();
     // The authserv-id (and an optional version) comes first.
@@ -208,6 +224,17 @@ mod tests {
             results[0].values("header.from").collect::<Vec<_>>(),
             ["a.example"]
         );
+    }
+
+    #[test]
+    fn a_header_over_the_length_cap_reads_as_nothing() {
+        let head = "mx.google.com; dmarc=pass header.from=github.com; spf=pass (";
+        let pad = |len: usize| format!("{head}{}) smtp.mailfrom=a@b.example", "x".repeat(len));
+        let fill = MAX_LEN - pad(0).len();
+        assert_eq!(pad(fill).len(), MAX_LEN);
+        assert_eq!(parse(&pad(fill)).map(|r| r.len()), Some(2));
+        assert_eq!(pad(fill + 1).len(), MAX_LEN + 1);
+        assert_eq!(parse(&pad(fill + 1)), None);
     }
 
     #[test]

@@ -143,6 +143,11 @@ pub struct Config {
     /// blocks). Empty by default: the socket peer is the client.
     #[serde(default)]
     pub trusted_proxies: crate::rate_limit::TrustedProxies,
+
+    /// Per-caller limits of the authenticated API
+    /// (`CAMPBOOKS_RATE_LIMITS__*`; [`rate_limit::api`](crate::rate_limit::api)).
+    #[serde(default)]
+    pub rate_limits: RateLimitsConfig,
 }
 
 impl Config {
@@ -221,6 +226,7 @@ impl Config {
         self.changes.check()?;
         self.mail.check()?;
         self.events.check()?;
+        self.rate_limits.check()?;
         self.telemetry.check()
     }
 }
@@ -876,6 +882,86 @@ impl ChangesConfig {
     }
 }
 
+/// Per-caller limits of the authenticated API (`CAMPBOOKS_RATE_LIMITS__*`,
+/// [`rate_limit::api`](crate::rate_limit::api)). Each class allows a count
+/// per window; a count of 0 turns that class off. Reads, writes and admin
+/// calls are counted per server process; sends across all of them.
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[serde(default)]
+pub struct RateLimitsConfig {
+    /// Whether any per-caller limit applies (`CAMPBOOKS_RATE_LIMITS__ENABLED`,
+    /// default `true`).
+    pub enabled: bool,
+    /// Reads per window (`CAMPBOOKS_RATE_LIMITS__READS`, default 600).
+    pub reads: u32,
+    /// The read window (`CAMPBOOKS_RATE_LIMITS__READS_WINDOW_SECONDS`, 60).
+    pub reads_window_seconds: u64,
+    /// Writes per window (`CAMPBOOKS_RATE_LIMITS__WRITES`, default 120).
+    pub writes: u32,
+    /// The write window (`CAMPBOOKS_RATE_LIMITS__WRITES_WINDOW_SECONDS`, 60).
+    pub writes_window_seconds: u64,
+    /// Mail sends per window, per person across all their apps
+    /// (`CAMPBOOKS_RATE_LIMITS__SENDS`, default 30).
+    pub sends: u32,
+    /// The send window (`CAMPBOOKS_RATE_LIMITS__SENDS_WINDOW_SECONDS`, 600).
+    pub sends_window_seconds: u64,
+    /// Admin API calls per window (`CAMPBOOKS_RATE_LIMITS__ADMIN`, default
+    /// 120).
+    pub admin: u32,
+    /// The admin window (`CAMPBOOKS_RATE_LIMITS__ADMIN_WINDOW_SECONDS`, 60).
+    pub admin_window_seconds: u64,
+}
+
+impl Default for RateLimitsConfig {
+    fn default() -> Self {
+        Self {
+            enabled: true,
+            reads: 600,
+            reads_window_seconds: 60,
+            writes: 120,
+            writes_window_seconds: 60,
+            sends: 30,
+            sends_window_seconds: 600,
+            admin: 120,
+            admin_window_seconds: 60,
+        }
+    }
+}
+
+impl RateLimitsConfig {
+    /// Longest window accepted, in seconds (a day).
+    pub const MAX_WINDOW_SECONDS: u64 = 86_400;
+
+    /// No per-caller limit at all (`ENABLED=false`).
+    pub fn off() -> Self {
+        Self {
+            enabled: false,
+            ..Self::default()
+        }
+    }
+
+    /// Startup check: every window is between a second and a day. The
+    /// message names the offending setting.
+    pub fn check(&self) -> Result<(), String> {
+        let windows = [
+            ("READS_WINDOW_SECONDS", self.reads_window_seconds),
+            ("WRITES_WINDOW_SECONDS", self.writes_window_seconds),
+            ("SENDS_WINDOW_SECONDS", self.sends_window_seconds),
+            ("ADMIN_WINDOW_SECONDS", self.admin_window_seconds),
+        ];
+        match windows
+            .iter()
+            .find(|(_, seconds)| !(1..=Self::MAX_WINDOW_SECONDS).contains(seconds))
+        {
+            Some((name, _)) => Err(format!(
+                "CAMPBOOKS_RATE_LIMITS__{name} must be between 1 and {}",
+                Self::MAX_WINDOW_SECONDS
+            )),
+            None => Ok(()),
+        }
+    }
+}
+
 /// Access-token validation settings (`CAMPBOOKS_AUTH__*`). The API is an
 /// OAuth 2.1 resource server (ADR 0004): it trusts JWTs signed by the
 /// identity provider at [`issuer`](Self::issuer).
@@ -1230,6 +1316,61 @@ mod tests {
             ..JobsConfig::default()
         };
         assert!(jobs.check().unwrap_err().contains("FAILED_RETENTION_DAYS"));
+    }
+
+    #[test]
+    fn rate_limits_have_defaults_and_bounded_windows() {
+        let defaults =
+            Config::from_figment(&figment(&[("database_url", "postgres://localhost/x")]))
+                .unwrap()
+                .rate_limits;
+        assert_eq!(defaults, RateLimitsConfig::default());
+        assert!(defaults.enabled);
+        assert_eq!((defaults.reads, defaults.reads_window_seconds), (600, 60));
+        assert_eq!((defaults.writes, defaults.writes_window_seconds), (120, 60));
+        assert_eq!((defaults.sends, defaults.sends_window_seconds), (30, 600));
+        assert_eq!((defaults.admin, defaults.admin_window_seconds), (120, 60));
+
+        // `CAMPBOOKS_RATE_LIMITS__WRITES=0` etc. land under `rate_limits`;
+        // what is not set keeps its own class's default.
+        let figment =
+            figment(&[("database_url", "postgres://localhost/x")]).merge(Serialized::default(
+                "rate_limits",
+                serde_json::json!({ "enabled": false, "writes": 0, "sends": 5 }),
+            ));
+        let config = Config::from_figment(&figment).unwrap();
+        assert!(!config.rate_limits.enabled);
+        assert_eq!(config.rate_limits.writes, 0);
+        assert_eq!(config.rate_limits.sends, 5);
+        assert_eq!(config.rate_limits.sends_window_seconds, 600);
+        assert!(config.check().is_ok());
+
+        for (name, broken) in [
+            (
+                "READS_WINDOW_SECONDS",
+                RateLimitsConfig {
+                    reads_window_seconds: 0,
+                    ..RateLimitsConfig::default()
+                },
+            ),
+            (
+                "SENDS_WINDOW_SECONDS",
+                RateLimitsConfig {
+                    sends_window_seconds: 86_401,
+                    ..RateLimitsConfig::default()
+                },
+            ),
+        ] {
+            let mut config = config.clone();
+            config.rate_limits = broken;
+            assert!(
+                config
+                    .check()
+                    .unwrap_err()
+                    .contains(&format!("CAMPBOOKS_RATE_LIMITS__{name}")),
+                "{name}"
+            );
+        }
     }
 
     #[test]

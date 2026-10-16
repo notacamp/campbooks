@@ -14,6 +14,7 @@ use campbooks_kernel::{
     AppState,
     auth::{ScopeName, Scoped},
     idempotency, operations,
+    rate_limit::api::ApiLimits,
     testing::{self, TestIdp, TestUser, WEB_CLIENT_SECRET},
 };
 use secrecy::SecretString;
@@ -78,6 +79,17 @@ async fn harness(db: PgPool) -> Harness {
 }
 
 async fn harness_with(db: PgPool, origin: &str, tweak: impl FnOnce(&mut BffConfig)) -> Harness {
+    harness_limited(db, origin, tweak, None).await
+}
+
+/// [`harness_with`], counting the per-caller rate limits with `limits`
+/// (the defaults when `None`).
+async fn harness_limited(
+    db: PgPool,
+    origin: &str,
+    tweak: impl FnOnce(&mut BffConfig),
+    limits: Option<ApiLimits>,
+) -> Harness {
     let idp = TestIdp::start().await;
     let mut config = testing::config("postgres://test@localhost/test");
     config.auth = idp.auth_config();
@@ -100,7 +112,10 @@ async fn harness_with(db: PgPool, origin: &str, tweak: impl FnOnce(&mut BffConfi
     };
     // The app runs as the runtime role, like the server (row-level security
     // applies); the test's own queries keep the superuser pool.
-    let state = crate::with_ports(AppState::new(testing::app_role_pool(&db).await, config));
+    let mut state = crate::with_ports(AppState::new(testing::app_role_pool(&db).await, config));
+    if let Some(limits) = limits {
+        state = state.with_api_limits(limits);
+    }
     let app = app(state, Some(*settings));
     Harness { app, idp, db }
 }
@@ -1509,12 +1524,20 @@ async fn a_suspended_accounts_web_sessions_end_at_once(db: PgPool) {
     let mut tx = pool.begin().await.unwrap();
     state
         .events
-        .publish(&mut tx, &AccountSuspended { account: suspended })
+        .publish(
+            &mut tx,
+            &AccountSuspended {
+                account: suspended,
+                at: None,
+            },
+        )
         .await
         .unwrap();
     tx.commit().await.unwrap();
     let stats = Worker::new(state).run_until_idle().await;
-    assert_eq!(stats.succeeded, 1, "{stats:?}");
+    // The BFF ends the sessions; the workspaces module announces the
+    // suspension in the account's workspaces (none here).
+    assert_eq!((stats.succeeded, stats.failed), (2, 0), "{stats:?}");
 
     let mut signed_in = Vec::new();
     for browser in &mut browsers {
@@ -1723,4 +1746,49 @@ fn openapi_documents_every_bff_operation_with_its_security() {
             "{method}"
         );
     }
+}
+
+// --- per-caller rate limits ---------------------------------------------------------
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn the_browsers_calls_count_against_the_person(db: PgPool) {
+    let limits = campbooks_kernel::config::RateLimitsConfig {
+        reads: 3,
+        ..campbooks_kernel::config::RateLimitsConfig::default()
+    };
+    let h = harness_limited(db, ORIGIN, |_| {}, Some(ApiLimits::new(&limits))).await;
+    let mut browser = Browser::new(&h.app);
+    browser.sign_in(&h.idp, "/").await;
+    for _ in 0..3 {
+        let reply = browser.get("/bff/api/v1/test/whoami").await;
+        assert_eq!(reply.status, StatusCode::OK, "{}", reply.body);
+    }
+    let refused = browser.get("/bff/api/v1/test/whoami").await;
+    refused.assert_problem(StatusCode::TOO_MANY_REQUESTS, "rate_limited");
+    assert_eq!(refused.header(header::RETRY_AFTER), Some("20"));
+    // The same person and web app with their token, directly: one budget.
+    let mut claims = h.idp.claims("test:read");
+    claims["sub"] = TestUser::default().subject.into();
+    let token = h.idp.token(&claims);
+    let direct = send(
+        &h.app,
+        Request::get("/api/v1/test/whoami")
+            .header(header::AUTHORIZATION, format!("Bearer {token}"))
+            .body(Body::empty())
+            .unwrap(),
+    )
+    .await;
+    direct.assert_problem(StatusCode::TOO_MANY_REQUESTS, "rate_limited");
+    // Someone else is not affected.
+    claims["sub"] = "someone-else".into();
+    let other = h.idp.token(&claims);
+    let reply = send(
+        &h.app,
+        Request::get("/api/v1/test/whoami")
+            .header(header::AUTHORIZATION, format!("Bearer {other}"))
+            .body(Body::empty())
+            .unwrap(),
+    )
+    .await;
+    assert_eq!(reply.status, StatusCode::OK, "{}", reply.body);
 }
