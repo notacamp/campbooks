@@ -208,4 +208,20 @@ describe("the rules list", () => {
     expect(within(mine).getByText(/Paused by a member/u)).toBeVisible();
     expect(within(mine).queryByText(/can no longer change this inbox/u)).toBeNull();
   });
+
+  it("says a rule naming a whole group of sites matches nothing", async () => {
+    const broad = {
+      ...LEDGER_RULE,
+      state: "paused" as const,
+      paused_reason: "domain_too_broad" as const,
+    };
+    mockApi({
+      ...people,
+      [`GET ${W}/rules`]: { body: { rules: [broad] } },
+      [`GET ${W}/inboxes`]: { body: { inboxes: [INBOX] } },
+    });
+    renderWithProviders(<RulesList workspaceId={DUARTE.id} />);
+    const mine = await screen.findByRole("list", { name: INBOX.address });
+    expect(within(mine).getByText(/^Paused: it names a whole group of sites/u)).toBeVisible();
+  });
 });

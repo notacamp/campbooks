@@ -742,7 +742,11 @@ false and `surface` always or never. A rule SHALL record its origin
 (`action`, `onboarding`, `instruction`, `correction`, `suggestion`), the
 member's words for an instruction, its author, and its state (`proposed`,
 `active`, `paused`, `removed`). Taught rules are member data: the built-in
-email signals stay the module's only rules of its own.
+email signals stay the module's only rules of its own. A `sender_domain`
+condition SHALL match only while its value is an owned domain (two labels or
+more, not a public suffix); a stored rule naming one that is now a public
+suffix (`github.io`) matches nothing and reads as paused with
+`paused_reason` `domain_too_broad`, still removable by a member.
 
 #### Scenario: A rule from a move
 - **WHEN** Ana creates a rule with `sender_address is notifications@github.com` and `move_to_stream updates`
@@ -755,6 +759,10 @@ email signals stay the module's only rules of its own.
 #### Scenario: Two actions in one slot
 - **WHEN** a rule asks to move to `updates` and to `receipts`
 - **THEN** the response is 400 with code `invalid_rule`
+
+#### Scenario: A stored rule naming a public suffix
+- **WHEN** a rule stored with `sender_domain is github.io` meets mail from `a@a.github.io`
+- **THEN** it does not match, while a rule for `github.com` still matches `a@mail.github.com`
 
 ### Requirement: Subject templates
 Every message SHALL keep a subject template: the subject lower-cased,
@@ -1312,7 +1320,8 @@ SHALL publish `conversations.rule_changed` for each of the member's rules
 that is not removed. A member leaving the workspace SHALL be recorded as not
 suspended as of their departure (they come back only by signing in).
 `RuleView` SHALL carry `paused_reason` when its state is `paused`:
-`inbox_read_only`, else `author_cannot_write`, else `paused_by_member`, else
+`inbox_read_only`, else `author_cannot_write`, else `domain_too_broad` (a
+`sender_domain` naming a public suffix), else `paused_by_member`, else
 `author_unavailable`. A suspension is an administrator's action and SHALL
 not be disclosed to other members, clients or the assistant: no rule
 reason, event or text readable in the workspace names it.

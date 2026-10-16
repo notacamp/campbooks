@@ -16,6 +16,16 @@ All notable changes to Campbooks Next are documented here. The format follows
   gets an Accounts card with "Add a way to sign in" at its bottom and Sign out everywhere
   in its own card with an outlined danger button. Nothing behaves differently.
 
+### Fixed
+
+- **A taught rule that names a whole group of sites stops matching.** A rule saved with
+  a sender domain like `github.io` (now known to cover every site under it) used to match
+  all of them. It now matches nothing and shows as paused in Scout's memory, where you can
+  remove it.
+- **An unreadable `Authentication-Results` header counts as failed.** A sender can no longer
+  hide a failed check by breaking the header with an unbalanced quote or comment. It only
+  adds a hint for the decision model.
+
 ### Security
 
 - **The change feed reveals nothing about inboxes you can't see.** The live stream of

@@ -463,6 +463,7 @@
       "paused": {
         "inbox_read_only": "Paused: this inbox is kept read-only",
         "author_cannot_write": "Paused: whoever taught it can no longer change this inbox",
+        "domain_too_broad": "Paused: it names a whole group of sites, so it matches nothing. Remove it",
         "paused_by_member": "Paused by a member",
         "author_unavailable": "Paused for now; it acts again on its own"
       },

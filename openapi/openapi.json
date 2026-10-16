@@ -13863,6 +13863,7 @@
         "enum": [
           "inbox_read_only",
           "author_cannot_write",
+          "domain_too_broad",
           "paused_by_member",
           "author_unavailable"
         ]

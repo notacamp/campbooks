@@ -217,13 +217,11 @@ impl Facts {
         let Some(value) = self.authentication_results.as_deref() else {
             return false;
         };
-        // A header too long to be a provider's (padded by a sender to hide a
-        // failure) is a failure: only an absent or unreadable one says nothing.
-        if auth_results::is_oversized(value) {
-            return true;
-        }
+        // A header that is present but cannot be read (padded past the cap, or
+        // broken with an unbalanced quote or comment a sender echoed into it
+        // to hide a failure) is a failure: only an absent one says nothing.
         let Some(results) = auth_results::parse(value) else {
-            return false;
+            return true;
         };
         let dmarc_failed = results
             .iter()
@@ -706,9 +704,68 @@ mod tests {
         );
         assert!(padded.len() > auth_results::MAX_LEN);
         assert!(failed("ana@studio.example", &padded));
-        // Absent or unreadable results still say nothing.
+        // Absent results still say nothing.
         assert!(!Facts::of(&mail("ana@studio.example", "x", "x", &[])).authentication_failed());
-        assert!(!failed("ana@studio.example", "mx.example.com; dmarc pass"));
+    }
+
+    #[test]
+    fn a_present_but_unreadable_results_header_fails_closed() {
+        for value in [
+            // An unbalanced comment or quote, as a sender's echoed part can leave.
+            "mx.example.com; dmarc=fail header.from=studio.example; spf=pass (x",
+            "mx.example.com; dmarc=fail header.from=studio.example; spf=pass \"x",
+            "mx.example.com; dmarc=fail header.from=studio.example) spf=pass",
+            "mx.example.com; dmarc pass",
+            "; dmarc=pass header.from=studio.example",
+        ] {
+            assert!(failed("ana@studio.example", value), "{value}");
+        }
+    }
+
+    #[test]
+    fn real_provider_headers_in_the_fixtures_are_readable() {
+        // Every provider header the repo records must parse, or a genuine
+        // message would count as failed. The recorded batches first.
+        let recorded = include_str!("../../../../modules/conversations/fixtures/dependabot.json");
+        let batch: serde_json::Value = serde_json::from_str(recorded).unwrap();
+        let mut found = Vec::new();
+        collect_results(&batch, &mut found);
+        assert!(!found.is_empty());
+        // Then the shapes the connectors' tests model on real providers.
+        found.extend(
+            [
+                "mx.google.com;\r\n       dkim=pass header.i=@github.com header.s=pf2023;\r\n       \
+                 dmarc=pass (p=REJECT sp=REJECT dis=NONE) header.from=github.com",
+                "mx.google.com; dkim=pass header.i=@github.com header.s=pf2023 header.b=AbC1; \
+                 spf=pass (google.com: domain of noreply@github.com designates 192.0.2.10 as \
+                 permitted sender) smtp.mailfrom=noreply@github.com; \
+                 dmarc=pass (p=REJECT sp=REJECT dis=NONE) header.from=github.com",
+                "mx.zohomail.com; dkim=pass; spf=pass; dmarc=pass header.from=github.com",
+            ]
+            .map(String::from),
+        );
+        for value in &found {
+            assert!(auth_results::parse(value).is_some(), "{value}");
+        }
+    }
+
+    fn collect_results(value: &serde_json::Value, found: &mut Vec<String>) {
+        match value {
+            serde_json::Value::Object(map) => {
+                for (key, value) in map {
+                    match value.as_str() {
+                        Some(text) if key == "authentication_results" => found.push(text.into()),
+                        _ => collect_results(value, found),
+                    }
+                }
+            }
+            serde_json::Value::Array(items) => {
+                for item in items {
+                    collect_results(item, found);
+                }
+            }
+            _ => {}
+        }
     }
 
     #[test]

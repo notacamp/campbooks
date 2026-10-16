@@ -345,11 +345,14 @@ pub struct Stored {
 
 impl Stored {
     /// The state the rule is in: an active rule whose author can no longer
-    /// change the inbox or is suspended, or whose inbox is kept read-only,
-    /// is paused.
+    /// change the inbox or is suspended, whose inbox is kept read-only, or
+    /// that names a sender domain which is a public suffix, is paused.
     pub fn effective_state(&self) -> RuleState {
         if self.state == RuleState::Active
-            && (!self.author_may_act || self.author_suspended || self.inbox_detached)
+            && (!self.author_may_act
+                || self.author_suspended
+                || self.inbox_detached
+                || self.domain_too_broad())
         {
             RuleState::Paused
         } else {
@@ -368,11 +371,22 @@ impl Stored {
             PausedReason::InboxReadOnly
         } else if !self.author_may_act {
             PausedReason::AuthorCannotWrite
+        } else if self.domain_too_broad() {
+            PausedReason::DomainTooBroad
         } else if self.state == RuleState::Paused {
             PausedReason::PausedByMember
         } else {
             PausedReason::AuthorUnavailable
         })
+    }
+
+    /// Whether a sender-domain condition names a public suffix: a rule
+    /// stored before the Public Suffix List was complete may. The engine
+    /// never matches it; only removing the rule clears this.
+    fn domain_too_broad(&self) -> bool {
+        self.conditions
+            .iter()
+            .any(|c| matches!(c, RuleCondition::SenderDomain(d) if !taught::is_owned_domain(d)))
     }
 
     /// The rule as the engine reads it.
@@ -730,4 +744,48 @@ pub fn hides(actions: &[RuleAction]) -> bool {
         RuleAction::Surface { value } => *value == SurfaceWhen::Never,
         RuleAction::AddLabel { .. } => false,
     })
+}
+
+#[cfg(test)]
+mod stored_tests {
+    use super::*;
+
+    fn stored(domain: &str, state: RuleState) -> Stored {
+        Stored {
+            id: RuleId::new(),
+            inbox: InboxId::new(),
+            teaching: TeachingId::new(),
+            conditions: vec![RuleCondition::SenderDomain(domain.into())],
+            actions: vec![RuleAction::Archive],
+            origin: RuleOrigin::Instruction,
+            origin_text: None,
+            state,
+            taught_by: None,
+            from_conversation: None,
+            created_at: Utc::now(),
+            confirmed_at: None,
+            applied_count: 0,
+            last_applied_at: None,
+            author_may_act: true,
+            author_suspended: false,
+            inbox_detached: false,
+        }
+    }
+
+    #[test]
+    fn a_stored_rule_naming_a_public_suffix_is_paused_for_good() {
+        let rule = stored("github.io", RuleState::Active);
+        assert_eq!(rule.effective_state(), RuleState::Paused);
+        assert_eq!(rule.paused_reason(), Some(PausedReason::DomainTooBroad));
+        // Even a member's pause does not hide it: resuming would not help.
+        let paused = stored("github.io", RuleState::Paused);
+        assert_eq!(paused.paused_reason(), Some(PausedReason::DomainTooBroad));
+    }
+
+    #[test]
+    fn an_owned_domain_rule_stays_active() {
+        let rule = stored("github.com", RuleState::Active);
+        assert_eq!(rule.effective_state(), RuleState::Active);
+        assert_eq!(rule.paused_reason(), None);
+    }
 }

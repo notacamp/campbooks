@@ -463,6 +463,7 @@
       "paused": {
         "inbox_read_only": "En pausa: esta bandeja de entrada es de solo lectura",
         "author_cannot_write": "En pausa: quien la enseñó ya no puede cambiar esta bandeja de entrada",
+        "domain_too_broad": "En pausa: nombra un grupo entero de sitios, así que no coincide con nada. Elimínala",
         "paused_by_member": "Pausada por un miembro",
         "author_unavailable": "En pausa por ahora; volverá a actuar sola"
       },
