@@ -187,6 +187,8 @@ export function useRuleMutations(workspaceId: string) {
       ),
     onSuccess: (rule) => {
       queryClient.setQueryData(removedKey(workspaceId, rule.id), true);
+      // Removed, with the run putting its mail back: seen at once.
+      queryClient.setQueryData(keys.rule(workspaceId, rule.id), rule);
     },
     onSettled: settle,
   });
@@ -210,6 +212,7 @@ export function useRuleMutations(workspaceId: string) {
       ),
     onSuccess: (rule) => {
       queryClient.removeQueries({ queryKey: removedKey(workspaceId, rule.id) });
+      queryClient.setQueryData(keys.rule(workspaceId, rule.id), rule);
     },
     onSettled: settle,
   });

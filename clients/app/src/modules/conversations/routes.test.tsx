@@ -329,7 +329,17 @@ describe("the inbox", () => {
       {
         [`DELETE ${W}/rules/${LEDGER_RULE.id}`]: () => {
           removed = true;
-          return { body: { ...LEDGER_RULE, state: "removed" } };
+          return {
+            body: {
+              ...LEDGER_RULE,
+              state: "removed",
+              run: { ...RUN, kind: "revert", state: "running", counted: false },
+            },
+          };
+        },
+        [`POST ${W}/rules/${LEDGER_RULE.id}/restore`]: () => {
+          removed = false;
+          return { body: LEDGER_RULE };
         },
       },
     );
@@ -346,6 +356,17 @@ describe("the inbox", () => {
     expect(screen.queryByRole("button", { name: "Undo all" })).toBeNull();
     // The rule's own Undo toast cannot remove it a second time.
     expect(api.calls.filter((call) => call.route.startsWith("DELETE"))).toHaveLength(1);
+
+    // Z brings the same rule back and applies it again: the panel follows it.
+    fireEvent.keyDown(document, { key: "z" });
+    expect(
+      await screen.findByRole("dialog", {
+        name: "Moved 40 to Newsletters. New ones will go there too.",
+      }),
+    ).toBeVisible();
+    expect(
+      api.calls.find((call) => call.route === `POST ${W}/rules/${LEDGER_RULE.id}/restore`)?.body,
+    ).toEqual({ apply_to_existing: true });
   });
 
   it("says when Undo all fails, and keeps it on offer", async () => {

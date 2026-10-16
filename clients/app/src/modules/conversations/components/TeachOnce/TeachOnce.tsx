@@ -377,7 +377,8 @@ function Running({ workspaceId, state, setState, announce, focused }: StepProps<
   const stream = streamName(t, ruleStream(data?.actions ?? []) ?? "primary");
   // Our own Undo all removes the rule too; only someone else's removal is news.
   const removedElsewhere = data?.state === "removed" && !state.reverting;
-  const reverting = state.reverting;
+  // Undo of Undo all brings the rule back: its new apply run is the news.
+  const reverting = state.reverting && data?.state !== "active";
   const revertRun = reverting && run?.kind === "revert" ? run : undefined;
   const applyRun = !reverting && run?.kind === "apply" ? run : undefined;
   const shown = reverting ? revertRun : applyRun;
