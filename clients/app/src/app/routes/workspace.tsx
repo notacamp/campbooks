@@ -119,6 +119,7 @@ const SETTINGS_SECTIONS = [
   { id: "members", path: "members" },
   { id: "mailboxes", path: "mailboxes" },
   { id: "waysIn", path: "sign-in" },
+  { id: "memory", path: "memory" },
 ] as const;
 
 function WorkspaceFrame({ workspace, all }: { workspace: Workspace; all: Workspace[] }) {

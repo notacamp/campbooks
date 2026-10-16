@@ -1,0 +1,11 @@
+{
+  "errors": {
+    "profile_needs_member": "Only a member of this workspace can tell Scout how to act.",
+    "compile_failed": "Scout couldn't read your sentence just now. Try again in a moment, or build the rule yourself.",
+    "instruction_empty": "Write what you want Scout to do with your mail.",
+    "instruction_too_long": "Keep it to {{max}} characters: one or two sentences.",
+    "instruction_has_link": "Leave links out. Say which mail, and what to do with it.",
+    "instruction_pasted_mail": "This looks pasted from an email. Say in your own words which mail, and what to do with it.",
+    "compile_unavailable": "This server has no language model that may read sentences. Build the rule by hand instead."
+  }
+}
