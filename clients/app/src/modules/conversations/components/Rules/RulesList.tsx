@@ -167,6 +167,10 @@ function RuleRow({
   const [putBack, setPutBack] = useState<"back" | "keep">("back");
   const number = (n: number) => new Intl.NumberFormat(locale).format(n);
   const facts = [
+    // Why it is paused first: the line is cut short on a narrow row.
+    rule.state === "paused"
+      ? t(`rules.list.paused.${rule.paused_reason ?? "author_cannot_write"}`)
+      : "",
     author === undefined ? "" : originLine(t, rule, author),
     rule.applied_count > 0
       ? t("rules.list.applied", { count: rule.applied_count, n: number(rule.applied_count) })
@@ -180,7 +184,6 @@ function RuleRow({
           n: number(rule.recent_exceptions),
         })
       : "",
-    rule.state === "paused" ? t("rules.list.paused") : "",
   ].filter((fact) => fact !== "");
 
   const trailing =

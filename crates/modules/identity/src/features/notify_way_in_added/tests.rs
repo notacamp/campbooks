@@ -104,7 +104,7 @@ async fn a_linked_provider_is_announced_to_both_addresses_once(db: PgPool) {
     let payload: serde_json::Value = sqlx::query_scalar(
         "SELECT payload FROM kernel.events WHERE name = 'identity.way_in_added'",
     )
-    .fetch_one(&kit.state.db)
+    .fetch_one(&kit.kernel)
     .await
     .unwrap();
     assert!(!payload.to_string().contains('@'), "{payload}");
@@ -116,7 +116,7 @@ async fn a_linked_provider_is_announced_to_both_addresses_once(db: PgPool) {
         "UPDATE kernel.jobs SET state = 'pending', run_at = now(), attempts = 0, finished_at = NULL
           WHERE kind = 'identity.notify_way_in_added'",
     )
-    .execute(&kit.state.db)
+    .execute(&kit.kernel)
     .await
     .unwrap();
     kit.run_jobs().await;
@@ -156,14 +156,14 @@ async fn an_unreachable_mail_server_is_tried_again(db: PgPool) {
         "SELECT count(*) FROM kernel.jobs
           WHERE kind = 'identity.notify_way_in_added' AND attempts = 1 AND last_error IS NOT NULL",
     )
-    .fetch_one(&kit.state.db)
+    .fetch_one(&kit.kernel)
     .await
     .unwrap();
     assert_eq!(waiting, 1);
     let error: String = sqlx::query_scalar(
         "SELECT last_error FROM kernel.jobs WHERE kind = 'identity.notify_way_in_added'",
     )
-    .fetch_one(&kit.state.db)
+    .fetch_one(&kit.kernel)
     .await
     .unwrap();
     assert!(!error.contains('@'), "{error}");
@@ -172,7 +172,7 @@ async fn an_unreachable_mail_server_is_tried_again(db: PgPool) {
     sqlx::query(
         "UPDATE kernel.jobs SET run_at = now() WHERE kind = 'identity.notify_way_in_added'",
     )
-    .execute(&kit.state.db)
+    .execute(&kit.kernel)
     .await
     .unwrap();
     kit.run_jobs().await;

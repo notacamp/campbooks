@@ -129,11 +129,37 @@ reason = "Whether an address has a pending invitation, before any workspace: adm
 
 [[access.pool_access]]
 path = "crates/modules/connectors/src/domain/schedule.rs"
-reason = "The dispatcher reads and leases the scheduling index across workspaces (ids and times, `FOR SELECT`/`FOR UPDATE` maintenance policies); provider budgets are instance-wide."
+reason = "Provider budgets are instance-wide (no workspace); the dispatcher itself works in the kernel scope (`[[access.kernel_scope]]`)."
 
 [[access.pool_access]]
 path = "crates/modules/connectors/src/zoho/flows.rs"
 reason = "A test file (`#[cfg(test)] mod flows;`): fixtures publish from plain transactions."
+
+[[access.pool_access]]
+path = "crates/server/src/bff/"
+reason = "The web BFF's sessions (schema `bff`) are instance-wide: none carries a workspace."
+
+[[access.pool_access]]
+path = "crates/kernel/src/db.rs"
+reason = "Where the kernel opens its transactions: `begin_for`, `begin_admin`, `begin_kernel`, each setting its scope before any query."
+
+[[access.pool_access]]
+path = "crates/kernel/src/jobs/context.rs"
+reason = "A job's transaction, opened on first use with the job's workspace set (or the kernel scope, `kernel_tx`)."
+
+# Cross-workspace work outside the kernel (campbooks-cloud#129): a
+# transaction in the kernel scope (`kernel::db::begin_kernel`, a job's
+# `kernel_tx`) reaches every workspace's kernel rows (the queue, the event
+# log) and the module rows its own maintenance policies admit. A
+# transaction that sets neither a workspace nor the kernel scope sees
+# nothing. Each entry is reviewed like an ADR.
+[[access.kernel_scope]]
+path = "crates/modules/connectors/src/domain/schedule.rs"
+reason = "The one-minute dispatcher leases due streams across workspaces (`connectors.sync_due` maintenance policies: ids and times, read and lease only) and enqueues each stream's run for its workspace."
+
+[[access.kernel_scope]]
+path = "crates/modules/conversations/src/features/backfill_needs/mod.rs"
+reason = "The needs backfill's dispatcher starts pending backfills across workspaces (`conversations.needs_backfills` maintenance policies: ids and states, start only) and enqueues each inbox's page job for its workspace."
 
 # Published events nothing consumes yet, and why they exist.
 [[access.unconsumed_events]]

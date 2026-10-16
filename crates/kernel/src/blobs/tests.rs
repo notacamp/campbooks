@@ -70,7 +70,7 @@ async fn attach(
     blob: &BlobRef,
     owner: &BlobOwner,
 ) {
-    let mut tx = db.begin().await.unwrap();
+    let mut tx = crate::db::begin_in(db, workspace).await.unwrap();
     assert!(blobs.attach(&mut tx, workspace, blob, owner).await.unwrap());
     tx.commit().await.unwrap();
 }
@@ -317,7 +317,7 @@ async fn the_same_bytes_are_stored_once_and_held_twice(db: PgPool) {
     let (a, b) = (owner("mail.message"), owner("mail.message"));
     attach(&blobs, &db, WS, &first, &a).await;
     attach(&blobs, &db, WS, &second, &b).await;
-    let mut tx = db.begin().await.unwrap();
+    let mut tx = crate::db::begin_in(&db, WS).await.unwrap();
     assert!(
         !blobs.attach(&mut tx, WS, &first, &a).await.unwrap(),
         "attaching twice is a no-op"
@@ -475,7 +475,7 @@ async fn attaching_an_unknown_blob_fails_without_breaking_the_transaction(db: Pg
         size: 12,
         content_type: "text/plain".into(),
     };
-    let mut tx = db.begin().await.unwrap();
+    let mut tx = crate::db::begin_in(&db, WS).await.unwrap();
     assert!(matches!(
         blobs
             .attach(&mut tx, WS, &ghost, &owner("mail.message"))
@@ -494,7 +494,7 @@ async fn attaching_an_unknown_blob_fails_without_breaking_the_transaction(db: Pg
         .put(OTHER_WS, b"never stored".as_slice(), "text/plain")
         .await
         .unwrap();
-    let mut tx = db.begin().await.unwrap();
+    let mut tx = crate::db::begin_in(&db, WS).await.unwrap();
     assert!(matches!(
         blobs
             .attach(&mut tx, WS, &other, &owner("mail.message"))
@@ -515,7 +515,7 @@ async fn detaching_drops_the_reference_and_restarts_the_grace_period(db: PgPool)
     attach(&blobs, &db, WS, &blob, &b).await;
     age_all(&db, 2 * DAY).await;
 
-    let mut tx = db.begin().await.unwrap();
+    let mut tx = crate::db::begin_in(&db, WS).await.unwrap();
     assert!(blobs.detach(&mut tx, WS, &blob.hash, &a).await.unwrap());
     assert!(!blobs.detach(&mut tx, WS, &blob.hash, &a).await.unwrap());
     assert_eq!(blobs.detach_owner(&mut tx, WS, &b).await.unwrap(), 1);
@@ -608,7 +608,7 @@ async fn an_attach_in_flight_keeps_its_blob_from_the_sweep(db: PgPool) {
     age_all(&db, 2 * DAY).await;
 
     // The attach holds the row (uncommitted) while the sweep runs.
-    let mut tx = db.begin().await.unwrap();
+    let mut tx = crate::db::begin_in(&db, WS).await.unwrap();
     blobs
         .attach(&mut tx, WS, &blob, &owner("mail.message"))
         .await
@@ -630,7 +630,7 @@ async fn an_attach_racing_a_claimed_sweep_waits_and_is_told_to_put_again(db: PgP
     age_all(&db, 2 * DAY).await;
 
     // The sweep claims the blob first…
-    let mut sweep = db.begin().await.unwrap();
+    let mut sweep = crate::db::begin_kernel(&db).await.unwrap();
     let claimed = claim_unreferenced(&mut sweep, DAY).await.unwrap();
     assert_eq!(claimed.len(), 1);
 
@@ -638,7 +638,7 @@ async fn an_attach_racing_a_claimed_sweep_waits_and_is_told_to_put_again(db: PgP
     let attaching = {
         let (blobs, db, blob) = (blobs.clone(), db.clone(), blob.clone());
         tokio::spawn(async move {
-            let mut tx = db.begin().await.unwrap();
+            let mut tx = crate::db::begin_in(&db, WS).await.unwrap();
             let attached = blobs
                 .attach(&mut tx, WS, &blob, &owner("mail.message"))
                 .await;
@@ -679,7 +679,7 @@ async fn a_put_racing_a_claimed_sweep_stores_the_bytes_again(db: PgPool) {
         .unwrap();
     age_all(&db, 2 * DAY).await;
 
-    let mut sweep = db.begin().await.unwrap();
+    let mut sweep = crate::db::begin_kernel(&db).await.unwrap();
     let claimed = claim_unreferenced(&mut sweep, DAY).await.unwrap();
     let putting = {
         let blobs = blobs.clone();

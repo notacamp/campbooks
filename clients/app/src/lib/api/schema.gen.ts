@@ -3095,6 +3095,12 @@ export interface components {
             items: components["schemas"]["PasskeyView"][];
         };
         /**
+         * @description Why a taught rule is paused: the one that would still hold once the
+         *     most passing one clears.
+         * @enum {string}
+         */
+        PausedReason: "inbox_read_only" | "author_cannot_write" | "paused_by_member" | "author_unavailable";
+        /**
          * @description Where a stream is in its reading.
          * @enum {string}
          */
@@ -3769,6 +3775,7 @@ export interface components {
             origin: components["schemas"]["RuleOrigin"];
             /** @description The member's own words, for an instruction. */
             origin_text?: string | null;
+            paused_reason?: components["schemas"]["PausedReason"] | null;
             /**
              * Format: int32
              * @description Conversations members changed back in the last 30 days.
@@ -3777,7 +3784,11 @@ export interface components {
             run?: components["schemas"]["RunView"] | null;
             /** @description Whether other members use its inbox: it acts for them too. */
             shared: boolean;
-            /** @description Whether it acts. `paused` when its author can no longer change the inbox. */
+            /**
+             * @description Whether it acts. `paused` when its author can no longer change the
+             *     inbox or is away for now, its inbox is kept read-only, or a member
+             *     paused it.
+             */
             state: components["schemas"]["RuleState"];
             taught_by?: components["schemas"]["UserId"] | null;
             /** @description The teaching it came with (shared by its rules in other inboxes). */
@@ -5553,7 +5564,7 @@ export interface operations {
                     "application/problem+json": components["schemas"]["Problem"];
                 };
             };
-            /** @description The language model failed (`compile_failed`). */
+            /** @description The language model failed (`compile_failed`), or the workspace used its whole daily AI limit (`ai_daily_limit_reached`). */
             503: {
                 headers: {
                     [name: string]: unknown;

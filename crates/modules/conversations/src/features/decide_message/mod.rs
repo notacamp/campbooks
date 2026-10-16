@@ -20,6 +20,13 @@
 //! facts (ADR 0018). A backlog pass waits while the answers check has not
 //! run or the provider did not answer it (about a day at most); when the
 //! check failed on the model's answers, the backfill queues nothing.
+//!
+//! Every pass's call counts against the workspace's daily AI limit
+//! (`campbooks_ai::usage`, campbooks-cloud#152). Over the limit the pass
+//! stores nothing, as when no model is configured, and the message keeps
+//! what was decided when it was stored (the facts, taught rules); it is not
+//! re-queued. When the call cannot be counted, it is not made and the job
+//! retries.
 
 use std::sync::Arc;
 
@@ -30,6 +37,7 @@ use campbooks_ai::{
         signals::email::{Envelope, Recipient, triage_questions},
         strategy::Strategy,
     },
+    usage::Scope,
 };
 use campbooks_kernel::{
     Event, EventConsumer, JobContext, JobError, JobHandler, blobs::BlobRef, db::BeginFor as _,
@@ -42,7 +50,7 @@ use crate::{
     domain::{
         blobs::read_text,
         conversation::{Changed, provider_message_ids},
-        decide::{ENVELOPE_BODY_BYTES, MessageParts, Source, envelope},
+        decide::{ENVELOPE_BODY_BYTES, MessageParts, PURPOSE, Source, envelope},
         decisions::Recorded,
         needs::{self, NeedSettings},
         policy::Policy,
@@ -148,12 +156,21 @@ impl Pass {
         }
 
         let questions = triage_questions();
-        let answers = match model.strategy.decide(&loaded.envelope, &questions).await {
+        // Counted against the workspace's daily AI limit (campbooks-cloud#152).
+        let usage = Scope::workspace(ctx.state().db.clone(), workspace, PURPOSE);
+        let asked = model.strategy.decide(&loaded.envelope, &questions);
+        let answers = match usage.run(asked).await {
             Ok(decisions) => decisions.answers,
             // The model failed (or has not passed) its answers check: the
             // pass does what it does when no model is configured, and
             // stores nothing.
             Err(campbooks_ai::Error::AnswersNotTrusted) => return Ok(Passed::NotTrusted),
+            // The workspace reached its daily AI limit: the same, and the
+            // message is not asked again later.
+            Err(campbooks_ai::Error::OverDailyCap { .. }) => {
+                tracing::debug!(workspace = %workspace, "over the daily AI limit: no model pass");
+                return Ok(Passed::Done);
+            }
             Err(error) => return Err(redact::ai(&error)),
         };
         let recorded = Recorded {
@@ -1325,3 +1342,6 @@ mod tests {
         assert_eq!(versions, [Some("checked:ctx2".to_owned())]);
     }
 }
+
+#[cfg(test)]
+mod usage_tests;

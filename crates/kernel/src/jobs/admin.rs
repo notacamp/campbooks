@@ -13,6 +13,8 @@
 //!   claimed, or that already succeeded, can never be touched, however the
 //!   calls race with the worker. Retrying is idempotent: the second call
 //!   finds the job pending (or running, or done) and changes nothing.
+//! - **Across workspaces.** The queue is every workspace's: each function
+//!   runs in the kernel scope ([`begin_kernel`](crate::db::begin_kernel)).
 
 use chrono::{DateTime, Utc};
 use serde::Serialize;
@@ -134,6 +136,7 @@ pub enum Discard {
 
 /// Counts of the queue by queue and kind.
 pub async fn summary(db: &PgPool, _grant: &AdminGrant) -> Result<QueueSummary, Error> {
+    let mut tx = crate::db::begin_kernel(db).await?;
     let rows = sqlx::query!(
         r#"
         SELECT queue, kind,
@@ -152,8 +155,9 @@ pub async fn summary(db: &PgPool, _grant: &AdminGrant) -> Result<QueueSummary, E
          ORDER BY queue, kind
         "#
     )
-    .fetch_all(db)
+    .fetch_all(&mut *tx)
     .await?;
+    tx.commit().await?;
     let kinds: Vec<KindSummary> = rows
         .into_iter()
         .map(|row| KindSummary {
@@ -186,6 +190,7 @@ pub async fn failed(
     let cursor = after.map(parse_cursor).transpose()?;
     let limit = limit.unwrap_or(DEFAULT_PAGE).clamp(1, MAX_PAGE);
     let (after_at, after_id) = cursor.unzip();
+    let mut tx = crate::db::begin_kernel(db).await?;
     let mut rows = sqlx::query_as!(
         FailedJob,
         r#"
@@ -205,8 +210,9 @@ pub async fn failed(
         after_id,
         limit + 1,
     )
-    .fetch_all(db)
+    .fetch_all(&mut *tx)
     .await?;
+    tx.commit().await?;
     let more = i64::try_from(rows.len()).is_ok_and(|n| n > limit);
     if more {
         rows.truncate(usize::try_from(limit).unwrap_or(usize::MAX));
@@ -221,7 +227,7 @@ pub async fn failed(
 /// Put one dead job back on its queue: pending, due now, attempts reset.
 pub async fn retry(db: &PgPool, _grant: &AdminGrant, id: JobId) -> Result<Retry, Error> {
     let id = Uuid::from(id);
-    let mut tx = db.begin().await?;
+    let mut tx = crate::db::begin_kernel(db).await?;
     let requeued = sqlx::query!(
         r#"
         UPDATE kernel.jobs j
@@ -264,7 +270,7 @@ pub async fn retry_kind(
     kind: &str,
     queue: Option<&str>,
 ) -> Result<u64, Error> {
-    let mut tx = db.begin().await?;
+    let mut tx = crate::db::begin_kernel(db).await?;
     let queues = sqlx::query_scalar!(
         r#"
         WITH locked AS (
@@ -316,22 +322,25 @@ pub async fn retry_kind(
 /// Delete one dead job. A job that is not dead is never deleted.
 pub async fn discard(db: &PgPool, _grant: &AdminGrant, id: JobId) -> Result<Discard, Error> {
     let id = Uuid::from(id);
+    let mut tx = crate::db::begin_kernel(db).await?;
     let deleted = sqlx::query!(
         "DELETE FROM kernel.jobs WHERE id = $1 AND state = 'failed'",
         id
     )
-    .execute(db)
+    .execute(&mut *tx)
     .await?
     .rows_affected();
     if deleted > 0 {
+        tx.commit().await?;
         return Ok(Discard::Discarded);
     }
     let exists = sqlx::query_scalar!(
         r#"SELECT EXISTS (SELECT 1 FROM kernel.jobs WHERE id = $1) AS "exists!""#,
         id
     )
-    .fetch_one(db)
+    .fetch_one(&mut *tx)
     .await?;
+    tx.commit().await?;
     Ok(if exists {
         Discard::Unchanged
     } else {

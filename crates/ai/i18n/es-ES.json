@@ -1,5 +1,6 @@
 {
   "errors": {
+    "ai_daily_limit_reached": "Se ha alcanzado el límite diario de IA de este espacio de trabajo ({{cap}} llamadas). El correo nuevo se ordena con tus reglas hasta las 00:00 UTC.",
     "ai_external_content_refused": "El proveedor de IA del rol {{role}} está fuera de la red de esta instancia, y esta instancia no le envía correo. Un administrador puede permitirlo.",
     "ai_role_not_configured": "Esta instancia no tiene ningún modelo de IA configurado para el rol {{role}}. Un administrador puede configurarlo."
   }

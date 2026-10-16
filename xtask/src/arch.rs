@@ -1108,7 +1108,7 @@ pub fn check_admin_sources(files: &[(String, String)]) -> Vec<String> {
         {
             violations.push(format!(
                 "{path}: names `{ADMIN_READS_SETTING}`; only the kernel may (use \
-                 `kernel::db::begin_admin` / `ADMIN_READS_SETTING`)"
+                 `kernel::db::begin_admin`)"
             ));
         }
     }

@@ -85,7 +85,8 @@ impl JobContext {
     }
 
     /// The connection pool, for work outside the job's transaction (it does
-    /// not carry the workspace setting).
+    /// not carry the workspace setting: a transaction begun on it without
+    /// `begin_for` sees no workspace's rows).
     pub fn pool(&self) -> &PgPool {
         &self.state.db
     }
@@ -102,6 +103,29 @@ impl JobContext {
             crate::db::set_workspace(&mut tx, workspace).await?;
         }
         Ok(self.tx.insert(tx))
+    }
+
+    /// The job's transaction in the **kernel scope**
+    /// (`campbooks.kernel_scope = on`): for an
+    /// instance-wide job that works across workspaces (pruning, a
+    /// scheduler's dispatcher), committed with the job's completion like
+    /// [`tx`](Self::tx). Outside the kernel, only the reviewed
+    /// `[[access.kernel_scope]]` entries of `architecture.toml` may call it
+    /// (`cargo xtask arch`).
+    ///
+    /// # Errors
+    /// [`JobError::Fatal`] for a job that belongs to a workspace: it works in
+    /// that workspace, never across.
+    pub async fn kernel_tx(&mut self) -> Result<&mut Transaction<'static, Postgres>, JobError> {
+        if self.info.workspace.is_some() {
+            return Err(JobError::fatal(
+                "a workspace's job works in its workspace; the kernel scope is for \
+                 instance-wide jobs",
+            ));
+        }
+        let tx = self.tx().await?;
+        crate::db::enter_kernel_scope(tx).await?;
+        Ok(tx)
     }
 
     /// Publish an event in the job's transaction.

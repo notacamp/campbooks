@@ -198,13 +198,16 @@ fn lock_key(workspace: &str) -> String {
 
 /// Record `changes` of `workspace`, declared by event `event`, inside the
 /// publisher's transaction (called by
-/// [`EventBus::publish`](crate::EventBus::publish)).
+/// [`EventBus::publish`](crate::EventBus::publish)). Refused
+/// ([`sqlx::Error::InvalidArgument`]) in a transaction that cannot reach
+/// `workspace`'s rows.
 pub(crate) async fn record(
     tx: &mut Transaction<'_, Postgres>,
     event: EventId,
     workspace: &str,
     changes: &[Change],
 ) -> Result<(), sqlx::Error> {
+    crate::db::require_scope(tx, workspace, "a change of the feed").await?;
     // Held until the publisher commits: the sequencer takes the exclusive
     // lock, so it cannot number anything while this transaction is in
     // flight, whether the job below is new or already pending or running.
@@ -319,6 +322,7 @@ pub async fn purge_workspace(
     tx: &mut Transaction<'_, Postgres>,
     workspace: &str,
 ) -> Result<u64, sqlx::Error> {
+    crate::db::require_scope(tx, workspace, "the purge of a workspace's feed").await?;
     let deleted = sqlx::query!(
         "DELETE FROM kernel.changes WHERE workspace_id = $1",
         workspace

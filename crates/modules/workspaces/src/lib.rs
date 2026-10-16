@@ -99,6 +99,10 @@ pub fn module() -> Module {
             .publishes::<events::MemberLeft>()
             .publishes::<events::MemberRoleChanged>()
             .publishes::<events::WorkspaceDeleting>()
+            .publishes::<events::MemberSuspended>()
+            .publishes::<events::MemberUnsuspended>()
+            .on_event::<features::member_suspension::AnnounceMemberSuspended>()
+            .on_event::<features::member_suspension::AnnounceMemberUnsuspended>()
             .job::<PurgeWorkspace>(),
         resources: domain::resources::resources(),
     }

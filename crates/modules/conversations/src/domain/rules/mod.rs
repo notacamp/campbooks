@@ -8,7 +8,8 @@
 //! recording each change with what it was before so it can be put back.
 //!
 //! A conversation matches a rule when its newest inbound message does. A
-//! rule acts only while its author still may change the inbox; a member who
+//! rule acts only while its author still may change the inbox and is not
+//! suspended (`member_suspensions`, campbooks-cloud#147); a member who
 //! changed back what a rule did makes that conversation an **exception** the
 //! rule leaves alone ([`exceptions`]).
 
@@ -37,7 +38,8 @@ pub use facts::{
 };
 
 use crate::model::{
-    ConversationId, InboxId, InboxRole, LabelId, RuleId, RuleOrigin, RuleState, Stream, TeachingId,
+    ConversationId, InboxId, InboxRole, LabelId, PausedReason, RuleId, RuleOrigin, RuleState,
+    Stream, TeachingId,
 };
 
 /// How far back exceptions count when a rule is questioned.
@@ -333,6 +335,9 @@ pub struct Stored {
     pub last_applied_at: Option<DateTime<Utc>>,
     /// Whether its author still may change its inbox (else it is paused).
     pub author_may_act: bool,
+    /// Whether its author's account is suspended (it is paused until the
+    /// suspension is lifted).
+    pub author_suspended: bool,
     /// Whether its inbox is kept read-only (its connection was removed): no
     /// rule acts there any more.
     pub inbox_detached: bool,
@@ -340,13 +345,34 @@ pub struct Stored {
 
 impl Stored {
     /// The state the rule is in: an active rule whose author can no longer
-    /// change the inbox, or whose inbox is kept read-only, is paused.
+    /// change the inbox or is suspended, or whose inbox is kept read-only,
+    /// is paused.
     pub fn effective_state(&self) -> RuleState {
-        if self.state == RuleState::Active && (!self.author_may_act || self.inbox_detached) {
+        if self.state == RuleState::Active
+            && (!self.author_may_act || self.author_suspended || self.inbox_detached)
+        {
             RuleState::Paused
         } else {
             self.state
         }
+    }
+
+    /// Why the rule is paused, when it is: the reason that would still hold
+    /// once the most passing one clears (a lifted suspension resumes it on
+    /// its own; a member's pause, or an author who left, needs a member).
+    pub fn paused_reason(&self) -> Option<PausedReason> {
+        if self.effective_state() != RuleState::Paused {
+            return None;
+        }
+        Some(if self.inbox_detached {
+            PausedReason::InboxReadOnly
+        } else if !self.author_may_act {
+            PausedReason::AuthorCannotWrite
+        } else if self.state == RuleState::Paused {
+            PausedReason::PausedByMember
+        } else {
+            PausedReason::AuthorUnavailable
+        })
     }
 
     /// The rule as the engine reads it.
@@ -380,6 +406,7 @@ struct RuleRow {
     applied_count: i32,
     last_applied_at: Option<DateTime<Utc>>,
     author_may_act: bool,
+    author_suspended: bool,
     inbox_detached: bool,
 }
 
@@ -404,6 +431,7 @@ impl TryFrom<RuleRow> for Stored {
             applied_count: row.applied_count,
             last_applied_at: row.last_applied_at,
             author_may_act: row.author_may_act,
+            author_suspended: row.author_suspended,
             inbox_detached: row.inbox_detached,
         })
     }
@@ -449,6 +477,10 @@ pub async fn find_any(conn: &mut PgConnection, id: RuleId) -> Result<Option<Stor
                    SELECT 1 FROM conversations.inbox_members im
                     WHERE im.inbox_id = r.inbox_id AND im.user_id = r.taught_by
                       AND im.role IN ('sender', 'manager'))) AS "author_may_act!",
+               EXISTS (
+                   SELECT 1 FROM conversations.member_suspensions s
+                    WHERE s.workspace_id = r.workspace_id AND s.user_id = r.taught_by
+                      AND s.suspended) AS "author_suspended!",
                i.detached_at IS NOT NULL AS "inbox_detached!"
           FROM conversations.rules r
           JOIN conversations.inboxes i ON i.id = r.inbox_id
@@ -480,6 +512,10 @@ pub async fn of_inboxes(conn: &mut PgConnection, inboxes: &[InboxId]) -> Result<
                    SELECT 1 FROM conversations.inbox_members im
                     WHERE im.inbox_id = r.inbox_id AND im.user_id = r.taught_by
                       AND im.role IN ('sender', 'manager'))) AS "author_may_act!",
+               EXISTS (
+                   SELECT 1 FROM conversations.member_suspensions s
+                    WHERE s.workspace_id = r.workspace_id AND s.user_id = r.taught_by
+                      AND s.suspended) AS "author_suspended!",
                i.detached_at IS NOT NULL AS "inbox_detached!"
           FROM conversations.rules r
           JOIN conversations.inboxes i ON i.id = r.inbox_id

@@ -158,11 +158,13 @@
     height: var(--size-viewport-min);
   }
 
-  /* Positioned, so what is positioned inside (visually hidden labels) is
-     clipped and scrolled with its pane instead of stretching the page. */
+  /* Every pane scrolls: the sidebar, a list, and the page's main content
+     (a reader, Home, any screen's <main>). Positioned, so what is
+     positioned inside (visually hidden labels) is clipped and scrolled with
+     its pane instead of stretching the page. */
   .sidebar,
   .listPane,
-  .reader {
+  .shell > main {
     position: relative;
     overflow-y: auto;
     overscroll-behavior: contain;

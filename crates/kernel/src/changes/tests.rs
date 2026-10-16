@@ -443,7 +443,7 @@ async fn purging_a_workspace_deletes_its_changes(db: PgPool) {
     publish(&state, "ws-a", &["1"]).await;
     publish(&state, "ws-b", &["1"]).await;
     Worker::new(state.clone()).run_until_idle().await;
-    let mut tx = state.db.begin().await.unwrap();
+    let mut tx = crate::db::begin_in(&state.db, "ws-a").await.unwrap();
     assert_eq!(purge_workspace(&mut tx, "ws-a").await.unwrap(), 1);
     tx.commit().await.unwrap();
     assert!(changes_of(&db, "ws-a").await.is_empty());

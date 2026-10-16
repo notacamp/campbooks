@@ -247,15 +247,23 @@ and `…/unsuspend` (`users.suspend`). Suspending SHALL, in one transaction,
 mark the account suspended, end its issuer sessions, revoke its refresh-token
 families, record `account_suspended` (with the administrator's account id)
 in the account's audit trail and publish `identity.account_suspended`; the
-web BFF SHALL then delete the account's web sessions. Both operations SHALL
-be idempotent: repeating one changes and records nothing more and answers
-the account as it is. Suspending an account that has an admin profile SHALL
-be refused with 409 `account_is_admin`, read through the kernel's
-`AdminProfiles` port, and change nothing.
+web BFF SHALL then delete the account's web sessions. Unsuspending SHALL, in
+one transaction, lift the suspension, record `account_unsuspended` and
+publish `identity.account_unsuspended`. Both events SHALL carry `at`, read
+after the account's row is locked, so a later change to one account always
+carries a later `at`. Both operations SHALL be idempotent: repeating one
+changes, records and publishes nothing more and answers the account as it
+is. Suspending an account that has an admin profile SHALL be refused with
+409 `account_is_admin`, read through the kernel's `AdminProfiles` port, and
+change nothing.
 
 #### Scenario: Suspend once, retry safely
 - **WHEN** a super admin suspends an account twice
 - **THEN** both answers are 200 with the same `suspended_at`, the account has no live session or refresh family, and one audit row and one event exist
+
+#### Scenario: Suspend, then lift
+- **WHEN** a super admin suspends an account and then unsuspends it twice
+- **THEN** one `identity.account_unsuspended` is published, with an `at` later than the suspension's
 
 #### Scenario: An administrator cannot be suspended over HTTP
 - **WHEN** a super admin suspends an account that has an admin profile, asking in Portuguese
@@ -360,3 +368,26 @@ SHALL answer 400 `too_many_accounts`; anyone without `users.read` SHALL get
 #### Scenario: Not an administrator
 - **WHEN** a member without a profile asks about any accounts
 - **THEN** the answer is 404
+
+### Requirement: AI usage for administrators
+The admin API SHALL let an administrator with `system.read` (or `super`) read
+a day's AI usage (`GET /admin/v1/system/ai-usage`, `system.admin_ai_usage`;
+today in UTC unless a `day` is given): the configured cap (`null` when there
+is none), the reserve kept for people, the day and when it resets, and for
+each workspace that used AI
+that day its calls, refused calls, whether it hit the cap, the calls left
+today, and its calls, failed calls and tokens by role and feature.
+Workspaces that hit the cap SHALL come first, then by calls. The answer
+SHALL hold ids and counts only.
+
+#### Scenario: Someone who is not a system reader
+- **WHEN** a member, or an administrator without `system.read`, reads the AI usage
+- **THEN** the response is 404
+
+#### Scenario: A capped workspace
+- **WHEN** one workspace reached its cap today and another did not
+- **THEN** the capped one is listed first with `capped` true and its refused calls, and the other with its remaining calls
+
+#### Scenario: Another day
+- **WHEN** an administrator asks for a past day
+- **THEN** the counts of that day are returned without a remaining count
