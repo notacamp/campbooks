@@ -238,6 +238,9 @@ A second, independent review (before merge) found, and this change fixes:
    element count now come from the parsed tree.
 2. *CPU on open*: the work cap ignored how many rules there were
    (`*{256 properties}` repeated, or thousands of selectors). Selectors times
-   elements and declarations times work are now capped too.
+   elements and declarations times work are now capped too. Matching counts
+   compound selectors (`a b > c` is three), and a selector of more than 16
+   compounds is dropped: css-inline matches with no ancestor filter, so a
+   long descendant chain walks the tree once per compound.
 3. *Same-site image requests after "Show images"* (`allow-same-origin`):
    accepted, as above; every app GET is a read.

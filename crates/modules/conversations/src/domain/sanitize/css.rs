@@ -108,6 +108,9 @@ pub const MAX_MEDIA_BYTES: usize = 64 * 1024;
 /// Most distinct properties kept from one style sheet: what the inliner does
 /// per element grows with it (and real mail uses well under a hundred).
 pub const MAX_PROPERTIES: usize = 256;
+/// Most compound selectors in one selector inlined (`a b > c` has three):
+/// matching a descendant chain walks the ancestors once per compound.
+pub const MAX_COMPOUNDS: usize = 16;
 
 /// One kept declaration: the property, lower-case, and its value as written.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -166,11 +169,11 @@ pub struct PlainRules {
     pub css: String,
     /// How many distinct properties they set (at most [`MAX_PROPERTIES`]).
     pub properties: usize,
-    /// How many selectors they have, a selector list counted once per
-    /// comma (an upper bound on the selectors the inliner matches).
+    /// How many compound selectors they have (`a b, c` has three): the
+    /// measure of matching them against one element.
     pub selectors: usize,
     /// How many declarations the inliner could apply per matched element:
-    /// each rule's kept declarations times its selectors.
+    /// each rule's kept declarations times its comma-separated selectors.
     pub declarations: usize,
 }
 
@@ -414,13 +417,53 @@ impl<'i> QualifiedRuleParser<'i> for PlainTopLevel {
         if kept.is_empty() {
             return Err(ParseError::custom(()));
         }
-        let selectors = selector.matches(',').count().saturating_add(1);
-        self.selectors = self.selectors.saturating_add(selectors);
+        let Some((selectors, compounds)) = selector_weight(&selector) else {
+            return Err(ParseError::custom(()));
+        };
+        self.selectors = self.selectors.saturating_add(compounds);
         self.declarations = self
             .declarations
             .saturating_add(selectors.saturating_mul(kept.len()));
         Ok(format!("{selector} {{ {} }}", join(&kept)))
     }
+}
+
+/// How many comma-separated selectors `selector` lists and how many
+/// compound selectors they hold, or `None` when one holds more than
+/// [`MAX_COMPOUNDS`]. Commas, spaces and combinators inside brackets,
+/// parentheses or quotes do not count.
+fn selector_weight(selector: &str) -> Option<(usize, usize)> {
+    let (mut selectors, mut compounds, mut in_selector) = (1_usize, 0_usize, 0_usize);
+    let (mut depth, mut quote, mut in_compound) = (0_usize, None, false);
+    for c in selector.chars() {
+        if let Some(q) = quote {
+            if c == q {
+                quote = None;
+            }
+            continue;
+        }
+        match c {
+            '"' | '\'' => quote = Some(c),
+            '(' | '[' => depth += 1,
+            ')' | ']' => depth = depth.saturating_sub(1),
+            _ => {}
+        }
+        if depth == 0 && c == ',' {
+            selectors += 1;
+            in_selector = 0;
+            in_compound = false;
+        } else if depth == 0 && (c.is_whitespace() || matches!(c, '>' | '+' | '~')) {
+            in_compound = false;
+        } else if !in_compound {
+            in_compound = true;
+            compounds += 1;
+            in_selector += 1;
+            if in_selector > MAX_COMPOUNDS {
+                return None;
+            }
+        }
+    }
+    Some((selectors, compounds))
 }
 
 /// A rule's selector, if every token of it is inert.
@@ -632,6 +675,15 @@ mod tests {
         assert_eq!(rules.properties, 1);
         assert_eq!(rules.selectors, 3);
         assert_eq!(rules.declarations, 3);
+        assert_eq!(selector_weight("a b > c, d"), Some((2, 4)));
+        assert_eq!(
+            selector_weight("p:not(a, b c) [title='x, y z']"),
+            Some((1, 2))
+        );
+        let long = ["a"; MAX_COMPOUNDS + 1].join(" ");
+        assert_eq!(selector_weight(&long), None);
+        let chain = plain_rules(&format!("{long} {{ color: red }} p {{ color: blue }}"));
+        assert_eq!(chain.css, "p { color: blue }");
         let many = (0..1000).fold(String::new(), |mut all, i| {
             let _ = write!(all, "a{i}: x;");
             all
