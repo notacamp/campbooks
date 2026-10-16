@@ -14,7 +14,10 @@ export default async function inboxPanesScroll({ page }: ScenarioContext): Promi
 
   if (phone) {
     await caption(page, "Phones are unchanged: the conversation is its own screen", 2500);
-    await page.getByRole("button", { name: /Back to/ }).first().click();
+    await page
+      .getByRole("button", { name: /Back to/ })
+      .first()
+      .click();
     await page.getByRole("region", { name: "Conversations" }).waitFor();
     await page.mouse.wheel(0, 1200);
     await caption(page, "and the list scrolls as a page", 2500);
@@ -28,7 +31,11 @@ export default async function inboxPanesScroll({ page }: ScenarioContext): Promi
     await page.mouse.wheel(0, 500);
     await pause(250);
   }
-  await caption(page, "The list scrolls on its own; its header, the sidebar and the account stay put", 3000);
+  await caption(
+    page,
+    "The list scrolls on its own; its header, the sidebar and the account stay put",
+    3000,
+  );
 
   await page.getByRole("main", { name: "Conversation" }).hover();
   await page.mouse.wheel(0, 400);

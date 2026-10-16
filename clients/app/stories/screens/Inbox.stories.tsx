@@ -439,7 +439,9 @@ const MANY = Array.from({ length: 40 }, (_, index) => {
 const many: Pick<Story, "args" | "play"> = {
   args: {
     path: `${PATH}/primary/${Q4.id}`,
-    api: inbox({ [`GET ${W}/conversations`]: { body: { conversations: MANY, next_cursor: null } } }),
+    api: inbox({
+      [`GET ${W}/conversations`]: { body: { conversations: MANY, next_cursor: null } },
+    }),
   },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
