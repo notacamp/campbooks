@@ -19,6 +19,8 @@ mod access_matrix_tests;
 #[cfg(test)]
 mod admin_tests;
 #[cfg(test)]
+mod ai_usage_tests;
+#[cfg(test)]
 mod assistant_tests;
 #[cfg(test)]
 mod identity_tests;
@@ -142,11 +144,7 @@ impl Composition {
     /// setting is an error naming it.
     pub fn from_env(config: &campbooks_kernel::Config) -> Result<Self, String> {
         let ai = campbooks_ai::AiConfig::from_env().map_err(|e| e.to_string())?;
-        let gateway = if ai.roles.is_empty() {
-            None
-        } else {
-            Some(campbooks_ai::Gateway::new(ai).map_err(|e| e.to_string())?)
-        };
+        let (gateway, ai_usage) = ai_gateway(ai)?;
         let connectors = campbooks_connectors::Deps::from_env(config)?;
         let identity = campbooks_identity::Deps::from_env(config, &scope_catalogue())?;
         let assistant = campbooks_assistant::AssistantDeps {
@@ -156,6 +154,7 @@ impl Composition {
             ai: gateway.clone(),
             facts: facts(config, &identity, &connectors),
             started_at: chrono::Utc::now(),
+            ai_usage,
         };
         Ok(Self {
             connectors,
@@ -168,6 +167,29 @@ impl Composition {
             assistant,
         })
     }
+}
+
+/// The AI gateway every module calls models through (none when no role is
+/// configured), and the meter it counts every call with, per workspace and
+/// UTC day, under `ai`'s daily cap (campbooks-cloud#152). The admin AI
+/// usage read shows the same meter.
+pub fn ai_gateway(
+    ai: campbooks_ai::AiConfig,
+) -> Result<
+    (
+        Option<campbooks_ai::Gateway>,
+        campbooks_system::AiUsageMeter,
+    ),
+    String,
+> {
+    let meter = campbooks_system::AiUsageMeter::new(ai.daily_call_cap());
+    if ai.roles.is_empty() {
+        return Ok((None, meter));
+    }
+    let gateway = campbooks_ai::Gateway::new(ai)
+        .map_err(|e| e.to_string())?
+        .with_meter(Arc::new(meter.clone()));
+    Ok((Some(gateway), meter))
 }
 
 /// Who signs people in and which providers are set up, by name only: what

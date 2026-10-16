@@ -1,7 +1,7 @@
 //! What a conversation needs, end to end over `fixtures/needs.json`.
 
 use axum::http::StatusCode;
-use campbooks_kernel::tenancy::WorkspaceId;
+use campbooks_kernel::{db::BeginFor, tenancy::WorkspaceId};
 use serde_json::{Value, json};
 use sqlx::PgPool;
 
@@ -416,5 +416,340 @@ async fn spam_and_trash_need_nothing(db: PgPool) {
     assert_eq!(
         marta["need"]["message_id"],
         kit.message_of("needs-1").await.as_str()
+    );
+}
+
+/// The provider moves fixture message `index` of `needs.json` to `mailbox`.
+async fn moved(kit: &Kit, workspace: WorkspaceId, inbox: InboxId, index: usize, mailbox: Value) {
+    let fixtures: Value = serde_json::from_str(&fixture("needs")).unwrap();
+    let mut change = fixtures["changes"][index].clone();
+    change["message"]["mailbox"] = mailbox;
+    let batch = dev::record(&kit.state, workspace, inbox, &json!({"changes": [change]}))
+        .await
+        .unwrap();
+    dev::submit(&kit.state, workspace, &batch).await.unwrap();
+    kit.run_jobs().await;
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_message_leaving_spam_raises_its_need_again(db: PgPool) {
+    let kit = Kit::new(db).await;
+    let (workspace, inbox, sam) = sams_needs(&kit).await;
+    let message = kit.message_of("needs-1").await;
+    let conversation = kit.conversation_of("needs-1").await;
+    let before = summary(&kit, &sam, workspace, "needs-1").await;
+    assert_eq!(before["need"]["reason"], "reply");
+
+    moved(
+        &kit,
+        workspace,
+        inbox,
+        0,
+        json!({"in_inbox": false, "in_spam": true}),
+    )
+    .await;
+    let spam = summary(&kit, &sam, workspace, "needs-1").await;
+    assert_eq!(spam["need"], Value::Null, "{spam}");
+
+    // "Not spam" at the provider: back in the inbox.
+    moved(&kit, workspace, inbox, 0, json!({"in_inbox": true})).await;
+    let back = summary(&kit, &sam, workspace, "needs-1").await;
+    assert_eq!(back["need"]["reason"], "reply", "{back}");
+    assert_eq!(back["need"]["message_id"], message.as_str());
+
+    let events = kit.events("conversations.need_changed").await;
+    let ours: Vec<&Value> = events
+        .iter()
+        .filter(|e| e["conversation"] == conversation.as_str())
+        .collect();
+    let cleared: Vec<Option<&str>> = ours.iter().map(|e| e["cleared_because"].as_str()).collect();
+    assert_eq!(cleared, [None, Some("trashed"), None]);
+    assert!(ours[2]["need"].is_object(), "{:?}", ours[2]);
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_trash_round_trip_keeps_a_members_confirmation_and_done(db: PgPool) {
+    let kit = Kit::new(db.clone()).await;
+    let (workspace, inbox, sam) = sams_needs(&kit).await;
+
+    // A confirmed need (the member answered "yes" to Scout's question): the
+    // verdict is stored on the need's message. Confirmation is only offered
+    // for a question the rules did not settle, so it is set directly.
+    let lease = kit.conversation_of("needs-2").await;
+    sqlx::query(
+        "UPDATE conversations.needs SET verdict = 'confirmed', verdict_message_id = message_id
+          WHERE conversation_id = $1::uuid",
+    )
+    .bind(lease)
+    .execute(&db)
+    .await
+    .unwrap();
+
+    // A need marked Done.
+    let bill = kit.conversation_of("needs-3").await;
+    let done = kit
+        .post(
+            &sam,
+            &format!("/api/v1/w/{workspace}/conversations/{bill}/need/resolve"),
+            Some(json!({"outcome": "done", "message_id": kit.message_of("needs-3").await})),
+        )
+        .await;
+    assert_eq!(done.status, StatusCode::OK, "{:?}", done.json);
+
+    // Both messages go to the trash, then come back.
+    for index in [1, 2] {
+        moved(
+            &kit,
+            workspace,
+            inbox,
+            index,
+            json!({"in_inbox": false, "in_trash": true}),
+        )
+        .await;
+    }
+    assert_eq!(
+        summary(&kit, &sam, workspace, "needs-2").await["need"],
+        Value::Null
+    );
+    for index in [1, 2] {
+        moved(&kit, workspace, inbox, index, json!({"in_inbox": true})).await;
+    }
+
+    // The confirmed need is open again, still the member's answer.
+    let lease = summary(&kit, &sam, workspace, "needs-2").await;
+    assert_eq!(lease["need"]["reason"], "do", "{lease}");
+    let (basis, trust): (String, String) = sqlx::query_as(
+        "SELECT basis, trust FROM conversations.needs
+          WHERE conversation_id = $1::uuid AND state = 'open'",
+    )
+    .bind(kit.conversation_of("needs-2").await)
+    .fetch_one(&db)
+    .await
+    .unwrap();
+    assert_eq!((basis.as_str(), trust.as_str()), ("member", "sure"));
+
+    // The one marked Done stays done: the trash did not undo the member.
+    let bill = summary(&kit, &sam, workspace, "needs-3").await;
+    assert_eq!(bill["need"], Value::Null, "{bill}");
+    let cause: String = sqlx::query_scalar(
+        "SELECT cleared_because FROM conversations.needs WHERE conversation_id = $1::uuid",
+    )
+    .bind(kit.conversation_of("needs-3").await)
+    .fetch_one(&db)
+    .await
+    .unwrap();
+    assert_eq!(cause, "done");
+}
+
+/// A refresh of `conversation` as a decide pass runs it, committed.
+async fn refreshed(kit: &Kit, workspace: WorkspaceId, conversation: &str) {
+    let mut tx = kit.state.db.begin_for(workspace).await.unwrap();
+    crate::domain::needs::refresh(
+        &mut tx,
+        &kit.state.events,
+        &workspace.to_string(),
+        conversation.parse().unwrap(),
+        &crate::domain::needs::NeedSettings::new(
+            36_500,
+            &crate::domain::policy::Policy::baseline(),
+        ),
+    )
+    .await
+    .unwrap();
+    tx.commit().await.unwrap();
+}
+
+/// Pending `conversations.refresh_need` jobs.
+async fn pending_refreshes(db: &PgPool) -> i64 {
+    sqlx::query_scalar(
+        "SELECT count(*) FROM kernel.jobs
+          WHERE kind = 'conversations.refresh_need' AND state = 'pending'",
+    )
+    .fetch_one(db)
+    .await
+    .unwrap()
+}
+
+/// Run the follow-up jobs now, not in their few seconds.
+async fn run_refreshes(kit: &Kit, db: &PgPool) {
+    sqlx::query("UPDATE kernel.jobs SET run_at = now() WHERE kind = 'conversations.refresh_need'")
+        .execute(db)
+        .await
+        .unwrap();
+    kit.run_jobs().await;
+}
+
+async fn needs_stored(db: &PgPool, conversation: &str) -> i64 {
+    sqlx::query_scalar("SELECT count(*) FROM conversations.needs WHERE conversation_id = $1::uuid")
+        .bind(conversation)
+        .fetch_one(db)
+        .await
+        .unwrap()
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_first_need_is_not_stored_for_a_message_mid_move(db: PgPool) {
+    let kit = Kit::new(db.clone()).await;
+    let (workspace, _, _) = sams_needs(&kit).await;
+    let conversation = kit.conversation_of("needs-1").await;
+    let message = kit.message_of("needs-1").await;
+    // As if the decide pass had not run yet: no need stored for Marta.
+    sqlx::query("DELETE FROM conversations.needs WHERE conversation_id = $1::uuid")
+        .bind(&conversation)
+        .execute(&db)
+        .await
+        .unwrap();
+
+    // The provider's move to spam is under way: the message row is updated
+    // and not yet committed.
+    let mut moving = kit.state.db.begin_for(workspace).await.unwrap();
+    sqlx::query(
+        "UPDATE conversations.messages SET in_spam = true, in_inbox = false WHERE id = $1::uuid",
+    )
+    .bind(&message)
+    .execute(&mut *moving)
+    .await
+    .unwrap();
+
+    // A decide-pass refresh beside it does not wait (a wait could deadlock
+    // with a request holding the needs row) and stores nothing.
+    tokio::time::timeout(
+        std::time::Duration::from_secs(10),
+        refreshed(&kit, workspace, &conversation),
+    )
+    .await
+    .expect("the refresh never waits on a message");
+    assert_eq!(needs_stored(&db, &conversation).await, 0);
+    assert_eq!(pending_refreshes(&db).await, 1);
+
+    // The move commits; the follow-up finds a message in spam: still nothing.
+    moving.commit().await.unwrap();
+    run_refreshes(&kit, &db).await;
+    assert_eq!(needs_stored(&db, &conversation).await, 0);
+    assert_eq!(pending_refreshes(&db).await, 0);
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_skipped_first_need_is_worked_out_by_a_follow_up(db: PgPool) {
+    let kit = Kit::new(db.clone()).await;
+    let (workspace, _, sam) = sams_needs(&kit).await;
+    let conversation = kit.conversation_of("needs-1").await;
+    let message = kit.message_of("needs-1").await;
+    sqlx::query("DELETE FROM conversations.needs WHERE conversation_id = $1::uuid")
+        .bind(&conversation)
+        .execute(&db)
+        .await
+        .unwrap();
+
+    // Another writer that never refreshes (a template fill) holds the row.
+    let mut writer = kit.state.db.begin_for(workspace).await.unwrap();
+    sqlx::query("UPDATE conversations.messages SET subject_template = '' WHERE id = $1::uuid")
+        .bind(&message)
+        .execute(&mut *writer)
+        .await
+        .unwrap();
+
+    // Skipped twice: nothing stored, one follow-up job per deferral (never
+    // a unique key, which would drop one made while a job runs).
+    refreshed(&kit, workspace, &conversation).await;
+    refreshed(&kit, workspace, &conversation).await;
+    assert_eq!(needs_stored(&db, &conversation).await, 0);
+    assert_eq!(pending_refreshes(&db).await, 2);
+
+    // Still held when the jobs first run: they wait out their lock timeout
+    // and retry.
+    sqlx::query("UPDATE kernel.jobs SET run_at = now() WHERE kind = 'conversations.refresh_need'")
+        .execute(&db)
+        .await
+        .unwrap();
+    let stats = campbooks_kernel::jobs::Worker::new(kit.state.clone())
+        .run_until_idle()
+        .await;
+    assert_eq!(stats.failed, 0, "{stats:?}");
+    assert_eq!(needs_stored(&db, &conversation).await, 0);
+    assert_eq!(pending_refreshes(&db).await, 2);
+
+    // The writer commits; the follow-up stores the open need.
+    writer.commit().await.unwrap();
+    run_refreshes(&kit, &db).await;
+    assert_eq!(pending_refreshes(&db).await, 0);
+    let marta = summary(&kit, &sam, workspace, "needs-1").await;
+    assert_eq!(marta["need"]["reason"], "reply", "{marta}");
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_first_need_does_not_wait_for_a_conversation_another_writer_locks(db: PgPool) {
+    let kit = Kit::new(db.clone()).await;
+    let (workspace, _, sam) = sams_needs(&kit).await;
+    let conversation = kit.conversation_of("needs-1").await;
+    sqlx::query("DELETE FROM conversations.needs WHERE conversation_id = $1::uuid")
+        .bind(&conversation)
+        .execute(&db)
+        .await
+        .unwrap();
+
+    // An archive (flags) has locked the conversation `FOR UPDATE` and will
+    // update its messages next: a share lock on the message taken now, with
+    // the needs insert then waiting on the conversation, would be a cycle.
+    let mut archiving = kit.state.db.begin_for(workspace).await.unwrap();
+    sqlx::query("SELECT 1 FROM conversations.conversations WHERE id = $1::uuid FOR UPDATE")
+        .bind(&conversation)
+        .execute(&mut *archiving)
+        .await
+        .unwrap();
+
+    tokio::time::timeout(
+        std::time::Duration::from_secs(10),
+        refreshed(&kit, workspace, &conversation),
+    )
+    .await
+    .expect("the refresh never waits on the conversation");
+    assert_eq!(needs_stored(&db, &conversation).await, 0);
+    assert_eq!(pending_refreshes(&db).await, 1);
+
+    // The writer then updates the message: nothing of ours holds it.
+    sqlx::query("UPDATE conversations.messages SET read = true WHERE conversation_id = $1::uuid")
+        .bind(&conversation)
+        .execute(&mut *archiving)
+        .await
+        .unwrap();
+    archiving.commit().await.unwrap();
+    run_refreshes(&kit, &db).await;
+    let marta = summary(&kit, &sam, workspace, "needs-1").await;
+    assert_eq!(marta["need"]["reason"], "reply", "{marta}");
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_member_s_done_does_not_wait_on_a_batch_updating_the_message(db: PgPool) {
+    let kit = Kit::new(db).await;
+    let (workspace, _, sam) = sams_needs(&kit).await;
+    let conversation = kit.conversation_of("needs-2").await;
+    let message = kit.message_of("needs-2").await;
+
+    // A sync batch has updated the message row and not committed.
+    let mut batch = kit.state.db.begin_for(workspace).await.unwrap();
+    sqlx::query("UPDATE conversations.messages SET read = true WHERE id = $1::uuid")
+        .bind(&message)
+        .execute(&mut *batch)
+        .await
+        .unwrap();
+
+    // Done completes without waiting for it (no needs-then-messages lock
+    // order against the batch's messages-then-needs).
+    let done = tokio::time::timeout(
+        std::time::Duration::from_secs(10),
+        kit.post(
+            &sam,
+            &format!("/api/v1/w/{workspace}/conversations/{conversation}/need/resolve"),
+            Some(json!({"outcome": "done", "message_id": message})),
+        ),
+    )
+    .await
+    .expect("Done never waits on the batch's message lock");
+    assert_eq!(done.status, StatusCode::OK, "{:?}", done.json);
+    batch.commit().await.unwrap();
+    assert_eq!(
+        summary(&kit, &sam, workspace, "needs-2").await["need"],
+        Value::Null
     );
 }

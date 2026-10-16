@@ -1,0 +1,17 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO system.ai_usage AS u (workspace_id, day, role, feature, calls)\n                   VALUES ($1, $2, $3, $4, 1)\n                   ON CONFLICT (workspace_id, day, role, feature)\n                   DO UPDATE SET calls = u.calls + 1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Date",
+        "Text",
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "75291c1e2499ad1351cdbb8049c1fa4dbe2d13d537b9599a93777e403acbcc68"
+}

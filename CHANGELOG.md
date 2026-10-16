@@ -8,6 +8,13 @@ All notable changes to Campbooks Next are documented here. The format follows
 
 ### Security
 
+- **Sender authentication is read more strictly.** An aligned DKIM signature no longer
+  counts when the domain's DMARC policy refused the mail (`fail`, `quarantine`, `reject`),
+  an authentication header over 8 KiB is treated as a failure instead of being parsed, and
+  "same organisation" now follows the real Public Suffix List (so two `github.io` sites, or
+  suffixes such as `co.at`, are never one sender) instead of a 24-entry guess. Separately,
+  a message that is being moved to spam or the trash can no longer have a first "needs you"
+  stored for it by a refresh running at the same moment. No migration.
 - **The API is rate-limited per person and per app.** Every call with a token now counts
   against a limit for whoever makes it, however it arrives (directly, through the web app,
   or from automation and the assistant): 600 reads and 120 writes a minute per person and
@@ -201,7 +208,7 @@ All notable changes to Campbooks Next are documented here. The format follows
   nothing until the person signed out. Now a session that predates the permissions the web app
   asks for ends on its next request and the app asks you to sign in again, which goes straight
   through while your sign-in at the identity provider is still live; signing out of such a
-  session still ends everything. Migration `20261020190000_bff__session_scopes` adds two
+  session still ends everything. Migration `20261020200000_bff__session_scopes` adds two
   nullable columns. After upgrading, everyone signed in to the web app signs in once more.
   (campbooks-cloud#172)
 - **Notifications with a question mark no longer ask for a reply.** "Your order has
@@ -278,6 +285,21 @@ All notable changes to Campbooks Next are documented here. The format follows
   It must be one of Zoho's accounts servers, or Campbooks refuses to start.
 
 ### Added
+
+- **A daily AI limit per workspace (`CAMPBOOKS_AI__DAILY_CALLS_PER_WORKSPACE`, default
+  5000, `0` for none).** Every model call (`decide`, `embed`, `complete`, `vision`) is
+  now counted per workspace, role and feature, per UTC day, with the tokens the
+  provider reports, in two new tables of the `system` schema (migration
+  `20261020190000_system__ai_usage`). Past the limit a workspace's new mail is still
+  stored and sorted by the facts and taught rules, without the model pass, until
+  00:00 UTC; nothing errors, and skipped mail is not asked again later. One log line
+  says when a workspace reaches it. If the count cannot be written, the call is not
+  made and the job retries. A tenth of the limit is kept for what people ask
+  themselves: background work stops 500 calls short of the default 5000, so a mail
+  flood cannot silence Scout; past the whole limit, compiling a sentence answers 503
+  `ai_daily_limit_reached`. Administrators read a day's usage per workspace, capped
+  ones first, at `GET /admin/v1/system/ai-usage` (`system.read`). Self-hosters
+  running their own model can set `0`.
 - **Teach once in the inbox.** After you move, archive, mark read or clear one
   email, Campbooks offers to do the same to every one like it, and to new
   ones: it says which mail and how many, shows a few, and makes a rule with

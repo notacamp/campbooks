@@ -2,7 +2,10 @@
 //! speak the OpenAI-compatible API; `decide` speaks Laya's typed protocol or
 //! goes through the instruct-model adapter (ADR 0009).
 
-use std::time::{Duration, Instant};
+use std::{
+    sync::Arc,
+    time::{Duration, Instant},
+};
 
 use reqwest::{Client, RequestBuilder, StatusCode, header::RETRY_AFTER};
 use secrecy::ExposeSecret;
@@ -15,6 +18,7 @@ use crate::{
     AiConfig, Error, Protocol, ProviderConfig, Role,
     decide::{self, Answers, DecisionContext, DecisionState, Question},
     telemetry::{Call, Instruments},
+    usage::{self, Meter},
 };
 
 /// Default TCP connect timeout.
@@ -198,14 +202,16 @@ impl ChatRequest {
     }
 }
 
-/// Token accounting, when the provider reports it.
+/// Token accounting, when the provider reports it: OpenAI-compatible
+/// servers name the counts `prompt_tokens`/`completion_tokens`, laya-serve
+/// `input_tokens`/`output_tokens`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Deserialize)]
 pub struct Usage {
     /// Prompt tokens.
-    #[serde(default)]
+    #[serde(default, alias = "input_tokens")]
     pub prompt_tokens: u32,
     /// Generated tokens.
-    #[serde(default)]
+    #[serde(default, alias = "output_tokens")]
     pub completion_tokens: u32,
 }
 
@@ -286,6 +292,8 @@ struct WireEmbedRequest<'a> {
 #[derive(Deserialize)]
 struct WireEmbedResponse {
     data: Vec<WireEmbedding>,
+    #[serde(default)]
+    usage: Option<Usage>,
 }
 
 #[derive(Deserialize)]
@@ -306,6 +314,9 @@ pub struct Gateway {
     /// The `decide` role's last answers check
     /// ([`Gateway::answers_check`]).
     pub(crate) checks: crate::decide::check::Checks,
+    /// Counts every model call and holds the daily cap ([`usage`]); `None`
+    /// for tools and tests, whose calls need no scope.
+    meter: Option<Arc<dyn Meter>>,
 }
 
 impl Gateway {
@@ -337,7 +348,25 @@ impl Gateway {
             instruments: Instruments::new(),
             probes: crate::health::Probes::default(),
             checks: crate::decide::check::Checks::default(),
+            meter: None,
         })
+    }
+
+    /// The same gateway counting every model call with `meter`: each call
+    /// must then run in a [`usage::Scope`], and is refused over the cap.
+    #[must_use]
+    pub fn with_meter(mut self, meter: Arc<dyn Meter>) -> Self {
+        self.meter = Some(meter);
+        self
+    }
+
+    /// Whether every model call is counted (and capped).
+    pub fn is_metered(&self) -> bool {
+        self.meter.is_some()
+    }
+
+    pub(crate) fn meter(&self) -> Option<&Arc<dyn Meter>> {
+        self.meter.as_ref()
     }
 
     /// The same gateway with another retry policy for `decide`.
@@ -362,12 +391,14 @@ impl Gateway {
     /// opted in ([`Error::ExternalContentRefused`]).
     pub async fn chat(&self, role: Role, request: ChatRequest) -> Result<ChatResponse, Error> {
         let provider = self.config.provider_for_content(role)?;
+        let ticket = self.admit(role).await?;
         let call = Call::start(&self.instruments, "chat", role, provider);
         let result = self
             .chat_with(role, provider, request)
             .instrument(call.span())
             .await;
         call.finish(&result, |r| (Some(r.model.as_str()), r.usage));
+        usage::settle(ticket, &result, |r| r.usage).await;
         result
     }
 
@@ -407,20 +438,22 @@ impl Gateway {
             return Ok(Vec::new());
         }
         let provider = self.config.provider_for_content(Role::Embed)?;
+        let ticket = self.admit(Role::Embed).await?;
         let call = Call::start(&self.instruments, "embeddings", Role::Embed, provider);
         let result = self
             .embed_with(provider, inputs)
             .instrument(call.span())
             .await;
-        call.finish(&result, |_| (None, None));
-        result
+        call.finish(&result, |(_, usage)| (None, *usage));
+        usage::settle(ticket, &result, |(_, usage)| *usage).await;
+        result.map(|(vectors, _)| vectors)
     }
 
     async fn embed_with(
         &self,
         provider: &ProviderConfig,
         inputs: &[String],
-    ) -> Result<Vec<Vec<f32>>, Error> {
+    ) -> Result<(Vec<Vec<f32>>, Option<Usage>), Error> {
         let body = WireEmbedRequest {
             model: &provider.model,
             input: inputs,
@@ -436,7 +469,10 @@ impl Gateway {
             )));
         }
         wire.data.sort_by_key(|e| e.index);
-        Ok(wire.data.into_iter().map(|e| e.embedding).collect())
+        Ok((
+            wire.data.into_iter().map(|e| e.embedding).collect(),
+            wire.usage,
+        ))
     }
 
     /// Answer typed `questions` about `state` with the `decide` role, all in
@@ -457,13 +493,15 @@ impl Gateway {
         if questions.is_empty() {
             return Ok(Answers::default());
         }
+        let ticket = self.admit(Role::Decide).await?;
         let call = Call::start(&self.instruments, "decide", Role::Decide, provider);
         let result = self
             .decide_with(ctx, provider, state, questions)
             .instrument(call.span())
             .await;
-        call.finish(&result, |_| (None, None));
-        result
+        call.finish(&result, |(_, usage)| (None, *usage));
+        usage::settle(ticket, &result, |(_, usage)| *usage).await;
+        result.map(|(answers, _)| answers)
     }
 
     async fn decide_with(
@@ -472,7 +510,7 @@ impl Gateway {
         provider: &ProviderConfig,
         state: &DecisionState,
         questions: &[Question],
-    ) -> Result<Answers, Error> {
+    ) -> Result<(Answers, Option<Usage>), Error> {
         tracing::debug!(
             purpose = ctx.purpose,
             protocol = provider.protocol.as_str(),
@@ -481,7 +519,7 @@ impl Gateway {
             "ai decide request"
         );
         let started = Instant::now();
-        let (raw, model, version) = match provider.protocol {
+        let (raw, model, version, usage) = match provider.protocol {
             Protocol::Laya => {
                 let body = decide::laya::Request {
                     model: &provider.model,
@@ -491,7 +529,8 @@ impl Gateway {
                 let request = self.post(provider, provider.decide_path())?.json(&body);
                 let wire: decide::laya::Response = self.send_with_retry(request).await?;
                 let model = wire.model(&provider.model);
-                (wire.into_raw(questions)?, model, None)
+                let usage = wire.usage;
+                (wire.into_raw(questions)?, model, None, usage)
             }
             Protocol::OpenAi => {
                 let messages = decide::openai::messages(state, questions);
@@ -517,7 +556,8 @@ impl Gateway {
                     wire.model.clone()
                 };
                 let version = wire.system_fingerprint.clone();
-                (wire.into_raw(questions)?, model, version)
+                let usage = wire.usage;
+                (wire.into_raw(questions)?, model, version, usage)
             }
         };
         let latency = started.elapsed();
@@ -527,7 +567,7 @@ impl Gateway {
             latency_ms = latency.as_millis(),
             "ai decide answered"
         );
-        Ok(Answers::new(
+        let answers = Answers::new(
             questions
                 .iter()
                 .zip(raw)
@@ -542,7 +582,8 @@ impl Gateway {
                     )
                 })
                 .collect(),
-        ))
+        );
+        Ok((answers, usage))
     }
 
     async fn send_with_retry<T: DeserializeOwned>(
