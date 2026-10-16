@@ -1,0 +1,17 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        INSERT INTO assistant.profiles (workspace_id, user_id, proactivity, asked_at)\n        VALUES ($1, $2, $3, CASE WHEN $4 THEN now() END)\n        ON CONFLICT (workspace_id, user_id) DO UPDATE\n           SET proactivity = EXCLUDED.proactivity,\n               asked_at = CASE WHEN $4 THEN coalesce(assistant.profiles.asked_at, now()) END,\n               revision = assistant.profiles.revision + 1,\n               updated_at = now()\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Text",
+        "Bool"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "b39149ad2c28f85747eb16e9dd705265932b962509feb9358ecac33969880155"
+}

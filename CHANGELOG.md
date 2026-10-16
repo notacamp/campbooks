@@ -156,6 +156,12 @@ All notable changes to Campbooks Next are documented here. The format follows
   possible, but nothing is provisioned for it.
 
 ### Changed
+- One "Search or ask" field and menu, with conversations inline. The sidebar's
+  separate "Search conversations" entry is gone: ⌘K and `/` (on screens 48rem and
+  wider) open the same menu, which lists matching conversations first (matched words
+  marked, the filters it understood as removable chips), then commands, then Ask,
+  under one cursor: ↑ ↓ move, ↵ opens, ⌘↵ shows all results. On a phone `/` and the
+  top bar's search button still open the results page.
 - **A decision model sorts mail and raises needs; rules only read headers and can
   only say no** (ADR 0018). Every phrase list and regular expression that read an
   email's subject, body or attachment names is gone. What is left reads structured
@@ -262,6 +268,20 @@ All notable changes to Campbooks Next are documented here. The format follows
   month asks whether to keep it. The rules list for Scout's memory is ready
   for its page. Demo: `pnpm --dir clients fake-google --lookalikes 24` and
   `pnpm --dir clients record teach-once`.
+- **Tell Scout what you care about** (campbooks-cloud#121): three optional
+  questions offered on Home after mail is connected (whose mail always
+  reaches you, what never needs you, and whether Scout should ask first),
+  and a "Teach Scout" box in Scout's memory. Answers and sentences become
+  rules you check before saving; saved rules run without AI. Teaching in
+  your own words uses the `complete` AI role only when you press Enter, and
+  sends it only your sentence and your own addresses and label names, never
+  your mail. Without a `complete` role, Scout's memory offers a rule builder
+  instead. Scout's memory is a Settings section (Settings → Scout's memory)
+  and lists your rules. If saving stops partway, Try again saves only what
+  is missing, and the count you see is what was saved. Keys: `T` / `Shift+T`
+  on the Home offer, `B` to go back, `Q` in Scout's memory, `⌘↵` to save a
+  rule. New migrations: the `assistant` schema, and an index on received
+  mail built without blocking writes; nothing to do.
 - **Rules you teach, applied to the mail that looks the same.** A taught rule
   says which mail it is about (the sender, its domain, a mailing list, the
   subject's template or words, a header, a label or a stream) and what to do

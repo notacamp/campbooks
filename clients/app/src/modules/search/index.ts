@@ -2,4 +2,4 @@
 // Other modules and the app shell import from here only.
 export { buildSearchRoutes } from "./routes";
 export { SEARCH_SHORTCUTS } from "./shortcuts";
-export { SearchOverlay } from "./components/SearchOverlay/SearchOverlay";
+export { useConversationSection } from "./use-conversation-section";

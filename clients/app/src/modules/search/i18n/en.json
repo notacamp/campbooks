@@ -3,13 +3,11 @@
     "label": "Search conversations",
     "placeholder": "Search conversations"
   },
-  "overlay": {
-    "label": "Search",
-    "results": "Results",
-    "hintMove": "Move",
-    "hintOpen": "Open",
-    "hintAll": "All results",
-    "hintClose": "Close"
+  "menu": {
+    "group": "Conversations",
+    "all": "All results for “{{query}}”",
+    "recent": "Recent searches",
+    "clearRecent": "Clear recent searches"
   },
   "shortcuts": {
     "open": "Search conversations"

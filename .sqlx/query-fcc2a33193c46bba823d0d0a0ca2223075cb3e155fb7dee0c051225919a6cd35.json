@@ -1,0 +1,53 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT proactivity, asked_at, revision FROM assistant.profiles\n            WHERE workspace_id = $1 AND user_id = $2",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "proactivity",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "assistant.profiles",
+            "name": "proactivity"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "asked_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "assistant.profiles",
+            "name": "asked_at"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "revision",
+        "type_info": "Int4",
+        "origin": {
+          "Table": {
+            "table": "assistant.profiles",
+            "name": "revision"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      true,
+      false
+    ]
+  },
+  "hash": "fcc2a33193c46bba823d0d0a0ca2223075cb3e155fb7dee0c051225919a6cd35"
+}

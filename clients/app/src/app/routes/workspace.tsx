@@ -119,6 +119,7 @@ const SETTINGS_SECTIONS = [
   { id: "members", path: "members" },
   { id: "mailboxes", path: "mailboxes" },
   { id: "waysIn", path: "sign-in" },
+  { id: "memory", path: "memory" },
 ] as const;
 
 function WorkspaceFrame({ workspace, all }: { workspace: Workspace; all: Workspace[] }) {
@@ -227,15 +228,6 @@ function WorkspaceFrame({ workspace, all }: { workspace: Workspace; all: Workspa
           <SearchButton
             onClick={() => {
               registry.run("command.open");
-            }}
-          />
-          <NavItem
-            label={tSearch("shortcuts.open")}
-            icon="search"
-            shortcut="search.open"
-            current={inSearch}
-            onClick={() => {
-              registry.run("search.open");
             }}
           />
           <NavItem

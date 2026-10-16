@@ -562,6 +562,8 @@ impl World {
             ("conversations.draft", draft.to_string()),
             ("conversations.rule", rule.to_string()),
             ("attention.item", item.to_string()),
+            // A profile is the member's own, addressed by their user id.
+            ("assistant.profile", u(Who::Member).to_string()),
         ]);
         let mut ids: Vec<String> = sqlx::query_scalar(
             "SELECT id::text FROM conversations.conversations WHERE inbox_id = $1
@@ -603,7 +605,10 @@ impl World {
             .and_then(Who::inbox_role)
             .map(ToOwned::to_owned);
         match resource_type {
-            "workspaces.member" => Facts::owned_by(OwnerFact::User(u(Who::Member))),
+            // A profile is addressed by its member, like a membership.
+            "workspaces.member" | "assistant.profile" => {
+                Facts::owned_by(OwnerFact::User(u(Who::Member)))
+            }
             "connectors.connection" => Facts::owned_by(OwnerFact::User(u(Who::Connector))),
             "conversations.inbox" => {
                 Facts::owned_by(OwnerFact::User(u(Who::Connector))).within(inbox, role)
@@ -866,6 +871,8 @@ fn body(world: &World, id: &str) -> Option<Value> {
         "conversations.update_rule" => json!({"actions": [{"action": "mark_read"}]}),
         "conversations.confirm_rule" | "conversations.restore_rule" => json!({}),
         "conversations.dismiss_rule_suggestion" => json!({"key": "matrix"}),
+        "assistant.update_profile" => json!({"proactivity": "ask_first", "asked": true}),
+        "assistant.compile_instruction" => json!({"text": "newsletters never need me"}),
         _ => return None,
     })
 }

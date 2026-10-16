@@ -12,7 +12,7 @@ import { useTranslation } from "react-i18next";
 import { useShortcut } from "~/lib/shortcuts";
 import { readPref } from "~/lib/storage/prefs";
 import { CommandMenu, ShortcutSheet, Text, ThemeProvider } from "~/lib/ui";
-import { SearchOverlay } from "~/modules/search";
+import { useConversationSection } from "~/modules/search";
 
 import { SessionGate } from "../session/SessionGate";
 
@@ -31,35 +31,21 @@ function RootLayout() {
   const { workspaceId } = useParams({ strict: false });
   const [sheetOpen, setSheetOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
-  const [search, setSearch] = useState<{ open: boolean; query: string }>({
-    open: false,
-    query: "",
-  });
 
-  // `/` searches the open workspace: an overlay on a desktop, the page on a phone.
-  const openSearch = (query = "") => {
-    setMenuOpen(false);
+  // `/` searches the open workspace: in the menu on a desktop, the page on a phone.
+  const openSearch = () => {
     setSheetOpen(false);
     if (workspaceId === undefined) {
       return;
     }
     if (typeof globalThis.matchMedia === "function" && globalThis.matchMedia(PHONE).matches) {
-      void navigate({
-        to: "/w/$workspaceId/search",
-        params: { workspaceId },
-        search: query === "" ? {} : { q: query },
-      });
+      setMenuOpen(false);
+      void navigate({ to: "/w/$workspaceId/search", params: { workspaceId } });
     } else {
-      setSearch({ open: true, query });
+      setMenuOpen(true);
     }
   };
-  useShortcut(
-    "search.open",
-    () => {
-      openSearch();
-    },
-    { enabled: workspaceId !== undefined },
-  );
+  useShortcut("search.open", openSearch, { enabled: workspaceId !== undefined });
 
   useShortcut("sheet.open", () => {
     setMenuOpen(false);
@@ -90,18 +76,8 @@ function RootLayout() {
         onClose={() => {
           setMenuOpen(false);
         }}
-        onSearch={workspaceId === undefined ? undefined : openSearch}
+        useSection={useConversationSection}
       />
-      {workspaceId === undefined ? null : (
-        <SearchOverlay
-          workspaceId={workspaceId}
-          open={search.open}
-          initialQuery={search.query}
-          onClose={() => {
-            setSearch({ open: false, query: "" });
-          }}
-        />
-      )}
     </ThemeProvider>
   );
 }

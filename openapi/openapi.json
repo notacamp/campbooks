@@ -1618,6 +1618,320 @@
         }
       }
     },
+    "/api/v1/w/{workspace_id}/assistant/compile": {
+      "post": {
+        "tags": [
+          "assistant"
+        ],
+        "summary": "Turn your sentence into rules to check.",
+        "operationId": "assistant.compile_instruction",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "description": "The workspace.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CompileRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "What Scout understood; nothing is saved.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CompileResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Empty, too long, a link or pasted mail (`instruction_empty`, `instruction_too_long`, `instruction_has_link`, `instruction_pasted_mail`).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid access token.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing scope, or not a member (`profile_needs_member`).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such workspace, or you are not a member.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "No language model may read sentences here (`compile_unavailable`): build the rule by hand.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many sentences this hour.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "The language model failed (`compile_failed`).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [
+              "assistant:write"
+            ]
+          }
+        ],
+        "x-campbooks": {
+          "access": {
+            "action": "write",
+            "resource": "assistant.profile"
+          },
+          "assistant": false,
+          "automation": false,
+          "mutates": true,
+          "records": [
+            "assistant.profile"
+          ],
+          "risk": "low"
+        }
+      }
+    },
+    "/api/v1/w/{workspace_id}/assistant/profile": {
+      "get": {
+        "tags": [
+          "assistant"
+        ],
+        "summary": "Your profile, or the defaults when you never answered.",
+        "operationId": "assistant.get_profile",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "description": "The workspace.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Your profile.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProfileView"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid access token.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing scope, or not a member (`profile_needs_member`).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such workspace, or you are not a member.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [
+              "assistant:read"
+            ]
+          }
+        ],
+        "x-campbooks": {
+          "access": {
+            "action": "read",
+            "resource": "assistant.profile"
+          },
+          "assistant": false,
+          "automation": false,
+          "mutates": false,
+          "records": [
+            "assistant.profile"
+          ],
+          "risk": "low"
+        }
+      },
+      "put": {
+        "tags": [
+          "assistant"
+        ],
+        "summary": "Keep your profile.",
+        "operationId": "assistant.update_profile",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "description": "The workspace.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProfileUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Your profile afterwards.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProfileView"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "A value outside the allowed set.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid access token.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing scope, or not a member (`profile_needs_member`).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such workspace, or you are not a member.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [
+              "assistant:write"
+            ]
+          }
+        ],
+        "x-campbooks": {
+          "access": {
+            "action": "write",
+            "resource": "assistant.profile"
+          },
+          "assistant": false,
+          "automation": false,
+          "mutates": true,
+          "records": [
+            "assistant.profile"
+          ],
+          "risk": "low"
+        }
+      }
+    },
     "/api/v1/w/{workspace_id}/attention": {
       "get": {
         "tags": [
@@ -6127,6 +6441,88 @@
         }
       }
     },
+    "/api/v1/w/{workspace_id}/labels": {
+      "get": {
+        "tags": [
+          "conversations"
+        ],
+        "summary": "List the labels of the inboxes you can read.",
+        "operationId": "conversations.list_labels",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "description": "The workspace.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The labels.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LabelList"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid access token.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing scope.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such workspace, or you are not a member.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [
+              "conversations:read"
+            ]
+          }
+        ],
+        "x-campbooks": {
+          "access": {
+            "action": "read",
+            "resource": "conversations.inbox"
+          },
+          "assistant": true,
+          "automation": false,
+          "mutates": false,
+          "records": [
+            "conversations.inbox"
+          ],
+          "risk": "low"
+        }
+      }
+    },
     "/api/v1/w/{workspace_id}/members": {
       "get": {
         "tags": [
@@ -7500,6 +7896,118 @@
           "mutates": false,
           "records": [
             "workspaces.security_event"
+          ],
+          "risk": "low"
+        }
+      }
+    },
+    "/api/v1/w/{workspace_id}/senders": {
+      "get": {
+        "tags": [
+          "conversations"
+        ],
+        "summary": "List who writes to the inboxes you can read.",
+        "operationId": "conversations.list_senders",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "description": "The workspace.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId"
+            }
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "description": "Words (2 to 100 characters) every listed sender's address, display\nname or domain contains, ignoring case and accents. Without it, the\nsenders replied to most.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "How many, 1 to 10 (default 10).",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "minimum": 0
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The senders.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SenderList"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "A `q` or `limit` out of range (`invalid_senders_query`).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid access token.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing scope.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such workspace, or you are not a member.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [
+              "conversations:read"
+            ]
+          }
+        ],
+        "x-campbooks": {
+          "access": {
+            "action": "read",
+            "resource": "conversations.inbox"
+          },
+          "assistant": true,
+          "automation": false,
+          "mutates": false,
+          "records": [
+            "conversations.inbox"
           ],
           "risk": "low"
         }
@@ -10779,6 +11287,40 @@
           }
         }
       },
+      "Candidate": {
+        "type": "object",
+        "description": "Someone the sentence names without an address.",
+        "required": [
+          "address",
+          "received",
+          "replied"
+        ],
+        "properties": {
+          "address": {
+            "type": "string",
+            "description": "Their address."
+          },
+          "name": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Their display name."
+          },
+          "received": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Messages from them.",
+            "minimum": 0
+          },
+          "replied": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Their conversations you replied to.",
+            "minimum": 0
+          }
+        }
+      },
       "Capability": {
         "type": "string",
         "description": "What a connection lets Campbooks do with the account.",
@@ -10817,6 +11359,67 @@
           "confidential",
           "public"
         ]
+      },
+      "CompileOutcome": {
+        "type": "string",
+        "description": "What came of the sentence.",
+        "enum": [
+          "rules",
+          "unsupported",
+          "unclear"
+        ]
+      },
+      "CompileRequest": {
+        "type": "object",
+        "description": "The sentence to compile.",
+        "required": [
+          "text"
+        ],
+        "properties": {
+          "text": {
+            "type": "string",
+            "description": "What you want, in your own words (at most 300 characters).",
+            "example": "anything from my accountant always matters"
+          }
+        },
+        "additionalProperties": false
+      },
+      "CompileResult": {
+        "type": "object",
+        "description": "What Scout understood. Nothing is saved.",
+        "required": [
+          "outcome",
+          "text",
+          "proposals"
+        ],
+        "properties": {
+          "outcome": {
+            "$ref": "#/components/schemas/CompileOutcome",
+            "description": "Rules to check, something rules can't do, or unclear."
+          },
+          "proposals": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Proposal"
+            },
+            "description": "The rules, at most three."
+          },
+          "text": {
+            "type": "string",
+            "description": "The sentence as used, to keep as the rule's `origin_text`."
+          },
+          "unsupported": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/UnsupportedReason",
+                "description": "Why not, when `unsupported`."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        }
       },
       "Confirm": {
         "type": "object",
@@ -12076,6 +12679,16 @@
           "auto_submitted"
         ]
       },
+      "HeaderKey": {
+        "type": "string",
+        "description": "A header a condition may test.",
+        "enum": [
+          "list_id",
+          "list_unsubscribe",
+          "auto_submitted",
+          "precedence"
+        ]
+      },
       "Health": {
         "type": "string",
         "description": "How a connection is doing.",
@@ -12282,6 +12895,30 @@
         "format": "uuid",
         "description": "InboxId (UUIDv7)"
       },
+      "InboxLabel": {
+        "type": "object",
+        "description": "A label of an inbox.",
+        "required": [
+          "id",
+          "inbox",
+          "name"
+        ],
+        "properties": {
+          "id": {
+            "$ref": "#/components/schemas/LabelId",
+            "description": "The label."
+          },
+          "inbox": {
+            "$ref": "#/components/schemas/InboxId",
+            "description": "Its inbox."
+          },
+          "name": {
+            "type": "string",
+            "description": "Its name.",
+            "example": "Clients"
+          }
+        }
+      },
       "InboxList": {
         "type": "object",
         "description": "The inboxes, by address.",
@@ -12315,6 +12952,7 @@
           "channel",
           "address",
           "unread_count",
+          "shared",
           "read_only"
         ],
         "properties": {
@@ -12352,6 +12990,10 @@
                 "type": "null"
               }
             ]
+          },
+          "shared": {
+            "type": "boolean",
+            "description": "Whether someone other than the caller holds a role on it (for a\nclient token: more than one member). Never says who."
           },
           "unread_count": {
             "type": "integer",
@@ -12568,6 +13210,22 @@
         "type": "string",
         "format": "uuid",
         "description": "LabelId (UUIDv7)"
+      },
+      "LabelList": {
+        "type": "object",
+        "description": "Labels, by inbox then name.",
+        "required": [
+          "labels"
+        ],
+        "properties": {
+          "labels": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/InboxLabel"
+            },
+            "description": "The labels."
+          }
+        }
       },
       "LabelView": {
         "type": "object",
@@ -13244,6 +13902,14 @@
           }
         }
       },
+      "Proactivity": {
+        "type": "string",
+        "description": "Whether rules Scout proposes from a member's own corrections may start\non their own (in an inbox only they use) or wait for a yes.",
+        "enum": [
+          "ask_first",
+          "act_then_tell"
+        ]
+      },
       "Problem": {
         "type": "object",
         "description": "RFC 9457 problem details.",
@@ -13284,6 +13950,392 @@
           "status": 404,
           "title": "Not found",
           "type": "about:blank"
+        }
+      },
+      "ProfileUpdate": {
+        "type": "object",
+        "description": "The profile to keep.",
+        "required": [
+          "proactivity",
+          "asked"
+        ],
+        "properties": {
+          "asked": {
+            "type": "boolean",
+            "description": "Whether you answered or put off the questions (keeps the first time)."
+          },
+          "proactivity": {
+            "$ref": "#/components/schemas/Proactivity",
+            "description": "How rules Scout proposes from your corrections start."
+          }
+        },
+        "additionalProperties": false
+      },
+      "ProfileView": {
+        "type": "object",
+        "description": "What the member told Scout.",
+        "required": [
+          "proactivity",
+          "revision"
+        ],
+        "properties": {
+          "asked_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "When you answered or put off the questions; `None` until then."
+          },
+          "proactivity": {
+            "$ref": "#/components/schemas/Proactivity",
+            "description": "How rules Scout proposes from your corrections start."
+          },
+          "revision": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Grows by one on every change; 0 before the first.",
+            "minimum": 0
+          }
+        }
+      },
+      "Proposal": {
+        "type": "object",
+        "description": "One rule to check.",
+        "required": [
+          "conditions",
+          "actions",
+          "inboxes"
+        ],
+        "properties": {
+          "actions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProposedAction"
+            },
+            "description": "What it does."
+          },
+          "conditions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProposedCondition"
+            },
+            "description": "All must hold; without the sender while `who` is unanswered."
+          },
+          "inboxes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProposalInbox"
+            },
+            "description": "The inboxes it can be taught in (where you may send)."
+          },
+          "who": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/WhoQuestion",
+                "description": "A sender to pick before saving: add it as `sender_address` (or\n`sender_domain`)."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        }
+      },
+      "ProposalInbox": {
+        "type": "object",
+        "description": "An inbox a rule can be taught in.",
+        "required": [
+          "id",
+          "address",
+          "shared"
+        ],
+        "properties": {
+          "address": {
+            "type": "string",
+            "description": "Its address."
+          },
+          "id": {
+            "type": "string",
+            "description": "The inbox."
+          },
+          "shared": {
+            "type": "boolean",
+            "description": "Someone else uses it too: the rule would act for everyone there."
+          }
+        }
+      },
+      "ProposedAction": {
+        "oneOf": [
+          {
+            "type": "object",
+            "description": "Put the conversation in this stream.",
+            "required": [
+              "stream",
+              "action"
+            ],
+            "properties": {
+              "action": {
+                "type": "string",
+                "enum": [
+                  "move_to_stream"
+                ]
+              },
+              "stream": {
+                "$ref": "#/components/schemas/StreamKey",
+                "description": "The stream."
+              }
+            }
+          },
+          {
+            "type": "object",
+            "description": "Take it out of the inbox.",
+            "required": [
+              "action"
+            ],
+            "properties": {
+              "action": {
+                "type": "string",
+                "enum": [
+                  "archive"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "description": "Put this label on it (its id).",
+            "required": [
+              "label",
+              "action"
+            ],
+            "properties": {
+              "action": {
+                "type": "string",
+                "enum": [
+                  "add_label"
+                ]
+              },
+              "label": {
+                "type": "string",
+                "description": "The label."
+              }
+            }
+          },
+          {
+            "type": "object",
+            "description": "Mark it read.",
+            "required": [
+              "action"
+            ],
+            "properties": {
+              "action": {
+                "type": "string",
+                "enum": [
+                  "mark_read"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "description": "Whether it needs a reply.",
+            "required": [
+              "value",
+              "action"
+            ],
+            "properties": {
+              "action": {
+                "type": "string",
+                "enum": [
+                  "needs_reply"
+                ]
+              },
+              "value": {
+                "type": "boolean",
+                "description": "Yes or no."
+              }
+            }
+          },
+          {
+            "type": "object",
+            "description": "Whether it asks for an action.",
+            "required": [
+              "value",
+              "action"
+            ],
+            "properties": {
+              "action": {
+                "type": "string",
+                "enum": [
+                  "asks_action"
+                ]
+              },
+              "value": {
+                "type": "boolean",
+                "description": "Yes or no."
+              }
+            }
+          },
+          {
+            "type": "object",
+            "description": "Always or never show it.",
+            "required": [
+              "value",
+              "action"
+            ],
+            "properties": {
+              "action": {
+                "type": "string",
+                "enum": [
+                  "surface"
+                ]
+              },
+              "value": {
+                "$ref": "#/components/schemas/SurfaceKey",
+                "description": "Which."
+              }
+            }
+          }
+        ],
+        "description": "What a rule does."
+      },
+      "ProposedCondition": {
+        "oneOf": [
+          {
+            "type": "object",
+            "description": "The sender's address is this one.",
+            "required": [
+              "value",
+              "field"
+            ],
+            "properties": {
+              "field": {
+                "type": "string",
+                "enum": [
+                  "sender_address"
+                ]
+              },
+              "value": {
+                "type": "string",
+                "description": "The sender's address is this one."
+              }
+            }
+          },
+          {
+            "type": "object",
+            "description": "The sender's domain is this one, or a subdomain of it.",
+            "required": [
+              "value",
+              "field"
+            ],
+            "properties": {
+              "field": {
+                "type": "string",
+                "enum": [
+                  "sender_domain"
+                ]
+              },
+              "value": {
+                "type": "string",
+                "description": "The sender's domain is this one, or a subdomain of it."
+              }
+            }
+          },
+          {
+            "type": "object",
+            "description": "The subject holds these words, in this order.",
+            "required": [
+              "value",
+              "field"
+            ],
+            "properties": {
+              "field": {
+                "type": "string",
+                "enum": [
+                  "subject_contains"
+                ]
+              },
+              "value": {
+                "type": "string",
+                "description": "The subject holds these words, in this order."
+              }
+            }
+          },
+          {
+            "type": "object",
+            "description": "A header is present.",
+            "required": [
+              "value",
+              "field"
+            ],
+            "properties": {
+              "field": {
+                "type": "string",
+                "enum": [
+                  "header"
+                ]
+              },
+              "value": {
+                "$ref": "#/components/schemas/ProposedHeader",
+                "description": "A header is present."
+              }
+            }
+          },
+          {
+            "type": "object",
+            "description": "The conversation has this label (its id).",
+            "required": [
+              "value",
+              "field"
+            ],
+            "properties": {
+              "field": {
+                "type": "string",
+                "enum": [
+                  "label"
+                ]
+              },
+              "value": {
+                "type": "string",
+                "description": "The conversation has this label (its id)."
+              }
+            }
+          },
+          {
+            "type": "object",
+            "description": "The conversation is in this stream.",
+            "required": [
+              "value",
+              "field"
+            ],
+            "properties": {
+              "field": {
+                "type": "string",
+                "enum": [
+                  "stream"
+                ]
+              },
+              "value": {
+                "$ref": "#/components/schemas/StreamKey",
+                "description": "The conversation is in this stream."
+              }
+            }
+          }
+        ],
+        "description": "One test on a message; all of a rule's conditions must hold."
+      },
+      "ProposedHeader": {
+        "type": "object",
+        "description": "A header test: the header is present.",
+        "required": [
+          "name"
+        ],
+        "properties": {
+          "name": {
+            "$ref": "#/components/schemas/HeaderKey",
+            "description": "Which header."
+          }
         }
       },
       "Provider": {
@@ -14740,6 +15792,58 @@
           }
         }
       },
+      "SenderList": {
+        "type": "object",
+        "description": "Senders, replied to most first.",
+        "required": [
+          "senders"
+        ],
+        "properties": {
+          "senders": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SenderView"
+            },
+            "description": "Replied to most first, then written most, then by address."
+          }
+        }
+      },
+      "SenderView": {
+        "type": "object",
+        "description": "Someone who writes to the caller's inboxes.",
+        "required": [
+          "address",
+          "received",
+          "replied"
+        ],
+        "properties": {
+          "address": {
+            "type": "string",
+            "description": "Their address, lower-cased.",
+            "example": "rita@silva-contas.example"
+          },
+          "name": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The display name on their newest message, when it had one.",
+            "example": "Rita Gomes"
+          },
+          "received": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Inbound messages from them in the caller's inboxes, among the newest\n(the last year, at most 5,000 messages).",
+            "minimum": 0
+          },
+          "replied": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Of those, their conversations the caller's inboxes replied to.",
+            "minimum": 0
+          }
+        }
+      },
       "SessionInfo": {
         "type": "object",
         "description": "Who is signed in. Never contains a token.",
@@ -15090,6 +16194,16 @@
           }
         }
       },
+      "StreamKey": {
+        "type": "string",
+        "description": "A stream.",
+        "enum": [
+          "primary",
+          "updates",
+          "receipts",
+          "newsletters"
+        ]
+      },
       "StreamSource": {
         "type": "string",
         "description": "Who put a conversation in its stream.",
@@ -15200,6 +16314,14 @@
             "description": "Where it is in its reading."
           }
         }
+      },
+      "SurfaceKey": {
+        "type": "string",
+        "description": "Always or never show.",
+        "enum": [
+          "always",
+          "never"
+        ]
       },
       "SurfaceWhen": {
         "type": "string",
@@ -15347,6 +16469,16 @@
         "enum": [
           "sure",
           "check"
+        ]
+      },
+      "UnsupportedReason": {
+        "type": "string",
+        "description": "Why a sentence can't be a rule.",
+        "enum": [
+          "sends_mail",
+          "deletes_mail",
+          "not_about_mail",
+          "too_vague"
         ]
       },
       "UpdateRule": {
@@ -15559,6 +16691,33 @@
           }
         }
       },
+      "WhoQuestion": {
+        "type": "object",
+        "description": "\"Who do you mean by …?\": the person must pick or type the sender.",
+        "required": [
+          "phrase",
+          "candidates",
+          "matched"
+        ],
+        "properties": {
+          "candidates": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Candidate"
+            },
+            "description": "Senders whose name, address or domain matches the phrase, replied\nto most first; when none match, the people replied to most."
+          },
+          "matched": {
+            "type": "boolean",
+            "description": "Whether the candidates matched the phrase."
+          },
+          "phrase": {
+            "type": "string",
+            "description": "The words from the sentence.",
+            "example": "my accountant"
+          }
+        }
+      },
       "WorkspaceClient": {
         "type": "object",
         "description": "A workspace client, as settings show it. Never its secret.",
@@ -15728,7 +16887,7 @@
         "type": "http",
         "scheme": "bearer",
         "bearerFormat": "JWT",
-        "description": "An OAuth 2.1 access token (a JWT) issued by this instance's identity provider, the issuer configured as `CAMPBOOKS_AUTH__ISSUER`. Each operation lists the scope it requires; operations with an empty requirement are public. Scopes:\n\n- `admin:access`: Reach the instance administration API, if your account has an admin profile. Granted to Campbooks' own apps only.\n- `attention:read`: See what needs you: the items on your Home.\n- `attention:write`: Put items on your Home off until later, and bring them back.\n- `connectors:read`: See the outside accounts connected to your workspaces and how their sync is doing.\n- `connectors:write`: Connect outside accounts (such as Gmail), sync them now and disconnect them.\n- `conversations:read`: Read your inboxes, conversations and messages.\n- `conversations:send`: Write drafts and send messages, replies and forwards from your inboxes.\n- `conversations:write`: Mark conversations read or unread, star, archive, label and move them between streams.\n- `identity:clients`: Register, rotate and remove a workspace's own apps and their secrets.\n- `identity:read`: See your account, its ways in and the mailboxes waiting to be connected.\n- `identity:write`: Change your account and connect or discard the mailboxes waiting on it.\n- `search:read`: Search the records you may read (conversations need conversations:read too).\n- `system:read`: Read operational status.\n- `workspaces:admin`: Manage workspaces you own or administer: settings, members, invitations, deletion and the security log.\n- `workspaces:read`: See your workspaces and who belongs to them.\n- `workspaces:write`: Create workspaces, accept invitations and leave workspaces."
+        "description": "An OAuth 2.1 access token (a JWT) issued by this instance's identity provider, the issuer configured as `CAMPBOOKS_AUTH__ISSUER`. Each operation lists the scope it requires; operations with an empty requirement are public. Scopes:\n\n- `admin:access`: Reach the instance administration API, if your account has an admin profile. Granted to Campbooks' own apps only.\n- `assistant:read`: See what you told Scout about how it should act.\n- `assistant:write`: Tell Scout how it should act, and turn your sentences into rules to check.\n- `attention:read`: See what needs you: the items on your Home.\n- `attention:write`: Put items on your Home off until later, and bring them back.\n- `connectors:read`: See the outside accounts connected to your workspaces and how their sync is doing.\n- `connectors:write`: Connect outside accounts (such as Gmail), sync them now and disconnect them.\n- `conversations:read`: Read your inboxes, conversations and messages.\n- `conversations:send`: Write drafts and send messages, replies and forwards from your inboxes.\n- `conversations:write`: Mark conversations read or unread, star, archive, label and move them between streams.\n- `identity:clients`: Register, rotate and remove a workspace's own apps and their secrets.\n- `identity:read`: See your account, its ways in and the mailboxes waiting to be connected.\n- `identity:write`: Change your account and connect or discard the mailboxes waiting on it.\n- `search:read`: Search the records you may read (conversations need conversations:read too).\n- `system:read`: Read operational status.\n- `workspaces:admin`: Manage workspaces you own or administer: settings, members, invitations, deletion and the security log.\n- `workspaces:read`: See your workspaces and who belongs to them.\n- `workspaces:write`: Create workspaces, accept invitations and leave workspaces."
       },
       "session": {
         "type": "apiKey",
@@ -15766,6 +16925,10 @@
     {
       "name": "search",
       "description": "One search over the records you may open: conversations today. Words in English, Portuguese, Spanish and French with accents ignored, Gmail-style operators, highlights as plain-text segments. Results come only from the containers (inboxes) you may see, checked at query time."
+    },
+    {
+      "name": "assistant",
+      "description": "What you told Scout about how to act, and turning a sentence you type into rules to check. Compiling uses the `complete` AI role only when you ask, and sends it your sentence and your own addresses and label names, never your mail; nothing is saved until you save a rule through the conversations module."
     },
     {
       "name": "changes",

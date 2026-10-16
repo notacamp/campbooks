@@ -6,17 +6,17 @@ import { useShortcut } from "~/lib/shortcuts";
 
 import { renderUi } from "../../../../../test/render";
 
-import { CommandMenu } from "./CommandMenu";
+import { CommandMenu, type MenuQuery, type MenuSection } from "./CommandMenu";
 
 function Screen({
   onInbox,
   onAsk,
-  onSearch,
+  useSection,
   onSuggestion,
 }: {
   onInbox: () => void;
   onAsk?: (query: string) => void;
-  onSearch?: (query: string) => void;
+  useSection?: (menu: MenuQuery) => MenuSection | undefined;
   onSuggestion?: () => void;
 }) {
   const [open, setOpen] = useState(false);
@@ -42,7 +42,7 @@ function Screen({
           },
         ]}
         onAsk={onAsk}
-        onSearch={onSearch}
+        useSection={useSection}
       />
     </>
   );
@@ -73,27 +73,117 @@ describe("CommandMenu", () => {
     expect(screen.queryByRole("option", { name: /Search or ask/ })).not.toBeInTheDocument();
   });
 
-  it("offers to search conversations for the query, before Ask, and hands it over", () => {
-    const onSearch = vi.fn();
-    renderUi(<Screen onInbox={vi.fn()} onAsk={vi.fn()} onSearch={onSearch} />);
-    open();
-    const input = screen.getByRole("combobox");
+  describe("with a section above the commands", () => {
+    const hits = ["Lease renewal", "Lease inspection"];
+    const onHit = vi.fn();
+    const onAll = vi.fn();
+    const onChip = vi.fn();
+    const useHits = ({ query }: MenuQuery): MenuSection | undefined =>
+      query.trim() === ""
+        ? undefined
+        : {
+            group: "Conversations",
+            chips: [{ id: "from:ana", label: "From ana", onRemove: onChip }],
+            onSubmitAll: onAll,
+            options: [
+              ...hits.map((hit) => ({
+                id: hit,
+                label: hit,
+                onSelect: () => {
+                  onHit(hit);
+                },
+              })),
+              { id: "all", label: `All results for “${query.trim()}”`, onSelect: onAll },
+            ],
+          };
 
-    fireEvent.change(input, { target: { value: "  lease " } });
-    const options = screen.getAllByRole("option");
+    it("lists it first, then the commands, then Ask, with one cursor across them", () => {
+      renderUi(<Screen onInbox={vi.fn()} onAsk={vi.fn()} useSection={useHits} />);
+      open();
+      const input = screen.getByRole("combobox");
 
-    expect(options.at(-2)).toHaveTextContent("Search conversations for “lease”");
-    expect(options.at(-1)).toHaveTextContent("Ask Campbooks: lease");
-    fireEvent.click(screen.getByRole("option", { name: /Search conversations/ }));
-    expect(onSearch).toHaveBeenCalledWith("lease");
-    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+      fireEvent.change(input, { target: { value: "lease" } });
+      const options = screen.getAllByRole("option");
+
+      expect(options.map((option) => option.textContent)).toEqual([
+        "Lease renewal",
+        "Lease inspection",
+        "All results for “lease”",
+        "Ask Campbooks: lease",
+      ]);
+      expect(options[0]).toHaveAttribute("aria-selected", "true");
+      fireEvent.keyDown(input, { key: "ArrowDown" });
+      fireEvent.keyDown(input, { key: "j", ctrlKey: true });
+      fireEvent.keyDown(input, { key: "ArrowDown" });
+      expect(input).toHaveAttribute("aria-activedescendant", options[3]?.id);
+      fireEvent.keyDown(input, { key: "ArrowDown" });
+      expect(options[0]).toHaveAttribute("aria-selected", "true");
+      expect(options.every((option) => option.getAttribute("tabindex") === "-1")).toBe(true);
+    });
+
+    it("runs a row with Enter or a click, and ⌘↵ shows everything", () => {
+      renderUi(<Screen onInbox={vi.fn()} useSection={useHits} />);
+      open();
+      const input = screen.getByRole("combobox");
+      fireEvent.change(input, { target: { value: "lease" } });
+
+      fireEvent.keyDown(input, { key: "ArrowDown" });
+      fireEvent.keyDown(input, { key: "Enter" });
+      expect(onHit).toHaveBeenLastCalledWith("Lease inspection");
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+
+      open();
+      fireEvent.change(screen.getByRole("combobox"), { target: { value: "lease" } });
+      fireEvent.click(screen.getByRole("option", { name: "Lease renewal" }));
+      expect(onHit).toHaveBeenLastCalledWith("Lease renewal");
+
+      open();
+      fireEvent.change(screen.getByRole("combobox"), { target: { value: "lease" } });
+      fireEvent.keyDown(screen.getByRole("combobox"), { key: "Enter", ctrlKey: true });
+      expect(onAll).toHaveBeenCalledOnce();
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    });
+
+    it("shows its chips under the input, and removing one keeps the focus in the field", () => {
+      renderUi(<Screen onInbox={vi.fn()} useSection={useHits} />);
+      open();
+      const input = screen.getByRole("combobox");
+      fireEvent.change(input, { target: { value: "lease" } });
+
+      fireEvent.click(screen.getByRole("button", { name: "Remove filter: From ana" }));
+
+      expect(onChip).toHaveBeenCalledOnce();
+      expect(input).toHaveFocus();
+    });
+
+    it("hints ⌘↵ only when the section can show everything", () => {
+      const { unmount } = renderUi(<Screen onInbox={vi.fn()} useSection={useHits} />);
+      open();
+      fireEvent.change(screen.getByRole("combobox"), { target: { value: "lease" } });
+      expect(screen.getByText("All results")).toBeInTheDocument();
+      unmount();
+
+      renderUi(<Screen onInbox={vi.fn()} />);
+      open();
+      expect(screen.queryByText("All results")).not.toBeInTheDocument();
+      expect(screen.getByText("Move")).toBeInTheDocument();
+      expect(screen.getByText("Close")).toBeInTheDocument();
+    });
   });
 
-  it("offers no search row without a query", () => {
-    renderUi(<Screen onInbox={vi.fn()} onSearch={vi.fn()} />);
+  it("keeps a section's rows open after they run when they say so", () => {
+    const fill = vi.fn();
+    const useRecent = (): MenuSection => ({
+      group: "Recent searches",
+      options: [{ id: "lease", label: "lease", keepOpen: true, onSelect: fill }],
+    });
+    renderUi(<Screen onInbox={vi.fn()} useSection={useRecent} />);
     open();
 
-    expect(screen.queryByRole("option", { name: /Search conversations/ })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("option", { name: "lease" }));
+
+    expect(fill).toHaveBeenCalledOnce();
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
   });
 
   it("filters ignoring accents and runs the active command with Enter", () => {
