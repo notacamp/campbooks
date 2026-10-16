@@ -25,9 +25,14 @@
 // message into every mailbox, to show mail arriving live, and
 // `GET /fake/mailbox` lists what each holds (subjects and state), to show
 // write-backs landing. `POST /fake/expire` withdraws every grant so far, to
-// show a mailbox that needs reconnecting.
+// show a mailbox that needs reconnecting. `--html-mail` adds the sanitiser's
+// fixture emails (newsletter, receipt, Outlook, Gmail, wide layouts and a
+// hostile one) to the Gmail mailbox, for showing the reader.
 import { createHash, generateKeyPairSync, randomBytes, sign } from "node:crypto";
+import { readdirSync, readFileSync } from "node:fs";
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
 
 import {
@@ -36,6 +41,7 @@ import {
   demoImage,
   describeMailbox,
   handleGmail,
+  htmlMailDemos,
   sendMessage,
   type Mailbox,
   writeGmail,
@@ -56,8 +62,26 @@ const { values } = parseArgs({
     port: { type: "string" },
     // Extra issues of a demo newsletter, so teaching once has lookalikes.
     lookalikes: { type: "string", default: "0" },
+    // The sanitiser's fixture emails, for showing the reader.
+    "html-mail": { type: "boolean", default: false },
   },
 });
+
+/** The sanitiser's fixture emails by name, when `--html-mail` asks for them. */
+function htmlFixtures(): Record<string, string> {
+  if (!values["html-mail"]) {
+    return {};
+  }
+  const dir = path.join(
+    path.dirname(fileURLToPath(import.meta.url)),
+    "../../../crates/modules/conversations/fixtures/email-html",
+  );
+  return Object.fromEntries(
+    readdirSync(dir)
+      .filter((file) => file.endsWith(".html"))
+      .map((file) => [file.slice(0, -5), readFileSync(path.join(dir, file), "utf8")]),
+  );
+}
 const provider = values.provider as Provider;
 const DEFAULT_PORTS: Record<Provider, string> = { google: "9050", microsoft: "9051", zoho: "9052" };
 if (!(provider in DEFAULT_PORTS)) {
@@ -138,7 +162,12 @@ function zohoMailboxOf(sub: string): ZohoMailbox {
 function mailboxOf(sub: string): Mailbox {
   let mailbox = mailboxes.get(sub);
   if (mailbox === undefined) {
-    mailbox = createMailbox(person.email, `${base}/images`, Number(values.lookalikes));
+    mailbox = createMailbox(
+      person.email,
+      `${base}/images`,
+      Number(values.lookalikes),
+      htmlMailDemos(person.email, `${base}/images`, htmlFixtures()),
+    );
     mailboxes.set(sub, mailbox);
   }
   return mailbox;
