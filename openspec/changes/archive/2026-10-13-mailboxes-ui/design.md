@@ -286,6 +286,17 @@ per-workspace rows behind row-level security.
    nothing.** Removes the way in on the first disconnect even while another
    workspace's connection still uses it. Rejected.
 
+### The sign-in allow-list (#495)
+
+The allow-list gates every door that creates or uses a way in. A connect
+with `sign_in: true` (and a link) is checked before the transaction that
+links the way in and records its mailbox, so a refusal writes nothing and
+hands nothing over. A connect with `sign_in: false` and a reconnect are not
+checked: they never create a way in or a session, so they are no road around
+the list (signing in with that account is still refused), and the list is no
+road around them either (a shared mailbox's content is the workspace's
+choice, not a sign-in).
+
 ## Risks
 
 - **Mail after Disconnect.** Until #117's purge consumes `mail = delete`,

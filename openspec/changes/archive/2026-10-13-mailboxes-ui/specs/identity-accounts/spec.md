@@ -62,6 +62,14 @@ return it with `connected=<connection id>`.
 - **WHEN** a signed-in member connects a second Google account in their workspace
 - **THEN** that Google account is a way in, and the grant-intake port receives its grant with a refresh token for that workspace
 
+#### Scenario: A connect that would add a way in, off the allow-list
+- **WHEN** the sign-in allow-list does not let an account in and a member connects it with `sign_in: true`
+- **THEN** the browser returns with `link_error=sign_in_not_allowed` before any way in or mailbox record is written or any grant handed over
+
+#### Scenario: A shared mailbox off the allow-list
+- **WHEN** a member connects that account with `sign_in: false`
+- **THEN** it is connected, no way in or mailbox record is written, and signing in with it is still refused
+
 #### Scenario: Connect a shared mailbox
 - **WHEN** a member connects `support@example.com` with `sign_in: false`
 - **THEN** the grant-intake port receives it with `signs_in` false, the member's ways in are unchanged, and no `identity.way_in_added` is published
