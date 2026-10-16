@@ -132,7 +132,8 @@ impl TokenVerifier {
         let WithExtra { claims, extra }: WithExtra<T> = inner
             .decode_from(token, issuer, client_id, &ID_TOKEN_TYPES, true)
             .await
-            .inspect_err(|err| tracing::debug!(error = %err, "ID token rejected"))?;
+            .inspect_err(|err| tracing::debug!(error = %err, "ID token rejected"))?
+            .rest;
         if claims.nonce.as_deref() != Some(nonce) {
             return Err(invalid());
         }

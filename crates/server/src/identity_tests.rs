@@ -37,12 +37,12 @@ use tower::ServiceExt as _;
 
 use crate::bff::config::{self, BffConfig, Loaded};
 
-const ORIGIN: &str = "http://localhost:8080";
+pub(crate) const ORIGIN: &str = "http://localhost:8080";
 /// Gmail's scope: what the connectors module asks for in the sign-up consent.
 const GMAIL: &str = "https://www.googleapis.com/auth/gmail.modify";
 
 /// One narrated step of the walk-through (shown with `--nocapture`).
-fn step(text: &str) {
+pub(crate) fn step(text: &str) {
     println!("  \u{2192} {text}");
 }
 
@@ -70,23 +70,23 @@ impl Logs {
     }
 }
 
-struct Browser {
+pub(crate) struct Browser {
     app: Router,
     cookies: BTreeMap<String, String>,
 }
 
-struct Reply {
-    status: StatusCode,
-    headers: HeaderMap,
-    body: String,
+pub(crate) struct Reply {
+    pub(crate) status: StatusCode,
+    pub(crate) headers: HeaderMap,
+    pub(crate) body: String,
 }
 
 impl Reply {
-    fn json(&self) -> Value {
+    pub(crate) fn json(&self) -> Value {
         serde_json::from_str(&self.body).unwrap_or(Value::Null)
     }
 
-    fn location(&self) -> String {
+    pub(crate) fn location(&self) -> String {
         self.headers
             .get(header::LOCATION)
             .and_then(|v| v.to_str().ok())
@@ -96,7 +96,12 @@ impl Reply {
 }
 
 impl Browser {
-    async fn send(&mut self, method: Method, url: &str, body: Option<Value>) -> Reply {
+    /// Another browser: no cookies.
+    pub(crate) fn forget_cookies(&mut self) {
+        self.cookies.clear();
+    }
+
+    pub(crate) async fn send(&mut self, method: Method, url: &str, body: Option<Value>) -> Reply {
         let path = url.strip_prefix(ORIGIN).unwrap_or(url);
         let mut request = Request::builder().method(method.clone()).uri(path);
         if !self.cookies.is_empty() {
@@ -140,13 +145,13 @@ impl Browser {
         }
     }
 
-    async fn get(&mut self, url: &str) -> Reply {
+    pub(crate) async fn get(&mut self, url: &str) -> Reply {
         self.send(Method::GET, url, None).await
     }
 
     /// A request with `headers` and a raw `body`, no cookies (an outside
     /// client, not a browser).
-    async fn raw(
+    pub(crate) async fn raw(
         &self,
         method: Method,
         url: &str,
@@ -195,7 +200,7 @@ impl Browser {
 /// The server with the in-process issuer, a (fake) Google and the web BFF,
 /// and a browser with no cookies; and the issuer (to mint tokens no client
 /// could get).
-async fn world(db: PgPool) -> (Browser, TestIdp, Arc<campbooks_identity::deps::Issuer>) {
+pub(crate) async fn world(db: PgPool) -> (Browser, TestIdp, Arc<campbooks_identity::deps::Issuer>) {
     let google = TestIdp::start().await;
     let mut config = testing::config("postgres://test@localhost/test");
     assert!(config.auth.issuer.is_none(), "no other identity provider");
@@ -461,7 +466,7 @@ async fn a_new_person_signs_up_through_the_bff_and_their_mailbox_reaches_their_w
 
 /// Sign up through the web app as the fake Google's user and land with a
 /// web session.
-async fn sign_up_through_bff(browser: &mut Browser, google: &TestIdp) {
+pub(crate) async fn sign_up_through_bff(browser: &mut Browser, google: &TestIdp) {
     let to_issuer = browser.get("/bff/login?return_to=/welcome").await;
     let screen = browser.get(&to_issuer.location()).await.location();
     let request = screen.trim_start_matches("/sign-in?request=").to_owned();
@@ -476,7 +481,7 @@ async fn sign_up_through_bff(browser: &mut Browser, google: &TestIdp) {
 }
 
 /// Create a workspace through the web app; its id.
-async fn create_workspace(browser: &mut Browser, name: &str) -> String {
+pub(crate) async fn create_workspace(browser: &mut Browser, name: &str) -> String {
     let created = browser
         .send(
             Method::POST,
