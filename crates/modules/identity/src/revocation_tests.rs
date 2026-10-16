@@ -230,7 +230,10 @@ async fn the_epoch_never_moves_back(db: PgPool) {
     let kit = Kit::new(db).await;
     let access = kit.signed_up().await;
     let account = account_of(&access);
-    let ahead = Utc::now() + TimeDelta::seconds(30);
+    // Whole microseconds, as Postgres keeps them (Linux clocks have more).
+    let ahead =
+        DateTime::from_timestamp_micros((Utc::now() + TimeDelta::seconds(30)).timestamp_micros())
+            .unwrap();
     suspend(&kit, account, ahead).await;
     unsuspend(&kit, account).await;
     // A revocation stamped earlier (another process's clock) keeps the later epoch.
