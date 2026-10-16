@@ -149,6 +149,12 @@ All notable changes to Campbooks Next are documented here. The format follows
   possible, but nothing is provisioned for it.
 
 ### Changed
+- One "Search or ask" field and menu, with conversations inline. The sidebar's
+  separate "Search conversations" entry is gone: ⌘K and `/` (on screens 48rem and
+  wider) open the same menu, which lists matching conversations first (matched words
+  marked, the filters it understood as removable chips), then commands, then Ask,
+  under one cursor: ↑ ↓ move, ↵ opens, ⌘↵ shows all results. On a phone `/` and the
+  top bar's search button still open the results page.
 - **A decision model sorts mail and raises needs; rules only read headers and can
   only say no** (ADR 0018). Every phrase list and regular expression that read an
   email's subject, body or attachment names is gone. What is left reads structured

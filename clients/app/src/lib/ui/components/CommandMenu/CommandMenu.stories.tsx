@@ -6,7 +6,7 @@ import { useShortcut } from "~/lib/shortcuts";
 
 import { Button } from "../Button/Button";
 
-import { CommandMenu, type Command } from "./CommandMenu";
+import { CommandMenu, type Command, type MenuQuery, type MenuSection } from "./CommandMenu";
 
 const meta = {
   title: "Components/CommandMenu",
@@ -38,10 +38,10 @@ const suggestions: Command[] = [
 /** What a screen binds shows up in the menu with its keys (here: the G-then-X places). */
 function Screen({
   onAsk,
-  onSearch,
+  useSection,
 }: {
   onAsk?: (query: string) => void;
-  onSearch?: (query: string) => void;
+  useSection?: (menu: MenuQuery) => MenuSection | undefined;
 }) {
   const [open, setOpen] = useState(true);
   const go = fn();
@@ -69,7 +69,7 @@ function Screen({
         }}
         commands={suggestions}
         onAsk={onAsk}
-        onSearch={onSearch}
+        useSection={useSection}
       />
     </div>
   );
@@ -106,15 +106,32 @@ export const Ask: Story = {
   },
 };
 
-/** With a query, a row also searches conversations for it (the search overlay takes over). */
-export const SearchConversations: Story = {
-  render: () => <Screen onAsk={fn()} onSearch={fn()} />,
+/** A screen's own section: matching rows first, then the commands, then Ask, under one cursor. */
+const useConversations = ({ query }: MenuQuery): MenuSection | undefined =>
+  query.trim() === ""
+    ? undefined
+    : {
+        group: "Conversations",
+        chips: [{ id: "from:ana", label: "From ana", onRemove: fn() }],
+        onSubmitAll: fn(),
+        options: [
+          { id: "lease", label: "Lease renewal for the Rua Direita flat", onSelect: fn() },
+          { id: "all", label: `All results for “${query.trim()}”`, onSelect: fn() },
+        ],
+      };
+
+export const WithSection: Story = {
+  render: () => <Screen onAsk={fn()} useSection={useConversations} />,
   play: async ({ canvasElement }) => {
     const body = within(canvasElement.ownerDocument.body);
-    await userEvent.type(await body.findByRole("combobox"), "lease");
-    await expect(
-      body.getByRole("option", { name: /Search conversations for “lease”/ }),
-    ).toBeVisible();
+    const input = await body.findByRole("combobox");
+    await userEvent.type(input, "lease");
+    const options = body.getAllByRole("option");
+    await expect(options[0]).toHaveTextContent("Lease renewal");
+    await expect(options.at(-1)).toHaveTextContent("Ask Campbooks: lease");
+    await userEvent.keyboard("{ArrowDown}{ArrowDown}");
+    await expect(input).toHaveAttribute("aria-activedescendant", options[2]?.id);
+    await expect(body.getByRole("button", { name: "Remove filter: From ana" })).toBeVisible();
   },
 };
 

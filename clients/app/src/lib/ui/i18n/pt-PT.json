@@ -25,8 +25,11 @@
     "empty": "Nada corresponde a «{{query}}»",
     "results": "Comandos",
     "ask": "Perguntar ao Campbooks: {{query}}",
-    "askGroup": "Perguntar ou pesquisar",
-    "search": "Pesquisar conversas por “{{query}}”"
+    "askGroup": "Perguntar",
+    "hintMove": "Mover",
+    "hintOpen": "Abrir",
+    "hintAll": "Todos os resultados",
+    "hintClose": "Fechar"
   },
   "shortcutSheet": {
     "title": "Atalhos de teclado"

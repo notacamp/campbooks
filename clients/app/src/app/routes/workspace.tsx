@@ -231,15 +231,6 @@ function WorkspaceFrame({ workspace, all }: { workspace: Workspace; all: Workspa
             }}
           />
           <NavItem
-            label={tSearch("shortcuts.open")}
-            icon="search"
-            shortcut="search.open"
-            current={inSearch}
-            onClick={() => {
-              registry.run("search.open");
-            }}
-          />
-          <NavItem
             label={tNav("nav.home")}
             icon="home"
             shortcut="nav.home"

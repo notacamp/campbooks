@@ -80,23 +80,28 @@ export function WorkspaceSwitcher({
   );
 }
 
-/** The sidebar's "Search or ask" field: opens the command menu (⌘K). */
+/** The sidebar's "Search or ask" field: opens the command menu (⌘K, or / in a workspace). */
 export function SearchButton({ onClick }: { onClick: () => void }) {
   const { t } = useTranslation("ui");
   const { platform } = useShortcuts();
   const definition = useShortcutDefinition("command.open");
+  const slash = useShortcutDefinition("search.open");
   return (
     <button
       type="button"
       className={styles["search"]}
       onClick={onClick}
       aria-keyshortcuts={
-        definition === undefined ? undefined : ariaKeyShortcut(definition.keys, platform)
+        [definition, slash]
+          .filter((each) => each !== undefined)
+          .map((each) => ariaKeyShortcut(each.keys, platform))
+          .join(" ") || undefined
       }
     >
       <Visor />
       <span className={styles["searchLabel"]}>{t("search.label")}</span>
       <KbdHint shortcut="command.open" />
+      <KbdHint shortcut="search.open" />
     </button>
   );
 }

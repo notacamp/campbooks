@@ -25,8 +25,11 @@
     "empty": "Rien ne correspond à « {{query}} »",
     "results": "Commandes",
     "ask": "Demander à Campbooks : {{query}}",
-    "askGroup": "Demander ou rechercher",
-    "search": "Rechercher des conversations pour « {{query}} »"
+    "askGroup": "Demander",
+    "hintMove": "Naviguer",
+    "hintOpen": "Ouvrir",
+    "hintAll": "Tous les résultats",
+    "hintClose": "Fermer"
   },
   "shortcutSheet": {
     "title": "Raccourcis clavier"
