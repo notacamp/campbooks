@@ -213,7 +213,7 @@
     "questions": {
       "title": "Your answers",
       "askFirst": "Ask me first. Nothing changes until you say yes.",
-      "actThenTell": "Do it and tell me, with Undo, in an inbox only you use.",
+      "actThenTell": "Do it and tell me, with Undo, in an inbox only I use.",
       "never": "You haven’t answered Scout’s questions yet.",
       "again": "Answer the questions again",
       "start": "Answer the questions",

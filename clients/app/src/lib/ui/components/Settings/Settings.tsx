@@ -76,7 +76,12 @@ export function SettingsSection({
       <div className={styles["top"]}>
         <Tag id={id} className={styles["title"]}>
           {title}
-          {count === undefined ? null : <span className={styles["count"]}> · {count}</span>}
+          {count === undefined || count === 0 ? null : (
+            <span className={styles["count"]}>
+              <span aria-hidden="true"> · </span>
+              {count}
+            </span>
+          )}
         </Tag>
         {description === undefined ? null : <p className={styles["description"]}>{description}</p>}
       </div>

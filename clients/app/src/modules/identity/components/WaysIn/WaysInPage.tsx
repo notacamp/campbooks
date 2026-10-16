@@ -135,6 +135,7 @@ export function WaysInPage({
             title={t("waysIn.loadError.title")}
             visor="thinking"
             visorSize="lg"
+            headingLevel={3}
             action={
               <Button
                 onClick={() => {

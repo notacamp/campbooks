@@ -84,11 +84,15 @@ export function PasskeysSection({ returnTo, leave = leavePage }: PasskeysSection
   const supported = passkeysSupported();
   const device = deviceName();
 
+  const addRef = useRef<HTMLButtonElement>(null);
+  const refocus = useRef(false);
+
   const start = () => {
     if (add.isPending) {
       return;
     }
     setProblem(undefined);
+    refocus.current = true;
     add.mutate(device === undefined ? undefined : t("passkeys.nameOn", { device }), {
       onError: (error) => {
         setProblem(addProblem(error));
@@ -102,8 +106,17 @@ export function PasskeysSection({ returnTo, leave = leavePage }: PasskeysSection
 
   // Nothing to list: the empty panel carries the add button itself.
   const none = passkeys.isSuccess && passkeys.data.items.length === 0;
+  // Adding the first passkey swaps the empty panel for the list, which
+  // re-creates the button: put focus back on it.
+  useEffect(() => {
+    if (refocus.current && add.isSuccess && !none) {
+      refocus.current = false;
+      addRef.current?.focus();
+    }
+  }, [add.isSuccess, none]);
   const addButton = (
     <Button
+      ref={addRef}
       variant="secondary"
       icon="plus"
       disabled={add.isPending || !passkeys.isSuccess}

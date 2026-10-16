@@ -1,7 +1,15 @@
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
-import { Button, EmptyState, InlineConfirm, List, ListRow, SettingsSection, Text } from "~/lib/ui";
+import {
+  Button,
+  InlineConfirm,
+  List,
+  ListRow,
+  SettingsEmpty,
+  SettingsSection,
+  Text,
+} from "~/lib/ui";
 
 import { useRetryKind, type KindSummary, type QueueSummary } from "../../api/jobs";
 import { formatUptime } from "../SystemAdminPanel/SystemOverview";
@@ -44,7 +52,9 @@ export function JobsSummary({ summary, onShowFailed, onNotice }: JobsSummaryProp
   return (
     <SettingsSection title={t("jobs.queue.title")}>
       {summary.kinds.length === 0 ? (
-        <EmptyState title={t("jobs.queue.emptyTitle")}>{t("jobs.queue.emptyLead")}</EmptyState>
+        <SettingsEmpty title={t("jobs.queue.emptyTitle")}>
+          {t("jobs.queue.emptyLead")}
+        </SettingsEmpty>
       ) : (
         <List label={t("jobs.queue.title")}>
           {summary.kinds.map((entry) => {

@@ -143,8 +143,8 @@ describe("JobsAdminPanel", () => {
 
     renderWithProviders(<JobsAdminPanel />);
 
-    expect(await screen.findByRole("heading", { name: "Nothing is queued" })).toBeVisible();
-    expect(await screen.findByRole("heading", { name: "No failed jobs" })).toBeVisible();
+    expect(await screen.findByText("Nothing is queued")).toBeVisible();
+    expect(await screen.findByText("No failed jobs")).toBeVisible();
   });
 
   it("offers to try again when the queue cannot be loaded", async () => {

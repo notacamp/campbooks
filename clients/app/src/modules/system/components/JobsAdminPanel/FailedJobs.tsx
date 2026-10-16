@@ -6,6 +6,7 @@ import {
   Button,
   CodeBlock,
   EmptyState,
+  SettingsEmpty,
   SettingsSection,
   InlineConfirm,
   List,
@@ -73,6 +74,7 @@ export function FailedJobs({ kind, kinds, onKind, onNotice }: FailedJobsProps) {
         </div>
       ) : failed.isError ? (
         <EmptyState
+          headingLevel={3}
           title={t("jobs.loadError.title")}
           visor="thinking"
           visorSize="lg"
@@ -89,7 +91,9 @@ export function FailedJobs({ kind, kinds, onKind, onNotice }: FailedJobsProps) {
           {t("jobs.loadError.lead")}
         </EmptyState>
       ) : items.length === 0 ? (
-        <EmptyState title={t("jobs.failed.emptyTitle")}>{t("jobs.failed.emptyLead")}</EmptyState>
+        <SettingsEmpty title={t("jobs.failed.emptyTitle")}>
+          {t("jobs.failed.emptyLead")}
+        </SettingsEmpty>
       ) : (
         <>
           <List label={t("jobs.failed.title")}>

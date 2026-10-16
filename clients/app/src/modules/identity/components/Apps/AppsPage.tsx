@@ -120,6 +120,7 @@ function LoadError({ onRetry }: { onRetry: () => void }) {
       title={t("apps.loadError.title")}
       visor="thinking"
       visorSize="lg"
+      headingLevel={3}
       action={<Button onClick={onRetry}>{t("apps.loadError.retry")}</Button>}
     >
       {t("apps.loadError.lead")}

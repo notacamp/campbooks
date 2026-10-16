@@ -6,7 +6,7 @@ import {
   Banner,
   Button,
   CopyField,
-  EmptyState,
+  SettingsEmpty,
   SettingsSection,
   InlineConfirm,
   List,
@@ -75,9 +75,9 @@ export function SignupCodes() {
             {t("signups.loadError.lead")}
           </Banner>
         ) : rows.length === 0 ? (
-          <EmptyState title={t("signups.codes.empty.title")} visor="asleep" visorSize="lg">
+          <SettingsEmpty title={t("signups.codes.empty.title")}>
             {t("signups.codes.empty.lead")}
-          </EmptyState>
+          </SettingsEmpty>
         ) : (
           <>
             <List label={t("signups.codes.list")}>

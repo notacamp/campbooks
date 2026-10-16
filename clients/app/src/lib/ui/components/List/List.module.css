@@ -125,7 +125,9 @@
 /* The chosen row's highlight bleeds past the card's text edge, so it is not cramped. */
 .list[data-flush] > .row[data-selected] {
   border-radius: var(--radius-md);
-  box-shadow: 0 0 0 var(--row-pad-x) var(--surface-selected);
+  box-shadow:
+    calc(-1 * var(--row-pad-x)) 0 0 0 var(--surface-selected),
+    var(--row-pad-x) 0 0 0 var(--surface-selected);
 }
 
 @media (width < 48rem) {

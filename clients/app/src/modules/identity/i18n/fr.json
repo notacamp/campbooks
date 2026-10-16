@@ -205,7 +205,7 @@
   },
   "waysIn": {
     "title": "Moyens de connexion",
-    "lead": "Comment vous entrez dans Campbooks. Gardez-en au moins deux, pour que perdre l’une ne vous enferme jamais dehors.",
+    "lead": "Comment vous entrez dans Campbooks. Gardez-en au moins deux, pour qu’en perdre un ne vous bloque jamais.",
     "list": "Vos moyens de connexion",
     "loading": "Chargement de vos moyens de connexion…",
     "loadError": {

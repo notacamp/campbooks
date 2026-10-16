@@ -177,6 +177,7 @@ export function MailboxesPage({ workspace, consent, result }: MailboxesPageProps
             title={t("mailboxes.loadError.title")}
             visor="thinking"
             visorSize="lg"
+            headingLevel={3}
             action={
               <Button
                 onClick={() => {

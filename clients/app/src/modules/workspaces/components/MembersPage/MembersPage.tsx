@@ -103,6 +103,7 @@ export function MembersPage({ workspace }: { workspace: Workspace }) {
             title={t("members.loadError.title")}
             visor="thinking"
             visorSize="lg"
+            headingLevel={3}
             action={
               <Button
                 onClick={() => {

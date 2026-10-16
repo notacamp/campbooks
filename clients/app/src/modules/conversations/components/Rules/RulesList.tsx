@@ -68,7 +68,7 @@ export function RulesList({ workspaceId }: { workspaceId: string }) {
       <EmptyState
         title={t("rules.list.failed")}
         visor="thinking"
-        headingLevel={2}
+        headingLevel={3}
         action={
           <Button
             variant="secondary"
