@@ -118,13 +118,21 @@ fn write(out: &Path, items: &[LabellingItem]) -> std::io::Result<()> {
     fs::write(out.join("labels.csv"), csv)
 }
 
-/// A CSV cell: quoted, with quotes doubled and line breaks as spaces.
+/// A CSV cell: quoted, with quotes doubled and line breaks as spaces. A
+/// cell a spreadsheet would read as a formula (a subject starting with `=`,
+/// `+`, `-` or `@`, written by the sender) starts with `'`, so opening the
+/// sheet runs nothing.
 fn csv_cell(text: &str) -> String {
     let flat: String = text
         .chars()
         .map(|c| if c == '\n' || c == '\r' { ' ' } else { c })
         .collect();
-    format!("\"{}\"", flat.replace('"', "\"\""))
+    let safe = if flat.starts_with(['=', '+', '-', '@', '\t']) {
+        format!("'{flat}")
+    } else {
+        flat
+    };
+    format!("\"{}\"", safe.replace('"', "\"\""))
 }
 
 #[cfg(test)]
@@ -135,5 +143,6 @@ mod tests {
     fn cells_are_quoted() {
         assert_eq!(csv_cell("a"), "\"a\"");
         assert_eq!(csv_cell("Re: \"x\", y\nz"), "\"Re: \"\"x\"\", y z\"");
+        assert_eq!(csv_cell("=HYPERLINK(1)"), "\"'=HYPERLINK(1)\"");
     }
 }
