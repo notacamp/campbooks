@@ -51,13 +51,15 @@ export function useDisconnect(workspaceId: string) {
       );
       return connectionId;
     },
-    onSuccess: async (connectionId) => {
+    onSuccess: (connectionId) => {
       queryClient.setQueryData<Connection[]>(
         operationKey("connectors.list_connections", { workspace_id: workspaceId }),
         (connections) => connections?.filter((connection) => connection.id !== connectionId),
       );
       // A way in may have gone with it, and its inboxes were deleted or kept.
-      await Promise.all([
+      // Not awaited: the row that asked is gone from the list, and the
+      // caller's own onSuccess must still run.
+      void Promise.all([
         queryClient.invalidateQueries({ queryKey: operationKey("identity.list_ways_in") }),
         queryClient.invalidateQueries({
           queryKey: operationKey("conversations.list_inboxes", { workspace_id: workspaceId }),
