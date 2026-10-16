@@ -25,11 +25,11 @@
 
 ## 5. Follow-ups (not in this change)
 
-- [ ] 5.1 Encryption at rest with `CAMPBOOKS_SECRET_KEY` (envelope keys per workspace)
-- [ ] 5.2 `workspaces` (#18) calls `purge_workspace` on `WorkspaceDeleting`
-- [ ] 5.3 Per-workspace storage usage and quotas
-- [ ] 5.4 A first download endpoint (in the owning module) streaming `get` with `Content-Disposition: attachment` and `nosniff`; `413` for over-limit uploads
-- [ ] 5.5 Backups and restore drill including object storage (#54)
+- [x] 5.1 Encryption at rest with `CAMPBOOKS_SECRET_KEY` (envelope keys per workspace) — moved to campbooks-cloud#176
+- [x] 5.2 `workspaces` (#18) calls `purge_workspace` on `WorkspaceDeleting` — shipped: the `workspaces.purge_workspace` job calls `BlobStore::purge_workspace`
+- [x] 5.3 Per-workspace storage usage and quotas — moved to campbooks-cloud#178
+- [x] 5.4 A first download endpoint (in the owning module) streaming `get` with `Content-Disposition: attachment` and `nosniff`; `413` for over-limit uploads — moved to campbooks-cloud#179
+- [x] 5.5 Backups and restore drill including object storage (#54) — shipped: cloud#54; `blobs-data` backup in `deploy/README.md`
 
 ## 6. Wrap-up
 

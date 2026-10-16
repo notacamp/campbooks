@@ -29,12 +29,12 @@
 
 ## 4. Follow-ups (not in this change)
 
-- [ ] 4.1 Add the `x-campbooks` operation extension (mutates, undo, automation, assistant, risk, records) to every `workspaces.*` operation once #50 lands its schema and xtask check (ADR 0013); operation ids already follow `workspaces.<verb>[_<noun>]`
-- [ ] 4.2 Email invitations through `notifications`; revoke an invitation; restore a workspace during its grace period
-- [ ] 4.3 Instance administration: approve `approval` signups, single-use signup codes (hosted beta codes)
-- [ ] 4.4 Sign-in security events from the BFF code flow (#16)
-- [ ] 4.5 Register per-workspace API clients with the IdP (ADR 0004)
-- [ ] 4.6 Web client: workspace switcher, members and invitations screens
+- [x] 4.1 Add the `x-campbooks` operation extension (mutates, undo, automation, assistant, risk, records) to every `workspaces.*` operation once #50 lands its schema and xtask check (ADR 0013); operation ids already follow `workspaces.<verb>[_<noun>]` — shipped: every `workspaces.*` operation carries `x-campbooks` (`operation-catalogue`)
+- [x] 4.2 Email invitations through `notifications`; revoke an invitation; restore a workspace during its grace period — moved to campbooks-cloud#193
+- [x] 4.3 Instance administration: approve `approval` signups, single-use signup codes (hosted beta codes) — shipped: admin approve/mint/revoke signup codes (`admin-signups`)
+- [x] 4.4 Sign-in security events from the BFF code flow (#16) — moved to campbooks-cloud#194
+- [x] 4.5 Register per-workspace API clients with the IdP (ADR 0004) — shipped: `register_client`/`rotate_client_secret` (`identity-clients-consent`, cloud#81)
+- [x] 4.6 Web client: workspace switcher, members and invitations screens — shipped: workspace switcher (`first-run-ui`), `MembersPage`, `AcceptInvitation`
 
 ## 5. Wrap-up
 
