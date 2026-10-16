@@ -8,15 +8,13 @@ All notable changes to Campbooks Next are documented here. The format follows
 
 ### Security
 
-- **Security-alert detection is harder to fool.** An aligned DKIM signature no longer
+- **Sender authentication is read more strictly.** An aligned DKIM signature no longer
   counts when DMARC says anything but pass for the same message, an authentication header
   over 8 KiB is ignored, and "same organisation" now follows the real Public Suffix List
   (so `x.com.br` and `y.com.br`, or two `github.io` sites, are never one sender) instead of
-  a 24-entry guess. On GitHub, GitLab and the other listed platforms the sender's whole
-  display name must be the platform's, so a person named "GitHub Smith" is not an alert.
-  Separately, a message that is being moved to spam or the trash can no longer have an open
-  "needs you" stored for it by a refresh running at the same moment. No migration. Provider
-  reason headers (`X-GitHub-Reason`) are not read yet (follow-up).
+  a 24-entry guess. Separately, a message that is being moved to spam or the trash can no
+  longer have an open "needs you" stored for it by a refresh running at the same moment.
+  No migration.
 - **Suspending an account or signing out everywhere stops its access tokens at once.**
   Tokens already issued used to keep working until they expired (up to ten minutes).
   Now the API refuses them on the next request (401 `invalid_token`, the same answer
@@ -132,6 +130,10 @@ All notable changes to Campbooks Next are documented here. The format follows
   cleaned message. Errors already stored are left as they are.
 
 ### Removed
+- **Due dates on needs, until they are extracted from the mail.** A need no longer
+  carries a due date guessed from words like "Friday" or "end of the month"; it will
+  again once a model extracts the date (a follow-up of ADR 0018). Needs raised before
+  the upgrade keep theirs.
 - **Rauthy is gone from the shipped stack** (ADR 0014, last slice). `deploy/compose.yaml`
   no longer has the `idp`, `idp-init` and `idp-provision` services or the `idp-data`
   volume, `deploy/idp/` is deleted, and the stack no longer sets
@@ -154,6 +156,24 @@ All notable changes to Campbooks Next are documented here. The format follows
   possible, but nothing is provisioned for it.
 
 ### Changed
+- **A decision model sorts mail and raises needs; rules only read headers and can
+  only say no** (ADR 0018). Every phrase list and regular expression that read an
+  email's subject, body or attachment names is gone. What is left reads structured
+  facts only: list mail (`List-Id`, `List-Unsubscribe`, a bulk `Precedence`), mail
+  sent automatically (`Auto-Submitted`) and no-reply senders need no reply, and that
+  "no" wins over the model's "yes". The `decide` model's answers now act where the
+  eval shows they hold their target: it places a new conversation in a stream
+  (stream source `model`, never over a member's move) and raises its need (`pay` is
+  an action asked by mail it sorted to Receipts). Without a trusted `decide` model,
+  mail stays in Primary and no need is raised beyond what the headers settle. The
+  upgrade keeps the old rules' answers as a record but stops them counting,
+  withdraws the needs only they raised, and asks a trusted model again about each
+  recent conversation's newest message. `CAMPBOOKS_AI__DECIDE__PATH` sets where
+  decide requests go (default `systemone` for Laya, `chat/completions` for an
+  instruct model), so a hosted decision model such as Jev through OpenRouter can
+  serve `decide` (see `deploy/README.md`; mail leaves the instance only with
+  `CAMPBOOKS_AI__DECIDE__EXTERNAL_CONTENT=allow`). The shipped defaults stay
+  open-weight.
 - Admin → People marks people whose account is suspended, and Admin →
   Signups → Codes says what a code is: good for the number of signups set
   when it is minted, until it is used up, expires or is revoked.
@@ -165,6 +185,11 @@ All notable changes to Campbooks Next are documented here. The format follows
   The first prune after upgrading may take a while on a large instance.
 
 ### Fixed
+- **Notifications with a question mark no longer ask for a reply.** "Your order has
+  shipped. Questions? Contact our support team." raised a Reply need, because a rule
+  read any "?" as a question for you. Needs raised that way are withdrawn on upgrade.
+  Automated mail (a calendar invitation, a support notice) becomes something to do
+  only when the model also finds a deadline in it, and a newsletter never does.
 - **A connected mailbox no longer loses its way to sign in to the cleanup.**
   The background cleanup that removes a way to sign in left behind by a
   mailbox connect that never finished now checks that the mailbox really

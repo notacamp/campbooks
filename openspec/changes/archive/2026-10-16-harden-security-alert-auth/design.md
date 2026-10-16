@@ -1,7 +1,7 @@
 ## Context
-Follow-ups to the security-alert review (#487). Facts such as headers and
-addresses may only veto an alert, never promote one; nothing here reads
-message content to decide.
+Follow-ups to the security-alert review (#487), applied to the authentication
+facts in `signals/facts.rs`. Facts only say no; nothing here reads message
+content to decide.
 
 ## Decisions
 - **DKIM defers to DMARC.** An aligned `dkim=pass` is the sender's own
@@ -9,7 +9,9 @@ message content to decide.
   result other than `pass` (fail, none, quarantine, temperror, permerror,
   policy…) in the header turns the DKIM path off. No `dmarc` result at all
   (Zoho adds none) keeps the DKIM path. The DMARC path is unchanged (exactly
-  one `pass` result whose `header.from` is the From domain).
+  one `pass` result whose `header.from` is the From domain). The result feeds
+  the `authentication_failed` hint, so a refused signature now reads as a
+  failure to the model.
 - **Length cap.** `auth_results::MAX_LEN` is 8 KiB. A provider's header is a
   few hundred bytes; the parts a sender can pad (envelope sender, comments)
   would otherwise make the tokeniser do unbounded work. Over the cap reads as
@@ -30,19 +32,14 @@ message content to decide.
   `example.com/org/net` suffixes keep their three labels, so fixtures stand
   for many organisations. `PUBLIC_SUFFIXES` is removed (no other user).
   `psl` is MIT OR Apache-2.0, already allowed by `deny.toml`.
-- **Platform display names.** For a `SECURITY_PLATFORMS` sender the squashed
-  (letters and digits, lower-case) whole display name must equal one of the
-  platform's names; "GitHub Smith" no longer passes. The listed names are the
-  platforms' own (`github`, `gitlab`, `bitbucket`, `npm`, `npmjs`, `pypi`,
-  `rubygems`, `rubygemsorg`, `crates`, `cratesio`, `snyk`). A platform that
-  signs under a longer name is simply not a sure to-do until its name is
-  added (fail closed).
-- **Provider reason headers: not built.** `Envelope::header` reads only what
-  the connectors normalise, and they keep `List-Id`, `List-Unsubscribe`,
-  `Precedence`, `Auto-Submitted` and the provider's `Authentication-Results`;
-  `X-GitHub-Reason` and `X-GitLab-NotificationReason` are dropped. Adding
-  them is connector work (a contract change). Follow-up: keep them and let
-  a present, non-security reason veto the platform alert.
+- **Security-alert rule gone.** While this change was in review, `next`
+  removed the content rule `signals.security_alert` and its platform list
+  (the decide model reads content; facts only say no). The display-name
+  hardening (a person named "GitHub Smith") and the provider reason-header
+  veto (`X-GitHub-Reason`) therefore have nothing to apply to and are not
+  built. The connectors keep only `List-Id`, `List-Unsubscribe`, `Precedence`,
+  `Auto-Submitted` and the provider's `Authentication-Results`; if a future
+  facts rule needs reason headers it is a connector contract change.
 - **Spam race and lock order.** Before this change a refresh read the
   newest inbound message without a lock, then stored the need. `apply_changes`
   updates a message's `in_spam`/`in_trash` in its transaction and refreshes

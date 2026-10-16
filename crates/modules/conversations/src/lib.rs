@@ -9,11 +9,12 @@
 //!   publishes [`events`] in the same transaction. The contract is
 //!   `contracts/message-change-batch.v1.schema.json`.
 //! - **Streams and the decide pass**: every inbound message is asked six
-//!   typed questions, by rules when it is stored and by the `decide` model
-//!   afterwards (`conversations.decide_message`). Every answer is stored in
-//!   `decisions`; a per-question switch says which may act. In this version
-//!   only confident rules answers place a conversation in a stream; model
-//!   answers are suggestions (ADR 0009 note, campbooks-cloud#59).
+//!   typed questions, by the facts when it is stored and by the `decide`
+//!   model afterwards (`conversations.decide_message`). Every answer is
+//!   stored in `decisions`; a per-question switch says which may act. The
+//!   facts read headers and addresses only and may only say "no"; the
+//!   model reads the email, and its accepted answers sort the conversation
+//!   and raise its need (ADR 0018).
 //! - **Search**: the module is the search source of its conversations
 //!   ([`search_source`], ADR 0016) and lists the inboxes a caller may search
 //!   through its visibility port ([`visibility`]).
@@ -32,7 +33,7 @@ use axum::Extension;
 use campbooks_ai::{
     Gateway, Role,
     decide::{
-        signals::email::EmailSignals,
+        signals::facts::EmailFacts,
         strategy::{Model, Strategy},
     },
 };
@@ -75,8 +76,11 @@ pub struct ConversationsDeps {
     pub ai: Option<Gateway>,
     /// The module's settings.
     pub config: ConversationsConfig,
-    /// The rules strategy that sorts conversations as messages arrive.
+    /// The rules strategy asked as messages arrive: the facts.
     pub rules: Arc<dyn Strategy>,
+    /// A strategy the model pass asks instead of the `decide` role (tests,
+    /// tools); `None` asks the role, when it is configured.
+    pub model: Option<Arc<dyn Strategy>>,
     /// Which answers may act, per question and source.
     pub policy: Policy,
 }
@@ -94,20 +98,22 @@ impl std::fmt::Debug for ConversationsDeps {
             .field("ai", &self.ai.is_some())
             .field("config", &self.config)
             .field("rules", &self.rules.name())
+            .field("model", &self.model.as_ref().map(|m| m.name().to_owned()))
             .field("policy", &self.policy)
             .finish()
     }
 }
 
 impl ConversationsDeps {
-    /// Dependencies with `ai` and `config`, sorting with the shared email
-    /// signals ([`EmailSignals`]) under the eval baseline's policy
+    /// Dependencies with `ai` and `config`, with the shared facts
+    /// ([`EmailFacts`]) as rules, under the eval baseline's policy
     /// ([`Policy::baseline`]).
     pub fn new(ai: Option<Gateway>, config: ConversationsConfig) -> Self {
         Self {
             ai,
             config,
-            rules: Arc::new(EmailSignals),
+            rules: Arc::new(EmailFacts),
+            model: None,
             policy: Policy::baseline(),
         }
     }
@@ -125,6 +131,14 @@ impl ConversationsDeps {
         self
     }
 
+    /// The same dependencies, the model pass asking `model` instead of the
+    /// `decide` role.
+    #[must_use]
+    pub fn with_model(mut self, model: Arc<dyn Strategy>) -> Self {
+        self.model = Some(model);
+        self
+    }
+
     /// The same dependencies acting on answers as `policy` allows.
     #[must_use]
     pub fn with_policy(mut self, policy: Policy) -> Self {
@@ -136,12 +150,15 @@ impl ConversationsDeps {
 /// The `conversations` module, composed with `deps`, ready for the server
 /// to mount.
 pub fn module(deps: ConversationsDeps) -> Module {
-    let model = deps.ai.filter(model_may_read_mail).map(|gateway| {
-        // Only while the role passes its answers check: otherwise the model
-        // pass leaves sorting to the rules, as if no model were configured.
-        Arc::new(Model::new("decide", gateway, domain::decide::PURPOSE).checked())
-            as Arc<dyn Strategy>
-    });
+    let model = match deps.model {
+        Some(strategy) => Some(features::decide_message::ModelPass::new(strategy, None)),
+        None => deps.ai.filter(model_may_read_mail).map(|gateway| {
+            // Only while the role passes its answers check: otherwise the
+            // model pass stores nothing, as if no model were configured.
+            let strategy = Model::new("decide", gateway.clone(), domain::decide::PURPOSE).checked();
+            features::decide_message::ModelPass::new(Arc::new(strategy), Some(gateway))
+        }),
+    };
     let needs = domain::needs::NeedSettings::new(deps.config.needs_window_days, &deps.policy);
     Module {
         name: NAME,
@@ -175,11 +192,21 @@ pub fn module(deps: ConversationsDeps) -> Module {
                 deps.policy.clone(),
                 needs.clone(),
             ))
-            .handler(features::backfill_needs::BackfillNeeds::new(needs.clone()))
+            .handler(features::backfill_needs::BackfillNeeds::new(
+                needs.clone(),
+                model.clone(),
+                deps.config.decide_backfill_days,
+            ))
             .schedule::<features::backfill_needs::DispatchNeedsBackfills>(
                 features::backfill_needs::EVERY,
             )
             .consumer(features::decide_message::DecideMessage::new(
+                model.clone(),
+                deps.config.decide_backfill_days,
+                deps.policy.clone(),
+                needs.clone(),
+            ))
+            .handler(features::decide_message::DecideBacklog::new(
                 model,
                 deps.config.decide_backfill_days,
                 deps.policy,
@@ -197,8 +224,9 @@ pub fn module(deps: ConversationsDeps) -> Module {
 
 /// Whether the model pass runs: the `decide` role is configured and may
 /// receive mail (on the instance's network, or opted in with
-/// `CAMPBOOKS_AI__DECIDE__EXTERNAL_CONTENT=allow`). Without it, rules alone
-/// sort mail and nothing leaves the instance.
+/// `CAMPBOOKS_AI__DECIDE__EXTERNAL_CONTENT=allow`). Without it, nothing is
+/// sorted out of Primary, only the facts' "no" acts, and nothing leaves the
+/// instance.
 fn model_may_read_mail(gateway: &Gateway) -> bool {
     match gateway.config().provider_for_content(Role::Decide) {
         Ok(_) => true,
@@ -207,7 +235,7 @@ fn model_may_read_mail(gateway: &Gateway) -> bool {
             // catalogues, worker): say it once.
             static WARNED: std::sync::Once = std::sync::Once::new();
             WARNED.call_once(|| {
-                tracing::warn!(%error, "the decide pass is off: rules alone sort mail");
+                tracing::warn!(%error, "the decide pass is off: only the facts read mail");
             });
             false
         }
@@ -285,6 +313,7 @@ mod tests {
         for kind in [
             "conversations.apply_changes",
             "conversations.decide_message",
+            "conversations.decide_backlog",
             "conversations.schedule_workspace_purge",
             "conversations.purge_workspace",
             "conversations.release_send",

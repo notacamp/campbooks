@@ -35,28 +35,27 @@ async fn summary(kit: &Kit, token: &str, workspace: WorkspaceId, provider_id: &s
 }
 
 #[sqlx::test(migrations = "../../../migrations")]
-async fn the_rules_raise_one_need_per_conversation(db: PgPool) {
+async fn the_model_raises_one_need_per_conversation(db: PgPool) {
     let kit = Kit::new(db).await;
     let (workspace, _, sam) = sams_needs(&kit).await;
 
+    // A person's question: a reply, with no due date until one is
+    // extracted, and no quote (the model gives its answers, not a sentence).
     let marta = summary(&kit, &sam, workspace, "needs-1").await;
     assert_eq!(marta["need"]["reason"], "reply");
     assert_eq!(marta["need"]["trust"], "sure");
-    assert_eq!(marta["need"]["due_on"], "2026-10-14");
-    assert_eq!(marta["need"]["rule"], "signals.reply_asked");
-    assert_eq!(
-        marta["need"]["quote"]["text"],
-        "Could you confirm Thursday\u{2019}s walkthrough?"
-    );
-    assert_eq!(marta["need"]["quote"]["from"]["name"], "Marta Ferreira");
+    assert_eq!(marta["need"]["basis"], "model");
+    assert_eq!(marta["need"]["due_on"], Value::Null);
+    assert_eq!(marta["need"]["rule"], "model.decide");
+    assert_eq!(marta["need"]["quote"], Value::Null);
 
     let pedro = summary(&kit, &sam, workspace, "needs-2").await;
     assert_eq!(pedro["need"]["reason"], "do");
-    assert_eq!(pedro["need"]["due_on"], "2026-10-16");
 
+    // An invoice from a service, sorted to Receipts: pay.
     let bill = summary(&kit, &sam, workspace, "needs-3").await;
+    assert_eq!(bill["stream"], "receipts");
     assert_eq!(bill["need"]["reason"], "pay");
-    assert_eq!(bill["need"]["due_on"], "2026-10-30");
 
     let phish = summary(&kit, &sam, workspace, "needs-4").await;
     assert_eq!(phish["need"]["reason"], "review");
@@ -65,7 +64,7 @@ async fn the_rules_raise_one_need_per_conversation(db: PgPool) {
     let jonas = summary(&kit, &sam, workspace, "needs-5").await;
     assert_eq!(jonas["need"]["reason"], "reply");
 
-    // Rules only: nothing is a question.
+    // Every answer accepted: nothing is a question.
     let events = kit.events("conversations.need_changed").await;
     assert_eq!(events.len(), 5, "{events:?}");
     assert!(events.iter().all(|e| e["need"]["trust"] == "sure"));
@@ -182,7 +181,7 @@ async fn not_needed_teaches_and_undo_withdraws_it(db: PgPool) {
             source.as_str(),
             withdrawn
         ),
-        ("needs_reply", "true", "false", "rules", false)
+        ("needs_reply", "true", "false", "model", false)
     );
     let last = kit.events("conversations.need_changed").await;
     assert_eq!(last.last().unwrap()["cleared_because"], "not_needed");

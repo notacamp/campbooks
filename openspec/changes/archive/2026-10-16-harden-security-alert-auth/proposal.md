@@ -1,10 +1,11 @@
 ## Why
-The security-alert rule (authenticated list mail from a code host or package
-registry becomes a sure to-do) shipped with known gaps, found in review:
-a DKIM signature that DMARC then refused still authenticated the mail; the
-registrable-domain guess knew 24 public suffixes; a person named "GitHub …"
-could pass for the platform; a decide pass beside a provider spam move could
-store an open need after the move; and two paths had no test.
+The authentication facts the decide pass hands a model (and the sender
+alignment that taught rules and Reply-To checks use) had known gaps, found
+in the security-alert review (#487): a DKIM signature that DMARC then refused
+still authenticated the mail; the registrable-domain guess knew 24 public
+suffixes; the results header had no length bound; and a decide pass beside a
+provider spam move could store an open need after the move; two need paths
+had no test.
 
 ## What Changes
 - A `dkim=pass` authenticates only when no `dmarc` result in the same header
@@ -13,8 +14,6 @@ store an open need after the move; and two paths had no test.
 - The registrable domain, and "a public suffix", come from the Public Suffix
   List (the `psl` crate, compiled in, ICANN and private sections), replacing
   the 24-entry list. A bare public suffix as From authenticates nothing.
-- On a listed platform the sender's whole display name must be the
-  platform's name; a name that merely holds it as a word no longer counts.
 - A need refresh takes the message it reads `FOR SHARE` before the needs row,
   so it cannot store an open need for a message a concurrent provider move to
   spam or the trash is committing.
@@ -22,11 +21,13 @@ store an open need after the move; and two paths had no test.
   confirmation and a Done.
 
 ## Capabilities
-- Modified: `conversations`.
+- Modified: `ai-decide-facts`, `conversations`.
 
 ## Impact
 Crates `campbooks-ai` (new dependency `psl`, MIT OR Apache-2.0) and
-`campbooks-conversations`. No migration, no event, no operation. The
-`X-GitHub-Reason` veto is not built: the connectors keep no such header
-(see design).
+`campbooks-conversations`. No migration, no event, no operation.
+The review's other two items (the platform display-name rule and the
+`X-GitHub-Reason` veto) concerned the `signals.security_alert` rule, which
+`next` removed in the meantime (facts only say no, ADR 0018); nothing is left
+to harden there (see design).
 Tracking issue: https://github.com/notacamp/campbooks-cloud/issues/133

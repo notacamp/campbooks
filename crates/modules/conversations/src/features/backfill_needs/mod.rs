@@ -1,9 +1,12 @@
-//! Needs for mail stored before attention existed (campbooks-cloud#123).
+//! Needs for mail stored before attention existed (campbooks-cloud#123), or
+//! before needs were worked out another way (the facts and the model,
+//! ADR 0018).
 //!
 //! A need is worked out when mail is stored (`apply_changes`), after the
 //! model pass (`decide_message`) and when a member acts; mail stored before
-//! the attention module existed was never looked at. The migration that
-//! added this feature lists every inbox of the time in
+//! the attention module existed was never looked at, and mail read by the
+//! retired content rules was looked at by rules that no longer count. The
+//! migrations that changed this list every inbox of the time in
 //! `conversations.needs_backfills`; then:
 //!
 //! - `conversations.dispatch_needs_backfills`, every minute, starts the
@@ -14,12 +17,19 @@
 //!   [`needs::refresh`] on each one whose last message falls within the
 //!   needs window, or that has an open need (so a need the stored answers no
 //!   longer support is withdrawn). `refresh` reads only stored messages and
-//!   decisions: no model and no rules are asked again. It publishes
+//!   decisions: no model and no rules are asked again there. It publishes
 //!   `conversations.need_changed` as for live mail, and the attention module
 //!   projects the items.
+//! - When a `decide` model is configured and has not failed its answers
+//!   check on its answers (a check still running, or one the provider did
+//!   not answer, still queues: the pass waits for it), each of those conversations' newest inbound message sent within
+//!   the decide window (`CAMPBOOKS_CONVERSATIONS__DECIDE_BACKFILL_DAYS`)
+//!   that no checked model answered is queued for the model pass
+//!   (`conversations.decide_backlog`, one job per message, ids only), which
+//!   sorts it and works out its need again.
 //!
 //! Running it again changes nothing: `refresh` publishes only when a need
-//! changed.
+//! changed, and a message a checked model answered is not asked again.
 
 use std::time::Duration;
 
@@ -28,13 +38,14 @@ use campbooks_kernel::{
     jobs::{self, EnqueueOptions, Enqueued},
     tenancy::WorkspaceId,
 };
-use chrono::Utc;
+use chrono::{TimeDelta, Utc};
 use serde::{Deserialize, Serialize};
 use sqlx::{Postgres, Transaction};
 
 use crate::{
     domain::needs::{self, NeedSettings},
-    model::{ConversationId, InboxId},
+    features::decide_message::{Backlog, DecideBacklog, ModelPass},
+    model::{ConversationId, InboxId, MessageId},
 };
 
 /// How often pending backfills are started.
@@ -128,12 +139,20 @@ impl Page {
 /// Works out the needs of one page of an inbox's conversations.
 pub struct BackfillNeeds {
     needs: NeedSettings,
+    model: Option<ModelPass>,
+    decide_window: TimeDelta,
 }
 
 impl BackfillNeeds {
-    /// A backfill raising needs as `needs` says (the live window and floor).
-    pub fn new(needs: NeedSettings) -> Self {
-        Self { needs }
+    /// A backfill raising needs as `needs` says (the live window and floor),
+    /// queueing the model pass (`model`, if any) for recent mail sent within
+    /// `decide_backfill_days` that no checked model answered.
+    pub fn new(needs: NeedSettings, model: Option<ModelPass>, decide_backfill_days: u32) -> Self {
+        Self {
+            needs,
+            model,
+            decide_window: TimeDelta::days(i64::from(decide_backfill_days)),
+        }
     }
 }
 
@@ -266,6 +285,10 @@ impl BackfillNeeds {
             }
         }
 
+        if self.model.as_ref().is_some_and(|m| !m.refused()) {
+            self.queue_model_pass(tx, workspace, &ids).await?;
+        }
+
         let last = ids.last().copied().or(page.after);
         let finished = i64::try_from(ids.len()).unwrap_or(i64::MAX) < PAGE;
         let refreshed = sqlx::query_scalar!(
@@ -294,6 +317,39 @@ impl BackfillNeeds {
             after: last,
         };
         jobs::enqueue_to::<Self>(tx, &next, next.options(workspace)).await?;
+        Ok(())
+    }
+
+    /// Queue the model pass for the newest inbound message of each of
+    /// `conversations` sent within the decide window that no checked model
+    /// answered.
+    async fn queue_model_pass(
+        &self,
+        tx: &mut Transaction<'_, Postgres>,
+        workspace: WorkspaceId,
+        conversations: &[ConversationId],
+    ) -> Result<(), JobError> {
+        let since = Utc::now() - self.decide_window;
+        let unanswered = sqlx::query_scalar!(
+            r#"SELECT newest.id AS "id!: MessageId"
+                 FROM (SELECT DISTINCT ON (m.conversation_id) m.id, m.sent_at
+                         FROM conversations.messages m
+                        WHERE m.conversation_id = ANY($1) AND m.direction = 'inbound'
+                          AND NOT m.in_spam AND NOT m.in_trash
+                        ORDER BY m.conversation_id, m.sent_at DESC, m.id DESC) newest
+                WHERE newest.sent_at >= $2
+                  AND NOT EXISTS (SELECT 1 FROM conversations.decisions d
+                                   WHERE d.message_id = newest.id AND d.source = 'model'
+                                     AND d.model_version LIKE 'checked:%')"#,
+            conversations as &[ConversationId],
+            since,
+        )
+        .fetch_all(&mut **tx)
+        .await?;
+        for message in unanswered {
+            let backlog = Backlog { message };
+            jobs::enqueue_to::<DecideBacklog>(tx, &backlog, backlog.options(workspace)).await?;
+        }
         Ok(())
     }
 }

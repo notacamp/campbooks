@@ -342,7 +342,7 @@ mod http_tests {
         let news = kit
             .get(&sam, &format!("{base}?stream=newsletters&inbox={inbox}"))
             .await;
-        assert_eq!(news.json["conversations"][0]["stream_source"], "rules");
+        assert_eq!(news.json["conversations"][0]["stream_source"], "model");
 
         let first = kit.get(&sam, &format!("{base}?limit=2")).await;
         assert_eq!(first.json["conversations"].as_array().unwrap().len(), 2);

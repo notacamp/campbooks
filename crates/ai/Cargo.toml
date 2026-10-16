@@ -10,7 +10,7 @@ publish.workspace = true
 
 [dependencies]
 campbooks-kernel.workspace = true
-# Resolving a deadline's words to a date (`decide::signals::dates`).
+# When the answers check ran (`decide::check`).
 chrono.workspace = true
 figment.workspace = true
 opentelemetry.workspace = true

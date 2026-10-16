@@ -11665,7 +11665,7 @@
         "properties": {
           "acted": {
             "type": "boolean",
-            "description": "Whether it changed anything. In this version only a confident rules\nstream answer may; every other answer is a suggestion."
+            "description": "Whether it changed anything: the policy let it act (a stream answer\nonly when it placed the conversation). The others are suggestions."
           },
           "confidence": {
             "type": [
@@ -12906,7 +12906,7 @@
               "null"
             ],
             "format": "date",
-            "description": "When it is due."
+            "description": "When it is due: none until a due date is extracted from the mail\n(needs raised before ADR 0018 may carry one)."
           },
           "message_id": {
             "$ref": "#/components/schemas/MessageId",
@@ -12924,7 +12924,7 @@
             "oneOf": [
               {
                 "$ref": "#/components/schemas/Quote",
-                "description": "What the sender wrote, when the rules quoted it."
+                "description": "What the sender wrote, when an answer stored before ADR 0018 quoted\nit."
               },
               {
                 "type": "null"
@@ -12940,8 +12940,8 @@
               "string",
               "null"
             ],
-            "description": "The rule that decided it (`signals.reply_asked`, …), for the sentence\nthe client words it with.",
-            "example": "signals.reply_asked"
+            "description": "The rule that decided it (`model.decide`, …), for the sentence the\nclient words it with.",
+            "example": "model.decide"
           },
           "trust": {
             "$ref": "#/components/schemas/NeedTrust",
@@ -13381,8 +13381,8 @@
           },
           "rule": {
             "type": "string",
-            "description": "`<strategy>.<rule>`, e.g. `signals.list_header`.",
-            "example": "signals.list_header"
+            "description": "`<strategy>.<rule>`, e.g. `facts.list_mail`.",
+            "example": "facts.list_mail"
           },
           "sentence": {
             "type": [
