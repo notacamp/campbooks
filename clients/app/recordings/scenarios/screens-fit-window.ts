@@ -37,9 +37,7 @@ export default async function screensFitWindow({ page }: ScenarioContext): Promi
   await caption(page, "The inbox list scrolls the same way", 2500);
 
   await page.emulateMedia({ colorScheme: "dark" });
-  await page.evaluate(() => {
-    document.documentElement.dataset["theme"] = "dark";
-  });
+  await page.evaluate(`document.documentElement.dataset.theme = "dark"`);
   await caption(page, "And in dark", 2500);
   await pause(500);
 }
