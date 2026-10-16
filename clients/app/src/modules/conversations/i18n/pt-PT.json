@@ -461,7 +461,12 @@
       "confirmRemove": "Remover",
       "cancel": "Manter",
       "forEveryone": "Para todos",
-      "paused": "Em pausa: quem a ensinou já não pode alterar esta caixa de entrada",
+      "paused": {
+        "inbox_read_only": "Em pausa: esta caixa de entrada é só de leitura",
+        "author_cannot_write": "Em pausa: quem a ensinou já não pode alterar esta caixa de entrada",
+        "paused_by_member": "Colocada em pausa por um membro",
+        "author_suspended": "Em pausa enquanto a conta de quem a ensinou estiver suspensa"
+      },
       "empty": "Ainda não há regras. Quando move, arquiva ou limpa uma mensagem, o Campbooks oferece-se para fazer o mesmo às parecidas.",
       "leave": "Deixá-las como estão",
       "changedMail": "As mensagens que alterou",

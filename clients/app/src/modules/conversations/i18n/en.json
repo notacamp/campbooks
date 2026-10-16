@@ -461,7 +461,12 @@
       "confirmRemove": "Remove",
       "cancel": "Keep",
       "forEveryone": "For everyone",
-      "paused": "Paused: whoever taught it can no longer change this inbox",
+      "paused": {
+        "inbox_read_only": "Paused: this inbox is kept read-only",
+        "author_cannot_write": "Paused: whoever taught it can no longer change this inbox",
+        "paused_by_member": "Paused by a member",
+        "author_suspended": "Paused while whoever taught it is suspended"
+      },
       "empty": "No rules yet. When you move, archive or clear one email, Campbooks offers to do the same to the ones like it.",
       "leave": "Leave them as they are",
       "changedMail": "The mail it changed",

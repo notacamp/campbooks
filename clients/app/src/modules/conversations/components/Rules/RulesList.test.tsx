@@ -183,4 +183,30 @@ describe("the rules list", () => {
     renderWithProviders(<RulesList workspaceId={DUARTE.id} />);
     expect(await screen.findByText(/No rules yet/u)).toBeVisible();
   });
+
+  it("says why a rule is paused", async () => {
+    const suspended = {
+      ...LEDGER_RULE,
+      state: "paused" as const,
+      paused_reason: "author_suspended" as const,
+    };
+    const byMember = {
+      ...PROPOSED,
+      id: "0192f1a0-0000-7000-8000-0000000000f2",
+      state: "paused" as const,
+      paused_reason: "paused_by_member" as const,
+    };
+    mockApi({
+      ...people,
+      [`GET ${W}/rules`]: { body: { rules: [suspended, byMember] } },
+      [`GET ${W}/inboxes`]: { body: { inboxes: [INBOX] } },
+    });
+    renderWithProviders(<RulesList workspaceId={DUARTE.id} />);
+    const mine = await screen.findByRole("list", { name: INBOX.address });
+    expect(
+      within(mine).getByText(/Paused while whoever taught it is suspended/u),
+    ).toBeVisible();
+    expect(within(mine).getByText(/Paused by a member/u)).toBeVisible();
+    expect(within(mine).queryByText(/can no longer change this inbox/u)).toBeNull();
+  });
 });

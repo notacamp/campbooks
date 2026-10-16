@@ -180,7 +180,7 @@ function RuleRow({
           n: number(rule.recent_exceptions),
         })
       : "",
-    rule.state === "paused" ? t("rules.list.paused") : "",
+    rule.state === "paused" ? t(`rules.list.paused.${rule.paused_reason ?? "author_cannot_write"}`) : "",
   ].filter((fact) => fact !== "");
 
   const trailing =
