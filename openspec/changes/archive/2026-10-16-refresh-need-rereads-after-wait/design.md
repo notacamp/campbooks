@@ -23,9 +23,12 @@ its ten attempts.
 (`live_conversation`, the needs row, the candidate, what happened since) were
 made before it waited, and under READ COMMITTED the writer it waited for may have
 archived the conversation, or another refresh may have stored the first need.
-So the job runs the refresh again, once, in the same transaction: its own locks
-are not waited for, so the second pass cannot wait or ask again, and every read
-is fresh. An archived conversation stores no open Reply need, and an existing
+So the job runs the refresh again, once, in the same transaction, and this
+second pass does not wait: every read is fresh, and it may pick a newer message
+than the one the job holds. The job's own locks pass at once; a message someone
+else holds comes back busy, and the job rolls back and retries with fresh reads.
+So the second pass can neither wait nor ask again, and never stores a need from
+reads made before a wait. An archived conversation stores no open Reply need, and an existing
 need is read under its row lock rather than overwritten from a stale view.
 
 **Real order of each caller of `needs::refresh`:**

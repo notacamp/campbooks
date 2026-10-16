@@ -722,8 +722,9 @@ const JOB_LOCK_TIMEOUT: &str = "5s";
 /// several conversations) is possible, and bounded: the deadlock detector or
 /// the lock timeout breaks it and the job retries. Because its reads predate
 /// the wait, once it holds both locks the refresh is worked out again, once,
-/// in the same transaction (see [`refresh_now`]); waiting means a long-held
-/// lock does not burn its attempts.
+/// in the same transaction and without waiting (see [`refresh_now`]): a
+/// newer message that someone else holds makes it retry; waiting means a
+/// long-held lock does not burn its attempts.
 ///
 /// Lock order of every caller of [`refresh`] (the order before it reaches
 /// this check): `apply_changes`, messages, then the conversation's counts,
@@ -863,12 +864,17 @@ pub async fn refresh_now(
 ) -> Result<Refreshed> {
     match refresh_pass(tx, events, workspace, id, settings, wait, false).await? {
         Pass::Done(done) => Ok(done),
-        // Once only: the second pass holds the locks (its own are never
-        // waited for), so it never asks again.
-        Pass::Again => match refresh_pass(tx, events, workspace, id, settings, wait, true).await? {
-            Pass::Done(done) => Ok(done),
-            Pass::Again => unreachable!("the second pass does not ask again"),
-        },
+        // Once only, and without waiting: the second pass reads everything
+        // again and may pick a newer message than the one the job holds; its
+        // own locks pass at once, and a message someone else holds is Busy
+        // (the job rolls back and retries with fresh reads), so it never
+        // waits on reads it made before a wait.
+        Pass::Again => {
+            match refresh_pass(tx, events, workspace, id, settings, false, true).await? {
+                Pass::Done(done) => Ok(done),
+                Pass::Again => unreachable!("the second pass does not ask again"),
+            }
+        }
     }
 }
 

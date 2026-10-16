@@ -56,7 +56,7 @@ member's confirmation SHALL still make the reopened need theirs (basis
 - **WHEN** a `conversations.refresh_need` job waits for a conversation whose archive is not yet committed, and the archive then commits
 - **THEN** the job works the need out again once it holds its locks and stores no open need for the archived conversation
 
-#### Scenario: Done while the follow-up waits
-- **WHEN** a member's Done is stored for the conversation while its `conversations.refresh_need` job waits
-- **THEN** the job keeps the Done and does not overwrite it with an open need
+#### Scenario: A need stored while the follow-up waits
+- **WHEN** another refresh stores the conversation's first need (or a member's Done on it) while its `conversations.refresh_need` job waits
+- **THEN** the job keeps the stored need and does not overwrite it from what it read before waiting
 
