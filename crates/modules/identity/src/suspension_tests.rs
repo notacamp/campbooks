@@ -15,7 +15,7 @@ use crate::{
 async fn count(kit: &Kit, sql: &'static str, account: Uuid) -> i64 {
     sqlx::query_scalar(sql)
         .bind(account)
-        .fetch_one(&kit.state.db)
+        .fetch_one(&kit.kernel)
         .await
         .unwrap()
 }
@@ -111,7 +111,7 @@ async fn a_suspended_account_gets_in_by_no_door_until_it_is_unsuspended(db: PgPo
 
     // Unsuspended: the same way in signs in afresh.
     let mut tx = kit.state.db.begin().await.unwrap();
-    let lifted = suspension::unsuspend(&mut tx, account, "root", Utc::now())
+    let lifted = suspension::unsuspend(&mut tx, &kit.state.events, account, "root", Utc::now())
         .await
         .unwrap();
     tx.commit().await.unwrap();
@@ -129,7 +129,7 @@ async fn a_suspended_account_gets_in_by_no_door_until_it_is_unsuspended(db: PgPo
 
     let mut tx = kit.state.db.begin().await.unwrap();
     assert_eq!(
-        suspension::unsuspend(&mut tx, account, "root", Utc::now())
+        suspension::unsuspend(&mut tx, &kit.state.events, account, "root", Utc::now())
             .await
             .unwrap(),
         Outcome::Unchanged
@@ -146,4 +146,52 @@ async fn a_suspended_account_gets_in_by_no_door_until_it_is_unsuspended(db: PgPo
         .unwrap(),
         Outcome::Missing
     );
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn suspending_and_lifting_publish_events_ordered_by_at(db: PgPool) {
+    let kit = Kit::new(db).await;
+    let (code, verifier) = kit.sign_up().await;
+    let tokens = kit.redeem(&code, &verifier).await;
+    let (_, claims) = Kit::decode(tokens.json["access_token"].as_str().unwrap());
+    let account: Uuid = claims["sub"].as_str().unwrap().parse().unwrap();
+    // One clock for both: `at` orders them, not the caller's time.
+    let now = Utc::now();
+    for lift in [false, true, true] {
+        let mut tx = kit.state.db.begin().await.unwrap();
+        if lift {
+            suspension::unsuspend(&mut tx, &kit.state.events, account, "root", now)
+                .await
+                .unwrap();
+        } else {
+            suspension::suspend(&mut tx, &kit.state.events, account, "root", now)
+                .await
+                .unwrap();
+        }
+        tx.commit().await.unwrap();
+    }
+    let events: Vec<(String, serde_json::Value)> = sqlx::query_as(
+        "SELECT name, payload FROM kernel.events
+          WHERE name IN ('identity.account_suspended', 'identity.account_unsuspended')
+            AND payload ->> 'account' = $1::text
+          ORDER BY id",
+    )
+    .bind(account)
+    .fetch_all(&kit.kernel)
+    .await
+    .unwrap();
+    let names: Vec<&str> = events.iter().map(|(n, _)| n.as_str()).collect();
+    // Lifting twice publishes once.
+    assert_eq!(
+        names,
+        ["identity.account_suspended", "identity.account_unsuspended"]
+    );
+    let at = |i: usize| {
+        events[i].1["at"]
+            .as_str()
+            .unwrap()
+            .parse::<chrono::DateTime<Utc>>()
+            .unwrap()
+    };
+    assert!(at(1) > at(0), "{events:?}");
 }

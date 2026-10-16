@@ -194,6 +194,10 @@
   --border-strong: light-dark(oklch(0.2 var(--n) / 0.16), oklch(1 0 0 / 0.13));
   --edge-highlight: light-dark(oklch(1 0 0 / 0.85), oklch(1 0 0 / 0.055));
 
+  /* scrollbars: a thin neutral thumb on no track, firmer while the pane is hovered */
+  --scrollbar-thumb: light-dark(oklch(0.2 var(--n) / 0.18), oklch(1 0 0 / 0.16));
+  --scrollbar-thumb-hover: light-dark(oklch(0.2 var(--n) / 0.34), oklch(1 0 0 / 0.3));
+
   /* text: contrast on surface-base ≈ 15, 9, 5.7 (AA), 3.5 (disabled/placeholder only) */
   --text-primary: light-dark(oklch(0.22 var(--n)), oklch(0.965 var(--n)));
   --text-secondary: light-dark(oklch(0.4 var(--n)), oklch(0.79 var(--n)));
@@ -321,6 +325,8 @@
   --home-min: 640px;
   --home-main-min: 520px;
   --reader-min: 480px;
+  --scrollbar-size: 10px;
+  --scrollbar-gap: 2px;
   --icon-size: var(--space-4);
   --icon-size-lg: var(--space-5);
   --icon-stroke: 1.75;

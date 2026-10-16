@@ -18,11 +18,13 @@ export interface HomeLayoutProps {
 /** Home: the "needs you" queue with its context column (stacks on narrow screens). */
 export function HomeLayout({ children, aside, asideLabel }: HomeLayoutProps) {
   return (
-    <main className={styles["home"]}>
-      <div className={styles["main"]}>{children}</div>
-      <aside className={styles["aside"]} aria-label={asideLabel}>
-        {aside}
-      </aside>
+    <main className={styles["page"]}>
+      <div className={styles["home"]}>
+        <div className={styles["main"]}>{children}</div>
+        <aside className={styles["aside"]} aria-label={asideLabel}>
+          {aside}
+        </aside>
+      </div>
     </main>
   );
 }

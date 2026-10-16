@@ -14,7 +14,7 @@
 //! let blob = state.blobs.put(workspace, BlobBody::stream(body), "message/rfc822").await?;
 //! // …and attach them to the record that holds them, in that record's
 //! // transaction. Keep the `BlobRef` on the record.
-//! let mut tx = state.db.begin().await?;
+//! let mut tx = state.db.begin_for(workspace).await?;
 //! /* insert the message, with blob.hash / blob.size / blob.content_type */
 //! state.blobs.attach(&mut tx, workspace, &blob, &BlobOwner::new("mail.message", id)).await?;
 //! tx.commit().await?;

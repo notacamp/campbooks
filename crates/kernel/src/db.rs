@@ -20,7 +20,10 @@
 //!
 //! **The workspace.** A request works in one workspace through
 //! [`BeginFor::begin_for`]; a job's [`JobContext::tx`](crate::JobContext::tx)
-//! sets the same setting.
+//! sets the same setting. A transaction that sets no workspace sees no
+//! workspace's rows, the kernel's included; the kernel's machinery works
+//! across workspaces only in the explicit **kernel scope**
+//! ([`begin_kernel`], the setting `campbooks.kernel_scope`).
 //!
 //! ```no_run
 //! # async fn demo(state: campbooks_kernel::AppState, workspace: campbooks_kernel::tenancy::WorkspaceId) -> Result<(), sqlx::Error> {
@@ -123,6 +126,162 @@ pub async fn begin_admin(
         .fetch_one(&mut *tx)
         .await?;
     Ok(tx)
+}
+
+/// The transaction-local Postgres setting that lets a transaction work
+/// across workspaces on the kernel's tables (the event log, the job queue,
+/// the change feed, the blob catalogue) and on the module tables whose
+/// maintenance policy admits it (campbooks-cloud#129). A transaction with
+/// neither a workspace nor this scope sees no row of any table with
+/// row-level security. Only the kernel names it (crate-private): policies
+/// compare it with `'on'`, [`begin_kernel`] and
+/// [`JobContext::kernel_tx`](crate::JobContext::kernel_tx) set it, and
+/// `cargo xtask arch` rejects the setting, this constant's name and those
+/// two functions' names anywhere else in Rust, except the reviewed
+/// `[[access.kernel_scope]]` entries of `architecture.toml` (for the two
+/// functions) and test code.
+pub(crate) const KERNEL_SCOPE_SETTING: &str = "campbooks.kernel_scope";
+
+/// Begin a transaction in the **kernel scope**
+/// (`campbooks.kernel_scope = on`, `SET LOCAL`): the kernel's machinery
+/// working across workspaces (workers claiming fairly, pruning, the blob
+/// sweeper, replay, the admin's queue) and the few module maintenance paths
+/// `architecture.toml` lists (a scheduler reading its index across
+/// workspaces). Everything else works in one workspace
+/// ([`BeginFor::begin_for`], a job's [`tx`](crate::JobContext::tx)).
+pub async fn begin_kernel(pool: &PgPool) -> Result<Transaction<'static, Postgres>, sqlx::Error> {
+    let mut tx = pool.begin().await?;
+    enter_kernel_scope(&mut tx).await?;
+    Ok(tx)
+}
+
+/// Turn the kernel scope on in the current transaction, until it ends or
+/// [`leave_kernel_scope`].
+pub(crate) async fn enter_kernel_scope(conn: &mut PgConnection) -> Result<(), sqlx::Error> {
+    sqlx::query_scalar!("SELECT set_config($1, 'on', true)", KERNEL_SCOPE_SETTING)
+        .fetch_one(conn)
+        .await?;
+    Ok(())
+}
+
+/// Turn the kernel scope off again in the current transaction.
+pub(crate) async fn leave_kernel_scope(conn: &mut PgConnection) -> Result<(), sqlx::Error> {
+    sqlx::query_scalar!("SELECT set_config($1, '', true)", KERNEL_SCOPE_SETTING)
+        .fetch_one(conn)
+        .await?;
+    Ok(())
+}
+
+/// Begin a transaction working in `workspace`, given as text (the kernel's
+/// tables keep workspaces as text): [`BeginFor::begin_for`] for the
+/// kernel's own per-workspace work.
+pub(crate) async fn begin_in(
+    pool: &PgPool,
+    workspace: &str,
+) -> Result<Transaction<'static, Postgres>, sqlx::Error> {
+    let mut tx = pool.begin().await?;
+    set_workspace(&mut tx, workspace).await?;
+    Ok(tx)
+}
+
+/// What a transaction may reach on the kernel's tables.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct Scope {
+    /// The workspace it works in ([`WORKSPACE_SETTING`]).
+    pub workspace: Option<String>,
+    /// Whether the kernel scope is on ([`KERNEL_SCOPE_SETTING`]).
+    pub kernel: bool,
+}
+
+impl Scope {
+    /// Whether rows of `workspace` are within reach.
+    pub fn reaches(&self, workspace: &str) -> bool {
+        self.kernel || self.workspace.as_deref() == Some(workspace)
+    }
+
+    /// Neither a workspace nor the kernel scope: no row is visible.
+    pub fn is_unset(&self) -> bool {
+        !self.kernel && self.workspace.is_none()
+    }
+}
+
+/// The scope of the current transaction.
+pub(crate) async fn scope(conn: &mut PgConnection) -> Result<Scope, sqlx::Error> {
+    let row = sqlx::query!(
+        r#"SELECT nullif(current_setting($1, true), '') AS workspace,
+                  coalesce(current_setting($2, true), '') = 'on' AS "kernel!""#,
+        WORKSPACE_SETTING,
+        KERNEL_SCOPE_SETTING,
+    )
+    .fetch_one(conn)
+    .await?;
+    Ok(Scope {
+        workspace: row.workspace,
+        kernel: row.kernel,
+    })
+}
+
+/// Refuse work on `workspace`'s kernel rows (`what`) in a transaction that
+/// cannot reach them: one working in another workspace, or in none and
+/// without the kernel scope (it would see and change nothing, silently).
+pub(crate) async fn require_scope(
+    conn: &mut PgConnection,
+    workspace: &str,
+    what: &str,
+) -> Result<(), sqlx::Error> {
+    let scope = scope(conn).await?;
+    if scope.reaches(workspace) {
+        return Ok(());
+    }
+    Err(sqlx::Error::InvalidArgument(if scope.is_unset() {
+        format!(
+            "{what} belongs to a workspace; run it in a transaction working there \
+             (`begin_for`, a job's `tx()`), not one that set no workspace"
+        )
+    } else {
+        format!("{what} belongs to another workspace than the transaction's")
+    }))
+}
+
+/// Before the kernel writes an instance-wide row (no workspace: an
+/// account's event, a scheduled tick) for a transaction that set nothing,
+/// lift it into the kernel scope for that statement. Returns whether it
+/// lifted; pass that to [`lower`] right after the statement.
+///
+/// **Invariant** (the callers, `EventBus::publish` and `jobs::insert`, keep
+/// it):
+/// - it lifts only a transaction that set **nothing** (no workspace, no
+///   kernel scope); a workspace or kernel transaction is left as it is;
+/// - between the lift and [`lower`] runs only the kernel's own statement,
+///   whose workspace parameter is `None`;
+/// - [`lower`] turns the scope off only if this lifted it, so a caller's
+///   own kernel scope is never turned off;
+/// - on an error between the two the transaction is aborted by Postgres
+///   (or carries no change worth keeping), and the caller returns the
+///   error without lowering;
+/// - a publish or enqueue future dropped mid-statement (a cancelled task, a
+///   lost `select!`) would leave the scope on: a caller must then drop the
+///   transaction too, never keep using it. Every caller awaits these to
+///   completion inside its own transaction's lifetime.
+pub(crate) async fn lift_for_instance_rows(conn: &mut PgConnection) -> Result<bool, sqlx::Error> {
+    if scope(conn).await?.is_unset() {
+        enter_kernel_scope(conn).await?;
+        return Ok(true);
+    }
+    Ok(false)
+}
+
+/// Undo [`lift_for_instance_rows`]: only when it lifted.
+pub(crate) async fn lower(conn: &mut PgConnection, lifted: bool) -> Result<(), sqlx::Error> {
+    if lifted {
+        leave_kernel_scope(conn).await?;
+        #[cfg(debug_assertions)]
+        {
+            let after = scope(conn).await?;
+            debug_assert!(after.is_unset(), "lowered to {after:?}, not unset");
+        }
+    }
+    Ok(())
 }
 
 /// The schema migrations applied to the database.

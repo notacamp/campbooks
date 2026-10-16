@@ -132,6 +132,17 @@ server test fails if a table with a `workspace_id` column has no forced
 policy, or if the runtime role cannot use a table. Module tests run under
 the same role with `kernel::testing::app_role_pool`.
 
+A transaction that sets no workspace sees nothing: no row of any table with
+row-level security, the kernel's included (a server test checks every such
+table). Work across workspaces (the job worker's claims, pruning, the blob
+sweeper, replay, the admin's queue, the schedulers' dispatchers) runs in the
+explicit **kernel scope**, `campbooks.kernel_scope = 'on'`, opened only by
+`kernel::db::begin_kernel` or a job's `ctx.kernel_tx()`; outside the kernel,
+only files listed under `[[access.kernel_scope]]` in `architecture.toml`
+may call them (`cargo xtask arch`). Instance-wide events and jobs (no
+workspace) can still be published and enqueued from a transaction that set
+nothing: the kernel lifts it for that one insert.
+
 ### Files (blobs)
 
 Message bodies (raw MIME), attachments and files are not stored in

@@ -14,11 +14,14 @@ campbooks-kernel.workspace = true
 chrono.workspace = true
 figment.workspace = true
 opentelemetry.workspace = true
+psl.workspace = true
 regex.workspace = true
 reqwest.workspace = true
 secrecy.workspace = true
 serde.workspace = true
 serde_json.workspace = true
+# The usage ledger is reached through the caller's pool (`usage::Scope`).
+sqlx.workspace = true
 thiserror.workspace = true
 tokio.workspace = true
 tracing.workspace = true
