@@ -276,7 +276,7 @@
       },
       "consent_incomplete": {
         "title": "Mail access wasn’t allowed.",
-        "lead": "You can sign in with that account now, but its mailbox isn’t connected. Try again and allow mail access."
+        "lead": "Nothing was connected, and that account wasn’t added as a way to sign in. Try again and allow mail access."
       },
       "account_mismatch": {
         "title": "That’s a different account.",

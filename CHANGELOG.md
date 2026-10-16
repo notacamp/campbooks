@@ -231,7 +231,11 @@ All notable changes to Campbooks Next are documented here. The format follows
   (default `true`) and adds no way in when it is `false`; a way in that came
   only from connecting a mailbox is removed when that mailbox is disconnected
   (unless another connection of yours uses it or it is your last way in),
-  signing out whoever used it; connections show `granted_by_you` and members
+  signing out whoever used it, and a connect that fails (mail access declined,
+  or the mailbox refused) leaves no new way in behind;
+  `connectors.connection_added` now names the provider account and the
+  grantor's account and is published for every accepted grant; connections
+  show `granted_by_you` and members
   `you` (the app no longer works out who you are by matching email
   addresses). An inbox kept as history after a disconnect opens read-only,
   saying so, with nothing to act on; new messages never offer it. Two

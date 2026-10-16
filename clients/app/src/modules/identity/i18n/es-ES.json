@@ -276,7 +276,7 @@
       },
       "consent_incomplete": {
         "title": "No se ha permitido el acceso al correo.",
-        "lead": "Ya puedes iniciar sesión con esa cuenta, pero su buzón no se ha conectado. Inténtalo de nuevo y permite el acceso al correo."
+        "lead": "No se ha conectado nada y esa cuenta no se ha añadido como forma de iniciar sesión. Inténtalo de nuevo y permite el acceso al correo."
       },
       "account_mismatch": {
         "title": "Esa es otra cuenta.",

@@ -1276,6 +1276,9 @@ async fn drafts_and_connections_reach_only_who_may_see_them(db: PgPool) {
             connection,
             provider: Provider::Google,
             granted_by: bea_id,
+            account_subject: None,
+            grantor_subject: None,
+            refreshed: false,
         })
         .await;
     let [ana_feed, bea_feed, cid_feed, dan_feed] = &mut feeds[..] else {

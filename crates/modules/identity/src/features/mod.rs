@@ -14,6 +14,7 @@ pub mod list_held_grants;
 pub mod list_passkeys;
 pub mod list_ways_in;
 pub mod member_left;
+pub mod name_connected_mailbox;
 pub mod notify_way_in_added;
 pub mod register_client;
 pub mod register_passkey;

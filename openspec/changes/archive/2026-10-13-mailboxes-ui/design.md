@@ -278,17 +278,38 @@ per-workspace rows behind row-level security.
    and counts the others. A way in linked before the table existed is never
    tracked, so it is never removed by mistake.
 
-   Two guards keep a row from outliving its mailbox or answering for
-   someone else's: a hand-over that fails takes back the row its round trip
-   wrote (no connection came of it), and the removal acts **only on the row
-   naming the disconnected connection**. A row naming none (a hand-over in
-   flight, or one whose naming failed) is never acted on, so its way in
-   stays; the event's `granted_by` is the workspaces module's user id, which
-   `identity` cannot map to an account, so it cannot be used instead. This
-   is what keeps B's disconnect of a shared mailbox from removing the way in
-   A tried to make of the same account in that workspace. The event carries
-   no issuer, so the row (found by connection) is checked against provider
-   and subject only.
+   Guards keep a row from outliving its mailbox or answering for someone
+   else's:
+   - The removal acts **only on the row naming the disconnected
+     connection**; a row naming none is never acted on by it. The event's
+     `granted_by` is the workspaces module's user id, which `identity`
+     cannot map to an account, so it cannot be used instead. This is what
+     keeps B's disconnect of a shared mailbox from removing the way in A
+     tried to make of the same account in that workspace. The event carries
+     no issuer, so the row (found by connection) is checked against
+     provider and subject only.
+   - A hand-over that fails takes back the row its round trip wrote and, in
+     the same transaction under the account lock, the way in that round
+     trip created (unless it is the account's last): no connection came of
+     it, so nothing is left to remove it later. A way in that existed
+     before the round trip stays. The hand-over runs in a spawned task, so
+     a browser that goes away mid-request cannot cancel it halfway.
+   - Naming is an upsert, done twice: by the round trip as a fast path, and
+     durably by `identity.name_connected_mailbox` consuming
+     `connectors.connection_added`, which now carries `provider`,
+     `account_subject` and the grantor's account (`grantor_subject`, the
+     token subject the grant was handed over for) and is published for
+     every accepted grant. The consumer names the row only for the
+     grantor's own way in of that provider account, and only when it is
+     tracked; a replay names the same connection again.
+   - A row still unnamed a day after it was written never became a
+     connection (the round trip died before either naming): the daily
+     prune deletes it and removes a connect-made way in it leaves with no
+     row, under the account lock, unless it is the account's last.
+     *Considered:* naming only from the event (no fast path) — the
+     confirmation on Mailboxes could then briefly not know which mailbox a
+     way in came with; keeping unnamed rows forever — a way in nothing
+     could ever remove.
 2. **Ask `connectors` through a kernel port** ("does any connection of
    provider X, account S remain?"). A cross-workspace read of `connectors`'
    rows: either a privileged connection that skips row-level security or a

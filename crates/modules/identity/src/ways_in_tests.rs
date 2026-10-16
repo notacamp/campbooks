@@ -409,7 +409,7 @@ async fn a_shared_mailbox_is_connected_without_becoming_a_way_in(db: PgPool) {
 }
 
 #[sqlx::test(migrations = "../../../migrations")]
-async fn a_mailbox_declined_at_the_provider_still_proves_the_way_in(db: PgPool) {
+async fn a_mailbox_declined_at_the_provider_adds_no_way_in(db: PgPool) {
     let kit = Kit::new(db).await;
     let access = kit.signed_up().await;
     kit.google.set_user(user("work-sam"));
@@ -429,12 +429,13 @@ async fn a_mailbox_declined_at_the_provider_still_proves_the_way_in(db: PgPool) 
     let back = kit.via(Provider::Google, &declined).await;
     assert_eq!(back.location(), "/w/ws?link_error=consent_incomplete");
     assert!(kit.intake.adopted().is_empty());
+    // Nothing was connected, so the way in this connect made goes again.
     assert_eq!(
         kit.ways_in(&access).await["items"]
             .as_array()
             .unwrap()
             .len(),
-        2
+        1
     );
 }
 

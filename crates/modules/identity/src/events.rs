@@ -293,6 +293,34 @@ impl DomainEvent for ConnectionRemoved {
     }
 }
 
+/// `connectors.connection_added` v1, as this module reads it: which
+/// connection a grant became, so the mailbox record of the way in it came
+/// with can be named even if the round trip that handed it over died.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ConnectionAdded {
+    /// The workspace.
+    pub workspace: String,
+    /// The connection (the connectors module's id).
+    pub connection: String,
+    /// Its provider.
+    pub provider: String,
+    /// The provider's stable id of the account (`sub`).
+    #[serde(default)]
+    pub account_subject: Option<String>,
+    /// The grantor's account here (the token subject it was handed over for).
+    #[serde(default)]
+    pub grantor_subject: Option<String>,
+}
+
+impl DomainEvent for ConnectionAdded {
+    const NAME: &'static str = "connectors.connection_added";
+    const VERSION: u16 = 1;
+
+    fn workspace(&self) -> Option<&str> {
+        Some(&self.workspace)
+    }
+}
+
 /// `workspaces.workspace_deleting` v1, as this module reads it.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct WorkspaceDeleting {

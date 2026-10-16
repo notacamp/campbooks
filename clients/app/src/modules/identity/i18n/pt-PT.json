@@ -276,7 +276,7 @@
       },
       "consent_incomplete": {
         "title": "O acesso ao correio não foi permitido.",
-        "lead": "Já pode iniciar sessão com essa conta, mas a caixa de correio não ficou ligada. Tente novamente e permita o acesso ao correio."
+        "lead": "Nada foi ligado e essa conta não foi adicionada como forma de iniciar sessão. Tente novamente e permita o acesso ao correio."
       },
       "account_mismatch": {
         "title": "Essa é outra conta.",

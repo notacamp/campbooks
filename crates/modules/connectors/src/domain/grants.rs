@@ -50,6 +50,9 @@ pub struct ProviderGrant {
     pub tokens: TokenGrant,
     /// The connection this consent extends, when it was started as one.
     pub extending: Option<ConnectionId>,
+    /// The grantor as the identity module knows them (its token subject),
+    /// when the grant came through it; announced with the connection.
+    pub grantor_subject: Option<String>,
     /// The accounts server of a Zoho grant's data centre.
     pub provider_server: Option<String>,
     /// The mailboxes the grant reaches (one for Gmail; a Zoho login's mail
@@ -200,20 +203,21 @@ async fn save(
             )
             .await?;
     }
-    if existing.is_none() {
-        state
-            .events
-            .publish(
-                tx,
-                &ConnectionAdded {
-                    workspace: workspace_key.clone(),
-                    connection: id,
-                    provider: g.grant.provider,
-                    granted_by: g.grant.user,
-                },
-            )
-            .await?;
-    }
+    state
+        .events
+        .publish(
+            tx,
+            &ConnectionAdded {
+                workspace: workspace_key.clone(),
+                connection: id,
+                provider: g.grant.provider,
+                granted_by: g.grant.user,
+                account_subject: Some(g.grant.account_subject.clone()),
+                grantor_subject: g.grant.grantor_subject.clone(),
+                refreshed: existing.is_some(),
+            },
+        )
+        .await?;
     start_streams(tx, state, deps, g, id, &had).await?;
     Ok(id)
 }

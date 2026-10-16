@@ -271,21 +271,50 @@ async fn the_last_way_in_stays(db: PgPool) {
 #[sqlx::test(migrations = "../../../migrations")]
 async fn another_members_disconnect_never_removes_your_way_in(db: PgPool) {
     let kit = Kit::new(db).await;
-    let ws = WorkspaceId::new();
-    // B connects the shared support@ mailbox here, not as a way in.
+    let (theirs, mine) = (WorkspaceId::new(), WorkspaceId::new());
+    // B connects the shared support@ mailbox in their workspace, not as a
+    // way in.
     kit.google.set_user(user("bea"));
     let bea = kit.signed_up().await;
-    let bea_connection = connect(&kit, &bea, ws, "support", false).await;
-    // A connects the same account here as a way in: the way in is added,
-    // then the connectors module refuses the grant (it is B's here).
+    let bea_connection = connect(&kit, &bea, theirs, "support", false).await;
+    // A made support@ a way in by connecting it in another workspace, then
+    // connects it in B's: the connectors module refuses (it is B's there).
     kit.new_browser();
     kit.google.set_user(user("ana"));
     let ana = kit.signed_up().await;
+    connect(&kit, &ana, mine, "support", true).await;
     kit.intake.refuse_next();
     kit.google.set_user(user("support"));
     let started = kit
         .start_link(
             &ana,
+            &json!({ "purpose": "connect", "provider": "google", "workspace_id": theirs,
+                     "sign_in": true, "return_to": BACK }),
+        )
+        .await;
+    let to_google = kit.get(started.json["url"].as_str().unwrap()).await;
+    let back = kit.via(Provider::Google, &to_google.location()).await;
+    assert!(back.location().contains("link_error="), "{back:?}");
+    // The failed hand-over took back its record in B's workspace; the way
+    // in (made earlier) stays.
+    assert_eq!(recorded(&kit, theirs, "support").await, "never-recorded");
+    assert!(addresses(&kit.ways_in(&ana).await).contains(&"support@example.com".to_owned()));
+
+    // B disconnects: A's way in is untouched.
+    removed_connection(&kit, theirs, &bea_connection, "support").await;
+    assert!(addresses(&kit.ways_in(&ana).await).contains(&"support@example.com".to_owned()));
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_refused_connect_takes_back_the_way_in_it_made(db: PgPool) {
+    let kit = Kit::new(db).await;
+    let access = kit.signed_up().await;
+    let ws = WorkspaceId::new();
+    kit.intake.refuse_next();
+    kit.google.set_user(user("support"));
+    let started = kit
+        .start_link(
+            &access,
             &json!({ "purpose": "connect", "provider": "google", "workspace_id": ws,
                      "sign_in": true, "return_to": BACK }),
         )
@@ -293,17 +322,13 @@ async fn another_members_disconnect_never_removes_your_way_in(db: PgPool) {
     let to_google = kit.get(started.json["url"].as_str().unwrap()).await;
     let back = kit.via(Provider::Google, &to_google.location()).await;
     assert!(back.location().contains("link_error="), "{back:?}");
-    assert!(addresses(&kit.ways_in(&ana).await).contains(&"support@example.com".to_owned()));
-    // Nothing connected for A, so nothing is recorded on A's way in.
+    // Nothing connected: no sign-in with support@ is left behind, nor a record.
+    assert!(!addresses(&kit.ways_in(&access).await).contains(&"support@example.com".to_owned()));
     let rows: i64 = sqlx::query_scalar("SELECT count(*) FROM identity.mailbox_links")
         .fetch_one(&kit.state.db)
         .await
         .unwrap();
-    assert_eq!(rows, 0, "the failed hand-over took its record back");
-
-    // B disconnects: A's way in is untouched.
-    removed_connection(&kit, ws, &bea_connection, "support").await;
-    assert!(addresses(&kit.ways_in(&ana).await).contains(&"support@example.com".to_owned()));
+    assert_eq!(rows, 0);
 }
 
 #[sqlx::test(migrations = "../../../migrations")]
@@ -323,7 +348,7 @@ async fn a_record_naming_no_connection_is_never_acted_on(db: PgPool) {
 }
 
 #[sqlx::test(migrations = "../../../migrations")]
-async fn a_failed_hand_over_leaves_no_record(db: PgPool) {
+async fn a_failed_hand_over_leaves_no_record_and_no_way_in(db: PgPool) {
     let kit = Kit::new(db).await;
     let access = kit.signed_up().await;
     let ws = WorkspaceId::new();
@@ -336,8 +361,7 @@ async fn a_failed_hand_over_leaves_no_record(db: PgPool) {
         )
         .await;
     let to_google = kit.get(started.json["url"].as_str().unwrap()).await;
-    // The person unticks the mail permission: the way in is added, nothing
-    // is connected.
+    // The person unticks the mail permission: nothing is connected.
     let declined = to_google.location().replace(
         &url::form_urlencoded::byte_serialize(crate::testkit::MAIL_SCOPE.as_bytes())
             .collect::<String>(),
@@ -348,7 +372,8 @@ async fn a_failed_hand_over_leaves_no_record(db: PgPool) {
         back.location(),
         format!("{BACK}?link_error=consent_incomplete")
     );
-    assert!(addresses(&kit.ways_in(&access).await).contains(&"work-sam@example.com".to_owned()));
+    // The way in this connect made goes with it.
+    assert!(!addresses(&kit.ways_in(&access).await).contains(&"work-sam@example.com".to_owned()));
     let rows: i64 = sqlx::query_scalar("SELECT count(*) FROM identity.mailbox_links")
         .fetch_one(&kit.state.db)
         .await

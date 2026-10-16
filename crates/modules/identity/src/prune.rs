@@ -3,15 +3,19 @@
 //! trips, pending sign-ups, passkey challenges, codes), held mailbox grants nobody adopted in
 //! time, ended sessions, and refresh-token families that expired or were
 //! revoked a day ago (kept that long so reuse of their tokens is still
-//! recognised as such), revoked consents after 30 days, and clients that
+//! recognised as such), revoked consents after 30 days, clients that
 //! registered themselves (or are known by a metadata document) and went
-//! unused for 30 days.
+//! unused for 30 days, and mailbox records that never got a connection
+//! within [`UNNAMED_GRACE`] (with the way in a connect created that they
+//! leave without a mailbox, as a disconnect would remove it).
 
 use std::time::Duration;
 
 use campbooks_kernel::{Job, JobContext, JobError};
 use chrono::{TimeDelta, Utc};
 use serde::{Deserialize, Serialize};
+
+use crate::{domain::mailbox_links, features::forget_connected_way_in::announce};
 
 /// How often [`Prune`] runs.
 pub const PRUNE_EVERY: Duration = Duration::from_mins(15);
@@ -21,6 +25,11 @@ pub const PRUNE_EVERY: Duration = Duration::from_mins(15);
 /// how long a sent notice is remembered (far longer than its delivery
 /// retries).
 const UNUSED_CLIENT: TimeDelta = TimeDelta::days(30);
+
+/// How long a mailbox record may wait for its connection: the round trip
+/// that wrote it names it within seconds, or `connectors.connection_added`
+/// does; one still unnamed after this never got a connection.
+pub const UNNAMED_GRACE: TimeDelta = TimeDelta::days(1);
 
 /// How long revoked or expired families and ended sessions are kept.
 const KEEP_ENDED: TimeDelta = TimeDelta::days(1);
@@ -116,7 +125,27 @@ impl Job for Prune {
         tx.commit()
             .await
             .map_err(|e| JobError::retry(format!("pruning identity state: {e}")))?;
-        tracing::info!(deleted, "pruned expired sign-in state");
+        let ways_in = sweep_unnamed_mailboxes(ctx, now)
+            .await
+            .map_err(|e| JobError::retry(format!("pruning mailbox records: {e}")))?;
+        tracing::info!(deleted, ways_in, "pruned expired sign-in state");
         Ok(())
     }
+}
+
+/// Delete mailbox records that never got a connection, and remove the ways
+/// in they leave without a mailbox (audited and announced as a disconnect
+/// would). How many ways in went.
+pub async fn sweep_unnamed_mailboxes(
+    ctx: &mut JobContext,
+    now: chrono::DateTime<Utc>,
+) -> campbooks_kernel::Result<usize> {
+    let state = ctx.state().clone();
+    let mut tx = state.db.begin().await?;
+    let removed = mailbox_links::sweep_unnamed(&mut tx, now - UNNAMED_GRACE, now).await?;
+    for gone in &removed {
+        announce(&state, &mut tx, gone, "mailbox_never_connected", now).await?;
+    }
+    tx.commit().await?;
+    Ok(removed.len())
 }

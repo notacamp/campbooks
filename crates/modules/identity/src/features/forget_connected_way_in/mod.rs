@@ -11,14 +11,53 @@
 //! fixes the lock order), so a way in some of whose mailboxes are unknown is
 //! never removed. Idempotent: a replay finds the record gone.
 
-use campbooks_kernel::{Event, EventConsumer, JobContext, JobError};
-use chrono::Utc;
+use campbooks_kernel::{AppState, Event, EventConsumer, JobContext, JobError, Result};
+use chrono::{DateTime, Utc};
+use sqlx::PgConnection;
 use uuid::Uuid;
 
 use crate::{
-    domain::{accounts, mailbox_links},
+    domain::{
+        accounts,
+        mailbox_links::{self, Removed},
+    },
     events::{ConnectionRemoved, WayInRemoved},
 };
+
+/// Audit way in `gone`'s removal (`reason`) and publish
+/// `identity.way_in_removed`, in the transaction that removed it.
+pub(crate) async fn announce(
+    state: &AppState,
+    conn: &mut sqlx::Transaction<'static, sqlx::Postgres>,
+    gone: &Removed,
+    reason: &str,
+    now: DateTime<Utc>,
+) -> Result<()> {
+    let db: &mut PgConnection = conn;
+    accounts::audit(
+        db,
+        Some(gone.account),
+        "way_in_removed",
+        serde_json::json!({
+            "method": "provider", "provider": gone.provider, "way_in": gone.way_in,
+            "sessions_ended": gone.sessions_ended, "reason": reason,
+        }),
+        now,
+    )
+    .await?;
+    state
+        .events
+        .publish(
+            conn,
+            &WayInRemoved {
+                account: gone.account,
+                method: "provider".to_owned(),
+                provider: Some(gone.provider.clone()),
+            },
+        )
+        .await?;
+    Ok(())
+}
 
 /// Removes the way in a removed mailbox alone brought.
 #[derive(Debug, Clone, Copy, Default)]
@@ -53,30 +92,9 @@ impl EventConsumer for ForgetConnectedWayIn {
         else {
             return Ok(());
         };
-        accounts::audit(
-            tx,
-            Some(gone.account),
-            "way_in_removed",
-            serde_json::json!({
-                "method": "provider", "provider": gone.provider, "way_in": gone.way_in,
-                "sessions_ended": gone.sessions_ended, "reason": "connection_removed",
-            }),
-            now,
-        )
-        .await
-        .map_err(retry)?;
-        state
-            .events
-            .publish(
-                tx,
-                &WayInRemoved {
-                    account: gone.account,
-                    method: "provider".to_owned(),
-                    provider: Some(gone.provider),
-                },
-            )
+        announce(&state, tx, &gone, "connection_removed", now)
             .await
-            .map_err(|e| JobError::retry(e.to_string()))?;
+            .map_err(retry)?;
         tracing::info!(
             sessions_ended = gone.sessions_ended,
             "a way in went with its last mailbox"

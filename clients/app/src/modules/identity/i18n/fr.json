@@ -276,7 +276,7 @@
       },
       "consent_incomplete": {
         "title": "L’accès aux mails n’a pas été autorisé.",
-        "lead": "Vous pouvez vous connecter avec ce compte, mais sa boîte mail n’est pas connectée. Réessayez en autorisant l’accès aux mails."
+        "lead": "Rien n’a été connecté, et ce compte n’a pas été ajouté comme moyen de connexion. Réessayez en autorisant l’accès aux mails."
       },
       "account_mismatch": {
         "title": "C’est un autre compte.",
