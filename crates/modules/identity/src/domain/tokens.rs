@@ -501,9 +501,12 @@ impl Mint<'_> {
     }
 
     /// The access token (RFC 9068). First-party clients get the person's
-    /// email and name.
+    /// email and name. Its `iat` is the time, or for a sign-in newer than
+    /// the account's last revocation minted in that revocation's second, the
+    /// next second ([`Profile::issued_at`]).
     pub fn access_token(&self) -> Result<String> {
         let now = self.now.timestamp();
+        let issued_at = self.profile.issued_at(self.grant.auth_time, self.now);
         let scopes: Vec<&str> = self.grant.scope.split_whitespace().collect();
         let wants = |scope: &str| scopes.contains(&scope);
         self.sign(
@@ -515,9 +518,9 @@ impl Mint<'_> {
                 azp: &self.grant.client_id,
                 client_id: &self.grant.client_id,
                 scope: &self.grant.scope,
-                iat: now,
+                iat: issued_at,
                 nbf: now,
-                exp: now + TOKEN_LIFETIME.num_seconds(),
+                exp: issued_at + TOKEN_LIFETIME.num_seconds(),
                 jti: random_token(),
                 auth_time: self.grant.auth_time.timestamp(),
                 sid: self.grant.session_id.map(|id| id.to_string()),

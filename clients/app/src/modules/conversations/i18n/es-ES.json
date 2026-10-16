@@ -51,7 +51,11 @@
     "older_one": "{{count}} mensaje anterior",
     "older_other": "{{count}} mensajes anteriores",
     "showOlder": "Mostrar",
-    "attachments": "Adjuntos"
+    "attachments": "Adjuntos",
+    "kept": {
+      "title": "Conservado como historial",
+      "lead": "{{address}} se desconectó y su correo se conserva aquí, solo lectura: no llega nada nuevo y no se puede enviar ni cambiar nada desde él."
+    }
   },
   "actions": {
     "star": "Destacar",

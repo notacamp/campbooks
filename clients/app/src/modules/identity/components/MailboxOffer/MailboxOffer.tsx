@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
-import { Banner, Button, Heading, InlineConfirm, Text } from "~/lib/ui";
+import { Banner, Button, ButtonLink, Heading, InlineConfirm, Text } from "~/lib/ui";
+import type { InAppLink } from "~/modules/connectors";
 
 import { useAdoptHeldGrant, useDiscardHeldGrant, type HeldGrant } from "../../api/queries";
 import { adoptFailure, useWaitsUntil } from "../MailboxStep/MailboxStep";
@@ -12,13 +13,16 @@ export interface MailboxOfferProps {
   /** The open workspace, where Connect puts it. */
   workspaceId: string;
   workspaceName: string;
+  /** Settings → Mailboxes, to connect another mailbox instead. */
+  other: InAppLink;
 }
 
 /**
  * Home's mail section while a mailbox from sign-up is waiting: Connect it to
- * this workspace, or forget it (confirmed in place: it can't be undone).
+ * this workspace, forget it (confirmed in place: it can't be undone), or
+ * connect a different one on Settings → Mailboxes (it keeps waiting).
  */
-export function MailboxOffer({ grant, workspaceId, workspaceName }: MailboxOfferProps) {
+export function MailboxOffer({ grant, workspaceId, workspaceName, other }: MailboxOfferProps) {
   const { t } = useTranslation("identity");
   const adopt = useAdoptHeldGrant(workspaceId);
   const discard = useDiscardHeldGrant();
@@ -85,6 +89,9 @@ export function MailboxOffer({ grant, workspaceId, workspaceName }: MailboxOffer
           >
             {t("offer.forget")}
           </Button>
+          <ButtonLink variant="link" {...other}>
+            {t("offer.other")}
+          </ButtonLink>
         </div>
       )}
     </section>

@@ -82,6 +82,13 @@ async fn a_person_adds_zoho_as_a_way_in_then_signs_in_with_it(db: PgPool) {
     assert_eq!(ways["items"][1]["linked_via"], "link");
     assert_eq!(ways["items"][1]["email"], "zoho-sam@example.com");
     assert_eq!(ways["providers"], json!(["google", "microsoft", "zoho"]));
+    // Mail only where there is an adapter: not Microsoft, Zoho once synced.
+    assert_eq!(ways["mailbox_providers"], json!(["google"]));
+    kit.intake.sync_zoho();
+    assert_eq!(
+        kit.ways_in(&access).await["mailbox_providers"],
+        json!(["google", "zoho"])
+    );
     let added = count(
         &kit,
         "SELECT count(*) FROM kernel.events WHERE name = 'identity.way_in_added'",
@@ -363,7 +370,46 @@ async fn connecting_a_mailbox_links_it_and_hands_its_grant_over(db: PgPool) {
 }
 
 #[sqlx::test(migrations = "../../../migrations")]
-async fn a_mailbox_declined_at_the_provider_still_proves_the_way_in(db: PgPool) {
+async fn a_shared_mailbox_is_connected_without_becoming_a_way_in(db: PgPool) {
+    let kit = Kit::new(db).await;
+    let access = kit.signed_up().await;
+    let workspace = uuid::Uuid::now_v7();
+    let connect = async |kit: &Kit| {
+        let started = kit
+            .start_link(
+                &access,
+                &json!({ "purpose": "connect", "provider": "google", "workspace_id": workspace,
+                         "sign_in": false, "return_to": "/w/ws" }),
+            )
+            .await;
+        assert_eq!(started.status, StatusCode::CREATED, "{started:?}");
+        let to_google = kit.get(started.json["url"].as_str().unwrap()).await;
+        kit.via(Provider::Google, &to_google.location()).await
+    };
+
+    // Unticked for the account you signed up with: still connected.
+    let back = connect(&kit).await;
+    assert_eq!(back.location(), "/w/ws?connected=connection-1");
+
+    // A shared mailbox: connected, never a way in, nothing announced.
+    kit.google.set_user(user("support"));
+    let back = connect(&kit).await;
+    assert_eq!(back.location(), "/w/ws?connected=connection-2");
+    assert_eq!(kit.intake.adopted()[1].2, "support@example.com");
+    let ways = kit.ways_in(&access).await;
+    assert_eq!(ways["items"].as_array().unwrap().len(), 1);
+    assert_eq!(
+        count(
+            &kit,
+            "SELECT count(*) FROM kernel.events WHERE name = 'identity.way_in_added'"
+        )
+        .await,
+        0
+    );
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_mailbox_declined_at_the_provider_adds_no_way_in(db: PgPool) {
     let kit = Kit::new(db).await;
     let access = kit.signed_up().await;
     kit.google.set_user(user("work-sam"));
@@ -383,12 +429,13 @@ async fn a_mailbox_declined_at_the_provider_still_proves_the_way_in(db: PgPool) 
     let back = kit.via(Provider::Google, &declined).await;
     assert_eq!(back.location(), "/w/ws?link_error=consent_incomplete");
     assert!(kit.intake.adopted().is_empty());
+    // Nothing was connected, so the way in this connect made goes again.
     assert_eq!(
         kit.ways_in(&access).await["items"]
             .as_array()
             .unwrap()
             .len(),
-        2
+        1
     );
 }
 
@@ -692,6 +739,81 @@ async fn a_zoho_refresh_token_campbooks_does_not_keep_is_revoked(db: PgPool) {
     );
     assert_eq!(kit.zoho.revoked_tokens().len(), before + 1);
     assert!(kit.intake.adopted().is_empty());
+}
+
+/// Start a `connect` of `provider` without a way in (`sign_in: false`) as
+/// `access`, and follow it through the provider: where the browser lands.
+async fn connect_shared(kit: &Kit, access: &str, provider: Provider) -> String {
+    let started = kit
+        .start_link(
+            access,
+            &json!({ "purpose": "connect", "provider": provider.as_str(), "sign_in": false,
+                     "workspace_id": uuid::Uuid::now_v7(), "return_to": SETTINGS }),
+        )
+        .await;
+    assert_eq!(started.status, StatusCode::CREATED, "{started:?}");
+    let to_provider = kit.get(started.json["url"].as_str().unwrap()).await;
+    kit.via(provider, &to_provider.location()).await.location()
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_shared_connect_of_another_accounts_way_in_is_refused(db: PgPool) {
+    let kit = Kit::new(db).await;
+    // Bea signs up with Google account `x`: it is her way in.
+    kit.google.set_user(user("x"));
+    let bea = kit.signed_up().await;
+    let bea_ways = kit.ways_in(&bea).await;
+    // Ana, in another browser, connects `x` as a shared mailbox.
+    kit.new_browser();
+    kit.google.set_user(user("ana"));
+    let ana = kit.signed_up().await;
+    kit.google.set_user(user("x"));
+    let back = connect_shared(&kit, &ana, Provider::Google).await;
+
+    assert_eq!(
+        back,
+        format!("{SETTINGS}?link_error=way_in_belongs_to_another_account")
+    );
+    assert!(kit.intake.adopted().is_empty(), "nothing adopted");
+    // A Google token is dropped, never revoked: revoking it would revoke
+    // Bea's whole grant to the app (see `revoke_unkept`).
+    assert!(kit.google.revoked_tokens().is_empty());
+    assert_eq!(kit.ways_in(&bea).await, bea_ways, "Bea's way in untouched");
+    assert_eq!(
+        kit.ways_in(&ana).await["items"].as_array().unwrap().len(),
+        1
+    );
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_shared_zoho_connect_of_another_accounts_way_in_revokes_its_token(db: PgPool) {
+    let kit = Kit::new(db).await;
+    kit.intake.sync_zoho();
+    // Bea's Zoho account `zoho-x` is her way in.
+    kit.google.set_user(user("bea"));
+    let bea = kit.signed_up().await;
+    kit.zoho.set_user(user("zoho-x"));
+    let at_zoho = link_to(&kit, &bea, Provider::Zoho).await;
+    kit.via(Provider::Zoho, &at_zoho).await;
+    let bea_ways = kit.ways_in(&bea).await;
+    // Ana connects it as a shared mailbox.
+    kit.new_browser();
+    kit.google.set_user(user("ana"));
+    let ana = kit.signed_up().await;
+    let before = kit.zoho.revoked_tokens().len();
+    let back = connect_shared(&kit, &ana, Provider::Zoho).await;
+
+    assert_eq!(
+        back,
+        format!("{SETTINGS}?link_error=way_in_belongs_to_another_account")
+    );
+    assert!(kit.intake.adopted().is_empty(), "nothing adopted");
+    assert_eq!(
+        kit.zoho.revoked_tokens().len(),
+        before + 1,
+        "its token revoked"
+    );
+    assert_eq!(kit.ways_in(&bea).await, bea_ways, "Bea's way in untouched");
 }
 
 /// Ways in, live sessions and connections handed over, as counts.

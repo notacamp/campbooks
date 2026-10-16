@@ -87,7 +87,7 @@
     "roleOf": "Role of {{name}}",
     "remove": "Remove",
     "removeLabel": "Remove {{name}}",
-    "confirmRemove": "Remove {{name}} from {{workspace}}? They lose access right away. To bring them back, invite them again.",
+    "confirmRemove": "Remove {{name}} from {{workspace}}? They lose access right away. To bring them back, invite them again. Their mailboxes here are disconnected, and a way to sign in they added only by connecting one of them goes too.",
     "cancel": "Cancel",
     "roleChanged": "{{name}}: {{role}}",
     "readOnly": "Only owners and admins can invite people or change roles.",

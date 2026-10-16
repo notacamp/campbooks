@@ -265,6 +265,62 @@ impl DomainEvent for MemberLeft {
     }
 }
 
+/// `connectors.connection_removed` v1, as this module reads it
+/// (`contracts/connectors.connection_removed.v1.schema.json`): the
+/// workspace, provider and account of the mailbox that went, whose way in
+/// may go with it. Events recorded before the account was named carry
+/// none, and change nothing.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ConnectionRemoved {
+    /// The workspace.
+    pub workspace: String,
+    /// The connection (the connectors module's id).
+    pub connection: String,
+    /// Its provider.
+    #[serde(default)]
+    pub provider: Option<String>,
+    /// The provider's stable id of the account (`sub`).
+    #[serde(default)]
+    pub account_subject: Option<String>,
+}
+
+impl DomainEvent for ConnectionRemoved {
+    const NAME: &'static str = "connectors.connection_removed";
+    const VERSION: u16 = 1;
+
+    fn workspace(&self) -> Option<&str> {
+        Some(&self.workspace)
+    }
+}
+
+/// `connectors.connection_added` v1, as this module reads it: which
+/// connection a grant became, so the mailbox record of the way in it came
+/// with can be named even if the round trip that handed it over died.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ConnectionAdded {
+    /// The workspace.
+    pub workspace: String,
+    /// The connection (the connectors module's id).
+    pub connection: String,
+    /// Its provider.
+    pub provider: String,
+    /// The provider's stable id of the account (`sub`).
+    #[serde(default)]
+    pub account_subject: Option<String>,
+    /// The grantor's account here (the token subject it was handed over for).
+    #[serde(default)]
+    pub grantor_subject: Option<String>,
+}
+
+impl DomainEvent for ConnectionAdded {
+    const NAME: &'static str = "connectors.connection_added";
+    const VERSION: u16 = 1;
+
+    fn workspace(&self) -> Option<&str> {
+        Some(&self.workspace)
+    }
+}
+
 /// `workspaces.workspace_deleting` v1, as this module reads it.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct WorkspaceDeleting {

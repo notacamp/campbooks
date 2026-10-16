@@ -175,7 +175,11 @@ belongs to (404 otherwise), a provider whose mailbox the instance can sync
 `reconnect` it SHALL need a connection the caller granted in that workspace
 (404 otherwise), and a recent sign-in unless that connection needs
 re-authorisation. Both SHALL ask for identity, mailbox and offline access with
-`prompt=consent`. A connect SHALL link the identity as for `link`. A
+`prompt=consent`. A connect SHALL link the identity as for `link`, unless it
+was started with `sign_in: false` (a shared mailbox): then it SHALL add no
+way in, still refuse an identity that is another account's way in, and hand
+the grant over marked as one the person does not sign in with (unless the
+identity already is one of their ways in). A
 reconnect SHALL accept only the connection's own provider account, refusing
 any other with `link_error=account_mismatch` before writing anything, and
 SHALL never add a way in. Then the grant SHALL go to the grant-intake port
@@ -186,6 +190,18 @@ return it with `connected=<connection id>`.
 #### Scenario: Connect a second Gmail
 - **WHEN** a signed-in member connects a second Google account in their workspace
 - **THEN** that Google account is a way in, and the grant-intake port receives its grant with a refresh token for that workspace
+
+#### Scenario: A connect that would add a way in, off the allow-list
+- **WHEN** the sign-in allow-list does not let an account in and a member connects it with `sign_in: true`
+- **THEN** the browser returns with `link_error=sign_in_not_allowed` before any way in or mailbox record is written or any grant handed over
+
+#### Scenario: A shared mailbox off the allow-list
+- **WHEN** a member connects that account with `sign_in: false`
+- **THEN** it is connected, no way in or mailbox record is written, and signing in with it is still refused
+
+#### Scenario: Connect a shared mailbox
+- **WHEN** a member connects `support@example.com` with `sign_in: false`
+- **THEN** the grant-intake port receives it with `signs_in` false, the member's ways in are unchanged, and no `identity.way_in_added` is published
 
 #### Scenario: Reconnect after a revoked grant
 - **WHEN** a member's connection needs re-authorisation and they reconnect it
@@ -206,7 +222,12 @@ return it with `connected=<connection id>`.
 ### Requirement: Listing and removing ways in
 `identity.list_ways_in` (`identity:read`) SHALL list the caller's provider
 ways in (provider, address as given at link time, how and when linked, last
-used) and the providers configured on the instance.
+used, and, for a way in a connect created, how many workspaces its mailbox is
+connected in and the connections among them that are known), the providers
+configured on the instance, and, as
+`mailbox_providers`, the configured providers a mailbox can be connected
+from (`identity.start_link` with `connect` accepts them: the instance has a
+mail adapter for them), in the same order.
 `identity.remove_way_in` (`identity:write`) SHALL need a recent sign-in,
 lock the account, and refuse with 409 `last_way_in` when the way in is the
 account's only one, counting provider identities and passkeys. A way in of
@@ -225,6 +246,10 @@ mailbox, SHALL be audited, and SHALL publish `identity.way_in_removed`.
 #### Scenario: Remove one of two
 - **WHEN** a person with a Google and a Zoho way in removes the Zoho one
 - **THEN** it is gone, signing in with Zoho now leads to the new-account screen, and every mailbox connection is untouched
+
+#### Scenario: Mailbox providers
+- **WHEN** an instance configures Google, Microsoft and Zoho for sign-in and has mail adapters for Google and Zoho only
+- **THEN** `providers` is `google`, `microsoft`, `zoho` and `mailbox_providers` is `google`, `zoho`
 
 ### Requirement: Signing in with Microsoft
 Signing in with Microsoft SHALL use the tenant set by
@@ -314,8 +339,11 @@ provider sign-in SHALL send the browser to the sign-in screen with
 answer 403 `account_suspended` once the assertion verified (and
 `passkey_not_accepted` before), starting no session; its issuer sessions SHALL no
 longer sign it in to any client; its authorization codes and refresh tokens
-SHALL be refused with `invalid_grant`. Once unsuspended, the account SHALL
-sign in again with its ways in; nothing ended by the suspension is restored.
+SHALL be refused with `invalid_grant`; the access tokens already issued to it
+SHALL be refused by the API at once (see "Revoked access tokens stop at
+once"). Once unsuspended, the account SHALL sign in again with its ways in;
+nothing ended by the suspension is restored, its old access tokens
+included.
 
 #### Scenario: Every door refuses
 - **WHEN** an account that holds a refresh token, an unredeemed code and an issuer session is suspended
@@ -328,6 +356,10 @@ sign in again with its ways in; nothing ended by the suspension is restored.
 #### Scenario: Unsuspended
 - **WHEN** the account is unsuspended and the person signs in with Google
 - **THEN** the web client receives a code and redeems it for tokens
+
+#### Scenario: Access tokens already issued
+- **WHEN** an account is suspended while a client holds one of its access tokens, and is then unsuspended
+- **THEN** the token gets 401 from the moment of the suspension and still after the unsuspension
 
 ### Requirement: Passkeys are ways in
 A passkey SHALL be a discoverable WebAuthn credential registered with user
@@ -690,12 +722,89 @@ with `signed_up_with`).
 `identity.sign_out_everywhere` (`identity:write`, `POST
 /api/v1/identity/sign-out-everywhere`) SHALL end every live issuer session of
 the caller's account and revoke every refresh token it holds, for every
-client, record it in the audit trail and publish
-`identity.signed_out_everywhere`; the web BFF SHALL end the account's web
+client, make the API refuse every access token issued to the account so
+far (see "Revoked access tokens stop at once"), record it in the audit
+trail and publish `identity.signed_out_everywhere`; the web BFF SHALL end the account's web
 sessions on it. It SHALL need no recent sign-in. A token bound to a workspace
 SHALL get 404 and end nothing. Ways to sign in SHALL offer it behind an
 inline confirmation, then sign the browser out.
 
 #### Scenario: A stolen session
 - **WHEN** a person signs out everywhere while another browser holds a session and a refresh token of their account
-- **THEN** that refresh token fails with `invalid_grant`, that browser's next authorization shows the sign-in screen, and its web session ends
+- **THEN** that refresh token fails with `invalid_grant`, the access tokens issued before get 401 at once, that browser's next authorization shows the sign-in screen, and its web session ends
+
+### Requirement: A way in that came only from connecting goes with its mailbox
+When a connect creates a way in (`linked_via = connect`), the identity module
+SHALL record, in the transaction that creates the way in, the workspace its
+mailbox is connected in, and SHALL record every later workspace that way in's
+mailbox is connected in before that grant is handed over; if the record
+cannot be written, the round trip SHALL fail rather than hand the grant over.
+The hand-over SHALL run to its end even if the browser goes away.
+When the hand-over then fails (the connectors module refuses the grant, mail
+access was declined, no refresh token came back), the record that round trip
+wrote SHALL be taken back and, in the same transaction under the account
+lock, a way in that round trip created SHALL be removed too (as below),
+unless it is the account's last way in. Once the grant is accepted, the
+record SHALL name the connection it became (written if it went missing).
+The connectors module SHALL publish `connectors.connection_added` for every
+accepted grant, with its `provider`, `account_subject` and the grantor's
+account (`grantor_subject`); `identity.name_connected_mailbox`, consuming
+it, SHALL name the record of that provider account's way in in that
+workspace, and only when that way in belongs to the grantor's account and
+is tracked (has a record). Replaying the event SHALL change nothing.
+A record still naming no connection a day after it was written never became
+one: the daily prune SHALL delete it and, under the account lock, remove a
+way in a connect created that it leaves with no record (as below, unless it
+is the account's last), published with reason `mailbox_never_connected`.
+`identity.forget_connected_way_in`, consuming `connectors.connection_removed`
+(its workspace, connection, `provider` and `account_subject`), SHALL lock
+the account, then act only on the record naming that very connection (a
+record that names none is never acted on), forget it and, when that way in
+has none left, was
+linked by connecting, and is not the account's last way in (provider accounts
+and passkeys), SHALL remove it as
+`identity.remove_way_in` does: ending every session signed in with it,
+revoking their refresh tokens, auditing it and publishing
+`identity.way_in_removed`. A way in with connections that were never recorded
+(linked before the record existed), one linked by signing up or by Add, and
+the last way in SHALL stay. Replaying the event SHALL change nothing.
+
+#### Scenario: Its last connection goes
+- **WHEN** a way in a connect created has connections in two workspaces and both are removed
+- **THEN** it stays after the first removal and is gone after the second, with one `identity.way_in_removed`
+
+#### Scenario: Another member's disconnect
+- **WHEN** B connects support@ in a workspace without signing in with it, A (who made support@ a way in by connecting it in another workspace) then connects the same account in B's workspace and the grant is refused, and B later disconnects their connection
+- **THEN** A's way in is untouched, and no record of A's was left in B's workspace
+
+#### Scenario: A failed hand-over
+- **WHEN** a connect adds a way in but mail access was declined at the provider, or the connectors module refuses the grant
+- **THEN** the way in it added is gone again and no mailbox record is left
+
+#### Scenario: A record the round trip never named
+- **WHEN** a connect's record names no connection because the round trip ended before naming it, and `connectors.connection_added` arrives for it
+- **THEN** the record names that connection, and a replay changes nothing
+
+#### Scenario: Someone else's connection names nothing
+- **WHEN** `connectors.connection_added` names the same provider account but a different grantor account
+- **THEN** no record is named or written
+
+#### Scenario: A record nothing ever named
+- **WHEN** a record still names no connection a day after it was written
+- **THEN** the daily prune deletes it and removes the way in it alone kept, with one `identity.way_in_removed`, unless that way in is the account's last
+
+#### Scenario: Two of its mailboxes removed at once
+- **WHEN** the two workspaces' mailboxes of a way in a connect created are removed concurrently
+- **THEN** exactly one of the two removals removes the way in
+
+#### Scenario: Whoever signed in with it is signed out
+- **WHEN** a browser is signed in with that way in when its last connection is removed
+- **THEN** that session has ended
+
+#### Scenario: Other ways in stay
+- **WHEN** the connection of a shared mailbox, of the account the person signed up with, or one never recorded is removed
+- **THEN** the person's ways in are unchanged
+
+#### Scenario: The last way in stays
+- **WHEN** the only way in left is one a connect created and its connection is removed
+- **THEN** it stays

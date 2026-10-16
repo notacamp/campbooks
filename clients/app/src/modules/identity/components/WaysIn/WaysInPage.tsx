@@ -336,13 +336,15 @@ function ProviderWays({
 }) {
   const { t } = useTranslation("identity");
   const connections = useConnections(workspaceId);
-  // A mailbox of yours here that stopped syncing, by its address: every
-  // connected mailbox is a way in, so it is one of these rows. The server
-  // checks it is yours when you reconnect.
+  // A mailbox you connected here that stopped syncing, shown on the way in
+  // of the same account (by provider and address: a mailbox connected
+  // without signing in with it has no row here). Only its grantor can
+  // reconnect it, so a colleague's never is offered; the server checks too.
   const needsYou = (way: WayIn) =>
     connections.data?.find(
       (connection) =>
         connection.health === "needs_reauth" &&
+        connection.granted_by_you &&
         connection.provider === way.provider &&
         connection.address.toLowerCase() === way.email?.toLowerCase(),
     );

@@ -1,0 +1,32 @@
+.status {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1-5);
+  min-width: 0;
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+}
+
+.dot {
+  flex: none;
+  width: var(--dot-size);
+  height: var(--dot-size);
+  border-radius: var(--radius-full);
+  background: var(--text-tertiary);
+}
+
+.status[data-tone="ok"] .dot {
+  background: var(--success);
+}
+
+.status[data-tone="problem"] {
+  color: var(--danger);
+}
+
+.status[data-tone="problem"] .dot {
+  background: var(--danger);
+}
+
+.text {
+  min-width: 0;
+}

@@ -200,7 +200,8 @@
     "confirmForget": "¿Olvidar {{address}}? Campbooks borra el permiso que le dio Google. Podrás seguir iniciando sesión con esta cuenta.",
     "confirm": "Olvidarlo",
     "cancel": "Conservarlo",
-    "forgetFailed": "No se ha podido olvidar. Vuelve a intentarlo."
+    "forgetFailed": "No se ha podido olvidar. Vuelve a intentarlo.",
+    "other": "Conectar otro buzón"
   },
   "waysIn": {
     "title": "Formas de iniciar sesión",
@@ -275,7 +276,7 @@
       },
       "consent_incomplete": {
         "title": "No se ha permitido el acceso al correo.",
-        "lead": "Ya puedes iniciar sesión con esa cuenta, pero su buzón no se ha conectado. Inténtalo de nuevo y permite el acceso al correo."
+        "lead": "No se ha conectado nada y esa cuenta no se ha añadido como forma de iniciar sesión. Inténtalo de nuevo y permite el acceso al correo."
       },
       "account_mismatch": {
         "title": "Esa es otra cuenta.",

@@ -48,9 +48,8 @@
     "title": "Ainda nada precisa de si",
     "subline": "Quando o Campbooks tiver algo para si, aparece aqui.",
     "connectTitle": "Ligar o seu correio",
-    "connectLead": "O Campbooks vai ler o seu correio e trazer para esta página o que precisa de si. Ligar uma caixa de correio a partir daqui ainda está a ser construído.",
+    "connectLead": "O Campbooks lê o seu correio e traz para esta página o que precisa de si. Ligue uma caixa de correio para começar.",
     "connect": "Ligar o seu correio",
-    "soon": "Brevemente",
     "context": "Primeiros passos",
     "start": "Primeiros passos",
     "invite": "Convide as pessoas com quem trabalha",
@@ -75,5 +74,11 @@
     "reauthAction": "Iniciar sessão novamente",
     "unreachableTitle": "Não é possível abrir a administração",
     "unreachableLead": "O servidor não respondeu. Verifique a sua ligação e tente novamente."
+  },
+  "settings": {
+    "sections": "Secções das definições",
+    "members": "Membros",
+    "mailboxes": "Caixas de correio",
+    "waysIn": "Formas de iniciar sessão"
   }
 }

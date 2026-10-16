@@ -114,6 +114,8 @@ pub struct FakeIntake {
     issuers: Mutex<Vec<String>>,
     /// Whether the instance syncs Zoho mailboxes too.
     zoho_mail: std::sync::atomic::AtomicBool,
+    /// Refuse the next grant (as when another member connected it).
+    refuse_next: std::sync::atomic::AtomicBool,
 }
 
 /// The Zoho mailbox scopes the fake intake asks for, when it syncs Zoho.
@@ -130,6 +132,13 @@ impl FakeIntake {
             .lock()
             .unwrap_or_else(PoisonError::into_inner)
             .clone()
+    }
+
+    /// Refuse the next grant handed over, as the connectors module does when
+    /// another member already connected that account here.
+    pub fn refuse_next(&self) {
+        self.refuse_next
+            .store(true, std::sync::atomic::Ordering::SeqCst);
     }
 
     /// Sync Zoho mailboxes too: a Zoho sign-in then asks for mail.
@@ -159,25 +168,38 @@ impl GrantIntake for FakeIntake {
     }
 
     fn adopt<'a>(&'a self, _state: &'a AppState, grant: ProviderGrant) -> AdoptFuture<'a> {
+        if self
+            .refuse_next
+            .swap(false, std::sync::atomic::Ordering::SeqCst)
+        {
+            return Box::pin(async {
+                Err(campbooks_kernel::Error::Conflict(
+                    campbooks_kernel::i18n::MESSAGES.reason("mailbox_unsupported"),
+                ))
+            });
+        }
         self.issuers
             .lock()
             .unwrap_or_else(PoisonError::into_inner)
             .push(grant.issuer.clone());
-        self.adopted
-            .lock()
-            .unwrap_or_else(PoisonError::into_inner)
-            .push((
-                grant.workspace,
-                grant.subject,
-                grant.address,
-                grant
-                    .refresh_token
-                    .as_ref()
-                    .map(|t| t.expose_secret().to_owned()),
-                grant.scopes,
-                grant.extending,
-            ));
-        Box::pin(async { Ok("connection-1".to_owned()) })
+        let mut adopted = self.adopted.lock().unwrap_or_else(PoisonError::into_inner);
+        // A reconnect lands on its connection; each new one gets the next id.
+        let id = grant.extending.clone().unwrap_or_else(|| {
+            let new = adopted.iter().filter(|handed| handed.5.is_none()).count() + 1;
+            format!("connection-{new}")
+        });
+        adopted.push((
+            grant.workspace,
+            grant.subject,
+            grant.address,
+            grant
+                .refresh_token
+                .as_ref()
+                .map(|t| t.expose_secret().to_owned()),
+            grant.scopes,
+            grant.extending,
+        ));
+        Box::pin(async move { Ok(id) })
     }
 
     fn reconnect_target<'a>(
@@ -597,14 +619,19 @@ impl Kit {
             .with_invitations(Arc::new(Invited(
                 invited.iter().map(|e| (*e).to_owned()).collect(),
             )))
-            .with_auth(TokenVerifier::in_process(
-                &auth,
-                &issuer.url,
-                Arc::new(LocalKeys {
-                    db: pool,
-                    keys: Arc::clone(&issuer.keys),
-                }),
-            ));
+            .with_auth(
+                TokenVerifier::in_process(
+                    &auth,
+                    &issuer.url,
+                    Arc::new(LocalKeys {
+                        db: pool.clone(),
+                        keys: Arc::clone(&issuer.keys),
+                    }),
+                )
+                // As the server wires it: suspension and sign out
+                // everywhere stop a person's tokens at once.
+                .with_revocation(pool, crate::token_revocation()),
+            );
         let api = testing::app(crate::module(deps.clone()), state.clone());
         let app = crate::protocol::router(state.clone(), deps.clone()).merge(api);
         Self {

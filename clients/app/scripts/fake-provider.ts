@@ -24,7 +24,8 @@
 // changes back to and sends through: `POST /fake/deliver` drops one more
 // message into every mailbox, to show mail arriving live, and
 // `GET /fake/mailbox` lists what each holds (subjects and state), to show
-// write-backs landing.
+// write-backs landing. `POST /fake/expire` withdraws every grant so far, to
+// show a mailbox that needs reconnecting.
 import { createHash, generateKeyPairSync, randomBytes, sign } from "node:crypto";
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { parseArgs } from "node:util";
@@ -115,6 +116,8 @@ interface Grant {
 const codes = new Map<string, Grant>();
 /** Access and refresh tokens → the account they were issued for. */
 const tokens = new Map<string, string>();
+/** Tokens `POST /fake/expire` withdrew: they never work again. */
+const withdrawn = new Set<string>();
 const mailboxes = new Map<string, Mailbox>();
 const zohoMailboxes = new Map<string, ZohoMailbox>();
 
@@ -277,7 +280,9 @@ const server = createServer((request, response) => {
         const refresh = form.get("refresh_token") ?? "";
         // A refresh token from an earlier run of the fake still works: it
         // gets a fresh demo mailbox of its own.
-        const sub = tokens.get(refresh) ?? (refresh.startsWith("fake-refresh-") ? refresh : "");
+        const sub = withdrawn.has(refresh)
+          ? ""
+          : (tokens.get(refresh) ?? (refresh.startsWith("fake-refresh-") ? refresh : ""));
         if (sub === "") {
           json(response, 400, { error: "invalid_grant" });
           return;
@@ -315,6 +320,14 @@ const server = createServer((request, response) => {
         scope: provider === "zoho" ? grant.scope.replaceAll(" ", ",") : grant.scope,
         id_token: idToken(grant.sub, grant.clientId, grant.nonce),
       });
+      return;
+    }
+    if (url.pathname === "/fake/expire" && request.method === "POST") {
+      // Every grant so far stops working, as when someone revokes the app at
+      // the provider: the next sync gets 401, then `invalid_grant`.
+      for (const token of tokens.keys()) withdrawn.add(token);
+      tokens.clear();
+      json(response, 200, { withdrawn: withdrawn.size });
       return;
     }
     if (url.pathname === layout.keys) {

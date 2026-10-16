@@ -185,6 +185,18 @@ export const Thread: Story = {
   },
 };
 
+/** A mailbox disconnected with its mail kept: history, read-only, nothing to act on. */
+export const KeptHistory: Story = {
+  args: {
+    path: `${PATH}/primary/${Q4.id}`,
+    api: inbox({ [`GET ${W}/inboxes`]: { body: { inboxes: [{ ...INBOX, read_only: true }] } } }),
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(await canvas.findByText("Kept as history")).toBeVisible();
+  },
+};
+
 /** An older message unfolded. */
 export const ThreadUnfolded: Story = {
   args: { path: `${PATH}/primary/${Q4.id}`, api: inbox() },

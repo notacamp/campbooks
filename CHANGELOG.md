@@ -8,6 +8,16 @@ All notable changes to Campbooks Next are documented here. The format follows
 
 ### Security
 
+- **Suspending an account or signing out everywhere stops its access tokens at once.**
+  Tokens already issued used to keep working until they expired (up to ten minutes).
+  Now the API refuses them on the next request (401 `invalid_token`, the same answer
+  as any bad token), on every route, the admin API, the idempotency layer and the web
+  app's calls, and an open change feed ends within a heartbeat. Unsuspending does not
+  bring them back: the person signs in again. A code or refresh token from a sign-in
+  before the revocation gets `invalid_grant`. Each request with a person's token now
+  reads one row of `identity.accounts` (migration
+  `20261020060000_identity__tokens_not_before` adds one nullable column). Instances
+  using an outside identity provider, and workspace clients' tokens, are unchanged.
 - **An allow-list for who may sign in (`CAMPBOOKS_SIGNUP__ALLOWED`).** A comma-separated
   list of addresses and domains (a domain matches `*@domain` exactly, not subdomains).
   Unset or empty changes nothing. When set, only listed people can sign in or create an
@@ -228,6 +238,35 @@ All notable changes to Campbooks Next are documented here. The format follows
   It must be one of Zoho's accounts servers, or Campbooks refuses to start.
 
 ### Added
+- Settings → Mailboxes: every mailbox connected to the workspace (yours;
+  all of them for owners and admins), who connected it and whether it is
+  syncing, waiting for someone to sign in again, paused by the provider or
+  failing. Connect Gmail or Zoho Mail from there (only the providers your
+  instance has set up for mail), choosing whether you also sign in with that
+  account (untick it for a shared mailbox like support@, which then never
+  becomes a way in); reconnect a mailbox of yours that stopped; or
+  disconnect one, choosing whether its mail in Campbooks is deleted (the
+  default) or kept as read-only history. The mail at Gmail or Zoho is never
+  touched; a way to sign in that came only from connecting that mailbox
+  goes with it. Keys: ⇧C connect, J/K choose, R reconnect, ⌫ disconnect. Home's
+  "Connect your mail" now opens it, and Settings lists its sections
+  (Members, Mailboxes, Ways to sign in) in the sidebar and, on phones,
+  under the header. API: `identity.list_ways_in` returns
+  `mailbox_providers`; `identity.start_link` takes `sign_in` for a connect
+  (default `true`) and adds no way in when it is `false`; a way in that came
+  only from connecting a mailbox is removed when that mailbox is disconnected
+  (unless another connection of yours uses it or it is your last way in),
+  signing out whoever used it, and a connect that fails (mail access declined,
+  or the mailbox refused) leaves no new way in behind;
+  `connectors.connection_added` now names the provider account and the
+  grantor's account and is published for every accepted grant; connections
+  show `granted_by_you` and members
+  `you` (the app no longer works out who you are by matching email
+  addresses). An inbox kept as history after a disconnect opens read-only,
+  saying so, with nothing to act on; new messages never offer it. Two
+  migrations (link tickets, and the connections a way in brought); nothing
+  to do.
+
 - **Move through the inbox with the arrow keys.** ↓ and ↑ move through a
   stream's conversations like J and K, Enter opens one, and going past the
   last row loads more. In an open conversation the arrows scroll it (J and K

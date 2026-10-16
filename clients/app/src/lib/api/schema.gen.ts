@@ -1837,6 +1837,8 @@ export interface components {
             display_name?: string | null;
             /** @description The member who granted it. */
             granted_by: components["schemas"]["UserId"];
+            /** @description The caller granted it (only they may reconnect or disconnect it). */
+            granted_by_you: boolean;
             /** @description How it is doing. */
             health: components["schemas"]["Health"];
             /**
@@ -2520,6 +2522,8 @@ export interface components {
             role: components["schemas"]["Role"];
             /** @description The user. */
             user_id: components["schemas"]["UserId"];
+            /** @description It is the caller (by user id, never by email). */
+            you: boolean;
         };
         /** @description A message's bodies. */
         MessageBody: {
@@ -3162,6 +3166,12 @@ export interface components {
              *     `connected=` or `link_error=` added.
              */
             return_to?: string | null;
+            /**
+             * @description For `connect`: also sign in with the account (default `true`).
+             *     `false` for a shared mailbox (support@): it is connected, never
+             *     added as a way in. Ignored by the other purposes.
+             */
+            sign_in?: boolean | null;
             workspace_id?: components["schemas"]["WorkspaceId"] | null;
         };
         /** @description A started consent. */
@@ -3360,6 +3370,11 @@ export interface components {
         /** @description A provider account the caller signs in with. */
         WayIn: {
             /**
+             * @description The connections among them that are known (the connectors module's
+             *     ids), to tell which mailbox a way in came with.
+             */
+            connections: string[];
+            /**
              * @description The address the provider gave when it was added (shown, never used
              *     to find an account).
              */
@@ -3383,6 +3398,13 @@ export interface components {
             linked_at: string;
             /** @description `sign_up`, `link` or `connect`. */
             linked_via: string;
+            /**
+             * Format: int32
+             * @description For a way in a connect created: how many workspaces its mailbox is
+             *     connected in. It goes when the last of them is disconnected (unless
+             *     it is the last way in). 0 for any other way in.
+             */
+            mailboxes: number;
             /** @description `google`, `microsoft` or `zoho`. */
             provider: string;
         };
@@ -3390,6 +3412,11 @@ export interface components {
         WaysIn: {
             /** @description Oldest first. */
             items: components["schemas"]["WayIn"][];
+            /**
+             * @description The providers a mailbox can be connected from (`identity.start_link`
+             *     with `connect`): offered, and with a mail adapter. Same order.
+             */
+            mailbox_providers: string[];
             /** @description The providers this instance offers, in display order. */
             providers: string[];
         };

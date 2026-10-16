@@ -152,6 +152,21 @@ describe("WaysInPage", () => {
     });
   });
 
+  it("never offers to reconnect a colleague's mailbox at the same address", async () => {
+    mockApi({
+      [WAYS]: { body: { items: [GOOGLE_WAY_IN], providers: ["google"] } },
+      [CONNECTIONS]: {
+        body: {
+          connections: [{ ...CONNECTION, health: "needs_reauth", granted_by_you: false }],
+        },
+      },
+    });
+    renderPage();
+
+    expect(await screen.findByText("Google")).toBeVisible();
+    expect(screen.queryByRole("button", { name: /^Reconnect/u })).toBeNull();
+  });
+
   it("says what the front door came back with", async () => {
     mockApi(listed([GOOGLE_WAY_IN]));
     renderPage({ result: { kind: "error", error: "way_in_belongs_to_another_account" } });

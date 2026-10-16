@@ -8,11 +8,14 @@ import { isTauri } from "~/lib/platform";
 import { useShortcut, useShortcuts } from "~/lib/shortcuts";
 import {
   Button,
+  ChipLink,
+  ChipRow,
   FocusPage,
   IconButton,
   initialsOf,
   NavItem,
   PhoneHeader,
+  PhoneSubnav,
   SearchButton,
   Shell,
   Sidebar,
@@ -111,7 +114,15 @@ export function WorkspaceLayout() {
   return <WorkspaceFrame workspace={workspace} all={workspaces.data ?? []} />;
 }
 
+/** Settings' sections, in order: where each lives under `/w/$workspaceId/settings`. */
+const SETTINGS_SECTIONS = [
+  { id: "members", path: "members" },
+  { id: "mailboxes", path: "mailboxes" },
+  { id: "waysIn", path: "sign-in" },
+] as const;
+
 function WorkspaceFrame({ workspace, all }: { workspace: Workspace; all: Workspace[] }) {
+  const { t } = useTranslation();
   const { t: tNav } = useTranslation("shortcuts");
   const { t: tSearch } = useTranslation("search");
   const { t: tWorkspaces } = useTranslation("workspaces");
@@ -167,6 +178,15 @@ function WorkspaceFrame({ workspace, all }: { workspace: Workspace; all: Workspa
   const openSwitcher = () => {
     setSwitching(true);
   };
+  const sections = SETTINGS_SECTIONS.map((section) => {
+    const href = `${base}/settings/${section.path}`;
+    return {
+      ...section,
+      href,
+      label: t(`settings.${section.id}`),
+      current: pathname === href || pathname.startsWith(`${href}/`),
+    };
+  });
 
   return (
     <>
@@ -191,6 +211,17 @@ function WorkspaceFrame({ workspace, all }: { workspace: Workspace; all: Workspa
           />
           <AccountMenu compact waysIn={link(waysInPath)} apps={link(appsPath)} />
         </PhoneHeader>
+        {inSettings ? (
+          <PhoneSubnav label={tNav("nav.settings")}>
+            <ChipRow label={t("settings.sections")}>
+              {sections.map((section) => (
+                <ChipLink key={section.id} current={section.current} {...link(section.href)}>
+                  {section.label}
+                </ChipLink>
+              ))}
+            </ChipRow>
+          </PhoneSubnav>
+        ) : null}
         <Sidebar>
           <WorkspaceSwitcher mark={mark} name={workspace.name} kind={kind} onClick={openSwitcher} />
           <SearchButton
@@ -227,9 +258,20 @@ function WorkspaceFrame({ workspace, all }: { workspace: Workspace; all: Workspa
             label={tNav("nav.settings")}
             icon="settings"
             shortcut="nav.settings"
-            current={inSettings}
+            current={inSettings && !sections.some((section) => section.current)}
             {...link(membersPath)}
           />
+          {inSettings
+            ? sections.map((section) => (
+                <NavItem
+                  key={section.id}
+                  sub
+                  label={section.label}
+                  current={section.current}
+                  {...link(section.href)}
+                />
+              ))
+            : null}
           <SidebarFooter>
             <Button
               variant="ghost"

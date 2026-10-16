@@ -43,6 +43,7 @@ pub mod protocol;
 mod prune;
 mod resources;
 pub mod scopes;
+mod token_revocation;
 pub mod upstream;
 mod web;
 pub mod webauthn;
@@ -52,6 +53,7 @@ pub use consent::consent_door;
 pub use deps::Deps;
 pub use domain::keys::LocalKeys;
 pub use prune::{PRUNE_EVERY, Prune};
+pub use token_revocation::token_revocation;
 
 /// Module name: crate directory, Postgres schema and OpenAPI tag.
 pub const NAME: &str = "identity";
@@ -85,6 +87,8 @@ pub fn module(deps: Deps) -> Module {
             .publishes::<events::ClientRemoved>()
             .publishes::<events::ConsentGranted>()
             .publishes::<events::ConsentRevoked>()
+            .consumer(features::forget_connected_way_in::ForgetConnectedWayIn)
+            .consumer(features::name_connected_mailbox::NameConnectedMailbox)
             .consumer(features::member_left::RevokeDepartedConsents)
             .consumer(features::notify_way_in_added::NotifyWayInAdded)
             .consumer(features::workspace_deleting::RemoveWorkspaceClients)
@@ -140,6 +144,8 @@ mod allow_list_tests;
 mod clients_tests;
 #[cfg(test)]
 mod passkey_tests;
+#[cfg(test)]
+mod revocation_tests;
 #[cfg(test)]
 mod suspension_tests;
 #[cfg(test)]

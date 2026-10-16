@@ -269,7 +269,7 @@ async fn respond(
     ctx: &Ctx,
     issuer: &Issuer,
     client: &Client,
-    tx: sqlx::Transaction<'static, sqlx::Postgres>,
+    mut tx: sqlx::Transaction<'static, sqlx::Postgres>,
     exchanged: Issued,
     now: chrono::DateTime<chrono::Utc>,
 ) -> Result<Response> {
@@ -306,9 +306,17 @@ async fn respond(
     {
         return Ok(oauth_error(StatusCode::BAD_REQUEST, "invalid_grant"));
     }
-    let Some(profile) = accounts::profile(&ctx.state.db, grant.account_id).await? else {
+    // Read under a share lock until the commit: a suspension or sign out
+    // everywhere committing now is either seen here or waits, and then
+    // takes an epoch later than these tokens.
+    let Some(profile) = accounts::profile_for_minting(&mut tx, grant.account_id).await? else {
         return Ok(oauth_error(StatusCode::BAD_REQUEST, "invalid_grant"));
     };
+    // A sign-in from before the account's last revocation mints nothing
+    // more, whatever code or refresh token it still holds.
+    if profile.revoked_for(grant.auth_time) {
+        return Ok(oauth_error(StatusCode::BAD_REQUEST, "invalid_grant"));
+    }
     tx.commit().await?;
     if !client.is_first_party() {
         clients::touch(&ctx.state.db, &client.id, now).await?;
