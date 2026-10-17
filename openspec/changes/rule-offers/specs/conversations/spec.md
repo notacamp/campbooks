@@ -125,13 +125,14 @@ A rule's `trash` or `spam` action SHALL put a new matching message in the
 trash or report it as spam as it arrives, and every matching conversation
 when applied to existing mail, as the trash and spam operations do (the
 provider is told; trash and spam exclude each other), recording the
-application so removing the rule with `restore` takes each one back out
-where it was. A member who takes a conversation out of the trash or spam
+application so removing the rule with `restore` takes each one back out as
+untrash and not spam do (out of the trash, back where it was; out of spam,
+received mail to the inbox). A member who takes a conversation out of the trash or spam
 SHALL make it an exception of the rule that put it there.
 
 #### Scenario: Undo all
 - **WHEN** a rule reporting fake PayPal mail as spam is applied to two conversations and removed with `restore`
-- **THEN** both come back out of spam to where they were
+- **THEN** both come back out of spam, received mail into the inbox
 
 ### Requirement: Bills a rule says are paid
 A rule's `mark_paid` action SHALL answer the money question `paid` (source

@@ -49,7 +49,8 @@ ADR 0018).
 taught rules): no archive, read, move out of Primary, "needs nothing" or
 `surface: never`. A trash or spam rule is the exception: it exists for that
 mail. "Always show" still outranks it, and its applications are undone like
-any other (untrash / not spam put each message back where it was).
+any other (untrash puts each message back where it was; not spam puts
+received mail in the inbox).
 
 ## Decision 2: "its bills are paid"
 
