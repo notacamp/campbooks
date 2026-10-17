@@ -180,8 +180,13 @@ async fn on_its_questions_ride_along_and_change_no_triage_answer(db: PgPool) {
     let off = run(db.clone(), false).await;
     let on = run(db, true).await;
     assert_eq!(off.bodies.len(), on.bodies.len(), "no second call");
-    for (before, after) in off.bodies.iter().zip(&on.bodies) {
-        assert_eq!(before["state"], after["state"]);
+    // The jobs run in any order: each message's request, by its state.
+    for after in &on.bodies {
+        let before = off
+            .bodies
+            .iter()
+            .find(|b| b["state"] == after["state"])
+            .expect("the same message was asked about with the catalogue off");
         let (before, after) = (
             before["questions"].as_object().unwrap(),
             after["questions"].as_object().unwrap(),

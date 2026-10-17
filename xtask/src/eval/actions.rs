@@ -20,7 +20,7 @@ use campbooks_ai::decide::{
     Answer, Question,
     signals::{
         actions::{ActionId, COMBOS, action_questions, likelihoods},
-        email::{Envelope, triage, triage_questions},
+        email::{Attachment, Envelope, Party, triage, triage_questions},
     },
 };
 use clap::Args;
@@ -108,11 +108,22 @@ fn asked() -> Vec<Question> {
         .into_iter()
         .filter(|q| q.id == triage::NEEDS_REPLY || q.id == triage::SUSPICIOUS)
         .collect();
-    let attached: Envelope = serde_json::from_value(serde_json::json!({
-        "from": {"name": "", "address": "someone@example.com"},
-        "attachments": [{"name": "a.pdf", "content_type": "application/pdf"}]
-    }))
-    .expect("a valid envelope");
+    let attached = Envelope {
+        from: Party {
+            name: String::new(),
+            address: "someone@example.com".into(),
+        },
+        to: Vec::new(),
+        cc: Vec::new(),
+        subject: String::new(),
+        headers: std::collections::BTreeMap::new(),
+        attachments: vec![Attachment {
+            name: "a.pdf".into(),
+            content_type: "application/pdf".into(),
+        }],
+        body: String::new(),
+        recipient: None,
+    };
     questions.extend(action_questions(&attached));
     questions
 }
