@@ -677,6 +677,7 @@ pub async fn create_in(
     body: &CreateRule,
 ) -> Result<CreatedRule> {
     rules::labels_of_inbox(tx, inbox, &body.conditions, &body.actions).await?;
+    rules::sender_seen(tx, inbox, &body.conditions, &body.actions).await?;
     if let Some(notice) = body.notice_id {
         rule_notices::check_open(tx, notice, inbox).await?;
     }
@@ -736,7 +737,11 @@ pub async fn create_in(
     if let Some(notice) = body.notice_id {
         rule_notices::accept(tx, notice, id).await?;
     }
-    if rule_state == RuleState::Active && body.apply_to_existing {
+    // Showing images changes no mail: nothing to apply to what is here.
+    if rule_state == RuleState::Active
+        && body.apply_to_existing
+        && !rules::only_shows_images(&body.actions)
+    {
         rule_runs::start(tx, &state.events, &ws, &rule, RunKind::Apply).await?;
     } else {
         rule_runs::announce(
@@ -1065,6 +1070,7 @@ pub async fn update(
     let actions = body.actions.unwrap_or_else(|| rule.actions.clone());
     rules::validate(&conditions, &actions)?;
     rules::labels_of_inbox(&mut tx, rule.inbox, &conditions, &actions).await?;
+    rules::sender_seen(&mut tx, rule.inbox, &conditions, &actions).await?;
     let next_state = match body.paused {
         Some(true) => RuleState::Paused,
         Some(false) if rule.state == RuleState::Paused => RuleState::Active,

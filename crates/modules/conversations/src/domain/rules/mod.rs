@@ -18,6 +18,7 @@ mod arrival;
 mod effects;
 mod exceptions;
 mod facts;
+mod images;
 
 use campbooks_ai::decide::{
     signals::email::{TEMPLATE_MAX_CHARS, subject_words},
@@ -36,6 +37,7 @@ pub use exceptions::{RuleException, RuleMark, Undone, attach, except, recent_exc
 pub use facts::{
     Candidate, TEMPLATE_PAGE, candidate, corresponds, fill_templates, scan, templates_missing,
 };
+pub use images::images_trusted;
 
 use crate::model::{
     ConversationId, InboxId, InboxRole, LabelId, PausedReason, RuleId, RuleOrigin, RuleState,
@@ -148,6 +150,11 @@ pub enum RuleAction {
     /// Its bills are already paid: Campbooks never asks "Is it paid?" about
     /// it.
     MarkPaid,
+    /// Show its remote images without asking ("Always show images from
+    /// <sender>", campbooks-cloud#200): one sender, nothing else; only for
+    /// mail whose sender passes authentication; tracking pixels stay
+    /// removed. Read when a message is opened, so it changes no mail.
+    ShowImages,
 }
 
 impl From<&RuleCondition> for taught::Condition {
@@ -196,6 +203,7 @@ impl From<&RuleAction> for taught::Action {
             RuleAction::Trash => Self::Trash,
             RuleAction::Spam => Self::Spam,
             RuleAction::MarkPaid => Self::MarkPaid,
+            RuleAction::ShowImages => Self::ShowImages,
         }
     }
 }
@@ -306,6 +314,41 @@ pub async fn labels_of_inbox(
         return Err(Error::BadRequest(crate::MESSAGES.reason("invalid_rule")));
     }
     Ok(())
+}
+
+/// 400 `invalid_rule` unless `inbox` holds inbound mail from the sender a
+/// rule that shows images names (its one address, or a domain with its
+/// subdomains): a member trusts only a sender whose mail they can see in an
+/// inbox they may teach in (campbooks-cloud#200). Any other rule passes.
+pub async fn sender_seen(
+    conn: &mut PgConnection,
+    inbox: InboxId,
+    conditions: &[RuleCondition],
+    actions: &[RuleAction],
+) -> Result<()> {
+    if !actions.contains(&RuleAction::ShowImages) {
+        return Ok(());
+    }
+    let invalid = || Error::BadRequest(crate::MESSAGES.reason("invalid_rule"));
+    let (address, domain) = match conditions {
+        [RuleCondition::SenderAddress(a)] => (a.trim().to_lowercase(), String::new()),
+        [RuleCondition::SenderDomain(d)] => (String::new(), d.trim().to_lowercase()),
+        _ => return Err(invalid()),
+    };
+    let seen: bool = sqlx::query_scalar(
+        "SELECT EXISTS (
+             SELECT 1 FROM conversations.messages
+              WHERE inbox_id = $1 AND direction = 'inbound'
+                AND (($2 <> '' AND sender_address = $2)
+                  OR ($3 <> '' AND (split_part(sender_address, '@', 2) = $3
+                       OR right(split_part(sender_address, '@', 2), length($3) + 1) = '.' || $3))))",
+    )
+    .bind(inbox)
+    .bind(&address)
+    .bind(&domain)
+    .fetch_one(conn)
+    .await?;
+    if seen { Ok(()) } else { Err(invalid()) }
 }
 
 /// The sum of the conditions' weights.
@@ -781,8 +824,14 @@ pub fn hides(actions: &[RuleAction]) -> bool {
         RuleAction::MoveToStream { stream } => *stream != Stream::Primary,
         RuleAction::NeedsReply { value } | RuleAction::AsksAction { value } => !value,
         RuleAction::Surface { value } => *value == SurfaceWhen::Never,
-        RuleAction::AddLabel { .. } => false,
+        RuleAction::AddLabel { .. } | RuleAction::ShowImages => false,
     })
+}
+
+/// Whether a rule only shows a sender's images: it changes no mail, so it
+/// has nothing to apply to the mail already here.
+pub fn only_shows_images(actions: &[RuleAction]) -> bool {
+    !actions.is_empty() && actions.iter().all(|a| *a == RuleAction::ShowImages)
 }
 
 /// Whether a rule puts mail in the trash or spam: it acts on suspicious

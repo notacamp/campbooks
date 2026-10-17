@@ -14613,7 +14613,8 @@
         "required": [
           "truncated",
           "remote_images",
-          "images_shown"
+          "images_shown",
+          "images_trusted"
         ],
         "properties": {
           "css": {
@@ -14633,6 +14634,10 @@
           "images_shown": {
             "type": "boolean",
             "description": "Whether the remote images were kept."
+          },
+          "images_trusted": {
+            "type": "boolean",
+            "description": "Whether a smart rule trusts the sender with its images (\"Always show\nimages from …\"), so they were kept without asking: the sender is\nauthenticated and nothing about the mail looks suspicious."
           },
           "remote_images": {
             "type": "integer",
@@ -16453,6 +16458,21 @@
                 "type": "string",
                 "enum": [
                   "mark_paid"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "description": "Show its remote images without asking (\"Always show images from\n<sender>\", campbooks-cloud#200): one sender, nothing else; only for\nmail whose sender passes authentication; tracking pixels stay\nremoved. Read when a message is opened, so it changes no mail.",
+            "required": [
+              "action"
+            ],
+            "properties": {
+              "action": {
+                "type": "string",
+                "enum": [
+                  "show_images"
                 ]
               }
             }

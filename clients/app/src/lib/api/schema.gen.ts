@@ -3202,6 +3202,12 @@ export interface components {
             /** @description Whether the remote images were kept. */
             images_shown: boolean;
             /**
+             * @description Whether a smart rule trusts the sender with its images ("Always show
+             *     images from …"), so they were kept without asking: the sender is
+             *     authenticated and nothing about the mail looks suspicious.
+             */
+            images_trusted: boolean;
+            /**
              * Format: int32
              * @description Remote images in the HTML part: held back (their `src` removed)
              *     unless `show_images` was asked for.
@@ -3952,6 +3958,9 @@ export interface components {
         } | {
             /** @enum {string} */
             action: "mark_paid";
+        } | {
+            /** @enum {string} */
+            action: "show_images";
         };
         /** @description One test on a message; all of a rule's conditions must hold. */
         RuleCondition: {
