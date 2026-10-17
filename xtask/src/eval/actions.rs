@@ -66,30 +66,50 @@ async fn actions(args: &ActionsArgs) -> Result<String> {
         bail!("--floor {bad}: a likelihood between 0 and 1");
     }
     let dataset = Dataset::load(&args.set_dir)?;
-    let questions = asked();
     // Only what the owner labelled goes to the model.
-    let selected: Vec<bool> = dataset
+    let labelled = dataset
         .items
         .iter()
-        .map(|i| !i.labels.actions.is_empty())
-        .collect();
-    let labelled = selected.iter().filter(|s| **s).count();
+        .filter(|i| !i.labels.actions.is_empty())
+        .count();
     if labelled == 0 {
         bail!(
             "no item is labelled for actions: fill the action columns of {}",
             args.set_dir.join("labels.csv").display()
         );
     }
-    let ctx = Context {
-        dataset: &dataset,
-        questions: &questions,
-        selected,
-    };
-    let run = match run_base(&ctx, &args.strategy, &Endpoints::from_env()).await? {
-        Ok(run) => run,
-        Err(reason) => bail!("`{}` did not run: {reason}", args.strategy),
-    };
-    let rated = ratings(&dataset, &run);
+    // Asked exactly as the model pass asks: mail with an attachment gets the
+    // Open attachment question, mail without one does not. One run each.
+    let endpoints = Endpoints::from_env();
+    let mut rated = vec![None; dataset.items.len()];
+    for attached in [true, false] {
+        let questions = asked(attached);
+        let selected: Vec<bool> = dataset
+            .items
+            .iter()
+            .map(|i| {
+                !i.labels.actions.is_empty()
+                    && i.message.envelope.attachments.is_empty() != attached
+            })
+            .collect();
+        if !selected.contains(&true) {
+            continue;
+        }
+        let ctx = Context {
+            dataset: &dataset,
+            questions: &questions,
+            selected,
+        };
+        let run = match run_base(&ctx, &args.strategy, &endpoints).await? {
+            Ok(run) => run,
+            Err(reason) => bail!("`{}` did not run: {reason}", args.strategy),
+        };
+        for (slot, ratings) in rated.iter_mut().zip(ratings(&dataset, &run)) {
+            if ratings.is_some() {
+                *slot = ratings;
+            }
+        }
+    }
     let labels: Vec<&BTreeMap<ActionId, bool>> =
         dataset.items.iter().map(|i| &i.labels.actions).collect();
     let report = report(&rated, &labels, &floors, labelled, &args.strategy);
@@ -100,12 +120,13 @@ async fn actions(args: &ActionsArgs) -> Result<String> {
     Ok(format!("{report}\nwrote {}", path.display()))
 }
 
-/// The questions the model pass asks with the catalogue on: every triage
-/// question, then the catalogue's (all of them: an item without an
-/// attachment simply gets no Open attachment rating, as in the pass).
-fn asked() -> Vec<Question> {
+/// The questions the model pass asks with the catalogue on about mail with
+/// an attachment (`attached`) or without: every triage question, then the
+/// catalogue's for such mail (`action_questions`, whose only veto is the
+/// attachment).
+fn asked(attached: bool) -> Vec<Question> {
     let mut questions = triage_questions();
-    let attached = Envelope {
+    let mail = Envelope {
         from: Party {
             name: String::new(),
             address: "someone@example.com".into(),
@@ -114,14 +135,18 @@ fn asked() -> Vec<Question> {
         cc: Vec::new(),
         subject: String::new(),
         headers: std::collections::BTreeMap::new(),
-        attachments: vec![Attachment {
-            name: "a.pdf".into(),
-            content_type: "application/pdf".into(),
-        }],
+        attachments: if attached {
+            vec![Attachment {
+                name: "a.pdf".into(),
+                content_type: "application/pdf".into(),
+            }]
+        } else {
+            Vec::new()
+        },
         body: String::new(),
         recipient: None,
     };
-    questions.extend(action_questions(&attached));
+    questions.extend(action_questions(&mail));
     questions
 }
 
@@ -358,7 +383,10 @@ mod tests {
 
     #[test]
     fn the_questions_asked_are_the_catalogue_s() {
-        let ids: Vec<String> = asked().into_iter().map(|q| q.id).collect();
+        let ids: Vec<String> = asked(true).into_iter().map(|q| q.id).collect();
+        let bare: Vec<String> = asked(false).into_iter().map(|q| q.id).collect();
+        assert!(!bare.contains(&"action_open_attachment".to_owned()));
+        assert_eq!(bare.len() + 1, ids.len());
         assert!(ids.contains(&"needs_reply".to_owned()));
         assert!(ids.contains(&"suspicious".to_owned()));
         for id in campbooks_ai::decide::signals::actions::question::ALL {

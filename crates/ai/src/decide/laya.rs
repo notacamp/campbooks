@@ -112,7 +112,9 @@ impl Serialize for Criteria<'_> {
 pub(crate) struct Response {
     #[serde(default)]
     model: Option<String>,
-    answers: HashMap<String, WireAnswer>,
+    /// Each answer as sent: read per question, so one the catalogue may
+    /// leave unrated cannot fail the triage answers beside it.
+    answers: HashMap<String, serde_json::Value>,
     #[serde(default)]
     routing: Option<Routing>,
     /// Tokens, when a hosted decision model reports them (laya-serve
@@ -151,15 +153,35 @@ impl Response {
             .unwrap_or_else(|| configured.to_owned())
     }
 
-    /// Match every question to its answer.
-    pub fn into_raw(mut self, questions: &[Question]) -> Result<Vec<RawAnswer>, Error> {
+    /// Match every question to its answer. A missing or malformed answer
+    /// fails the call, except to a catalogue question
+    /// ([`is_catalogue`](super::signals::actions::question::is_catalogue)),
+    /// which is then unanswered (`None`).
+    pub fn into_raw(mut self, questions: &[Question]) -> Result<Vec<Option<RawAnswer>>, Error> {
         questions
             .iter()
             .map(|q| {
-                let wire = self.answers.remove(&q.id).ok_or_else(|| {
-                    Error::InvalidResponse(format!("no answer for question `{}`", q.id))
-                })?;
-                decode(q, wire)
+                let raw = self
+                    .answers
+                    .remove(&q.id)
+                    .ok_or_else(|| {
+                        Error::InvalidResponse(format!("no answer for question `{}`", q.id))
+                    })
+                    .and_then(|value| {
+                        let wire: WireAnswer = serde_json::from_value(value).map_err(|_| {
+                            Error::InvalidResponse(format!("answer `{}` is malformed", q.id))
+                        })?;
+                        decode(q, wire)
+                    });
+                match raw {
+                    Ok(raw) => Ok(Some(raw)),
+                    Err(error) if super::signals::actions::question::is_catalogue(&q.id) => {
+                        // The error names the question only, never the mail.
+                        tracing::debug!(question = %q.id, %error, "catalogue answer dropped");
+                        Ok(None)
+                    }
+                    Err(error) => Err(error),
+                }
             })
             .collect()
     }
@@ -308,7 +330,12 @@ mod tests {
         }))
         .unwrap();
         assert_eq!(response.model("cfg"), "convaiinnovations/laya/multilingual");
-        let raw = response.into_raw(&questions()).unwrap();
+        let raw: Vec<RawAnswer> = response
+            .into_raw(&questions())
+            .unwrap()
+            .into_iter()
+            .map(Option::unwrap)
+            .collect();
 
         assert_eq!(raw[0].value, AnswerValue::Choice("alpha".into()));
         assert_eq!(
@@ -351,5 +378,38 @@ mod tests {
         let noul: Response =
             serde_json::from_value(json!({"answers": {"asks_user": {"noul": 1.5}}})).unwrap();
         assert!(noul.into_raw(&qs[2..]).is_err());
+        let malformed: Response =
+            serde_json::from_value(json!({"answers": {"asks_user": {"noul": "NaN"}}})).unwrap();
+        assert!(malformed.into_raw(&qs[2..]).is_err());
+    }
+
+    #[test]
+    fn a_catalogue_answer_that_does_not_fit_is_no_rating_and_fails_nothing() {
+        use crate::decide::signals::actions::question;
+        let mut qs = questions();
+        for id in [
+            question::REMIND,
+            question::FORWARD,
+            question::PAID_AUTOMATICALLY,
+        ] {
+            qs.push(Question::noul(id, "A catalogue statement."));
+        }
+        // Remind missing, Forward out of range, paid not a number at all.
+        let response: Response = serde_json::from_value(json!({
+            "answers": {
+                "category": {"choice": "alpha", "probabilities": {"zeta": 0.3, "alpha": 0.7}},
+                "urgency": {"score": 1.0, "probabilities": {"0": 0.2, "1": 0.6, "2": 0.2}},
+                "asks_user": {"noul": 0.8},
+                "action_forward": {"noul": 1.5},
+                "action_paid_automatically": {"noul": "NaN"}
+            }
+        }))
+        .unwrap();
+        let raw = response.into_raw(&qs).unwrap();
+        assert!(raw[..3].iter().all(Option::is_some), "triage as always");
+        assert!(
+            raw[3..].iter().all(Option::is_none),
+            "no rating, no failure"
+        );
     }
 }

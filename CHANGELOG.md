@@ -41,6 +41,12 @@ All notable changes to Campbooks Next are documented here. The format follows
 
 ### Fixed
 
+- **One bad action answer never costs an email its sorting.** With the action catalogue
+  on, an action answer the model leaves out or gets wrong (not a number, out of range)
+  now just means no rating for that action; the email is sorted exactly as with the
+  catalogue off. The sorting questions stay strict as before. The actions eval now asks
+  each email what the model pass asks (Open attachment only when there is one), and the
+  actions labelling export lists the message that raised each need.
 - **Decide calls leave room to answer.** The OpenAI-compatible decide path now asks for up
   to 4096 tokens, so a reasoning model is never cut off before its answer. It is a cap: a
   model that answered before costs and takes the same.

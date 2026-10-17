@@ -19,7 +19,10 @@ use serde_json::{Map, Value, json};
 
 use crate::{
     Error,
-    decide::{AnswerValue, DecisionState, Question, QuestionKind, RawAnswer},
+    decide::{
+        AnswerValue, DecisionState, Question, QuestionKind, RawAnswer,
+        signals::actions::question::is_catalogue,
+    },
     gateway::Message,
 };
 
@@ -158,7 +161,7 @@ struct WireAlternative {
 impl Response {
     /// Parse the answer object and, when log-probabilities came back, derive
     /// each answer's option probabilities.
-    pub fn into_raw(self, questions: &[Question]) -> Result<Vec<RawAnswer>, Error> {
+    pub fn into_raw(self, questions: &[Question]) -> Result<Vec<Option<RawAnswer>>, Error> {
         let choice = self
             .choices
             .into_iter()
@@ -179,18 +182,31 @@ impl Response {
         questions
             .iter()
             .map(|q| {
-                let value = object.get(&q.id).ok_or_else(|| {
-                    Error::InvalidResponse(format!("no answer for question `{}`", q.id))
-                })?;
-                let value = parse_value(q, value)?;
+                let value = object
+                    .get(&q.id)
+                    .ok_or_else(|| {
+                        Error::InvalidResponse(format!("no answer for question `{}`", q.id))
+                    })
+                    .and_then(|value| parse_value(q, value));
+                // A catalogue question's missing or unfitting answer is no
+                // rating; any other fails the call, as it always has.
+                let value = match value {
+                    Ok(value) => value,
+                    Err(error) if is_catalogue(&q.id) => {
+                        // The error names the question only, never the mail.
+                        tracing::debug!(question = %q.id, %error, "catalogue answer dropped");
+                        return Ok(None);
+                    }
+                    Err(error) => return Err(error),
+                };
                 let probabilities = tokens.as_ref().and_then(|t| {
                     let start = value_start(content.as_bytes(), &q.id)?;
                     t.option_probabilities(start, &option_texts(q))
                 });
-                Ok(RawAnswer {
+                Ok(Some(RawAnswer {
                     value,
                     probabilities,
-                })
+                }))
             })
             .collect()
     }
@@ -651,6 +667,39 @@ mod tests {
         assert_eq!(
             parse_value(&q[1], &json!(1)).unwrap(),
             AnswerValue::Score(1.0)
+        );
+    }
+
+    #[test]
+    fn a_catalogue_answer_that_does_not_fit_is_no_rating_and_fails_nothing() {
+        use crate::decide::signals::actions::question;
+        let questions = [
+            Question::noul("needs_reply", "?"),
+            Question::noul(question::REMIND, "?"),
+            Question::noul(question::FORWARD, "?"),
+        ];
+        let response = |content: &str| -> Response {
+            serde_json::from_value(json!({"choices": [{"message": {"content": content}}]})).unwrap()
+        };
+        // Remind missing, Forward not a boolean: no rating for either.
+        let raw = response(r#"{"needs_reply": true, "action_forward": "maybe"}"#)
+            .into_raw(&questions)
+            .unwrap();
+        assert_eq!(
+            raw[0].as_ref().map(|r| &r.value),
+            Some(&AnswerValue::Noul(true))
+        );
+        assert!(raw[1].is_none() && raw[2].is_none());
+        // A triage answer that does not fit still fails the call.
+        assert!(
+            response(r#"{"needs_reply": "maybe", "action_remind": true, "action_forward": true}"#)
+                .into_raw(&questions)
+                .is_err()
+        );
+        assert!(
+            response(r#"{"action_remind": true, "action_forward": true}"#)
+                .into_raw(&questions)
+                .is_err()
         );
     }
 }

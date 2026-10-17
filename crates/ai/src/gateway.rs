@@ -518,7 +518,8 @@ impl Gateway {
 
     /// Answer typed `questions` about `state` with the `decide` role, all in
     /// one call. Answers come back in question order, calibrated with the
-    /// role's temperatures. The state is never logged.
+    /// role's temperatures; a catalogue question left unanswered has none.
+    /// The state is never logged.
     ///
     /// Questions are checked first ([`decide::MAX_OPTIONS`] options at most,
     /// unique ids and labels, …); a bad set fails with
@@ -611,19 +612,23 @@ impl Gateway {
             latency_ms = latency.as_millis(),
             "ai decide answered"
         );
+        // A question left unanswered (only ever a catalogue one, see the
+        // parsers) has no answer here.
         let answers = Answers::new(
             questions
                 .iter()
                 .zip(raw)
-                .map(|(question, raw)| {
-                    decide::finish(
-                        question,
-                        raw,
-                        &provider.calibration,
-                        &model,
-                        version.as_deref(),
-                        latency,
-                    )
+                .filter_map(|(question, raw)| {
+                    raw.map(|raw| {
+                        decide::finish(
+                            question,
+                            raw,
+                            &provider.calibration,
+                            &model,
+                            version.as_deref(),
+                            latency,
+                        )
+                    })
                 })
                 .collect(),
         );
