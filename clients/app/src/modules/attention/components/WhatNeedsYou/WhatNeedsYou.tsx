@@ -632,9 +632,13 @@ export function WhatNeedsYou({ workspaceId, now, offer }: WhatNeedsYouProps) {
     }
   };
   const selectedActions = selected === undefined ? undefined : actionsOf(selected);
+  // Offered alone or within a pair (R presses Reply wherever it sits).
   const offered = (id: ActionId) =>
     selectedActions !== undefined &&
-    (selectedActions.choices.some((choice) => choice.steps.some((each) => each === id)) ||
+    (selectedActions.choices.some((choice) => {
+      const steps: readonly ActionId[] = choice.steps;
+      return steps.includes(id);
+    }) ||
       selectedActions.universal.some((action) => action.id === id));
 
   const move = (step: number) => {
