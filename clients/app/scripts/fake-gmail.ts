@@ -501,7 +501,8 @@ function lookalikes(me: string, count: number): DemoMessage[] {
     to: me,
     subject: `This week: ${topics[index % topics.length] ?? "layout"} (issue ${String(count + 120 - index)})`,
     hoursAgo: 34 + index * 3,
-    labels: ["INBOX", "CATEGORY_PROMOTIONS"],
+    // Unread, as a digest nobody opens: what Scout notices.
+    labels: ["INBOX", "UNREAD", "CATEGORY_PROMOTIONS"],
     headers: { "List-Unsubscribe": "<mailto:leave@design-notes.example>", Precedence: "list" },
     text: "Three short essays, and what we read this week.",
   }));

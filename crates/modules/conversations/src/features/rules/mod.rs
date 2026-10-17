@@ -30,8 +30,10 @@ use crate::{
         rules::{self, NewRule, RuleAction, RuleCondition, Stored},
     },
     events::RULE_RECORD,
+    features::rule_notices,
     model::{
-        ConversationId, InboxId, PausedReason, RuleId, RuleOrigin, RuleState, RunKind, TeachingId,
+        ConversationId, InboxId, PausedReason, RuleId, RuleNoticeId, RuleOrigin, RuleState,
+        RunKind, TeachingId,
     },
     scopes::{ConversationsRead, ConversationsWrite},
 };
@@ -388,7 +390,8 @@ pub async fn compute_preview(
                 continue;
             }
             out.matching += 1;
-            if candidate.suspicious && rules::hides(actions) {
+            // A rule for the trash or spam is about such mail: it acts on it.
+            if candidate.suspicious && rules::hides(actions) && !rules::bins(actions) {
                 out.skipped_suspicious += 1;
                 continue;
             }
@@ -448,7 +451,7 @@ fn sample(c: &rules::Candidate) -> PreviewSample {
 }
 
 /// The rule winning each slot of `outcome` (labels aside).
-fn winners(outcome: &campbooks_ai::decide::taught::Outcome) -> [Option<&str>; 6] {
+fn winners(outcome: &campbooks_ai::decide::taught::Outcome) -> [Option<&str>; 8] {
     [
         outcome.stream.as_ref().map(|a| a.rule.as_str()),
         outcome.archive.as_deref(),
@@ -456,6 +459,8 @@ fn winners(outcome: &campbooks_ai::decide::taught::Outcome) -> [Option<&str>; 6]
         outcome.needs_reply.as_ref().map(|a| a.rule.as_str()),
         outcome.asks_action.as_ref().map(|a| a.rule.as_str()),
         outcome.surface.as_ref().map(|a| a.rule.as_str()),
+        outcome.bin.as_ref().map(|a| a.rule.as_str()),
+        outcome.paid.as_deref(),
     ]
 }
 
@@ -500,6 +505,9 @@ fn would_change(
         || outcome.needs_reply.as_ref().is_some_and(|a| won(&a.rule))
         || outcome.asks_action.as_ref().is_some_and(|a| won(&a.rule))
         || outcome.surface.as_ref().is_some_and(|a| won(&a.rule))
+        // The scan leaves out mail already in the trash or spam.
+        || outcome.bin.as_ref().is_some_and(|a| won(&a.rule))
+        || outcome.paid.as_deref().is_some_and(won)
 }
 
 // --- Create ------------------------------------------------------------------
@@ -544,6 +552,11 @@ pub struct CreateRule {
     /// inboxes.
     #[serde(default)]
     pub teaching_id: Option<TeachingId>,
+    /// The suggestion it answers ("Scout noticed"), which the member saw as
+    /// a smart rule and confirmed: the rule acts at once (origin
+    /// `suggestion`), and the suggestion is accepted.
+    #[serde(default)]
+    pub notice_id: Option<RuleNoticeId>,
 }
 
 const fn yes() -> bool {
@@ -617,18 +630,18 @@ pub async fn create(
     Ok((StatusCode::CREATED, Json(created)))
 }
 
-/// Create `body` in `inbox` for `access` in `tx` (the caller checked they
-/// may teach there).
-pub async fn create_in(
+/// The state a new rule starts in, and whether it acts without asking.
+async fn starting_state(
     tx: &mut Transaction<'_, Postgres>,
     state: &AppState,
     access: &Access,
     inbox: InboxId,
     body: &CreateRule,
-) -> Result<CreatedRule> {
-    rules::labels_of_inbox(tx, inbox, &body.conditions, &body.actions).await?;
-    let from_evidence = matches!(body.origin, RuleOrigin::Correction | RuleOrigin::Suggestion);
-    let (rule_state, acted_without_asking) = if from_evidence {
+    origin: RuleOrigin,
+) -> Result<(RuleState, bool)> {
+    let from_evidence = body.notice_id.is_none()
+        && matches!(origin, RuleOrigin::Correction | RuleOrigin::Suggestion);
+    Ok(if from_evidence {
         // Rules from evidence act for the member only when they let
         // Campbooks act without asking, and never for others.
         let personal = !rules::is_shared(tx, inbox).await?;
@@ -651,7 +664,30 @@ pub async fn create_in(
             NewRuleState::Active => (RuleState::Active, false),
             NewRuleState::Proposed => (RuleState::Proposed, false),
         }
+    })
+}
+
+/// Create `body` in `inbox` for `access` in `tx` (the caller checked they
+/// may teach there).
+pub async fn create_in(
+    tx: &mut Transaction<'_, Postgres>,
+    state: &AppState,
+    access: &Access,
+    inbox: InboxId,
+    body: &CreateRule,
+) -> Result<CreatedRule> {
+    rules::labels_of_inbox(tx, inbox, &body.conditions, &body.actions).await?;
+    if let Some(notice) = body.notice_id {
+        rule_notices::check_open(tx, notice, inbox).await?;
+    }
+    // A suggestion the member confirmed as a smart rule is theirs: it acts.
+    let origin = if body.notice_id.is_some() {
+        RuleOrigin::Suggestion
+    } else {
+        body.origin
     };
+    let (rule_state, acted_without_asking) =
+        starting_state(tx, state, access, inbox, body, origin).await?;
     let ws = access.workspace.to_string();
     if let Some(from) = body.from_conversation_id {
         let in_inbox = sqlx::query_scalar!(
@@ -688,7 +724,7 @@ pub async fn create_in(
             teaching: body.teaching_id.unwrap_or_default(),
             conditions: &body.conditions,
             actions: &body.actions,
-            origin: body.origin,
+            origin,
             origin_text: body.origin_text.as_deref(),
             state: rule_state,
             taught_by: access.user,
@@ -697,6 +733,9 @@ pub async fn create_in(
     )
     .await?;
     let rule = rules::find(tx, id).await?.ok_or(Error::NotFound)?;
+    if let Some(notice) = body.notice_id {
+        rule_notices::accept(tx, notice, id).await?;
+    }
     if rule_state == RuleState::Active && body.apply_to_existing {
         rule_runs::start(tx, &state.events, &ws, &rule, RunKind::Apply).await?;
     } else {
@@ -1150,6 +1189,10 @@ pub async fn remove(
     .await?;
     let mut removed = rule.clone();
     removed.state = RuleState::Removed;
+    // Undone right after it was saved from a suggestion: offered again.
+    if query.restore {
+        rule_notices::reopen(&mut tx, rule.id, RESTORE_MINUTES).await?;
+    }
     let ws = access.workspace.to_string();
     // Nothing is put back in an inbox kept read-only.
     if query.restore && !rule.inbox_detached {
@@ -1300,6 +1343,7 @@ pub async fn restore(
     )
     .execute(&mut *tx)
     .await?;
+    rule_notices::reaccept(&mut tx, rule.id).await?;
     let rule = rules::find(&mut tx, rule.id)
         .await?
         .ok_or(Error::NotFound)?;

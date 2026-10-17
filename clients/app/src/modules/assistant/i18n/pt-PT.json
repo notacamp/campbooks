@@ -118,7 +118,8 @@
         "precedence": "foi enviado em massa"
       },
       "label": "tem a etiqueta {{value}}",
-      "stream": "está em {{value}}"
+      "stream": "está em {{value}}",
+      "sender_checks_fail": "falha as verificações do remetente"
     },
     "act": {
       "move_to_stream": "movê-lo para {{value}}",
@@ -130,7 +131,10 @@
       "asks_action_true": "pede-lhe que faça algo",
       "asks_action_false": "não lhe pede nada",
       "surface_always": "mantê-lo na caixa de entrada e nunca o arquivar",
-      "surface_never": "nunca precisa de si"
+      "surface_never": "nunca precisa de si",
+      "trash": "pô-lo no lixo",
+      "spam": "denunciá-lo como spam",
+      "mark_paid": "as faturas já estão pagas"
     },
     "stream": {
       "primary": "Principal",

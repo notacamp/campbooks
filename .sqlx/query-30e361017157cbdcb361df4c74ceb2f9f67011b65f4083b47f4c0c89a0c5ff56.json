@@ -1,0 +1,122 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        WITH latest AS (\n            SELECT c.id, c.stream, c.archived_at IS NOT NULL AS archived, c.trashed,\n                   c.unread_count > 0 AS unread, m.sender_address, m.sender ->> 'name' AS name,\n                   m.sent_at, m.headers,\n                   EXISTS (SELECT 1 FROM conversations.messages o\n                            WHERE o.conversation_id = c.id AND o.direction = 'outbound') AS replied,\n                   EXISTS (SELECT 1 FROM conversations.decisions d\n                            WHERE d.conversation_id = c.id AND d.question = 'suspicious'\n                              AND d.value = 'true'::jsonb) AS suspicious,\n                   EXISTS (SELECT 1 FROM conversations.decisions d\n                            WHERE d.conversation_id = c.id AND d.question = 'money'\n                              AND d.value = '\"owed\"'::jsonb) AS owed,\n                   EXISTS (SELECT 1 FROM conversations.needs n\n                            WHERE n.conversation_id = c.id AND n.reason IN ('reply', 'do')\n                              AND (n.state = 'open' OR n.verdict IN ('done', 'confirmed'))) AS asked\n              FROM conversations.conversations c\n              CROSS JOIN LATERAL (\n                  SELECT sender_address, sender, sent_at, headers\n                    FROM conversations.messages\n                   WHERE conversation_id = c.id AND direction = 'inbound'\n                   ORDER BY sent_at DESC, id DESC LIMIT 1\n              ) m\n             WHERE c.inbox_id = $1 AND c.last_message_at > now() - make_interval(days => $2)\n        )\n        SELECT sender_address AS \"sender_address!\",\n               max(name) AS sender_name,\n               count(*) AS \"received!\",\n               count(*) FILTER (WHERE NOT unread) AS \"opened!\",\n               count(*) FILTER (WHERE unread AND (archived OR trashed)) AS \"archived_unread!\",\n               count(*) FILTER (WHERE sent_at > now() - interval '7 days') AS \"last_week!\",\n               count(DISTINCT date_trunc('day', sent_at)) AS \"days!\",\n               bool_or(replied) AS \"replied!\",\n               bool_or(suspicious) AS \"suspicious!\",\n               bool_or(owed) AS \"owed!\",\n               bool_or(asked) AS \"asked!\",\n               mode() WITHIN GROUP (ORDER BY stream) AS \"stream!\",\n               (array_agg(headers ORDER BY sent_at DESC))[1] AS \"headers!\",\n               array_agg(sent_at ORDER BY sent_at) AS \"dates!\"\n          FROM latest\n         GROUP BY sender_address\n        HAVING count(*) >= $3\n         ORDER BY count(*) DESC, sender_address\n         LIMIT $4\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "sender_address!",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "conversations.messages",
+            "name": "sender_address"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "sender_name",
+        "type_info": "Text",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 2,
+        "name": "received!",
+        "type_info": "Int8",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 3,
+        "name": "opened!",
+        "type_info": "Int8",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 4,
+        "name": "archived_unread!",
+        "type_info": "Int8",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 5,
+        "name": "last_week!",
+        "type_info": "Int8",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 6,
+        "name": "days!",
+        "type_info": "Int8",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 7,
+        "name": "replied!",
+        "type_info": "Bool",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 8,
+        "name": "suspicious!",
+        "type_info": "Bool",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 9,
+        "name": "owed!",
+        "type_info": "Bool",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 10,
+        "name": "asked!",
+        "type_info": "Bool",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 11,
+        "name": "stream!",
+        "type_info": "Text",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 12,
+        "name": "headers!",
+        "type_info": "Jsonb",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 13,
+        "name": "dates!",
+        "type_info": "TimestamptzArray",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Int4",
+        "Int8",
+        "Int8"
+      ]
+    },
+    "nullable": [
+      false,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null
+    ]
+  },
+  "hash": "30e361017157cbdcb361df4c74ceb2f9f67011b65f4083b47f4c0c89a0c5ff56"
+}

@@ -50,7 +50,8 @@
     "safe": "Marked safe · {{name}}",
     "snoozed": "Snoozed · {{name}}, back {{when}}",
     "replied": "Sending to {{name}}",
-    "paid": "Marked paid · {{name}}"
+    "paid": "Marked paid · {{name}}",
+    "reported": "Reported · {{name}}"
   },
   "error": {
     "title": "Could not load what needs you",

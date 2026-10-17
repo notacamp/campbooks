@@ -47,7 +47,7 @@ export function snoozeOptions(now: Date): { key: SnoozeKey; until: Date }[] {
 }
 
 /** What a row offers: the item's own actions (keys 1 to 3), then the universal ones. */
-export type OwnActionId = "reply" | "yes" | "no" | "safe" | "paid" | "to_pay" | "remind";
+export type OwnActionId = "reply" | "yes" | "no" | "report" | "safe" | "paid" | "to_pay" | "remind";
 export type UniversalActionId = "done" | "snooze" | "not_needed";
 
 /**
@@ -60,7 +60,9 @@ export type RowKind = "question" | "warning" | "need" | "bill" | "toPay";
  * The actions Home offers for a need today. A question (`check`) is
  * answered Yes or No (No is "not needed", so Not needed is not repeated,
  * and Done means nothing until it is answered); a warning is cleared with
- * "It's safe" (its not needed); anything else is replied to. #166 will
+ * "It's safe" (its not needed) or reported and deleted (into spam, with a
+ * smart rule offered after, campbooks-cloud#169); anything else is replied
+ * to. #166 will
  * replace the own actions with a ranked list from the server.
  */
 export function rowActionIds(kind: RowKind): {
@@ -81,7 +83,7 @@ export function rowActionIds(kind: RowKind): {
       return { own: ["yes", "no"], universal: ["snooze"] };
     }
     case "warning": {
-      return { own: ["safe"], universal: ["done", "snooze"] };
+      return { own: ["report", "safe"], universal: ["done", "snooze"] };
     }
     case "need": {
       return { own: ["reply"], universal: ["done", "snooze", "not_needed"] };

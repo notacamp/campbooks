@@ -1,0 +1,36 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE conversations.messages SET in_trash = false, updated_at = now()\n                WHERE conversation_id = $1 AND in_trash AND provider_message_id = ANY($2)\n               RETURNING provider_message_id, direction = 'inbound' AS \"inbound!\"",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "provider_message_id",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "conversations.messages",
+            "name": "provider_message_id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "inbound!",
+        "type_info": "Bool",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "TextArray"
+      ]
+    },
+    "nullable": [
+      false,
+      null
+    ]
+  },
+  "hash": "85797f5c7d4a79648cb7ba68b555e38dba8d8151d1d3baa4ab13f5d6b433697c"
+}

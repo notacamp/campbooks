@@ -23,6 +23,8 @@ pub enum Undone {
     Read,
     /// Took a label off.
     Label(LabelId),
+    /// Took it out of the trash or spam.
+    Bin,
 }
 
 /// A rule a member just changed back on one conversation.
@@ -57,6 +59,7 @@ pub async fn except(
             Undone::Archive => before.archived,
             Undone::Read => before.read,
             Undone::Label(label) => before.labels.contains(&label),
+            Undone::Bin => before.binned.is_some(),
         }
     });
     let Some(found) = found else { return Ok(None) };

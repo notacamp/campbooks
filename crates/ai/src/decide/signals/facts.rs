@@ -106,6 +106,57 @@ pub fn is_machine_sender(envelope: &Envelope) -> bool {
         || facts.service_sender()
 }
 
+/// Whether the receiving provider's `authentication_results` say mail from
+/// `from` failed its sender checks ([`Facts::authentication_failed`]): what a
+/// taught rule's "fails its sender checks" condition reads. Absent results
+/// say nothing (`false`).
+pub fn sender_checks_failed(from: &str, authentication_results: Option<&str>) -> bool {
+    Facts {
+        from: from.to_lowercase(),
+        authentication_results: authentication_results.map(str::to_owned),
+        ..Facts::default()
+    }
+    .authentication_failed()
+}
+
+/// Whether the receiving provider's `authentication_results` hold an
+/// explicit `dmarc=fail` under a published policy of `reject` or
+/// `quarantine` (Gmail's `dmarc=fail (p=REJECT sp=REJECT dis=REJECT)`, or a
+/// `policy.published-domain-policy` property). The domain then publishes
+/// DMARC and asks for mail failing it to be refused, so its genuine mail
+/// passes: what "pretending to be" a domain means, both for the offer and
+/// for a rule's "fails its sender checks". A policy that cannot be read
+/// (some providers leave it out) is not one: `false`.
+pub fn dmarc_refused(authentication_results: Option<&str>) -> bool {
+    let strict = |policy: &str| {
+        policy.eq_ignore_ascii_case("reject") || policy.eq_ignore_ascii_case("quarantine")
+    };
+    authentication_results
+        .and_then(auth_results::parse)
+        .is_some_and(|results| {
+            results.iter().any(|r| {
+                // `key=value` words of the result's own comments.
+                let said = |key: &str| {
+                    r.comments
+                        .iter()
+                        .flat_map(|comment| comment.split_whitespace())
+                        .filter_map(|word| word.split_once('='))
+                        .filter(move |(k, _)| k.eq_ignore_ascii_case(key))
+                        .map(|(_, value)| value)
+                        .collect::<Vec<_>>()
+                };
+                // `dis=NONE`: the receiver did not apply the policy (it
+                // trusted a forwarder or a list, by ARC): not a refusal.
+                let overridden = said("dis").iter().any(|d| d.eq_ignore_ascii_case("none"));
+                r.method == "dmarc"
+                    && r.result == "fail"
+                    && !overridden
+                    && (said("p").iter().any(|p| strict(p))
+                        || r.values("policy.published-domain-policy").any(strict))
+            })
+        })
+}
+
 /// The structured facts of an email: addresses, a few headers and the
 /// attachments' media types. It holds none of the email's text.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
@@ -917,5 +968,35 @@ mod tests {
                 );
             }
         }
+    }
+
+    #[test]
+    fn only_a_dmarc_failure_under_a_refusing_policy_is_a_refusal() {
+        let rejected =
+            "mx.google.com; dmarc=fail (p=REJECT sp=REJECT dis=REJECT) header.from=bank.example";
+        assert!(dmarc_refused(Some(rejected)));
+        // The receiver let it through anyway (a forwarder or a list it
+        // trusts, by ARC): not a refusal.
+        let overridden = "mx.google.com; arc=pass; dmarc=fail (p=REJECT sp=REJECT dis=NONE) header.from=bank.example";
+        assert!(!dmarc_refused(Some(overridden)));
+        let quarantined = "mx.example; dmarc=fail (p=quarantine) header.from=bank.example";
+        assert!(dmarc_refused(Some(quarantined)));
+        // p=none asks for nothing to be refused: genuine mail sent through
+        // other tools fails too.
+        let monitored =
+            "mx.google.com; dmarc=fail (p=NONE sp=NONE dis=NONE) header.from=client.example";
+        assert!(!dmarc_refused(Some(monitored)));
+        // No policy to read.
+        let bare = "mx.zoho.eu; dmarc=fail header.from=bank.example";
+        assert!(!dmarc_refused(Some(bare)));
+        // A policy echoed in another result's comment says nothing.
+        let echoed = "mx.example; spf=fail (p=REJECT) smtp.mailfrom=x@bank.example; dmarc=fail header.from=bank.example";
+        assert!(!dmarc_refused(Some(echoed)));
+        // Nothing authenticated, but nothing refused: a domain that publishes
+        // no DMARC fails its checks with its genuine mail too.
+        let unsigned = "mx.example; spf=none smtp.mailfrom=shop.example";
+        assert!(sender_checks_failed("hi@shop.example", Some(unsigned)));
+        assert!(!dmarc_refused(Some(unsigned)));
+        assert!(!dmarc_refused(None));
     }
 }

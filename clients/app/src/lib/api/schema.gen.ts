@@ -1232,6 +1232,47 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/w/{workspace_id}/rule-notices": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List what Scout noticed in the inboxes you may teach in: smart rules it
+         *     offers for mail you get a lot of.
+         */
+        get: operations["conversations.list_rule_notices"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/w/{workspace_id}/rule-notices/{notice_id}/answer": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Answer a suggestion: "Not now" hides it for a while, "Don't suggest
+         *     this" for good (for that sender and kind). For you alone.
+         */
+        post: operations["conversations.answer_rule_notice"];
+        /** Take back your answer to a suggestion (Undo): it is offered again. */
+        delete: operations["conversations.clear_rule_notice_answer"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/w/{workspace_id}/rules": {
         parameters: {
             query?: never;
@@ -1994,6 +2035,11 @@ export interface components {
             decision: components["schemas"]["Decision"];
             workspace_id?: components["schemas"]["WorkspaceId"] | null;
         };
+        /** @description "Not now" or "Don't suggest this". */
+        AnswerRuleNotice: {
+            /** @description The answer. */
+            answer: components["schemas"]["NoticeAnswer"];
+        };
         /** @description An answer's value: a label (choice), a level (score) or yes/no. */
         AnswerView: boolean | number | string;
         /** @description Where to go next. */
@@ -2103,6 +2149,11 @@ export interface components {
             /** @description The identity provider's signed logout token. */
             logout_token: string;
         };
+        /**
+         * @description How regularly a sender writes.
+         * @enum {string}
+         */
+        Cadence: "daily" | "weekly" | "monthly";
         /** @description Someone the sentence names without an address. */
         Candidate: {
             /** @description Their address. */
@@ -2532,6 +2583,7 @@ export interface components {
             /** @description All must hold. */
             conditions: components["schemas"]["RuleCondition"][];
             from_conversation_id?: components["schemas"]["ConversationId"] | null;
+            notice_id?: components["schemas"]["RuleNoticeId"] | null;
             /** @description Where it came from (default `action`). */
             origin?: components["schemas"]["RuleOrigin"];
             /** @description The member's own words, for an instruction (at most 500 characters). */
@@ -3096,7 +3148,7 @@ export interface components {
          * @description How a suggestion picks the mail that looks the same.
          * @enum {string}
          */
-        Likeness: "sender" | "list" | "sender_template" | "domain_template";
+        Likeness: "sender" | "list" | "sender_template" | "domain_template" | "domain" | "impersonation";
         /**
          * @description What the round trip is for.
          * @enum {string}
@@ -3299,6 +3351,49 @@ export interface components {
          * @enum {string}
          */
         NoSuggestion: "suspicious" | "correspondent" | "too_few" | "dismissed" | "not_teachable";
+        /**
+         * @description A member's answer to a suggestion Scout made.
+         * @enum {string}
+         */
+        NoticeAnswer: "not_now" | "never";
+        /**
+         * @description What a suggestion says, in numbers the client turns into a sentence
+         *     ("You got 34 emails from builds@ci.example.com in the last 60 days and
+         *     opened 2").
+         */
+        NoticeEvidence: {
+            /**
+             * Format: int32
+             * @description Of those, archived or deleted unread.
+             */
+            archived_unread: number;
+            cadence?: components["schemas"]["Cadence"] | null;
+            /**
+             * Format: int32
+             * @description Of those, sent in the last seven days.
+             */
+            last_week: number;
+            /**
+             * Format: int32
+             * @description Of those, opened.
+             */
+            opened: number;
+            /**
+             * Format: int32
+             * @description Conversations from the sender in the window.
+             */
+            received: number;
+            /**
+             * Format: int32
+             * @description The window, in days.
+             */
+            window_days: number;
+        };
+        /**
+         * @description What Scout noticed about a sender's mail, and so the rule it offers.
+         * @enum {string}
+         */
+        NoticeKind: "keep_off_home" | "archive_on_arrival";
         /**
          * @description How a member resolves a need.
          * @enum {string}
@@ -3834,6 +3929,15 @@ export interface components {
             action: "surface";
             /** @description Which. */
             value: components["schemas"]["SurfaceWhen"];
+        } | {
+            /** @enum {string} */
+            action: "trash";
+        } | {
+            /** @enum {string} */
+            action: "spam";
+        } | {
+            /** @enum {string} */
+            action: "mark_paid";
         };
         /** @description One test on a message; all of a rule's conditions must hold. */
         RuleCondition: {
@@ -3879,6 +3983,9 @@ export interface components {
             field: "stream";
             /** @description The conversation is in this stream. */
             value: components["schemas"]["Stream"];
+        } | {
+            /** @enum {string} */
+            field: "sender_checks_fail";
         };
         /** @description A rule a member just changed back on one conversation. */
         RuleException: {
@@ -3918,6 +4025,37 @@ export interface components {
              *     sender, or a manager of its inbox, while the inbox is not kept read-only.
              */
             may_change: boolean;
+        };
+        /** @description A smart rule Scout offers for mail an inbox gets a lot of. */
+        RuleNotice: {
+            /** @description Its actions. */
+            actions: components["schemas"]["RuleAction"][];
+            /** @description The rule's conditions. */
+            conditions: components["schemas"]["RuleCondition"][];
+            /** @description Why, in numbers. */
+            evidence: components["schemas"]["NoticeEvidence"];
+            /** @description The suggestion. */
+            id: components["schemas"]["RuleNoticeId"];
+            /** @description Its inbox. */
+            inbox_id: components["schemas"]["InboxId"];
+            /** @description What Scout noticed. */
+            kind: components["schemas"]["NoticeKind"];
+            /** @description The sender's address. */
+            sender: string;
+            /** @description The name the sender gives, as plain text. */
+            sender_name?: string | null;
+            /** @description Other members use the inbox: the rule would act for them too. */
+            shared: boolean;
+        };
+        /**
+         * Format: uuid
+         * @description RuleNoticeId (UUIDv7)
+         */
+        RuleNoticeId: string;
+        /** @description What Scout noticed, the most frequent sender first. */
+        RuleNoticeList: {
+            /** @description The suggestions. */
+            notices: components["schemas"]["RuleNotice"][];
         };
         /**
          * @description Where a taught rule came from.
@@ -7485,7 +7623,7 @@ export interface operations {
         parameters: {
             query: {
                 /** @description What the member did. */
-                action: "move_to_stream" | "archive" | "mark_read" | "add_label" | "not_needed";
+                action: "move_to_stream" | "archive" | "mark_read" | "add_label" | "not_needed" | "report" | "paid";
                 /** @description The stream, for `move_to_stream`. */
                 stream?: components["schemas"]["Stream"];
                 /** @description The label, for `add_label`. */
@@ -9343,6 +9481,151 @@ export interface operations {
             };
             /** @description `last_owner`: you are its only owner. */
             409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "conversations.list_rule_notices": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The workspace. */
+                workspace_id: components["schemas"]["WorkspaceId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The suggestions. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RuleNoticeList"];
+                };
+            };
+            /** @description No valid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Missing scope, or an app asked. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "conversations.answer_rule_notice": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The workspace. */
+                workspace_id: components["schemas"]["WorkspaceId"];
+                /** @description The suggestion. */
+                notice_id: components["schemas"]["RuleNoticeId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AnswerRuleNotice"];
+            };
+        };
+        responses: {
+            /** @description Answered. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description No valid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Missing scope, you may only read this inbox, or an app asked. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No such suggestion, or you cannot see it. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "conversations.clear_rule_notice_answer": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The workspace. */
+                workspace_id: components["schemas"]["WorkspaceId"];
+                /** @description The suggestion. */
+                notice_id: components["schemas"]["RuleNoticeId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Offered again. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description No valid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Missing scope, you may only read this inbox, or an app asked. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No such suggestion, or you cannot see it. */
+            404: {
                 headers: {
                     [name: string]: unknown;
                 };

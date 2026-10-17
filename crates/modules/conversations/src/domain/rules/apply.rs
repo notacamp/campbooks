@@ -4,7 +4,7 @@ use std::collections::BTreeSet;
 
 use campbooks_ai::decide::{
     signals::email::triage,
-    taught::{self, Outcome, Surface, TaughtRule},
+    taught::{self, Bin, Outcome, Surface, TaughtRule},
 };
 use campbooks_kernel::{EventBus, Result};
 use serde::{Deserialize, Serialize};
@@ -17,7 +17,7 @@ use super::{
 };
 use crate::{
     domain::{
-        flags::Flag,
+        flags::{self, Flag},
         needs::{self, NeedSettings},
     },
     events::{Change, RequestedChange},
@@ -59,6 +59,18 @@ pub struct Before {
     /// Questions the rule answered on its newest inbound message.
     #[serde(default)]
     pub answered: Vec<String>,
+    /// Where the rule put it out of the way (the trash or spam), when it did.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub binned: Option<Bin>,
+    /// The messages it put there (provider ids): its undo takes out only
+    /// these, never ones the member binned by hand.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub binned_messages: Vec<String>,
+    /// Whether the conversation was archived when the rule reported it as
+    /// spam: taking it out of spam puts received mail in the inbox, so the
+    /// undo archives it again.
+    #[serde(default)]
+    pub binned_archived: bool,
 }
 
 /// Where a rule acts: the inbox, the workspace's event key and the events.
@@ -172,6 +184,16 @@ async fn carry_out(
         }
         effects.add(flag.change(), messages, flag.requested_for_all()?);
     }
+    if let Some(bin) = mine.bin {
+        let flag = bin_flag(bin);
+        let messages = effects::flag_conversation(tx, candidate.id, flag).await?;
+        if !messages.is_empty() {
+            before.binned = Some(bin);
+            before.binned_messages.clone_from(&messages);
+            before.binned_archived = bin == Bin::Spam && candidate.archived;
+            effects.add(flag.change(), messages, flag.requested_for_all()?);
+        }
+    }
     for label in &mine.labels {
         let linked =
             effects::link_label(tx, ctx.workspace_id, ctx.inbox, candidate.id, *label).await?;
@@ -190,12 +212,29 @@ async fn carry_out(
     Ok((before, effects))
 }
 
+/// The flag that puts mail in `bin`.
+pub const fn bin_flag(bin: Bin) -> Flag {
+    match bin {
+        Bin::Trash => Flag::Trash,
+        Bin::Spam => Flag::Spam,
+    }
+}
+
+/// The flag that takes mail out of `bin`, back where it was.
+const fn unbin_flag(bin: Bin) -> Flag {
+    match bin {
+        Bin::Trash => Flag::Untrash,
+        Bin::Spam => Flag::Unspam,
+    }
+}
+
 struct Mine {
     stream: Option<Stream>,
     archive: bool,
     read: bool,
     labels: Vec<LabelId>,
     answers: bool,
+    bin: Option<Bin>,
 }
 
 impl Mine {
@@ -216,7 +255,13 @@ impl Mine {
                 .collect(),
             answers: outcome.needs_reply.as_ref().is_some_and(|a| a.rule == id)
                 || outcome.asks_action.as_ref().is_some_and(|a| a.rule == id)
-                || outcome.surface.as_ref().is_some_and(|a| a.rule == id),
+                || outcome.surface.as_ref().is_some_and(|a| a.rule == id)
+                || outcome.paid.as_deref() == Some(id),
+            bin: outcome
+                .bin
+                .as_ref()
+                .filter(|a| a.rule == id)
+                .map(|a| a.value),
         }
     }
 
@@ -226,6 +271,7 @@ impl Mine {
             && !self.read
             && self.labels.is_empty()
             && !self.answers
+            && self.bin.is_none()
     }
 }
 
@@ -247,10 +293,18 @@ pub fn answers<'a>(outcome: &Outcome, rule: &'a str) -> Vec<TaughtAnswer<'a>> {
             };
             (json!(value), json!(["always", "never"]))
         });
+    // "Its bills are paid": the money question answered `paid`, so no "Is
+    // it paid?" is asked (and an open one is cleared).
+    let paid = outcome
+        .paid
+        .as_deref()
+        .filter(|r| *r == rule)
+        .map(|_| (json!(triage::PAID), json!(triage::MONEY_OPTIONS)));
     [
         (triage::NEEDS_REPLY, flag(&outcome.needs_reply)),
         (triage::ASKS_ACTION, flag(&outcome.asks_action)),
         (needs::SURFACE, surface),
+        (triage::MONEY, paid),
     ]
     .into_iter()
     .filter_map(|(question, answer)| {
@@ -406,6 +460,38 @@ async fn undo(
             messages,
             RequestedChange::MoveToStream { stream: *stream },
         );
+    }
+    if let Some(bin) = before.binned {
+        // Out of the trash or spam, each message with its own direction (a
+        // provider puts received mail back in the inbox, never sent mail).
+        let flag = unbin_flag(bin);
+        // Only the messages it binned (every one, for an application
+        // recorded before they were kept).
+        let items = if before.binned_messages.is_empty() {
+            flags::change_items(conn, id, flag).await?
+        } else {
+            flags::unbin_messages(conn, id, flag, &before.binned_messages).await?
+        };
+        let mut groups: Vec<(RequestedChange, Vec<String>)> = Vec::new();
+        for (message, change) in items {
+            match groups.iter_mut().find(|(c, _)| *c == change) {
+                Some((_, messages)) => messages.push(message),
+                None => groups.push((change, vec![message])),
+            }
+        }
+        for (change, messages) in groups {
+            effects.add(flag.change(), messages, change);
+        }
+        if before.binned_archived {
+            let messages = effects::flag_conversation(conn, id, Flag::Archive).await?;
+            if !messages.is_empty() {
+                effects.add(
+                    Flag::Archive.change(),
+                    messages,
+                    Flag::Archive.requested_for_all()?,
+                );
+            }
+        }
     }
     for (did, flag) in [
         (before.archived, Flag::Unarchive),

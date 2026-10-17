@@ -483,6 +483,26 @@ impl World {
         rule
     }
 
+    /// Something Scout noticed in the inbox (campbooks-cloud#169).
+    async fn seed_notice(&self, inbox: campbooks_conversations::model::InboxId) -> Uuid {
+        let notice = Uuid::now_v7();
+        sqlx::query(
+            "INSERT INTO conversations.rule_notices
+                 (id, workspace_id, inbox_id, kind, sender_address, conditions, actions, evidence)
+             VALUES ($1, $2, $3, 'archive_on_arrival', 'digest@example.com',
+                     '[{\"field\": \"sender_address\", \"value\": \"digest@example.com\"}]',
+                     '[{\"action\": \"archive\"}]',
+                     '{\"received\": 12, \"opened\": 0, \"archived_unread\": 12, \"last_week\": 2, \"window_days\": 60}')",
+        )
+        .bind(notice)
+        .bind(self.a.as_uuid())
+        .bind(inbox)
+        .execute(&self.db)
+        .await
+        .unwrap();
+        notice
+    }
+
     /// One record of every other type, and what the inbox holds.
     async fn seed_records(
         &mut self,
@@ -520,6 +540,7 @@ impl World {
         .await
         .unwrap();
         let rule = self.seed_rule(inbox, sender).await;
+        let notice = self.seed_notice(inbox).await;
         let invitation = Uuid::now_v7();
         sqlx::query(
             "INSERT INTO workspaces.invitations
@@ -561,6 +582,8 @@ impl World {
             ("conversations.correction", correction.to_string()),
             ("conversations.draft", draft.to_string()),
             ("conversations.rule", rule.to_string()),
+            // Not a resource of its own: answered as its inbox.
+            ("conversations.rule_notice", notice.to_string()),
             ("attention.item", item.to_string()),
             // A profile is the member's own, addressed by their user id.
             ("assistant.profile", u(Who::Member).to_string()),
@@ -874,6 +897,7 @@ fn body(world: &World, id: &str) -> Option<Value> {
         | "conversations.restore_rule"
         | "conversations.suggest_replies" => json!({}),
         "conversations.dismiss_rule_suggestion" => json!({"key": "matrix"}),
+        "conversations.answer_rule_notice" => json!({"answer": "not_now"}),
         "assistant.update_profile" => json!({"proactivity": "ask_first", "asked": true}),
         "assistant.compile_instruction" => json!({"text": "newsletters never need me"}),
         "conversations.write_reply" => json!({"intent": "Say yes"}),
@@ -922,6 +946,16 @@ fn acts_in_the_inbox(id: &str) -> bool {
             | "conversations.dismiss_rule_suggestion"
             | "conversations.suggest_replies"
             | "conversations.write_reply"
+            | "conversations.answer_rule_notice"
+            | "conversations.clear_rule_notice_answer"
+    )
+}
+
+/// Operations on one of Scout's suggestions (campbooks-cloud#169).
+fn answers_a_notice(id: &str) -> bool {
+    matches!(
+        id,
+        "conversations.answer_rule_notice" | "conversations.clear_rule_notice_answer"
     )
 }
 
@@ -950,6 +984,7 @@ fn fill(world: &World, path: &str) -> String {
         .replace("{item_id}", &world.instances["attention.item"])
         .replace("{inbox_id}", &world.instances["conversations.inbox"])
         .replace("{rule_id}", &world.instances["conversations.rule"])
+        .replace("{notice_id}", &world.instances["conversations.rule_notice"])
         .replace("{id}", &Uuid::now_v7().to_string())
 }
 
@@ -1247,6 +1282,10 @@ async fn a_disconnected_mailbox_answers_as_declared(db: PgPool) {
                             {
                                 Decision::NotFound
                             }
+                            // A kept inbox forgets what Scout noticed in it
+                            // (`forget_connection`): its suggestions are
+                            // nobody's any more either.
+                            (Mail::Kept, Some(_)) if answers_a_notice(&id) => Decision::NotFound,
                             _ => expected(&world, *who, resource, action, instance.as_deref(), &id),
                         };
                         (*who, decision)

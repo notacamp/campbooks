@@ -1387,3 +1387,70 @@ async fn a_proposal_whose_domain_became_a_public_suffix_is_not_kept(db: PgPool) 
     assert_eq!(kept.status, StatusCode::BAD_REQUEST, "{:?}", kept.json);
     assert_eq!(kept.json["code"], "invalid_rule");
 }
+
+/// Each GitHub message's (in spam, in the inbox).
+async fn bins(kit: &Kit) -> Vec<(String, bool, bool)> {
+    sqlx::query_as(
+        "SELECT provider_message_id, in_spam, in_inbox FROM conversations.messages
+          WHERE provider_message_id LIKE 'gh-%' ORDER BY provider_message_id",
+    )
+    .fetch_all(&kit.db)
+    .await
+    .unwrap()
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_spam_rule_undone_puts_each_conversation_back_where_it_was(db: PgPool) {
+    let kit = kit(db).await;
+    let (workspace, inbox, sam, _) = sams_notifications(&kit, 3).await;
+    // Sam archived one before the rule.
+    let archived = kit.conversation_of("gh-1").await;
+    let done = kit
+        .post(
+            &sam,
+            &format!("/api/v1/w/{workspace}/conversations/{archived}/archive"),
+            None,
+        )
+        .await;
+    assert_eq!(done.status, StatusCode::OK, "{:?}", done.json);
+    let created = kit
+        .post(
+            &sam,
+            &format!("/api/v1/w/{workspace}/inboxes/{inbox}/rules"),
+            Some(json!({
+                "conditions": [{"field": "sender_address", "value": GITHUB}],
+                "actions": [{"action": "spam"}],
+            })),
+        )
+        .await;
+    assert_eq!(created.status, StatusCode::CREATED, "{:?}", created.json);
+    let rule = created.json["rule"]["id"].as_str().unwrap().to_owned();
+    kit.run_jobs().await;
+    assert!(
+        bins(&kit)
+            .await
+            .iter()
+            .all(|(_, spam, inbox)| *spam && !*inbox),
+        "{:?}",
+        bins(&kit).await
+    );
+
+    let removed = kit
+        .delete(
+            &sam,
+            &format!("/api/v1/w/{workspace}/rules/{rule}?restore=true"),
+        )
+        .await;
+    assert_eq!(removed.status, StatusCode::OK, "{:?}", removed.json);
+    kit.run_jobs().await;
+    // Out of spam: received mail back in the inbox, and the archived one
+    // archived again.
+    assert_eq!(
+        bins(&kit).await,
+        [
+            ("gh-0".to_owned(), false, true),
+            ("gh-1".to_owned(), false, false),
+            ("gh-2".to_owned(), false, true),
+        ]
+    );
+}

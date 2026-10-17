@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "DELETE FROM conversations.rule_notice_answers WHERE inbox_id = $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "6a3990ea5e35112bf3bcc1b5dfb47eb20b90954127385f2f8cce907f0858efdf"
+}

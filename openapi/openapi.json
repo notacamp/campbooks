@@ -4531,7 +4531,9 @@
                 "archive",
                 "mark_read",
                 "add_label",
-                "not_needed"
+                "not_needed",
+                "report",
+                "paid"
               ]
             }
           },
@@ -7642,6 +7644,255 @@
             "workspaces.member"
           ],
           "risk": "high"
+        }
+      }
+    },
+    "/api/v1/w/{workspace_id}/rule-notices": {
+      "get": {
+        "tags": [
+          "conversations"
+        ],
+        "summary": "List what Scout noticed in the inboxes you may teach in: smart rules it\noffers for mail you get a lot of.",
+        "operationId": "conversations.list_rule_notices",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "description": "The workspace.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The suggestions.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RuleNoticeList"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid access token.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing scope, or an app asked.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [
+              "conversations:read"
+            ]
+          }
+        ],
+        "x-campbooks": {
+          "access": {
+            "action": "write",
+            "resource": "conversations.inbox"
+          },
+          "assistant": false,
+          "automation": false,
+          "mutates": false,
+          "records": [
+            "conversations.rule"
+          ],
+          "risk": "low"
+        }
+      }
+    },
+    "/api/v1/w/{workspace_id}/rule-notices/{notice_id}/answer": {
+      "post": {
+        "tags": [
+          "conversations"
+        ],
+        "summary": "Answer a suggestion: \"Not now\" hides it for a while, \"Don't suggest\nthis\" for good (for that sender and kind). For you alone.",
+        "operationId": "conversations.answer_rule_notice",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "description": "The workspace.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId"
+            }
+          },
+          {
+            "name": "notice_id",
+            "in": "path",
+            "description": "The suggestion.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/RuleNoticeId"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AnswerRuleNotice"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Answered."
+          },
+          "401": {
+            "description": "No valid access token.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing scope, you may only read this inbox, or an app asked.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such suggestion, or you cannot see it.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [
+              "conversations:write"
+            ]
+          }
+        ],
+        "x-campbooks": {
+          "access": {
+            "action": "write",
+            "resource": "conversations.inbox"
+          },
+          "assistant": false,
+          "automation": false,
+          "mutates": true,
+          "records": [
+            "conversations.rule"
+          ],
+          "risk": "low",
+          "undo": "conversations.clear_rule_notice_answer"
+        }
+      },
+      "delete": {
+        "tags": [
+          "conversations"
+        ],
+        "summary": "Take back your answer to a suggestion (Undo): it is offered again.",
+        "operationId": "conversations.clear_rule_notice_answer",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "description": "The workspace.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId"
+            }
+          },
+          {
+            "name": "notice_id",
+            "in": "path",
+            "description": "The suggestion.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/RuleNoticeId"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Offered again."
+          },
+          "401": {
+            "description": "No valid access token.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing scope, you may only read this inbox, or an app asked.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such suggestion, or you cannot see it.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [
+              "conversations:write"
+            ]
+          }
+        ],
+        "x-campbooks": {
+          "access": {
+            "action": "write",
+            "resource": "conversations.inbox"
+          },
+          "assistant": false,
+          "automation": false,
+          "mutates": true,
+          "records": [
+            "conversations.rule"
+          ],
+          "risk": "low"
         }
       }
     },
@@ -11784,6 +12035,20 @@
           }
         }
       },
+      "AnswerRuleNotice": {
+        "type": "object",
+        "description": "\"Not now\" or \"Don't suggest this\".",
+        "required": [
+          "answer"
+        ],
+        "properties": {
+          "answer": {
+            "$ref": "#/components/schemas/NoticeAnswer",
+            "description": "The answer."
+          }
+        },
+        "additionalProperties": false
+      },
       "AnswerView": {
         "oneOf": [
           {
@@ -12024,6 +12289,15 @@
             "description": "The identity provider's signed logout token."
           }
         }
+      },
+      "Cadence": {
+        "type": "string",
+        "description": "How regularly a sender writes.",
+        "enum": [
+          "daily",
+          "weekly",
+          "monthly"
+        ]
       },
       "Candidate": {
         "type": "object",
@@ -12994,6 +13268,17 @@
               {
                 "$ref": "#/components/schemas/ConversationId",
                 "description": "The conversation it was taught from."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "notice_id": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/RuleNoticeId",
+                "description": "The suggestion it answers (\"Scout noticed\"), which the member saw as\na smart rule and confirmed: the rule acts at once (origin\n`suggestion`), and the suggestion is accepted."
               },
               {
                 "type": "null"
@@ -14236,7 +14521,9 @@
           "sender",
           "list",
           "sender_template",
-          "domain_template"
+          "domain_template",
+          "domain",
+          "impersonation"
         ]
       },
       "LinkPurpose": {
@@ -14733,6 +15020,76 @@
           "too_few",
           "dismissed",
           "not_teachable"
+        ]
+      },
+      "NoticeAnswer": {
+        "type": "string",
+        "description": "A member's answer to a suggestion Scout made.",
+        "enum": [
+          "not_now",
+          "never"
+        ]
+      },
+      "NoticeEvidence": {
+        "type": "object",
+        "description": "What a suggestion says, in numbers the client turns into a sentence\n(\"You got 34 emails from builds@ci.example.com in the last 60 days and\nopened 2\").",
+        "required": [
+          "received",
+          "opened",
+          "archived_unread",
+          "last_week",
+          "window_days"
+        ],
+        "properties": {
+          "archived_unread": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Of those, archived or deleted unread.",
+            "minimum": 0
+          },
+          "cadence": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Cadence",
+                "description": "How regularly they come, when they do."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "last_week": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Of those, sent in the last seven days.",
+            "minimum": 0
+          },
+          "opened": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Of those, opened.",
+            "minimum": 0
+          },
+          "received": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Conversations from the sender in the window.",
+            "minimum": 0
+          },
+          "window_days": {
+            "type": "integer",
+            "format": "int32",
+            "description": "The window, in days.",
+            "minimum": 0
+          }
+        }
+      },
+      "NoticeKind": {
+        "type": "string",
+        "description": "What Scout noticed about a sender's mail, and so the rule it offers.",
+        "enum": [
+          "keep_off_home",
+          "archive_on_arrival"
         ]
       },
       "Outcome": {
@@ -16030,6 +16387,51 @@
                 "description": "Which."
               }
             }
+          },
+          {
+            "type": "object",
+            "description": "Put it in the trash.",
+            "required": [
+              "action"
+            ],
+            "properties": {
+              "action": {
+                "type": "string",
+                "enum": [
+                  "trash"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "description": "Report it as spam (\"Never see emails like this again\").",
+            "required": [
+              "action"
+            ],
+            "properties": {
+              "action": {
+                "type": "string",
+                "enum": [
+                  "spam"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "description": "Its bills are already paid: Campbooks never asks \"Is it paid?\" about\nit.",
+            "required": [
+              "action"
+            ],
+            "properties": {
+              "action": {
+                "type": "string",
+                "enum": [
+                  "mark_paid"
+                ]
+              }
+            }
           }
         ],
         "description": "What a rule does; at most one of each kind, labels excepted."
@@ -16195,6 +16597,21 @@
                 "description": "The conversation is in this stream."
               }
             }
+          },
+          {
+            "type": "object",
+            "description": "The receiving provider's authentication results say the sender's\ndomain failed its checks (with a sender or domain: \"mail that says it\nis from paypal.com but is not\").",
+            "required": [
+              "field"
+            ],
+            "properties": {
+              "field": {
+                "type": "string",
+                "enum": [
+                  "sender_checks_fail"
+                ]
+              }
+            }
           }
         ],
         "description": "One test on a message; all of a rule's conditions must hold."
@@ -16278,6 +16695,88 @@
           "may_change": {
             "type": "boolean",
             "description": "Whether the caller may stop it (\"Stop doing this\"): its author while a\nsender, or a manager of its inbox, while the inbox is not kept read-only."
+          }
+        }
+      },
+      "RuleNotice": {
+        "type": "object",
+        "description": "A smart rule Scout offers for mail an inbox gets a lot of.",
+        "required": [
+          "id",
+          "inbox_id",
+          "kind",
+          "sender",
+          "conditions",
+          "actions",
+          "evidence",
+          "shared"
+        ],
+        "properties": {
+          "actions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RuleAction"
+            },
+            "description": "Its actions."
+          },
+          "conditions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RuleCondition"
+            },
+            "description": "The rule's conditions."
+          },
+          "evidence": {
+            "$ref": "#/components/schemas/NoticeEvidence",
+            "description": "Why, in numbers."
+          },
+          "id": {
+            "$ref": "#/components/schemas/RuleNoticeId",
+            "description": "The suggestion."
+          },
+          "inbox_id": {
+            "$ref": "#/components/schemas/InboxId",
+            "description": "Its inbox."
+          },
+          "kind": {
+            "$ref": "#/components/schemas/NoticeKind",
+            "description": "What Scout noticed."
+          },
+          "sender": {
+            "type": "string",
+            "description": "The sender's address."
+          },
+          "sender_name": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The name the sender gives, as plain text."
+          },
+          "shared": {
+            "type": "boolean",
+            "description": "Other members use the inbox: the rule would act for them too."
+          }
+        }
+      },
+      "RuleNoticeId": {
+        "type": "string",
+        "format": "uuid",
+        "description": "RuleNoticeId (UUIDv7)"
+      },
+      "RuleNoticeList": {
+        "type": "object",
+        "description": "What Scout noticed, the most frequent sender first.",
+        "required": [
+          "notices"
+        ],
+        "properties": {
+          "notices": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RuleNotice"
+            },
+            "description": "The suggestions."
           }
         }
       },

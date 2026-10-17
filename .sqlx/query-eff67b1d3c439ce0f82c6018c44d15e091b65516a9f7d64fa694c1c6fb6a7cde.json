@@ -1,0 +1,24 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT i.id AS \"id!: InboxId\"\n             FROM unnest($1::uuid[]) AS i(id)\n             LEFT JOIN conversations.rule_notice_scans s ON s.inbox_id = i.id\n            WHERE s.scanned_at IS NULL OR s.scanned_at < now() - make_interval(hours => $2)",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id!: InboxId",
+        "type_info": "Uuid",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "UuidArray",
+        "Int4"
+      ]
+    },
+    "nullable": [
+      true
+    ]
+  },
+  "hash": "eff67b1d3c439ce0f82c6018c44d15e091b65516a9f7d64fa694c1c6fb6a7cde"
+}

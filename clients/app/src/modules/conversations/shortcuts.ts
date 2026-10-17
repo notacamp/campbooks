@@ -88,6 +88,15 @@ export const CONVERSATIONS_SHORTCUTS = [
     label: "conversations:shortcuts.showImages",
   },
   {
+    // The smart-rule confirmation: save it (the dialog's own keys are
+    // plain; ⌘↵ reaches the registry through it).
+    id: "inbox.rule.save",
+    keys: "mod+enter",
+    scope: "item",
+    group: "item",
+    label: "conversations:shortcuts.saveRule",
+  },
+  {
     // A taught rule's run: put back everything it changed (teach once).
     id: "inbox.rule.undo_all",
     keys: "shift+z",

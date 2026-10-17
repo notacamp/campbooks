@@ -110,14 +110,35 @@ pub async fn unplace(
     Ok(moved > 0)
 }
 
-/// Set `flag` (archive or read) on message `id` alone. Returns the provider
-/// ids changed.
+/// Set `flag` (archive, read, trash or spam) on message `id` alone, as
+/// [`flags::change`] does for a conversation. Returns the provider ids
+/// changed.
 pub async fn flag_message(
     conn: &mut PgConnection,
     id: MessageId,
     flag: Flag,
 ) -> Result<Vec<String>> {
     Ok(match flag {
+        Flag::Trash => {
+            sqlx::query_scalar!(
+                "UPDATE conversations.messages SET in_trash = true, in_spam = false,
+                        updated_at = now()
+                  WHERE id = $1 AND (NOT in_trash OR in_spam) RETURNING provider_message_id",
+                id as MessageId,
+            )
+            .fetch_all(conn)
+            .await?
+        }
+        Flag::Spam => {
+            sqlx::query_scalar!(
+                "UPDATE conversations.messages
+                    SET in_spam = true, in_inbox = false, in_trash = false, updated_at = now()
+                  WHERE id = $1 AND NOT in_spam RETURNING provider_message_id",
+                id as MessageId,
+            )
+            .fetch_all(conn)
+            .await?
+        }
         Flag::Archive => {
             sqlx::query_scalar!(
                 "UPDATE conversations.messages SET in_inbox = false, updated_at = now()
@@ -302,7 +323,19 @@ pub async fn record(
                                      'answered', (SELECT jsonb_agg(DISTINCT q) FROM jsonb_array_elements(
                                          coalesce(conversations.rule_applications.before -> 'answered',
                                                   '[]'::jsonb)
-                                         || coalesce(EXCLUDED.before -> 'answered', '[]'::jsonb)) q)))
+                                         || coalesce(EXCLUDED.before -> 'answered', '[]'::jsonb)) q),
+                                     'binned', coalesce(
+                                         conversations.rule_applications.before -> 'binned',
+                                         EXCLUDED.before -> 'binned'),
+                                     'binned_messages', (SELECT jsonb_agg(DISTINCT m) FROM jsonb_array_elements(
+                                         coalesce(conversations.rule_applications.before -> 'binned_messages',
+                                                  '[]'::jsonb)
+                                         || coalesce(EXCLUDED.before -> 'binned_messages', '[]'::jsonb)) m),
+                                     'binned_archived',
+                                         coalesce((conversations.rule_applications.before
+                                                   ->> 'binned_archived')::boolean, false)
+                                         OR coalesce((EXCLUDED.before ->> 'binned_archived')::boolean,
+                                                     false)))
                              ELSE EXCLUDED.before END
         "#,
         rule as RuleId,

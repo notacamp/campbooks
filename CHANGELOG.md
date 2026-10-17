@@ -8,6 +8,18 @@ All notable changes to Campbooks Next are documented here. The format follows
 
 ### Added
 
+- **Smart rules, offered when they help.** After Report and delete, Home asks "Never see
+  emails like this again?" and offers a rule for that sender's address. When the mail
+  failed DMARC and its domain publishes a reject or quarantine policy, it offers instead
+  to report mail pretending to be that domain, which never touches people you write to. A
+  whole domain is never put in the trash or spam. After Already paid, it offers to mark
+  that sender's invoices paid from now on. At the bottom of Home, "Scout noticed" suggests
+  a rule for mail you get a lot of and rarely open, or archive unread, one at a time, with
+  Not now and Don't suggest this. Every rule, teach once's included, opens the same
+  confirmation first: the rule as a sentence, what it matches, and whether to apply it to
+  the mail already here. Nothing is saved before Save smart rule, and Undo takes it back.
+  Rules run on their own, with no AI, and Scout noticed reads only counts and dates, never
+  what the mail says.
 - **Trash and Report.** A conversation can go to the trash, or be reported as spam
   ("Report and delete"), with Undo for both. Untrash puts it back where it was. Not spam
   puts mail you received back in your inbox, as Gmail's own button does, and never your

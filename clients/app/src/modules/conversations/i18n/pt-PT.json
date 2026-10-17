@@ -170,7 +170,8 @@
     "nextAttachment": "Anexo seguinte",
     "notNeeded": "Não é preciso (ou é seguro)",
     "undoAll": "Anular tudo o que uma regra fez",
-    "allPaid": "Todas as faturas já pagas"
+    "allPaid": "Todas as faturas já pagas",
+    "saveRule": "Guardar a regra inteligente"
   },
   "compose": {
     "title": {
@@ -281,7 +282,8 @@
       "alreadyPaid": "Já está paga",
       "stillToPay": "Ainda por pagar",
       "markPaid": "Marcar como paga",
-      "billPrompt": "O Campbooks não tem acesso ao seu banco."
+      "billPrompt": "O Campbooks não tem acesso ao seu banco.",
+      "report": "Denunciar e apagar"
     },
     "toast": {
       "done": "Feito · {{name}}",
@@ -295,7 +297,8 @@
       "allPaid_one": "{{count}} fatura marcada como paga",
       "allPaid_other": "{{count}} faturas marcadas como pagas",
       "allPaidFailed_one": "Não foi possível marcar {{count}} fatura como paga. Tente de novo.",
-      "allPaidFailed_other": "Não foi possível marcar {{count}} faturas como pagas. Tente de novo."
+      "allPaidFailed_other": "Não foi possível marcar {{count}} faturas como pagas. Tente de novo.",
+      "reported": "Denunciado · {{name}}. Está no spam"
     },
     "summary": {
       "heading": "Resumo do Scout"
@@ -315,7 +318,9 @@
       "about": "sobre «{{value}}»",
       "header": "com um cabeçalho de lista",
       "label": "com uma etiqueta",
-      "stream": "em {{value}}"
+      "stream": "em {{value}}",
+      "checksFail": "que falha as verificações do remetente",
+      "pretending": "que diz vir de {{value}} mas falha as verificações do remetente"
     },
     "do": {
       "archive": "arquivadas",
@@ -326,12 +331,17 @@
       "asksAction": "pedem alguma coisa",
       "noAction": "nunca pedem nada",
       "always": "sempre mantidas na caixa de entrada",
-      "never": "nunca precisam de si"
+      "never": "nunca precisam de si",
+      "trash": "vai para o lixo",
+      "spam": "denunciado como spam",
+      "paid": "as faturas já estão pagas"
     },
     "likeness": {
       "sender": "Tudo de {{address}}",
       "list": "Só a lista {{list}}",
-      "template": "Só «{{template}}» de {{from}}"
+      "template": "Só «{{template}}» de {{from}}",
+      "domain": "Tudo de {{domain}}",
+      "impersonation": "Emails que fingem ser de {{domain}}"
     },
     "offer": {
       "which": "Que mensagens",
@@ -446,7 +456,10 @@
       "never": "Para o Campbooks, esta nunca precisa de si",
       "withOthers": "{{line}} · {{others}}",
       "others_one": "como outra {{from}}",
-      "others_other": "como {{n}} outras {{from}}"
+      "others_other": "como {{n}} outras {{from}}",
+      "trash": "O Campbooks pôs isto no lixo",
+      "spam": "O Campbooks denunciou isto como spam",
+      "paid": "O Campbooks diz que isto já está pago"
     },
     "reader": {
       "stop": "Deixar de fazer isto"
@@ -557,5 +570,61 @@
     },
     "to": "Para {{recipient}}",
     "replyToElsewhere": "As respostas vão para {{recipient}}, não para o remetente {{sender}}. Confirme antes de enviar."
+  },
+  "smartRule": {
+    "tag": "Regra inteligente",
+    "lead": "Isto fica guardado como uma regra inteligente. Confirme-a antes de começar a funcionar.",
+    "how": "Passa a funcionar sozinha, sem IA. Encontra-a na memória do Scout → Regras inteligentes, onde a pode alterar ou desligar quando quiser.",
+    "matches_one": "Corresponde a {{n}} email que já cá está.",
+    "matches_other": "Corresponde a {{n}} emails que já cá estão.",
+    "matchesAtLeast": "Corresponde a pelo menos {{n}} emails que já cá estão.",
+    "noMatches": "Ainda nada aqui corresponde. Atua no email novo.",
+    "matchesUnknown": "O Campbooks não conseguiu contar o que corresponde.",
+    "examples": "Emails que correspondem",
+    "existing_one": "Aplicar também ao que já cá está",
+    "existing_other": "Aplicar também aos {{n}} que já cá estão",
+    "save": "Guardar regra inteligente",
+    "retry": "Tentar de novo",
+    "cancel": "Cancelar",
+    "failed": "O Campbooks não conseguiu guardar esta regra inteligente. Nada mudou.",
+    "saved": "Regra inteligente guardada",
+    "savedDetail": "Está na memória do Scout. Altere-a ou desligue-a quando quiser.",
+    "toast": "Regra inteligente guardada · {{rule}}",
+    "shared": "Para todos em {{inbox}}.",
+    "titleTeach": "Uma regra para emails como este",
+    "titleReport": "Uma regra para emails como este",
+    "titlePaid": "Uma regra para as faturas de {{payee}}",
+    "titleNotice": "Uma regra para emails de {{sender}}"
+  },
+  "ahead": {
+    "reportTitle": "Nunca mais ver emails como este?",
+    "reportPretending": "O Campbooks pode denunciar, à chegada e sem perguntar, os emails que dizem vir de {{domain}} mas falham as verificações do remetente. A regra aparece na memória do Scout.",
+    "reportSender": "O Campbooks pode denunciar como spam, à chegada e sem perguntar, os emails de {{sender}}. A regra aparece na memória do Scout.",
+    "paidTitle": "As faturas de {{payee}} são sempre pagas por si?",
+    "paidDetail": "Se estiverem em débito direto, o Campbooks pode marcar como pagas as próximas faturas de {{payee}}, sem perguntar. A regra aparece na memória do Scout.",
+    "accept": "Sim, a partir de agora",
+    "loadFailed": "O Campbooks não conseguiu preparar essa regra. Nada mudou."
+  },
+  "noticed": {
+    "title": "O Scout reparou",
+    "position": "{{n}} de {{total}}",
+    "keepOffHome_one": "Recebeu {{n}} email de {{sender}} nos últimos {{days}} dias e abriu {{opened}}.",
+    "keepOffHome_other": "Recebeu {{n}} emails de {{sender}} nos últimos {{days}} dias e abriu {{opened}}.",
+    "keepOffHomeAsk": "Tirá-los da Página inicial e arquivá-los em {{stream}}?",
+    "archived_one": "{{sender}} enviou-lhe {{n}} email nos últimos {{days}} dias e arquivou ou apagou {{archived}} sem ler.",
+    "archived_other": "{{sender}} enviou-lhe {{n}} emails nos últimos {{days}} dias e arquivou ou apagou {{archived}} sem ler.",
+    "archiveAsk": "Arquivá-los à chegada?",
+    "cadence": {
+      "daily": "Chegam quase todos os dias.",
+      "weekly": "Chegam todas as semanas.",
+      "monthly": "Chegam todos os meses."
+    },
+    "setUp": "Criar uma regra inteligente…",
+    "notNow": "Agora não",
+    "never": "Não sugerir isto",
+    "notNowDone": "O Scout pergunta outra vez mais tarde",
+    "neverDone": "O Scout não volta a sugerir isso",
+    "failed": "O Campbooks não conseguiu registar isso. Tente de novo.",
+    "shared": "Para todos em {{inbox}}."
   }
 }

@@ -11,8 +11,12 @@
 //! Precedence per slot: the highest [`TaughtRule::specificity`], then the
 //! latest `confirmed_at`, then the smallest id. Two guards follow: mail that
 //! looks suspicious is never hidden (no archive, no read, no move out of
-//! Primary, no "needs nothing", no `surface: never`), and a winning
-//! `surface: always` keeps every other rule from hiding the mail.
+//! Primary, no "needs nothing", no `surface: never`, no "paid"), and a
+//! winning `surface: always` keeps every other rule from hiding the mail,
+//! the trash and spam included. A rule that puts mail in the trash or spam
+//! is the one exception to the first guard: it is about the suspicious mail
+//! itself ("Never see emails like this again", campbooks-cloud#169), so it
+//! acts on it.
 //!
 //! [`TaughtRules`] is also a [`Strategy`] for the stream and needs questions,
 //! so the eval harness and a [`Cascade`](super::strategy::Cascade) can put it
@@ -79,16 +83,20 @@ pub enum Condition {
     Label(String),
     /// The conversation is in this stream.
     Stream(String),
+    /// The receiving provider's authentication results say the sender's
+    /// domain failed its checks (a structured fact, never the content).
+    SenderChecksFail,
 }
 
 impl Condition {
     /// How narrowly it picks mail: a template, list or header 3; subject
-    /// words or an address 2; a domain, label or stream 1.
+    /// words or an address 2; a domain, label, stream or failed sender
+    /// checks 1.
     pub fn weight(&self) -> u32 {
         match self {
             Self::SubjectTemplate(_) | Self::ListId(_) | Self::Header(_) => 3,
             Self::SubjectContains(_) | Self::SenderAddress(_) => 2,
-            Self::SenderDomain(_) | Self::Label(_) | Self::Stream(_) => 1,
+            Self::SenderDomain(_) | Self::Label(_) | Self::Stream(_) | Self::SenderChecksFail => 1,
         }
     }
 
@@ -129,6 +137,7 @@ impl Condition {
             }
             Self::Label(label) => facts.labels.iter().any(|l| l == label),
             Self::Stream(stream) => facts.stream == stream,
+            Self::SenderChecksFail => facts.impersonated && !facts.correspondent,
         }
     }
 }
@@ -177,6 +186,22 @@ pub enum Action {
         /// Which.
         value: Surface,
     },
+    /// Put it in the trash.
+    Trash,
+    /// Report it as spam.
+    Spam,
+    /// Its bills are paid: Campbooks never asks "Is it paid?" about it.
+    MarkPaid,
+}
+
+/// Where a rule puts mail it takes out of the way for good.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Bin {
+    /// The trash.
+    Trash,
+    /// Spam (reported).
+    Spam,
 }
 
 /// The places an action fills; one rule fills each at most once.
@@ -196,6 +221,10 @@ pub enum Slot {
     AsksAction,
     /// Always or never show.
     Surface,
+    /// The trash or spam.
+    Bin,
+    /// Whether its bills are paid.
+    Money,
 }
 
 impl Action {
@@ -209,6 +238,8 @@ impl Action {
             Self::NeedsReply { .. } => Slot::NeedsReply,
             Self::AsksAction { .. } => Slot::AsksAction,
             Self::Surface { .. } => Slot::Surface,
+            Self::Trash | Self::Spam => Slot::Bin,
+            Self::MarkPaid => Slot::Money,
         }
     }
 }
@@ -234,6 +265,10 @@ pub enum Invalid {
     /// Neither the sender, a list, a header nor the subject is tested.
     #[error("a rule must say which mail it is about")]
     TooBroad,
+    /// The trash or spam for a whole domain: people the inbox writes to may
+    /// send from it.
+    #[error("a whole domain is never put in the trash or spam")]
+    DomainToBin,
 }
 
 /// Free mail providers: a domain of theirs on its own would match people.
@@ -359,6 +394,7 @@ impl TaughtRule {
                 Condition::SubjectContains(v) => !subject_words(v).is_empty(),
                 Condition::Header(test) => test.value.as_ref().is_none_or(|v| !v.trim().is_empty()),
                 Condition::Stream(v) => triage::STREAMS.contains(&v.as_str()),
+                Condition::SenderChecksFail => true,
             };
             if !ok {
                 return Err(Invalid::Value);
@@ -389,6 +425,18 @@ impl TaughtRule {
                 return Err(Invalid::FreeMailDomain);
             }
         }
+        // The trash and spam need more than a domain: a narrowing condition,
+        // or "fails its sender checks" (mail pretending to be it).
+        let bins = actions
+            .iter()
+            .any(|a| matches!(a, Action::Trash | Action::Spam));
+        if bins
+            && !conditions
+                .iter()
+                .any(|c| narrows(c) || *c == Condition::SenderChecksFail)
+        {
+            return Err(Invalid::DomainToBin);
+        }
         Ok(())
     }
 
@@ -409,6 +457,10 @@ impl TaughtRule {
 
 /// What the engine reads of one message and its conversation.
 #[derive(Debug, Clone, Default)]
+#[allow(
+    clippy::struct_excessive_bools,
+    reason = "independent facts about one message, each read by its own condition or guard"
+)]
 pub struct Facts<'a> {
     /// The sender's address.
     pub sender_address: &'a str,
@@ -431,6 +483,18 @@ pub struct Facts<'a> {
     /// The message looks suspicious, or its conversation has an open
     /// Review need.
     pub suspicious: bool,
+    /// The receiving provider's authentication results say the sender's
+    /// domain failed its checks (`EmailFacts::authentication_failed`): the
+    /// broad test, which keeps `mark_paid` off such mail.
+    pub auth_failed: bool,
+    /// They hold an explicit DMARC failure under a published reject or
+    /// quarantine policy (`signals::facts::dmarc_refused`): the narrow test
+    /// "fails its sender checks" reads, since the domain's genuine mail
+    /// passes.
+    pub impersonated: bool,
+    /// The inbox writes to the sender: "fails its sender checks" never
+    /// matches their mail.
+    pub correspondent: bool,
 }
 
 /// One slot's answer and the rule that gave it.
@@ -459,6 +523,10 @@ pub struct Outcome {
     pub asks_action: Option<Applied<bool>>,
     /// Always or never show.
     pub surface: Option<Applied<Surface>>,
+    /// Into the trash or spam.
+    pub bin: Option<Applied<Bin>>,
+    /// Its bills are paid.
+    pub paid: Option<String>,
 }
 
 impl Outcome {
@@ -477,6 +545,8 @@ impl Outcome {
         out.extend(self.needs_reply.as_ref().map(|a| a.rule.as_str()));
         out.extend(self.asks_action.as_ref().map(|a| a.rule.as_str()));
         out.extend(self.surface.as_ref().map(|a| a.rule.as_str()));
+        out.extend(self.bin.as_ref().map(|a| a.rule.as_str()));
+        out.extend(self.paid.as_deref());
         out
     }
 }
@@ -523,16 +593,29 @@ pub fn evaluate(rules: &[TaughtRule], facts: &Facts<'_>) -> Outcome {
                         rule: id(),
                     });
                 }
+                Action::Trash | Action::Spam if out.bin.is_none() => {
+                    let value = if *action == Action::Trash {
+                        Bin::Trash
+                    } else {
+                        Bin::Spam
+                    };
+                    out.bin = Some(Applied { value, rule: id() });
+                }
+                Action::MarkPaid if out.paid.is_none() => out.paid = Some(id()),
                 _ => {}
             }
         }
     }
 
-    let keep_visible = facts.suspicious
-        || out
-            .surface
-            .as_ref()
-            .is_some_and(|s| s.value == Surface::Always);
+    let always = out
+        .surface
+        .as_ref()
+        .is_some_and(|s| s.value == Surface::Always);
+    if always {
+        // "Never hide this" outranks the trash and spam too.
+        out.bin = None;
+    }
+    let keep_visible = facts.suspicious || always;
     if keep_visible {
         out.archive = None;
         out.read = None;
@@ -554,6 +637,12 @@ pub fn evaluate(rules: &[TaughtRule], facts: &Facts<'_>) -> Outcome {
         {
             out.surface = None;
         }
+        out.paid = None;
+    }
+    // A bill whose sender failed its checks may be a fake one: never marked
+    // paid without the member, whatever the model made of it.
+    if facts.auth_failed {
+        out.paid = None;
     }
     out
 }
@@ -620,6 +709,9 @@ impl Strategy for TaughtRules {
                 labels: &[],
                 stream: "primary",
                 suspicious: false,
+                auth_failed: false,
+                impersonated: false,
+                correspondent: false,
             };
             let outcome = evaluate(&self.rules, &facts);
             let answers = questions

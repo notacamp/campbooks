@@ -51,6 +51,14 @@ impl EventHandler for ForgetMember {
         )
         .execute(&mut **tx)
         .await?;
+        // Their answers to what Scout noticed too.
+        sqlx::query!(
+            "DELETE FROM conversations.rule_notice_answers WHERE user_id = $1 AND answered_at <= $2",
+            left.user.as_uuid(),
+            before,
+        )
+        .execute(&mut **tx)
+        .await?;
         // Whatever held their rules off ends with their membership: they
         // can only come back by signing in, so they are not suspended then.
         // Recorded as of their departure, so a suspension that took effect

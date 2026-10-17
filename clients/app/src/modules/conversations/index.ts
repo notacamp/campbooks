@@ -12,6 +12,11 @@ export {
   type NeedView,
 } from "./api/queries";
 export { useNeedActions } from "./components/Needs/use-need-actions";
+// Smart rules (campbooks-cloud#169): the confirmation every rule goes
+// through, the offers after Report and delete and Already paid, and "Scout
+// noticed" at the bottom of Home.
+export { useAheadOffer } from "./components/SmartRule/AheadOffer";
+export { ScoutNoticed } from "./components/SmartRule/ScoutNoticed";
 export { NeedMessage, needMessageOf } from "./components/NeedMessage/NeedMessage";
 export {
   billKind,

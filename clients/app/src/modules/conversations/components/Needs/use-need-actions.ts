@@ -35,6 +35,12 @@ export interface NeedActionOptions {
    * campbooks-cloud#169).
    */
   onPaid?: (conversation: ConversationSummary) => void;
+  /**
+   * A warning was reported as spam and the server agreed: where the rule
+   * for mail like it is offered ("Never see emails like this again?",
+   * campbooks-cloud#169).
+   */
+  onReported?: (conversation: ConversationSummary) => void;
 }
 
 /**
@@ -44,7 +50,7 @@ export interface NeedActionOptions {
  */
 export function useNeedActions(
   workspaceId: string,
-  { onChanged, onUndo, onRedo, onFailed, onPaid }: NeedActionOptions = {},
+  { onChanged, onUndo, onRedo, onFailed, onPaid, onReported }: NeedActionOptions = {},
 ) {
   const { t: typed } = useTranslation("conversations");
   const t = typed as unknown as Translate;
@@ -55,8 +61,14 @@ export function useNeedActions(
   // Each request settles on its own promise: `mutate`'s callbacks only fire
   // for the latest call, so a failure under a quicker second action would be
   // lost (the row hidden, no toast). `entry` is the undo entry the verdict
-  // pushed, taken back when it fails.
-  const run = (conversation: ConversationSummary, verdict: NeedVerdict, entry?: number) => {
+  // pushed, taken back when it fails. `undone` says when that entry was
+  // undone before the server answered: then nothing is offered after it.
+  const run = (
+    conversation: ConversationSummary,
+    verdict: NeedVerdict,
+    entry?: number,
+    undone?: { current: boolean },
+  ) => {
     void mutation
       .mutateAsync({ conversation, action: { need: verdict } })
       .then(
@@ -65,7 +77,7 @@ export function useNeedActions(
           if (verdict === "not_needed" && conversation.need?.question !== "suspicious") {
             teach?.after(conversation, { kind: "not_needed" });
           }
-          if (verdict === "already_paid") {
+          if (verdict === "already_paid" && undone?.current !== true) {
             onPaid?.(conversation);
           }
         },
@@ -117,21 +129,24 @@ export function useNeedActions(
     }
     const name = needSender(need, conversation);
     const safe = verdict === "not_needed" && need.question === "suspicious";
+    const undone = { current: false };
     const entry = undo.push({
       label: t(safe ? "needs.toast.safe" : TOASTS[verdict], { name }),
       undo: () => {
+        undone.current = true;
         onUndo?.(conversation);
         run(conversation, "reopen");
       },
       redo: () => {
+        undone.current = false;
         // Yes to a question and Still to pay keep the item on the list.
         if (verdict !== "confirm" && verdict !== "still_to_pay") {
           onRedo?.(conversation);
         }
-        run(conversation, verdict);
+        run(conversation, verdict, undefined, undone);
       },
     });
-    run(conversation, verdict, entry);
+    run(conversation, verdict, entry, undone);
   };
 
   /** One Undo for several bills marked paid at once: those the server took. */
@@ -204,7 +219,65 @@ export function useNeedActions(
     });
   };
 
+  /**
+   * Report and delete: the conversation goes to spam (at the provider too),
+   * with Undo putting it back where it was.
+   */
+  const report = (conversation: ConversationSummary) => {
+    const need = conversation.need;
+    const name = need === null || need === undefined ? "" : needSender(need, conversation);
+    // Undone before the server answered: no offer for mail taken back out.
+    let undone = false;
+    // Not spam waits for the report to settle, so it is never overtaken,
+    // and is sent only when the report went through.
+    let reported: Promise<boolean> = Promise.resolve(false);
+    const entry = undo.push({
+      label: t("needs.toast.reported", { name }),
+      undo: () => {
+        undone = true;
+        onUndo?.(conversation);
+        void reported
+          .then((ok) =>
+            ok ? mutation.mutateAsync({ conversation, action: "not_spam" }) : undefined,
+          )
+          .catch(() => {
+            undo.notify(t("needs.toast.failed", { name }));
+          })
+          .finally(() => {
+            onChanged?.();
+          });
+      },
+    });
+    reported = mutation
+      .mutateAsync({ conversation, action: "spam" })
+      .then(
+        () => {
+          if (!undone) {
+            onReported?.(conversation);
+          }
+          return true;
+        },
+        () => {
+          undo.retract(entry);
+          onFailed?.(conversation);
+          undo.fail({
+            label: t("needs.toast.failed", { name }),
+            retry: () => {
+              onRedo?.(conversation);
+              report(conversation);
+            },
+          });
+          return false;
+        },
+      )
+      .finally(() => {
+        onChanged?.();
+      });
+  };
+
   return {
+    /** Report and delete a warning: into spam, with Undo. */
+    report,
     done: (conversation: ConversationSummary) => {
       judge(conversation, "done");
     },

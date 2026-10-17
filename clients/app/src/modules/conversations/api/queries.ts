@@ -174,6 +174,11 @@ export type ConversationAction =
   | "unread"
   | "star"
   | "unstar"
+  // Report and delete, and its undo (back where it was).
+  | "spam"
+  | "not_spam"
+  | "trash"
+  | "untrash"
   | { stream: Stream }
   | { need: NeedVerdict };
 
@@ -184,6 +189,10 @@ const PATHS = {
   unread: "/api/v1/w/{workspace_id}/conversations/{conversation_id}/unread",
   star: "/api/v1/w/{workspace_id}/conversations/{conversation_id}/star",
   unstar: "/api/v1/w/{workspace_id}/conversations/{conversation_id}/unstar",
+  spam: "/api/v1/w/{workspace_id}/conversations/{conversation_id}/spam",
+  not_spam: "/api/v1/w/{workspace_id}/conversations/{conversation_id}/not-spam",
+  trash: "/api/v1/w/{workspace_id}/conversations/{conversation_id}/trash",
+  untrash: "/api/v1/w/{workspace_id}/conversations/{conversation_id}/untrash",
 } as const;
 
 /** How an action changes a summary, for the optimistic update. */
@@ -227,6 +236,16 @@ function applied(summary: ConversationSummary, action: ConversationAction): Conv
     }
     case "unstar": {
       return { ...summary, starred: false };
+    }
+    // In spam or the trash, it needs nothing; the server's summary says the
+    // rest.
+    case "spam":
+    case "trash": {
+      return { ...summary, need: null };
+    }
+    case "not_spam":
+    case "untrash": {
+      return summary;
     }
   }
 }
