@@ -19,7 +19,7 @@
       "title": "¿De quién quieres ver siempre el correo?",
       "lead": "Su correo se queda en tu bandeja de entrada y nunca se archiva. Son las personas a las que más respondes.",
       "label": "Personas que quieres ver siempre",
-      "noSenders": "Todavía no hay correo para sugerir. Añade una dirección o un dominio abajo.",
+      "noSenders": "Todavía no hay correo para sugerir. Escribe una dirección o un dominio arriba.",
       "count_one": "{{count}} correo",
       "count_other": "{{count}} correos"
     },
@@ -30,7 +30,8 @@
       "lists": "Boletines y listas de correo",
       "listsHint": "Correo con la cabecera List-Id",
       "automatic": "Notificaciones automáticas",
-      "automaticHint": "Correo marcado como enviado automáticamente"
+      "automaticHint": "Correo marcado como enviado automáticamente",
+      "senders": "Remitentes que nunca te necesitan"
     },
     "add": {
       "label": "Otra persona",
@@ -38,6 +39,14 @@
       "button": "Añadir",
       "invalid": "Escribe una dirección completa (nombre@example.com) o un dominio (example.com).",
       "freeMail": "{{domain}} es un proveedor de correo gratuito: una regla para todo él incluiría a gente que no conoces. Añade mejor la dirección de la persona."
+    },
+    "find": {
+      "label": "Buscar a alguien",
+      "placeholder": "Un nombre, una dirección o un dominio",
+      "newAddress": "Todavía no hay correo suyo",
+      "newDomain": "Todas las personas de {{domain}}",
+      "none": "Nadie en tu correo coincide con «{{text}}». Para añadir a alguien nuevo, escribe su dirección completa o un dominio.",
+      "failed": "Scout no ha podido buscarlo ahora. Inténtalo de nuevo en un momento."
     },
     "act": {
       "title": "Cuando Scout está seguro, ¿debe actuar?",
