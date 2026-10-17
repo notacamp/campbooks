@@ -25,8 +25,9 @@ describe("needs in words", () => {
     expect(needSentence(t, need(JONAS), "Jonas Weber")).toBe(
       'needs.line.question{"name":"Jonas Weber"}',
     );
+    expect(needSentence(t, need(LUZ), "Luz Energia")).toBe('needs.line.pay{"name":"Luz Energia"}');
     expect(needSentence(t, need(ACME), "Acme Hosting")).toBe(
-      'needs.line.pay{"name":"Acme Hosting"}',
+      'needs.line.checkPay{"name":"Acme Hosting"}',
     );
     expect(needSentence(t, { ...need(MARTA), trust: "check" }, "Inês")).toBe(
       'needs.line.checkReply{"name":"Inês"}',
@@ -81,11 +82,15 @@ describe("needs in words", () => {
       overdue: false,
       soon: true,
     });
+    // A bill still to pay says how late it is; anything else, since when.
     expect(dueLabel(t, need(LUZ), "en-GB", today)).toEqual({
-      text: 'needs.due.overdue{"date":"Mon"}',
+      text: 'needs.due.daysOverdue{"count":1}',
       overdue: true,
       soon: true,
     });
+    expect(dueLabel(t, { ...need(LUZ), reason: "do" }, "en-GB", today)?.text).toBe(
+      'needs.due.overdue{"date":"Mon"}',
+    );
     expect(dueLabel(t, need(ACME), "en-GB", today)?.text).toBe('needs.due.on{"date":"30 Oct"}');
     expect(dueLabel(t, need(JONAS), "en-GB", today)).toBeUndefined();
   });

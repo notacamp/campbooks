@@ -10,6 +10,7 @@ import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
 import {
+  ACME,
   CLEARED,
   COUNTS,
   ITEMS,
@@ -17,6 +18,7 @@ import {
   MARTA_DETAIL,
   NEEDS,
   JONAS,
+  LUZ,
   PEDRO,
   PHISH,
   PHISH_DETAIL,
@@ -260,6 +262,117 @@ describe("What needs you", () => {
       expect(calls.calls.find((c) => c.route.endsWith("/need/resolve"))?.body).toMatchObject({
         outcome: "not_needed",
       });
+    });
+  });
+
+  it("asks whether a bill is paid, and takes Already paid on 1", async () => {
+    const calls = mockApi({
+      [`GET ${W}/attention`]: (request) =>
+        new URL(request.url).searchParams.get("state") === "cleared"
+          ? { body: { items: [], counts: [] } }
+          : { body: { items: ITEMS, counts: COUNTS } },
+      [`GET ${W}/conversations`]: { body: { conversations: NEEDS, next_cursor: null } },
+      [`POST ${W}/conversations/${ACME.id}/need/resolve`]: { body: { ...ACME, need: null } },
+    });
+    renderHome();
+    expect(await screen.findByText("Acme Hosting sent an invoice. Is it paid?")).toBeVisible();
+    expect(
+      screen.getByText("Campbooks can’t see your bank, so it asks whether each invoice is paid."),
+    ).toBeVisible();
+    // One bill asked about: no "All … already paid".
+    expect(screen.queryByRole("button", { name: /already paid/u })).toBeNull();
+    fireEvent.click(screen.getByText("Acme Hosting"));
+    const actions = screen.getByRole("group", { name: "Actions for Acme Hosting" });
+    expect(
+      within(actions)
+        .getAllByRole("button")
+        .map((b) => b.textContent),
+    ).toEqual(["Already paid1", "Still to pay2", "Snooze…S", "Not neededX"]);
+    fireEvent.keyDown(document, { key: "1" });
+    await waitFor(() => {
+      expect(calls.calls.find((c) => c.route.endsWith("/need/resolve"))?.body).toEqual({
+        outcome: "already_paid",
+        message_id: ACME.need?.message_id,
+      });
+    });
+    expect(screen.getByText("Marked paid · Acme Hosting")).toBeVisible();
+  });
+
+  it("keeps a bill still to pay as Pay, with a reminder first", async () => {
+    const kept = {
+      ...ACME,
+      need:
+        ACME.need === null
+          ? null
+          : { ...ACME.need, trust: "sure" as const, basis: "member" as const },
+    };
+    // The server's answer from then on: Still to pay was recorded.
+    let answered = false;
+    const calls = mockApi({
+      [`GET ${W}/attention`]: (request) =>
+        new URL(request.url).searchParams.get("state") === "cleared"
+          ? { body: { items: [], counts: [] } }
+          : { body: { items: ITEMS, counts: COUNTS } },
+      [`GET ${W}/conversations`]: () => ({
+        body: {
+          conversations: NEEDS.map((c) => (answered && c.id === ACME.id ? kept : c)),
+          next_cursor: null,
+        },
+      }),
+      [`POST ${W}/conversations/${ACME.id}/need/resolve`]: () => {
+        answered = true;
+        return { body: kept };
+      },
+    });
+    renderHome();
+    fireEvent.click(await screen.findByText("Acme Hosting"));
+    fireEvent.keyDown(document, { key: "2" });
+    await waitFor(() => {
+      expect(calls.calls.find((c) => c.route.endsWith("/need/resolve"))?.body).toMatchObject({
+        outcome: "still_to_pay",
+      });
+    });
+    expect(await screen.findByText("Pay Acme Hosting")).toBeVisible();
+    const actions = screen.getByRole("group", { name: "Actions for Acme Hosting" });
+    const labels = within(actions)
+      .getAllByRole("button")
+      .map((b) => b.textContent ?? "");
+    expect(labels[0]).toMatch(/^Remind me /u);
+    expect(labels.slice(1)).toEqual(["Mark paid2", "Snooze…S", "Not neededX"]);
+    // Luz, overdue, says by how much.
+    expect(screen.getByText("Pay Luz Energia")).toBeVisible();
+    expect(screen.getByText("1 day overdue")).toBeVisible();
+  });
+
+  it("marks every bill asked about paid at once, with one Undo", async () => {
+    const asked = {
+      ...LUZ,
+      need: LUZ.need === null ? null : { ...LUZ.need, trust: "check" as const },
+    };
+    const calls = mockApi({
+      [`GET ${W}/attention`]: (request) =>
+        new URL(request.url).searchParams.get("state") === "cleared"
+          ? { body: { items: [], counts: [] } }
+          : { body: { items: ITEMS, counts: COUNTS } },
+      [`GET ${W}/conversations`]: {
+        body: { conversations: NEEDS.map((c) => (c.id === LUZ.id ? asked : c)), next_cursor: null },
+      },
+      [`POST ${W}/conversations/${ACME.id}/need/resolve`]: { body: { ...ACME, need: null } },
+      [`POST ${W}/conversations/${LUZ.id}/need/resolve`]: { body: { ...LUZ, need: null } },
+      [`POST ${W}/conversations/${ACME.id}/need/reopen`]: { body: ACME },
+      [`POST ${W}/conversations/${LUZ.id}/need/reopen`]: { body: asked },
+    });
+    renderHome();
+    fireEvent.click(await screen.findByRole("button", { name: "All 2 already paid" }));
+    await waitFor(() => {
+      expect(
+        calls.calls.filter((c) => c.route.endsWith("/need/resolve")).map((c) => c.body),
+      ).toHaveLength(2);
+    });
+    expect(await screen.findByText("Marked 2 invoices paid")).toBeVisible();
+    fireEvent.keyDown(document, { key: "z" });
+    await waitFor(() => {
+      expect(calls.calls.filter((c) => c.route.endsWith("/need/reopen"))).toHaveLength(2);
     });
   });
 

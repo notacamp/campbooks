@@ -23,12 +23,7 @@ export type NeedView = Schema<"NeedView">;
 
 /** A member's verdict on what a conversation needs (`conversations.resolve_need`, …). */
 export type NeedVerdict =
-  | "done"
-  | "not_needed"
-  | "confirm"
-  | "reopen"
-  | "already_paid"
-  | "still_to_pay";
+  "done" | "not_needed" | "confirm" | "reopen" | "already_paid" | "still_to_pay";
 
 /** The built-in streams, in display order. */
 export const STREAMS: readonly Stream[] = ["primary", "updates", "receipts", "newsletters"];

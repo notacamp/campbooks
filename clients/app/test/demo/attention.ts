@@ -118,6 +118,7 @@ export const PEDRO = conversation({
   },
 });
 
+/** A bill the member said is still to pay, two days overdue on Tuesday. */
 export const LUZ = conversation({
   n: 5,
   subject: "Invoice 7781",
@@ -126,14 +127,15 @@ export const LUZ = conversation({
   need: {
     reason: "pay",
     trust: "sure",
-    question: "asks_action",
-    rule: "signals.payment_due",
+    question: "money",
+    rule: "model.decide",
     due_on: "2026-10-12",
     overdue: true,
     quote: "Please pay invoice 7781 by 12 October to avoid a late fee.",
   },
 });
 
+/** A bill Campbooks asks about: "Is it paid?". */
 export const ACME = conversation({
   n: 6,
   subject: "Your invoice INV-2041",
@@ -141,9 +143,9 @@ export const ACME = conversation({
   sent: "2026-10-13T06:30:00Z",
   need: {
     reason: "pay",
-    trust: "sure",
-    question: "asks_action",
-    rule: "signals.payment_due",
+    trust: "check",
+    question: "money",
+    rule: "model.decide",
     due_on: "2026-10-30",
     quote: "Amount due: €49.00. Payment due by 30 October.",
   },

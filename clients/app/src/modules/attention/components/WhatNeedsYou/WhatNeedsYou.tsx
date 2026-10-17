@@ -40,9 +40,11 @@ import { useAttention, useRefreshAttention, useSnooze, type ItemView } from "../
 import {
   doneTodayKind,
   groupByReason,
+  remindTime,
   rowActionIds,
   snoozeOptions,
   type OwnActionId,
+  type RowKind,
   type UniversalActionId,
 } from "../../model";
 
@@ -82,8 +84,16 @@ interface Row {
 
 type ActionId = OwnActionId | UniversalActionId;
 
-const kindOf = (need: NeedView) =>
-  need.question === "suspicious" ? "warning" : need.trust === "check" ? "question" : "need";
+const kindOf = (need: NeedView): RowKind => {
+  if (need.question === "suspicious") {
+    return "warning";
+  }
+  // A bill: asked "Is it paid?" until the member answers, then "Pay …".
+  if (need.reason === "pay" && need.question === "money") {
+    return need.trust === "check" ? "bill" : "toPay";
+  }
+  return need.trust === "check" ? "question" : "need";
+};
 
 /**
  * Home: what needs the member, grouped Review, Reply, Decide, Do, Pay, due
@@ -263,6 +273,8 @@ export function WhatNeedsYou({ workspaceId, now, offer }: WhatNeedsYouProps) {
         show(row);
       }
     },
+    // campbooks-cloud#169 offers the paid rule for the sender here
+    // (`onPaid`), after Already paid.
   });
 
   const when = (until: Date) =>
@@ -283,6 +295,22 @@ export function WhatNeedsYou({ workspaceId, now, offer }: WhatNeedsYouProps) {
   };
   const confirm = (row: Row) => {
     needActions.confirm(row.conversation);
+  };
+  const paid = (row: Row) => {
+    hide(row, t("confirm.paid", { name: row.name }));
+    needActions.alreadyPaid(row.conversation);
+  };
+  // Still to pay: the row stays, now "Pay …", with a reminder first.
+  const stillToPay = (row: Row) => {
+    setHighlight(undefined);
+    needActions.stillToPay(row.conversation);
+  };
+  // Every bill of the Pay group still asked about, with one Undo.
+  const allPaid = (bills: readonly Row[]) => {
+    for (const row of bills) {
+      hide(row, t("confirm.paid", { name: row.name }));
+    }
+    needActions.allPaid(bills.map((row) => row.conversation));
   };
   // Each request settles on its own promise (`mutate`'s callbacks only fire
   // for the latest call). `entry` is the snooze's undo entry, taken back when
@@ -343,14 +371,33 @@ export function WhatNeedsYou({ workspaceId, now, offer }: WhatNeedsYouProps) {
     });
   };
 
+  const reminder = (row: Row) => remindTime(row.need.due_on, now ?? new Date());
+  const remindLabel = (row: Row) => {
+    const { until, kind } = reminder(row);
+    const time = new Intl.DateTimeFormat(i18n.language, {
+      hour: "2-digit",
+      minute: "2-digit",
+    }).format(until);
+    const day = new Intl.DateTimeFormat(i18n.language, {
+      weekday: "short",
+      day: "numeric",
+      month: "short",
+    }).format(until);
+    return t(`remind.${kind}`, { when: day, time });
+  };
+
   /** What a row offers, in words with keys: the shape #166's ranked actions drop into. */
   const actionsOf = (row: Row): { own: ItemAction[]; universal: ItemAction[] } => {
-    const ids = rowActionIds(kindOf(row.need));
+    const kind = kindOf(row.need);
+    const ids = rowActionIds(kind);
     const ownLabel: Record<OwnActionId, string> = {
       reply: t("actions.reply"),
       yes: tc("needs.actions.yes"),
       no: tc("needs.actions.no"),
       safe: tc("needs.actions.safe"),
+      paid: tc(kind === "bill" ? "needs.actions.alreadyPaid" : "needs.actions.markPaid"),
+      to_pay: tc("needs.actions.stillToPay"),
+      remind: kind === "toPay" ? remindLabel(row) : "",
     };
     const universalLabel: Record<UniversalActionId, string> = {
       done: tc("needs.actions.done"),
@@ -384,6 +431,18 @@ export function WhatNeedsYou({ workspaceId, now, offer }: WhatNeedsYouProps) {
       case "yes": {
         setHighlight(undefined);
         confirm(row);
+        return;
+      }
+      case "paid": {
+        paid(row);
+        return;
+      }
+      case "to_pay": {
+        stillToPay(row);
+        return;
+      }
+      case "remind": {
+        snoozeUntil(row, reminder(row).until);
         return;
       }
       case "no":
@@ -603,75 +662,91 @@ export function WhatNeedsYou({ workspaceId, now, offer }: WhatNeedsYouProps) {
       {offer}
       {loading ? <SkeletonList rows={4} /> : null}
       <div ref={list} className="flex flex-col">
-        {groups.map((group) => (
-          <QueueGroup
-            key={group.reason}
-            signal={group.reason}
-            name={t(`groups.${group.reason}`)}
-            count={group.rows.filter((row) => row.confirmation === undefined).length}
-          >
-            {group.rows.map((row) => {
-              const due = dueLabel(tc, row.need, i18n.language, now);
-              const expanded = expandedId === row.item.id;
-              const isSelected = row.item.id === selected?.item.id;
-              const actions = isSelected ? actionsOf(row) : undefined;
-              return (
-                <Item
-                  key={row.item.id}
-                  id={itemId(row.item.id)}
-                  who={row.name}
-                  what={needSentence(tc, row.need, row.name)}
-                  excerpt={row.need.quote?.text}
-                  avatar={{
-                    name: row.name,
-                    kind:
-                      row.item.reason === "pay" || row.need.question === "suspicious"
-                        ? "service"
-                        : "person",
-                  }}
-                  due={due?.text}
-                  soon={due?.soon === true}
-                  selected={isSelected}
-                  expanded={expanded}
-                  confirmation={row.confirmation}
-                  onConfirmEnd={() => {
-                    folded(row);
-                  }}
-                  onToggle={() => {
-                    select(row.item.id);
-                    setExpandedId(expanded ? undefined : row.item.id);
-                  }}
-                  actions={
-                    actions === undefined ? undefined : (
-                      <ItemActions
-                        label={t("actions.label", { name: row.name })}
-                        own={actions.own}
-                        universal={actions.universal}
-                        highlighted={highlight}
-                        onHighlight={setHighlight}
-                        onAction={(id) => {
-                          run(row, id as ActionId);
+        {groups.map((group) => {
+          const live = group.rows.filter((row) => row.confirmation === undefined);
+          const bills = live.filter((row) => kindOf(row.need) === "bill");
+          return (
+            <QueueGroup
+              key={group.reason}
+              signal={group.reason}
+              name={t(`groups.${group.reason}`)}
+              count={live.length}
+              note={bills.length > 0 ? t("pay.note") : undefined}
+              action={
+                bills.length > 1 ? (
+                  <Button
+                    onClick={() => {
+                      allPaid(bills);
+                    }}
+                  >
+                    {t("pay.allPaid", { count: bills.length })}
+                  </Button>
+                ) : undefined
+              }
+            >
+              {group.rows.map((row) => {
+                const due = dueLabel(tc, row.need, i18n.language, now);
+                const expanded = expandedId === row.item.id;
+                const isSelected = row.item.id === selected?.item.id;
+                const actions = isSelected ? actionsOf(row) : undefined;
+                return (
+                  <Item
+                    key={row.item.id}
+                    id={itemId(row.item.id)}
+                    who={row.name}
+                    what={needSentence(tc, row.need, row.name)}
+                    excerpt={row.need.quote?.text}
+                    avatar={{
+                      name: row.name,
+                      kind:
+                        row.item.reason === "pay" || row.need.question === "suspicious"
+                          ? "service"
+                          : "person",
+                    }}
+                    due={due?.text}
+                    soon={due?.soon === true}
+                    selected={isSelected}
+                    expanded={expanded}
+                    confirmation={row.confirmation}
+                    onConfirmEnd={() => {
+                      folded(row);
+                    }}
+                    onToggle={() => {
+                      select(row.item.id);
+                      setExpandedId(expanded ? undefined : row.item.id);
+                    }}
+                    actions={
+                      actions === undefined ? undefined : (
+                        <ItemActions
+                          label={t("actions.label", { name: row.name })}
+                          own={actions.own}
+                          universal={actions.universal}
+                          highlighted={highlight}
+                          onHighlight={setHighlight}
+                          onAction={(id) => {
+                            run(row, id as ActionId);
+                          }}
+                        />
+                      )
+                    }
+                    detail={
+                      <NeedDetail
+                        workspaceId={workspaceId}
+                        row={row}
+                        t={t}
+                        tc={tc}
+                        locale={i18n.language}
+                        onOpen={() => {
+                          openConversation(row);
                         }}
                       />
-                    )
-                  }
-                  detail={
-                    <NeedDetail
-                      workspaceId={workspaceId}
-                      row={row}
-                      t={t}
-                      tc={tc}
-                      locale={i18n.language}
-                      onOpen={() => {
-                        openConversation(row);
-                      }}
-                    />
-                  }
-                />
-              );
-            })}
-          </QueueGroup>
-        ))}
+                    }
+                  />
+                );
+              })}
+            </QueueGroup>
+          );
+        })}
       </div>
       <Dialog
         open={snoozing !== undefined}
