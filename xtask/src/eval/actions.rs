@@ -359,9 +359,8 @@ mod tests {
     #[test]
     fn the_questions_asked_are_the_catalogue_s() {
         let ids: Vec<String> = asked().into_iter().map(|q| q.id).collect();
-        use campbooks_ai::decide::signals::email::triage;
-        assert!(ids.contains(&triage::NEEDS_REPLY.to_owned()));
-        assert!(ids.contains(&triage::SUSPICIOUS.to_owned()));
+        assert!(ids.contains(&"needs_reply".to_owned()));
+        assert!(ids.contains(&"suspicious".to_owned()));
         for id in campbooks_ai::decide::signals::actions::question::ALL {
             assert!(ids.contains(&id.to_owned()), "{id}");
         }
