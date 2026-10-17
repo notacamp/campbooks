@@ -101,22 +101,8 @@ impl JobHandler for ReleaseSend {
         if !still_may_send(&state, tx, workspace, author.map(Into::into), &payload).await? {
             return Ok(());
         }
-        let released = sqlx::query_scalar!(
-            r#"
-            UPDATE conversations.drafts
-               SET state = $3, send_id = $4, rfc_message_id = $5, updated_at = now()
-             WHERE id = $1 AND state = 'scheduled' AND send_generation = $2
-            RETURNING id
-            "#,
-            payload.draft as DraftId,
-            payload.generation,
-            DraftState::Sending.as_str(),
-            send_id as SendId,
-            rfc_message_id,
-        )
-        .fetch_optional(&mut **tx)
-        .await?;
-        if released.is_none() {
+        let released = mark_sending(tx, &payload, send_id, &rfc_message_id, &blob).await?;
+        if !released {
             return Ok(()); // Cancelled while the document was written.
         }
         state
@@ -164,30 +150,7 @@ async fn still_may_send(
     author: Option<campbooks_kernel::tenancy::UserId>,
     payload: &ReleaseSendPayload,
 ) -> Result<bool, JobError> {
-    let role = match author {
-        Some(author) => state.membership.role_held(tx, workspace, author).await?,
-        None => None,
-    };
-    let allowed = match role {
-        Some(role) => {
-            let access = Access {
-                workspace,
-                user: author,
-                role: Some(role),
-            };
-            campbooks_kernel::authz::authorize(
-                state,
-                tx,
-                &access,
-                campbooks_kernel::authz::Action::Send,
-                &campbooks_kernel::RecordRef::new(DRAFT_RECORD, &payload.draft),
-            )
-            .await?
-                == campbooks_kernel::authz::Decision::Allow
-        }
-        None => false,
-    };
-    if allowed {
+    if author_may_send(state, tx, workspace, author, payload.draft).await? {
         return Ok(true);
     }
     sqlx::query!(
@@ -201,6 +164,74 @@ async fn still_may_send(
     .await?;
     tracing::info!(draft = %payload.draft, "scheduled send not released: the author may no longer send it");
     Ok(false)
+}
+
+/// Mark the draft as being sent as `send_id`, written as `blob`, in `tx`:
+/// `false` when it is no longer scheduled at the payload's generation
+/// (cancelled meanwhile). The document is recorded with the send: the
+/// connector asks for it (`outbound_requests`) and sends this one, never
+/// one an event names.
+async fn mark_sending(
+    tx: &mut sqlx::PgConnection,
+    payload: &ReleaseSendPayload,
+    send_id: SendId,
+    rfc_message_id: &str,
+    blob: &campbooks_kernel::blobs::BlobRef,
+) -> Result<bool, JobError> {
+    let send_document =
+        serde_json::to_value(blob).map_err(|e| JobError::fatal(redact::json(&e)))?;
+    let released = sqlx::query_scalar!(
+        r#"
+            UPDATE conversations.drafts
+               SET state = $3, send_id = $4, rfc_message_id = $5, send_document = $6,
+                   updated_at = now()
+             WHERE id = $1 AND state = 'scheduled' AND send_generation = $2
+            RETURNING id
+            "#,
+        payload.draft as DraftId,
+        payload.generation,
+        DraftState::Sending.as_str(),
+        send_id as SendId,
+        rfc_message_id,
+        send_document,
+    )
+    .fetch_optional(tx)
+    .await?;
+    Ok(released.is_some())
+}
+
+/// Whether `author` may still send `draft`: a member of `workspace` (their
+/// membership held until `conn`'s transaction ends) who is allowed to send
+/// it (they may have lost the inbox, or it was kept read-only). A draft
+/// with no author (a client token's) is never sent on its own. Asked again
+/// by the connector, through the outbound-requests port, before it sends.
+pub(crate) async fn author_may_send(
+    state: &campbooks_kernel::AppState,
+    conn: &mut sqlx::PgConnection,
+    workspace: WorkspaceId,
+    author: Option<campbooks_kernel::tenancy::UserId>,
+    draft: DraftId,
+) -> campbooks_kernel::Result<bool> {
+    let Some(author) = author else {
+        return Ok(false);
+    };
+    let Some(role) = state.membership.role_held(conn, workspace, author).await? else {
+        return Ok(false);
+    };
+    let access = Access {
+        workspace,
+        user: Some(author),
+        role: Some(role),
+    };
+    Ok(campbooks_kernel::authz::authorize(
+        state,
+        conn,
+        &access,
+        campbooks_kernel::authz::Action::Send,
+        &campbooks_kernel::RecordRef::new(DRAFT_RECORD, &draft),
+    )
+    .await?
+        == campbooks_kernel::authz::Decision::Allow)
 }
 
 /// The outgoing message document of `row`, sent as `send_id`.

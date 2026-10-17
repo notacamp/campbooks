@@ -274,6 +274,7 @@ pub fn with_ports(state: AppState) -> AppState {
         .with_visibility(campbooks_conversations::visibility())
         .with_preferences(campbooks_assistant::preferences())
         .with_kept_mail(campbooks_conversations::kept_mail())
+        .with_outbound(campbooks_conversations::outbound_requests())
         .with_search_sources(SearchSources::new(vec![
             campbooks_conversations::search_source(),
         ]))

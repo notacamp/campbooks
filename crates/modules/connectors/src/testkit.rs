@@ -7,7 +7,7 @@
 //! No test talks to Google.
 
 use std::{
-    collections::{BTreeMap, HashMap},
+    collections::{BTreeMap, HashMap, HashSet},
     sync::{Arc, Mutex, PoisonError},
 };
 
@@ -27,6 +27,7 @@ use campbooks_kernel::{
     connections::{ConsentDoor, ConsentFuture, ConsentRequest, ProviderGrant, StartedConsent},
     crypto::{Cipher, SecretKey},
     jobs::{Registry, Worker},
+    outbound::{OutboundRequests, StandingFuture, StoredSend, StoredSendFuture},
     tenancy::{Access, Membership, MembershipFuture, Role, UserId, WorkspaceId},
     testing::{self, TestIdp, TestResponse},
 };
@@ -41,7 +42,10 @@ use crate::{
     Deps,
     config::ConnectorsConfig,
     deps::CREDENTIALS_PURPOSE,
-    domain::intake::grant_intake,
+    domain::{
+        intake::grant_intake,
+        model::{InboxId, SendId},
+    },
     google::{Endpoints, GMAIL_SCOPE, Google},
     provider::ClientSecret,
     zoho::{Centres, MAIL_SCOPES as ZOHO_SCOPES, Zoho},
@@ -167,6 +171,96 @@ impl Membership for FakeMembership {
     }
 }
 
+/// What the conversations module stored: the sends it released and the
+/// changes its conversations show (the outbound-requests port, faked).
+/// Nothing stands until a test says so, as for a forged event.
+#[derive(Debug, Default)]
+pub struct FakeOutbound {
+    sends: Mutex<HashMap<uuid::Uuid, StoredSend>>,
+    /// Per conversation, the messages whose requested changes stand.
+    changes: Mutex<HashMap<uuid::Uuid, HashSet<String>>>,
+}
+
+impl FakeOutbound {
+    /// Send `send` was released from `inbox` as `message`.
+    pub fn release(&self, send: SendId, inbox: InboxId, message: BlobRef) {
+        self.sends
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .insert(
+                send.into(),
+                StoredSend {
+                    inbox: inbox.into(),
+                    message,
+                },
+            );
+    }
+
+    /// Send `send` no longer waits for the provider (sent, failed, its
+    /// author gone).
+    pub fn withdraw(&self, send: SendId) {
+        self.sends
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .remove(&uuid::Uuid::from(send));
+    }
+
+    /// Conversation `conversation` shows the changes asked for `messages`.
+    pub fn show(&self, conversation: uuid::Uuid, messages: &[&str]) {
+        self.changes
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .entry(conversation)
+            .or_default()
+            .extend(messages.iter().map(|&m| m.to_owned()));
+    }
+}
+
+impl OutboundRequests for FakeOutbound {
+    fn stored_send<'a>(
+        &'a self,
+        _state: &'a AppState,
+        _conn: &'a mut sqlx::PgConnection,
+        _workspace: WorkspaceId,
+        send: uuid::Uuid,
+    ) -> StoredSendFuture<'a> {
+        let stored = self
+            .sends
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .get(&send)
+            .cloned();
+        Box::pin(async move { Ok(stored) })
+    }
+
+    fn changes_standing<'a>(
+        &'a self,
+        _conn: &'a mut sqlx::PgConnection,
+        _workspace: WorkspaceId,
+        _request: uuid::Uuid,
+        _inbox: uuid::Uuid,
+        conversation: uuid::Uuid,
+        items: &'a [serde_json::Value],
+    ) -> StandingFuture<'a> {
+        let shown = self
+            .changes
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .get(&conversation)
+            .cloned()
+            .unwrap_or_default();
+        let standing = items
+            .iter()
+            .map(|item| {
+                item["provider_message_id"]
+                    .as_str()
+                    .is_some_and(|id| shown.contains(id))
+            })
+            .collect();
+        Box::pin(async move { Ok(standing) })
+    }
+}
+
 /// The module over a fresh database, with a fake Google.
 pub struct Kit {
     /// The test database as its owner (no row-level security), for
@@ -184,6 +278,8 @@ pub struct Kit {
     pub deps: Deps,
     /// The identity module's front door, faked.
     pub door: Arc<FakeDoor>,
+    /// What the conversations module stored, faked.
+    pub outbound: Arc<FakeOutbound>,
     app: Router,
     idp: TestIdp,
     membership: Arc<FakeMembership>,
@@ -257,11 +353,13 @@ impl Kit {
         let blobs = BlobStore::memory(&BlobsConfig::default(), pool.clone());
         let membership = Arc::new(FakeMembership::default());
         let door = Arc::new(FakeDoor::default());
+        let outbound = Arc::new(FakeOutbound::default());
         let state = idp
             .state(pool)
             .with_blobs(blobs)
             .with_membership(membership.clone())
             .with_consent_door(door.clone())
+            .with_outbound(outbound.clone())
             .with_registry(Registry::build(&[crate::module(deps.clone())]).unwrap());
         let app = testing::app(crate::module(deps.clone()), state.clone());
         Self {
@@ -272,6 +370,7 @@ impl Kit {
             zoho,
             deps,
             door,
+            outbound,
             app,
             idp,
             membership,

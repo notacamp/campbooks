@@ -1,0 +1,18 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO conversations.change_requests\n               (id, workspace_id, inbox_id, conversation_id, items)\n           VALUES ($1, $2::text::uuid, $3, $4, $5)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text",
+        "Uuid",
+        "Uuid",
+        "Jsonb"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "f9d1e54c3a00a056d4eac51ae99af98af9449cf5c53ce8d96db08a6acb1902a8"
+}

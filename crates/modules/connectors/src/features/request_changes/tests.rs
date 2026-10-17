@@ -56,10 +56,21 @@ impl Mailbox {
     /// conversations asks for `items` (message id, change): the event is
     /// checked against the contract, published and its consumer run.
     async fn request(&self, kit: &Kit, items: &[(&str, Value)]) {
+        // The conversation shows every change asked (conversations applied
+        // them before asking).
+        let conversation = uuid::Uuid::now_v7();
+        let ids: Vec<&str> = items.iter().map(|(id, _)| *id).collect();
+        kit.outbound.show(conversation, &ids);
+        self.publish(kit, conversation, items).await;
+    }
+
+    /// Publish `changes_requested` for `items` of `conversation` and run its
+    /// consumer, whatever conversations shows.
+    async fn publish(&self, kit: &Kit, conversation: uuid::Uuid, items: &[(&str, Value)]) {
         let payload = json!({
             "workspace": self.ws.to_string(),
             "inbox_id": self.inbox,
-            "conversation": uuid::Uuid::now_v7(),
+            "conversation": conversation,
             "origin": "user",
             "items": items.iter().map(|(id, change)| json!({
                 "provider_message_id": id, "change": change
@@ -734,6 +745,68 @@ async fn a_message_in_the_trash_or_spam_is_not_brought_back(db: PgPool) {
             end("skipped", Some("in_trash")),
             end("skipped", Some("label_not_at_provider")),
         ]
+    );
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_forged_change_request_changes_nothing(db: PgPool) {
+    let kit = Kit::new(db).await;
+    let m = mailbox(&kit, &[&["INBOX", "UNREAD"], &["INBOX"]]).await;
+    kit.google.clear_calls();
+    // Appended in the workspace, but no conversation shows these changes.
+    m.publish(
+        &kit,
+        uuid::Uuid::now_v7(),
+        &[
+            (m.ids[0].as_str(), json!({"kind": "archive"})),
+            (m.ids[1].as_str(), json!({"kind": "mark_unread"})),
+        ],
+    )
+    .await;
+    // Nothing recorded, and not even the history stamp asked for.
+    assert!(outbound(&kit).await.is_empty());
+    assert!(
+        !kit.google
+            .calls()
+            .iter()
+            .any(|call| call.contains("/profile")),
+        "{:?}",
+        kit.google.calls()
+    );
+    m.run(&kit).await;
+    assert!(kit.google.writes().is_empty(), "{:?}", kit.google.writes());
+    assert_eq!(
+        kit.google.labels_of(&m.ids[0]),
+        labels(&["INBOX", "UNREAD"])
+    );
+    assert_eq!(kit.google.labels_of(&m.ids[1]), labels(&["INBOX"]));
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn only_the_changes_a_conversation_shows_are_made(db: PgPool) {
+    let kit = Kit::new(db).await;
+    let m = mailbox(&kit, &[&["INBOX", "UNREAD"], &["INBOX", "UNREAD"]]).await;
+    // The conversation shows the first message read; the second was smuggled
+    // into the request.
+    let conversation = uuid::Uuid::now_v7();
+    kit.outbound.show(conversation, &[m.ids[0].as_str()]);
+    m.publish(
+        &kit,
+        conversation,
+        &[
+            (m.ids[0].as_str(), json!({"kind": "mark_read"})),
+            (m.ids[1].as_str(), json!({"kind": "mark_read"})),
+        ],
+    )
+    .await;
+    m.run(&kit).await;
+    let rows = outbound(&kit).await;
+    assert_eq!(rows.len(), 1, "{rows:?}");
+    assert_eq!(rows[0].0, m.ids[0]);
+    assert_eq!(kit.google.labels_of(&m.ids[0]), labels(&["INBOX"]));
+    assert_eq!(
+        kit.google.labels_of(&m.ids[1]),
+        labels(&["INBOX", "UNREAD"])
     );
 }
 

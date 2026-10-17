@@ -1417,10 +1417,176 @@ async fn a_scheduled_send_follows_its_authors_real_membership(db: PgPool) {
             // `failed` once the connector answers).
             assert_ne!(state, "draft");
             assert_eq!(requested, 1);
+            // The connector asked conversations through the real
+            // outbound-requests port, which confirmed it (campbooks-cloud#226).
+            assert_eq!(sends_recorded(&world).await, 1);
         } else {
             assert_eq!(state, "draft");
             assert_eq!(requested, 0);
         }
+    }
+}
+
+/// The sends the connector recorded in workspace A.
+async fn sends_recorded(world: &World) -> i64 {
+    sqlx::query_scalar("SELECT count(*) FROM connectors.sends WHERE workspace_id = $1")
+        .bind(world.a.as_uuid())
+        .fetch_one(&world.db)
+        .await
+        .unwrap()
+}
+
+/// campbooks-cloud#226: `conversations.send_requested` appended in workspace
+/// A by a transaction of the runtime role, naming a real draft that was
+/// never released, is checked by the connector against the real
+/// outbound-requests port: nothing is recorded, so nothing can be sent.
+#[sqlx::test(migrations = "../../migrations")]
+async fn a_forged_send_request_is_refused_by_the_real_port(db: PgPool) {
+    use campbooks_conversations::{
+        events::SendRequested,
+        model::{DraftId, InboxId, SendId},
+    };
+    let world = World::new(db).await;
+    let ws = world.a.to_string();
+    let message = world
+        .state
+        .blobs
+        .put(&ws, b"{}".to_vec(), "application/json")
+        .await
+        .unwrap();
+    let mut tx = world.state.db.begin_for(world.a).await.unwrap();
+    world
+        .state
+        .events
+        .publish(
+            &mut tx,
+            &SendRequested {
+                workspace: ws.clone(),
+                inbox_id: world.instances["conversations.inbox"]
+                    .parse::<InboxId>()
+                    .unwrap(),
+                draft: world.instances["conversations.draft"]
+                    .parse::<DraftId>()
+                    .unwrap(),
+                send_id: SendId::new(),
+                message,
+                author: Some(world.users[&Who::Sender]),
+            },
+        )
+        .await
+        .unwrap();
+    tx.commit().await.unwrap();
+    Worker::new(world.state.clone()).run_until_idle().await;
+    assert_eq!(sends_recorded(&world).await, 0);
+}
+
+/// The outbound changes the connector recorded in workspace A.
+async fn changes_recorded(world: &World) -> i64 {
+    sqlx::query_scalar("SELECT count(*) FROM connectors.outbound_changes WHERE workspace_id = $1")
+        .bind(world.a.as_uuid())
+        .fetch_one(&world.db)
+        .await
+        .unwrap()
+}
+
+/// campbooks-cloud#226: `conversations.changes_requested` appended in
+/// workspace A by a transaction of the runtime role, for a real
+/// conversation of a connected inbox, is checked by the connector against
+/// the real outbound-requests port: nothing is recorded. A member's own
+/// change, through the API, is.
+#[sqlx::test(migrations = "../../migrations")]
+async fn a_forged_change_request_is_refused_by_the_real_port(db: PgPool) {
+    use campbooks_conversations::{
+        events::{ChangesRequested, RequestOrigin, RequestedChange, RequestedItem},
+        model::{ConversationId, InboxId},
+    };
+    let world = World::new(db).await;
+    let inbox = world.instances["conversations.inbox"].clone();
+    let conversation = world.instances["conversations.conversation"].clone();
+    // The inbox's messages stream, so the connector would record changes.
+    sqlx::query(
+        "INSERT INTO connectors.streams
+             (id, workspace_id, connection_id, capability, phase, interval_seconds, inbox_id)
+         VALUES ($1, $2, $3::uuid, 'messages', 'incremental', 60, $4::uuid)",
+    )
+    .bind(Uuid::now_v7())
+    .bind(world.a.as_uuid())
+    .bind(&world.instances["connectors.connection"])
+    .bind(&inbox)
+    .execute(&world.db)
+    .await
+    .unwrap();
+
+    let mut tx = world.state.db.begin_for(world.a).await.unwrap();
+    world
+        .state
+        .events
+        .publish(
+            &mut tx,
+            &ChangesRequested {
+                workspace: world.a.to_string(),
+                inbox_id: inbox.parse::<InboxId>().unwrap(),
+                conversation: conversation.parse::<ConversationId>().unwrap(),
+                origin: RequestOrigin::User,
+                items: vec![RequestedItem {
+                    provider_message_id: "en-1".into(),
+                    change: RequestedChange::Archive,
+                }],
+            },
+        )
+        .await
+        .unwrap();
+    tx.commit().await.unwrap();
+    Worker::new(world.state.clone()).run_until_idle().await;
+    assert_eq!(changes_recorded(&world).await, 0);
+
+    // A member's own changes, through the flags (`request_each`), labels
+    // and trash and spam operations: each one that changes something is
+    // recorded.
+    let token = world.token(Who::Connector.subject());
+    for action in [
+        "archive",
+        "unarchive",
+        "read",
+        "unread",
+        "trash",
+        "untrash",
+        "spam",
+        "not-spam",
+    ] {
+        let uri = format!(
+            "/api/v1/w/{}/conversations/{conversation}/{action}",
+            world.a
+        );
+        let (status, bytes, _) = world.call(Some(&token), "POST", &uri, None).await;
+        assert_eq!(
+            status,
+            StatusCode::OK,
+            "{}",
+            String::from_utf8_lossy(&bytes)
+        );
+    }
+    Worker::new(world.state.clone()).run_until_idle().await;
+    assert!(changes_recorded(&world).await > 0);
+    let kinds: Vec<String> = sqlx::query_scalar(
+        "SELECT DISTINCT kind FROM connectors.outbound_changes WHERE workspace_id = $1 ORDER BY 1",
+    )
+    .bind(world.a.as_uuid())
+    .fetch_all(&world.db)
+    .await
+    .unwrap();
+    for kind in [
+        "mark_read",
+        "mark_unread",
+        "trash",
+        "untrash",
+        "spam",
+        "unspam",
+    ] {
+        assert!(
+            kinds.iter().any(|k| k == kind),
+            "{kind} not recorded: {kinds:?}"
+        );
     }
 }
 

@@ -61,7 +61,8 @@ pub use domain::{
     policy::{Policy, Switch},
 };
 pub use features::{
-    inbox_visibility::visibility, kept_mail::kept_mail, search_source::search_source,
+    inbox_visibility::visibility, kept_mail::kept_mail, outbound_requests::outbound_requests,
+    search_source::search_source,
 };
 /// The owner's money mail as an eval set to label (campbooks-cloud#167).
 pub mod labelling {
