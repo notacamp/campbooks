@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT s.inbox_id AS \"inbox: InboxId\", s.document, s.state, s.unclear, s.attempted_at,\n                  st.id AS \"stream?: StreamId\", st.paused AS \"paused?\", st.cursor AS \"cursor?\",\n                  st.mailbox_key AS \"mailbox_key?\",\n                  c.id AS \"connection?: ConnectionId\", c.provider AS \"provider?\",\n                  c.provider_server,\n                  c.granted_by AS \"granted_by?: UserId\", c.health AS \"health?\"\n             FROM connectors.sends s\n             LEFT JOIN connectors.streams st ON st.id = s.stream_id\n             LEFT JOIN connectors.connections c ON c.id = st.connection_id\n            WHERE s.id = $1",
+  "query": "SELECT s.inbox_id AS \"inbox: InboxId\", s.document, s.state, s.unclear, s.attempted_at,\n                  st.id AS \"stream?: StreamId\", st.paused AS \"paused?\", st.cursor AS \"cursor?\",\n                  st.mailbox_key AS \"mailbox_key?\",\n                  c.id AS \"connection?: ConnectionId\", c.provider AS \"provider?\",\n                  c.provider_server,\n                  c.granted_by AS \"granted_by?: UserId\", c.health AS \"health?\"\n             FROM connectors.sends s\n             LEFT JOIN connectors.streams st ON st.id = s.stream_id AND st.inbox_id = s.inbox_id\n             LEFT JOIN connectors.connections c ON c.id = st.connection_id\n            WHERE s.id = $1",
   "describe": {
     "columns": [
       {
@@ -180,5 +180,5 @@
       true
     ]
   },
-  "hash": "60bf47ef842b596e06ec93e0379884d578867d1ed228d670a1b4cfaa3c9883d7"
+  "hash": "62b65f4bc513fcee846f5b080571b6720b02bfd2bc87e454f12c16b45389f0b0"
 }

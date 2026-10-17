@@ -47,7 +47,8 @@ crates/
                            implements the kernel's `Membership` port.
     connectors/            campbooks-connectors — connections to outside accounts,
                            credentials, the sync engine and the Gmail adapter;
-                           implements the kernel's `GrantIntake` port.
+                           implements the kernel's `GrantIntake` port; asks the
+                           `OutboundRequests` port before it sends or changes mail.
     identity/              campbooks-identity — accounts and their ways in, provider
                            sign-in, and the in-process OAuth 2.1 issuer (ADR 0014).
     admin/                 campbooks-admin — instance administrators' profiles and the

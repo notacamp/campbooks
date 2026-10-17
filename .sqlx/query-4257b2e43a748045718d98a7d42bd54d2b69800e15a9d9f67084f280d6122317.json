@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "DELETE FROM conversations.change_requests\n          WHERE conversation_id = $1 AND created_at < now() - interval '7 days'",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "4257b2e43a748045718d98a7d42bd54d2b69800e15a9d9f67084f280d6122317"
+}

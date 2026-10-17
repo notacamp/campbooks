@@ -1,0 +1,30 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE connectors.sends\n              SET attempts = attempts + 1, attempted_at = $2, unclear = true, updated_at = now()\n            WHERE id = $1 AND state = 'pending' AND attempted_at IS NOT DISTINCT FROM $3\n        RETURNING id",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "connectors.sends",
+            "name": "id"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Timestamptz",
+        "Timestamptz"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "da178eccbe36c1b5f704b576b067507cee0a661b6cccfcb374fb676c490b63c2"
+}

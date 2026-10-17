@@ -9,6 +9,15 @@
 //! [`UNCLEAR_WAIT`] before that lookup, so Gmail's search has caught up. A
 //! definite refusal fails the send at once.
 //!
+//! Before any call to the provider, the conversations module is asked
+//! again, through the kernel's outbound-requests port, whether the send
+//! stands (campbooks-cloud#226): its draft is still being sent as this
+//! send, from this inbox, by an author who may still send from it. The
+//! document sent is the one that module stored, never one an event names,
+//! and this module's row must name that same one. A send that no longer
+//! stands is settled as failed (`unavailable`, or `unknown_outcome` after an
+//! attempt that may have gone) without calling the provider.
+//!
 //! On success, in the job's transaction: the sent message is indexed and
 //! announced in a change batch exactly as sync would (so it shows in its
 //! conversation now, and the next sync knows it), the send is marked sent,
@@ -190,13 +199,25 @@ impl SendMessage {
             }
         }
 
+        // The document recorded here came from that module too
+        // (`queue_send`): one that differs was not written by it. A send
+        // that does not stand is never sent; an unclear one is still looked
+        // up (a read), so one that went out is recorded as sent.
+        let port = standing_document(ctx, workspace, send, target.inbox).await?;
+        let stands = port.as_ref() == Some(&target.document);
+        if !stands && !target.unclear {
+            return not_standing(ctx, workspace, send, &target).await;
+        }
         let Some(token) = self
             .token(ctx, workspace, send, &target, connection)
             .await?
         else {
             return Ok(());
         };
-        let document = read_document(ctx, workspace, &target.document).await?;
+        // The port's document whenever it returns the send (then equal to
+        // the recorded one when it stands); else the row's, for a lookup only.
+        let document =
+            read_document(ctx, workspace, port.as_ref().unwrap_or(&target.document)).await?;
         let attempt = Attempt {
             workspace,
             send,
@@ -204,6 +225,7 @@ impl SendMessage {
             token: &token,
             document: &document,
             give_up,
+            stands,
             now,
         };
         match provider {
@@ -226,6 +248,7 @@ impl SendMessage {
             token,
             document,
             give_up,
+            stands,
             now,
         } = attempt;
         let Some(google) = self.deps.google.clone() else {
@@ -251,14 +274,16 @@ impl SendMessage {
             match gmail.find_by_message_id(&document.rfc_message_id).await {
                 Ok(Some(meta)) => {
                     tracing::info!(%workspace, %send, "an earlier attempt was sent");
-                    let sent = gmail_sent(&meta, raw, now);
+                    // Indexed only while the send stands: these bytes are
+                    // the recorded document's.
+                    let sent = gmail_sent(&meta, stands.then_some(raw), now);
                     return self
                         .finish_sent(ctx, workspace, send, &target, stream, sent, now)
                         .await;
                 }
                 Ok(None) => {
                     // Proven not sent.
-                    set_unclear(ctx, workspace, send, false).await?;
+                    clear_unclear(ctx.pool(), workspace, send, target.attempted_at).await?;
                     target.unclear = false;
                 }
                 Err(err) => {
@@ -269,12 +294,12 @@ impl SendMessage {
                 }
             }
         }
-        if give_up {
-            return finish_failed(ctx, workspace, send, &target, "unavailable").await;
+        if give_up || !stands {
+            return unsent(ctx, workspace, send, &target, stands).await;
         }
 
         // From here until Gmail answers, the message may be out.
-        record_attempt(ctx, workspace, send, now).await?;
+        record_attempt(ctx.pool(), workspace, send, target.attempted_at, now).await?;
         target.unclear = true;
         match gmail.send(&raw, document.thread_key.as_deref()).await {
             Ok(answer) => {
@@ -284,7 +309,7 @@ impl SendMessage {
                     label_ids: answer.label_ids,
                     internal_date: None,
                 };
-                let sent = gmail_sent(&meta, raw, now);
+                let sent = gmail_sent(&meta, Some(raw), now);
                 self.finish_sent(ctx, workspace, send, &target, stream, sent, now)
                     .await
             }
@@ -298,7 +323,7 @@ impl SendMessage {
             }
             Err(err) => {
                 // A definite answer: this attempt did not send it.
-                set_unclear(ctx, workspace, send, false).await?;
+                clear_unclear(ctx.pool(), workspace, send, Some(now)).await?;
                 target.unclear = false;
                 self.refused(ctx, workspace, send, &target, &err).await
             }
@@ -315,6 +340,9 @@ struct Attempt<'a> {
     token: &'a str,
     document: &'a OutgoingMessage,
     give_up: bool,
+    /// The conversations module still confirms the send: without it, an
+    /// unclear attempt is only looked up, never sent again.
+    stands: bool,
     now: DateTime<Utc>,
 }
 
@@ -327,9 +355,9 @@ struct Sent {
     fetched: Option<Fetched>,
 }
 
-/// A message Gmail has (`meta`), sent as `raw`.
-fn gmail_sent(meta: &MessageMeta, raw: Vec<u8>, now: DateTime<Utc>) -> Sent {
-    let fetched_bytes = u64::try_from(raw.len()).unwrap_or(u64::MAX);
+/// A message Gmail has (`meta`), sent as `raw` (indexed and announced when
+/// given).
+fn gmail_sent(meta: &MessageMeta, raw: Option<Vec<u8>>, now: DateTime<Utc>) -> Sent {
     let meta = MessageMeta {
         internal_date: meta
             .internal_date
@@ -340,16 +368,19 @@ fn gmail_sent(meta: &MessageMeta, raw: Vec<u8>, now: DateTime<Utc>) -> Sent {
     Sent {
         id: Some(meta.id.clone()),
         thread_key: Some(meta.thread_id.clone()),
-        fetched: Some(gmail::fetched(
-            &meta.id.clone(),
-            MessageRaw {
-                meta,
-                raw,
-                fetched_bytes,
-            },
-            &HashMap::new(),
-            now,
-        )),
+        fetched: raw.map(|raw| {
+            let fetched_bytes = u64::try_from(raw.len()).unwrap_or(u64::MAX);
+            gmail::fetched(
+                &meta.id.clone(),
+                MessageRaw {
+                    meta,
+                    raw,
+                    fetched_bytes,
+                },
+                &HashMap::new(),
+                now,
+            )
+        }),
     }
 }
 
@@ -550,7 +581,7 @@ async fn load(
                   c.provider_server,
                   c.granted_by AS "granted_by?: UserId", c.health AS "health?"
              FROM connectors.sends s
-             LEFT JOIN connectors.streams st ON st.id = s.stream_id
+             LEFT JOIN connectors.streams st ON st.id = s.stream_id AND st.inbox_id = s.inbox_id
              LEFT JOIN connectors.connections c ON c.id = st.connection_id
             WHERE s.id = $1"#,
         send as SendId,
@@ -579,6 +610,27 @@ async fn load(
         paused: row.paused,
         cursor: row.cursor,
     }))
+}
+
+/// The document of send `send` as the conversations module stored it,
+/// while the send stands and is sent from `inbox` (the outbound-requests
+/// port, in a short transaction of its own); `None` otherwise.
+async fn standing_document(
+    ctx: &JobContext,
+    workspace: WorkspaceId,
+    send: SendId,
+    inbox: InboxId,
+) -> Result<Option<BlobRef>, JobError> {
+    let state = ctx.state().clone();
+    let mut tx = ctx.pool().begin_for(workspace).await?;
+    let stored = state
+        .outbound
+        .stored_send(&state, &mut tx, workspace, send.into())
+        .await?;
+    tx.commit().await?;
+    Ok(stored
+        .filter(|stored| stored.inbox == uuid::Uuid::from(inbox))
+        .map(|stored| stored.message))
 }
 
 /// The bytes of `blob`, at most `max` (`None` when larger).
@@ -651,44 +703,97 @@ async fn message_bytes(
     Ok((raw.len() <= MAX_MESSAGE_BYTES).then_some(raw))
 }
 
-/// Record an attempt before the call, in a transaction of its own, so a
-/// later run knows Gmail may have the message.
+/// Claim an attempt before the call, in a transaction of its own, so a
+/// later run knows the provider may have the message. The claim holds only
+/// while the send is pending and no other runner recorded an attempt since
+/// `previous` was read: of two jobs of one send, one calls the provider and
+/// the other waits and finds the outcome.
 async fn record_attempt(
-    ctx: &JobContext,
+    pool: &sqlx::PgPool,
     workspace: WorkspaceId,
     send: SendId,
+    previous: Option<DateTime<Utc>>,
     now: DateTime<Utc>,
 ) -> Result<(), JobError> {
-    let mut tx = ctx.pool().begin_for(workspace).await?;
-    sqlx::query!(
+    let mut tx = pool.begin_for(workspace).await?;
+    let claimed = sqlx::query_scalar!(
         r#"UPDATE connectors.sends
               SET attempts = attempts + 1, attempted_at = $2, unclear = true, updated_at = now()
-            WHERE id = $1"#,
+            WHERE id = $1 AND state = 'pending' AND attempted_at IS NOT DISTINCT FROM $3
+        RETURNING id"#,
         send as SendId,
         now,
+        previous,
     )
-    .execute(&mut *tx)
+    .fetch_optional(&mut *tx)
     .await?;
     tx.commit().await?;
+    if claimed.is_none() {
+        return Err(JobError::retry_after(
+            "another attempt at this send was claimed first",
+            UNCLEAR_WAIT,
+        ));
+    }
     Ok(())
 }
 
-/// Record whether an attempt may have reached Gmail without an answer.
-async fn set_unclear(
-    ctx: &JobContext,
+/// Settle a send proven unsent without calling the provider: given up
+/// (`unavailable`), or no longer standing.
+async fn unsent(
+    ctx: &mut JobContext,
     workspace: WorkspaceId,
     send: SendId,
-    unclear: bool,
+    target: &Target,
+    stands: bool,
 ) -> Result<(), JobError> {
-    let mut tx = ctx.pool().begin_for(workspace).await?;
-    sqlx::query!(
-        "UPDATE connectors.sends SET unclear = $2, updated_at = now() WHERE id = $1",
+    if stands {
+        return finish_failed(ctx, workspace, send, target, "unavailable").await;
+    }
+    not_standing(ctx, workspace, send, target).await
+}
+
+/// The send no longer stands (the conversations module does not confirm
+/// it): settle it without calling the provider.
+async fn not_standing(
+    ctx: &mut JobContext,
+    workspace: WorkspaceId,
+    send: SendId,
+    target: &Target,
+) -> Result<(), JobError> {
+    tracing::warn!(
+        %workspace,
+        %send,
+        "a recorded send no longer stands; not sending"
+    );
+    finish_failed(ctx, workspace, send, target, "unavailable").await
+}
+
+/// Record that no attempt is out (a lookup proved it unsent, or the provider
+/// refused it), only while the last attempt is still the one at
+/// `attempted_at`: a slower runner never clears a newer claim.
+async fn clear_unclear(
+    pool: &sqlx::PgPool,
+    workspace: WorkspaceId,
+    send: SendId,
+    attempted_at: Option<DateTime<Utc>>,
+) -> Result<(), JobError> {
+    let mut tx = pool.begin_for(workspace).await?;
+    let cleared = sqlx::query_scalar!(
+        r#"UPDATE connectors.sends SET unclear = false, updated_at = now()
+            WHERE id = $1 AND attempted_at IS NOT DISTINCT FROM $2
+        RETURNING id"#,
         send as SendId,
-        unclear,
+        attempted_at,
     )
-    .execute(&mut *tx)
+    .fetch_optional(&mut *tx)
     .await?;
     tx.commit().await?;
+    if cleared.is_none() {
+        return Err(JobError::retry_after(
+            "another attempt at this send was claimed meanwhile",
+            UNCLEAR_WAIT,
+        ));
+    }
     Ok(())
 }
 

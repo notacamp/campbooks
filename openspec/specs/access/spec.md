@@ -460,7 +460,11 @@ account; `identity.revoke_departed_consents` and
 when the person is no longer a member of the workspace;
 `identity.remove_workspace_clients` and `connectors.revoke_workspace_grants`
 (`workspaces.workspace_deleting`) SHALL act only when the workspace is no
-longer live. Consumers whose effects stay within the event's own workspace
+longer live. A consumer that acts at a provider on a member's behalf counts
+as reaching past the workspace: `connectors.queue_send`,
+`connectors.send_message` and `connectors.request_changes` SHALL send or
+change mail only as the conversations module's outbound-requests port
+confirms it. Consumers whose effects stay within the event's own workspace
 (its own data, which the same transaction could change directly) SHALL NOT
 be required to check.
 
@@ -481,3 +485,7 @@ be required to check.
 - **WHEN** `workspaces.workspace_deleting` names a workspace that is still live
 - **THEN** its clients, the consents bound to it and its connections stay, unrevoked at the provider
 - **AND** once it is deleted, the same event removes and revokes them
+
+#### Scenario: A forged send or change request
+- **WHEN** a transaction working in workspace A appends `conversations.send_requested` or `conversations.changes_requested` that the conversations module's records do not bear out
+- **THEN** its mailbox sends nothing and no change is made at the provider
