@@ -5574,7 +5574,7 @@ export interface operations {
                     "application/problem+json": components["schemas"]["Problem"];
                 };
             };
-            /** @description The language model failed (`compile_failed`), or the workspace used its whole daily AI limit (`ai_daily_limit_reached`). */
+            /** @description The language model failed or its answer could not be read (`compile_failed`), or the workspace used its whole daily AI limit (`ai_daily_limit_reached`). */
             503: {
                 headers: {
                     [name: string]: unknown;

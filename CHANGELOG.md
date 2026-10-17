@@ -6,6 +6,16 @@ All notable changes to Campbooks Next are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- **Build a rule yourself, any time (campbooks-cloud#217).** In Scout's memory, "Build a
+  rule yourself" next to the privacy line opens the rule builder without sending anything
+  to a language model, and "Tell Scout in a sentence instead" goes back. When Scout can't
+  make a rule of a sentence, it offers the builder too. In the builder, "It's from" finds
+  senders by name, as in Scout's questions: type part of a name, or a full address or a
+  domain. Each sender you tick becomes its own rule, so mail from any of them counts, and
+  each rule shows what it matches before you save it.
+
 ### Changed
 
 - **An opened Home item shows the email (campbooks-cloud#203).** Pressing Enter on an item
@@ -32,6 +42,14 @@ All notable changes to Campbooks Next are documented here. The format follows
 
 ### Fixed
 
+- **Teach Scout no longer blames your words when the model fails (campbooks-cloud#217).**
+  A sentence like "anything from my accountants at northtax or atelier conseils always
+  matters" could come back as "Scout couldn't turn that into a rule" when the model's
+  answer was empty, cut short or wrapped in a code fence. Scout now gives a thinking
+  model room to answer, reads an answer wrapped in a code fence, and when the answer
+  still can't be read says Scout couldn't read the sentence just now, with Try again and
+  "build the rule yourself". The server log says why the model stopped and how long its
+  answer was, never what it wrote.
 - **A taught rule that names a whole group of sites stops matching.** A rule saved with
   a sender domain like `github.io` (now known to cover every site under it) used to match
   all of them. It now matches nothing and shows as paused in Scout's memory, where you can
