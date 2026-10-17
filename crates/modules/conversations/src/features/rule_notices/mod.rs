@@ -427,10 +427,12 @@ pub async fn list(
     Extension(settings): Extension<NoticeSettings>,
     workspace: Workspace<ConversationsRead>,
 ) -> Result<Json<RuleNoticeList>> {
-    // Suggestions are a member's to answer: an app is refused (403), as
-    // when it answers one.
-    member_only(&workspace.principal)?;
     let access = &workspace.access;
+    // Suggestions are about a person's mail: an app acting for nobody is
+    // refused (403).
+    if access.user.is_none() {
+        return Err(Error::Denied(crate::MESSAGES.reason("rule_needs_member")));
+    }
     let mut tx = state.db.begin_for(access.workspace).await?;
     let mut teachable = Vec::new();
     for inbox in visible_inboxes(&mut tx, access).await? {

@@ -482,9 +482,25 @@ describe("the inbox", () => {
     // Z undoes the latest action: saving the rule.
     expect(screen.getByText(/^Smart rule saved · /u)).toBeVisible();
     fireEvent.keyDown(document.body, { key: "z" });
-    await waitFor(() => {
-      expect(api.calls.some((call) => call.route.startsWith("DELETE"))).toBe(true);
-    });
+    await waitFor(
+      () => {
+        expect(api.calls.some((call) => call.route.startsWith("DELETE"))).toBe(true);
+      },
+      {
+        // TEMP diagnosis (#169): what holds the Z.
+        onTimeout: (error) => {
+          const texts = (selector: string) =>
+            [...document.querySelectorAll(selector)]
+              .map((node) => (node.textContent).slice(0, 120))
+              .join(" | ");
+          error.message += `\nactive: ${document.activeElement?.outerHTML.slice(0, 200) ?? ""}`;
+          error.message += `\nstatus: ${texts('[role="status"]')}`;
+          error.message += `\ndialogs: ${texts('[role="dialog"]')}`;
+          error.message += `\ncalls: ${api.calls.map((call) => call.route).join(", ")}`;
+          return error;
+        },
+      },
+    );
     expect(await screen.findByRole("dialog", { name: "Putting 40 back" })).toBeVisible();
     expect(
       await screen.findByText("Rule removed · Mail from hello@weekly-ledger.example → Newsletters"),

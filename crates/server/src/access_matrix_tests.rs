@@ -483,6 +483,26 @@ impl World {
         rule
     }
 
+    /// Something Scout noticed in the inbox (campbooks-cloud#169).
+    async fn seed_notice(&self, inbox: campbooks_conversations::model::InboxId) -> Uuid {
+        let notice = Uuid::now_v7();
+        sqlx::query(
+            "INSERT INTO conversations.rule_notices
+                 (id, workspace_id, inbox_id, kind, sender_address, conditions, actions, evidence)
+             VALUES ($1, $2, $3, 'archive_on_arrival', 'digest@example.com',
+                     '[{\"field\": \"sender_address\", \"value\": \"digest@example.com\"}]',
+                     '[{\"action\": \"archive\"}]',
+                     '{\"received\": 12, \"opened\": 0, \"archived_unread\": 12, \"last_week\": 2, \"window_days\": 60}')",
+        )
+        .bind(notice)
+        .bind(self.a.as_uuid())
+        .bind(inbox)
+        .execute(&self.db)
+        .await
+        .unwrap();
+        notice
+    }
+
     /// One record of every other type, and what the inbox holds.
     async fn seed_records(
         &mut self,
@@ -520,22 +540,7 @@ impl World {
         .await
         .unwrap();
         let rule = self.seed_rule(inbox, sender).await;
-        // Something Scout noticed in the inbox (campbooks-cloud#169).
-        let notice = Uuid::now_v7();
-        sqlx::query(
-            "INSERT INTO conversations.rule_notices
-                 (id, workspace_id, inbox_id, kind, sender_address, conditions, actions, evidence)
-             VALUES ($1, $2, $3, 'archive_on_arrival', 'digest@example.com',
-                     '[{\"field\": \"sender_address\", \"value\": \"digest@example.com\"}]',
-                     '[{\"action\": \"archive\"}]',
-                     '{\"received\": 12, \"opened\": 0, \"archived_unread\": 12, \"last_week\": 2, \"window_days\": 60}')",
-        )
-        .bind(notice)
-        .bind(self.a.as_uuid())
-        .bind(inbox)
-        .execute(&db)
-        .await
-        .unwrap();
+        let notice = self.seed_notice(inbox).await;
         let invitation = Uuid::now_v7();
         sqlx::query(
             "INSERT INTO workspaces.invitations
