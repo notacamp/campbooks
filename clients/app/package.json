@@ -38,7 +38,8 @@
     "openapi-fetch": "0.17.0",
     "react": "19.3.0",
     "react-dom": "19.3.0",
-    "react-i18next": "17.0.15"
+    "react-i18next": "17.0.15",
+    "web-vitals": "6.2.3"
   },
   "devDependencies": {
     "@eslint-community/eslint-plugin-eslint-comments": "4.8.1",

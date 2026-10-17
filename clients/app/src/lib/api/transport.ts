@@ -188,3 +188,16 @@ export function createTauriTransport(
 export function selectTransport(): Transport {
   return isTauri() ? createTauriTransport() : createWebTransport();
 }
+
+/**
+ * The transport for background calls nobody is waiting on (the app's own
+ * telemetry): like {@link selectTransport}, but an ended session never
+ * sends the browser to sign in.
+ */
+export function selectQuietTransport(): Transport {
+  return isTauri()
+    ? createTauriTransport()
+    : createWebTransport(undefined, undefined, () => {
+        // A background call never navigates; the next real request will.
+      });
+}

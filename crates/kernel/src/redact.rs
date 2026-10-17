@@ -109,6 +109,46 @@ pub fn job_error(message: &str) -> String {
     out
 }
 
+/// Longest value [`looks_like_an_id`] accepts.
+const MAX_ID_LEN: usize = 200;
+
+/// Longest [`error_kind`].
+pub const MAX_KIND_LEN: usize = 120;
+
+/// What kind of error `text` describes, never what it was about: `text`
+/// through [`job_error`] (quotes, addresses, URLs' paths and
+/// tokens masked, first line only), then only its head, before the first
+/// `: `, `; ` or ` (` where an error's message usually goes on to quote
+/// what it failed on (`job failed: <the provider's reply>`), at most
+/// [`MAX_KIND_LEN`] characters.
+pub fn error_kind(text: &str) -> String {
+    let redacted = job_error(text);
+    let head = [": ", "; ", " ("]
+        .iter()
+        .filter_map(|separator| redacted.find(separator))
+        .min()
+        .map_or(redacted.as_str(), |at| &redacted[..at]);
+    let head = head.trim();
+    match head.char_indices().nth(MAX_KIND_LEN) {
+        Some((at, _)) => format!("{}…", &head[..at]),
+        None => head.to_owned(),
+    }
+}
+
+/// Whether `value` reads like an id, a name or a route template rather than
+/// data: short, only letters, digits and `-_.:/{}`, and no run of
+/// [`OPAQUE_RUN`] characters between separators (a token).
+pub fn looks_like_an_id(value: &str) -> bool {
+    !value.is_empty()
+        && value.len() <= MAX_ID_LEN
+        && value.chars().all(|c| {
+            c.is_ascii_alphanumeric() || matches!(c, '-' | '_' | '.' | ':' | '/' | '{' | '}')
+        })
+        && value
+            .split(['/', '{', '}', ':'])
+            .all(|segment| segment.len() < OPAQUE_RUN)
+}
+
 /// Shortest run of token-like characters [`job_error`] hides. Longer than a
 /// UUID (36), so ids stay readable.
 pub const OPAQUE_RUN: usize = 40;
@@ -233,6 +273,55 @@ fn is_address(word: &str) -> bool {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn ids_and_names_pass_data_does_not() {
+        for ok in [
+            "0192a1b2-c3d4-7e5f-8a9b-0c1d2e3f4a5b",
+            "4bf92f3577b34da6a3ce929d0e0e4736",
+            "/api/v1/w/{workspace_id}/members",
+            "connectors.sync_stream",
+            "crates/kernel/src/error.rs:162",
+            "campbooks_kernel::error",
+        ] {
+            assert!(looks_like_an_id(ok), "{ok}");
+        }
+        for leak in [
+            "alice@example.com",
+            "Q4 restructuring plan",
+            "eyJhbGciOiJSUzI1NiJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4ifQ.abc",
+            "ya29.a0AfH6SMBx3examplelongaccesstokenvalue1234567890",
+            "",
+        ] {
+            assert!(!looks_like_an_id(leak), "{leak}");
+        }
+    }
+
+    #[test]
+    fn error_kinds_keep_the_head_of_the_message() {
+        assert_eq!(
+            error_kind("database error 23505 on constraint members_email_key in table members"),
+            "database error 23505 on constraint members_email_key in table members"
+        );
+        assert_eq!(
+            error_kind(
+                "provider answered 401 for https://gmail.googleapis.com/gmail/v1/users/me: Bearer x"
+            ),
+            "provider answered 401 for https://gmail.googleapis.com/…"
+        );
+        assert_eq!(
+            error_kind("job failed: Please find the board pack attached"),
+            "job failed"
+        );
+        assert_eq!(
+            error_kind("sync stopped (maya@example.com said no)"),
+            "sync stopped"
+        );
+        assert_eq!(
+            error_kind(&"x ".repeat(200)).chars().count(),
+            MAX_KIND_LEN + 1
+        );
+    }
+
     use super::*;
 
     const MAIL: &str = "Maya <maya@northwind-studio.example>";

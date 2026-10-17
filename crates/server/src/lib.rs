@@ -11,6 +11,7 @@
 
 pub mod bff;
 pub mod changes;
+pub mod error_reports;
 pub mod telemetry;
 pub mod web;
 
