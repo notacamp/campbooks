@@ -245,20 +245,20 @@ fn report(
         "\n## Done together (from the labels)\n\n\
          | Pair | Both | First | Second | In combos |\n| --- | --- | --- | --- | --- |\n",
     );
-    for (i, a) in ActionId::ALL.iter().enumerate() {
-        for b in &ActionId::ALL[i + 1..] {
-            if one_question(*a, *b) {
+    for (index, first) in ActionId::ALL.iter().enumerate() {
+        for second in &ActionId::ALL[index + 1..] {
+            if one_question(*first, *second) {
                 continue;
             }
-            let (both, first, second) = together(labels, *a, *b);
-            let combo = COMBOS
-                .iter()
-                .any(|(x, y)| (x == a && y == b) || (x == b && y == a));
+            let (both, firsts, seconds) = together(labels, *first, *second);
+            let combo = COMBOS.iter().any(|(one, other)| {
+                (one == first && other == second) || (one == second && other == first)
+            });
             let _ = writeln!(
                 out,
-                "| {} + {} | {both} | {first} | {second} | {} |",
-                a.as_str(),
-                b.as_str(),
+                "| {} + {} | {both} | {firsts} | {seconds} | {} |",
+                first.as_str(),
+                second.as_str(),
                 if combo { "yes" } else { "" }
             );
         }

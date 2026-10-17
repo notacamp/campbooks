@@ -1234,7 +1234,7 @@ pub async fn attach(conn: &mut PgConnection, summaries: &mut [ConversationSummar
         "#,
         &ids as &[ConversationId],
     )
-    .fetch_all(conn)
+    .fetch_all(&mut *conn)
     .await?;
     let today = Utc::now().date_naive();
     for row in rows {
