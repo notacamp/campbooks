@@ -188,6 +188,14 @@ impl Kit {
         (self.idp.token(&claims), user)
     }
 
+    /// A token for `sub`, already a member, whose claims name them `name`.
+    pub fn token_named(&self, sub: &str, name: &str) -> String {
+        let mut claims = self.idp.claims(ALL_SCOPES);
+        claims["sub"] = sub.into();
+        claims["name"] = name.into();
+        self.idp.token(&claims)
+    }
+
     /// `sub` leaves `workspace` (their inbox memberships stay until
     /// `workspaces.member_left` is handled).
     pub fn leave(&self, sub: &str, workspace: WorkspaceId) {

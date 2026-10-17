@@ -126,11 +126,27 @@ export function Dialog({
         event.stopPropagation();
       }
     };
+    // The focused control went away (a step replaced it): the focus is on
+    // the page, not in the dialog. Keys still belong to the dialog, never
+    // to the page behind it.
+    const onStrayKeyDown = (event: KeyboardEvent) => {
+      const target = event.target;
+      if (target !== document.body && target !== document.documentElement) {
+        return;
+      }
+      dialogElement.focus();
+      onKeyDown(event);
+      if (!event.metaKey && !event.ctrlKey && !event.altKey) {
+        event.stopPropagation();
+      }
+    };
     scrimElement.addEventListener("mousedown", onScrimDown);
     dialogElement.addEventListener("keydown", onKeyDown);
+    document.addEventListener("keydown", onStrayKeyDown, true);
     return () => {
       scrimElement.removeEventListener("mousedown", onScrimDown);
       dialogElement.removeEventListener("keydown", onKeyDown);
+      document.removeEventListener("keydown", onStrayKeyDown, true);
     };
   }, [open]);
 
@@ -222,12 +238,29 @@ export interface DialogChoicesProps {
   onChoose: (id: string) => void;
   /** Accessible name of the group. */
   label?: string | undefined;
+  /**
+   * Take the focus when shown: for choices that arrive after the dialog
+   * opened (the first gets it, as when the dialog opens on them).
+   */
+  focusOnShow?: boolean | undefined;
 }
 
 /** A dialog's choices, one per line, each with its number key. The first gets the focus. */
-export function DialogChoices({ choices, onChoose, label }: DialogChoicesProps) {
+export function DialogChoices({
+  choices,
+  onChoose,
+  label,
+  focusOnShow = false,
+}: DialogChoicesProps) {
+  const group = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    // Never away from someone typing (a digit would then pick a choice).
+    if (focusOnShow && !isTypingTarget(document.activeElement)) {
+      group.current?.querySelector<HTMLElement>("[data-dialog-choice]")?.focus();
+    }
+  }, [focusOnShow]);
   return (
-    <div className={styles["choices"]} role="group" aria-label={label}>
+    <div ref={group} className={styles["choices"]} role="group" aria-label={label}>
       {choices.map((choice, index) => (
         <button
           key={choice.id}

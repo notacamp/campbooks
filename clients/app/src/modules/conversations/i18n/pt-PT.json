@@ -509,5 +509,50 @@
       "inbox": "Uma caixa de entrada",
       "emptyTitle": "Ainda não há regras"
     }
+  },
+  "reply": {
+    "title": "Responder a {{name}}",
+    "reading": "O Scout está a ler a conversa…",
+    "choose": "O que deve dizer? Escolha uma opção ou diga-o por palavras suas.",
+    "noSuggestions": "Desta vez o Scout não tem sugestões. Diga-o por palavras suas ou escreva-a você mesmo.",
+    "suggestionsFailed": "O Scout não conseguiu sugerir respostas agora. Diga-o por palavras suas ou escreva-a você mesmo.",
+    "unavailable": "O Scout não pode escrever respostas neste servidor, por isso escreva esta você mesmo.",
+    "choices": "Respostas prováveis",
+    "quoteFrom": "{{name}}, {{date}}",
+    "own": {
+      "label": "Ou diga-o por palavras suas",
+      "placeholder": "p. ex. sim, mas chego 15 minutos atrasado",
+      "action": "Escrever rascunho"
+    },
+    "writing": "A escrever o rascunho…",
+    "draftDescription": "O rascunho do Scout. Edite-o aqui ou peça uma alteração. Nada é enviado até carregar em Enviar.",
+    "draftLabel": "A sua resposta",
+    "shorter": "Mais curta",
+    "shortening": "A encurtar…",
+    "changing": "A alterar…",
+    "back": "Voltar às opções",
+    "change": {
+      "label": "Pedir uma alteração",
+      "placeholder": "p. ex. mais calorosa, ou mencione os planos",
+      "action": "Alterar"
+    },
+    "send": "Enviar",
+    "openInComposer": "Abrir no editor",
+    "writeOwn": "Escrever eu",
+    "pending": "A enviar para {{name}}…",
+    "sending": "A enviar para {{name}}",
+    "result": "A enviar para {{name}}",
+    "resultDetail": "Sai dentro de alguns segundos. Até lá, pode anular em baixo.",
+    "undone": "Não enviado. O seu rascunho voltou.",
+    "tooLate": "Já é tarde para anular: a resposta já saiu.",
+    "errors": {
+      "write": "O Scout não conseguiu escrever isso agora. Tente de novo ou escreva-a você mesmo.",
+      "limit": "O Scout escreveu muitas respostas nesta hora. Tente mais tarde ou escreva-a você mesmo.",
+      "dailyLimit": "Este espaço de trabalho já usou a quota de IA de hoje. Escreva esta você mesmo.",
+      "send": "Não foi possível enviar para {{name}}. O seu rascunho foi guardado.",
+      "open": "Não foi possível abrir o editor. O seu rascunho continua aqui."
+    },
+    "to": "Para {{recipient}}",
+    "replyToElsewhere": "As respostas vão para {{recipient}}, não para o remetente {{sender}}. Confirme antes de enviar."
   }
 }

@@ -49,6 +49,7 @@
     "notNeeded": "Pas nécessaire · {{name}}",
     "safe": "Marqué comme sûr · {{name}}",
     "snoozed": "Reporté · {{name}}, revient {{when}}",
+    "replied": "Envoi à {{name}}",
     "paid": "Marquée comme payée · {{name}}"
   },
   "error": {

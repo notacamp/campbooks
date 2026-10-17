@@ -727,6 +727,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/w/{workspace_id}/conversations/{conversation_id}/reply/draft": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Scout's reply for an intent, or your draft rewritten. */
+        post: operations["conversations.write_reply"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/w/{workspace_id}/conversations/{conversation_id}/reply/suggestions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Likely replies to a message, as short intents. */
+        post: operations["conversations.suggest_replies"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/w/{workspace_id}/conversations/{conversation_id}/rule-suggestions": {
         parameters: {
             query?: never;
@@ -3606,6 +3640,20 @@ export interface components {
             /** @description 1 to 64 characters. */
             name: string;
         };
+        /** @description Likely replies to a message, as short intents. */
+        ReplySuggestions: {
+            /** @description At most three, in your language; empty when Scout has none. */
+            intents: string[];
+            /** @description The message answered. */
+            message_id: components["schemas"]["MessageId"];
+        };
+        /** @description Scout's reply, as plain text. Nothing is saved or sent. */
+        ReplyText: {
+            /** @description The message answered. */
+            message_id: components["schemas"]["MessageId"];
+            /** @description The reply, signed with your name when it is known. */
+            text: string;
+        };
         /** @description What the sign-in screen shows for a waiting authorization request. */
         RequestInfo: {
             /** @description The client asking. */
@@ -4297,6 +4345,10 @@ export interface components {
             /** @description Where it is in its reading. */
             phase: components["schemas"]["Phase"];
         };
+        /** @description Which message to suggest replies to. */
+        SuggestReplies: {
+            message_id?: components["schemas"]["MessageId"] | null;
+        };
         /**
          * @description Always or never show.
          * @enum {string}
@@ -4562,6 +4614,24 @@ export interface components {
              */
             name: string;
             role?: components["schemas"]["Role"] | null;
+        };
+        /** @description What the reply should say, or how to change the draft. */
+        WriteReply: {
+            /**
+             * @description How to change the draft, in plain words (at most 300 characters).
+             * @example warmer
+             */
+            change?: string | null;
+            /** @description The draft as it stands, to rewrite with `change` or `shorter`. */
+            draft?: string | null;
+            /**
+             * @description What it should say: a likely reply or your own words (at most 300 characters).
+             * @example Yes, Thursday 10:00 works
+             */
+            intent: string;
+            message_id?: components["schemas"]["MessageId"] | null;
+            /** @description Make the draft shorter. */
+            shorter?: boolean;
         };
     };
     responses: never;
@@ -7099,6 +7169,181 @@ export interface operations {
             };
             /** @description No such conversation, or you cannot see it. */
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "conversations.write_reply": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The workspace. */
+                workspace_id: components["schemas"]["WorkspaceId"];
+                /** @description The conversation. */
+                conversation_id: components["schemas"]["ConversationId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WriteReply"];
+            };
+        };
+        responses: {
+            /** @description The reply as plain text; nothing is saved or sent. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReplyText"];
+                };
+            };
+            /** @description No intent, or an intent, change or draft too long (`reply_ask_invalid`). */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No valid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Missing scope, or you may only read this inbox (`inbox_read_only`). */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No such conversation or message, or you cannot see it. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No language model may read mail here (`reply_unavailable`): write the reply yourself. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Too many replies asked for this hour. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description The language model failed (`reply_failed`), or the workspace used its whole daily AI limit (`ai_daily_limit_reached`). */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "conversations.suggest_replies": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The workspace. */
+                workspace_id: components["schemas"]["WorkspaceId"];
+                /** @description The conversation. */
+                conversation_id: components["schemas"]["ConversationId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SuggestReplies"];
+            };
+        };
+        responses: {
+            /** @description Likely replies; nothing is saved. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReplySuggestions"];
+                };
+            };
+            /** @description No valid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Missing scope, or you may only read this inbox (`inbox_read_only`). */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No such conversation or message, or you cannot see it. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No language model may read mail here (`reply_unavailable`): write the reply yourself. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Too many replies asked for this hour. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description The language model failed (`reply_failed`), or the workspace used its whole daily AI limit (`ai_daily_limit_reached`). */
+            503: {
                 headers: {
                     [name: string]: unknown;
                 };
