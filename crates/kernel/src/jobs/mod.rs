@@ -99,6 +99,12 @@ pub trait Job: Serialize + DeserializeOwned + Send + Sync + 'static {
     const MAX_ATTEMPTS: u32 = DEFAULT_MAX_ATTEMPTS;
     /// Whether an operator must hear when one dies ([`Watch`]).
     const WATCH: Option<Watch> = None;
+    /// Whether the job is the instance's only, never a workspace's
+    /// (maintenance across workspaces, a scheduler's dispatcher): the
+    /// worker refuses, without running it, a job of this kind that carries
+    /// a workspace (campbooks-cloud#211). A scheduled job
+    /// ([`Background::schedule`]) is instance-only whatever this says.
+    const INSTANCE_ONLY: bool = false;
 
     /// Do the work.
     fn run(self, ctx: &mut JobContext) -> impl Future<Output = Result<(), JobError>> + Send;
@@ -123,6 +129,9 @@ pub trait JobHandler: Send + Sync + 'static {
     const MAX_ATTEMPTS: u32 = DEFAULT_MAX_ATTEMPTS;
     /// Whether an operator must hear when one dies ([`Watch`]).
     const WATCH: Option<Watch> = None;
+    /// Whether the kind is the instance's only, never a workspace's
+    /// ([`Job::INSTANCE_ONLY`]).
+    const INSTANCE_ONLY: bool = false;
 
     /// Do the work.
     fn run(

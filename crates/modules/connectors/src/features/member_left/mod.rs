@@ -2,6 +2,14 @@
 //! is personal, so the connections a departing member granted in that
 //! workspace are disconnected and revoked. Their mail is deleted, unless the
 //! owner or admin who removed them chose to keep it read-only (`mail`).
+//!
+//! The event alone is no proof that the member left: any transaction
+//! working in the workspace could write it (campbooks-cloud#211), and
+//! revoking a grant at its provider reaches past the workspace (the same
+//! account's other connections lose it too). Before acting, the handler
+//! asks the workspaces module (the membership port), in a transaction of
+//! that workspace, whether they are a member there; while they are,
+//! nothing happens.
 
 use campbooks_kernel::{
     Event, EventConsumer, JobContext, JobError,
@@ -41,6 +49,15 @@ impl EventConsumer for RevokeDepartedGrants {
             .map_err(|_| JobError::fatal("member_left without a workspace id"))?;
         let state = ctx.state().clone();
         let mut tx = ctx.pool().begin_for(workspace).await?;
+        let member = state
+            .membership
+            .role_held(&mut *tx, workspace, event.payload.user)
+            .await
+            .map_err(|e| JobError::retry(e.to_string()))?;
+        if member.is_some() {
+            tracing::warn!("member_left names someone who is still a member; not acted on");
+            return Ok(());
+        }
         // Only the connections that existed when they left: a member who
         // came back since keeps what they connected after.
         let granted = sqlx::query_scalar!(

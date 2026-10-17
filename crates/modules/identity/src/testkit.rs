@@ -166,6 +166,14 @@ impl FakeIntake {
             .clear();
     }
 
+    /// Connection `id` goes (as on disconnect), unannounced.
+    pub fn drop_connection(&self, id: &str) {
+        self.connections
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .retain(|held| held.4 != id);
+    }
+
     /// Sync Zoho mailboxes too: a Zoho sign-in then asks for mail.
     pub fn sync_zoho(&self) {
         self.zoho_mail
@@ -315,11 +323,17 @@ pub const FOREIGN: uuid::Uuid = uuid::Uuid::from_u128(0x0199_0000_0000_7000_8000
 pub const MEMBER_IN_HOME: uuid::Uuid =
     uuid::Uuid::from_u128(0x0199_0000_0000_7000_8000_0000_0000_0b01);
 
-/// Everyone belongs everywhere (as an owner) except [`FOREIGN`], and is a
-/// plain member of [`MEMBER_ONLY`]; client tokens reach their own
-/// workspace.
-#[derive(Debug)]
-struct Everyone;
+/// Everyone belongs everywhere (as an owner) except [`FOREIGN`] and the
+/// workspaces deleted ([`Kit::delete_workspace`]), and is a plain member of
+/// [`MEMBER_ONLY`]; client tokens reach their own workspace. The role a
+/// later job reads ([`Membership::role_held`]) is held only by the members
+/// [`Kit::keep_member`] names.
+#[derive(Debug, Default)]
+struct Everyone {
+    deleted: Mutex<Vec<uuid::Uuid>>,
+    /// `(workspace, workspaces module's user id)`.
+    held: Mutex<Vec<(uuid::Uuid, uuid::Uuid)>>,
+}
 
 impl Membership for Everyone {
     fn resolve<'a>(
@@ -328,8 +342,13 @@ impl Membership for Everyone {
         principal: &'a Principal,
         workspace: WorkspaceId,
     ) -> MembershipFuture<'a> {
+        let deleted = self
+            .deleted
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .contains(workspace.as_uuid());
         Box::pin(async move {
-            if *workspace.as_uuid() == FOREIGN {
+            if *workspace.as_uuid() == FOREIGN || deleted {
                 return Ok(None);
             }
             if principal.kind == campbooks_kernel::auth::PrincipalKind::Client {
@@ -355,6 +374,20 @@ impl Membership for Everyone {
                 role: Some(role),
             }))
         })
+    }
+
+    fn role_held<'a>(
+        &'a self,
+        _conn: &'a mut sqlx::PgConnection,
+        workspace: WorkspaceId,
+        user: UserId,
+    ) -> campbooks_kernel::tenancy::RoleFuture<'a> {
+        let held = self
+            .held
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .contains(&(*workspace.as_uuid(), *user.as_uuid()));
+        Box::pin(async move { Ok(held.then_some(Role::Member)) })
     }
 
     fn workspaces_of<'a>(
@@ -587,6 +620,8 @@ pub struct Kit {
     cookies: Mutex<HashMap<String, String>>,
     /// The address requests come from (none: from inside the process).
     peer: Mutex<Option<std::net::SocketAddr>>,
+    /// The membership port.
+    everyone: Arc<Everyone>,
 }
 
 impl Kit {
@@ -672,6 +707,7 @@ impl Kit {
         let documents = Arc::new(FakeDocuments::default());
         issuer.fetcher = documents.clone();
         let intake = Arc::new(FakeIntake::default());
+        let everyone = Arc::new(Everyone::default());
         let outbox = Arc::new(campbooks_kernel::mail::Outbox::default());
         let issuer = deps.issuer.clone().unwrap_or_else(|| panic!("issuer"));
         let mut auth = config.auth.clone();
@@ -681,7 +717,7 @@ impl Kit {
                 campbooks_kernel::jobs::Registry::build(&[crate::module(deps.clone())])
                     .unwrap_or_else(|e| panic!("registry: {e}")),
             )
-            .with_membership(Arc::new(Everyone))
+            .with_membership(everyone.clone())
             .with_grant_intake(intake.clone())
             .with_mailer(outbox.clone())
             .with_invitations(Arc::new(Invited(
@@ -716,6 +752,7 @@ impl Kit {
             outbox,
             cookies: Mutex::default(),
             peer: Mutex::default(),
+            everyone,
         }
     }
 
@@ -789,6 +826,36 @@ impl Kit {
         }
         .access_token()
         .unwrap_or_else(|e| panic!("minting: {e}"))
+    }
+
+    /// From now on the membership port says workspace `workspace` is gone,
+    /// as once the workspaces module deleted it.
+    pub fn delete_workspace(&self, workspace: uuid::Uuid) {
+        self.everyone
+            .deleted
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .push(workspace);
+    }
+
+    /// From now on the membership port says `user` (the workspaces module's
+    /// id) is a member of `workspace` when a job asks
+    /// ([`Membership::role_held`]), as when they never left.
+    pub fn keep_member(&self, workspace: uuid::Uuid, user: uuid::Uuid) {
+        self.everyone
+            .held
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .push((workspace, user));
+    }
+
+    /// `user` left `workspace` after all ([`keep_member`](Self::keep_member)).
+    pub fn member_gone(&self, workspace: uuid::Uuid, user: uuid::Uuid) {
+        self.everyone
+            .held
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .retain(|held| *held != (workspace, user));
     }
 
     /// Run every job that is ready (event deliveries included).

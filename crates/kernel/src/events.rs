@@ -254,8 +254,26 @@ impl EventBus {
                 .await?
             }
         };
-        let id = sqlx::query_scalar!(
-            r#"
+        let id = match event.workspace() {
+            // An instance-wide event's id is chosen here and nothing is read
+            // back: a workspace transaction may read no instance-wide row
+            // (campbooks-cloud#211), and row-level security checks a
+            // `RETURNING` against the read policies.
+            None => {
+                append_instance_wide(
+                    &mut **tx,
+                    E::NAME,
+                    E::VERSION,
+                    &payload,
+                    &kinds,
+                    &queues,
+                    &max_attempts,
+                )
+                .await?
+            }
+            Some(_) => {
+                sqlx::query_scalar!(
+                    r#"
             WITH event AS (
                 INSERT INTO kernel.events (name, version, workspace_id, payload)
                 VALUES ($1, $2, $3, $4)
@@ -271,17 +289,19 @@ impl EventBus {
             )
             SELECT id AS "id!: EventId" FROM event
             "#,
-            E::NAME,
-            i32::from(E::VERSION),
-            event.workspace(),
-            payload,
-            &kinds as &[&str],
-            &queues as &[&str],
-            &max_attempts,
-            crate::telemetry::current_traceparent(),
-        )
-        .fetch_one(&mut **tx)
-        .await?;
+                    E::NAME,
+                    i32::from(E::VERSION),
+                    event.workspace(),
+                    payload,
+                    &kinds as &[&str],
+                    &queues as &[&str],
+                    &max_attempts,
+                    crate::telemetry::current_traceparent(),
+                )
+                .fetch_one(&mut **tx)
+                .await?
+            }
+        };
         crate::db::lower(tx, lifted).await?;
 
         let changes = event.changes();
@@ -378,6 +398,48 @@ impl EventBus {
         tracing::info!(consumer, enqueued, "events replayed");
         Ok(enqueued)
     }
+}
+
+/// Append the instance-wide event `name` (no workspace) and one delivery
+/// per consumer (`kinds`, with their `queues` and `max_attempts`), under an
+/// id chosen here. Nothing is read back (no `RETURNING`): from a workspace
+/// transaction, which may add an event declared `PUBLISHED_IN_WORKSPACES`
+/// but read no instance-wide row, row-level security would refuse it
+/// (campbooks-cloud#211).
+async fn append_instance_wide(
+    conn: &mut sqlx::PgConnection,
+    name: &str,
+    version: u16,
+    payload: &serde_json::Value,
+    kinds: &[&str],
+    queues: &[&str],
+    max_attempts: &[i32],
+) -> Result<EventId, sqlx::Error> {
+    let id = EventId::new();
+    sqlx::query(
+        r"
+        WITH event AS (
+            INSERT INTO kernel.events (id, name, version, workspace_id, payload)
+            VALUES ($1, $2, $3, NULL, $4)
+        )
+        INSERT INTO kernel.jobs
+            (queue, kind, payload, workspace_id, event_id, unique_key, max_attempts,
+             trace_context)
+        SELECT c.queue, c.kind, '{}'::jsonb, NULL, $1, $1::text, c.max_attempts, $8
+          FROM unnest($5::text[], $6::text[], $7::int[]) AS c(kind, queue, max_attempts)
+        ",
+    )
+    .bind(*id.as_uuid())
+    .bind(name)
+    .bind(i32::from(version))
+    .bind(payload)
+    .bind(kinds)
+    .bind(queues)
+    .bind(max_attempts)
+    .bind(crate::telemetry::current_traceparent())
+    .execute(conn)
+    .await?;
+    Ok(id)
 }
 
 /// Refuse to publish `event` (of workspace `workspace`) in a transaction set

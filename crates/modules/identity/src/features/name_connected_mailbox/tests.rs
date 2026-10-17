@@ -320,3 +320,28 @@ async fn a_record_the_connectors_module_cannot_answer_for_stays(db: PgPool) {
     assert!(addresses(&kit.ways_in(&access).await).contains(&"work-sam@example.com".to_owned()));
     assert_eq!(removals(&kit).await, 0);
 }
+
+/// The event alone is not believed (campbooks-cloud#211): a
+/// `connectors.connection_added` written in the workspace for a connection
+/// the connectors module does not hold names nothing, so a later forged
+/// removal of that connection has no record to act on.
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_connection_the_connectors_module_does_not_hold_names_nothing(db: PgPool) {
+    let kit = Kit::new(db).await;
+    let access = kit.signed_up().await;
+    let ws = WorkspaceId::new();
+    let connection = connected_unnamed(&kit, &access, ws, "work-sam").await;
+
+    added(
+        &kit,
+        ws,
+        "forged-connection",
+        "work-sam",
+        &account_of(&access),
+    )
+    .await;
+    assert_eq!(records(&kit).await, vec![(*ws.as_uuid(), None)]);
+    // The one it holds still names the record.
+    added(&kit, ws, &connection, "work-sam", &account_of(&access)).await;
+    assert_eq!(records(&kit).await, vec![(*ws.as_uuid(), Some(connection))]);
+}

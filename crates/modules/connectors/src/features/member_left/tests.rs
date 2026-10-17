@@ -30,6 +30,28 @@ async fn a_departing_members_connections_are_revoked(db: PgPool) {
     let bea = kit.user("bea");
     let bea_id = kit.join(&bea, ws, Role::Member);
 
+    // Written in the workspace while Ana is still a member: the event alone
+    // is not believed (campbooks-cloud#211).
+    let mut tx = kit.state.db.begin_for(ws).await.unwrap();
+    kit.state
+        .events
+        .publish(
+            &mut tx,
+            &MemberLeft {
+                workspace: ws.to_string(),
+                user: ana_id,
+                mail: MailChoice::Delete,
+            },
+        )
+        .await
+        .unwrap();
+    tx.commit().await.unwrap();
+    kit.run_jobs().await;
+    assert_eq!(connections(&kit).await, 1, "nothing revoked while a member");
+    assert!(kit.google.revoked().is_empty());
+
+    kit.leave(&ana, ws);
+    kit.leave(&bea, ws);
     let mut tx = kit.state.db.begin_for(ws).await.unwrap();
     for (user, mail) in [(bea_id, MailChoice::Delete), (ana_id, MailChoice::Keep)] {
         kit.state
@@ -68,20 +90,30 @@ async fn a_deleted_workspaces_connections_are_revoked_at_once(db: PgPool) {
     kit.join(&bea, other, Role::Owner);
     kit.connect(&bea, other).await; // a connection elsewhere stays
 
-    let mut tx = kit.state.db.begin_for(ws).await.unwrap();
-    kit.state
-        .events
-        .publish(
-            &mut tx,
-            &WorkspaceDeleting {
-                workspace: ws.to_string(),
-                purge_after: Utc::now() + chrono::TimeDelta::days(30),
-            },
-        )
-        .await
-        .unwrap();
-    tx.commit().await.unwrap();
-    kit.run_jobs().await;
+    let deleting = || async {
+        let mut tx = kit.state.db.begin_for(ws).await.unwrap();
+        kit.state
+            .events
+            .publish(
+                &mut tx,
+                &WorkspaceDeleting {
+                    workspace: ws.to_string(),
+                    purge_after: Utc::now() + chrono::TimeDelta::days(30),
+                },
+            )
+            .await
+            .unwrap();
+        tx.commit().await.unwrap();
+        kit.run_jobs().await;
+    };
+    // Written in the workspace while it is live: not believed
+    // (campbooks-cloud#211).
+    deleting().await;
+    assert_eq!(connections(&kit).await, 2, "nothing revoked while live");
+    assert!(kit.google.revoked().is_empty());
+
+    kit.delete_workspace(ws);
+    deleting().await;
     assert_eq!(connections(&kit).await, 1, "only the other workspace's");
     assert_eq!(kit.google.revoked().len(), 1);
 }

@@ -45,9 +45,17 @@ async fn connect(
         .to_owned()
 }
 
-/// What the connectors module publishes when connection `connection` (of
-/// Google account `subject`) in `workspace` goes.
+/// What the connectors module does when connection `connection` (of Google
+/// account `subject`) in `workspace` goes: it removes the connection and
+/// publishes `connectors.connection_removed`.
 async fn removed_connection(kit: &Kit, workspace: WorkspaceId, connection: &str, subject: &str) {
+    kit.intake.drop_connection(connection);
+    announce_removed(kit, workspace, connection, subject).await;
+}
+
+/// `connectors.connection_removed` for connection `connection` (of Google
+/// account `subject`) in `workspace`, whether or not it went.
+async fn announce_removed(kit: &Kit, workspace: WorkspaceId, connection: &str, subject: &str) {
     let mut tx = kit.state.db.begin_for(workspace).await.unwrap();
     kit.state
         .events
@@ -379,4 +387,37 @@ async fn a_failed_hand_over_leaves_no_record_and_no_way_in(db: PgPool) {
         .await
         .unwrap();
     assert_eq!(rows, 0);
+}
+
+/// The event alone is not believed (campbooks-cloud#211): a
+/// `connectors.connection_removed` written in the workspace for a
+/// connection the connectors module still holds leaves the way in, its
+/// record and its sessions alone.
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_forged_removal_of_a_live_connection_changes_nothing(db: PgPool) {
+    let kit = Kit::new(db).await;
+    let access = kit.signed_up().await;
+    let ws = WorkspaceId::new();
+    let connection = connect(&kit, &access, ws, "work-sam", true).await;
+    let before = kit.ways_in(&access).await;
+    assert!(addresses(&before).contains(&"work-sam@example.com".to_owned()));
+
+    // Still connected, yet announced as removed.
+    announce_removed(&kit, ws, &connection, "work-sam").await;
+    assert_eq!(addresses(&kit.ways_in(&access).await), addresses(&before));
+    assert_eq!(recorded(&kit, ws, "work-sam").await, connection);
+    let removals: i64 = sqlx::query_scalar(
+        "SELECT count(*) FROM kernel.events WHERE name = 'identity.way_in_removed'",
+    )
+    .fetch_one(&kit.kernel)
+    .await
+    .unwrap();
+    assert_eq!(removals, 0);
+
+    // The connectors module cannot answer: nothing is decided on a guess.
+    kit.intake.drop_connection(&connection);
+    kit.intake.cannot_answer();
+    announce_removed(&kit, ws, &connection, "work-sam").await;
+    assert!(addresses(&kit.ways_in(&access).await).contains(&"work-sam@example.com".to_owned()));
+    assert_eq!(recorded(&kit, ws, "work-sam").await, connection);
 }
