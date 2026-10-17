@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT pg_advisory_xact_lock(hashtextextended('kernel.jobs.ordering_key:' || $1, 0))",
+  "query": "SELECT pg_advisory_xact_lock(hashtextextended(\n                 'kernel.jobs.ordering_key:' || jsonb_build_array($1::text, $2::text)::text, 0))",
   "describe": {
     "columns": [
       {
@@ -12,6 +12,7 @@
     ],
     "parameters": {
       "Left": [
+        "Text",
         "Text"
       ]
     },
@@ -19,5 +20,5 @@
       null
     ]
   },
-  "hash": "d165f35a3d044ed426d7c58a17c4a4530df4101a380050f38749d3b87da269ad"
+  "hash": "f527fbe992fd51730a0f2efdb903e57ea0b68195637adacff07d88346532be48"
 }

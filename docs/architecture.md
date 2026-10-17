@@ -343,7 +343,9 @@ projections, maintenance — is a `Job` type (`NAME` = `<module>.<job>`, a
 `QUEUE`, `MAX_ATTEMPTS`) registered with `.job::<J>()` and enqueued in a
 transaction with `jobs::enqueue(&mut tx, &job, options)`. Options give it a
 workspace, a delay, a priority, a `unique_key` (at most one unfinished job per
-key) or an `ordering_key` (jobs sharing it run one at a time, in order).
+kind and key) or an `ordering_key` (jobs sharing it run one at a time, in
+order). Both keys are per workspace, with instance-wide work as one more: a
+workspace cannot hold or delay another workspace's key.
 Recurring work is `.schedule::<J>(every)`; each tick runs once however many
 workers run. A handler returns `JobError::Retry` (backoff with jitter) or
 `JobError::Fatal` (marked failed and kept for inspection, 30 days by

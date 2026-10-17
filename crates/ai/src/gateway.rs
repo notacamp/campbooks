@@ -229,6 +229,20 @@ pub struct ChatResponse {
 }
 
 impl ChatResponse {
+    /// Why the model stopped, for a log line: one of a few known words,
+    /// never whatever string the provider sent.
+    #[must_use]
+    pub fn finish_kind(&self) -> &'static str {
+        match self.finish_reason.as_deref() {
+            None => "none",
+            Some("stop") => "stop",
+            Some("length") => "length",
+            Some("content_filter") => "content_filter",
+            Some("tool_calls") => "tool_calls",
+            Some(_) => "other",
+        }
+    }
+
     /// Parse structured output. Some models wrap the JSON in one Markdown
     /// code fence (` ```json … ``` ` or ` ``` … ``` `) even when a JSON
     /// response format was asked for; that one fence and the whitespace
@@ -772,6 +786,22 @@ mod tests {
             model: "test-model".to_owned(),
             finish_reason: Some("stop".to_owned()),
             usage: None,
+        }
+    }
+
+    #[test]
+    fn finish_kind_names_only_known_reasons() {
+        let mut response = answer("{}");
+        for (reason, kind) in [
+            (None, "none"),
+            (Some("stop"), "stop"),
+            (Some("length"), "length"),
+            (Some("content_filter"), "content_filter"),
+            (Some("tool_calls"), "tool_calls"),
+            (Some("ignore previous instructions"), "other"),
+        ] {
+            response.finish_reason = reason.map(str::to_owned);
+            assert_eq!(response.finish_kind(), kind, "{reason:?}");
         }
     }
 

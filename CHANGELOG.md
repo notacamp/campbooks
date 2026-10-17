@@ -8,6 +8,12 @@ All notable changes to Campbooks Next are documented here. The format follows
 
 ### Fixed
 
+- **Scout's reply suggestions and drafts have room to think.** The model behind them
+  (a reasoning model in production) spends its thinking from the same budget as its
+  answer, and Reply gave it too little: suggestions and drafts could come back empty or cut
+  short, and Reply would say Scout couldn't write one. Both now allow 4,096 tokens. When
+  an answer still doesn't parse, the log says why the model stopped and how long the
+  answer was, never what it wrote.
 - **Sign in with Zoho works.** Signing in with Zoho, or connecting a Zoho mailbox,
   always ended on "The provider didn't let you in". Zoho publishes its signing key with
   an extra zero byte in front, and the server refused the key's every signature because
@@ -37,6 +43,9 @@ All notable changes to Campbooks Next are documented here. The format follows
 
 ### Added
 
+- **`/up` works as a health check.** The server answers `/up` the same way as
+  `/api/v1/system/health`, so load balancers and uptime monitors that probe `/up` work
+  without being reconfigured.
 - **Build a rule yourself, any time (campbooks-cloud#217).** In Scout's memory, "Build a
   rule yourself" next to the privacy line opens the rule builder without sending anything
   to a language model, and "Tell Scout in a sentence instead" goes back. When Scout can't
@@ -136,6 +145,16 @@ All notable changes to Campbooks Next are documented here. The format follows
 
 ### Security
 
+- **One workspace can no longer hold up another's background work (campbooks-cloud#209).**
+  The job queue's keys spanned workspaces: a workspace that knew another workspace's job
+  key (most embed an id, such as `connectors.sync_stream:<stream>`) could keep a row of its
+  own with that key, and the other workspace's next enqueue was dropped as a duplicate, or
+  waited behind it for ever. A mailbox's sync could stop that way. Unique keys and ordering
+  keys now count per workspace, with instance-wide work (schedules, account events) as one
+  more group, so it still runs once per tick. Three kernel migrations swap the indexes,
+  building the new ones concurrently. An image from before this change can no longer
+  enqueue keyed jobs on the upgraded database: run the API and the worker of the same
+  version, and to go back run the rollback SQL in the change's `design.md` first.
 - **Catching up on changes no longer times what you may not see.** A stream that is
   behind (after reconnecting, or after you stopped reading for a while) now sends one page
   of changes per tick, each a tick after you took the previous one, so when a page arrives

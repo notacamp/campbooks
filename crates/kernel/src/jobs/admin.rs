@@ -139,8 +139,9 @@ pub enum Retry {
     Requeued,
     /// It is not dead (already requeued, running, or done): nothing changed.
     Unchanged,
-    /// Another unfinished job of the same kind holds its unique key, so
-    /// running it again would duplicate that work: nothing changed.
+    /// Another unfinished job of the same kind and workspace holds its
+    /// unique key, so running it again would duplicate that work: nothing
+    /// changed.
     Superseded,
     /// There is no such job.
     Missing,
@@ -291,6 +292,7 @@ pub async fn retry(db: &PgPool, _grant: &AdminGrant, id: JobId) -> Result<Retry,
            AND (j.unique_key IS NULL OR NOT EXISTS (
                 SELECT 1 FROM kernel.jobs o
                  WHERE o.kind = j.kind AND o.unique_key = j.unique_key
+                   AND o.workspace_id IS NOT DISTINCT FROM j.workspace_id
                    AND o.state IN ('pending', 'running')))
         RETURNING j.queue
         "#,
@@ -315,8 +317,9 @@ pub async fn retry(db: &PgPool, _grant: &AdminGrant, id: JobId) -> Result<Retry,
 
 /// Put dead jobs of one kind back on their queue (optionally one queue),
 /// oldest first, at most [`RETRY_BATCH`] per call. Jobs whose unique key is
-/// held by another unfinished job are skipped. Returns how many were
-/// requeued; a result equal to the batch size means there may be more.
+/// held by another unfinished job of their workspace are skipped. Returns
+/// how many were requeued; a result equal to the batch size means there may
+/// be more.
 pub async fn retry_kind(
     db: &PgPool,
     _grant: &AdminGrant,
@@ -327,23 +330,26 @@ pub async fn retry_kind(
     let queues = sqlx::query_scalar!(
         r#"
         WITH locked AS (
-            SELECT j.id, j.unique_key
+            SELECT j.id, j.unique_key, j.workspace_id
               FROM kernel.jobs j
              WHERE j.state = 'failed' AND j.kind = $1
                AND ($2::text IS NULL OR j.queue = $2)
                AND (j.unique_key IS NULL OR NOT EXISTS (
                     SELECT 1 FROM kernel.jobs o
                      WHERE o.kind = j.kind AND o.unique_key = j.unique_key
+                       AND o.workspace_id IS NOT DISTINCT FROM j.workspace_id
                        AND o.state IN ('pending', 'running')))
              ORDER BY j.finished_at, j.id
              LIMIT $3
                FOR UPDATE SKIP LOCKED
         ),
         picked AS (
-            -- Two dead jobs sharing a unique key must not both come back.
+            -- Two dead jobs of one workspace sharing a unique key must not
+            -- both come back (instance-wide ones are one more workspace).
             SELECT id FROM (
                 SELECT id, unique_key,
-                       row_number() OVER (PARTITION BY unique_key ORDER BY id) AS n
+                       row_number() OVER (PARTITION BY workspace_id, unique_key
+                                          ORDER BY id) AS n
                   FROM locked
             ) l
              WHERE l.unique_key IS NULL OR l.n = 1

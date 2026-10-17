@@ -29,6 +29,9 @@ mod testkit;
 
 pub use deps::{Deps, Facts, IdentityProvider};
 pub use features::ai_meter::AiUsageMeter;
+/// The health check's handler, for the server to also mount at the probe
+/// path `/up` (outside the API's OpenAPI document).
+pub use features::health::handler as health;
 
 /// Module name: crate directory, Postgres schema and OpenAPI tag.
 pub const NAME: &str = "system";

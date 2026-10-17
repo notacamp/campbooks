@@ -5,6 +5,7 @@
    answers both the web app (open `http://localhost:8080/`) and the API (`/api/v1/...`) on
    port 8080.
 3. Check it: `curl http://localhost:8080/api/v1/system/health` should return `{"status":"ok","database":"ok"}`.
+   `/up` is an alias that gives the same answer, for load balancers and uptime monitors that probe it.
 4. Optional local AI: set `CAMPBOOKS_AI__DECIDE__API_KEY` in `.env`
    (`openssl rand -hex 32`), run `docker compose --profile ai up -d`, then pull the
    `complete` model once: `docker compose exec ollama ollama pull qwen3:8b`. Laya and
