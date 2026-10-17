@@ -264,12 +264,7 @@ pub async fn reopen(
     .await?
     .ok_or_else(|| Error::Conflict(crate::MESSAGES.reason("nothing_to_reopen")))?;
     if let Some(correction) = withdrawn {
-        sqlx::query!(
-            "UPDATE conversations.corrections SET withdrawn_at = now() WHERE id = $1",
-            correction as CorrectionId,
-        )
-        .execute(&mut *tx)
-        .await?;
+        withdraw(&mut tx, correction).await?;
     }
     needs::refresh(
         &mut tx,
@@ -282,6 +277,17 @@ pub async fn reopen(
     let summary = summary(&mut tx, access.user, id).await?;
     tx.commit().await?;
     Ok(Json(summary))
+}
+
+/// Withdraw `correction`: it no longer says what the member thinks.
+async fn withdraw(tx: &mut Transaction<'_, Postgres>, correction: CorrectionId) -> Result<()> {
+    sqlx::query!(
+        "UPDATE conversations.corrections SET withdrawn_at = now() WHERE id = $1",
+        correction as CorrectionId,
+    )
+    .execute(&mut **tx)
+    .await?;
+    Ok(())
 }
 
 /// Record `verdict` on conversation `id`'s open need.
@@ -376,12 +382,7 @@ async fn judge(
     if verdict == NeedVerdict::NotNeeded
         && let Some(earlier) = earlier_correction
     {
-        sqlx::query!(
-            "UPDATE conversations.corrections SET withdrawn_at = now() WHERE id = $1",
-            earlier as CorrectionId,
-        )
-        .execute(&mut *tx)
-        .await?;
+        withdraw(&mut tx, earlier).await?;
     }
     sqlx::query!(
         r#"
