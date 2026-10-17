@@ -19,7 +19,7 @@
       "title": "Whose mail should always reach you?",
       "lead": "Their mail stays in your inbox and never gets filed away. These are the people you reply to most.",
       "label": "People to always see",
-      "noSenders": "No mail yet to suggest from. Add an address or a domain below.",
+      "noSenders": "No mail yet to suggest from. Type an address or a domain above.",
       "count_one": "{{count}} email",
       "count_other": "{{count}} emails"
     },
@@ -30,7 +30,8 @@
       "lists": "Newsletters and mailing lists",
       "listsHint": "Mail with a List-Id header",
       "automatic": "Automatic notifications",
-      "automaticHint": "Mail marked as sent automatically"
+      "automaticHint": "Mail marked as sent automatically",
+      "senders": "Senders that never need you"
     },
     "add": {
       "label": "Someone else",
@@ -38,6 +39,14 @@
       "button": "Add",
       "invalid": "Write a full address (name@example.com) or a domain (example.com).",
       "freeMail": "{{domain}} is a free mail provider: a rule for all of it would match people you don’t know. Add the person’s address instead."
+    },
+    "find": {
+      "label": "Find someone",
+      "placeholder": "A name, an address or a domain",
+      "newAddress": "No mail from them yet",
+      "newDomain": "Everyone at {{domain}}",
+      "none": "No one in your mail matches “{{text}}”. To add someone new, write their full address or a domain.",
+      "failed": "Scout couldn’t look that up just now. Try again in a moment."
     },
     "act": {
       "title": "When Scout is sure, should it act?",

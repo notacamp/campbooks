@@ -43,6 +43,20 @@ const SENDERS = [
   { address: "rita@silva-contas.example", name: "Rita Gomes", received: 41, replied: 23 },
   { address: "duarte@pessoa-obras.example", name: "Duarte Pessoa", received: 28, replied: 17 },
 ];
+const JOANA = { address: "joana@reis-design.example", name: "Joana Reis", received: 6, replied: 1 };
+/** `list_senders`: the suggestions, or Joana for any `q` her name or address contains. */
+const SENDERS_ROUTE: MockHandler = (request) => {
+  const q = new URL(request.url).searchParams.get("q")?.toLowerCase();
+  if (q === undefined) {
+    return { body: { senders: SENDERS } };
+  }
+  const all = [...SENDERS, JOANA];
+  return {
+    body: {
+      senders: all.filter((sender) => `${sender.address} ${sender.name}`.toLowerCase().includes(q)),
+    },
+  };
+};
 const PREVIEW = {
   matching: 41,
   would_change: 41,
@@ -63,7 +77,7 @@ function mockEverything(overrides: Record<string, MockHandler> = {}) {
   let next = 0;
   return mockApi({
     [`GET ${W}/inboxes`]: { body: { inboxes: INBOXES } },
-    [`GET ${W}/senders`]: { body: { senders: SENDERS } },
+    [`GET ${W}/senders`]: SENDERS_ROUTE,
     [`GET ${W}/assistant/profile`]: { body: PROFILE },
     [`PUT ${W}/assistant/profile`]: (_request, body) => ({
       body: { ...(body as object), asked_at: "2026-10-14T10:00:00Z", revision: 1 },
@@ -203,13 +217,107 @@ describe("Questions", () => {
     mockEverything();
     renderWithProviders(<Questions workspaceId={WS} onHome={vi.fn()} onMemory={vi.fn()} />);
 
-    const field = await screen.findByRole("textbox", { name: "Someone else" });
-    fireEvent.change(field, { target: { value: "gmail.com" } });
-    fireEvent.keyDown(field, { key: "Enter" });
+    const box = await screen.findByRole("searchbox", { name: "Find someone" });
+    fireEvent.change(box, { target: { value: "gmail.com" } });
+    fireEvent.keyDown(box, { key: "Enter" });
 
     expect(await screen.findByText(/gmail\.com is a free mail provider/u)).toBeVisible();
+    expect(screen.queryByRole("checkbox", { name: "gmail.com" })).toBeNull();
     expect(
       screen.getByRole("heading", { name: "Whose mail should always reach you?" }),
+    ).toBeVisible();
+  });
+
+  it("finds someone by name beyond the suggestions, keeping who is already ticked", async () => {
+    const api = mockEverything();
+    renderWithProviders(<Questions workspaceId={WS} onHome={vi.fn()} onMemory={vi.fn()} />);
+
+    fireEvent.click(await screen.findByRole("checkbox", { name: "Rita Gomes" }));
+    const box = screen.getByRole("searchbox", { name: "Find someone" });
+    fireEvent.change(box, { target: { value: "joana" } });
+
+    fireEvent.click(await screen.findByRole("checkbox", { name: "Joana Reis" }));
+    expect(api.calls.some((call) => call.route === `GET ${W}/senders`)).toBe(true);
+    expect(screen.getByRole("checkbox", { name: "Rita Gomes" })).toBeChecked();
+    expect(screen.queryByRole("checkbox", { name: "Duarte Pessoa" })).toBeNull();
+    expect(
+      await screen.findByText(
+        "Mail from Joana Reis (joana@reis-design.example) always stays in your inbox and never gets filed away.",
+      ),
+    ).toBeVisible();
+
+    // Cleared, the suggestions come back and Joana stays with her name.
+    fireEvent.click(screen.getByRole("button", { name: "Clear search" }));
+    expect(await screen.findByRole("checkbox", { name: "Duarte Pessoa" })).toBeInTheDocument();
+    expect(screen.getByRole("checkbox", { name: "Joana Reis" })).toBeChecked();
+  });
+
+  it("filters the cards as you type, before the server answers", async () => {
+    mockEverything();
+    renderWithProviders(<Questions workspaceId={WS} onHome={vi.fn()} onMemory={vi.fn()} />);
+
+    await screen.findByRole("checkbox", { name: "Duarte Pessoa" });
+    fireEvent.change(screen.getByRole("searchbox", { name: "Find someone" }), {
+      target: { value: "r" },
+    });
+    expect(screen.getByRole("checkbox", { name: "Rita Gomes" })).toBeInTheDocument();
+    expect(screen.getByRole("checkbox", { name: "Duarte Pessoa" })).toBeInTheDocument();
+    fireEvent.change(screen.getByRole("searchbox", { name: "Find someone" }), {
+      target: { value: "rita" },
+    });
+    expect(screen.queryByRole("checkbox", { name: "Duarte Pessoa" })).toBeNull();
+  });
+
+  it("adds an address no one in the mail matches with Enter, and stays on the view", async () => {
+    mockEverything();
+    renderWithProviders(<Questions workspaceId={WS} onHome={vi.fn()} onMemory={vi.fn()} />);
+
+    const box = await screen.findByRole("searchbox", { name: "Find someone" });
+    fireEvent.change(box, { target: { value: "New@Studio.example" } });
+    expect(await screen.findByText("No mail from them yet")).toBeVisible();
+    fireEvent.keyDown(box, { key: "Enter" });
+
+    expect(screen.getByRole("checkbox", { name: "new@studio.example" })).toBeChecked();
+    expect(box).toHaveValue("");
+    expect(
+      screen.getByRole("heading", { name: "Whose mail should always reach you?" }),
+    ).toBeVisible();
+  });
+
+  it("says when no one matches, and Esc clears the box without leaving", async () => {
+    mockEverything();
+    const onHome = vi.fn();
+    renderWithProviders(<Questions workspaceId={WS} onHome={onHome} onMemory={vi.fn()} />);
+
+    const box = await screen.findByRole("searchbox", { name: "Find someone" });
+    fireEvent.change(box, { target: { value: "zzz" } });
+    expect(
+      await screen.findByText(
+        "No one in your mail matches “zzz”. To add someone new, write their full address or a domain.",
+      ),
+    ).toBeVisible();
+    fireEvent.keyDown(box, { key: "Escape" });
+
+    expect(box).toHaveValue("");
+    expect(onHome).not.toHaveBeenCalled();
+    expect(await screen.findByRole("checkbox", { name: "Rita Gomes" })).toBeInTheDocument();
+  });
+
+  it("doesn't suggest people on what never needs you, but finds them", async () => {
+    mockEverything();
+    renderWithProviders(<Questions workspaceId={WS} onHome={vi.fn()} onMemory={vi.fn()} />);
+
+    await screen.findByRole("heading", { name: "Whose mail should always reach you?" });
+    fireEvent.keyDown(document.body, { key: "s" });
+    await screen.findByRole("heading", { name: "What never needs you?" });
+    expect(screen.queryByRole("checkbox", { name: "Rita Gomes" })).toBeNull();
+
+    fireEvent.change(screen.getByRole("searchbox", { name: "Find someone" }), {
+      target: { value: "duarte" },
+    });
+    fireEvent.click(await screen.findByRole("checkbox", { name: "Duarte Pessoa" }));
+    expect(
+      await screen.findByText(/Duarte Pessoa \(duarte@pessoa-obras\.example\)/u),
     ).toBeVisible();
   });
 

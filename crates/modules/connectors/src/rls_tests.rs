@@ -75,14 +75,25 @@ async fn a_workspace_transaction_sees_only_its_workspace(db: PgPool) {
     assert_eq!(due, 0);
     tx.rollback().await.unwrap();
 
-    // In the kernel scope (the dispatcher's), only the scheduling index is
-    // visible (ids and times).
-    let mut tx = campbooks_kernel::db::begin_kernel(&app).await.unwrap();
+    // In the maintenance scope (the dispatcher's), only the scheduling index
+    // is visible (ids and times).
+    let mut tx = campbooks_kernel::db::begin_maintenance(&app).await.unwrap();
     assert_eq!(visible(&mut tx).await, [0; 6]);
     let due: i64 = sqlx::query_scalar!(r#"SELECT count(*) AS "n!" FROM connectors.sync_due"#)
         .fetch_one(&mut *tx)
         .await
         .unwrap();
     assert_eq!(due, 1);
+    tx.rollback().await.unwrap();
+
+    // The kernel scope reaches the kernel's tables only, not the index
+    // (campbooks-cloud#196).
+    let mut tx = campbooks_kernel::db::begin_kernel(&app).await.unwrap();
+    assert_eq!(visible(&mut tx).await, [0; 6]);
+    let due: i64 = sqlx::query_scalar!(r#"SELECT count(*) AS "n!" FROM connectors.sync_due"#)
+        .fetch_one(&mut *tx)
+        .await
+        .unwrap();
+    assert_eq!(due, 0);
     tx.rollback().await.unwrap();
 }
