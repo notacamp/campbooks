@@ -35,6 +35,23 @@ All notable changes to Campbooks Next are documented here. The format follows
 
 ### Security
 
+- **Web sign-in records are reachable only through the sign-in's own functions.** The
+  tables holding web sessions, sign-ins in progress and retired session tokens could be
+  read and changed by any of the server's database work. Now the server's database role
+  has no access to them at all. It goes through narrow functions, each acting on the one
+  session whose cookie a request presented, the one sign-in it is finishing, or one
+  person's sessions; only the clean-up of ended sessions reaches across people. A sign-in's
+  nonce, the one value that was stored in plain text, is now encrypted like the rest.
+  Nobody is signed out by the upgrade. A sign-in started in the ten minutes before it
+  answers "invalid state" once; start it again. Upgrade the server and the worker
+  together: a process of the previous version fails every web request until it is
+  replaced. If you roll back, run the SQL in the change's design first
+  (campbooks-cloud#212).
+- **Smaller fixes from the same review.** `CAMPBOOKS_CHANGES__OPENS_WINDOW_SECONDS` must
+  now be at most a day (a longer one made every change stream fail to open); the server
+  refuses to start otherwise. The rate-limit clean-up no longer deletes a counter renewed
+  at the same moment. Migrations may pin a function's `search_path` only to exactly
+  `pg_catalog, pg_temp` (campbooks-cloud#213).
 - **Retried requests never bring back a secret, and keys and counters stay private.**
   Requests sent with an `Idempotency-Key` used to have their answers cached for a day,
   including a new app's client secret. That cache could be read from any workspace's work,

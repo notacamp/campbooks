@@ -1003,8 +1003,10 @@ mod tests {
     /// the `admin` crate's own tests pin. So is the list of instance-wide
     /// rows a workspace may add (`kernel.instance_rows_from_workspaces`,
     /// campbooks-cloud#207), which it may only read: it changes by migration;
-    /// and the rate-limit counters (`kernel.rate_limits`, campbooks-cloud#210),
-    /// which it reaches only through the kernel's two functions.
+    /// the rate-limit counters (`kernel.rate_limits`, campbooks-cloud#210),
+    /// which it reaches only through the kernel's two functions; and the web
+    /// sign-in's tables (schema `bff`, campbooks-cloud#212), which it reaches
+    /// only through the BFF's functions.
     #[sqlx::test(migrations = "../../migrations")]
     async fn the_runtime_role_may_use_every_table(db: sqlx::PgPool) {
         let role = campbooks_kernel::db::DEFAULT_RUNTIME_ROLE;
@@ -1032,7 +1034,7 @@ mod tests {
         let functions_only = "kernel.rate_limits";
         let missing: Vec<String> = missing
             .into_iter()
-            .filter(|t| t != read_only && t != functions_only)
+            .filter(|t| t != read_only && t != functions_only && !BFF_TABLES.contains(&t.as_str()))
             .collect();
         assert!(
             missing.is_empty(),
@@ -1069,13 +1071,97 @@ mod tests {
             (false, false, false, false, true, true),
             "`{role}` reaches {functions_only} through the kernel's functions only"
         );
+        // The web sign-in's tables: no privilege at all, of any kind.
+        for table in BFF_TABLES {
+            let any: bool = sqlx::query_scalar(
+                "SELECT has_table_privilege($1, $2,
+                            'SELECT, INSERT, UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER')",
+            )
+            .bind(role)
+            .bind(table)
+            .fetch_one(&db)
+            .await
+            .unwrap();
+            assert!(!any, "`{role}` holds a privilege on {table}");
+        }
+        // And exactly these functions to reach them.
+        let functions: Vec<String> = sqlx::query_scalar(
+            "SELECT p.proname::text
+               FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
+              WHERE n.nspname = 'bff' AND has_function_privilege($1, p.oid, 'EXECUTE')
+              ORDER BY 1",
+        )
+        .bind(role)
+        .fetch_all(&db)
+        .await
+        .unwrap();
+        assert_eq!(
+            functions, BFF_FUNCTIONS,
+            "`{role}` reaches schema `bff` through these"
+        );
     }
 
-    /// Every table of the kernel's schema has row-level security, enabled
-    /// and forced with a policy, or is listed here as instance-only with the
-    /// reason (campbooks-cloud#210): a new kernel table cannot be left open
-    /// to every transaction by omission. A listed table grants the runtime
-    /// role no write.
+    /// The web sign-in's tables (campbooks-cloud#212).
+    const BFF_TABLES: [&str; 3] = [
+        "bff.login_transactions",
+        "bff.retired_tokens",
+        "bff.sessions",
+    ];
+
+    /// The functions the BFF reaches them through, in name order: one per
+    /// operation it needs, each on the one session (or sign-in, or account)
+    /// its arguments name; only the prunes reach across accounts.
+    const BFF_FUNCTIONS: [&str; 15] = [
+        "create_session",
+        "end_account_sessions",
+        "end_session",
+        "find_session",
+        "lock_session_tokens",
+        "mark_session_delivered",
+        "prune_logins",
+        "prune_sessions",
+        "reissue_session",
+        "retired_session",
+        "rotate_session",
+        "start_login",
+        "store_session_tokens",
+        "take_login",
+        "touch_session",
+    ];
+
+    /// Every `SECURITY DEFINER` function runs with the pinned path
+    /// `pg_catalog, pg_temp` (so a caller's objects cannot shadow a name in
+    /// its body) and is not executable by `PUBLIC`: the runtime role is
+    /// granted each one explicitly (campbooks-cloud#210, #212).
+    #[sqlx::test(migrations = "../../migrations")]
+    async fn every_definer_function_pins_its_path_and_is_granted(db: sqlx::PgPool) {
+        let functions: Vec<(String, Option<Vec<String>>, bool)> = sqlx::query_as(
+            "SELECT p.oid::regprocedure::text, p.proconfig,
+                    has_function_privilege('public', p.oid, 'EXECUTE')
+               FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
+              WHERE p.prosecdef AND n.nspname NOT IN ('pg_catalog', 'information_schema')
+              ORDER BY 1",
+        )
+        .fetch_all(&db)
+        .await
+        .unwrap();
+        assert!(functions.len() >= BFF_FUNCTIONS.len() + 2, "{functions:?}");
+        for (function, config, public) in functions {
+            assert_eq!(
+                config,
+                Some(vec!["search_path=pg_catalog, pg_temp".to_owned()]),
+                "{function} pins its search_path"
+            );
+            assert!(!public, "{function} is executable by PUBLIC");
+        }
+    }
+
+    /// Every table of the kernel's and the BFF's schemas has row-level
+    /// security, enabled and forced with a policy, or grants the runtime role
+    /// no privilege at all (reached through functions only), or is listed
+    /// here as instance-only with the reason (campbooks-cloud#210, #212): a
+    /// new table there cannot be left open to every transaction by omission.
+    /// A listed table grants the runtime role no write.
     #[sqlx::test(migrations = "../../migrations")]
     async fn every_kernel_table_has_row_level_security_or_a_reason(db: sqlx::PgPool) {
         const INSTANCE_ONLY: [(&str, &str); 1] = [(
@@ -1084,18 +1170,28 @@ mod tests {
              log's policies: written by migrations only, the runtime role may only read it, and \
              it holds nothing of any caller or workspace",
         )];
+        let role = campbooks_kernel::db::DEFAULT_RUNTIME_ROLE;
         let tables: Vec<(String, bool)> = sqlx::query_as(
             "SELECT n.nspname || '.' || c.relname,
-                    c.relrowsecurity AND c.relforcerowsecurity
-                        AND EXISTS (SELECT 1 FROM pg_policy p WHERE p.polrelid = c.oid)
+                    (c.relrowsecurity AND c.relforcerowsecurity
+                        AND EXISTS (SELECT 1 FROM pg_policy p WHERE p.polrelid = c.oid))
+                    OR NOT has_table_privilege($1, c.oid,
+                        'SELECT, INSERT, UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER')
                FROM pg_class c
                JOIN pg_namespace n ON n.oid = c.relnamespace
-              WHERE n.nspname = 'kernel' AND c.relkind IN ('r', 'p')
+              WHERE n.nspname IN ('kernel', 'bff') AND c.relkind IN ('r', 'p')
               ORDER BY 1",
         )
+        .bind(role)
         .fetch_all(&db)
         .await
         .unwrap();
+        for table in BFF_TABLES {
+            assert!(
+                tables.iter().any(|(t, _)| t == table),
+                "{table} is covered: {tables:?}"
+            );
+        }
         assert!(tables.len() > INSTANCE_ONLY.len(), "{tables:?}");
         let open: Vec<&str> = tables
             .iter()
@@ -1105,10 +1201,9 @@ mod tests {
         let listed: Vec<&str> = INSTANCE_ONLY.iter().map(|(table, _)| *table).collect();
         assert_eq!(
             open, listed,
-            "every kernel table enables and forces row-level security with a policy, or is \
-             listed as instance-only with its reason"
+            "every kernel and BFF table enables and forces row-level security with a policy, \
+             grants the runtime role nothing, or is listed as instance-only with its reason"
         );
-        let role = campbooks_kernel::db::DEFAULT_RUNTIME_ROLE;
         for (table, reason) in INSTANCE_ONLY {
             assert!(!reason.trim().is_empty(), "{table} needs a reason");
             let writes: bool = sqlx::query_scalar(

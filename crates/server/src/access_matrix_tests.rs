@@ -1414,7 +1414,8 @@ async fn a_transaction_that_sets_nothing_sees_no_row_of_any_table(db: PgPool) {
 
     // With whether the runtime role may read the table at all: one it may
     // not (the rate-limit counters, reached through the kernel's functions
-    // only, campbooks-cloud#210) must refuse the read outright.
+    // only, campbooks-cloud#210; the web sign-in's tables, reached through
+    // the BFF's, campbooks-cloud#212) must refuse the read outright.
     let listed: Vec<(String, bool)> = sqlx::query_as(
         "SELECT format('%I.%I', n.nspname, c.relname),
                 has_table_privilege($1, c.oid, 'SELECT')
@@ -1434,7 +1435,12 @@ async fn a_transaction_that_sets_nothing_sees_no_row_of_any_table(db: PgPool) {
         .collect();
     assert_eq!(
         unreadable,
-        BTreeSet::from(["kernel.rate_limits"]),
+        BTreeSet::from([
+            "bff.login_transactions",
+            "bff.retired_tokens",
+            "bff.sessions",
+            "kernel.rate_limits",
+        ]),
         "tables the runtime role may not read at all"
     );
     let mut populated = BTreeSet::new();

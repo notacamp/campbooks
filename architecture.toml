@@ -138,7 +138,7 @@ reason = "A test file (`#[cfg(test)] mod flows;`): fixtures publish from plain t
 
 [[access.pool_access]]
 path = "crates/server/src/bff/store.rs"
-reason = "The web BFF's session store (schema `bff`): sessions are instance-wide, none carries a workspace. It also opens the single-flight token refresh's transaction (`begin_refresh`), the one the refresh locks its session row in."
+reason = "The web BFF's session store (schema `bff`): sessions are instance-wide, none carries a workspace, and every statement calls one of the `bff.*` functions (the runtime role has no privilege on the tables, campbooks-cloud#212). It also opens the single-flight token refresh's transaction (`begin_refresh`), the one the refresh locks its session row in."
 
 [[access.pool_access]]
 path = "crates/kernel/src/db.rs"
