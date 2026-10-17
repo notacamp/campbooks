@@ -67,7 +67,8 @@ any other role, naming the variable.
   `{"model", "state", "questions"}` in laya-serve's format, with questions and
   options in the caller's order, and the configured key as a bearer token.
 - With `openai`, the gateway SHALL `POST` to `<base_url>/chat/completions` a
-  prompt holding the state and the questions, `temperature` 0, and a strict
+  prompt holding the state and the questions, `temperature` 0, `max_tokens`
+  4096 (room for a reasoning model to think before its JSON), and a strict
   JSON schema allowing only each choice's labels, each score's level numbers
   and a boolean per `noul`. Unless `CAMPBOOKS_AI__DECIDE__LOGPROBS` is false it
   SHALL request token log-probabilities and derive each answer's option
@@ -83,6 +84,10 @@ any other role, naming the variable.
 #### Scenario: Existing configuration
 - **WHEN** `CAMPBOOKS_AI__DECIDE__BASE_URL` and `__MODEL` are set and `__PROTOCOL` is not
 - **THEN** `decide` asks that model over the OpenAI-compatible chat API
+
+#### Scenario: Room to answer
+- **WHEN** `decide` runs with `protocol = openai`
+- **THEN** the request carries `max_tokens` 4096
 
 ### Requirement: Retries
 `decide` SHALL retry a request after a connection failure or a 5xx response,

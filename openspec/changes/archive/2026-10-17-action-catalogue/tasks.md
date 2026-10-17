@@ -21,4 +21,4 @@
 
 - [x] 4.1 OpenAPI and client types regenerated
 - [x] 4.2 CHANGELOG
-- [ ] 4.3 CI green; review; archive
+- [x] 4.3 CI green; review; archive
