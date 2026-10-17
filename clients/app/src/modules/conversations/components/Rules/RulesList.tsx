@@ -251,7 +251,11 @@ function RuleRow({
             setConfirming(false);
           }}
         >
-          {t("rules.list.removeQuestion")}
+          {t(
+            rule.actions.some((action) => action.action === "show_images")
+              ? "rules.list.removeImagesQuestion"
+              : "rules.list.removeQuestion",
+          )}
           {rule.applied_count > 0 ? (
             <ChoiceCards
               label={t("rules.list.changedMail")}

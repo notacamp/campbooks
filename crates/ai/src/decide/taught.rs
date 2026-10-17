@@ -192,6 +192,10 @@ pub enum Action {
     Spam,
     /// Its bills are paid: Campbooks never asks "Is it paid?" about it.
     MarkPaid,
+    /// Show its remote images without asking (campbooks-cloud#200): read
+    /// when the mail is opened ([`shows_images`]), never on arrival, and
+    /// only for mail whose sender passes authentication.
+    ShowImages,
 }
 
 /// Where a rule puts mail it takes out of the way for good.
@@ -225,6 +229,8 @@ pub enum Slot {
     Bin,
     /// Whether its bills are paid.
     Money,
+    /// Whether its remote images show without asking.
+    Images,
 }
 
 impl Action {
@@ -240,6 +246,7 @@ impl Action {
             Self::Surface { .. } => Slot::Surface,
             Self::Trash | Self::Spam => Slot::Bin,
             Self::MarkPaid => Slot::Money,
+            Self::ShowImages => Slot::Images,
         }
     }
 }
@@ -269,6 +276,10 @@ pub enum Invalid {
     /// send from it.
     #[error("a whole domain is never put in the trash or spam")]
     DomainToBin,
+    /// Showing images is a rule of its own about one sender: one address or
+    /// one domain, and nothing else.
+    #[error("showing images needs one sender, and nothing else")]
+    ImagesNeedSender,
 }
 
 /// Free mail providers: a domain of theirs on its own would match people.
@@ -436,6 +447,17 @@ impl TaughtRule {
                 .any(|c| narrows(c) || *c == Condition::SenderChecksFail)
         {
             return Err(Invalid::DomainToBin);
+        }
+        // Trusting a sender's images: one sender (an address, or a domain
+        // the checks above allow), as the rule's only condition and action.
+        if actions.contains(&Action::ShowImages)
+            && (actions.len() != 1
+                || !matches!(
+                    conditions,
+                    [Condition::SenderAddress(_) | Condition::SenderDomain(_)]
+                ))
+        {
+            return Err(Invalid::ImagesNeedSender);
         }
         Ok(())
     }
@@ -645,6 +667,29 @@ pub fn evaluate(rules: &[TaughtRule], facts: &Facts<'_>) -> Outcome {
         out.paid = None;
     }
     out
+}
+
+/// The rule that shows the remote images of a message with `facts`, if one
+/// does (campbooks-cloud#200): an active rule with [`Action::ShowImages`]
+/// whose sender matches, the most specific first. Only when the receiving
+/// provider's results `authenticated` the From domain (a DMARC pass for it,
+/// or an aligned DKIM pass; no results at all is not a pass), so a spoofed
+/// sender never gets its images shown; and never for mail that looks
+/// suspicious or failed its checks.
+pub fn shows_images<'r>(
+    rules: &'r [TaughtRule],
+    facts: &Facts<'_>,
+    authenticated: bool,
+) -> Option<&'r str> {
+    if !authenticated || facts.suspicious || facts.auth_failed || facts.impersonated {
+        return None;
+    }
+    let mut matching: Vec<&TaughtRule> = rules
+        .iter()
+        .filter(|r| r.actions.contains(&Action::ShowImages) && r.matches(facts))
+        .collect();
+    matching.sort_by(|a, b| a.precedes(b));
+    matching.first().map(|r| r.id.as_str())
 }
 
 /// A `List-Id` as rules compare it: lower-cased, the id inside its angle

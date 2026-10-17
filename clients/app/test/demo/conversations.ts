@@ -260,6 +260,7 @@ export const Q4_BODY = {
   truncated: false,
   remote_images: 0,
   images_shown: false,
+  images_trusted: false,
 };
 
 /** The newsletter's body: two remote images held back until "Show images". */
@@ -274,6 +275,7 @@ export function ledgerBody(shown: boolean) {
     truncated: false,
     remote_images: 1,
     images_shown: shown,
+    images_trusted: false,
   };
 }
 

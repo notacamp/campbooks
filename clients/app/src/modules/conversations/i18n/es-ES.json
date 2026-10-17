@@ -69,7 +69,9 @@
     "showImages": "Mostrar imágenes",
     "imagesHidden_one": "{{count}} imagen remota oculta, para que el remitente no sepa cuándo lees esto.",
     "imagesHidden_other": "{{count}} imágenes remotas ocultas, para que el remitente no sepa cuándo lees esto.",
-    "imagesShown": "Imágenes remotas visibles."
+    "imagesShown": "Imágenes remotas visibles.",
+    "trustImages": "Mostrar siempre las imágenes de {{name}}",
+    "imagesTrusted": "Imágenes visibles: confías en {{name}}. Los píxeles de seguimiento siguen eliminados."
   },
   "toast": {
     "done": "Hecho · {{subject}}",
@@ -171,7 +173,8 @@
     "notNeeded": "No hace falta (o es seguro)",
     "undoAll": "Deshacer todo lo que hizo una regla",
     "allPaid": "Todas las facturas ya pagadas",
-    "saveRule": "Guardar la regla inteligente"
+    "saveRule": "Guardar la regla inteligente",
+    "trustImages": "Mostrar siempre las imágenes de este remitente"
   },
   "compose": {
     "title": {
@@ -334,7 +337,8 @@
       "never": "nunca te necesitan",
       "trash": "va a la papelera",
       "spam": "denunciado como spam",
-      "paid": "sus facturas ya están pagadas"
+      "paid": "sus facturas ya están pagadas",
+      "images": "sus imágenes se muestran siempre"
     },
     "likeness": {
       "sender": "Todo de {{address}}",
@@ -459,7 +463,8 @@
       "others_other": "como otros {{n}} {{from}}",
       "trash": "Campbooks lo puso en la papelera",
       "spam": "Campbooks lo denunció como spam",
-      "paid": "Campbooks dice que esto ya está pagado"
+      "paid": "Campbooks dice que esto ya está pagado",
+      "images": "Campbooks muestra las imágenes de este remitente"
     },
     "reader": {
       "stop": "Dejar de hacerlo"
@@ -523,7 +528,8 @@
       "failed": "No se pudieron cargar las reglas",
       "retry": "Reintentar",
       "inbox": "Una bandeja de entrada",
-      "emptyTitle": "Aún no hay reglas"
+      "emptyTitle": "Aún no hay reglas",
+      "removeImagesQuestion": "¿Quitar esta regla? Sus imágenes vuelven a quedar retenidas hasta que elijas Mostrar imágenes."
     }
   },
   "reply": {
@@ -594,7 +600,17 @@
     "titleTeach": "Una regla para correos como este",
     "titleReport": "Una regla para correos como este",
     "titlePaid": "Una regla para las facturas de {{payee}}",
-    "titleNotice": "Una regla para los correos de {{sender}}"
+    "titleNotice": "Una regla para los correos de {{sender}}",
+    "whose": "Mostrar imágenes de",
+    "imagesTitle": "Mostrar siempre las imágenes de {{sender}}",
+    "imagesAddress": "Solo {{address}}",
+    "imagesAddressDetail": "Solo esta dirección.",
+    "imagesDomain": "Cualquier dirección de {{domain}}",
+    "imagesDomainDetail": "Todas las direcciones de {{domain}} y de sus subdominios, cuando pasan las comprobaciones del propio dominio.",
+    "imagesMatches_one": "Ya hay {{n}} conversación de este remitente. Sus imágenes se muestran siempre que su correo pasa las comprobaciones.",
+    "imagesMatches_other": "Ya hay {{n}} conversaciones de este remitente. Sus imágenes se muestran siempre que su correo pasa las comprobaciones.",
+    "imagesNew": "Sus imágenes se mostrarán en el correo nuevo de este remitente que pase las comprobaciones.",
+    "imagesHow": "Solo para el correo que pasa las comprobaciones del remitente, nunca para el que se hace pasar por él. Los píxeles de seguimiento siguen eliminados."
   },
   "ahead": {
     "reportTitle": "¿No volver a ver correos como este?",

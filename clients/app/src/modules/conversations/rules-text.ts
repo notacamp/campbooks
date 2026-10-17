@@ -105,6 +105,9 @@ function actionPhrase(t: Translate, action: RuleAction): string {
     case "mark_paid": {
       return t("rules.do.paid");
     }
+    case "show_images": {
+      return t("rules.do.images");
+    }
   }
 }
 
@@ -226,6 +229,9 @@ function markKey(actions: readonly RuleAction[]): string {
     }
     case "mark_paid": {
       return "paid";
+    }
+    case "show_images": {
+      return "images";
     }
   }
 }

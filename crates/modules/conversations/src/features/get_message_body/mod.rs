@@ -4,7 +4,8 @@
 //! The HTML is untrusted and never served as `text/html`: it is sanitised
 //! here (`domain::sanitize`: style sheets inlined into filtered `style`
 //! attributes; no scripts, forms or frames; links open in a new tab; remote
-//! images held back unless asked for; tracking pixels removed), then reaches
+//! images held back unless asked for or a smart rule trusts the sender;
+//! tracking pixels removed), then reaches
 //! the client as a string that the client renders only in its sandboxed
 //! frame (`lib/ui/safe-html`, AGENTS.md), with the message's filtered
 //! `@media` rules beside it.
@@ -32,6 +33,7 @@ use crate::{
         access::visible_inboxes,
         attachments::{is_raster, sniff},
         blobs::{read_bytes, read_text},
+        rules::images_trusted,
         sanitize::{InlineImages, sanitize},
     },
     features::get_conversation::Bodies,
@@ -72,6 +74,10 @@ pub struct MessageBody {
     pub remote_images: u32,
     /// Whether the remote images were kept.
     pub images_shown: bool,
+    /// Whether a smart rule trusts the sender with its images ("Always show
+    /// images from …"), so they were kept without asking: the sender is
+    /// authenticated and nothing about the mail looks suspicious.
+    pub images_trusted: bool,
     /// The HTML part's `@media` rules, filtered like its `style` attributes
     /// (nothing that loads or runs survives): CSS the client applies to the
     /// frame's document only, never to its own page.
@@ -141,6 +147,7 @@ pub async fn handler(
     )
     .fetch_all(&mut *tx)
     .await?;
+    let trusted = images_trusted(&mut tx, &inboxes, message).await?;
     tx.commit().await?;
     let bodies: Bodies = serde_json::from_value(bodies)
         .map_err(|e| Error::internal(crate::domain::redact::json(&e)))?;
@@ -155,7 +162,9 @@ pub async fn handler(
         _ => InlineImages::new(),
     };
     // CPU-bound (inlining, two ammonia passes): off the async workers.
-    let show = query.show_images;
+    // Trust only flips what is held back by default: the same sanitiser,
+    // tracking pixels removed either way.
+    let show = query.show_images || trusted;
     let sanitized = match html {
         Some(html) => Some(
             tokio::task::spawn_blocking(move || sanitize(&html, show, &inline))
@@ -167,7 +176,8 @@ pub async fn handler(
     Ok(Json(MessageBody {
         text,
         remote_images: sanitized.as_ref().map_or(0, |s| s.remote_images),
-        images_shown: query.show_images,
+        images_shown: show,
+        images_trusted: trusted,
         css: sanitized.as_ref().and_then(|s| s.css.clone()),
         html: sanitized.map(|s| s.html),
         truncated,
@@ -410,5 +420,155 @@ mod tests {
             kit.get(&sam, &mismatched).await.status,
             StatusCode::NOT_FOUND
         );
+    }
+
+    /// One recorded message from `from` with a remote image and a tracking
+    /// pixel, and the receiving provider's `results` (or none).
+    fn newsletter(id: &str, subject: &str, results: Option<&str>) -> serde_json::Value {
+        let mut message = json!({
+            "provider_message_id": id,
+            "from": {"name": "Brightloop", "address": "news@brightloop.example"},
+            "to": [{"address": "sam@example.com"}],
+            "subject": subject,
+            "sent_at": "2026-10-06T08:30:00Z",
+            "direction": "inbound",
+            "text": "This month at Brightloop.",
+            "html": "<p>This month</p><img src=\"https://cdn.brightloop.example/banner.png\" alt=\"Banner\" width=\"560\" height=\"120\"><img src=\"https://t.brightloop.example/open.gif\" width=\"1\" height=\"1\">",
+            "mailbox": {"in_inbox": true},
+            "read": false, "starred": false
+        });
+        if let Some(results) = results {
+            message["headers"] = json!({"authentication_results": results});
+        }
+        json!({"op": "upsert", "message": message})
+    }
+
+    /// The body of message `id`, as Sam reads it.
+    async fn body_of(
+        kit: &Kit,
+        sam: &str,
+        workspace: campbooks_kernel::tenancy::WorkspaceId,
+        id: &str,
+    ) -> serde_json::Value {
+        let (conversation, message): (String, String) = sqlx::query_as(
+            "SELECT conversation_id::text, id::text FROM conversations.messages
+              WHERE provider_message_id = $1",
+        )
+        .bind(id)
+        .fetch_one(&kit.db)
+        .await
+        .unwrap();
+        let uri =
+            format!("/api/v1/w/{workspace}/conversations/{conversation}/messages/{message}/body");
+        kit.get(sam, &uri).await.json
+    }
+
+    /// Every message stored as judged not suspicious by the model.
+    async fn judged_not_suspicious(db: &PgPool) {
+        sqlx::query(
+            "INSERT INTO conversations.decisions
+                    (id, workspace_id, message_id, conversation_id, question, source,
+                     strategy, value, model, acted, state_version)
+             SELECT gen_random_uuid(), workspace_id, id, conversation_id, 'suspicious',
+                    'model', 'laya', 'false'::jsonb, 'laya-test', false, 1
+               FROM conversations.messages
+             ON CONFLICT DO NOTHING",
+        )
+        .execute(db)
+        .await
+        .unwrap();
+    }
+
+    #[sqlx::test(migrations = "../../../migrations")]
+    async fn a_trusted_sender_s_images_show_only_when_it_is_authenticated(db: PgPool) {
+        let kit = Kit::new(db.clone()).await;
+        let (workspace, inbox, sam) = kit.sams_inbox().await;
+        let recorded = json!({"changes": [
+            newsletter("trusted-1", "October at Brightloop", Some(
+                "mx.google.com; dkim=pass header.i=@brightloop.example header.s=s1; \
+                 dmarc=pass (p=REJECT sp=REJECT dis=NONE) header.from=brightloop.example")),
+            // Signed by someone else, no DMARC: a spoofed From.
+            newsletter("spoofed-1", "Your Brightloop account", Some(
+                "mx.google.com; dkim=pass header.i=@spoofer.example header.s=s1; \
+                 spf=pass smtp.mailfrom=bounce@spoofer.example")),
+            newsletter("dmarc-1", "Brightloop invoice", Some(
+                "mx.google.com; spf=pass smtp.mailfrom=bounce@spoofer.example; \
+                 dmarc=fail (p=REJECT sp=REJECT dis=REJECT) header.from=brightloop.example")),
+            newsletter("noauth-1", "Brightloop news", None),
+        ]});
+        let batch = dev::record(&kit.state, workspace, inbox, &recorded)
+            .await
+            .unwrap();
+        dev::submit(&kit.state, workspace, &batch).await.unwrap();
+        kit.run_jobs().await;
+        let rules = format!("/api/v1/w/{workspace}/inboxes/{inbox}/rules");
+        let trust = |address: &str| {
+            json!({
+                "conditions": [{"field": "sender_address", "value": address}],
+                "actions": [{"action": "show_images"}],
+            })
+        };
+        // No sender the member has no mail from.
+        let stranger = kit
+            .post(&sam, &rules, Some(trust("stranger@elsewhere.example")))
+            .await;
+        assert_eq!(stranger.status, StatusCode::BAD_REQUEST);
+        // Before: held back.
+        assert_eq!(
+            body_of(&kit, &sam, workspace, "trusted-1").await["images_shown"],
+            false
+        );
+
+        let created = kit
+            .post(&sam, &rules, Some(trust("News@Brightloop.example")))
+            .await;
+        assert_eq!(created.status, StatusCode::CREATED, "{}", created.json);
+        let rule = created.json["rule"]["id"].as_str().unwrap().to_owned();
+        // It changes no mail: nothing to apply.
+        let runs: i64 = sqlx::query_scalar("SELECT count(*) FROM conversations.rule_runs")
+            .fetch_one(&db)
+            .await
+            .unwrap();
+        assert_eq!(runs, 0);
+        // Not judged yet (no `suspicious` answer): nothing is trusted.
+        assert_eq!(
+            body_of(&kit, &sam, workspace, "trusted-1").await["images_trusted"],
+            false
+        );
+        // Judged not suspicious, every one of them.
+        judged_not_suspicious(&db).await;
+
+        let shown = body_of(&kit, &sam, workspace, "trusted-1").await;
+        assert_eq!(shown["images_trusted"], true);
+        assert_eq!(shown["images_shown"], true);
+        let html = shown["html"].as_str().unwrap();
+        assert!(
+            html.contains("https://cdn.brightloop.example/banner.png"),
+            "{html}"
+        );
+        // The tracking pixel stays removed for a trusted sender.
+        assert!(!html.contains("t.brightloop.example"), "{html}");
+        // A spoofed From, a failed DMARC check and no results: never.
+        for id in ["spoofed-1", "dmarc-1", "noauth-1"] {
+            let held = body_of(&kit, &sam, workspace, id).await;
+            assert_eq!(held["images_trusted"], false, "{id}");
+            assert_eq!(held["images_shown"], false, "{id}");
+            assert!(
+                !held["html"]
+                    .as_str()
+                    .unwrap()
+                    .contains("cdn.brightloop.example"),
+                "{id}"
+            );
+        }
+
+        // Removed, "Show images" is back.
+        let removed = kit
+            .delete(&sam, &format!("/api/v1/w/{workspace}/rules/{rule}"))
+            .await;
+        assert!(removed.status.is_success(), "{}", removed.status);
+        let after = body_of(&kit, &sam, workspace, "trusted-1").await;
+        assert_eq!(after["images_trusted"], false);
+        assert_eq!(after["images_shown"], false);
     }
 }

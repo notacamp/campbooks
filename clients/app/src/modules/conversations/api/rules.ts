@@ -232,6 +232,10 @@ export function useRuleMutations(workspaceId: string) {
         queryKey: operationKey("conversations.get_rule", { workspace_id: workspaceId }),
       }),
       refreshConversations(queryClient, workspaceId),
+      // A rule that trusts a sender's images shows or hides them at once.
+      queryClient.invalidateQueries({
+        queryKey: operationKey("conversations.get_message_body", { workspace_id: workspaceId }),
+      }),
     ]);
   };
   const create = useMutation({

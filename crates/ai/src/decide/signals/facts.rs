@@ -119,6 +119,28 @@ pub fn sender_checks_failed(from: &str, authentication_results: Option<&str>) ->
     .authentication_failed()
 }
 
+/// Whether the receiving provider's `authentication_results` authenticate
+/// mail from `from`: a DMARC pass for the From domain, or a DKIM pass
+/// aligned with it that no DMARC result refuses, and no DMARC failure.
+/// Absent results, results that cannot be read, and `authserv-id; none` (the
+/// receiver checked nothing) are not a pass: `false`. What trusting a
+/// sender's images needs (campbooks-cloud#200), so a spoofed From never
+/// gets them.
+pub fn sender_authenticated(from: &str, authentication_results: Option<&str>) -> bool {
+    let Some(results) = authentication_results.and_then(auth_results::parse) else {
+        return false;
+    };
+    let facts = Facts {
+        from: from.to_lowercase(),
+        ..Facts::default()
+    };
+    !results.is_empty()
+        && !results
+            .iter()
+            .any(|r| r.method == "dmarc" && r.result == "fail")
+        && facts.authenticated(&results)
+}
+
 /// Whether the receiving provider's `authentication_results` hold an
 /// explicit `dmarc=fail` under a published policy of `reject` or
 /// `quarantine` (Gmail's `dmarc=fail (p=REJECT sp=REJECT dis=REJECT)`, or a
@@ -938,6 +960,43 @@ mod tests {
             Question::choice(triage::NEEDS_REPLY, "Which?", [("a", ""), ("b", "")]),
         ];
         assert_eq!(EmailFacts::answer(&env, &qs).answers, vec![None, None]);
+    }
+
+    #[test]
+    fn only_authenticated_mail_counts_as_from_its_sender() {
+        let from = "news@brightloop.example";
+        // A DMARC pass for the From domain, and an aligned DKIM pass.
+        assert!(sender_authenticated(
+            from,
+            Some(
+                "mx.google.com; dkim=pass header.i=@brightloop.example header.s=s1; \
+                 dmarc=pass (p=REJECT sp=REJECT dis=NONE) header.from=brightloop.example"
+            )
+        ));
+        assert!(sender_authenticated(
+            from,
+            Some("mx.google.com; dkim=pass header.i=@mail.brightloop.example header.s=s1")
+        ));
+        // A spoofed From: DMARC fails, whatever else passed.
+        assert!(!sender_authenticated(
+            from,
+            Some(
+                "mx.google.com; spf=pass smtp.mailfrom=bounce@spoofer.example; \
+                 dmarc=fail (p=REJECT sp=REJECT dis=REJECT) header.from=brightloop.example"
+            )
+        ));
+        // Signed, but by someone else.
+        assert!(!sender_authenticated(
+            from,
+            Some("mx.google.com; dkim=pass header.i=@spoofer.example header.s=s1")
+        ));
+        // No results, nothing checked, or a header that can't be read: no pass.
+        assert!(!sender_authenticated(from, None));
+        assert!(!sender_authenticated(from, Some("mx.example.com; none")));
+        assert!(!sender_authenticated(
+            from,
+            Some("mx.google.com; dkim=pass (unclosed")
+        ));
     }
 
     /// No rule here may read what an email says (ADR 0018): outside the

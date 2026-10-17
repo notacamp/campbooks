@@ -134,7 +134,8 @@
       "surface_never": "it never needs you",
       "trash": "put it in the trash",
       "spam": "report it as spam",
-      "mark_paid": "its bills are already paid"
+      "mark_paid": "its bills are already paid",
+      "show_images": "always show its images"
     },
     "stream": {
       "primary": "Primary",

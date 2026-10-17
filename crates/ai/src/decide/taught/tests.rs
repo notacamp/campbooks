@@ -521,3 +521,109 @@ fn paid_is_its_own_slot_and_never_for_suspicious_mail() {
     let json = serde_json::to_value(Condition::SenderChecksFail).unwrap();
     assert_eq!(json, serde_json::json!({"field": "sender_checks_fail"}));
 }
+
+#[test]
+fn showing_images_is_a_rule_about_one_sender_alone() {
+    let address = || Condition::SenderAddress("news@brightloop.example".into());
+    assert_eq!(
+        TaughtRule::validate(&[address()], &[Action::ShowImages]),
+        Ok(())
+    );
+    assert_eq!(
+        TaughtRule::validate(
+            &[Condition::SenderDomain("brightloop.example".into())],
+            &[Action::ShowImages]
+        ),
+        Ok(())
+    );
+    // Nothing else beside it, and nothing but the sender.
+    assert_eq!(
+        TaughtRule::validate(&[address()], &[Action::ShowImages, Action::MarkRead]),
+        Err(Invalid::ImagesNeedSender)
+    );
+    assert_eq!(
+        TaughtRule::validate(
+            &[address(), Condition::SubjectContains("newsletter".into())],
+            &[Action::ShowImages]
+        ),
+        Err(Invalid::ImagesNeedSender)
+    );
+    assert_eq!(
+        TaughtRule::validate(
+            &[Condition::ListId("news.brightloop.example".into())],
+            &[Action::ShowImages]
+        ),
+        Err(Invalid::ImagesNeedSender)
+    );
+    // A free mail domain alone would trust everyone on it.
+    assert_eq!(
+        TaughtRule::validate(
+            &[Condition::SenderDomain("gmail.com".into())],
+            &[Action::ShowImages]
+        ),
+        Err(Invalid::FreeMailDomain)
+    );
+}
+
+#[test]
+fn images_show_only_for_an_authenticated_trusted_sender() {
+    let rules = [
+        rule(
+            "address",
+            vec![Condition::SenderAddress("news@brightloop.example".into())],
+            vec![Action::ShowImages],
+            1,
+        ),
+        rule(
+            "domain",
+            vec![Condition::SenderDomain("paperkite.example".into())],
+            vec![Action::ShowImages],
+            2,
+        ),
+        rule(
+            "archive",
+            vec![Condition::SenderAddress("ads@paperkite.example".into())],
+            vec![Action::Archive],
+            3,
+        ),
+    ];
+    let mail = |sender| facts(sender, "This week", None);
+    assert_eq!(
+        shows_images(&rules, &mail("News@Brightloop.example"), true),
+        Some("address")
+    );
+    // The domain, and its subdomains; the archive rule shows nothing.
+    assert_eq!(
+        shows_images(&rules, &mail("ads@paperkite.example"), true),
+        Some("domain")
+    );
+    assert_eq!(
+        shows_images(&rules, &mail("hi@mail.paperkite.example"), true),
+        Some("domain")
+    );
+    assert_eq!(shows_images(&rules, &mail("ana@example.com"), true), None);
+    // Not authenticated (spoofed, or no results): never.
+    assert_eq!(
+        shows_images(&rules, &mail("news@brightloop.example"), false),
+        None
+    );
+    // Failed checks or suspicious mail: never, even when authenticated.
+    for guarded in [
+        Facts {
+            auth_failed: true,
+            ..mail("news@brightloop.example")
+        },
+        Facts {
+            impersonated: true,
+            ..mail("news@brightloop.example")
+        },
+        Facts {
+            suspicious: true,
+            ..mail("news@brightloop.example")
+        },
+    ] {
+        assert_eq!(shows_images(&rules, &guarded, true), None);
+    }
+    // It changes nothing on arrival.
+    assert!(evaluate(&rules[..2], &mail("news@brightloop.example")).is_empty());
+}

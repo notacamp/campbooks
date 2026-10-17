@@ -6,6 +6,7 @@ import {
   Banner,
   Button,
   Checkbox,
+  ChoiceCards,
   Dialog,
   RulePreview,
   Text,
@@ -42,6 +43,25 @@ export interface SmartRuleDraft {
   noticeId?: string | undefined;
   /** The inbox's address when other members use it: the rule acts for them too. */
   sharedInbox?: string | undefined;
+  /**
+   * Other senders the member may pick instead (the first is `conditions`):
+   * the address, or anyone at its domain.
+   */
+  choices?:
+    | readonly {
+        id: string;
+        title: string;
+        description?: string | undefined;
+        /** The dialog's title while it is picked. */
+        heading?: string | undefined;
+        conditions: RuleCondition[];
+      }[]
+    | undefined;
+}
+
+/** Whether a rule only shows a sender's images: it changes no mail. */
+function showsImages(actions: readonly RuleAction[]): boolean {
+  return actions.length > 0 && actions.every((action) => action.action === "show_images");
 }
 
 export interface SmartRuleConfirmProps {
@@ -90,14 +110,16 @@ function Confirm({
   const locale = i18n.language;
   const undo = useUndoToast();
   const { create, remove, restore, wasRemoved } = useRuleMutations(workspaceId);
-  const preview = useRulePreview(workspaceId, draft.inboxId, {
-    conditions: draft.conditions,
-    actions: draft.actions,
-  });
+  const [choice, setChoice] = useState(draft.choices?.[0]?.id);
+  const chosen = draft.choices?.find((each) => each.id === choice);
+  const conditions = chosen?.conditions ?? draft.conditions;
+  const images = showsImages(draft.actions);
+  const rule = { conditions, actions: draft.actions };
+  const preview = useRulePreview(workspaceId, draft.inboxId, rule);
   const [existing, setExisting] = useState(true);
   const [failed, setFailed] = useState(false);
   const [saved, setSaved] = useState(false);
-  const sentence = ruleSentence(t, locale, draft);
+  const sentence = ruleSentence(t, locale, rule);
   const count = preview.data?.would_change ?? 0;
   const complete = preview.data?.complete ?? true;
   const number = (n: number) => new Intl.NumberFormat(locale).format(n);
@@ -112,6 +134,13 @@ function Confirm({
   let summary: string | undefined;
   if (preview.isError) {
     summary = t("smartRule.matchesUnknown");
+  } else if (images && preview.data !== undefined) {
+    // It changes no mail: say whose mail it opens up, not what it would change.
+    const matching = preview.data.matching;
+    summary =
+      matching === 0
+        ? t("smartRule.imagesNew")
+        : t("smartRule.imagesMatches", { count: matching, n: number(matching) });
   } else if (preview.data !== undefined) {
     summary =
       count === 0
@@ -131,9 +160,9 @@ function Confirm({
     create
       .mutateAsync({
         inboxId: draft.inboxId,
-        conditions: draft.conditions,
+        conditions,
         actions: draft.actions,
-        applyToExisting: existing && count > 0,
+        applyToExisting: existing && count > 0 && !images,
         origin: draft.origin,
         fromConversation: draft.fromConversation,
         noticeId: draft.noticeId,
@@ -181,7 +210,7 @@ function Confirm({
     <Dialog
       open
       onClose={onClose}
-      title={draft.title}
+      title={chosen?.heading ?? draft.title}
       description={t("smartRule.lead")}
       result={
         saved ? { title: t("smartRule.saved"), detail: t("smartRule.savedDetail") } : undefined
@@ -204,23 +233,40 @@ function Confirm({
       }
     >
       <div className="flex flex-col gap-3">
+        {draft.choices === undefined || draft.choices.length < 2 ? null : (
+          <ChoiceCards
+            label={t("smartRule.whose")}
+            options={draft.choices.map((each) => ({
+              value: each.id,
+              title: each.title,
+              description: each.description,
+            }))}
+            value={choice ?? null}
+            onChange={setChoice}
+          />
+        )}
         <RulePreview
           tag={t("smartRule.tag")}
           sentence={sentence}
           summary={summary}
-          samples={samples}
+          samples={images ? [] : samples}
           samplesLabel={t("smartRule.examples")}
           pending={preview.isPending}
         />
         <Text tone="secondary" size="sm">
           {t("smartRule.how")}
         </Text>
+        {images ? (
+          <Text tone="secondary" size="sm">
+            {t("smartRule.imagesHow")}
+          </Text>
+        ) : null}
         {draft.sharedInbox === undefined ? null : (
           <Text tone="secondary" size="sm">
             {t("smartRule.shared", { inbox: draft.sharedInbox })}
           </Text>
         )}
-        {count > 0 ? (
+        {count > 0 && !images ? (
           <Checkbox
             label={t("smartRule.existing", { count, n: number(count) })}
             checked={existing}
