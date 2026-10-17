@@ -2358,6 +2358,8 @@ impl DomainEvent for Filed {
 #[sqlx::test(migrations = "../../migrations")]
 async fn catching_up_past_more_hidden_changes_than_a_page_looks_the_same(db: PgPool) {
     const TICK: Duration = Duration::from_millis(250);
+    // A frame is recorded a moment after it left.
+    const SLACK: Duration = Duration::from_millis(20);
     let world = World::with(db, |c| {
         c.heartbeat_seconds = MATRIX_BEAT.as_secs();
         c.catch_up_tick_ms = u64::try_from(TICK.as_millis()).unwrap();
@@ -2437,9 +2439,7 @@ async fn catching_up_past_more_hidden_changes_than_a_page_looks_the_same(db: PgP
         // workspace as in the quiet one. A read begins once the client took
         // what came before it (`ready`, then the previous page), so each
         // page is timed from there: timing from the request that opened
-        // the stream would count how long opening took under load. The
-        // slack covers the recorder taking a frame a moment after it left.
-        const SLACK: Duration = Duration::from_millis(20);
+        // the stream would count how long opening took under load.
         let left: Vec<Duration> = frames
             .iter()
             .filter(|(_, f)| f.is("change"))
