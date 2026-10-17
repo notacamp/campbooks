@@ -491,7 +491,7 @@ describe("the inbox", () => {
         onTimeout: (error) => {
           const texts = (selector: string) =>
             [...document.querySelectorAll(selector)]
-              .map((node) => (node.textContent).slice(0, 120))
+              .map((node) => node.textContent.slice(0, 120))
               .join(" | ");
           error.message += `\nactive: ${document.activeElement?.outerHTML.slice(0, 200) ?? ""}`;
           error.message += `\nstatus: ${texts('[role="status"]')}`;
