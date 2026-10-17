@@ -366,10 +366,11 @@ describe("What needs you: the actions Scout picked", () => {
     const row = await actions("Acme Hosting");
     fireEvent.click(row.getByRole("button", { name: /^Remind me…/u }));
     const dialog = await screen.findByRole("dialog", { name: "Remind me about Acme Hosting…" });
-    const choices = within(dialog)
+    // The first choice (its number key is 1).
+    const first = within(dialog)
       .getAllByRole("button")
-      .filter((button) => button.hasAttribute("data-dialog-choice"));
-    expect(choices[0]).toHaveTextContent(/Before it’s due/u);
+      .find((button) => button.dataset["dialogChoice"] !== undefined);
+    expect(first).toHaveTextContent(/Before it’s due/u);
   });
 
   it("addresses an untouched forward again, and starts a new one beside a written one", async () => {
