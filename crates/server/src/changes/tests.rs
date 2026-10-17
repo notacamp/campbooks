@@ -1707,6 +1707,11 @@ async fn an_inbox_gained_unannounced_makes_the_stream_resync_at_its_heartbeat(db
         .await
         .unwrap();
     assert!(feed.next_event().await.is("ready"));
+    // The stream lists her containers at its first read, after `ready`: an
+    // inbox made before that is simply in its first list (nothing was read
+    // past, so nothing to resync). Its first heartbeat comes after that
+    // listing whatever the scheduling, so the inbox below is made after it.
+    feed.next_beat().await;
 
     // An inbox made for her with no change announcing it (only a bug would
     // do that): its first mail is read past under her old list.
@@ -2234,9 +2239,22 @@ async fn assert_blind(db: PgPool, observers: &[Observer], hidden: &[Unseen]) {
             "{what}: the streams differ\nbusy: {seen:#?}\nquiet: {unseen:#?}"
         );
 
-        // Resuming from any token it was given replays the same.
+        // Resuming from any token it was given replays the same. The
+        // tokens are taken from the frames `canonical` compares (heartbeats
+        // left out): each stream's heartbeats are on its own timer from its
+        // own open, so a change may land just before a beat in one stream
+        // and just after it in the other, and counting the beats' tokens
+        // would pair different points of the two streams. The final
+        // heartbeat is the same point in both (each transcript ends on it),
+        // and resuming from it replays nothing.
         let tokens = |frames: &[(Duration, Frame)]| -> Vec<String> {
-            frames.iter().filter_map(|(_, f)| f.id.clone()).collect()
+            let mut tokens: Vec<String> = frames
+                .iter()
+                .filter(|(_, f)| !f.is_beat())
+                .filter_map(|(_, f)| f.id.clone())
+                .collect();
+            tokens.extend(frames.last().and_then(|(_, f)| f.id.clone()));
+            tokens
         };
         let (seen_tokens, unseen_tokens) = (tokens(seen), tokens(unseen));
         assert_eq!(seen_tokens.len(), unseen_tokens.len(), "{what}");
@@ -2340,6 +2358,8 @@ impl DomainEvent for Filed {
 #[sqlx::test(migrations = "../../migrations")]
 async fn catching_up_past_more_hidden_changes_than_a_page_looks_the_same(db: PgPool) {
     const TICK: Duration = Duration::from_millis(250);
+    // A frame is recorded a moment after it left.
+    const SLACK: Duration = Duration::from_millis(20);
     let world = World::with(db, |c| {
         c.heartbeat_seconds = MATRIX_BEAT.as_secs();
         c.catch_up_tick_ms = u64::try_from(TICK.as_millis()).unwrap();
@@ -2416,20 +2436,26 @@ async fn catching_up_past_more_hidden_changes_than_a_page_looks_the_same(db: PgP
         );
         assert_tokens_fresh_and_beats_on_time(frames, "catch-up");
         // One page per tick, each a tick after its read began, in the busy
-        // workspace as in the quiet one.
+        // workspace as in the quiet one. A read begins once the client took
+        // what came before it (`ready`, then the previous page), so each
+        // page is timed from there: timing from the request that opened
+        // the stream would count how long opening took under load.
         let left: Vec<Duration> = frames
             .iter()
             .filter(|(_, f)| f.is("change"))
             .map(|(at, _)| *at)
             .collect();
+        assert!(frames[0].1.is("ready"), "{:?}", frames[0]);
+        let mut taken = frames[0].0;
         for (page, (first, last)) in [(0, 199), (200, 399), (400, 449)].into_iter().enumerate() {
-            let due = TICK * u32::try_from(page + 1).unwrap();
+            let due = taken + TICK;
             assert!(
-                left[first] >= due && left[last] < due + TICK / 2,
+                left[first] + SLACK >= due && left[last] < due + TICK / 2,
                 "page {page} left from {:?} to {:?}, due at {due:?}",
                 left[first],
                 left[last]
             );
+            taken = left[last];
         }
     }
 }
