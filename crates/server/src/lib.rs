@@ -843,10 +843,11 @@ mod tests {
         );
     }
 
-    /// Cross-workspace maintenance on a module's table needs the kernel
-    /// scope (the schedulers' dispatchers), and may only read and lease (or
-    /// start): its maintenance policies are `FOR SELECT` and `FOR UPDATE`.
-    /// No policy admits a transaction merely for setting no workspace
+    /// Cross-workspace maintenance on a module's table needs the
+    /// maintenance scope (the schedulers' dispatchers), and may only read and
+    /// lease (or start): its maintenance policies are `FOR SELECT` and `FOR
+    /// UPDATE`. No module policy admits the kernel scope (campbooks-cloud#196),
+    /// and none admits a transaction merely for setting no workspace
     /// (campbooks-cloud#129).
     #[sqlx::test(migrations = "../../migrations")]
     async fn maintenance_policies_only_read_and_lease(db: sqlx::PgPool) {
@@ -866,16 +867,19 @@ mod tests {
             .map(|(_, name, _, _)| name)
             .collect();
         assert!(admitting_unset.is_empty(), "{admitting_unset:?}");
-        // Policies admitting the kernel scope.
-        let kernel = format!(
-            "'{}'::text, true) = 'on'::text",
-            testing::kernel_scope_setting()
-        );
-        let policies: Vec<(String, String, String)> = rows
-            .into_iter()
-            .filter(|(_, _, _, qual)| qual.contains(&kernel))
-            .map(|(table, name, cmd, _)| (table, name, cmd))
-            .collect();
+        let admitting = |setting: &str| {
+            let on = format!("'{setting}'::text, true) = 'on'::text");
+            rows.iter()
+                .filter(|(_, _, _, qual)| qual.contains(&on))
+                .map(|(table, name, cmd, _)| (table.clone(), name.clone(), cmd.clone()))
+                .collect::<Vec<_>>()
+        };
+        // No module table admits the kernel scope: it reaches the kernel's
+        // tables only.
+        let kernel = admitting(testing::kernel_scope_setting());
+        assert!(kernel.is_empty(), "{kernel:?}");
+        // Policies admitting the maintenance scope.
+        let policies = admitting(testing::maintenance_scope_setting());
         assert_eq!(
             policies,
             [

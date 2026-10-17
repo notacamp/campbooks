@@ -129,37 +129,46 @@ reason = "Whether an address has a pending invitation, before any workspace: adm
 
 [[access.pool_access]]
 path = "crates/modules/connectors/src/domain/schedule.rs"
-reason = "Provider budgets are instance-wide (no workspace); the dispatcher itself works in the kernel scope (`[[access.kernel_scope]]`)."
+reason = "Provider budgets are instance-wide (no workspace); the dispatcher itself works in the maintenance scope (`[[access.maintenance_scope]]`)."
 
 [[access.pool_access]]
 path = "crates/modules/connectors/src/zoho/flows.rs"
 reason = "A test file (`#[cfg(test)] mod flows;`): fixtures publish from plain transactions."
 
+
 [[access.pool_access]]
-path = "crates/server/src/bff/"
-reason = "The web BFF's sessions (schema `bff`) are instance-wide: none carries a workspace."
+path = "crates/server/src/bff/store.rs"
+reason = "The web BFF's session store (schema `bff`): sessions are instance-wide, none carries a workspace."
+
+[[access.pool_access]]
+path = "crates/server/src/bff/mod.rs"
+reason = "The BFF's single-flight token refresh locks its session row (schema `bff`, instance-wide) in a transaction of its own."
 
 [[access.pool_access]]
 path = "crates/kernel/src/db.rs"
-reason = "Where the kernel opens its transactions: `begin_for`, `begin_admin`, `begin_kernel`, each setting its scope before any query."
+reason = "Where the kernel opens its transactions: `begin_for`, `begin_admin`, `begin_kernel`, `begin_maintenance`, each setting its scope before any query."
 
 [[access.pool_access]]
 path = "crates/kernel/src/jobs/context.rs"
-reason = "A job's transaction, opened on first use with the job's workspace set (or the kernel scope, `kernel_tx`)."
+reason = "A job's transaction, opened on first use with the job's workspace set (or a scope: `kernel_tx`, `maintenance_tx`)."
 
-# Cross-workspace work outside the kernel (campbooks-cloud#129): a
-# transaction in the kernel scope (`kernel::db::begin_kernel`, a job's
-# `kernel_tx`) reaches every workspace's kernel rows (the queue, the event
-# log) and the module rows its own maintenance policies admit. A
-# transaction that sets neither a workspace nor the kernel scope sees
-# nothing. Each entry is reviewed like an ADR.
-[[access.kernel_scope]]
+# Cross-workspace work outside the kernel. A transaction in the kernel
+# scope (`kernel::db::begin_kernel`, a job's `kernel_tx`) reaches every
+# workspace's kernel rows (the queue, the event log, the change feed, the
+# blob catalogue): no file outside the kernel may open it today
+# (`[[access.kernel_scope]]` is empty; campbooks-cloud#129, #196). A module
+# scheduler's dispatcher works in the narrower maintenance scope
+# (`kernel::db::begin_maintenance`, a job's `maintenance_tx`), which only its
+# own table's maintenance policies admit and no kernel table does; it
+# enqueues each run in that run's workspace. A transaction that sets neither
+# a workspace nor a scope sees nothing. Each entry is reviewed like an ADR.
+[[access.maintenance_scope]]
 path = "crates/modules/connectors/src/domain/schedule.rs"
-reason = "The one-minute dispatcher leases due streams across workspaces (`connectors.sync_due` maintenance policies: ids and times, read and lease only) and enqueues each stream's run for its workspace."
+reason = "The one-minute dispatcher leases due streams across workspaces (`connectors.sync_due` maintenance policies: ids and times, read and lease only) and enqueues each stream's run in its workspace."
 
-[[access.kernel_scope]]
+[[access.maintenance_scope]]
 path = "crates/modules/conversations/src/features/backfill_needs/mod.rs"
-reason = "The needs backfill's dispatcher starts pending backfills across workspaces (`conversations.needs_backfills` maintenance policies: ids and states, start only) and enqueues each inbox's page job for its workspace."
+reason = "The needs backfill's dispatcher starts pending backfills across workspaces (`conversations.needs_backfills` maintenance policies: ids and states, start only) and enqueues each inbox's page job in its workspace."
 
 # Published events nothing consumes yet, and why they exist.
 [[access.unconsumed_events]]

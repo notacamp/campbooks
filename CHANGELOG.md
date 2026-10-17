@@ -35,6 +35,15 @@ All notable changes to Campbooks Next are documented here. The format follows
 
 ### Security
 
+- **Background work shared by the whole instance can only be changed by the kernel.**
+  Account events, account jobs and scheduled ticks belong to no workspace. Work running in
+  a workspace could still read and add them, which it needs, but it could also complete,
+  requeue or delete them. Now only the kernel's own machinery (the worker, retention, the
+  admin's queue) can change them. The two schedulers that work across workspaces (polling
+  mailboxes, the needs backfill) now get a narrower scope that reads only their own
+  schedule and reaches no other workspace's events or jobs. The architecture check also
+  closes four ways around it (campbooks-cloud#196). Before redeploying an older version,
+  run the rollback in the change's design notes.
 - **The change feed reveals nothing about inboxes you can't see.** The live stream of
   what changed used to carry the workspace's own change count: as the `ready` frame's
   `head`, as every frame's cursor (so the gap between two of your changes counted the

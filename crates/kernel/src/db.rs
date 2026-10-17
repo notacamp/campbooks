@@ -155,6 +155,43 @@ pub async fn begin_kernel(pool: &PgPool) -> Result<Transaction<'static, Postgres
     Ok(tx)
 }
 
+/// The transaction-local Postgres setting that a module's **maintenance
+/// policies** trust, and nothing else: a scheduler's dispatcher reading and
+/// leasing its own index across workspaces (`connectors.sync_due`,
+/// `conversations.needs_backfills`; campbooks-cloud#196). The kernel's tables
+/// do not admit it, so a transaction in this scope reaches no workspace's
+/// events, jobs, changes or blobs: the dispatcher enqueues each run in the
+/// run's workspace ([`set_workspace`] before the enqueue). Only the kernel
+/// names it (crate-private); [`begin_maintenance`] and
+/// [`JobContext::maintenance_tx`](crate::JobContext::maintenance_tx) set it,
+/// and `cargo xtask arch` keeps those two to the reviewed
+/// `[[access.maintenance_scope]]` entries of `architecture.toml`.
+pub(crate) const MAINTENANCE_SCOPE_SETTING: &str = "campbooks.maintenance_scope";
+
+/// Begin a transaction in the **maintenance scope**
+/// (`campbooks.maintenance_scope = on`, `SET LOCAL`): only the module tables
+/// whose maintenance policy admits it show rows across workspaces. Work on
+/// one workspace's rows (an enqueue) sets that workspace first
+/// ([`set_workspace`]).
+pub async fn begin_maintenance(
+    pool: &PgPool,
+) -> Result<Transaction<'static, Postgres>, sqlx::Error> {
+    let mut tx = pool.begin().await?;
+    enter_maintenance_scope(&mut tx).await?;
+    Ok(tx)
+}
+
+/// Turn the maintenance scope on in the current transaction, until it ends.
+pub(crate) async fn enter_maintenance_scope(conn: &mut PgConnection) -> Result<(), sqlx::Error> {
+    sqlx::query_scalar!(
+        "SELECT set_config($1, 'on', true)",
+        MAINTENANCE_SCOPE_SETTING
+    )
+    .fetch_one(conn)
+    .await?;
+    Ok(())
+}
+
 /// Turn the kernel scope on in the current transaction, until it ends or
 /// [`leave_kernel_scope`].
 pub(crate) async fn enter_kernel_scope(conn: &mut PgConnection) -> Result<(), sqlx::Error> {
