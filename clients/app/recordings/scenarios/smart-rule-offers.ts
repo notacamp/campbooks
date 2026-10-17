@@ -81,12 +81,13 @@ export default async function smartRuleOffers({ page }: ScenarioContext): Promis
   await homeShows(page, workspace, "Scout noticed");
   await page.getByText("Scout noticed").first().scrollIntoViewIfNeeded();
   await caption(page, "At the bottom of Home: something Scout noticed", 2400);
-  await page.getByRole("button", { name: /^Set up a smart rule/u }).click();
+  const noticed = page.getByRole("region", { name: "Scout noticed" });
+  await noticed.getByRole("button", { name: /^Set up a smart rule/u }).click();
   await page.getByRole("dialog", { name: /A rule for mail from/u }).waitFor();
   await caption(page, "The same confirmation, before anything is saved", 2400);
   await page.keyboard.press("Escape");
   await pause(600);
-  await page.getByRole("button", { name: /^Not now/u }).click();
+  await noticed.getByRole("button", { name: /^Not now/u }).click();
   await caption(page, "Not now: it asks another time, with Undo", 2000);
   await page.getByRole("button", { name: /^Undo/u }).first().click();
   await pause(1500);
