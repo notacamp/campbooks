@@ -24,6 +24,7 @@
     "fake-google": "pnpm --filter @campbooks/app run fake-google",
     "fake-microsoft": "pnpm --filter @campbooks/app run fake-microsoft",
     "fake-zoho": "pnpm --filter @campbooks/app run fake-zoho",
+    "fake-complete": "pnpm --filter @campbooks/app run fake-complete",
     "i18n:check": "pnpm -r run i18n:check",
     "format": "prettier --write .",
     "format:check": "prettier --check ."

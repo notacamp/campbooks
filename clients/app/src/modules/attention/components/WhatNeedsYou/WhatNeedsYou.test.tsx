@@ -25,6 +25,7 @@ import {
   SOFIA,
 } from "../../../../../test/demo/attention";
 import { NOW, W } from "../../../../../test/demo/conversations";
+import { REPLY } from "../../../../../test/demo/drafts";
 import { DUARTE } from "../../../../../test/demo/workspaces";
 import { mockApi, problem, renderWithProviders } from "../../../../../test/render";
 
@@ -65,8 +66,30 @@ function api(items = ITEMS, live?: { items: typeof ITEMS }) {
     [`POST ${W}/conversations/${MARTA.id}/need/resolve`]: { body: { ...MARTA, need: null } },
     [`POST ${W}/conversations/${JONAS.id}/need/resolve`]: { body: { ...JONAS, need: null } },
     [`POST ${W}/attention/${ITEMS[3]?.id ?? ""}/snooze`]: { body: ITEMS[3] },
+    [`POST ${W}/conversations/${MARTA.id}/reply/suggestions`]: {
+      body: {
+        message_id: MARTA_DETAIL.messages.at(-1)?.id,
+        intents: ["Say Thursday works", "Ask to move it"],
+      },
+    },
+    [`POST ${W}/conversations/${MARTA.id}/reply/draft`]: {
+      body: { message_id: MARTA_DETAIL.messages.at(-1)?.id, text: MARTA_REPLY },
+    },
+    [`POST ${W}/drafts`]: { status: 201, body: MARTA_DRAFT },
+    [`POST ${W}/drafts/${MARTA_DRAFT.id}/send`]: {
+      status: 202,
+      body: { ...MARTA_DRAFT, state: "scheduled", send_at: "2026-10-13T15:00:10Z" },
+    },
   });
 }
+
+const MARTA_REPLY = "Hi Marta,\n\nThursday works.\n\nSam Rivera";
+const MARTA_DRAFT = {
+  ...REPLY,
+  conversation_id: MARTA.id,
+  message_id: MARTA_DETAIL.messages.at(-1)?.id ?? null,
+  body: MARTA_REPLY,
+};
 
 /** The row (button) holding `text`, and whether it is the selected one. */
 function isSelected(text: string): boolean {
@@ -413,16 +436,46 @@ describe("What needs you", () => {
     });
   });
 
-  it("replies with R in the conversation's reader", async () => {
-    api();
+  it("opens the reply dialog with R; Write my own opens the reader's composer", async () => {
+    const calls = api();
     const { router } = renderHome();
     await screen.findByText("This may be phishing. Don’t use its links.");
     fireEvent.keyDown(document, { key: "j" });
     fireEvent.keyDown(document, { key: "r" });
+    expect(await screen.findByRole("dialog", { name: "Reply to Marta" })).toBeVisible();
+    expect(await screen.findByRole("button", { name: /Say Thursday works/u })).toBeVisible();
+    // Scout reads the newest message; nothing is written before a pick.
+    expect(
+      calls.calls.find((c) => c.route === `POST ${W}/conversations/${MARTA.id}/reply/suggestions`)
+        ?.body,
+    ).toEqual({ message_id: MARTA_DETAIL.messages.at(-1)?.id });
+    expect(calls.calls.some((c) => c.route.endsWith("/reply/draft"))).toBe(false);
+    fireEvent.click(screen.getByRole("button", { name: /Write my own/u }));
     await waitFor(() => {
       expect(router.state.location.pathname).toBe(`/w/${DUARTE.id}/inbox/primary/${MARTA.id}`);
     });
     expect(router.state.location.search).toEqual({ reply: true });
+  });
+
+  it("sends Scout's draft from the dialog and folds the item", async () => {
+    const calls = api();
+    renderHome();
+    await screen.findByText("This may be phishing. Don’t use its links.");
+    fireEvent.keyDown(document, { key: "j" });
+    fireEvent.keyDown(document, { key: "1" });
+    const first = await screen.findByRole("button", { name: /Say Thursday works/u });
+    fireEvent.keyDown(first, { key: "1" });
+    const text = await screen.findByRole("textbox", { name: "Your reply" });
+    expect(text).toHaveValue(MARTA_REPLY);
+    fireEvent.keyDown(text, { key: "Enter", ctrlKey: true });
+    await waitFor(() => {
+      expect(calls.calls.map((c) => c.route)).toContain(`POST ${W}/drafts/${MARTA_DRAFT.id}/send`);
+    });
+    expect(calls.calls.find((c) => c.route === `POST ${W}/drafts`)?.body).toMatchObject({
+      kind: "reply",
+      body: MARTA_REPLY,
+    });
+    expect((await screen.findAllByText("Sending to Marta Ferreira")).length).toBeGreaterThan(0);
   });
 
   it("snoozes an item until Monday from the Snooze dialog (S)", async () => {

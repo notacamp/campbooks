@@ -88,7 +88,8 @@ pub fn request(email: &Email) -> ChatRequest {
         }),
     );
     request.temperature = Some(0.2);
-    request.max_tokens = Some(800);
+    // The model reasons before it answers and its thinking shares the budget.
+    request.max_tokens = Some(4096);
     request
 }
 

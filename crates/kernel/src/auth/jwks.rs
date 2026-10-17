@@ -21,6 +21,7 @@ use std::{
 };
 
 use axum::http::{HeaderMap, header};
+use base64::{Engine as _, engine::general_purpose::URL_SAFE_NO_PAD};
 use chrono::{DateTime, TimeDelta, Utc};
 use jsonwebtoken::{
     Algorithm, DecodingKey,
@@ -371,8 +372,26 @@ fn usable_key(raw: serde_json::Value) -> Option<CachedKey> {
         return None;
     }
     let kid = jwk.common.key_id.clone()?;
-    let key = DecodingKey::from_jwk(&jwk).ok()?;
+    let key = match &jwk.algorithm {
+        // Zoho publishes `n` with a leading zero byte, which the RSA backend
+        // refuses when it verifies (every signature then fails); the number is
+        // the same without it.
+        AlgorithmParameters::RSA(params) => DecodingKey::from_rsa_raw_components(
+            without_leading_zeros(&URL_SAFE_NO_PAD.decode(&params.n).ok()?),
+            without_leading_zeros(&URL_SAFE_NO_PAD.decode(&params.e).ok()?),
+        ),
+        _ => DecodingKey::from_jwk(&jwk).ok()?,
+    };
     Some(CachedKey { kid, alg, key })
+}
+
+/// A big-endian integer in its minimal encoding.
+fn without_leading_zeros(bytes: &[u8]) -> &[u8] {
+    let start = bytes
+        .iter()
+        .position(|byte| *byte != 0)
+        .unwrap_or(bytes.len());
+    &bytes[start..]
 }
 
 /// How long a JWKS response may be cached: its `Cache-Control: max-age`,
@@ -475,6 +494,60 @@ mod tests {
             "kty": "RSA", "kid": "r1", "alg": "RS256", "n": "sXch", "e": "AQAB"
         });
         assert_eq!(usable_key(rsa).unwrap().alg, Algorithm::RS256);
+    }
+
+    #[test]
+    fn verifies_with_rsa_keys_published_with_a_leading_zero() {
+        use aws_lc_rs::{
+            rand::SystemRandom,
+            rsa::{KeyPair, KeySize, PublicKeyComponents},
+            signature::{KeyPair as _, RSA_PKCS1_SHA256},
+        };
+
+        let pair = KeyPair::generate(KeySize::Rsa2048).unwrap();
+        let public = PublicKeyComponents::<Vec<u8>>::from(pair.public_key());
+        // As Zoho publishes it: `n` one byte longer, starting with 0x00.
+        let padded_n = [&[0_u8][..], &public.n].concat();
+        let jwk = serde_json::json!({
+            "kty": "RSA", "kid": "z1", "alg": "RS256", "use": "sig",
+            "n": URL_SAFE_NO_PAD.encode(&padded_n), "e": URL_SAFE_NO_PAD.encode(&public.e)
+        });
+        let signed = format!(
+            "{}.{}",
+            URL_SAFE_NO_PAD.encode(r#"{"alg":"RS256","kid":"z1"}"#),
+            URL_SAFE_NO_PAD.encode(r#"{"sub":"someone"}"#)
+        );
+        let mut signature = vec![0; pair.public_key().modulus_len()];
+        pair.sign(
+            &RSA_PKCS1_SHA256,
+            &SystemRandom::new(),
+            signed.as_bytes(),
+            &mut signature,
+        )
+        .unwrap();
+        let token = format!("{signed}.{}", URL_SAFE_NO_PAD.encode(&signature));
+
+        let key = usable_key(jwk).unwrap().key;
+        let mut validation = jsonwebtoken::Validation::new(Algorithm::RS256);
+        validation.required_spec_claims.clear();
+        validation.validate_exp = false;
+        validation.validate_aud = false;
+        let claims = jsonwebtoken::decode::<serde_json::Value>(&token, &key, &validation)
+            .unwrap()
+            .claims;
+        assert_eq!(claims["sub"], "someone");
+
+        let other = KeyPair::generate(KeySize::Rsa2048).unwrap();
+        other
+            .sign(
+                &RSA_PKCS1_SHA256,
+                &SystemRandom::new(),
+                signed.as_bytes(),
+                &mut signature,
+            )
+            .unwrap();
+        let forged = format!("{signed}.{}", URL_SAFE_NO_PAD.encode(&signature));
+        assert!(jsonwebtoken::decode::<serde_json::Value>(&forged, &key, &validation).is_err());
     }
 
     #[test]

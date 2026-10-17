@@ -8,6 +8,11 @@ All notable changes to Campbooks Next are documented here. The format follows
 
 ### Fixed
 
+- **Sign in with Zoho works.** Signing in with Zoho, or connecting a Zoho mailbox,
+  always ended on "The provider didn't let you in". Zoho publishes its signing key with
+  an extra zero byte in front, and the server refused the key's every signature because
+  of it. The server now reads the key without the zero byte and checks everything else as
+  before.
 - **Pay asks "Is it paid?", and receipts never land in Pay.** Pay used to be raised for
   any money mail the decide model read as asking something, so invoices already paid and
   payment confirmations showed up as "Pay". The decide model now answers one more
@@ -39,6 +44,20 @@ All notable changes to Campbooks Next are documented here. The format follows
   senders by name, as in Scout's questions: type part of a name, or a full address or a
   domain. Each sender you tick becomes its own rule, so mail from any of them counts, and
   each rule shows what it matches before you save it.
+- **Reply proposes Scout's draft.** Reply (R, an item's Reply on Home, the reader's Reply)
+  now opens a dialog with two or three likely replies, each with its number key ("Yes,
+  Thursday works", "Ask to move it to the afternoon"), a line to say it in your own words,
+  and "Write my own" for the plain composer. Scout writes the draft only when you pick one,
+  in the conversation's language and signed with your name. Edit it in place, make it
+  shorter or ask for a change in plain words, then Send: it goes with the usual Undo
+  window, the Home item folds away, and Undo brings the draft back. "Open in composer"
+  moves it to the full composer. Nothing is sent until you press Send, and nothing is
+  written before you pick. Servers with no `complete` model that may read mail offer only
+  "Write my own", saying why. Items in an inbox you can only read no longer offer Reply,
+  Done or Not needed on Home. Two new operations, `conversations.suggest_replies` and
+  `conversations.write_reply`, need `conversations:send`, count against the workspace's
+  daily AI limit and a per-member hourly allowance, and store nothing.
+
 
 - **Scout's summary of the email on an opened Home item.** When an email raises a need, the
   `complete` model writes one or two plain sentences saying what it is about, once, in the

@@ -1,5 +1,8 @@
 {
   "errors": {
+    "reply_unavailable": "Este servidor não tem um modelo de linguagem que possa ler o correio, por isso o Scout não pode escrever respostas aqui. Escreva esta você mesmo.",
+    "reply_failed": "O Scout não conseguiu escrever a resposta agora. Tente de novo daqui a pouco ou escreva-a você mesmo.",
+    "reply_ask_invalid": "Diga o que a resposta deve dizer, com 1 a {{max}} caracteres.",
     "invalid_limit": "O limite tem de estar entre 1 e {{max}}.",
     "invalid_cursor": "Esta ligação de página não é válida. Recomece pela primeira página.",
     "invalid_label_name": "O nome de uma etiqueta tem de ter entre 1 e {{max}} caracteres.",

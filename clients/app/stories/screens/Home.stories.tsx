@@ -140,6 +140,90 @@ export const SnoozeDialog: Story = {
   },
 };
 
+const REPLY_ROUTES: Record<string, MockRoute> = {
+  [`POST ${W}/conversations/${MARTA.id}/reply/suggestions`]: {
+    body: {
+      message_id: MARTA_DETAIL.messages.at(-1)?.id,
+      intents: [
+        "Yes, Thursday works",
+        "Ask to move it to the afternoon",
+        "Say you'll confirm by tomorrow",
+      ],
+    },
+  },
+  [`POST ${W}/conversations/${MARTA.id}/reply/draft`]: {
+    body: {
+      message_id: MARTA_DETAIL.messages.at(-1)?.id,
+      text: "Hi Marta,\n\nThursday works for me. See you at the walkthrough.\n\nBest,\nSam Rivera",
+    },
+  },
+};
+
+/** R opens Reply: Scout's likely replies, each with its key, and Write my own. */
+export const ReplyDialog: Story = {
+  args: { path: PATH, api: home(REPLY_ROUTES) },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await canvas.findByText("Marta Ferreira is waiting for your reply");
+    await userEvent.keyboard("j");
+    await userEvent.keyboard("r");
+    const body = within(canvasElement.ownerDocument.body);
+    const dialog = await body.findByRole("dialog", { name: "Reply to Marta" });
+    // The dialog fades in: wait until it is shown.
+    await waitFor(async () => {
+      await expect(dialog).toBeVisible();
+    });
+    const first = await body.findByRole("button", { name: /Yes, Thursday works/u });
+    await waitFor(async () => {
+      await expect(first).toHaveFocus();
+    });
+  },
+};
+
+/** A pick asks Scout for the draft: editable, with Shorter, Change and Send. */
+export const ReplyDraft: Story = {
+  args: { path: PATH, api: home(REPLY_ROUTES) },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await canvas.findByText("Marta Ferreira is waiting for your reply");
+    await userEvent.keyboard("j");
+    await userEvent.keyboard("r");
+    const body = within(canvasElement.ownerDocument.body);
+    await body.findByRole("button", { name: /Yes, Thursday works/u });
+    await userEvent.keyboard("1");
+    const text = await body.findByRole("textbox", { name: "Your reply" });
+    await waitFor(async () => {
+      await expect(text).toHaveFocus();
+    });
+  },
+};
+
+/** No model may read mail on this server: only Write my own, saying why. */
+export const ReplyUnavailable: Story = {
+  args: {
+    path: PATH,
+    api: home({
+      [`POST ${W}/conversations/${MARTA.id}/reply/suggestions`]: {
+        status: 409,
+        body: { status: 409, code: "reply_unavailable", title: "Unavailable" },
+      },
+    }),
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await canvas.findByText("Marta Ferreira is waiting for your reply");
+    await userEvent.keyboard("j");
+    await userEvent.keyboard("r");
+    const body = within(canvasElement.ownerDocument.body);
+    // The dialog fades in: wait until its line is shown.
+    await waitFor(async () => {
+      await expect(
+        body.getByText("Scout can't write replies on this server, so you write this one."),
+      ).toBeVisible();
+    });
+  },
+};
+
 /** Nothing needs you: a fact, not a promise, with Done today still there. */
 export const NothingNeedsYou: Story = {
   args: {

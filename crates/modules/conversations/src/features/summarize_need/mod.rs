@@ -159,7 +159,29 @@ impl JobHandler for SummarizeNeed {
             .run(gateway.chat(Role::Complete, prompt::request(&email)))
             .await
         {
-            Ok(response) => response.json::<Answer>().ok(),
+            Ok(response) => {
+                let parsed = response.json::<Answer>().ok();
+                if parsed.is_none() {
+                    // Sizes and the stop reason only, never what the model wrote.
+                    let finish = finish_kind(response.finish_reason.as_deref());
+                    let reason = if response.content.trim().is_empty() {
+                        "empty"
+                    } else if finish == "length" {
+                        "truncated"
+                    } else {
+                        "not_json"
+                    };
+                    tracing::warn!(
+                        feature = FEATURE,
+                        reason,
+                        finish_reason = finish,
+                        completion_tokens = response.usage.map(|u| u.completion_tokens),
+                        content_chars = response.content.chars().count(),
+                        "the summary answer did not parse"
+                    );
+                }
+                parsed
+            }
             // The workspace used its whole daily limit: wait for it to
             // reset, as background work does.
             Err(campbooks_ai::Error::OverDailyCap { .. }) => {
@@ -229,6 +251,19 @@ fn retryable(error: &campbooks_ai::Error) -> bool {
             | campbooks_ai::Error::InvalidResponse(_)
             | campbooks_ai::Error::Metering
     )
+}
+
+/// Why the model stopped, for the log: one of a few known words.
+// TODO: share `ChatResponse::finish_kind` once it lands on next.
+fn finish_kind(reason: Option<&str>) -> &'static str {
+    match reason {
+        None => "none",
+        Some("stop") => "stop",
+        Some("length") => "length",
+        Some("content_filter") => "content_filter",
+        Some("tool_calls") => "tool_calls",
+        Some(_) => "other",
+    }
 }
 
 /// What kind of failure, for the log: never the provider's words.

@@ -32,6 +32,7 @@ pub mod purge_workspace;
 pub mod record_send;
 pub mod refresh_need;
 pub mod release_send;
+pub mod reply;
 pub mod rules;
 pub mod search_source;
 pub mod send_draft;

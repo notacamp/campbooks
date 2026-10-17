@@ -162,6 +162,8 @@ pub fn module(deps: ConversationsDeps) -> Module {
         .ai
         .clone()
         .filter(features::summarize_need::may_read_mail);
+    // Scout's replies ask the `complete` role, when it may read mail.
+    let writer = features::reply::ReplyWriter::new(deps.ai.clone());
     let model = match deps.model {
         Some(strategy) => Some(features::decide_message::ModelPass::new(strategy, None)),
         None => deps.ai.filter(model_may_read_mail).map(|gateway| {
@@ -181,7 +183,8 @@ pub fn module(deps: ConversationsDeps) -> Module {
                 undo: chrono::TimeDelta::seconds(i64::from(deps.config.undo_send_seconds)),
             }))
             .layer(Extension(needs.clone()))
-            .layer(Extension(deps.policy.clone())),
+            .layer(Extension(deps.policy.clone()))
+            .layer(Extension(writer)),
         admin_router: None,
         background: Background::new()
             .publishes::<events::MessageReceived>()
@@ -266,7 +269,8 @@ fn router() -> OpenApiRouter<AppState> {
     use features::{
         archive, create_draft, get_attachment, get_conversation, get_message_body, labels,
         list_conversations, list_drafts, list_inboxes, list_labels, list_senders, list_streams,
-        mark_read, move_to_stream, needs, rules, send_draft, star, suggest_rules, update_draft,
+        mark_read, move_to_stream, needs, reply, rules, send_draft, star, suggest_rules,
+        update_draft,
     };
     OpenApiRouter::new()
         .routes(routes!(list_inboxes::handler))
@@ -306,6 +310,8 @@ fn router() -> OpenApiRouter<AppState> {
         .routes(routes!(rules::restore))
         .routes(routes!(suggest_rules::suggest))
         .routes(routes!(suggest_rules::dismiss))
+        .routes(routes!(reply::suggest))
+        .routes(routes!(reply::write))
 }
 
 #[cfg(test)]
