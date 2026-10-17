@@ -58,9 +58,9 @@
   },
   "noSubject": "(no subject)",
   "remind": {
-    "before": "Remind me {{when}}",
+    "today": "Remind me today at {{time}}",
     "tomorrow": "Remind me tomorrow at {{time}}",
-    "monday": "Remind me Monday"
+    "on": "Remind me on {{date}}"
   },
   "pay": {
     "allPaid_one": "{{count}} already paid",

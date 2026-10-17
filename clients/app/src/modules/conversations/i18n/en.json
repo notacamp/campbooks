@@ -169,7 +169,8 @@
     "showImages": "Show images",
     "nextAttachment": "Next attachment",
     "notNeeded": "Not needed (or it’s safe)",
-    "undoAll": "Undo all a rule did"
+    "undoAll": "Undo all a rule did",
+    "allPaid": "All bills already paid"
   },
   "compose": {
     "title": {
@@ -292,7 +293,9 @@
       "paid": "Marked paid · {{name}}",
       "toPay": "Kept in Pay · {{name}}",
       "allPaid_one": "Marked {{count}} invoice paid",
-      "allPaid_other": "Marked {{count}} invoices paid"
+      "allPaid_other": "Marked {{count}} invoices paid",
+      "allPaidFailed_one": "Couldn’t mark {{count}} invoice paid. Try again.",
+      "allPaidFailed_other": "Couldn’t mark {{count}} invoices paid. Try again."
     }
   },
   "rules": {

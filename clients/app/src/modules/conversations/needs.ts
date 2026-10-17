@@ -7,6 +7,18 @@ import { displayName, reasonText, type Translate } from "./model";
 
 const DAY_MS = 86_400_000;
 
+/**
+ * A bill: a Pay need from the money question. `ask` while Campbooks asks
+ * "Is it paid?", `toPay` once the member said it is still to pay; not a
+ * bill otherwise.
+ */
+export function billKind(need: NeedView): "ask" | "toPay" | undefined {
+  if (need.reason !== "pay" || need.question !== "money") {
+    return undefined;
+  }
+  return need.trust === "check" ? "ask" : "toPay";
+}
+
 /** Who a need is from: the sender's name; for a warning, their address (a name is free to fake). */
 export function needSender(need: NeedView, conversation: ConversationSummary): string {
   const from = need.quote?.from ?? conversation.latest_from ?? null;
@@ -22,7 +34,7 @@ export function needSentence(t: Translate, need: NeedView, name: string): string
     return t("needs.line.warning");
   }
   if (need.trust === "check") {
-    if (need.question === "money") {
+    if (billKind(need) === "ask") {
       // Campbooks can't see the bank: a bill is a question until answered
       // (Already paid / Still to pay).
       return t("needs.line.checkPay", { name });
@@ -58,7 +70,7 @@ export function needChip(t: Translate, need: NeedView): string {
   if (need.question === "suspicious") {
     return t("needs.chip.suspicious");
   }
-  if (need.trust === "check" && need.question !== "money") {
+  if (need.trust === "check" && billKind(need) === undefined) {
     return t("needs.chip.check");
   }
   return t(`needs.chip.${need.reason}`);
@@ -66,7 +78,7 @@ export function needChip(t: Translate, need: NeedView): string {
 
 /** The signal colour of a need's chip. */
 export function needSignal(need: NeedView): "reply" | "do" | "pay" | "review" {
-  return need.trust === "check" && need.question !== "money" ? "review" : need.reason;
+  return need.trust === "check" && billKind(need) === undefined ? "review" : need.reason;
 }
 
 /** Days from `today` to `isoDate` (a calendar date), negative when past. */
@@ -99,7 +111,7 @@ export function dueLabel(
   }
   const days = daysUntil(due, today);
   // A bill still to pay says how late it is: "2 days overdue".
-  if (days < 0 && need.reason === "pay" && need.trust === "sure") {
+  if (days < 0 && billKind(need) === "toPay") {
     return { text: t("needs.due.daysOverdue", { count: -days }), overdue: true, soon: true };
   }
   if (days < 0) {

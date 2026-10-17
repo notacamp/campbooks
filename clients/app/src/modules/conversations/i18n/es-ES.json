@@ -169,7 +169,8 @@
     "showImages": "Mostrar imágenes",
     "nextAttachment": "Siguiente adjunto",
     "notNeeded": "No hace falta (o es seguro)",
-    "undoAll": "Deshacer todo lo que hizo una regla"
+    "undoAll": "Deshacer todo lo que hizo una regla",
+    "allPaid": "Todas las facturas ya pagadas"
   },
   "compose": {
     "title": {
@@ -228,7 +229,7 @@
       "warning": "Esto puede ser phishing. No uses sus enlaces.",
       "checkReply": "¿{{name}} necesita respuesta?",
       "checkDo": "¿{{name}} te ha pedido que hagas algo?",
-      "checkPay": "{{name}} ha enviado una factura. ¿Está pagada?",
+      "checkPay": "{{name}} ha enviado una factura. ¿Ya está pagada?",
       "taughtReply": "{{name}}: responder, por una regla",
       "taughtDo": "{{name}}: por hacer, por una regla"
     },
@@ -280,7 +281,7 @@
       "alreadyPaid": "Ya está pagada",
       "stillToPay": "Pendiente de pago",
       "markPaid": "Marcar como pagada",
-      "billPrompt": "Campbooks no ve tu banco."
+      "billPrompt": "Campbooks no tiene acceso a tu banco."
     },
     "toast": {
       "done": "Hecho · {{name}}",
@@ -292,7 +293,9 @@
       "paid": "Marcada como pagada · {{name}}",
       "toPay": "Se queda en Pagar · {{name}}",
       "allPaid_one": "{{count}} factura marcada como pagada",
-      "allPaid_other": "{{count}} facturas marcadas como pagadas"
+      "allPaid_other": "{{count}} facturas marcadas como pagadas",
+      "allPaidFailed_one": "No se ha podido marcar {{count}} factura como pagada. Inténtalo de nuevo.",
+      "allPaidFailed_other": "No se han podido marcar {{count}} facturas como pagadas. Inténtalo de nuevo."
     }
   },
   "rules": {

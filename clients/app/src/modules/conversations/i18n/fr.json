@@ -169,7 +169,8 @@
     "showImages": "Afficher les images",
     "nextAttachment": "Pièce jointe suivante",
     "notNeeded": "Pas nécessaire (ou c’est sûr)",
-    "undoAll": "Annuler tout ce qu’a fait une règle"
+    "undoAll": "Annuler tout ce qu’a fait une règle",
+    "allPaid": "Toutes les factures déjà payées"
   },
   "compose": {
     "title": {
@@ -279,8 +280,8 @@
       "questionPrompt": "Campbooks n’en est pas sûr.",
       "alreadyPaid": "Déjà payée",
       "stillToPay": "Reste à payer",
-      "markPaid": "Marquer payée",
-      "billPrompt": "Campbooks ne voit pas votre banque."
+      "markPaid": "Marquer comme payée",
+      "billPrompt": "Campbooks n’a pas accès à votre banque."
     },
     "toast": {
       "done": "Fait · {{name}}",
@@ -289,10 +290,12 @@
       "confirmed": "Merci · {{name}} reste dans votre liste",
       "failed": "Impossible de modifier {{name}} : rien n’a changé. Réessayez.",
       "changed": "{{name}} a changé pendant que vous regardiez : jetez-y un nouveau coup d’œil.",
-      "paid": "Marquée payée · {{name}}",
+      "paid": "Marquée comme payée · {{name}}",
       "toPay": "Reste dans À payer · {{name}}",
-      "allPaid_one": "{{count}} facture marquée payée",
-      "allPaid_other": "{{count}} factures marquées payées"
+      "allPaid_one": "{{count}} facture marquée comme payée",
+      "allPaid_other": "{{count}} factures marquées comme payées",
+      "allPaidFailed_one": "Impossible de marquer {{count}} facture comme payée. Réessayez.",
+      "allPaidFailed_other": "Impossible de marquer {{count}} factures comme payées. Réessayez."
     }
   },
   "rules": {

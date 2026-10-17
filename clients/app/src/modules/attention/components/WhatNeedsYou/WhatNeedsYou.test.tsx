@@ -295,7 +295,8 @@ describe("What needs you", () => {
         message_id: ACME.need?.message_id,
       });
     });
-    expect(screen.getByText("Marked paid · Acme Hosting")).toBeVisible();
+    // The row's own confirmation and the toast say it.
+    expect(screen.getAllByText("Marked paid · Acme Hosting")).toHaveLength(2);
   });
 
   it("keeps a bill still to pay as Pay, with a reminder first", async () => {
@@ -336,7 +337,7 @@ describe("What needs you", () => {
     const actions = screen.getByRole("group", { name: "Actions for Acme Hosting" });
     const labels = within(actions)
       .getAllByRole("button")
-      .map((b) => b.textContent ?? "");
+      .map((b) => b.textContent);
     expect(labels[0]).toMatch(/^Remind me /u);
     expect(labels.slice(1)).toEqual(["Mark paid2", "Snooze…S", "Not neededX"]);
     // Luz, overdue, says by how much.

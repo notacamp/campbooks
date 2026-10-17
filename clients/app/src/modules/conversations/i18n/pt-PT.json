@@ -169,7 +169,8 @@
     "showImages": "Mostrar imagens",
     "nextAttachment": "Anexo seguinte",
     "notNeeded": "Não é preciso (ou é seguro)",
-    "undoAll": "Anular tudo o que uma regra fez"
+    "undoAll": "Anular tudo o que uma regra fez",
+    "allPaid": "Todas as faturas já pagas"
   },
   "compose": {
     "title": {
@@ -280,7 +281,7 @@
       "alreadyPaid": "Já está paga",
       "stillToPay": "Ainda por pagar",
       "markPaid": "Marcar como paga",
-      "billPrompt": "O Campbooks não vê o seu banco."
+      "billPrompt": "O Campbooks não tem acesso ao seu banco."
     },
     "toast": {
       "done": "Feito · {{name}}",
@@ -292,7 +293,9 @@
       "paid": "Marcada como paga · {{name}}",
       "toPay": "Fica em Pagar · {{name}}",
       "allPaid_one": "{{count}} fatura marcada como paga",
-      "allPaid_other": "{{count}} faturas marcadas como pagas"
+      "allPaid_other": "{{count}} faturas marcadas como pagas",
+      "allPaidFailed_one": "Não foi possível marcar {{count}} fatura como paga. Tente de novo.",
+      "allPaidFailed_other": "Não foi possível marcar {{count}} faturas como pagas. Tente de novo."
     }
   },
   "rules": {

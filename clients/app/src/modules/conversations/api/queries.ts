@@ -400,6 +400,14 @@ export function useConversationAction(workspaceId: string) {
     onMutate: ({ conversation, action }) => {
       const next = applied(conversation, action);
       placeInLists(queryClient, workspaceId, next);
+      // Lists by ids (Home's rows) are plain arrays under the same key.
+      queryClient.setQueriesData<unknown>({ queryKey: keys.lists(workspaceId) }, (data: unknown) =>
+        Array.isArray(data)
+          ? (data as ConversationSummary[]).map((summary) =>
+              summary.id === next.id ? next : summary,
+            )
+          : data,
+      );
       queryClient.setQueryData<ConversationDetail>(
         keys.conversation(workspaceId, conversation.id),
         (detail) => (detail === undefined ? detail : { ...detail, conversation: next }),

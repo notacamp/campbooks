@@ -23,6 +23,7 @@ import {
   type ItemAction,
 } from "~/lib/ui";
 import {
+  billKind,
   dueLabel,
   howRows,
   needSender,
@@ -89,8 +90,9 @@ const kindOf = (need: NeedView): RowKind => {
     return "warning";
   }
   // A bill: asked "Is it paid?" until the member answers, then "Pay …".
-  if (need.reason === "pay" && need.question === "money") {
-    return need.trust === "check" ? "bill" : "toPay";
+  const bill = billKind(need);
+  if (bill !== undefined) {
+    return bill === "ask" ? "bill" : "toPay";
   }
   return need.trust === "check" ? "question" : "need";
 };
@@ -372,32 +374,55 @@ export function WhatNeedsYou({ workspaceId, now, offer }: WhatNeedsYouProps) {
   };
 
   const reminder = (row: Row) => remindTime(row.need.due_on, now ?? new Date());
+  // Said from the time it gives: today or tomorrow at 09:00, else the date.
   const remindLabel = (row: Row) => {
-    const { until, kind } = reminder(row);
+    const { until } = reminder(row);
+    const from = now ?? new Date();
+    const days = Math.round(
+      (new Date(until).setHours(0, 0, 0, 0) - new Date(from).setHours(0, 0, 0, 0)) / 86_400_000,
+    );
     const time = new Intl.DateTimeFormat(i18n.language, {
       hour: "2-digit",
       minute: "2-digit",
+      hourCycle: "h23",
     }).format(until);
-    const day = new Intl.DateTimeFormat(i18n.language, {
-      weekday: "short",
-      day: "numeric",
-      month: "short",
-    }).format(until);
-    return t(`remind.${kind}`, { when: day, time });
+    if (days <= 1) {
+      return t(days <= 0 ? "remind.today" : "remind.tomorrow", { time });
+    }
+    const date = new Intl.DateTimeFormat(i18n.language, { day: "numeric", month: "long" }).format(
+      until,
+    );
+    return t("remind.on", { date });
   };
 
   /** What a row offers, in words with keys: the shape #166's ranked actions drop into. */
   const actionsOf = (row: Row): { own: ItemAction[]; universal: ItemAction[] } => {
     const kind = kindOf(row.need);
     const ids = rowActionIds(kind);
-    const ownLabel: Record<OwnActionId, string> = {
-      reply: t("actions.reply"),
-      yes: tc("needs.actions.yes"),
-      no: tc("needs.actions.no"),
-      safe: tc("needs.actions.safe"),
-      paid: tc(kind === "bill" ? "needs.actions.alreadyPaid" : "needs.actions.markPaid"),
-      to_pay: tc("needs.actions.stillToPay"),
-      remind: kind === "toPay" ? remindLabel(row) : "",
+    const ownLabel = (id: OwnActionId): string => {
+      switch (id) {
+        case "reply": {
+          return t("actions.reply");
+        }
+        case "yes": {
+          return tc("needs.actions.yes");
+        }
+        case "no": {
+          return tc("needs.actions.no");
+        }
+        case "safe": {
+          return tc("needs.actions.safe");
+        }
+        case "paid": {
+          return tc(kind === "bill" ? "needs.actions.alreadyPaid" : "needs.actions.markPaid");
+        }
+        case "to_pay": {
+          return tc("needs.actions.stillToPay");
+        }
+        case "remind": {
+          return remindLabel(row);
+        }
+      }
     };
     const universalLabel: Record<UniversalActionId, string> = {
       done: tc("needs.actions.done"),
@@ -407,7 +432,7 @@ export function WhatNeedsYou({ workspaceId, now, offer }: WhatNeedsYouProps) {
     return {
       own: ids.own.slice(0, CHOICE_KEYS.length).map((id, index) => ({
         id,
-        label: ownLabel[id],
+        label: ownLabel(id),
         key: CHOICE_KEYS[index] ?? "item.choice1",
       })),
       universal: ids.universal.map((id) => ({
@@ -592,6 +617,15 @@ export function WhatNeedsYou({ workspaceId, now, offer }: WhatNeedsYouProps) {
     },
     { enabled: hasRows },
   );
+  // Shift+E: every bill the Pay group asks about is already paid.
+  const askedBills = order.filter((row) => kindOf(row.need) === "bill");
+  useShortcut(
+    "item.all_paid",
+    () => {
+      allPaid(askedBills);
+    },
+    { enabled: askedBills.length > 1 },
+  );
   useShortcut(
     "item.reply",
     () => {
@@ -675,6 +709,7 @@ export function WhatNeedsYou({ workspaceId, now, offer }: WhatNeedsYouProps) {
               action={
                 bills.length > 1 ? (
                   <Button
+                    shortcut="item.all_paid"
                     onClick={() => {
                       allPaid(bills);
                     }}

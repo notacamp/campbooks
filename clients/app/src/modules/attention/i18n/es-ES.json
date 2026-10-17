@@ -58,13 +58,13 @@
   },
   "noSubject": "(sin asunto)",
   "remind": {
-    "before": "Recordármelo el {{when}}",
+    "today": "Recordármelo hoy a las {{time}}",
     "tomorrow": "Recordármelo mañana a las {{time}}",
-    "monday": "Recordármelo el lunes"
+    "on": "Recordármelo el {{date}}"
   },
   "pay": {
-    "allPaid_one": "{{count}} ya pagada",
-    "allPaid_other": "Las {{count}} ya pagadas",
-    "note": "Campbooks no ve tu banco, así que pregunta si cada factura está pagada."
+    "allPaid_one": "Ya he pagado {{count}}",
+    "allPaid_other": "Ya he pagado las {{count}}",
+    "note": "Campbooks no tiene acceso a tu banco, así que pregunta si cada factura está pagada."
   }
 }

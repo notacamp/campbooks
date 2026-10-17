@@ -118,7 +118,7 @@ export const PEDRO = conversation({
   },
 });
 
-/** A bill the member said is still to pay, two days overdue on Tuesday. */
+/** A bill the member said is still to pay, a day overdue on Tuesday. */
 export const LUZ = conversation({
   n: 5,
   subject: "Invoice 7781",

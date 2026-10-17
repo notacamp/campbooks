@@ -49,7 +49,7 @@
     "notNeeded": "Pas nécessaire · {{name}}",
     "safe": "Marqué comme sûr · {{name}}",
     "snoozed": "Reporté · {{name}}, revient {{when}}",
-    "paid": "Marquée payée · {{name}}"
+    "paid": "Marquée comme payée · {{name}}"
   },
   "error": {
     "title": "Impossible de charger ce qui a besoin de vous",
@@ -58,13 +58,13 @@
   },
   "noSubject": "(sans objet)",
   "remind": {
-    "before": "Me le rappeler {{when}}",
+    "today": "Me le rappeler aujourd’hui à {{time}}",
     "tomorrow": "Me le rappeler demain à {{time}}",
-    "monday": "Me le rappeler lundi"
+    "on": "Me le rappeler le {{date}}"
   },
   "pay": {
-    "allPaid_one": "{{count}} déjà payée",
-    "allPaid_other": "Les {{count}} déjà payées",
-    "note": "Campbooks ne voit pas votre banque : il demande donc si chaque facture est payée."
+    "allPaid_one": "J’ai déjà payé {{count}}",
+    "allPaid_other": "J’ai déjà payé les {{count}}",
+    "note": "Campbooks n’a pas accès à votre banque : il demande donc si chaque facture est payée."
   }
 }

@@ -9,11 +9,14 @@ the row into "Marked paid · <payee>" with Undo in the toast. Still to pay
 SHALL keep the row in Pay as "Pay <payee>", with "N days overdue" or its due
 date when the need has one (from `due_on` only), and offer first a reminder:
 two days before the due date at 09:00, tomorrow at 09:00 once that has
-passed or the bill is overdue, or "Remind me Monday" with no due date; then
-Mark paid (2), Snooze and Not needed. The reminder SHALL snooze the item
+passed or the bill is overdue, or next Monday at 09:00 with no due date,
+labelled by the time it gives ("Remind me tomorrow at 09:00", "Remind me on
+28 October"); then Mark paid (2), Snooze and Not needed. The reminder SHALL snooze the item
 until then, with the Snooze toast and Undo. When the Pay group holds two or
-more bills asked about, its heading SHALL offer "All N already paid", which
-marks them all paid with one toast and one Undo for all of them; the group
+more bills asked about, its heading SHALL offer "All N already paid" (Shift+E),
+which marks them all paid with one toast and one Undo for all of them (when
+some fail, the Undo covers the others and one failure offers Retry for the
+rest); the group
 SHALL say that Campbooks can't see the bank, so it asks. After Already paid
 the screen SHALL leave a hook for offering a paid rule for that sender
 (campbooks-cloud#169), which offers nothing yet.

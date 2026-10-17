@@ -40,20 +40,16 @@ export default async function payQuestion({ page }: ScenarioContext): Promise<vo
   await page.getByText(BILL).first().click();
   await caption(page, "Already paid is 1, Still to pay is 2");
 
-  if (isPhone(page)) {
-    await page.getByRole("button", { name: /^Still to pay/u }).click();
-  } else {
-    await page.keyboard.press("2");
-  }
+  await (isPhone(page)
+    ? page.getByRole("button", { name: /^Still to pay/u }).click()
+    : page.keyboard.press("2"));
   await page.getByText(`Pay ${BILL}`).waitFor();
   await caption(page, "Still to pay: it stays in Pay, with a reminder as its first action", 2600);
   await caption(page, "The reminder comes from the due date only; with none, Monday");
 
-  if (isPhone(page)) {
-    await page.getByRole("button", { name: /^Mark paid/u }).click();
-  } else {
-    await page.keyboard.press("2");
-  }
+  await (isPhone(page)
+    ? page.getByRole("button", { name: /^Mark paid/u }).click()
+    : page.keyboard.press("2"));
   await caption(page, "Mark paid: a one-line confirmation, and Undo in the toast", 2200);
   await page.getByRole("button", { name: /^Undo/u }).first().click();
   await pause(1500);

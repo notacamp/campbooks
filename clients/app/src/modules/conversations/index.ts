@@ -13,6 +13,7 @@ export {
 } from "./api/queries";
 export { useNeedActions } from "./components/Needs/use-need-actions";
 export {
+  billKind,
   dueLabel,
   howRows,
   needSender,

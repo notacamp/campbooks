@@ -35,7 +35,14 @@ import {
   streamName,
   type Translate,
 } from "../../model";
-import { howRows, needSender, needSentence, quoteAttribution, warningReasons } from "../../needs";
+import {
+  billKind,
+  howRows,
+  needSender,
+  needSentence,
+  quoteAttribution,
+  warningReasons,
+} from "../../needs";
 import { NeedChips } from "../Needs/NeedChips";
 import { ruleLine } from "../../rules-text";
 import { useNeedActions } from "../Needs/use-need-actions";
@@ -127,8 +134,10 @@ export function ConversationReader({
   const footerLine = (summary: NonNullable<typeof conversation>) =>
     ruleMark === undefined ? placementLine(t, summary) : ruleLine(t, ruleMark, i18n.language);
   const question = need?.trust === "check";
-  // A bill: Campbooks can't see the bank, so it asks whether it is paid.
-  const bill = question && need?.question === "money";
+  // A bill: Campbooks can't see the bank, so it asks whether it is paid;
+  // once still to pay, Mark paid is its Done.
+  const bill = need !== undefined && billKind(need) === "ask";
+  const toPay = need !== undefined && billKind(need) === "toPay";
 
   const [opened, setOpened] = useState<Set<string>>(new Set());
   const [images, setImages] = useState<Set<string>>(new Set());
@@ -286,7 +295,7 @@ export function ConversationReader({
         needActions.notNeeded(conversation);
       }
     },
-    { enabled: need !== undefined && !question },
+    { enabled: need !== undefined && (!question || bill) },
   );
 
   // Wrappers carry the responsive classes: a component's own styles win
@@ -581,10 +590,14 @@ export function ConversationReader({
                       <Button
                         variant="secondary"
                         onClick={() => {
-                          needActions.done(conversation);
+                          if (toPay) {
+                            needActions.alreadyPaid(conversation);
+                          } else {
+                            needActions.done(conversation);
+                          }
                         }}
                       >
-                        {t("needs.actions.done")}
+                        {t(toPay ? "needs.actions.markPaid" : "needs.actions.done")}
                       </Button>
                       <Button
                         variant="ghost"

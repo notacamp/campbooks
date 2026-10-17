@@ -58,13 +58,13 @@
   },
   "noSubject": "(sem assunto)",
   "remind": {
-    "before": "Lembrar-me {{when}}",
+    "today": "Lembrar-me hoje às {{time}}",
     "tomorrow": "Lembrar-me amanhã às {{time}}",
-    "monday": "Lembrar-me na segunda-feira"
+    "on": "Lembrar-me a {{date}}"
   },
   "pay": {
-    "allPaid_one": "{{count}} já paga",
-    "allPaid_other": "Todas as {{count}} já pagas",
-    "note": "O Campbooks não vê o seu banco, por isso pergunta se cada fatura está paga."
+    "allPaid_one": "Já paguei {{count}}",
+    "allPaid_other": "Já paguei as {{count}}",
+    "note": "O Campbooks não tem acesso ao seu banco, por isso pergunta se cada fatura está paga."
   }
 }

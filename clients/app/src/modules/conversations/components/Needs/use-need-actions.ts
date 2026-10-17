@@ -124,11 +124,69 @@ export function useNeedActions(
         run(conversation, "reopen");
       },
       redo: () => {
-        onRedo?.(conversation);
+        // Yes to a question and Still to pay keep the item on the list.
+        if (verdict !== "confirm" && verdict !== "still_to_pay") {
+          onRedo?.(conversation);
+        }
         run(conversation, verdict);
       },
     });
     run(conversation, verdict, entry);
+  };
+
+  /** One Undo for several bills marked paid at once: those the server took. */
+  const pushAllPaid = (conversations: readonly ConversationSummary[]) =>
+    undo.push({
+      label: t("needs.toast.allPaid", { count: conversations.length }),
+      undo: () => {
+        for (const conversation of conversations) {
+          onUndo?.(conversation);
+          run(conversation, "reopen");
+        }
+      },
+      redo: () => {
+        for (const conversation of conversations) {
+          onRedo?.(conversation);
+          run(conversation, "already_paid");
+        }
+      },
+    });
+
+  // Several bills at once: each request settles on its own; when some fail,
+  // the Undo covers only the others and one failure says so, with one Retry
+  // for those. No paid rule is offered after a bulk action.
+  const allPaid = (conversations: readonly ConversationSummary[]) => {
+    if (conversations.length === 0) {
+      return;
+    }
+    const entry = pushAllPaid(conversations);
+    void Promise.allSettled(
+      conversations.map((conversation) =>
+        mutation.mutateAsync({ conversation, action: { need: "already_paid" } }),
+      ),
+    ).then((results) => {
+      const failed = conversations.filter((_, index) => results[index]?.status === "rejected");
+      if (failed.length > 0) {
+        undo.retract(entry);
+        const done = conversations.filter((conversation) => !failed.includes(conversation));
+        if (done.length > 0) {
+          pushAllPaid(done);
+        }
+        for (const conversation of failed) {
+          onFailed?.(conversation);
+        }
+        undo.fail({
+          label: t("needs.toast.allPaidFailed", { count: failed.length }),
+          retry: () => {
+            for (const conversation of failed) {
+              onRedo?.(conversation);
+            }
+            allPaid(failed);
+          },
+        });
+      }
+      onChanged?.();
+    });
   };
 
   return {
@@ -150,29 +208,7 @@ export function useNeedActions(
       judge(conversation, "still_to_pay");
     },
     /** Several bills paid at once, with one Undo for all of them. */
-    allPaid: (conversations: readonly ConversationSummary[]) => {
-      if (conversations.length === 0) {
-        return;
-      }
-      const entry = undo.push({
-        label: t("needs.toast.allPaid", { count: conversations.length }),
-        undo: () => {
-          for (const conversation of conversations) {
-            onUndo?.(conversation);
-            run(conversation, "reopen");
-          }
-        },
-        redo: () => {
-          for (const conversation of conversations) {
-            onRedo?.(conversation);
-            run(conversation, "already_paid");
-          }
-        },
-      });
-      for (const conversation of conversations) {
-        run(conversation, "already_paid", entry);
-      }
-    },
+    allPaid,
     /** Take back a verdict (Done today's Undo). */
     reopen: (conversation: ConversationSummary) => {
       run(conversation, "reopen");
