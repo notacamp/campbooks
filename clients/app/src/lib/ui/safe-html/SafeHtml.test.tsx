@@ -11,6 +11,7 @@ import {
   SANDBOX,
   SANDBOX_INERT_LINKS,
   stripLinks,
+  withoutLinks,
 } from "./SafeHtml";
 
 function frame(container: HTMLElement): HTMLIFrameElement {
@@ -53,6 +54,13 @@ describe("SafeHtml", () => {
     expect(link?.hasAttribute("href")).toBe(false);
     expect(link?.getAttribute("data-href")).toBe("https://evil.example");
     expect(doc.querySelectorAll("[href]")).toHaveLength(0);
+  });
+
+  it("gives an inert frame mail with no links in it from the start", () => {
+    const html = '<p>Hi <a href="https://evil.example">verify</a></p>';
+    expect(withoutLinks(html)).toBe('<p>Hi <a data-href="https://evil.example">verify</a></p>');
+    const { container } = renderUi(<SafeHtml html={html} title="Message" inertLinks />);
+    expect(frame(container).getAttribute("srcdoc")).not.toMatch(/\shref=/u);
   });
 
   it("blocks remote images with its own policy until they are asked for", () => {

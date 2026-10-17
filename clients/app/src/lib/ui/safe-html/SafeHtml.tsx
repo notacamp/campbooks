@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import styles from "./SafeHtml.module.css";
 
@@ -34,11 +34,18 @@ export const SANDBOX = "allow-same-origin allow-popups allow-popups-to-escape-sa
  */
 export const SANDBOX_INERT_LINKS = "allow-same-origin";
 
+/** `html` with its links made plain text ({@link stripLinks}), parsed inertly. */
+export function withoutLinks(html: string): string {
+  const doc = new DOMParser().parseFromString(html, "text/html");
+  stripLinks(doc);
+  return doc.body.innerHTML;
+}
+
 /**
- * Take the links out of a frame's document: each `href` moves to
- * `data-href`, so a link is plain text (not focusable, no "Open in new
- * tab", nothing the mail's CSS can switch back on). The sandbox without
- * popups stays as the second layer, covering the moment before load.
+ * Take the links out of a document: each `href` moves to `data-href`, so a
+ * link is plain text (not focusable, no "Open in new tab", nothing the
+ * mail's CSS can switch back on). The sandbox without popups stays as the
+ * second layer.
  */
 export function stripLinks(doc: Document): void {
   for (const link of doc.querySelectorAll("a[href], area[href]")) {
@@ -194,7 +201,12 @@ export function SafeHtml({
 }: SafeHtmlProps) {
   const frame = useRef<HTMLIFrameElement>(null);
   const [measured, setMeasured] = useState<number | undefined>();
-  const srcDoc = frameDocument(html, remoteImages);
+  // Inert links are taken out before the frame ever parses the mail (an
+  // inert DOMParser document loads and runs nothing), and again on load.
+  const srcDoc = useMemo(
+    () => frameDocument(inertLinks ? withoutLinks(html) : html, remoteImages),
+    [html, remoteImages, inertLinks],
+  );
   const rules = css ?? undefined;
 
   useEffect(() => {
