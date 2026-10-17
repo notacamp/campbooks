@@ -88,25 +88,6 @@ jobs:
       - name: Unused dependencies
         if: always()
         run: cargo machete
-      # TEMP (campbooks-cloud#169, removed before review): agents may not
-      # build locally, so CI writes the generated files for the branch.
-      - name: TEMP generate offline cache and API documents
-        if: always()
-        run: |
-          cargo sqlx migrate run --source migrations
-          cargo sqlx prepare --workspace -- --all-targets || true
-          cargo xtask openapi || true
-          cargo xtask events || true
-        env: { SQLX_OFFLINE: "false" }
-      - name: TEMP upload generated files
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: generated
-          include-hidden-files: true
-          path: |
-            .sqlx/
-            openapi/
 
   rust-scaffold:
     runs-on: ubuntu-latest
