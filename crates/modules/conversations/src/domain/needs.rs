@@ -963,7 +963,7 @@ enum Pass {
     Again,
 }
 
-#[allow(clippy::too_many_arguments)]
+#[allow(clippy::too_many_arguments, clippy::too_many_lines)]
 async fn refresh_pass(
     tx: &mut Transaction<'_, Postgres>,
     events: &EventBus,

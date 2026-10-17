@@ -287,14 +287,18 @@ async fn without_a_complete_role_nothing_is_queued_and_the_email_still_shows(db:
 #[sqlx::test(migrations = "../../../migrations")]
 async fn the_backfill_summarises_the_open_needs_that_have_none(db: PgPool) {
     // Needs raised before this shipped: no summary, no job.
-    let off = Kit::new(db.clone()).await;
-    let (_, inbox, ..) = sams_needs(&off).await;
-    assert!(stored(&off).await.is_empty());
+    let server = complete(&good()).await;
+    let kit = kit(db, &server).await;
+    let (_, inbox, ..) = sams_needs(&kit).await;
+    sqlx::query("DELETE FROM conversations.need_summaries")
+        .execute(&kit.db)
+        .await
+        .unwrap();
+    assert!(stored(&kit).await.is_empty());
+    let before = calls(&server).await;
 
     // The upgrade: the migration queues every inbox for the needs backfill,
     // and the scheduler's tick runs it.
-    let server = complete(&good()).await;
-    let kit = kit(db, &server).await;
     sqlx::query(
         "INSERT INTO conversations.needs_backfills (inbox_id, workspace_id)
          SELECT id, workspace_id FROM conversations.inboxes WHERE id = $1
@@ -320,7 +324,7 @@ async fn the_backfill_summarises_the_open_needs_that_have_none(db: PgPool) {
     assert_eq!(i64::try_from(rows.len()).unwrap(), open_needs(&kit).await);
     assert!(rows.iter().all(|(_, state, _)| state == "written"));
     let after = calls(&server).await;
-    assert_eq!(after, rows.len());
+    assert_eq!(after - before, rows.len());
 
     // A second run asks for nothing again.
     sqlx::query("UPDATE conversations.needs_backfills SET state = 'pending', after_id = NULL")

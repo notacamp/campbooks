@@ -122,6 +122,24 @@ const NEED_SUMMARY: &str = "SELECT s.texts FROM conversations.needs n \
        JOIN conversations.need_summaries s ON s.message_id = n.message_id \
       WHERE n.conversation_id = $1 AND n.state = 'open' AND s.state = 'written'";
 
+/// The summary of the email behind the conversation's open need, in
+/// `locale`, else in English.
+async fn need_summary(
+    conn: &mut sqlx::PgConnection,
+    id: ConversationId,
+    locale: Locale,
+) -> Result<Option<String>> {
+    let texts: Option<serde_json::Value> = sqlx::query_scalar(NEED_SUMMARY)
+        .bind(id)
+        .fetch_optional(&mut *conn)
+        .await?;
+    Ok(texts.and_then(|texts| {
+        [locale, Locale::En]
+            .into_iter()
+            .find_map(|l| texts.get(l.tag())?.as_str().map(ToOwned::to_owned))
+    }))
+}
+
 /// `messages.recipients`.
 #[derive(Deserialize)]
 struct Recipients {
@@ -224,15 +242,7 @@ pub async fn handler(
     for view in &mut decisions {
         view.threshold = suggestions::threshold(&policy, view);
     }
-    let texts: Option<serde_json::Value> = sqlx::query_scalar(NEED_SUMMARY)
-        .bind(id)
-        .fetch_optional(&mut *tx)
-        .await?;
-    let need_summary = texts.and_then(|texts| {
-        [locale, Locale::En]
-            .into_iter()
-            .find_map(|l| texts.get(l.tag())?.as_str().map(ToOwned::to_owned))
-    });
+    let need_summary = need_summary(&mut tx, id, locale).await?;
     let ids: Vec<MessageId> = rows.iter().map(|r| r.id).collect();
     let mut attachments = attachments_of(&mut tx, &ids).await?;
     tx.commit().await?;
