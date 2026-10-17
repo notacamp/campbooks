@@ -4,7 +4,7 @@
 //!
 //! See `openspec/changes/observability/design.md`.
 
-use std::{collections::HashMap, io::Write as _, time::Duration};
+use std::{collections::HashMap, io::Write as _, sync::Arc, time::Duration};
 
 use axum::{
     Router,
@@ -463,6 +463,7 @@ pub async fn observe(State(metrics): State<Metrics>, request: Request, next: Nex
         trace_id = Empty,
         workspace.id = Empty,
         principal.kind = Empty,
+        campbooks.via = Empty,
     );
     telemetry::set_parent_from(&span, request.headers());
     telemetry::record_trace_id(&span);
@@ -471,6 +472,14 @@ pub async fn observe(State(metrics): State<Metrics>, request: Request, next: Nex
     let response = next.run(request).instrument(span.clone()).await;
     let status = response.status();
     let elapsed = started.elapsed();
+    // A web BFF request is named after the API route it ran through.
+    let route = match response.extensions().get::<ServedRoute>() {
+        Some(ServedRoute(served)) => {
+            name_after(&span, &method, served);
+            Some(served.to_string())
+        }
+        None => route,
+    };
     // The problem's stable code, never its (translated) text.
     let error = response
         .extensions()
@@ -493,6 +502,42 @@ pub async fn observe(State(metrics): State<Metrics>, request: Request, next: Nex
     });
     metrics.http_request(&method, route.as_deref(), status.as_u16(), error, elapsed);
     response
+}
+
+/// The API route template a web BFF request (`/bff/api/*`, `/bff/admin/*`)
+/// ran through in-process, put on its response by [`served_route`] so that
+/// [`observe`] names the request, its log line and its metrics after it
+/// rather than after `/bff/api/{*path}`.
+#[derive(Clone, Debug)]
+pub struct ServedRoute(Arc<str>);
+
+/// Route layer of the BFF's in-process routers: names the outer request's
+/// span after the route the forwarded request matched (so what is logged
+/// while it runs carries it too), marked `campbooks.via=bff`, and puts the
+/// route on the response as a [`ServedRoute`].
+pub async fn served_route(request: Request, next: Next) -> Response {
+    let route = request
+        .extensions()
+        .get::<MatchedPath>()
+        .map(|path| Arc::<str>::from(path.as_str()));
+    if let Some(route) = &route {
+        let span = tracing::Span::current();
+        if span.metadata().is_some_and(|meta| meta.name() == "http") {
+            name_after(&span, request.method().as_str(), route);
+        }
+    }
+    let mut response = next.run(request).await;
+    if let Some(route) = route {
+        response.extensions_mut().insert(ServedRoute(route));
+    }
+    response
+}
+
+/// Name a request's span after the API route a BFF request ran through.
+fn name_after(span: &tracing::Span, method: &str, route: &str) {
+    span.record("otel.name", format!("{method} {route}"));
+    span.record("http.route", route);
+    span.record("campbooks.via", "bff");
 }
 
 /// A client-sent request id, if it is a plain token (letters, digits,

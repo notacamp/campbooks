@@ -151,8 +151,8 @@ impl Bff {
                 cookies: Cookies::new(settings.secure_cookies),
                 public_origin: settings.public_origin.into(),
                 timeouts: settings.timeouts,
-                api,
-                admin,
+                api: api.route_layer(axum::middleware::from_fn(crate::telemetry::served_route)),
+                admin: admin.route_layer(axum::middleware::from_fn(crate::telemetry::served_route)),
                 refresh_locks: (0..REFRESH_LOCKS)
                     .map(|_| tokio::sync::Mutex::new(()))
                     .collect(),

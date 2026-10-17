@@ -52,6 +52,11 @@ All notable changes to Campbooks Next are documented here. The format follows
 
 ### Changed
 
+- **Web requests are logged and counted under the API route they ran.** A call the web app
+  makes through the BFF (`/bff/api/*`) used to appear in the request log, its trace and the
+  request metrics as `/bff/api/{*path}`; it now carries the API's route template
+  (`GET /api/v1/w/{workspace_id}/members`) and `campbooks.via=bff`. Dashboards and alerts
+  by `http_route` see the web app's traffic route by route.
 - **An opened Home item shows the email (campbooks-cloud#203).** Pressing Enter on an item
   (or clicking the selected row) now shows the email it is about, rendered as the reader
   renders it, a few lines deep with "Show the whole email" to read it all in place. Until
