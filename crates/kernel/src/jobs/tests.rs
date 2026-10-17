@@ -2772,4 +2772,111 @@ mod kernel_scope {
             "each ran with no workspace; failed attempts left no row"
         );
     }
+
+    #[sqlx::test(migrations = "../../migrations")]
+    async fn the_maintenance_scope_reaches_no_kernel_table(db: PgPool) {
+        let state = runtime(&db).await;
+        let ana = WorkspaceId::new();
+        let ws = ana.to_string();
+        // A workspace's event (with a change and two deliveries), a job and a
+        // blob reference, and an instance-wide event.
+        let mut tx = state.db.begin_for(ana).await.unwrap();
+        state
+            .events
+            .publish(
+                &mut tx,
+                &Touched {
+                    workspace: ws.clone(),
+                },
+            )
+            .await
+            .unwrap();
+        enqueue(
+            &mut tx,
+            &Probe::note("own"),
+            EnqueueOptions::for_workspace(ws.clone()),
+        )
+        .await
+        .unwrap();
+        let blob = state
+            .blobs
+            .put(&ws, b"bytes".to_vec(), "text/plain")
+            .await
+            .unwrap();
+        let owner = BlobOwner::new("test.thing", uuid::Uuid::now_v7());
+        state
+            .blobs
+            .attach(&mut tx, &ws, &blob, &owner)
+            .await
+            .unwrap();
+        state
+            .events
+            .publish(
+                &mut tx,
+                &Pinged {
+                    workspace: None,
+                    n: 1,
+                },
+            )
+            .await
+            .unwrap();
+        tx.commit().await.unwrap();
+
+        let mut tx = db::begin_maintenance(&state.db).await.unwrap();
+        let seen: i64 = sqlx::query_scalar(
+            "SELECT (SELECT count(*) FROM kernel.events) + (SELECT count(*) FROM kernel.jobs)
+                  + (SELECT count(*) FROM kernel.changes) + (SELECT count(*) FROM kernel.change_heads)
+                  + (SELECT count(*) FROM kernel.blobs) + (SELECT count(*) FROM kernel.blob_refs)",
+        )
+        .fetch_one(&mut *tx)
+        .await
+        .unwrap();
+        assert_eq!(
+            seen, 0,
+            "the kernel's tables do not admit the maintenance scope"
+        );
+        assert!(
+            owner_count(&db, "SELECT count(*) FROM kernel.jobs").await > 0,
+            "there were rows to see"
+        );
+        // A workspace's job is refused until the dispatcher works in its
+        // workspace; then it is enqueued there.
+        let mut step = db::savepoint(&mut tx).await.unwrap();
+        let refused_here = enqueue(
+            &mut step,
+            &Probe::note("dispatched"),
+            EnqueueOptions::for_workspace(ws.clone()),
+        )
+        .await;
+        assert!(refused(&refused_here), "{refused_here:?}");
+        drop(step);
+        db::set_workspace(&mut tx, &ws).await.unwrap();
+        let enqueued = enqueue(
+            &mut tx,
+            &Probe::note("dispatched"),
+            EnqueueOptions::for_workspace(ws.clone()),
+        )
+        .await
+        .unwrap();
+        assert!(matches!(enqueued, Enqueued::Created(_)), "{enqueued:?}");
+        tx.commit().await.unwrap();
+
+        // A workspace's job may not open it.
+        let info = super::super::context::JobInfo {
+            id: JobId::new(),
+            kind: Probe::NAME.to_owned(),
+            queue: Probe::QUEUE.to_owned(),
+            attempt: 1,
+            max_attempts: 1,
+            workspace: Some(ws.clone()),
+            event_id: None,
+        };
+        let mut ctx = JobContext::new(state.clone(), info);
+        assert!(matches!(
+            ctx.maintenance_tx().await,
+            Err(JobError::Fatal(_))
+        ));
+        let stats = Worker::new(state.clone()).run_until_idle().await;
+        assert_eq!(stats.failed, 0, "{stats:?}");
+    }
 }

@@ -51,6 +51,13 @@ pub struct AccessFile {
     /// maintenance policies (campbooks-cloud#129). Reviewed like an ADR.
     #[serde(default)]
     pub kernel_scope: Vec<PoolAccess>,
+    /// Files outside the kernel that may open a transaction in the
+    /// maintenance scope (`begin_maintenance`, a job's `maintenance_tx`),
+    /// with the reason: a scheduler's dispatcher reading its own index
+    /// across workspaces through its table's maintenance policies, which no
+    /// kernel table admits (campbooks-cloud#196). Reviewed like an ADR.
+    #[serde(default)]
+    pub maintenance_scope: Vec<PoolAccess>,
     /// Published events nothing consumes on purpose, with the reason.
     #[serde(default)]
     pub unconsumed_events: Vec<Unconsumed>,
@@ -470,108 +477,190 @@ pub fn check_workspace_queries(
     violations
 }
 
-/// The setting that opens the kernel scope (`kernel::db::KERNEL_SCOPE_SETTING`).
-pub const KERNEL_SCOPE_SETTING: &str = "campbooks.kernel_scope";
+/// Which reviewed list of `architecture.toml` lets a file outside the kernel
+/// use one of the kernel's scope names.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+enum Door {
+    /// None: only the kernel names it.
+    Never,
+    /// `[[access.kernel_scope]]`.
+    Kernel,
+    /// `[[access.maintenance_scope]]`.
+    Maintenance,
+}
 
-/// The last part of the kernel scope's setting: outside the kernel, the word
-/// on its own (in code or a string, any case) usually means the setting's
-/// name is being built at runtime.
-const SCOPE_WORD_TEXT: &str = "kernel_scope";
+impl Door {
+    /// The list's name in `architecture.toml`.
+    fn list(self) -> &'static str {
+        match self {
+            Self::Never => "",
+            Self::Kernel => "kernel_scope",
+            Self::Maintenance => "maintenance_scope",
+        }
+    }
+
+    /// The reviewed entries of that list.
+    fn entries(self, file: &AccessFile) -> &[PoolAccess] {
+        match self {
+            Self::Never => &[],
+            Self::Kernel => &file.kernel_scope,
+            Self::Maintenance => &file.maintenance_scope,
+        }
+    }
+}
+
+/// The settings that open a cross-workspace scope (the kernel's
+/// `KERNEL_SCOPE_SETTING`, `MAINTENANCE_SCOPE_SETTING`), each with its last
+/// word: outside the kernel, the word on its own (in code or a string, any
+/// case) usually means the setting's name is being built at runtime.
+const SCOPE_SETTINGS: [(&str, &str, Door); 2] = [
+    ("campbooks.kernel_scope", "kernel_scope", Door::Kernel),
+    (
+        "campbooks.maintenance_scope",
+        "maintenance_scope",
+        Door::Maintenance,
+    ),
+];
 
 /// The kernel's names that open a cross-workspace scope or name its
 /// setting: outside the kernel, each is a violation wherever it appears in
 /// code (a call, a `use … as` rename, `JobContext::kernel_tx(ctx)`, a
-/// function value), comments aside. `false`: no file may use it; `true`:
-/// files listed under `[[access.kernel_scope]]` may.
-const SCOPE_IDENTIFIERS: [(&str, bool); 4] = [
-    ("KERNEL_SCOPE_SETTING", false),
-    ("ADMIN_READS_SETTING", false),
-    ("begin_kernel", true),
-    ("kernel_tx", true),
+/// function value), comments aside, unless its [`Door`] lists the file.
+const SCOPE_IDENTIFIERS: [(&str, Door); 7] = [
+    ("KERNEL_SCOPE_SETTING", Door::Never),
+    ("MAINTENANCE_SCOPE_SETTING", Door::Never),
+    ("ADMIN_READS_SETTING", Door::Never),
+    ("begin_kernel", Door::Kernel),
+    ("kernel_tx", Door::Kernel),
+    ("begin_maintenance", Door::Maintenance),
+    ("maintenance_tx", Door::Maintenance),
 ];
 
-/// Only the kernel names the kernel scope's setting (`campbooks.kernel_scope`,
-/// in any code, tests included), and outside the kernel no code uses the
-/// identifiers `KERNEL_SCOPE_SETTING` or `ADMIN_READS_SETTING`, nor
-/// `begin_kernel` or `kernel_tx` except in the reviewed `kernel_scope`
-/// entries. Nor, outside the kernel and those entries, does code or a string
-/// name the word `kernel_scope` on its own (a setting name built at runtime,
-/// tests included). Test code is exempt from the identifier rule. Entries need
-/// a reason and must name a file that uses one (no stale exceptions).
+/// Only the kernel names a scope's setting (`campbooks.kernel_scope`,
+/// `campbooks.maintenance_scope`, in any code, tests included), and outside
+/// the kernel no code uses the identifiers `KERNEL_SCOPE_SETTING`,
+/// `MAINTENANCE_SCOPE_SETTING` or `ADMIN_READS_SETTING`, nor a scope's
+/// openers (`begin_kernel` / `kernel_tx`, `begin_maintenance` /
+/// `maintenance_tx`) except in that scope's reviewed entries
+/// (`kernel_scope`, `maintenance_scope`). Nor, outside the kernel and those
+/// entries, does code or a string name a setting's last word on its own
+/// (`kernel_scope`, `maintenance_scope`: a setting name built at runtime,
+/// tests included). Test code is exempt from the identifier rule. Entries
+/// need a reason and must name a file that uses one of their openers (no
+/// stale exceptions).
 pub fn check_kernel_scope(sources: &[(String, String)], file: &AccessFile) -> Vec<String> {
-    static SCOPE_WORD: LazyLock<Regex> = LazyLock::new(|| {
-        Regex::new(&format!(r"\b{SCOPE_WORD_TEXT}\b"))
-            .unwrap_or_else(|e| unreachable!("static regex compiles: {e}"))
-    });
     static IDENTIFIER: LazyLock<Regex> = LazyLock::new(|| {
-        Regex::new(r"\b(KERNEL_SCOPE_SETTING|ADMIN_READS_SETTING|begin_kernel|kernel_tx)\b")
+        let names: Vec<&str> = SCOPE_IDENTIFIERS.iter().map(|(name, _)| *name).collect();
+        Regex::new(&format!(r"\b({})\b", names.join("|")))
             .unwrap_or_else(|e| unreachable!("static regex compiles: {e}"))
     });
-    let mut violations: Vec<String> = file
-        .kernel_scope
+    let doors = [Door::Kernel, Door::Maintenance];
+    let mut violations: Vec<String> = doors
         .iter()
-        .filter(|entry| entry.reason.trim().is_empty())
-        .map(|entry| {
-            format!(
-                "architecture.toml: kernel scope `{}` needs a reason",
-                entry.path
-            )
+        .flat_map(|door| {
+            door.entries(file)
+                .iter()
+                .filter(|entry| entry.reason.trim().is_empty())
+                .map(move |entry| {
+                    format!(
+                        "architecture.toml: {} `{}` needs a reason",
+                        door.list().replace('_', " "),
+                        entry.path
+                    )
+                })
         })
         .collect();
-    let mut used = BTreeSet::new();
+    let mut used: BTreeSet<(Door, &str)> = BTreeSet::new();
     for (path, text) in sources {
         if path.starts_with("crates/kernel/") {
             continue;
         }
-        let allowed = file.kernel_scope.iter().any(|entry| entry.path == *path);
-        if text.to_lowercase().contains(KERNEL_SCOPE_SETTING) {
-            violations.push(format!(
-                "{path}: names `{KERNEL_SCOPE_SETTING}`; only the kernel may (use \
-                 `kernel::db::begin_kernel`)"
-            ));
-        } else if !allowed && SCOPE_WORD.is_match(&without_comments(text).to_lowercase()) {
-            // The setting's name pieced together (`'campbooks.' ||
-            // 'kernel_scope'`, `campbooks."kernel_scope"`, `concat!`,
-            // `stringify!`) still names the word, in code or in a string.
-            violations.push(format!(
-                "{path}: names `{SCOPE_WORD_TEXT}` (in code or a string), which builds the \
-                 kernel scope's setting; only the kernel may (use `kernel::db::begin_kernel`)"
-            ));
-        }
+        let listed = |door: Door| door.entries(file).iter().any(|entry| entry.path == *path);
+        violations.extend(names_a_setting(path, text, listed));
         if is_test_file(path) {
             continue;
         }
         let code = without_comments(without_tests(text));
-        let mut found = BTreeSet::new();
-        for name in IDENTIFIER.find_iter(&code) {
-            found.insert(name.as_str());
-        }
+        let found: BTreeSet<&str> = IDENTIFIER
+            .find_iter(&code)
+            .map(|name| name.as_str())
+            .collect();
         for (name, door) in SCOPE_IDENTIFIERS {
             if !found.contains(name) {
                 continue;
             }
-            if door && allowed {
-                used.insert(path.as_str());
-            } else if door {
-                violations.push(format!(
-                    "{path}: uses `{name}`, which opens the kernel scope (cross-workspace \
-                     access); work in one workspace (`begin_for`, the job's `ctx.tx()`), or \
-                     list the file under `[[access.kernel_scope]]` with the reason (reviewed \
-                     like an ADR)"
-                ));
-            } else {
+            if door == Door::Never {
                 violations.push(format!(
                     "{path}: uses `{name}`; only the kernel names a scope's setting (open it \
-                     with `kernel::db::begin_kernel` / `begin_admin`)"
+                     with `kernel::db::begin_kernel` / `begin_maintenance` / `begin_admin`)"
+                ));
+            } else if listed(door) {
+                used.insert((door, path.as_str()));
+            } else {
+                violations.push(format!(
+                    "{path}: uses `{name}`, which opens the {} (cross-workspace access); \
+                     work in one workspace (`begin_for`, the job's `ctx.tx()`), or list the \
+                     file under `[[access.{}]]` with the reason (reviewed like an ADR)",
+                    door.list().replace('_', " "),
+                    door.list()
                 ));
             }
         }
     }
-    for entry in &file.kernel_scope {
-        if !used.contains(entry.path.as_str()) {
+    for door in doors {
+        for entry in door.entries(file) {
+            if !used.contains(&(door, entry.path.as_str())) {
+                violations.push(format!(
+                    "architecture.toml: {} `{}` names no file that opens it",
+                    door.list().replace('_', " "),
+                    entry.path
+                ));
+            }
+        }
+    }
+    violations
+}
+
+/// `path` (outside the kernel) names a scope's setting (`campbooks.…`,
+/// anywhere, any case), or, unless `listed` for that scope, its last word on
+/// its own in code or a string: the setting's name pieced together
+/// (`'campbooks.' || 'kernel_scope'`, `campbooks."kernel_scope"`, `concat!`,
+/// `stringify!`) still names the word.
+fn names_a_setting(path: &str, text: &str, listed: impl Fn(Door) -> bool) -> Vec<String> {
+    static WORDS: LazyLock<Vec<(Regex, &str, Door)>> = LazyLock::new(|| {
+        SCOPE_SETTINGS
+            .iter()
+            .map(|&(_, word, door)| {
+                let regex = Regex::new(&format!(r"\b{word}\b"))
+                    .unwrap_or_else(|e| unreachable!("static regex compiles: {e}"));
+                (regex, word, door)
+            })
+            .collect()
+    });
+    let lowered = text.to_lowercase();
+    let mut code: Option<String> = None;
+    let mut violations = Vec::new();
+    for ((setting, _, door), (word_regex, word, _)) in SCOPE_SETTINGS.iter().zip(WORDS.iter()) {
+        if lowered.contains(setting) {
+            let opener = if *door == Door::Kernel {
+                "kernel"
+            } else {
+                "maintenance"
+            };
             violations.push(format!(
-                "architecture.toml: kernel scope `{}` names no file that opens it",
-                entry.path
+                "{path}: names `{setting}`; only the kernel may (use \
+                 `kernel::db::begin_{opener}`)"
+            ));
+            continue;
+        }
+        if listed(*door) {
+            continue;
+        }
+        let code = code.get_or_insert_with(|| without_comments(text).to_lowercase());
+        if word_regex.is_match(code) {
+            violations.push(format!(
+                "{path}: names `{word}` (in code or a string), which builds a scope's \
+                 setting; only the kernel may"
             ));
         }
     }
@@ -1114,6 +1203,64 @@ mod tests {
         let tested =
             "fn f() {}\n#[cfg(test)]\nmod tests {\n    fn t() { let _ = db::begin_kernel; }\n}\n";
         assert!(check_kernel_scope(&source(tested), &none).is_empty());
+    }
+
+    #[test]
+    fn the_maintenance_scope_has_its_own_door() {
+        let entry = |path: &str| PoolAccess {
+            path: path.to_owned(),
+            reason: "the scheduler".to_owned(),
+        };
+        let module = "crates/modules/mail/src/dispatch.rs";
+        let source = |text: &str| vec![(module.to_owned(), text.to_owned())];
+        let none = AccessFile::default();
+        let opens = "let tx = db::begin_maintenance(&pool).await?;";
+        let job = "let tx = ctx.maintenance_tx().await?;";
+        for text in [opens, job] {
+            let found = check_kernel_scope(&source(text), &none);
+            assert_eq!(found.len(), 1, "{text}: {found:?}");
+            assert!(
+                found[0].contains("[[access.maintenance_scope]]"),
+                "{found:?}"
+            );
+        }
+        let maintenance = AccessFile {
+            maintenance_scope: vec![entry(module)],
+            ..AccessFile::default()
+        };
+        assert!(check_kernel_scope(&source(opens), &maintenance).is_empty());
+        assert!(check_kernel_scope(&source(job), &maintenance).is_empty());
+        // The maintenance door does not open the kernel scope, nor the other
+        // way round.
+        let kernel_call = "let tx = db::begin_kernel(&pool).await?;";
+        let found = check_kernel_scope(&source(&format!("{opens}\n{kernel_call}")), &maintenance);
+        assert_eq!(found.len(), 1, "{found:?}");
+        assert!(found[0].contains("`begin_kernel`"), "{found:?}");
+        let kernel = AccessFile {
+            kernel_scope: vec![entry(module)],
+            ..AccessFile::default()
+        };
+        let found = check_kernel_scope(&source(&format!("{kernel_call}\n{opens}")), &kernel);
+        assert_eq!(found.len(), 1, "{found:?}");
+        assert!(found[0].contains("`begin_maintenance`"), "{found:?}");
+        // Its setting, constant and word stay the kernel's, even in a
+        // reviewed file.
+        for named in [
+            r#"sqlx::query("SELECT set_config('campbooks.maintenance_scope', 'on', true)")"#,
+            r#"sqlx::query_scalar!("SELECT set_config($1, 'on', true)", db::MAINTENANCE_SCOPE_SETTING)"#,
+        ] {
+            let found = check_kernel_scope(&source(&format!("{opens}\n{named}")), &maintenance);
+            assert_eq!(found.len(), 1, "{named}: {found:?}");
+        }
+        let pieced =
+            r#"sqlx::query("SELECT set_config('campbooks.' || 'maintenance_scope', 'on', true)")"#;
+        let found = check_kernel_scope(&source(pieced), &none);
+        assert_eq!(found.len(), 1, "{found:?}");
+        assert!(found[0].contains("`maintenance_scope`"), "{found:?}");
+        // A stale entry is a violation.
+        let stale = check_kernel_scope(&source("fn nothing() {}"), &maintenance);
+        assert_eq!(stale.len(), 1, "{stale:?}");
+        assert!(stale[0].contains("maintenance scope"), "{stale:?}");
     }
 
     #[test]
