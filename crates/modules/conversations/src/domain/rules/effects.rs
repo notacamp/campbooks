@@ -132,8 +132,7 @@ pub async fn flag_message(
         Flag::Spam => {
             sqlx::query_scalar!(
                 "UPDATE conversations.messages
-                    SET inbox_before_spam = in_inbox, in_spam = true, in_inbox = false,
-                        in_trash = false, updated_at = now()
+                    SET in_spam = true, in_inbox = false, in_trash = false, updated_at = now()
                   WHERE id = $1 AND NOT in_spam RETURNING provider_message_id",
                 id as MessageId,
             )

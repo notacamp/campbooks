@@ -17,7 +17,7 @@ use super::{
 };
 use crate::{
     domain::{
-        flags::Flag,
+        flags::{self, Flag},
         needs::{self, NeedSettings},
     },
     events::{Change, RequestedChange},
@@ -451,10 +451,18 @@ async fn undo(
         );
     }
     if let Some(bin) = before.binned {
+        // Out of the trash or spam, each message with its own direction (a
+        // provider puts received mail back in the inbox, never sent mail).
         let flag = unbin_flag(bin);
-        let messages = effects::flag_conversation(conn, id, flag).await?;
-        if !messages.is_empty() {
-            effects.add(flag.change(), messages, flag.requested());
+        let mut groups: Vec<(RequestedChange, Vec<String>)> = Vec::new();
+        for (message, change) in flags::change_items(conn, id, flag).await? {
+            match groups.iter_mut().find(|(c, _)| *c == change) {
+                Some((_, messages)) => messages.push(message),
+                None => groups.push((change, vec![message])),
+            }
+        }
+        for (change, messages) in groups {
+            effects.add(flag.change(), messages, change);
         }
     }
     for (did, flag) in [

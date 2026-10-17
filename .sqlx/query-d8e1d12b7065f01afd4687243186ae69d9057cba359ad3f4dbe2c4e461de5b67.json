@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "DELETE FROM conversations.rule_notice_answers WHERE user_id = $1 AND answered_at <= $2",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Timestamptz"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "d8e1d12b7065f01afd4687243186ae69d9057cba359ad3f4dbe2c4e461de5b67"
+}

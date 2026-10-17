@@ -1,0 +1,113 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT n.id AS \"id: RuleNoticeId\", n.inbox_id AS \"inbox_id: InboxId\", n.kind,\n               n.sender_address, n.sender_name, n.conditions, n.actions, n.evidence\n          FROM conversations.rule_notices n\n         WHERE n.inbox_id = ANY($1) AND n.state = 'open'\n           AND NOT EXISTS (\n               SELECT 1 FROM conversations.rule_notice_answers a\n                WHERE a.inbox_id = n.inbox_id AND a.user_id = $2 AND a.kind = n.kind\n                  AND a.sender_address = n.sender_address\n                  AND (a.answer = 'never' OR a.until > now()))\n         ORDER BY (n.evidence ->> 'received')::int DESC, n.id\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id: RuleNoticeId",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "conversations.rule_notices",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "inbox_id: InboxId",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "conversations.rule_notices",
+            "name": "inbox_id"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "kind",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "conversations.rule_notices",
+            "name": "kind"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "sender_address",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "conversations.rule_notices",
+            "name": "sender_address"
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "sender_name",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "conversations.rule_notices",
+            "name": "sender_name"
+          }
+        }
+      },
+      {
+        "ordinal": 5,
+        "name": "conditions",
+        "type_info": "Jsonb",
+        "origin": {
+          "Table": {
+            "table": "conversations.rule_notices",
+            "name": "conditions"
+          }
+        }
+      },
+      {
+        "ordinal": 6,
+        "name": "actions",
+        "type_info": "Jsonb",
+        "origin": {
+          "Table": {
+            "table": "conversations.rule_notices",
+            "name": "actions"
+          }
+        }
+      },
+      {
+        "ordinal": 7,
+        "name": "evidence",
+        "type_info": "Jsonb",
+        "origin": {
+          "Table": {
+            "table": "conversations.rule_notices",
+            "name": "evidence"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "UuidArray",
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      true,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "7f08b5c4605f135a31a9dfa85a89afeda061891e03eea57eca0652b8d7127c6e"
+}
