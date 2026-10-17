@@ -42,6 +42,13 @@ pub mod question {
 
     /// Every catalogue question, in the order they are asked.
     pub const ALL: [&str; 4] = [REMIND, OPEN_ATTACHMENT, FORWARD, PAID_AUTOMATICALLY];
+
+    /// Whether `id` is one of the catalogue's questions: an answer to one
+    /// that is missing or does not fit is no rating, never a failed call
+    /// (the triage questions asked with it keep their strict checks).
+    pub fn is_catalogue(id: &str) -> bool {
+        ALL.contains(&id)
+    }
 }
 
 /// One action of the catalogue.

@@ -417,7 +417,8 @@ impl Answer {
     }
 }
 
-/// Every answer of one call, in question order.
+/// Every answer of one call, in question order (a catalogue question left
+/// unanswered has none, see `signals::actions::question::is_catalogue`).
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct Answers {
     answers: Vec<Answer>,

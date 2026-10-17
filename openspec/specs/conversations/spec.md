@@ -1904,7 +1904,10 @@ Reply from the `needs_reply` answer (never for a no-reply sender), Remind,
 Open attachment (never without an attachment) and Forward from their own
 questions, Report from the `suspicious` answer and It's safe from its
 complement, Already paid from `action_paid_automatically` and Still to pay
-from its complement; an answer without probabilities rates nothing. The
+from its complement; an answer without probabilities rates nothing, and a catalogue answer
+missing or not fitting its type rates nothing for that action and fails
+nothing: the triage answers are stored and acted on exactly as if it had not
+been asked. The
 facts SHALL only rule an action out and nothing SHALL read what an email
 says. The ratings SHALL be stored per message
 (`conversations.action_likelihoods`), never as decisions, so the triage
@@ -1938,20 +1941,30 @@ rated or read, and every need SHALL read exactly as before, with no
 - **WHEN** a phishing message's need is shown with `suspicious` at 0.2
 - **THEN** it offers It's safe, then Report, and nothing else
 
+#### Scenario: A catalogue answer that does not fit
+- **WHEN** the catalogue is on and the model leaves out `action_remind`, answers `action_forward` out of range and `action_paid_automatically` with "NaN"
+- **THEN** the decision succeeds, its triage decisions and needs are the same as with the catalogue off, and Remind, Forward, Already paid and Still to pay are not rated
+
 ### Requirement: Labelling the owner's actions
 `campbooks-server labelling export --set actions --workspace <id> --days <n>
 --out <folder>` SHALL write, under the guards of the money export (operator
 only, inside the workspace with row-level security, a new folder readable by
-the operator only, a warning that it holds real mail), the newest inbound
-message of each conversation that had a need, with a `labels.csv` holding one
+the operator only, a warning that it holds real mail), per conversation that
+had a need, the newest message that raised one (the message the model pass
+rates), with a `labels.csv` holding one
 empty column per action of the catalogue. `cargo xtask eval actions
 --set-dir <folder> --floor <x>…` SHALL read the owner's marks (a row with any
 action marked is labelled, a blank cell in it meaning no; a row left blank is
-skipped), send only labelled items to the model, rate them as the model pass
-does, print per action and floor the precision, recall and counts, and how
+skipped), send only labelled items to the model, ask each one exactly what the
+model pass asks (Open attachment only for an item with an attachment), rate
+them as the model pass does, print per action and floor the precision, recall and counts, and how
 often each pair of actions is done together, and write the report into the
 folder. No floor SHALL be set from emails an agent wrote.
 
 #### Scenario: Scoring a floor
 - **WHEN** the owner marked Reply on two emails and the model rates them 0.9 and 0.55
 - **THEN** at floor 0.5 Reply scores 100% precision and recall, and at 0.7 its recall is 50%
+
+#### Scenario: The need's own message
+- **WHEN** a conversation's need was raised by its first message and a later inbound reply raised none
+- **THEN** the export lists the first message, not the reply

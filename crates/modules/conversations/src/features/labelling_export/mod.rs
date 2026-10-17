@@ -15,9 +15,10 @@
 //! then reads the labels the owner filled in `labels.csv`.
 //!
 //! The same export serves the action catalogue (campbooks-cloud#166):
-//! [`LabellingSet::Actions`] lists the newest inbound message of every
-//! conversation that had a need (open or cleared), for the owner to say
-//! which actions they would take (`cargo xtask eval actions`).
+//! [`LabellingSet::Actions`] lists, per conversation, the newest message that
+//! raised a need (open or cleared): the message the model pass rates, for
+//! the owner to say which actions they would take (`cargo xtask eval
+//! actions`).
 //!
 //! Nothing here decides anything: it reads stored messages only.
 
@@ -138,9 +139,10 @@ pub async fn export_set(
                AND m.direction = 'inbound' AND NOT m.in_spam AND NOT m.in_trash
                AND m.sent_at >= $1
                AND CASE WHEN $4
-                        -- The action catalogue: mail that had a need.
+                        -- The action catalogue: the message that raised a
+                        -- need, the one the model pass rates.
                         THEN EXISTS (SELECT 1 FROM conversations.needs n
-                                      WHERE n.conversation_id = c.id)
+                                      WHERE n.message_id = m.id)
                         -- The money question: in Receipts, or had a Pay need.
                         ELSE c.stream = 'receipts'
                              OR EXISTS (SELECT 1 FROM conversations.needs n

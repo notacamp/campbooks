@@ -109,6 +109,21 @@ async fn the_actions_set_lists_mail_that_had_a_need(db: PgPool) {
             .iter()
             .all(|i| i.item["labels"] == serde_json::json!({}))
     );
+    // Each is the message that raised its conversation's need.
+    let mut raised: Vec<String> = sqlx::query_scalar(
+        "SELECT DISTINCT ON (n.conversation_id) m.subject
+           FROM conversations.needs n JOIN conversations.messages m ON m.id = n.message_id
+          WHERE n.workspace_id = $1
+          ORDER BY n.conversation_id, m.sent_at DESC",
+    )
+    .bind(workspace.as_uuid())
+    .fetch_all(&kit.db)
+    .await
+    .unwrap();
+    let mut exported: Vec<String> = items.iter().map(|i| i.subject.clone()).collect();
+    raised.sort();
+    exported.sort();
+    assert_eq!(exported, raised);
     let actions = manifest_for(LabellingSet::Actions);
     assert_eq!(actions["name"], "owner-actions");
     assert_eq!(actions["private"], true);

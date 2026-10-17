@@ -15,7 +15,10 @@ unique within the call and one of three types: `choice` (one label of an
 ordered set of labelled options), `score` (one level of an ordered list of
 level descriptions) and `noul` (whether a statement holds). It SHALL answer
 every question of the call in one provider request and return one answer per
-question, in question order. An answer SHALL carry its typed value, the
+question, in question order, except that a question of the action catalogue
+(an `action_*` id) whose answer is missing or does not fit its type SHALL be
+left unanswered instead of failing the call. Any other question whose answer
+is missing or does not fit SHALL fail the call, as before. An answer SHALL carry its typed value, the
 probability of each option in question order when the provider can tell
 (`[false, true]` for `noul`), a confidence equal to the probability of the
 reported answer, the model that answered, the model version when the provider
@@ -29,6 +32,14 @@ from `decide`.
 #### Scenario: No questions
 - **WHEN** a caller asks no question
 - **THEN** no request is sent and the answers are empty
+
+#### Scenario: A catalogue answer that does not fit
+- **WHEN** the provider leaves out `action_remind`, answers `action_forward` with 1.5 and `action_paid_automatically` with "NaN", and answers the triage questions well
+- **THEN** the call succeeds, the triage answers come back as usual and the three catalogue questions have no answer
+
+#### Scenario: A triage answer that does not fit
+- **WHEN** the provider answers a triage `noul` question with "NaN" or leaves it out
+- **THEN** the call fails, as before
 
 ### Requirement: Confidence threshold
 An answer SHALL offer `accept_if(threshold)`, which returns its value only

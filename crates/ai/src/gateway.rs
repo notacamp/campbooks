@@ -611,19 +611,23 @@ impl Gateway {
             latency_ms = latency.as_millis(),
             "ai decide answered"
         );
+        // A question left unanswered (only ever a catalogue one, see the
+        // parsers) has no answer here.
         let answers = Answers::new(
             questions
                 .iter()
                 .zip(raw)
-                .map(|(question, raw)| {
-                    decide::finish(
-                        question,
-                        raw,
-                        &provider.calibration,
-                        &model,
-                        version.as_deref(),
-                        latency,
-                    )
+                .filter_map(|(question, raw)| {
+                    raw.map(|raw| {
+                        decide::finish(
+                            question,
+                            raw,
+                            &provider.calibration,
+                            &model,
+                            version.as_deref(),
+                            latency,
+                        )
+                    })
                 })
                 .collect(),
         );

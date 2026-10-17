@@ -169,10 +169,11 @@ impl Strategy for Model {
                 )
                 .await?;
             Ok(Decisions {
-                answers: answers
+                // By question: a question left unanswered is an abstention.
+                answers: questions
                     .iter()
-                    .map(|answer| {
-                        let mut answer = answer.clone();
+                    .map(|question| {
+                        let mut answer = answers.get(&question.id)?.clone();
                         if self.checked {
                             answer.model_version =
                                 Some(super::check::stamp(answer.model_version.as_deref()));

@@ -55,13 +55,35 @@ fn answers() -> Value {
     answers
 }
 
-/// A Laya gateway on `server` whose answers check passed.
-fn gateway(server: &MockServer) -> Gateway {
-    let provider = ProviderConfig::new(
+/// How the stand-in answers: Laya's answers object, or the content of an
+/// OpenAI-compatible chat completion (no log-probabilities).
+#[derive(Clone)]
+enum Answering {
+    Laya(Value),
+    OpenAi(Value),
+}
+
+/// The triage answers as an OpenAI-compatible model writes them, and every
+/// catalogue answer `true`.
+fn openai_answers() -> Value {
+    let mut object = json!({
+        "stream": "primary", "needs_reply": true, "asks_action": true,
+        "has_deadline": false, "urgency": 1, "suspicious": false, "money": "neither"
+    });
+    for id in question::ALL {
+        object[id] = json!(true);
+    }
+    object
+}
+
+/// A gateway on `server` speaking `protocol`, whose answers check passed.
+fn gateway(server: &MockServer, protocol: Protocol) -> Gateway {
+    let mut provider = ProviderConfig::new(
         format!("{}/v1", server.uri()).parse().unwrap(),
         "convaiinnovations/laya-multilingual",
     )
-    .with_protocol(Protocol::Laya);
+    .with_protocol(protocol);
+    provider.logprobs = false;
     let gateway = Gateway::new(AiConfig {
         roles: [(Role::Decide, provider)].into(),
         ..AiConfig::default()
@@ -94,14 +116,35 @@ struct Run {
 }
 
 async fn run(db: PgPool, enabled: bool) -> Run {
+    run_with(db, enabled, Answering::Laya(answers())).await
+}
+
+async fn run_with(db: PgPool, enabled: bool, answering: Answering) -> Run {
     let server = MockServer::start().await;
-    Mock::given(method("POST"))
-        .and(path("/v1/systemone"))
-        .respond_with(ResponseTemplate::new(200).set_body_json(answers()))
-        .mount(&server)
-        .await;
+    let protocol = match &answering {
+        Answering::Laya(answers) => {
+            Mock::given(method("POST"))
+                .and(path("/v1/systemone"))
+                .respond_with(ResponseTemplate::new(200).set_body_json(answers))
+                .mount(&server)
+                .await;
+            Protocol::Laya
+        }
+        Answering::OpenAi(content) => {
+            Mock::given(method("POST"))
+                .and(path("/v1/chat/completions"))
+                .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+                    "model": "instruct-test",
+                    "choices": [{"message": {"role": "assistant",
+                                             "content": content.to_string()}}]
+                })))
+                .mount(&server)
+                .await;
+            Protocol::OpenAi
+        }
+    };
     let mut deps = ConversationsDeps {
-        ai: Some(gateway(&server)),
+        ai: Some(gateway(&server, protocol)),
         model: None,
         ..sorting_deps()
     };
@@ -284,4 +327,61 @@ fn off_the_pass_asks_exactly_the_triage_questions() {
     let asked = on.0.asked(&triage, &envelope);
     assert_eq!(asked[..triage.len()], triage[..]);
     assert_eq!(asked.len(), triage.len() + question::ALL.len());
+}
+
+/// The catalogue's answers broken three ways: Remind missing, Forward not a
+/// number, the paid question out of range.
+fn broken(mut answers: Value) -> Value {
+    let map = answers["answers"].as_object_mut().unwrap();
+    map.remove(question::REMIND);
+    map.insert(
+        question::FORWARD.into(),
+        json!({"type": "noul", "noul": "NaN"}),
+    );
+    map.insert(
+        question::PAID_AUTOMATICALLY.into(),
+        json!({"type": "noul", "noul": 1.5, "confidence": 1.5}),
+    );
+    answers
+}
+
+/// The actions rated in `run`.
+async fn rated_actions(run: &Run) -> Vec<String> {
+    sqlx::query_scalar("SELECT DISTINCT action FROM conversations.action_likelihoods ORDER BY 1")
+        .fetch_all(&run.kit.db)
+        .await
+        .unwrap()
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_catalogue_answer_that_does_not_fit_drops_only_its_rating(db: PgPool) {
+    let off = run(db.clone(), false).await;
+    let on = run_with(db, true, Answering::Laya(broken(answers()))).await;
+    // The job went through: triage is stored as with the catalogue off.
+    assert!(!on.decisions.is_empty());
+    assert_eq!(off.decisions, on.decisions);
+    assert_eq!(off.needs.len(), on.needs.len());
+    // Only the actions whose answers fit are rated: Open attachment (its
+    // answer was fine), Reply (needs_reply), Report and It's safe
+    // (suspicious); not Remind, Forward or the paid pair.
+    let rated = rated_actions(&on).await;
+    assert_eq!(
+        rated,
+        ["open_attachment", "reply", "report", "safe"],
+        "{rated:?}"
+    );
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn over_openai_a_catalogue_answer_that_does_not_fit_fails_nothing(db: PgPool) {
+    let mut content = openai_answers();
+    content.as_object_mut().unwrap().remove(question::REMIND);
+    content[question::FORWARD] = json!("maybe");
+    content[question::PAID_AUTOMATICALLY] = json!(7);
+    let off = run_with(db.clone(), false, Answering::OpenAi(openai_answers())).await;
+    let on = run_with(db, true, Answering::OpenAi(content)).await;
+    assert!(!on.decisions.is_empty());
+    assert_eq!(off.decisions, on.decisions);
+    // Without log-probabilities nothing has a likelihood to rate.
+    assert!(rated_actions(&on).await.is_empty());
 }
