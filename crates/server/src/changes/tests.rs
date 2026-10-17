@@ -2434,20 +2434,28 @@ async fn catching_up_past_more_hidden_changes_than_a_page_looks_the_same(db: PgP
         );
         assert_tokens_fresh_and_beats_on_time(frames, "catch-up");
         // One page per tick, each a tick after its read began, in the busy
-        // workspace as in the quiet one.
+        // workspace as in the quiet one. A read begins once the client took
+        // what came before it (`ready`, then the previous page), so each
+        // page is timed from there: timing from the request that opened
+        // the stream would count how long opening took under load. The
+        // slack covers the recorder taking a frame a moment after it left.
+        const SLACK: Duration = Duration::from_millis(20);
         let left: Vec<Duration> = frames
             .iter()
             .filter(|(_, f)| f.is("change"))
             .map(|(at, _)| *at)
             .collect();
+        assert!(frames[0].1.is("ready"), "{:?}", frames[0]);
+        let mut taken = frames[0].0;
         for (page, (first, last)) in [(0, 199), (200, 399), (400, 449)].into_iter().enumerate() {
-            let due = TICK * u32::try_from(page + 1).unwrap();
+            let due = taken + TICK;
             assert!(
-                left[first] >= due && left[last] < due + TICK / 2,
+                left[first] + SLACK >= due && left[last] < due + TICK / 2,
                 "page {page} left from {:?} to {:?}, due at {due:?}",
                 left[first],
                 left[last]
             );
+            taken = left[last];
         }
     }
 }
