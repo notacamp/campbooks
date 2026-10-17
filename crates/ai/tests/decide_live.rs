@@ -91,7 +91,8 @@ async fn three_questions_about_a_sample_email() {
 }
 
 /// The answers check (`check::cases`) against the configured `decide`
-/// role, exactly as the server runs it. With Jev through OpenRouter:
+/// role, exactly as the server runs it. With Jev through the `OpenRouter`
+/// decisions endpoint:
 ///
 /// ```sh
 /// CAMPBOOKS_AI__DECIDE__PROTOCOL=laya \
