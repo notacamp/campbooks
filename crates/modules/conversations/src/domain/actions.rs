@@ -21,7 +21,8 @@ use serde::{Deserialize, Serialize};
 use sqlx::{PgConnection, types::Uuid};
 use utoipa::ToSchema;
 
-use crate::model::{ConversationSummary, MessageId, NeedAction, NeedQuestion, NeedReason};
+use super::conversation::ConversationSummary;
+use crate::model::{MessageId, NeedAction, NeedQuestion, NeedReason};
 
 /// The most actions a need offers.
 pub const MAX_ACTIONS: usize = 3;

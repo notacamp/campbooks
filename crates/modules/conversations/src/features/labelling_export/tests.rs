@@ -109,10 +109,10 @@ async fn the_actions_set_lists_mail_that_had_a_need(db: PgPool) {
             .iter()
             .all(|i| i.item["labels"] == serde_json::json!({}))
     );
-    let manifest = manifest_for(LabellingSet::Actions);
-    assert_eq!(manifest["name"], "owner-actions");
-    assert_eq!(manifest["private"], true);
-    assert_eq!(manifest["actions"][0], "reply");
+    let actions = manifest_for(LabellingSet::Actions);
+    assert_eq!(actions["name"], "owner-actions");
+    assert_eq!(actions["private"], true);
+    assert_eq!(actions["actions"][0], "reply");
     // The money set is as it was.
     assert_eq!(manifest_for(LabellingSet::Money), manifest());
 }
