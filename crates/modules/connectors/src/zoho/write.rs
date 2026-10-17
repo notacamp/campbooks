@@ -597,8 +597,8 @@ mod tests {
             (vec![Op::MoveTo("1".into())], false)
         );
         assert_eq!(made(unspam_sent, &spam, None), (vec![], true));
-        // Not in spam: nothing to take out.
-        assert_eq!(made(unspam, &trashed, None), (vec![], false));
+        // Not in spam: nothing taken out, and never out of the trash.
+        assert_eq!(made(unspam, &trashed, None), (vec![], true));
         // Already there: nothing to call.
         assert_eq!(
             made(change(&["TRASH"], &[]), &trashed, None),
@@ -622,6 +622,21 @@ mod tests {
             without_inbox(&change(&["TRASH", "STARRED"], &["UNREAD", "SPAM"])),
             change(&["STARRED"], &["UNREAD"])
         );
+    }
+
+    #[test]
+    fn the_index_holds_where_trash_and_spam_put_it() {
+        let folders = Folders {
+            inbox: Some("1"),
+            trash: Some("5"),
+            spam: Some("4"),
+            listed: &["1", "3", "4", "5", "7"],
+        };
+        let change = |add: &[&str], remove: &[&str]| (list(add), list(remove));
+        let in_inbox = list(&["INBOX", "UNREAD", "folder:1"]);
+        let trashed = list(&["TRASH", "UNREAD", "folder:5"]);
+        let untrash = change(&["INBOX"], &["TRASH"]);
+        let was_archived_own = list(&["ARCHIVED", "OWN", "folder:7"]);
         // What the index keeps.
         assert_eq!(
             after(&in_inbox, &change(&["TRASH"], &["SPAM"]), &folders, None),
