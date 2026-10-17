@@ -64,6 +64,7 @@ pub struct Telemetry {
     meter_provider: Option<SdkMeterProvider>,
     prometheus: Option<prometheus::Registry>,
     traces_exported: bool,
+    error_reports: Option<sentry::ClientInitGuard>,
 }
 
 impl std::fmt::Debug for Telemetry {
@@ -72,6 +73,7 @@ impl std::fmt::Debug for Telemetry {
             .field("traces_exported", &self.traces_exported)
             .field("metrics_exported", &self.meter_provider.is_some())
             .field("prometheus", &self.prometheus.is_some())
+            .field("error_reports", &self.error_reports.is_some())
             .finish_non_exhaustive()
     }
 }
@@ -141,11 +143,17 @@ impl Telemetry {
             provider
         });
 
+        let reported = meter_provider.as_ref().map(|provider| {
+            crate::error_reports::reported_counter(&provider.meter_with_scope(scope()))
+        });
+        let error_reports = crate::error_reports::init(config, role, reported)?;
+
         Ok(Self {
             tracer_provider,
             meter_provider,
             prometheus,
             traces_exported: endpoint.is_some(),
+            error_reports,
         })
     }
 
@@ -210,18 +218,26 @@ impl Telemetry {
             .build();
     }
 
+    /// Whether errors are reported to an error tracker.
+    pub fn reports_errors(&self) -> bool {
+        self.error_reports.is_some()
+    }
+
     /// Install the subscriber: JSON or pretty logs on stdout, spans bridged
-    /// to OpenTelemetry, pool waits measured.
+    /// to OpenTelemetry, pool waits measured, errors reported when a DSN is
+    /// configured.
     pub fn install_subscriber(&self, format: LogFormat) {
-        tracing_subscriber::registry()
-            .with(layers(
-                format,
-                std::io::stdout,
-                self.tracer(),
-                self.traces_exported,
-                self.pool_wait(),
-            ))
-            .init();
+        let mut layers = layers(
+            format,
+            std::io::stdout,
+            self.tracer(),
+            self.traces_exported,
+            self.pool_wait(),
+        );
+        if self.reports_errors() {
+            layers.push(crate::error_reports::ErrorReportLayer.boxed());
+        }
+        tracing_subscriber::registry().with(layers).init();
     }
 
     /// The `/metrics` router, when the Prometheus listener is configured.
@@ -231,6 +247,8 @@ impl Telemetry {
 
     /// Flush and stop the exporters. Call it outside the async runtime.
     pub fn shutdown(self) {
+        // Flushes the queued error reports (up to its shutdown timeout).
+        drop(self.error_reports);
         if let Err(e) = self.tracer_provider.shutdown_with_timeout(FLUSH_TIMEOUT) {
             tracing::warn!(error = %e, "could not flush traces");
         }

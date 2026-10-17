@@ -6,6 +6,26 @@ All notable changes to Campbooks Next are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- **Error reports to GlitchTip or Sentry.** Set `CAMPBOOKS_TELEMETRY__ERROR_DSN` and every
+  internal error, job that failed for good and panic is reported, filed under the release
+  and `CAMPBOOKS_TELEMETRY__ENVIRONMENT`. A report holds only ids (request, trace,
+  workspace, job), the route or job kind, where it was logged and the kind of error, with
+  quotes, addresses, links and tokens masked. Never the person, the request, a header, a
+  cookie or the mail it was about. `campbooks-server telemetry test-error` sends one
+  invented report to check the setup.
+- **The app's own errors and page timings, for operators.** With
+  `CAMPBOOKS_TELEMETRY__CLIENT_COLLECTOR_URL` set, the app reports the errors it did not
+  handle and its web vitals to its server, which scrubs them and forwards them to a Grafana
+  Faro receiver. Only the route shown, a random id for that run of the app, the browser and
+  the error's class, message head and stack positions are sent. Without the setting the app
+  sends nothing.
+- **Connector sync metrics.** `campbooks_connector_syncs_total` counts sync runs by provider
+  and outcome, and `campbooks_connector_overdue_streams` shows streams waiting more than
+  five minutes past due. `campbooks_errors_reported_total` and
+  `campbooks_client_telemetry_items_total` count what reaches the tracker and the receiver.
+
 ### Changed
 
 - **An opened Home item shows the email (campbooks-cloud#203).** Pressing Enter on an item
@@ -42,18 +62,25 @@ All notable changes to Campbooks Next are documented here. The format follows
 
 ### Security
 
-- **Catching up on changes no longer times what you may not see.** A stream that is behind
-  (after reconnecting) now sends one page of changes per tick, each a tick after the client
-  took the previous one, so when a page arrives no longer depends on how many changes it
-  skipped in inboxes you are not in. A page whose read takes longer than a tick still
-  arrives a whole tick later. An inbox you were given without notice now makes your
-  stream start over at its next heartbeat instead of missing that inbox's first changes. Set the tick with `CAMPBOOKS_CHANGES__CATCH_UP_TICK_MS` (50 ms by default,
-  50 to 1000). Live changes still arrive at once.
-- **A stream lists your inboxes once, and again only when access changes.** It used to list
-  them on every wake-up. Now it keeps the list until someone's access to an inbox changes,
-  or until its next heartbeat. When you are given an inbox (connecting a mailbox), its first
-  mail still reaches open streams at once. When your membership ends, your stream ends at
-  once, even if you could not see the change that removed you.
+- **Catching up on changes no longer times what you may not see.** A stream that is
+  behind (after reconnecting, or after you stopped reading for a while) now sends one page
+  of changes per tick, each a tick after you took the previous one, so when a page arrives
+  no longer depends on how many changes it skipped in inboxes you are not in. A page whose
+  read takes longer than a tick still arrives a whole tick later. An inbox you were given
+  without notice now makes your stream start over at its next heartbeat instead of missing
+  that inbox's first changes. Set the tick with `CAMPBOOKS_CHANGES__CATCH_UP_TICK_MS`
+  (50 ms by default, 50 to 1000). Live changes still arrive at once.
+- **A stream lists your inboxes once, and again only when access changes.** It used to
+  list them on every wake-up. Now it keeps the list until someone's access to an inbox
+  changes, or until its next heartbeat. When you are given an inbox (connecting a
+  mailbox), its first mail still reaches open streams at once. When your membership ends,
+  your stream ends at once, even if you could not see the change that removed you.
+- **A message built to be slow to parse no longer ties up the server.** HTML made of
+  thousands of stray or unclosed tags could take minutes of CPU every time the message was
+  read, and again when search indexed it. The reader now measures the parse first and shows
+  such a message as plain text once it passes a fixed budget, and search reduces HTML to
+  text without building a tree. Ordinary mail is unchanged. No migration
+  (campbooks-cloud#205).
 - **A suspension and its lift always reach a member's rules in the right order.** Each
   account now counts its suspensions and lifts, and the rules a member taught follow the
   latest count, not the clock: a clock that stepped back can no longer leave them paused
