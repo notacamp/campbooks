@@ -58,8 +58,8 @@
     }
   },
   "actions": {
-    "star": "Destacar",
-    "unstar": "Quitar destacado",
+    "star": "Fijar",
+    "unstar": "Dejar de fijar",
     "read": "Marcar como leída",
     "unread": "Marcar como no leída",
     "move": "Mover",
@@ -73,8 +73,8 @@
   },
   "toast": {
     "done": "Hecho · {{subject}}",
-    "starred": "Destacada · {{subject}}",
-    "unstarred": "Sin destacar · {{subject}}",
+    "starred": "Fijada · {{subject}}",
+    "unstarred": "Ya no está fijada · {{subject}}",
     "read": "Marcada como leída · {{subject}}",
     "unread": "Marcada como no leída · {{subject}}",
     "moved": "Movida a {{stream}} · {{subject}}"
@@ -161,7 +161,7 @@
     "updates": "Ir a Novedades",
     "receipts": "Ir a Recibos",
     "newsletters": "Ir a Boletines",
-    "star": "Destacar o quitar destacado",
+    "star": "Fijar o dejar de fijar",
     "unread": "Marcar como leída o no leída",
     "move": "Mover a un flujo",
     "replyAll": "Responder a todos",

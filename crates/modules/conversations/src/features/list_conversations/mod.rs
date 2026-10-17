@@ -1,5 +1,5 @@
 //! `GET /api/v1/w/{workspace_id}/conversations` — conversations by stream,
-//! newest first, a page at a time.
+//! pinned first (the provider's star), then newest first, a page at a time.
 
 use axum::{Json, extract::State};
 use base64::{Engine as _, engine::general_purpose::URL_SAFE_NO_PAD};
@@ -56,13 +56,13 @@ pub struct ListQuery {
 /// A page of conversations.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 pub struct ConversationList {
-    /// Newest first.
+    /// Pinned first, then newest first (archived lists and `ids`: newest first).
     pub conversations: Vec<ConversationSummary>,
     /// Pass it as `cursor` for the next page; `None` on the last page.
     pub next_cursor: Option<String>,
 }
 
-/// List conversations, newest first.
+/// List conversations: pinned first, then newest first.
 #[utoipa::path(
     get,
     path = "/api/v1/w/{workspace_id}/conversations",
@@ -134,9 +134,14 @@ pub async fn handler(
     tx.commit().await?;
     let next_cursor = if conversations.len() > limit as usize {
         conversations.truncate(limit as usize);
-        conversations
-            .last()
-            .map(|last| encode_cursor(last.last_message_at, last.id))
+        conversations.last().map(|last| {
+            // Archived lists ignore pins, so their cursor never carries one.
+            encode_cursor(
+                last.starred && !query.archived,
+                last.last_message_at,
+                last.id,
+            )
+        })
     } else {
         None
     };
@@ -151,11 +156,12 @@ async fn fetch_page(
     conn: &mut PgConnection,
     inboxes: &[InboxId],
     query: &ListQuery,
-    after: Option<(DateTime<Utc>, ConversationId)>,
+    after: Option<Cursor>,
     limit: u32,
 ) -> Result<Vec<SummaryRow>> {
     let stream = query.stream.map(Stream::as_str);
-    let (after_at, after_id) = after.unzip();
+    let after_pinned = after.is_some_and(|cursor| cursor.pinned);
+    let (after_at, after_id) = after.map(|cursor| (cursor.at, cursor.id)).unzip();
     let fetch = i64::from(limit) + 1;
     let rows = if query.archived {
         sqlx::query_as!(
@@ -209,8 +215,9 @@ async fn fetch_page(
               ) m ON true
              WHERE c.inbox_id = ANY($1) AND c.archived_at IS NULL AND NOT c.trashed
                AND ($2::text IS NULL OR c.stream = $2)
-               AND ($3::timestamptz IS NULL OR (c.last_message_at, c.id) < ($3, $4))
-             ORDER BY c.last_message_at DESC, c.id DESC
+               AND ($3::timestamptz IS NULL
+                    OR (c.starred, c.last_message_at, c.id) < ($6::bool, $3, $4))
+             ORDER BY c.starred DESC, c.last_message_at DESC, c.id DESC
              LIMIT $5
             "#,
             inboxes as &[InboxId],
@@ -218,6 +225,7 @@ async fn fetch_page(
             after_at,
             after_id as Option<ConversationId>,
             fetch,
+            after_pinned,
         )
         .fetch_all(&mut *conn)
         .await?
@@ -271,21 +279,42 @@ async fn fetch_ids(
     .await?)
 }
 
-/// `(last_message_at, id)` of the last row of a page, opaque.
-fn encode_cursor(at: DateTime<Utc>, id: ConversationId) -> String {
+/// Where the previous page ended: whether its last row was pinned, its
+/// `last_message_at` and its id.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct Cursor {
+    pinned: bool,
+    at: DateTime<Utc>,
+    id: ConversationId,
+}
+
+/// `(pinned, last_message_at, id)` of the last row of a page, opaque.
+fn encode_cursor(pinned: bool, at: DateTime<Utc>, id: ConversationId) -> String {
     URL_SAFE_NO_PAD.encode(format!(
-        "{}|{id}",
+        "{}|{}|{id}",
+        u8::from(pinned),
         at.to_rfc3339_opts(chrono::SecondsFormat::Nanos, true)
     ))
 }
 
-fn decode_cursor(cursor: &str) -> Result<(DateTime<Utc>, ConversationId)> {
+/// A cursor from before pins (`at|id`) reads as not pinned: a list paged
+/// across the upgrade goes on among the unpinned conversations.
+fn decode_cursor(cursor: &str) -> Result<Cursor> {
     let bad = || Error::BadRequest(crate::MESSAGES.reason("invalid_cursor"));
     let bytes = URL_SAFE_NO_PAD.decode(cursor).map_err(|_| bad())?;
     let text = String::from_utf8(bytes).map_err(|_| bad())?;
-    let (at, id) = text.split_once('|').ok_or_else(bad)?;
+    let parts: Vec<&str> = text.split('|').collect();
+    let (pinned, at, id) = match parts.as_slice() {
+        [at, id] | ["0", at, id] => (false, *at, *id),
+        ["1", at, id] => (true, *at, *id),
+        _ => return Err(bad()),
+    };
     let at = DateTime::parse_from_rfc3339(at).map_err(|_| bad())?;
-    Ok((at.with_timezone(&Utc), id.parse().map_err(|_| bad())?))
+    Ok(Cursor {
+        pinned,
+        at: at.with_timezone(&Utc),
+        id: id.parse().map_err(|_| bad())?,
+    })
 }
 
 #[cfg(test)]
@@ -296,9 +325,33 @@ mod tests {
     fn cursors_round_trip_and_reject_junk() {
         let at = Utc::now();
         let id = ConversationId::new();
-        assert_eq!(decode_cursor(&encode_cursor(at, id)).unwrap(), (at, id));
+        for pinned in [false, true] {
+            assert_eq!(
+                decode_cursor(&encode_cursor(pinned, at, id)).unwrap(),
+                Cursor { pinned, at, id }
+            );
+        }
         assert!(decode_cursor("not-a-cursor").is_err());
         assert!(decode_cursor(&URL_SAFE_NO_PAD.encode("2026-01-01|nope")).is_err());
+        assert!(decode_cursor(&URL_SAFE_NO_PAD.encode("2|2026-01-01T00:00:00Z|x")).is_err());
+    }
+
+    #[test]
+    fn a_cursor_from_before_pins_reads_as_not_pinned() {
+        let at = Utc::now();
+        let id = ConversationId::new();
+        let legacy = URL_SAFE_NO_PAD.encode(format!(
+            "{}|{id}",
+            at.to_rfc3339_opts(chrono::SecondsFormat::Nanos, true)
+        ));
+        assert_eq!(
+            decode_cursor(&legacy).unwrap(),
+            Cursor {
+                pinned: false,
+                at,
+                id
+            }
+        );
     }
 }
 
@@ -377,6 +430,63 @@ mod http_tests {
         );
         let unknown = format!("{base}?inbox={}", InboxId::new());
         assert_eq!(kit.get(&sam, &unknown).await.status, StatusCode::NOT_FOUND);
+    }
+
+    #[sqlx::test(migrations = "../../../migrations")]
+    async fn pinned_conversations_stay_at_the_top_of_their_stream(db: PgPool) {
+        let kit = Kit::new(db).await;
+        let (workspace, _, sam) = kit.sams_inbox().await;
+        let base = format!("/api/v1/w/{workspace}/conversations");
+        // Pin the oldest: the Q4 plan.
+        let q4 = kit.conversation_of("en-1").await;
+        let pinned = kit.post(&sam, &format!("{base}/{q4}/star"), None).await;
+        assert_eq!(pinned.json["starred"], true);
+
+        let subjects = |json: &serde_json::Value| -> Vec<String> {
+            json["conversations"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(|c| c["subject"].as_str().unwrap().to_owned())
+                .collect()
+        };
+        let all = kit.get(&sam, &base).await;
+        assert_eq!(
+            subjects(&all.json),
+            [
+                "Q4 plan: can you review by Friday?",
+                "New sign-in to your account from Linux",
+                "Issue 142: five tools for calmer mornings"
+            ]
+        );
+        let primary = kit.get(&sam, &format!("{base}?stream=primary")).await;
+        assert_eq!(primary.json["conversations"][0]["starred"], true);
+
+        // Paging crosses from the pinned to the rest without losing or repeating one.
+        let mut seen = Vec::new();
+        let mut cursor: Option<String> = None;
+        for _ in 0..4 {
+            let uri = match &cursor {
+                Some(c) => format!("{base}?limit=1&cursor={c}"),
+                None => format!("{base}?limit=1"),
+            };
+            let page = kit.get(&sam, &uri).await;
+            assert_eq!(page.status, StatusCode::OK, "{:?}", page.json);
+            seen.extend(subjects(&page.json));
+            cursor = page.json["next_cursor"].as_str().map(str::to_owned);
+            if cursor.is_none() {
+                break;
+            }
+        }
+        assert_eq!(seen, subjects(&all.json));
+
+        // Archived lists stay newest first.
+        kit.post(&sam, &format!("{base}/{q4}/archive"), None).await;
+        let archived = kit.get(&sam, &format!("{base}?archived=true")).await;
+        assert_eq!(
+            subjects(&archived.json),
+            ["Q4 plan: can you review by Friday?"]
+        );
     }
 
     #[sqlx::test(migrations = "../../../migrations")]

@@ -24,8 +24,8 @@ export interface VisorProps {
    * `dizzy`: something failed on our side. `starry`: a big win. `hearts`: a warm moment.
    */
   state?: VisorState | undefined;
-  /** sm 22px · md ×1.4 · lg ×2 · xl ×2.8 */
-  size?: "sm" | "md" | "lg" | "xl" | undefined;
+  /** xs ×0.75 (inside a button) · sm 22px · md ×1.4 · lg ×2 · xl ×2.8 */
+  size?: "xs" | "sm" | "md" | "lg" | "xl" | undefined;
   /** Announce the state ("Campbooks is reading"). Decorative by default. */
   announce?: boolean | undefined;
   /** Colour the star and heart eyes (`--visor-tint-star`, `--visor-tint-heart`). Eyes are white by default. */

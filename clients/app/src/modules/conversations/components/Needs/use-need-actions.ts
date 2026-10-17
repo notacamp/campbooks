@@ -44,35 +44,59 @@ export function useNeedActions(
   const undo = useUndoToast();
   const teach = useTeachOnce();
 
-  const run = (conversation: ConversationSummary, verdict: NeedVerdict) => {
-    mutation.mutate(
-      { conversation, action: { need: verdict } },
-      {
-        onSuccess: () => {
+  // Each request settles on its own promise: `mutate`'s callbacks only fire
+  // for the latest call, so a failure under a quicker second action would be
+  // lost (the row hidden, no toast). `entry` is the undo entry the verdict
+  // pushed, taken back when it fails.
+  const run = (conversation: ConversationSummary, verdict: NeedVerdict, entry?: number) => {
+    void mutation
+      .mutateAsync({ conversation, action: { need: verdict } })
+      .then(
+        () => {
           // Not needed on a need (not a warning) can teach: "these never need me".
           if (verdict === "not_needed" && conversation.need?.question !== "suspicious") {
             teach?.after(conversation, { kind: "not_needed" });
           }
         },
-        onError: (error) => {
-          // Nothing changed on the server: put it back and say so plainly.
-          onFailed?.(conversation);
+        (error: unknown) => {
+          // Nothing changed on the server: put it back as it was and say so
+          // plainly. A failed reopen leaves it done (hidden again).
+          if (entry !== undefined) {
+            undo.retract(entry);
+          }
+          if (verdict === "reopen") {
+            onRedo?.(conversation);
+          } else {
+            onFailed?.(conversation);
+          }
           const need = conversation.need;
           const name = need === null || need === undefined ? "" : needSender(need, conversation);
-          undo.notify(
-            t(
-              problemCode(error) === "need_changed" ? "needs.toast.changed" : "needs.toast.failed",
-              {
-                name,
+          // A failure stays until Retry or dismiss. A need that changed
+          // meanwhile is not retried: the member should look again.
+          if (problemCode(error) === "need_changed") {
+            undo.fail({ label: t("needs.toast.changed", { name }) });
+          } else {
+            undo.fail({
+              label: t("needs.toast.failed", { name }),
+              retry: () => {
+                // Show at once what the retry is about to do.
+                if (verdict === "reopen") {
+                  onUndo?.(conversation);
+                  run(conversation, "reopen");
+                } else {
+                  if (verdict !== "confirm") {
+                    onRedo?.(conversation);
+                  }
+                  judge(conversation, verdict);
+                }
               },
-            ),
-          );
+            });
+          }
         },
-        onSettled: () => {
-          onChanged?.();
-        },
-      },
-    );
+      )
+      .finally(() => {
+        onChanged?.();
+      });
   };
 
   const judge = (conversation: ConversationSummary, verdict: Exclude<NeedVerdict, "reopen">) => {
@@ -82,8 +106,7 @@ export function useNeedActions(
     }
     const name = needSender(need, conversation);
     const safe = verdict === "not_needed" && need.question === "suspicious";
-    run(conversation, verdict);
-    undo.push({
+    const entry = undo.push({
       label: t(safe ? "needs.toast.safe" : TOASTS[verdict], { name }),
       undo: () => {
         onUndo?.(conversation);
@@ -94,6 +117,7 @@ export function useNeedActions(
         run(conversation, verdict);
       },
     });
+    run(conversation, verdict, entry);
   };
 
   return {

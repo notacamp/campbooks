@@ -1,14 +1,17 @@
 name: Publish next
 
-# Every green push to `next` becomes a multi-arch image and a staging deploy:
+# Every green push to `next` is tagged for deploy and deployed to staging and
+# production:
 #
-#   CI (on next) succeeds → build amd64 + arm64 natively → manifest
-#   ghcr.io/notacamp/campbooks:next and :next-<sha> → Trivy → dispatch
-#   `campbooks-next-staging` to the private cloud repo, which pulls the tag.
+#   CI (on next) builds both images on amd64 + arm64, scans and attests them,
+#   and pushes them as `ci-<sha>` while the tests run → CI succeeds → this
+#   adds `next-<sha>` and `next` to those same digests → dispatch
+#   `campbooks-next-staging` and `campbooks-next-prod` to the private cloud
+#   repo, which pull the tag.
 #
 # The Laya model server (the `decide` role, deploy/laya) is published next to
 # it as ghcr.io/notacamp/campbooks-laya with the same tags, so a deploy pins
-# both images with one tag. The dispatch waits for both.
+# both images with one tag.
 #
 # Tags stay in the `next*` namespace until cutover so they never collide with
 # the Rails releases (`X.Y.Z`, `latest`) published from `main`. The build,
@@ -26,11 +29,16 @@ permissions:
   contents: read
 
 concurrency:
-  group: publish-next
+  # Only a green push to next (or a manual run) publishes. Every other CI
+  # completion (a failed run, or one dropped because a newer push was
+  # queued) gets a group of its own, so it can never cancel a publish in
+  # flight and leave that round undeployed.
+  group: >-
+    ${{ (github.event_name == 'workflow_dispatch' ||
+         (github.event.workflow_run.conclusion == 'success' &&
+          github.event.workflow_run.event == 'push'))
+        && 'publish-next' || format('publish-next-ignored-{0}', github.run_id) }}
   cancel-in-progress: true
-
-env:
-  REGISTRY_IMAGE: ghcr.io/${{ github.repository }}
 
 jobs:
   plan:
@@ -53,38 +61,44 @@ jobs:
           echo "ref=$REF" >> "$GITHUB_OUTPUT"
           echo "sha_tag=next-${REF:0:12}" >> "$GITHUB_OUTPUT"
 
-  image:
+  promote:
+    # CI built, scanned and attested both images for this commit as
+    # `ci-<sha>`. Give the same digests the deploy tags; the attestations
+    # are bound to the digest, so they still apply.
     needs: plan
-    uses: ./.github/workflows/image.yml
-    with:
-      ref: ${{ needs.plan.outputs.ref }}
-      tags: |
-        ${{ needs.plan.outputs.sha_tag }}
-        next
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
     permissions:
       contents: read
       packages: write
-      id-token: write
-      attestations: write
-
-  laya-image:
-    needs: plan
-    uses: ./.github/workflows/image.yml
-    with:
-      ref: ${{ needs.plan.outputs.ref }}
-      image: campbooks-laya
-      context: deploy/laya
-      tags: |
-        ${{ needs.plan.outputs.sha_tag }}
-        next
-    permissions:
-      contents: read
-      packages: write
-      id-token: write
-      attestations: write
+    steps:
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4
+      - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Tag the images CI built
+        env:
+          REF: ${{ needs.plan.outputs.ref }}
+          SHA_TAG: ${{ needs.plan.outputs.sha_tag }}
+          OWNER: ${{ github.repository_owner }}
+        run: |
+          set -o pipefail
+          digest() { docker buildx imagetools inspect "$1" --format '{{json .Manifest}}' | jq -r .digest; }
+          for image in campbooks campbooks-laya; do
+            repo="ghcr.io/$OWNER/$image"
+            built=$(digest "$repo:ci-$REF") || {
+              echo "::error::$repo:ci-$REF is missing: CI builds it on every push to next"; exit 1; }
+            docker buildx imagetools create -t "$repo:$SHA_TAG" -t "$repo:next" "$repo@$built"
+            tagged=$(digest "$repo:$SHA_TAG")
+            [ "$tagged" = "$built" ] || {
+              echo "::error::$repo:$SHA_TAG is $tagged, not the $built CI scanned"; exit 1; }
+            echo "$repo:$SHA_TAG and :next → $built"
+          done
 
   deploy:
-    needs: [plan, image, laya-image]
+    needs: [plan, promote]
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:

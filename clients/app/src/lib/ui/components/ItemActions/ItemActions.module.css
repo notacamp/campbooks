@@ -1,0 +1,25 @@
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-1-5);
+}
+
+.divider {
+  width: var(--border-width);
+  height: var(--actions-divider-height);
+  margin: 0 var(--space-1);
+  background: var(--border-strong);
+}
+
+.actions [data-highlighted] {
+  outline: var(--focus-width) solid var(--focus-ring);
+  outline-offset: var(--border-width);
+}
+
+/* Phones wrap the buttons; the divider would land at a line's end. */
+@media (width < 48rem) {
+  .divider {
+    display: none;
+  }
+}

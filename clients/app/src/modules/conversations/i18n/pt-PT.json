@@ -58,8 +58,8 @@
     }
   },
   "actions": {
-    "star": "Marcar com estrela",
-    "unstar": "Tirar a estrela",
+    "star": "Fixar",
+    "unstar": "Desafixar",
     "read": "Marcar como lida",
     "unread": "Marcar como não lida",
     "move": "Mover",
@@ -73,8 +73,8 @@
   },
   "toast": {
     "done": "Concluída · {{subject}}",
-    "starred": "Com estrela · {{subject}}",
-    "unstarred": "Sem estrela · {{subject}}",
+    "starred": "Fixada · {{subject}}",
+    "unstarred": "Desafixada · {{subject}}",
     "read": "Marcada como lida · {{subject}}",
     "unread": "Marcada como não lida · {{subject}}",
     "moved": "Movida para {{stream}} · {{subject}}"
@@ -161,7 +161,7 @@
     "updates": "Ir para Atualizações",
     "receipts": "Ir para Recibos",
     "newsletters": "Ir para Newsletters",
-    "star": "Pôr ou tirar a estrela",
+    "star": "Fixar ou desafixar",
     "unread": "Marcar como lida ou não lida",
     "move": "Mover para um fluxo",
     "replyAll": "Responder a todos",

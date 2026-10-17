@@ -17,6 +17,10 @@
     0 0 0 var(--border-width) var(--visor-rim);
 }
 
+.visor[data-size="xs"] {
+  --s: calc(var(--visor-size) * 0.75);
+}
+
 .visor[data-size="md"] {
   --s: calc(var(--visor-size) * 1.4);
 }
