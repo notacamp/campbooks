@@ -129,11 +129,42 @@ reason = "Whether an address has a pending invitation, before any workspace: adm
 
 [[access.pool_access]]
 path = "crates/modules/connectors/src/domain/schedule.rs"
-reason = "The dispatcher reads and leases the scheduling index across workspaces (ids and times, `FOR SELECT`/`FOR UPDATE` maintenance policies); provider budgets are instance-wide."
+reason = "Provider budgets are instance-wide (no workspace); the dispatcher itself works in the maintenance scope (`[[access.maintenance_scope]]`)."
 
 [[access.pool_access]]
 path = "crates/modules/connectors/src/zoho/flows.rs"
 reason = "A test file (`#[cfg(test)] mod flows;`): fixtures publish from plain transactions."
+
+
+[[access.pool_access]]
+path = "crates/server/src/bff/store.rs"
+reason = "The web BFF's session store (schema `bff`): sessions are instance-wide, none carries a workspace, and every statement calls one of the `bff.*` functions (the runtime role has no privilege on the tables, campbooks-cloud#212). It also opens the single-flight token refresh's transaction (`begin_refresh`), the one the refresh locks its session row in."
+
+[[access.pool_access]]
+path = "crates/kernel/src/db.rs"
+reason = "Where the kernel opens its transactions: `begin_for`, `begin_admin`, `begin_kernel`, `begin_maintenance`, each setting its scope before any query."
+
+[[access.pool_access]]
+path = "crates/kernel/src/jobs/context.rs"
+reason = "A job's transaction, opened on first use with the job's workspace set (or a scope: `kernel_tx`, `maintenance_tx`)."
+
+# Cross-workspace work outside the kernel. A transaction in the kernel
+# scope (`kernel::db::begin_kernel`, a job's `kernel_tx`) reaches every
+# workspace's kernel rows (the queue, the event log, the change feed, the
+# blob catalogue): no file outside the kernel may open it today
+# (`[[access.kernel_scope]]` is empty; campbooks-cloud#129, #196). A module
+# scheduler's dispatcher works in the narrower maintenance scope
+# (`kernel::db::begin_maintenance`, a job's `maintenance_tx`), which only its
+# own table's maintenance policies admit and no kernel table does; it
+# enqueues each run in that run's workspace. A transaction that sets neither
+# a workspace nor a scope sees nothing. Each entry is reviewed like an ADR.
+[[access.maintenance_scope]]
+path = "crates/modules/connectors/src/domain/schedule.rs"
+reason = "The one-minute dispatcher leases due streams across workspaces (`connectors.sync_due` maintenance policies: ids and times, read and lease only) and enqueues each stream's run in its workspace."
+
+[[access.maintenance_scope]]
+path = "crates/modules/conversations/src/features/backfill_needs/mod.rs"
+reason = "The needs backfill's dispatcher starts pending backfills across workspaces (`conversations.needs_backfills` maintenance policies: ids and states, start only) and enqueues each inbox's page job in its workspace."
 
 # Published events nothing consumes yet, and why they exist.
 [[access.unconsumed_events]]
@@ -147,6 +178,10 @@ reason = "The change feed: the sent draft leaves its author's list."
 [[access.unconsumed_events]]
 name = "conversations.rule_changed"
 reason = "The change feed: clients follow a taught rule and its run's progress."
+
+[[access.unconsumed_events]]
+name = "conversations.need_summarised"
+reason = "The change feed: Scout's summary of a need's email was written, so an open Home item or reader asks for the conversation again and shows it."
 
 [[access.unconsumed_events]]
 name = "conversations.send_failed"

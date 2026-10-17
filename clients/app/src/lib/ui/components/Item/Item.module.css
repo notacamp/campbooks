@@ -1,6 +1,14 @@
 .wrapper {
   display: flex;
   flex-direction: column;
+  border-radius: var(--row-radius);
+}
+
+/* The selected item is one block: its row, its actions and what opening it shows. */
+.wrapper[data-selected] {
+  --clamp-fade-to: var(--accent-soft);
+
+  background: var(--accent-soft);
 }
 
 .item {
@@ -19,18 +27,13 @@
   cursor: pointer;
 }
 
-.item:hover,
-.item:focus-visible,
-.item[data-selected] {
-  --hint-opacity: 1;
-}
-
 .item:hover {
   background: var(--surface-hover);
 }
 
-.item[data-selected] {
-  background: var(--accent-soft);
+.item[data-selected],
+.item[data-selected]:hover {
+  background: none;
 }
 
 .item > :first-child {
@@ -85,11 +88,6 @@
   font-weight: var(--weight-semibold);
 }
 
-.hints {
-  display: inline-flex;
-  gap: var(--space-0-5);
-}
-
 .meta {
   display: flex;
   flex-wrap: wrap;
@@ -139,6 +137,31 @@
   list-style: disc;
 }
 
+/* Scout's summary: the visor and a small heading over the model's sentences. */
+.summary {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  max-width: var(--measure);
+}
+
+.summaryHead {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-xs);
+  color: var(--text-tertiary);
+}
+
+.summaryText {
+  min-width: 0;
+  unicode-bidi: isolate;
+  font-size: var(--text-md);
+  line-height: var(--leading-relaxed);
+  color: var(--text-primary);
+  overflow-wrap: anywhere;
+}
+
 .context {
   display: flex;
   align-items: flex-start;
@@ -165,6 +188,11 @@
   background: var(--accent-soft);
 }
 
+/* Selected, the block already carries the tint: not twice. */
+.wrapper[data-selected] .swipe .item {
+  background: none;
+}
+
 .swipeAction {
   display: grid;
   place-items: center;
@@ -186,8 +214,66 @@
   color: var(--swipe-done-fg);
 }
 
-@media (hover: none) and (pointer: coarse) {
-  .hints {
-    display: none;
+.actions {
+  padding: 0 var(--row-pad-x) var(--space-3)
+    calc(var(--row-pad-x) + var(--size-avatar-md) + var(--space-3));
+}
+
+/* A row acted on: its confirmation, then it folds away. */
+.confirmation {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+  max-height: var(--size-hit);
+  overflow: hidden;
+  padding: var(--space-3) var(--row-pad-x);
+  font-size: var(--text-md);
+  font-weight: var(--weight-medium);
+  color: var(--success);
+  animation: fold var(--duration-confirm) var(--ease-out) forwards;
+}
+
+.check {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: var(--size-avatar-sm);
+  height: var(--size-avatar-sm);
+  border-radius: var(--radius-full);
+  background: var(--success-soft);
+}
+
+.confirmationText {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (width < 48rem) {
+  .actions,
+  .detail {
+    padding-left: var(--row-pad-x);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .confirmation {
+    animation: none;
+  }
+}
+
+@keyframes fold {
+  0%,
+  70% {
+    max-height: var(--size-hit);
+    opacity: 1;
+  }
+
+  100% {
+    max-height: 0;
+    padding-block: 0;
+    opacity: 0;
   }
 }

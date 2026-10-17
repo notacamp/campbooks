@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        DELETE FROM kernel.jobs\n         WHERE kind = $1 AND unique_key = 'schedule:' || $1\n           AND state IN ('pending', 'running')\n           AND (state = 'pending' OR workspace_id IS NOT NULL\n                OR locked_until < now() OR locked_until > now() + make_interval(secs => $2))\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Float8"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "816f31117c48308d5b749200cecc018e6a6c77668d8d8ce9965ec94695db0a74"
+}

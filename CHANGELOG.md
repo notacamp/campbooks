@@ -6,8 +6,307 @@ All notable changes to Campbooks Next are documented here. The format follows
 
 ## [Unreleased]
 
+### Fixed
+
+- **Scout's reply suggestions and drafts have room to think.** The model behind them
+  (a reasoning model in production) spends its thinking from the same budget as its
+  answer, and Reply gave it too little: suggestions and drafts could come back empty or cut
+  short, and Reply would say Scout couldn't write one. Both now allow 4,096 tokens. When
+  an answer still doesn't parse, the log says why the model stopped and how long the
+  answer was, never what it wrote.
+- **Sign in with Zoho works.** Signing in with Zoho, or connecting a Zoho mailbox,
+  always ended on "The provider didn't let you in". Zoho publishes its signing key with
+  an extra zero byte in front, and the server refused the key's every signature because
+  of it. The server now reads the key without the zero byte and checks everything else as
+  before.
+- **Pay asks "Is it paid?", and receipts never land in Pay.** Pay used to be raised for
+  any money mail the decide model read as asking something, so invoices already paid and
+  payment confirmations showed up as "Pay". The decide model now answers one more
+  question in the same call: does the email ask for a payment still owed, confirm one
+  already made, or neither. Only a payment still owed raises Pay, and since Campbooks
+  can't see your bank it asks on Home: "Acme Hosting sent an invoice. Is it paid?" with
+  Already paid (1) and Still to pay (2), and "All N already paid" on the Pay group with one
+  Undo. Still to pay keeps it as "Pay Acme Hosting", says how many days overdue it is when
+  there's a due date, and offers a reminder first (two days before the due date, tomorrow
+  morning when overdue, Monday with no date). The reader asks the same. Existing
+  needs are worked out again on upgrade, and mail from the last two weeks is asked the new
+  question once; a Pay item on older mail goes away and doesn't come back. A bill on
+  recent mail stays until its question is answered, so one the upgrade could not ask (the
+  daily AI limit, or a self-hosted model failing the answers check) is never dropped. The
+  answers check now also requires the owed and paid cases to be right. Newsletters never
+  raise Pay; other streams can, when the model is sure the payment is owed. After this
+  upgrade, rolling back to an earlier image is not supported: the stored answers use the
+  new money question and verdicts.
+  For operators, `campbooks-server labelling export` writes your recent money mail as a
+  sheet to label on your own machine, and `cargo xtask eval decide --set-dir` measures the
+  model on it (campbooks-cloud#167).
+
+### Added
+
+- **`/up` works as a health check.** The server answers `/up` the same way as
+  `/api/v1/system/health`, so load balancers and uptime monitors that probe `/up` work
+  without being reconfigured.
+- **Build a rule yourself, any time (campbooks-cloud#217).** In Scout's memory, "Build a
+  rule yourself" next to the privacy line opens the rule builder without sending anything
+  to a language model, and "Tell Scout in a sentence instead" goes back. When Scout can't
+  make a rule of a sentence, it offers the builder too. In the builder, "It's from" finds
+  senders by name, as in Scout's questions: type part of a name, or a full address or a
+  domain. Each sender you tick becomes its own rule, so mail from any of them counts, and
+  each rule shows what it matches before you save it.
+- **Reply proposes Scout's draft.** Reply (R, an item's Reply on Home, the reader's Reply)
+  now opens a dialog with two or three likely replies, each with its number key ("Yes,
+  Thursday works", "Ask to move it to the afternoon"), a line to say it in your own words,
+  and "Write my own" for the plain composer. Scout writes the draft only when you pick one,
+  in the conversation's language and signed with your name. Edit it in place, make it
+  shorter or ask for a change in plain words, then Send: it goes with the usual Undo
+  window, the Home item folds away, and Undo brings the draft back. "Open in composer"
+  moves it to the full composer. Nothing is sent until you press Send, and nothing is
+  written before you pick. Servers with no `complete` model that may read mail offer only
+  "Write my own", saying why. Items in an inbox you can only read no longer offer Reply,
+  Done or Not needed on Home. Two new operations, `conversations.suggest_replies` and
+  `conversations.write_reply`, need `conversations:send`, count against the workspace's
+  daily AI limit and a per-member hourly allowance, and store nothing.
+
+
+- **Scout's summary of the email on an opened Home item.** When an email raises a need, the
+  `complete` model writes one or two plain sentences saying what it is about, once, in the
+  background, and the opened item shows them first, under "Scout's summary" with the visor,
+  above the email, so you can decide without reading it. The summary is written in all four
+  languages in one call and you read yours. It is never written again and opening an item never
+  asks the model. It counts against the workspace's daily AI limit (one call per email that
+  raises a need) and appears only when a `complete` model is configured and may receive mail on
+  this server; otherwise, or when the call fails, the email shows as before. Mail that may be
+  phishing gets no summary, only its warning, so Scout never retells a scam in its own voice.
+  Needs that were open before the upgrade get theirs in the background, with nothing to do.
+
+- **Error reports to GlitchTip or Sentry.** Set `CAMPBOOKS_TELEMETRY__ERROR_DSN` and every
+  internal error, job that failed for good and panic is reported, filed under the release
+  and `CAMPBOOKS_TELEMETRY__ENVIRONMENT`. A report holds only ids (request, trace,
+  workspace, job), the route or job kind, where it was logged and the kind of error, with
+  quotes, addresses, links and tokens masked. Never the person, the request, a header, a
+  cookie or the mail it was about. `campbooks-server telemetry test-error` sends one
+  invented report to check the setup.
+- **The app's own errors and page timings, for operators.** With
+  `CAMPBOOKS_TELEMETRY__CLIENT_COLLECTOR_URL` set, the app reports the errors it did not
+  handle and its web vitals to its server, which scrubs them and forwards them to a Grafana
+  Faro receiver. Only the route shown, a random id for that run of the app, the browser and
+  the error's class, message head and stack positions are sent. Without the setting the app
+  sends nothing.
+- **Connector sync metrics.** `campbooks_connector_syncs_total` counts sync runs by provider
+  and outcome, and `campbooks_connector_overdue_streams` shows streams waiting more than
+  five minutes past due. `campbooks_errors_reported_total` and
+  `campbooks_client_telemetry_items_total` count what reaches the tracker and the receiver.
+
+### Changed
+
+- **Web requests are logged and counted under the API route they ran.** A call the web app
+  makes through the BFF (`/bff/api/*`) used to appear in the request log, its trace and the
+  request metrics as `/bff/api/{*path}`; it now carries the API's route template
+  (`GET /api/v1/w/{workspace_id}/members`) and `campbooks.via=bff`. Dashboards and alerts
+  by `http_route` see the web app's traffic route by route.
+- **An opened Home item shows the email (campbooks-cloud#203).** Pressing Enter on an item
+  (or clicking the selected row) now shows the email it is about, rendered as the reader
+  renders it, a few lines deep with "Show the whole email" to read it all in place. Until
+  now an opened item showed only how it was decided. In mail that may be phishing, links
+  lead nowhere, on Home and in the reader, and a line says so. Plain-text mail now keeps
+  its line breaks and paragraphs instead of running together into one line. The selected item's
+  background now covers its actions and what opening it shows, not only its first line.
+- **Find people by name in Scout's questions.** In "Whose mail should always reach you?"
+  and "What never needs you?", the address field is now a filter box. Type part of a name,
+  an address or a domain and the cards narrow at once, then Scout finds anyone in your mail
+  who matches, beyond the ten it suggests. The people you ticked stay listed. A full
+  address or a domain no one matches still shows as its own card to tick. With text in the
+  box, Enter ticks the first match and Esc clears it. "What never needs you?" no longer
+  suggests the people you reply to most.
+- **Settings pages are made of section cards.** Every Settings and Admin page now has a
+  display-face title with its lead, then each section in its own card with a larger title,
+  a count where it lists things ("Accounts · 2") and a one-line description. In Scout's
+  memory the rules no longer sit under a second "Rules" heading, the sentence field keeps
+  its label for screen readers only, and the privacy line has a lock. Ways to sign in
+  gets an Accounts card with "Add a way to sign in" at its bottom and Sign out everywhere
+  in its own card with an outlined danger button. Nothing behaves differently.
+
+### Fixed
+
+- **Teach Scout no longer blames your words when the model fails (campbooks-cloud#217).**
+  A sentence like "anything from my accountants at northtax or atelier conseils always
+  matters" could come back as "Scout couldn't turn that into a rule" when the model's
+  answer was empty, cut short or wrapped in a code fence. Scout now gives a thinking
+  model room to answer, reads an answer wrapped in a code fence, and when the answer
+  still can't be read says Scout couldn't read the sentence just now, with Try again and
+  "build the rule yourself". The server log says why the model stopped and how long its
+  answer was, never what it wrote.
+- **A taught rule that names a whole group of sites stops matching.** A rule saved with
+  a sender domain like `github.io` (now known to cover every site under it) used to match
+  all of them. It now matches nothing and shows as paused in Scout's memory, where you can
+  remove it.
+- **An unreadable `Authentication-Results` header counts as failed.** A sender can no longer
+  hide a failed check by breaking the header with an unbalanced quote or comment. It only
+  adds a hint for the decision model.
+
 ### Security
 
+- **One workspace can no longer hold up another's background work (campbooks-cloud#209).**
+  The job queue's keys spanned workspaces: a workspace that knew another workspace's job
+  key (most embed an id, such as `connectors.sync_stream:<stream>`) could keep a row of its
+  own with that key, and the other workspace's next enqueue was dropped as a duplicate, or
+  waited behind it for ever. A mailbox's sync could stop that way. Unique keys and ordering
+  keys now count per workspace, with instance-wide work (schedules, account events) as one
+  more group, so it still runs once per tick. Three kernel migrations swap the indexes,
+  building the new ones concurrently. An image from before this change can no longer
+  enqueue keyed jobs on the upgraded database: run the API and the worker of the same
+  version, and to go back run the rollback SQL in the change's `design.md` first.
+- **Catching up on changes no longer times what you may not see.** A stream that is
+  behind (after reconnecting, or after you stopped reading for a while) now sends one page
+  of changes per tick, each a tick after you took the previous one, so when a page arrives
+  no longer depends on how many changes it skipped in inboxes you are not in. A page whose
+  read takes longer than a tick still arrives a whole tick later. An inbox you were given
+  without notice now makes your stream start over at its next heartbeat instead of missing
+  that inbox's first changes. Set the tick with `CAMPBOOKS_CHANGES__CATCH_UP_TICK_MS`
+  (50 ms by default, 50 to 1000). Live changes still arrive at once.
+- **A stream lists your inboxes once, and again only when access changes.** It used to
+  list them on every wake-up. Now it keeps the list until someone's access to an inbox
+  changes, or until its next heartbeat. When you are given an inbox (connecting a
+  mailbox), its first mail still reaches open streams at once. When your membership ends,
+  your stream ends at once, even if you could not see the change that removed you.
+- **A message built to be slow to parse no longer ties up the server.** HTML made of
+  thousands of stray or unclosed tags could take minutes of CPU every time the message was
+  read, and again when search indexed it. The reader now measures the parse first and shows
+  such a message as plain text once it passes a fixed budget, and search reduces HTML to
+  text without building a tree. Ordinary mail is unchanged. No migration
+  (campbooks-cloud#205).
+- **A suspension and its lift always reach a member's rules in the right order.** Each
+  account now counts its suspensions and lifts, and the rules a member taught follow the
+  latest count, not the clock: a clock that stepped back can no longer leave them paused
+  after a lift. A member who joins or leaves a workspace at the moment they are suspended
+  or lifted now gets the right state there too. If a suspension fails to reach the rules,
+  Admin → Jobs shows it under "Work to watch" and the server logs "suspension fan-out
+  delivery died". Keeping a suggested rule whose author is away now says first that it
+  stays paused until they are back or someone takes it over.
+- **The database functions that act for the server no longer run as a superuser.** The
+  functions behind web sign-in and the rate limits run with their owner's rights. Their
+  owner was the login that applied the migrations, which on the bundled Postgres is a
+  superuser, so a bug in one of them would have had every right on the server. They now
+  belong to `campbooks_definer`, a role that cannot log in, owns no table and holds only
+  the few privileges those functions use. The migrations create it. If your migration
+  login is neither a superuser nor allowed to create roles, the upgrade stops and names
+  the two statements an administrator must run once (see `deploy/README.md`). The
+  functions also check their input more strictly: a sign-in can only land on a path of
+  this site, as the server already checks. `CAMPBOOKS_BFF__ABSOLUTE_TIMEOUT_HOURS` must
+  now be at most 8784 (366 days); the server refuses to start otherwise. Signing in again
+  in the same browser now also revokes the earlier session's refresh token. Nobody is
+  signed out by the upgrade. If you roll back, run the SQL in the change's design first
+  (campbooks-cloud#214).
+- **Web sign-in records are reachable only through the sign-in's own functions.** The
+  tables holding web sessions, sign-ins in progress and retired session tokens could be
+  read and changed by any of the server's database work. Now the server's database role
+  has no access to them at all. It goes through narrow functions, each acting on the one
+  session whose cookie a request presented, the one sign-in it is finishing, or one
+  person's sessions; only the clean-up of ended sessions reaches across people. A sign-in's
+  nonce, the one value that was stored in plain text, is now encrypted like the rest.
+  Nobody is signed out by the upgrade. A sign-in started in the ten minutes before it
+  answers "invalid state" once; start it again. Upgrade the server and the worker
+  together: a process of the previous version fails every web request until it is
+  replaced. If you roll back, run the SQL in the change's design first
+  (campbooks-cloud#212).
+- **Smaller fixes from the same review.** `CAMPBOOKS_CHANGES__OPENS_WINDOW_SECONDS` must
+  now be at most a day (a longer one made every change stream fail to open); the server
+  refuses to start otherwise. The rate-limit clean-up no longer deletes a counter renewed
+  at the same moment. Migrations may pin a function's `search_path` only to exactly
+  `pg_catalog, pg_temp` (campbooks-cloud#213).
+- **Retried requests never bring back a secret, and keys and counters stay private.**
+  Requests sent with an `Idempotency-Key` used to have their answers cached for a day,
+  including a new app's client secret. That cache could be read from any workspace's work,
+  and anyone could reset or use up the rate-limit counters. Now each caller reaches only
+  their own keys. The answers that show something once (an app's client secret, a rotated
+  secret, an invitation link, a link or connection ticket) are never kept. Sending such a
+  request again with the same key answers 409 `idempotency_secret_shown_once` instead of
+  showing the secret twice. Answers of those requests cached before this release are
+  dropped. Rate-limit counters can only be counted and pruned through two database
+  functions. No connection can read, reset or rewrite them.
+- **A workspace can no longer forge background work for the whole instance.** Work running
+  in a workspace could add a job or event that belongs to no workspace. One such row could
+  stop the job pruning, or all mail polling, for good. It can now only add the account
+  events a workspace announces (an app's access revoked, a way to sign in removed) and their
+  deliveries, and no row of its own may hold a schedule's key. Nor can it touch the
+  schedules' record of their last runs any more, and an account's event it writes into its
+  own workspace by hand (to sign someone out everywhere, say) is never acted on. A schedule
+  blocked by a row
+  that will never run is freed at its next tick, the old row kept as failed. Administrators
+  with `jobs.retry` can also discard a schedule's pending or stuck run. The mail and needs
+  dispatchers no longer leave the last workspace set after they queue work, and the
+  architecture checks catch scope names spelled with escapes and test modules hidden inside
+  other code (campbooks-cloud#207). Rolling back to an older image needs a one-off SQL step,
+  in the change's design.
+- **Background work shared by the whole instance can only be changed by the kernel.**
+  Account events, account jobs and scheduled ticks belong to no workspace. Work running in
+  a workspace could still read and add them, which it needs, but it could also complete,
+  requeue or delete them. Now only the kernel's own machinery (the worker, retention, the
+  admin's queue) can change them. The two schedulers that work across workspaces (polling
+  mailboxes, the needs backfill) now get a narrower scope that reads only their own
+  schedule and reaches no other workspace's events or jobs. The architecture check also
+  closes four ways around it (campbooks-cloud#196). Before redeploying an older version,
+  run the rollback in the change's design notes.
+- **The change feed reveals nothing about inboxes you can't see.** The live stream of
+  what changed used to carry the workspace's own change count: as the `ready` frame's
+  `head`, as every frame's cursor (so the gap between two of your changes counted the
+  ones you were not shown), in a heartbeat sent only when hidden changes had happened,
+  in when a resume answered `too_far_behind` or `cursor_expired`, and in how a catch-up
+  came in bursts (a page was 200 changes of the workspace, hidden ones included). A
+  member outside an inbox could tell from it how much mail that inbox gets, and when.
+  The stream now reads pages of changes you may see only, filtered in the database;
+  cursors are sealed resume tokens, new on every frame, all the same length and good
+  only for you; `ready` has no `head`; heartbeats come on a fixed timer, busy or idle,
+  each with a fresh token; every change you may see is its own frame; and a token
+  expires by its age alone (changes are now kept for the retention period after they
+  were numbered). A test compares each kind of caller's stream (member, admin, a client
+  acting for a member, a client acting for nobody) with and without activity they may
+  not see, and they match. `CAMPBOOKS_CHANGES__MAX_BACKLOG` and the `too_far_behind`
+  reset are gone; opening streams is now limited per person or client
+  (`CAMPBOOKS_CHANGES__OPENS_PER_WINDOW`, 30 per `OPENS_WINDOW_SECONDS` 60 by default),
+  and the server warns at startup when `CAMPBOOKS_SECRET_KEY` is not set. Apps holding
+  a cursor from before refetch once. Migration
+  `20261020220000_kernel__change_sequenced_at` (campbooks-cloud#131).
+- **A suspended member's rules pause until the suspension is lifted.** A rule acts in
+  its author's name, so while an administrator has the author's account suspended their
+  rules read as paused, exactly as when the author can no longer change the inbox: they
+  leave new mail alone, a run over existing mail stops at its next batch, and previews
+  and suggestions no longer count them. Unsuspending makes them act again, with nothing
+  to redo (a run they stopped is not restarted). Other members see only that the rule
+  is paused for now and acts again on its own, never that its author is suspended. A
+  member removed while suspended gets their rules back when invited again. The identity
+  module now also publishes `identity.account_unsuspended`, both suspension events carry
+  an ordered `at`, and the workspaces module announces each in every workspace of the
+  account (`workspaces.member_suspended` / `workspaces.member_unsuspended`). Migration
+  `20261020210000_conversations__member_suspensions`. An account suspended before this
+  version keeps its rules acting until an administrator unsuspends and suspends it again
+  (campbooks-cloud#147).
+- **A database transaction that names no workspace now sees nothing.** The kernel's
+  event log, job queue, change feed and blob catalogue used to show every workspace's
+  rows to any transaction that set no workspace, which is how background work crossed
+  workspaces, but also meant code that forgot to pick a workspace could read and write
+  every tenant's. Cross-workspace work now needs an explicit kernel scope that only the
+  kernel opens (and, by a reviewed exception in `architecture.toml`, the two schedulers'
+  dispatchers); everything else sees no row of any table with row-level security.
+  Enqueueing a workspace's job, recording a change of the feed and attaching or
+  detaching a blob now fail in a transaction that cannot reach that workspace, instead
+  of silently doing nothing, and `cargo xtask arch` also checks `acquire()`, SQL kept in
+  constants, and the server and kernel code. Migrations
+  `20261020200000_kernel__kernel_scope`, `20261020200100_connectors__kernel_scope` and
+  `20261020200200_conversations__kernel_scope` replace the policies; nothing to do on
+  upgrade. **Upgrade every process at once**: if you run the API and the job worker as
+  separate containers (or several replicas), stop the old ones before or as the new ones
+  start, because a process still on an older version stops claiming jobs and cannot sign
+  anyone in once the migrations have run. Going back to an older version needs a SQL
+  rollback first (the policies' revert is in the change's design notes,
+  `openspec/changes/archive/2026-10-16-kernel-scope/design.md`, "Rollback").
+- **Sender authentication is read more strictly.** An aligned DKIM signature no longer
+  counts when the domain's DMARC policy refused the mail (`fail`, `quarantine`, `reject`),
+  an authentication header over 8 KiB is treated as a failure instead of being parsed, and
+  "same organisation" now follows the real Public Suffix List (so two `github.io` sites, or
+  suffixes such as `co.at`, are never one sender) instead of a 24-entry guess. Separately,
+  a message that is being moved to spam or the trash can no longer have a first "needs you"
+  stored for it by a refresh running at the same moment. No migration.
 - **The API is rate-limited per person and per app.** Every call with a token now counts
   against a limit for whoever makes it, however it arrives (directly, through the web app,
   or from automation and the assistant): 600 reads and 120 writes a minute per person and
@@ -160,6 +459,11 @@ All notable changes to Campbooks Next are documented here. The format follows
   possible, but nothing is provisioned for it.
 
 ### Changed
+- **The rules list says why a rule is paused**, first on its line: its author can no
+  longer change the inbox, its author is away for now (it acts again on its own; the
+  cause is never shown), a member paused it, or the inbox is kept read-only
+  (`RuleView.paused_reason`). A rule a member paused no longer claims its author lost
+  access.
 - One "Search or ask" field and menu, with conversations inline. The sidebar's
   separate "Search conversations" entry is gone: ⌘K and `/` (on screens 48rem and
   wider) open the same menu, which lists matching conversations first (matched words
@@ -195,6 +499,34 @@ All notable changes to Campbooks Next are documented here. The format follows
   The first prune after upgrading may take a while on a large instance.
 
 ### Fixed
+- **New features no longer stay hidden from people signed in before the release that added them.**
+  A web session kept the permissions it asked for at sign-in, so after a release that adds
+  some (Scout's questions and memory in this one), the new features answered 403 and showed
+  nothing until the person signed out. Now a session that predates the permissions the web app
+  asks for ends on its next request and the app asks you to sign in again, which goes straight
+  through while your sign-in at the identity provider is still live; signing out of such a
+  session still ends everything. Migration `20261020230000_bff__session_scopes` adds two
+  nullable columns. After upgrading, everyone signed in to the web app signs in once more.
+  (campbooks-cloud#172)
+- **HTML email renders with its own styles, safely (campbooks-cloud#160).** Newsletters,
+  receipts and Outlook or Gmail replies looked broken: their style sheets were dropped
+  (the page's policy blocks them in the mail frame too), the document title and hidden
+  preview text showed up in the body, the frame's height was a guess (mail was cut short
+  or padded, and long mail scrolled inside its frame) and a 600px layout did not fit a
+  phone. Now the server inlines a message's style sheets into `style` attributes before
+  sanitising (never fetching a linked or imported sheet), filters every declaration with a
+  real CSS parser (nothing that loads or runs survives: no `url()`, `@import`,
+  `expression()`, `var()`, escapes), and returns the message's `@media` rules, filtered the
+  same way, in a new `css` field of the message body. The reader's frame is as tall as its
+  content, shrinks a layout wider than the reader to fit, and applies the `@media` rules to
+  the frame only. It still never runs a script, submits a form or loads a remote image
+  before "Show images"; tracking pixels sized or hidden by their style are now removed
+  too. The page's own policy is unchanged.
+- **A need settled while its follow-up waited is no longer overwritten.** When a first
+  "needs you" was put off because its message was busy, the follow-up could store it from
+  what it had read before waiting: an open need on a conversation archived meanwhile, or
+  over a Done a member had just given. It now works the need out again once it has its
+  locks. No migration.
 - **Notifications with a question mark no longer ask for a reply.** "Your order has
   shipped. Questions? Contact our support team." raised a Reply need, because a rule
   read any "?" as a question for you. Needs raised that way are withdrawn on upgrade.
@@ -206,6 +538,11 @@ All notable changes to Campbooks Next are documented here. The format follows
   isn't connected first, and waits for a connect you retried. If connecting
   a mailbox breaks unexpectedly, you now land back on Mailboxes with an
   error instead of a server error page.
+- **Home fits the window on desktop too, and scrollbars match the app.** A busy Home
+  still made the whole page scroll and pushed the account menu down; from 1024px wide
+  Home now scrolls on its own beside the sidebar, like the inbox. Scrollbars are thin
+  and quiet, a soft thumb with no track that firms up when you point at the pane, in
+  light and dark.
 - **The inbox no longer grows taller than the window on desktop.** A long list of
   conversations made the whole page scroll, pushing the account menu down and taking
   the open conversation with it. From 1024px wide the page is the window's height:
@@ -269,6 +606,44 @@ All notable changes to Campbooks Next are documented here. The format follows
   It must be one of Zoho's accounts servers, or Campbooks refuses to start.
 
 ### Added
+
+- **Home: every item says what you can do with it, right where you look.** The selected
+  item shows its actions under it, in one button style with each key: its own actions on
+  1 to 3 (Reply; Yes and No for a question; It's safe for a warning), then Done (E),
+  Snooze… (S) and Not needed (X). Other rows stay calm, with no buttons or bare key hints,
+  and the keyboard legend leaves the aside (every key is in the `?` sheet). ↑/↓ move
+  between items as J and K do, ←/→ move a highlight along the buttons, Enter presses it
+  and Esc clears it. An item you act on turns into a one-line confirmation ("Done · Marta
+  Ferreira") and folds away in under a second; the toast keeps Undo and Z
+  (campbooks-cloud#165).
+- **Snooze, in a dialog.** Later is now Snooze, on S: a dialog offers Later today,
+  Tomorrow morning, Monday morning and the new Next week, each with its number key; Esc
+  closes it with nothing changed, and on a phone it is a bottom sheet. It is the new
+  `lib/ui` Dialog, which the reply and smart-rule dialogs will reuse, with a result state
+  that closes by itself.
+- **The toast can wait and can stay.** Actions that take a moment can show "Sending…"
+  with the visor thinking (and Undo while it can still be taken back), and a failure now
+  stays until you choose Retry or dismiss it instead of fading after six seconds.
+- **Pin, on P.** Star is now called Pin, and pinned conversations stay at the top of
+  their stream in the inbox. It is still the provider's star (Gmail's STARRED), synced
+  as before. Migrations `20261020235000_conversations__pinned_stream_list_index` and
+  `20261020235100_conversations__pinned_inbox_list_index` add the matching indexes,
+  built concurrently.
+
+- **A daily AI limit per workspace (`CAMPBOOKS_AI__DAILY_CALLS_PER_WORKSPACE`, default
+  5000, `0` for none).** Every model call (`decide`, `embed`, `complete`, `vision`) is
+  now counted per workspace, role and feature, per UTC day, with the tokens the
+  provider reports, in two new tables of the `system` schema (migration
+  `20261020190000_system__ai_usage`). Past the limit a workspace's new mail is still
+  stored and sorted by the facts and taught rules, without the model pass, until
+  00:00 UTC; nothing errors, and skipped mail is not asked again later. One log line
+  says when a workspace reaches it. If the count cannot be written, the call is not
+  made and the job retries. A tenth of the limit is kept for what people ask
+  themselves: background work stops 500 calls short of the default 5000, so a mail
+  flood cannot silence Scout; past the whole limit, compiling a sentence answers 503
+  `ai_daily_limit_reached`. Administrators read a day's usage per workspace, capped
+  ones first, at `GET /admin/v1/system/ai-usage` (`system.read`). Self-hosters
+  running their own model can set `0`.
 - **Teach once in the inbox.** After you move, archive, mark read or clear one
   email, Campbooks offers to do the same to every one like it, and to new
   ones: it says which mail and how many, shows a few, and makes a rule with

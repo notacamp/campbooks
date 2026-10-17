@@ -74,6 +74,10 @@ const ICONS = {
     path("M10 4.5H6.5A1.5 1.5 0 0 0 5 6v12a1.5 1.5 0 0 0 1.5 1.5H10"),
     path("m15 8 4 4-4 4M19 12h-9"),
   ],
+  lock: [
+    <rect key="r" x="5" y="11" width="14" height="9.5" rx="2" />,
+    path("M8 11V7.5a4 4 0 0 1 8 0V11"),
+  ],
   key: [<circle key="c" cx="8" cy="12" r="3.5" />, path("M11.5 12H20M17 12v3M20 12v2.5")],
   mail: [<rect key="r" x="3.5" y="5.5" width="17" height="13" rx="2" />, path("m4 7 8 6 8-6")],
   "chevron-right": [path("m9 6 6 6-6 6")],
@@ -104,6 +108,12 @@ const ICONS = {
       fill="currentColor"
       d="m12 4 2.4 5 5.4.7-4 3.7 1 5.4-4.8-2.6-4.8 2.6 1-5.4-4-3.7 5.4-.7Z"
     />,
+  ],
+  // Pin: the provider's star, named Pin in the UI.
+  pin: [path("M9 4.5h6l-1 5 3 3v1.5H7V12.5l3-3Z"), path("M12 14v6")],
+  "pin-filled": [
+    <path key="p" fill="currentColor" d="M9 4.5h6l-1 5 3 3v1.5H7V12.5l3-3Z" />,
+    path("M12 14v6"),
   ],
   archive: [
     <rect key="r" x="3.5" y="4.5" width="17" height="4.5" rx="1.5" />,

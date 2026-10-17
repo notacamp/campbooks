@@ -45,6 +45,22 @@ pub enum Error {
     /// sent.
     #[error("the decide model has not passed its answers check; its answers are not used")]
     AnswersNotTrusted,
+    /// The workspace reached its daily AI limit ([`crate::usage`]); nothing
+    /// was sent. The caller does what it does without a model.
+    #[error("the workspace reached its daily AI limit of {cap} calls; nothing was sent")]
+    OverDailyCap {
+        /// Calls a workspace may make per UTC day.
+        cap: u32,
+    },
+    /// A metered gateway was called outside any usage scope
+    /// ([`crate::usage::Scope`]): a bug in the calling code. Nothing was
+    /// sent.
+    #[error("an AI call was made outside a usage scope; nothing was sent")]
+    Unattributed,
+    /// The call could not be counted (the ledger is unavailable), so it was
+    /// not made: a broken ledger never lifts the cap. Try again later.
+    #[error("the AI call could not be counted; nothing was sent")]
+    Metering,
 }
 
 impl From<Error> for campbooks_kernel::Error {
@@ -59,6 +75,11 @@ impl From<Error> for campbooks_kernel::Error {
                 crate::MESSAGES
                     .reason("ai_external_content_refused")
                     .arg("role", role.as_str()),
+            ),
+            Error::OverDailyCap { cap } => Self::Unavailable(
+                crate::MESSAGES
+                    .reason("ai_daily_limit_reached")
+                    .arg("cap", cap.to_string()),
             ),
             other => Self::internal(other),
         }
@@ -86,6 +107,13 @@ mod tests {
         });
         assert_eq!(err.code(), "ai_external_content_refused");
         assert!(err.to_problem(Locale::PtPt).detail.contains("complete"));
+    }
+
+    #[test]
+    fn the_daily_limit_is_unavailable_and_explained() {
+        let err = campbooks_kernel::Error::from(Error::OverDailyCap { cap: 5000 });
+        assert_eq!(err.code(), "ai_daily_limit_reached");
+        assert!(err.to_problem(Locale::En).detail.contains("5000"));
     }
 
     #[test]

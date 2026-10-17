@@ -91,14 +91,31 @@ seed or call SHALL fail it until it says how.
 
 ### Requirement: Module code stays inside a workspace transaction
 Module code SHALL read and write workspace tables only in a transaction
-that sets the workspace (`begin_for`, a job's `tx`). Opening a transaction
-without one, or querying a workspace table on the pool, SHALL fail
-`cargo xtask arch`, except in files listed in `architecture.toml` with the
-reason.
+that sets the workspace (`begin_for`, a job's `tx`), or in a scope where
+`architecture.toml` allows it. Opening a transaction or a connection
+without one (`.begin()`, `.acquire()`, `Acquire::begin`), or querying a
+workspace table on the pool, including through SQL kept in a `const` of the
+same file, SHALL fail `cargo xtask arch`, in the modules, the server and the
+kernel, except in files listed in `architecture.toml` with the reason. The
+server's entries SHALL name files, never a directory, so a new file is
+checked; the web BFF's only entry SHALL be its session store (`store.rs`),
+which also opens the token refresh's transaction.
 
 #### Scenario: A query on the pool
 - **WHEN** a module runs `SELECT … FROM conversations.messages` on `state.db` directly
 - **THEN** `cargo xtask arch` fails naming the file and the table
+
+#### Scenario: A connection taken from the pool
+- **WHEN** server or module code calls `state.db.acquire()` outside the listed files
+- **THEN** `cargo xtask arch` fails naming the file
+
+#### Scenario: SQL in a constant
+- **WHEN** a module keeps `const SQL: &str = "SELECT … FROM conversations.messages"` and runs `sqlx::query(SQL)` on the pool
+- **THEN** `cargo xtask arch` fails naming the file and the table
+
+#### Scenario: A new file of the BFF
+- **WHEN** a new file under `crates/server/src/bff/`, or the BFF's `mod.rs`, calls `self.db.begin()`
+- **THEN** `cargo xtask arch` fails naming the file
 
 ### Requirement: Events belong to their transaction's workspace and have a consumer
 Publishing an event of one workspace in a transaction set to another, or in
@@ -110,3 +127,313 @@ saying why it has none.
 #### Scenario: A cross-workspace publish
 - **WHEN** a handler working in workspace A publishes an event of workspace B
 - **THEN** the publish fails and nothing is written
+
+### Requirement: An unset transaction sees nothing
+A transaction that sets neither a workspace nor a scope SHALL see no row of
+any table with row-level security, the kernel's event log, job queue,
+change feed and blob catalogue included. Work across workspaces on the
+kernel's tables SHALL need the kernel scope (`campbooks.kernel_scope =
+'on'`), which only `kernel::db::begin_kernel` and a job's `kernel_tx` set.
+A module scheduler's dispatcher SHALL work in the narrower maintenance
+scope (`campbooks.maintenance_scope = 'on'`), which only
+`kernel::db::begin_maintenance` and a job's `maintenance_tx` set, which only
+its own table's maintenance policies admit and which no kernel table admits;
+it SHALL enqueue each run with `jobs::enqueue_in` / `enqueue_to_in`, which
+set the run's workspace for that enqueue only and clear it again in the
+same transaction. Only the kernel SHALL name a scope's setting
+(`campbooks.kernel_scope`, `campbooks.maintenance_scope`,
+`campbooks.admin_reads`) or the idempotency layer's caller
+(`campbooks.idempotency_caller`), its constant or its last word on its own
+(`kernel_scope`, `maintenance_scope`, `admin_reads`, `idempotency_caller`,
+in code or a string,
+any case, tests included, also when spelled with escapes such as `\x5f` or
+`\u{5f}`), and outside the kernel only the files listed for that scope in
+`architecture.toml` (`[[access.kernel_scope]]`,
+`[[access.maintenance_scope]]`), each with its reason, SHALL use its
+openers by any name or form (`cargo xtask arch`); an entry for one scope
+SHALL NOT open the other, and the admin reads and the idempotency caller
+have no list. A file's test
+module SHALL end the check only when it is the file's last item, at its top
+level. A workspace transaction SHALL keep seeing its own rows and the
+instance-wide rows of the event log and the queue. Module maintenance
+policies SHALL admit the maintenance scope, never the kernel scope nor a
+transaction that merely set nothing; the kernel scope SHALL appear only in
+the kernel tables' policies (`workspace_isolation`; `kernel_scope_only` on
+the schedules' last ticks and the rate-limit counters; the expired-only
+read and prune of the idempotency keys), `USING` and `WITH CHECK` read
+alike, and the idempotency caller only in the idempotency keys'
+`caller_isolation`. An instance-wide event or job SHALL still be publishable or
+enqueueable from a transaction that set nothing, the kernel lifting that
+transaction into its scope for its own insert only.
+
+#### Scenario: Every table, nothing set
+- **WHEN** rows exist in a sample of tables of every kind (the kernel's, modules', the workspaces themselves) and the runtime role opens a transaction that sets nothing
+- **THEN** every table with row-level security answers zero rows, a table added later included, and those the runtime role may not read at all (`kernel.rate_limits`, `bff.sessions`, `bff.login_transactions`, `bff.retired_tokens`) refuse the read
+
+#### Scenario: The kernel's machinery
+- **WHEN** jobs of two workspaces and an instance-wide job are queued, as the runtime role
+- **THEN** the worker claims them fairly and completes them, delivers events of a workspace and instance-wide events, runs the schedules, prunes, sweeps blobs, replays and serves the admin's queue under the kernel scope
+
+#### Scenario: The maintenance scope
+- **WHEN** a transaction of the runtime role opens the maintenance scope while the event log, the queue, the change feed and the blob catalogue hold rows
+- **THEN** it sees none of them, enqueueing a workspace's job is refused until it sets that workspace, and a workspace's job asking for `maintenance_tx` fails
+
+#### Scenario: Enqueueing in a workspace for one enqueue
+- **WHEN** a maintenance transaction enqueues jobs of two workspaces with `enqueue_in`, and a transaction that works in a workspace calls `enqueue_in`
+- **THEN** each job is enqueued in its workspace and the transaction works in none afterwards, and the second call is refused
+
+#### Scenario: Every policy is read
+- **WHEN** the database's policies are listed, every schema's and both `USING` and `WITH CHECK`
+- **THEN** none admits a transaction for setting no workspace, the kernel scope appears only in the kernel's `workspace_isolation` policies, `kernel_scope_only` on `kernel.schedules` and `kernel.rate_limits` and the two expired-only policies of `kernel.idempotency`, the idempotency caller only in `kernel.idempotency`'s `caller_isolation`, and the maintenance scope only in the four maintenance policies
+
+#### Scenario: A module opening the kernel scope
+- **WHEN** a module file not listed for that scope calls `begin_kernel`, `kernel_tx`, `begin_maintenance` or `maintenance_tx`, renames one (`use … as`), calls it as `JobContext::kernel_tx(ctx)` or takes it as a function value, or code outside the kernel names `campbooks.kernel_scope`, `campbooks.maintenance_scope`, `campbooks.admin_reads`, `campbooks.idempotency_caller`, `KERNEL_SCOPE_SETTING`, `MAINTENANCE_SCOPE_SETTING`, `ADMIN_READS_SETTING` or `IDEMPOTENCY_CALLER_SETTING`
+- **THEN** `cargo xtask arch` fails naming the file
+
+#### Scenario: A setting name built at runtime
+- **WHEN** code outside the kernel and the listed files writes `set_config('campbooks.' || 'kernel_scope', …)`, `SET LOCAL campbooks."kernel_scope"`, `concat!("campbooks.", stringify!(admin_reads))`, `format!("campbooks.{}", "maintenance_scope")`, `"campbooks.kernel\x5fscope"` or `"kernel\u{5f}scope"`, a test included
+- **THEN** `cargo xtask arch` fails naming the file
+
+#### Scenario: Text that hides a call
+- **WHEN** a module file opens the kernel scope after a C raw string holding `//` (`cr#"x"//"#; begin_kernel(pool);`), after a string or comment holding `#[cfg(test)]` and `mod tests {` on the next line, or after a `#[cfg(test)] mod tests {}` nested in another module, inside a `macro_rules!` body, or followed by more code
+- **THEN** `cargo xtask arch` still fails naming the file
+
+### Requirement: Kernel writes refuse a transaction that cannot reach their workspace
+Enqueueing a workspace's job, recording a change of the feed, attaching or
+detaching a blob and the kernel's per-workspace purges SHALL fail
+(`InvalidArgument`) in a transaction that set no workspace and is not in
+the kernel scope, or that works in another workspace, writing nothing,
+rather than silently reaching no row.
+
+#### Scenario: Enqueue without a workspace set
+- **WHEN** code enqueues a job for workspace A in a transaction that set no workspace
+- **THEN** the enqueue fails and no job is queued
+
+#### Scenario: Attach in another workspace
+- **WHEN** code attaches workspace A's blob in a transaction working in workspace B
+- **THEN** the attach fails and no reference is recorded
+
+### Requirement: Instance-wide rows change only in the kernel scope
+A workspace transaction SHALL read the instance-wide rows (no workspace) of
+the event log and the job queue, but SHALL NOT update, delete or lock them,
+nor turn one of its own rows into an instance-wide one. It SHALL add an
+instance-wide row only as a fresh event whose name, or a fresh delivery of
+such an event to a consumer whose kind, is listed in
+`kernel.instance_rows_from_workspaces` (pending, unclaimed, due now, keyed
+by its event, no ordering key), and SHALL NOT enqueue any other
+instance-wide job. The list SHALL hold exactly the events declared
+`DomainEvent::PUBLISHED_IN_WORKSPACES` and their consumers; the runtime role
+SHALL only read it. Outside the kernel scope no row, a workspace's own
+included, SHALL carry a schedule's unique key (`schedule:<name>`). The
+kernel SHALL refuse an instance-wide job, or an instance-wide event not
+declared `PUBLISHED_IN_WORKSPACES`, from a workspace transaction before
+asking the database. A delivery SHALL be handled only when its event is
+logged in the event's own workspace (none for an instance-wide type);
+otherwise it SHALL fail for good without running its handler. Only the
+kernel scope SHALL read or write the schedules' last ticks
+(`kernel.schedules`). Only the kernel scope SHALL change instance-wide rows:
+claiming, renewing, releasing, retrying, reaping and completing
+instance-wide jobs, pruning and the admin's queue SHALL keep working there.
+
+#### Scenario: Changing an instance-wide job from a workspace
+- **WHEN** a transaction working in workspace A updates or deletes the queue's or the event log's instance-wide rows, or locks them with `FOR UPDATE`
+- **THEN** no row is changed or locked, and the rows are unchanged once it commits
+
+#### Scenario: Moving a row out of the workspace
+- **WHEN** a transaction working in workspace A sets the workspace of one of its own jobs to none
+- **THEN** the statement fails
+
+#### Scenario: Forging a schedule's row
+- **WHEN** a transaction working in workspace A inserts, as raw SQL, a job holding `schedule:kernel.prune_jobs`, instance-wide or of its own workspace
+- **THEN** row-level security refuses it, and the schedule's next tick enqueues as usual
+
+#### Scenario: Forging other instance-wide work
+- **WHEN** a transaction working in workspace A inserts, as raw SQL, an instance-wide delivery due never, already claimed, ordered behind another key or keyed otherwise than by its event, a job of an unlisted kind, an event of an unlisted name (`identity.account_suspended`), or a listed event dated in the future
+- **THEN** row-level security refuses each one
+
+#### Scenario: An account's event forged in a workspace
+- **WHEN** a transaction working in workspace A writes, as raw SQL into its own workspace, an `identity.signed_out_everywhere` naming another person's account and a `bff.end_signed_out_sessions` delivery of it, and the worker runs
+- **THEN** the delivery fails for good, its handler never runs, and that person stays signed in
+
+#### Scenario: An event naming another workspace
+- **WHEN** a workspace's event whose payload names workspace B is logged in workspace A, with a delivery there
+- **THEN** the delivery fails for good and its handler never runs
+
+#### Scenario: The schedules' last ticks
+- **WHEN** a transaction working in a workspace, or one that set nothing, reads `kernel.schedules`, sets a schedule's `last_tick` far ahead, or inserts a row
+- **THEN** it sees no row, changes none, and the insert is refused
+
+#### Scenario: Adding instance-wide work from a workspace
+- **WHEN** a transaction working in workspace A publishes an instance-wide event declared `PUBLISHED_IN_WORKSPACES` (a member removes a workspace client; a departed member's consents are revoked; a removed mailbox takes the account's last way in)
+- **THEN** the event and its deliveries are added and the worker runs them
+
+#### Scenario: Refused by the kernel
+- **WHEN** a transaction working in workspace A enqueues an instance-wide job, or publishes an instance-wide event not declared `PUBLISHED_IN_WORKSPACES`
+- **THEN** the kernel refuses it with an invalid-argument error and nothing is added
+
+#### Scenario: The list matches the registry
+- **WHEN** the server's registry is built and the migrated list is read
+- **THEN** they name the same events and delivery kinds, and the runtime role may read the list but not change it
+
+#### Scenario: Instance-wide jobs keep running
+- **WHEN** an instance-wide job fails once, another's worker dies holding it, and a third fails for good, as the runtime role
+- **THEN** the first is retried and succeeds, the second is reaped and run again, and the third is recorded as failed
+
+### Requirement: Idempotency keys belong to their caller
+`kernel.idempotency` SHALL enable and force row-level security. A key SHALL
+be reachable only in a transaction naming its caller
+(`campbooks.idempotency_caller`, `user:<subject>` or `client:<client id>`),
+which only the kernel's idempotency layer opens
+(`kernel::db::begin_as_idempotency_caller`), for the claim, the stored
+answer and the release. The kernel scope SHALL read and delete expired
+keys only (the hourly prune), and SHALL NOT read a live key nor write any.
+A transaction working in a workspace, or one that set nothing, SHALL see no
+key and SHALL NOT add, change or delete one. Request bodies SHALL never be
+stored, only a hash of the request, and no stored answer SHALL hold a
+secret (see `operation-catalogue`).
+
+#### Scenario: A workspace transaction and the keys
+- **WHEN** a key is stored for a caller, and a transaction of the runtime role working in a workspace counts, updates, deletes and inserts idempotency keys
+- **THEN** it counts zero, changes and deletes none, the insert is refused by row-level security, and the caller's replay still returns the stored answer
+
+#### Scenario: Another caller's keys
+- **WHEN** a transaction names another caller, or names none and sets no workspace
+- **THEN** it sees none of the first caller's keys
+
+#### Scenario: The prune
+- **WHEN** the hourly prune runs as the runtime role while one key has expired and another is live
+- **THEN** it deletes the expired key only, and a transaction in the kernel scope sees no live key and rewrites none
+
+### Requirement: Rate-limit counters are reached only through the kernel's functions
+The runtime role SHALL hold no privilege on `kernel.rate_limits`, which
+SHALL enable and force row-level security (kernel scope only). It SHALL
+count a hit only through `kernel.take_rate_limit(bucket, window_seconds,
+cost)` and prune ended windows only through
+`kernel.prune_rate_limits(batch)`: `SECURITY DEFINER` functions with a pinned
+`search_path` that turn the kernel scope on for their own statement and
+restore the caller's setting. The prune SHALL delete only windows that have
+ended, checked again on each row it deletes, so a window a hit renews while
+the batch is chosen is kept. `take_rate_limit` SHALL refuse a bucket that
+is not 32 bytes, a window outside (0, 86400] seconds and a cost below 1. No
+transaction of the runtime role, in a workspace or not, SHALL read, reset,
+lower or write a counter otherwise, and every limit SHALL keep limiting.
+
+#### Scenario: Reading or resetting a counter
+- **WHEN** a transaction of the runtime role, working in a workspace or setting nothing, selects, updates, deletes or inserts rate-limit counters
+- **THEN** each statement is refused (permission denied), and a key over its limit is still refused
+
+#### Scenario: Bad input to the function
+- **WHEN** the runtime role calls `kernel.take_rate_limit` with an 8-byte bucket, a window of 0 or of 86 401 seconds, or a cost of 0 or below
+- **THEN** each call fails and no counter is written
+
+#### Scenario: Limits and pruning as the runtime role
+- **WHEN** the runtime role hits a limit of two per minute three times, then the window ends and the prune runs
+- **THEN** the third hit is refused, the prune deletes the ended windows, and the next hit is allowed
+
+### Requirement: Every kernel table has row-level security or a stated reason
+Every table of schemas `kernel` and `bff` SHALL enable and force row-level
+security and carry at least one policy, or SHALL grant the runtime role no
+privilege of any kind on the table or on any of its columns (reached through
+`SECURITY DEFINER` functions only), or SHALL be listed, in the server's
+test, as instance-only with the reason it needs none; a listed table SHALL
+grant the runtime role no `INSERT`, `UPDATE`, `DELETE` or `TRUNCATE`, on the
+table or a column. Today the list SHALL hold only
+`kernel.instance_rows_from_workspaces` (read-only to the runtime role,
+written by migrations). Every `SECURITY DEFINER` function SHALL set exactly
+`search_path = pg_catalog, pg_temp` and SHALL NOT be executable by `PUBLIC`.
+A migration MAY pin a function's `search_path` to exactly `pg_catalog,
+pg_temp` (`pg_temp` last, no other entry, ending the name) in its
+definition and SHALL NOT change the session's, nor name `search_path` in a
+string (`set_config`) (`cargo xtask arch`).
+
+#### Scenario: A new kernel table without row-level security
+- **WHEN** a migration adds a table to schema `kernel` without enabling and forcing row-level security, and it is not listed with a reason
+- **THEN** the server's test fails naming the table
+
+#### Scenario: A function's pinned path
+- **WHEN** a kernel migration defines a `SECURITY DEFINER` function with `SET search_path = pg_catalog, pg_temp`, and others run `SET search_path = pg_catalog, pg_temp;`, end the file with it, set a function's path to another schema, to `pg_catalog, pg_temp, kernel`, to `pg_temp, pg_catalog`, to `pg_catalog, pg_temp$x` or to `pg_catalog, pg_tempx`, or call `set_config('search_path', …)` in a function body or a statement
+- **THEN** `cargo xtask arch` accepts the first and fails naming the others
+
+#### Scenario: A BFF table the runtime role may reach
+- **WHEN** a migration grants the runtime role any privilege on a table of schema `bff`, or on one of its columns, without forced row-level security and a policy
+- **THEN** the server's test fails naming the table
+
+#### Scenario: A definer function open to everyone
+- **WHEN** a migration defines a `SECURITY DEFINER` function without the pinned path, or without revoking it from `PUBLIC`
+- **THEN** the server's test fails naming the function
+
+### Requirement: The web sign-in's tables are reached only through the BFF's functions
+The runtime role SHALL hold no privilege on `bff.sessions`,
+`bff.login_transactions` and `bff.retired_tokens`, which SHALL enable
+row-level security with one policy, admitting only the functions' owner
+`campbooks_definer`. It SHALL reach them only through the
+`SECURITY DEFINER` functions of schema `bff`, one per operation of the web
+BFF: `create_session`, `find_session`, `touch_session`,
+`mark_session_delivered`, `rotate_session`, `reissue_session`,
+`retired_session`, `end_session`, `lock_session_tokens`,
+`store_session_tokens`, `end_account_sessions`, `prune_sessions`,
+`start_login`, `take_login` and `prune_logins`. Each SHALL run with a pinned
+`search_path`, be executable by the runtime role only, and act on the one
+session named by the SHA-256 of a token its cookie presented, the one
+sign-in named by its state's SHA-256, or the sessions of one account (or of
+one identity-provider session); none SHALL answer a session's token hashes
+or list sessions. Only the two prunes SHALL reach across accounts, deleting
+only rows ended by the database's clock, at most 10 000 per call, each row
+checked again as it is deleted. The functions creating rows SHALL refuse
+token, state and browser hashes that are not 32 bytes, missing sealed
+values, a sign-in longer than an hour, a session longer than 366 days and
+deadlines out of order, and a landing the handler would refuse: longer than
+2 048 characters, not starting with exactly one `/`, holding anything but
+visible ASCII, a backslash, `"`, `'`, `<`, `>` or a backtick, or naming the
+BFF's own paths. `touch_session` SHALL refuse a missing time or idle
+deadline, or a deadline not after the use, and `store_session_tokens` a
+missing or empty sealed access or refresh token or a missing deadline.
+
+#### Scenario: Direct access as the runtime role
+- **WHEN** a transaction of the runtime role selects, updates, deletes, inserts, truncates or locks any of the three tables while a session, a sign-in and a retired token exist
+- **THEN** each statement is refused (permission denied), and the session still works
+
+#### Scenario: Another account's session
+- **WHEN** two people are signed in, and the runtime role calls the functions with the first person's token hash, an unknown hash, an empty or `NULL` hash, and ends the first person's account sessions
+- **THEN** it finds only the first person's session, nothing for the others, and only the first person is signed out
+
+#### Scenario: Everything still works through the functions
+- **WHEN** a person signs in, the cookie rotates and is reissued, the access token is refreshed, the person signs out, signs out everywhere or is suspended, and the prune runs, all as the runtime role
+- **THEN** each behaves as before, and the prune deletes ended sessions and expired sign-ins only
+
+#### Scenario: Input the BFF never sends
+- **WHEN** the runtime role starts a sign-in landing on `//evil.example`, `/\evil.example`, a path with a space or a tab, `/"><script>`, `/bff/logout` or a path of 2 049 characters, touches a session with no time, no deadline or a deadline equal to the use, stores tokens with none or an empty one, or creates a session of 367 days or whose idle deadline is its start
+- **THEN** each call fails as invalid input and nothing changes, and a sign-in landing on `/inbox?view=all#top` is accepted
+
+### Requirement: Definer functions run as a dedicated owner that cannot log in
+Every `SECURITY DEFINER` function SHALL be owned by `campbooks_definer`,
+never by a superuser or a role that can log in (such as the migration
+login). `campbooks_definer` SHALL NOT log in, be a superuser, bypass
+row-level security, create databases or roles, or replicate; it SHALL be a
+member of no role, no runtime role SHALL be a member of it, and it SHALL own
+nothing but those functions. It SHALL hold exactly the privileges their
+statements need: `USAGE` on schemas `kernel` and `bff`; `SELECT`, `INSERT`,
+`UPDATE` and `DELETE` on `kernel.rate_limits` and `bff.sessions`; `SELECT`,
+`INSERT` and `DELETE` on `bff.login_transactions`; `SELECT` and `INSERT` on
+`bff.retired_tokens`; and no grant on a column, function or database. A
+migration SHALL create the role when its login may (a superuser, or a login
+with `CREATEROLE`), and otherwise SHALL fail naming the statements an
+administrator runs once; it SHALL never leave a function with the login.
+Handing the functions over SHALL keep each one executable by the runtime role
+only.
+
+#### Scenario: Who owns the definer functions
+- **WHEN** every migration has run and the database's `SECURITY DEFINER` functions are listed
+- **THEN** each belongs to `campbooks_definer`, which cannot log in, has no privileged attribute, is a member of no role, owns nothing else and holds exactly the privileges above
+
+#### Scenario: A new definer function left with the migration login
+- **WHEN** a later migration creates a `SECURITY DEFINER` function without `ALTER FUNCTION … OWNER TO campbooks_definer`
+- **THEN** the server's test fails naming the function
+
+#### Scenario: The functions still work for the runtime role
+- **WHEN** the runtime role counts rate-limit hits, starts and finishes a sign-in, uses, rotates, refreshes and ends a session, and the prunes run
+- **THEN** each behaves as before, and the runtime role still cannot read or write the four tables directly
+
+#### Scenario: A migration login that cannot create roles
+- **WHEN** the migration login is neither a superuser nor allowed to create roles and `campbooks_definer` does not exist or cannot be taken
+- **THEN** the migration fails, naming `CREATE ROLE campbooks_definer NOLOGIN NOINHERIT` and `GRANT campbooks_definer TO <login>`, and applies once an administrator has run them

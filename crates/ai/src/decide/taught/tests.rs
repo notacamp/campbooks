@@ -377,3 +377,22 @@ async fn as_a_strategy_it_answers_stream_and_needs() {
     assert!(out.get(&qs, triage::SUSPICIOUS).is_none());
     assert_eq!(out.remote_calls, 0);
 }
+
+#[test]
+fn a_stored_rule_naming_a_public_suffix_matches_nothing() {
+    let broad = [rule(
+        "r1",
+        vec![Condition::SenderDomain("github.io".into())],
+        vec![to_stream("updates")],
+        1,
+    )];
+    assert!(evaluate(&broad, &facts("a@a.github.io", "Hi", None)).is_empty());
+    assert!(evaluate(&broad, &facts("a@github.io", "Hi", None)).is_empty());
+    let owned = [rule(
+        "r2",
+        vec![Condition::SenderDomain("github.com".into())],
+        vec![to_stream("updates")],
+        1,
+    )];
+    assert!(!evaluate(&owned, &facts("a@mail.github.com", "Hi", None)).is_empty());
+}

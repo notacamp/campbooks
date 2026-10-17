@@ -563,7 +563,8 @@
           "records": [
             "identity.link_ticket"
           ],
-          "risk": "low"
+          "risk": "low",
+          "secret_once": true
         }
       }
     },
@@ -1276,6 +1277,78 @@
         }
       }
     },
+    "/api/v1/system/client-telemetry": {
+      "post": {
+        "tags": [
+          "system"
+        ],
+        "summary": "Report the app's own errors and timings.",
+        "operationId": "system.report_client_telemetry",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ClientReport"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "description": "Taken: what passes the scrubber is forwarded to the collector."
+          },
+          "401": {
+            "description": "No valid access token.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The token lacks `system:read`.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "This instance collects no client telemetry: stop sending.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [
+              "system:read"
+            ]
+          }
+        ],
+        "x-campbooks": {
+          "access": {
+            "action": "create",
+            "resource": "system.client_report"
+          },
+          "assistant": false,
+          "automation": false,
+          "mutates": true,
+          "records": [],
+          "risk": "low"
+        }
+      }
+    },
     "/api/v1/system/health": {
       "get": {
         "tags": [
@@ -1718,7 +1791,7 @@
             }
           },
           "503": {
-            "description": "The language model failed (`compile_failed`).",
+            "description": "The language model failed or its answer could not be read (`compile_failed`), or the workspace used its whole daily AI limit (`ai_daily_limit_reached`).",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -2257,7 +2330,7 @@
           "changes"
         ],
         "summary": "Follow a workspace's changes.",
-        "description": "A Server-Sent Events stream of what changed in the workspace, for clients\nthat keep a cache: each `change` frame names a record and an operation\n(`{\"cursor\",\"record\":{\"type\",\"id\"},\"op\":\"upsert\"|\"delete\",\"version\"}`),\nnever its contents; refetch what you show. Frames: `ready` (where the\nstream starts), `change`, `heartbeat` (an SSE comment, or the cursor when\nit moved past changes you may not see), `reset` (your cursor is unknown,\nexpired or too far behind: refetch everything, continue from the\ncursor given), `revoked` (you no longer belong to the workspace) and\n`closing` (the stream ends; reconnect with your cursor). Every frame\nthat carries a cursor sets the SSE `id`, so `EventSource` resumes on its\nown. You only receive changes of records a read operation you hold a\nscope for returns.",
+        "description": "A Server-Sent Events stream of what changed in the workspace, for clients\nthat keep a cache: each `change` frame names a record and an operation\n(`{\"cursor\",\"record\":{\"type\",\"id\"},\"op\":\"upsert\"|\"delete\",\"version\"}`),\nnever its contents; refetch what you show. Frames: `ready` (where the\nstream starts), `change`, `heartbeat` (every heartbeat interval from the\nopen, busy or idle), `reset` (your token is unknown or expired, or\nsomething you cached went out of sight: refetch everything, continue\nfrom the token given), `revoked` (you no longer belong to the\nworkspace) and `closing` (the stream ends; reconnect with your token).\n`ready`, `change`, `heartbeat` and `reset` carry a resume token as\n`cursor` and as the SSE `id`, so `EventSource` resumes on its own. A\ntoken is opaque, new on every frame and good only for the caller it was\ngiven to: keep the latest, never parse or compare one. You only receive changes of records a read operation you\nhold a scope for returns, and nothing in the stream (tokens, heartbeats,\nresets) depends on changes you may not see.",
         "operationId": "changes.stream",
         "parameters": [
           {
@@ -2272,7 +2345,7 @@
           {
             "name": "Last-Event-ID",
             "in": "header",
-            "description": "The last cursor received; resumes after it.",
+            "description": "The last resume token received; resumes after it.",
             "required": false,
             "schema": {
               "type": [
@@ -2284,7 +2357,7 @@
           {
             "name": "after",
             "in": "query",
-            "description": "The last cursor received, for clients that cannot send\n`Last-Event-ID` (the header wins when both are present). Omit it to\nstart from now.",
+            "description": "The last resume token received (any frame's `cursor`), for clients\nthat cannot send `Last-Event-ID` (the header wins when both are\npresent). Omit it to start from now.",
             "required": false,
             "schema": {
               "type": "string"
@@ -2333,7 +2406,7 @@
             }
           },
           "429": {
-            "description": "`too_many_streams`: you hold the maximum number of open streams.",
+            "description": "`too_many_streams`: you hold the maximum number of open streams; `rate_limited`: you opened too many lately (see `Retry-After`).",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -2553,7 +2626,8 @@
           "records": [
             "connectors.connection"
           ],
-          "risk": "low"
+          "risk": "low",
+          "secret_once": true
         }
       }
     },
@@ -2850,7 +2924,7 @@
         "tags": [
           "conversations"
         ],
-        "summary": "List conversations, newest first.",
+        "summary": "List conversations: pinned first, then newest first.",
         "operationId": "conversations.list",
         "parameters": [
           {
@@ -3844,7 +3918,7 @@
         "tags": [
           "conversations"
         ],
-        "summary": "Mark what a conversation needs as done, or as not needed.",
+        "summary": "Resolve what a conversation needs: done, not needed, already paid or still to pay.",
         "operationId": "conversations.resolve_need",
         "parameters": [
           {
@@ -3928,7 +4002,7 @@
             }
           },
           "409": {
-            "description": "It needs nothing (`no_open_need`), or not what you saw any more (`need_changed`).",
+            "description": "It needs nothing (`no_open_need`), not what you saw any more (`need_changed`), or a paid answer for a need that is not Pay (`not_a_payment`).",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -4051,6 +4125,278 @@
           ],
           "risk": "low",
           "undo": "conversations.mark_unread"
+        }
+      }
+    },
+    "/api/v1/w/{workspace_id}/conversations/{conversation_id}/reply/draft": {
+      "post": {
+        "tags": [
+          "conversations"
+        ],
+        "summary": "Scout's reply for an intent, or your draft rewritten.",
+        "operationId": "conversations.write_reply",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "description": "The workspace.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId"
+            }
+          },
+          {
+            "name": "conversation_id",
+            "in": "path",
+            "description": "The conversation.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ConversationId"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WriteReply"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "The reply as plain text; nothing is saved or sent.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReplyText"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "No intent, or an intent, change or draft too long (`reply_ask_invalid`).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid access token.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing scope, or you may only read this inbox (`inbox_read_only`).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such conversation or message, or you cannot see it.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "No language model may read mail here (`reply_unavailable`): write the reply yourself.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many replies asked for this hour.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "The language model failed (`reply_failed`), or the workspace used its whole daily AI limit (`ai_daily_limit_reached`).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [
+              "conversations:send"
+            ]
+          }
+        ],
+        "x-campbooks": {
+          "access": {
+            "action": "send",
+            "resource": "conversations.inbox"
+          },
+          "assistant": false,
+          "automation": false,
+          "mutates": true,
+          "records": [
+            "conversations.message"
+          ],
+          "risk": "low"
+        }
+      }
+    },
+    "/api/v1/w/{workspace_id}/conversations/{conversation_id}/reply/suggestions": {
+      "post": {
+        "tags": [
+          "conversations"
+        ],
+        "summary": "Likely replies to a message, as short intents.",
+        "operationId": "conversations.suggest_replies",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "description": "The workspace.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId"
+            }
+          },
+          {
+            "name": "conversation_id",
+            "in": "path",
+            "description": "The conversation.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ConversationId"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SuggestReplies"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Likely replies; nothing is saved.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReplySuggestions"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid access token.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing scope, or you may only read this inbox (`inbox_read_only`).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such conversation or message, or you cannot see it.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "No language model may read mail here (`reply_unavailable`): write the reply yourself.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many replies asked for this hour.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "The language model failed (`reply_failed`), or the workspace used its whole daily AI limit (`ai_daily_limit_reached`).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [
+              "conversations:send"
+            ]
+          }
+        ],
+        "x-campbooks": {
+          "access": {
+            "action": "send",
+            "resource": "conversations.inbox"
+          },
+          "assistant": false,
+          "automation": false,
+          "mutates": true,
+          "records": [
+            "conversations.message"
+          ],
+          "risk": "low"
         }
       }
     },
@@ -5661,7 +6007,8 @@
           "records": [
             "identity.client"
           ],
-          "risk": "high"
+          "risk": "high",
+          "secret_once": true
         }
       }
     },
@@ -5846,7 +6193,8 @@
           "records": [
             "identity.client"
           ],
-          "risk": "high"
+          "risk": "high",
+          "secret_once": true
         }
       }
     },
@@ -6448,7 +6796,8 @@
           "records": [
             "workspaces.invitation"
           ],
-          "risk": "high"
+          "risk": "high",
+          "secret_once": true
         }
       }
     },
@@ -7362,6 +7711,16 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/RuleView"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Not a valid rule (any more).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
                 }
               }
             }
@@ -11363,6 +11722,245 @@
           "email"
         ]
       },
+      "ClientBrowser": {
+        "type": "object",
+        "description": "The browser or web view the app runs in.",
+        "properties": {
+          "mobile": {
+            "type": [
+              "boolean",
+              "null"
+            ],
+            "description": "Whether the device is a phone or a tablet."
+          },
+          "name": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "`Chrome`, `Safari`, `WebKit`."
+          },
+          "os": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The operating system."
+          },
+          "version": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Its version."
+          }
+        }
+      },
+      "ClientEvent": {
+        "type": "object",
+        "description": "A named moment.",
+        "required": [
+          "name",
+          "timestamp"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Its name.",
+            "example": "session_start"
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When it happened."
+          }
+        }
+      },
+      "ClientException": {
+        "type": "object",
+        "description": "An error the app did not handle.",
+        "required": [
+          "kind",
+          "message",
+          "timestamp"
+        ],
+        "properties": {
+          "frames": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ClientFrame"
+            },
+            "description": "Where, innermost first."
+          },
+          "kind": {
+            "type": "string",
+            "description": "The error's class (`TypeError`).",
+            "example": "TypeError"
+          },
+          "message": {
+            "type": "string",
+            "description": "Its message: forwarded as an error kind only (its head, with\naddresses, quotes, links and tokens masked).",
+            "example": "Cannot read properties of undefined"
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When it happened."
+          }
+        }
+      },
+      "ClientFrame": {
+        "type": "object",
+        "description": "One frame of an exception's stack.",
+        "properties": {
+          "column": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32",
+            "description": "Column, from 1.",
+            "minimum": 0
+          },
+          "file": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The script's URL: forwarded as its file name only.",
+            "example": "https://app.example.com/assets/index-3f2c1e0.js"
+          },
+          "function": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The function's name."
+          },
+          "line": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32",
+            "description": "Line, from 1.",
+            "minimum": 0
+          }
+        }
+      },
+      "ClientMeasurement": {
+        "type": "object",
+        "description": "A timing.",
+        "required": [
+          "kind",
+          "values",
+          "timestamp"
+        ],
+        "properties": {
+          "kind": {
+            "type": "string",
+            "description": "What was measured (`web-vitals`).",
+            "example": "web-vitals"
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When it was taken."
+          },
+          "values": {
+            "type": "object",
+            "description": "Its values by name (`lcp`, `inp`, `cls`, `fcp`, `ttfb`, `fid`,\n`delta`); others are dropped.",
+            "additionalProperties": {
+              "type": "number",
+              "format": "double"
+            },
+            "propertyNames": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "ClientPlatform": {
+        "type": "string",
+        "description": "Where the app runs.",
+        "enum": [
+          "web",
+          "native"
+        ]
+      },
+      "ClientReport": {
+        "type": "object",
+        "description": "A batch of the app's own telemetry.",
+        "required": [
+          "session_id"
+        ],
+        "properties": {
+          "app_version": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The app's version.",
+            "example": "0.42.0"
+          },
+          "browser": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/ClientBrowser",
+                "description": "The browser or web view."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "events": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ClientEvent"
+            },
+            "description": "Named moments (`session_start`, `view_changed`)."
+          },
+          "exceptions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ClientException"
+            },
+            "description": "Errors the app did not handle."
+          },
+          "measurements": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ClientMeasurement"
+            },
+            "description": "Timings (web vitals)."
+          },
+          "platform": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/ClientPlatform",
+                "description": "Where the app is built for."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "session_id": {
+            "type": "string",
+            "description": "A random id of the app's session (not the sign-in session): joins a\nsession's reports.",
+            "example": "k3Jx8vQ2mN"
+          },
+          "view": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The route template of the page shown (`/w/$workspaceId/inbox`),\nnever its address.",
+            "example": "/w/$workspaceId/inbox"
+          }
+        }
+      },
       "ClientType": {
         "type": "string",
         "description": "How a workspace client signs in.",
@@ -11828,6 +12426,13 @@
               "$ref": "#/components/schemas/MessageView"
             },
             "description": "Up to the 100 newest messages, oldest first."
+          },
+          "need_summary": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Scout's summary of the email behind the conversation's open need, in\nyour language (English when it has none in yours), written once when\nthe need was raised. None when there is no open need, the summary is\nnot written yet (it arrives with a change to this conversation), or no\nmodel may read mail on this server."
           }
         }
       },
@@ -11848,7 +12453,7 @@
             "items": {
               "$ref": "#/components/schemas/ConversationSummary"
             },
-            "description": "Newest first."
+            "description": "Pinned first, then newest first (archived lists and `ids`: newest first)."
           },
           "next_cursor": {
             "type": [
@@ -13356,6 +13961,13 @@
           "images_shown"
         ],
         "properties": {
+          "css": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The HTML part's `@media` rules, filtered like its `style` attributes\n(nothing that loads or runs survives): CSS the client applies to the\nframe's document only, never to its own page."
+          },
           "html": {
             "type": [
               "string",
@@ -13531,7 +14143,8 @@
         "enum": [
           "needs_reply",
           "asks_action",
-          "suspicious"
+          "suspicious",
+          "money"
         ]
       },
       "NeedReason": {
@@ -13759,7 +14372,9 @@
         "description": "How a member resolves a need.",
         "enum": [
           "done",
-          "not_needed"
+          "not_needed",
+          "already_paid",
+          "still_to_pay"
         ]
       },
       "ParsedQuery": {
@@ -13849,6 +14464,17 @@
             "description": "Oldest first."
           }
         }
+      },
+      "PausedReason": {
+        "type": "string",
+        "description": "Why a taught rule is paused: the one that would still hold once the\nmost passing one clears.",
+        "enum": [
+          "inbox_read_only",
+          "domain_too_broad",
+          "author_cannot_write",
+          "paused_by_member",
+          "author_unavailable"
+        ]
       },
       "Phase": {
         "type": "string",
@@ -14720,6 +15346,45 @@
           }
         }
       },
+      "ReplySuggestions": {
+        "type": "object",
+        "description": "Likely replies to a message, as short intents.",
+        "required": [
+          "message_id",
+          "intents"
+        ],
+        "properties": {
+          "intents": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "At most three, in your language; empty when Scout has none."
+          },
+          "message_id": {
+            "$ref": "#/components/schemas/MessageId",
+            "description": "The message answered."
+          }
+        }
+      },
+      "ReplyText": {
+        "type": "object",
+        "description": "Scout's reply, as plain text. Nothing is saved or sent.",
+        "required": [
+          "message_id",
+          "text"
+        ],
+        "properties": {
+          "message_id": {
+            "$ref": "#/components/schemas/MessageId",
+            "description": "The message answered."
+          },
+          "text": {
+            "type": "string",
+            "description": "The reply, signed with your name when it is known."
+          }
+        }
+      },
       "RequestInfo": {
         "type": "object",
         "description": "What the sign-in screen shows for a waiting authorization request.",
@@ -14807,7 +15472,7 @@
           },
           "outcome": {
             "$ref": "#/components/schemas/Outcome",
-            "description": "Done or Not needed."
+            "description": "Done, Not needed, or for a Pay need Already paid or Still to pay."
           }
         },
         "additionalProperties": false
@@ -15540,6 +16205,28 @@
             ],
             "description": "The member's own words, for an instruction."
           },
+          "paused_once_kept": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/PausedReason",
+                "description": "For a proposed rule, why it would be paused once kept (confirming\nkeeps its author): say so before a member says yes. Absent for any\nother rule, or when it would act."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "paused_reason": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/PausedReason",
+                "description": "Why it is paused; absent unless `state` is `paused`."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "recent_exceptions": {
             "type": "integer",
             "format": "int32",
@@ -15563,7 +16250,7 @@
           },
           "state": {
             "$ref": "#/components/schemas/RuleState",
-            "description": "Whether it acts. `paused` when its author can no longer change the inbox."
+            "description": "Whether it acts. `paused` when its author can no longer change the\ninbox or is away for now, its inbox is kept read-only, or a member\npaused it."
           },
           "taught_by": {
             "oneOf": [
@@ -16326,6 +17013,24 @@
           }
         }
       },
+      "SuggestReplies": {
+        "type": "object",
+        "description": "Which message to suggest replies to.",
+        "properties": {
+          "message_id": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/MessageId",
+                "description": "The message answered; the conversation's newest by default."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "additionalProperties": false
+      },
       "SurfaceKey": {
         "type": "string",
         "description": "Always or never show.",
@@ -16891,6 +17596,51 @@
             ]
           }
         }
+      },
+      "WriteReply": {
+        "type": "object",
+        "description": "What the reply should say, or how to change the draft.",
+        "required": [
+          "intent"
+        ],
+        "properties": {
+          "change": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "How to change the draft, in plain words (at most 300 characters).",
+            "example": "warmer"
+          },
+          "draft": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The draft as it stands, to rewrite with `change` or `shorter`."
+          },
+          "intent": {
+            "type": "string",
+            "description": "What it should say: a likely reply or your own words (at most 300 characters).",
+            "example": "Yes, Thursday 10:00 works"
+          },
+          "message_id": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/MessageId",
+                "description": "The message answered; the conversation's newest by default."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "shorter": {
+            "type": "boolean",
+            "description": "Make the draft shorter."
+          }
+        },
+        "additionalProperties": false
       }
     },
     "securitySchemes": {
@@ -16898,7 +17648,7 @@
         "type": "http",
         "scheme": "bearer",
         "bearerFormat": "JWT",
-        "description": "An OAuth 2.1 access token (a JWT) issued by this instance's identity provider, the issuer configured as `CAMPBOOKS_AUTH__ISSUER`. Each operation lists the scope it requires; operations with an empty requirement are public. Scopes:\n\n- `admin:access`: Reach the instance administration API, if your account has an admin profile. Granted to Campbooks' own apps only.\n- `assistant:read`: See what you told Scout about how it should act.\n- `assistant:write`: Tell Scout how it should act, and turn your sentences into rules to check.\n- `attention:read`: See what needs you: the items on your Home.\n- `attention:write`: Put items on your Home off until later, and bring them back.\n- `connectors:read`: See the outside accounts connected to your workspaces and how their sync is doing.\n- `connectors:write`: Connect outside accounts (such as Gmail), sync them now and disconnect them.\n- `conversations:read`: Read your inboxes, conversations and messages.\n- `conversations:send`: Write drafts and send messages, replies and forwards from your inboxes.\n- `conversations:write`: Mark conversations read or unread, star, archive, label and move them between streams.\n- `identity:clients`: Register, rotate and remove a workspace's own apps and their secrets.\n- `identity:read`: See your account, its ways in and the mailboxes waiting to be connected.\n- `identity:write`: Change your account and connect or discard the mailboxes waiting on it.\n- `search:read`: Search the records you may read (conversations need conversations:read too).\n- `system:read`: Read operational status.\n- `workspaces:admin`: Manage workspaces you own or administer: settings, members, invitations, deletion and the security log.\n- `workspaces:read`: See your workspaces and who belongs to them.\n- `workspaces:write`: Create workspaces, accept invitations and leave workspaces."
+        "description": "An OAuth 2.1 access token (a JWT) issued by this instance's identity provider, the issuer configured as `CAMPBOOKS_AUTH__ISSUER`. Each operation lists the scope it requires; operations with an empty requirement are public. Scopes:\n\n- `admin:access`: Reach the instance administration API, if your account has an admin profile. Granted to Campbooks' own apps only.\n- `assistant:read`: See what you told Scout about how it should act.\n- `assistant:write`: Tell Scout how it should act, and turn your sentences into rules to check.\n- `attention:read`: See what needs you: the items on your Home.\n- `attention:write`: Put items on your Home off until later, and bring them back.\n- `connectors:read`: See the outside accounts connected to your workspaces and how their sync is doing.\n- `connectors:write`: Connect outside accounts (such as Gmail), sync them now and disconnect them.\n- `conversations:read`: Read your inboxes, conversations and messages.\n- `conversations:send`: Write drafts and send messages, replies and forwards from your inboxes.\n- `conversations:write`: Mark conversations read or unread, star, archive, label and move them between streams.\n- `identity:clients`: Register, rotate and remove a workspace's own apps and their secrets.\n- `identity:read`: See your account, its ways in and the mailboxes waiting to be connected.\n- `identity:write`: Change your account and connect or discard the mailboxes waiting on it.\n- `search:read`: Search the records you may read (conversations need conversations:read too).\n- `system:read`: Read operational status, and report the app's own errors and timings.\n- `workspaces:admin`: Manage workspaces you own or administer: settings, members, invitations, deletion and the security log.\n- `workspaces:read`: See your workspaces and who belongs to them.\n- `workspaces:write`: Create workspaces, accept invitations and leave workspaces."
       },
       "session": {
         "type": "apiKey",

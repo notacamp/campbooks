@@ -318,6 +318,23 @@ pub struct TelemetryConfig {
     /// `0.0.0.0:9464`). Unauthenticated: keep it off the internet. Unset
     /// means no listener.
     pub metrics_addr: Option<SocketAddr>,
+    /// DSN of a Sentry-compatible error tracker (`GlitchTip`, Sentry) that
+    /// receives the server's panics and errors
+    /// (`CAMPBOOKS_TELEMETRY__ERROR_DSN`). Reports hold ids and error kinds
+    /// only. Secret. Unset (or empty) means no report leaves the process.
+    pub error_dsn: Option<SecretString>,
+    /// The deployment error reports and client telemetry are filed under
+    /// (`CAMPBOOKS_TELEMETRY__ENVIRONMENT`, e.g. `production`, `staging`;
+    /// default `production`).
+    pub environment: Option<String>,
+    /// Where the server forwards the app's own error and timing reports, a
+    /// Grafana Faro receiver (`CAMPBOOKS_TELEMETRY__CLIENT_COLLECTOR_URL`,
+    /// e.g. `http://alloy:12347/collect`). Unset (or empty) means the app's
+    /// reports are refused and nothing is forwarded.
+    pub client_collector_url: Option<String>,
+    /// API key sent to the client collector as `x-api-key`
+    /// (`CAMPBOOKS_TELEMETRY__CLIENT_COLLECTOR_KEY`). Secret.
+    pub client_collector_key: Option<SecretString>,
 }
 
 impl Default for TelemetryConfig {
@@ -327,6 +344,10 @@ impl Default for TelemetryConfig {
             otlp_headers: None,
             sample_ratio: 1.0,
             metrics_addr: None,
+            error_dsn: None,
+            environment: None,
+            client_collector_url: None,
+            client_collector_key: None,
         }
     }
 }
@@ -353,6 +374,26 @@ impl TelemetryConfig {
             .unwrap_or_default()
     }
 
+    /// The error tracker's DSN, trimmed; `None` when unset or blank.
+    pub fn error_dsn(&self) -> Option<&str> {
+        non_blank(
+            self.error_dsn
+                .as_ref()
+                .map(secrecy::ExposeSecret::expose_secret),
+        )
+    }
+
+    /// The deployment name: [`environment`](Self::environment), else
+    /// `production`.
+    pub fn environment(&self) -> &str {
+        non_blank(self.environment.as_deref()).unwrap_or("production")
+    }
+
+    /// The client collector's URL, trimmed; `None` when unset or blank.
+    pub fn client_collector_url(&self) -> Option<&str> {
+        non_blank(self.client_collector_url.as_deref())
+    }
+
     /// Whether metrics leave the process (OTLP or the Prometheus listener).
     pub fn exports_metrics(&self) -> bool {
         self.otlp_endpoint().is_some() || self.metrics_addr.is_some()
@@ -364,6 +405,19 @@ impl TelemetryConfig {
     pub fn check(&self) -> Result<(), String> {
         if let Some(endpoint) = self.otlp_endpoint() {
             check_url("CAMPBOOKS_TELEMETRY__OTLP_ENDPOINT", endpoint)?;
+        }
+        if let Some(url) = self.client_collector_url() {
+            check_url("CAMPBOOKS_TELEMETRY__CLIENT_COLLECTOR_URL", url)?;
+        }
+        if let Some(environment) = non_blank(self.environment.as_deref())
+            && !environment
+                .chars()
+                .all(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '_' | '.'))
+        {
+            return Err(format!(
+                "CAMPBOOKS_TELEMETRY__ENVIRONMENT={environment} must be letters, digits, \
+                 '-', '_' or '.'"
+            ));
         }
         if !(0.0..=1.0).contains(&self.sample_ratio) {
             return Err(format!(
@@ -823,15 +877,31 @@ pub struct ChangesConfig {
     /// arrives (`CAMPBOOKS_CHANGES__POLL_INTERVAL_MS`); notifications wake
     /// streams at once, the poll is the safety net.
     pub poll_interval_ms: u64,
-    /// A client further behind than this many changes is told to `reset`
-    /// instead of catching up (`CAMPBOOKS_CHANGES__MAX_BACKLOG`).
-    pub max_backlog: u64,
     /// How long changes are kept (`CAMPBOOKS_CHANGES__RETENTION_HOURS`);
-    /// a client resuming from an older cursor is told to `reset`.
+    /// a client resuming with a token older than this (less a few minutes)
+    /// is told to `reset`. Only the token's age decides, never how many
+    /// changes came after it, so a client learns nothing of changes it may
+    /// not see.
     pub retention_hours: u64,
     /// Streams one caller may hold open at once, per server process
     /// (`CAMPBOOKS_CHANGES__MAX_STREAMS_PER_PRINCIPAL`); more answer 429.
     pub max_streams_per_principal: usize,
+    /// Streams one caller (a person, or a client) may open per window,
+    /// across every process (`CAMPBOOKS_CHANGES__OPENS_PER_WINDOW`); more
+    /// answer 429 `rate_limited`. A stream resumed from an old token reads
+    /// up to the retention's worth of changes, so a client reconnecting in
+    /// a loop is held back here. 0 turns the limit off.
+    pub opens_per_window: u32,
+    /// The window of `OPENS_PER_WINDOW`, in seconds
+    /// (`CAMPBOOKS_CHANGES__OPENS_WINDOW_SECONDS`).
+    pub opens_window_seconds: u64,
+    /// The catch-up tick, in milliseconds
+    /// (`CAMPBOOKS_CHANGES__CATCH_UP_TICK_MS`, 50 to 1000): a stream behind
+    /// the head sends one page per tick, each a tick after its read began,
+    /// so when a page leaves does not depend on how many changes the caller
+    /// may not see it read past. A stream that caught up sends a new
+    /// change at once.
+    pub catch_up_tick_ms: u64,
 }
 
 impl Default for ChangesConfig {
@@ -840,14 +910,21 @@ impl Default for ChangesConfig {
             heartbeat_seconds: 25,
             max_connection_seconds: 900,
             poll_interval_ms: 5_000,
-            max_backlog: 10_000,
             retention_hours: 72,
             max_streams_per_principal: 8,
+            opens_per_window: 30,
+            opens_window_seconds: 60,
+            catch_up_tick_ms: 50,
         }
     }
 }
 
 impl ChangesConfig {
+    /// Shortest catch-up tick accepted, in milliseconds.
+    pub const MIN_CATCH_UP_TICK_MS: u64 = 50;
+    /// Longest catch-up tick accepted, in milliseconds.
+    pub const MAX_CATCH_UP_TICK_MS: u64 = 1_000;
+
     /// Startup check: every value is in a usable range. The message names
     /// the offending setting.
     pub fn check(&self) -> Result<(), String> {
@@ -867,12 +944,28 @@ impl ChangesConfig {
                 self.poll_interval_ms >= 10,
                 "at least 10",
             ),
-            ("MAX_BACKLOG", self.max_backlog >= 1, "at least 1"),
             ("RETENTION_HOURS", self.retention_hours >= 1, "at least 1"),
             (
                 "MAX_STREAMS_PER_PRINCIPAL",
                 self.max_streams_per_principal >= 1,
                 "at least 1",
+            ),
+            // Counted by `kernel.take_rate_limit`, which refuses a window
+            // longer than a day (campbooks-cloud#213): a longer one would
+            // fail every stream's open.
+            (
+                "OPENS_WINDOW_SECONDS",
+                (1..=RateLimitsConfig::MAX_WINDOW_SECONDS).contains(&self.opens_window_seconds),
+                "between 1 and 86400",
+            ),
+            // Shorter would let a long scan show through the tick; longer
+            // than a second makes catching up slow (and could pass the
+            // shortest heartbeat).
+            (
+                "CATCH_UP_TICK_MS",
+                (Self::MIN_CATCH_UP_TICK_MS..=Self::MAX_CATCH_UP_TICK_MS)
+                    .contains(&self.catch_up_tick_ms),
+                "between 50 and 1000",
             ),
         ];
         match checks.iter().find(|(_, ok, _)| !ok) {
@@ -1669,6 +1762,36 @@ mod tests {
                 .contains("CAMPBOOKS_CHANGES__MAX_CONNECTION_SECONDS")
         );
         config.changes = ChangesConfig::default();
+        for seconds in [0, RateLimitsConfig::MAX_WINDOW_SECONDS + 1] {
+            config.changes.opens_window_seconds = seconds;
+            assert!(
+                config.check().unwrap_err().contains(
+                    "CAMPBOOKS_CHANGES__OPENS_WINDOW_SECONDS must be between 1 and 86400"
+                ),
+                "{seconds}"
+            );
+        }
+        config.changes.opens_window_seconds = RateLimitsConfig::MAX_WINDOW_SECONDS;
+        assert!(
+            config.changes.check().is_ok(),
+            "a day is the longest window"
+        );
+        config.changes = ChangesConfig::default();
+        for ms in [0, 49, 1_001] {
+            config.changes.catch_up_tick_ms = ms;
+            assert!(
+                config
+                    .check()
+                    .unwrap_err()
+                    .contains("CAMPBOOKS_CHANGES__CATCH_UP_TICK_MS must be between 50 and 1000"),
+                "{ms}"
+            );
+        }
+        for ms in [50, 1_000] {
+            config.changes.catch_up_tick_ms = ms;
+            assert!(config.changes.check().is_ok(), "{ms}");
+        }
+        config.changes = ChangesConfig::default();
         // The `code` policy needs no environment code: administrators mint
         // single-use codes in the database.
         config.signup.policy = SignupPolicy::Code;
@@ -1737,6 +1860,20 @@ mod tests {
                 },
                 "CAMPBOOKS_TELEMETRY__OTLP_HEADERS",
             ),
+            (
+                TelemetryConfig {
+                    client_collector_url: Some("alloy:12347".into()),
+                    ..TelemetryConfig::default()
+                },
+                "CAMPBOOKS_TELEMETRY__CLIENT_COLLECTOR_URL",
+            ),
+            (
+                TelemetryConfig {
+                    environment: Some("prod uction".into()),
+                    ..TelemetryConfig::default()
+                },
+                "CAMPBOOKS_TELEMETRY__ENVIRONMENT",
+            ),
         ];
         for (config, setting) in cases {
             let err = config.check().unwrap_err();
@@ -1744,6 +1881,16 @@ mod tests {
             assert!(!err.contains("hunter2"), "{err}");
         }
         assert!(TelemetryConfig::default().check().is_ok());
+        let blank = TelemetryConfig {
+            error_dsn: Some(SecretString::from("")),
+            environment: Some(" ".into()),
+            client_collector_url: Some(String::new()),
+            ..TelemetryConfig::default()
+        };
+        assert!(blank.check().is_ok());
+        assert_eq!(blank.error_dsn(), None);
+        assert_eq!(blank.client_collector_url(), None);
+        assert_eq!(blank.environment(), "production");
     }
 
     #[test]

@@ -1,5 +1,8 @@
 {
   "errors": {
+    "reply_unavailable": "Este servidor no tiene un modelo de lenguaje que pueda leer el correo, así que Scout no puede escribir respuestas aquí. Escríbela tú mismo.",
+    "reply_failed": "Scout no ha podido escribir la respuesta ahora. Inténtalo de nuevo en un momento o escríbela tú mismo.",
+    "reply_ask_invalid": "Di lo que debe decir la respuesta, con entre 1 y {{max}} caracteres.",
     "invalid_limit": "El límite debe estar entre 1 y {{max}}.",
     "invalid_cursor": "Este enlace de página no es válido. Vuelve a empezar desde la primera página.",
     "invalid_label_name": "El nombre de una etiqueta debe tener entre 1 y {{max}} caracteres.",
@@ -17,6 +20,7 @@
     "too_late": "Ya es tarde para deshacer: el mensaje ya ha salido.",
     "invalid_ids": "Pide entre 1 y {{max}} identificadores de conversación, separados por comas.",
     "no_open_need": "Aquí ya no hay nada que te necesite.",
+    "not_a_payment": "Esto no es un pago pendiente.",
     "nothing_to_reopen": "Aquí no hay nada que recuperar.",
     "need_changed": "Esto ha cambiado mientras lo mirabas. Vuelve a mirarlo.",
     "invalid_rule": "No se puede guardar esta regla. Necesita de una a cuatro condiciones que digan a qué correos se aplica, y de una a cuatro acciones de tipos distintos.",

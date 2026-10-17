@@ -14,7 +14,7 @@
     "do": "À faire",
     "pay": "À payer"
   },
-  "context": "Fait aujourd’hui et raccourcis",
+  "context": "Fait aujourd’hui",
   "doneTodayTitle": "Fait aujourd’hui",
   "doneTodayEmpty": "Rien pour l’instant aujourd’hui.",
   "doneToday": {
@@ -22,28 +22,50 @@
     "notNeeded": "Pas nécessaire · {{subject}}",
     "replied": "Répondu · {{subject}}",
     "archived": "Archivé · {{subject}}",
-    "later": "Plus tard · {{subject}}",
+    "snoozed": "Reporté · {{subject}}",
     "gone": "Plus nécessaire · {{subject}}"
   },
-  "later": {
-    "title": "Faire revenir",
+  "snooze": {
+    "title": "Reporter {{name}} jusqu’à…",
+    "description": "Il quitte l’accueil jusque-là, puis revient tout seul.",
+    "choices": "Quand",
     "today": "Plus tard aujourd’hui",
-    "tomorrow": "Demain",
-    "monday": "Lundi",
-    "toast": "Plus tard · {{name}}, revient {{when}}",
-    "button": "Plus tard",
-    "failed": "Impossible de reporter {{name}} : rien n’a changé. Réessayez."
+    "tomorrow": "Demain matin",
+    "monday": "Lundi matin",
+    "nextWeek": "La semaine prochaine",
+    "toast": "Reporté · {{name}}, revient {{when}}",
+    "button": "Reporter…",
+    "failed": "Impossible de reporter {{name}} : rien n’a changé. Réessayez.",
+    "undoFailed": "Impossible de faire revenir {{name}} : il reste reporté. Réessayez."
   },
   "actions": {
     "reply": "Répondre",
     "open": "Ouvrir la conversation",
-    "undo": "Annuler"
+    "undo": "Annuler",
+    "label": "Actions pour {{name}}"
   },
-  "keyboard": "Clavier",
+  "confirm": {
+    "done": "Fait · {{name}}",
+    "notNeeded": "Pas nécessaire · {{name}}",
+    "safe": "Marqué comme sûr · {{name}}",
+    "snoozed": "Reporté · {{name}}, revient {{when}}",
+    "replied": "Envoi à {{name}}",
+    "paid": "Marquée comme payée · {{name}}"
+  },
   "error": {
     "title": "Impossible de charger ce qui a besoin de vous",
     "body": "Campbooks n’a pas pu joindre le serveur. Rien n’a été perdu.",
     "retry": "Réessayer"
   },
-  "noSubject": "(sans objet)"
+  "noSubject": "(sans objet)",
+  "remind": {
+    "today": "Me le rappeler aujourd’hui à {{time}}",
+    "tomorrow": "Me le rappeler demain à {{time}}",
+    "on": "Me le rappeler le {{date}}"
+  },
+  "pay": {
+    "allPaid_one": "J’ai déjà payé {{count}}",
+    "allPaid_other": "J’ai déjà payé les {{count}}",
+    "note": "Campbooks n’a pas accès à votre banque : il demande donc si chaque facture est payée."
+  }
 }

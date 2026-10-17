@@ -6,7 +6,7 @@ import { useInstantSearch, useSearchRestart, type SearchHit } from "./api/querie
 import { HitRow, hitStream } from "./hit-row";
 import { chipLabel, removeFilter } from "./model";
 import { IndexingNote, NoResults, SearchProblem, Warnings } from "./states";
-import { useDebounced } from "./use-debounced";
+import { useDebounced } from "~/lib/hooks/use-debounced";
 import { useRecentSearches } from "./use-recent";
 import { useSearchT } from "./use-search-t";
 

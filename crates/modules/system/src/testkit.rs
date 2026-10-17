@@ -64,8 +64,12 @@ pub async fn world(db: PgPool, deps: Deps) -> World {
         ("fixer", vec!["jobs.retry"]),
     ]));
     let pool = testing::app_role_pool(&db).await;
+    // The kernel's own schedules, for the schedule actions.
+    let registry = campbooks_kernel::jobs::Registry::build(&[crate::module()])
+        .unwrap_or_else(|e| unreachable!("the system module registers: {e}"));
     let mut state = idp
         .state(pool)
+        .with_registry(registry)
         .with_admin(Arc::new(profiles), trail.clone());
     let config = Arc::make_mut(&mut state.config);
     config.database_url = "postgres://app:db-password@db.example.com/campbooks".into();

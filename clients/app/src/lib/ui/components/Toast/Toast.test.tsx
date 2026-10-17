@@ -4,7 +4,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { renderUi } from "../../../../../test/render";
 
-import { Toast, UndoProvider, useUndoToast } from "./Toast";
+import { Toast, UndoProvider, useUndoToast, type PendingHandle } from "./Toast";
 
 function Harness() {
   const undo = useUndoToast();
@@ -50,6 +50,47 @@ function Harness() {
 describe("UndoProvider", () => {
   afterEach(() => {
     vi.useRealTimers();
+  });
+
+  it("takes a failed action out of the history, so Z skips it", () => {
+    const undone: string[] = [];
+    function Retracting() {
+      const undo = useUndoToast();
+      return (
+        <div>
+          <button
+            type="button"
+            onClick={() => {
+              undo.push({
+                label: "Done · Ana",
+                undo: () => {
+                  undone.push("ana");
+                },
+              });
+              const failed = undo.push({
+                label: "Done · Rui",
+                undo: () => {
+                  undone.push("rui");
+                },
+              });
+              undo.retract(failed);
+            }}
+          >
+            act
+          </button>
+          <p>{`entries ${String(undo.history.length)}`}</p>
+        </div>
+      );
+    }
+    renderUi(
+      <UndoProvider>
+        <Retracting />
+      </UndoProvider>,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "act" }));
+    expect(screen.getByText("entries 1")).toBeVisible();
+    fireEvent.keyDown(document, { key: "z" });
+    expect(undone).toEqual(["ana"]);
   });
 
   it("shows each action with Undo in a polite live region", () => {
@@ -156,6 +197,137 @@ describe("UndoProvider", () => {
     fireEvent.click(screen.getByRole("button", { name: "late" }));
     expect(screen.getByRole("status")).toHaveTextContent("Too late: it was already sent");
     expect(screen.queryByRole("button", { name: /^Undo/ })).not.toBeInTheDocument();
+  });
+
+  it("shows a pending action, then how it went, with Undo once done", () => {
+    vi.useFakeTimers();
+    let handle: PendingHandle | undefined;
+    const undone = vi.fn();
+    function Pending() {
+      const undo = useUndoToast();
+      return (
+        <button
+          type="button"
+          onClick={() => {
+            handle = undo.pending({ label: "Sending to Marta…" });
+          }}
+        >
+          send
+        </button>
+      );
+    }
+    renderUi(
+      <UndoProvider toastMs={1000}>
+        <Pending />
+      </UndoProvider>,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "send" }));
+
+    expect(screen.getByRole("status")).toHaveTextContent("Sending to Marta…");
+    expect(screen.getByRole("status").querySelector("[data-state='thinking']")).not.toBeNull();
+    // No Undo: this pending action can't be taken back.
+    expect(screen.queryByRole("button", { name: /^Undo/ })).not.toBeInTheDocument();
+    act(() => {
+      vi.advanceTimersByTime(5000);
+    });
+    expect(screen.getByRole("status")).toHaveTextContent("Sending to Marta…");
+
+    act(() => {
+      handle?.done({ label: "Sent to Marta", undo: undone });
+    });
+    expect(screen.getByRole("status")).toHaveTextContent("Sent to Marta");
+    fireEvent.keyDown(document.body, { key: "z" });
+    expect(undone).toHaveBeenCalledOnce();
+  });
+
+  it("cancels a pending action with Z while it allows it", () => {
+    const cancel = vi.fn();
+    let handle: PendingHandle | undefined;
+    function Pending() {
+      const undo = useUndoToast();
+      return (
+        <button
+          type="button"
+          onClick={() => {
+            handle = undo.pending({
+              label: "Sending to Marta…",
+              cancel,
+              cancelled: "Not sent. Your draft is back.",
+            });
+          }}
+        >
+          send
+        </button>
+      );
+    }
+    renderUi(
+      <UndoProvider>
+        <Pending />
+      </UndoProvider>,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "send" }));
+    expect(screen.getByRole("button", { name: /^Undo/ })).toBeInTheDocument();
+
+    fireEvent.keyDown(document.body, { key: "z" });
+
+    expect(cancel).toHaveBeenCalledOnce();
+    expect(screen.getByRole("status")).toHaveTextContent("Not sent. Your draft is back.");
+    // Settled: a late outcome changes nothing.
+    act(() => {
+      handle?.done({ label: "Sent to Marta" });
+    });
+    expect(screen.getByRole("status")).toHaveTextContent("Not sent. Your draft is back.");
+  });
+
+  it("keeps a failure up until Retry or dismiss", () => {
+    vi.useFakeTimers();
+    const retry = vi.fn();
+    function Failing() {
+      const undo = useUndoToast();
+      return (
+        <>
+          <button
+            type="button"
+            onClick={() => {
+              undo.pending({ label: "Sending to Marta…" }).fail({
+                label: "Couldn't send to Marta. Your draft is kept.",
+                retry,
+              });
+            }}
+          >
+            send
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              undo.fail({ label: "Couldn't snooze Pedro: nothing changed." });
+            }}
+          >
+            snooze
+          </button>
+        </>
+      );
+    }
+    renderUi(
+      <UndoProvider toastMs={1000}>
+        <Failing />
+      </UndoProvider>,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "send" }));
+    act(() => {
+      vi.advanceTimersByTime(60_000);
+    });
+
+    expect(screen.getByRole("alert")).toHaveTextContent("Couldn't send to Marta.");
+    fireEvent.click(screen.getByRole("button", { name: "Retry" }));
+    expect(retry).toHaveBeenCalledOnce();
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "snooze" }));
+    expect(screen.getByRole("alert")).toHaveTextContent("Couldn't snooze Pedro");
+    expect(screen.queryByRole("button", { name: "Retry" })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Dismiss" }));
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   });
 
   it("refuses useUndoToast outside a provider", () => {

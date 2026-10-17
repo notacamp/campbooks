@@ -13,6 +13,14 @@
 //!   claimed, or that already succeeded, can never be touched, however the
 //!   calls race with the worker. Retrying is idempotent: the second call
 //!   finds the job pending (or running, or done) and changes nothing.
+//! - **And a schedule's stuck row.** [`discard_schedule`] deletes the one
+//!   unfinished row of a schedule (its `schedule:<name>` key) unless a live
+//!   worker holds it, so a row that blocks the schedule's ticks (forged
+//!   before campbooks-cloud#207, or wedged) can be cleared; the next tick
+//!   enqueues afresh. The tick heals such rows itself; this is the
+//!   operator's way not to wait for it.
+//! - **Across workspaces.** The queue is every workspace's: each function
+//!   runs in the kernel scope ([`begin_kernel`](crate::db::begin_kernel)).
 
 use chrono::{DateTime, Utc};
 use serde::Serialize;
@@ -20,7 +28,7 @@ use sqlx::PgPool;
 use utoipa::ToSchema;
 use uuid::Uuid;
 
-use super::{JobId, NOTIFY_CHANNEL};
+use super::{JobId, NOTIFY_CHANNEL, Registry};
 use crate::{Error, admin::AdminGrant, i18n};
 
 /// Most failed jobs [`retry_kind`] requeues per call; call again for more.
@@ -42,6 +50,23 @@ pub struct QueueSummary {
     pub oldest_ready_seconds: Option<i64>,
     /// Counts per queue and kind, sorted by queue then kind.
     pub kinds: Vec<KindSummary>,
+    /// The dead jobs of the kinds an operator must hear about, by what they
+    /// are for (each kind's `Watch`), sorted by code; every watched code is
+    /// listed, with 0 when nothing died.
+    pub watched: Vec<WatchedSummary>,
+}
+
+/// The dead jobs of the kinds watched under one code.
+#[derive(Debug, Clone, Serialize, ToSchema)]
+pub struct WatchedSummary {
+    /// What the kinds are for (`suspension_fanout`: a suspension, or its
+    /// lift, reaching the rules a member taught); the client words it.
+    pub code: String,
+    /// The kinds watched under it, sorted.
+    pub kinds: Vec<String>,
+    /// How many of their jobs are dead: until each is retried, what it
+    /// carried has not happened.
+    pub failed: i64,
 }
 
 /// The jobs of one kind on one queue.
@@ -114,8 +139,9 @@ pub enum Retry {
     Requeued,
     /// It is not dead (already requeued, running, or done): nothing changed.
     Unchanged,
-    /// Another unfinished job of the same kind holds its unique key, so
-    /// running it again would duplicate that work: nothing changed.
+    /// Another unfinished job of the same kind and workspace holds its
+    /// unique key, so running it again would duplicate that work: nothing
+    /// changed.
     Superseded,
     /// There is no such job.
     Missing,
@@ -132,8 +158,25 @@ pub enum Discard {
     Missing,
 }
 
-/// Counts of the queue by queue and kind.
-pub async fn summary(db: &PgPool, _grant: &AdminGrant) -> Result<QueueSummary, Error> {
+/// What [`discard_schedule`] did.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DiscardSchedule {
+    /// Its pending or stuck row is gone; the next tick enqueues afresh.
+    Discarded,
+    /// Nothing to discard: no unfinished row, or a live worker is running it.
+    Unchanged,
+    /// No schedule has that name.
+    Unknown,
+}
+
+/// Counts of the queue by queue and kind, and of the dead jobs of the kinds
+/// `registry` watches.
+pub async fn summary(
+    db: &PgPool,
+    registry: &Registry,
+    _grant: &AdminGrant,
+) -> Result<QueueSummary, Error> {
+    let mut tx = crate::db::begin_kernel(db).await?;
     let rows = sqlx::query!(
         r#"
         SELECT queue, kind,
@@ -152,8 +195,9 @@ pub async fn summary(db: &PgPool, _grant: &AdminGrant) -> Result<QueueSummary, E
          ORDER BY queue, kind
         "#
     )
-    .fetch_all(db)
+    .fetch_all(&mut *tx)
     .await?;
+    tx.commit().await?;
     let kinds: Vec<KindSummary> = rows
         .into_iter()
         .map(|row| KindSummary {
@@ -167,10 +211,24 @@ pub async fn summary(db: &PgPool, _grant: &AdminGrant) -> Result<QueueSummary, E
             oldest_ready_seconds: row.oldest_ready_seconds,
         })
         .collect();
+    let watched = registry
+        .watched()
+        .into_iter()
+        .map(|(code, watched)| WatchedSummary {
+            code: code.to_owned(),
+            failed: kinds
+                .iter()
+                .filter(|k| watched.iter().any(|w| *w == k.kind))
+                .map(|k| k.failed)
+                .sum(),
+            kinds: watched.into_iter().map(str::to_owned).collect(),
+        })
+        .collect();
     Ok(QueueSummary {
         at: Utc::now(),
         oldest_ready_seconds: kinds.iter().filter_map(|k| k.oldest_ready_seconds).max(),
         kinds,
+        watched,
     })
 }
 
@@ -186,6 +244,7 @@ pub async fn failed(
     let cursor = after.map(parse_cursor).transpose()?;
     let limit = limit.unwrap_or(DEFAULT_PAGE).clamp(1, MAX_PAGE);
     let (after_at, after_id) = cursor.unzip();
+    let mut tx = crate::db::begin_kernel(db).await?;
     let mut rows = sqlx::query_as!(
         FailedJob,
         r#"
@@ -205,8 +264,9 @@ pub async fn failed(
         after_id,
         limit + 1,
     )
-    .fetch_all(db)
+    .fetch_all(&mut *tx)
     .await?;
+    tx.commit().await?;
     let more = i64::try_from(rows.len()).is_ok_and(|n| n > limit);
     if more {
         rows.truncate(usize::try_from(limit).unwrap_or(usize::MAX));
@@ -221,7 +281,7 @@ pub async fn failed(
 /// Put one dead job back on its queue: pending, due now, attempts reset.
 pub async fn retry(db: &PgPool, _grant: &AdminGrant, id: JobId) -> Result<Retry, Error> {
     let id = Uuid::from(id);
-    let mut tx = db.begin().await?;
+    let mut tx = crate::db::begin_kernel(db).await?;
     let requeued = sqlx::query!(
         r#"
         UPDATE kernel.jobs j
@@ -232,6 +292,7 @@ pub async fn retry(db: &PgPool, _grant: &AdminGrant, id: JobId) -> Result<Retry,
            AND (j.unique_key IS NULL OR NOT EXISTS (
                 SELECT 1 FROM kernel.jobs o
                  WHERE o.kind = j.kind AND o.unique_key = j.unique_key
+                   AND o.workspace_id IS NOT DISTINCT FROM j.workspace_id
                    AND o.state IN ('pending', 'running')))
         RETURNING j.queue
         "#,
@@ -256,35 +317,39 @@ pub async fn retry(db: &PgPool, _grant: &AdminGrant, id: JobId) -> Result<Retry,
 
 /// Put dead jobs of one kind back on their queue (optionally one queue),
 /// oldest first, at most [`RETRY_BATCH`] per call. Jobs whose unique key is
-/// held by another unfinished job are skipped. Returns how many were
-/// requeued; a result equal to the batch size means there may be more.
+/// held by another unfinished job of their workspace are skipped. Returns
+/// how many were requeued; a result equal to the batch size means there may
+/// be more.
 pub async fn retry_kind(
     db: &PgPool,
     _grant: &AdminGrant,
     kind: &str,
     queue: Option<&str>,
 ) -> Result<u64, Error> {
-    let mut tx = db.begin().await?;
+    let mut tx = crate::db::begin_kernel(db).await?;
     let queues = sqlx::query_scalar!(
         r#"
         WITH locked AS (
-            SELECT j.id, j.unique_key
+            SELECT j.id, j.unique_key, j.workspace_id
               FROM kernel.jobs j
              WHERE j.state = 'failed' AND j.kind = $1
                AND ($2::text IS NULL OR j.queue = $2)
                AND (j.unique_key IS NULL OR NOT EXISTS (
                     SELECT 1 FROM kernel.jobs o
                      WHERE o.kind = j.kind AND o.unique_key = j.unique_key
+                       AND o.workspace_id IS NOT DISTINCT FROM j.workspace_id
                        AND o.state IN ('pending', 'running')))
              ORDER BY j.finished_at, j.id
              LIMIT $3
                FOR UPDATE SKIP LOCKED
         ),
         picked AS (
-            -- Two dead jobs sharing a unique key must not both come back.
+            -- Two dead jobs of one workspace sharing a unique key must not
+            -- both come back (instance-wide ones are one more workspace).
             SELECT id FROM (
                 SELECT id, unique_key,
-                       row_number() OVER (PARTITION BY unique_key ORDER BY id) AS n
+                       row_number() OVER (PARTITION BY workspace_id, unique_key
+                                          ORDER BY id) AS n
                   FROM locked
             ) l
              WHERE l.unique_key IS NULL OR l.n = 1
@@ -316,27 +381,76 @@ pub async fn retry_kind(
 /// Delete one dead job. A job that is not dead is never deleted.
 pub async fn discard(db: &PgPool, _grant: &AdminGrant, id: JobId) -> Result<Discard, Error> {
     let id = Uuid::from(id);
+    let mut tx = crate::db::begin_kernel(db).await?;
     let deleted = sqlx::query!(
         "DELETE FROM kernel.jobs WHERE id = $1 AND state = 'failed'",
         id
     )
-    .execute(db)
+    .execute(&mut *tx)
     .await?
     .rows_affected();
     if deleted > 0 {
+        tx.commit().await?;
         return Ok(Discard::Discarded);
     }
     let exists = sqlx::query_scalar!(
         r#"SELECT EXISTS (SELECT 1 FROM kernel.jobs WHERE id = $1) AS "exists!""#,
         id
     )
-    .fetch_one(db)
+    .fetch_one(&mut *tx)
     .await?;
+    tx.commit().await?;
     Ok(if exists {
         Discard::Unchanged
     } else {
         Discard::Missing
     })
+}
+
+/// Delete schedule `name`'s unfinished row (the job holding its
+/// `schedule:<name>` unique key) when it is pending, belongs to a workspace
+/// (a forgery), or runs on a lease that has expired or is longer than any
+/// worker gives: whatever blocks the schedule's next tick. A run a live
+/// worker holds is kept.
+pub async fn discard_schedule(
+    state: &crate::AppState,
+    _grant: &AdminGrant,
+    name: &str,
+) -> Result<DiscardSchedule, Error> {
+    let Some(schedule) = state
+        .events
+        .registry()
+        .schedules()
+        .iter()
+        .find(|s| s.name == name)
+    else {
+        return Ok(DiscardSchedule::Unknown);
+    };
+    let (_, leased) = super::worker::stuck_after(&state.config.jobs, schedule.every);
+    let mut tx = crate::db::begin_kernel(&state.db).await?;
+    let deleted = sqlx::query!(
+        r#"
+        DELETE FROM kernel.jobs
+         WHERE kind = $1 AND unique_key = 'schedule:' || $1
+           AND state IN ('pending', 'running')
+           AND (state = 'pending' OR workspace_id IS NOT NULL
+                OR locked_until < now() OR locked_until > now() + make_interval(secs => $2))
+        "#,
+        schedule.name,
+        leased,
+    )
+    .execute(&mut *tx)
+    .await?
+    .rows_affected();
+    tx.commit().await?;
+    if deleted > 0 {
+        tracing::warn!(
+            schedule = schedule.name,
+            "an administrator discarded a schedule's pending or stuck row"
+        );
+        return Ok(DiscardSchedule::Discarded);
+    }
+    Ok(DiscardSchedule::Unchanged)
 }
 
 async fn notify(conn: &mut sqlx::PgConnection, queue: &str) -> Result<(), sqlx::Error> {

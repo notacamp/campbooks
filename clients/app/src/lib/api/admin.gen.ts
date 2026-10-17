@@ -89,6 +89,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/admin/v1/system/ai-usage": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** A day's AI usage per workspace, workspaces the cap refused first. */
+        get: operations["system.admin_ai_usage"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/admin/v1/system/jobs": {
         parameters: {
             query?: never;
@@ -189,6 +206,26 @@ export interface paths {
         put?: never;
         post?: never;
         delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/v1/system/schedules/{name}/run": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Discard a schedule's pending or stuck run, so its next tick enqueues
+         *     afresh. A run a live worker holds is kept.
+         */
+        delete: operations["system.admin_discard_schedule_run"];
         options?: never;
         head?: never;
         patch?: never;
@@ -704,6 +741,68 @@ export interface components {
             /** @description The role. */
             role: components["schemas"]["AiRole"];
         };
+        /** @description A day's AI usage across the instance. */
+        AiUsageDay: {
+            /**
+             * Format: int32
+             * @description Model calls a workspace may make per UTC day
+             *     (`CAMPBOOKS_AI__DAILY_CALLS_PER_WORKSPACE`); `null` when there is no
+             *     cap.
+             */
+            cap?: number | null;
+            /**
+             * Format: date
+             * @description The UTC day.
+             */
+            day: string;
+            /**
+             * Format: int32
+             * @description Calls of the cap kept for what people ask themselves (the
+             *     assistant): background work, such as reading new mail, stops this
+             *     many calls short of the cap. `null` when there is no cap.
+             */
+            reserve?: number | null;
+            /**
+             * Format: date-time
+             * @description When that day's counts start again: 00:00 UTC the next day.
+             */
+            resets_at: string;
+            /**
+             * @description The workspaces that used AI that day: those the cap refused first,
+             *     then by calls.
+             */
+            workspaces: components["schemas"]["WorkspaceAiUsage"][];
+        };
+        /** @description Calls of one role for one feature. */
+        AiUse: {
+            /**
+             * Format: int64
+             * @description Calls made.
+             */
+            calls: number;
+            /**
+             * Format: int64
+             * @description Completion tokens the providers reported.
+             */
+            completion_tokens: number;
+            /**
+             * Format: int64
+             * @description Of which failed (no answer, or an unusable one).
+             */
+            failed: number;
+            /**
+             * @description What asked (`conversations.triage`).
+             * @example conversations.triage
+             */
+            feature: string;
+            /**
+             * Format: int64
+             * @description Prompt tokens the providers reported (0 when they report none).
+             */
+            prompt_tokens: number;
+            /** @description The AI role called. */
+            role: components["schemas"]["AiRole"];
+        };
         /**
          * @description Which object store holds the blobs.
          * @enum {string}
@@ -1015,6 +1114,12 @@ export interface components {
              * @description Age of the oldest job that is ready to run and waiting, in seconds.
              */
             oldest_ready_seconds?: number | null;
+            /**
+             * @description The dead jobs of the kinds an operator must hear about, by what they
+             *     are for (each kind's `Watch`), sorted by code; every watched code is
+             *     listed, with 0 when nothing died.
+             */
+            watched: components["schemas"]["WatchedSummary"][];
         };
         /** @description Why a request is turned down. */
         RejectSignupRequest: {
@@ -1150,6 +1255,52 @@ export interface components {
          * @description UserId (UUIDv7)
          */
         UserId: string;
+        /** @description The dead jobs of the kinds watched under one code. */
+        WatchedSummary: {
+            /**
+             * @description What the kinds are for (`suspension_fanout`: a suspension, or its
+             *     lift, reaching the rules a member taught); the client words it.
+             */
+            code: string;
+            /**
+             * Format: int64
+             * @description How many of their jobs are dead: until each is retried, what it
+             *     carried has not happened.
+             */
+            failed: number;
+            /** @description The kinds watched under it, sorted. */
+            kinds: string[];
+        };
+        /** @description One workspace's AI usage on the day. */
+        WorkspaceAiUsage: {
+            /**
+             * Format: int64
+             * @description Model calls made (admitted).
+             */
+            calls: number;
+            /** @description Whether the cap refused any of its calls that day. */
+            capped: boolean;
+            /**
+             * Format: date-time
+             * @description The first refusal, when there was one.
+             */
+            capped_at?: string | null;
+            /**
+             * Format: int64
+             * @description Calls refused over the cap.
+             */
+            refused: number;
+            /**
+             * Format: int64
+             * @description Calls left today, the reserve included; `null` for another day or
+             *     without a cap.
+             */
+            remaining?: number | null;
+            /** @description Its calls by role and feature. */
+            uses: components["schemas"]["AiUse"][];
+            /** @description The workspace. */
+            workspace_id: components["schemas"]["WorkspaceId"];
+        };
         /**
          * Format: uuid
          * @description WorkspaceId (UUIDv7)
@@ -1377,6 +1528,58 @@ export interface operations {
                 };
             };
             /** @description No such account, or not an administrator with `users.suspend`. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "system.admin_ai_usage": {
+        parameters: {
+            query?: {
+                /** @description The UTC day (`YYYY-MM-DD`); today when absent. */
+                day?: string | null;
+                /** @description Workspaces to list, 1 to 500 (default 100). */
+                limit?: number | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The day's usage and the cap. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AiUsageDay"];
+                };
+            };
+            /** @description Malformed query. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `admin_reauth_required`: sign in again. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not an administrator with `system.read`. */
             404: {
                 headers: {
                     [name: string]: unknown;
@@ -1642,6 +1845,47 @@ export interface operations {
                 };
             };
             /** @description Not an administrator with `system.read` (the same answer as an unknown route). */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "system.admin_discard_schedule_run": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The schedule (`<module>.<job>`). */
+                name: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Deleted, or nothing to do. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JobAction"];
+                };
+            };
+            /** @description `admin_reauth_required`: sign in again. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No such schedule, or not an administrator with `jobs.retry`. */
             404: {
                 headers: {
                     [name: string]: unknown;

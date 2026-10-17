@@ -11,13 +11,18 @@ send slice's composer fills.
 ### Requirement: Streams, not people
 The inbox SHALL be its streams: Primary, Updates, Receipts and Newsletters,
 listed under Inbox in the sidebar (chips on phones) with their unread counts,
-opened with G then 1 to 4. A stream's page SHALL list its conversations
-newest first, a page at a time, with sender, time, subject, snippet, unread,
-starred and message count, and All or Unread.
+opened with G then 1 to 4. A stream's page SHALL list its pinned
+conversations first, then the rest newest first, a page at a time, with
+sender, time, subject, snippet, unread, pinned and message count, and All or
+Unread.
 
 #### Scenario: Open a stream from the keyboard
 - **WHEN** the user presses G then 3
 - **THEN** the Receipts stream opens
+
+#### Scenario: A pinned conversation
+- **WHEN** the user pins an older conversation in Primary
+- **THEN** it moves to the top of Primary, marked pinned, and stays there as newer mail arrives
 
 ### Requirement: Suggestions shown as suggestions
 The decide pass's answers SHALL be shown as suggestions, never applied by the
@@ -42,34 +47,65 @@ to, and whether it acted. A stream suggestion SHALL offer "Move to <stream>"
 The reader SHALL show the conversation's subject, the note, and its messages
 newest first with the newest (and any unread) open and older ones folded to
 one line until opened, each with sender, recipients, time and attachments.
-HTML bodies SHALL be shown only in a sandboxed frame (no scripts, an opaque
-origin, its own Content-Security-Policy, no referrer); remote images SHALL
-stay blocked until the user chooses "Show images" for that message (Shift+I
-for all). Opening an unread conversation SHALL mark it read.
+HTML bodies SHALL be shown only in a sandboxed frame that never runs scripts
+(sandbox exactly `allow-same-origin allow-popups
+allow-popups-to-escape-sandbox`: no `allow-scripts`, no forms, no top
+navigation), with its own Content-Security-Policy and no referrer. The frame
+SHALL be as tall as its content (measured, and again when its width or
+content changes; never scrolling inside except sideways), SHALL shrink a
+layout wider than the reader to fit, down to half size, and SHALL apply the
+message's filtered `@media` rules to its own document only, never to the
+app's page. Remote images SHALL stay blocked until the user chooses "Show
+images" for that message (Shift+I for all). Opening an unread conversation
+SHALL mark it read.
 
 #### Scenario: A newsletter with remote images
 - **WHEN** the user opens a message whose body has a remote image
 - **THEN** the frame's policy allows only `data:` images, the reader says one remote image is hidden, and after "Show images" the frame allows `https` images
 
+#### Scenario: A long message
+- **WHEN** the user opens a message whose content is 3,000px tall
+- **THEN** the frame is 3,000px tall, cut nowhere and not padded, and the reader scrolls, not the frame
+
+#### Scenario: A fixed 600px layout on a phone
+- **WHEN** the user opens a message laid out at 600px wide at 375px
+- **THEN** it is shown shrunk to the frame's width and the page does not scroll sideways
+
+#### Scenario: A responsive newsletter on a phone
+- **WHEN** a message's `@media (max-width: 620px)` rule makes its container full width and the frame is 343px wide
+- **THEN** the rule applies inside the frame, the layout fits without shrinking, and the app's own page is unaffected
+
 ### Requirement: Tidying with undo
-Done (E, archive), star (S), read or unread (U) and move to a stream (M, then
-1 to 4) SHALL act on the open conversation, or on the list's cursor (J/K),
-show at once, and push an entry that Undo (Z, or the toast) takes back. After
-Done the next conversation opens (the list, on phones).
+Done (E, archive), Pin or unpin (P, the provider's star), read or unread (U)
+and move to a stream (M, then 1 to 4) SHALL act on the open conversation, or
+on the list's cursor (J/K), show at once, and push an entry that Undo (Z, or
+the toast) takes back. After Done the next conversation opens (the list, on
+phones). The UI SHALL call it Pin everywhere, in en, pt-PT, es-ES and fr.
 
 #### Scenario: Done and Undo
 - **WHEN** the user presses E on an open conversation, then Z
 - **THEN** the conversation is archived, the toast says "Done · <subject>", and Z unarchives it
 
+#### Scenario: Pin
+- **WHEN** the user presses P on an open conversation
+- **THEN** it is pinned, the toast says "Pinned · <subject>" with Undo, and Gmail shows it starred
+
 ### Requirement: The reply slot
 The reader SHALL expose a slot at the end of the thread for the send slice's
 composer, with Reply (R), Reply all (Shift+R) and Forward (F) that tell the slot
 which message to answer and how; without a composer those actions SHALL be
-hidden.
+hidden. Reply SHALL first open the reply dialog (Scout's likely replies and
+draft); its "Write my own" and "Open in composer" SHALL open the slot's
+composer on the newest message, the latter on the draft Scout wrote. Reply
+all and Forward SHALL open the composer directly.
 
 #### Scenario: No composer yet
 - **WHEN** the inbox runs without a reply-slot renderer
 - **THEN** the reader shows no Reply, Reply all or Forward
+
+#### Scenario: Write my own
+- **WHEN** the user presses R in the reader, then chooses "Write my own"
+- **THEN** the dialog closes and the composer opens at the end of the thread, as before
 
 ### Requirement: Separate screens on phones
 From 64rem the list and the reader SHALL show side by side at every width,
@@ -233,7 +269,7 @@ it) and Keep it (Esc).
 ### Requirement: Kept inboxes are read as history
 An inbox `conversations.list_inboxes` lists as `read_only` (its mailbox was
 disconnected and its mail kept), or one the person only reads, SHALL open in
-the reader with no action that writes: no Done, star, read or unread, move,
+the reader with no action that writes: no Done, Pin, read or unread, move,
 reply, reply all or forward, no assistant choices, and opening it SHALL NOT
 mark it read. Until the inbox is known (its list loading or failed), the
 reader SHALL offer no write action either. A kept inbox SHALL say so ("Kept as history", naming its
@@ -242,3 +278,36 @@ address). New messages SHALL never offer a read-only inbox to send from.
 #### Scenario: A kept conversation
 - **WHEN** the person opens a conversation of an inbox listed with `read_only: true`
 - **THEN** "Kept as history" is shown, no write action is offered, E does nothing, and nothing is marked read
+
+### Requirement: A bill in the reader
+When the open conversation's need is a Pay question (trust `check`, question
+`money`), the reader SHALL say that Campbooks can't see the bank and offer
+Already paid (1) and Still to pay (2) in place of Yes and No, plus Not needed
+(X), each acting as on Home, with Undo. A bill the member said is still to
+pay SHALL offer Mark paid (recorded as Already paid) in place of Done.
+
+#### Scenario: Still to pay from the reader
+- **WHEN** Sam opens Acme Hosting's invoice and presses 2
+- **THEN** the need becomes a sure Pay need and the reader offers Mark paid and Not needed
+
+### Requirement: Links in mail that may be phishing
+In a conversation whose need is a warning (`suspicious`), the reader SHALL
+show each message body with links that lead nowhere: once the body has
+loaded, each link SHALL become plain text (its address kept aside, not as a
+link, so it cannot be clicked, focused or opened from the browser's menu,
+whatever the mail's styles say), and the frame SHALL NOT allow popups, also
+while a frame shown before the warning arrived is replaced. Every other
+protection of the body stays as it is.
+
+#### Scenario: A phishing message in the reader
+- **WHEN** the user opens a conversation Campbooks flagged as possible phishing and clicks a link in it
+- **THEN** nothing opens
+
+### Requirement: Plain-text mail keeps its line breaks
+A message shown as plain text SHALL keep its own line breaks and paragraphs,
+in the reader and wherever the message is shown (Home's opened item), and a
+long word or link SHALL wrap instead of widening the page.
+
+#### Scenario: A plain-text letter
+- **WHEN** the user opens a plain-text email written as three short paragraphs
+- **THEN** it shows as three paragraphs, not one run-on line

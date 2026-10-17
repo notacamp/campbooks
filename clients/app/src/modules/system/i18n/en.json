@@ -163,6 +163,14 @@
       "expiredLeases_one": "{{count}} running job lost its worker",
       "expiredLeases_other": "{{count}} running jobs lost their worker"
     },
+    "watched": {
+      "title": "Work to watch",
+      "lead": "Background work whose failures matter at once. Until a dead delivery is retried, what it carried has not happened.",
+      "suspensionFanout": "Suspensions reaching members’ rules",
+      "none": "No dead deliveries",
+      "dead_one": "{{count}} dead delivery",
+      "dead_other": "{{count}} dead deliveries"
+    },
     "retryAll": {
       "question_one": "Retry the {{count}} failed {{kind}} job? It starts again from its first attempt.",
       "question_other": "Retry all {{count}} failed {{kind}} jobs? Each starts again from its first attempt.",

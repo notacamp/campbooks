@@ -16,6 +16,7 @@
     "fake-google": "node scripts/fake-provider.ts --provider google",
     "fake-microsoft": "node scripts/fake-provider.ts --provider microsoft",
     "fake-zoho": "node scripts/fake-provider.ts --provider zoho",
+    "fake-complete": "node scripts/fake-complete.ts",
     "i18n:check": "node scripts/i18n-check.ts",
     "lint": "eslint . --max-warnings 0 && stylelint --allow-empty-input \"src/**/*.css\" \"stories/**/*.css\"",
     "test": "vitest run --coverage",
@@ -37,7 +38,8 @@
     "openapi-fetch": "0.17.0",
     "react": "19.3.0",
     "react-dom": "19.3.0",
-    "react-i18next": "17.0.15"
+    "react-i18next": "17.0.15",
+    "web-vitals": "6.2.3"
   },
   "devDependencies": {
     "@eslint-community/eslint-plugin-eslint-comments": "4.8.1",

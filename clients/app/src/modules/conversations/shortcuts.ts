@@ -37,8 +37,9 @@ export const CONVERSATIONS_SHORTCUTS = [
     label: "conversations:shortcuts.newsletters",
   },
   {
+    // Pin: the provider's star (Gmail STARRED), named Pin in the UI.
     id: "conversations.star",
-    keys: "s",
+    keys: "p",
     scope: "item",
     group: "item",
     label: "conversations:shortcuts.star",
@@ -93,6 +94,14 @@ export const CONVERSATIONS_SHORTCUTS = [
     scope: "global",
     group: "item",
     label: "conversations:shortcuts.undoAll",
+  },
+  {
+    // Home's Pay group: every bill it asks about is already paid.
+    id: "item.all_paid",
+    keys: "shift+e",
+    scope: "item",
+    group: "item",
+    label: "conversations:shortcuts.allPaid",
   },
   {
     // Focus moves through the open messages' attachments; Enter opens one.

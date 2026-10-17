@@ -35,13 +35,22 @@ import {
   streamName,
   type Translate,
 } from "../../model";
-import { howRows, needSender, needSentence, quoteAttribution, warningReasons } from "../../needs";
+import {
+  billKind,
+  howRows,
+  needSender,
+  needSentence,
+  quoteAttribution,
+  warningReasons,
+} from "../../needs";
 import { NeedChips } from "../Needs/NeedChips";
 import { ruleLine } from "../../rules-text";
 import { useNeedActions } from "../Needs/use-need-actions";
 import { useTeachOnce } from "../TeachOnce/TeachOnce";
 import { useRuleActions } from "../TeachOnce/use-rule-actions";
 import type { InboxActions } from "../InboxScreen/use-inbox-actions";
+
+import { ReplyDialog } from "../ReplyDialog/ReplyDialog";
 
 import { MovePicker } from "./MovePicker";
 import type { RenderReplySlot, ReplyMode, ReplyRequest, ReplySlotContext } from "./ReplySlot";
@@ -127,11 +136,17 @@ export function ConversationReader({
   const footerLine = (summary: NonNullable<typeof conversation>) =>
     ruleMark === undefined ? placementLine(t, summary) : ruleLine(t, ruleMark, i18n.language);
   const question = need?.trust === "check";
+  // A bill: Campbooks can't see the bank, so it asks whether it is paid;
+  // once still to pay, Mark paid is its Done.
+  const bill = need !== undefined && billKind(need) === "ask";
+  const toPay = need !== undefined && billKind(need) === "toPay";
 
   const [opened, setOpened] = useState<Set<string>>(new Set());
   const [images, setImages] = useState<Set<string>>(new Set());
   const [moving, setMoving] = useState(false);
   const [reply, setReply] = useState<ReplyRequest | null>(null);
+  // Reply first asks Scout (the reply dialog).
+  const [replying, setReplying] = useState<{ opened: number } | undefined>();
   const nonce = useRef(0);
 
   // Opening an unread conversation reads it (once).
@@ -160,6 +175,11 @@ export function ConversationReader({
     }
     nonce.current += 1;
     setReply({ mode, messageId: newest.id, nonce: nonce.current });
+  };
+  /** Reply: the dialog with Scout's likely replies. */
+  const openReply = () => {
+    nonce.current += 1;
+    setReplying({ opened: nonce.current });
   };
   // Home's R: answer the newest message as soon as it is here (once).
   const repliedOnce = useRef(false);
@@ -222,7 +242,7 @@ export function ConversationReader({
     },
     { enabled: viewing },
   );
-  useShortcut("overlay.close", onBack, { enabled: !moving });
+  useShortcut("overlay.close", onBack, { enabled: !moving && replying === undefined });
   // J/K step between conversations; the arrows keep scrolling this one.
   useShortcut("list.next", onNext, { alternates: false });
   useShortcut("list.previous", onPrevious, { alternates: false });
@@ -230,7 +250,7 @@ export function ConversationReader({
   useShortcut(
     "item.reply",
     () => {
-      askReply("reply");
+      openReply();
     },
     { enabled: canReply },
   );
@@ -254,7 +274,9 @@ export function ConversationReader({
       if (conversation === undefined) {
         return;
       }
-      if (question) {
+      if (bill) {
+        needActions.alreadyPaid(conversation);
+      } else if (question) {
         needActions.confirm(conversation);
       } else if (suggestion !== undefined) {
         actions.move(conversation, suggestion.stream);
@@ -266,7 +288,11 @@ export function ConversationReader({
     "item.choice2",
     () => {
       if (conversation !== undefined) {
-        needActions.notNeeded(conversation);
+        if (bill) {
+          needActions.stillToPay(conversation);
+        } else {
+          needActions.notNeeded(conversation);
+        }
       }
     },
     { enabled: question && !offering },
@@ -278,7 +304,7 @@ export function ConversationReader({
         needActions.notNeeded(conversation);
       }
     },
-    { enabled: need !== undefined && !question },
+    { enabled: need !== undefined && (!question || bill) },
   );
 
   // Wrappers carry the responsive classes: a component's own styles win
@@ -337,7 +363,7 @@ export function ConversationReader({
           icon="reply"
           shortcut="item.reply"
           onClick={() => {
-            askReply("reply");
+            openReply();
           }}
         >
           {tShortcuts("item.reply")}
@@ -395,7 +421,7 @@ export function ConversationReader({
             </span>
             <IconButton
               label={conversation.starred ? t("actions.unstar") : t("actions.star")}
-              icon={conversation.starred ? "star-filled" : "star"}
+              icon={conversation.starred ? "pin-filled" : "pin"}
               shortcut="conversations.star"
               aria-pressed={conversation.starred}
               onClick={() => {
@@ -510,7 +536,11 @@ export function ConversationReader({
             key={conversation.id}
             label={t("scout.label")}
             visor={need.question === "suspicious" ? "alert" : question ? "unsure" : "idle"}
-            reasons={need.question === "suspicious" ? warningReasons(t, exists, decisions) : []}
+            reasons={
+              need.question === "suspicious"
+                ? [...warningReasons(t, exists, decisions), t("needs.mail.linksOff")]
+                : []
+            }
             {...(need.quote === null || need.quote === undefined
               ? {}
               : {
@@ -526,26 +556,66 @@ export function ConversationReader({
             chips={<NeedChips need={need} now={now} />}
             {...(question
               ? {
-                  choice: {
-                    prompt: t("needs.actions.questionPrompt"),
-                    options: [
-                      {
-                        label: t("needs.actions.yes"),
-                        ...choiceKey("item.choice1"),
-                        onSelect: () => {
-                          needActions.confirm(conversation);
-                        },
+                  choice: bill
+                    ? {
+                        prompt: t("needs.actions.billPrompt"),
+                        options: [
+                          {
+                            label: t("needs.actions.alreadyPaid"),
+                            ...choiceKey("item.choice1"),
+                            onSelect: () => {
+                              needActions.alreadyPaid(conversation);
+                            },
+                          },
+                          {
+                            label: t("needs.actions.stillToPay"),
+                            ...choiceKey("item.choice2"),
+                            onSelect: () => {
+                              needActions.stillToPay(conversation);
+                            },
+                          },
+                        ],
+                      }
+                    : {
+                        prompt: t("needs.actions.questionPrompt"),
+                        options: [
+                          {
+                            label: t("needs.actions.yes"),
+                            ...choiceKey("item.choice1"),
+                            onSelect: () => {
+                              needActions.confirm(conversation);
+                            },
+                          },
+                          {
+                            label: t("needs.actions.no"),
+                            ...choiceKey("item.choice2"),
+                            onSelect: () => {
+                              needActions.notNeeded(conversation);
+                            },
+                          },
+                        ],
                       },
-                      {
-                        label: t("needs.actions.no"),
-                        ...choiceKey("item.choice2"),
-                        onSelect: () => {
-                          needActions.notNeeded(conversation);
-                        },
-                      },
-                    ],
-                  },
-                  ...(stopButton === null ? {} : { actions: stopButton }),
+                  // A bill can also be not needed (X): shown, as every key is.
+                  ...(bill
+                    ? {
+                        actions: (
+                          <>
+                            <Button
+                              variant="ghost"
+                              shortcut="conversations.resolve_need"
+                              onClick={() => {
+                                needActions.notNeeded(conversation);
+                              }}
+                            >
+                              {t("needs.actions.notNeeded")}
+                            </Button>
+                            {stopButton}
+                          </>
+                        ),
+                      }
+                    : stopButton === null
+                      ? {}
+                      : { actions: stopButton }),
                 }
               : {
                   actions: (
@@ -553,10 +623,14 @@ export function ConversationReader({
                       <Button
                         variant="secondary"
                         onClick={() => {
-                          needActions.done(conversation);
+                          if (toPay) {
+                            needActions.alreadyPaid(conversation);
+                          } else {
+                            needActions.done(conversation);
+                          }
                         }}
                       >
-                        {t("needs.actions.done")}
+                        {t(toPay ? "needs.actions.markPaid" : "needs.actions.done")}
                       </Button>
                       <Button
                         variant="ghost"
@@ -598,6 +672,7 @@ export function ConversationReader({
               setImages((current) => new Set([...current, message.id]));
             }}
             kind={message.direction === "outbound" ? "person" : kind}
+            inertLinks={conversation.need?.question === "suspicious"}
             now={now}
           />
         ))}
@@ -613,7 +688,7 @@ export function ConversationReader({
               icon="reply"
               grow
               onClick={() => {
-                askReply("reply");
+                openReply();
               }}
             >
               {tShortcuts("item.reply")}
@@ -631,6 +706,28 @@ export function ConversationReader({
           </Button>
         </ActionBar>
       ) : null}
+      {replying === undefined || renderReplySlot === undefined ? null : (
+        <ReplyDialog
+          key={replying.opened}
+          workspaceId={workspaceId}
+          conversationId={conversation.id}
+          onClose={() => {
+            setReplying(undefined);
+          }}
+          onWriteOwn={() => {
+            setReplying(undefined);
+            askReply("reply");
+          }}
+          onOpenDraft={() => {
+            setReplying(undefined);
+            askReply("reply");
+          }}
+          onUndone={() => {
+            // The reply slot reopens the undone draft in the composer.
+            askReply("reply");
+          }}
+        />
+      )}
     </>
   );
 }

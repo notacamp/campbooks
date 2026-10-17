@@ -506,8 +506,53 @@ function lookalikes(me: string, count: number): DemoMessage[] {
   }));
 }
 
-/** A new demo mailbox for `address`. */
-export function createMailbox(address: string, images: string, extra = 0): Mailbox {
+/**
+ * The sanitiser's fixture emails (`crates/modules/conversations/fixtures/
+ * email-html`, campbooks-cloud#160) as demo messages, newest first: real-
+ * world-shaped HTML for showing the reader. Their fictional image hosts are
+ * pointed at the fake's own pictures, so "Show images" loads something.
+ */
+export function htmlMailDemos(
+  me: string,
+  images: string,
+  fixtures: Record<string, string>,
+): DemoMessage[] {
+  const pictures = (html: string) =>
+    html.replaceAll(/https:\/\/(?:images|cdn)\.example\//gu, `${images}/fixture/`);
+  const demos: [string, string, string][] = [
+    ["newsletter", "HTMLemail <news@news.example>", "A simple call to action"],
+    ["receipt", "Harbourline <receipts@shop.example>", "Your Harbourline receipt R-20418"],
+    ["marketing-600", "Harbourline <sale@shop.example>", "Thirty per cent off waterproofs"],
+    ["marketing-fluid", "Harbourline <news@shop.example>", "New in: the autumn range"],
+    ["outlook", "Ana Lopes <ana@brightloop.example>", "Re: Harbour walk figures"],
+    ["gmail", "Sam Rivera <sam.rivera@rivera.example>", "Re: Second instalment"],
+    ["hostile", "Prize Desk <win@prize-desk.example>", "You have won (a hostile test message)"],
+  ];
+  return demos.flatMap(([name, from, subject], index) => {
+    const html = fixtures[name];
+    return html === undefined
+      ? []
+      : [
+          {
+            from,
+            to: me,
+            subject,
+            hoursAgo: 0.1 + index * 0.05,
+            labels: ["INBOX", "UNREAD", "CATEGORY_PERSONAL"],
+            text: subject,
+            html: pictures(html),
+          },
+        ];
+  });
+}
+
+/** A new demo mailbox for `address`, with `more` messages on top of the demo. */
+export function createMailbox(
+  address: string,
+  images: string,
+  extra = 0,
+  more: DemoMessage[] = [],
+): Mailbox {
   const mailbox: Mailbox = {
     address,
     messages: [],
@@ -517,7 +562,7 @@ export function createMailbox(address: string, images: string, extra = 0): Mailb
   };
   const threads = new Map<string, { threadId: string; messageId: string }>();
   const now = Date.now();
-  for (const demo of [...demoMessages(address, images), ...lookalikes(address, extra)]) {
+  for (const demo of [...demoMessages(address, images), ...lookalikes(address, extra), ...more]) {
     const date = new Date(now - demo.hoursAgo * 3_600_000);
     const messageId = `<${hex(6)}@demo.example>`;
     const parent = demo.replyTo === undefined ? undefined : threads.get(demo.replyTo);
@@ -759,6 +804,10 @@ export function sendMessage(
 export function demoImage(name: string): { type: string; body: string } | undefined {
   const svg = (width: number, height: number, fill: string, label: string) =>
     `<svg xmlns="http://www.w3.org/2000/svg" width="${String(width)}" height="${String(height)}" viewBox="0 0 ${String(width)} ${String(height)}"><rect width="100%" height="100%" rx="8" fill="${fill}"/><text x="50%" y="55%" text-anchor="middle" font-family="Georgia,serif" font-size="${String(Math.round(height / 4))}" fill="#fff">${label}</text></svg>`;
+  if (name.startsWith("fixture/")) {
+    // A fixture email's picture: a labelled panel, at the size the email gives it.
+    return { type: "image/svg+xml", body: svg(600, 300, "#5b7f95", name.slice(8)) };
+  }
   switch (name) {
     case "ledger-banner.svg": {
       return { type: "image/svg+xml", body: svg(560, 120, "#2f5d50", "The Weekly Ledger") };

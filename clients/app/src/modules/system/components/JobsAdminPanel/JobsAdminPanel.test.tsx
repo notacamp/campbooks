@@ -6,6 +6,7 @@ import {
   FAILED_JOBS_FIRST_PAGE,
   JOBS_SUMMARY,
   JOBS_SUMMARY_EMPTY,
+  JOBS_SUMMARY_SUSPENSIONS_DEAD,
 } from "../../../../../test/demo/admin";
 import { mockApi, problem, renderWithProviders } from "../../../../../test/render";
 
@@ -45,6 +46,25 @@ describe("JobsAdminPanel", () => {
       "model returned an invalid decision",
     );
     expect(within(failed).getByText("No error was recorded.")).toBeVisible();
+  });
+
+  it("counts the dead deliveries of the work to watch, under a clear name", async () => {
+    mockApi({ [SUMMARY]: { body: JOBS_SUMMARY }, [FAILED]: { body: FAILED_JOBS } });
+    const { unmount } = renderWithProviders(<JobsAdminPanel />);
+    const watched = await screen.findByRole("list", { name: "Work to watch" });
+    const [row] = within(watched).getAllByRole("listitem");
+    expect(row).toHaveTextContent("Suspensions reaching members’ rules");
+    expect(row).toHaveTextContent("workspaces.announce_member_suspended");
+    expect(row).toHaveTextContent("No dead deliveries");
+    unmount();
+
+    mockApi({
+      [SUMMARY]: { body: JOBS_SUMMARY_SUSPENSIONS_DEAD },
+      [FAILED]: { body: FAILED_JOBS },
+    });
+    renderWithProviders(<JobsAdminPanel />);
+    const dead = await screen.findByRole("list", { name: "Work to watch" });
+    expect(within(dead).getByText("2 dead deliveries")).toBeVisible();
   });
 
   it("retries one failed job and says so", async () => {
@@ -143,8 +163,8 @@ describe("JobsAdminPanel", () => {
 
     renderWithProviders(<JobsAdminPanel />);
 
-    expect(await screen.findByRole("heading", { name: "Nothing is queued" })).toBeVisible();
-    expect(await screen.findByRole("heading", { name: "No failed jobs" })).toBeVisible();
+    expect(await screen.findByText("Nothing is queued")).toBeVisible();
+    expect(await screen.findByText("No failed jobs")).toBeVisible();
   });
 
   it("offers to try again when the queue cannot be loaded", async () => {

@@ -83,8 +83,8 @@ export const Layout: Story = {
       <ReaderPane label="Conversation">
         <PaneHeader>
           <Button shortcut="item.done">Done</Button>
-          <Button variant="ghost" shortcut="item.later">
-            Later
+          <Button variant="ghost" shortcut="item.snooze">
+            Snooze…
           </Button>
           <Spacer />
           <IconButton label="Previous conversation" icon="chevron-up" shortcut="list.previous" />

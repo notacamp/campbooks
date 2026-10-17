@@ -19,7 +19,7 @@
       "title": "De qui voulez-vous toujours voir les messages ?",
       "lead": "Leurs messages restent dans votre boîte de réception et ne sont jamais classés. Ce sont les personnes à qui vous répondez le plus.",
       "label": "Personnes à toujours voir",
-      "noSenders": "Pas encore de courrier pour faire des suggestions. Ajoutez une adresse ou un domaine ci-dessous.",
+      "noSenders": "Pas encore de courrier pour faire des suggestions. Saisissez une adresse ou un domaine ci-dessus.",
       "count_one": "{{count}} e-mail",
       "count_other": "{{count}} e-mails"
     },
@@ -30,7 +30,8 @@
       "lists": "Newsletters et listes de diffusion",
       "listsHint": "Courrier avec un en-tête List-Id",
       "automatic": "Notifications automatiques",
-      "automaticHint": "Courrier marqué comme envoyé automatiquement"
+      "automaticHint": "Courrier marqué comme envoyé automatiquement",
+      "senders": "Expéditeurs qui n’ont jamais besoin de vous"
     },
     "add": {
       "label": "Quelqu’un d’autre",
@@ -38,6 +39,14 @@
       "button": "Ajouter",
       "invalid": "Saisissez une adresse complète (nom@example.com) ou un domaine (example.com).",
       "freeMail": "{{domain}} est un fournisseur de messagerie gratuit : une règle pour tout ce domaine toucherait des inconnus. Ajoutez plutôt l’adresse de la personne."
+    },
+    "find": {
+      "label": "Trouver quelqu’un",
+      "placeholder": "Un nom, une adresse ou un domaine",
+      "newAddress": "Pas encore de courrier de sa part",
+      "newDomain": "Tout le monde chez {{domain}}",
+      "none": "Personne dans votre courrier ne correspond à « {{text}} ». Pour ajouter quelqu’un de nouveau, saisissez son adresse complète ou un domaine.",
+      "failed": "Scout n’a pas pu faire la recherche pour l’instant. Réessayez dans un instant."
     },
     "act": {
       "title": "Quand Scout est sûr, doit-il agir ?",
@@ -183,7 +192,8 @@
       "announce": "Voici la règle que j’ai comprise : {{rule}}",
       "saveFailed": "Scout n’a pas pu enregistrer la règle. Réessayez.",
       "savePartial": "Enregistrée dans {{saved}} boîtes sur {{total}}, puis Scout s’est arrêté. Réessayer l’enregistre dans les autres.",
-      "retry": "Réessayer"
+      "retry": "Réessayer",
+      "description": "Dites-le en une phrase. Scout vous montre la règle, et ce qu’elle concerne, avant d’enregistrer quoi que ce soit."
     },
     "builder": {
       "noModel": "Ce serveur n’a pas de modèle de langage pour lire des phrases, alors créez la règle ici.",
@@ -191,10 +201,8 @@
       "then": "Alors",
       "condition": "Quel courrier",
       "action": "Quoi faire",
-      "value": "Adresse, domaine ou mots",
       "conditions": {
-        "sender_address": "L’expéditeur est",
-        "sender_domain": "Le domaine de l’expéditeur est",
+        "from": "Il vient de",
         "subject_contains": "L’objet contient",
         "list": "Il vient d’une liste de diffusion",
         "automatic": "Il a été envoyé automatiquement"
@@ -207,18 +215,30 @@
         "archive": "L’archiver"
       },
       "show": "Afficher la règle",
-      "byHand": "Scout n’a pas pu lire votre phrase, alors créez la règle ici."
+      "byHand": "Scout n’a pas pu lire votre phrase, alors créez la règle ici.",
+      "title": "Créer une règle",
+      "lead": "Choisissez quel courrier, puis ce que Scout en fait. Aucune IA ne lit ceci.",
+      "open": "Créer une règle vous-même",
+      "back": "Le dire à Scout en une phrase",
+      "senders": "Expéditeurs",
+      "words": "Mots de l’objet",
+      "pickSender": "Cochez au moins un expéditeur, ou saisissez une adresse complète ou un domaine.",
+      "showMany": "Afficher les règles",
+      "oneEach": "Une règle par expéditeur, pour que le courrier de chacun d’eux compte."
     },
     "questions": {
       "title": "Vos réponses",
-      "askFirst": "Quand Scout propose une règle à partir de vos corrections, il attend votre oui.",
-      "actThenTell": "Quand Scout propose une règle à partir de vos corrections dans une boîte que vous êtes seul à utiliser, il l’active et vous prévient, avec Annuler.",
+      "askFirst": "Demandez-moi d’abord. Rien ne change tant que vous n’avez pas dit oui.",
+      "actThenTell": "Faites-le et prévenez-moi, avec Annuler, dans une boîte que je suis seul à utiliser.",
       "never": "Vous n’avez pas encore répondu aux questions de Scout.",
       "again": "Répondre à nouveau aux questions",
       "start": "Répondre aux questions",
-      "failed": "Scout n’a pas pu charger vos réponses pour l’instant."
+      "failed": "Scout n’a pas pu charger vos réponses pour l’instant.",
+      "description": "Trois questions rapides : de qui les e-mails vous parviennent toujours, ce qui n’a jamais besoin de vous et si Scout demande d’abord.",
+      "proactivity": "Quand Scout est sûr"
     },
-    "rules": "Vos règles"
+    "rules": "Vos règles",
+    "rulesDescription": "Tout ce que Scout fait de lui-même. Si vous retirez une règle, elle s’arrête ; vous choisissez si les e-mails qu’elle a déplacés reviennent."
   },
   "shortcuts": {
     "skip": "Passer cette question",

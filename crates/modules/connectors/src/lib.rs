@@ -39,6 +39,7 @@ mod features;
 mod gmail;
 mod google;
 mod mail;
+mod metrics;
 mod provider;
 #[cfg(test)]
 mod rls_tests;

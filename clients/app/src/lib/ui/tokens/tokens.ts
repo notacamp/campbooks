@@ -17,6 +17,7 @@ export const SEMANTIC_TOKENS = {
     "surface-scrim",
   ],
   border: ["border-subtle", "border-strong", "edge-highlight"],
+  scrollbar: ["scrollbar-thumb", "scrollbar-thumb-hover"],
   text: ["text-primary", "text-secondary", "text-tertiary", "text-disabled"],
   accent: [
     "accent",
@@ -27,7 +28,7 @@ export const SEMANTIC_TOKENS = {
     "highlight",
     "focus-ring",
   ],
-  status: ["danger", "danger-soft", "success"],
+  status: ["danger", "danger-soft", "success", "success-soft"],
   signal: [
     "signal-reply",
     "signal-decide",
@@ -70,12 +71,19 @@ export const COMPONENT_TOKENS = [
   "content-max",
   "toast-height",
   "overlay-width",
+  "dialog-width",
+  "clamp-height",
+  "clamp-fade-height",
+  "clamp-fade-to",
+  "dialog-result-width",
   "popover-width",
   "offer-width",
   "offer-max-height",
   "progress-height",
   "narrow-width",
   "row-text-min",
+  "scrollbar-size",
+  "scrollbar-gap",
 ] as const;
 
 export type SemanticToken = (typeof SEMANTIC_TOKENS)[keyof typeof SEMANTIC_TOKENS][number];

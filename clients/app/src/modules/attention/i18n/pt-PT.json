@@ -14,7 +14,7 @@
     "do": "Fazer",
     "pay": "Pagar"
   },
-  "context": "Feito hoje e teclas",
+  "context": "Feito hoje",
   "doneTodayTitle": "Feito hoje",
   "doneTodayEmpty": "Ainda nada hoje.",
   "doneToday": {
@@ -22,28 +22,50 @@
     "notNeeded": "Não era preciso · {{subject}}",
     "replied": "Respondido · {{subject}}",
     "archived": "Arquivado · {{subject}}",
-    "later": "Mais tarde · {{subject}}",
+    "snoozed": "Adiado · {{subject}}",
     "gone": "Já não é preciso · {{subject}}"
   },
-  "later": {
-    "title": "Voltar a mostrar",
+  "snooze": {
+    "title": "Adiar {{name}} até…",
+    "description": "Sai da página inicial até lá e volta sozinho.",
+    "choices": "Quando",
     "today": "Mais logo",
-    "tomorrow": "Amanhã",
-    "monday": "Segunda-feira",
-    "toast": "Mais tarde · {{name}}, volta {{when}}",
-    "button": "Mais tarde",
-    "failed": "Não foi possível adiar {{name}}: nada mudou. Tente de novo."
+    "tomorrow": "Amanhã de manhã",
+    "monday": "Segunda de manhã",
+    "nextWeek": "Próxima semana",
+    "toast": "Adiado · {{name}}, volta {{when}}",
+    "button": "Adiar…",
+    "failed": "Não foi possível adiar {{name}}: nada mudou. Tente de novo.",
+    "undoFailed": "Não foi possível trazer {{name}} de volta: continua adiado. Tente de novo."
   },
   "actions": {
     "reply": "Responder",
     "open": "Abrir conversa",
-    "undo": "Anular"
+    "undo": "Anular",
+    "label": "Ações para {{name}}"
   },
-  "keyboard": "Teclado",
+  "confirm": {
+    "done": "Feito · {{name}}",
+    "notNeeded": "Não era preciso · {{name}}",
+    "safe": "Marcado como seguro · {{name}}",
+    "snoozed": "Adiado · {{name}}, volta {{when}}",
+    "replied": "A enviar para {{name}}",
+    "paid": "Marcada como paga · {{name}}"
+  },
   "error": {
     "title": "Não foi possível carregar o que precisa de si",
     "body": "O Campbooks não conseguiu contactar o servidor. Nada se perdeu.",
     "retry": "Tentar de novo"
   },
-  "noSubject": "(sem assunto)"
+  "noSubject": "(sem assunto)",
+  "remind": {
+    "today": "Lembrar-me hoje às {{time}}",
+    "tomorrow": "Lembrar-me amanhã às {{time}}",
+    "on": "Lembrar-me a {{date}}"
+  },
+  "pay": {
+    "allPaid_one": "Já paguei {{count}}",
+    "allPaid_other": "Já paguei as {{count}}",
+    "note": "O Campbooks não tem acesso ao seu banco, por isso pergunta se cada fatura está paga."
+  }
 }

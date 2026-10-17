@@ -6,7 +6,8 @@ import {
   Button,
   CodeBlock,
   EmptyState,
-  Heading,
+  SettingsEmpty,
+  SettingsSection,
   InlineConfirm,
   List,
   ListRow,
@@ -55,10 +56,7 @@ export function FailedJobs({ kind, kinds, onKind, onNotice }: FailedJobsProps) {
   });
 
   return (
-    <section className="flex flex-col gap-3">
-      <Heading level={2} size="section">
-        {t("jobs.failed.title")}
-      </Heading>
+    <SettingsSection title={t("jobs.failed.title")}>
       <Select
         label={t("jobs.failed.filter")}
         value={kind ?? ""}
@@ -76,6 +74,7 @@ export function FailedJobs({ kind, kinds, onKind, onNotice }: FailedJobsProps) {
         </div>
       ) : failed.isError ? (
         <EmptyState
+          headingLevel={3}
           title={t("jobs.loadError.title")}
           visor="thinking"
           visorSize="lg"
@@ -92,7 +91,9 @@ export function FailedJobs({ kind, kinds, onKind, onNotice }: FailedJobsProps) {
           {t("jobs.loadError.lead")}
         </EmptyState>
       ) : items.length === 0 ? (
-        <EmptyState title={t("jobs.failed.emptyTitle")}>{t("jobs.failed.emptyLead")}</EmptyState>
+        <SettingsEmpty title={t("jobs.failed.emptyTitle")}>
+          {t("jobs.failed.emptyLead")}
+        </SettingsEmpty>
       ) : (
         <>
           <List label={t("jobs.failed.title")}>
@@ -148,7 +149,7 @@ export function FailedJobs({ kind, kinds, onKind, onNotice }: FailedJobsProps) {
           ) : null}
         </>
       )}
-    </section>
+    </SettingsSection>
   );
 }
 

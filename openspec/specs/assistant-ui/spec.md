@@ -25,8 +25,16 @@ from a ticked box), Skip (`S`) and Not now (`Esc`), and Back from
 the second view on, each with its shortcut hint from the registry, and the
 line "You can change this anytime in Scout's memory." No view SHALL
 require an answer. The sender view SHALL offer the senders from
-`conversations.list_senders` and a field that accepts an address or a
-domain. Free-mail domains SHALL be refused with a sentence saying why.
+`conversations.list_senders`. Both sender views SHALL have a filter box
+that finds senders by name, address or domain, so the member never needs
+to know an address by heart. Typing SHALL filter the cards at once, and
+from two characters SHALL ask `list_senders` with `q`. Senders already
+ticked SHALL stay listed while filtering. A full address or a domain that
+matches no sender SHALL show as its own card to tick. With text in the
+box, `Enter` SHALL tick the first match and clear the box, and `Esc` SHALL
+clear it. When nothing matches, the view SHALL say so. The "never needs
+you" view SHALL not suggest senders before the member types. Free-mail
+domains SHALL be refused with a sentence saying why.
 The third question SHALL always be shown, with no client flag: the
 proactivity it sets is read by taught rules (#482, on `next`) through the
 `MemberPreferences` port. Not now SHALL keep the answers the member had
@@ -45,6 +53,14 @@ it fails. It SHALL do nothing while a save is in flight.
 #### Scenario: Not now fails
 - **WHEN** saving Not now fails
 - **THEN** the flow stays open and says Scout couldn't put the questions off
+
+#### Scenario: Finding someone by name
+- **WHEN** a member types "joana" in the filter box and Joana Reis is not among the suggested senders
+- **THEN** the cards show Joana Reis with her address, found through `list_senders?q=joana`, and ticking her shows the rule she becomes
+
+#### Scenario: Someone not in the mail yet
+- **WHEN** a member types "new@studio.example" and no sender matches
+- **THEN** a card "new@studio.example" says there is no mail from them yet, and ticking it adds them
 
 ### Requirement: Every answer shown as its rule
 On the sender and "never needs you" views, each selection SHALL show the

@@ -281,6 +281,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/system/client-telemetry": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Report the app's own errors and timings. */
+        post: operations["system.report_client_telemetry"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/system/health": {
         parameters: {
             query?: never;
@@ -433,14 +450,17 @@ export interface paths {
          *     that keep a cache: each `change` frame names a record and an operation
          *     (`{"cursor","record":{"type","id"},"op":"upsert"|"delete","version"}`),
          *     never its contents; refetch what you show. Frames: `ready` (where the
-         *     stream starts), `change`, `heartbeat` (an SSE comment, or the cursor when
-         *     it moved past changes you may not see), `reset` (your cursor is unknown,
-         *     expired or too far behind: refetch everything, continue from the
-         *     cursor given), `revoked` (you no longer belong to the workspace) and
-         *     `closing` (the stream ends; reconnect with your cursor). Every frame
-         *     that carries a cursor sets the SSE `id`, so `EventSource` resumes on its
-         *     own. You only receive changes of records a read operation you hold a
-         *     scope for returns.
+         *     stream starts), `change`, `heartbeat` (every heartbeat interval from the
+         *     open, busy or idle), `reset` (your token is unknown or expired, or
+         *     something you cached went out of sight: refetch everything, continue
+         *     from the token given), `revoked` (you no longer belong to the
+         *     workspace) and `closing` (the stream ends; reconnect with your token).
+         *     `ready`, `change`, `heartbeat` and `reset` carry a resume token as
+         *     `cursor` and as the SSE `id`, so `EventSource` resumes on its own. A
+         *     token is opaque, new on every frame and good only for the caller it was
+         *     given to: keep the latest, never parse or compare one. You only receive changes of records a read operation you
+         *     hold a scope for returns, and nothing in the stream (tokens, heartbeats,
+         *     resets) depends on changes you may not see.
          */
         get: operations["changes.stream"];
         put?: never;
@@ -527,7 +547,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List conversations, newest first. */
+        /** List conversations: pinned first, then newest first. */
         get: operations["conversations.list"];
         put?: never;
         post?: never;
@@ -682,7 +702,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Mark what a conversation needs as done, or as not needed. */
+        /** Resolve what a conversation needs: done, not needed, already paid or still to pay. */
         post: operations["conversations.resolve_need"];
         delete?: never;
         options?: never;
@@ -701,6 +721,40 @@ export interface paths {
         put?: never;
         /** Mark a conversation read. */
         post: operations["conversations.mark_read"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/w/{workspace_id}/conversations/{conversation_id}/reply/draft": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Scout's reply for an intent, or your draft rewritten. */
+        post: operations["conversations.write_reply"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/w/{workspace_id}/conversations/{conversation_id}/reply/suggestions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Likely replies to a message, as short intents. */
+        post: operations["conversations.suggest_replies"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2013,6 +2067,124 @@ export interface components {
          * @enum {string}
          */
         Channel: "email";
+        /** @description The browser or web view the app runs in. */
+        ClientBrowser: {
+            /** @description Whether the device is a phone or a tablet. */
+            mobile?: boolean | null;
+            /** @description `Chrome`, `Safari`, `WebKit`. */
+            name?: string | null;
+            /** @description The operating system. */
+            os?: string | null;
+            /** @description Its version. */
+            version?: string | null;
+        };
+        /** @description A named moment. */
+        ClientEvent: {
+            /**
+             * @description Its name.
+             * @example session_start
+             */
+            name: string;
+            /**
+             * Format: date-time
+             * @description When it happened.
+             */
+            timestamp: string;
+        };
+        /** @description An error the app did not handle. */
+        ClientException: {
+            /** @description Where, innermost first. */
+            frames?: components["schemas"]["ClientFrame"][];
+            /**
+             * @description The error's class (`TypeError`).
+             * @example TypeError
+             */
+            kind: string;
+            /**
+             * @description Its message: forwarded as an error kind only (its head, with
+             *     addresses, quotes, links and tokens masked).
+             * @example Cannot read properties of undefined
+             */
+            message: string;
+            /**
+             * Format: date-time
+             * @description When it happened.
+             */
+            timestamp: string;
+        };
+        /** @description One frame of an exception's stack. */
+        ClientFrame: {
+            /**
+             * Format: int32
+             * @description Column, from 1.
+             */
+            column?: number | null;
+            /**
+             * @description The script's URL: forwarded as its file name only.
+             * @example https://app.example.com/assets/index-3f2c1e0.js
+             */
+            file?: string | null;
+            /** @description The function's name. */
+            function?: string | null;
+            /**
+             * Format: int32
+             * @description Line, from 1.
+             */
+            line?: number | null;
+        };
+        /** @description A timing. */
+        ClientMeasurement: {
+            /**
+             * @description What was measured (`web-vitals`).
+             * @example web-vitals
+             */
+            kind: string;
+            /**
+             * Format: date-time
+             * @description When it was taken.
+             */
+            timestamp: string;
+            /**
+             * @description Its values by name (`lcp`, `inp`, `cls`, `fcp`, `ttfb`, `fid`,
+             *     `delta`); others are dropped.
+             */
+            values: {
+                [key: string]: number;
+            };
+        };
+        /**
+         * @description Where the app runs.
+         * @enum {string}
+         */
+        ClientPlatform: "web" | "native";
+        /** @description A batch of the app's own telemetry. */
+        ClientReport: {
+            /**
+             * @description The app's version.
+             * @example 0.42.0
+             */
+            app_version?: string | null;
+            browser?: components["schemas"]["ClientBrowser"] | null;
+            /** @description Named moments (`session_start`, `view_changed`). */
+            events?: components["schemas"]["ClientEvent"][];
+            /** @description Errors the app did not handle. */
+            exceptions?: components["schemas"]["ClientException"][];
+            /** @description Timings (web vitals). */
+            measurements?: components["schemas"]["ClientMeasurement"][];
+            platform?: components["schemas"]["ClientPlatform"] | null;
+            /**
+             * @description A random id of the app's session (not the sign-in session): joins a
+             *     session's reports.
+             * @example k3Jx8vQ2mN
+             */
+            session_id: string;
+            /**
+             * @description The route template of the page shown (`/w/$workspaceId/inbox`),
+             *     never its address.
+             * @example /w/$workspaceId/inbox
+             */
+            view?: string | null;
+        };
         /**
          * @description How a workspace client signs in.
          * @enum {string}
@@ -2221,6 +2393,14 @@ export interface components {
             decisions: components["schemas"]["DecisionView"][];
             /** @description Up to the 100 newest messages, oldest first. */
             messages: components["schemas"]["MessageView"][];
+            /**
+             * @description Scout's summary of the email behind the conversation's open need, in
+             *     your language (English when it has none in yours), written once when
+             *     the need was raised. None when there is no open need, the summary is
+             *     not written yet (it arrives with a change to this conversation), or no
+             *     model may read mail on this server.
+             */
+            need_summary?: string | null;
         };
         /**
          * Format: uuid
@@ -2229,7 +2409,7 @@ export interface components {
         ConversationId: string;
         /** @description A page of conversations. */
         ConversationList: {
-            /** @description Newest first. */
+            /** @description Pinned first, then newest first (archived lists and `ids`: newest first). */
             conversations: components["schemas"]["ConversationSummary"][];
             /** @description Pass it as `cursor` for the next page; `None` on the last page. */
             next_cursor?: string | null;
@@ -2891,6 +3071,12 @@ export interface components {
         };
         /** @description A message's bodies. */
         MessageBody: {
+            /**
+             * @description The HTML part's `@media` rules, filtered like its `style` attributes
+             *     (nothing that loads or runs survives): CSS the client applies to the
+             *     frame's document only, never to its own page.
+             */
+            css?: string | null;
             /** @description The HTML part, sanitised; still to be shown only in a sandboxed frame. */
             html?: string | null;
             /** @description Whether the remote images were kept. */
@@ -2963,7 +3149,7 @@ export interface components {
          * @description The question whose answer raised a need.
          * @enum {string}
          */
-        NeedQuestion: "needs_reply" | "asks_action" | "suspicious";
+        NeedQuestion: "needs_reply" | "asks_action" | "suspicious" | "money";
         /**
          * @description Why a conversation needs its inbox's members (attention).
          * @enum {string}
@@ -3049,7 +3235,7 @@ export interface components {
          * @description How a member resolves a need.
          * @enum {string}
          */
-        Outcome: "done" | "not_needed";
+        Outcome: "done" | "not_needed" | "already_paid" | "still_to_pay";
         /** @description The query as understood. */
         ParsedQuery: {
             /** @description The filters applied. */
@@ -3094,6 +3280,12 @@ export interface components {
             /** @description Oldest first. */
             items: components["schemas"]["PasskeyView"][];
         };
+        /**
+         * @description Why a taught rule is paused: the one that would still hold once the
+         *     most passing one clears.
+         * @enum {string}
+         */
+        PausedReason: "inbox_read_only" | "domain_too_broad" | "author_cannot_write" | "paused_by_member" | "author_unavailable";
         /**
          * @description Where a stream is in its reading.
          * @enum {string}
@@ -3456,6 +3648,20 @@ export interface components {
             /** @description 1 to 64 characters. */
             name: string;
         };
+        /** @description Likely replies to a message, as short intents. */
+        ReplySuggestions: {
+            /** @description At most three, in your language; empty when Scout has none. */
+            intents: string[];
+            /** @description The message answered. */
+            message_id: components["schemas"]["MessageId"];
+        };
+        /** @description Scout's reply, as plain text. Nothing is saved or sent. */
+        ReplyText: {
+            /** @description The message answered. */
+            message_id: components["schemas"]["MessageId"];
+            /** @description The reply, signed with your name when it is known. */
+            text: string;
+        };
         /** @description What the sign-in screen shows for a waiting authorization request. */
         RequestInfo: {
             /** @description The client asking. */
@@ -3501,7 +3707,7 @@ export interface components {
              *     `need_changed`).
              */
             message_id: components["schemas"]["MessageId"];
-            /** @description Done or Not needed. */
+            /** @description Done, Not needed, or for a Pay need Already paid or Still to pay. */
             outcome: components["schemas"]["Outcome"];
         };
         /** @description How to bring a removed rule back. */
@@ -3769,6 +3975,8 @@ export interface components {
             origin: components["schemas"]["RuleOrigin"];
             /** @description The member's own words, for an instruction. */
             origin_text?: string | null;
+            paused_once_kept?: components["schemas"]["PausedReason"] | null;
+            paused_reason?: components["schemas"]["PausedReason"] | null;
             /**
              * Format: int32
              * @description Conversations members changed back in the last 30 days.
@@ -3777,7 +3985,11 @@ export interface components {
             run?: components["schemas"]["RunView"] | null;
             /** @description Whether other members use its inbox: it acts for them too. */
             shared: boolean;
-            /** @description Whether it acts. `paused` when its author can no longer change the inbox. */
+            /**
+             * @description Whether it acts. `paused` when its author can no longer change the
+             *     inbox or is away for now, its inbox is kept read-only, or a member
+             *     paused it.
+             */
             state: components["schemas"]["RuleState"];
             taught_by?: components["schemas"]["UserId"] | null;
             /** @description The teaching it came with (shared by its rules in other inboxes). */
@@ -4141,6 +4353,10 @@ export interface components {
             /** @description Where it is in its reading. */
             phase: components["schemas"]["Phase"];
         };
+        /** @description Which message to suggest replies to. */
+        SuggestReplies: {
+            message_id?: components["schemas"]["MessageId"] | null;
+        };
         /**
          * @description Always or never show.
          * @enum {string}
@@ -4406,6 +4622,24 @@ export interface components {
              */
             name: string;
             role?: components["schemas"]["Role"] | null;
+        };
+        /** @description What the reply should say, or how to change the draft. */
+        WriteReply: {
+            /**
+             * @description How to change the draft, in plain words (at most 300 characters).
+             * @example warmer
+             */
+            change?: string | null;
+            /** @description The draft as it stands, to rewrite with `change` or `shorter`. */
+            draft?: string | null;
+            /**
+             * @description What it should say: a likely reply or your own words (at most 300 characters).
+             * @example Yes, Thursday 10:00 works
+             */
+            intent: string;
+            message_id?: components["schemas"]["MessageId"] | null;
+            /** @description Make the draft shorter. */
+            shorter?: boolean;
         };
     };
     responses: never;
@@ -5262,6 +5496,55 @@ export interface operations {
             };
         };
     };
+    "system.report_client_telemetry": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ClientReport"];
+            };
+        };
+        responses: {
+            /** @description Taken: what passes the scrubber is forwarded to the collector. */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description No valid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description The token lacks `system:read`. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description This instance collects no client telemetry: stop sending. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
     "system.health": {
         parameters: {
             query?: never;
@@ -5553,7 +5836,7 @@ export interface operations {
                     "application/problem+json": components["schemas"]["Problem"];
                 };
             };
-            /** @description The language model failed (`compile_failed`). */
+            /** @description The language model failed or its answer could not be read (`compile_failed`), or the workspace used its whole daily AI limit (`ai_daily_limit_reached`). */
             503: {
                 headers: {
                     [name: string]: unknown;
@@ -5865,14 +6148,14 @@ export interface operations {
         parameters: {
             query?: {
                 /**
-                 * @description The last cursor received, for clients that cannot send
-                 *     `Last-Event-ID` (the header wins when both are present). Omit it to
-                 *     start from now.
+                 * @description The last resume token received (any frame's `cursor`), for clients
+                 *     that cannot send `Last-Event-ID` (the header wins when both are
+                 *     present). Omit it to start from now.
                  */
                 after?: string;
             };
             header?: {
-                /** @description The last cursor received; resumes after it. */
+                /** @description The last resume token received; resumes after it. */
                 "Last-Event-ID"?: string | null;
             };
             path: {
@@ -5919,7 +6202,7 @@ export interface operations {
                     "application/problem+json": components["schemas"]["Problem"];
                 };
             };
-            /** @description `too_many_streams`: you hold the maximum number of open streams. */
+            /** @description `too_many_streams`: you hold the maximum number of open streams; `rate_limited`: you opened too many lately (see `Retry-After`). */
             429: {
                 headers: {
                     [name: string]: unknown;
@@ -6840,7 +7123,7 @@ export interface operations {
                     "application/problem+json": components["schemas"]["Problem"];
                 };
             };
-            /** @description It needs nothing (`no_open_need`), or not what you saw any more (`need_changed`). */
+            /** @description It needs nothing (`no_open_need`), not what you saw any more (`need_changed`), or a paid answer for a need that is not Pay (`not_a_payment`). */
             409: {
                 headers: {
                     [name: string]: unknown;
@@ -6894,6 +7177,181 @@ export interface operations {
             };
             /** @description No such conversation, or you cannot see it. */
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "conversations.write_reply": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The workspace. */
+                workspace_id: components["schemas"]["WorkspaceId"];
+                /** @description The conversation. */
+                conversation_id: components["schemas"]["ConversationId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WriteReply"];
+            };
+        };
+        responses: {
+            /** @description The reply as plain text; nothing is saved or sent. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReplyText"];
+                };
+            };
+            /** @description No intent, or an intent, change or draft too long (`reply_ask_invalid`). */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No valid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Missing scope, or you may only read this inbox (`inbox_read_only`). */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No such conversation or message, or you cannot see it. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No language model may read mail here (`reply_unavailable`): write the reply yourself. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Too many replies asked for this hour. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description The language model failed (`reply_failed`), or the workspace used its whole daily AI limit (`ai_daily_limit_reached`). */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "conversations.suggest_replies": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The workspace. */
+                workspace_id: components["schemas"]["WorkspaceId"];
+                /** @description The conversation. */
+                conversation_id: components["schemas"]["ConversationId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SuggestReplies"];
+            };
+        };
+        responses: {
+            /** @description Likely replies; nothing is saved. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReplySuggestions"];
+                };
+            };
+            /** @description No valid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Missing scope, or you may only read this inbox (`inbox_read_only`). */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No such conversation or message, or you cannot see it. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No language model may read mail here (`reply_unavailable`): write the reply yourself. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Too many replies asked for this hour. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description The language model failed (`reply_failed`), or the workspace used its whole daily AI limit (`ai_daily_limit_reached`). */
+            503: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -8871,6 +9329,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["RuleView"];
+                };
+            };
+            /** @description Not a valid rule (any more). */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
                 };
             };
             /** @description No valid access token. */

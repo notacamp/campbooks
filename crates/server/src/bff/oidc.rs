@@ -278,6 +278,11 @@ impl Oidc {
         }
     }
 
+    /// The scopes every sign-in asks for (space-separated).
+    pub fn scopes(&self) -> &str {
+        &self.scopes
+    }
+
     /// The OIDC client id.
     pub fn client_id(&self) -> &str {
         &self.client_id

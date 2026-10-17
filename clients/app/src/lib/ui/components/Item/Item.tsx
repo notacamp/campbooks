@@ -1,10 +1,7 @@
-import type { ReactNode } from "react";
-
-import type { ShortcutId } from "~/lib/shortcuts";
+import { useEffect, useRef, type ReactNode } from "react";
 
 import { Avatar, type AvatarProps } from "../Avatar/Avatar";
 import { Icon, type IconName } from "../Icon/Icon";
-import { KbdHint } from "../Kbd/Kbd";
 import { Tag } from "../Tag/Tag";
 import { Visor } from "../Visor/Visor";
 
@@ -31,8 +28,18 @@ export interface ItemProps {
   onToggle?: (() => void) | undefined;
   /** Phone rows open a page instead of expanding. */
   href?: string | undefined;
-  /** Shortcuts hinted on hover and selection. */
-  hints?: ShortcutId[] | undefined;
+  /**
+   * The selected row's actions, right under it (an {@link ItemActions}).
+   * Pass them for the selected row only: other rows stay calm.
+   */
+  actions?: ReactNode | undefined;
+  /**
+   * The row was acted on: it becomes this one-line confirmation ("Done ·
+   * Marta Ferreira") and folds away, then `onConfirmEnd` runs (under a
+   * second; an instant swap under reduced motion).
+   */
+  confirmation?: string | undefined;
+  onConfirmEnd?: (() => void) | undefined;
   /** Shown under the row while expanded (usually an {@link ItemDetail}). */
   detail?: ReactNode | undefined;
   /** Revealed actions, as after a swipe on a phone ({@link SwipeAction}s). */
@@ -56,24 +63,22 @@ export function Item({
   expanded = false,
   onToggle,
   href,
-  hints = ["item.done", "item.later", "list.open"],
+  actions,
+  confirmation,
+  onConfirmEnd,
   detail,
   swipeActions,
   id,
 }: ItemProps) {
+  if (confirmation !== undefined) {
+    return <ItemConfirmation id={id} text={confirmation} onEnd={onConfirmEnd} />;
+  }
   const content = (
     <>
       <Avatar {...avatar} />
       <span className={styles["who"]}>{who}</span>{" "}
       <span className={styles["due"]} data-soon={soon || undefined}>
         {due}
-        {hints.length > 0 ? (
-          <span className={styles["hints"]}>
-            {hints.map((shortcut) => (
-              <KbdHint key={shortcut} shortcut={shortcut} reveal />
-            ))}
-          </span>
-        ) : null}
       </span>{" "}
       <span className={styles["what"]}>{what}</span>
       {excerpt === undefined || expanded ? null : <q className={styles["excerpt"]}>{excerpt}</q>}
@@ -107,7 +112,7 @@ export function Item({
       </a>
     );
   return (
-    <div className={styles["wrapper"]}>
+    <div className={styles["wrapper"]} data-selected={selected || undefined}>
       {swipeActions === undefined ? (
         row
       ) : (
@@ -116,7 +121,43 @@ export function Item({
           {swipeActions}
         </div>
       )}
+      {actions === undefined ? null : <div className={styles["actions"]}>{actions}</div>}
       {expanded && detail !== undefined ? detail : null}
+    </div>
+  );
+}
+
+/** How long a confirmation shows before it has folded away (`--duration-confirm`). */
+const ITEM_CONFIRM_MS = 900;
+
+/** A row acted on: one line, a check, then it folds away. */
+function ItemConfirmation({
+  id,
+  text,
+  onEnd,
+}: {
+  id: string | undefined;
+  text: string;
+  onEnd: (() => void) | undefined;
+}) {
+  const end = useRef(onEnd);
+  useEffect(() => {
+    end.current = onEnd;
+  });
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      end.current?.();
+    }, ITEM_CONFIRM_MS);
+    return () => {
+      clearTimeout(timer);
+    };
+  }, []);
+  return (
+    <div id={id} className={styles["confirmation"]}>
+      <span className={styles["check"]} aria-hidden="true">
+        <Icon name="check" />
+      </span>
+      <span className={styles["confirmationText"]}>{text}</span>
     </div>
   );
 }
@@ -128,6 +169,16 @@ export interface ItemDetailProps {
   quote?: string | undefined;
   /** Why to be careful, before the quote (a warning's tells). */
   reasons?: string[] | undefined;
+  /**
+   * Scout's summary of the email, in one or two plain sentences: a
+   * model's words about untrusted mail, shown as text only, marked with the
+   * visor, after the reasons and above the email. Nothing is drawn without it.
+   */
+  summary?: string | undefined;
+  /** The summary's heading: "Scout's summary". */
+  summaryLabel?: string | undefined;
+  /** The email itself, after the summary (in place of the quote). */
+  mail?: ReactNode | undefined;
   /** The assistant's context, next to the visor. */
   context?: string | undefined;
   /** Buttons: the item's own actions, then Later and Done. */
@@ -141,6 +192,9 @@ export function ItemDetail({
   quoteFrom,
   quote,
   reasons = [],
+  summary,
+  summaryLabel,
+  mail,
   context,
   actions,
   how,
@@ -154,7 +208,19 @@ export function ItemDetail({
           ))}
         </ul>
       )}
-      {quote === undefined ? null : (
+      {summary === undefined || summary === "" ? null : (
+        <section className={styles["summary"]} aria-label={summaryLabel}>
+          {summaryLabel === undefined ? null : (
+            <span className={styles["summaryHead"]} aria-hidden="true">
+              <Visor size="xs" />
+              {summaryLabel}
+            </span>
+          )}
+          <p className={styles["summaryText"]}>{summary}</p>
+        </section>
+      )}
+      {mail}
+      {quote === undefined || mail !== undefined ? null : (
         <p className={styles["quote"]}>
           {quoteFrom === undefined ? null : (
             <span className={styles["quoteFrom"]}>{quoteFrom}</span>

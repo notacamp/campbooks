@@ -11,6 +11,7 @@
 
 pub mod bff;
 pub mod changes;
+pub mod error_reports;
 pub mod telemetry;
 pub mod web;
 
@@ -18,6 +19,8 @@ pub mod web;
 mod access_matrix_tests;
 #[cfg(test)]
 mod admin_tests;
+#[cfg(test)]
+mod ai_usage_tests;
 #[cfg(test)]
 mod assistant_tests;
 #[cfg(test)]
@@ -70,6 +73,11 @@ pub const REQUEST_TIMEOUT: Duration = Duration::from_secs(30);
 /// Path the OpenAPI document is served at.
 pub const OPENAPI_PATH: &str = "/openapi.json";
 
+/// Path the health check also answers at, for load balancers and uptime
+/// monitors that probe `/up`. Not an API operation: it is mounted by
+/// [`compose`], outside the OpenAPI document.
+pub const UP_PATH: &str = "/up";
+
 /// Header carrying the request id, generated when the client sends none.
 pub const REQUEST_ID_HEADER: &str = "x-request-id";
 
@@ -87,6 +95,10 @@ pub const SECURITY_HEADERS: [(HeaderName, &str); 3] = [
 /// cache ([`no_store`]).
 pub const NO_STORE_PREFIXES: [&str; 3] = ["/api/", "/bff/", "/admin/"];
 
+/// Exact paths outside those prefixes that are never stored either: the
+/// probe alias, whose answer must always be live.
+const NO_STORE_PATHS: [&str; 1] = [UP_PATH];
+
 /// `Cache-Control: no-store` and `Pragma: no-cache` on every response under
 /// [`NO_STORE_PREFIXES`], whatever the handler set (a handler's own
 /// `no-store` variant, such as `private, no-store`, is kept). One layer, so
@@ -95,7 +107,8 @@ async fn no_store(request: AxumRequest, next: middleware::Next) -> axum::respons
     let path = request.uri().path();
     let private = NO_STORE_PREFIXES
         .iter()
-        .any(|prefix| path.starts_with(prefix) || path == prefix.trim_end_matches('/'));
+        .any(|prefix| path.starts_with(prefix) || path == prefix.trim_end_matches('/'))
+        || NO_STORE_PATHS.contains(&path);
     let mut response = next.run(request).await;
     if private {
         let headers = response.headers_mut();
@@ -142,11 +155,7 @@ impl Composition {
     /// setting is an error naming it.
     pub fn from_env(config: &campbooks_kernel::Config) -> Result<Self, String> {
         let ai = campbooks_ai::AiConfig::from_env().map_err(|e| e.to_string())?;
-        let gateway = if ai.roles.is_empty() {
-            None
-        } else {
-            Some(campbooks_ai::Gateway::new(ai).map_err(|e| e.to_string())?)
-        };
+        let (gateway, ai_usage) = ai_gateway(ai)?;
         let connectors = campbooks_connectors::Deps::from_env(config)?;
         let identity = campbooks_identity::Deps::from_env(config, &scope_catalogue())?;
         let assistant = campbooks_assistant::AssistantDeps {
@@ -156,6 +165,7 @@ impl Composition {
             ai: gateway.clone(),
             facts: facts(config, &identity, &connectors),
             started_at: chrono::Utc::now(),
+            ai_usage,
         };
         Ok(Self {
             connectors,
@@ -168,6 +178,29 @@ impl Composition {
             assistant,
         })
     }
+}
+
+/// The AI gateway every module calls models through (none when no role is
+/// configured), and the meter it counts every call with, per workspace and
+/// UTC day, under `ai`'s daily cap (campbooks-cloud#152). The admin AI
+/// usage read shows the same meter.
+pub fn ai_gateway(
+    ai: campbooks_ai::AiConfig,
+) -> Result<
+    (
+        Option<campbooks_ai::Gateway>,
+        campbooks_system::AiUsageMeter,
+    ),
+    String,
+> {
+    let meter = campbooks_system::AiUsageMeter::new(ai.daily_call_cap());
+    if ai.roles.is_empty() {
+        return Ok((None, meter));
+    }
+    let gateway = campbooks_ai::Gateway::new(ai)
+        .map_err(|e| e.to_string())?
+        .with_meter(Arc::new(meter.clone()));
+    Ok((Some(gateway), meter))
 }
 
 /// Who signs people in and which providers are set up, by name only: what
@@ -613,6 +646,8 @@ fn compose(
             OPENAPI_PATH,
             get(move || async move { Json(spec.as_ref().clone()) }),
         )
+        // The health check again, for probes: same handler, so same answer.
+        .route(UP_PATH, get(campbooks_system::health))
         .with_state(state)
         .merge(bff.router())
         .merge(identity);
@@ -821,55 +856,156 @@ mod tests {
         );
     }
 
-    /// A transaction that sets no workspace (the scheduler's dispatcher) may
-    /// only read and lease the scheduling index, never insert or delete
-    /// rows of any workspace's: its maintenance policies are `FOR SELECT`
-    /// and `FOR UPDATE`, and no other policy admits a transaction without a
-    /// workspace on a module's table.
+    /// Cross-workspace maintenance on a module's table needs the
+    /// maintenance scope (the schedulers' dispatchers), and may only read and
+    /// lease (or start): its maintenance policies are `FOR SELECT` and `FOR
+    /// UPDATE`. No module policy admits the kernel scope (campbooks-cloud#196),
+    /// no kernel policy admits the maintenance scope, and none admits a
+    /// transaction merely for setting no workspace (campbooks-cloud#129).
+    /// Every policy of every schema is read, `USING` and `WITH CHECK` alike,
+    /// for any mention of a setting (campbooks-cloud#207).
     #[sqlx::test(migrations = "../../migrations")]
     async fn maintenance_policies_only_read_and_lease(db: sqlx::PgPool) {
-        let rows: Vec<(String, String, String, String)> = sqlx::query_as(
-            "SELECT tablename::text, policyname::text, cmd::text, coalesce(qual, '')
+        let rows: Vec<(String, String, String, String, String)> = sqlx::query_as(
+            "SELECT schemaname::text, tablename::text, policyname::text, cmd::text,
+                    coalesce(qual, '') || ' ' || coalesce(with_check, '')
                FROM pg_policies
-              WHERE schemaname NOT IN ('kernel', 'admin', 'pg_catalog')
-              ORDER BY 1, 2",
+              WHERE schemaname <> 'pg_catalog'
+              ORDER BY 1, 2, 3",
         )
         .fetch_all(&db)
         .await
         .unwrap();
-        // Policies admitting a transaction that set no workspace.
         let unset = "'campbooks.workspace_id'::text, true), ''::text) IS NULL";
-        let policies: Vec<(String, String, String)> = rows
-            .into_iter()
-            .filter(|(_, _, _, qual)| qual.contains(unset))
-            .map(|(table, name, cmd, _)| (table, name, cmd))
+        let admitting_unset: Vec<&String> = rows
+            .iter()
+            .filter(|(.., text)| text.contains(unset))
+            .map(|(_, _, name, ..)| name)
             .collect();
+        assert!(admitting_unset.is_empty(), "{admitting_unset:?}");
+        let mentioning = |setting: &str| {
+            let name = format!("'{setting}'");
+            rows.iter()
+                .filter(|(.., text)| text.contains(&name))
+                .map(|(schema, table, policy, cmd, _)| {
+                    (format!("{schema}.{table}"), policy.clone(), cmd.clone())
+                })
+                .collect::<Vec<_>>()
+        };
+        // The kernel scope: the kernel's own tables, each through its one
+        // `workspace_isolation` policy, except the schedules' last ticks and
+        // the rate-limit counters (`kernel_scope_only`) and the idempotency
+        // keys, of which it may only read and delete the expired
+        // (campbooks-cloud#210); and nothing else.
+        let kernel = mentioning(testing::kernel_scope_setting());
+        assert!(!kernel.is_empty());
+        let expected = |table: &str, policy: &str, cmd: &str| match table {
+            "kernel.schedules" | "kernel.rate_limits" => {
+                (policy, cmd) == ("kernel_scope_only", "ALL")
+            }
+            "kernel.idempotency" => matches!(
+                (policy, cmd),
+                ("kernel_scope_reads_expired", "SELECT")
+                    | ("kernel_scope_prunes_expired", "DELETE")
+            ),
+            table if table.starts_with("kernel.") => {
+                (policy, cmd) == ("workspace_isolation", "ALL")
+            }
+            _ => false,
+        };
+        let elsewhere: Vec<_> = kernel
+            .iter()
+            .filter(|(table, policy, cmd)| !expected(table.as_str(), policy.as_str(), cmd.as_str()))
+            .collect();
+        assert!(elsewhere.is_empty(), "{elsewhere:?}");
+        for (table, policy) in [
+            ("kernel.schedules", "kernel_scope_only"),
+            ("kernel.rate_limits", "kernel_scope_only"),
+            ("kernel.idempotency", "kernel_scope_reads_expired"),
+            ("kernel.idempotency", "kernel_scope_prunes_expired"),
+        ] {
+            assert!(
+                kernel.iter().any(|(t, p, _)| t == table && p == policy),
+                "{table} `{policy}` admits the kernel scope: {kernel:?}"
+            );
+        }
+        // The idempotency layer's caller: its keys only, through one policy.
         assert_eq!(
-            policies,
-            [
-                // The needs backfill's dispatcher (conversations): reads ids
-                // and states, and may only start a row (`WITH CHECK`).
-                (
-                    "needs_backfills".to_owned(),
-                    "maintenance_reads_backfills".to_owned(),
-                    "SELECT".to_owned()
-                ),
-                (
-                    "needs_backfills".to_owned(),
-                    "maintenance_starts_backfills".to_owned(),
-                    "UPDATE".to_owned()
-                ),
-                (
-                    "sync_due".to_owned(),
-                    "maintenance_leases_schedule".to_owned(),
-                    "UPDATE".to_owned()
-                ),
-                (
-                    "sync_due".to_owned(),
-                    "maintenance_reads_schedule".to_owned(),
-                    "SELECT".to_owned()
-                ),
-            ]
+            mentioning(testing::idempotency_caller_setting()),
+            [(
+                "kernel.idempotency".to_owned(),
+                "caller_isolation".to_owned(),
+                "ALL".to_owned()
+            )]
+        );
+        // The maintenance scope: these four, on module tables.
+        let policies = mentioning(testing::maintenance_scope_setting());
+        let expected = [
+            // The stream dispatcher (connectors): reads and leases.
+            (
+                "connectors.sync_due",
+                "maintenance_leases_schedule",
+                "UPDATE",
+            ),
+            (
+                "connectors.sync_due",
+                "maintenance_reads_schedule",
+                "SELECT",
+            ),
+            // The needs backfill's dispatcher (conversations): reads ids and
+            // states, and may only start a row (`WITH CHECK`).
+            (
+                "conversations.needs_backfills",
+                "maintenance_reads_backfills",
+                "SELECT",
+            ),
+            (
+                "conversations.needs_backfills",
+                "maintenance_starts_backfills",
+                "UPDATE",
+            ),
+        ]
+        .map(|(table, policy, cmd)| (table.to_owned(), policy.to_owned(), cmd.to_owned()));
+        assert_eq!(policies, expected);
+    }
+
+    /// What a workspace transaction may add of the instance-wide rows
+    /// (`kernel.instance_rows_from_workspaces`, read by row-level security)
+    /// is what the registry derives: the events declared
+    /// `PUBLISHED_IN_WORKSPACES` and their consumers' deliveries
+    /// (campbooks-cloud#207). A new such event, or a new consumer of one,
+    /// needs a kernel migration adding it to the list.
+    #[sqlx::test(migrations = "../../migrations")]
+    async fn the_instance_rows_a_workspace_may_add_match_the_registry(db: sqlx::PgPool) {
+        let listed: Vec<(String, String)> = sqlx::query_as(
+            "SELECT row_kind, name FROM kernel.instance_rows_from_workspaces ORDER BY 1, 2",
+        )
+        .fetch_all(&db)
+        .await
+        .unwrap();
+        let derived = registry().unwrap().instance_rows_from_workspaces();
+        let mut expected: Vec<(String, String)> = derived
+            .events
+            .iter()
+            .map(|name| ("event".to_owned(), (*name).to_owned()))
+            .chain(
+                derived
+                    .kinds
+                    .iter()
+                    .map(|name| ("job".to_owned(), (*name).to_owned())),
+            )
+            .collect();
+        expected.sort();
+        assert_eq!(
+            listed, expected,
+            "kernel.instance_rows_from_workspaces must list exactly what the registry \
+             derives; add (or remove) the rows in a kernel migration"
+        );
+        // Today: identity's two account events a workspace announces, with
+        // no consumer.
+        assert_eq!(
+            derived.events,
+            ["identity.consent_revoked", "identity.way_in_removed"]
         );
     }
 
@@ -877,7 +1013,13 @@ mod tests {
     /// role the server queries as: each migration grants its own. The
     /// `admin` module's tables are the deliberate exception (ADR 0015): the
     /// runtime role may only read profiles and append to the trail, which
-    /// the `admin` crate's own tests pin.
+    /// the `admin` crate's own tests pin. So is the list of instance-wide
+    /// rows a workspace may add (`kernel.instance_rows_from_workspaces`,
+    /// campbooks-cloud#207), which it may only read: it changes by migration;
+    /// the rate-limit counters (`kernel.rate_limits`, campbooks-cloud#210),
+    /// which it reaches only through the kernel's two functions; and the web
+    /// sign-in's tables (schema `bff`, campbooks-cloud#212), which it reaches
+    /// only through the BFF's functions.
     #[sqlx::test(migrations = "../../migrations")]
     async fn the_runtime_role_may_use_every_table(db: sqlx::PgPool) {
         let role = campbooks_kernel::db::DEFAULT_RUNTIME_ROLE;
@@ -899,10 +1041,392 @@ mod tests {
         .fetch_all(&db)
         .await
         .unwrap();
+        let read_only = "kernel.instance_rows_from_workspaces";
+        // The rate-limit counters: no privilege at all; the runtime role
+        // counts and prunes through the kernel's functions (campbooks-cloud#210).
+        let functions_only = "kernel.rate_limits";
+        let missing: Vec<String> = missing
+            .into_iter()
+            .filter(|t| t != read_only && t != functions_only && !BFF_TABLES.contains(&t.as_str()))
+            .collect();
         assert!(
             missing.is_empty(),
             "`{role}` lacks privileges on {missing:?}"
         );
+        let privileges: (bool, bool, bool, bool) = sqlx::query_as(
+            "SELECT has_table_privilege($1, $2, 'SELECT'), has_table_privilege($1, $2, 'INSERT'),
+                    has_table_privilege($1, $2, 'UPDATE'), has_table_privilege($1, $2, 'DELETE')",
+        )
+        .bind(role)
+        .bind(read_only)
+        .fetch_one(&db)
+        .await
+        .unwrap();
+        assert_eq!(
+            privileges,
+            (true, false, false, false),
+            "`{role}` only reads {read_only}"
+        );
+        let privileges: (bool, bool, bool, bool, bool, bool, bool) = sqlx::query_as(
+            "SELECT has_table_privilege($1, $2, 'SELECT'), has_table_privilege($1, $2, 'INSERT'),
+                    has_table_privilege($1, $2, 'UPDATE'), has_table_privilege($1, $2, 'DELETE'),
+                    has_any_column_privilege($1, $2, 'SELECT, INSERT, UPDATE, REFERENCES'),
+                    has_function_privilege($1,
+                        'kernel.take_rate_limit(bytea, double precision, integer)', 'EXECUTE'),
+                    has_function_privilege($1, 'kernel.prune_rate_limits(integer)', 'EXECUTE')",
+        )
+        .bind(role)
+        .bind(functions_only)
+        .fetch_one(&db)
+        .await
+        .unwrap();
+        assert_eq!(
+            privileges,
+            (false, false, false, false, false, true, true),
+            "`{role}` reaches {functions_only} through the kernel's functions only"
+        );
+        // The web sign-in's tables: no privilege at all, of any kind, on the
+        // table or on any of its columns.
+        for table in BFF_TABLES {
+            let any: bool = sqlx::query_scalar(
+                "SELECT has_table_privilege($1, $2,
+                            'SELECT, INSERT, UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER')
+                     OR has_any_column_privilege($1, $2, 'SELECT, INSERT, UPDATE, REFERENCES')",
+            )
+            .bind(role)
+            .bind(table)
+            .fetch_one(&db)
+            .await
+            .unwrap();
+            assert!(!any, "`{role}` holds a privilege on {table}");
+        }
+        // And exactly these functions to reach them.
+        let functions: Vec<String> = sqlx::query_scalar(
+            "SELECT p.proname::text
+               FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
+              WHERE n.nspname = 'bff' AND has_function_privilege($1, p.oid, 'EXECUTE')
+              ORDER BY 1",
+        )
+        .bind(role)
+        .fetch_all(&db)
+        .await
+        .unwrap();
+        assert_eq!(
+            functions, BFF_FUNCTIONS,
+            "`{role}` reaches schema `bff` through these"
+        );
+    }
+
+    /// The web sign-in's tables (campbooks-cloud#212).
+    const BFF_TABLES: [&str; 3] = [
+        "bff.login_transactions",
+        "bff.retired_tokens",
+        "bff.sessions",
+    ];
+
+    /// The functions the BFF reaches them through, in name order: one per
+    /// operation it needs, each on the one session (or sign-in, or account)
+    /// its arguments name; only the prunes reach across accounts.
+    const BFF_FUNCTIONS: [&str; 15] = [
+        "create_session",
+        "end_account_sessions",
+        "end_session",
+        "find_session",
+        "lock_session_tokens",
+        "mark_session_delivered",
+        "prune_logins",
+        "prune_sessions",
+        "reissue_session",
+        "retired_session",
+        "rotate_session",
+        "start_login",
+        "store_session_tokens",
+        "take_login",
+        "touch_session",
+    ];
+
+    /// Every `SECURITY DEFINER` function runs with the pinned path
+    /// `pg_catalog, pg_temp` (so a caller's objects cannot shadow a name in
+    /// its body) and is not executable by `PUBLIC`: the runtime role is
+    /// granted each one explicitly (campbooks-cloud#210, #212).
+    #[sqlx::test(migrations = "../../migrations")]
+    async fn every_definer_function_pins_its_path_and_is_granted(db: sqlx::PgPool) {
+        let functions: Vec<(String, Option<Vec<String>>, bool)> = sqlx::query_as(
+            "SELECT p.oid::regprocedure::text, p.proconfig,
+                    has_function_privilege('public', p.oid, 'EXECUTE')
+               FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
+              WHERE p.prosecdef AND n.nspname NOT IN ('pg_catalog', 'information_schema')
+              ORDER BY 1",
+        )
+        .fetch_all(&db)
+        .await
+        .unwrap();
+        assert!(functions.len() >= BFF_FUNCTIONS.len() + 2, "{functions:?}");
+        for (function, config, public) in functions {
+            assert_eq!(
+                config,
+                Some(vec!["search_path=pg_catalog, pg_temp".to_owned()]),
+                "{function} pins its search_path"
+            );
+            assert!(!public, "{function} is executable by PUBLIC");
+        }
+    }
+
+    /// Every table of the kernel's and the BFF's schemas has row-level
+    /// security, enabled and forced with a policy, or grants the runtime role
+    /// no privilege at all (reached through functions only), or is listed
+    /// here as instance-only with the reason (campbooks-cloud#210, #212): a
+    /// new table there cannot be left open to every transaction by omission.
+    /// A listed table grants the runtime role no write.
+    #[sqlx::test(migrations = "../../migrations")]
+    async fn every_kernel_table_has_row_level_security_or_a_reason(db: sqlx::PgPool) {
+        const INSTANCE_ONLY: [(&str, &str); 1] = [(
+            "kernel.instance_rows_from_workspaces",
+            "the instance-wide rows a workspace may add, read by the queue's and the event \
+             log's policies: written by migrations only, the runtime role may only read it, and \
+             it holds nothing of any caller or workspace",
+        )];
+        let role = campbooks_kernel::db::DEFAULT_RUNTIME_ROLE;
+        let tables: Vec<(String, bool)> = sqlx::query_as(KERNEL_TABLES_PROTECTED)
+            .bind(role)
+            .fetch_all(&db)
+            .await
+            .unwrap();
+        for table in BFF_TABLES {
+            assert!(
+                tables.iter().any(|(t, _)| t == table),
+                "{table} is covered: {tables:?}"
+            );
+        }
+        assert!(tables.len() > INSTANCE_ONLY.len(), "{tables:?}");
+        let open: Vec<&str> = tables
+            .iter()
+            .filter(|(_, protected)| !protected)
+            .map(|(table, _)| table.as_str())
+            .collect();
+        let listed: Vec<&str> = INSTANCE_ONLY.iter().map(|(table, _)| *table).collect();
+        assert_eq!(
+            open, listed,
+            "every kernel and BFF table enables and forces row-level security with a policy, \
+             grants the runtime role nothing, or is listed as instance-only with its reason"
+        );
+        for (table, reason) in INSTANCE_ONLY {
+            assert!(!reason.trim().is_empty(), "{table} needs a reason");
+            let writes: bool = sqlx::query_scalar(
+                "SELECT has_table_privilege($1, $2, 'INSERT')
+                     OR has_table_privilege($1, $2, 'UPDATE')
+                     OR has_table_privilege($1, $2, 'DELETE')
+                     OR has_table_privilege($1, $2, 'TRUNCATE')
+                     OR has_any_column_privilege($1, $2, 'INSERT, UPDATE')",
+            )
+            .bind(role)
+            .bind(table)
+            .fetch_one(&db)
+            .await
+            .unwrap();
+            assert!(
+                !writes,
+                "`{role}` may write {table}, which has no row-level security"
+            );
+        }
+    }
+
+    /// Whether each table of the kernel's and the BFF's schemas is protected
+    /// from the runtime role (`$1`): row-level security enabled and forced
+    /// with a policy, or no privilege of any kind on the table or on any of
+    /// its columns (`has_table_privilege` does not see a column's grant).
+    const KERNEL_TABLES_PROTECTED: &str = "
+        SELECT n.nspname || '.' || c.relname,
+               (c.relrowsecurity AND c.relforcerowsecurity
+                   AND EXISTS (SELECT 1 FROM pg_policy p WHERE p.polrelid = c.oid))
+               OR NOT (has_table_privilege($1, c.oid,
+                           'SELECT, INSERT, UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER')
+                       OR has_any_column_privilege($1, c.oid,
+                           'SELECT, INSERT, UPDATE, REFERENCES'))
+          FROM pg_class c
+          JOIN pg_namespace n ON n.oid = c.relnamespace
+         WHERE n.nspname IN ('kernel', 'bff') AND c.relkind IN ('r', 'p')
+         ORDER BY 1";
+
+    /// A grant on one column of a BFF table is a privilege the coverage
+    /// test sees (campbooks-cloud#214, item 6).
+    #[sqlx::test(migrations = "../../migrations")]
+    async fn a_column_grant_leaves_a_table_open(db: sqlx::PgPool) {
+        let role = campbooks_kernel::db::DEFAULT_RUNTIME_ROLE;
+        sqlx::query("GRANT SELECT (subject) ON bff.sessions TO campbooks_app")
+            .execute(&db)
+            .await
+            .unwrap();
+        let tables: Vec<(String, bool)> = sqlx::query_as(KERNEL_TABLES_PROTECTED)
+            .bind(role)
+            .fetch_all(&db)
+            .await
+            .unwrap();
+        assert!(
+            tables.contains(&("bff.sessions".to_owned(), false)),
+            "{tables:?}"
+        );
+    }
+
+    /// The role every `SECURITY DEFINER` function belongs to
+    /// (campbooks-cloud#214).
+    const DEFINER_ROLE: &str = "campbooks_definer";
+
+    /// Every `SECURITY DEFINER` function belongs to the dedicated owner role,
+    /// never to a superuser or a role that can log in (such as the migration
+    /// login), so a bug in a body runs with that role's few rights
+    /// (campbooks-cloud#214). The role cannot log in, holds no privileged
+    /// attribute, is a member of no role, and no runtime role is a member of
+    /// it; it owns nothing but the functions and holds exactly the
+    /// privileges their statements need. A migration adding a definer
+    /// function hands it over (`ALTER FUNCTION … OWNER TO
+    /// campbooks_definer`), or this fails naming the function.
+    #[sqlx::test(migrations = "../../migrations")]
+    async fn definer_functions_belong_to_the_nologin_owner_role(db: sqlx::PgPool) {
+        let owners: Vec<(String, String, bool, bool)> = sqlx::query_as(
+            "SELECT p.oid::regprocedure::text, r.rolname::text, r.rolsuper, r.rolcanlogin
+               FROM pg_proc p
+               JOIN pg_namespace n ON n.oid = p.pronamespace
+               JOIN pg_roles r ON r.oid = p.proowner
+              WHERE p.prosecdef AND n.nspname NOT IN ('pg_catalog', 'information_schema')
+              ORDER BY 1",
+        )
+        .fetch_all(&db)
+        .await
+        .unwrap();
+        assert!(owners.len() >= BFF_FUNCTIONS.len() + 2, "{owners:?}");
+        for (function, owner, superuser, login) in &owners {
+            assert!(
+                !superuser && !login,
+                "{function} belongs to `{owner}`, a superuser or a role that can log in"
+            );
+            assert_eq!(owner, DEFINER_ROLE, "{function} belongs to the owner role");
+        }
+
+        let attributes: (bool, bool, bool, bool, bool, bool, i64) = sqlx::query_as(
+            "SELECT r.rolsuper, r.rolcanlogin, r.rolbypassrls, r.rolcreatedb, r.rolcreaterole,
+                    r.rolreplication,
+                    (SELECT count(*) FROM pg_auth_members m WHERE m.member = r.oid)
+               FROM pg_roles r
+              WHERE r.rolname = $1",
+        )
+        .bind(DEFINER_ROLE)
+        .fetch_one(&db)
+        .await
+        .unwrap();
+        assert_eq!(
+            attributes,
+            (false, false, false, false, false, false, 0),
+            "`{DEFINER_ROLE}`: no login, no privileged attribute, a member of no role"
+        );
+        let runtime_member: bool = sqlx::query_scalar("SELECT pg_has_role($1, $2, 'MEMBER')")
+            .bind(campbooks_kernel::db::DEFAULT_RUNTIME_ROLE)
+            .bind(DEFINER_ROLE)
+            .fetch_one(&db)
+            .await
+            .unwrap();
+        assert!(
+            !runtime_member,
+            "the runtime role cannot act as `{DEFINER_ROLE}`"
+        );
+
+        let owned: Vec<String> = sqlx::query_scalar(
+            "SELECT format('relation %s', c.oid::regclass) FROM pg_class c
+              WHERE c.relowner = $1::text::regrole
+             UNION ALL
+             SELECT format('schema %I', n.nspname) FROM pg_namespace n
+              WHERE n.nspowner = $1::text::regrole
+             UNION ALL
+             SELECT format('function %s', p.oid::regprocedure) FROM pg_proc p
+              WHERE p.proowner = $1::text::regrole AND NOT p.prosecdef
+             ORDER BY 1",
+        )
+        .bind(DEFINER_ROLE)
+        .fetch_all(&db)
+        .await
+        .unwrap();
+        assert!(owned.is_empty(), "`{DEFINER_ROLE}` owns {owned:?}");
+
+        let tables: Vec<(String, String)> = sqlx::query_as(
+            "SELECT n.nspname || '.' || c.relname,
+                    string_agg(a.privilege_type, ', ' ORDER BY a.privilege_type)
+               FROM pg_class c
+               JOIN pg_namespace n ON n.oid = c.relnamespace,
+                    aclexplode(c.relacl) a
+              WHERE a.grantee = $1::text::regrole
+              GROUP BY 1
+              ORDER BY 1",
+        )
+        .bind(DEFINER_ROLE)
+        .fetch_all(&db)
+        .await
+        .unwrap();
+        let expected = [
+            ("bff.login_transactions", "DELETE, INSERT, SELECT"),
+            ("bff.retired_tokens", "INSERT, SELECT"),
+            ("bff.sessions", "DELETE, INSERT, SELECT, UPDATE"),
+            ("kernel.rate_limits", "DELETE, INSERT, SELECT, UPDATE"),
+        ]
+        .map(|(table, privileges)| (table.to_owned(), privileges.to_owned()));
+        assert_eq!(
+            tables, expected,
+            "`{DEFINER_ROLE}` holds what the functions need"
+        );
+        let schemas: Vec<(String, String)> = sqlx::query_as(
+            "SELECT n.nspname::text, a.privilege_type
+               FROM pg_namespace n, aclexplode(n.nspacl) a
+              WHERE a.grantee = $1::text::regrole
+              ORDER BY 1, 2",
+        )
+        .bind(DEFINER_ROLE)
+        .fetch_all(&db)
+        .await
+        .unwrap();
+        assert_eq!(
+            schemas,
+            [("bff", "USAGE"), ("kernel", "USAGE")]
+                .map(|(schema, privilege)| (schema.to_owned(), privilege.to_owned())),
+            "`{DEFINER_ROLE}` may use the two schemas, and create nothing"
+        );
+        let elsewhere: i64 = sqlx::query_scalar(
+            "SELECT (SELECT count(*) FROM pg_attribute a, aclexplode(a.attacl) x
+                      WHERE x.grantee = $1::text::regrole)
+                  + (SELECT count(*) FROM pg_proc p, aclexplode(p.proacl) x
+                      WHERE x.grantee = $1::text::regrole AND p.proowner <> x.grantee)
+                  + (SELECT count(*) FROM pg_database d, aclexplode(d.datacl) x
+                      WHERE x.grantee = $1::text::regrole)",
+        )
+        .bind(DEFINER_ROLE)
+        .fetch_one(&db)
+        .await
+        .unwrap();
+        assert_eq!(elsewhere, 0, "no column, function or database grant");
+
+        // The functions still work for the runtime role, as their owner.
+        let runtime = testing::app_role_pool(&db).await;
+        let hits: Vec<i32> = sqlx::query_scalar(
+            "SELECT hits FROM kernel.take_rate_limit(sha256('a bucket'::bytea), 60, 1)
+             UNION ALL
+             SELECT hits FROM kernel.take_rate_limit(sha256('a bucket'::bytea), 60, 1)",
+        )
+        .fetch_all(&runtime)
+        .await
+        .unwrap();
+        assert_eq!(hits.iter().max(), Some(&2), "{hits:?}");
+        sqlx::query(
+            "SELECT bff.start_login(sha256('a state'::bytea), sha256('a browser'::bytea),
+                                    '\\x01', '\\x02', '/inbox', now(),
+                                    now() + interval '10 minutes', NULL)",
+        )
+        .execute(&runtime)
+        .await
+        .unwrap();
+        let landing: Option<String> =
+            sqlx::query_scalar("SELECT return_to FROM bff.take_login(sha256('a state'::bytea))")
+                .fetch_optional(&runtime)
+                .await
+                .unwrap();
+        assert_eq!(landing.as_deref(), Some("/inbox"));
     }
 
     /// The worker runs as the runtime role in production: it can claim, run
@@ -1281,6 +1805,48 @@ mod tests {
                 assert_eq!(header(&raw, name), Some(*value), "{name}");
             }
         }
+    }
+
+    #[sqlx::test(migrations = "../../migrations")]
+    async fn up_answers_like_the_health_check(db: sqlx::PgPool) {
+        let dir = WebDir::new();
+        let mut config = testing::config("postgres://test@localhost/test");
+        config.web_dir = Some(dir.0.clone());
+        let app = router(AppState::new(db, config), None);
+        let health = fetch(&app, "/api/v1/system/health", None).await;
+        // A browser navigation still gets the health answer, not the web client.
+        for accept in [None, HTML] {
+            let up = fetch(&app, UP_PATH, accept).await;
+            assert_eq!(up.status, StatusCode::OK, "{}", up.body);
+            assert_eq!(up.body, health.body);
+            assert_eq!(up.body, r#"{"status":"ok","database":"ok"}"#);
+            assert_eq!(header(&up, &header::CACHE_CONTROL), Some("no-store"));
+            assert_eq!(header(&up, &header::PRAGMA), Some("no-cache"));
+        }
+    }
+
+    #[tokio::test]
+    async fn up_is_a_503_problem_when_the_database_is_down() {
+        let dir = WebDir::new();
+        for app in [app(), web_app(&dir)] {
+            let up = fetch(&app, UP_PATH, HTML).await;
+            assert_eq!(up.status, StatusCode::SERVICE_UNAVAILABLE, "{}", up.body);
+            assert_eq!(
+                header(&up, &header::CONTENT_TYPE),
+                Some("application/problem+json")
+            );
+            assert_eq!(header(&up, &header::CACHE_CONTROL), Some("no-store"));
+            let problem: serde_json::Value = serde_json::from_str(&up.body).unwrap();
+            assert_eq!(problem["code"], "database_unreachable");
+        }
+    }
+
+    #[tokio::test]
+    async fn up_is_not_in_the_openapi_document() {
+        let spec = fetch(&app(), OPENAPI_PATH, None).await;
+        let spec: serde_json::Value = serde_json::from_str(&spec.body).unwrap();
+        assert!(spec["paths"].get(UP_PATH).is_none());
+        assert!(spec["paths"].get("/api/v1/system/health").is_some());
     }
 
     #[tokio::test]

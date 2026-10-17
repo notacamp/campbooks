@@ -10,7 +10,9 @@ import {
   InlineConfirm,
   List,
   ListRow,
+  SettingsEmpty,
   SkeletonList,
+  StatusText,
 } from "~/lib/ui";
 import { useMembers } from "~/modules/workspaces";
 
@@ -67,7 +69,7 @@ export function RulesList({ workspaceId }: { workspaceId: string }) {
       <EmptyState
         title={t("rules.list.failed")}
         visor="thinking"
-        headingLevel={2}
+        headingLevel={3}
         action={
           <Button
             variant="secondary"
@@ -86,9 +88,7 @@ export function RulesList({ workspaceId }: { workspaceId: string }) {
   }
   if (rules.data.length === 0) {
     return (
-      <EmptyState title={t("rules.list.label")} visor="idle" headingLevel={2}>
-        {t("rules.list.empty")}
-      </EmptyState>
+      <SettingsEmpty title={t("rules.list.emptyTitle")}>{t("rules.list.empty")}</SettingsEmpty>
     );
   }
   // Keep / No act on the inbox (anyone who may teach there): only offered
@@ -121,7 +121,7 @@ export function RulesList({ workspaceId }: { workspaceId: string }) {
     <div className="flex flex-col gap-6">
       {waiting.length === 0 ? null : (
         <section className="flex flex-col gap-2">
-          <Heading level={2} size="section">
+          <Heading level={3} size="section">
             {t("rules.list.waiting")}
           </Heading>
           <List label={t("rules.list.waiting")}>{waiting.map(row)}</List>
@@ -135,7 +135,7 @@ export function RulesList({ workspaceId }: { workspaceId: string }) {
         );
         return (
           <section key={inboxId} className="flex flex-col gap-2">
-            <Heading level={2} size="section">
+            <Heading level={3} size="section">
               {name}
             </Heading>
             <List label={name}>{list.map(row)}</List>
@@ -167,6 +167,10 @@ function RuleRow({
   const [putBack, setPutBack] = useState<"back" | "keep">("back");
   const number = (n: number) => new Intl.NumberFormat(locale).format(n);
   const facts = [
+    // Why it is paused first: the line is cut short on a narrow row.
+    rule.state === "paused"
+      ? t(`rules.list.paused.${rule.paused_reason ?? "author_cannot_write"}`)
+      : "",
     author === undefined ? "" : originLine(t, rule, author),
     rule.applied_count > 0
       ? t("rules.list.applied", { count: rule.applied_count, n: number(rule.applied_count) })
@@ -180,7 +184,6 @@ function RuleRow({
           n: number(rule.recent_exceptions),
         })
       : "",
-    rule.state === "paused" ? t("rules.list.paused") : "",
   ].filter((fact) => fact !== "");
 
   const trailing =
@@ -218,6 +221,10 @@ function RuleRow({
         {t("rules.list.remove")}
       </Button>
     ) : undefined;
+
+  // Keeping it keeps its author: one who is away for now leaves it paused,
+  // and the member is told before saying yes, never why.
+  const staysPaused = rule.state === "proposed" && rule.paused_once_kept === "author_unavailable";
 
   return (
     <ListRow
@@ -264,6 +271,8 @@ function RuleRow({
             />
           ) : null}
         </InlineConfirm>
+      ) : staysPaused ? (
+        <StatusText tone="waiting">{t("rules.list.keptStaysPaused")}</StatusText>
       ) : null}
     </ListRow>
   );

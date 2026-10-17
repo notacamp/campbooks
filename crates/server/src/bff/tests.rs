@@ -58,6 +58,17 @@ async fn whoami(
     }))
 }
 
+/// A session's id, current and previous token hashes, and sealed access,
+/// refresh and ID tokens, as stored.
+type StoredSession = (
+    uuid::Uuid,
+    Vec<u8>,
+    Option<Vec<u8>>,
+    Vec<u8>,
+    Option<Vec<u8>>,
+    Vec<u8>,
+);
+
 /// What a test reads back from `bff.sessions`.
 type SessionRow = (
     Vec<u8>,
@@ -79,16 +90,16 @@ async fn harness(db: PgPool) -> Harness {
 }
 
 async fn harness_with(db: PgPool, origin: &str, tweak: impl FnOnce(&mut BffConfig)) -> Harness {
-    harness_limited(db, origin, tweak, None).await
+    harness_limited(db, origin, tweak, |state| state).await
 }
 
-/// [`harness_with`], counting the per-caller rate limits with `limits`
-/// (the defaults when `None`).
+/// [`harness_with`], with the app state changed by `with` (the per-caller
+/// rate limits, the metrics).
 async fn harness_limited(
     db: PgPool,
     origin: &str,
     tweak: impl FnOnce(&mut BffConfig),
-    limits: Option<ApiLimits>,
+    with: impl FnOnce(AppState) -> AppState,
 ) -> Harness {
     let idp = TestIdp::start().await;
     let mut config = testing::config("postgres://test@localhost/test");
@@ -112,10 +123,10 @@ async fn harness_limited(
     };
     // The app runs as the runtime role, like the server (row-level security
     // applies); the test's own queries keep the superuser pool.
-    let mut state = crate::with_ports(AppState::new(testing::app_role_pool(&db).await, config));
-    if let Some(limits) = limits {
-        state = state.with_api_limits(limits);
-    }
+    let state = with(crate::with_ports(AppState::new(
+        testing::app_role_pool(&db).await,
+        config,
+    )));
     let app = app(state, Some(*settings));
     Harness { app, idp, db }
 }
@@ -297,6 +308,14 @@ async fn exec(db: &PgPool, sql: &'static str) {
     sqlx::query(sql).execute(db).await.unwrap();
 }
 
+/// The BFF's cipher under the harness's secret key.
+fn cipher() -> campbooks_kernel::crypto::Cipher {
+    campbooks_kernel::crypto::Cipher::new(
+        &campbooks_kernel::crypto::SecretKey::from_bytes([7; 32]),
+        config::KEY_PURPOSE,
+    )
+}
+
 // --- login ---------------------------------------------------------------------
 
 #[sqlx::test(migrations = "../../migrations")]
@@ -334,12 +353,25 @@ async fn login_redirects_to_the_idp_with_pkce_state_and_nonce(db: PgPool) {
         count(&h.db, "SELECT count(*) FROM bff.login_transactions").await,
         1
     );
-    let stored: (String, String) =
-        sqlx::query_as("SELECT return_to, nonce FROM bff.login_transactions")
+    // Stored: hashes of the state and the login cookie, the nonce and the
+    // verifier sealed; nothing a database reader could replay.
+    let (return_to, state_hash, nonce): (String, Vec<u8>, Vec<u8>) =
+        sqlx::query_as("SELECT return_to, state_hash, nonce FROM bff.login_transactions")
             .fetch_one(&h.db)
             .await
             .unwrap();
-    assert_eq!(stored, ("/inbox?tab=2".to_owned(), params["nonce"].clone()));
+    assert_eq!(return_to, "/inbox?tab=2");
+    assert_eq!(state_hash, campbooks_kernel::crypto::hash(&params["state"]));
+    assert!(
+        !String::from_utf8_lossy(&nonce).contains(params["nonce"].as_str()),
+        "the nonce is sealed"
+    );
+    assert_eq!(
+        cipher()
+            .open(&nonce, &super::handlers::nonce_context(&state_hash))
+            .unwrap(),
+        params["nonce"]
+    );
 
     // Every sign-in gets its own state, nonce and verifier.
     let again = query(
@@ -541,12 +573,19 @@ async fn callback_refuses_an_id_token_for_another_nonce(db: PgPool) {
     let login = browser.get("/bff/login").await;
     let callback = path_and_query(&h.idp.authorize(login.header(header::LOCATION).unwrap()));
     // The IdP's ID token carries the nonce of the request; the sign-in on
-    // record now expects another one.
-    exec(
-        &h.db,
-        "UPDATE bff.login_transactions SET nonce = 'another-nonce'",
-    )
-    .await;
+    // record now expects another one (sealed for it like the real one).
+    let state_hash: Vec<u8> = sqlx::query_scalar("SELECT state_hash FROM bff.login_transactions")
+        .fetch_one(&h.db)
+        .await
+        .unwrap();
+    sqlx::query("UPDATE bff.login_transactions SET nonce = $1")
+        .bind(cipher().seal(
+            "another-nonce",
+            &super::handlers::nonce_context(&state_hash),
+        ))
+        .execute(&h.db)
+        .await
+        .unwrap();
     let reply = browser.get(&callback).await;
     reply.assert_problem(StatusCode::BAD_REQUEST, "invalid_id_token");
     assert!(reply.set_cookie(SESSION).is_none());
@@ -592,6 +631,15 @@ async fn signing_in_again_replaces_the_session(db: PgPool) {
     browser.sign_in(&h.idp, "/").await;
     assert_ne!(browser.cookie(SESSION).unwrap(), first);
     assert_eq!(count(&h.db, "SELECT count(*) FROM bff.sessions").await, 1);
+    // The ended session's refresh token is revoked; the new one stays live
+    // (campbooks-cloud#214).
+    let revoked = h.idp.revoked_tokens();
+    assert_eq!(revoked.len(), 1, "the earlier session's refresh token");
+    assert!(!h.idp.is_live_refresh_token(&revoked[0]));
+    assert_eq!(
+        browser.get("/bff/api/v1/test/whoami").await.status,
+        StatusCode::OK
+    );
 }
 
 // --- session -------------------------------------------------------------------
@@ -651,6 +699,100 @@ async fn idle_and_absolute_timeouts_end_a_session(db: PgPool) {
         browser.get("/bff/session").await.json()["authenticated"],
         false
     );
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn a_session_missing_newer_scopes_ends_and_signs_in_again(db: PgPool) {
+    let h = harness(db).await;
+    let mut browser = Browser::new(&h.app);
+    browser.sign_in(&h.idp, "/").await;
+    // A session that asked for every scope keeps going.
+    assert_eq!(
+        browser.get("/bff/session").await.json()["authenticated"],
+        true
+    );
+    assert_eq!(
+        browser.get("/bff/api/v1/test/whoami").await.status,
+        StatusCode::OK
+    );
+
+    // Signed in before a release added a scope: its tokens never get it, so
+    // it ends like an expired session and the app signs in again; its
+    // refresh token is revoked.
+    exec(&h.db, "UPDATE bff.sessions SET scopes = 'openid'").await;
+    let reply = browser.get("/bff/api/v1/test/whoami").await;
+    reply.assert_problem(StatusCode::UNAUTHORIZED, "session_required");
+    assert!(reply.set_cookie(SESSION).unwrap().contains("Max-Age=0"));
+    assert_eq!(count(&h.db, "SELECT count(*) FROM bff.sessions").await, 0);
+    let revoked = h.idp.revoked_tokens();
+    assert_eq!(revoked.len(), 1, "its refresh token is revoked");
+    assert!(!h.idp.is_live_refresh_token(&revoked[0]));
+
+    // The next sign-in asks for every scope, and stays signed in.
+    browser.sign_in(&h.idp, "/").await;
+    assert_eq!(
+        browser.get("/bff/session").await.json()["authenticated"],
+        true
+    );
+    assert_eq!(
+        browser.get("/bff/api/v1/test/whoami").await.status,
+        StatusCode::OK
+    );
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn a_session_from_before_scopes_were_recorded_ends(db: PgPool) {
+    let h = harness(db).await;
+    let mut browser = Browser::new(&h.app);
+    browser.sign_in(&h.idp, "/").await;
+    exec(&h.db, "UPDATE bff.sessions SET scopes = NULL").await;
+    let reply = browser.get("/bff/session").await;
+    assert_eq!(reply.json()["authenticated"], false);
+    assert!(reply.set_cookie(SESSION).unwrap().contains("Max-Age=0"));
+    assert_eq!(count(&h.db, "SELECT count(*) FROM bff.sessions").await, 0);
+    assert_eq!(h.idp.revoked_tokens().len(), 1);
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn a_sign_in_keeps_the_scopes_it_started_with(db: PgPool) {
+    let h = harness(db).await;
+    let mut browser = Browser::new(&h.app);
+    // Started before a deploy that added a scope, finished after it: the
+    // session records what the sign-in asked for, so it ends on use.
+    let login = browser.get("/bff/login?return_to=%2F").await;
+    exec(&h.db, "UPDATE bff.login_transactions SET scopes = 'openid'").await;
+    let callback = h.idp.authorize(login.header(header::LOCATION).unwrap());
+    let landed = browser.get(&path_and_query(&callback)).await;
+    assert_eq!(landed.status, StatusCode::OK, "{}", landed.body);
+    assert_eq!(
+        count(
+            &h.db,
+            "SELECT count(*) FROM bff.sessions WHERE scopes = 'openid'"
+        )
+        .await,
+        1,
+        "the session keeps what its sign-in asked for"
+    );
+    assert_eq!(
+        browser.get("/bff/session").await.json()["authenticated"],
+        false
+    );
+}
+
+#[test]
+fn asked_for_all_compares_sets() {
+    use super::asked_for_all;
+    assert!(asked_for_all(
+        Some("openid a:read b:write"),
+        "b:write openid"
+    ));
+    assert!(asked_for_all(Some("openid  a:read"), "a:read openid"));
+    assert!(!asked_for_all(
+        Some("openid a:read"),
+        "openid a:read assistant:read"
+    ));
+    assert!(!asked_for_all(None, "openid"));
+    assert!(asked_for_all(Some(""), ""));
 }
 
 #[sqlx::test(migrations = "../../migrations")]
@@ -843,17 +985,15 @@ async fn a_reissue_says_why_it_did_not(db: PgPool) {
     )
     .await;
     browser.get("/bff/session").await;
-    let id: uuid::Uuid = sqlx::query_scalar("SELECT id FROM bff.sessions")
-        .fetch_one(&h.db)
-        .await
-        .unwrap();
     let now = chrono::Utc::now();
     let grace_since = now - super::config::ROTATION_GRACE;
+    // As the server calls it: the runtime role, through `bff.reissue_session`.
+    let runtime = testing::app_role_pool(&h.db).await;
     let reissue = |previous: &str| {
         let previous = hash(previous);
-        let db = h.db.clone();
+        let db = runtime.clone();
         async move {
-            store::reissue(&db, id, &previous, &hash("fresh"), now, grace_since)
+            store::reissue(&db, &previous, &hash("fresh"), now, grace_since)
                 .await
                 .unwrap()
         }
@@ -982,8 +1122,10 @@ async fn signing_out_everywhere_ends_the_persons_web_sessions(db: PgPool) {
     other.sign_in(&h.idp, "/").await;
     assert_eq!(count(&h.db, "SELECT count(*) FROM bff.sessions").await, 3);
 
+    // The worker runs as the runtime role, like the server's: the handler
+    // ends the sessions through `bff.end_account_sessions`.
     let state = AppState::new(
-        h.db.clone(),
+        testing::app_role_pool(&h.db).await,
         testing::config("postgres://test@localhost/test"),
     )
     .with_registry(crate::registry().unwrap());
@@ -1008,6 +1150,67 @@ async fn signing_out_everywhere_ends_the_persons_web_sessions(db: PgPool) {
         other.get("/bff/session").await.json()["authenticated"],
         true,
         "nobody else's"
+    );
+}
+
+/// A workspace writing an account's `identity.signed_out_everywhere` and its
+/// delivery into its own workspace by hand, as the runtime role, ends
+/// nobody's sessions: the delivery fails, its handler never runs
+/// (campbooks-cloud#207).
+#[sqlx::test(migrations = "../../migrations")]
+async fn a_sign_out_everywhere_forged_in_a_workspace_ends_nobody(db: PgPool) {
+    let h = harness(db).await;
+    let victim = uuid::Uuid::now_v7();
+    h.idp.set_user(TestUser {
+        subject: victim.to_string(),
+        name: "Ana Lima".to_owned(),
+        email: "ana@example.com".to_owned(),
+    });
+    let mut laptop = Browser::new(&h.app);
+    laptop.sign_in(&h.idp, "/").await;
+
+    let runtime = testing::app_role_pool(&h.db).await;
+    let workspace = uuid::Uuid::now_v7().to_string();
+    let mut tx = runtime.begin().await.unwrap();
+    campbooks_kernel::db::set_workspace(&mut tx, &workspace)
+        .await
+        .unwrap();
+    let job: uuid::Uuid = sqlx::query_scalar(
+        "WITH e AS (
+             INSERT INTO kernel.events (name, version, workspace_id, payload)
+             VALUES ('identity.signed_out_everywhere', 1, $1,
+                     jsonb_build_object('account', $2::text))
+             RETURNING id)
+         INSERT INTO kernel.jobs
+             (queue, kind, payload, workspace_id, event_id, unique_key, max_attempts)
+         SELECT 'events', 'bff.end_signed_out_sessions', '{}', $1, id, id::text, 3 FROM e
+         RETURNING id",
+    )
+    .bind(&workspace)
+    .bind(victim)
+    .fetch_one(&mut *tx)
+    .await
+    .unwrap();
+    tx.commit().await.unwrap();
+
+    let state = AppState::new(
+        runtime.clone(),
+        testing::config("postgres://test@localhost/test"),
+    )
+    .with_registry(crate::registry().unwrap());
+    campbooks_kernel::jobs::Worker::new(state)
+        .run_until_idle()
+        .await;
+    let job_state: String = sqlx::query_scalar("SELECT state FROM kernel.jobs WHERE id = $1")
+        .bind(job)
+        .fetch_one(&h.db)
+        .await
+        .unwrap();
+    assert_eq!(job_state, "failed");
+    assert_eq!(
+        laptop.get("/bff/session").await.json()["authenticated"],
+        true,
+        "the victim is still signed in"
     );
 }
 
@@ -1524,12 +1727,21 @@ async fn a_suspended_accounts_web_sessions_end_at_once(db: PgPool) {
     let mut tx = pool.begin().await.unwrap();
     state
         .events
-        .publish(&mut tx, &AccountSuspended { account: suspended })
+        .publish(
+            &mut tx,
+            &AccountSuspended {
+                account: suspended,
+                at: None,
+                seq: None,
+            },
+        )
         .await
         .unwrap();
     tx.commit().await.unwrap();
     let stats = Worker::new(state).run_until_idle().await;
-    assert_eq!(stats.succeeded, 1, "{stats:?}");
+    // The BFF ends the sessions; the workspaces module announces the
+    // suspension in the account's workspaces (none here).
+    assert_eq!((stats.succeeded, stats.failed), (2, 0), "{stats:?}");
 
     let mut signed_in = Vec::new();
     for browser in &mut browsers {
@@ -1560,6 +1772,431 @@ async fn backchannel_logout_refuses_bad_tokens(db: PgPool) {
         browser.get("/bff/session").await.json()["authenticated"],
         true
     );
+}
+
+// --- the tables' boundary (campbooks-cloud#212) -------------------------------
+
+/// The runtime role the server runs as can neither read, write, empty nor
+/// lock the BFF's tables: only the `bff.*` functions reach them.
+#[sqlx::test(migrations = "../../migrations")]
+async fn the_runtime_role_cannot_touch_the_bff_tables(db: PgPool) {
+    let h = harness(db).await;
+    let mut browser = Browser::new(&h.app);
+    browser.sign_in(&h.idp, "/").await;
+    Browser::new(&h.app).get("/bff/login").await;
+    exec(
+        &h.db,
+        "UPDATE bff.sessions SET rotated_at = now() - interval '2 hours'",
+    )
+    .await;
+    for _ in 0..2 {
+        browser.get("/bff/session").await;
+        exec(
+            &h.db,
+            "UPDATE bff.sessions SET rotated_at = now() - interval '2 hours'",
+        )
+        .await;
+    }
+    for table in [
+        "SELECT count(*) FROM bff.sessions",
+        "SELECT count(*) FROM bff.login_transactions",
+        "SELECT count(*) FROM bff.retired_tokens",
+    ] {
+        assert!(count(&h.db, table).await > 0, "{table}: a row to protect");
+    }
+
+    let runtime = testing::app_role_pool(&h.db).await;
+    for sql in [
+        "SELECT * FROM bff.sessions",
+        "SELECT * FROM bff.login_transactions",
+        "SELECT * FROM bff.retired_tokens",
+        "UPDATE bff.sessions SET expires_at = now()",
+        "UPDATE bff.login_transactions SET expires_at = now()",
+        "UPDATE bff.retired_tokens SET retired_at = now()",
+        "DELETE FROM bff.sessions",
+        "DELETE FROM bff.login_transactions",
+        "DELETE FROM bff.retired_tokens",
+        "INSERT INTO bff.retired_tokens (token_hash, session_id, retired_at)
+             SELECT '\\x00', gen_random_uuid(), now()",
+        "TRUNCATE bff.retired_tokens",
+        "LOCK TABLE bff.sessions IN ACCESS SHARE MODE",
+    ] {
+        let mut tx = runtime.begin().await.unwrap();
+        let refused = sqlx::query(sql).execute(&mut *tx).await.unwrap_err();
+        assert_eq!(
+            refused
+                .as_database_error()
+                .and_then(sqlx::error::DatabaseError::code)
+                .as_deref(),
+            Some("42501"),
+            "{sql}: {refused}"
+        );
+    }
+    assert_eq!(
+        browser.get("/bff/session").await.json()["authenticated"],
+        true,
+        "the session is untouched"
+    );
+}
+
+/// Every function answers about the one session the presented token hash
+/// names, or the one account named, never another account's.
+#[sqlx::test(migrations = "../../migrations")]
+async fn the_functions_never_reach_another_accounts_session(db: PgPool) {
+    use campbooks_kernel::crypto::hash;
+
+    let h = harness(db).await;
+    let mut ana = Browser::new(&h.app);
+    ana.sign_in(&h.idp, "/").await;
+    h.idp.set_user(TestUser {
+        subject: "someone-else".to_owned(),
+        ..TestUser::default()
+    });
+    let mut sam = Browser::new(&h.app);
+    sam.sign_in(&h.idp, "/").await;
+    let ana_hash = hash(ana.cookie(SESSION).unwrap());
+    let sam_hash = hash(sam.cookie(SESSION).unwrap());
+    let runtime = testing::app_role_pool(&h.db).await;
+
+    let found = store::find_session(&runtime, &ana_hash)
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(found.subject, "test-user");
+    assert!(found.current);
+    assert_eq!(
+        store::find_session(&runtime, &sam_hash)
+            .await
+            .unwrap()
+            .unwrap()
+            .subject,
+        "someone-else"
+    );
+    let unknown = hash("nobody's cookie");
+    assert!(
+        store::find_session(&runtime, &unknown)
+            .await
+            .unwrap()
+            .is_none()
+    );
+    assert!(!store::is_retired(&runtime, &unknown).await.unwrap());
+    assert!(
+        !store::rotate(&runtime, &unknown, &hash("fresh"), chrono::Utc::now())
+            .await
+            .unwrap()
+    );
+    assert!(
+        store::end_session(&runtime, &unknown)
+            .await
+            .unwrap()
+            .is_none()
+    );
+    {
+        let mut tx = store::begin_refresh(&runtime).await.unwrap();
+        assert!(
+            store::lock_tokens(&mut tx, &unknown)
+                .await
+                .unwrap()
+                .is_none()
+        );
+    }
+    // No function lists sessions: an empty or NULL hash finds nothing.
+    for nothing in [&b""[..], &[0_u8; 32][..]] {
+        assert!(
+            store::find_session(&runtime, nothing)
+                .await
+                .unwrap()
+                .is_none()
+        );
+    }
+    let listed: i64 = sqlx::query_scalar("SELECT count(*) FROM bff.find_session(NULL)")
+        .fetch_one(&runtime)
+        .await
+        .unwrap();
+    assert_eq!(listed, 0);
+
+    // One account's sessions end; the other's stay.
+    assert_eq!(
+        store::delete_for_logout(&runtime, Some("test-user"), None)
+            .await
+            .unwrap(),
+        1
+    );
+    assert_eq!(
+        store::delete_for_logout(&runtime, None, None)
+            .await
+            .unwrap(),
+        0
+    );
+    assert_eq!(ana.get("/bff/session").await.json()["authenticated"], false);
+    assert_eq!(sam.get("/bff/session").await.json()["authenticated"], true);
+    // Ending by a token hash ends that session only.
+    let ended = store::end_session(&runtime, &sam_hash)
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(count(&h.db, "SELECT count(*) FROM bff.sessions").await, 0);
+    assert!(!ended.id_token.is_empty());
+}
+
+/// The functions refuse what the BFF never sends (campbooks-cloud#214): a
+/// landing that is not a same-origin path (`//`, a backslash, a space, the
+/// BFF's own paths, too long), a use with no time or no later deadline, a
+/// refresh that would store nothing, and a session longer than 366 days.
+#[sqlx::test(migrations = "../../migrations")]
+async fn the_functions_refuse_bad_input(db: PgPool) {
+    use chrono::{TimeDelta, Utc};
+
+    const START: &str = "SELECT bff.start_login(sha256(gen_random_uuid()::text::bytea),
+                                                sha256(gen_random_uuid()::text::bytea),
+                                                '\\x01', '\\x02', $1, now(),
+                                                now() + interval '10 minutes', NULL)";
+    const TOUCH: &str = "SELECT bff.touch_session($1, $2, $3)";
+    const STORE: &str = "SELECT bff.store_session_tokens($1, $2, $3, $4)";
+    const CREATE: &str = "SELECT bff.create_session(gen_random_uuid(),
+                                                    sha256(gen_random_uuid()::text::bytea),
+                                                    'test-user', NULL, NULL, NULL, '\\x01', now(),
+                                                    NULL, '\\x02', NULL, now(),
+                                                    now() + $1::text::interval,
+                                                    now() + $2::text::interval, NULL)";
+
+    let h = harness(db).await;
+    let mut browser = Browser::new(&h.app);
+    browser.sign_in(&h.idp, "/").await;
+    let presented = campbooks_kernel::crypto::hash(browser.cookie(SESSION).unwrap());
+    let runtime = testing::app_role_pool(&h.db).await;
+    let now = Utc::now();
+    let later = now + TimeDelta::hours(1);
+    let sealed: &[u8] = b"sealed";
+
+    let long = format!("/{}", "a".repeat(2048));
+    for landing in [
+        "//evil.example",
+        "/\\evil.example",
+        "/\\/evil.example",
+        "evil.example",
+        "",
+        "/a b",
+        "/a\tb",
+        "/\"><script>",
+        "/bff",
+        "/bff/logout",
+        long.as_str(),
+    ] {
+        invalid(
+            sqlx::query(START).bind(landing).execute(&runtime).await,
+            landing,
+        );
+    }
+    sqlx::query(START)
+        .bind("/inbox?view=all#top")
+        .execute(&runtime)
+        .await
+        .unwrap();
+
+    for (seen, idle_until) in [
+        (None, Some(later)),
+        (Some(now), None),
+        (Some(now), Some(now)),
+    ] {
+        invalid(
+            sqlx::query(TOUCH)
+                .bind(&presented)
+                .bind(seen)
+                .bind(idle_until)
+                .execute(&runtime)
+                .await,
+            "touch_session",
+        );
+    }
+    sqlx::query(TOUCH)
+        .bind(&presented)
+        .bind(now)
+        .bind(later)
+        .execute(&runtime)
+        .await
+        .unwrap();
+
+    for (access, until, refresh) in [
+        (None, Some(later), Some(sealed)),
+        (Some(sealed), None, Some(sealed)),
+        (Some(sealed), Some(later), None),
+        (Some(&b""[..]), Some(later), Some(sealed)),
+    ] {
+        invalid(
+            sqlx::query(STORE)
+                .bind(&presented)
+                .bind(access)
+                .bind(until)
+                .bind(refresh)
+                .execute(&runtime)
+                .await,
+            "store_session_tokens",
+        );
+    }
+
+    for (idle, ends) in [
+        ("1 hour", "367 days"),
+        ("0 seconds", "1 day"),
+        ("2 days", "1 day"),
+    ] {
+        invalid(
+            sqlx::query(CREATE)
+                .bind(idle)
+                .bind(ends)
+                .execute(&runtime)
+                .await,
+            ends,
+        );
+    }
+    sqlx::query(CREATE)
+        .bind("1 hour")
+        .bind("365 days")
+        .execute(&runtime)
+        .await
+        .unwrap();
+
+    assert_eq!(
+        browser.get("/bff/session").await.json()["authenticated"],
+        true,
+        "the session is untouched"
+    );
+    assert_eq!(
+        browser.get("/bff/api/v1/test/whoami").await.status,
+        StatusCode::OK,
+        "its tokens too"
+    );
+}
+
+/// A call the function refused as invalid input (`22023`).
+fn invalid(result: sqlx::Result<sqlx::postgres::PgQueryResult>, what: &str) {
+    let refused = result.expect_err(what);
+    assert_eq!(
+        refused
+            .as_database_error()
+            .and_then(sqlx::error::DatabaseError::code)
+            .as_deref(),
+        Some("22023"),
+        "{what}: {refused}"
+    );
+}
+
+/// What the BFF keeps at rest: cookies, previous and retired tokens, the
+/// state and the login cookie as SHA-256; the access, refresh and ID tokens,
+/// the PKCE verifier and the nonce sealed, bound to their row and column.
+#[sqlx::test(migrations = "../../migrations")]
+async fn nothing_secret_is_stored_in_plain_text(db: PgPool) {
+    use campbooks_kernel::crypto::hash;
+
+    let h = harness(db).await;
+    let mut browser = Browser::new(&h.app);
+    browser.sign_in(&h.idp, "/").await;
+    let mut cookies = vec![browser.cookie(SESSION).unwrap().to_owned()];
+    // Two rotations: a previous token and a retired one.
+    for _ in 0..2 {
+        exec(
+            &h.db,
+            "UPDATE bff.sessions SET rotated_at = now() - interval '2 hours'",
+        )
+        .await;
+        browser.get("/bff/session").await;
+        cookies.push(browser.cookie(SESSION).unwrap().to_owned());
+    }
+    let mut pending = Browser::new(&h.app);
+    let login = query(
+        pending
+            .get("/bff/login")
+            .await
+            .header(header::LOCATION)
+            .unwrap(),
+    );
+    let login_cookie = pending.cookie(LOGIN).unwrap().to_owned();
+
+    let (id, token_hash, previous, access, refresh, id_token): StoredSession = sqlx::query_as(
+        "SELECT id, token_hash, previous_token_hash, access_token, refresh_token, id_token
+           FROM bff.sessions",
+    )
+    .fetch_one(&h.db)
+    .await
+    .unwrap();
+    assert_eq!(token_hash, hash(&cookies[2]));
+    assert_eq!(previous, Some(hash(&cookies[1])));
+    let retired: Vec<u8> = sqlx::query_scalar("SELECT token_hash FROM bff.retired_tokens")
+        .fetch_one(&h.db)
+        .await
+        .unwrap();
+    assert_eq!(retired, hash(&cookies[0]));
+    let cipher = cipher();
+    for (column, sealed) in [
+        ("access_token", access),
+        ("refresh_token", refresh.unwrap()),
+        ("id_token", id_token),
+    ] {
+        assert!(!sealed.starts_with(b"eyJ"), "{column} is sealed");
+        let opened = cipher
+            .open(&sealed, &super::sealed_for(id, column))
+            .unwrap();
+        assert!(!opened.is_empty(), "{column}");
+        // Bound to its row and column: it opens nowhere else.
+        assert!(
+            cipher
+                .open(&sealed, &super::sealed_for(uuid::Uuid::now_v7(), column))
+                .is_err()
+        );
+    }
+
+    let (state_hash, browser_hash, nonce, verifier): (Vec<u8>, Vec<u8>, Vec<u8>, Vec<u8>) =
+        sqlx::query_as(
+            "SELECT state_hash, browser_hash, nonce, code_verifier FROM bff.login_transactions",
+        )
+        .fetch_one(&h.db)
+        .await
+        .unwrap();
+    assert_eq!(state_hash, hash(&login["state"]));
+    assert_eq!(browser_hash, hash(&login_cookie));
+    assert_eq!(
+        cipher
+            .open(&nonce, &super::handlers::nonce_context(&state_hash))
+            .unwrap(),
+        login["nonce"]
+    );
+    let verifier = cipher
+        .open(&verifier, &super::handlers::verifier_context(&state_hash))
+        .unwrap();
+    assert_eq!(
+        campbooks_kernel::crypto::pkce_challenge(&verifier),
+        login["code_challenge"]
+    );
+
+    // No value a request carried appears anywhere, as text or bytes.
+    let secrets: Vec<&str> = cookies
+        .iter()
+        .map(String::as_str)
+        .chain([
+            login_cookie.as_str(),
+            login["state"].as_str(),
+            login["nonce"].as_str(),
+            verifier.as_str(),
+        ])
+        .collect();
+    for table in ["sessions", "login_transactions", "retired_tokens"] {
+        for secret in &secrets {
+            // A row as text shows bytea as hex: look for both spellings.
+            let found: i64 = sqlx::query_scalar(sqlx::AssertSqlSafe(format!(
+                "SELECT count(*) FROM bff.{table} t
+                  WHERE strpos(t::text, $1) > 0
+                     OR strpos(t::text, encode(convert_to($1, 'UTF8'), 'hex')) > 0"
+            )))
+            .bind(*secret)
+            .fetch_one(&h.db)
+            .await
+            .unwrap();
+            assert_eq!(
+                found, 0,
+                "bff.{table} holds a request's secret in plain text"
+            );
+        }
+    }
 }
 
 // --- pruning -------------------------------------------------------------------
@@ -1595,7 +2232,9 @@ async fn pruning_deletes_ended_sessions_and_stale_sign_ins(db: PgPool) {
     )
     .await;
 
-    let pruned = store::prune(&h.db, chrono::Utc::now()).await.unwrap();
+    // As the job runs it: the runtime role, through the prune functions.
+    let runtime = testing::app_role_pool(&h.db).await;
+    let pruned = store::prune(&runtime).await.unwrap();
     assert_eq!(pruned, (2, 1));
     assert_eq!(live.get("/bff/session").await.json()["authenticated"], true);
     assert_eq!(
@@ -1748,7 +2387,13 @@ async fn the_browsers_calls_count_against_the_person(db: PgPool) {
         reads: 3,
         ..campbooks_kernel::config::RateLimitsConfig::default()
     };
-    let h = harness_limited(db, ORIGIN, |_| {}, Some(ApiLimits::new(&limits))).await;
+    let h = harness_limited(
+        db,
+        ORIGIN,
+        |_| {},
+        |state| state.with_api_limits(ApiLimits::new(&limits)),
+    )
+    .await;
     let mut browser = Browser::new(&h.app);
     browser.sign_in(&h.idp, "/").await;
     for _ in 0..3 {
@@ -1783,4 +2428,47 @@ async fn the_browsers_calls_count_against_the_person(db: PgPool) {
     )
     .await;
     assert_eq!(reply.status, StatusCode::OK, "{}", reply.body);
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn api_calls_are_counted_under_the_api_route(db: PgPool) {
+    let telemetry = crate::telemetry::Telemetry::new(
+        &campbooks_kernel::config::TelemetryConfig {
+            metrics_addr: Some(([127, 0, 0, 1], 0).into()),
+            ..Default::default()
+        },
+        "all",
+    )
+    .unwrap();
+    let metrics = telemetry.metrics();
+    let h = harness_limited(db, ORIGIN, |_| {}, |state| state.with_metrics(metrics)).await;
+    let mut browser = Browser::new(&h.app);
+    browser.sign_in(&h.idp, "/").await;
+    let reply = browser.get("/bff/api/v1/test/whoami").await;
+    assert_eq!(reply.status, StatusCode::OK, "{}", reply.body);
+    let missing = browser.get("/bff/api/v1/nope").await;
+    assert_eq!(missing.status, StatusCode::NOT_FOUND);
+
+    // Counted under the API route it ran through; an unmatched call under
+    // the BFF's own (the request log is tested in tests/request_log.rs).
+    let page = telemetry.metrics_router().unwrap();
+    let scraped = page
+        .oneshot(Request::get("/metrics").body(Body::empty()).unwrap())
+        .await
+        .unwrap();
+    let text = String::from_utf8(
+        axum::body::to_bytes(scraped.into_body(), usize::MAX)
+            .await
+            .unwrap()
+            .to_vec(),
+    )
+    .unwrap();
+    let counted = |route: &str| {
+        text.lines().any(|line| {
+            line.starts_with("http_server_request_duration_seconds_count{")
+                && line.contains(&format!("http_route=\"{route}\""))
+        })
+    };
+    assert!(counted("/api/v1/test/whoami"), "{text}");
+    assert!(counted("/bff/api/{*path}"), "the unmatched call: {text}");
 }

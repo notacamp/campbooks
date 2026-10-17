@@ -9,8 +9,11 @@
 //!   it (`.schedule::<J>(every)`).
 //! - **Enqueue** it with [`enqueue`] inside a transaction, so it exists if and
 //!   only if the caller's change commits. [`EnqueueOptions`] sets a delay,
-//!   priority, a `unique_key` (at most one unfinished job per key) and an
-//!   `ordering_key` (jobs sharing it run one at a time, in enqueue order).
+//!   priority, a `unique_key` (at most one unfinished job per kind and key
+//!   in a workspace) and an `ordering_key` (a workspace's jobs sharing it
+//!   run one at a time, in enqueue order). Both keys are per workspace, with
+//!   instance-wide work as one more: a workspace cannot hold or delay
+//!   another's key (campbooks-cloud#209).
 //! - **Run**: a [`Worker`] claims jobs fairly across workspaces, runs each in
 //!   a [`JobContext`] whose transaction carries the job's workspace
 //!   (`campbooks.workspace_id`), retries [`JobError::Retry`] with
@@ -35,7 +38,7 @@ use sqlx::{PgConnection, Postgres, Transaction};
 pub use context::JobContext;
 pub use maintenance::{PruneEvents, PruneJobs, purge_workspace};
 pub(crate) use registry::is_dotted;
-pub use registry::{Background, ConsumerInfo, Registry, RegistryError};
+pub use registry::{Background, ConsumerInfo, InstanceRows, Registry, RegistryError};
 pub use worker::{Worker, WorkerStats};
 
 crate::define_id!(
@@ -52,6 +55,25 @@ pub const NOTIFY_CHANNEL: &str = "kernel_jobs";
 /// Longest `last_error` kept, in characters, after
 /// [`redact::job_error`](crate::redact::job_error) kept its first line.
 pub const MAX_ERROR_LEN: usize = 500;
+
+/// A kind of background work an operator must hear about when it dies: a
+/// dead job or delivery of it is counted under `code` in Admin → Jobs (with
+/// every other kind watched under the same code), and its death is logged
+/// at WARN as `died`, a stable line an alert can match. Declared with the
+/// work (`WATCH` on [`Job`], [`JobHandler`], [`EventHandler`] and
+/// [`EventConsumer`]); kinds sharing a code must share the line.
+///
+/// [`EventHandler`]: crate::EventHandler
+/// [`EventConsumer`]: crate::EventConsumer
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Watch {
+    /// What the watched kinds are for, lower-case snake case
+    /// (`suspension_fanout`); the admin client words it.
+    pub code: &'static str,
+    /// The WARN line logged when one dies (`suspension fan-out delivery
+    /// died`): no ids or content, so alerts and logs can quote it.
+    pub died: &'static str,
+}
 
 /// A unit of background work.
 ///
@@ -75,6 +97,8 @@ pub trait Job: Serialize + DeserializeOwned + Send + Sync + 'static {
     const QUEUE: &'static str;
     /// Attempts before the job is marked failed (dead).
     const MAX_ATTEMPTS: u32 = DEFAULT_MAX_ATTEMPTS;
+    /// Whether an operator must hear when one dies ([`Watch`]).
+    const WATCH: Option<Watch> = None;
 
     /// Do the work.
     fn run(self, ctx: &mut JobContext) -> impl Future<Output = Result<(), JobError>> + Send;
@@ -97,6 +121,8 @@ pub trait JobHandler: Send + Sync + 'static {
     const QUEUE: &'static str;
     /// Attempts before the job is marked failed (dead).
     const MAX_ATTEMPTS: u32 = DEFAULT_MAX_ATTEMPTS;
+    /// Whether an operator must hear when one dies ([`Watch`]).
+    const WATCH: Option<Watch> = None;
 
     /// Do the work.
     fn run(
@@ -179,11 +205,15 @@ pub struct EnqueueOptions {
     /// The workspace the job works for: it runs with that workspace set and
     /// counts towards its fair share.
     pub workspace: Option<String>,
-    /// While a job of the same kind with this key is pending or running,
-    /// enqueueing another is a no-op ([`Enqueued::Duplicate`]).
+    /// While a job of the same kind with this key is pending or running in
+    /// the same workspace (or, for instance-wide work, in none), enqueueing
+    /// another is a no-op ([`Enqueued::Duplicate`]). Another workspace's
+    /// job with the same key is another job (campbooks-cloud#209).
     pub unique_key: Option<String>,
-    /// Jobs with the same key run strictly one at a time, in enqueue order.
-    /// Enqueuers sharing a key are serialized until their transactions end.
+    /// Jobs of one workspace (or instance-wide ones) with the same key run
+    /// strictly one at a time, in enqueue order; another workspace's jobs
+    /// with the same key do not wait for them. Enqueuers sharing a key in a
+    /// workspace are serialized until their transactions end.
     pub ordering_key: Option<String>,
     /// Higher runs first among the workspace's ready jobs.
     pub priority: i16,
@@ -234,12 +264,17 @@ impl EnqueueOptions {
 pub enum Enqueued {
     /// A new job.
     Created(JobId),
-    /// An unfinished job with the same kind and unique key exists already.
+    /// An unfinished job with the same kind and unique key exists already
+    /// in the same workspace (or, instance-wide, in none).
     Duplicate,
 }
 
 /// Enqueue `job` inside `tx`: it exists for workers once `tx` commits, and
 /// never if it rolls back. The job's span will link to the current span.
+///
+/// # Errors
+/// [`sqlx::Error::InvalidArgument`] when `options` names a workspace that
+/// `tx` does not work in (another one, or none and no kernel scope).
 pub async fn enqueue<J: Job>(
     tx: &mut Transaction<'_, Postgres>,
     job: &J,
@@ -279,6 +314,88 @@ pub async fn enqueue_to<H: JobHandler>(
     .await
 }
 
+/// From a transaction that works in no workspace (a scheduler's dispatcher
+/// in the maintenance scope, campbooks-cloud#196): enqueue `job` in
+/// `workspace`, like [`enqueue`] with `options.workspace` set to it. The
+/// transaction works in `workspace` for this enqueue only: the kernel sets
+/// it, enqueues, and clears it again, so the next statement of the
+/// transaction (another workspace's enqueue, a read of the dispatcher's
+/// index) does not run in it (campbooks-cloud#207).
+///
+/// # Errors
+/// [`sqlx::Error::InvalidArgument`] when `tx` already works in a workspace
+/// (use [`enqueue`] there); the enqueue's own errors. On an error the
+/// workspace is cleared too, unless the database aborted the transaction.
+pub async fn enqueue_in<J: Job>(
+    tx: &mut Transaction<'_, Postgres>,
+    workspace: &str,
+    job: &J,
+    options: EnqueueOptions,
+) -> Result<Enqueued, sqlx::Error> {
+    let payload = serde_json::to_value(job).map_err(|e| sqlx::Error::Encode(e.into()))?;
+    insert_in(
+        tx,
+        workspace,
+        NewJob {
+            kind: J::NAME,
+            queue: J::QUEUE,
+            max_attempts: J::MAX_ATTEMPTS,
+            payload,
+        },
+        options,
+    )
+    .await
+}
+
+/// Enqueue a job of `H`'s kind in `workspace` from a transaction that works
+/// in none, like [`enqueue_in`].
+///
+/// # Errors
+/// As [`enqueue_in`].
+pub async fn enqueue_to_in<H: JobHandler>(
+    tx: &mut Transaction<'_, Postgres>,
+    workspace: &str,
+    payload: &H::Payload,
+    options: EnqueueOptions,
+) -> Result<Enqueued, sqlx::Error> {
+    let payload = serde_json::to_value(payload).map_err(|e| sqlx::Error::Encode(e.into()))?;
+    insert_in(
+        tx,
+        workspace,
+        NewJob {
+            kind: H::NAME,
+            queue: H::QUEUE,
+            max_attempts: H::MAX_ATTEMPTS,
+            payload,
+        },
+        options,
+    )
+    .await
+}
+
+/// Set `workspace`, insert `job` there, and clear the workspace again.
+async fn insert_in(
+    tx: &mut Transaction<'_, Postgres>,
+    workspace: &str,
+    job: NewJob,
+    mut options: EnqueueOptions,
+) -> Result<Enqueued, sqlx::Error> {
+    if crate::db::scope(tx).await?.workspace.is_some() {
+        return Err(sqlx::Error::InvalidArgument(format!(
+            "job `{}`: `enqueue_in` is for a transaction that works in no workspace; this one \
+             works in one already (use `enqueue`)",
+            job.kind
+        )));
+    }
+    options.workspace = Some(workspace.to_owned());
+    crate::db::set_workspace(tx, workspace).await?;
+    let enqueued = insert(tx, job, options).await;
+    let cleared = crate::db::clear_workspace(tx).await;
+    let enqueued = enqueued?;
+    cleared?;
+    Ok(enqueued)
+}
+
 /// A job row about to be inserted.
 struct NewJob {
     kind: &'static str,
@@ -292,11 +409,39 @@ async fn insert(
     job: NewJob,
     options: EnqueueOptions,
 ) -> Result<Enqueued, sqlx::Error> {
+    // A workspace's job is enqueued where that workspace's rows are in
+    // reach: refused in a transaction that set no workspace (row-level
+    // security would hide the queue from it). An instance-wide job is
+    // enqueued from a transaction that set nothing (the kernel lifts it for
+    // this one insert) or from the kernel scope, never from a workspace's
+    // (campbooks-cloud#207: row-level security refuses it there).
+    let what = format!("job `{}`", job.kind);
+    let lifted = match &options.workspace {
+        Some(workspace) => {
+            crate::db::require_scope(tx, workspace, &what).await?;
+            false
+        }
+        None => crate::db::lift_for_instance_rows(tx, &what, false).await?,
+    };
+    let enqueued = insert_row(tx, job, options).await?;
+    crate::db::lower(tx, lifted).await?;
+    Ok(enqueued)
+}
+
+async fn insert_row(
+    tx: &mut Transaction<'_, Postgres>,
+    job: NewJob,
+    options: EnqueueOptions,
+) -> Result<Enqueued, sqlx::Error> {
     if let Some(key) = &options.ordering_key {
-        // Serialize enqueuers of one ordering key until they commit, so
-        // enqueue order (`seq`) is also commit order for that key.
+        // Serialize enqueuers of one ordering key in one workspace (or of
+        // the instance-wide one) until they commit, so enqueue order (`seq`)
+        // is also commit order for that key there. Another workspace's
+        // enqueuers of the same key take another lock (campbooks-cloud#209).
         sqlx::query_scalar!(
-            "SELECT pg_advisory_xact_lock(hashtextextended('kernel.jobs.ordering_key:' || $1, 0))",
+            "SELECT pg_advisory_xact_lock(hashtextextended(
+                 'kernel.jobs.ordering_key:' || jsonb_build_array($1::text, $2::text)::text, 0))",
+            options.workspace,
             key
         )
         .fetch_one(&mut **tx)
@@ -308,7 +453,7 @@ async fn insert(
             (queue, kind, payload, workspace_id, unique_key, ordering_key, priority,
              run_at, max_attempts, trace_context)
         VALUES ($1, $2, $3, $4, $5, $6, $7, coalesce($8, now()), $9, $10)
-        ON CONFLICT (kind, unique_key)
+        ON CONFLICT (kind, unique_key, workspace_id)
             WHERE unique_key IS NOT NULL AND state IN ('pending', 'running')
             DO NOTHING
         RETURNING id AS "id: JobId"

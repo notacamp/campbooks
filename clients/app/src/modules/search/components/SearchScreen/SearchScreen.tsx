@@ -52,7 +52,7 @@ import {
   Warnings,
 } from "../../states";
 import { useRecentSearches } from "../../use-recent";
-import { useDebounced } from "../../use-debounced";
+import { useDebounced } from "~/lib/hooks/use-debounced";
 import { useSearchT } from "../../use-search-t";
 
 const DEBOUNCE_MS = 250;

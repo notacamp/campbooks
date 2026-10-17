@@ -1,10 +1,17 @@
 import type { ReactNode } from "react";
 
+import { useInCard } from "../../internal/in-card";
+
 import styles from "./Facts.module.css";
 
 /** A named group of facts (a description list) in a raised panel, like a {@link List}. */
 export function FactList({ children }: { children: ReactNode }) {
-  return <dl className={styles["list"]}>{children}</dl>;
+  const inCard = useInCard();
+  return (
+    <dl className={styles["list"]} data-in-card={inCard || undefined}>
+      {children}
+    </dl>
+  );
 }
 
 /** How a fact is doing; the dot repeats what the value says, never replaces it. */

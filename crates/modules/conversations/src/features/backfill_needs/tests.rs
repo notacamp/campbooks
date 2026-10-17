@@ -480,6 +480,46 @@ async fn an_open_question_its_answers_no_longer_support_is_withdrawn(db: PgPool)
 }
 
 #[sqlx::test(migrations = "../../../migrations")]
+async fn a_bill_raised_before_the_money_question_stays_until_it_is_asked(db: PgPool) {
+    // A bill an earlier version raised as Pay, on recent mail never asked
+    // the money question; the upgraded model cannot be asked yet (its
+    // answers check has not run), as when the daily AI cap is reached.
+    let kit = Kit::new(db.clone()).await;
+    let (workspace, _) = mailbox(&kit, &["needs"]).await;
+    before_attention(&db, workspace).await;
+    let bill = kit.message_of("needs-3").await;
+    sqlx::query(
+        "DELETE FROM conversations.decisions WHERE message_id = $1::uuid AND question = 'money'",
+    )
+    .bind(&bill)
+    .execute(&db)
+    .await
+    .unwrap();
+    sqlx::query(
+        "INSERT INTO conversations.needs
+             (conversation_id, workspace_id, message_id, reason, trust, basis, question, state,
+              latest_inbound_id)
+         SELECT conversation_id, workspace_id, id, 'pay', 'check', 'model', 'asks_action',
+                'open', id
+           FROM conversations.messages WHERE id = $1::uuid",
+    )
+    .bind(&bill)
+    .execute(&db)
+    .await
+    .unwrap();
+
+    let (kit, _model) = upgraded(&db, sorting_deps()).await;
+    seed(&db).await;
+    tick(&kit).await;
+    let bills: Vec<_> = needs_of(&db, workspace)
+        .await
+        .into_iter()
+        .filter(|(message, ..)| message == "needs-3")
+        .collect();
+    assert_eq!(bills, [row("needs-3", "pay", "open", "")]);
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
 async fn a_conversation_that_cannot_be_worked_out_is_skipped(db: PgPool) {
     let kit = Kit::new(db.clone()).await;
     let (workspace, _) = mailbox(&kit, &["needs"]).await;
@@ -539,8 +579,18 @@ async fn a_backfill_row_keeps_its_inbox_and_workspace(db: PgPool) {
     let kit = Kit::new(db.clone()).await;
     let (workspace, _) = mailbox(&kit, &["needs"]).await;
     seed(&db).await;
-    // The dispatcher's context (no workspace) may only start rows.
+    // A transaction that sets nothing sees no row (campbooks-cloud#129).
     let mut tx = kit.state.db.begin().await.unwrap();
+    let seen: i64 = sqlx::query_scalar("SELECT count(*) FROM conversations.needs_backfills")
+        .fetch_one(&mut *tx)
+        .await
+        .unwrap();
+    assert_eq!(seen, 0);
+    tx.rollback().await.unwrap();
+    // The dispatcher's context (the maintenance scope) may only start rows.
+    let mut tx = campbooks_kernel::db::begin_maintenance(&kit.state.db)
+        .await
+        .unwrap();
     let moved = sqlx::query(
         "UPDATE conversations.needs_backfills SET state = 'running', workspace_id = $1",
     )
@@ -549,7 +599,9 @@ async fn a_backfill_row_keeps_its_inbox_and_workspace(db: PgPool) {
     .await;
     assert!(moved.is_err(), "moved to another workspace");
     tx.rollback().await.unwrap();
-    let mut tx = kit.state.db.begin().await.unwrap();
+    let mut tx = campbooks_kernel::db::begin_maintenance(&kit.state.db)
+        .await
+        .unwrap();
     let finished = sqlx::query("UPDATE conversations.needs_backfills SET state = 'done'")
         .execute(&mut *tx)
         .await;
@@ -728,4 +780,57 @@ async fn recent_mail_no_checked_model_answered_is_read_again_once(db: PgPool) {
     .await
     .unwrap();
     assert_eq!(asked_again, 5);
+}
+
+/// Only the maintenance scope reads the backfills across workspaces: the
+/// kernel scope (which reaches the kernel's tables) sees none of them, and
+/// neither does a transaction that set nothing (campbooks-cloud#196).
+#[sqlx::test(migrations = "../../../migrations")]
+async fn only_the_maintenance_scope_reads_the_backfills(db: PgPool) {
+    let kit = Kit::new(db.clone()).await;
+    mailbox(&kit, &["needs"]).await;
+    mailbox(&kit, &["needs"]).await;
+    seed(&db).await;
+    let count = "SELECT count(*) FROM conversations.needs_backfills";
+    let owner: i64 = sqlx::query_scalar(count).fetch_one(&db).await.unwrap();
+    assert_eq!(owner, 2);
+    let kernel = campbooks_kernel::testing::kernel_scope_pool(&db).await;
+    let seen: i64 = sqlx::query_scalar(count).fetch_one(&kernel).await.unwrap();
+    assert_eq!(seen, 0, "the kernel scope");
+    let seen: i64 = sqlx::query_scalar(count)
+        .fetch_one(&kit.state.db)
+        .await
+        .unwrap();
+    assert_eq!(seen, 0, "nothing set");
+    let mut tx = campbooks_kernel::db::begin_maintenance(&kit.state.db)
+        .await
+        .unwrap();
+    let seen: i64 = sqlx::query_scalar(count).fetch_one(&mut *tx).await.unwrap();
+    assert_eq!(seen, 2, "the maintenance scope");
+    tx.rollback().await.unwrap();
+}
+
+/// The dispatcher's page jobs are each enqueued in their inbox's workspace,
+/// and leave its transaction working in none (campbooks-cloud#207).
+#[sqlx::test(migrations = "../../../migrations")]
+async fn the_dispatcher_leaves_no_workspace_set(db: PgPool) {
+    let kit = Kit::new(db.clone()).await;
+    let first = mailbox(&kit, &["needs"]).await;
+    let second = mailbox(&kit, &["needs"]).await;
+    let running: Vec<(WorkspaceId, super::Page)> = [first, second]
+        .into_iter()
+        .map(|(workspace, inbox)| (workspace, super::Page { inbox, after: None }))
+        .collect();
+    let mut tx = campbooks_kernel::db::begin_maintenance(&kit.state.db)
+        .await
+        .unwrap();
+    let queued = super::queue_pages(&mut tx, &running).await.unwrap();
+    assert_eq!(queued, 2);
+    let workspace: Option<String> =
+        sqlx::query_scalar("SELECT nullif(current_setting('campbooks.workspace_id', true), '')")
+            .fetch_one(&mut *tx)
+            .await
+            .unwrap();
+    assert_eq!(workspace, None);
+    tx.rollback().await.unwrap();
 }

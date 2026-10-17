@@ -56,5 +56,9 @@ async fn readers_cannot_trash_and_strangers_see_nothing(db: PgPool) {
         let hidden = kit.post(&leo, &format!("{base}/{action}"), None).await;
         assert_eq!(hidden.status, StatusCode::NOT_FOUND, "{action}");
     }
-    assert!(kit.events("conversations.changes_requested").await.is_empty());
+    assert!(
+        kit.events("conversations.changes_requested")
+            .await
+            .is_empty()
+    );
 }

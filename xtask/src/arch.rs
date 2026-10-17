@@ -289,6 +289,31 @@ static SCHEMA_STATEMENT: LazyLock<Regex> = LazyLock::new(|| {
     .unwrap_or_else(|e| unreachable!("static regex compiles: {e}"))
 });
 
+/// A function's own `SET search_path = pg_catalog, pg_temp`: the hygiene a
+/// `SECURITY DEFINER` function needs, so names in its body cannot be
+/// shadowed by the caller's objects. The only mention of `search_path` a
+/// migration may make. Exactly those two entries, `pg_temp` last: a match
+/// followed by `,` (another entry), by `;` or by the end of the file (a
+/// statement changing the session's path) captures group 2 and is refused
+/// (campbooks-cloud#213). `pg_temp` must end the name: a following
+/// identifier character, `$` included (`pg_temp$x` is another schema),
+/// captures group 1 and is refused too (campbooks-cloud#214; the `regex`
+/// crate has no look-ahead for `pg_temp(?![\w$])`).
+static PINNED_SEARCH_PATH: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r"\bset\s+search_path\s*(?:=|to)\s*pg_catalog\s*,\s*pg_temp([\w$]*)(\s*(?:[,;]|$))?")
+        .unwrap_or_else(|e| unreachable!("static regex compiles: {e}"))
+});
+
+/// A string literal naming `search_path` (`set_config('search_path', …)`)
+/// changes the path at run time: refused, as string literals are otherwise
+/// dropped before the schema checks read a migration (campbooks-cloud#214).
+fn names_search_path_in_a_string(sql: &str) -> bool {
+    SQL_NOISE.find_iter(sql).any(|m| {
+        let text = m.as_str();
+        text.starts_with('\'') && text.to_lowercase().contains("search_path")
+    })
+}
+
 static QUALIFIED_NAME: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(r"\b([a-z_][a-z0-9_]*)\s*\.\s*[a-z_]")
         .unwrap_or_else(|e| unreachable!("static regex compiles: {e}"))
@@ -296,7 +321,8 @@ static QUALIFIED_NAME: LazyLock<Regex> = LazyLock::new(|| {
 
 /// Each migration touches only its owner's schema: it creates, alters or
 /// drops no other schema, never qualifies a name with another module's (or
-/// the kernel's) schema, and never changes `search_path`. `files` are
+/// the kernel's) schema, and never changes `search_path` (a function's own
+/// pinned `SET search_path = pg_catalog, pg_temp` aside). `files` are
 /// `(file name, SQL)`; files with a malformed name are reported by
 /// [`check_migrations`] and skipped here.
 pub fn check_migration_schemas(
@@ -304,7 +330,7 @@ pub fn check_migration_schemas(
     modules: &BTreeSet<String>,
 ) -> Vec<String> {
     let mut violations = Vec::new();
-    for (name, sql) in files {
+    for (name, raw) in files {
         let Some(owner) = MIGRATION_NAME
             .captures(name)
             .and_then(|caps| caps.get(2))
@@ -313,7 +339,7 @@ pub fn check_migration_schemas(
             continue;
         };
         let sql = SQL_NOISE
-            .replace_all(sql, " ")
+            .replace_all(raw, " ")
             .to_lowercase()
             .replace('"', "");
         let mut touched = BTreeSet::new();
@@ -336,7 +362,11 @@ pub fn check_migration_schemas(
                  touch only the `{owner}` schema (reference other modules by ID)"
             ));
         }
-        if sql.contains("search_path") {
+        let pinned = PINNED_SEARCH_PATH
+            .captures_iter(&sql)
+            .filter(|caps| caps.get(1).is_some_and(|tail| tail.is_empty()) && caps.get(2).is_none())
+            .count();
+        if sql.matches("search_path").count() > pinned || names_search_path_in_a_string(raw) {
             violations.push(format!(
                 "migrations/{name}: must not change `search_path`; qualify names with `{owner}.`"
             ));
@@ -641,13 +671,14 @@ fn check_meta(
             && key != "query_in"
             && key != "access"
             && key != "rate_limit"
+            && key != "secret_once"
         {
             violations.push(format!(
                 "OpenAPI operation `{name}`: unknown key `x-campbooks.{key}`"
             ));
         }
     }
-    for key in ["mutates", "automation", "assistant"] {
+    for key in ["mutates", "automation", "assistant", "secret_once"] {
         if meta.get(key).is_some_and(|v| !v.is_boolean()) {
             violations.push(format!(
                 "OpenAPI operation `{name}`: `x-campbooks.{key}` must be a boolean"
@@ -703,6 +734,14 @@ fn check_meta(
     };
     check_method(name, method, meta, violations);
     check_rate_limit(name, meta, violations);
+    if meta.get("secret_once").is_some()
+        && meta.get("mutates").and_then(serde_json::Value::as_bool) != Some(true)
+    {
+        violations.push(format!(
+            "OpenAPI operation `{name}`: `x-campbooks.secret_once` is only for operations that \
+             mutate (the idempotency layer stores answers of mutating operations only)"
+        ));
+    }
     meta.get("mutates")
         .and_then(serde_json::Value::as_bool)
         .map(|mutates| Meta { mutates, undo })
@@ -1108,7 +1147,7 @@ pub fn check_admin_sources(files: &[(String, String)]) -> Vec<String> {
         {
             violations.push(format!(
                 "{path}: names `{ADMIN_READS_SETTING}`; only the kernel may (use \
-                 `kernel::db::begin_admin` / `ADMIN_READS_SETTING`)"
+                 `kernel::db::begin_admin`)"
             ));
         }
     }
@@ -1467,6 +1506,83 @@ mod tests {
     }
 
     #[test]
+    fn only_a_functions_pinned_search_path_is_allowed() {
+        let modules: BTreeSet<String> = ["mail"].map(String::from).into();
+        let ok = [sql(
+            "20261012000000_kernel__count.sql",
+            "CREATE FUNCTION kernel.count(n integer) RETURNS bigint LANGUAGE sql\n\
+             SECURITY DEFINER\n    SET search_path = pg_catalog, pg_temp\n\
+             AS $$ SELECT count(*) FROM kernel.jobs $$;",
+        )];
+        assert!(check_migration_schemas(&ok, &modules).is_empty());
+        let bad = [
+            sql(
+                "20261012000001_kernel__path.sql",
+                "SET search_path = pg_catalog, pg_temp;",
+            ),
+            sql(
+                "20261012000002_kernel__path.sql",
+                "CREATE FUNCTION kernel.f() RETURNS int LANGUAGE sql \
+                 SET search_path = kernel AS $$ SELECT 1 $$;",
+            ),
+            sql(
+                "20261012000003_kernel__path.sql",
+                "CREATE FUNCTION kernel.f() RETURNS int LANGUAGE sql \
+                 SET search_path = pg_catalog, pg_temp AS $$ SELECT 1 $$; \
+                 SET search_path TO kernel;",
+            ),
+            // Another entry after `pg_temp`, so it is not last.
+            sql(
+                "20261012000004_kernel__path.sql",
+                "CREATE FUNCTION kernel.f() RETURNS int LANGUAGE sql SECURITY DEFINER \
+                 SET search_path = pg_catalog, pg_temp, kernel AS $$ SELECT 1 $$;",
+            ),
+            sql(
+                "20261012000005_kernel__path.sql",
+                "CREATE FUNCTION kernel.f() RETURNS int LANGUAGE sql SECURITY DEFINER \
+                 SET search_path = pg_catalog, pg_temp , public AS $$ SELECT 1 $$;",
+            ),
+            // `pg_temp` before another schema.
+            sql(
+                "20261012000006_kernel__path.sql",
+                "CREATE FUNCTION kernel.f() RETURNS int LANGUAGE sql SECURITY DEFINER \
+                 SET search_path = pg_temp, pg_catalog AS $$ SELECT 1 $$;",
+            ),
+            // A session-wide statement at the very end of the file.
+            sql(
+                "20261012000007_kernel__path.sql",
+                "SELECT 1;\nSET search_path = pg_catalog, pg_temp\n",
+            ),
+            // `pg_temp$x` and `pg_tempx` are other schemas, not `pg_temp`
+            // (campbooks-cloud#214).
+            sql(
+                "20261012000008_kernel__path.sql",
+                "CREATE FUNCTION kernel.f() RETURNS int LANGUAGE sql SECURITY DEFINER \
+                 SET search_path = pg_catalog, pg_temp$x AS $$ SELECT 1 $$;",
+            ),
+            sql(
+                "20261012000009_kernel__path.sql",
+                "CREATE FUNCTION kernel.f() RETURNS int LANGUAGE sql SECURITY DEFINER \
+                 SET search_path = pg_catalog, pg_tempx AS $$ SELECT 1 $$;",
+            ),
+            // The path changed at run time, through a string.
+            sql(
+                "20261012000010_kernel__path.sql",
+                "CREATE FUNCTION kernel.f() RETURNS int LANGUAGE plpgsql SECURITY DEFINER \
+                 SET search_path = pg_catalog, pg_temp AS $$ BEGIN \
+                 PERFORM set_config('search_path', 'kernel', true); RETURN 1; END $$;",
+            ),
+            sql(
+                "20261012000011_kernel__path.sql",
+                "SELECT pg_catalog.set_config('SEARCH_PATH', 'public', false);",
+            ),
+        ];
+        let v = check_migration_schemas(&bad, &modules);
+        assert_eq!(v.len(), 11, "{v:#?}");
+        assert!(v.iter().all(|v| v.contains("search_path")), "{v:#?}");
+    }
+
+    #[test]
     fn background_errors_are_violations() {
         assert!(check_background(&[]).is_empty());
         let v = check_background(&["job `x`: must be `mail.<name>`".to_owned()]);
@@ -1764,6 +1880,35 @@ mod tests {
         assert!(
             v.iter()
                 .any(|m| m.contains("`POST /l`: `x-campbooks.rate_limit` must be \"send\""))
+        );
+    }
+
+    #[test]
+    fn secret_once_is_a_boolean_on_a_mutating_operation() {
+        let mut secret = meta(true);
+        secret["secret_once"] = serde_json::json!(true);
+        let mut on_a_read = meta(false);
+        on_a_read["secret_once"] = serde_json::json!(true);
+        let mut not_a_flag = meta(true);
+        not_a_flag["secret_once"] = serde_json::json!("yes");
+        let spec = serde_json::json!({ "paths": {
+            "/s": { "post": { "operationId": "mail.s", "x-campbooks": secret } },
+            "/r": { "get": { "operationId": "mail.r", "x-campbooks": on_a_read } },
+            "/f": { "post": { "operationId": "mail.f", "x-campbooks": not_a_flag } },
+        }});
+        let owners = owners(&[
+            ("POST", "/s", "mail"),
+            ("GET", "/r", "mail"),
+            ("POST", "/f", "mail"),
+        ]);
+        let v = check_operations(&spec, &owners);
+        assert_eq!(v.len(), 2, "{v:#?}");
+        assert!(v.iter().any(|m| {
+            m.contains("`GET /r`: `x-campbooks.secret_once` is only for operations that mutate")
+        }));
+        assert!(
+            v.iter()
+                .any(|m| m.contains("`POST /f`: `x-campbooks.secret_once` must be a boolean"))
         );
     }
 

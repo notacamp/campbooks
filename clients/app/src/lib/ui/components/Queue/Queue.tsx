@@ -18,11 +18,13 @@ export interface HomeLayoutProps {
 /** Home: the "needs you" queue with its context column (stacks on narrow screens). */
 export function HomeLayout({ children, aside, asideLabel }: HomeLayoutProps) {
   return (
-    <main className={styles["home"]}>
-      <div className={styles["main"]}>{children}</div>
-      <aside className={styles["aside"]} aria-label={asideLabel}>
-        {aside}
-      </aside>
+    <main className={styles["page"]}>
+      <div className={styles["home"]}>
+        <div className={styles["main"]}>{children}</div>
+        <aside className={styles["aside"]} aria-label={asideLabel}>
+          {aside}
+        </aside>
+      </div>
     </main>
   );
 }
@@ -64,6 +66,10 @@ export interface QueueGroupProps {
   signal: Signal;
   name: string;
   count: number;
+  /** One action for the whole group, at the end of its heading ("All 3 already paid"). */
+  action?: ReactNode | undefined;
+  /** A muted line under the heading, saying why the group is as it is. */
+  note?: string | undefined;
   /** {@link Item}s. */
   children: ReactNode;
 }
@@ -73,13 +79,17 @@ export interface QueueGroupProps {
  * the structure; it is deliberately not a landmark (six regions per page
  * would only add noise for screen-reader users).
  */
-export function QueueGroup({ signal, name, count, children }: QueueGroupProps) {
+export function QueueGroup({ signal, name, count, action, note, children }: QueueGroupProps) {
   return (
     <section className={styles["group"]} data-signal={signal}>
-      <h2 className={styles["groupTitle"]}>
-        <Dot signal={signal} />
-        {name} <span className={styles["count"]}>{count}</span>
-      </h2>
+      <div className={styles["groupHead"]}>
+        <h2 className={styles["groupTitle"]}>
+          <Dot signal={signal} />
+          {name} <span className={styles["count"]}>{count}</span>
+        </h2>
+        {action === undefined ? null : <div className={styles["groupAction"]}>{action}</div>}
+      </div>
+      {note === undefined ? null : <p className={styles["groupNote"]}>{note}</p>}
       <div className={styles["items"]}>{children}</div>
     </section>
   );

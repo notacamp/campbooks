@@ -11,7 +11,7 @@ use std::{
 };
 
 use serde_json::Value;
-use sqlx::{PgExecutor, PgPool, postgres::PgListener};
+use sqlx::{PgConnection, PgPool, postgres::PgListener};
 use tokio::{
     sync::Notify,
     task::{self, JoinError, JoinSet},
@@ -28,6 +28,7 @@ use super::{
 use crate::{
     AppState,
     config::JobsConfig,
+    db,
     events::EventId,
     telemetry::{self, JobOutcome},
 };
@@ -264,8 +265,21 @@ impl Worker {
         id: JobId,
         attempt: u32,
     ) -> Result<bool, sqlx::Error> {
-        mark_succeeded(&self.shared.state.db, &self.shared.id, id, attempt).await
+        mark_succeeded_on(&self.shared.state.db, &self.shared.id, id, attempt).await
     }
+}
+
+/// How far past now a schedule's row may be due (`.0`) and leased (`.1`), in
+/// seconds, before it counts as stuck: twice the longest wait a tick or a
+/// retry gives it (the schedule's period, the longest retry delay), and
+/// twice the lease a worker renews.
+#[expect(
+    clippy::cast_precision_loss,
+    reason = "periods and delays are far below 2^52 seconds"
+)]
+pub(crate) fn stuck_after(config: &JobsConfig, every: Duration) -> (f64, f64) {
+    let longest = every.as_secs_f64().max(config.retry_max_seconds as f64);
+    (2.0 * longest, 2.0 * config.lease_seconds as f64)
 }
 
 /// The jobs a worker is running, by task, with when they were claimed.
@@ -311,8 +325,23 @@ impl Shared {
     /// jobs offers its next jobs (by priority, then age), and the claim takes
     /// them in turns — every workspace's first job before any second one —
     /// starting with the workspace served least recently. A job waits while
-    /// an earlier job with its ordering key is unfinished.
+    /// an earlier job of its workspace (or, instance-wide, of none) with its
+    /// ordering key is unfinished. Across every
+    /// workspace: in the kernel scope.
     async fn claim(&self, queue: &str, limit: usize) -> Result<Vec<Claimed>, sqlx::Error> {
+        let mut tx = db::begin_kernel(&self.state.db).await?;
+        let claimed = self.claim_in(&mut tx, queue, limit).await?;
+        tx.commit().await?;
+        Ok(claimed)
+    }
+
+    /// [`claim`](Self::claim)'s statement, in `conn`.
+    async fn claim_in(
+        &self,
+        conn: &mut PgConnection,
+        queue: &str,
+        limit: usize,
+    ) -> Result<Vec<Claimed>, sqlx::Error> {
         let limit = i64::try_from(limit).unwrap_or(i64::MAX);
         let rows = sqlx::query!(
             r#"
@@ -357,6 +386,7 @@ impl Shared {
                          AND (j.ordering_key IS NULL OR NOT EXISTS (
                               SELECT 1 FROM kernel.jobs o
                                WHERE o.ordering_key = j.ordering_key
+                                 AND o.workspace_key = j.workspace_key
                                  AND o.state IN ('pending', 'running')
                                  AND o.seq < j.seq))
                        ORDER BY j.priority DESC, j.run_at, j.seq
@@ -389,7 +419,7 @@ impl Shared {
             self.id,
             self.lease().as_secs_f64(),
         )
-        .fetch_all(&self.state.db)
+        .fetch_all(conn)
         .await?;
 
         bump(&self.counters.claimed, rows.len() as u64);
@@ -479,6 +509,7 @@ impl Shared {
     /// Jobs whose worker stopped renewing their lease go back to pending
     /// (or to failed, if that was their last attempt).
     async fn reap(&self) -> Result<(), sqlx::Error> {
+        let mut tx = db::begin_kernel(&self.state.db).await?;
         let reclaimed = sqlx::query!(
             r#"
             WITH expired AS (
@@ -502,35 +533,53 @@ impl Shared {
             "#,
             REAP_BATCH,
         )
-        .fetch_all(&self.state.db)
+        .fetch_all(&mut *tx)
         .await?;
+        tx.commit().await?;
         for job in reclaimed {
             tracing::warn!(job_id = %job.id, kind = %job.kind, state = %job.state,
                 "reclaimed a job whose lease expired");
+            if job.state == "failed" {
+                self.died(&job.kind);
+            }
         }
         Ok(())
     }
 
+    /// A job of `kind` died: say so in the line its kind is watched by, if
+    /// it is ([`Watch`](super::Watch)).
+    fn died(&self, kind: &str) {
+        if let Some(watch) = self.registry.watch(kind) {
+            tracing::warn!(watch = watch.code, kind, "{}", watch.died);
+        }
+    }
+
     /// Enqueue `schedule`'s job if this tick has not been enqueued yet.
     async fn tick(&self, schedule: &super::registry::ScheduleInfo) -> Result<(), sqlx::Error> {
-        let mut tx = self.state.db.begin().await?;
-        let tick = sqlx::query_scalar!(
-            r#"
+        // Schedules are the instance's: their jobs belong to no workspace.
+        let mut tx = db::begin_kernel(&self.state.db).await?;
+        // A tick recorded more than one period ahead never comes due (no
+        // workspace can write the table, campbooks-cloud#207, but a clock
+        // that jumped could): it counts as this tick, so the schedule runs.
+        let tick: Option<i64> = sqlx::query_scalar(
+            r"
             INSERT INTO kernel.schedules (name, last_tick)
             VALUES ($1, floor(extract(epoch FROM now())::float8 / $2::float8)::bigint)
             ON CONFLICT (name) DO UPDATE
                SET last_tick = excluded.last_tick, updated_at = now()
              WHERE kernel.schedules.last_tick < excluded.last_tick
+                OR kernel.schedules.last_tick > excluded.last_tick + 1
             RETURNING last_tick
-            "#,
-            schedule.name,
-            schedule.every.as_secs_f64(),
+            ",
         )
+        .bind(schedule.name)
+        .bind(schedule.every.as_secs_f64())
         .fetch_optional(&mut *tx)
         .await?;
         let Some(tick) = tick else {
             return Ok(());
         };
+        self.heal(&mut tx, schedule).await?;
         let enqueued = super::insert(
             &mut tx,
             NewJob {
@@ -547,6 +596,50 @@ impl Shared {
         Ok(())
     }
 
+    /// Before a tick enqueues: retire a row that holds `schedule`'s unique
+    /// key but would never run as the schedule's (campbooks-cloud#207), so
+    /// the tick does not count as its duplicate. Stuck is a row of a
+    /// workspace (only a forgery, from before the policies refused it), a
+    /// pending one due later than any tick or retry would put it, or a
+    /// running one leased longer than any worker leases. It is marked failed
+    /// with the reason (kept for inspection, then pruned), never run. A row
+    /// due soon, retrying, or held by a live worker is left alone.
+    async fn heal(
+        &self,
+        tx: &mut sqlx::Transaction<'static, sqlx::Postgres>,
+        schedule: &super::registry::ScheduleInfo,
+    ) -> Result<(), sqlx::Error> {
+        let (later, leased) = stuck_after(&self.config, schedule.every);
+        let healed = sqlx::query!(
+            r#"
+            UPDATE kernel.jobs
+               SET state = 'failed', finished_at = now(), locked_by = NULL, locked_until = NULL,
+                   last_error = 'stuck schedule row replaced by the schedule''s tick',
+                   updated_at = now()
+             WHERE kind = $1 AND unique_key = 'schedule:' || $1
+               AND state IN ('pending', 'running')
+               AND (workspace_id IS NOT NULL
+                    OR (state = 'pending' AND run_at > now() + make_interval(secs => $2))
+                    OR (state = 'running' AND locked_until > now() + make_interval(secs => $3)))
+            RETURNING id AS "id: JobId", workspace_id IS NOT NULL AS "of_a_workspace!"
+            "#,
+            schedule.name,
+            later,
+            leased,
+        )
+        .fetch_all(&mut **tx)
+        .await?;
+        for row in healed {
+            tracing::warn!(
+                schedule = schedule.name,
+                job_id = %row.id,
+                of_a_workspace = row.of_a_workspace,
+                "replaced a stuck schedule row; it is kept as failed for inspection"
+            );
+        }
+        Ok(())
+    }
+
     /// Record success. With an open job transaction, the success is written
     /// in it and committed with the handler's work, provided this worker
     /// still holds the job.
@@ -557,12 +650,12 @@ impl Shared {
         elapsed: Duration,
     ) -> Option<JobOutcome> {
         let held = match tx {
-            Some(mut tx) => match mark_succeeded(&mut *tx, &self.id, info.id, info.attempt).await {
+            Some(mut tx) => match self.mark_in(&mut tx, info).await {
                 Ok(true) => tx.commit().await.map(|()| true),
                 Ok(false) => tx.rollback().await.map(|()| false),
                 Err(e) => Err(e),
             },
-            None => mark_succeeded(&self.state.db, &self.id, info.id, info.attempt).await,
+            None => mark_succeeded_on(&self.state.db, &self.id, info.id, info.attempt).await,
         };
         match held {
             Ok(true) => {
@@ -588,6 +681,21 @@ impl Shared {
         }
     }
 
+    /// Mark `info` succeeded in its own (handler's) transaction. The handler
+    /// is done: an instance-wide job's transaction, which set no workspace
+    /// and so sees no row of the queue, is lifted into the kernel scope for
+    /// this last statement.
+    async fn mark_in(
+        &self,
+        tx: &mut sqlx::Transaction<'static, sqlx::Postgres>,
+        info: &JobInfo,
+    ) -> Result<bool, sqlx::Error> {
+        if info.workspace.is_none() {
+            db::enter_kernel_scope(tx).await?;
+        }
+        mark_succeeded(tx, &self.id, info.id, info.attempt).await
+    }
+
     /// Record a failed attempt: retry later, or mark the job failed (dead).
     /// `None` when the failure could not be recorded.
     async fn fail(&self, info: &JobInfo, error: &JobError) -> Option<JobOutcome> {
@@ -606,7 +714,9 @@ impl Shared {
             self.config.retry_base_ms as f64 / 1_000.0,
             self.config.retry_max_seconds as f64,
         );
-        let outcome = sqlx::query!(
+        let outcome = async {
+            let mut tx = db::begin_kernel(&self.state.db).await?;
+            let row = sqlx::query!(
             r#"
             UPDATE kernel.jobs
                SET state = CASE WHEN $4 OR attempts >= max_attempts THEN 'failed' ELSE 'pending' END,
@@ -634,12 +744,17 @@ impl Shared {
             max,
             message,
         )
-        .fetch_optional(&self.state.db)
+        .fetch_optional(&mut *tx)
+        .await?;
+            tx.commit().await?;
+            Ok::<_, sqlx::Error>(row)
+        }
         .await;
         match outcome {
             Ok(Some(row)) if row.state == "failed" => {
                 bump(&self.counters.failed, 1);
                 tracing::error!(error = %message, "job failed for good");
+                self.died(&info.kind);
                 Some(JobOutcome::Failed)
             }
             Ok(Some(row)) => {
@@ -681,8 +796,10 @@ impl Shared {
     /// Record queue depth and the age of the oldest ready job, per queue,
     /// for every queue this worker serves (0 when empty).
     async fn sample_queues(&self) {
-        let rows = sqlx::query!(
-            r#"
+        let rows = async {
+            let mut tx = db::begin_kernel(&self.state.db).await?;
+            let rows = sqlx::query!(
+                r#"
             SELECT queue AS "queue!",
                    count(*) FILTER (WHERE state = 'pending' AND run_at <= now()) AS "ready!",
                    count(*) FILTER (WHERE state = 'pending' AND run_at > now()) AS "scheduled!",
@@ -694,8 +811,12 @@ impl Shared {
              WHERE state IN ('pending', 'running', 'failed')
              GROUP BY queue
             "#
-        )
-        .fetch_all(&self.state.db)
+            )
+            .fetch_all(&mut *tx)
+            .await?;
+            tx.commit().await?;
+            Ok::<_, sqlx::Error>(rows)
+        }
         .await;
         let rows = match rows {
             Ok(rows) => rows,
@@ -727,18 +848,24 @@ impl Shared {
 
     /// Renew the lease of a running job.
     async fn heartbeat(&self, info: &JobInfo) {
-        let renewed = sqlx::query!(
-            r#"
+        let renewed = async {
+            let mut tx = db::begin_kernel(&self.state.db).await?;
+            let done = sqlx::query!(
+                r#"
             UPDATE kernel.jobs
                SET locked_until = now() + make_interval(secs => $4), updated_at = now()
              WHERE id = $1 AND state = 'running' AND locked_by = $2 AND attempts = $3
             "#,
-            info.id as JobId,
-            self.id,
-            super::attempts_to_db(info.attempt),
-            self.lease().as_secs_f64(),
-        )
-        .execute(&self.state.db)
+                info.id as JobId,
+                self.id,
+                super::attempts_to_db(info.attempt),
+                self.lease().as_secs_f64(),
+            )
+            .execute(&mut *tx)
+            .await?;
+            tx.commit().await?;
+            Ok::<_, sqlx::Error>(done)
+        }
         .await;
         match renewed {
             Ok(done) if done.rows_affected() == 0 => {
@@ -756,8 +883,10 @@ impl Shared {
             return;
         }
         let ids: Vec<JobId> = jobs.iter().map(|j| j.id).collect();
-        let released = sqlx::query!(
-            r#"
+        let released = async {
+            let mut tx = db::begin_kernel(&self.state.db).await?;
+            let done = sqlx::query!(
+                r#"
             UPDATE kernel.jobs
                SET state = 'pending',
                    attempts = greatest(attempts - 1, 0),
@@ -767,10 +896,14 @@ impl Shared {
                    updated_at = now()
              WHERE id = ANY($1) AND state = 'running' AND locked_by = $2
             "#,
-            &ids as &[JobId],
-            self.id,
-        )
-        .execute(&self.state.db)
+                &ids as &[JobId],
+                self.id,
+            )
+            .execute(&mut *tx)
+            .await?;
+            tx.commit().await?;
+            Ok::<_, sqlx::Error>(done)
+        }
         .await;
         match released {
             Ok(done) => {
@@ -853,9 +986,22 @@ async fn with_heartbeat<F: Future>(shared: &Shared, info: &JobInfo, work: F) -> 
     }
 }
 
+/// [`mark_succeeded`] in a transaction of its own, in the kernel scope.
+async fn mark_succeeded_on(
+    pool: &PgPool,
+    worker: &str,
+    id: JobId,
+    attempt: u32,
+) -> Result<bool, sqlx::Error> {
+    let mut tx = db::begin_kernel(pool).await?;
+    let held = mark_succeeded(&mut tx, worker, id, attempt).await?;
+    tx.commit().await?;
+    Ok(held)
+}
+
 /// Mark a job this worker holds succeeded. `false` when it no longer holds it.
-async fn mark_succeeded<'e>(
-    db: impl PgExecutor<'e>,
+async fn mark_succeeded(
+    conn: &mut PgConnection,
     worker: &str,
     id: JobId,
     attempt: u32,
@@ -871,7 +1017,7 @@ async fn mark_succeeded<'e>(
         worker,
         super::attempts_to_db(attempt),
     )
-    .execute(db)
+    .execute(conn)
     .await?;
     Ok(done.rows_affected() == 1)
 }

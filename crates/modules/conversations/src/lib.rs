@@ -61,6 +61,12 @@ pub use domain::{
 pub use features::{
     inbox_visibility::visibility, kept_mail::kept_mail, search_source::search_source,
 };
+/// The owner's money mail as an eval set to label (campbooks-cloud#167).
+pub mod labelling {
+    pub use crate::features::labelling_export::{
+        LabellingItem, MAX_ITEMS, OWNER, export_for_labelling, manifest,
+    };
+}
 
 /// Module name: crate directory, Postgres schema and OpenAPI tag.
 pub const NAME: &str = "conversations";
@@ -150,6 +156,14 @@ impl ConversationsDeps {
 /// The `conversations` module, composed with `deps`, ready for the server
 /// to mount.
 pub fn module(deps: ConversationsDeps) -> Module {
+    // Scout's summary of a need's email: only while the `complete` role may
+    // receive mail here.
+    let summaries = deps
+        .ai
+        .clone()
+        .filter(features::summarize_need::may_read_mail);
+    // Scout's replies ask the `complete` role, when it may read mail.
+    let writer = features::reply::ReplyWriter::new(deps.ai.clone());
     let model = match deps.model {
         Some(strategy) => Some(features::decide_message::ModelPass::new(strategy, None)),
         None => deps.ai.filter(model_may_read_mail).map(|gateway| {
@@ -159,7 +173,8 @@ pub fn module(deps: ConversationsDeps) -> Module {
             features::decide_message::ModelPass::new(Arc::new(strategy), Some(gateway))
         }),
     };
-    let needs = domain::needs::NeedSettings::new(deps.config.needs_window_days, &deps.policy);
+    let needs = domain::needs::NeedSettings::new(deps.config.needs_window_days, &deps.policy)
+        .with_summaries(summaries.is_some());
     Module {
         name: NAME,
         scopes: scopes::ALL,
@@ -168,7 +183,8 @@ pub fn module(deps: ConversationsDeps) -> Module {
                 undo: chrono::TimeDelta::seconds(i64::from(deps.config.undo_send_seconds)),
             }))
             .layer(Extension(needs.clone()))
-            .layer(Extension(deps.policy.clone())),
+            .layer(Extension(deps.policy.clone()))
+            .layer(Extension(writer)),
         admin_router: None,
         background: Background::new()
             .publishes::<events::MessageReceived>()
@@ -181,12 +197,15 @@ pub fn module(deps: ConversationsDeps) -> Module {
             .publishes::<events::InboxChanged>()
             .publishes::<events::InboxRemoved>()
             .publishes::<events::NeedChanged>()
+            .publishes::<events::NeedSummarised>()
             .publishes::<events::RuleChanged>()
             .handler(features::release_send::ReleaseSend)
             .handler(features::check_send::CheckSend)
             .consumer(features::record_send::RecordSend)
             .handler(features::apply_rule::ApplyRules::new(needs.clone()))
             .handler(features::fill_templates::FillTemplates)
+            .handler(features::refresh_need::RefreshNeed::new(needs.clone()))
+            .handler(features::summarize_need::SummarizeNeed::new(summaries))
             .handler(features::apply_changes::ApplyChanges::new(
                 deps.rules,
                 deps.policy.clone(),
@@ -216,6 +235,8 @@ pub fn module(deps: ConversationsDeps) -> Module {
             .on_event::<features::create_inbox::CreateInbox>()
             .on_event::<features::forget_connection::ForgetConnection>()
             .on_event::<features::forget_member::ForgetMember>()
+            .on_event::<features::suspended_authors::PauseSuspendedAuthor>()
+            .on_event::<features::suspended_authors::ResumeUnsuspendedAuthor>()
             .on_event::<features::purge_workspace::ScheduleWorkspacePurge>()
             .job::<features::purge_workspace::PurgeWorkspace>(),
         resources: domain::resources::resources(),
@@ -248,8 +269,8 @@ fn router() -> OpenApiRouter<AppState> {
     use features::{
         archive, create_draft, get_attachment, get_conversation, get_message_body, labels,
         list_conversations, list_drafts, list_inboxes, list_labels, list_senders, list_streams,
-        mark_read, move_to_stream, needs, rules, send_draft, spam, star, suggest_rules, trash,
-        update_draft,
+        mark_read, move_to_stream, needs, reply, rules, send_draft, spam, star, suggest_rules,
+        trash, update_draft,
     };
     OpenApiRouter::new()
         .routes(routes!(list_inboxes::handler))
@@ -293,6 +314,8 @@ fn router() -> OpenApiRouter<AppState> {
         .routes(routes!(rules::restore))
         .routes(routes!(suggest_rules::suggest))
         .routes(routes!(suggest_rules::dismiss))
+        .routes(routes!(reply::suggest))
+        .routes(routes!(reply::write))
 }
 
 #[cfg(test)]
@@ -328,6 +351,8 @@ mod tests {
             "conversations.check_send",
             "conversations.apply_rule",
             "conversations.fill_templates",
+            "conversations.refresh_need",
+            "conversations.summarize_need",
             "conversations.backfill_needs",
             "conversations.dispatch_needs_backfills",
         ] {

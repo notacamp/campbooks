@@ -1,0 +1,30 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO system.ai_usage_days AS d (workspace_id, day, calls)\n               VALUES ($1, $2, 1)\n               ON CONFLICT (workspace_id, day) DO UPDATE SET calls = d.calls + 1\n                WHERE $3::int IS NULL OR d.calls < $3\n               RETURNING d.calls",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "calls",
+        "type_info": "Int4",
+        "origin": {
+          "Table": {
+            "table": "system.ai_usage_days",
+            "name": "calls"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Date",
+        "Int4"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "204610c6c9997d155e701fb8205a375c2d4fac8125e3dc9ab4a2763c9e42c40b"
+}

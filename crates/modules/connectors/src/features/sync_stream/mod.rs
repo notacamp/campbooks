@@ -38,6 +38,7 @@ use crate::{
     gmail::{self, Reader},
     google::LabelInfo,
     mail::{IndexOp, ReadError},
+    metrics::{self, SyncOutcome},
     provider::ProviderError,
     zoho,
 };
@@ -113,6 +114,7 @@ impl JobHandler for SyncStream {
             {
                 Ok(token) => token,
                 Err(TokenError::NeedsReauth(reason)) => {
+                    metrics::sync_finished(target.provider, SyncOutcome::Refused);
                     return self
                         .needs_reauth(ctx, workspace, &target, reason, now)
                         .await;
@@ -131,18 +133,29 @@ impl JobHandler for SyncStream {
         let read = match target.provider {
             Provider::Google => {
                 self.run_gmail(ctx, workspace, &target, &token, &backlog, now)
-                    .await?
+                    .await
             }
             Provider::Zoho => {
                 self.run_zoho(ctx, workspace, &target, &token, &backlog, now)
-                    .await?
+                    .await
             }
-        };
+        }
+        .inspect_err(|_| metrics::sync_finished(target.provider, SyncOutcome::Failed))?;
+        // Without a page the run waits or has recorded its trouble, and
+        // counted it.
         let Some(read) = read else {
             return Ok(());
         };
-        self.apply(ctx, workspace, &target, inbox, read, backlog.last(), now)
-            .await
+        let applied = self
+            .apply(ctx, workspace, &target, inbox, read, backlog.last(), now)
+            .await;
+        let outcome = if applied.is_ok() {
+            SyncOutcome::Ok
+        } else {
+            SyncOutcome::Failed
+        };
+        metrics::sync_finished(target.provider, outcome);
+        applied
     }
 }
 
@@ -226,6 +239,7 @@ impl SyncStream {
             };
         let rate = self.deps.config.google.units_per_second;
         if let Err(wait) = schedule::take_budget(ctx.pool(), target.provider, cost, rate).await? {
+            metrics::sync_finished(target.provider, SyncOutcome::Throttled);
             Self::wait_for_budget(ctx, workspace, target.stream, wait, now).await?;
             return Ok(None);
         }
@@ -318,6 +332,7 @@ impl SyncStream {
         let key = schedule::connection_budget(target.connection);
         let rate = Rate::per_minute(config.requests_per_minute);
         if let Err(wait) = schedule::take(ctx.pool(), &key, cost, rate).await? {
+            metrics::sync_finished(target.provider, SyncOutcome::Throttled);
             Self::wait_for_budget(ctx, workspace, target.stream, wait, now).await?;
             return Ok(None);
         }
@@ -569,6 +584,14 @@ impl SyncStream {
         now: DateTime<Utc>,
     ) -> Result<(), JobError> {
         let poll = &self.deps.config.poll;
+        let outcome = match err {
+            ProviderError::Unauthorized | ProviderError::InvalidGrant => SyncOutcome::Refused,
+            ProviderError::RateLimited { .. } => SyncOutcome::Throttled,
+            ProviderError::NotFound
+            | ProviderError::Unavailable(_)
+            | ProviderError::Unexpected(_) => SyncOutcome::Failed,
+        };
+        metrics::sync_finished(target.provider, outcome);
         match err {
             ProviderError::Unauthorized => self.refused(ctx, workspace, target, now).await,
             ProviderError::InvalidGrant => {

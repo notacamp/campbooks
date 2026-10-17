@@ -4,17 +4,20 @@
 //! At most one need per conversation, kept in `conversations.needs`:
 //!
 //! - **Raised** ([`raise`], pure) from the decide pass's answers about the
-//!   newest inbound message that is not in spam or the trash: `pay`, `reply`
-//!   or `do` from answers the policy let act (`pay` is an action asked by
-//!   mail sorted to Receipts); `review` for a suspicious message (a warning)
-//!   or, when a model answers, for a suggestion put to the member as a
-//!   question. The facts only ever say "no" (ADR 0018), so a sure need comes
-//!   from the model; a facts "no" still wins over a model's "yes".
+//!   newest inbound message that is not in spam or the trash: `pay` when the
+//!   money answer says a payment is still owed, always as a question ("Is it
+//!   paid?", campbooks-cloud#167: Campbooks cannot see the bank); `reply` or
+//!   `do` from answers the policy let act; `review` for a suspicious message
+//!   (a warning) or, when a model answers, for a suggestion put to the
+//!   member as a question. Mail sorted to Receipts needs nothing but a
+//!   payment still owed: a receipt or a payment confirmation needs nothing.
+//!   The facts only ever say "no" (ADR 0018), so a sure need comes from the
+//!   model; a facts "no" still wins over a model's "yes".
 //! - **Settled** ([`settle`], pure) against what happened since: a reply
 //!   clears Reply and Do, an archive clears Reply and Review, the trash or
 //!   spam (the conversation's, or the need's own message's) clears
 //!   everything, and a member's verdict (Done, Not needed, a confirmed
-//!   question) wins.
+//!   question, Already paid, Still to pay) wins.
 //! - **Refreshed** ([`refresh`]) wherever those inputs change, publishing
 //!   `conversations.need_changed` with a growing revision when the need did.
 //!
@@ -42,7 +45,8 @@ use crate::{
 pub const SURFACE: &str = "surface";
 /// The `urgency` level meaning "today".
 const TODAY_LEVEL: f64 = 2.0;
-/// The stream whose mail asks for payment rather than an action.
+/// The stream of automated money mail: only a payment still owed needs
+/// anything there.
 const RECEIPTS: &str = "receipts";
 /// The stream of people writing personally.
 const PRIMARY: &str = "primary";
@@ -57,6 +61,10 @@ pub struct NeedSettings {
     pub window: TimeDelta,
     /// Which answers may act.
     pub policy: Policy,
+    /// Whether a need that opens queues Scout's summary of its email
+    /// (`conversations.summarize_need`): only when the `complete` role may
+    /// receive mail on this server.
+    pub summaries: bool,
 }
 
 impl NeedSettings {
@@ -65,7 +73,16 @@ impl NeedSettings {
         Self {
             window: TimeDelta::days(i64::from(days)),
             policy: policy.clone(),
+            summaries: false,
         }
+    }
+
+    /// The same settings, queueing a summary for each need that opens when
+    /// `on`.
+    #[must_use]
+    pub const fn with_summaries(mut self, on: bool) -> Self {
+        self.summaries = on;
+        self
     }
 
     /// The confidence from which a model suggestion becomes a question.
@@ -198,6 +215,40 @@ fn settled_no(answers: &[Answer], question: &str) -> bool {
         .any(|a| a.question == question && a.acted && !a.is_true())
 }
 
+/// The answer saying the message asks for a payment still owed, when one
+/// counts: the policy let it act, or it is the model's, at least
+/// [`NeedSettings::check_floor`] sure (a Pay need is a question either
+/// way). An acted answer saying otherwise wins.
+fn owed<'a>(answers: &'a [Answer], settings: &NeedSettings) -> Option<&'a Answer> {
+    let money = |a: &&Answer| a.question == triage::MONEY;
+    let says_owed = |a: &Answer| a.value.as_str() == Some(triage::OWED);
+    if taught_no_ask(answers)
+        || answers
+            .iter()
+            .filter(money)
+            .any(|a| a.acted && !says_owed(a))
+    {
+        return None;
+    }
+    answers
+        .iter()
+        .filter(money)
+        .filter(|a| says_owed(a))
+        .find(|a| {
+            a.acted
+                || (a.basis == NeedBasis::Model
+                    && a.confidence.is_some_and(|c| c >= settings.check_floor()))
+        })
+}
+
+/// Whether a rule the member taught says this mail asks nothing of them: no
+/// bill to pay either.
+fn taught_no_ask(answers: &[Answer]) -> bool {
+    answers
+        .iter()
+        .any(|a| a.basis == NeedBasis::Taught && a.question == triage::ASKS_ACTION && !a.is_true())
+}
+
 /// The need the answers about `message` raise, if any, under `settings`.
 pub fn raise(message: MessageId, answers: &[Answer], settings: &NeedSettings) -> Option<Need> {
     let check_floor = settings.check_floor();
@@ -236,15 +287,20 @@ pub fn raise(message: MessageId, answers: &[Answer], settings: &NeedSettings) ->
     });
     let may_ask = taught_ask || may_ask(stream, answers);
     let asks = accepted(answers, triage::ASKS_ACTION);
-    let raised = if let Some(asks) = asks.filter(|_| stream == Some(RECEIPTS)) {
+    let owed = owed(answers, settings).filter(|_| stream != Some(NEWSLETTERS));
+    let raised = if let Some(owed) = owed {
+        // Campbooks cannot see the bank: a payment still owed is always a
+        // question, "Is it paid?", until a member answers it.
         Some(need(
             NeedReason::Pay,
-            NeedTrust::Sure,
-            asks.basis,
-            NeedQuestion::AsksAction,
-            asks,
+            NeedTrust::Check,
+            owed.basis,
+            NeedQuestion::Money,
+            owed,
         ))
-    } else if !may_ask {
+    } else if !may_ask || (stream == Some(RECEIPTS) && !taught_ask) {
+        // Money mail asks for nothing but a payment, and the money answer
+        // says none is owed (a receipt, a payment confirmation): nothing.
         None
     } else if let Some(reply) = accepted(answers, triage::NEEDS_REPLY) {
         Some(need(
@@ -337,6 +393,7 @@ fn rule_clears(answers: &[Answer], question: NeedQuestion) -> bool {
         return false;
     }
     surfaces_never(answers)
+        || (question == NeedQuestion::Money && taught_no_ask(answers))
         || answers.iter().any(|a| {
             a.basis == NeedBasis::Taught && a.question == question.as_str() && !a.is_true()
         })
@@ -381,13 +438,17 @@ pub enum Settled {
 /// design).
 pub fn settle(mut need: Need, since: Since) -> Settled {
     match since.verdict {
-        Some(NeedVerdict::Done) => return Settled::Cleared(need, ClearCause::Done),
+        // Paid already is done for a Pay need: nothing is filed yet.
+        Some(NeedVerdict::Done | NeedVerdict::AlreadyPaid) => {
+            return Settled::Cleared(need, ClearCause::Done);
+        }
         Some(NeedVerdict::NotNeeded) => return Settled::Cleared(need, ClearCause::NotNeeded),
-        Some(NeedVerdict::Confirmed) => {
+        Some(NeedVerdict::Confirmed | NeedVerdict::StillToPay) => {
             // "Yes, it needs a reply": the question becomes what it asked.
             if need.trust == NeedTrust::Check {
                 need.reason = match need.question {
                     NeedQuestion::AsksAction => NeedReason::Do,
+                    NeedQuestion::Money => NeedReason::Pay,
                     NeedQuestion::NeedsReply | NeedQuestion::Suspicious => NeedReason::Reply,
                 };
             }
@@ -544,19 +605,36 @@ async fn candidate(
     // as it is, settled against what happened since.
     let mut raised = None;
     let mut reread = false;
+    let mut recent = false;
+    let mut money_asked = true;
     if let Some(newest) = &newest {
-        let recent = newest.sent_at >= Utc::now() - settings.window;
+        recent = newest.sent_at >= Utc::now() - settings.window;
         reread = row.is_some_and(|r| r.message_id == newest.id);
         if recent || reread {
             let answers = answers(tx, newest.id).await?;
+            money_asked = answers.iter().any(|a| a.question == triage::MONEY);
             raised = raise(newest.id, &answers, settings);
         }
     }
     let open = row.filter(|r| r.state == "open");
     let withdrawn = match open {
-        Some(row) if reread && raised.is_none() => {
-            row.verdict_on(row.message_id)? != Some(NeedVerdict::Confirmed)
+        // A bill raised before the money question, on mail recent enough to
+        // be asked it, stays until it is answered: a pass that could not ask
+        // (the daily AI cap, a model that failed the answers check) must not
+        // drop a bill that may still be owed.
+        Some(row)
+            if reread
+                && raised.is_none()
+                && recent
+                && !money_asked
+                && row.need()?.reason == NeedReason::Pay =>
+        {
+            false
         }
+        Some(row) if reread && raised.is_none() => !matches!(
+            row.verdict_on(row.message_id)?,
+            Some(NeedVerdict::Confirmed | NeedVerdict::StillToPay)
+        ),
         _ => false,
     };
     let need = match (raised, open) {
@@ -657,10 +735,188 @@ async fn live_conversation(
     }))
 }
 
+/// What the check of a first need's source message found.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum SourceCheck {
+    /// It can carry the need.
+    Carries,
+    /// It is in spam or the trash (or gone): no need, now or later.
+    Cannot,
+    /// Another transaction is changing it right now: undecided.
+    Busy,
+}
+
+/// How a refresh ended.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Refreshed {
+    /// Settled (stored, cleared, or nothing to change).
+    Settled,
+    /// A first need was not stored because its message is being changed by
+    /// another transaction; the need is still to be worked out.
+    Deferred,
+}
+
+/// How long the follow-up job waits for a lock before it gives up and
+/// retries.
+const JOB_LOCK_TIMEOUT: &str = "5s";
+
+/// Check the conversation and the message an open first need is about to be
+/// stored for.
+///
+/// The race: a decide pass reads a message before a provider move to spam or
+/// the trash commits, then stores an open need after it. It exists only when
+/// the conversation has no needs row yet: with one, `current` locks it `FOR
+/// UPDATE`, which serialises refreshes, and the move's own refresh (the end
+/// of `apply_changes`) clears a stale need. So this runs only for a first
+/// insert.
+///
+/// What it takes, in this order, and keeps until the transaction ends:
+/// 1. the conversation row `FOR KEY SHARE`, which is what the foreign key of
+///    the needs insert would take anyway. Taking it first means the insert
+///    can no longer wait for a conversation lock a writer holds (flags and
+///    rules lock the conversation `FOR UPDATE` and then update messages,
+///    which would wait on the share lock below: a cycle if we took the
+///    message first). A lock held by another transaction is not waited for
+///    (`SKIP LOCKED`); the same transaction's own lock is not skipped, so
+///    `judge`, `reopen`, flags and rules refreshing their own conversation
+///    are unaffected (and the first two always have a needs row anyway).
+/// 2. the message row `FOR SHARE`, re-read under the lock. Every later
+///    writer of that message (a move, a flag, a template fill) waits for
+///    this transaction to commit.
+///
+/// In the request and event paths nothing waits: a row someone else holds is
+/// [`SourceCheck::Busy`], nothing is stored, and the refresh is
+/// [`Refreshed::Deferred`], which [`refresh`] turns into a durable
+/// `conversations.refresh_need` job. That is safe whatever the writer is: not
+/// every writer refreshes the conversation (`fill_templates` does not), so
+/// the follow-up does not depend on it.
+///
+/// The follow-up job (`wait`) holds no needs row and no message lock when it
+/// gets here (plain reads so far), so it may wait: both locks are taken
+/// blocking under a 5 s `lock_timeout`, and a timeout is
+/// [`SourceCheck::Busy`] (the job retries). While it waits for the message it
+/// holds the conversation `FOR KEY SHARE`, which a request taking that
+/// conversation `FOR UPDATE` waits on; a longer cycle (with a rule run over
+/// several conversations) is possible, and bounded: the deadlock detector or
+/// the lock timeout breaks it and the job retries. Because its reads predate
+/// the wait, once it holds both locks the refresh is worked out again, once,
+/// in the same transaction and without waiting (see [`refresh_now`]): a
+/// newer message that someone else holds makes it retry; waiting means a
+/// long-held lock does not burn its attempts.
+///
+/// Lock order of every caller of [`refresh`] (the order before it reaches
+/// this check): `apply_changes`, messages, then the conversation's counts,
+/// then here; flags (`flags::apply`), conversation, then messages, then here;
+/// rules (`rules/apply`), the conversation, then messages, then here; `judge`, `reopen`,
+/// conversation, then the needs row (never here); the decide pass, the
+/// backfill and the follow-up job, the needs row (none yet) then here. This
+/// check never waits except in the job, so it adds no wait edge to any of
+/// them.
+async fn source_can_carry(
+    tx: &mut Transaction<'_, Postgres>,
+    conversation: ConversationId,
+    message: MessageId,
+    wait: bool,
+) -> Result<SourceCheck> {
+    let (conversation_sql, message_sql) = if wait {
+        (
+            "SELECT 1 FROM conversations.conversations WHERE id = $1 FOR KEY SHARE",
+            "SELECT NOT in_spam AND NOT in_trash FROM conversations.messages
+              WHERE id = $1 FOR SHARE",
+        )
+    } else {
+        (
+            "SELECT 1 FROM conversations.conversations WHERE id = $1
+               FOR KEY SHARE SKIP LOCKED",
+            "SELECT NOT in_spam AND NOT in_trash FROM conversations.messages
+              WHERE id = $1 FOR SHARE SKIP LOCKED",
+        )
+    };
+    // A savepoint: a lock timeout aborts only this part of the transaction.
+    let mut sp = sqlx::Connection::begin(&mut **tx).await?;
+    // The timeout in force, put back afterwards (transaction-local, not a
+    // session-wide RESET).
+    let mut previous_timeout: Option<String> = None;
+    if wait {
+        previous_timeout = Some(
+            sqlx::query_scalar("SELECT current_setting('lock_timeout')")
+                .fetch_one(&mut *sp)
+                .await?,
+        );
+        sqlx::query("SELECT set_config('lock_timeout', $1, true)")
+            .bind(JOB_LOCK_TIMEOUT)
+            .execute(&mut *sp)
+            .await?;
+    }
+    let locked = async {
+        let conversation_held: Option<i32> = sqlx::query_scalar(conversation_sql)
+            .bind(conversation)
+            .fetch_optional(&mut *sp)
+            .await?;
+        if conversation_held.is_none() {
+            return Ok::<_, sqlx::Error>(None);
+        }
+        let free: Option<bool> = sqlx::query_scalar(message_sql)
+            .bind(message)
+            .fetch_optional(&mut *sp)
+            .await?;
+        Ok(Some(free))
+    }
+    .await;
+    match &locked {
+        Err(e)
+            if e.as_database_error()
+                .and_then(sqlx::error::DatabaseError::code)
+                .as_deref()
+                == Some("55P03") =>
+        {
+            sp.rollback().await?;
+            return Ok(SourceCheck::Busy);
+        }
+        Err(_) => {
+            locked.map_err(Error::from)?;
+            unreachable!("the error was returned above");
+        }
+        Ok(_) => {}
+    }
+    if let Some(previous) = previous_timeout {
+        sqlx::query("SELECT set_config('lock_timeout', $1, true)")
+            .bind(previous)
+            .execute(&mut *sp)
+            .await?;
+    }
+    sp.commit().await?;
+    match locked.map_err(Error::from)? {
+        // The conversation row is held by another transaction.
+        None => Ok(SourceCheck::Busy),
+        Some(Some(true)) => Ok(SourceCheck::Carries),
+        Some(Some(false)) => Ok(SourceCheck::Cannot),
+        // `SKIP LOCKED` says nothing for a locked row and for a missing one;
+        // a plain read tells them apart and never waits.
+        Some(None) => {
+            let exists: bool = sqlx::query_scalar(
+                "SELECT EXISTS (SELECT 1 FROM conversations.messages WHERE id = $1)",
+            )
+            .bind(message)
+            .fetch_one(&mut **tx)
+            .await?;
+            Ok(if exists {
+                SourceCheck::Busy
+            } else {
+                SourceCheck::Cannot
+            })
+        }
+    }
+}
+
 /// Work out conversation `id`'s need again and, when it changed, store it
 /// and publish `conversations.need_changed` in `tx`. A conversation that is
 /// gone, has no inbound message, or is in a kept read-only inbox
 /// (`detached_at`) changes nothing.
+///
+/// A first need whose message another transaction is changing is not stored
+/// now; a `conversations.refresh_need` job, enqueued in `tx`, works it out
+/// again a few seconds later.
 pub async fn refresh(
     tx: &mut Transaction<'_, Postgres>,
     events: &EventBus,
@@ -668,8 +924,57 @@ pub async fn refresh(
     id: ConversationId,
     settings: &NeedSettings,
 ) -> Result<()> {
+    if refresh_now(tx, events, workspace, id, settings, false).await? == Refreshed::Deferred {
+        crate::features::refresh_need::enqueue(tx, workspace, id).await?;
+    }
+    Ok(())
+}
+
+/// [`refresh`] without the follow-up: says whether it deferred. `wait` is
+/// for the follow-up job only (see [`source_can_carry`]).
+pub async fn refresh_now(
+    tx: &mut Transaction<'_, Postgres>,
+    events: &EventBus,
+    workspace: &str,
+    id: ConversationId,
+    settings: &NeedSettings,
+    wait: bool,
+) -> Result<Refreshed> {
+    match refresh_pass(tx, events, workspace, id, settings, wait, false).await? {
+        Pass::Done(done) => Ok(done),
+        // Once only, and without waiting: the second pass reads everything
+        // again and may pick a newer message than the one the job holds; its
+        // own locks pass at once, and a message someone else holds is Busy
+        // (the job rolls back and retries with fresh reads), so it never
+        // waits on reads it made before a wait.
+        Pass::Again => {
+            match refresh_pass(tx, events, workspace, id, settings, false, true).await? {
+                Pass::Done(done) => Ok(done),
+                Pass::Again => unreachable!("the second pass does not ask again"),
+            }
+        }
+    }
+}
+
+/// How one pass of [`refresh_now`] ended.
+enum Pass {
+    Done(Refreshed),
+    /// The waiting job got its locks after reading: read everything again.
+    Again,
+}
+
+#[allow(clippy::too_many_arguments, clippy::too_many_lines)]
+async fn refresh_pass(
+    tx: &mut Transaction<'_, Postgres>,
+    events: &EventBus,
+    workspace: &str,
+    id: ConversationId,
+    settings: &NeedSettings,
+    wait: bool,
+    again: bool,
+) -> Result<Pass> {
     let Some(conversation) = live_conversation(tx, id).await? else {
-        return Ok(());
+        return Ok(Pass::Done(Refreshed::Settled));
     };
     let conversation_state = (conversation.archived, conversation.trashed);
     let row = current(tx, id).await?;
@@ -679,7 +984,7 @@ pub async fn refresh(
         withdrawn,
     } = candidate(tx, id, row.as_ref(), settings).await?;
     let Some(need) = need else {
-        return Ok(());
+        return Ok(Pass::Done(Refreshed::Settled));
     };
 
     let (since, sent) = since(tx, id, &conversation_state, row.as_ref(), &need).await?;
@@ -693,8 +998,21 @@ pub async fn refresh(
         Settled::Open(need) => (need, None),
         Settled::Cleared(need, cause) => (need, Some(*cause)),
     };
+    // A first need for a message a move may be changing right now: store
+    // nothing, the move's refresh decides (see `source_can_carry`).
+    if row.is_none() && cause.is_none() {
+        match source_can_carry(tx, id, need.message, wait).await? {
+            // The job waited for its locks: everything read so far may
+            // predate what it waited for (an archive, another refresh's
+            // need), so work it out again, once, with the locks held.
+            SourceCheck::Carries if wait && !again => return Ok(Pass::Again),
+            SourceCheck::Carries => {}
+            SourceCheck::Cannot => return Ok(Pass::Done(Refreshed::Settled)),
+            SourceCheck::Busy => return Ok(Pass::Done(Refreshed::Deferred)),
+        }
+    }
     if !worth_announcing(row.as_ref(), need, cause, latest)? {
-        return Ok(());
+        return Ok(Pass::Done(Refreshed::Settled));
     }
     let cleared_by = match cause {
         Some(ClearCause::Done | ClearCause::NotNeeded) => row.as_ref().and_then(|r| r.verdict_by),
@@ -735,6 +1053,18 @@ pub async fn refresh(
     )
     .fetch_one(&mut **tx)
     .await?;
+    // A need that opens for a message (new, or back after being cleared)
+    // gets Scout's summary of the email, through a job: never here, and
+    // once per message however often the need is worked out again. Mail
+    // that may be phishing gets none: a summary would retell the scam in
+    // Scout's voice, and the warning is what matters there.
+    let opened = cause.is_none()
+        && row
+            .as_ref()
+            .is_none_or(|r| r.state != "open" || r.message_id != need.message);
+    if settings.summaries && opened && need.question != NeedQuestion::Suspicious {
+        crate::features::summarize_need::enqueue(tx, workspace, need.message).await?;
+    }
     events
         .publish(
             tx,
@@ -760,7 +1090,7 @@ pub async fn refresh(
             },
         )
         .await?;
-    Ok(())
+    Ok(Pass::Done(Refreshed::Settled))
 }
 
 /// Whether settling `need` (cleared by `cause`, if any) changes what was
@@ -1078,26 +1408,112 @@ mod tests {
         assert!(!need.urgent);
     }
 
+    fn money(label: &str, confidence: f64, acted: bool) -> Answer {
+        confident(
+            answer(triage::MONEY, NeedBasis::Model, json!(label), acted),
+            confidence,
+        )
+    }
+
     #[test]
-    fn a_bill_sorted_to_receipts_is_pay() {
+    fn a_bill_is_a_pay_question() {
         let need = raised(&[
             stream(NeedBasis::Model, "receipts", true),
             answer(triage::ASKS_ACTION, NeedBasis::Model, json!(true), true),
             answer(triage::NEEDS_REPLY, NeedBasis::Model, json!(true), true),
             answer(triage::URGENCY, NeedBasis::Model, json!(2.0), true),
+            money("owed", 0.91, false),
         ])
         .unwrap();
-        assert_eq!(need.reason, NeedReason::Pay);
+        assert_eq!(
+            (need.reason, need.trust, need.question, need.basis),
+            (
+                NeedReason::Pay,
+                NeedTrust::Check,
+                NeedQuestion::Money,
+                NeedBasis::Model
+            )
+        );
         assert!(need.urgent);
+        assert_eq!(need.due_on, None, "no due date until one is read (#146)");
+    }
+
+    /// The bug of campbooks-cloud#167: an invoice already paid or a payment
+    /// confirmation the model reads as asking something became "Pay".
+    #[test]
+    fn a_receipt_or_a_payment_confirmation_needs_nothing() {
+        for label in ["paid", "neither"] {
+            let receipt = [
+                stream(NeedBasis::Model, "receipts", true),
+                answer(triage::ASKS_ACTION, NeedBasis::Model, json!(true), true),
+                answer(triage::HAS_DEADLINE, NeedBasis::Model, json!(true), true),
+                money(label, 0.95, false),
+            ];
+            assert_eq!(raised(&receipt), None, "{label}");
+        }
+        // Answered before the money question was asked: nothing until the
+        // model is asked again.
+        let unasked = [
+            stream(NeedBasis::Model, "receipts", true),
+            answer(triage::ASKS_ACTION, NeedBasis::Model, json!(true), true),
+        ];
+        assert_eq!(raised(&unasked), None);
     }
 
     #[test]
-    fn a_later_bill_in_a_receipts_conversation_is_pay() {
+    fn an_unsure_owed_is_no_pay() {
+        let unsure = [
+            stream(NeedBasis::Model, "receipts", true),
+            answer(triage::ASKS_ACTION, NeedBasis::Model, json!(true), true),
+            money("owed", 0.6, false),
+        ];
+        assert_eq!(raised(&unsure), None);
+        // An answer the policy let act counts at any confidence, and an
+        // acted answer saying otherwise wins over a confident "owed".
+        let acted = [money("owed", 0.6, true)];
+        assert_eq!(raised(&acted).unwrap().reason, NeedReason::Pay);
+        let settled = [money("paid", 0.6, true), money("owed", 0.95, false)];
+        assert_eq!(raised(&settled), None);
+    }
+
+    #[test]
+    fn a_taught_no_ask_is_no_bill() {
+        let answers = [
+            stream(NeedBasis::Model, "receipts", true),
+            money("owed", 0.95, false),
+            answer(triage::ASKS_ACTION, NeedBasis::Taught, json!(false), true),
+        ];
+        assert_eq!(raised(&answers), None);
+        assert!(rule_clears(&answers, NeedQuestion::Money));
+    }
+
+    #[test]
+    fn an_invoice_sent_by_hand_is_pay_and_a_newsletter_never() {
+        let by_hand = raised(&[
+            stream(NeedBasis::Model, "primary", true),
+            answer(triage::ASKS_ACTION, NeedBasis::Model, json!(true), true),
+            answer(triage::NEEDS_REPLY, NeedBasis::Model, json!(true), true),
+            money("owed", 0.9, false),
+        ])
+        .unwrap();
+        assert_eq!(
+            (by_hand.reason, by_hand.trust),
+            (NeedReason::Pay, NeedTrust::Check)
+        );
+        let promotion = [
+            stream(NeedBasis::Model, "newsletters", true),
+            money("owed", 0.9, false),
+        ];
+        assert_eq!(raised(&promotion), None);
+    }
+
+    #[test]
+    fn a_later_message_in_a_receipts_conversation() {
         // The conversation was placed by an earlier message: this stream
         // answer did not act, but the policy accepts it.
         let need = raised(&[
             stream(NeedBasis::Model, "receipts", false),
-            answer(triage::ASKS_ACTION, NeedBasis::Model, json!(true), true),
+            money("owed", 0.9, false),
         ])
         .unwrap();
         assert_eq!(need.reason, NeedReason::Pay);
@@ -1107,7 +1523,7 @@ mod tests {
         assert_eq!(
             raised(&[unsure.clone(), asks.clone()]),
             None,
-            "an unsure stream is no bill, and mail no answer sorted needs a deadline"
+            "mail no answer sorted needs a deadline"
         );
         let need = raised(&[
             unsure,
@@ -1146,16 +1562,6 @@ mod tests {
             answer(triage::HAS_DEADLINE, NeedBasis::Model, json!(true), true),
         ];
         assert_eq!(raised(&newsletter), None);
-    }
-
-    #[test]
-    fn an_invoice_sent_by_hand_is_do() {
-        let need = raised(&[
-            stream(NeedBasis::Model, "primary", true),
-            answer(triage::ASKS_ACTION, NeedBasis::Model, json!(true), true),
-        ])
-        .unwrap();
-        assert_eq!(need.reason, NeedReason::Do);
     }
 
     #[test]
@@ -1384,6 +1790,32 @@ mod tests {
                 );
             }
             Settled::Cleared(..) => panic!("a confirmed question stays open"),
+        }
+    }
+
+    #[test]
+    fn is_it_paid() {
+        let mut question = need(NeedReason::Pay);
+        question.trust = NeedTrust::Check;
+        question.question = NeedQuestion::Money;
+        let paid = Since {
+            verdict: Some(NeedVerdict::AlreadyPaid),
+            ..Since::default()
+        };
+        assert_eq!(
+            cause(&settle(question.clone(), paid)),
+            Some(ClearCause::Done)
+        );
+        let to_pay = Since {
+            verdict: Some(NeedVerdict::StillToPay),
+            ..Since::default()
+        };
+        match settle(question, to_pay) {
+            Settled::Open(need) => assert_eq!(
+                (need.reason, need.trust, need.basis),
+                (NeedReason::Pay, NeedTrust::Sure, NeedBasis::Member)
+            ),
+            Settled::Cleared(..) => panic!("still to pay stays open"),
         }
     }
 }

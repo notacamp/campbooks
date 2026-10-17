@@ -10,8 +10,9 @@
 //! `conversations.needs_backfills`; then:
 //!
 //! - `conversations.dispatch_needs_backfills`, every minute, starts the
-//!   pending rows (a maintenance transaction, no workspace set: it reads ids
-//!   and states only);
+//!   pending rows (a transaction in the maintenance scope: it reads ids and
+//!   states only, through the table's maintenance policies, and enqueues
+//!   each page job in its inbox's workspace, set for that enqueue only);
 //! - `conversations.backfill_needs` pages through one inbox's conversations
 //!   by id, in the inbox's workspace (row-level security applies), and runs
 //!   [`needs::refresh`] on each one whose last message falls within the
@@ -24,15 +25,25 @@
 //!   check on its answers (a check still running, or one the provider did
 //!   not answer, still queues: the pass waits for it), each of those conversations' newest inbound message sent within
 //!   the decide window (`CAMPBOOKS_CONVERSATIONS__DECIDE_BACKFILL_DAYS`)
-//!   that no checked model answered is queued for the model pass
+//!   that no checked model answered, or that lacks a checked answer to a
+//!   triage question added since (the money question, campbooks-cloud#167),
+//!   is queued for the model pass
 //!   (`conversations.decide_backlog`, one job per message, ids only), which
 //!   sorts it and works out its need again.
 //!
+//! - When the `complete` role may receive mail on this server, each open need
+//!   of those conversations whose email Scout has not summarised is queued
+//!   for `conversations.summarize_need` (campbooks-cloud#204): one job per
+//!   message, never on a request path, and a message already summarised is
+//!   not asked again.
+//!
 //! Running it again changes nothing: `refresh` publishes only when a need
-//! changed, and a message a checked model answered is not asked again.
+//! changed, and a message a checked model answered every question about is
+//! not asked again.
 
 use std::time::Duration;
 
+use campbooks_ai::decide::signals::email::triage_questions;
 use campbooks_kernel::{
     EventBus, Job, JobContext, JobError, JobHandler, db,
     jobs::{self, EnqueueOptions, Enqueued},
@@ -44,9 +55,20 @@ use sqlx::{Postgres, Transaction};
 
 use crate::{
     domain::needs::{self, NeedSettings},
-    features::decide_message::{Backlog, DecideBacklog, ModelPass},
+    features::{
+        decide_message::{Backlog, DecideBacklog, ModelPass},
+        summarize_need,
+    },
     model::{ConversationId, InboxId, MessageId},
 };
+
+/// The messages behind the open needs of some conversations that Scout has
+/// not summarised (or whose one failure may be tried again).
+const NEEDING_SUMMARY: &str = "SELECT n.message_id FROM conversations.needs n \
+       LEFT JOIN conversations.need_summaries s ON s.message_id = n.message_id \
+      WHERE n.conversation_id = ANY($1) AND n.state = 'open' \
+        AND n.question <> 'suspicious' \
+        AND (s.message_id IS NULL OR (s.state = 'failed' AND s.attempts < 2))";
 
 /// How often pending backfills are started.
 pub const EVERY: Duration = Duration::from_mins(1);
@@ -70,7 +92,11 @@ impl Job for DispatchNeedsBackfills {
     const MAX_ATTEMPTS: u32 = 1;
 
     async fn run(self, ctx: &mut JobContext) -> Result<(), JobError> {
-        let tx = ctx.tx().await?;
+        // Across workspaces, through the table's maintenance policies (ids
+        // and states only): the maintenance scope, allowed for this file in
+        // `architecture.toml`. It reaches no kernel table: each page job is
+        // enqueued in its inbox's workspace, set for that enqueue only.
+        let tx = ctx.maintenance_tx().await?;
         sqlx::query!(
             r#"UPDATE conversations.needs_backfills b SET state = 'running'
                 WHERE b.inbox_id IN (
@@ -94,23 +120,47 @@ impl Job for DispatchNeedsBackfills {
         )
         .fetch_all(&mut **tx)
         .await?;
-        let mut queued = 0_usize;
-        for row in &running {
-            let page = Page {
-                inbox: row.inbox,
-                after: row.after,
-            };
-            let enqueued =
-                jobs::enqueue_to::<BackfillNeeds>(tx, &page, page.options(row.workspace)).await?;
-            if matches!(enqueued, Enqueued::Created(_)) {
-                queued += 1;
-            }
-        }
+        let running: Vec<(WorkspaceId, Page)> = running
+            .iter()
+            .map(|row| {
+                let page = Page {
+                    inbox: row.inbox,
+                    after: row.after,
+                };
+                (row.workspace, page)
+            })
+            .collect();
+        let queued = queue_pages(tx, &running).await?;
         if queued > 0 {
             tracing::info!(inboxes = queued, "needs backfill pages queued");
         }
         Ok(())
     }
+}
+
+/// Enqueue each running backfill's page job from the dispatcher's
+/// transaction, which works in no workspace: each in its inbox's workspace,
+/// set for that enqueue only (`jobs::enqueue_to_in`), so nothing after it
+/// runs in the last inbox's workspace (campbooks-cloud#207). Returns how
+/// many were new.
+async fn queue_pages(
+    tx: &mut Transaction<'_, Postgres>,
+    running: &[(WorkspaceId, Page)],
+) -> Result<usize, sqlx::Error> {
+    let mut queued = 0_usize;
+    for (workspace, page) in running {
+        let enqueued = jobs::enqueue_to_in::<BackfillNeeds>(
+            tx,
+            &workspace.to_string(),
+            page,
+            page.options(*workspace),
+        )
+        .await?;
+        if matches!(enqueued, Enqueued::Created(_)) {
+            queued += 1;
+        }
+    }
+    Ok(queued)
 }
 
 /// One page of an inbox's backfill.
@@ -288,6 +338,9 @@ impl BackfillNeeds {
         if self.model.as_ref().is_some_and(|m| !m.refused()) {
             self.queue_model_pass(tx, workspace, &ids).await?;
         }
+        if self.needs.summaries {
+            Self::queue_summaries(tx, &ws, &ids).await?;
+        }
 
         let last = ids.last().copied().or(page.after);
         let finished = i64::try_from(ids.len()).unwrap_or(i64::MAX) < PAGE;
@@ -320,9 +373,28 @@ impl BackfillNeeds {
         Ok(())
     }
 
+    /// Queue Scout's summary (`conversations.summarize_need`, ids only, one
+    /// pending job per message) for the email behind each open need of
+    /// `conversations` that has none, or only a first failure. A message
+    /// already summarised is not asked again.
+    async fn queue_summaries(
+        tx: &mut Transaction<'_, Postgres>,
+        workspace: &str,
+        conversations: &[ConversationId],
+    ) -> Result<(), JobError> {
+        let unsummarised: Vec<MessageId> = sqlx::query_scalar(NEEDING_SUMMARY)
+            .bind(conversations)
+            .fetch_all(&mut **tx)
+            .await?;
+        for message in unsummarised {
+            summarize_need::enqueue(tx, workspace, message).await?;
+        }
+        Ok(())
+    }
+
     /// Queue the model pass for the newest inbound message of each of
-    /// `conversations` sent within the decide window that no checked model
-    /// answered.
+    /// `conversations` sent within the decide window that a checked model
+    /// has not answered every triage question about.
     async fn queue_model_pass(
         &self,
         tx: &mut Transaction<'_, Postgres>,
@@ -330,6 +402,7 @@ impl BackfillNeeds {
         conversations: &[ConversationId],
     ) -> Result<(), JobError> {
         let since = Utc::now() - self.decide_window;
+        let questions: Vec<String> = triage_questions().into_iter().map(|q| q.id).collect();
         let unanswered = sqlx::query_scalar!(
             r#"SELECT newest.id AS "id!: MessageId"
                  FROM (SELECT DISTINCT ON (m.conversation_id) m.id, m.sent_at
@@ -338,11 +411,15 @@ impl BackfillNeeds {
                           AND NOT m.in_spam AND NOT m.in_trash
                         ORDER BY m.conversation_id, m.sent_at DESC, m.id DESC) newest
                 WHERE newest.sent_at >= $2
-                  AND NOT EXISTS (SELECT 1 FROM conversations.decisions d
-                                   WHERE d.message_id = newest.id AND d.source = 'model'
-                                     AND d.model_version LIKE 'checked:%')"#,
+                  AND EXISTS (SELECT 1 FROM unnest($3::text[]) q (id)
+                               WHERE NOT EXISTS (
+                                     SELECT 1 FROM conversations.decisions d
+                                      WHERE d.message_id = newest.id AND d.source = 'model'
+                                        AND d.model_version LIKE 'checked:%'
+                                        AND d.question = q.id))"#,
             conversations as &[ConversationId],
             since,
+            &questions,
         )
         .fetch_all(&mut **tx)
         .await?;

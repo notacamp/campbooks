@@ -61,6 +61,15 @@ impl Policy {
     /// | `has_deadline` | 90% | never answers | 0.51, 97% | act ≥ 0.51 |
     /// | `urgency` | 85% | never answers | 0.73, 81% (does not hold) | record |
     /// | `suspicious` | 98% | never answers | 0.54, 100% | act ≥ 0.54 |
+    /// | `money` | 90% | never answers | not measured | record |
+    ///
+    /// `money` (campbooks-cloud#167) is not in the fictional set: its
+    /// operating point comes from mail the owner labels
+    /// (`cargo xtask eval decide --set-dir`), never from emails an agent
+    /// wrote. Until then it only records, and an "owed" answer the policy
+    /// does not accept raises a Pay need as a question from
+    /// [`CHECK_FLOOR`](Self::CHECK_FLOOR), like any other suggestion: Pay
+    /// always asks "Is it paid?", so the member decides.
     ///
     /// Without a trusted `decide` model only the facts' "no" acts: nothing
     /// is sorted out of Primary and no sure need is raised.
@@ -219,13 +228,34 @@ mod tests {
                 .clone()
         };
         let policy = Policy::baseline();
+        let asked = campbooks_ai::decide::signals::email::triage_questions();
         for (name, source) in [("facts", Source::Rules), ("jev", Source::Model)] {
             let run = run(name);
             let questions = run["questions"].as_array().unwrap();
+            let measured: Vec<&str> = questions
+                .iter()
+                .map(|q| q["id"].as_str().unwrap())
+                .collect();
+            // A question the report does not measure never acts.
+            for question in &asked {
+                if !measured.contains(&question.id.as_str()) {
+                    assert_eq!(
+                        policy.switch(&question.id, source),
+                        Switch::Record,
+                        "{name} / {}: not measured, so it only records",
+                        question.id
+                    );
+                }
+            }
+            // Changing that is a reviewed change citing the owner's eval.
             assert_eq!(
-                questions.len(),
-                campbooks_ai::decide::signals::email::triage_questions().len(),
-                "{name}"
+                policy.switch(questions::MONEY, source),
+                Switch::Record,
+                "{name}: money"
+            );
+            assert!(
+                measured.iter().all(|id| asked.iter().any(|q| q.id == *id)),
+                "{name}: the report measures a question nobody asks"
             );
             for question in questions {
                 let id = question["id"].as_str().unwrap();

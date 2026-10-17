@@ -19,7 +19,7 @@
       "title": "¿De quién quieres ver siempre el correo?",
       "lead": "Su correo se queda en tu bandeja de entrada y nunca se archiva. Son las personas a las que más respondes.",
       "label": "Personas que quieres ver siempre",
-      "noSenders": "Todavía no hay correo para sugerir. Añade una dirección o un dominio abajo.",
+      "noSenders": "Todavía no hay correo para sugerir. Escribe una dirección o un dominio arriba.",
       "count_one": "{{count}} correo",
       "count_other": "{{count}} correos"
     },
@@ -30,7 +30,8 @@
       "lists": "Boletines y listas de correo",
       "listsHint": "Correo con la cabecera List-Id",
       "automatic": "Notificaciones automáticas",
-      "automaticHint": "Correo marcado como enviado automáticamente"
+      "automaticHint": "Correo marcado como enviado automáticamente",
+      "senders": "Remitentes que nunca te necesitan"
     },
     "add": {
       "label": "Otra persona",
@@ -38,6 +39,14 @@
       "button": "Añadir",
       "invalid": "Escribe una dirección completa (nombre@example.com) o un dominio (example.com).",
       "freeMail": "{{domain}} es un proveedor de correo gratuito: una regla para todo él incluiría a gente que no conoces. Añade mejor la dirección de la persona."
+    },
+    "find": {
+      "label": "Buscar a alguien",
+      "placeholder": "Un nombre, una dirección o un dominio",
+      "newAddress": "Todavía no hay correo suyo",
+      "newDomain": "Todas las personas de {{domain}}",
+      "none": "Nadie en tu correo coincide con «{{text}}». Para añadir a alguien nuevo, escribe su dirección completa o un dominio.",
+      "failed": "Scout no ha podido buscarlo ahora. Inténtalo de nuevo en un momento."
     },
     "act": {
       "title": "Cuando Scout está seguro, ¿debe actuar?",
@@ -183,7 +192,8 @@
       "announce": "Esta es la regla que he entendido: {{rule}}",
       "saveFailed": "Scout no ha podido guardar la regla. Inténtalo de nuevo.",
       "savePartial": "Guardada en {{saved}} de {{total}} bandejas, y Scout se ha detenido. Reintentar la guarda en las demás.",
-      "retry": "Reintentar"
+      "retry": "Reintentar",
+      "description": "Dilo en una frase. Scout te muestra la regla, y a qué correos afecta, antes de guardar nada."
     },
     "builder": {
       "noModel": "Este servidor no tiene un modelo de lenguaje para leer frases, así que crea la regla aquí.",
@@ -191,10 +201,8 @@
       "then": "Entonces",
       "condition": "Qué correo",
       "action": "Qué hacer",
-      "value": "Dirección, dominio o palabras",
       "conditions": {
-        "sender_address": "El remitente es",
-        "sender_domain": "El dominio del remitente es",
+        "from": "Es de",
         "subject_contains": "El asunto contiene",
         "list": "Viene de una lista de correo",
         "automatic": "Se envió automáticamente"
@@ -207,18 +215,30 @@
         "archive": "Archivarlo"
       },
       "show": "Mostrar la regla",
-      "byHand": "Scout no ha podido leer tu frase, así que crea la regla aquí."
+      "byHand": "Scout no ha podido leer tu frase, así que crea la regla aquí.",
+      "title": "Crear una regla",
+      "lead": "Elige qué correo y luego qué hace Scout con él. Ninguna IA lee esto.",
+      "open": "Crear una regla a mano",
+      "back": "Decírselo a Scout en una frase",
+      "senders": "Remitentes",
+      "words": "Palabras del asunto",
+      "pickSender": "Marca al menos un remitente, o escribe una dirección completa o un dominio.",
+      "showMany": "Mostrar las reglas",
+      "oneEach": "Una regla por remitente, así cuenta el correo de cualquiera de ellos."
     },
     "questions": {
       "title": "Tus respuestas",
-      "askFirst": "Cuando Scout propone una regla a partir de tus correcciones, espera tu sí.",
-      "actThenTell": "Cuando Scout propone una regla a partir de tus correcciones en una bandeja solo tuya, la activa y te avisa, con Deshacer.",
+      "askFirst": "Pregúntame primero. Nada cambia hasta que digas que sí.",
+      "actThenTell": "Hazlo y avísame, con Deshacer, en una bandeja solo mía.",
       "never": "Todavía no has respondido a las preguntas de Scout.",
       "again": "Responder de nuevo a las preguntas",
       "start": "Responder a las preguntas",
-      "failed": "Scout no ha podido cargar tus respuestas ahora."
+      "failed": "Scout no ha podido cargar tus respuestas ahora.",
+      "description": "Tres preguntas rápidas: de quién llegan siempre los correos hasta ti, cuáles nunca te necesitan y si Scout pregunta primero.",
+      "proactivity": "Cuando Scout está seguro"
     },
-    "rules": "Tus reglas"
+    "rules": "Tus reglas",
+    "rulesDescription": "Todo lo que Scout hace por su cuenta. Si quitas una regla, deja de actuar; tú eliges si los correos que movió vuelven a su sitio."
   },
   "shortcuts": {
     "skip": "Omitir esta pregunta",

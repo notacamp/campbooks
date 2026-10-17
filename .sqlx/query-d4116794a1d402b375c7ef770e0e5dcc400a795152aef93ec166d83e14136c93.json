@@ -1,0 +1,28 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        UPDATE kernel.jobs j\n           SET state = 'pending', run_at = now(), attempts = 0,\n               finished_at = NULL, locked_by = NULL, locked_until = NULL,\n               updated_at = now()\n         WHERE j.id = $1 AND j.state = 'failed'\n           AND (j.unique_key IS NULL OR NOT EXISTS (\n                SELECT 1 FROM kernel.jobs o\n                 WHERE o.kind = j.kind AND o.unique_key = j.unique_key\n                   AND o.workspace_id IS NOT DISTINCT FROM j.workspace_id\n                   AND o.state IN ('pending', 'running')))\n        RETURNING j.queue\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "queue",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "kernel.jobs",
+            "name": "queue"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "d4116794a1d402b375c7ef770e0e5dcc400a795152aef93ec166d83e14136c93"
+}

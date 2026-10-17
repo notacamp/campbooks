@@ -225,10 +225,13 @@ fn the_admin_document_describes_its_security_and_permissions() {
 /// that add admin views; reviewed like an ADR (ADR 0015). Metadata only:
 /// Admin → Signups (slice S1) reads signup requests; Admin → People and
 /// Workspaces (slice S2) read workspaces, memberships, invitations (counted)
-/// and connections' health and sync state.
+/// and connections' health and sync state; the AI usage read
+/// (campbooks-cloud#152) reads counts of model calls and tokens.
 const ADMIN_READ_TABLES: &[&str] = &[
     "connectors.connections",
     "connectors.streams",
+    "system.ai_usage",
+    "system.ai_usage_days",
     "workspaces.invitations",
     "workspaces.members",
     "workspaces.signup_requests",

@@ -16,11 +16,13 @@
   "item": {
     "reply": "Responder",
     "done": "Hecho",
-    "later": "Más tarde",
+    "snooze": "Posponer",
     "hold": "Reservar tiempo",
-    "paid": "Marcar como pagado",
     "choice1": "Primera opción",
-    "choice2": "Segunda opción"
+    "choice2": "Segunda opción",
+    "choice3": "Tercera opción",
+    "nextAction": "Siguiente acción del elemento",
+    "previousAction": "Acción anterior del elemento"
   },
   "compose": {
     "draft": "Redáctalo por mí",

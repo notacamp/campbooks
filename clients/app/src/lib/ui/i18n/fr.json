@@ -11,7 +11,10 @@
   "toast": {
     "region": "Notifications",
     "undone": "Annulé : {{label}}",
-    "redone": "Rétabli : {{label}}"
+    "redone": "Rétabli : {{label}}",
+    "dismiss": "Fermer",
+    "retry": "Réessayer",
+    "cancelled": "Arrêté : {{label}}"
   },
   "note": {
     "label": "Où en sont les choses"
@@ -64,7 +67,7 @@
   },
   "conversation": {
     "unread": "Non lue",
-    "starred": "Suivie",
+    "starred": "Épinglée",
     "attachment": "Contient des pièces jointes"
   },
   "recipients": {

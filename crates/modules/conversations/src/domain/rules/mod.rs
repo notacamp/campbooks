@@ -8,7 +8,8 @@
 //! recording each change with what it was before so it can be put back.
 //!
 //! A conversation matches a rule when its newest inbound message does. A
-//! rule acts only while its author still may change the inbox; a member who
+//! rule acts only while its author still may change the inbox and is not
+//! suspended (`member_suspensions`, campbooks-cloud#147); a member who
 //! changed back what a rule did makes that conversation an **exception** the
 //! rule leaves alone ([`exceptions`]).
 
@@ -37,7 +38,8 @@ pub use facts::{
 };
 
 use crate::model::{
-    ConversationId, InboxId, InboxRole, LabelId, RuleId, RuleOrigin, RuleState, Stream, TeachingId,
+    ConversationId, InboxId, InboxRole, LabelId, PausedReason, RuleId, RuleOrigin, RuleState,
+    Stream, TeachingId,
 };
 
 /// How far back exceptions count when a rule is questioned.
@@ -333,6 +335,9 @@ pub struct Stored {
     pub last_applied_at: Option<DateTime<Utc>>,
     /// Whether its author still may change its inbox (else it is paused).
     pub author_may_act: bool,
+    /// Whether its author's account is suspended (it is paused until the
+    /// suspension is lifted).
+    pub author_suspended: bool,
     /// Whether its inbox is kept read-only (its connection was removed): no
     /// rule acts there any more.
     pub inbox_detached: bool,
@@ -340,13 +345,64 @@ pub struct Stored {
 
 impl Stored {
     /// The state the rule is in: an active rule whose author can no longer
-    /// change the inbox, or whose inbox is kept read-only, is paused.
+    /// change the inbox or is suspended, whose inbox is kept read-only, or
+    /// that names a sender domain which is a public suffix, is paused.
     pub fn effective_state(&self) -> RuleState {
-        if self.state == RuleState::Active && (!self.author_may_act || self.inbox_detached) {
+        if self.state == RuleState::Active
+            && (!self.author_may_act
+                || self.author_suspended
+                || self.inbox_detached
+                || self.domain_too_broad())
+        {
             RuleState::Paused
         } else {
             self.state
         }
+    }
+
+    /// Why the rule is paused, when it is: the reason that would still hold
+    /// once the most passing one clears (a lifted suspension resumes it on
+    /// its own; a member's pause, or an author who left, needs a member).
+    pub fn paused_reason(&self) -> Option<PausedReason> {
+        if self.effective_state() != RuleState::Paused {
+            return None;
+        }
+        Some(if self.inbox_detached {
+            PausedReason::InboxReadOnly
+        } else if self.domain_too_broad() {
+            // Before the author's reasons: adopting it would not make it act.
+            PausedReason::DomainTooBroad
+        } else if !self.author_may_act {
+            PausedReason::AuthorCannotWrite
+        } else if self.state == RuleState::Paused {
+            PausedReason::PausedByMember
+        } else {
+            PausedReason::AuthorUnavailable
+        })
+    }
+
+    /// For a proposed rule, why it would be paused once a member says yes
+    /// (confirming keeps its author, campbooks-cloud#197): an author away
+    /// for now, one who can no longer change the inbox, an inbox kept
+    /// read-only. `None` for any other rule, or when it would act.
+    pub fn paused_once_kept(&self) -> Option<PausedReason> {
+        if self.state != RuleState::Proposed {
+            return None;
+        }
+        let kept = Self {
+            state: RuleState::Active,
+            ..self.clone()
+        };
+        kept.paused_reason()
+    }
+
+    /// Whether a sender-domain condition names a public suffix: a rule
+    /// stored before the Public Suffix List was complete may. The engine
+    /// never matches it; only removing the rule clears this.
+    fn domain_too_broad(&self) -> bool {
+        self.conditions
+            .iter()
+            .any(|c| matches!(c, RuleCondition::SenderDomain(d) if !taught::is_owned_domain(d)))
     }
 
     /// The rule as the engine reads it.
@@ -380,6 +436,7 @@ struct RuleRow {
     applied_count: i32,
     last_applied_at: Option<DateTime<Utc>>,
     author_may_act: bool,
+    author_suspended: bool,
     inbox_detached: bool,
 }
 
@@ -404,6 +461,7 @@ impl TryFrom<RuleRow> for Stored {
             applied_count: row.applied_count,
             last_applied_at: row.last_applied_at,
             author_may_act: row.author_may_act,
+            author_suspended: row.author_suspended,
             inbox_detached: row.inbox_detached,
         })
     }
@@ -449,6 +507,10 @@ pub async fn find_any(conn: &mut PgConnection, id: RuleId) -> Result<Option<Stor
                    SELECT 1 FROM conversations.inbox_members im
                     WHERE im.inbox_id = r.inbox_id AND im.user_id = r.taught_by
                       AND im.role IN ('sender', 'manager'))) AS "author_may_act!",
+               EXISTS (
+                   SELECT 1 FROM conversations.member_suspensions s
+                    WHERE s.workspace_id = r.workspace_id AND s.user_id = r.taught_by
+                      AND s.suspended) AS "author_suspended!",
                i.detached_at IS NOT NULL AS "inbox_detached!"
           FROM conversations.rules r
           JOIN conversations.inboxes i ON i.id = r.inbox_id
@@ -480,6 +542,10 @@ pub async fn of_inboxes(conn: &mut PgConnection, inboxes: &[InboxId]) -> Result<
                    SELECT 1 FROM conversations.inbox_members im
                     WHERE im.inbox_id = r.inbox_id AND im.user_id = r.taught_by
                       AND im.role IN ('sender', 'manager'))) AS "author_may_act!",
+               EXISTS (
+                   SELECT 1 FROM conversations.member_suspensions s
+                    WHERE s.workspace_id = r.workspace_id AND s.user_id = r.taught_by
+                      AND s.suspended) AS "author_suspended!",
                i.detached_at IS NOT NULL AS "inbox_detached!"
           FROM conversations.rules r
           JOIN conversations.inboxes i ON i.id = r.inbox_id
@@ -694,4 +760,75 @@ pub fn hides(actions: &[RuleAction]) -> bool {
         RuleAction::Surface { value } => *value == SurfaceWhen::Never,
         RuleAction::AddLabel { .. } => false,
     })
+}
+
+#[cfg(test)]
+mod stored_tests {
+    use super::*;
+
+    fn stored(domain: &str, state: RuleState) -> Stored {
+        Stored {
+            id: RuleId::new(),
+            inbox: InboxId::new(),
+            teaching: TeachingId::new(),
+            conditions: vec![RuleCondition::SenderDomain(domain.into())],
+            actions: vec![RuleAction::Archive],
+            origin: RuleOrigin::Instruction,
+            origin_text: None,
+            state,
+            taught_by: None,
+            from_conversation: None,
+            created_at: Utc::now(),
+            confirmed_at: None,
+            applied_count: 0,
+            last_applied_at: None,
+            author_may_act: true,
+            author_suspended: false,
+            inbox_detached: false,
+        }
+    }
+
+    #[test]
+    fn a_stored_rule_naming_a_public_suffix_is_paused_for_good() {
+        let rule = stored("github.io", RuleState::Active);
+        assert_eq!(rule.effective_state(), RuleState::Paused);
+        assert_eq!(rule.paused_reason(), Some(PausedReason::DomainTooBroad));
+        // Even a member's pause does not hide it: resuming would not help.
+        let paused = stored("github.io", RuleState::Paused);
+        assert_eq!(paused.paused_reason(), Some(PausedReason::DomainTooBroad));
+    }
+
+    #[test]
+    fn it_ranks_right_after_a_read_only_inbox() {
+        let mut rule = stored("github.io", RuleState::Active);
+        rule.author_may_act = false;
+        rule.author_suspended = true;
+        assert_eq!(rule.paused_reason(), Some(PausedReason::DomainTooBroad));
+        rule.inbox_detached = true;
+        assert_eq!(rule.paused_reason(), Some(PausedReason::InboxReadOnly));
+    }
+
+    #[test]
+    fn a_proposal_says_why_it_would_stay_paused_once_kept() {
+        let mut rule = stored("github.com", RuleState::Proposed);
+        assert_eq!(rule.effective_state(), RuleState::Proposed);
+        assert_eq!(rule.paused_reason(), None);
+        assert_eq!(rule.paused_once_kept(), None);
+        rule.author_suspended = true;
+        assert_eq!(
+            rule.paused_once_kept(),
+            Some(PausedReason::AuthorUnavailable)
+        );
+        // Only for a proposal: an active rule says so with `paused_reason`.
+        rule.state = RuleState::Active;
+        assert_eq!(rule.paused_once_kept(), None);
+        assert_eq!(rule.paused_reason(), Some(PausedReason::AuthorUnavailable));
+    }
+
+    #[test]
+    fn an_owned_domain_rule_stays_active() {
+        let rule = stored("github.com", RuleState::Active);
+        assert_eq!(rule.effective_state(), RuleState::Active);
+        assert_eq!(rule.paused_reason(), None);
+    }
 }

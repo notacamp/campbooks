@@ -188,6 +188,14 @@ impl Kit {
         (self.idp.token(&claims), user)
     }
 
+    /// A token for `sub`, already a member, whose claims name them `name`.
+    pub fn token_named(&self, sub: &str, name: &str) -> String {
+        let mut claims = self.idp.claims(ALL_SCOPES);
+        claims["sub"] = sub.into();
+        claims["name"] = name.into();
+        self.idp.token(&claims)
+    }
+
     /// `sub` leaves `workspace` (their inbox memberships stay until
     /// `workspaces.member_left` is handled).
     pub fn leave(&self, sub: &str, workspace: WorkspaceId) {
@@ -282,6 +290,16 @@ impl Kit {
     /// `GET uri` with `token`.
     pub async fn get(&self, token: &str, uri: &str) -> TestResponse {
         self.call(Method::GET, token, uri, None).await
+    }
+
+    /// `GET uri` with `token`, asking for `language` (`Accept-Language`).
+    pub async fn get_in(&self, token: &str, uri: &str, language: &str) -> TestResponse {
+        let request = Request::get(uri)
+            .header(header::AUTHORIZATION, format!("Bearer {token}"))
+            .header(header::ACCEPT_LANGUAGE, language)
+            .body(Body::empty())
+            .unwrap();
+        testing::send(&self.app, request).await
     }
 
     /// `GET uri` with `token`, whole: status, headers and body bytes.
@@ -476,9 +494,10 @@ impl Scripted {
 
     /// The model as a good one reads the fixtures' mail, sure of every
     /// answer (0.97): a person's question needs a reply, a request is an
-    /// action, a bill from a service is in Receipts and asks for payment, a
-    /// look-alike asking for a password is phishing, lists and
-    /// notifications ask nothing.
+    /// action, a bill from a service is in Receipts and asks for a payment
+    /// still owed (so does a supplier's invoice sent by hand), a receipt
+    /// confirms one made, a look-alike asking for a password is phishing,
+    /// lists and notifications ask nothing.
     pub fn fixtures() -> Self {
         // Pedro writes again about the lease, asking nothing new.
         Self::model(fixture_answers()).followup(
@@ -490,7 +509,8 @@ impl Scripted {
 }
 
 /// `answers` for one sender: stream, needs reply, asks action, has a
-/// deadline, urgency level, suspicious; all at 0.97.
+/// deadline, urgency level, suspicious, and money "neither"
+/// ([`money`] says otherwise); all at 0.97.
 // One flag per yes/no question, in the questions' order: a table row.
 #[allow(clippy::fn_params_excessive_bools)]
 pub fn script(
@@ -509,7 +529,22 @@ pub fn script(
         (triage::HAS_DEADLINE, AnswerValue::Noul(deadline), at),
         (triage::URGENCY, AnswerValue::Score(urgency), at),
         (triage::SUSPICIOUS, AnswerValue::Noul(suspicious), at),
+        (
+            triage::MONEY,
+            AnswerValue::Choice(triage::NEITHER.to_owned()),
+            at,
+        ),
     ]
+}
+
+/// `script` with `label` (`owed`, `paid`) as its money answer.
+pub fn money(mut script: Script, label: &str) -> Script {
+    for (id, value, _) in &mut script {
+        if *id == triage::MONEY {
+            *value = AnswerValue::Choice(label.to_owned());
+        }
+    }
+    script
 }
 
 fn fixture_answers() -> Vec<(&'static str, Script)> {
@@ -531,7 +566,7 @@ fn fixture_answers() -> Vec<(&'static str, Script)> {
         // pt-PT: a water bill, a friend's dinner question, a promotion.
         (
             "faturacao@aguas-do-vale.example",
-            script("receipts", false, true, true, 1.0, false),
+            money(script("receipts", false, true, true, 1.0, false), "owed"),
         ),
         (
             "rui.tavares@correio.example",
@@ -544,7 +579,7 @@ fn fixture_answers() -> Vec<(&'static str, Script)> {
         // es-ES: an invoice a supplier sent by hand, a list digest.
         (
             "administracion@harinas-del-sur.example",
-            script("primary", false, true, true, 1.0, false),
+            money(script("primary", false, true, true, 1.0, false), "owed"),
         ),
         (
             "boletin@gremio-panaderos.example",
@@ -557,7 +592,7 @@ fn fixture_answers() -> Vec<(&'static str, Script)> {
         ),
         (
             "caisse@boulangerie-halles.example",
-            script("receipts", false, false, false, 0.0, false),
+            money(script("receipts", false, false, false, 0.0, false), "paid"),
         ),
         (
             "hugo.bernard@courriel.example",
@@ -574,7 +609,7 @@ fn fixture_answers() -> Vec<(&'static str, Script)> {
         ),
         (
             "billing@acme-hosting.example",
-            script("receipts", false, true, true, 1.0, false),
+            money(script("receipts", false, true, true, 1.0, false), "owed"),
         ),
         (
             "it-support@at3lier-sol.example",

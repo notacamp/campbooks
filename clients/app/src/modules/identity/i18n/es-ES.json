@@ -205,7 +205,7 @@
   },
   "waysIn": {
     "title": "Formas de iniciar sesión",
-    "lead": "Puedes iniciar sesión en Campbooks con cualquiera de estas cuentas. Cada buzón que conectes pasa a ser una más.",
+    "lead": "Cómo entras en Campbooks. Mantén al menos dos, para que perder una nunca te deje fuera.",
     "list": "Tus formas de iniciar sesión",
     "loading": "Cargando tus formas de iniciar sesión…",
     "loadError": {
@@ -307,7 +307,9 @@
       "confirm": "Sí, cerrar en todas partes",
       "confirmLead": "¿Cerrar sesión en Campbooks en todos los dispositivos y aplicaciones, incluido este navegador? Después volverás a iniciar sesión aquí.",
       "failed": "No se pudo cerrar sesión en todas partes. No cambió nada; inténtalo de nuevo."
-    }
+    },
+    "accounts": "Cuentas",
+    "accountsLead": "Puedes iniciar sesión con cualquiera de estas. Cada buzón que conectes pasa a ser una más."
   },
   "passkeySignUp": {
     "eyebrow": "Cuenta nueva",
@@ -406,7 +408,8 @@
         "lead": "No se ha añadido nada. Inténtalo de nuevo."
       }
     },
-    "freshSignIn": "Por seguridad, añadir una llave de acceso requiere haber iniciado sesión en los últimos cinco minutos. Vuelve a iniciar sesión; volverás aquí enseguida."
+    "freshSignIn": "Por seguridad, añadir una llave de acceso requiere haber iniciado sesión en los últimos cinco minutos. Vuelve a iniciar sesión; volverás aquí enseguida.",
+    "noneLead": "Añade una en este dispositivo."
   },
   "admin": {
     "title": "Cuenta",

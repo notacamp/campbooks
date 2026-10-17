@@ -1,5 +1,8 @@
-//! `campbooks-system` — instance health and version, and the admin
-//! dashboard's System panel (`GET /admin/v1/system/overview`, ADR 0015).
+//! `campbooks-system` — instance health and version, the app's own error
+//! and timing reports (forwarded to the operator's collector), the admin dashboard's
+//! System panel (`GET /admin/v1/system/overview`, ADR 0015), and the AI
+//! usage ledger with its daily cap ([`AiUsageMeter`], read by
+//! `GET /admin/v1/system/ai-usage`).
 //!
 //! This is the **reference vertical slice**: copy its shape for every new
 //! module. `lib.rs` only assembles [`module`]; each use case lives in its own
@@ -25,6 +28,10 @@ pub mod scopes;
 mod testkit;
 
 pub use deps::{Deps, Facts, IdentityProvider};
+pub use features::ai_meter::AiUsageMeter;
+/// The health check's handler, for the server to also mount at the probe
+/// path `/up` (outside the API's OpenAPI document).
+pub use features::health::handler as health;
 
 /// Module name: crate directory, Postgres schema and OpenAPI tag.
 pub const NAME: &str = "system";
@@ -34,8 +41,8 @@ pub static MESSAGES: Catalogue = campbooks_kernel::catalogue!(NAME);
 
 /// The system module composed with nothing (for catalogues and tests).
 /// The module's part of the access catalogue (ADR 0017).
-static RESOURCES: [campbooks_kernel::authz::ResourceType; 2] = {
-    use campbooks_kernel::authz::{Action, Grant, Grantee, ResourceType, Tenancy};
+static RESOURCES: [campbooks_kernel::authz::ResourceType; 3] = {
+    use campbooks_kernel::authz::{Action, Grant, Grantee, Owner, ResourceType, Tenancy};
     [
         ResourceType {
             grants: &[Grant::new(Grantee::Anyone, &[Action::Read])],
@@ -43,6 +50,16 @@ static RESOURCES: [campbooks_kernel::authz::ResourceType; 2] = {
                 "system.instance",
                 "The instance's health and version: public.",
                 Tenancy::Public,
+            )
+        },
+        ResourceType {
+            owner: Owner::Account,
+            owner_actions: &[Action::Create],
+            ..ResourceType::new(
+                "system.client_report",
+                "A report of the app's own errors and timings, sent by a signed-in person's \
+                 app and forwarded, scrubbed, to the operator's collector: never read back.",
+                Tenancy::Account,
             )
         },
         ResourceType {
@@ -68,15 +85,18 @@ pub fn module_with(deps: Deps) -> Module {
         scopes: scopes::ALL,
         router: OpenApiRouter::new()
             .routes(routes!(features::health::handler))
-            .routes(routes!(features::version::handler)),
+            .routes(routes!(features::version::handler))
+            .routes(routes!(features::client_telemetry::handler)),
         admin_router: Some(
             OpenApiRouter::new()
                 .routes(routes!(features::admin_overview::handler))
+                .routes(routes!(features::admin_ai_usage::handler))
                 .routes(routes!(features::admin_jobs::summary))
                 .routes(routes!(features::admin_jobs::failed))
                 .routes(routes!(features::admin_job_actions::retry))
                 .routes(routes!(features::admin_job_actions::discard))
                 .routes(routes!(features::admin_job_actions::retry_kind))
+                .routes(routes!(features::admin_job_actions::discard_schedule_run))
                 .layer(Extension(deps)),
         ),
         background: Background::new(),

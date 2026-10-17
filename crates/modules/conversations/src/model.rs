@@ -462,6 +462,9 @@ vocabulary!(
         AsksAction => "asks_action",
         /// `suspicious`.
         Suspicious => "suspicious",
+        /// `money`: it asks for a payment still owed (a Pay need, always a
+        /// question until a member answers it, campbooks-cloud#167).
+        Money => "money",
     }
 );
 
@@ -494,6 +497,11 @@ vocabulary!(
         NotNeeded => "not_needed",
         /// A question answered yes (stored as a correction).
         Confirmed => "confirmed",
+        /// A Pay need is already paid: it is cleared as done.
+        AlreadyPaid => "already_paid",
+        /// A Pay need is still to pay: Campbooks stands behind it (stored
+        /// as a correction confirming the money answer).
+        StillToPay => "still_to_pay",
     }
 );
 
@@ -520,10 +528,33 @@ vocabulary!(
         Proposed => "proposed",
         /// Acts on existing and new mail.
         Active => "active",
-        /// Stopped: its author may no longer change the inbox, or a member paused it.
+        /// Stopped: its author may no longer change the inbox or is away for
+        /// now, its inbox is kept read-only, or a member paused it.
         Paused => "paused",
         /// Gone.
         Removed => "removed",
+    }
+);
+
+vocabulary!(
+    /// Why a taught rule is paused: the one that would still hold once the
+    /// most passing one clears.
+    PausedReason {
+        /// Its inbox is kept read-only: no rule acts there any more.
+        InboxReadOnly => "inbox_read_only",
+        /// It names a sender domain that is a public suffix (`github.io`), so
+        /// it would cover every site under it and matches nothing. Only
+        /// removing it clears this.
+        DomainTooBroad => "domain_too_broad",
+        /// Its author is no longer a sender or manager of the inbox, until
+        /// a manager adopts or removes it.
+        AuthorCannotWrite => "author_cannot_write",
+        /// A member paused it.
+        PausedByMember => "paused_by_member",
+        /// Its author is away for now; it acts again on its own once they
+        /// are back. Deliberately says no more: why someone is away is not
+        /// other members' business.
+        AuthorUnavailable => "author_unavailable",
     }
 );
 

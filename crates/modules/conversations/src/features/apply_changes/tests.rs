@@ -72,7 +72,15 @@ async fn requested_changes_follow_the_contract(db: PgPool) {
     let id = kit.conversation_of("en-1").await;
     let base = format!("/api/v1/w/{workspace}/conversations/{id}");
     for action in [
-        "read", "unread", "star", "unstar", "archive", "unarchive", "trash", "untrash", "spam",
+        "read",
+        "unread",
+        "star",
+        "unstar",
+        "archive",
+        "unarchive",
+        "trash",
+        "untrash",
+        "spam",
         "not-spam",
     ] {
         kit.post(&sam, &format!("{base}/{action}"), None).await;
@@ -183,9 +191,9 @@ async fn applying_a_batch_again_changes_nothing(db: PgPool) {
     let before = kit.threads(inbox).await;
     let events = count(&db, "SELECT count(*) FROM kernel.events").await;
     let decisions = count(&db, "SELECT count(*) FROM conversations.decisions").await;
-    // The model's six answers for each of the three inbound messages, and
+    // The model's seven answers for each of the three inbound messages, and
     // the facts' "no" for the newsletter and the sign-in alert.
-    assert_eq!(decisions, 3 * 6 + 2);
+    assert_eq!(decisions, 3 * 7 + 2);
 
     kit.ingest(workspace, inbox, "en").await;
     assert_eq!(kit.threads(inbox).await, before);
@@ -499,7 +507,9 @@ async fn a_malformed_batch_fails_without_its_content_in_the_error(db: PgPool) {
         )
         .await
         .unwrap();
-    let mut tx = kit.state.db.begin().await.unwrap();
+    let mut tx = campbooks_kernel::db::BeginFor::begin_for(&kit.state.db, workspace)
+        .await
+        .unwrap();
     campbooks_kernel::jobs::enqueue_to::<super::ApplyChanges>(
         &mut tx,
         &crate::ingest::ApplyChangesPayload { inbox, batch: blob },

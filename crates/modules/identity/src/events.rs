@@ -4,6 +4,7 @@
 //! and methods; never addresses, tokens or secrets.
 
 use campbooks_kernel::DomainEvent;
+use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 use uuid::Uuid;
@@ -129,6 +130,9 @@ impl DomainEvent for WayInRemoved {
     const NAME: &'static str = "identity.way_in_removed";
     const VERSION: u16 = 1;
     const WORKSPACE_SCOPED: bool = false;
+    // A workspace's job announces it when a removed mailbox took the
+    // account's last way in with it (`identity.forget_connected_way_in`).
+    const PUBLISHED_IN_WORKSPACES: bool = true;
 
     fn workspace(&self) -> Option<&str> {
         None
@@ -138,15 +142,54 @@ impl DomainEvent for WayInRemoved {
 /// An administrator suspended an account: its sessions ended and its
 /// refresh tokens were revoked, and it cannot sign in until it is
 /// unsuspended. Consumers drop whatever else keeps it signed in (the web
-/// BFF's sessions).
+/// BFF's sessions) and stop whatever acts in its name (the rules its
+/// member taught).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 pub struct AccountSuspended {
     /// The account (the `sub` of its tokens).
     pub account: Uuid,
+    /// When the suspension took effect, read under the account's lock: a
+    /// later suspension or lift of the same account always has a later
+    /// `at`. Absent on events published before it existed (use the event's
+    /// `occurred_at`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub at: Option<DateTime<Utc>>,
+    /// The account's count of suspensions and lifts, this one included
+    /// (odd: suspended). Of two changes to one account, the higher `seq` is
+    /// the later, whatever the clock said. Absent on events published
+    /// before it existed (order those by `at`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub seq: Option<i64>,
 }
 
 impl DomainEvent for AccountSuspended {
     const NAME: &'static str = "identity.account_suspended";
+    const VERSION: u16 = 1;
+    const WORKSPACE_SCOPED: bool = false;
+
+    fn workspace(&self) -> Option<&str> {
+        None
+    }
+}
+
+/// An administrator lifted an account's suspension: it may sign in again.
+/// Nothing that the suspension ended comes back, but what was only paused
+/// (the rules its member taught) acts again.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+pub struct AccountUnsuspended {
+    /// The account (the `sub` of its tokens).
+    pub account: Uuid,
+    /// When the lift took effect, ordered like [`AccountSuspended::at`].
+    pub at: DateTime<Utc>,
+    /// The account's count of suspensions and lifts, this one included
+    /// (even: not suspended), ordered like [`AccountSuspended::seq`]. Absent
+    /// on events published before it existed.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub seq: Option<i64>,
+}
+
+impl DomainEvent for AccountUnsuspended {
+    const NAME: &'static str = "identity.account_unsuspended";
     const VERSION: u16 = 1;
     const WORKSPACE_SCOPED: bool = false;
 
@@ -236,6 +279,9 @@ impl DomainEvent for ConsentRevoked {
     const NAME: &'static str = "identity.consent_revoked";
     const VERSION: u16 = 1;
     const WORKSPACE_SCOPED: bool = false;
+    // Announced in a workspace's transaction when a workspace client is
+    // removed and when a member leaves.
+    const PUBLISHED_IN_WORKSPACES: bool = true;
 
     // A person's, not a workspace's (Campbooks' own apps name none): the
     // workspace is in the payload.

@@ -10,6 +10,7 @@ import { adminApi, unwrap, type AdminSchema } from "~/lib/api";
 /** What `GET /admin/v1/system/jobs` answers: the queue by queue and kind (admin API). */
 export type QueueSummary = AdminSchema<"QueueSummary">;
 export type KindSummary = AdminSchema<"KindSummary">;
+export type WatchedSummary = AdminSchema<"WatchedSummary">;
 export type FailedJob = AdminSchema<"FailedJob">;
 export type JobAction = AdminSchema<"JobAction">;
 export type RetryKindResult = AdminSchema<"RetryKindResult">;

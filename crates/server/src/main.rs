@@ -3,6 +3,7 @@
 #![forbid(unsafe_code)]
 
 mod admin_cli;
+mod labelling_cli;
 
 use std::{
     io::{Read as _, Write as _},
@@ -70,10 +71,21 @@ enum Command {
         #[command(subcommand)]
         command: admin_cli::AdminCommand,
     },
+    /// Export a workspace's money mail for its owner to label locally
+    /// (`export`): what the money question's operating point is tuned on.
+    Labelling {
+        #[command(subcommand)]
+        command: labelling_cli::LabellingCommand,
+    },
     /// Work with the search index.
     Search {
         #[command(subcommand)]
         command: SearchCommand,
+    },
+    /// Check the telemetry settings.
+    Telemetry {
+        #[command(subcommand)]
+        command: TelemetryCommand,
     },
     /// Print the OpenAPI document as JSON.
     Openapi,
@@ -107,6 +119,15 @@ enum EventsCommand {
     /// holds): every event the modules publish, its version, whether it is
     /// workspace-scoped, and its payload schema.
     Catalogue,
+}
+
+#[derive(Debug, Subcommand)]
+enum TelemetryCommand {
+    /// Send one test report to `CAMPBOOKS_TELEMETRY__ERROR_DSN` through the
+    /// server's own pipeline, as if a request had failed. Its fields are
+    /// invented and include an address and a token the scrubber must drop,
+    /// so the report shows what a real one holds. Prints the report's id.
+    TestError,
 }
 
 #[derive(Debug, Subcommand)]
@@ -162,9 +183,13 @@ fn main() -> ExitCode {
             Err(e) => fail(&e.to_string()),
         },
         Command::Admin { command } => admin_cli::run(command),
+        Command::Labelling { command } => labelling_cli::run(command),
         Command::Search {
             command: SearchCommand::Reindex { workspace },
         } => reindex(&workspace),
+        Command::Telemetry {
+            command: TelemetryCommand::TestError,
+        } => test_error(),
         Command::Openapi => print_json(&campbooks_server::openapi(), "OpenAPI document"),
         Command::Scopes => print_json(&campbooks_server::scope_catalogue(), "scope catalogue"),
         Command::Healthcheck { port } => healthcheck(port.unwrap_or_else(port_from_env)),
@@ -212,6 +237,50 @@ fn serve(role: Role) -> ExitCode {
     }
 }
 
+/// `telemetry test-error`: one report through the production pipeline.
+fn test_error() -> ExitCode {
+    let config = match Config::from_env() {
+        Ok(config) => config,
+        Err(e) => return fail(&e.to_string()),
+    };
+    if let Err(e) = config.telemetry.check() {
+        return fail(&e);
+    }
+    let telemetry = match Telemetry::new(&config.telemetry, "all") {
+        Ok(telemetry) => telemetry,
+        Err(e) => return fail(&e),
+    };
+    if !telemetry.reports_errors() {
+        return fail("CAMPBOOKS_TELEMETRY__ERROR_DSN is not set: errors are not reported");
+    }
+    telemetry.install_subscriber(config.log_format);
+    let span = tracing::info_span!(
+        "http",
+        request_id = %uuid::Uuid::now_v7(),
+        http.route = "/api/v1/system/telemetry-test",
+        http.request.method = "POST",
+        workspace.id = %uuid::Uuid::nil(),
+        // Never read by the reporter: not allowlisted.
+        user.email = "test-address@example.com",
+    );
+    span.in_scope(|| {
+        tracing::error!(
+            error = "test error for test-address@example.com: token \
+                     ya29.test0000000000000000000000000000000000000000",
+            "telemetry test error"
+        );
+    });
+    let id = sentry::last_event_id();
+    telemetry.shutdown();
+    match id {
+        Some(id) => {
+            let _ = writeln!(std::io::stdout(), "sent test error report {}", id.simple());
+            ExitCode::SUCCESS
+        }
+        None => fail("the test error report was not sent"),
+    }
+}
+
 /// Rate-limit counters keyed by the instance secret, so every process of the
 /// install counts together; without one, each process counts alone.
 fn rate_limits() -> Result<campbooks_kernel::rate_limit::RateLimits, String> {
@@ -221,14 +290,18 @@ fn rate_limits() -> Result<campbooks_kernel::rate_limit::RateLimits, String> {
     })
 }
 
-/// The signer of opaque values (cursors) keyed by the instance secret, so
-/// every process of the install verifies them; without one, each process
-/// signs alone.
+/// The signer of opaque values (cursors, the change feed's resume tokens)
+/// keyed by the instance secret, so every process of the install verifies
+/// them; without one, each process signs alone, which is said at startup.
 fn signer() -> Result<campbooks_kernel::crypto::Signer, String> {
-    Ok(match campbooks_kernel::crypto::SecretKey::from_env()? {
-        Some(secret) => campbooks_kernel::crypto::Signer::new(&secret),
-        None => campbooks_kernel::crypto::Signer::default(),
-    })
+    if let Some(secret) = campbooks_kernel::crypto::SecretKey::from_env()? {
+        return Ok(campbooks_kernel::crypto::Signer::new(&secret));
+    }
+    tracing::warn!(
+        "CAMPBOOKS_SECRET_KEY is not set: search cursors and change feed resume tokens work \
+         only in this process and until it restarts (clients then refetch); set it in production"
+    );
+    Ok(campbooks_kernel::crypto::Signer::default())
 }
 
 /// Startup checks of the settings `role` uses; the web BFF's settings when

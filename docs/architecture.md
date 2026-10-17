@@ -132,6 +132,17 @@ server test fails if a table with a `workspace_id` column has no forced
 policy, or if the runtime role cannot use a table. Module tests run under
 the same role with `kernel::testing::app_role_pool`.
 
+A transaction that sets no workspace sees nothing: no row of any table with
+row-level security, the kernel's included (a server test checks every such
+table). Work across workspaces (the job worker's claims, pruning, the blob
+sweeper, replay, the admin's queue, the schedulers' dispatchers) runs in the
+explicit **kernel scope**, `campbooks.kernel_scope = 'on'`, opened only by
+`kernel::db::begin_kernel` or a job's `ctx.kernel_tx()`; outside the kernel,
+only files listed under `[[access.kernel_scope]]` in `architecture.toml`
+may call them (`cargo xtask arch`). Instance-wide events and jobs (no
+workspace) can still be published and enqueued from a transaction that set
+nothing: the kernel lifts it for that one insert.
+
 ### Files (blobs)
 
 Message bodies (raw MIME), attachments and files are not stored in
@@ -262,10 +273,14 @@ builds that router with `kernel::operations::compose`.
 per-operation opt-out): the first request's response is stored in
 `kernel.idempotency` for 24 hours and replayed for an identical retry
 (`Idempotency-Replayed: true`); a different request with the same key is
-422, one still running is 409. Keys belong to the authenticated caller;
-server errors and auth failures release the key. GET and HEAD ignore the
-header. The kernel's `kernel.prune_idempotency` schedule deletes expired
-keys hourly.
+422, one still running is 409. Keys belong to the authenticated caller:
+row-level security admits a key only to a transaction naming its caller,
+which only the layer opens. Server errors and auth failures release the
+key. GET and HEAD ignore the header. An operation declaring
+`x-campbooks.secret_once` (its answer shows a secret once) has no answer
+stored: a replay of its key is 409 `idempotency_secret_shown_once`. The
+kernel's `kernel.prune_idempotency` schedule deletes expired keys hourly,
+in the kernel scope.
 
 **Record references.** A module that points at another module's record
 stores a `kernel::RecordRef { type, id }`, with `type` =
@@ -328,7 +343,9 @@ projections, maintenance — is a `Job` type (`NAME` = `<module>.<job>`, a
 `QUEUE`, `MAX_ATTEMPTS`) registered with `.job::<J>()` and enqueued in a
 transaction with `jobs::enqueue(&mut tx, &job, options)`. Options give it a
 workspace, a delay, a priority, a `unique_key` (at most one unfinished job per
-key) or an `ordering_key` (jobs sharing it run one at a time, in order).
+kind and key) or an `ordering_key` (jobs sharing it run one at a time, in
+order). Both keys are per workspace, with instance-wide work as one more: a
+workspace cannot hold or delay another workspace's key.
 Recurring work is `.schedule::<J>(every)`; each tick runs once however many
 workers run. A handler returns `JobError::Retry` (backoff with jitter) or
 `JobError::Fatal` (marked failed and kept for inspection, 30 days by
@@ -481,7 +498,14 @@ flow with PKCE as the confidential client `campbooks-web`; `/bff/callback`
 validates the ID token (with the kernel's JWKS cache) and starts a session.
 Sessions live in Postgres schema `bff`: the cookie value only as a hash, the
 access, refresh and ID tokens encrypted (AES-256-GCM, key derived from
-`CAMPBOOKS_SECRET_KEY`). The browser gets one `HttpOnly`, `SameSite=Strict`
+`CAMPBOOKS_SECRET_KEY`), as are a started sign-in's PKCE verifier and nonce.
+The runtime role holds no privilege on these tables: the BFF reaches them
+through `SECURITY DEFINER` functions in schema `bff`, each acting on the one
+session a presented cookie's hash names, one sign-in, or one account
+(campbooks-cloud#212). Like the kernel's rate-limit functions, they run as
+`campbooks_definer`, a role that cannot log in, owns no table and holds only
+the privileges their statements need, never as the migration login
+(campbooks-cloud#214). The browser gets one `HttpOnly`, `SameSite=Strict`
 `__Host-campbooks_session` cookie and nothing else. `/bff/api/*` attaches the
 session's access token (refreshed just before it expires, once per session
 however many requests race) and runs the request through the API router in
@@ -524,7 +548,9 @@ scope nor `admin:access`. Access tokens name the API's resource URI, `<origin>/a
 (RFC 8707); `/.well-known/oauth-protected-resource/api` describes it
 (RFC 9728), and the API's Bearer challenges point there, so an MCP agent that
 knows only the API's URL finds the issuer. Endpoints anyone can call are
-rate-limited per client address through `kernel::rate_limit`.
+rate-limited per client address through `kernel::rate_limit`, whose
+counters the runtime role reaches only through the kernel's
+`kernel.take_rate_limit` and `kernel.prune_rate_limits` functions.
 
 ### Instance administration (ADR 0015)
 

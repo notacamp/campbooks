@@ -94,6 +94,15 @@ export {
   type HowDecidedRow,
 } from "./components/HowDecided/HowDecided";
 export { Dot, type DotProps } from "./components/Dot/Dot";
+export {
+  PrivacyLine,
+  SettingsEmpty,
+  SettingsPage,
+  SettingsSection,
+  type SettingsEmptyProps,
+  type SettingsPageProps,
+  type SettingsSectionProps,
+} from "./components/Settings/Settings";
 export { Fact, FactList, type FactProps, type FactStatus } from "./components/Facts/Facts";
 export { EmptyState, type EmptyStateProps } from "./components/EmptyState/EmptyState";
 export {
@@ -104,6 +113,14 @@ export {
   type TextFieldProps,
 } from "./components/Field/Field";
 export { Brand, FocusPage, type FocusPageProps } from "./components/FocusPage/FocusPage";
+export {
+  Dialog,
+  DialogChoices,
+  type DialogChoice,
+  type DialogChoicesProps,
+  type DialogProps,
+  type DialogResult,
+} from "./components/Dialog/Dialog";
 export { Icon, ICON_NAMES, type IconName, type IconProps } from "./components/Icon/Icon";
 export { IconButton, type IconButtonProps } from "./components/IconButton/IconButton";
 export {
@@ -113,6 +130,11 @@ export {
   type ItemDetailProps,
   type ItemProps,
 } from "./components/Item/Item";
+export {
+  ItemActions,
+  type ItemAction,
+  type ItemActionsProps,
+} from "./components/ItemActions/ItemActions";
 export { InlineConfirm, type InlineConfirmProps } from "./components/InlineConfirm/InlineConfirm";
 export {
   SearchField,
@@ -199,12 +221,21 @@ export {
   type WorkspaceSwitcherProps,
 } from "./components/Shell/Shell";
 export {
+  AskLine,
+  ReplyDraft,
+  ReplyQuote,
+  type AskLineProps,
+  type ReplyDraftProps,
+  type ReplyQuoteProps,
+} from "./components/ReplyDraft/ReplyDraft";
+export {
   RulePreview,
   type RulePreviewProps,
   type RulePreviewSample,
 } from "./components/RulePreview/RulePreview";
 export { SafeHtml, type SafeHtmlProps } from "./safe-html/SafeHtml";
 export { ShortcutSheet, type ShortcutSheetProps } from "./components/ShortcutSheet/ShortcutSheet";
+export { Clamp, type ClampProps } from "./components/Clamp/Clamp";
 export { Skeleton, SkeletonList, type SkeletonProps } from "./components/Skeleton/Skeleton";
 export {
   StatusText,
@@ -219,6 +250,9 @@ export {
   ToastRegion,
   UndoProvider,
   useUndoToast,
+  type PendingAction,
+  type PendingFailure,
+  type PendingHandle,
   type UndoableAction,
   type UndoApi,
   type UndoEntry,

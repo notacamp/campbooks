@@ -8,10 +8,21 @@
 //! live session and revokes every refresh-token family at once, records it
 //! in the account's audit trail and publishes
 //! [`AccountSuspended`](crate::events::AccountSuspended), on which the web
-//! BFF drops the account's web sessions. The access tokens already issued
+//! BFF drops the account's web sessions and the rules its member taught
+//! pause. The access tokens already issued
 //! stop at once: the account's revocation epoch moves to now
 //! ([`accounts::revoke_tokens`]), and the API checks it on every request.
-//! Unsuspending leaves the epoch: those tokens never come back.
+//! Unsuspending leaves the epoch: those tokens never come back. It publishes
+//! [`AccountUnsuspended`](crate::events::AccountUnsuspended), on which the
+//! paused rules act again.
+//!
+//! Both events carry `seq`, the account's count of suspensions and lifts
+//! (`identity.accounts.suspension_seq`), bumped by one under the account's
+//! row lock: of two changes to one account the later always has the higher
+//! `seq`, so consumers order them by it whatever order they arrive in and
+//! whatever the clock did between them (campbooks-cloud#197). They also
+//! carry `at`, the moment the change took effect, read under the same lock;
+//! consumers order by it only the events published before `seq` existed.
 
 use campbooks_kernel::{EventBus, Result};
 use chrono::{DateTime, Utc};
@@ -19,7 +30,7 @@ use sqlx::{Postgres, Transaction};
 use uuid::Uuid;
 
 use super::accounts;
-use crate::events::AccountSuspended;
+use crate::events::{AccountSuspended, AccountUnsuspended};
 
 /// What suspending or unsuspending changed.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -46,11 +57,14 @@ pub async fn suspend(
     if was_suspended {
         return Ok(Outcome::Unchanged);
     }
-    sqlx::query("UPDATE identity.accounts SET disabled_at = $2 WHERE id = $1")
-        .bind(account)
-        .bind(now)
-        .execute(&mut **tx)
-        .await?;
+    let seq: i64 = sqlx::query_scalar(
+        "UPDATE identity.accounts SET disabled_at = $2, suspension_seq = suspension_seq + 1
+          WHERE id = $1 RETURNING suspension_seq",
+    )
+    .bind(account)
+    .bind(now)
+    .fetch_one(&mut **tx)
+    .await?;
     accounts::revoke_tokens(tx, account, now).await?;
     let sessions = sqlx::query(
         "UPDATE identity.sessions SET ended_at = $2 WHERE account_id = $1 AND ended_at IS NULL",
@@ -81,7 +95,17 @@ pub async fn suspend(
         now,
     )
     .await?;
-    events.publish(tx, &AccountSuspended { account }).await?;
+    let at = changed_at(tx).await?;
+    events
+        .publish(
+            tx,
+            &AccountSuspended {
+                account,
+                at: Some(at),
+                seq: Some(seq),
+            },
+        )
+        .await?;
     Ok(Outcome::Changed)
 }
 
@@ -90,6 +114,7 @@ pub async fn suspend(
 /// tokens issued before the suspension included (the epoch stays).
 pub async fn unsuspend(
     tx: &mut Transaction<'_, Postgres>,
+    events: &EventBus,
     account: Uuid,
     by: &str,
     now: DateTime<Utc>,
@@ -100,10 +125,13 @@ pub async fn unsuspend(
     if !was_suspended {
         return Ok(Outcome::Unchanged);
     }
-    sqlx::query("UPDATE identity.accounts SET disabled_at = NULL WHERE id = $1")
-        .bind(account)
-        .execute(&mut **tx)
-        .await?;
+    let seq: i64 = sqlx::query_scalar(
+        "UPDATE identity.accounts SET disabled_at = NULL, suspension_seq = suspension_seq + 1
+          WHERE id = $1 RETURNING suspension_seq",
+    )
+    .bind(account)
+    .fetch_one(&mut **tx)
+    .await?;
     accounts::audit(
         tx,
         Some(account),
@@ -112,5 +140,26 @@ pub async fn unsuspend(
         now,
     )
     .await?;
+    let at = changed_at(tx).await?;
+    events
+        .publish(
+            tx,
+            &AccountUnsuspended {
+                account,
+                at,
+                seq: Some(seq),
+            },
+        )
+        .await?;
     Ok(Outcome::Changed)
+}
+
+/// The moment a suspension or lift takes effect: the database's clock now,
+/// while the account's row is locked (not the transaction's start, which may
+/// precede an earlier change's commit). Ordering goes by `seq`; this orders
+/// only events published before it existed.
+async fn changed_at(tx: &mut Transaction<'_, Postgres>) -> Result<DateTime<Utc>> {
+    Ok(sqlx::query_scalar("SELECT clock_timestamp()")
+        .fetch_one(&mut **tx)
+        .await?)
 }

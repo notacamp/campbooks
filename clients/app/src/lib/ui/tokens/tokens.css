@@ -194,6 +194,10 @@
   --border-strong: light-dark(oklch(0.2 var(--n) / 0.16), oklch(1 0 0 / 0.13));
   --edge-highlight: light-dark(oklch(1 0 0 / 0.85), oklch(1 0 0 / 0.055));
 
+  /* scrollbars: a thin neutral thumb on no track, firmer while the pane is hovered */
+  --scrollbar-thumb: light-dark(oklch(0.2 var(--n) / 0.18), oklch(1 0 0 / 0.16));
+  --scrollbar-thumb-hover: light-dark(oklch(0.2 var(--n) / 0.34), oklch(1 0 0 / 0.3));
+
   /* text: contrast on surface-base ≈ 15, 9, 5.7 (AA), 3.5 (disabled/placeholder only) */
   --text-primary: light-dark(oklch(0.22 var(--n)), oklch(0.965 var(--n)));
   --text-secondary: light-dark(oklch(0.4 var(--n)), oklch(0.79 var(--n)));
@@ -230,6 +234,7 @@
   --danger: light-dark(oklch(0.52 0.19 25), oklch(0.72 0.16 25));
   --danger-soft: light-dark(oklch(0.52 0.19 25 / 0.09), oklch(0.72 0.16 25 / 0.14));
   --success: light-dark(oklch(0.5 0.13 155), oklch(0.76 0.14 155));
+  --success-soft: light-dark(oklch(0.5 0.13 155 / 0.12), oklch(0.76 0.14 155 / 0.16));
 
   /* signals: dot colour; soft fills mix it at --signal-soft-mix */
   --signal-soft-mix: 15%;
@@ -301,6 +306,20 @@
   --toast-height: 44px;
   --toast-offset: var(--space-6);
   --overlay-width: 560px;
+  --dialog-width: 520px;
+  --dialog-result-width: 380px;
+  --dialog-sheet-max-height: 88dvh;
+  --dialog-drain-height: 3px;
+  --actions-divider-height: 18px;
+  /* Long content opened in place (an email on Home) shows this deep, then a fade. */
+  --clamp-height: 16rem;
+  --clamp-fade-height: var(--space-12);
+  /* What the fade fades into: the surface the clamp sits on. */
+  --clamp-fade-to: var(--surface-base);
+  /* A row acted on shows its confirmation, then folds away (under a second). */
+  --duration-confirm: 900ms;
+  /* A dialog's result stays about a second, then closes on its own. */
+  --duration-result: 1100ms;
   --popover-width: 300px;
   --offer-width: 420px;
   --offer-max-height: calc(100dvh - var(--toast-offset) - var(--toast-height) - var(--space-12));
@@ -311,6 +330,8 @@
   --home-min: 640px;
   --home-main-min: 520px;
   --reader-min: 480px;
+  --scrollbar-size: 10px;
+  --scrollbar-gap: 2px;
   --icon-size: var(--space-4);
   --icon-size-lg: var(--space-5);
   --icon-stroke: 1.75;

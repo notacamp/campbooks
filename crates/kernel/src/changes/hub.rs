@@ -16,9 +16,10 @@ use crate::config::ChangesConfig;
 /// Wait before reconnecting a listener that failed.
 const LISTEN_RETRY: Duration = Duration::from_secs(5);
 
-/// Feed queries one process runs at once, whatever the number of open
-/// streams: a wake-up of thousands of streams queues here instead of
-/// taking the whole connection pool.
+/// Streams of one process working in the database at once, whatever the
+/// number of open streams: each holds a permit for the whole of a read or a
+/// heartbeat (every query of it, one connection at a time), so a wake-up of
+/// thousands of streams queues here instead of taking the whole pool.
 const CONCURRENT_QUERIES: usize = 4;
 
 /// The process's change-feed hub. Cheap to clone; part of
@@ -125,7 +126,7 @@ impl ChangeHub {
             .subscribe()
     }
 
-    /// A permit to run one feed query.
+    /// A permit for one stream's read or heartbeat.
     pub(crate) async fn query_permit(&self) -> Option<OwnedSemaphorePermit> {
         Arc::clone(&self.inner.queries).acquire_owned().await.ok()
     }

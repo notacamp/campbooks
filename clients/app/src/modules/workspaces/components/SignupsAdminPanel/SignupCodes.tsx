@@ -6,13 +6,12 @@ import {
   Banner,
   Button,
   CopyField,
-  EmptyState,
-  Heading,
+  SettingsEmpty,
+  SettingsSection,
   InlineConfirm,
   List,
   ListRow,
   SkeletonList,
-  Text,
   TextField,
 } from "~/lib/ui";
 
@@ -50,15 +49,11 @@ export function SignupCodes() {
   const { t } = useTranslation("workspaces");
   const codes = useSignupCodes();
   const rows = allPages(codes.data, (page) => page.codes);
-  const listTitle = useId();
 
   return (
     <>
       <MintForm />
-      <section className="flex flex-col gap-3" aria-labelledby={listTitle}>
-        <Heading level={2} size="section" id={listTitle}>
-          {t("signups.codes.listTitle")}
-        </Heading>
+      <SettingsSection title={t("signups.codes.listTitle")}>
         {codes.isPending ? (
           <div role="status" aria-label={t("signups.codes.loading")}>
             <SkeletonList rows={2} />
@@ -80,9 +75,9 @@ export function SignupCodes() {
             {t("signups.loadError.lead")}
           </Banner>
         ) : rows.length === 0 ? (
-          <EmptyState title={t("signups.codes.empty.title")} visor="asleep" visorSize="lg">
+          <SettingsEmpty title={t("signups.codes.empty.title")}>
             {t("signups.codes.empty.lead")}
-          </EmptyState>
+          </SettingsEmpty>
         ) : (
           <>
             <List label={t("signups.codes.list")}>
@@ -105,7 +100,7 @@ export function SignupCodes() {
             ) : null}
           </>
         )}
-      </section>
+      </SettingsSection>
     </>
   );
 }
@@ -167,13 +162,11 @@ function MintForm() {
   };
 
   return (
-    <section className="flex flex-col gap-3" aria-labelledby={titleId}>
-      <Heading level={2} size="section" id={titleId}>
-        {t("signups.codes.mint.title")}
-      </Heading>
-      <Text tone="tertiary" size="sm">
-        {t("signups.codes.mint.lead")}
-      </Text>
+    <SettingsSection
+      title={t("signups.codes.mint.title")}
+      description={t("signups.codes.mint.lead")}
+      titleId={titleId}
+    >
       <form
         className="flex flex-col gap-3 sm:flex-row sm:items-start"
         aria-labelledby={titleId}
@@ -251,7 +244,7 @@ function MintForm() {
           </div>
         </>
       )}
-    </section>
+    </SettingsSection>
   );
 }
 

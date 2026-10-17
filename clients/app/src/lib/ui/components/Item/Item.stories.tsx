@@ -2,6 +2,7 @@ import type { Meta, StoryObj } from "@storybook/react-vite";
 import { expect, fn, userEvent, within } from "storybook/test";
 
 import { Button } from "../Button/Button";
+import { ItemActions } from "../ItemActions/ItemActions";
 
 import { Item, ItemDetail, SwipeAction } from "./Item";
 
@@ -39,8 +40,8 @@ const detail = (
           Open proposal
         </Button>
         <Button shortcut="item.reply">Reply</Button>
-        <Button variant="ghost" shortcut="item.later">
-          Later
+        <Button variant="ghost" shortcut="item.snooze">
+          Snooze…
         </Button>
         <Button variant="ghost" shortcut="item.done">
           Done
@@ -52,11 +53,35 @@ const detail = (
 
 export const Default: Story = {};
 
-/** The keyboard cursor (J/K) is here: hints show. */
-export const Selected: Story = { args: { selected: true } };
+const actions = (
+  <ItemActions
+    label="Actions for Sofia Pessoa"
+    own={[{ id: "reply", label: "Reply", key: "item.choice1" }]}
+    universal={[
+      { id: "done", label: "Done", key: "item.done" },
+      { id: "snooze", label: "Snooze…", key: "item.snooze" },
+      { id: "not_needed", label: "Not needed", key: "conversations.resolve_need" },
+    ]}
+    onAction={fn()}
+  />
+);
+
+/** The keyboard cursor (J/K) is here: its actions show right under it. */
+export const Selected: Story = {
+  args: { selected: true, actions },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(canvas.getByRole("group", { name: "Actions for Sofia Pessoa" })).toBeVisible();
+  },
+};
+
+/** Acted on: a one-line confirmation that folds away. */
+export const Confirmation: Story = {
+  args: { confirmation: "Done · Sofia Pessoa", onConfirmEnd: fn() },
+};
 
 export const Expanded: Story = {
-  args: { selected: true, expanded: true, detail },
+  args: { selected: true, expanded: true, actions, detail },
   play: async ({ canvasElement }) => {
     const row = within(canvasElement).getByRole("button", { name: /Sofia Pessoa · Brightloop/ });
     await expect(row).toHaveAttribute("aria-expanded", "true");
@@ -89,10 +114,9 @@ export const Swiped: Story = {
     who: "Sofia Pessoa",
     what: "Waiting on your review of the Q4 proposal",
     tags: [],
-    hints: [],
     swipeActions: (
       <>
-        <SwipeAction tone="later" icon="clock" label="Later" onClick={fn()} />
+        <SwipeAction tone="later" icon="clock" label="Snooze" onClick={fn()} />
         <SwipeAction tone="done" icon="check" label="Done" onClick={fn()} />
       </>
     ),
@@ -103,7 +127,6 @@ export const AsLink: Story = {
   args: {
     href: "#conversation",
     tags: [],
-    hints: [],
     who: "Rui Matos",
     what: "Send two August receipts",
   },
@@ -119,6 +142,31 @@ export const WithExcerpt: Story = {
     due: "Due tomorrow",
     soon: true,
     tags: [],
+  },
+};
+
+/** Opened with Scout's summary above the email (here a stand-in for it). */
+export const SummaryOpen: Story = {
+  args: {
+    who: "Marta Ferreira",
+    what: "Marta asks you to confirm Thursday’s walkthrough.",
+    avatar: { name: "Marta Ferreira" },
+    due: "Due Wed",
+    tags: [],
+    expanded: true,
+    detail: (
+      <ItemDetail
+        summaryLabel="Scout’s summary"
+        summary="Marta is arranging the walkthrough with the builders. She proposes Thursday at 10:00 and needs your answer by Wednesday."
+        mail={
+          <p>
+            Hi Sam, could you confirm Thursday’s walkthrough? The builders need to know by
+            Wednesday.
+          </p>
+        }
+        actions={<Button variant="secondary">Open conversation</Button>}
+      />
+    ),
   },
 };
 

@@ -1,0 +1,20 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE system.ai_usage\n                  SET failed = failed + $5,\n                      prompt_tokens = prompt_tokens + $6,\n                      completion_tokens = completion_tokens + $7\n                WHERE workspace_id = $1 AND day = $2 AND role = $3 AND feature = $4",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Date",
+        "Text",
+        "Text",
+        "Int4",
+        "Int8",
+        "Int8"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "d79fbe58b57f1b6863e5b47899a1ade4fc6ec17a6193920f105d4675aadf7e28"
+}

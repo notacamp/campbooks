@@ -58,8 +58,8 @@
     }
   },
   "actions": {
-    "star": "Star",
-    "unstar": "Unstar",
+    "star": "Pin",
+    "unstar": "Unpin",
     "read": "Mark read",
     "unread": "Mark unread",
     "move": "Move",
@@ -73,8 +73,8 @@
   },
   "toast": {
     "done": "Done · {{subject}}",
-    "starred": "Starred · {{subject}}",
-    "unstarred": "Unstarred · {{subject}}",
+    "starred": "Pinned · {{subject}}",
+    "unstarred": "Unpinned · {{subject}}",
     "read": "Marked read · {{subject}}",
     "unread": "Marked unread · {{subject}}",
     "moved": "Moved to {{stream}} · {{subject}}"
@@ -103,6 +103,7 @@
     "whyHasDeadline": "Mentions a date",
     "whyUrgent": "Urgent",
     "whySuspicious": "Suspicious",
+    "whyMoney": "Payment",
     "sortedTaught": "Campbooks put this in {{stream}}, by a rule"
   },
   "reasons": {
@@ -160,7 +161,7 @@
     "updates": "Go to Updates",
     "receipts": "Go to Receipts",
     "newsletters": "Go to Newsletters",
-    "star": "Star or unstar",
+    "star": "Pin or unpin",
     "unread": "Mark read or unread",
     "move": "Move to a stream",
     "replyAll": "Reply all",
@@ -168,7 +169,8 @@
     "showImages": "Show images",
     "nextAttachment": "Next attachment",
     "notNeeded": "Not needed (or it’s safe)",
-    "undoAll": "Undo all a rule did"
+    "undoAll": "Undo all a rule did",
+    "allPaid": "All bills already paid"
   },
   "compose": {
     "title": {
@@ -223,10 +225,11 @@
       "reply": "{{name}} is waiting for your reply",
       "question": "{{name}} asked you a question",
       "do": "{{name}} asked you to do something",
-      "pay": "{{name}} sent a bill to pay",
+      "pay": "Pay {{name}}",
       "warning": "This may be phishing. Don’t use its links.",
       "checkReply": "Does {{name}} need a reply?",
       "checkDo": "Did {{name}} ask you to do something?",
+      "checkPay": "{{name}} sent an invoice. Is it paid?",
       "taughtReply": "{{name}}: a reply, by a rule",
       "taughtDo": "{{name}}: to do, by a rule"
     },
@@ -242,7 +245,9 @@
       "today": "Due today",
       "tomorrow": "Due tomorrow",
       "on": "Due {{date}}",
-      "overdue": "Overdue · was due {{date}}"
+      "overdue": "Overdue · was due {{date}}",
+      "daysOverdue_one": "{{count}} day overdue",
+      "daysOverdue_other": "{{count}} days overdue"
     },
     "how": {
       "yes": "Yes.",
@@ -250,6 +255,11 @@
       "urgency0": "No hurry.",
       "urgency1": "Within the next days.",
       "urgency2": "Today.",
+      "money": {
+        "owed": "Asks for a payment still owed.",
+        "paid": "Confirms a payment already made.",
+        "neither": "Neither asks for nor confirms a payment."
+      },
       "source": {
         "rules": "Rules",
         "model": "Model",
@@ -267,7 +277,11 @@
       "safe": "It’s safe",
       "yes": "Yes",
       "no": "No",
-      "questionPrompt": "Campbooks is not sure."
+      "questionPrompt": "Campbooks is not sure.",
+      "alreadyPaid": "Already paid",
+      "stillToPay": "Still to pay",
+      "markPaid": "Mark paid",
+      "billPrompt": "Campbooks can’t see your bank."
     },
     "toast": {
       "done": "Done · {{name}}",
@@ -275,7 +289,21 @@
       "safe": "Marked safe · {{name}}. Campbooks will learn from it",
       "confirmed": "Thanks · {{name}} stays on your list",
       "failed": "Could not change {{name}}: nothing changed. Try again.",
-      "changed": "{{name}} changed while you looked: have another look."
+      "changed": "{{name}} changed while you looked: have another look.",
+      "paid": "Marked paid · {{name}}",
+      "toPay": "Kept in Pay · {{name}}",
+      "allPaid_one": "Marked {{count}} invoice paid",
+      "allPaid_other": "Marked {{count}} invoices paid",
+      "allPaidFailed_one": "Couldn’t mark {{count}} invoice paid. Try again.",
+      "allPaidFailed_other": "Couldn’t mark {{count}} invoices paid. Try again."
+    },
+    "summary": {
+      "heading": "Scout’s summary"
+    },
+    "mail": {
+      "more": "Show the whole email",
+      "less": "Show less",
+      "linksOff": "Links are off in mail that may be phishing."
     }
   },
   "rules": {
@@ -401,6 +429,7 @@
       "made": "New rule · {{rule}}",
       "stopped": "Rule removed · {{rule}}",
       "kept": "Rule kept · {{rule}}",
+      "keptPaused": "Rule kept, paused for now · {{rule}}",
       "declined": "Rule declined · {{rule}}",
       "failed": "Campbooks could not change that rule. Nothing changed."
     },
@@ -452,7 +481,6 @@
       "suggestion": "Suggested by Campbooks"
     },
     "list": {
-      "label": "Rules",
       "waiting": "Waiting for you",
       "keep": "Keep this rule",
       "no": "No",
@@ -461,8 +489,15 @@
       "confirmRemove": "Remove",
       "cancel": "Keep",
       "forEveryone": "For everyone",
-      "paused": "Paused: whoever taught it can no longer change this inbox",
-      "empty": "No rules yet. When you move, archive or clear one email, Campbooks offers to do the same to the ones like it.",
+      "paused": {
+        "inbox_read_only": "Paused: this inbox is kept read-only",
+        "author_cannot_write": "Paused: whoever taught it can no longer change this inbox",
+        "domain_too_broad": "Paused: its domain is too broad",
+        "paused_by_member": "Paused by a member",
+        "author_unavailable": "Paused for now; it acts again on its own"
+      },
+      "keptStaysPaused": "If kept, it stays paused until whoever taught it is back or someone takes it over",
+      "empty": "Teach Scout above, or answer its questions below. When you move, archive or clear an email, Campbooks also offers to do the same to the ones like it.",
       "leave": "Leave them as they are",
       "changedMail": "The mail it changed",
       "applied_one": "{{n}} so far",
@@ -474,7 +509,53 @@
       "lastActed": "Last acted {{time}}",
       "failed": "Could not load the rules",
       "retry": "Try again",
-      "inbox": "An inbox"
+      "inbox": "An inbox",
+      "emptyTitle": "No rules yet"
     }
+  },
+  "reply": {
+    "title": "Reply to {{name}}",
+    "reading": "Scout is reading the conversation…",
+    "choose": "What should it say? Pick one, or say it in your words.",
+    "noSuggestions": "Scout has no suggestions this time. Say it in your words, or write it yourself.",
+    "suggestionsFailed": "Scout couldn't suggest replies just now. Say it in your words, or write it yourself.",
+    "unavailable": "Scout can't write replies on this server, so you write this one.",
+    "choices": "Likely replies",
+    "quoteFrom": "{{name}}, {{date}}",
+    "own": {
+      "label": "Or say it in your words",
+      "placeholder": "e.g. yes, but I'll be 15 minutes late",
+      "action": "Draft it"
+    },
+    "writing": "Writing the draft…",
+    "draftDescription": "Scout's draft. Edit it here, or ask for a change. Nothing is sent until you press Send.",
+    "draftLabel": "Your reply",
+    "shorter": "Shorter",
+    "shortening": "Making it shorter…",
+    "changing": "Changing it…",
+    "back": "Back to the choices",
+    "change": {
+      "label": "Ask for a change",
+      "placeholder": "e.g. warmer, or mention the plans",
+      "action": "Change"
+    },
+    "send": "Send",
+    "openInComposer": "Open in composer",
+    "writeOwn": "Write my own",
+    "pending": "Sending to {{name}}…",
+    "sending": "Sending to {{name}}",
+    "result": "Sending to {{name}}",
+    "resultDetail": "It goes in a few seconds. Undo is at the bottom until then.",
+    "undone": "Not sent. Your draft is back.",
+    "tooLate": "Too late to undo: the reply has already left.",
+    "errors": {
+      "write": "Scout couldn't write that just now. Try again, or write it yourself.",
+      "limit": "Scout has written a lot of replies this hour. Try again later, or write it yourself.",
+      "dailyLimit": "This workspace has used today's AI allowance. Write this one yourself.",
+      "send": "Couldn't send to {{name}}. Your draft is kept.",
+      "open": "Couldn't open the composer. Your draft is kept here."
+    },
+    "to": "To {{recipient}}",
+    "replyToElsewhere": "Replies go to {{recipient}}, not to the sender {{sender}}. Check before you send."
   }
 }

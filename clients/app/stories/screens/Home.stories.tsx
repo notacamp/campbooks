@@ -123,16 +123,104 @@ export const SafeWithUndo: Story = {
   },
 };
 
-/** L opens Later: later today, tomorrow or Monday. */
-export const LaterMenu: Story = {
+/** S opens Snooze: later today, tomorrow, Monday or next week, in a dialog. */
+export const SnoozeDialog: Story = {
   args: { path: PATH, api: home() },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     await canvas.findByText("Marta Ferreira is waiting for your reply");
     await userEvent.keyboard("j");
-    await userEvent.keyboard("l");
+    await userEvent.keyboard("s");
     const body = within(canvasElement.ownerDocument.body);
-    await expect(await body.findByRole("dialog", { name: "Bring it back" })).toBeVisible();
+    const dialog = await body.findByRole("dialog", { name: "Snooze Marta Ferreira until…" });
+    // It rises in over a moment.
+    await waitFor(async () => {
+      await expect(dialog).toBeVisible();
+    });
+  },
+};
+
+const REPLY_ROUTES: Record<string, MockRoute> = {
+  [`POST ${W}/conversations/${MARTA.id}/reply/suggestions`]: {
+    body: {
+      message_id: MARTA_DETAIL.messages.at(-1)?.id,
+      intents: [
+        "Yes, Thursday works",
+        "Ask to move it to the afternoon",
+        "Say you'll confirm by tomorrow",
+      ],
+    },
+  },
+  [`POST ${W}/conversations/${MARTA.id}/reply/draft`]: {
+    body: {
+      message_id: MARTA_DETAIL.messages.at(-1)?.id,
+      text: "Hi Marta,\n\nThursday works for me. See you at the walkthrough.\n\nBest,\nSam Rivera",
+    },
+  },
+};
+
+/** R opens Reply: Scout's likely replies, each with its key, and Write my own. */
+export const ReplyDialog: Story = {
+  args: { path: PATH, api: home(REPLY_ROUTES) },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await canvas.findByText("Marta Ferreira is waiting for your reply");
+    await userEvent.keyboard("j");
+    await userEvent.keyboard("r");
+    const body = within(canvasElement.ownerDocument.body);
+    const dialog = await body.findByRole("dialog", { name: "Reply to Marta" });
+    // The dialog fades in: wait until it is shown.
+    await waitFor(async () => {
+      await expect(dialog).toBeVisible();
+    });
+    const first = await body.findByRole("button", { name: /Yes, Thursday works/u });
+    await waitFor(async () => {
+      await expect(first).toHaveFocus();
+    });
+  },
+};
+
+/** A pick asks Scout for the draft: editable, with Shorter, Change and Send. */
+export const ReplyDraft: Story = {
+  args: { path: PATH, api: home(REPLY_ROUTES) },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await canvas.findByText("Marta Ferreira is waiting for your reply");
+    await userEvent.keyboard("j");
+    await userEvent.keyboard("r");
+    const body = within(canvasElement.ownerDocument.body);
+    await body.findByRole("button", { name: /Yes, Thursday works/u });
+    await userEvent.keyboard("1");
+    const text = await body.findByRole("textbox", { name: "Your reply" });
+    await waitFor(async () => {
+      await expect(text).toHaveFocus();
+    });
+  },
+};
+
+/** No model may read mail on this server: only Write my own, saying why. */
+export const ReplyUnavailable: Story = {
+  args: {
+    path: PATH,
+    api: home({
+      [`POST ${W}/conversations/${MARTA.id}/reply/suggestions`]: {
+        status: 409,
+        body: { status: 409, code: "reply_unavailable", title: "Unavailable" },
+      },
+    }),
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await canvas.findByText("Marta Ferreira is waiting for your reply");
+    await userEvent.keyboard("j");
+    await userEvent.keyboard("r");
+    const body = within(canvasElement.ownerDocument.body);
+    // The dialog fades in: wait until its line is shown.
+    await waitFor(async () => {
+      await expect(
+        body.getByText("Scout can't write replies on this server, so you write this one."),
+      ).toBeVisible();
+    });
   },
 };
 
@@ -171,3 +259,67 @@ export const LoadError: Story = {
     ).toBeVisible();
   },
 };
+
+// A busy morning: forty things need you, more than fit in the window.
+const MANY_NEEDS = Array.from({ length: 40 }, (_, index) => {
+  const summary = NEEDS[index % NEEDS.length] ?? MARTA;
+  return index < NEEDS.length ? summary : { ...summary, id: `${summary.id}-${String(index)}` };
+});
+const MANY_ITEMS = MANY_NEEDS.map((summary, index) => {
+  const base = ITEMS[index % ITEMS.length] ?? ITEMS[0];
+  return index < ITEMS.length || base === undefined
+    ? base
+    : {
+        ...base,
+        id: `${base.id}-${String(index)}`,
+        record: { ...base.record, id: summary.id },
+      };
+}).filter((item) => item !== undefined);
+
+/** A viewport the story test runs at (the addon reads `globals.viewport`). */
+function at(name: string, width: number, height: number) {
+  return {
+    parameters: {
+      viewport: {
+        options: {
+          [name]: { name, styles: { width: `${String(width)}px`, height: `${String(height)}px` } },
+        },
+      },
+    },
+    globals: { viewport: { value: name } },
+  };
+}
+
+const busy: Pick<Story, "args" | "play"> = {
+  args: {
+    path: PATH,
+    api: home({
+      [`GET ${W}/attention`]: (_body, url) =>
+        url.searchParams.get("state") === "cleared"
+          ? { body: { items: CLEARED, counts: [] } }
+          : { body: { items: MANY_ITEMS, counts: COUNTS } },
+      [`GET ${W}/conversations`]: {
+        body: { conversations: [...MANY_NEEDS, SOFIA], next_cursor: null },
+      },
+    }),
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await canvas.findByRole("heading", { level: 1, name: "40 things need you" });
+    const page = canvas.getByRole("main");
+    const [sidebar] = canvas.getAllByRole("navigation");
+    // Forty needs are taller than the window, so Home scrolls inside its pane…
+    await waitFor(() => expect(page.scrollHeight).toBeGreaterThan(page.clientHeight));
+    page.scrollTop = page.scrollHeight;
+    await waitFor(() => expect(page.scrollTop).toBeGreaterThan(0));
+    // …while the page itself stays the window's height and the sidebar stays put.
+    await expect(document.documentElement.scrollHeight).toBeLessThanOrEqual(globalThis.innerHeight);
+    await expect(sidebar?.getBoundingClientRect().bottom).toBe(globalThis.innerHeight);
+  },
+};
+
+/** A busy Home in a narrow desktop window: Home scrolls, the page doesn't. */
+export const BusyNarrowDesktop: Story = { ...busy, ...at("narrowDesktop", 1100, 800) };
+
+/** A busy Home in a wide desktop window: Home scrolls, the page doesn't. */
+export const BusyDesktop: Story = { ...busy, ...at("desktop", 1440, 900) };

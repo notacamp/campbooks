@@ -16,10 +16,20 @@
 //!
 //! `conversations.decide_backlog` is the same pass for one stored message,
 //! enqueued by the needs backfill (`backfill_needs`) for recent mail that a
-//! trusted model never answered: mail stored before the upgrade to the
-//! facts (ADR 0018). A backlog pass waits while the answers check has not
+//! trusted model never answered, or answered before a triage question was
+//! added: mail stored before the upgrade to the facts (ADR 0018), or before
+//! the money question (campbooks-cloud#167). It asks every question again;
+//! the checked answers already stored are kept, and only the missing ones
+//! are added. A backlog pass waits while the answers check has not
 //! run or the provider did not answer it (about a day at most); when the
 //! check failed on the model's answers, the backfill queues nothing.
+//!
+//! Every pass's call counts against the workspace's daily AI limit
+//! (`campbooks_ai::usage`, campbooks-cloud#152). Over the limit the pass
+//! stores nothing, as when no model is configured, and the message keeps
+//! what was decided when it was stored (the facts, taught rules); it is not
+//! re-queued. When the call cannot be counted, it is not made and the job
+//! retries.
 
 use std::sync::Arc;
 
@@ -30,6 +40,7 @@ use campbooks_ai::{
         signals::email::{Envelope, Recipient, triage_questions},
         strategy::Strategy,
     },
+    usage::Scope,
 };
 use campbooks_kernel::{
     Event, EventConsumer, JobContext, JobError, JobHandler, blobs::BlobRef, db::BeginFor as _,
@@ -42,7 +53,7 @@ use crate::{
     domain::{
         blobs::read_text,
         conversation::{Changed, provider_message_ids},
-        decide::{ENVELOPE_BODY_BYTES, MessageParts, Source, envelope},
+        decide::{ENVELOPE_BODY_BYTES, MessageParts, PURPOSE, Source, envelope},
         decisions::Recorded,
         needs::{self, NeedSettings},
         policy::Policy,
@@ -105,6 +116,17 @@ impl ModelPass {
     }
 }
 
+/// When a message counts as answered already.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Answered {
+    /// A checked model answered any question about it (a live delivery,
+    /// replayed).
+    Any,
+    /// A checked model answered every triage question about it (the
+    /// backlog, after a question was added).
+    Every,
+}
+
 /// How one pass over a message ended.
 enum Passed {
     /// Answered and stored, or nothing to do.
@@ -132,6 +154,7 @@ impl Pass {
         ctx: &mut JobContext,
         workspace: WorkspaceId,
         message: MessageId,
+        answered: Answered,
     ) -> Result<Passed, JobError> {
         let Some(model) = &self.model else {
             return Ok(Passed::Done);
@@ -140,20 +163,29 @@ impl Pass {
         if !model.trusted() {
             return Ok(Passed::NotTrusted);
         }
-        let Some(loaded) = load(ctx, workspace, message).await? else {
+        let questions = triage_questions();
+        let Some(loaded) = load(ctx, workspace, message, &questions, answered).await? else {
             return Ok(Passed::Done);
         };
         if loaded.sent_at < Utc::now() - self.backfill {
             return Ok(Passed::Done);
         }
 
-        let questions = triage_questions();
-        let answers = match model.strategy.decide(&loaded.envelope, &questions).await {
+        // Counted against the workspace's daily AI limit (campbooks-cloud#152).
+        let usage = Scope::workspace(ctx.state().db.clone(), workspace, PURPOSE);
+        let asked = model.strategy.decide(&loaded.envelope, &questions);
+        let answers = match usage.run(asked).await {
             Ok(decisions) => decisions.answers,
             // The model failed (or has not passed) its answers check: the
             // pass does what it does when no model is configured, and
             // stores nothing.
             Err(campbooks_ai::Error::AnswersNotTrusted) => return Ok(Passed::NotTrusted),
+            // The workspace reached its daily AI limit: the same, and the
+            // message is not asked again later.
+            Err(campbooks_ai::Error::OverDailyCap { .. }) => {
+                tracing::debug!(workspace = %workspace, "over the daily AI limit: no model pass");
+                return Ok(Passed::Done);
+            }
             Err(error) => return Err(redact::ai(&error)),
         };
         let recorded = Recorded {
@@ -265,7 +297,9 @@ impl EventConsumer for DecideMessage {
             .workspace
             .parse()
             .map_err(|_| JobError::fatal("message_received names an invalid workspace"))?;
-        self.0.run(ctx, workspace, facts.message).await?;
+        self.0
+            .run(ctx, workspace, facts.message, Answered::Any)
+            .await?;
         Ok(())
     }
 }
@@ -317,7 +351,10 @@ impl JobHandler for DecideBacklog {
             .workspace()
             .and_then(|w| w.parse().ok())
             .ok_or_else(|| JobError::fatal("decide backlog enqueued outside a workspace"))?;
-        let passed = self.0.run(ctx, workspace, backlog.message).await?;
+        let passed = self
+            .0
+            .run(ctx, workspace, backlog.message, Answered::Every)
+            .await?;
         // Right after a start the check may not have run yet, or the
         // provider may have been down when it ran: ask again once it has
         // passed, rather than lose the message.
@@ -343,12 +380,15 @@ struct Loaded {
 
 /// The message's conversation and envelope, or `None` when there is nothing
 /// to do (gone, its inbox detached, outbound, or already answered by a
-/// checked model).
+/// checked model, as `answered` counts it, about `questions`).
 async fn load(
     ctx: &JobContext,
     workspace: WorkspaceId,
     message: MessageId,
+    questions: &[campbooks_ai::decide::Question],
+    answered: Answered,
 ) -> Result<Option<Loaded>, JobError> {
+    let ids: Vec<String> = questions.iter().map(|q| q.id.clone()).collect();
     let state = ctx.state();
     let mut tx = state.db.begin_for(workspace).await?;
     let row = sqlx::query!(
@@ -356,9 +396,10 @@ async fn load(
         SELECT m.conversation_id AS "conversation: ConversationId",
                m.inbox_id AS "inbox: InboxId", m.direction, m.sent_at,
                m.sender, m.recipients, m.subject, m.headers, m.bodies,
-               EXISTS (SELECT 1 FROM conversations.decisions d
-                        WHERE d.message_id = m.id AND d.source = 'model'
-                          AND d.model_version LIKE 'checked:%') AS "answered!",
+               (SELECT count(DISTINCT d.question) FROM conversations.decisions d
+                 WHERE d.message_id = m.id AND d.source = 'model'
+                   AND d.model_version LIKE 'checked:%'
+                   AND d.question = ANY($2)) AS "answered!",
                i.address AS inbox_address, i.display_name AS inbox_name,
                (SELECT count(*) FROM conversations.inbox_members im
                  WHERE im.inbox_id = i.id) AS "inbox_members!",
@@ -374,12 +415,17 @@ async fn load(
            AND i.detached_at IS NULL
         "#,
         message as MessageId,
+        &ids,
     )
     .fetch_optional(&mut *tx)
     .await?;
     tx.commit().await?;
     let Some(row) = row else { return Ok(None) };
-    if row.answered || row.direction != "inbound" {
+    let done = match answered {
+        Answered::Any => row.answered > 0,
+        Answered::Every => usize::try_from(row.answered).is_ok_and(|n| n >= ids.len()),
+    };
+    if done || row.direction != "inbound" {
         return Ok(None);
     }
     let decode =
@@ -468,6 +514,9 @@ struct Bodies {
 }
 
 #[cfg(test)]
+mod usage_tests;
+
+#[cfg(test)]
 mod tests {
     use campbooks_ai::{
         AiConfig, Gateway, Protocol, ProviderConfig, Role,
@@ -505,7 +554,9 @@ mod tests {
                 "has_deadline": noul(0.7),
                 "urgency": {"type": "score", "score": 1.0,
                     "probabilities": {"0": 0.2, "1": 0.6, "2": 0.2}},
-                "suspicious": noul(0.05)
+                "suspicious": noul(0.05),
+                "money": {"type": "choice", "choice": "neither",
+                    "probabilities": {"owed": 0.02, "paid": 0.02, "neither": 0.96}}
             }
         })
     }
@@ -619,7 +670,7 @@ mod tests {
         .fetch_all(&db)
         .await
         .unwrap();
-        assert_eq!(rows.len(), 3 * 6);
+        assert_eq!(rows.len(), 3 * 7);
         // Recorded with the envelope version (context 2, the facts) and the
         // stamp of the passed answers check.
         assert!(rows.iter().all(
@@ -807,7 +858,9 @@ mod tests {
                 "has_deadline": noul(0.1),
                 "urgency": {"type": "score", "score": 1.0,
                     "probabilities": {"0": 0.2, "1": 0.6, "2": 0.2}},
-                "suspicious": noul(0.02)
+                "suspicious": noul(0.02),
+                "money": {"type": "choice", "choice": "neither",
+                    "probabilities": {"owed": 0.02, "paid": 0.02, "neither": 0.96}}
             }
         })
     }
@@ -827,7 +880,9 @@ mod tests {
                 "has_deadline": noul(0.05),
                 "urgency": {"type": "score", "score": 0.2,
                     "probabilities": {"0": 0.8, "1": 0.2, "2": 0.0}},
-                "suspicious": noul(0.02)
+                "suspicious": noul(0.02),
+                "money": {"type": "choice", "choice": "neither",
+                    "probabilities": {"owed": 0.02, "paid": 0.02, "neither": 0.96}}
             }
         })
     }
@@ -862,7 +917,7 @@ mod tests {
         .fetch_one(db)
         .await
         .unwrap();
-        assert_eq!(model, 6, "the model pass ran");
+        assert_eq!(model, 7, "the model pass ran");
         let request = &server.received_requests().await.unwrap()[0];
         let body: Value = serde_json::from_slice(&request.body).unwrap();
         let state = body["state"].as_str().unwrap().to_owned();

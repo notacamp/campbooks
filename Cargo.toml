@@ -78,6 +78,9 @@ icu_properties = "2.3.0"
 unicode-security = "0.1.2"
 
 # Errors, observability, misc
+# The Public Suffix List, compiled in (no runtime fetch): the registrable
+# domain of a sender (`decide::signals::facts`).
+psl = "2.1.241"
 thiserror = "2.0.21"
 anyhow = "1.0.104"
 tracing = "0.1.44"
@@ -94,6 +97,10 @@ opentelemetry-otlp = { version = "0.33.0", default-features = false, features = 
 opentelemetry-prometheus = "0.33.0"
 prometheus = { version = "0.14.0", default-features = false }
 tracing-opentelemetry = { version = "0.34.0", default-features = false }
+# Error reports to a Sentry-compatible service (GlitchTip, Sentry), off unless
+# `CAMPBOOKS_TELEMETRY__ERROR_DSN` is set. No panic integration (the server's
+# own hook withholds panic messages), no logs or metrics; rustls, like the rest.
+sentry = { version = "0.49.3", default-features = false, features = ["reqwest", "rustls"] }
 # sqlx's pool options take a `log` level; already in the graph via sqlx.
 log = "0.4.34"
 uuid = { version = "1.28.0", features = ["v7", "serde"] }
@@ -117,6 +124,15 @@ regex = "1.13.1"
 # RUSTSEC-2021-0157/0158 in 4.2.0. Relax to a caret requirement after
 # 2026-10-27.
 ammonia = "=4.2.3"
+# Email: inlining a message's style sheets into `style` attributes before
+# ammonia cleans it (conversations, campbooks-cloud#160). No default
+# features: never fetches a remote sheet (`http`) or reads a file (`file`).
+# Its html5ever and cssparser are the ones ammonia already brings.
+css-inline = { version = "=0.22.0", default-features = false }
+# Email: the CSS parser behind the declaration filter and the tokenizer that
+# reads style text (conversations). Already in the graph through ammonia.
+cssparser = "0.38.0"
+html5ever = "0.40.1"
 
 # Search: telling which of the four shipped languages an entry is written in
 # (whatlang: trigram profiles, no model files, MIT).

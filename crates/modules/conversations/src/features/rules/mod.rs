@@ -30,7 +30,9 @@ use crate::{
         rules::{self, NewRule, RuleAction, RuleCondition, Stored},
     },
     events::RULE_RECORD,
-    model::{ConversationId, InboxId, RuleId, RuleOrigin, RuleState, RunKind, TeachingId},
+    model::{
+        ConversationId, InboxId, PausedReason, RuleId, RuleOrigin, RuleState, RunKind, TeachingId,
+    },
     scopes::{ConversationsRead, ConversationsWrite},
 };
 
@@ -91,8 +93,18 @@ pub struct RuleView {
     pub origin: RuleOrigin,
     /// The member's own words, for an instruction.
     pub origin_text: Option<String>,
-    /// Whether it acts. `paused` when its author can no longer change the inbox.
+    /// Whether it acts. `paused` when its author can no longer change the
+    /// inbox or is away for now, its inbox is kept read-only, or a member
+    /// paused it.
     pub state: RuleState,
+    /// Why it is paused; absent unless `state` is `paused`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub paused_reason: Option<PausedReason>,
+    /// For a proposed rule, why it would be paused once kept (confirming
+    /// keeps its author): say so before a member says yes. Absent for any
+    /// other rule, or when it would act.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub paused_once_kept: Option<PausedReason>,
     /// Who taught it; `None` when a client did.
     pub taught_by: Option<UserId>,
     /// The conversation it was taught from.
@@ -145,6 +157,8 @@ async fn views(
             origin: rule.origin,
             origin_text: rule.origin_text.clone(),
             state: rule.effective_state(),
+            paused_reason: rule.paused_reason(),
+            paused_once_kept: rule.paused_once_kept(),
             taught_by: rule.taught_by,
             from_conversation_id: rule.from_conversation,
             created_at: rule.created_at,
@@ -686,7 +700,16 @@ pub async fn create_in(
     if rule_state == RuleState::Active && body.apply_to_existing {
         rule_runs::start(tx, &state.events, &ws, &rule, RunKind::Apply).await?;
     } else {
-        rule_runs::announce(tx, &state.events, &ws, inbox, id, rule_state, None).await?;
+        rule_runs::announce(
+            tx,
+            &state.events,
+            &ws,
+            inbox,
+            id,
+            rule.effective_state(),
+            None,
+        )
+        .await?;
     }
     Ok(CreatedRule {
         rule: view(tx, access, &rule).await?,
@@ -790,6 +813,8 @@ pub struct ConfirmRule {
     request_body = ConfirmRule,
     responses(
         (status = OK, description = "The rule, now active.", body = RuleView),
+        (status = BAD_REQUEST, description = "Not a valid rule (any more).", body = Problem,
+            content_type = "application/problem+json"),
         (status = UNAUTHORIZED, description = "No valid access token.", body = Problem,
             content_type = "application/problem+json"),
         (status = FORBIDDEN, description = "Missing scope, or you may only read this inbox.",
@@ -817,6 +842,9 @@ pub async fn confirm(
     if rules::lock_state(&mut tx, rule.id).await? != Some(RuleState::Proposed) {
         return Err(Error::Conflict(crate::MESSAGES.reason("rule_not_proposed")));
     }
+    // As `create` does: a proposal stored before its domain became a public
+    // suffix is not kept (it could never act).
+    rules::validate(&rule.conditions, &rule.actions)?;
     replace(
         &mut tx,
         &state,
@@ -849,7 +877,7 @@ pub async fn confirm(
             &ws,
             rule.inbox,
             rule.id,
-            rule.state,
+            rule.effective_state(),
             None,
         )
         .await?;

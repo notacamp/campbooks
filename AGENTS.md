@@ -116,8 +116,11 @@ Use `ENV` with neutral `example.com` defaults. *(gitleaks in CI.)*
 - **Telemetry carries no personal data or secrets.** Span fields, log fields
   and metric attributes never hold message content, prompts, tokens, cookies,
   codes or email addresses, and metric attributes never hold ids (route
-  templates, names and small enums only). See `kernel::telemetry`.
-  *(CI: the server's telemetry privacy test.)*
+  templates, names and small enums only). See `kernel::telemetry`. Error
+  reports and the app's forwarded telemetry carry ids and error kinds only
+  (`kernel::redact::error_kind`, `server::error_reports`,
+  `system::client_telemetry`). *(CI: the server's telemetry privacy test,
+  its error report tests and the client telemetry scrubber tests.)*
 - Untrusted HTML (email bodies) is rendered only in a sandboxed iframe with a
   strict CSP; never `dangerouslySetInnerHTML` outside `lib/ui/safe-html`.
 

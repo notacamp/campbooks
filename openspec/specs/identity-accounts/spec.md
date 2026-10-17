@@ -294,16 +294,19 @@ keep no provider token.
 - **THEN** the authorization request carries no `access_type=offline`, and no grant is held
 
 ### Requirement: Ways to sign in screen
-Settings SHALL have a Ways to sign in page listing the person's provider ways
-in, with Remove behind an inline confirmation (and `last_way_in` explained
-in place), Add for each configured provider, Reconnect for this workspace's
-connections of theirs that need re-authorisation, a "Sign in again" offer
-when an action needs a recent sign-in, further sections other slices
-contribute (passkeys), a notice and a "New" mark when a way in (other than
-the sign-up's) was added in the last seven days, and Sign out everywhere
-behind an inline confirmation. The sign-in screen SHALL offer every provider
-the server lists. Both SHALL be in en, pt-PT, es-ES and fr, keyboard-operable
-with visible hints, and usable at 375px.
+Settings SHALL have a Ways to sign in page, made of section cards
+(`settings-ui`) under the lead "How you get into Campbooks. Keep at least two,
+so losing one never locks you out.": an "Accounts" card with a count listing
+the person's provider ways in, with Remove behind an inline confirmation (and
+`last_way_in` explained in place), Reconnect for this workspace's connections
+of theirs that need re-authorisation, and, at its bottom, Add for each
+configured provider; further sections other slices contribute (passkeys); a
+"Sign in again" offer when an action needs a recent sign-in; a notice and a
+"New" mark when a way in (other than the sign-up's) was added in the last
+seven days; and Sign out everywhere as its own card, its button outlined in
+the danger tone, behind an inline confirmation. The sign-in screen SHALL offer
+every provider the server lists. Both SHALL be in en, pt-PT, es-ES and fr,
+keyboard-operable with visible hints, and usable at 375px.
 
 #### Scenario: Remove with confirmation
 - **WHEN** the person presses Remove on a way in
@@ -601,11 +604,12 @@ three.
 - **THEN** that session's refresh token is refused, and the passkey no longer signs in
 
 ### Requirement: Passkeys section
-Settings → Ways to sign in SHALL have a Passkeys section below the provider
-ways in: the person's passkeys (synced or on one device, added, last used),
-Rename in place, Remove behind an inline confirmation (`last_way_in`
-explained in place), and "Add a passkey" (`N` then `P`), naming the new
-passkey after the device. A refusal for a stale sign-in SHALL offer "Sign in
+Settings → Ways to sign in SHALL have a Passkeys card below the Accounts card:
+the person's passkeys (synced or on one device, added, last used), Rename in
+place, Remove behind an inline confirmation (`last_way_in` explained in
+place), and "Add a passkey" (`N` then `P`), naming the new passkey after the
+device. With no passkeys the card SHALL show a quiet panel, "No passkeys yet",
+holding the Add button. A refusal for a stale sign-in SHALL offer "Sign in
 again" through `/bff/login?max_age=600`. A browser without passkeys SHALL be
 told so instead of offered Add. Every string SHALL be in en, pt-PT, es-ES
 and fr, and the section usable at 375px.

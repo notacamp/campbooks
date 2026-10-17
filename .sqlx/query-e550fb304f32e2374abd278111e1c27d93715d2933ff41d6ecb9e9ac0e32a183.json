@@ -1,0 +1,88 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT message_id AS \"message: MessageId\", reason, question, basis, trust,\n               decision_id AS \"decision: DecisionId\"\n          FROM conversations.needs\n         WHERE conversation_id = $1 AND state = 'open' FOR UPDATE\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "message: MessageId",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "conversations.needs",
+            "name": "message_id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "reason",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "conversations.needs",
+            "name": "reason"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "question",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "conversations.needs",
+            "name": "question"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "basis",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "conversations.needs",
+            "name": "basis"
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "trust",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "conversations.needs",
+            "name": "trust"
+          }
+        }
+      },
+      {
+        "ordinal": 5,
+        "name": "decision: DecisionId",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "conversations.needs",
+            "name": "decision_id"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      true
+    ]
+  },
+  "hash": "e550fb304f32e2374abd278111e1c27d93715d2933ff41d6ecb9e9ac0e32a183"
+}

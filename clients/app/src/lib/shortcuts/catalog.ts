@@ -79,11 +79,26 @@ export const DEFAULT_SHORTCUTS = [
   { id: "list.open", keys: "enter", scope: "list", group: "list", label: "shortcuts:list.open" },
   { id: "item.reply", keys: "r", scope: "item", group: "item", label: "shortcuts:item.reply" },
   { id: "item.done", keys: "e", scope: "item", group: "item", label: "shortcuts:item.done" },
-  { id: "item.later", keys: "l", scope: "item", group: "item", label: "shortcuts:item.later" },
+  { id: "item.snooze", keys: "s", scope: "item", group: "item", label: "shortcuts:item.snooze" },
   { id: "item.hold", keys: "h", scope: "item", group: "item", label: "shortcuts:item.hold" },
-  { id: "item.paid", keys: "p", scope: "item", group: "item", label: "shortcuts:item.paid" },
   { id: "item.choice1", keys: "1", scope: "item", group: "item", label: "shortcuts:item.choice1" },
   { id: "item.choice2", keys: "2", scope: "item", group: "item", label: "shortcuts:item.choice2" },
+  { id: "item.choice3", keys: "3", scope: "item", group: "item", label: "shortcuts:item.choice3" },
+  // ←/→ walk the selected row's actions; Enter (list.open) presses the highlighted one.
+  {
+    id: "item.next_action",
+    keys: "arrowright",
+    scope: "item",
+    group: "item",
+    label: "shortcuts:item.nextAction",
+  },
+  {
+    id: "item.previous_action",
+    keys: "arrowleft",
+    scope: "item",
+    group: "item",
+    label: "shortcuts:item.previousAction",
+  },
 
   // Writing
   {

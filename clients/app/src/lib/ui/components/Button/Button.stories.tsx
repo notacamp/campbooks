@@ -12,7 +12,7 @@ const meta = {
   argTypes: {
     variant: {
       control: "inline-radio",
-      options: ["primary", "secondary", "ghost", "danger", "link"],
+      options: ["primary", "secondary", "ghost", "danger", "danger-outline", "link"],
     },
     size: { control: "inline-radio", options: ["md", "lg"] },
   },
@@ -33,9 +33,22 @@ export const Secondary: Story = {
   args: { variant: "secondary", children: "Reply", shortcut: "item.reply" },
 };
 export const Ghost: Story = {
-  args: { variant: "ghost", children: "Later", shortcut: "item.later" },
+  args: { variant: "ghost", children: "Snooze…", shortcut: "item.snooze" },
+};
+
+/** An action that runs the AI: the small visor before its label. */
+export const Ai: Story = {
+  args: { variant: "secondary", ai: true, children: "Draft a reply", keys: "2" },
+  play: async ({ canvasElement }) => {
+    const button = within(canvasElement).getByRole("button", { name: /Draft a reply/ });
+    await expect(button).toHaveAttribute("data-ai", "true");
+    await expect(button.querySelector("[data-state]")).not.toBeNull();
+  },
 };
 export const Danger: Story = { args: { variant: "danger", children: "It was not me", keys: "2" } };
+export const DangerOutline: Story = {
+  args: { variant: "danger-outline", children: "Sign out everywhere", icon: "sign-out" },
+};
 export const Link: Story = { args: { variant: "link", children: "Why?" } };
 
 /** 44px, for touch: phone action bars. */

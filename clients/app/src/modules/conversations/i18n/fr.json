@@ -58,8 +58,8 @@
     }
   },
   "actions": {
-    "star": "Suivre",
-    "unstar": "Ne plus suivre",
+    "star": "Épingler",
+    "unstar": "Désépingler",
     "read": "Marquer comme lue",
     "unread": "Marquer comme non lue",
     "move": "Déplacer",
@@ -73,8 +73,8 @@
   },
   "toast": {
     "done": "Terminé · {{subject}}",
-    "starred": "Suivie · {{subject}}",
-    "unstarred": "Plus suivie · {{subject}}",
+    "starred": "Épinglée · {{subject}}",
+    "unstarred": "Désépinglée · {{subject}}",
     "read": "Marquée comme lue · {{subject}}",
     "unread": "Marquée comme non lue · {{subject}}",
     "moved": "Déplacée vers {{stream}} · {{subject}}"
@@ -103,6 +103,7 @@
     "whyHasDeadline": "Mentionne une date",
     "whyUrgent": "Urgent",
     "whySuspicious": "Suspect",
+    "whyMoney": "Paiement",
     "sortedTaught": "Campbooks l’a rangée dans {{stream}}, selon une règle"
   },
   "reasons": {
@@ -160,7 +161,7 @@
     "updates": "Aller à Notifications",
     "receipts": "Aller à Reçus",
     "newsletters": "Aller à Newsletters",
-    "star": "Suivre ou ne plus suivre",
+    "star": "Épingler ou désépingler",
     "unread": "Marquer comme lue ou non lue",
     "move": "Déplacer vers un flux",
     "replyAll": "Répondre à tous",
@@ -168,7 +169,8 @@
     "showImages": "Afficher les images",
     "nextAttachment": "Pièce jointe suivante",
     "notNeeded": "Pas nécessaire (ou c’est sûr)",
-    "undoAll": "Annuler tout ce qu’a fait une règle"
+    "undoAll": "Annuler tout ce qu’a fait une règle",
+    "allPaid": "Toutes les factures déjà payées"
   },
   "compose": {
     "title": {
@@ -223,10 +225,11 @@
       "reply": "{{name}} attend votre réponse",
       "question": "{{name}} vous a posé une question",
       "do": "{{name}} vous a demandé de faire quelque chose",
-      "pay": "{{name}} a envoyé une facture à payer",
+      "pay": "Payer {{name}}",
       "warning": "Ceci pourrait être du hameçonnage. N’utilisez pas ses liens.",
       "checkReply": "Faut-il répondre à {{name}} ?",
       "checkDo": "Y a-t-il quelque chose à faire pour {{name}} ?",
+      "checkPay": "{{name}} a envoyé une facture. Est-elle payée ?",
       "taughtReply": "{{name}} : à répondre, selon une règle",
       "taughtDo": "{{name}} : à faire, selon une règle"
     },
@@ -242,7 +245,9 @@
       "today": "Pour aujourd’hui",
       "tomorrow": "Pour demain",
       "on": "Pour le {{date}}",
-      "overdue": "En retard · prévu le {{date}}"
+      "overdue": "En retard · prévu le {{date}}",
+      "daysOverdue_one": "{{count}} jour de retard",
+      "daysOverdue_other": "{{count}} jours de retard"
     },
     "how": {
       "yes": "Oui.",
@@ -250,6 +255,11 @@
       "urgency0": "Pas d’urgence.",
       "urgency1": "Dans les prochains jours.",
       "urgency2": "Aujourd’hui.",
+      "money": {
+        "owed": "Demande un paiement encore dû.",
+        "paid": "Confirme un paiement déjà effectué.",
+        "neither": "Ne demande ni ne confirme aucun paiement."
+      },
       "source": {
         "rules": "Règles",
         "model": "Modèle",
@@ -267,7 +277,11 @@
       "safe": "C’est sûr",
       "yes": "Oui",
       "no": "Non",
-      "questionPrompt": "Campbooks n’en est pas sûr."
+      "questionPrompt": "Campbooks n’en est pas sûr.",
+      "alreadyPaid": "Déjà payée",
+      "stillToPay": "Reste à payer",
+      "markPaid": "Marquer comme payée",
+      "billPrompt": "Campbooks n’a pas accès à votre banque."
     },
     "toast": {
       "done": "Fait · {{name}}",
@@ -275,7 +289,21 @@
       "safe": "Marqué comme sûr · {{name}}. Campbooks en tiendra compte",
       "confirmed": "Merci · {{name}} reste dans votre liste",
       "failed": "Impossible de modifier {{name}} : rien n’a changé. Réessayez.",
-      "changed": "{{name}} a changé pendant que vous regardiez : jetez-y un nouveau coup d’œil."
+      "changed": "{{name}} a changé pendant que vous regardiez : jetez-y un nouveau coup d’œil.",
+      "paid": "Marquée comme payée · {{name}}",
+      "toPay": "Reste dans À payer · {{name}}",
+      "allPaid_one": "{{count}} facture marquée comme payée",
+      "allPaid_other": "{{count}} factures marquées comme payées",
+      "allPaidFailed_one": "Impossible de marquer {{count}} facture comme payée. Réessayez.",
+      "allPaidFailed_other": "Impossible de marquer {{count}} factures comme payées. Réessayez."
+    },
+    "summary": {
+      "heading": "Résumé de Scout"
+    },
+    "mail": {
+      "more": "Afficher tout l’e-mail",
+      "less": "Afficher moins",
+      "linksOff": "Les liens sont désactivés dans les e-mails qui pourraient être du hameçonnage."
     }
   },
   "rules": {
@@ -401,6 +429,7 @@
       "made": "Nouvelle règle · {{rule}}",
       "stopped": "Règle retirée · {{rule}}",
       "kept": "Règle gardée · {{rule}}",
+      "keptPaused": "Règle gardée, en pause pour l’instant · {{rule}}",
       "declined": "Règle refusée · {{rule}}",
       "failed": "Campbooks n’a pas pu modifier cette règle. Rien n’a changé."
     },
@@ -452,7 +481,6 @@
       "suggestion": "Suggérée par Campbooks"
     },
     "list": {
-      "label": "Règles",
       "waiting": "En attente de votre réponse",
       "keep": "Garder cette règle",
       "no": "Non",
@@ -461,8 +489,15 @@
       "confirmRemove": "Retirer",
       "cancel": "Garder",
       "forEveryone": "Pour tout le monde",
-      "paused": "En pause : la personne qui l’a enseignée ne peut plus modifier cette boîte",
-      "empty": "Pas encore de règles. Quand vous déplacez, archivez ou retirez un e-mail, Campbooks propose de faire de même pour ceux qui lui ressemblent.",
+      "paused": {
+        "inbox_read_only": "En pause : cette boîte est en lecture seule",
+        "author_cannot_write": "En pause : la personne qui l’a enseignée ne peut plus modifier cette boîte",
+        "domain_too_broad": "En pause : le domaine est trop large",
+        "paused_by_member": "Mise en pause par un membre",
+        "author_unavailable": "En pause pour l’instant ; elle reprendra d’elle-même"
+      },
+      "keptStaysPaused": "Si vous la gardez, elle reste en pause jusqu’au retour de la personne qui l’a enseignée, ou jusqu’à ce que quelqu’un la reprenne",
+      "empty": "Apprenez à Scout ci-dessus ou répondez à ses questions plus bas. Quand vous déplacez, archivez ou retirez un e-mail, Campbooks propose aussi de faire de même pour ceux qui lui ressemblent.",
       "leave": "Les laisser tels quels",
       "changedMail": "Les e-mails qu’elle a modifiés",
       "applied_one": "{{n}} jusqu’ici",
@@ -474,7 +509,53 @@
       "lastActed": "Dernière action {{time}}",
       "failed": "Impossible de charger les règles",
       "retry": "Réessayer",
-      "inbox": "Une boîte de réception"
+      "inbox": "Une boîte de réception",
+      "emptyTitle": "Pas encore de règles"
     }
+  },
+  "reply": {
+    "title": "Répondre à {{name}}",
+    "reading": "Scout lit la conversation…",
+    "choose": "Que doit-elle dire ? Choisissez une option ou dites-le avec vos mots.",
+    "noSuggestions": "Scout n’a pas de suggestion cette fois. Dites-le avec vos mots ou écrivez-la vous-même.",
+    "suggestionsFailed": "Scout n’a pas pu suggérer de réponses pour l’instant. Dites-le avec vos mots ou écrivez-la vous-même.",
+    "unavailable": "Scout ne peut pas écrire de réponses sur ce serveur : écrivez celle-ci vous-même.",
+    "choices": "Réponses probables",
+    "quoteFrom": "{{name}}, {{date}}",
+    "own": {
+      "label": "Ou dites-le avec vos mots",
+      "placeholder": "p. ex. oui, mais j’aurai 15 minutes de retard",
+      "action": "Rédiger"
+    },
+    "writing": "Rédaction du brouillon…",
+    "draftDescription": "Le brouillon de Scout. Modifiez-le ici ou demandez un changement. Rien n’est envoyé avant que vous appuyiez sur Envoyer.",
+    "draftLabel": "Votre réponse",
+    "shorter": "Plus courte",
+    "shortening": "Raccourcissement…",
+    "changing": "Modification…",
+    "back": "Revenir aux choix",
+    "change": {
+      "label": "Demander un changement",
+      "placeholder": "p. ex. plus chaleureuse, ou mentionnez les plans",
+      "action": "Modifier"
+    },
+    "send": "Envoyer",
+    "openInComposer": "Ouvrir dans l’éditeur",
+    "writeOwn": "L’écrire moi-même",
+    "pending": "Envoi à {{name}}…",
+    "sending": "Envoi à {{name}}",
+    "result": "Envoi à {{name}}",
+    "resultDetail": "Elle part dans quelques secondes. D’ici là, vous pouvez annuler en bas.",
+    "undone": "Non envoyée. Votre brouillon est revenu.",
+    "tooLate": "Trop tard pour annuler : la réponse est déjà partie.",
+    "errors": {
+      "write": "Scout n’a pas pu écrire cela pour l’instant. Réessayez ou écrivez-la vous-même.",
+      "limit": "Scout a écrit beaucoup de réponses cette heure-ci. Réessayez plus tard ou écrivez-la vous-même.",
+      "dailyLimit": "Cet espace de travail a utilisé son quota d’IA du jour. Écrivez celle-ci vous-même.",
+      "send": "Impossible d’envoyer à {{name}}. Votre brouillon est conservé.",
+      "open": "Impossible d’ouvrir l’éditeur. Votre brouillon reste ici."
+    },
+    "to": "À {{recipient}}",
+    "replyToElsewhere": "Les réponses vont à {{recipient}}, pas à l’expéditeur {{sender}}. Vérifiez avant d’envoyer."
   }
 }

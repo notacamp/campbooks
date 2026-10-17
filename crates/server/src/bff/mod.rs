@@ -151,8 +151,8 @@ impl Bff {
                 cookies: Cookies::new(settings.secure_cookies),
                 public_origin: settings.public_origin.into(),
                 timeouts: settings.timeouts,
-                api,
-                admin,
+                api: api.route_layer(axum::middleware::from_fn(crate::telemetry::served_route)),
+                admin: admin.route_layer(axum::middleware::from_fn(crate::telemetry::served_route)),
                 refresh_locks: (0..REFRESH_LOCKS)
                     .map(|_| tokio::sync::Mutex::new(()))
                     .collect(),
@@ -313,7 +313,7 @@ impl Job for PruneSessions {
     const MAX_ATTEMPTS: u32 = 3;
 
     async fn run(self, ctx: &mut JobContext) -> Result<(), JobError> {
-        let (sessions, logins) = store::prune(ctx.pool(), Utc::now()).await?;
+        let (sessions, logins) = store::prune(ctx.pool()).await?;
         tracing::info!(sessions, logins, "pruned ended web sessions and sign-ins");
         Ok(())
     }
@@ -371,18 +371,33 @@ fn seconds_until(until: DateTime<Utc>, now: DateTime<Utc>) -> i64 {
 
 impl Inner {
     /// The live session the request's cookie names, recording its use and
-    /// rotating its token when due.
+    /// rotating its token when due. A session that predates the scopes the
+    /// BFF asks for now is retired and counts as none.
     async fn current(&self, headers: &HeaderMap) -> Result<Option<Current>, Error> {
+        self.lookup(headers, true).await
+    }
+
+    /// [`Self::current`], keeping a session whatever scopes it asked for:
+    /// for signing out, which ends it in full.
+    async fn current_any_scopes(&self, headers: &HeaderMap) -> Result<Option<Current>, Error> {
+        self.lookup(headers, false).await
+    }
+
+    async fn lookup(
+        &self,
+        headers: &HeaderMap,
+        check_scopes: bool,
+    ) -> Result<Option<Current>, Error> {
         let Some(token) = self.cookies.session(headers) else {
             return Ok(None);
         };
         let now = Utc::now();
         let token_hash = hash(&token);
-        let Some(session) = store::find_session(&self.db, &token_hash, now).await? else {
-            if let Some(id) = store::retired_session(&self.db, &token_hash, now).await? {
+        let Some(session) = store::find_session(&self.db, &token_hash).await? else {
+            if store::is_retired(&self.db, &token_hash).await? {
                 // A token two or more rotations old: a copied cookie.
                 tracing::warn!("a retired web session token was presented again; the session ends");
-                self.terminate(id).await?;
+                self.terminate(&token_hash).await?;
             }
             return Ok(None);
         };
@@ -395,7 +410,7 @@ impl Inner {
                 tracing::warn!(
                     "a rotated-away web session token was presented again; the session ends"
                 );
-                self.terminate(session.id).await?;
+                self.terminate(&token_hash).await?;
                 return Ok(None);
             }
             // The successor never reached this browser (the response that
@@ -406,7 +421,6 @@ impl Inner {
             let fresh = random_token();
             match store::reissue(
                 &self.db,
-                session.id,
                 &token_hash,
                 &hash(&fresh),
                 now,
@@ -425,21 +439,34 @@ impl Inner {
                     tracing::warn!(
                         "a rotated-away web session token was presented again; the session ends"
                     );
-                    self.terminate(session.id).await?;
+                    self.terminate(&token_hash).await?;
                     return Ok(None);
                 }
                 Reissue::Gone => return Ok(None),
             }
         } else if session.current && !session.token_delivered {
-            store::delivered(&self.db, session.id, &token_hash).await?;
+            store::delivered(&self.db, &token_hash).await?;
+        }
+        if check_scopes && !asked_for_all(session.scopes.as_deref(), self.oidc.scopes()) {
+            // Signed in before a release that asks for more (a new module's
+            // scopes): its tokens can never get them, and every feature
+            // behind them would answer 403. It ends like an expired session,
+            // so the app signs in again and comes back with every scope; the
+            // identity provider's own session is left alone, so that sign-in
+            // can go straight through.
+            tracing::info!(
+                "a web session predates scopes the BFF now asks for; it ends so the next sign-in asks for them"
+            );
+            self.retire(&token_hash).await?;
+            return Ok(None);
         }
         if now - session.last_seen_at >= TOUCH_EVERY {
             let idle_until = (now + self.timeouts.idle).min(session.expires_at);
-            store::touch(&self.db, session.id, now, idle_until).await?;
+            store::touch(&self.db, &token_hash, now, idle_until).await?;
         }
         if session.current && now - session.rotated_at >= self.timeouts.rotate {
             let fresh = random_token();
-            if store::rotate(&self.db, session.id, &token_hash, &hash(&fresh), now).await? {
+            if store::rotate(&self.db, &token_hash, &hash(&fresh), now).await? {
                 rotated = Some(
                     self.cookies
                         .set_session(&fresh, seconds_until(session.expires_at, now)),
@@ -454,27 +481,27 @@ impl Inner {
     /// wait for the one refreshing and use its result.
     async fn access_token(&self, session: &Session) -> Result<String, AccessError> {
         if Utc::now() + REFRESH_BEFORE_EXPIRY < session.access_expires_at {
-            return self.open_access(session.id, &session.access_token).await;
+            return self.open_access(session, &session.access_token).await;
         }
         let lock = &self.refresh_locks[lock_index(session.id)];
         let _guard = lock.lock().await;
-        let mut tx = self.db.begin().await?;
-        let Some(tokens) = store::lock_tokens(&mut tx, session.id).await? else {
+        let mut tx = store::begin_refresh(&self.db).await?;
+        let Some(tokens) = store::lock_tokens(&mut tx, &session.presented).await? else {
             return Err(AccessError::SessionEnded);
         };
         let now = Utc::now();
         if now + REFRESH_BEFORE_EXPIRY < tokens.access_expires_at {
             // Another request refreshed while this one waited.
             tx.commit().await?;
-            return self.open_access(session.id, &tokens.access_token).await;
+            return self.open_access(session, &tokens.access_token).await;
         }
         let still_valid = now < tokens.access_expires_at;
         let Some(sealed_refresh) = &tokens.refresh_token else {
             tx.commit().await?;
             return if still_valid {
-                self.open_access(session.id, &tokens.access_token).await
+                self.open_access(session, &tokens.access_token).await
             } else {
-                self.end(session.id).await
+                self.end(&session.presented).await
             };
         };
         let Ok(refresh_token) = self
@@ -482,7 +509,7 @@ impl Inner {
             .open(sealed_refresh, &sealed_for(session.id, "refresh_token"))
         else {
             drop(tx);
-            return self.unreadable(session.id).await;
+            return self.unreadable(&session.presented).await;
         };
         match self.oidc.refresh(&refresh_token).await {
             Ok(fresh) => {
@@ -496,7 +523,7 @@ impl Inner {
                 });
                 store::update_tokens(
                     &mut tx,
-                    session.id,
+                    &session.presented,
                     &access,
                     expires_at,
                     refresh.as_deref().or(Some(sealed_refresh.as_slice())),
@@ -507,7 +534,7 @@ impl Inner {
             }
             Err(OidcError::Rejected(reason)) => {
                 tracing::info!(%reason, "the identity provider refused to refresh a web session; it ends");
-                store::delete_session(&mut tx, session.id).await?;
+                store::delete_session(&mut tx, &session.presented).await?;
                 tx.commit().await?;
                 Err(AccessError::SessionEnded)
             }
@@ -515,7 +542,7 @@ impl Inner {
                 drop(tx);
                 if still_valid {
                     tracing::warn!(%reason, "could not refresh a web session yet; using its current access token");
-                    self.open_access(session.id, &tokens.access_token).await
+                    self.open_access(session, &tokens.access_token).await
                 } else {
                     Err(AccessError::Failed(Error::Unavailable(
                         campbooks_kernel::i18n::MESSAGES.reason("idp_unavailable"),
@@ -525,46 +552,42 @@ impl Inner {
         }
     }
 
-    async fn open_access(&self, id: Uuid, sealed: &[u8]) -> Result<String, AccessError> {
-        match self.cipher.open(sealed, &sealed_for(id, "access_token")) {
+    async fn open_access(&self, session: &Session, sealed: &[u8]) -> Result<String, AccessError> {
+        match self
+            .cipher
+            .open(sealed, &sealed_for(session.id, "access_token"))
+        {
             Ok(token) => Ok(token),
-            Err(_) => self.unreadable(id).await,
+            Err(_) => self.unreadable(&session.presented).await,
         }
     }
 
     /// The session's tokens cannot be decrypted (e.g. `CAMPBOOKS_SECRET_KEY`
     /// changed): it ends, and the user signs in again.
-    async fn unreadable(&self, id: Uuid) -> Result<String, AccessError> {
+    async fn unreadable(&self, presented: &[u8]) -> Result<String, AccessError> {
         tracing::warn!(
             "a web session's stored tokens could not be decrypted (was CAMPBOOKS_SECRET_KEY \
              changed?); the session ends"
         );
-        self.end(id).await
+        self.end(presented).await
     }
 
-    /// End session `id` everywhere it reaches: delete it, revoke its
-    /// refresh token at the identity provider, and end the in-process
-    /// issuer's session (its ID token is the proof). Whether the issuer
-    /// session was ended here. Failures past the deletion are logged: the
-    /// web session is gone either way.
-    async fn terminate(&self, id: Uuid) -> sqlx::Result<bool> {
-        let Some((refresh_token, id_token)) =
-            store::delete_session(&mut *self.db.acquire().await?, id).await?
+    /// End the session that holds or held the token hashing to `presented`
+    /// (current, previous or retired) everywhere it reaches: delete it,
+    /// revoke its refresh token at the identity provider, and end the
+    /// in-process issuer's session (its ID token is the proof). Whether the
+    /// issuer session was ended here. Failures past the deletion are logged:
+    /// the web session is gone either way.
+    async fn terminate(&self, presented: &[u8]) -> sqlx::Result<bool> {
+        let Some(store::Ended {
+            id,
+            refresh_token,
+            id_token,
+        }) = store::end_session(&self.db, presented).await?
         else {
             return Ok(false);
         };
-        if let Some(sealed) = refresh_token {
-            match self.cipher.open(&sealed, &sealed_for(id, "refresh_token")) {
-                Ok(refresh_token) => {
-                    if let Err(err) = self.oidc.revoke(&refresh_token).await {
-                        tracing::warn!(error = %err, "could not revoke an ended session's refresh token");
-                    }
-                }
-                Err(_) => {
-                    tracing::warn!("an ended session's refresh token could not be decrypted");
-                }
-            }
-        }
+        self.revoke_refresh(id, refresh_token).await;
         // The in-process issuer's session ends here, with the ID token as
         // proof (ADR 0014): nothing for the browser to visit or forge.
         if self.oidc.in_process()
@@ -580,8 +603,36 @@ impl Inner {
         Ok(false)
     }
 
-    async fn end(&self, id: Uuid) -> Result<String, AccessError> {
-        store::delete_session(&mut *self.db.acquire().await?, id).await?;
+    /// End the session `presented` names here only: delete it and revoke
+    /// its refresh token, leaving the identity provider's session as it is
+    /// (a new sign-in may go straight through).
+    async fn retire(&self, presented: &[u8]) -> sqlx::Result<()> {
+        if let Some(ended) = store::end_session(&self.db, presented).await? {
+            self.revoke_refresh(ended.id, ended.refresh_token).await;
+        }
+        Ok(())
+    }
+
+    /// Revoke an ended session's refresh token at the identity provider;
+    /// failures are logged, the session is gone either way.
+    async fn revoke_refresh(&self, id: Uuid, sealed: Option<Vec<u8>>) {
+        let Some(sealed) = sealed else {
+            return;
+        };
+        match self.cipher.open(&sealed, &sealed_for(id, "refresh_token")) {
+            Ok(refresh_token) => {
+                if let Err(err) = self.oidc.revoke(&refresh_token).await {
+                    tracing::warn!(error = %err, "could not revoke an ended session's refresh token");
+                }
+            }
+            Err(_) => {
+                tracing::warn!("an ended session's refresh token could not be decrypted");
+            }
+        }
+    }
+
+    async fn end(&self, presented: &[u8]) -> Result<String, AccessError> {
+        store::end_session(&self.db, presented).await?;
         Err(AccessError::SessionEnded)
     }
 }
@@ -590,6 +641,17 @@ impl Inner {
 /// default when it gives none.
 fn expires_in(seconds: Option<u64>) -> TimeDelta {
     TimeDelta::seconds(seconds.and_then(|s| i64::try_from(s).ok()).unwrap_or(300))
+}
+
+/// Whether a session that asked for `had` at sign-in asked for every scope in
+/// `wanted` (both space-separated, in any order). A session that recorded
+/// none (`None`, from before they were recorded) asked for none.
+fn asked_for_all(had: Option<&str>, wanted: &str) -> bool {
+    had.is_some_and(|had| {
+        wanted
+            .split_whitespace()
+            .all(|scope| had.split_whitespace().any(|h| h == scope))
+    })
 }
 
 fn lock_index(id: Uuid) -> usize {

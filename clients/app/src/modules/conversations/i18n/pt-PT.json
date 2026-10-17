@@ -58,8 +58,8 @@
     }
   },
   "actions": {
-    "star": "Marcar com estrela",
-    "unstar": "Tirar a estrela",
+    "star": "Fixar",
+    "unstar": "Desafixar",
     "read": "Marcar como lida",
     "unread": "Marcar como não lida",
     "move": "Mover",
@@ -73,8 +73,8 @@
   },
   "toast": {
     "done": "Concluída · {{subject}}",
-    "starred": "Com estrela · {{subject}}",
-    "unstarred": "Sem estrela · {{subject}}",
+    "starred": "Fixada · {{subject}}",
+    "unstarred": "Desafixada · {{subject}}",
     "read": "Marcada como lida · {{subject}}",
     "unread": "Marcada como não lida · {{subject}}",
     "moved": "Movida para {{stream}} · {{subject}}"
@@ -103,6 +103,7 @@
     "whyHasDeadline": "Refere uma data",
     "whyUrgent": "Urgente",
     "whySuspicious": "Suspeita",
+    "whyMoney": "Pagamento",
     "sortedTaught": "O Campbooks pô-la em {{stream}}, por uma regra"
   },
   "reasons": {
@@ -160,7 +161,7 @@
     "updates": "Ir para Atualizações",
     "receipts": "Ir para Recibos",
     "newsletters": "Ir para Newsletters",
-    "star": "Pôr ou tirar a estrela",
+    "star": "Fixar ou desafixar",
     "unread": "Marcar como lida ou não lida",
     "move": "Mover para um fluxo",
     "replyAll": "Responder a todos",
@@ -168,7 +169,8 @@
     "showImages": "Mostrar imagens",
     "nextAttachment": "Anexo seguinte",
     "notNeeded": "Não é preciso (ou é seguro)",
-    "undoAll": "Anular tudo o que uma regra fez"
+    "undoAll": "Anular tudo o que uma regra fez",
+    "allPaid": "Todas as faturas já pagas"
   },
   "compose": {
     "title": {
@@ -223,10 +225,11 @@
       "reply": "{{name}} está à espera da sua resposta",
       "question": "{{name}} fez-lhe uma pergunta",
       "do": "{{name}} pediu-lhe para fazer algo",
-      "pay": "{{name}} enviou uma fatura para pagar",
+      "pay": "Pagar a {{name}}",
       "warning": "Isto pode ser phishing. Não use as ligações.",
       "checkReply": "{{name}} precisa de resposta?",
       "checkDo": "{{name}} pediu-lhe para fazer algo?",
+      "checkPay": "{{name}} enviou uma fatura. Já está paga?",
       "taughtReply": "{{name}}: responder, por uma regra",
       "taughtDo": "{{name}}: a fazer, por uma regra"
     },
@@ -242,7 +245,9 @@
       "today": "Até hoje",
       "tomorrow": "Até amanhã",
       "on": "Até {{date}}",
-      "overdue": "Em atraso · era até {{date}}"
+      "overdue": "Em atraso · era até {{date}}",
+      "daysOverdue_one": "{{count}} dia em atraso",
+      "daysOverdue_other": "{{count}} dias em atraso"
     },
     "how": {
       "yes": "Sim.",
@@ -250,6 +255,11 @@
       "urgency0": "Sem pressa.",
       "urgency1": "Nos próximos dias.",
       "urgency2": "Hoje.",
+      "money": {
+        "owed": "Pede um pagamento ainda em dívida.",
+        "paid": "Confirma um pagamento já feito.",
+        "neither": "Não pede nem confirma um pagamento."
+      },
       "source": {
         "rules": "Regras",
         "model": "Modelo",
@@ -267,7 +277,11 @@
       "safe": "É seguro",
       "yes": "Sim",
       "no": "Não",
-      "questionPrompt": "O Campbooks não tem a certeza."
+      "questionPrompt": "O Campbooks não tem a certeza.",
+      "alreadyPaid": "Já está paga",
+      "stillToPay": "Ainda por pagar",
+      "markPaid": "Marcar como paga",
+      "billPrompt": "O Campbooks não tem acesso ao seu banco."
     },
     "toast": {
       "done": "Feito · {{name}}",
@@ -275,7 +289,21 @@
       "safe": "Marcado como seguro · {{name}}. O Campbooks vai aprender com isto",
       "confirmed": "Obrigado · {{name}} fica na sua lista",
       "failed": "Não foi possível alterar {{name}}: nada mudou. Tente de novo.",
-      "changed": "{{name}} mudou enquanto via: volte a ver."
+      "changed": "{{name}} mudou enquanto via: volte a ver.",
+      "paid": "Marcada como paga · {{name}}",
+      "toPay": "Fica em Pagar · {{name}}",
+      "allPaid_one": "{{count}} fatura marcada como paga",
+      "allPaid_other": "{{count}} faturas marcadas como pagas",
+      "allPaidFailed_one": "Não foi possível marcar {{count}} fatura como paga. Tente de novo.",
+      "allPaidFailed_other": "Não foi possível marcar {{count}} faturas como pagas. Tente de novo."
+    },
+    "summary": {
+      "heading": "Resumo do Scout"
+    },
+    "mail": {
+      "more": "Mostrar o email completo",
+      "less": "Mostrar menos",
+      "linksOff": "As ligações estão desativadas em emails que podem ser phishing."
     }
   },
   "rules": {
@@ -401,6 +429,7 @@
       "made": "Nova regra · {{rule}}",
       "stopped": "Regra removida · {{rule}}",
       "kept": "Regra mantida · {{rule}}",
+      "keptPaused": "Regra mantida, em pausa por agora · {{rule}}",
       "declined": "Regra recusada · {{rule}}",
       "failed": "O Campbooks não conseguiu alterar essa regra. Nada mudou."
     },
@@ -452,7 +481,6 @@
       "suggestion": "Sugerida pelo Campbooks"
     },
     "list": {
-      "label": "Regras",
       "waiting": "À sua espera",
       "keep": "Manter esta regra",
       "no": "Não",
@@ -461,8 +489,15 @@
       "confirmRemove": "Remover",
       "cancel": "Manter",
       "forEveryone": "Para todos",
-      "paused": "Em pausa: quem a ensinou já não pode alterar esta caixa de entrada",
-      "empty": "Ainda não há regras. Quando move, arquiva ou limpa uma mensagem, o Campbooks oferece-se para fazer o mesmo às parecidas.",
+      "paused": {
+        "inbox_read_only": "Em pausa: esta caixa de entrada é só de leitura",
+        "author_cannot_write": "Em pausa: quem a ensinou já não pode alterar esta caixa de entrada",
+        "domain_too_broad": "Em pausa: o domínio é demasiado amplo",
+        "paused_by_member": "Colocada em pausa por um membro",
+        "author_unavailable": "Em pausa por agora; volta a agir sozinha"
+      },
+      "keptStaysPaused": "Se a mantiver, fica em pausa até quem a ensinou voltar ou alguém ficar com ela",
+      "empty": "Ensine o Scout acima ou responda às perguntas abaixo. Quando move, arquiva ou limpa um email, o Campbooks também se oferece para fazer o mesmo aos parecidos.",
       "leave": "Deixá-las como estão",
       "changedMail": "As mensagens que alterou",
       "applied_one": "{{n}} até agora",
@@ -474,7 +509,53 @@
       "lastActed": "Última vez {{time}}",
       "failed": "Não foi possível carregar as regras",
       "retry": "Tentar de novo",
-      "inbox": "Uma caixa de entrada"
+      "inbox": "Uma caixa de entrada",
+      "emptyTitle": "Ainda não há regras"
     }
+  },
+  "reply": {
+    "title": "Responder a {{name}}",
+    "reading": "O Scout está a ler a conversa…",
+    "choose": "O que deve dizer? Escolha uma opção ou diga-o por palavras suas.",
+    "noSuggestions": "Desta vez o Scout não tem sugestões. Diga-o por palavras suas ou escreva-a você mesmo.",
+    "suggestionsFailed": "O Scout não conseguiu sugerir respostas agora. Diga-o por palavras suas ou escreva-a você mesmo.",
+    "unavailable": "O Scout não pode escrever respostas neste servidor, por isso escreva esta você mesmo.",
+    "choices": "Respostas prováveis",
+    "quoteFrom": "{{name}}, {{date}}",
+    "own": {
+      "label": "Ou diga-o por palavras suas",
+      "placeholder": "p. ex. sim, mas chego 15 minutos atrasado",
+      "action": "Escrever rascunho"
+    },
+    "writing": "A escrever o rascunho…",
+    "draftDescription": "O rascunho do Scout. Edite-o aqui ou peça uma alteração. Nada é enviado até carregar em Enviar.",
+    "draftLabel": "A sua resposta",
+    "shorter": "Mais curta",
+    "shortening": "A encurtar…",
+    "changing": "A alterar…",
+    "back": "Voltar às opções",
+    "change": {
+      "label": "Pedir uma alteração",
+      "placeholder": "p. ex. mais calorosa, ou mencione os planos",
+      "action": "Alterar"
+    },
+    "send": "Enviar",
+    "openInComposer": "Abrir no editor",
+    "writeOwn": "Escrever eu",
+    "pending": "A enviar para {{name}}…",
+    "sending": "A enviar para {{name}}",
+    "result": "A enviar para {{name}}",
+    "resultDetail": "Sai dentro de alguns segundos. Até lá, pode anular em baixo.",
+    "undone": "Não enviado. O seu rascunho voltou.",
+    "tooLate": "Já é tarde para anular: a resposta já saiu.",
+    "errors": {
+      "write": "O Scout não conseguiu escrever isso agora. Tente de novo ou escreva-a você mesmo.",
+      "limit": "O Scout escreveu muitas respostas nesta hora. Tente mais tarde ou escreva-a você mesmo.",
+      "dailyLimit": "Este espaço de trabalho já usou a quota de IA de hoje. Escreva esta você mesmo.",
+      "send": "Não foi possível enviar para {{name}}. O seu rascunho foi guardado.",
+      "open": "Não foi possível abrir o editor. O seu rascunho continua aqui."
+    },
+    "to": "Para {{recipient}}",
+    "replyToElsewhere": "As respostas vão para {{recipient}}, não para o remetente {{sender}}. Confirme antes de enviar."
   }
 }

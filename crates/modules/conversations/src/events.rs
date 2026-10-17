@@ -281,6 +281,37 @@ impl DomainEvent for NeedChanged {
     }
 }
 
+/// Scout's summary of the email behind a conversation's need was written
+/// (campbooks-cloud#204). Ids only: never the summary. It exists so open
+/// Home items and readers ask for the conversation again and show it.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+pub struct NeedSummarised {
+    /// The workspace.
+    pub workspace: String,
+    /// The inbox: who may see the conversation.
+    pub inbox: InboxId,
+    /// The conversation.
+    pub conversation: ConversationId,
+    /// The message summarised.
+    pub message: MessageId,
+}
+
+impl DomainEvent for NeedSummarised {
+    const NAME: &'static str = "conversations.need_summarised";
+    const VERSION: u16 = 1;
+
+    fn workspace(&self) -> Option<&str> {
+        Some(&self.workspace)
+    }
+
+    fn changes(&self) -> Vec<FeedChange> {
+        vec![
+            FeedChange::upsert(RecordRef::new(CONVERSATION_RECORD, &self.conversation))
+                .within(inbox_record(self.inbox)),
+        ]
+    }
+}
+
 /// A change a member asked for, to be made at the provider too.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 #[serde(tag = "kind", rename_all = "snake_case")]
@@ -590,8 +621,9 @@ impl DomainEvent for CapabilityGranted {
 /// The connection-account v1 document, as this module reads it
 /// (`contracts/connection-account.v1.schema.json`).
 /// The inbox changed in a way that may change who sees it, or what they
-/// may do there: a membership ended, its owner left, or it was kept
-/// read-only after its connection was removed. Ids only.
+/// may do there: a member was given it, a membership ended, its owner
+/// left, or it was kept read-only after its connection was removed. Ids
+/// only.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 pub struct InboxChanged {
     /// The workspace.
@@ -682,6 +714,55 @@ pub struct MemberLeft {
 
 impl DomainEvent for MemberLeft {
     const NAME: &'static str = "workspaces.member_left";
+    const VERSION: u16 = 1;
+
+    fn workspace(&self) -> Option<&str> {
+        Some(&self.workspace)
+    }
+}
+
+/// `workspaces.member_suspended` v1, as this module reads it.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct MemberSuspended {
+    /// The workspace.
+    pub workspace: String,
+    /// The member.
+    pub user: UserId,
+    /// When it took effect: orders the change only when it has no `seq`.
+    pub at: DateTime<Utc>,
+    /// The account's count of suspensions and lifts as of this change: the
+    /// highest is the truth. Absent on changes from before it existed,
+    /// which are older than any that has one.
+    #[serde(default)]
+    pub seq: Option<i64>,
+}
+
+impl DomainEvent for MemberSuspended {
+    const NAME: &'static str = "workspaces.member_suspended";
+    const VERSION: u16 = 1;
+
+    fn workspace(&self) -> Option<&str> {
+        Some(&self.workspace)
+    }
+}
+
+/// `workspaces.member_unsuspended` v1, as this module reads it.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct MemberUnsuspended {
+    /// The workspace.
+    pub workspace: String,
+    /// The member.
+    pub user: UserId,
+    /// When it took effect: orders the change only when it has no `seq`.
+    pub at: DateTime<Utc>,
+    /// The account's count of suspensions and lifts as of this change, as
+    /// [`MemberSuspended::seq`].
+    #[serde(default)]
+    pub seq: Option<i64>,
+}
+
+impl DomainEvent for MemberUnsuspended {
+    const NAME: &'static str = "workspaces.member_unsuspended";
     const VERSION: u16 = 1;
 
     fn workspace(&self) -> Option<&str> {

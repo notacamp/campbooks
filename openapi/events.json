@@ -475,7 +475,7 @@
       "workspaceScoped": true,
       "payload": {
         "type": "object",
-        "description": "The connection-account v1 document, as this module reads it\n(`contracts/connection-account.v1.schema.json`).\nThe inbox changed in a way that may change who sees it, or what they\nmay do there: a membership ended, its owner left, or it was kept\nread-only after its connection was removed. Ids only.",
+        "description": "The connection-account v1 document, as this module reads it\n(`contracts/connection-account.v1.schema.json`).\nThe inbox changed in a way that may change who sees it, or what they\nmay do there: a member was given it, a membership ended, its owner\nleft, or it was kept read-only after its connection was removed. Ids\nonly.",
         "required": [
           "workspace",
           "inbox"
@@ -628,6 +628,40 @@
             "type": "string",
             "format": "date-time",
             "description": "When that message was sent."
+          },
+          "workspace": {
+            "type": "string",
+            "description": "The workspace."
+          }
+        }
+      }
+    },
+    {
+      "name": "conversations.need_summarised",
+      "module": "conversations",
+      "version": 1,
+      "workspaceScoped": true,
+      "payload": {
+        "type": "object",
+        "description": "Scout's summary of the email behind a conversation's need was written\n(campbooks-cloud#204). Ids only: never the summary. It exists so open\nHome items and readers ask for the conversation again and show it.",
+        "required": [
+          "workspace",
+          "inbox",
+          "conversation",
+          "message"
+        ],
+        "properties": {
+          "conversation": {
+            "$ref": "#/components/schemas/ConversationId",
+            "description": "The conversation."
+          },
+          "inbox": {
+            "$ref": "#/components/schemas/InboxId",
+            "description": "The inbox: who may see the conversation."
+          },
+          "message": {
+            "$ref": "#/components/schemas/MessageId",
+            "description": "The message summarised."
           },
           "workspace": {
             "type": "string",
@@ -808,7 +842,7 @@
       "workspaceScoped": false,
       "payload": {
         "type": "object",
-        "description": "An administrator suspended an account: its sessions ended and its\nrefresh tokens were revoked, and it cannot sign in until it is\nunsuspended. Consumers drop whatever else keeps it signed in (the web\nBFF's sessions).",
+        "description": "An administrator suspended an account: its sessions ended and its\nrefresh tokens were revoked, and it cannot sign in until it is\nunsuspended. Consumers drop whatever else keeps it signed in (the web\nBFF's sessions) and stop whatever acts in its name (the rules its\nmember taught).",
         "required": [
           "account"
         ],
@@ -817,6 +851,56 @@
             "type": "string",
             "format": "uuid",
             "description": "The account (the `sub` of its tokens)."
+          },
+          "at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "When the suspension took effect, read under the account's lock: a\nlater suspension or lift of the same account always has a later\n`at`. Absent on events published before it existed (use the event's\n`occurred_at`)."
+          },
+          "seq": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "The account's count of suspensions and lifts, this one included\n(odd: suspended). Of two changes to one account, the higher `seq` is\nthe later, whatever the clock said. Absent on events published\nbefore it existed (order those by `at`)."
+          }
+        }
+      }
+    },
+    {
+      "name": "identity.account_unsuspended",
+      "module": "identity",
+      "version": 1,
+      "workspaceScoped": false,
+      "payload": {
+        "type": "object",
+        "description": "An administrator lifted an account's suspension: it may sign in again.\nNothing that the suspension ended comes back, but what was only paused\n(the rules its member taught) acts again.",
+        "required": [
+          "account",
+          "at"
+        ],
+        "properties": {
+          "account": {
+            "type": "string",
+            "format": "uuid",
+            "description": "The account (the `sub` of its tokens)."
+          },
+          "at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When the lift took effect, ordered like [`AccountSuspended::at`]."
+          },
+          "seq": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "The account's count of suspensions and lifts, this one included\n(even: not suspended), ordered like [`AccountSuspended::seq`]. Absent\non events published before it existed."
           }
         }
       }
@@ -1199,6 +1283,82 @@
           "to": {
             "$ref": "#/components/schemas/Role",
             "description": "Their new role."
+          },
+          "user": {
+            "$ref": "#/components/schemas/UserId",
+            "description": "The member."
+          },
+          "workspace": {
+            "type": "string",
+            "description": "The workspace."
+          }
+        }
+      }
+    },
+    {
+      "name": "workspaces.member_suspended",
+      "module": "workspaces",
+      "version": 1,
+      "workspaceScoped": true,
+      "payload": {
+        "type": "object",
+        "description": "A member's account was suspended (`identity.account_suspended`): they\ncannot get in, and whatever acts in their name in the workspace stops\nuntil the suspension is lifted. Published in every workspace they belong\nto.",
+        "required": [
+          "workspace",
+          "user",
+          "at"
+        ],
+        "properties": {
+          "at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When the suspension took effect; orders the change only when it\ncarries no `seq`."
+          },
+          "seq": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "The account's count of suspensions and lifts as of this change\n(identity's `seq`): of two changes to one member, the higher `seq`\nis the truth, whatever order they arrive in. Absent when the change\ncame from an event published before it existed: such a change is\nolder than any that carries one, and two of them are ordered by `at`."
+          },
+          "user": {
+            "$ref": "#/components/schemas/UserId",
+            "description": "The member."
+          },
+          "workspace": {
+            "type": "string",
+            "description": "The workspace."
+          }
+        }
+      }
+    },
+    {
+      "name": "workspaces.member_unsuspended",
+      "module": "workspaces",
+      "version": 1,
+      "workspaceScoped": true,
+      "payload": {
+        "type": "object",
+        "description": "A member's suspension was lifted (`identity.account_unsuspended`).\nPublished in every workspace they belong to.",
+        "required": [
+          "workspace",
+          "user",
+          "at"
+        ],
+        "properties": {
+          "at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When the lift took effect, ordered like [`MemberSuspended::at`]."
+          },
+          "seq": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "The account's count of suspensions and lifts as of this change,\nordered like [`MemberSuspended::seq`]."
           },
           "user": {
             "$ref": "#/components/schemas/UserId",
