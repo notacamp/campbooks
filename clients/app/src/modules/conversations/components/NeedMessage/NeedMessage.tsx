@@ -47,7 +47,6 @@ export function NeedMessage({ workspaceId, conversation, need, now }: NeedMessag
         }}
         kind={avatarKind(conversation)}
         inertLinks={suspicious}
-        note={suspicious ? t("needs.mail.linksOff") : undefined}
         now={now}
       />
     </Clamp>

@@ -510,7 +510,11 @@ export function ConversationReader({
             key={conversation.id}
             label={t("scout.label")}
             visor={need.question === "suspicious" ? "alert" : question ? "unsure" : "idle"}
-            reasons={need.question === "suspicious" ? warningReasons(t, exists, decisions) : []}
+            reasons={
+              need.question === "suspicious"
+                ? [...warningReasons(t, exists, decisions), t("needs.mail.linksOff")]
+                : []
+            }
             {...(need.quote === null || need.quote === undefined
               ? {}
               : {

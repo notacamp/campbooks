@@ -729,7 +729,7 @@ function NeedDetail({ workspaceId, row, t, tc, locale, now, onOpen }: NeedDetail
   const warning = need.question === "suspicious";
   return (
     <ItemDetail
-      reasons={warning ? warningReasons(tc, exists, decisions) : []}
+      reasons={warning ? [...warningReasons(tc, exists, decisions), tc("needs.mail.linksOff")] : []}
       mail={
         <NeedMessage
           workspaceId={workspaceId}

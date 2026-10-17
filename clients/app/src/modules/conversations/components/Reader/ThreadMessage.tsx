@@ -36,8 +36,6 @@ export interface ThreadMessageProps {
   kind: "person" | "service";
   /** The conversation may be phishing: the body's links lead nowhere. */
   inertLinks?: boolean | undefined;
-  /** A line under the message, with its other notes ("Links are off…"). */
-  note?: string | undefined;
   now?: Date | undefined;
 }
 
@@ -56,7 +54,6 @@ export function ThreadMessage({
   onShowImages,
   kind,
   inertLinks = false,
-  note,
   now,
 }: ThreadMessageProps) {
   const { t: typed, i18n } = useTranslation("conversations");
@@ -125,13 +122,8 @@ export function ThreadMessage({
       rich={message.has_html}
       files={files}
       actions={
-        remote > 0 || truncated || note !== undefined ? (
+        remote > 0 || truncated ? (
           <>
-            {note === undefined ? null : (
-              <Text tone="tertiary" size="sm">
-                {note}
-              </Text>
-            )}
             {truncated ? (
               <Text tone="tertiary" size="sm">
                 {t("reader.truncated")}
