@@ -29,8 +29,9 @@ pub fn visibility() -> VisibilityPort {
 pub struct InboxVisibility;
 
 impl Visibility for InboxVisibility {
-    /// A membership ending, an owner leaving, an inbox kept read-only or
-    /// deleted are announced as changes of the inbox record.
+    /// An inbox made for a member, a membership ending, an owner leaving,
+    /// an inbox kept read-only or deleted are announced as changes of the
+    /// inbox record.
     fn access_records(&self) -> &'static [&'static str] {
         &[INBOX_RECORD]
     }

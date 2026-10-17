@@ -35,6 +35,17 @@ All notable changes to Campbooks Next are documented here. The format follows
 
 ### Security
 
+- **Catching up on changes no longer times what you may not see.** A stream that is behind
+  (after reconnecting) now sends one page of changes per tick, each on a tick counted from
+  when it opened, so when a page arrives no longer depends on how many changes it skipped
+  in inboxes you are not in. A page whose read takes longer than a tick still arrives a
+  tick later. Set the tick with `CAMPBOOKS_CHANGES__CATCH_UP_TICK_MS` (50 ms by default,
+  50 to 1000). Live changes still arrive at once.
+- **A stream lists your inboxes once, and again only when access changes.** It used to list
+  them on every wake-up. Now it keeps the list until someone's access to an inbox changes,
+  or until its next heartbeat. When you are given an inbox (connecting a mailbox), its first
+  mail still reaches open streams at once. When your membership ends, your stream ends at
+  once, even if you could not see the change that removed you.
 - **A suspension and its lift always reach a member's rules in the right order.** Each
   account now counts its suspensions and lifts, and the rules a member taught follow the
   latest count, not the clock: a clock that stepped back can no longer leave them paused

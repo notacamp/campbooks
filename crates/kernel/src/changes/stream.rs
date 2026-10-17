@@ -19,10 +19,19 @@
 //! - **Pages hold visible changes only.** The page query filters in SQL by
 //!   what the caller may see ([`Sight`]: the record types their scopes read,
 //!   the audiences they are in, the containers the visibility port lists for
-//!   them, asked again for every read). A page is up to [`PAGE`] changes
-//!   the caller may see, so how frames group into bursts never depends on
-//!   hidden changes; the hidden ones are skipped by moving the read position
-//!   to the head the read saw.
+//!   them). A page is up to [`PAGE`] changes the caller may see, so how
+//!   frames group into bursts never depends on hidden changes; the hidden
+//!   ones are skipped by moving the read position to the head the read saw.
+//! - **The containers are listed once and kept** ([`Containers`]) until a
+//!   change that may change who sees inside one, or who belongs to the
+//!   workspace, is numbered in a range the stream read (seen or not: a new
+//!   inbox is announced inside itself), and at every heartbeat. The page is
+//!   then read again under the new list before anything of it is shown.
+//! - **Catching up is paced** ([`Pacer`]): from the open, and after a full
+//!   page, each read's frames leave on the next catch-up tick counted from
+//!   the open, so when a page leaves does not depend on how many hidden
+//!   changes its read went past. A stream that has caught up sends what a
+//!   wake-up brings at once.
 //! - **Cursors are sealed resume tokens** (`T1`… above), never the
 //!   workspace's sequence. A token holds a [`Position`] sealed with the
 //!   instance's key ([`Signer::seal`](crate::crypto::Signer::seal),
@@ -46,6 +55,9 @@
 //! hidden one too) or on the poll, and its frames leave together; two
 //! visible changes numbered apart may go out in one burst or two depending
 //! on when the stream read, which hidden changes can shift by milliseconds.
+//! While catching up, a read that takes longer than a tick (a scan past a
+//! great many hidden changes) leaves on a later tick: the delay shows, in
+//! whole ticks.
 
 use std::{
     collections::{BTreeSet, HashMap, HashSet, VecDeque},
@@ -210,6 +222,129 @@ fn start(
     } else {
         Start::Reset("cursor_expired")
     }
+}
+
+/// A stream's catch-up pacing. A read that starts while the stream is
+/// behind (the first read after the open, or any read after a full page)
+/// releases its frames at the first tick after it ends, ticks counted from
+/// the open; one that starts caught up releases them at once. A read that
+/// fits in a tick therefore leaves exactly on the tick, however long it
+/// scanned.
+#[derive(Debug, Clone, Copy)]
+struct Pacer {
+    /// Where the ticks are counted from (the open).
+    origin: Instant,
+    tick: Duration,
+    /// Whether the next read starts behind the head.
+    catching_up: bool,
+}
+
+impl Pacer {
+    /// Ticks of `tick` from `origin`; the stream starts behind.
+    fn new(origin: Instant, tick: Duration) -> Self {
+        Self {
+            origin,
+            tick: tick.max(Duration::from_millis(1)),
+            catching_up: true,
+        }
+    }
+
+    /// A read that ended at `ended` stopped at a full page (`full`) or not:
+    /// when its frames may leave (`None`: at once).
+    fn after_read(&mut self, ended: Instant, full: bool) -> Option<Instant> {
+        let paced = self.catching_up;
+        self.catching_up = full;
+        paced.then(|| self.tick_after(ended))
+    }
+
+    /// The first tick strictly after `at`.
+    fn tick_after(&self, at: Instant) -> Instant {
+        let elapsed = at.saturating_duration_since(self.origin).as_nanos();
+        let ticks = elapsed / self.tick.as_nanos() + 1;
+        self.origin
+            + self
+                .tick
+                .saturating_mul(u32::try_from(ticks).unwrap_or(u32::MAX))
+    }
+}
+
+/// The containers a stream may show changes from, listed once and kept
+/// until something may have changed them.
+struct Containers {
+    /// What the page query filters by (the containers among the rest).
+    sight: Sight,
+    /// The head read just before they were listed: what any change up to it
+    /// did to who sees inside a container is in the list.
+    covers: i64,
+}
+
+/// What was numbered in a range a read covered, seen or not.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+struct AccessChanges {
+    /// A change that may change who belongs to the workspace.
+    members: bool,
+    /// A change that may change who sees inside a container.
+    containers: bool,
+}
+
+/// The record types [`access_changes`] looks for, each after its own
+/// sequence number (what was already accounted for).
+struct Watched<'a> {
+    /// Record types that may change who belongs to the workspace.
+    members: &'a [String],
+    /// Membership changes up to this one were resolved.
+    members_from: i64,
+    /// Record types that may change who sees inside a container.
+    containers: &'a [String],
+    /// The containers were listed after this one.
+    containers_from: i64,
+}
+
+/// Whether a change of a watched record type, after its own sequence
+/// number, was numbered in `(after, upto]` of `workspace`, whoever may see
+/// it. Ids are not read: only whether one exists.
+async fn access_changes(
+    conn: &mut PgConnection,
+    workspace: &str,
+    after: i64,
+    upto: i64,
+    watched: &Watched<'_>,
+) -> Result<AccessChanges, sqlx::Error> {
+    if upto <= after || (watched.members.is_empty() && watched.containers.is_empty()) {
+        return Ok(AccessChanges::default());
+    }
+    // The same range scan the page query made, on the access record types
+    // only (a handful of rows at most).
+    let (members, containers): (bool, bool) = sqlx::query_as(
+        "SELECT coalesce(bool_or(record_type = ANY($4::text[]) AND seq > $5), false),
+                coalesce(bool_or(record_type = ANY($6::text[]) AND seq > $7), false)
+           FROM kernel.changes
+          WHERE workspace_id = $1 AND seq > $2 AND seq <= $3
+            AND (record_type = ANY($4::text[]) OR record_type = ANY($6::text[]))",
+    )
+    .bind(workspace)
+    .bind(after)
+    .bind(upto)
+    .bind(watched.members)
+    .bind(watched.members_from)
+    .bind(watched.containers)
+    .bind(watched.containers_from)
+    .fetch_one(&mut *conn)
+    .await?;
+    Ok(AccessChanges {
+        members,
+        containers,
+    })
+}
+
+/// The workspace's head (0 before its first change).
+async fn head(conn: &mut PgConnection, workspace: &str) -> Result<i64, sqlx::Error> {
+    sqlx::query_scalar(
+        "SELECT coalesce((SELECT head FROM kernel.change_heads WHERE workspace_id = $1), 0)",
+    )
+    .bind(workspace)
+    .fetch_one(&mut *conn)
+    .await
 }
 
 /// What a caller may see, as the page query filters it.
@@ -456,10 +591,16 @@ pub async fn open(
     let heartbeat = Duration::from_secs(config.heartbeat_seconds);
     let rules = ReadRules::from_state(state);
     let readable = rules.readable(&subscription.principal);
+    let records = |types: &[&str]| types.iter().map(ToString::to_string).collect::<Vec<_>>();
     let feed = Feed {
         rules,
         readable,
-        access_records: state.membership.access_records(),
+        member_records: records(state.membership.access_records()),
+        container_records: records(state.visibility.access_records()),
+        containers: None,
+        members_checked: position.seq,
+        pacer: Pacer::new(now, Duration::from_millis(config.catch_up_tick_ms)),
+        release_at: None,
         state: state.clone(),
         workspace,
         binding,
@@ -493,8 +634,22 @@ struct Feed {
     /// The record types the caller's scopes read (its scopes are fixed for
     /// the stream's life).
     readable: Vec<String>,
-    /// Record types whose changes may change who belongs to the workspace.
-    access_records: &'static [&'static str],
+    /// Record types whose changes may change who belongs to the workspace:
+    /// one numbered in a page's range, seen or not, makes the stream resolve
+    /// membership before showing the page.
+    member_records: Vec<String>,
+    /// Record types whose changes may change who sees inside a container:
+    /// one numbered in a page's range, seen or not, makes the stream list
+    /// the containers again and read the page anew.
+    container_records: Vec<String>,
+    /// The containers the caller may see, as last listed; `None` until the
+    /// next read lists them.
+    containers: Option<Containers>,
+    /// Membership changes up to this sequence number were resolved.
+    members_checked: i64,
+    pacer: Pacer,
+    /// When the queued frames may leave (a catch-up read's tick).
+    release_at: Option<Instant>,
     /// Where the next read starts: every change up to it was delivered or
     /// is not the caller's to see.
     cursor: i64,
@@ -512,10 +667,10 @@ struct Feed {
     next_heartbeat: Instant,
     poll: Duration,
     out: VecDeque<Frame>,
-    /// Containers this stream has shown changes from. Visibility is asked
-    /// afresh for every read (so a member taken out of an inbox stops
-    /// getting its ids at once); when one of these goes out of sight the
-    /// client is told to drop what it cached (`reset`, `access_changed`).
+    /// Containers this stream has shown changes from. When one of these
+    /// goes out of sight (the containers listed again, or one asked about
+    /// before its page is shown) the client is told to drop what it cached
+    /// (`reset`, `access_changed`).
     shown: HashSet<RecordRef>,
     done: bool,
     _slot: StreamSlot,
@@ -525,6 +680,10 @@ impl Feed {
     /// The next frame, or `None` once the stream is over.
     async fn next(&mut self) -> Option<Frame> {
         loop {
+            // A catch-up read's frames leave on its tick.
+            if let Some(at) = self.release_at.take() {
+                tokio::time::sleep_until(at).await;
+            }
             if let Some(frame) = self.out.pop_front() {
                 return Some(frame);
             }
@@ -607,51 +766,89 @@ impl Feed {
         Ok(self.read().await?.is_some_and(|page| page.full))
     }
 
+    /// List the containers the caller may see now. The head is read first:
+    /// every change up to it was committed before the list is, so what it
+    /// did is in the list. A container shown before that is not in it any
+    /// more makes the client drop its cache.
+    async fn list_containers(&mut self) -> Result<Containers, Error> {
+        let mut tx = self.state.db.begin_for(self.subscription.workspace).await?;
+        let covers = head(&mut tx, &self.workspace).await?;
+        tx.commit().await?;
+        let set = self.visible_containers().await?;
+        if self.shown.iter().any(|c| !set.contains(c)) {
+            self.lost_sight();
+        }
+        let sight = Sight::new(self.readable.clone(), &self.subscription.access, &set);
+        Ok(Containers { sight, covers })
+    }
+
     /// Read the next page of visible changes and queue them, returning what
     /// the read saw (`None` when the stream ended on the way).
     async fn read(&mut self) -> Result<Option<PageSeen>, Error> {
         loop {
-            // Asked afresh for every read: the containers first, so a
-            // member taken out of an inbox gets none of its ids from here on.
-            let containers = self.visible_containers().await?;
-            if self.shown.iter().any(|c| !containers.contains(c)) {
-                self.lost_sight();
-            }
-            let sight = Sight::new(
-                self.readable.clone(),
-                &self.subscription.access,
-                &containers,
-            );
-            let page = {
+            // One permit for the listing (when due) and the page: the
+            // listing is one more query of the same read, never nested in
+            // another permit.
+            let (page, end, changed) = {
                 let _permit = self.state.changes.query_permit().await;
+                let containers = match self.containers.take() {
+                    Some(containers) => containers,
+                    None => self.list_containers().await?,
+                };
                 let mut tx = self.state.db.begin_for(self.subscription.workspace).await?;
-                let page =
-                    read_visible(&mut tx, &self.workspace, self.cursor, &sight, PAGE).await?;
+                let page = read_visible(
+                    &mut tx,
+                    &self.workspace,
+                    self.cursor,
+                    &containers.sight,
+                    PAGE,
+                )
+                .await?;
+                // Where the next read starts: every change up to it was
+                // read (shown or not the caller's).
+                let end = match page.rows.last() {
+                    Some(last) if page.full => last.seq,
+                    _ => page.head.max(self.cursor),
+                };
+                let watched = Watched {
+                    members: &self.member_records,
+                    members_from: self.members_checked.max(self.cursor),
+                    containers: &self.container_records,
+                    containers_from: containers.covers.max(self.cursor),
+                };
+                let changed =
+                    access_changes(&mut tx, &self.workspace, self.cursor, end, &watched).await?;
                 tx.commit().await?;
-                page
+                if !changed.containers {
+                    self.containers = Some(containers);
+                }
+                (page, end, changed)
             };
-            // A page that may change who belongs to the workspace: resolve
-            // again before showing it (a former member gets nothing more),
+            // Someone's access to a container may have changed in this
+            // range (a membership ended, an inbox was made for someone):
+            // list them again and read the page anew, before any of it is
+            // shown.
+            if changed.containers {
+                continue;
+            }
+            // Who belongs to the workspace may have changed: resolve again
+            // before showing the page (a former member gets nothing more),
             // and read it again under a changed access.
-            let touches = page.rows.iter().any(|row| {
-                self.access_records
-                    .contains(&row.record.record_type.as_str())
-            });
-            if touches {
+            if changed.members {
                 let before = self.subscription.access;
                 self.check_access().await?;
                 if self.done {
                     return Ok(None);
                 }
+                self.members_checked = end;
                 if self.subscription.access != before {
+                    self.containers = None;
                     continue;
                 }
             }
             self.show(&page).await?;
-            self.cursor = match page.rows.last() {
-                Some(last) if page.full => last.seq,
-                _ => page.head.max(self.cursor),
-            };
+            self.cursor = end;
+            self.release_at = self.pacer.after_read(Instant::now(), page.full);
             return Ok(Some(PageSeen {
                 at: page.at,
                 full: page.full,
@@ -796,8 +993,8 @@ impl Feed {
         Ok(())
     }
 
-    /// The heartbeat, on its fixed timer: check membership, read (which
-    /// asks about the containers again), then send a fresh token. When that
+    /// The heartbeat, on its fixed timer: check membership, list the
+    /// containers again and read, then send a fresh token. When that
     /// read reached the head it saw, the token moves to that head and the
     /// read's time, so a resume skips the hidden changes before it; whether
     /// it moved is sealed inside it.
@@ -806,6 +1003,9 @@ impl Feed {
         while self.next_heartbeat <= now {
             self.next_heartbeat += self.heartbeat;
         }
+        // The containers are listed again at least once a heartbeat, so a
+        // change of access nothing announced is not kept any longer.
+        self.containers = None;
         self.check_access().await?;
         if self.done {
             return Ok(());
@@ -931,6 +1131,76 @@ mod tests {
             start(Some(Ok(at(2, NOW))), NOW, 7, None, DAY),
             Start::Reset("cursor_expired")
         );
+    }
+
+    const TICK: Duration = Duration::from_millis(50);
+
+    /// A catch-up as a stream makes it, on a paused clock: each read scans
+    /// for its time, then its frames leave when the pacer says, and the
+    /// next read starts. Returns when each read's frames left, from the
+    /// open.
+    async fn catch_up(reads: &[(Duration, bool)]) -> Vec<Duration> {
+        let origin = Instant::now();
+        let mut pacer = Pacer::new(origin, TICK);
+        let mut left = Vec::new();
+        for &(scan, full) in reads {
+            tokio::time::sleep(scan).await;
+            if let Some(at) = pacer.after_read(Instant::now(), full) {
+                tokio::time::sleep_until(at).await;
+            }
+            left.push(origin.elapsed());
+        }
+        left
+    }
+
+    /// Three pages of a catch-up (two full, then the rest), then one live
+    /// read, with `hidden` changes scanned past in each, at a few
+    /// microseconds a change.
+    fn reads(hidden: [u32; 4]) -> Vec<(Duration, bool)> {
+        let query = Duration::from_millis(2);
+        let per_hidden = Duration::from_micros(2);
+        hidden
+            .iter()
+            .enumerate()
+            .map(|(n, &h)| (query + per_hidden * h, n < 2))
+            .collect()
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn catch_up_pages_leave_on_the_tick_whatever_was_scanned() {
+        let ms = Duration::from_millis;
+        // A few hidden changes, or up to 23,000 (46 ms of scanning) per page.
+        let tiny = catch_up(&reads([0, 3, 10, 0])).await;
+        let large = catch_up(&reads([20_000, 23_000, 15_000, 0])).await;
+        let on_the_tick = [ms(50), ms(100), ms(150)];
+        assert_eq!(tiny[..3], on_the_tick, "{tiny:?}");
+        assert_eq!(large[..3], on_the_tick, "{large:?}");
+        // Caught up, a wake-up's read leaves as soon as it is read.
+        assert_eq!(tiny[3], ms(152));
+        assert_eq!(large[3], ms(152));
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn a_scan_longer_than_the_tick_shows_in_whole_ticks() {
+        let ms = Duration::from_millis;
+        // 35,000 hidden changes: 72 ms of scanning, more than a tick.
+        let slow = catch_up(&reads([0, 35_000, 0, 0])).await;
+        assert_eq!(slow[..3], [ms(50), ms(150), ms(200)], "{slow:?}");
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn a_stream_starts_behind_and_paces_again_after_a_full_page() {
+        let origin = Instant::now();
+        let mut pacer = Pacer::new(origin, TICK);
+        // The first read after the open is paced even when it is not full.
+        assert_eq!(pacer.after_read(origin, false), Some(origin + TICK));
+        // Caught up: at once.
+        assert_eq!(pacer.after_read(origin + TICK, false), None);
+        // A live burst of more than a page: the read after it is paced.
+        assert_eq!(pacer.after_read(origin + TICK * 3, true), None);
+        let later = origin + TICK * 3 + Duration::from_millis(1);
+        assert_eq!(pacer.after_read(later, false), Some(origin + TICK * 4));
+        assert_eq!(pacer.after_read(later, false), None);
     }
 
     fn principal(subject: &str, kind: PrincipalKind, client: Option<&str>) -> Principal {

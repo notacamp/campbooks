@@ -841,6 +841,13 @@ pub struct ChangesConfig {
     /// The window of `OPENS_PER_WINDOW`, in seconds
     /// (`CAMPBOOKS_CHANGES__OPENS_WINDOW_SECONDS`).
     pub opens_window_seconds: u64,
+    /// The catch-up tick, in milliseconds
+    /// (`CAMPBOOKS_CHANGES__CATCH_UP_TICK_MS`, 50 to 1000): a stream behind
+    /// the head sends one page per tick, each on a tick counted from the
+    /// open, so when a page leaves does not depend on how many changes the
+    /// caller may not see it read past. A stream that caught up sends a new
+    /// change at once.
+    pub catch_up_tick_ms: u64,
 }
 
 impl Default for ChangesConfig {
@@ -853,11 +860,17 @@ impl Default for ChangesConfig {
             max_streams_per_principal: 8,
             opens_per_window: 30,
             opens_window_seconds: 60,
+            catch_up_tick_ms: 50,
         }
     }
 }
 
 impl ChangesConfig {
+    /// Shortest catch-up tick accepted, in milliseconds.
+    pub const MIN_CATCH_UP_TICK_MS: u64 = 50;
+    /// Longest catch-up tick accepted, in milliseconds.
+    pub const MAX_CATCH_UP_TICK_MS: u64 = 1_000;
+
     /// Startup check: every value is in a usable range. The message names
     /// the offending setting.
     pub fn check(&self) -> Result<(), String> {
@@ -890,6 +903,15 @@ impl ChangesConfig {
                 "OPENS_WINDOW_SECONDS",
                 (1..=RateLimitsConfig::MAX_WINDOW_SECONDS).contains(&self.opens_window_seconds),
                 "between 1 and 86400",
+            ),
+            // Shorter would let a long scan show through the tick; longer
+            // than a second makes catching up slow (and could pass the
+            // shortest heartbeat).
+            (
+                "CATCH_UP_TICK_MS",
+                (Self::MIN_CATCH_UP_TICK_MS..=Self::MAX_CATCH_UP_TICK_MS)
+                    .contains(&self.catch_up_tick_ms),
+                "between 50 and 1000",
             ),
         ];
         match checks.iter().find(|(_, ok, _)| !ok) {
@@ -1700,6 +1722,21 @@ mod tests {
             config.changes.check().is_ok(),
             "a day is the longest window"
         );
+        config.changes = ChangesConfig::default();
+        for ms in [0, 49, 1_001] {
+            config.changes.catch_up_tick_ms = ms;
+            assert!(
+                config
+                    .check()
+                    .unwrap_err()
+                    .contains("CAMPBOOKS_CHANGES__CATCH_UP_TICK_MS must be between 50 and 1000"),
+                "{ms}"
+            );
+        }
+        for ms in [50, 1_000] {
+            config.changes.catch_up_tick_ms = ms;
+            assert!(config.changes.check().is_ok(), "{ms}");
+        }
         config.changes = ChangesConfig::default();
         // The `code` policy needs no environment code: administrators mint
         // single-use codes in the database.

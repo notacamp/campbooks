@@ -54,6 +54,8 @@ uuid.workspace = true
 [dev-dependencies]
 # The `testing` module is also compiled for the kernel's own unit tests.
 http-body-util.workspace = true
+# A paused clock for the change feed's pacing tests.
+tokio = { workspace = true, features = ["test-util"] }
 
 [lints]
 workspace = true
