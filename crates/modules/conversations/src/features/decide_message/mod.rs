@@ -165,6 +165,24 @@ impl Pass {
         asked
     }
 
+    /// The catalogue's rating of every action from `answers` (and the model
+    /// that gave them), with the catalogue on.
+    fn rate(
+        &self,
+        envelope: &Envelope,
+        answers: &[Option<campbooks_ai::decide::strategy::Decided>],
+    ) -> Option<(
+        Vec<(campbooks_ai::decide::signals::actions::ActionId, f64)>,
+        String,
+    )> {
+        self.actions.enabled.then(|| {
+            let given: Vec<&campbooks_ai::decide::Answer> =
+                answers.iter().flatten().map(|d| &d.answer).collect();
+            let model = given.first().map(|a| a.model.clone()).unwrap_or_default();
+            (likelihoods(envelope, &given), model)
+        })
+    }
+
     /// Ask the model about `message` and store its answers: sort the
     /// conversation when its stream answer is accepted and the message is
     /// its first inbound one, then refresh its need.
@@ -210,12 +228,7 @@ impl Pass {
         };
         // The catalogue's answers are rated, never stored as decisions:
         // the triage answers are recorded exactly as without it.
-        let rated = self.actions.enabled.then(|| {
-            let given: Vec<&campbooks_ai::decide::Answer> =
-                answers.iter().flatten().map(|d| &d.answer).collect();
-            let model_name = given.first().map(|a| a.model.clone()).unwrap_or_default();
-            (likelihoods(&loaded.envelope, &given), model_name)
-        });
+        let rated = self.rate(&loaded.envelope, &answers);
         answers.truncate(questions.len());
         let recorded = Recorded {
             message,

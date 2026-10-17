@@ -202,13 +202,13 @@ async fn on_its_questions_ride_along_and_change_no_triage_answer(db: PgPool) {
             .all(|(_, q, ..)| !q.starts_with("action_"))
     );
     assert!(on.rated > 0);
-    // A Reply need offers Reply first (0.9), then what else cleared the
-    // floor.
+    // A need raised by `needs_reply` (a Reply need, or a question about
+    // it) offers Reply first (0.9), then what else cleared the floor.
     let reply = on
         .needs
         .iter()
-        .find(|n| n["reason"] == "reply")
-        .expect("a reply need");
+        .find(|n| n["question"] == "needs_reply")
+        .unwrap_or_else(|| panic!("a needs_reply need in {:?}", on.needs));
     assert_eq!(
         reply["actions"][0],
         json!({"actions": ["reply"], "likelihood": 90})
