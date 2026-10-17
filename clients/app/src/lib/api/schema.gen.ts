@@ -281,6 +281,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/system/client-telemetry": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Report the app's own errors and timings. */
+        post: operations["system.report_client_telemetry"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/system/health": {
         parameters: {
             query?: never;
@@ -2016,6 +2033,124 @@ export interface components {
          * @enum {string}
          */
         Channel: "email";
+        /** @description The browser or web view the app runs in. */
+        ClientBrowser: {
+            /** @description Whether the device is a phone or a tablet. */
+            mobile?: boolean | null;
+            /** @description `Chrome`, `Safari`, `WebKit`. */
+            name?: string | null;
+            /** @description The operating system. */
+            os?: string | null;
+            /** @description Its version. */
+            version?: string | null;
+        };
+        /** @description A named moment. */
+        ClientEvent: {
+            /**
+             * @description Its name.
+             * @example session_start
+             */
+            name: string;
+            /**
+             * Format: date-time
+             * @description When it happened.
+             */
+            timestamp: string;
+        };
+        /** @description An error the app did not handle. */
+        ClientException: {
+            /** @description Where, innermost first. */
+            frames?: components["schemas"]["ClientFrame"][];
+            /**
+             * @description The error's class (`TypeError`).
+             * @example TypeError
+             */
+            kind: string;
+            /**
+             * @description Its message: forwarded as an error kind only (its head, with
+             *     addresses, quotes, links and tokens masked).
+             * @example Cannot read properties of undefined
+             */
+            message: string;
+            /**
+             * Format: date-time
+             * @description When it happened.
+             */
+            timestamp: string;
+        };
+        /** @description One frame of an exception's stack. */
+        ClientFrame: {
+            /**
+             * Format: int32
+             * @description Column, from 1.
+             */
+            column?: number | null;
+            /**
+             * @description The script's URL: forwarded as its file name only.
+             * @example https://app.example.com/assets/index-3f2c1e0.js
+             */
+            file?: string | null;
+            /** @description The function's name. */
+            function?: string | null;
+            /**
+             * Format: int32
+             * @description Line, from 1.
+             */
+            line?: number | null;
+        };
+        /** @description A timing. */
+        ClientMeasurement: {
+            /**
+             * @description What was measured (`web-vitals`).
+             * @example web-vitals
+             */
+            kind: string;
+            /**
+             * Format: date-time
+             * @description When it was taken.
+             */
+            timestamp: string;
+            /**
+             * @description Its values by name (`lcp`, `inp`, `cls`, `fcp`, `ttfb`, `fid`,
+             *     `delta`); others are dropped.
+             */
+            values: {
+                [key: string]: number;
+            };
+        };
+        /**
+         * @description Where the app runs.
+         * @enum {string}
+         */
+        ClientPlatform: "web" | "native";
+        /** @description A batch of the app's own telemetry. */
+        ClientReport: {
+            /**
+             * @description The app's version.
+             * @example 0.42.0
+             */
+            app_version?: string | null;
+            browser?: components["schemas"]["ClientBrowser"] | null;
+            /** @description Named moments (`session_start`, `view_changed`). */
+            events?: components["schemas"]["ClientEvent"][];
+            /** @description Errors the app did not handle. */
+            exceptions?: components["schemas"]["ClientException"][];
+            /** @description Timings (web vitals). */
+            measurements?: components["schemas"]["ClientMeasurement"][];
+            platform?: components["schemas"]["ClientPlatform"] | null;
+            /**
+             * @description A random id of the app's session (not the sign-in session): joins a
+             *     session's reports.
+             * @example k3Jx8vQ2mN
+             */
+            session_id: string;
+            /**
+             * @description The route template of the page shown (`/w/$workspaceId/inbox`),
+             *     never its address.
+             * @example /w/$workspaceId/inbox
+             */
+            view?: string | null;
+        };
         /**
          * @description How a workspace client signs in.
          * @enum {string}
@@ -5274,6 +5409,55 @@ export interface operations {
             };
             /** @description Missing scope, or not a user token. */
             403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "system.report_client_telemetry": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ClientReport"];
+            };
+        };
+        responses: {
+            /** @description Taken: what passes the scrubber is forwarded to the collector. */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description No valid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description The token lacks `system:read`. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description This instance collects no client telemetry: stop sending. */
+            404: {
                 headers: {
                     [name: string]: unknown;
                 };

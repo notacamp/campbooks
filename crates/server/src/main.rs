@@ -75,6 +75,11 @@ enum Command {
         #[command(subcommand)]
         command: SearchCommand,
     },
+    /// Check the telemetry settings.
+    Telemetry {
+        #[command(subcommand)]
+        command: TelemetryCommand,
+    },
     /// Print the OpenAPI document as JSON.
     Openapi,
     /// Print the OAuth scope catalogue as JSON (`[{name, description}]`), for
@@ -107,6 +112,15 @@ enum EventsCommand {
     /// holds): every event the modules publish, its version, whether it is
     /// workspace-scoped, and its payload schema.
     Catalogue,
+}
+
+#[derive(Debug, Subcommand)]
+enum TelemetryCommand {
+    /// Send one test report to `CAMPBOOKS_TELEMETRY__ERROR_DSN` through the
+    /// server's own pipeline, as if a request had failed. Its fields are
+    /// invented and include an address and a token the scrubber must drop,
+    /// so the report shows what a real one holds. Prints the report's id.
+    TestError,
 }
 
 #[derive(Debug, Subcommand)]
@@ -165,6 +179,9 @@ fn main() -> ExitCode {
         Command::Search {
             command: SearchCommand::Reindex { workspace },
         } => reindex(&workspace),
+        Command::Telemetry {
+            command: TelemetryCommand::TestError,
+        } => test_error(),
         Command::Openapi => print_json(&campbooks_server::openapi(), "OpenAPI document"),
         Command::Scopes => print_json(&campbooks_server::scope_catalogue(), "scope catalogue"),
         Command::Healthcheck { port } => healthcheck(port.unwrap_or_else(port_from_env)),
@@ -209,6 +226,50 @@ fn serve(role: Role) -> ExitCode {
             tracing::error!(error = %e, "server failed");
             ExitCode::FAILURE
         }
+    }
+}
+
+/// `telemetry test-error`: one report through the production pipeline.
+fn test_error() -> ExitCode {
+    let config = match Config::from_env() {
+        Ok(config) => config,
+        Err(e) => return fail(&e.to_string()),
+    };
+    if let Err(e) = config.telemetry.check() {
+        return fail(&e);
+    }
+    let telemetry = match Telemetry::new(&config.telemetry, "all") {
+        Ok(telemetry) => telemetry,
+        Err(e) => return fail(&e),
+    };
+    if !telemetry.reports_errors() {
+        return fail("CAMPBOOKS_TELEMETRY__ERROR_DSN is not set: errors are not reported");
+    }
+    telemetry.install_subscriber(config.log_format);
+    let span = tracing::info_span!(
+        "http",
+        request_id = %uuid::Uuid::now_v7(),
+        http.route = "/api/v1/system/telemetry-test",
+        http.request.method = "POST",
+        workspace.id = %uuid::Uuid::nil(),
+        // Never read by the reporter: not allowlisted.
+        user.email = "test-address@example.com",
+    );
+    span.in_scope(|| {
+        tracing::error!(
+            error = "test error for test-address@example.com: token \
+                     ya29.test0000000000000000000000000000000000000000",
+            "telemetry test error"
+        );
+    });
+    let id = sentry::last_event_id();
+    telemetry.shutdown();
+    match id {
+        Some(id) => {
+            let _ = writeln!(std::io::stdout(), "sent test error report {}", id.simple());
+            ExitCode::SUCCESS
+        }
+        None => fail("the test error report was not sent"),
     }
 }
 

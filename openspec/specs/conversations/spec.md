@@ -270,7 +270,24 @@ workspace's rows when its grace period ends.
 
 ### Requirement: Sanitised email HTML
 `conversations.get_message_body` SHALL sanitise the HTML body before
-returning it. First the body's style sheets SHALL be inlined into `style`
+returning it. Before any tree is built, the HTML SHALL be measured by
+parsing it as a whole document and as a fragment in a `div` (the modes the
+style inliner and the sanitiser parse it in), each parse counting the tree
+builder's work (each tree operation and each
+element name read in a scope check one unit; creating an element adds its
+attributes; merging attributes into an element adds its attributes and the
+new ones; moving a node before a sibling or out of its parent adds the
+parent's number of children; moving children adds their number), fed in
+chunks of at most 1 KiB and stopped as soon as the work passes 10,000,000
+units or the two parses together have taken 500 ms; HTML past either limit
+in either parse, or whose tree is deeper than
+4,096 levels, SHALL be returned as its text instead: the characters outside
+scripts, styles, the head, the title and the markup a `noscript`, `iframe`,
+`noembed` or `noframes` holds, entities decoded, a line break at
+each `br` and at the end of each `p`, `div`, `li`, `tr`, `td`, heading,
+`table`, `ul` and `ol`, escaped, as the only content of one
+`<div style="white-space: pre-wrap">`, with `remote_images` 0 and no `css`.
+Otherwise, first the body's style sheets SHALL be inlined into `style`
 attributes from the sheets' filtered rules only, without ever fetching or
 reading a linked or imported sheet; sheets SHALL be dropped instead past
 256 KiB of style text, 20,000 elements, a nesting of 256 levels in the
@@ -332,6 +349,22 @@ placeholder otherwise. No other `data:` source survives.
 #### Scenario: An inline logo
 - **WHEN** a member reads a message whose HTML shows `cid:logo@example.com` and which has an inline PNG part with that content id
 - **THEN** the image's source is a `data:image/png;base64,…` URL of that part, without asking to show images, and it is not counted in `remote_images`
+
+#### Scenario: HTML built to be slow to parse
+- **WHEN** a member reads a message whose 2 MiB HTML body is `<div></span>` repeated, which takes minutes to parse in full
+- **THEN** the measure stops within its budget, the HTML in the response is the body's text in one `pre-wrap` `div` with no other markup, `remote_images` is 0 and `css` is absent
+
+#### Scenario: Work the parser does without telling the tree
+- **WHEN** the body is one start tag with 60,000 attributes, or 20,000 nested `<b id=N>` with distinct ids
+- **THEN** measuring stops at the 500 ms limit and the body is shown as its text
+
+#### Scenario: A leading frameset
+- **WHEN** the same body starts with `<frameset>`, after which a whole-document parse drops the rest
+- **THEN** it is still shown as its text, because the fragment parse is measured too
+
+#### Scenario: A large ordinary newsletter
+- **WHEN** a member reads a 1.5 MiB newsletter of nested tables, links and images
+- **THEN** it is sanitised and styled as any other message, well within the budget
 
 ### Requirement: Stream counts
 `GET /api/v1/w/{workspace_id}/streams` (`conversations.list_streams`,
@@ -710,7 +743,11 @@ time (its last message), subject, label names, facets (stream, unread,
 starred, archived, label ids) and, per message, its people (from, to, cc
 with names and addresses), plain text (the text part, or the HTML part
 reduced to text when there is none, quoted history removed, at most
-32 KiB), attachment names, mailbox (`inbox`, `archive`, `spam`, `trash`),
+32 KiB; the HTML is reduced by html5ever's tokenizer alone, with no tree,
+fed 1 KiB at a time and stopped after 500 ms with the words read so far, keeping the characters outside scripts, styles, the head, the
+title, the markup a `noscript`, `iframe`, `noembed` or `noframes` holds, and
+`blockquote`s, with a line break at each `br` and at the end of
+each block), attachment names, mailbox (`inbox`, `archive`, `spam`, `trash`),
 direction and a content stamp made of the hashes of the blobs it is read
 from. A conversation that no longer exists SHALL be reported as gone.
 Drafts SHALL NOT be returned.
@@ -726,6 +763,10 @@ Drafts SHALL NOT be returned.
 #### Scenario: A flag change
 - **WHEN** a conversation is marked read and search refreshes it
 - **THEN** the content stamps of its messages are unchanged, so no body is read again
+
+#### Scenario: HTML built to be slow to parse
+- **WHEN** search asks for an HTML-only message whose HTML would take minutes to build as a tree
+- **THEN** it gets the message's text, or the words read within 500 ms
 
 ### Requirement: Visible inboxes as a list
 The module's container-visibility port SHALL also list the inboxes a caller

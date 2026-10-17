@@ -28,20 +28,34 @@
 //! [`MAX_APPLYING`] declarations times that work (applying them).
 //!
 //! Depth and element count come from the tree html5ever's tree builder
-//! makes ([`shape`]), the same parse the inliner runs, never from counting
+//! makes ([`measure`]), the same parse the inliner runs, never from counting
 //! tags: stray end tags and foreign content (`<svg><xmp>`) make the tags
 //! and the tree disagree.
+//!
+//! [`measure`] is also the gate for everything that parses the HTML after
+//! it (the inliner, ammonia): the tree builder's time grows with the depth
+//! of its stack of open elements times the tags it reads, so HTML built for
+//! it takes minutes. The measure counts that work in its tree sink, as the
+//! later parses will do it on the same tokens and in the same modes (a
+//! whole document for the inliner, a fragment in a `div` for ammonia), and
+//! gives up past
+//! [`MAX_PARSE_WORK`] units or [`MAX_PARSE_DEPTH`] levels. A parse cannot be
+//! cancelled, so the HTML is fed a chunk at a time and the count is read
+//! between chunks: a message built to be slow costs about one chunk past the
+//! budget.
 
 use std::{
     borrow::Cow,
-    cell::{Ref, RefCell},
+    cell::{Cell, Ref, RefCell},
+    rc::Rc,
     sync::Arc,
+    time::{Duration, Instant},
 };
 
 use super::css;
 use css_inline::{CSSInliner, InlineError, StylesheetResolver};
 use html5ever::{
-    Attribute, ParseOpts, QualName, local_name, ns, parse_document,
+    Attribute, ParseOpts, Parser, QualName, local_name, ns, parse_document, parse_fragment,
     tendril::{StrTendril, TendrilSink},
     tokenizer::{
         BufferQueue, TagKind, Token, TokenSink, TokenSinkResult, Tokenizer, TokenizerOpts,
@@ -63,6 +77,25 @@ pub const MAX_MATCHING: usize = 50_000_000;
 /// Most declarations (per matched element) times [`MAX_WORK`]'s measure
 /// inlined: applying a declaration looks through the element's properties.
 pub const MAX_APPLYING: usize = 500_000_000;
+/// Most tree-builder work the measure allows (see [`measure`]): about seven
+/// times what a dense 2 MiB newsletter costs (the reader reads no more), and
+/// a few tens of milliseconds of parsing.
+pub const MAX_PARSE_WORK: usize = 10_000_000;
+/// Deepest tree the measure allows.
+pub const MAX_PARSE_DEPTH: usize = 4_096;
+/// The most time measuring may take, for both parses together: about three
+/// times what the densest ordinary 2 MiB mail needs on the production CPU.
+/// It covers work the tree builder and the tokenizer do without calling the
+/// sink (the active formatting list's duplicate check, a start tag's
+/// attributes), which the work count cannot see.
+pub const MAX_PARSE_TIME: Duration = Duration::from_millis(500);
+/// Bytes of HTML fed to the measure between two reads of its work count and
+/// the clock: small, so what one huge tag costs between two checks stays
+/// small.
+const CHUNK: usize = 1024;
+
+/// What a measuring parse unwinds with when it is over time.
+struct OverBudget;
 
 /// The HTML with its style sheets inlined, and what inlining left over.
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
@@ -77,8 +110,8 @@ pub struct Inlined {
     pub media: Option<String>,
 }
 
-/// Inline the style sheets of `html`.
-pub fn inline(html: &str) -> Inlined {
+/// Inline the style sheets of `html`, whose measured tree is `tree`.
+pub fn inline(html: &str, tree: &Shape) -> Inlined {
     let found = scan(html);
     let unchanged = |media: Option<String>| Inlined {
         html: html.to_owned(),
@@ -88,7 +121,6 @@ pub fn inline(html: &str) -> Inlined {
     if found.styles.trim().is_empty() || found.styles.len() > MAX_STYLE_BYTES {
         return unchanged(None);
     }
-    let tree = shape(html);
     if tree.deepest > MAX_NESTING || tree.elements > MAX_ELEMENTS {
         return unchanged(None);
     }
@@ -208,19 +240,90 @@ impl TokenSink for Scanner {
     }
 }
 
-/// The shape of the tree html5ever builds for a document.
+/// The shape of the tree html5ever builds for a document, and the work it
+/// took to build it.
 #[derive(Debug, Default, PartialEq, Eq)]
-struct Shape {
+pub struct Shape {
     /// Elements created.
-    elements: usize,
+    pub elements: usize,
     /// The deepest node, the document's children at depth 1.
-    deepest: usize,
+    pub deepest: usize,
+    /// Tree-builder work, in the units of [`MAX_PARSE_WORK`].
+    pub work: usize,
 }
 
-/// Parse `html` as the inliner does (a whole document) and measure the tree
-/// it makes, walking it with an explicit stack: nothing here recurses.
-fn shape(html: &str) -> Shape {
-    parse_document(Measure::default(), ParseOpts::default()).one(html)
+/// Parse `html` as the inliner and ammonia do, counting the tree builder's
+/// work, and measure the tree, walking it with an explicit stack: nothing
+/// here recurses. `None` when the work passes [`MAX_PARSE_WORK`] or the tree
+/// is deeper than [`MAX_PARSE_DEPTH`].
+///
+/// The later parses run the same algorithm on the same tokens, so what this
+/// counts is what they would pay, as long as it parses the way each of them
+/// does: the inliner parses a whole document, ammonia a fragment in a `div`
+/// (its `make_parser`), and the two can differ wholesale (a leading
+/// `<frameset>` makes a document drop everything after it, while a fragment
+/// reads it all). So both are measured, and both must stay within the
+/// budget; the shape is the document's, which is what the inliner sees.
+pub fn measure(html: &str) -> Option<Shape> {
+    measure_within(html, MAX_PARSE_TIME)
+}
+
+/// [`measure`] with its own time allowance (tests on slow machines).
+fn measure_within(html: &str, allowance: Duration) -> Option<Shape> {
+    let deadline = Instant::now() + allowance;
+    let fragment = measure_with(html, deadline, |sink| {
+        parse_fragment(
+            sink,
+            ParseOpts::default(),
+            QualName::new(None, ns!(html), local_name!("div")),
+            vec![],
+            false,
+        )
+    })?;
+    let document = measure_with(html, deadline, |sink| {
+        parse_document(sink, ParseOpts::default())
+    })?;
+    Some(Shape {
+        work: document.work.max(fragment.work),
+        ..document
+    })
+}
+
+/// One measured parse of `html` by the parser `start` makes, within
+/// `deadline`. The HTML is fed in chunks of at most 1 KiB and the count and
+/// the clock are checked after each, because a running parse cannot be
+/// stopped from outside: a message built to be slow costs about one chunk
+/// past the budget instead of minutes. Inside a chunk the sink checks the
+/// clock too, and unwinds when it is over: that is the only way out of a
+/// parse that is running, and the parser is dropped with the closure.
+fn measure_with(
+    html: &str,
+    deadline: Instant,
+    start: impl FnOnce(Measure) -> Parser<Measure>,
+) -> Option<Shape> {
+    let work = Rc::new(Cell::new(0));
+    let measured = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        let mut parser = start(Measure::new(Rc::clone(&work), deadline));
+        let mut rest = html;
+        while !rest.is_empty() {
+            let mut end = rest.len().min(CHUNK);
+            while !rest.is_char_boundary(end) {
+                end -= 1;
+            }
+            let (chunk, tail) = rest.split_at(end);
+            parser.process(StrTendril::from_slice(chunk));
+            if work.get() > MAX_PARSE_WORK || Instant::now() > deadline {
+                return None;
+            }
+            rest = tail;
+        }
+        Some(parser.finish())
+    }));
+    match measured {
+        Ok(shape) => shape.filter(|s| s.work <= MAX_PARSE_WORK && s.deepest <= MAX_PARSE_DEPTH),
+        Err(payload) if payload.is::<OverBudget>() => None,
+        Err(payload) => std::panic::resume_unwind(payload),
+    }
 }
 
 /// A node of the measured tree: its name (empty unless it is an element)
@@ -232,21 +335,22 @@ struct Node {
     next: Option<usize>,
     first: Option<usize>,
     last: Option<usize>,
+    /// How many children it has, kept exact.
+    children: usize,
+    /// How many attributes it has.
+    attrs: usize,
 }
 
 /// A tree sink that keeps only the tree's links (node 0 is the document).
 struct Measure {
     nodes: RefCell<Vec<Node>>,
     elements: RefCell<usize>,
-}
-
-impl Default for Measure {
-    fn default() -> Self {
-        Self {
-            nodes: RefCell::new(vec![Node::new(unnamed())]),
-            elements: RefCell::new(0),
-        }
-    }
+    /// Work counted so far, shared with [`measure`], which reads it between
+    /// chunks while the parser owns the sink.
+    work: Rc<Cell<usize>>,
+    /// When measuring must stop, checked every 1,024 sink calls.
+    deadline: Instant,
+    calls: Cell<u32>,
 }
 
 /// The name of a node that is not an element.
@@ -263,11 +367,42 @@ impl Node {
             next: None,
             first: None,
             last: None,
+            children: 0,
+            attrs: 0,
         }
     }
 }
 
 impl Measure {
+    fn new(work: Rc<Cell<usize>>, deadline: Instant) -> Self {
+        Self {
+            nodes: RefCell::new(vec![Node::new(unnamed())]),
+            elements: RefCell::new(0),
+            work,
+            deadline,
+            calls: Cell::new(0),
+        }
+    }
+
+    /// Count `units` of work. Every sink method calls this first, before it
+    /// borrows anything, so the unwind below leaves no borrow behind.
+    fn charge(&self, units: usize) {
+        self.work.set(self.work.get().saturating_add(units));
+        let calls = self.calls.get().wrapping_add(1);
+        self.calls.set(calls);
+        if calls.is_multiple_of(1024) && Instant::now() > self.deadline {
+            std::panic::resume_unwind(Box::new(OverBudget));
+        }
+    }
+
+    /// The children of the parent of `node` (none for a root).
+    fn siblings(&self, node: usize) -> usize {
+        let nodes = self.nodes.borrow();
+        nodes[node]
+            .parent
+            .map_or(0, |parent| nodes[parent].children)
+    }
+
     fn push(&self, name: QualName) -> usize {
         let mut nodes = self.nodes.borrow_mut();
         nodes.push(Node::new(name));
@@ -280,6 +415,7 @@ impl Measure {
             (n.parent, n.previous, n.next)
         };
         let Some(parent) = parent else { return };
+        nodes[parent].children -= 1;
         match previous {
             Some(previous) => nodes[previous].next = next,
             None => nodes[parent].first = next,
@@ -307,6 +443,7 @@ impl Measure {
             None => nodes[parent].first = Some(child),
         }
         nodes[parent].last = Some(child);
+        nodes[parent].children += 1;
     }
 
     fn insert_before(nodes: &mut [Node], sibling: usize, child: usize) {
@@ -326,6 +463,7 @@ impl Measure {
             None => nodes[parent].first = Some(child),
         }
         nodes[sibling].previous = Some(child);
+        nodes[parent].children += 1;
     }
 }
 
@@ -352,38 +490,52 @@ impl TreeSink for Measure {
         Shape {
             elements: self.elements.into_inner(),
             deepest,
+            work: self.work.get(),
         }
     }
 
-    fn parse_error(&self, _msg: Cow<'static, str>) {}
+    // Every call is a unit. The tree builder's quadratic paths all go
+    // through the sink: `elem_name` is what each scope check calls for every
+    // open element it passes, and foster parenting and the adoption agency
+    // move nodes (`append_before_sibling`, `remove_from_parent`,
+    // `reparent_children`), weighted here as ammonia's RcDom pays for them
+    // (it searches the parent's child list).
+
+    fn parse_error(&self, _msg: Cow<'static, str>) {
+        self.charge(1);
+    }
 
     fn get_document(&self) -> usize {
+        self.charge(1);
         0
     }
 
     fn elem_name<'a>(&'a self, target: &'a usize) -> Self::ElemName<'a> {
+        self.charge(1);
         Ref::map(self.nodes.borrow(), |nodes| &nodes[*target].name)
     }
 
-    fn create_element(
-        &self,
-        name: QualName,
-        _attrs: Vec<Attribute>,
-        _flags: ElementFlags,
-    ) -> usize {
+    fn create_element(&self, name: QualName, attrs: Vec<Attribute>, _flags: ElementFlags) -> usize {
+        self.charge(1);
+        self.charge(attrs.len());
         *self.elements.borrow_mut() += 1;
-        self.push(name)
+        let node = self.push(name);
+        self.nodes.borrow_mut()[node].attrs = attrs.len();
+        node
     }
 
     fn create_comment(&self, _text: StrTendril) -> usize {
+        self.charge(1);
         self.push(unnamed())
     }
 
     fn create_pi(&self, _target: StrTendril, _data: StrTendril) -> usize {
+        self.charge(1);
         self.push(unnamed())
     }
 
     fn append(&self, parent: &usize, child: NodeOrText<usize>) {
+        self.charge(1);
         if let NodeOrText::AppendNode(child) = child {
             Self::append_node(&mut self.nodes.borrow_mut(), *parent, child);
         }
@@ -395,6 +547,7 @@ impl TreeSink for Measure {
         prev_element: &usize,
         child: NodeOrText<usize>,
     ) {
+        self.charge(1);
         if self.nodes.borrow()[*element].parent.is_some() {
             self.append_before_sibling(element, child);
         } else {
@@ -408,32 +561,51 @@ impl TreeSink for Measure {
         _public_id: StrTendril,
         _system_id: StrTendril,
     ) {
+        self.charge(1);
     }
 
     // The inliner keeps a template's contents as its children, so do we.
     fn get_template_contents(&self, target: &usize) -> usize {
+        self.charge(1);
         *target
     }
 
     fn same_node(&self, x: &usize, y: &usize) -> bool {
+        self.charge(1);
         x == y
     }
 
-    fn set_quirks_mode(&self, _mode: QuirksMode) {}
+    fn set_quirks_mode(&self, _mode: QuirksMode) {
+        self.charge(1);
+    }
 
     fn append_before_sibling(&self, sibling: &usize, new_node: NodeOrText<usize>) {
+        self.charge(1);
+        self.charge(self.siblings(*sibling));
         if let NodeOrText::AppendNode(child) = new_node {
             Self::insert_before(&mut self.nodes.borrow_mut(), *sibling, child);
         }
     }
 
-    fn add_attrs_if_missing(&self, _target: &usize, _attrs: Vec<Attribute>) {}
+    // RcDom rebuilds a set of the element's existing attribute names on
+    // every call, so a repeated `<html a1>` costs the attributes so far.
+    fn add_attrs_if_missing(&self, target: &usize, attrs: Vec<Attribute>) {
+        self.charge(1);
+        let existing = self.nodes.borrow()[*target].attrs;
+        self.charge(existing.saturating_add(attrs.len()));
+        self.nodes.borrow_mut()[*target].attrs = existing.saturating_add(attrs.len());
+    }
 
     fn remove_from_parent(&self, target: &usize) {
+        self.charge(1);
+        self.charge(self.siblings(*target));
         Self::detach(&mut self.nodes.borrow_mut(), *target);
     }
 
     fn reparent_children(&self, node: &usize, new_parent: &usize) {
+        self.charge(1);
+        let moved = self.nodes.borrow()[*node].children;
+        self.charge(moved);
         let mut nodes = self.nodes.borrow_mut();
         while let Some(child) = nodes[*node].first {
             Self::append_node(&mut nodes, *new_parent, child);
@@ -446,6 +618,36 @@ mod tests {
     use std::fmt::Write as _;
 
     use super::*;
+
+    /// A string built by `add` called for 0..count.
+    fn repeated_with(count: usize, add: impl Fn(&mut String, usize)) -> String {
+        let mut text = String::new();
+        for i in 0..count {
+            add(&mut text, i);
+        }
+        text
+    }
+
+    /// `super::inline` on the HTML's own measured shape.
+    fn inline(html: &str) -> Inlined {
+        super::inline(html, &accepted(html).expect("within the parse budget"))
+    }
+
+    /// `measure` with minutes of time, for slow test machines: the work
+    /// budget and depth cap still apply.
+    fn accepted(html: &str) -> Option<Shape> {
+        measure_within(html, Duration::from_mins(1))
+    }
+
+    const FIXTURES: [&str; 7] = [
+        include_str!("../../../fixtures/email-html/newsletter.html"),
+        include_str!("../../../fixtures/email-html/receipt.html"),
+        include_str!("../../../fixtures/email-html/outlook.html"),
+        include_str!("../../../fixtures/email-html/gmail.html"),
+        include_str!("../../../fixtures/email-html/marketing-600.html"),
+        include_str!("../../../fixtures/email-html/marketing-fluid.html"),
+        include_str!("../../../fixtures/email-html/hostile.html"),
+    ];
 
     #[test]
     fn rules_are_inlined_and_sheets_removed() {
@@ -557,23 +759,18 @@ mod tests {
             "<style>p {{ color: red }}</style>{}<p>x</p>",
             "<div></span>".repeat(MAX_NESTING + 10)
         );
-        assert!(shape(&stray).deepest > MAX_NESTING);
+        assert!(accepted(&stray).expect("cheap").deepest > MAX_NESTING);
         assert_eq!(inline(&stray).html, stray);
         // Foreign content: in `<svg>`, `<xmp>` is an element, not raw text.
         let foreign = format!(
             "<style>p {{ color: red }}</style><svg><xmp>{}</svg><p>x</p>",
             "<g>".repeat(MAX_NESTING + 10)
         );
-        assert!(shape(&foreign).deepest > MAX_NESTING);
+        assert!(accepted(&foreign).expect("cheap").deepest > MAX_NESTING);
         assert_eq!(inline(&foreign).html, foreign);
         // A plain document: html, body, p.
-        assert_eq!(
-            shape("<p>x</p>"),
-            Shape {
-                elements: 4,
-                deepest: 3
-            }
-        );
+        let plain = accepted("<p>x</p>").expect("cheap");
+        assert_eq!((plain.elements, plain.deepest), (4, 3));
     }
 
     #[test]
@@ -594,6 +791,9 @@ mod tests {
                 let tree = Measure {
                     nodes: RefCell::new(nodes),
                     elements: RefCell::new(0),
+                    work: Rc::new(Cell::new(0)),
+                    deadline: Instant::now() + MAX_PARSE_TIME,
+                    calls: Cell::new(0),
                 };
                 tree.finish().deepest
             })
@@ -653,5 +853,72 @@ mod tests {
             "{}",
             result.html
         );
+    }
+
+    #[test]
+    fn html_built_to_be_slow_is_refused() {
+        // Minutes of tree building in full; the budget stops each within a
+        // chunk or so.
+        assert!(measure(&"<div></span>".repeat(200_000)).is_none());
+        assert!(measure(&"<div>".repeat(200_000)).is_none());
+        assert!(measure(&"<a><table><a>x".repeat(50_000)).is_none());
+    }
+
+    #[test]
+    fn a_leading_frameset_does_not_hide_the_work() {
+        // A document drops what follows a leading `<frameset>`; ammonia's
+        // fragment parse reads it all, so the fragment is measured too.
+        assert!(measure(&format!("<frameset>{}", "<div></span>".repeat(200_000))).is_none());
+        assert!(measure(&format!("<frameset>{}", "<div>".repeat(200_000))).is_none());
+        assert!(accepted("<frameset><p>x</p>").is_some());
+    }
+
+    #[test]
+    fn ordinary_mail_is_far_under_the_budget() {
+        for html in FIXTURES {
+            let shape = accepted(html).expect("within the budget");
+            assert!(shape.work < MAX_PARSE_WORK / 10, "{}", shape.work);
+        }
+    }
+
+    #[test]
+    fn a_large_newsletter_has_room() {
+        let block = r#"<table width="600" cellpadding="0"><tr><td class="a"><a href="https://t.example/x"><img src="https://t.example/i.png" width="100"></a><h2>Title</h2><p>Some <b>bold</b> words and more words.</p><ul><li>One</li><li>Two</li></ul></td></tr></table>"#;
+        let html = block.repeat(3_000);
+        assert!(html.len() > 700 * 1024);
+        let html = format!("{html}{html}");
+        let shape = accepted(&html).expect("within the budget");
+        assert!(shape.work < MAX_PARSE_WORK / 4, "{}", shape.work);
+    }
+
+    #[test]
+    fn depth_past_the_cap_is_refused() {
+        assert!(measure(&"<font color=red>x".repeat(5_000)).is_none());
+        assert!(accepted(&"<font color=red>x".repeat(3_000)).is_some());
+    }
+
+    #[test]
+    fn work_the_sink_cannot_see_is_refused() {
+        // Attributes added to the same element again and again.
+        let repeated = repeated_with(20_000, |s, i| {
+            let _ = write!(s, "<html a{i}>");
+        });
+        assert!(measure(&repeated).is_none());
+        // The active formatting list's duplicate check.
+        let formatting = repeated_with(20_000, |s, i| {
+            let _ = write!(s, "<b id={i}>");
+        });
+        assert!(measure(&formatting).is_none());
+        // Many open elements, then end tags that scan them.
+        let strays = "<span>".repeat(100_000) + &"</x>".repeat(2_048);
+        assert!(measure(&strays).is_none());
+        // One start tag with 60,000 attributes.
+        let many = repeated_with(60_000, |s, i| {
+            let _ = write!(s, "a{i} ");
+        });
+        assert!(measure(&format!("<p {many}>x</p>")).is_none());
+        // Deep spans, then templates left open.
+        let templates = "<span>".repeat(20_000) + &"<template>".repeat(10_000);
+        assert!(measure(&templates).is_none());
     }
 }
