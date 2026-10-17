@@ -2,7 +2,7 @@
 //! newest inbound message, found with a prefilter an index can serve.
 
 use campbooks_ai::decide::{
-    signals::email::subject_template,
+    signals::{email::subject_template, facts::sender_checks_failed},
     taught::{Facts, normalise_list_id},
 };
 use campbooks_kernel::{Error, Result};
@@ -61,7 +61,17 @@ impl Candidate {
             labels: &self.labels,
             stream: self.stream.as_str(),
             suspicious: self.suspicious,
+            auth_failed: self.auth_failed(),
         }
+    }
+
+    /// Whether the receiving provider's authentication results say its
+    /// sender failed its checks.
+    pub fn auth_failed(&self) -> bool {
+        sender_checks_failed(
+            &self.sender_address,
+            self.headers.authentication_results.as_deref(),
+        )
     }
 }
 

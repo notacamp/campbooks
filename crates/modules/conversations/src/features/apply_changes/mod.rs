@@ -25,7 +25,10 @@ use std::{
 
 use campbooks_ai::decide::{
     AnswerValue, Question,
-    signals::email::{subject_template, triage, triage_questions},
+    signals::{
+        email::{subject_template, triage, triage_questions},
+        facts::sender_checks_failed,
+    },
     strategy::{Decided, Strategy},
     taught::{Facts, Outcome, TaughtRule, evaluate},
 };
@@ -696,6 +699,10 @@ impl Apply<'_> {
             labels: &labels,
             stream: &stream,
             suspicious,
+            auth_failed: sender_checks_failed(
+                &sender,
+                message.headers.authentication_results.as_deref(),
+            ),
         };
         Ok(evaluate(&acting, &facts))
     }

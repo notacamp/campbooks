@@ -56,8 +56,8 @@ impl Ledger {
 }
 
 /// Carry out what `outcome` says about a message that just arrived: store
-/// the rules' answers as `taught` decisions, archive, mark read or label the
-/// message (and ask the provider to do the same), and record each rule's
+/// the rules' answers as `taught` decisions, archive, mark read, label, trash
+/// or report the message (and ask the provider to do the same), and record each rule's
 /// application. Returns what changed on the conversation, for the batch to
 /// announce.
 pub async fn on_arrival(
@@ -103,6 +103,14 @@ pub async fn on_arrival(
             ledger.of(rule).read = true;
         }
         effects.add(flag.change(), messages, flag.requested());
+    }
+    if let Some(applied) = &outcome.bin {
+        let flag = super::apply::bin_flag(applied.value);
+        let messages = effects::flag_message(tx, arrival.message, flag).await?;
+        if !messages.is_empty() {
+            ledger.of(&applied.rule).binned = Some(applied.value);
+            effects.add(flag.change(), messages, flag.requested());
+        }
     }
     for applied in &outcome.labels {
         let Ok(label) = applied.value.parse::<LabelId>() else {

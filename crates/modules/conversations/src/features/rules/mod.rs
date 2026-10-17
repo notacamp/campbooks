@@ -388,7 +388,8 @@ pub async fn compute_preview(
                 continue;
             }
             out.matching += 1;
-            if candidate.suspicious && rules::hides(actions) {
+            // A rule for the trash or spam is about such mail: it acts on it.
+            if candidate.suspicious && rules::hides(actions) && !rules::bins(actions) {
                 out.skipped_suspicious += 1;
                 continue;
             }
@@ -448,7 +449,7 @@ fn sample(c: &rules::Candidate) -> PreviewSample {
 }
 
 /// The rule winning each slot of `outcome` (labels aside).
-fn winners(outcome: &campbooks_ai::decide::taught::Outcome) -> [Option<&str>; 6] {
+fn winners(outcome: &campbooks_ai::decide::taught::Outcome) -> [Option<&str>; 8] {
     [
         outcome.stream.as_ref().map(|a| a.rule.as_str()),
         outcome.archive.as_deref(),
@@ -456,6 +457,8 @@ fn winners(outcome: &campbooks_ai::decide::taught::Outcome) -> [Option<&str>; 6]
         outcome.needs_reply.as_ref().map(|a| a.rule.as_str()),
         outcome.asks_action.as_ref().map(|a| a.rule.as_str()),
         outcome.surface.as_ref().map(|a| a.rule.as_str()),
+        outcome.bin.as_ref().map(|a| a.rule.as_str()),
+        outcome.paid.as_deref(),
     ]
 }
 
@@ -500,6 +503,9 @@ fn would_change(
         || outcome.needs_reply.as_ref().is_some_and(|a| won(&a.rule))
         || outcome.asks_action.as_ref().is_some_and(|a| won(&a.rule))
         || outcome.surface.as_ref().is_some_and(|a| won(&a.rule))
+        // The scan leaves out mail already in the trash or spam.
+        || outcome.bin.as_ref().is_some_and(|a| won(&a.rule))
+        || outcome.paid.as_deref().is_some_and(won)
 }
 
 // --- Create ------------------------------------------------------------------

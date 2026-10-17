@@ -106,6 +106,19 @@ pub fn is_machine_sender(envelope: &Envelope) -> bool {
         || facts.service_sender()
 }
 
+/// Whether the receiving provider's `authentication_results` say mail from
+/// `from` failed its sender checks ([`Facts::authentication_failed`]): what a
+/// taught rule's "fails its sender checks" condition reads. Absent results
+/// say nothing (`false`).
+pub fn sender_checks_failed(from: &str, authentication_results: Option<&str>) -> bool {
+    Facts {
+        from: from.to_lowercase(),
+        authentication_results: authentication_results.map(str::to_owned),
+        ..Facts::default()
+    }
+    .authentication_failed()
+}
+
 /// The structured facts of an email: addresses, a few headers and the
 /// attachments' media types. It holds none of the email's text.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]

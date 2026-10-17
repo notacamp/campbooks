@@ -92,6 +92,10 @@ pub enum RuleCondition {
     Label(LabelId),
     /// The conversation is in this stream.
     Stream(Stream),
+    /// The receiving provider's authentication results say the sender's
+    /// domain failed its checks (with a sender or domain: "mail that says it
+    /// is from paypal.com but is not").
+    SenderChecksFail,
 }
 
 /// Always or never show.
@@ -137,6 +141,13 @@ pub enum RuleAction {
         /// Which.
         value: SurfaceWhen,
     },
+    /// Put it in the trash.
+    Trash,
+    /// Report it as spam ("Never see emails like this again").
+    Spam,
+    /// Its bills are already paid: Campbooks never asks "Is it paid?" about
+    /// it.
+    MarkPaid,
 }
 
 impl From<&RuleCondition> for taught::Condition {
@@ -158,6 +169,7 @@ impl From<&RuleCondition> for taught::Condition {
             }),
             RuleCondition::Label(l) => Self::Label(l.to_string()),
             RuleCondition::Stream(s) => Self::Stream(s.as_str().to_owned()),
+            RuleCondition::SenderChecksFail => Self::SenderChecksFail,
         }
     }
 }
@@ -181,6 +193,9 @@ impl From<&RuleAction> for taught::Action {
                     SurfaceWhen::Never => Surface::Never,
                 },
             },
+            RuleAction::Trash => Self::Trash,
+            RuleAction::Spam => Self::Spam,
+            RuleAction::MarkPaid => Self::MarkPaid,
         }
     }
 }
@@ -214,7 +229,9 @@ pub fn validate(conditions: &[RuleCondition], actions: &[RuleAction]) -> Result<
             .value
             .as_ref()
             .is_some_and(|v| v.chars().count() > MAX_VALUE_CHARS),
-        RuleCondition::Label(_) | RuleCondition::Stream(_) => false,
+        RuleCondition::Label(_) | RuleCondition::Stream(_) | RuleCondition::SenderChecksFail => {
+            false
+        }
     });
     if too_long {
         return Err(invalid());
@@ -751,15 +768,29 @@ pub async fn insert(
     Ok(id)
 }
 
-/// Whether a rule's stream move is blocked by suspicious mail.
+/// Whether a rule's actions hide mail (or a question about it) from the
+/// member: never for a correspondent's mail, and, except the trash and spam
+/// ([`bins`]), never for suspicious mail.
 pub fn hides(actions: &[RuleAction]) -> bool {
     actions.iter().any(|a| match a {
-        RuleAction::Archive | RuleAction::MarkRead => true,
+        RuleAction::Archive
+        | RuleAction::MarkRead
+        | RuleAction::Trash
+        | RuleAction::Spam
+        | RuleAction::MarkPaid => true,
         RuleAction::MoveToStream { stream } => *stream != Stream::Primary,
         RuleAction::NeedsReply { value } | RuleAction::AsksAction { value } => !value,
         RuleAction::Surface { value } => *value == SurfaceWhen::Never,
         RuleAction::AddLabel { .. } => false,
     })
+}
+
+/// Whether a rule puts mail in the trash or spam: it acts on suspicious
+/// mail too, since that mail is what it is about.
+pub fn bins(actions: &[RuleAction]) -> bool {
+    actions
+        .iter()
+        .any(|a| matches!(a, RuleAction::Trash | RuleAction::Spam))
 }
 
 #[cfg(test)]

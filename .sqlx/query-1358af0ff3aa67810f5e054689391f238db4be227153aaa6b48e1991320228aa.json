@@ -1,0 +1,18 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        INSERT INTO conversations.rule_applications\n            (rule_id, conversation_id, workspace_id, run_id, before)\n        VALUES ($1, $2, $3, $4, $5)\n        ON CONFLICT (rule_id, conversation_id) DO UPDATE\n           SET applied_at = now(), reverted_at = NULL,\n               run_id = coalesce(EXCLUDED.run_id, conversations.rule_applications.run_id),\n               before = CASE WHEN conversations.rule_applications.reverted_at IS NULL\n                             THEN conversations.rule_applications.before || jsonb_strip_nulls(\n                                 jsonb_build_object(\n                                     'stream', coalesce(\n                                         conversations.rule_applications.before -> 'stream',\n                                         EXCLUDED.before -> 'stream'),\n                                     'moved_to', coalesce(\n                                         EXCLUDED.before -> 'moved_to',\n                                         conversations.rule_applications.before -> 'moved_to'),\n                                     'archived',\n                                         coalesce((conversations.rule_applications.before\n                                                   ->> 'archived')::boolean, false)\n                                         OR coalesce((EXCLUDED.before ->> 'archived')::boolean,\n                                                     false),\n                                     'read',\n                                         coalesce((conversations.rule_applications.before\n                                                   ->> 'read')::boolean, false)\n                                         OR coalesce((EXCLUDED.before ->> 'read')::boolean, false),\n                                     'labels', (SELECT jsonb_agg(DISTINCT l) FROM jsonb_array_elements(\n                                         coalesce(conversations.rule_applications.before -> 'labels',\n                                                  '[]'::jsonb)\n                                         || coalesce(EXCLUDED.before -> 'labels', '[]'::jsonb)) l),\n                                     'answered', (SELECT jsonb_agg(DISTINCT q) FROM jsonb_array_elements(\n                                         coalesce(conversations.rule_applications.before -> 'answered',\n                                                  '[]'::jsonb)\n                                         || coalesce(EXCLUDED.before -> 'answered', '[]'::jsonb)) q),\n                                     'binned', coalesce(\n                                         conversations.rule_applications.before -> 'binned',\n                                         EXCLUDED.before -> 'binned')))\n                             ELSE EXCLUDED.before END\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Uuid",
+        "Uuid",
+        "Jsonb"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "1358af0ff3aa67810f5e054689391f238db4be227153aaa6b48e1991320228aa"
+}

@@ -83,6 +83,7 @@ pub async fn apply(
     let undone = match flag {
         Flag::Unarchive => Some(rules::Undone::Archive),
         Flag::Unread => Some(rules::Undone::Read),
+        Flag::Untrash | Flag::Unspam => Some(rules::Undone::Bin),
         _ => None,
     };
     let exception = match undone {

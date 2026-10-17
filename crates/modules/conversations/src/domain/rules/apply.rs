@@ -4,7 +4,7 @@ use std::collections::BTreeSet;
 
 use campbooks_ai::decide::{
     signals::email::triage,
-    taught::{self, Outcome, Surface, TaughtRule},
+    taught::{self, Bin, Outcome, Surface, TaughtRule},
 };
 use campbooks_kernel::{EventBus, Result};
 use serde::{Deserialize, Serialize};
@@ -59,6 +59,9 @@ pub struct Before {
     /// Questions the rule answered on its newest inbound message.
     #[serde(default)]
     pub answered: Vec<String>,
+    /// Where the rule put it out of the way (the trash or spam), when it did.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub binned: Option<Bin>,
 }
 
 /// Where a rule acts: the inbox, the workspace's event key and the events.
@@ -172,6 +175,14 @@ async fn carry_out(
         }
         effects.add(flag.change(), messages, flag.requested());
     }
+    if let Some(bin) = mine.bin {
+        let flag = bin_flag(bin);
+        let messages = effects::flag_conversation(tx, candidate.id, flag).await?;
+        if !messages.is_empty() {
+            before.binned = Some(bin);
+            effects.add(flag.change(), messages, flag.requested());
+        }
+    }
     for label in &mine.labels {
         let linked =
             effects::link_label(tx, ctx.workspace_id, ctx.inbox, candidate.id, *label).await?;
@@ -190,12 +201,29 @@ async fn carry_out(
     Ok((before, effects))
 }
 
+/// The flag that puts mail in `bin`.
+pub const fn bin_flag(bin: Bin) -> Flag {
+    match bin {
+        Bin::Trash => Flag::Trash,
+        Bin::Spam => Flag::Spam,
+    }
+}
+
+/// The flag that takes mail out of `bin`, back where it was.
+const fn unbin_flag(bin: Bin) -> Flag {
+    match bin {
+        Bin::Trash => Flag::Untrash,
+        Bin::Spam => Flag::Unspam,
+    }
+}
+
 struct Mine {
     stream: Option<Stream>,
     archive: bool,
     read: bool,
     labels: Vec<LabelId>,
     answers: bool,
+    bin: Option<Bin>,
 }
 
 impl Mine {
@@ -216,7 +244,13 @@ impl Mine {
                 .collect(),
             answers: outcome.needs_reply.as_ref().is_some_and(|a| a.rule == id)
                 || outcome.asks_action.as_ref().is_some_and(|a| a.rule == id)
-                || outcome.surface.as_ref().is_some_and(|a| a.rule == id),
+                || outcome.surface.as_ref().is_some_and(|a| a.rule == id)
+                || outcome.paid.as_deref() == Some(id),
+            bin: outcome
+                .bin
+                .as_ref()
+                .filter(|a| a.rule == id)
+                .map(|a| a.value),
         }
     }
 
@@ -226,6 +260,7 @@ impl Mine {
             && !self.read
             && self.labels.is_empty()
             && !self.answers
+            && self.bin.is_none()
     }
 }
 
@@ -247,10 +282,18 @@ pub fn answers<'a>(outcome: &Outcome, rule: &'a str) -> Vec<TaughtAnswer<'a>> {
             };
             (json!(value), json!(["always", "never"]))
         });
+    // "Its bills are paid": the money question answered `paid`, so no "Is
+    // it paid?" is asked (and an open one is cleared).
+    let paid = outcome
+        .paid
+        .as_deref()
+        .filter(|r| *r == rule)
+        .map(|_| (json!(triage::PAID), json!(triage::MONEY_OPTIONS)));
     [
         (triage::NEEDS_REPLY, flag(&outcome.needs_reply)),
         (triage::ASKS_ACTION, flag(&outcome.asks_action)),
         (needs::SURFACE, surface),
+        (triage::MONEY, paid),
     ]
     .into_iter()
     .filter_map(|(question, answer)| {
@@ -406,6 +449,13 @@ async fn undo(
             messages,
             RequestedChange::MoveToStream { stream: *stream },
         );
+    }
+    if let Some(bin) = before.binned {
+        let flag = unbin_flag(bin);
+        let messages = effects::flag_conversation(conn, id, flag).await?;
+        if !messages.is_empty() {
+            effects.add(flag.change(), messages, flag.requested());
+        }
     }
     for (did, flag) in [
         (before.archived, Flag::Unarchive),

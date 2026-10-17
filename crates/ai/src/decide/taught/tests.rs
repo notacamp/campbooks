@@ -396,3 +396,87 @@ fn a_stored_rule_naming_a_public_suffix_matches_nothing() {
     )];
     assert!(!evaluate(&owned, &facts("a@mail.github.com", "Hi", None)).is_empty());
 }
+
+#[test]
+fn a_rule_against_mail_failing_its_sender_checks_reports_it_even_when_suspicious() {
+    let rules = [rule(
+        "fake",
+        vec![
+            Condition::SenderDomain("paypal.com".into()),
+            Condition::SenderChecksFail,
+        ],
+        vec![Action::Spam],
+        1,
+    )];
+    let fake = Facts {
+        suspicious: true,
+        auth_failed: true,
+        ..facts("service@paypal.com", "Your account has been limited", None)
+    };
+    let out = evaluate(&rules, &fake);
+    assert_eq!(
+        out.bin,
+        Some(Applied {
+            value: Bin::Spam,
+            rule: "fake".into()
+        })
+    );
+    // The real sender passes its checks: the rule leaves it alone.
+    let real = facts("service@paypal.com", "Your receipt", None);
+    assert!(evaluate(&rules, &real).is_empty());
+}
+
+#[test]
+fn always_show_outranks_the_trash() {
+    let rules = [
+        rule(
+            "bin",
+            vec![Condition::SenderDomain("shop.example".into())],
+            vec![Action::Trash],
+            1,
+        ),
+        rule(
+            "keep",
+            vec![Condition::SenderAddress("ines@shop.example".into())],
+            vec![Action::Surface {
+                value: Surface::Always,
+            }],
+            2,
+        ),
+    ];
+    let out = evaluate(&rules, &facts("ines@shop.example", "Hello", None));
+    assert_eq!(out.bin, None);
+    let other = evaluate(&rules, &facts("deals@shop.example", "Sale", None));
+    assert_eq!(other.bin.map(|b| b.value), Some(Bin::Trash));
+}
+
+#[test]
+fn paid_is_its_own_slot_and_never_for_suspicious_mail() {
+    let rules = [rule(
+        "edp",
+        vec![Condition::SenderAddress("faturas@edp.example".into())],
+        vec![Action::MarkPaid],
+        1,
+    )];
+    let bill = facts("faturas@edp.example", "Fatura outubro", None);
+    assert_eq!(evaluate(&rules, &bill).paid.as_deref(), Some("edp"));
+    let suspicious = Facts {
+        suspicious: true,
+        ..bill
+    };
+    assert_eq!(evaluate(&rules, &suspicious).paid, None);
+    assert_eq!(
+        TaughtRule::validate(
+            &[Condition::SenderAddress("a@b.example".into())],
+            &[Action::Trash, Action::Spam]
+        ),
+        Err(Invalid::SameSlot)
+    );
+    // Failed checks alone say nothing about which mail.
+    assert_eq!(
+        TaughtRule::validate(&[Condition::SenderChecksFail], &[Action::Spam]),
+        Err(Invalid::TooBroad)
+    );
+    let json = serde_json::to_value(Condition::SenderChecksFail).unwrap();
+    assert_eq!(json, serde_json::json!({"field": "sender_checks_fail"}));
+}
