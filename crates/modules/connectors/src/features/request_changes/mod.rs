@@ -84,7 +84,8 @@ impl EventConsumer for RequestChanges {
             tx.commit().await?;
             return Ok(());
         };
-        let items = standing(ctx.state(), &mut tx, workspace, &event.payload).await?;
+        let request = *event.id.as_uuid();
+        let items = standing(ctx.state(), &mut tx, workspace, request, &event.payload).await?;
         if items.is_empty() {
             tx.commit().await?;
             return Ok(());
@@ -182,13 +183,14 @@ async fn user_labels(
     .collect())
 }
 
-/// The items of `request` its conversation still shows, as the
-/// conversations module answers in `conn` (the outbound-requests port);
-/// the others are logged and left out.
+/// The items of `request` (event `id`) the conversations module recorded
+/// for it, as it answers in `conn` (the outbound-requests port); the others
+/// are logged and left out.
 async fn standing<'r>(
     state: &AppState,
     conn: &mut PgConnection,
     workspace: WorkspaceId,
+    id: uuid::Uuid,
     request: &'r ChangesRequested,
 ) -> Result<Vec<&'r RequestedItem>, JobError> {
     let asked: Vec<serde_json::Value> = request
@@ -202,6 +204,7 @@ async fn standing<'r>(
         .changes_standing(
             conn,
             workspace,
+            id,
             request.inbox_id.into(),
             request.conversation,
             &asked,
@@ -218,7 +221,7 @@ async fn standing<'r>(
             %workspace,
             asked = request.items.len(),
             standing = items.len(),
-            "changes_requested names changes its conversation does not show; those are not made"
+            "changes_requested names changes the conversations module did not request; those are not made"
         );
     }
     Ok(items)

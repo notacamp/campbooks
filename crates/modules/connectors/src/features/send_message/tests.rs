@@ -4,6 +4,7 @@
 
 use campbooks_kernel::{
     clock::Clock as _,
+    db::BeginFor as _,
     tenancy::{Role, WorkspaceId},
 };
 use chrono::TimeDelta;
@@ -593,4 +594,113 @@ async fn a_request_replayed_after_its_send_sends_nothing_more(db: PgPool) {
     assert_eq!(kit.google.send_calls(), 1);
     assert_eq!(completed(&kit, ws).await.len(), 1);
     assert_eq!(recorded(&kit).await, 1);
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_send_pointed_at_another_inboxs_stream_is_not_sent_from_it(db: PgPool) {
+    let kit = Kit::new(db).await;
+    let (ws, inbox, thread) = connected(&kit).await;
+    // A send conversations released from another inbox (no stream), whose
+    // row names this mailbox's stream: written by hand, with its job.
+    let elsewhere = InboxId::new();
+    let send = SendId::new();
+    let blob = document(&kit, ws, elsewhere, send, Some(&thread), "Thanks").await;
+    kit.outbound.release(send, elsewhere, blob.clone());
+    let stream: uuid::Uuid =
+        sqlx::query_scalar("SELECT id FROM connectors.streams WHERE inbox_id = $1")
+            .bind(uuid::Uuid::from(inbox))
+            .fetch_one(&kit.db)
+            .await
+            .unwrap();
+    sqlx::query(
+        "INSERT INTO connectors.sends (id, workspace_id, stream_id, inbox_id, document)
+         VALUES ($1, $2, $3, $4, $5)",
+    )
+    .bind(uuid::Uuid::from(send))
+    .bind(uuid::Uuid::from(ws))
+    .bind(stream)
+    .bind(uuid::Uuid::from(elsewhere))
+    .bind(serde_json::to_value(&blob).unwrap())
+    .execute(&kit.db)
+    .await
+    .unwrap();
+    let mut tx = kit.state.db.begin_for(ws).await.unwrap();
+    campbooks_kernel::jobs::enqueue_to::<super::SendMessage>(
+        &mut tx,
+        &super::SendMessagePayload {
+            send,
+            give_up: false,
+        },
+        campbooks_kernel::jobs::EnqueueOptions::for_workspace(ws.to_string()),
+    )
+    .await
+    .unwrap();
+    tx.commit().await.unwrap();
+    settle(&kit).await;
+    assert_eq!(kit.google.send_calls(), 0);
+    let done = completed(&kit, ws).await;
+    assert_eq!(done.len(), 1);
+    assert_eq!(done[0]["reason"], "not_connected");
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn an_attempt_is_claimed_once(db: PgPool) {
+    let kit = Kit::new(db).await;
+    let (ws, inbox, thread) = connected(&kit).await;
+    drain(&kit).await;
+    let send = request(&kit, ws, inbox, Some(&thread)).await;
+    kit.run_jobs().await;
+    // Two runners read the send with no attempt yet: one claims it.
+    let now = kit.clock.now();
+    assert!(
+        super::record_attempt(&kit.state.db, ws, send, None, now)
+            .await
+            .is_ok()
+    );
+    assert!(
+        super::record_attempt(&kit.state.db, ws, send, None, now)
+            .await
+            .is_err()
+    );
+    assert_eq!(row(&kit).await, ("pending".to_owned(), 1, true));
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn two_jobs_for_one_send_call_gmail_once(db: PgPool) {
+    let kit = Kit::new(db).await;
+    let (ws, inbox, thread) = connected(&kit).await;
+    drain(&kit).await;
+    let send = request(&kit, ws, inbox, Some(&thread)).await;
+    kit.run_jobs().await;
+    // A second job for the same send (a planted row, a duplicate), run
+    // alongside the first.
+    let mut tx = kit.state.db.begin_for(ws).await.unwrap();
+    campbooks_kernel::jobs::enqueue_to::<super::SendMessage>(
+        &mut tx,
+        &super::SendMessagePayload {
+            send,
+            give_up: false,
+        },
+        campbooks_kernel::jobs::EnqueueOptions::for_workspace(ws.to_string())
+            .unique(format!("again:{send}")),
+    )
+    .await
+    .unwrap();
+    tx.commit().await.unwrap();
+    refill(&kit).await;
+    sqlx::query(
+        "UPDATE kernel.jobs SET run_at = now()
+          WHERE kind = 'connectors.send_message' AND state = 'pending' AND payload->>'give_up' = 'false'",
+    )
+    .execute(&kit.db)
+    .await
+    .unwrap();
+    let one = campbooks_kernel::jobs::Worker::new(kit.state.clone());
+    let two = campbooks_kernel::jobs::Worker::new(kit.state.clone());
+    futures_util::future::join(one.run_until_idle(), two.run_until_idle()).await;
+    settle(&kit).await;
+    assert_eq!(kit.google.send_calls(), 1);
+    let done = completed(&kit, ws).await;
+    assert_eq!(done.len(), 1);
+    assert_eq!(done[0]["outcome"], "sent");
 }

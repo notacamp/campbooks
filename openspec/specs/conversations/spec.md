@@ -1694,12 +1694,12 @@ that send, with the outgoing document recorded for it, and its author is a
 member of the workspace allowed to send the draft (the check that releases
 it); the draft SHALL stay locked against its outcome until the asking
 transaction ends. The port SHALL return the draft's inbox and that document.
-A requested change SHALL stand only when the conversation is in the named
-inbox, the message is one of its messages, and its stored state shows the
-change: read or unread, starred or not, in the inbox or not, the label on
-the conversation or not under exactly the provider key named, the
-conversation in the named stream. An item that does not parse SHALL NOT
-stand.
+Every `conversations.changes_requested` the module publishes SHALL be
+recorded, in the same transaction, under the event's id with its inbox,
+conversation and items (ids and provider message ids only); a record SHALL
+go with its conversation, or after seven days. A requested change SHALL
+stand only when the request of that id, conversation and inbox holds an
+equal item. An item that does not parse SHALL NOT stand.
 
 #### Scenario: A released send stands
 - **WHEN** the connector asks about a send released from Sam's draft
@@ -1709,10 +1709,10 @@ stand.
 - **WHEN** the send's author left the workspace, or its draft failed, or no document was recorded for it
 - **THEN** the port says it does not stand
 
-#### Scenario: An undone change
+#### Scenario: A change and its undo
 - **WHEN** a member marks a conversation read and then unread before the connector asks
-- **THEN** the unread change stands and the read change no longer stands for that message
+- **THEN** both requests stand, each under its own id, and the connector merges them
 
 #### Scenario: A forged change
-- **WHEN** the connector asks about an archive of a message still in the inbox, a message of another conversation, or a label under a key the label does not have
-- **THEN** none of them stands
+- **WHEN** the connector asks about a request id the module never recorded, an item the request did not hold, or a label key other than the one requested
+- **THEN** none of them stands, even a change the conversation already shows

@@ -237,6 +237,7 @@ impl OutboundRequests for FakeOutbound {
         &'a self,
         _conn: &'a mut sqlx::PgConnection,
         _workspace: WorkspaceId,
+        _request: uuid::Uuid,
         _inbox: uuid::Uuid,
         conversation: uuid::Uuid,
         items: &'a [serde_json::Value],

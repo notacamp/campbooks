@@ -14,7 +14,7 @@ use chrono::{DateTime, TimeDelta, Utc};
 
 use super::{
     Attempt, MAX_MESSAGE_BYTES, SendMessage, Sent, Target, UNCLEAR_WAIT, finish_failed, read_blob,
-    record_attempt, set_unclear,
+    record_attempt, set_unclear, unsent,
 };
 use crate::{
     contract::{Address, OutgoingMessage},
@@ -57,6 +57,7 @@ impl SendMessage {
             token,
             document,
             give_up,
+            stands,
             now,
         } = attempt;
         let (Some(zoho), Some(connection)) = (self.deps.zoho.clone(), target.connection) else {
@@ -97,8 +98,8 @@ impl SendMessage {
                 }
             }
         }
-        if give_up {
-            return finish_failed(ctx, workspace, send, &target, "unavailable").await;
+        if give_up || !stands {
+            return unsent(ctx, workspace, send, &target, stands).await;
         }
 
         // Attachments go up first: uploading one is not sending.
@@ -115,7 +116,7 @@ impl SendMessage {
         let parent = parent_of(ctx, workspace, stream, document).await?;
 
         // From here until Zoho answers, the message may be out.
-        record_attempt(ctx, workspace, send, now).await?;
+        record_attempt(ctx.pool(), workspace, send, target.attempted_at, now).await?;
         target.unclear = true;
         match mail.send(&body, parent.as_deref()).await {
             Ok(answer) => {

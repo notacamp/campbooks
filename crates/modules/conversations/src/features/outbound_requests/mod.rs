@@ -8,18 +8,12 @@
 //!   outgoing document `release_send` recorded, and its author may still
 //!   send it (a member, allowed to send from the inbox). The connector sends
 //!   that document, never one an event names.
-//! - A requested change stands while the conversation in that inbox shows
-//!   it: the message is read for `mark_read`, the label is on it with the
-//!   key named for `add_label`, the conversation is in the stream for
-//!   `move_to_stream`, and so on. A member's own change is applied here in
-//!   the transaction that requests it, so it always stands when the
-//!   connector asks, unless a later change undid it (which then stands in
-//!   its place).
+//! - A requested change stands only when this module recorded it, under
+//!   the id of the event that carried it, for that conversation and inbox
+//!   (`conversation::request` records every request it publishes). A member's
+//!   change and its undo both stand, as before; the connector merges them.
 
-use std::{
-    collections::{HashMap, HashSet},
-    sync::Arc,
-};
+use std::sync::Arc;
 
 use campbooks_kernel::{
     AppState,
@@ -31,9 +25,9 @@ use serde::Deserialize as _;
 use sqlx::{PgConnection, types::Uuid};
 
 use crate::{
-    events::{RequestedChange, RequestedItem},
+    events::RequestedItem,
     features::release_send::author_may_send,
-    model::{ConversationId, DraftId, DraftState, InboxId, LabelId, SendId},
+    model::{ConversationId, DraftId, DraftState, InboxId, SendId},
 };
 
 /// The port, for the server to register.
@@ -91,146 +85,31 @@ impl OutboundRequests for StoredRequests {
         &'a self,
         conn: &'a mut PgConnection,
         _workspace: WorkspaceId,
+        request: Uuid,
         inbox: Uuid,
         conversation: Uuid,
         items: &'a [serde_json::Value],
     ) -> StandingFuture<'a> {
         Box::pin(async move {
-            let parsed: Vec<Option<RequestedItem>> = items
-                .iter()
-                .map(|item| RequestedItem::deserialize(item).ok())
-                .collect();
-            let none = vec![false; items.len()];
-            let conversation = ConversationId::from(conversation);
-            let Some(stored) = sqlx::query!(
-                r#"SELECT inbox_id AS "inbox: InboxId", stream
-                     FROM conversations.conversations
-                    WHERE id = $1"#,
-                conversation as ConversationId,
+            let recorded = sqlx::query_scalar!(
+                r#"SELECT items FROM conversations.change_requests
+                    WHERE id = $1 AND conversation_id = $2 AND inbox_id = $3"#,
+                request,
+                ConversationId::from(conversation) as ConversationId,
+                InboxId::from(inbox) as InboxId,
             )
             .fetch_optional(&mut *conn)
-            .await?
-            else {
-                return Ok(none);
-            };
-            if Uuid::from(stored.inbox) != inbox {
-                return Ok(none);
-            }
-            let named: Vec<String> = parsed
+            .await?;
+            let recorded: Vec<RequestedItem> = recorded
+                .and_then(|items| Vec::<RequestedItem>::deserialize(&items).ok())
+                .unwrap_or_default();
+            Ok(items
                 .iter()
-                .flatten()
-                .map(|item| item.provider_message_id.clone())
-                .collect();
-            let messages: HashMap<String, Flags> = sqlx::query!(
-                r#"SELECT provider_message_id, read, starred, in_inbox
-                     FROM conversations.messages
-                    WHERE conversation_id = $1 AND provider_message_id = ANY($2)"#,
-                conversation as ConversationId,
-                &named,
-            )
-            .fetch_all(&mut *conn)
-            .await?
-            .into_iter()
-            .map(|m| {
-                (
-                    m.provider_message_id,
-                    Flags {
-                        read: m.read,
-                        starred: m.starred,
-                        in_inbox: m.in_inbox,
-                    },
-                )
-            })
-            .collect();
-            let on: HashSet<LabelId> = sqlx::query_scalar!(
-                r#"SELECT label_id AS "label: LabelId"
-                     FROM conversations.conversation_labels
-                    WHERE conversation_id = $1"#,
-                conversation as ConversationId,
-            )
-            .fetch_all(&mut *conn)
-            .await?
-            .into_iter()
-            .collect();
-            let asked: Vec<LabelId> = parsed
-                .iter()
-                .flatten()
-                .filter_map(|item| match &item.change {
-                    RequestedChange::AddLabel { label, .. }
-                    | RequestedChange::RemoveLabel { label, .. } => Some(*label),
-                    _ => None,
+                .map(|item| {
+                    RequestedItem::deserialize(item).is_ok_and(|item| recorded.contains(&item))
                 })
-                .collect();
-            let keys: HashMap<LabelId, Option<String>> = sqlx::query!(
-                r#"SELECT id AS "id: LabelId", provider_key
-                     FROM conversations.labels
-                    WHERE inbox_id = $1 AND id = ANY($2)"#,
-                stored.inbox as InboxId,
-                &asked as &[LabelId],
-            )
-            .fetch_all(&mut *conn)
-            .await?
-            .into_iter()
-            .map(|l| (l.id, l.provider_key))
-            .collect();
-            let shown = Shown {
-                stream: &stored.stream,
-                messages: &messages,
-                on: &on,
-                keys: &keys,
-            };
-            Ok(parsed
-                .iter()
-                .map(|item| item.as_ref().is_some_and(|item| shown.stands(item)))
                 .collect())
         })
-    }
-}
-
-/// A message's flags as stored.
-#[derive(Debug, Clone, Copy)]
-struct Flags {
-    read: bool,
-    starred: bool,
-    in_inbox: bool,
-}
-
-/// The conversation as stored: what a requested change is checked against.
-struct Shown<'a> {
-    stream: &'a str,
-    messages: &'a HashMap<String, Flags>,
-    on: &'a HashSet<LabelId>,
-    keys: &'a HashMap<LabelId, Option<String>>,
-}
-
-impl Shown<'_> {
-    /// Whether `item` is what the conversation shows now.
-    fn stands(&self, item: &RequestedItem) -> bool {
-        let Some(flags) = self.messages.get(&item.provider_message_id) else {
-            return false; // Not a message of this conversation.
-        };
-        let key_is = |label: &LabelId, key: Option<&str>| {
-            self.keys
-                .get(label)
-                .is_some_and(|stored| stored.as_deref() == key)
-        };
-        match &item.change {
-            RequestedChange::MarkRead => flags.read,
-            RequestedChange::MarkUnread => !flags.read,
-            RequestedChange::Star => flags.starred,
-            RequestedChange::Unstar => !flags.starred,
-            RequestedChange::Archive => !flags.in_inbox,
-            RequestedChange::Unarchive => flags.in_inbox,
-            RequestedChange::AddLabel {
-                label,
-                provider_key,
-            } => self.on.contains(label) && key_is(label, provider_key.as_deref()),
-            RequestedChange::RemoveLabel {
-                label,
-                provider_key,
-            } => !self.on.contains(label) && key_is(label, provider_key.as_deref()),
-            RequestedChange::MoveToStream { stream } => stream.as_str() == self.stream,
-        }
     }
 }
 

@@ -52,14 +52,16 @@ pub trait OutboundRequests: std::fmt::Debug + Send + Sync + 'static {
     ) -> StoredSendFuture<'a>;
 
     /// For each of `items` (one requested change, as the asking module's
-    /// event writes it: `{provider_message_id, change}`), whether the stored
-    /// state of `conversation` in `inbox` still shows that change. Read in
+    /// event writes it: `{provider_message_id, change}`), whether the asking
+    /// module recorded that change as part of request `request` (the id of
+    /// the event that carried it) for `conversation` in `inbox`. Read in
     /// `conn`, a transaction working in `workspace`. An item that does not
-    /// parse, or names a message of another conversation, is `false`.
+    /// parse, or that the request did not hold, is `false`.
     fn changes_standing<'a>(
         &'a self,
         conn: &'a mut PgConnection,
         workspace: WorkspaceId,
+        request: Uuid,
         inbox: Uuid,
         conversation: Uuid,
         items: &'a [serde_json::Value],
@@ -85,6 +87,7 @@ impl OutboundRequests for NoOutboundRequests {
         &'a self,
         _conn: &'a mut PgConnection,
         _workspace: WorkspaceId,
+        _request: Uuid,
         _inbox: Uuid,
         _conversation: Uuid,
         items: &'a [serde_json::Value],

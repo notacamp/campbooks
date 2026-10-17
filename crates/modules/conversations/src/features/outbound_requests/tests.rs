@@ -118,10 +118,12 @@ async fn a_send_stops_standing_once_it_is_no_longer_being_sent(db: PgPool) {
     assert_eq!(stored(&kit, workspace, &send).await, None);
 }
 
-/// What the port answers for `items` of `conversation` in `inbox`.
+/// What the port answers for `items` of request `request` on
+/// `conversation` in `inbox`.
 async fn standing(
     kit: &Kit,
     workspace: WorkspaceId,
+    request: &str,
     inbox: InboxId,
     conversation: &str,
     items: &[Value],
@@ -131,6 +133,7 @@ async fn standing(
         .changes_standing(
             &mut tx,
             workspace,
+            request.parse().unwrap(),
             inbox.into(),
             conversation.parse().unwrap(),
             items,
@@ -141,17 +144,30 @@ async fn standing(
     standing
 }
 
-/// The items of the last `changes_requested` event.
-async fn last_items(kit: &Kit) -> Vec<Value> {
-    let requested = kit.events("conversations.changes_requested").await;
-    requested.last().unwrap()["items"]
-        .as_array()
-        .unwrap()
-        .clone()
+/// Every answer is yes (and there is one).
+fn every(answers: &[bool]) -> bool {
+    !answers.is_empty() && answers.iter().all(|s| *s)
+}
+
+/// No answer is yes.
+fn none(answers: &[bool]) -> bool {
+    answers.iter().all(|s| !s)
+}
+
+/// The last `changes_requested` event: its id and items.
+async fn last_request(kit: &Kit) -> (String, Vec<Value>) {
+    let (id, payload): (String, Value) = sqlx::query_as(
+        "SELECT id::text, payload FROM kernel.events
+          WHERE name = 'conversations.changes_requested' ORDER BY id DESC LIMIT 1",
+    )
+    .fetch_one(&kit.db)
+    .await
+    .unwrap();
+    (id, payload["items"].as_array().unwrap().clone())
 }
 
 #[sqlx::test(migrations = "../../../migrations")]
-async fn a_members_change_stands_until_a_later_one_undoes_it(db: PgPool) {
+async fn a_members_change_stands_as_it_was_requested(db: PgPool) {
     let kit = Kit::new(db).await;
     let (workspace, inbox, sam) = kit.sams_inbox().await;
     let conversation = kit.conversation_of("en-1").await;
@@ -159,97 +175,97 @@ async fn a_members_change_stands_until_a_later_one_undoes_it(db: PgPool) {
 
     let read = kit.post(&sam, &format!("{base}/read"), None).await;
     assert_eq!(read.status, StatusCode::OK, "{:?}", read.json);
-    let read_items = last_items(&kit).await;
+    let (read_request, read_items) = last_request(&kit).await;
     assert!(!read_items.is_empty());
-    let all = vec![true; read_items.len()];
-    assert_eq!(
-        standing(&kit, workspace, inbox, &conversation, &read_items).await,
-        all
-    );
-    // Asked in another inbox, or for another conversation: nothing stands.
-    assert!(
-        standing(&kit, workspace, InboxId::new(), &conversation, &read_items)
-            .await
-            .iter()
-            .all(|s| !s)
-    );
+    assert!(every(
+        &standing(
+            &kit,
+            workspace,
+            &read_request,
+            inbox,
+            &conversation,
+            &read_items
+        )
+        .await
+    ));
+    // Under another request id, in another inbox, for another conversation
+    // or another workspace: nothing stands.
     let other = Uuid::now_v7().to_string();
-    assert!(
-        standing(&kit, workspace, inbox, &other, &read_items)
-            .await
-            .iter()
-            .all(|s| !s)
+    assert!(none(
+        &standing(&kit, workspace, &other, inbox, &conversation, &read_items).await
+    ));
+    assert!(none(
+        &standing(
+            &kit,
+            workspace,
+            &read_request,
+            InboxId::new(),
+            &conversation,
+            &read_items
+        )
+        .await
+    ));
+    assert!(none(
+        &standing(&kit, workspace, &read_request, inbox, &other, &read_items).await
+    ));
+    assert!(none(
+        &standing(
+            &kit,
+            WorkspaceId::new(),
+            &read_request,
+            inbox,
+            &conversation,
+            &read_items
+        )
+        .await
+    ));
+    // A change the request did not hold, smuggled in with it.
+    let smuggled = [
+        json!({"provider_message_id": read_items[0]["provider_message_id"], "change": {"kind": "archive"}}),
+        json!({"provider_message_id": "en-3", "change": {"kind": "mark_read"}}),
+    ];
+    assert_eq!(
+        standing(
+            &kit,
+            workspace,
+            &read_request,
+            inbox,
+            &conversation,
+            &smuggled
+        )
+        .await,
+        [false, false]
     );
 
-    // Unread again: that change stands, and "read" no longer does for it.
+    // Undone before the connector asks: both requests stand, as made (the
+    // connector merges them, the later winning).
     kit.post(&sam, &format!("{base}/unread"), None).await;
-    let unread_items = last_items(&kit).await;
-    assert_eq!(
-        standing(&kit, workspace, inbox, &conversation, &unread_items).await,
-        [true]
-    );
-    let read_again = json!({
-        "provider_message_id": unread_items[0]["provider_message_id"],
-        "change": {"kind": "mark_read"},
-    });
-    assert_eq!(
-        standing(&kit, workspace, inbox, &conversation, &[read_again]).await,
-        [false]
-    );
+    let (unread_request, unread_items) = last_request(&kit).await;
+    assert_ne!(unread_request, read_request);
+    assert!(every(
+        &standing(
+            &kit,
+            workspace,
+            &unread_request,
+            inbox,
+            &conversation,
+            &unread_items
+        )
+        .await
+    ));
+    assert!(every(
+        &standing(
+            &kit,
+            workspace,
+            &read_request,
+            inbox,
+            &conversation,
+            &read_items
+        )
+        .await
+    ));
 
-    // Star, archive, a move and a label, each as the conversation shows it.
-    for action in ["star", "archive"] {
-        kit.post(&sam, &format!("{base}/{action}"), None).await;
-        let items = last_items(&kit).await;
-        assert!(
-            standing(&kit, workspace, inbox, &conversation, &items)
-                .await
-                .iter()
-                .all(|s| *s),
-            "{action}"
-        );
-    }
-    let before = kit.events("conversations.changes_requested").await.len();
-    let current: String =
-        sqlx::query_scalar("SELECT stream FROM conversations.conversations WHERE id = $1::uuid")
-            .bind(&conversation)
-            .fetch_one(&kit.db)
-            .await
-            .unwrap();
-    let to = if current == "receipts" {
-        "updates"
-    } else {
-        "receipts"
-    };
-    let moved = kit
-        .post(&sam, &format!("{base}/stream"), Some(json!({"stream": to})))
-        .await;
-    assert_eq!(moved.status, StatusCode::OK, "{:?}", moved.json);
-    assert_eq!(
-        kit.events("conversations.changes_requested").await.len(),
-        before + 1
-    );
-    let items = last_items(&kit).await;
-    assert!(
-        standing(&kit, workspace, inbox, &conversation, &items)
-            .await
-            .iter()
-            .all(|s| *s)
-    );
-    let elsewhere: Vec<Value> = items
-        .iter()
-        .map(|item| {
-            let mut item = item.clone();
-            item["change"]["stream"] = "newsletters".into();
-            item
-        })
-        .collect();
-    assert!(
-        standing(&kit, workspace, inbox, &conversation, &elsewhere)
-            .await
-            .iter()
-            .all(|s| !s)
-    );
+    // A label, under the key it was requested with only.
     let label = kit
         .post(
             &sam,
@@ -258,14 +274,18 @@ async fn a_members_change_stands_until_a_later_one_undoes_it(db: PgPool) {
         )
         .await;
     assert_eq!(label.status, StatusCode::OK, "{:?}", label.json);
-    let items = last_items(&kit).await;
-    assert!(
-        standing(&kit, workspace, inbox, &conversation, &items)
-            .await
-            .iter()
-            .all(|s| *s)
-    );
-    // The same label under a key the provider never gave it does not.
+    let (label_request, items) = last_request(&kit).await;
+    assert!(every(
+        &standing(
+            &kit,
+            workspace,
+            &label_request,
+            inbox,
+            &conversation,
+            &items
+        )
+        .await
+    ));
     let rekeyed: Vec<Value> = items
         .iter()
         .map(|item| {
@@ -274,12 +294,17 @@ async fn a_members_change_stands_until_a_later_one_undoes_it(db: PgPool) {
             item
         })
         .collect();
-    assert!(
-        standing(&kit, workspace, inbox, &conversation, &rekeyed)
-            .await
-            .iter()
-            .all(|s| !s)
-    );
+    assert!(none(
+        &standing(
+            &kit,
+            workspace,
+            &label_request,
+            inbox,
+            &conversation,
+            &rekeyed
+        )
+        .await
+    ));
 }
 
 #[sqlx::test(migrations = "../../../migrations")]
@@ -287,16 +312,17 @@ async fn a_forged_change_stands_for_nothing(db: PgPool) {
     let kit = Kit::new(db).await;
     let (workspace, inbox, _) = kit.sams_inbox().await;
     let conversation = kit.conversation_of("en-1").await;
-    // en-1 is unread and in the inbox: neither "read" nor "archive" shows.
+    // No request was ever made here: whatever it names, nothing stands,
+    // even a change the conversation happens to show already.
     let items = [
-        json!({"provider_message_id": "en-1", "change": {"kind": "mark_read"}}),
         json!({"provider_message_id": "en-1", "change": {"kind": "archive"}}),
-        json!({"provider_message_id": "not-a-message", "change": {"kind": "mark_unread"}}),
+        json!({"provider_message_id": "en-2", "change": {"kind": "mark_read"}}),
         json!({"provider_message_id": "en-1", "change": {"kind": "send_everything"}}),
         json!("garbage"),
     ];
+    let request = Uuid::now_v7().to_string();
     assert_eq!(
-        standing(&kit, workspace, inbox, &conversation, &items).await,
-        [false, false, false, false, false]
+        standing(&kit, workspace, &request, inbox, &conversation, &items).await,
+        [false, false, false, false]
     );
 }

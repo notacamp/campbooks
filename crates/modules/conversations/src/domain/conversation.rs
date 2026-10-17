@@ -288,7 +288,10 @@ impl Changed {
 }
 
 /// Publish `changes_requested` for a member's change: `change` for each of
-/// `provider_message_ids`. Nothing is published when the list is empty.
+/// `provider_message_ids`, and record it under the event's id, which the
+/// connector asks about before making it (the outbound-requests port).
+/// Requests on the conversation older than seven days go. Nothing is
+/// published when the list is empty.
 pub async fn request(
     events: &EventBus,
     tx: &mut Transaction<'_, Postgres>,
@@ -298,7 +301,7 @@ pub async fn request(
     if changed.provider_message_ids.is_empty() {
         return Ok(());
     }
-    let items = changed
+    let items: Vec<RequestedItem> = changed
         .provider_message_ids
         .iter()
         .map(|id| RequestedItem {
@@ -306,7 +309,8 @@ pub async fn request(
             change: change.clone(),
         })
         .collect();
-    events
+    let recorded = serde_json::to_value(&items).map_err(Error::internal)?;
+    let id = events
         .publish(
             tx,
             &ChangesRequested {
@@ -318,5 +322,24 @@ pub async fn request(
             },
         )
         .await?;
+    sqlx::query!(
+        "DELETE FROM conversations.change_requests
+          WHERE conversation_id = $1 AND created_at < now() - interval '7 days'",
+        changed.conversation as ConversationId,
+    )
+    .execute(&mut **tx)
+    .await?;
+    sqlx::query!(
+        r#"INSERT INTO conversations.change_requests
+               (id, workspace_id, inbox_id, conversation_id, items)
+           VALUES ($1, $2::text::uuid, $3, $4, $5)"#,
+        id.as_uuid(),
+        changed.workspace,
+        changed.inbox as InboxId,
+        changed.conversation as ConversationId,
+        recorded,
+    )
+    .execute(&mut **tx)
+    .await?;
     Ok(())
 }

@@ -146,18 +146,21 @@ All notable changes to Campbooks Next are documented here. The format follows
 
 ### Security
 
-- **A mailbox sends and changes mail only when a member really asked (campbooks-cloud#226).**
+- **An event alone can't make a mailbox send or change mail (campbooks-cloud#226).**
   The connector no longer takes a send or change request event as proof. Before it records
   a send, and again before every call to Gmail or Zoho for it, it asks the conversations
   module whether the send still stands: the draft is being sent as that send, from that
   inbox, by an author who may still send it. It sends the message that module recorded
-  when the draft left its undo window, never one an event names. A change (read, star,
-  archive, a label, a stream) is made only when the conversation still shows it. A request
-  that doesn't stand does nothing and is logged, without content. One conversations
-  migration records the outgoing document with each send. A draft released by an older
-  image during the upgrade isn't sent: it shows as failed after an hour and can be sent
-  again. To go back to an earlier image, run the rollback SQL in the change's `design.md`
-  first.
+  when the draft left its undo window, never one an event names, and only from the
+  mailbox of the draft's own inbox. Each call to the provider is claimed first, so two
+  jobs for one send never both send it. A change (read, star, archive, a label, a stream)
+  is made only when the conversations module recorded that very request. A request that
+  doesn't stand does nothing and is logged, without content. Someone who can run SQL in a
+  workspace can still release a draft of their own; closing that is campbooks-cloud#227.
+  Two conversations migrations record the outgoing document with each send and every
+  change request. A send or change made by an older image during the upgrade isn't made
+  (a draft shows as failed after an hour and can be sent again). To go back to an earlier
+  image, run the rollback SQL in the change's `design.md` first.
 - **A workspace can't plant maintenance jobs, fake a disconnect or read account events
   (campbooks-cloud#211).** The worker now refuses, without running it, a job of a kind that
   only ever runs instance-wide (every schedule, such as pruning and the mailbox poller, and
