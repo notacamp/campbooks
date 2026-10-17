@@ -7,6 +7,7 @@
 - [x] 1.3 Containers listed once per stream (`Containers`, the head read before the list as `covers`), under the query permit with the page; listed again at every heartbeat
 - [x] 1.4 `access_changes`: whether a membership or container-access record type was numbered in the page's range (after what was already accounted for), seen or not; a container change lists again and reads the page anew, a membership change resolves membership before the page is shown
 - [x] 1.5 Stream and visibility-port docs
+- [x] 1.6 Each stream runs in a task of its own, sending frames over a channel of one; the body only receives and holds the stream slot; every read and heartbeat holds one query permit for all of its queries
 
 ## 2. Conversations
 

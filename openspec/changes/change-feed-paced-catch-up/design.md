@@ -108,6 +108,42 @@ announced inside a container they cannot see, waited for the next
 heartbeat. Membership changes are rare (joins, leaves, role changes,
 renames), so the re-check costs a few queries now and then.
 
+### 4. A task per stream; one permit for all of a read
+
+The reviews of this change found two more things in the same code:
+
+- **The permit did not bound the pool.** Only the page query held the
+  feed's query permit; listing containers, the second look at a page's
+  containers and the membership re-check ran outside it, so a wake-up of
+  N streams sent up to N of those to the pool before they queued. Now each
+  database step of a stream (a read, a heartbeat) takes one permit in
+  `Feed::next` and holds it for every query of that step, one connection at
+  a time. A process's streams therefore use at most `CONCURRENT_QUERIES`
+  (4) connections at once. A permit holder waiting for a connection waits
+  at most the pool's acquire timeout, then the stream ends `unavailable`;
+  permits are never nested and no connection is held while waiting for a
+  permit, so they cannot deadlock.
+- **Production was safe by an invariant nobody enforced.** The stream ran
+  inside the response body: a body polled no more while a read was pending
+  (a consumer that stops polling mid-read) kept that read's permit and
+  connection. hyper never does that, but a test did, and four such bodies
+  froze every other stream of the process (the flaky
+  `many_subscribers_each_receive_every_change_once`, fixed in the test by
+  #532). Now `open` spawns the stream in a task of its own that sends each
+  frame over a channel of one (`run`); the body only receives
+  (`Frames`). A body that is not polled leaves the task waiting to send,
+  holding nothing; a dropped body ends the task at once (the read in flight
+  is dropped, giving back its permit and connection), and gives the
+  caller's stream slot back as it drops. A catch-up for a client that went
+  away used to stop at the next write; it now stops at once.
+
+The channel holds one frame, so the next page's read may start while the
+last frame of the previous page waits in it: backpressure is now "the
+client has taken the previous page's frames, but for one".
+
+No timeout on the permit-held section beyond the pool's acquire timeout:
+with the task, a step only waits on the database.
+
 ## What is left (accepted)
 
 - **The live tail's read timing** (unchanged from #514). A caught-up
@@ -154,3 +190,7 @@ renames), so the re-check costs a few queries now and then.
   inbox is made for her (its first mail arrives at once). A removal the
   member cannot see ends her stream (`revoked`) well before the 25 s
   heartbeat. `create_inbox` publishes `inbox_changed` once, not on replay.
+- Every server test reads streams through the task, so a test that stops
+  reading a stream mid-read (`quiet_for`, `drain`) no longer pins a permit
+  or a connection; the existing tests (and the matrix) cover that the frames
+  are unchanged.

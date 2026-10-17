@@ -32,6 +32,10 @@
 //!   the open, so when a page leaves does not depend on how many hidden
 //!   changes its read went past. A stream that has caught up sends what a
 //!   wake-up brings at once.
+//! - **A stream runs in a task of its own** and hands its frames to the
+//!   response body over a channel of one, so a body that is not polled
+//!   holds no query permit or connection; every read and heartbeat holds one
+//!   of the process's query permits for all of its queries.
 //! - **Cursors are sealed resume tokens** (`T1`… above), never the
 //!   workspace's sequence. A token holds a [`Position`] sealed with the
 //!   instance's key ([`Signer::seal`](crate::crypto::Signer::seal),
@@ -71,7 +75,10 @@ use chrono::Utc;
 use futures_util::Stream;
 use serde_json::json;
 use sqlx::PgConnection;
-use tokio::{sync::watch, time::Instant};
+use tokio::{
+    sync::{mpsc, watch},
+    time::Instant,
+};
 
 use super::{Audience, ChangeOp, hub::StreamSlot};
 use crate::{
@@ -616,11 +623,55 @@ pub async fn open(
         out: VecDeque::from([first]),
         shown: HashSet::new(),
         done: false,
-        _slot: slot,
     };
-    Ok(futures_util::stream::unfold(feed, |mut feed| async move {
-        feed.next().await.map(|frame| (Ok(frame), feed))
-    }))
+    // The stream runs in a task of its own and hands its frames over one at
+    // a time: the response body only receives, so a body that stops being
+    // polled never holds a query permit or a database connection, and a
+    // client that goes away ends the task at once.
+    let (frames, received) = mpsc::channel(1);
+    // In the request's span, like the body it serves.
+    tokio::spawn(tracing::Instrument::in_current_span(run(feed, frames)));
+    Ok(Frames {
+        received,
+        _slot: slot,
+    })
+}
+
+/// The response body's side of a stream: the frames its task sends, and
+/// the caller's stream slot, given back as soon as the body is dropped.
+struct Frames {
+    received: mpsc::Receiver<Frame>,
+    _slot: StreamSlot,
+}
+
+impl Stream for Frames {
+    type Item = Result<Frame, Infallible>;
+
+    fn poll_next(
+        mut self: std::pin::Pin<&mut Self>,
+        cx: &mut std::task::Context<'_>,
+    ) -> std::task::Poll<Option<Self::Item>> {
+        self.received.poll_recv(cx).map(|frame| frame.map(Ok))
+    }
+}
+
+/// Drive `feed`, sending each frame once the previous one was taken, until
+/// it ends or the receiving body is dropped.
+async fn run(mut feed: Feed, frames: mpsc::Sender<Frame>) {
+    loop {
+        let next = tokio::select! {
+            next = feed.next() => next,
+            // Gone: dropping the read in flight gives its permit and its
+            // connection back.
+            () = frames.closed() => return,
+        };
+        let Some(frame) = next else {
+            return;
+        };
+        if frames.send(frame).await.is_err() {
+            return;
+        }
+    }
 }
 
 /// One open stream.
@@ -673,7 +724,6 @@ struct Feed {
     /// (`reset`, `access_changed`).
     shown: HashSet<RecordRef>,
     done: bool,
-    _slot: StreamSlot,
 }
 
 impl Feed {
@@ -696,14 +746,25 @@ impl Feed {
                 continue;
             }
             // Due even while busy: the cadence never depends on what was read.
+            // Every database step of a stream (a heartbeat, a read) holds one
+            // of the process's feed query permits throughout, so a wake-up
+            // of many streams takes at most that many connections.
             if now >= self.next_heartbeat {
-                if let Err(e) = self.heartbeat().await {
+                let beat = {
+                    let _permit = self.state.changes.query_permit().await;
+                    self.heartbeat().await
+                };
+                if let Err(e) = beat {
                     tracing::warn!(error = %e, "change feed: heartbeat failed; closing the stream");
                     self.end("closing", &json!({ "reason": "unavailable" }));
                 }
                 continue;
             }
-            match self.read_page().await {
+            let read = {
+                let _permit = self.state.changes.query_permit().await;
+                self.read_page().await
+            };
+            match read {
                 // More visible changes are waiting (after the frames queued).
                 Ok(true) => continue,
                 Ok(false) => {}
@@ -785,12 +846,10 @@ impl Feed {
     /// Read the next page of visible changes and queue them, returning what
     /// the read saw (`None` when the stream ended on the way).
     async fn read(&mut self) -> Result<Option<PageSeen>, Error> {
+        // Called under the stream's query permit (`next`): the listing, the
+        // page, membership and the second look at containers all run in it.
         loop {
-            // One permit for the listing (when due) and the page: the
-            // listing is one more query of the same read, never nested in
-            // another permit.
             let (page, end, changed) = {
-                let _permit = self.state.changes.query_permit().await;
                 let containers = match self.containers.take() {
                     Some(containers) => containers,
                     None => self.list_containers().await?,

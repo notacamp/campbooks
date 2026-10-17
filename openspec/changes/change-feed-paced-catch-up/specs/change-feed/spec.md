@@ -2,8 +2,14 @@
 
 ### Requirement: Backpressure and limits
 The stream SHALL read changes in bounded pages of changes the caller may
-see, reading the next page only once the previous one has been sent, and
-SHALL hold no database connection while waiting. While it is behind the
+see, reading the next page only once the client has taken the previous
+page's frames (but for one held ready), and SHALL hold no database
+connection while waiting. A client that stops reading SHALL hold no query
+permit and no database connection, and one that goes away SHALL end the
+stream's work at once. Every read and heartbeat of a stream SHALL hold one
+of a bounded number of permits per process for all of its queries, so the
+streams of a process together use at most that many connections at once.
+While it is behind the
 head (from the open until a read ends short of a full page, and again
 after any full page), it SHALL send at most one page per catch-up tick:
 each read made while behind SHALL release its frames at the first tick
@@ -20,6 +26,10 @@ day, checked at startup.
 #### Scenario: Many subscribers
 - **WHEN** many clients subscribe to the same workspace and one change is recorded
 - **THEN** every client receives it once
+
+#### Scenario: A client that stops reading
+- **WHEN** a client stops reading its stream while changes keep arriving
+- **THEN** the other streams of the process keep reading and delivering
 
 #### Scenario: Reconnecting in a loop
 - **WHEN** a caller opens more streams than the configured number within the window

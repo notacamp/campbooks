@@ -1211,6 +1211,49 @@ async fn many_subscribers_each_receive_every_change_once(db: PgPool) {
 }
 
 #[sqlx::test(migrations = "../../migrations")]
+async fn streams_left_unread_mid_read_hold_nothing_back(db: PgPool) {
+    // A fast poll keeps every stream reading, so leaving one is likely to
+    // leave it mid-read; the process has four query permits.
+    let world = World::with(db, |c| {
+        c.max_streams_per_principal = 16;
+        c.opens_per_window = 0;
+        c.poll_interval_ms = 20;
+    })
+    .await;
+    let ana = world.user("ana");
+    let ws = world.create_workspace(&ana, "Shop").await;
+    world.server.sequence().await;
+    let mut left = Vec::new();
+    for _ in 0..8 {
+        let mut feed = world.server.subscribe(Some(&ana), &ws, None).await.unwrap();
+        assert!(feed.next_event().await.is("ready"));
+        left.push(feed);
+    }
+    // Each is read for a moment, then left, again and again while the feed
+    // is busy.
+    for n in 0..10 {
+        world.rename(&ana, &ws, &format!("Shop {n}")).await;
+        world.server.sequence().await;
+        for feed in &mut left {
+            feed.drain(Duration::from_millis(1)).await;
+        }
+    }
+    // Their bodies hold no permit and no connection: a stream opened now
+    // still reads.
+    let mut reader = world.server.subscribe(Some(&ana), &ws, None).await.unwrap();
+    assert!(reader.next_event().await.is("ready"));
+    world.rename(&ana, &ws, "Last").await;
+    world.server.sequence().await;
+    assert_eq!(
+        record_of(&reader.next_event().await).0,
+        "workspaces.workspace"
+    );
+    drop(left);
+    drop(reader);
+    world.server.state.db.close().await;
+}
+
+#[sqlx::test(migrations = "../../migrations")]
 async fn a_caller_holds_a_limited_number_of_streams(db: PgPool) {
     let world = World::with(db, |c| c.max_streams_per_principal = 2).await;
     let ana = world.user("ana");

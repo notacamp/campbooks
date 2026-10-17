@@ -44,6 +44,13 @@ new module, no new cross-module dependency, no migration.
   numbered in a page's range, seen or not, makes the stream resolve
   membership before showing that page. A removed member's stream ends at
   once, even when the removal is not one they may see.
+- **A stream runs in a task of its own, one permit per read.** The body
+  only receives frames over a channel of one, so a client that stops
+  reading holds no permit or connection, and one that goes away ends the
+  stream's work at once. Every read and heartbeat holds one of the
+  process's four feed permits for all of its queries (listing, page,
+  membership, the second look at containers), so a wake-up of many streams
+  takes at most four connections.
 - **A new inbox is announced.** When a `messages` grant adds the member to
   an inbox, `conversations.create_inbox` publishes
   `conversations.inbox_changed` (within the inbox). Open streams of that
