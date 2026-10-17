@@ -353,9 +353,9 @@ impl Feed {
         while let Ok(Some(_)) = tokio::time::timeout(window, self.read()).await {}
     }
 
-    /// Nothing but heartbeats arrives within `window`. The stream is left
-    /// mid-read when the window ends, so it may hold a feed query permit and
-    /// a connection until it is read again or dropped.
+    /// Nothing but heartbeats arrives within `window`. The body is left
+    /// unread when the window ends; the stream's task then waits to send,
+    /// holding nothing.
     async fn quiet_for(&mut self, window: Duration) {
         let deadline = tokio::time::Instant::now() + window;
         loop {
@@ -1172,15 +1172,9 @@ async fn a_client_whose_member_left_loses_its_feed(db: PgPool) {
 
 #[sqlx::test(migrations = "../../migrations")]
 async fn many_subscribers_each_receive_every_change_once(db: PgPool) {
-    // No poll: each stream's frame comes from its first read (the rename is
-    // numbered before any of them reads) or the notification's wake-up.
-    // Forty streams polling every 200 ms kept the test's five connections
-    // and single thread busy with empty reads, so on a loaded runner a
-    // stream's first read could wait past the deadline.
     let world = World::with(db, |c| {
         c.max_streams_per_principal = 64;
         c.opens_per_window = 0;
-        c.poll_interval_ms = 60_000;
     })
     .await;
     let ana = world.user("ana");
@@ -1195,12 +1189,9 @@ async fn many_subscribers_each_receive_every_change_once(db: PgPool) {
     world.rename(&ana, &ws, "Shop two").await;
     world.server.sequence().await;
     // Every stream's frame first, then the quiet window for all at once.
-    // A stream whose quiet window ended is left mid-read (the test stops
-    // polling its body) and may keep holding one of the process's four feed
-    // query permits, or a connection of the pool of five, until it is
-    // dropped. Once four had, a stream still waiting for its first frame
-    // could never read (seen on a loaded runner). After handing out a frame
-    // a stream holds nothing until it is polled again.
+    // (Streams read in tasks of their own, so a body left unread holds no
+    // query permit or connection; when the stream ran inside the body, one
+    // left mid-read did, and four froze the rest: #532.)
     let received = futures_util::future::join_all(feeds.iter_mut().map(Feed::next_event)).await;
     futures_util::future::join_all(
         feeds

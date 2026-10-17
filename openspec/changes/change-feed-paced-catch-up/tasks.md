@@ -16,4 +16,4 @@
 ## 3. Server
 
 - [x] 3.1 Tests: the list kept across wake-ups and listed again when a member is taken out of an inbox (no id of its new mail) and when an inbox is made for them (its mail arrives at once); a removal the caller cannot see ends the stream before the heartbeat; catch-up pages on the tick in the busy and the quiet workspace
-- [x] 3.2 `many_subscribers_each_receive_every_change_once` no longer depends on the poll: forty streams polling every 200 ms over five connections on one thread could hold a stream's first read past the deadline (seen on `next`); the poll is off in that test and each frame comes from the first read
+- [x] 3.2 `streams_left_unread_mid_read_hold_nothing_back`: eight streams read briefly and left again and again on a fast poll; a new stream still reads at once (the flaky many-subscribers test was fixed in the test by #532; this makes it safe by construction)
