@@ -33,8 +33,10 @@ pub trait Visibility: std::fmt::Debug + Send + Sync + 'static {
     /// change stream keeps the containers it listed until one of these is
     /// numbered (whether or not its caller may see it) or its next
     /// heartbeat, so every way of gaining or losing sight inside a
-    /// container must be announced by such a change, or wait for a
-    /// heartbeat.
+    /// container must be announced by such a change. A gain that is not
+    /// has its changes until the next heartbeat skipped: that heartbeat
+    /// finds the container and sends `reset` (`access_changed`) so the
+    /// client refetches.
     fn access_records(&self) -> &'static [&'static str] {
         &[]
     }

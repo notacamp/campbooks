@@ -153,8 +153,10 @@ streams of a process together use at most that many connections at once.
 While it is behind the
 head (from the open until a read ends short of a full page, and again
 after any full page), it SHALL send at most one page per catch-up tick:
-each read made while behind SHALL release its frames at the first tick
-after the read ends, ticks counted from the open. The tick SHALL be
+each read made while behind SHALL release its frames one tick after the
+read began (when the client had taken the previous page's frames, before
+the read waits for anything), or after the fewest whole ticks that reach
+its end when it takes longer. The tick SHALL be
 configured (`CAMPBOOKS_CHANGES__CATCH_UP_TICK_MS`, 50 ms by default)
 between 50 ms and one second, checked at startup. A stream that has caught
 up SHALL send the changes a wake-up brings as soon as it reads them. The
@@ -182,7 +184,7 @@ day, checked at startup.
 
 #### Scenario: Catching up, one page a tick
 - **WHEN** a client resumes with several pages of changes it may see waiting, and each page's read takes less than a tick
-- **THEN** it receives the catch-up's first page one tick after the open, the second two ticks after, and each next page one tick later
+- **THEN** it receives the catch-up's first page one tick after the open, and each next page one tick after it took the previous one, whenever in a tick it took it
 
 #### Scenario: A catch-up tick out of range
 - **WHEN** `CAMPBOOKS_CHANGES__CATCH_UP_TICK_MS` is 49 or 1 001
@@ -232,8 +234,11 @@ numbered up to that page: it SHALL keep the list it made and list them
 again before showing a page whose range holds such a change (a change of a
 record type the container-visibility port names as changing access,
 whether or not the caller may see it), and at least once a heartbeat
-interval. It SHALL resolve the caller's membership before showing a page
-whose range holds a change that may change who belongs to the workspace,
+interval. When the list made at a heartbeat holds a container the previous
+list lacked (a gain no change announced), it SHALL send `reset` with
+reason `access_changed`. It SHALL resolve the caller's membership before
+showing a page when a change that may change who belongs to the workspace
+was numbered after what it last looked at, up to the head the read saw,
 whether or not the caller may see that change. When a container whose
 changes it has shown is no longer visible, it SHALL send `reset` with
 reason `access_changed` (the client drops what it cached and refetches)
@@ -257,6 +262,14 @@ shown.
 #### Scenario: Given an inbox
 - **WHEN** an inbox is made for a member who follows the feed and mail arrives in it
 - **THEN** they receive the new mail's changes before their next heartbeat
+
+#### Scenario: Given an inbox nothing announced
+- **WHEN** an inbox is made for a member who follows the feed without a change announcing it, and mail arrives in it
+- **THEN** at their next heartbeat they receive `reset` (`access_changed`), and the inbox's later mail reaches them
+
+#### Scenario: Removed after more than a page
+- **WHEN** more than a page of changes a member may see and then their removal are numbered together
+- **THEN** the stream sends `revoked` and ends without showing any of those changes
 
 #### Scenario: Woken by changes that do not touch access
 - **WHEN** a stream is woken again and again by mail and renames
@@ -282,7 +295,7 @@ recorded (in an inbox they are not in, private to another person, or
 written for client tokens only). The stream SHALL read in pages of changes
 the caller may see, filtered before the page is cut, so how its frames
 group never depends on such changes, and while it catches up each page
-SHALL leave on a tick counted from the open, so when it leaves does not
+SHALL leave one tick after its read began, so when it leaves does not
 depend on them either as long as its read takes less than a tick. Resume
 tokens SHALL be opaque: sealed by the server so a client can neither read
 nor alter one, of one length, new on every frame, and bound to the
@@ -301,7 +314,7 @@ or the same `reset`) whether or not such changes were recorded.
 
 #### Scenario: Catching up past many hidden changes
 - **WHEN** a member resumes after more changes they may not see than a page holds, interleaved with changes they may see
-- **THEN** they receive the same frames, in the same pages, each page on the same tick, all before the next heartbeat, as in a workspace without the hidden changes
+- **THEN** they receive the same frames, in the same pages, each page as long after they took the previous one, all before the next heartbeat, as in a workspace without the hidden changes
 
 #### Scenario: Probing with made-up cursors
 - **WHEN** a client resumes with a number, a token of another workspace or caller, or an altered token

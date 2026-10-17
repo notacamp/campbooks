@@ -26,10 +26,12 @@ new module, no new cross-module dependency, no migration.
 
 - **Catch-up pages leave on a fixed tick.** From the open, and after any
   full page, a stream is behind the head. Each read made while behind
-  releases its frames at the first tick after the read ends, ticks counted
-  from the open (`CAMPBOOKS_CHANGES__CATCH_UP_TICK_MS`, 50 ms by default,
-  50 to 1000, checked at startup). So a page whose read fits in a tick
-  leaves exactly on the tick, however many hidden changes it went past. A
+  releases its frames one tick after the read began, before it waited for
+  anything (`CAMPBOOKS_CHANGES__CATCH_UP_TICK_MS`, 50 ms by default, 50 to
+  1000, checked at startup), or a whole number of ticks when it takes
+  longer. So a page whose read fits in a tick leaves exactly a tick after
+  the client took the previous one, however many hidden changes it went
+  past. A
   stream that caught up sends what a wake-up brings at once, as before.
 - **The containers are listed once and kept per stream.** The list is kept
   until a change that may change who sees inside a container (the

@@ -1693,6 +1693,106 @@ async fn a_removal_the_caller_cannot_see_still_ends_the_stream_at_once(db: PgPoo
 }
 
 #[sqlx::test(migrations = "../../migrations")]
+async fn an_inbox_gained_unannounced_makes_the_stream_resync_at_its_heartbeat(db: PgPool) {
+    use campbooks_conversations::{dev, model::InboxRole};
+
+    let world = World::with(db, |c| c.heartbeat_seconds = 1).await;
+    let ana = world.user("ana");
+    let ws = world.create_workspace(&ana, "Shop").await;
+    let (_, bea_id) = world.add_member(&ws, "bea", "member").await;
+    world.server.sequence().await;
+    let mut feed = world
+        .server
+        .subscribe(Some(&world.token("bea", READ_ALL)), &ws, None)
+        .await
+        .unwrap();
+    assert!(feed.next_event().await.is("ready"));
+
+    // An inbox made for her with no change announcing it (only a bug would
+    // do that): its first mail is read past under her old list.
+    let own = dev::create_inbox(
+        &world.server.state,
+        ws.parse().unwrap(),
+        "bea@example.com",
+        &[(bea_id, InboxRole::Manager)],
+    )
+    .await
+    .unwrap();
+    world.ingest(&ws, own, EN).await;
+    // The next heartbeat finds it and tells the client to refetch.
+    let reset = tokio::time::timeout(Duration::from_secs(5), feed.next_event())
+        .await
+        .unwrap_or_else(|_| panic!("no reset: {}", feed.raw));
+    assert!(reset.is("reset"), "{reset:?}");
+    assert_eq!(reset.json()["reason"], "access_changed");
+    // From then on its mail reaches her.
+    world.ingest(&ws, own, FR).await;
+    let arrived = message_ids(&world.db, own, "fr-").await;
+    assert!(!arrived.is_empty());
+    tokio::time::timeout(Duration::from_secs(5), async {
+        while !arrived.iter().all(|id| feed.raw.contains(id)) {
+            feed.next_event().await;
+        }
+    })
+    .await
+    .unwrap_or_else(|_| panic!("the inbox's mail did not arrive: {}", feed.raw));
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn a_removal_numbered_after_a_full_page_stops_that_page(db: PgPool) {
+    let world = World::with(db, |c| c.heartbeat_seconds = 600).await;
+    let busy = world.space("Busy").await;
+    let mut feed = world
+        .server
+        .subscribe(
+            Some(&world.observer_token(Observer::Member, &busy.ws)),
+            &busy.ws,
+            None,
+        )
+        .await
+        .unwrap();
+    assert!(feed.next_event().await.is("ready"));
+    // More than a page she may see, then her removal, numbered together.
+    let mut tx = world.db.begin().await.unwrap();
+    campbooks_kernel::db::set_workspace(&mut tx, &busy.ws)
+        .await
+        .unwrap();
+    world
+        .server
+        .state
+        .events
+        .publish(
+            &mut tx,
+            &Filed {
+                workspace: busy.ws.clone(),
+                into: (0..450)
+                    .map(|n| (busy.shared.to_string(), format!("c-{n}")))
+                    .collect(),
+            },
+        )
+        .await
+        .unwrap();
+    tx.commit().await.unwrap();
+    let (status, _) = world
+        .server
+        .call(
+            Some(&world.user("ana")),
+            "DELETE",
+            &format!("/api/v1/w/{}/members/{}", busy.ws, busy.bea),
+            None,
+        )
+        .await;
+    assert_eq!(status, StatusCode::NO_CONTENT);
+    world.server.sequence().await;
+
+    // The removal is past the first page's end, yet no page is shown.
+    let revoked = feed.next_event().await;
+    assert!(revoked.is("revoked"), "{revoked:?}");
+    assert!(feed.next().await.is_none(), "the stream ends");
+    assert!(!feed.raw.contains("event: change"), "{}", feed.raw);
+}
+
+#[sqlx::test(migrations = "../../migrations")]
 async fn drafts_and_connections_reach_only_who_may_see_them(db: PgPool) {
     use campbooks_connectors::{ConnectionId, Provider, events::ConnectionAdded};
     use campbooks_conversations::{
@@ -2315,7 +2415,7 @@ async fn catching_up_past_more_hidden_changes_than_a_page_looks_the_same(db: PgP
             "ready, the changes, a heartbeat"
         );
         assert_tokens_fresh_and_beats_on_time(frames, "catch-up");
-        // One page per tick, each on its tick from the open, in the busy
+        // One page per tick, each a tick after its read began, in the busy
         // workspace as in the quiet one.
         let left: Vec<Duration> = frames
             .iter()

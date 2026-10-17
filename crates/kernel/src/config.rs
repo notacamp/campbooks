@@ -843,9 +843,9 @@ pub struct ChangesConfig {
     pub opens_window_seconds: u64,
     /// The catch-up tick, in milliseconds
     /// (`CAMPBOOKS_CHANGES__CATCH_UP_TICK_MS`, 50 to 1000): a stream behind
-    /// the head sends one page per tick, each on a tick counted from the
-    /// open, so when a page leaves does not depend on how many changes the
-    /// caller may not see it read past. A stream that caught up sends a new
+    /// the head sends one page per tick, each a tick after its read began,
+    /// so when a page leaves does not depend on how many changes the caller
+    /// may not see it read past. A stream that caught up sends a new
     /// change at once.
     pub catch_up_tick_ms: u64,
 }
