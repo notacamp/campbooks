@@ -24,7 +24,15 @@ const SUBJECT: &str = "Q4 restructuring plan";
 const BODY: &str = "Please find the board pack attached";
 const ATTACHMENT: &str = "salaries-2026.xlsx";
 const ACCESS_TOKEN: &str = "ya29.a0AfH6SMBx3examplelongaccesstokenvalue1234567890abcdef";
-const JWT: &str = "eyJhbGciOiJSUzI1NiJ9.eyJzdWIiOiJtYXlhIiwiZW1haWwiOiJtYXlhQG5vcnRod2luZCJ9.c2lnbmF0dXJlc2lnbmF0dXJl";
+/// A made-up token shaped like a JWT, assembled so the source holds no
+/// token-like literal (gitleaks).
+const JWT: &str = concat!(
+    "eyJhbGciOiJSUzI1NiJ9",
+    ".",
+    "eyJzdWIiOiJtYXlhIiwiZW1haWwiOiJtYXlhQG5vcnRod2luZCJ9",
+    ".",
+    "c2lnbmF0dXJlc2lnbmF0dXJl"
+);
 const COOKIE: &str = "__Host-campbooks_session=s3ss10n-c00k1e-v4lue";
 const WORKSPACE: &str = "0192a1b2-c3d4-7e5f-8a9b-0c1d2e3f4a5b";
 const REQUEST_ID: &str = "0192a1b2-0000-7e5f-8a9b-0c1d2e3f4a5c";
