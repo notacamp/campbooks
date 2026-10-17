@@ -5,6 +5,7 @@
 use std::{
     cell::{Cell, RefCell},
     sync::LazyLock,
+    time::{Duration, Instant},
 };
 
 use html5ever::{
@@ -54,16 +55,34 @@ pub fn from_html(html: &str) -> String {
     text_of(html, Quotes::Drop)
 }
 
+/// The most time reading the text of one body may take. Search wants the
+/// words: HTML whose tokenizing takes longer than this (only crafted HTML,
+/// such as a single tag with tens of thousands of attributes) gives the
+/// words read so far.
+pub const MAX_TEXT_TIME: Duration = Duration::from_millis(500);
+/// Bytes of HTML fed to the tokenizer between two reads of the clock.
+const CHUNK: usize = 1024;
+
 /// The text of an HTML body, read with html5ever's tokenizer alone (no
 /// tree, so time linear in the input however the tags nest): no tags, no
 /// scripts, styles, head or title, entities decoded, a line break at each
 /// `br` and at the end of each block, and no `<blockquote>`s when `quotes`
 /// is [`Quotes::Drop`].
 pub fn text_of(html: &str, quotes: Quotes) -> String {
+    let deadline = Instant::now() + MAX_TEXT_TIME;
     let tokenizer = Tokenizer::new(Reader::new(quotes), TokenizerOpts::default());
     let queue = BufferQueue::default();
-    queue.push_back(StrTendril::from_slice(html));
-    let _ = tokenizer.feed(&queue);
+    let mut rest = html;
+    while !rest.is_empty() && Instant::now() <= deadline {
+        let mut end = rest.len().min(CHUNK);
+        while !rest.is_char_boundary(end) {
+            end -= 1;
+        }
+        let (chunk, tail) = rest.split_at(end);
+        queue.push_back(StrTendril::from_slice(chunk));
+        let _ = tokenizer.feed(&queue);
+        rest = tail;
+    }
     tokenizer.end();
     tokenizer.sink.text.take()
 }
@@ -257,5 +276,12 @@ mod tests {
         assert!(text_of(html, Quotes::Keep).contains("Old"));
         assert!(!from_html(html).contains("Old"));
         assert!(from_html(html).contains("New"));
+    }
+
+    #[test]
+    fn a_tag_with_countless_attributes_returns() {
+        let many = (0..60_000).map(|i| format!("a{i} ")).collect::<String>();
+        let text = text_of(&format!("<p>x</p><p {many}>y</p>"), Quotes::Keep);
+        assert!(text.contains('x'), "{text}");
     }
 }

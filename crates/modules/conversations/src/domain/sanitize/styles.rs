@@ -49,6 +49,7 @@ use std::{
     cell::{Cell, Ref, RefCell},
     rc::Rc,
     sync::Arc,
+    time::{Duration, Instant},
 };
 
 use super::css;
@@ -82,8 +83,19 @@ pub const MAX_APPLYING: usize = 500_000_000;
 pub const MAX_PARSE_WORK: usize = 10_000_000;
 /// Deepest tree the measure allows.
 pub const MAX_PARSE_DEPTH: usize = 4_096;
-/// Bytes of HTML fed to the measure between two reads of its work count.
-const CHUNK: usize = 8 * 1024;
+/// The most time measuring may take, for both parses together: about three
+/// times what the densest ordinary 2 MiB mail needs on the production CPU.
+/// It covers work the tree builder and the tokenizer do without calling the
+/// sink (the active formatting list's duplicate check, a start tag's
+/// attributes), which the work count cannot see.
+pub const MAX_PARSE_TIME: Duration = Duration::from_millis(500);
+/// Bytes of HTML fed to the measure between two reads of its work count and
+/// the clock: small, so what one huge tag costs between two checks stays
+/// small.
+const CHUNK: usize = 1024;
+
+/// What a measuring parse unwinds with when it is over time.
+struct OverBudget;
 
 /// The HTML with its style sheets inlined, and what inlining left over.
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
@@ -253,7 +265,13 @@ pub struct Shape {
 /// reads it all). So both are measured, and both must stay within the
 /// budget; the shape is the document's, which is what the inliner sees.
 pub fn measure(html: &str) -> Option<Shape> {
-    let fragment = measure_with(html, |sink| {
+    measure_within(html, MAX_PARSE_TIME)
+}
+
+/// [`measure`] with its own time allowance (tests on slow machines).
+fn measure_within(html: &str, allowance: Duration) -> Option<Shape> {
+    let deadline = Instant::now() + allowance;
+    let fragment = measure_with(html, deadline, |sink| {
         parse_fragment(
             sink,
             ParseOpts::default(),
@@ -262,35 +280,50 @@ pub fn measure(html: &str) -> Option<Shape> {
             false,
         )
     })?;
-    let document = measure_with(html, |sink| parse_document(sink, ParseOpts::default()))?;
+    let document = measure_with(html, deadline, |sink| {
+        parse_document(sink, ParseOpts::default())
+    })?;
     Some(Shape {
         work: document.work.max(fragment.work),
         ..document
     })
 }
 
-/// One measured parse of `html` by the parser `start` makes. The HTML is
-/// fed in chunks of at most 8 KiB and the count is checked after each,
-/// because a running parse cannot be stopped from outside: a message built
-/// to be slow costs about one chunk past the budget instead of minutes.
-fn measure_with(html: &str, start: impl FnOnce(Measure) -> Parser<Measure>) -> Option<Shape> {
+/// One measured parse of `html` by the parser `start` makes, within
+/// `deadline`. The HTML is fed in chunks of at most 1 KiB and the count and
+/// the clock are checked after each, because a running parse cannot be
+/// stopped from outside: a message built to be slow costs about one chunk
+/// past the budget instead of minutes. Inside a chunk the sink checks the
+/// clock too, and unwinds when it is over: that is the only way out of a
+/// parse that is running, and the parser is dropped with the closure.
+fn measure_with(
+    html: &str,
+    deadline: Instant,
+    start: impl FnOnce(Measure) -> Parser<Measure>,
+) -> Option<Shape> {
     let work = Rc::new(Cell::new(0));
-    let mut parser = start(Measure::new(Rc::clone(&work)));
-    let mut rest = html;
-    while !rest.is_empty() {
-        let mut end = rest.len().min(CHUNK);
-        while !rest.is_char_boundary(end) {
-            end -= 1;
+    let measured = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        let mut parser = start(Measure::new(Rc::clone(&work), deadline));
+        let mut rest = html;
+        while !rest.is_empty() {
+            let mut end = rest.len().min(CHUNK);
+            while !rest.is_char_boundary(end) {
+                end -= 1;
+            }
+            let (chunk, tail) = rest.split_at(end);
+            parser.process(StrTendril::from_slice(chunk));
+            if work.get() > MAX_PARSE_WORK || Instant::now() > deadline {
+                return None;
+            }
+            rest = tail;
         }
-        let (chunk, tail) = rest.split_at(end);
-        parser.process(StrTendril::from_slice(chunk));
-        if work.get() > MAX_PARSE_WORK {
-            return None;
-        }
-        rest = tail;
+        Some(parser.finish())
+    }));
+    match measured {
+        Ok(shape) => shape.filter(|s| s.work <= MAX_PARSE_WORK && s.deepest <= MAX_PARSE_DEPTH),
+        Err(payload) if payload.is::<OverBudget>() => None,
+        Err(payload) => std::panic::resume_unwind(payload),
     }
-    let shape = parser.finish();
-    (shape.work <= MAX_PARSE_WORK && shape.deepest <= MAX_PARSE_DEPTH).then_some(shape)
 }
 
 /// A node of the measured tree: its name (empty unless it is an element)
@@ -304,6 +337,8 @@ struct Node {
     last: Option<usize>,
     /// How many children it has, kept exact.
     children: usize,
+    /// How many attributes it has.
+    attrs: usize,
 }
 
 /// A tree sink that keeps only the tree's links (node 0 is the document).
@@ -313,6 +348,9 @@ struct Measure {
     /// Work counted so far, shared with [`measure`], which reads it between
     /// chunks while the parser owns the sink.
     work: Rc<Cell<usize>>,
+    /// When measuring must stop, checked every 1,024 sink calls.
+    deadline: Instant,
+    calls: Cell<u32>,
 }
 
 /// The name of a node that is not an element.
@@ -330,21 +368,31 @@ impl Node {
             first: None,
             last: None,
             children: 0,
+            attrs: 0,
         }
     }
 }
 
 impl Measure {
-    fn new(work: Rc<Cell<usize>>) -> Self {
+    fn new(work: Rc<Cell<usize>>, deadline: Instant) -> Self {
         Self {
             nodes: RefCell::new(vec![Node::new(unnamed())]),
             elements: RefCell::new(0),
             work,
+            deadline,
+            calls: Cell::new(0),
         }
     }
 
+    /// Count `units` of work. Every sink method calls this first, before it
+    /// borrows anything, so the unwind below leaves no borrow behind.
     fn charge(&self, units: usize) {
         self.work.set(self.work.get().saturating_add(units));
+        let calls = self.calls.get().wrapping_add(1);
+        self.calls.set(calls);
+        if calls % 1024 == 0 && Instant::now() > self.deadline {
+            std::panic::resume_unwind(Box::new(OverBudget));
+        }
     }
 
     /// The children of the parent of `node` (none for a root).
@@ -467,15 +515,13 @@ impl TreeSink for Measure {
         Ref::map(self.nodes.borrow(), |nodes| &nodes[*target].name)
     }
 
-    fn create_element(
-        &self,
-        name: QualName,
-        _attrs: Vec<Attribute>,
-        _flags: ElementFlags,
-    ) -> usize {
+    fn create_element(&self, name: QualName, attrs: Vec<Attribute>, _flags: ElementFlags) -> usize {
         self.charge(1);
+        self.charge(attrs.len());
         *self.elements.borrow_mut() += 1;
-        self.push(name)
+        let node = self.push(name);
+        self.nodes.borrow_mut()[node].attrs = attrs.len();
+        node
     }
 
     fn create_comment(&self, _text: StrTendril) -> usize {
@@ -541,8 +587,13 @@ impl TreeSink for Measure {
         }
     }
 
-    fn add_attrs_if_missing(&self, _target: &usize, _attrs: Vec<Attribute>) {
+    // RcDom rebuilds a set of the element's existing attribute names on
+    // every call, so a repeated `<html a1>` costs the attributes so far.
+    fn add_attrs_if_missing(&self, target: &usize, attrs: Vec<Attribute>) {
         self.charge(1);
+        let existing = self.nodes.borrow()[*target].attrs;
+        self.charge(existing.saturating_add(attrs.len()));
+        self.nodes.borrow_mut()[*target].attrs = existing.saturating_add(attrs.len());
     }
 
     fn remove_from_parent(&self, target: &usize) {
@@ -553,7 +604,8 @@ impl TreeSink for Measure {
 
     fn reparent_children(&self, node: &usize, new_parent: &usize) {
         self.charge(1);
-        self.charge(self.nodes.borrow()[*node].children);
+        let moved = self.nodes.borrow()[*node].children;
+        self.charge(moved);
         let mut nodes = self.nodes.borrow_mut();
         while let Some(child) = nodes[*node].first {
             Self::append_node(&mut nodes, *new_parent, child);
@@ -569,7 +621,13 @@ mod tests {
 
     /// `super::inline` on the HTML's own measured shape.
     fn inline(html: &str) -> Inlined {
-        super::inline(html, &measure(html).expect("within the parse budget"))
+        super::inline(html, &accepted(html).expect("within the parse budget"))
+    }
+
+    /// `measure` with minutes of time, for slow test machines: the work
+    /// budget and depth cap still apply.
+    fn accepted(html: &str) -> Option<Shape> {
+        measure_within(html, Duration::from_secs(60))
     }
 
     const FIXTURES: [&str; 7] = [
@@ -692,17 +750,17 @@ mod tests {
             "<style>p {{ color: red }}</style>{}<p>x</p>",
             "<div></span>".repeat(MAX_NESTING + 10)
         );
-        assert!(measure(&stray).expect("cheap").deepest > MAX_NESTING);
+        assert!(accepted(&stray).expect("cheap").deepest > MAX_NESTING);
         assert_eq!(inline(&stray).html, stray);
         // Foreign content: in `<svg>`, `<xmp>` is an element, not raw text.
         let foreign = format!(
             "<style>p {{ color: red }}</style><svg><xmp>{}</svg><p>x</p>",
             "<g>".repeat(MAX_NESTING + 10)
         );
-        assert!(measure(&foreign).expect("cheap").deepest > MAX_NESTING);
+        assert!(accepted(&foreign).expect("cheap").deepest > MAX_NESTING);
         assert_eq!(inline(&foreign).html, foreign);
         // A plain document: html, body, p.
-        let plain = measure("<p>x</p>").expect("cheap");
+        let plain = accepted("<p>x</p>").expect("cheap");
         assert_eq!((plain.elements, plain.deepest), (4, 3));
     }
 
@@ -801,13 +859,13 @@ mod tests {
         // fragment parse reads it all, so the fragment is measured too.
         assert!(measure(&format!("<frameset>{}", "<div></span>".repeat(200_000))).is_none());
         assert!(measure(&format!("<frameset>{}", "<div>".repeat(200_000))).is_none());
-        assert!(measure("<frameset><p>x</p>").is_some());
+        assert!(accepted("<frameset><p>x</p>").is_some());
     }
 
     #[test]
     fn ordinary_mail_is_far_under_the_budget() {
         for html in FIXTURES {
-            let shape = measure(html).expect("within the budget");
+            let shape = accepted(html).expect("within the budget");
             assert!(shape.work < MAX_PARSE_WORK / 10, "{}", shape.work);
         }
     }
@@ -818,13 +876,36 @@ mod tests {
         let html = block.repeat(3_000);
         assert!(html.len() > 700 * 1024);
         let html = format!("{html}{html}");
-        let shape = measure(&html).expect("within the budget");
+        let shape = accepted(&html).expect("within the budget");
         assert!(shape.work < MAX_PARSE_WORK / 4, "{}", shape.work);
     }
 
     #[test]
     fn depth_past_the_cap_is_refused() {
         assert!(measure(&"<font color=red>x".repeat(5_000)).is_none());
-        assert!(measure(&"<font color=red>x".repeat(3_000)).is_some());
+        assert!(accepted(&"<font color=red>x".repeat(3_000)).is_some());
+    }
+
+    #[test]
+    fn work_the_sink_cannot_see_is_refused() {
+        // Attributes added to the same element again and again.
+        let repeated = (0..20_000)
+            .map(|i| format!("<html a{i}>"))
+            .collect::<String>();
+        assert!(measure(&repeated).is_none());
+        // The active formatting list's duplicate check.
+        let formatting = (0..20_000)
+            .map(|i| format!("<b id={i}>"))
+            .collect::<String>();
+        assert!(measure(&formatting).is_none());
+        // Many open elements, then end tags that scan them.
+        let strays = "<span>".repeat(100_000) + &"</x>".repeat(2_048);
+        assert!(measure(&strays).is_none());
+        // One start tag with 60,000 attributes.
+        let many = (0..60_000).map(|i| format!("a{i} ")).collect::<String>();
+        assert!(measure(&format!("<p {many}>x</p>")).is_none());
+        // Deep spans, then templates left open.
+        let templates = "<span>".repeat(20_000) + &"<template>".repeat(10_000);
+        assert!(measure(&templates).is_none());
     }
 }
