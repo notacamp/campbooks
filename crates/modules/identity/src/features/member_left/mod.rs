@@ -46,7 +46,7 @@ impl EventConsumer for RevokeDepartedConsents {
         let member = state
             .membership
             .role_held(
-                &mut **tx,
+                tx,
                 WorkspaceId::from_uuid(workspace),
                 UserId::from_uuid(event.payload.user),
             )

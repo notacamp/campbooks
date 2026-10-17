@@ -261,7 +261,7 @@ impl EventBus {
             // `RETURNING` against the read policies.
             None => {
                 append_instance_wide(
-                    &mut **tx,
+                    tx,
                     E::NAME,
                     E::VERSION,
                     &payload,

@@ -51,7 +51,7 @@ impl EventConsumer for RevokeDepartedGrants {
         let mut tx = ctx.pool().begin_for(workspace).await?;
         let member = state
             .membership
-            .role_held(&mut *tx, workspace, event.payload.user)
+            .role_held(&mut tx, workspace, event.payload.user)
             .await
             .map_err(|e| JobError::retry(e.to_string()))?;
         if member.is_some() {
