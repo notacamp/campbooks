@@ -404,13 +404,7 @@ async fn prepare<'a>(
             } else {
                 Author::Them
             },
-            name: cut_bytes(
-                &sender
-                    .name
-                    .filter(|name| !name.trim().is_empty())
-                    .unwrap_or(sender.address),
-                NAME_BYTES,
-            ),
+            name: shown_name(sender),
             sent_at: sent.to_rfc3339_opts(SecondsFormat::Secs, true),
             text,
         });
@@ -444,6 +438,15 @@ async fn own_words(state: &AppState, workspace: &str, bodies: &Bodies) -> Result
 }
 
 /// `text` cut to at most `max` bytes, at a character boundary.
+/// A sender as the model reads them: their name, else their address, capped.
+fn shown_name(sender: Address) -> String {
+    let name = sender
+        .name
+        .filter(|name| !name.trim().is_empty())
+        .unwrap_or(sender.address);
+    cut_bytes(&name, NAME_BYTES)
+}
+
 fn cut_bytes(text: &str, max: usize) -> String {
     if text.len() <= max {
         return text.to_owned();

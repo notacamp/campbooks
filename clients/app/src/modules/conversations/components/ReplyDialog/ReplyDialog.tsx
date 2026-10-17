@@ -71,6 +71,13 @@ function recipientOf(message: MessageView) {
   return message.direction === "outbound" ? message.to[0] : (message.reply_to[0] ?? message.from);
 }
 
+/** How long the send can still be undone, from its `send_at` (at least a second). */
+function undoWindow(sendAt: string | null | undefined): number | undefined {
+  return sendAt === null || sendAt === undefined
+    ? undefined
+    : Math.max(1000, new Date(sendAt).getTime() - Date.now());
+}
+
 /** "Marta Ferreira <marta@casa-lume.example>", or the address alone. */
 function addressLine(party: { name?: string | null; address: string }): string {
   const name = party.name?.trim();
@@ -265,10 +272,7 @@ export function ReplyDialog({
         throw new Error("nothing to answer yet");
       }
       const scheduled = await sendDraft(workspaceId, draft.id, draft.version);
-      const window =
-        scheduled.send_at === null || scheduled.send_at === undefined
-          ? undefined
-          : Math.max(1000, new Date(scheduled.send_at).getTime() - Date.now());
+      const window = undoWindow(scheduled.send_at);
       const asked = intent;
       handle.done({
         label: t("reply.sending", { name: person }),
