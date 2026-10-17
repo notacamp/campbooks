@@ -88,7 +88,8 @@ export default async function homeRankedActions({ page }: ScenarioContext): Prom
     .pressSequentially("Pedro", { delay: 120 });
   await pause(1200);
   await forward.getByRole("button", { name: /Pedro Alves/u }).click();
-  await page.getByRole("heading", { level: 1, name: "Primary" }).waitFor();
+  // The composer, not the stream's heading: a phone shows the reader alone.
+  await page.getByRole("heading", { level: 2, name: "Forward" }).waitFor();
   await caption(page, "The forward waits in the composer, addressed: nothing is sent yet", 2600);
 
   // Open attachment: the item opens on its file.
