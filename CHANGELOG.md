@@ -62,6 +62,12 @@ All notable changes to Campbooks Next are documented here. The format follows
 
 ### Security
 
+- **A message built to be slow to parse no longer ties up the server.** HTML made of
+  thousands of stray or unclosed tags could take minutes of CPU every time the message was
+  read, and again when search indexed it. The reader now measures the parse first and shows
+  such a message as plain text once it passes a fixed budget, and search reduces HTML to
+  text without building a tree. Ordinary mail is unchanged. No migration
+  (campbooks-cloud#205).
 - **A suspension and its lift always reach a member's rules in the right order.** Each
   account now counts its suspensions and lifts, and the rules a member taught follow the
   latest count, not the clock: a clock that stepped back can no longer leave them paused
