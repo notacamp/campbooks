@@ -1277,6 +1277,78 @@
         }
       }
     },
+    "/api/v1/system/client-telemetry": {
+      "post": {
+        "tags": [
+          "system"
+        ],
+        "summary": "Report the app's own errors and timings.",
+        "operationId": "system.report_client_telemetry",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ClientReport"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "description": "Taken: what passes the scrubber is forwarded to the collector."
+          },
+          "401": {
+            "description": "No valid access token.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The token lacks `system:read`.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "This instance collects no client telemetry: stop sending.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [
+              "system:read"
+            ]
+          }
+        ],
+        "x-campbooks": {
+          "access": {
+            "action": "create",
+            "resource": "system.client_report"
+          },
+          "assistant": false,
+          "automation": false,
+          "mutates": true,
+          "records": [],
+          "risk": "low"
+        }
+      }
+    },
     "/api/v1/system/health": {
       "get": {
         "tags": [
@@ -11378,6 +11450,245 @@
           "email"
         ]
       },
+      "ClientBrowser": {
+        "type": "object",
+        "description": "The browser or web view the app runs in.",
+        "properties": {
+          "mobile": {
+            "type": [
+              "boolean",
+              "null"
+            ],
+            "description": "Whether the device is a phone or a tablet."
+          },
+          "name": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "`Chrome`, `Safari`, `WebKit`."
+          },
+          "os": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The operating system."
+          },
+          "version": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Its version."
+          }
+        }
+      },
+      "ClientEvent": {
+        "type": "object",
+        "description": "A named moment.",
+        "required": [
+          "name",
+          "timestamp"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Its name.",
+            "example": "session_start"
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When it happened."
+          }
+        }
+      },
+      "ClientException": {
+        "type": "object",
+        "description": "An error the app did not handle.",
+        "required": [
+          "kind",
+          "message",
+          "timestamp"
+        ],
+        "properties": {
+          "frames": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ClientFrame"
+            },
+            "description": "Where, innermost first."
+          },
+          "kind": {
+            "type": "string",
+            "description": "The error's class (`TypeError`).",
+            "example": "TypeError"
+          },
+          "message": {
+            "type": "string",
+            "description": "Its message: forwarded as an error kind only (its head, with\naddresses, quotes, links and tokens masked).",
+            "example": "Cannot read properties of undefined"
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When it happened."
+          }
+        }
+      },
+      "ClientFrame": {
+        "type": "object",
+        "description": "One frame of an exception's stack.",
+        "properties": {
+          "column": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32",
+            "description": "Column, from 1.",
+            "minimum": 0
+          },
+          "file": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The script's URL: forwarded as its file name only.",
+            "example": "https://app.example.com/assets/index-3f2c1e0.js"
+          },
+          "function": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The function's name."
+          },
+          "line": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32",
+            "description": "Line, from 1.",
+            "minimum": 0
+          }
+        }
+      },
+      "ClientMeasurement": {
+        "type": "object",
+        "description": "A timing.",
+        "required": [
+          "kind",
+          "values",
+          "timestamp"
+        ],
+        "properties": {
+          "kind": {
+            "type": "string",
+            "description": "What was measured (`web-vitals`).",
+            "example": "web-vitals"
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When it was taken."
+          },
+          "values": {
+            "type": "object",
+            "description": "Its values by name (`lcp`, `inp`, `cls`, `fcp`, `ttfb`, `fid`,\n`delta`); others are dropped.",
+            "additionalProperties": {
+              "type": "number",
+              "format": "double"
+            },
+            "propertyNames": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "ClientPlatform": {
+        "type": "string",
+        "description": "Where the app runs.",
+        "enum": [
+          "web",
+          "native"
+        ]
+      },
+      "ClientReport": {
+        "type": "object",
+        "description": "A batch of the app's own telemetry.",
+        "required": [
+          "session_id"
+        ],
+        "properties": {
+          "app_version": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The app's version.",
+            "example": "0.42.0"
+          },
+          "browser": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/ClientBrowser",
+                "description": "The browser or web view."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "events": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ClientEvent"
+            },
+            "description": "Named moments (`session_start`, `view_changed`)."
+          },
+          "exceptions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ClientException"
+            },
+            "description": "Errors the app did not handle."
+          },
+          "measurements": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ClientMeasurement"
+            },
+            "description": "Timings (web vitals)."
+          },
+          "platform": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/ClientPlatform",
+                "description": "Where the app is built for."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "session_id": {
+            "type": "string",
+            "description": "A random id of the app's session (not the sign-in session): joins a\nsession's reports.",
+            "example": "k3Jx8vQ2mN"
+          },
+          "view": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The route template of the page shown (`/w/$workspaceId/inbox`),\nnever its address.",
+            "example": "/w/$workspaceId/inbox"
+          }
+        }
+      },
       "ClientType": {
         "type": "string",
         "description": "How a workspace client signs in.",
@@ -16956,7 +17267,7 @@
         "type": "http",
         "scheme": "bearer",
         "bearerFormat": "JWT",
-        "description": "An OAuth 2.1 access token (a JWT) issued by this instance's identity provider, the issuer configured as `CAMPBOOKS_AUTH__ISSUER`. Each operation lists the scope it requires; operations with an empty requirement are public. Scopes:\n\n- `admin:access`: Reach the instance administration API, if your account has an admin profile. Granted to Campbooks' own apps only.\n- `assistant:read`: See what you told Scout about how it should act.\n- `assistant:write`: Tell Scout how it should act, and turn your sentences into rules to check.\n- `attention:read`: See what needs you: the items on your Home.\n- `attention:write`: Put items on your Home off until later, and bring them back.\n- `connectors:read`: See the outside accounts connected to your workspaces and how their sync is doing.\n- `connectors:write`: Connect outside accounts (such as Gmail), sync them now and disconnect them.\n- `conversations:read`: Read your inboxes, conversations and messages.\n- `conversations:send`: Write drafts and send messages, replies and forwards from your inboxes.\n- `conversations:write`: Mark conversations read or unread, star, archive, label and move them between streams.\n- `identity:clients`: Register, rotate and remove a workspace's own apps and their secrets.\n- `identity:read`: See your account, its ways in and the mailboxes waiting to be connected.\n- `identity:write`: Change your account and connect or discard the mailboxes waiting on it.\n- `search:read`: Search the records you may read (conversations need conversations:read too).\n- `system:read`: Read operational status.\n- `workspaces:admin`: Manage workspaces you own or administer: settings, members, invitations, deletion and the security log.\n- `workspaces:read`: See your workspaces and who belongs to them.\n- `workspaces:write`: Create workspaces, accept invitations and leave workspaces."
+        "description": "An OAuth 2.1 access token (a JWT) issued by this instance's identity provider, the issuer configured as `CAMPBOOKS_AUTH__ISSUER`. Each operation lists the scope it requires; operations with an empty requirement are public. Scopes:\n\n- `admin:access`: Reach the instance administration API, if your account has an admin profile. Granted to Campbooks' own apps only.\n- `assistant:read`: See what you told Scout about how it should act.\n- `assistant:write`: Tell Scout how it should act, and turn your sentences into rules to check.\n- `attention:read`: See what needs you: the items on your Home.\n- `attention:write`: Put items on your Home off until later, and bring them back.\n- `connectors:read`: See the outside accounts connected to your workspaces and how their sync is doing.\n- `connectors:write`: Connect outside accounts (such as Gmail), sync them now and disconnect them.\n- `conversations:read`: Read your inboxes, conversations and messages.\n- `conversations:send`: Write drafts and send messages, replies and forwards from your inboxes.\n- `conversations:write`: Mark conversations read or unread, star, archive, label and move them between streams.\n- `identity:clients`: Register, rotate and remove a workspace's own apps and their secrets.\n- `identity:read`: See your account, its ways in and the mailboxes waiting to be connected.\n- `identity:write`: Change your account and connect or discard the mailboxes waiting on it.\n- `search:read`: Search the records you may read (conversations need conversations:read too).\n- `system:read`: Read operational status, and report the app's own errors and timings.\n- `workspaces:admin`: Manage workspaces you own or administer: settings, members, invitations, deletion and the security log.\n- `workspaces:read`: See your workspaces and who belongs to them.\n- `workspaces:write`: Create workspaces, accept invitations and leave workspaces."
       },
       "session": {
         "type": "apiKey",

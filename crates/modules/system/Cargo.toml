@@ -13,7 +13,11 @@ axum.workspace = true
 campbooks-ai.workspace = true
 campbooks-kernel.workspace = true
 chrono.workspace = true
+opentelemetry.workspace = true
+reqwest.workspace = true
+secrecy.workspace = true
 serde.workspace = true
+serde_json.workspace = true
 sqlx.workspace = true
 tokio.workspace = true
 tracing.workspace = true
@@ -22,7 +26,6 @@ utoipa-axum.workspace = true
 
 [dev-dependencies]
 campbooks-kernel = { workspace = true, features = ["test-util"] }
-serde_json.workspace = true
 uuid.workspace = true
 wiremock.workspace = true
 

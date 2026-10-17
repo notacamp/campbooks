@@ -97,6 +97,10 @@ opentelemetry-otlp = { version = "0.33.0", default-features = false, features = 
 opentelemetry-prometheus = "0.33.0"
 prometheus = { version = "0.14.0", default-features = false }
 tracing-opentelemetry = { version = "0.34.0", default-features = false }
+# Error reports to a Sentry-compatible service (GlitchTip, Sentry), off unless
+# `CAMPBOOKS_TELEMETRY__ERROR_DSN` is set. No panic integration (the server's
+# own hook withholds panic messages), no logs or metrics; rustls, like the rest.
+sentry = { version = "0.49.3", default-features = false, features = ["reqwest", "rustls"] }
 # sqlx's pool options take a `log` level; already in the graph via sqlx.
 log = "0.4.34"
 uuid = { version = "1.28.0", features = ["v7", "serde"] }

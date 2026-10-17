@@ -30,6 +30,26 @@ All notable changes to Campbooks Next are documented here. The format follows
   sheet to label on your own machine, and `cargo xtask eval decide --set-dir` measures the
   model on it (campbooks-cloud#167).
 
+### Added
+
+- **Error reports to GlitchTip or Sentry.** Set `CAMPBOOKS_TELEMETRY__ERROR_DSN` and every
+  internal error, job that failed for good and panic is reported, filed under the release
+  and `CAMPBOOKS_TELEMETRY__ENVIRONMENT`. A report holds only ids (request, trace,
+  workspace, job), the route or job kind, where it was logged and the kind of error, with
+  quotes, addresses, links and tokens masked. Never the person, the request, a header, a
+  cookie or the mail it was about. `campbooks-server telemetry test-error` sends one
+  invented report to check the setup.
+- **The app's own errors and page timings, for operators.** With
+  `CAMPBOOKS_TELEMETRY__CLIENT_COLLECTOR_URL` set, the app reports the errors it did not
+  handle and its web vitals to its server, which scrubs them and forwards them to a Grafana
+  Faro receiver. Only the route shown, a random id for that run of the app, the browser and
+  the error's class, message head and stack positions are sent. Without the setting the app
+  sends nothing.
+- **Connector sync metrics.** `campbooks_connector_syncs_total` counts sync runs by provider
+  and outcome, and `campbooks_connector_overdue_streams` shows streams waiting more than
+  five minutes past due. `campbooks_errors_reported_total` and
+  `campbooks_client_telemetry_items_total` count what reaches the tracker and the receiver.
+
 ### Changed
 
 - **An opened Home item shows the email (campbooks-cloud#203).** Pressing Enter on an item
