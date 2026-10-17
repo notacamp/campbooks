@@ -318,6 +318,23 @@ pub struct TelemetryConfig {
     /// `0.0.0.0:9464`). Unauthenticated: keep it off the internet. Unset
     /// means no listener.
     pub metrics_addr: Option<SocketAddr>,
+    /// DSN of a Sentry-compatible error tracker (`GlitchTip`, Sentry) that
+    /// receives the server's panics and errors
+    /// (`CAMPBOOKS_TELEMETRY__ERROR_DSN`). Reports hold ids and error kinds
+    /// only. Secret. Unset (or empty) means no report leaves the process.
+    pub error_dsn: Option<SecretString>,
+    /// The deployment error reports and client telemetry are filed under
+    /// (`CAMPBOOKS_TELEMETRY__ENVIRONMENT`, e.g. `production`, `staging`;
+    /// default `production`).
+    pub environment: Option<String>,
+    /// Where the server forwards the app's own error and timing reports, a
+    /// Grafana Faro receiver (`CAMPBOOKS_TELEMETRY__CLIENT_COLLECTOR_URL`,
+    /// e.g. `http://alloy:12347/collect`). Unset (or empty) means the app's
+    /// reports are refused and nothing is forwarded.
+    pub client_collector_url: Option<String>,
+    /// API key sent to the client collector as `x-api-key`
+    /// (`CAMPBOOKS_TELEMETRY__CLIENT_COLLECTOR_KEY`). Secret.
+    pub client_collector_key: Option<SecretString>,
 }
 
 impl Default for TelemetryConfig {
@@ -327,6 +344,10 @@ impl Default for TelemetryConfig {
             otlp_headers: None,
             sample_ratio: 1.0,
             metrics_addr: None,
+            error_dsn: None,
+            environment: None,
+            client_collector_url: None,
+            client_collector_key: None,
         }
     }
 }
@@ -353,6 +374,26 @@ impl TelemetryConfig {
             .unwrap_or_default()
     }
 
+    /// The error tracker's DSN, trimmed; `None` when unset or blank.
+    pub fn error_dsn(&self) -> Option<&str> {
+        non_blank(
+            self.error_dsn
+                .as_ref()
+                .map(secrecy::ExposeSecret::expose_secret),
+        )
+    }
+
+    /// The deployment name: [`environment`](Self::environment), else
+    /// `production`.
+    pub fn environment(&self) -> &str {
+        non_blank(self.environment.as_deref()).unwrap_or("production")
+    }
+
+    /// The client collector's URL, trimmed; `None` when unset or blank.
+    pub fn client_collector_url(&self) -> Option<&str> {
+        non_blank(self.client_collector_url.as_deref())
+    }
+
     /// Whether metrics leave the process (OTLP or the Prometheus listener).
     pub fn exports_metrics(&self) -> bool {
         self.otlp_endpoint().is_some() || self.metrics_addr.is_some()
@@ -364,6 +405,19 @@ impl TelemetryConfig {
     pub fn check(&self) -> Result<(), String> {
         if let Some(endpoint) = self.otlp_endpoint() {
             check_url("CAMPBOOKS_TELEMETRY__OTLP_ENDPOINT", endpoint)?;
+        }
+        if let Some(url) = self.client_collector_url() {
+            check_url("CAMPBOOKS_TELEMETRY__CLIENT_COLLECTOR_URL", url)?;
+        }
+        if let Some(environment) = non_blank(self.environment.as_deref())
+            && !environment
+                .chars()
+                .all(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '_' | '.'))
+        {
+            return Err(format!(
+                "CAMPBOOKS_TELEMETRY__ENVIRONMENT={environment} must be letters, digits, \
+                 '-', '_' or '.'"
+            ));
         }
         if !(0.0..=1.0).contains(&self.sample_ratio) {
             return Err(format!(
@@ -1751,6 +1805,20 @@ mod tests {
                 },
                 "CAMPBOOKS_TELEMETRY__OTLP_HEADERS",
             ),
+            (
+                TelemetryConfig {
+                    client_collector_url: Some("alloy:12347".into()),
+                    ..TelemetryConfig::default()
+                },
+                "CAMPBOOKS_TELEMETRY__CLIENT_COLLECTOR_URL",
+            ),
+            (
+                TelemetryConfig {
+                    environment: Some("prod uction".into()),
+                    ..TelemetryConfig::default()
+                },
+                "CAMPBOOKS_TELEMETRY__ENVIRONMENT",
+            ),
         ];
         for (config, setting) in cases {
             let err = config.check().unwrap_err();
@@ -1758,6 +1826,16 @@ mod tests {
             assert!(!err.contains("hunter2"), "{err}");
         }
         assert!(TelemetryConfig::default().check().is_ok());
+        let blank = TelemetryConfig {
+            error_dsn: Some(SecretString::from("")),
+            environment: Some(" ".into()),
+            client_collector_url: Some(String::new()),
+            ..TelemetryConfig::default()
+        };
+        assert!(blank.check().is_ok());
+        assert_eq!(blank.error_dsn(), None);
+        assert_eq!(blank.client_collector_url(), None);
+        assert_eq!(blank.environment(), "production");
     }
 
     #[test]

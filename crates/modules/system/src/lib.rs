@@ -1,4 +1,5 @@
-//! `campbooks-system` — instance health and version, the admin dashboard's
+//! `campbooks-system` — instance health and version, the app's own error
+//! and timing reports (forwarded to the operator's collector), the admin dashboard's
 //! System panel (`GET /admin/v1/system/overview`, ADR 0015), and the AI
 //! usage ledger with its daily cap ([`AiUsageMeter`], read by
 //! `GET /admin/v1/system/ai-usage`).
@@ -37,8 +38,8 @@ pub static MESSAGES: Catalogue = campbooks_kernel::catalogue!(NAME);
 
 /// The system module composed with nothing (for catalogues and tests).
 /// The module's part of the access catalogue (ADR 0017).
-static RESOURCES: [campbooks_kernel::authz::ResourceType; 2] = {
-    use campbooks_kernel::authz::{Action, Grant, Grantee, ResourceType, Tenancy};
+static RESOURCES: [campbooks_kernel::authz::ResourceType; 3] = {
+    use campbooks_kernel::authz::{Action, Grant, Grantee, Owner, ResourceType, Tenancy};
     [
         ResourceType {
             grants: &[Grant::new(Grantee::Anyone, &[Action::Read])],
@@ -46,6 +47,16 @@ static RESOURCES: [campbooks_kernel::authz::ResourceType; 2] = {
                 "system.instance",
                 "The instance's health and version: public.",
                 Tenancy::Public,
+            )
+        },
+        ResourceType {
+            owner: Owner::Account,
+            owner_actions: &[Action::Create],
+            ..ResourceType::new(
+                "system.client_report",
+                "A report of the app's own errors and timings, sent by a signed-in person's \
+                 app and forwarded, scrubbed, to the operator's collector: never read back.",
+                Tenancy::Account,
             )
         },
         ResourceType {
@@ -71,7 +82,8 @@ pub fn module_with(deps: Deps) -> Module {
         scopes: scopes::ALL,
         router: OpenApiRouter::new()
             .routes(routes!(features::health::handler))
-            .routes(routes!(features::version::handler)),
+            .routes(routes!(features::version::handler))
+            .routes(routes!(features::client_telemetry::handler)),
         admin_router: Some(
             OpenApiRouter::new()
                 .routes(routes!(features::admin_overview::handler))

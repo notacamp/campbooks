@@ -1,6 +1,8 @@
 import type { QueryClient } from "@tanstack/react-query";
 import { createRoute, createRouter, Navigate, type RouterHistory } from "@tanstack/react-router";
 
+import { reportError } from "~/lib/telemetry";
+
 import { AdminLayout } from "./admin/AdminLayout";
 import { buildModuleAdminRoutes, buildModuleRoutes } from "./modules";
 import { Home } from "./routes/home";
@@ -76,6 +78,10 @@ export function createAppRouter(queryClient: QueryClient, history?: RouterHistor
     context: { queryClient },
     defaultPreload: "intent",
     scrollRestoration: true,
+    // Errors a route's error screen caught never reach `window.onerror`.
+    defaultOnCatch: (error) => {
+      reportError(error);
+    },
   });
 }
 

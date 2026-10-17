@@ -2,7 +2,7 @@ import createClient from "openapi-fetch";
 
 import type { paths as adminPaths } from "./admin.gen";
 import type { paths } from "./schema.gen";
-import { selectTransport, type Transport } from "./transport";
+import { selectQuietTransport, selectTransport, type Transport } from "./transport";
 
 export function createApiClient(transport: Transport) {
   return createClient<paths>({ baseUrl: transport.baseUrl, fetch: transport.fetch });
@@ -35,6 +35,12 @@ export const api: ApiClient = createApiClient(transport);
 export function browserUrl(path: string): string | undefined {
   return transport.kind === "web" ? `${transport.baseUrl}${path}` : undefined;
 }
+
+/**
+ * An API client for background calls nobody waits on (the app's own
+ * telemetry): an ended session never sends the browser to sign in.
+ */
+export const backgroundApi: ApiClient = createApiClient(selectQuietTransport());
 
 /** The app's admin API client, over the same transport. */
 export const adminApi: AdminClient = createAdminClient(transport);

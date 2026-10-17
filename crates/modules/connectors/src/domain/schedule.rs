@@ -25,6 +25,10 @@ use crate::config::PollConfig;
 /// How long a dispatched stream's row stays out of the dispatcher's way.
 pub const LEASE: TimeDelta = TimeDelta::minutes(15);
 
+/// How long past due a stream counts as overdue (the dispatcher ticks
+/// every minute).
+pub const OVERDUE: TimeDelta = TimeDelta::minutes(5);
+
 /// Most streams one dispatcher tick enqueues.
 pub const DISPATCH_BATCH: i64 = 500;
 
@@ -106,6 +110,15 @@ async fn enqueue(
 /// before (the queue admits no other). Returns how many it enqueued.
 pub async fn dispatch(pool: &PgPool, now: DateTime<Utc>) -> Result<usize> {
     let mut tx = campbooks_kernel::db::begin_maintenance(pool).await?;
+    // Streams the dispatcher should have run already: a backlog it cannot
+    // keep up with, or runs that keep dying.
+    let overdue = sqlx::query_scalar!(
+        r#"SELECT count(*) AS "count!" FROM connectors.sync_due WHERE due_at <= $1"#,
+        now - OVERDUE,
+    )
+    .fetch_one(&mut *tx)
+    .await?;
+    crate::metrics::overdue_streams(u64::try_from(overdue).unwrap_or(0));
     let due = sqlx::query!(
         r#"UPDATE connectors.sync_due d SET due_at = $2
             WHERE d.stream_id IN (

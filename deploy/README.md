@@ -250,6 +250,43 @@ dropped telemetry, never slower requests. The standard `OTEL_SERVICE_NAME` and
 `OTEL_RESOURCE_ATTRIBUTES=deployment.environment=production`). Both exports can be on at
 once.
 
+**Error reports.** Point the server at a Sentry-compatible error tracker (GlitchTip,
+Sentry) with the DSN of a project made for it:
+
+```sh
+CAMPBOOKS_TELEMETRY__ERROR_DSN=https://<key>@errors.example.com/<project>   # secret
+CAMPBOOKS_TELEMETRY__ENVIRONMENT=production                               # or staging, ...
+```
+
+Each internal error (a 500), job that failed for good and panic becomes one report, filed
+under the release (the image's `GIT_SHA`) and the environment. A report holds the error's
+kind (the head of its message, with quotes, addresses, links and tokens masked), the ids
+of the request or job it happened in (request, trace, workspace, job), the route template
+or job kind and the file and line it was logged at: never the request, the person, a
+header, a cookie or what the error was about. Check the setup with
+
+```sh
+docker compose exec server campbooks-server telemetry test-error
+```
+
+which sends one invented report and prints its id.
+
+**The app's own errors and timings.** The app reports the errors it did not handle and
+its web vitals to its server, which scrubs them and forwards them to a
+[Grafana Faro](https://grafana.com/oss/faro/) receiver (Grafana Alloy's `faro.receiver`):
+
+```sh
+CAMPBOOKS_TELEMETRY__CLIENT_COLLECTOR_URL=http://alloy:12347/collect
+CAMPBOOKS_TELEMETRY__CLIENT_COLLECTOR_KEY=<the receiver's api_key>        # secret
+```
+
+The app never talks to the receiver itself, so it needs no CORS or CSP change and the
+receiver need not face the internet. What is forwarded: the route template shown
+(`/w/$workspaceId/inbox`, never the address), a random id for that run of the app, the
+browser's name and platform, and for an error its class, the head of its message and the
+file names and positions of its stack. Without a receiver the app is told to stop and
+sends nothing more.
+
 **What you get.**
 
 | Metric (Prometheus name) | What | Labels |
@@ -263,6 +300,10 @@ once.
 | `gen_ai_client_token_usage` | Tokens per AI call | the above plus `gen_ai_token_type` |
 | `db_client_connection_count`, `db_client_connection_max` | Database pool use | `db_client_connection_state` |
 | `db_client_connection_wait_time_seconds` | Time waiting for a pooled connection | |
+| `campbooks_connector_syncs_total` | Sync runs of connected accounts | `provider`, `outcome` (`ok`, `throttled`, `refused`, `failed`) |
+| `campbooks_connector_overdue_streams` | Streams due for more than 5 minutes that no run picked up | |
+| `campbooks_errors_reported_total` | Error reports sent to the tracker | `source` |
+| `campbooks_client_telemetry_items_total` | The app's errors, timings and events | `kind`, `outcome` (`forwarded`, `dropped`) |
 | `campbooks_build_info` | Always 1 | `service_version`, `campbooks_role` |
 
 Good first alerts: a rising share of 5xx in `http_server_request_duration_seconds_count`,
@@ -277,8 +318,9 @@ request that enqueued it), per AI call and per identity-provider fetch, and hono
 header there unless you want callers to choose which of their requests are traced.
 
 **Privacy.** Telemetry never contains message content, prompts, tokens, cookies, codes
-or email addresses, and metrics never carry ids (workspace ids appear on spans only). A
-test in the server enforces this for every release.
+or email addresses, and metrics never carry ids (workspace ids appear on spans and error
+reports only). Tests in the server enforce this for logs, spans, error reports and the
+app's forwarded telemetry on every release.
 
 ## Outgoing mail
 
