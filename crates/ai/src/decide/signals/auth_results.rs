@@ -7,8 +7,10 @@
 //! (nested) are dropped, a quoted string is one atom wherever it appears
 //! (inside a comment too, so a `)` in it closes nothing), and only a `;` at
 //! the top level ends a result. Anything malformed (an unclosed comment or
-//! quoted string, a result without `method=value`) reads as no results at
-//! all.
+//! quoted string, a result without `method=value`) is not read at all: the
+//! caller treats a present header it cannot read as a failure (see
+//! `Facts::authentication_failed`). The one result section with no method is
+//! `none` (RFC 8601 §2.2: nothing was checked), which reads as no results.
 
 /// One method's result, with its own properties.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -34,8 +36,7 @@ impl MethodResult {
 /// The longest `Authentication-Results` value read, in bytes. A real
 /// provider's header is a few hundred bytes; a sender can pad the parts it
 /// echoes (the envelope sender, comments) to make the tokeniser work, and a
-/// padded header is not one a provider wrote. Anything longer reads as no
-/// results.
+/// padded header is not one a provider wrote. Anything longer is not read.
 pub const MAX_LEN: usize = 8 * 1024;
 
 /// Whether `value` is longer than [`MAX_LEN`]: not read, and not to be taken
@@ -44,8 +45,9 @@ pub fn is_oversized(value: &str) -> bool {
     value.len() > MAX_LEN
 }
 
-/// The results of `value` after its authserv-id, or `None` when it is
-/// malformed or longer than [`MAX_LEN`].
+/// The results of `value` after its authserv-id: empty for `authserv-id; none`
+/// (the receiver checked nothing), or `None` when it is malformed, has no
+/// result section at all, or is longer than [`MAX_LEN`].
 pub fn parse(value: &str) -> Option<Vec<MethodResult>> {
     if is_oversized(value) {
         return None;
@@ -54,10 +56,51 @@ pub fn parse(value: &str) -> Option<Vec<MethodResult>> {
     let mut segments = segments.into_iter();
     // The authserv-id (and an optional version) comes first.
     segments.next().filter(|tokens| !tokens.is_empty())?;
-    segments
-        .filter(|tokens| !tokens.is_empty())
-        .map(|tokens| method_result(&tokens))
+    let sections: Vec<Vec<String>> = segments.filter(|tokens| !tokens.is_empty()).collect();
+    if let [only] = sections.as_slice()
+        && let [word] = only.as_slice()
+        && word.eq_ignore_ascii_case("none")
+    {
+        return Some(Vec::new());
+    }
+    if sections.is_empty() {
+        return None;
+    }
+    sections
+        .iter()
+        .map(|tokens| method_result(&glue(tokens)))
         .collect()
+}
+
+/// `tokens` with the whitespace RFC 8601 allows around `=` (and around `/`
+/// in the method) taken out: `dkim = pass`, `dkim/1 = pass`,
+/// `header.d = x` (a comment before the `=` leaves the same gap). An empty
+/// value (`smtp.mailfrom=`) takes nothing from what follows it when that is
+/// itself a `property=value` pair.
+fn glue(tokens: &[String]) -> Vec<String> {
+    let pair = |token: &str| {
+        token
+            .split_once('=')
+            .is_some_and(|(key, _)| key.contains('.'))
+    };
+    let mut out: Vec<String> = Vec::new();
+    let mut join = false;
+    for token in tokens {
+        let first = out.len() == 1;
+        let attach = out.last().is_some()
+            && (token.starts_with('=')
+                || (first && token.starts_with('/'))
+                || (join && !pair(token)));
+        if attach {
+            if let Some(last) = out.last_mut() {
+                last.push_str(token);
+            }
+        } else {
+            out.push(token.clone());
+        }
+        join = token.ends_with('=') || (out.len() == 1 && token.ends_with('/'));
+    }
+    out
 }
 
 /// The header's top-level `;`-separated parts, each as its tokens, with
@@ -227,7 +270,7 @@ mod tests {
     }
 
     #[test]
-    fn a_header_over_the_length_cap_reads_as_nothing() {
+    fn a_header_over_the_length_cap_is_not_read() {
         let head = "mx.google.com; dmarc=pass header.from=github.com; spf=pass (";
         let pad = |len: usize| format!("{head}{}) smtp.mailfrom=a@b.example", "x".repeat(len));
         let fill = MAX_LEN - pad(0).len();
@@ -238,7 +281,7 @@ mod tests {
     }
 
     #[test]
-    fn malformed_headers_read_as_nothing() {
+    fn malformed_headers_are_not_read() {
         for value in [
             "mx.google.com; dmarc=pass (unclosed header.from=github.com",
             "mx.google.com; dmarc=pass header.from=\"github.com",
@@ -248,5 +291,34 @@ mod tests {
         ] {
             assert_eq!(parse(value), None, "{value}");
         }
+    }
+
+    #[test]
+    fn none_is_no_results_and_other_empty_shapes_are_not_read() {
+        assert_eq!(parse("mx.google.com; none"), Some(Vec::new()));
+        assert_eq!(parse("mx.google.com 1; NONE"), Some(Vec::new()));
+        for value in [
+            "mx.google.com;",
+            "mx.google.com",
+            "mx.google.com; none; none",
+            "mx.google.com; none dmarc=pass header.from=github.com",
+        ] {
+            assert_eq!(parse(value), None, "{value}");
+        }
+    }
+
+    #[test]
+    fn rfc_8601_whitespace_and_comments_around_the_equals_sign() {
+        let results =
+            parse("mx.google.com; dkim (x)=pass header.d = github.com; dkim/1 = fail").unwrap();
+        assert_eq!(results[0].result, "pass");
+        assert_eq!(
+            results[0].values("header.d").collect::<Vec<_>>(),
+            ["github.com"]
+        );
+        assert_eq!(
+            (results[1].method.as_str(), results[1].result.as_str()),
+            ("dkim", "fail")
+        );
     }
 }

@@ -62,7 +62,11 @@ any other role SHALL be a configuration error.
 The facts SHALL read the receiving provider's `Authentication-Results` as RFC
 8601 says. A value longer than 8 KiB (8192 bytes) SHALL be unread and SHALL
 count as authentication failed (a sender may not pad a header to hide a
-failure); an absent or malformed one says nothing. The sender's domain SHALL count as authenticated only by exactly one
+failure), and so SHALL one that is present but cannot be read (an unbalanced
+quote or comment a sender echoed into it); only an absent one, or one whose
+only result section is `none` (RFC 8601: the receiver checked nothing),
+says nothing. The whitespace RFC 8601 allows around `=` and `/` and a comment
+before `=` SHALL be read. The sender's domain SHALL count as authenticated only by exactly one
 `dmarc` result, `pass`, whose `header.from` is the From domain; or by a
 `dkim=pass` whose signing domains all have the From domain's registrable
 domain, while no `dmarc` result in the header refuses it: only `pass`, `none`,
@@ -94,3 +98,15 @@ alone.
 #### Scenario: A signer under a shared suffix
 - **WHEN** a message from `ana@y.com.br` is signed only by `x.com.br`, or one from `ana@b.github.io` only by `a.github.io`
 - **THEN** the hints say authentication failed, while mail from `mail.y.com.br` signed by `y.com.br` is authenticated
+
+#### Scenario: An unreadable results header
+- **WHEN** the provider's `Authentication-Results` is present with an unbalanced quote or comment, or a result without `=`
+- **THEN** the hints say authentication failed, while an absent header says nothing
+
+#### Scenario: A receiver that checked nothing
+- **WHEN** the provider's `Authentication-Results` is `mx.example.com; none`
+- **THEN** the hints say nothing, while `mx.example.com;` with no result section, or `none` beside another result, says authentication failed
+
+#### Scenario: Real provider headers
+- **WHEN** the headers recorded in the repo's fixtures and modelled on Gmail and Zoho are read
+- **THEN** every one parses

@@ -807,6 +807,8 @@ pub struct ConfirmRule {
     request_body = ConfirmRule,
     responses(
         (status = OK, description = "The rule, now active.", body = RuleView),
+        (status = BAD_REQUEST, description = "Not a valid rule (any more).", body = Problem,
+            content_type = "application/problem+json"),
         (status = UNAUTHORIZED, description = "No valid access token.", body = Problem,
             content_type = "application/problem+json"),
         (status = FORBIDDEN, description = "Missing scope, or you may only read this inbox.",
@@ -834,6 +836,9 @@ pub async fn confirm(
     if rules::lock_state(&mut tx, rule.id).await? != Some(RuleState::Proposed) {
         return Err(Error::Conflict(crate::MESSAGES.reason("rule_not_proposed")));
     }
+    // As `create` does: a proposal stored before its domain became a public
+    // suffix is not kept (it could never act).
+    rules::validate(&rule.conditions, &rule.actions)?;
     replace(
         &mut tx,
         &state,
