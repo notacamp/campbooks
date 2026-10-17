@@ -84,7 +84,9 @@ async fn flag_on_arrival(
         let flag = super::apply::bin_flag(applied.value);
         let messages = effects::flag_message(tx, arrival.message, flag).await?;
         if !messages.is_empty() {
-            ledger.of(&applied.rule).binned = Some(applied.value);
+            let before = ledger.of(&applied.rule);
+            before.binned = Some(applied.value);
+            before.binned_messages.extend(messages.iter().cloned());
             effects.add(flag.change(), messages, flag.requested_for_all()?);
         }
     }

@@ -14,11 +14,22 @@ export interface ScoutNoticedProps {
   workspaceId: string;
 }
 
+/**
+ * Who it is about: the address, after the name the sender gives (which the
+ * sender chooses, so never alone).
+ */
+function senderOf(notice: RuleNotice): string {
+  const name = notice.sender_name?.trim();
+  return name === undefined || name === "" || name === notice.sender
+    ? notice.sender
+    : `${name} (${notice.sender})`;
+}
+
 /** What Scout noticed, as one sentence and its question, in the reader's words. */
 function sentence(t: Translate, locale: string, notice: RuleNotice): string {
   const { evidence } = notice;
   const number = (n: number) => new Intl.NumberFormat(locale).format(n);
-  const sender = notice.sender_name ?? notice.sender;
+  const sender = senderOf(notice);
   const counts = {
     count: evidence.received,
     n: number(evidence.received),
@@ -122,7 +133,7 @@ export function ScoutNoticed({ workspaceId }: ScoutNoticedProps) {
       inboxId: notice.inbox_id,
       conditions: notice.conditions,
       actions: notice.actions,
-      title: t("smartRule.titleNotice", { sender: notice.sender_name ?? notice.sender }),
+      title: t("smartRule.titleNotice", { sender: notice.sender }),
       origin: "suggestion",
       noticeId: notice.id,
       sharedInbox,

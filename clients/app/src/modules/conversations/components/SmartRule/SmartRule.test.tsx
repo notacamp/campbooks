@@ -161,13 +161,15 @@ describe("Scout noticed", () => {
     const note = await screen.findByRole("region", { name: "Scout noticed" });
     expect(
       within(note).getByText(
-        /You got 34 emails from CI in the last 60 days and opened 2\. They come most days\. Keep them off Home and file them under Updates\?/u,
+        /You got 34 emails from CI \(builds@ci\.example\.com\) in the last 60 days and opened 2\. They come most days\. Keep them off Home and file them under Updates\?/u,
       ),
     ).toBeVisible();
     expect(within(note).getByText("1 of 1")).toBeVisible();
 
     fireEvent.click(within(note).getByRole("button", { name: "Set up a smart rule…" }));
-    const dialog = await screen.findByRole("dialog", { name: "A rule for mail from CI" });
+    const dialog = await screen.findByRole("dialog", {
+      name: "A rule for mail from builds@ci.example.com",
+    });
     fireEvent.click(within(dialog).getByRole("button", { name: /^Cancel/u }));
 
     fireEvent.click(within(note).getByRole("button", { name: "Not now" }));

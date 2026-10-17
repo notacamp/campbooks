@@ -299,6 +299,9 @@ export function WhatNeedsYou({ workspaceId, now, offer }: WhatNeedsYouProps) {
     onReported: (conversation) => {
       ahead.offer(conversation, { kind: "report" });
     },
+    onReportUndone: () => {
+      ahead.cancel();
+    },
   });
 
   const when = (until: Date) =>

@@ -126,8 +126,10 @@ function Confirm({
       return;
     }
     setFailed(false);
-    create.mutate(
-      {
+    // A promise, not mutate's callbacks: closed while saving, the rule is
+    // still made, so its Undo must still be offered.
+    create
+      .mutateAsync({
         inboxId: draft.inboxId,
         conditions: draft.conditions,
         actions: draft.actions,
@@ -135,9 +137,9 @@ function Confirm({
         origin: draft.origin,
         fromConversation: draft.fromConversation,
         noticeId: draft.noticeId,
-      },
-      {
-        onSuccess: ({ rule }) => {
+      })
+      .then(
+        ({ rule }) => {
           setSaved(true);
           onSaved?.(rule);
           undo.push({
@@ -168,11 +170,10 @@ function Confirm({
             },
           });
         },
-        onError: () => {
+        () => {
           setFailed(true);
         },
-      },
-    );
+      );
   };
   useShortcut("inbox.rule.save", save, { enabled: !saved });
 

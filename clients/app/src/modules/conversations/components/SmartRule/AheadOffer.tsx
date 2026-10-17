@@ -36,6 +36,11 @@ export interface AheadOfferApi {
    * before the action): offer the smart rule for mail like it still to come.
    */
   offer: (conversation: ConversationSummary, action: AheadAction) => void;
+  /**
+   * The action was undone: an offer still to come, or still asking, goes
+   * (a confirmation already open stays, the member chose it).
+   */
+  cancel: () => void;
   /** The offer and its confirmation, rendered once by the screen. */
   element: ReactNode;
   /** An offer is up and holds 1 and Esc: the screen leaves its own unbound. */
@@ -84,10 +89,17 @@ export function useAheadOffer(workspaceId: string): AheadOfferApi {
     setState({ step: "idle" });
   }, []);
 
+  const cancel = useCallback(() => {
+    asked.current += 1;
+    setState((current) => (current.step === "asking" ? { step: "idle" } : current));
+  }, []);
+
   let element: ReactNode = null;
   if (state.step === "asking") {
     element = (
       <Asking
+        // A newer offer starts over (its own default choice).
+        key={`${state.conversation.id}:${state.action.kind}`}
         workspaceId={workspaceId}
         state={state}
         onConfirm={(draft) => {
@@ -99,7 +111,7 @@ export function useAheadOffer(workspaceId: string): AheadOfferApi {
   } else if (state.step === "confirming") {
     element = <SmartRuleConfirm workspaceId={workspaceId} draft={state.draft} onClose={close} />;
   }
-  return { offer, element, offering: state.step !== "idle" };
+  return { offer, cancel, element, offering: state.step !== "idle" };
 }
 
 function Asking({

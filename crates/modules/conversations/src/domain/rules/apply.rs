@@ -62,6 +62,15 @@ pub struct Before {
     /// Where the rule put it out of the way (the trash or spam), when it did.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub binned: Option<Bin>,
+    /// The messages it put there (provider ids): its undo takes out only
+    /// these, never ones the member binned by hand.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub binned_messages: Vec<String>,
+    /// Whether the conversation was archived when the rule reported it as
+    /// spam: taking it out of spam puts received mail in the inbox, so the
+    /// undo archives it again.
+    #[serde(default)]
+    pub binned_archived: bool,
 }
 
 /// Where a rule acts: the inbox, the workspace's event key and the events.
@@ -180,6 +189,8 @@ async fn carry_out(
         let messages = effects::flag_conversation(tx, candidate.id, flag).await?;
         if !messages.is_empty() {
             before.binned = Some(bin);
+            before.binned_messages.clone_from(&messages);
+            before.binned_archived = bin == Bin::Spam && candidate.archived;
             effects.add(flag.change(), messages, flag.requested_for_all()?);
         }
     }
@@ -454,8 +465,15 @@ async fn undo(
         // Out of the trash or spam, each message with its own direction (a
         // provider puts received mail back in the inbox, never sent mail).
         let flag = unbin_flag(bin);
+        // Only the messages it binned (every one, for an application
+        // recorded before they were kept).
+        let items = if before.binned_messages.is_empty() {
+            flags::change_items(conn, id, flag).await?
+        } else {
+            flags::unbin_messages(conn, id, flag, &before.binned_messages).await?
+        };
         let mut groups: Vec<(RequestedChange, Vec<String>)> = Vec::new();
-        for (message, change) in flags::change_items(conn, id, flag).await? {
+        for (message, change) in items {
             match groups.iter_mut().find(|(c, _)| *c == change) {
                 Some((_, messages)) => messages.push(message),
                 None => groups.push((change, vec![message])),
@@ -463,6 +481,16 @@ async fn undo(
         }
         for (change, messages) in groups {
             effects.add(flag.change(), messages, change);
+        }
+        if before.binned_archived {
+            let messages = effects::flag_conversation(conn, id, Flag::Archive).await?;
+            if !messages.is_empty() {
+                effects.add(
+                    Flag::Archive.change(),
+                    messages,
+                    Flag::Archive.requested_for_all()?,
+                );
+            }
         }
     }
     for (did, flag) in [

@@ -2,7 +2,10 @@
 //! newest inbound message, found with a prefilter an index can serve.
 
 use campbooks_ai::decide::{
-    signals::{email::subject_template, facts::sender_checks_failed},
+    signals::{
+        email::subject_template,
+        facts::{dmarc_failed, sender_checks_failed},
+    },
     taught::{Facts, normalise_list_id},
 };
 use campbooks_kernel::{Error, Result};
@@ -72,6 +75,11 @@ impl Candidate {
             &self.sender_address,
             self.headers.authentication_results.as_deref(),
         )
+    }
+
+    /// Whether they hold an explicit `dmarc=fail` ([`dmarc_failed`]).
+    pub fn dmarc_failed(&self) -> bool {
+        dmarc_failed(self.headers.authentication_results.as_deref())
     }
 }
 

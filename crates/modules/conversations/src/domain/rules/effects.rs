@@ -326,7 +326,16 @@ pub async fn record(
                                          || coalesce(EXCLUDED.before -> 'answered', '[]'::jsonb)) q),
                                      'binned', coalesce(
                                          conversations.rule_applications.before -> 'binned',
-                                         EXCLUDED.before -> 'binned')))
+                                         EXCLUDED.before -> 'binned'),
+                                     'binned_messages', (SELECT jsonb_agg(DISTINCT m) FROM jsonb_array_elements(
+                                         coalesce(conversations.rule_applications.before -> 'binned_messages',
+                                                  '[]'::jsonb)
+                                         || coalesce(EXCLUDED.before -> 'binned_messages', '[]'::jsonb)) m),
+                                     'binned_archived',
+                                         coalesce((conversations.rule_applications.before
+                                                   ->> 'binned_archived')::boolean, false)
+                                         OR coalesce((EXCLUDED.before ->> 'binned_archived')::boolean,
+                                                     false)))
                              ELSE EXCLUDED.before END
         "#,
         rule as RuleId,

@@ -83,9 +83,10 @@ two other conversations or the message has a List-Id, never for a suspicious
 conversation, and never while the member dismissed it. After the member
 reported the conversation as spam (`action=report`) it SHALL offer to report
 mail like it as it arrives, suspicious as it is: when the receiving provider
-says its sender failed its checks, the sender's domain with
-`sender_checks_fail` first (never the bare domain), then the sender; else the
-sender, then its domain unless a free-mail one. After Already paid on its Pay
+says its sender explicitly failed DMARC (`dmarc=fail`, so the domain's genuine
+mail passes), the sender's domain with `sender_checks_fail` first, then the
+sender; else the sender only. A whole domain SHALL never be offered to the
+trash or spam (people the inbox writes to may send from it). After Already paid on its Pay
 need (`action=paid`) it SHALL offer `mark_paid` for the sender, then its
 domain unless a free-mail one, a correspondent included. These two SHALL be
 offered with nothing like it in the inbox yet (they are about mail still to
@@ -127,7 +128,9 @@ when applied to existing mail, as the trash and spam operations do (the
 provider is told; trash and spam exclude each other), recording the
 application so removing the rule with `restore` takes each one back out as
 untrash and not spam do (out of the trash, back where it was; out of spam,
-received mail to the inbox). A member who takes a conversation out of the trash or spam
+received mail to the inbox), for the messages the rule binned only, never
+ones the member binned by hand; a conversation that was archived when the
+rule reported it SHALL be archived again. A member who takes a conversation out of the trash or spam
 SHALL make it an exception of the rule that put it there.
 
 #### Scenario: Undo all
@@ -138,7 +141,9 @@ SHALL make it an exception of the rule that put it there.
 A rule's `mark_paid` action SHALL answer the money question `paid` (source
 `taught`, acted) for the mail it matches, so no "Is it paid?" Pay need is
 raised for it and an open one is cleared with cause `rule`; a reply or an
-action the same mail asks for SHALL still be raised.
+action the same mail asks for SHALL still be raised. It SHALL never act on
+suspicious mail, nor on mail whose sender failed its checks, whatever the
+model made of it (a fake invoice is never marked paid).
 
 #### Scenario: EDP from now on
 - **WHEN** a rule says faturas@edp.example's bills are paid and a new EDP invoice arrives that the model reads as owed

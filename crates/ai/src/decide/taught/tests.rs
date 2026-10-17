@@ -465,6 +465,12 @@ fn paid_is_its_own_slot_and_never_for_suspicious_mail() {
         ..bill
     };
     assert_eq!(evaluate(&rules, &suspicious).paid, None);
+    // Failing its sender checks is enough, whatever the model said.
+    let failing = Facts {
+        auth_failed: true,
+        ..bill
+    };
+    assert_eq!(evaluate(&rules, &failing).paid, None);
     assert_eq!(
         TaughtRule::validate(
             &[Condition::SenderAddress("a@b.example".into())],

@@ -41,6 +41,8 @@ export interface NeedActionOptions {
    * campbooks-cloud#169).
    */
   onReported?: (conversation: ConversationSummary) => void;
+  /** That report was undone: its offer goes too. */
+  onReportUndone?: (conversation: ConversationSummary) => void;
 }
 
 /**
@@ -50,7 +52,15 @@ export interface NeedActionOptions {
  */
 export function useNeedActions(
   workspaceId: string,
-  { onChanged, onUndo, onRedo, onFailed, onPaid, onReported }: NeedActionOptions = {},
+  {
+    onChanged,
+    onUndo,
+    onRedo,
+    onFailed,
+    onPaid,
+    onReported,
+    onReportUndone,
+  }: NeedActionOptions = {},
 ) {
   const { t: typed } = useTranslation("conversations");
   const t = typed as unknown as Translate;
@@ -217,9 +227,13 @@ export function useNeedActions(
   const report = (conversation: ConversationSummary) => {
     const need = conversation.need;
     const name = need === null || need === undefined ? "" : needSender(need, conversation);
+    // Undone before the server answered: no offer for mail taken back out.
+    let undone = false;
     const entry = undo.push({
       label: t("needs.toast.reported", { name }),
       undo: () => {
+        undone = true;
+        onReportUndone?.(conversation);
         onUndo?.(conversation);
         void mutation
           .mutateAsync({ conversation, action: "not_spam" })
@@ -235,7 +249,9 @@ export function useNeedActions(
       .mutateAsync({ conversation, action: "spam" })
       .then(
         () => {
-          onReported?.(conversation);
+          if (!undone) {
+            onReported?.(conversation);
+          }
         },
         () => {
           undo.retract(entry);

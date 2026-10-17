@@ -32,17 +32,22 @@ a notice is the caller's to fetch, and rule changes publish
 | | **a. Report as spam, on mail failing its sender checks for that domain (chosen)** | b. Trash everything from the sender | c. Trash everything from the domain |
 | --- | --- | --- | --- |
 | A phishing mail pretending to be paypal.com | the next fake goes to spam; real PayPal mail (passing its checks) is untouched | the next fake from another address gets through | real PayPal mail goes too |
-| A look-alike domain that signs its own mail | sender, then its domain, as choices | covered | covered |
+| A look-alike domain that signs its own mail | the sender (never a whole domain to the bin) | covered | covered |
 | Tells the provider | yes (spam is the report) | no | no |
 
 **Chosen: a.** "Fails its sender checks" is the receiving provider's
 `Authentication-Results` read as the facts already read it
 (`EmailFacts::authentication_failed`: a DMARC fail, or neither a DMARC pass
 for the From domain nor an aligned DKIM pass; absent results say nothing).
-When it holds, the offer's default is the From domain *with* that condition,
+The offer uses it only on an explicit `dmarc=fail`: the domain publishes
+DMARC, so its genuine mail passes (for a domain that authenticates nothing,
+its genuine mail fails the checks too, and the offer is the sender instead).
+Then the offer's default is the From domain *with* that condition,
 never the bare domain, and only for a rule that reports or deletes: the
 offer after Already paid never offers "pretending to be" (a pretender's
-bills are never marked paid). The action is `spam` (Report and delete reports to the
+bills are never marked paid, and `mark_paid` never acts on mail failing its
+checks at all). A whole domain is never offered to the bin: a colleague of
+the phisher's victim may write from it. The action is `spam` (Report and delete reports to the
 provider); `trash` exists for rules that just delete, without a report. The
 brand a phishing mail imitates in its text is not read (no content rules,
 ADR 0018).

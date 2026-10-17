@@ -119,6 +119,21 @@ pub fn sender_checks_failed(from: &str, authentication_results: Option<&str>) ->
     .authentication_failed()
 }
 
+/// Whether the receiving provider's `authentication_results` hold an
+/// explicit `dmarc=fail`: the From domain publishes DMARC and this mail
+/// failed it, so the domain's genuine mail passes. "Pretending to be" a
+/// domain is only offered then: for a domain that authenticates nothing,
+/// its genuine mail fails its checks too.
+pub fn dmarc_failed(authentication_results: Option<&str>) -> bool {
+    authentication_results
+        .and_then(auth_results::parse)
+        .is_some_and(|results| {
+            results
+                .iter()
+                .any(|r| r.method == "dmarc" && r.result == "fail")
+        })
+}
+
 /// The structured facts of an email: addresses, a few headers and the
 /// attachments' media types. It holds none of the email's text.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
@@ -930,5 +945,17 @@ mod tests {
                 );
             }
         }
+    }
+
+    #[test]
+    fn only_an_explicit_dmarc_failure_is_one() {
+        let failed = "mx.example; dmarc=fail (p=REJECT) header.from=bank.example";
+        assert!(dmarc_failed(Some(failed)));
+        // Nothing authenticated, but nothing refused: a domain that publishes
+        // no DMARC fails its checks with its genuine mail too.
+        let unsigned = "mx.example; spf=none smtp.mailfrom=shop.example";
+        assert!(sender_checks_failed("hi@shop.example", Some(unsigned)));
+        assert!(!dmarc_failed(Some(unsigned)));
+        assert!(!dmarc_failed(None));
     }
 }

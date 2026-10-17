@@ -135,38 +135,40 @@ pub fn notice(stats: &SenderStats, settings: &NoticeSettings) -> Option<Noticed>
     {
         return None;
     }
-    let percent = |n: u32| u64::from(n) * 100 / u64::from(stats.received.max(1));
-    let (kind, actions) =
-        if percent(stats.archived_unread) >= u64::from(settings.archived_unread_percent_min) {
-            (
-                NoticeKind::ArchiveOnArrival,
-                vec![
-                    RuleAction::Archive,
-                    RuleAction::Surface {
-                        value: SurfaceWhen::Never,
-                    },
-                ],
-            )
-        } else if percent(stats.opened) <= u64::from(settings.opened_percent_max) {
-            // Filed where the decide pass sorts most of it; mail it keeps in
-            // Primary goes to Updates.
-            let stream = if stats.stream == Stream::Primary {
-                Stream::Updates
-            } else {
-                stats.stream
-            };
-            (
-                NoticeKind::KeepOffHome,
-                vec![
-                    RuleAction::MoveToStream { stream },
-                    RuleAction::Surface {
-                        value: SurfaceWhen::Never,
-                    },
-                ],
-            )
+    // Exact percentages (n / received against p / 100), never rounded down.
+    let received = u64::from(stats.received.max(1));
+    let at_least = |n: u32, p: u32| u64::from(n) * 100 >= u64::from(p) * received;
+    let at_most = |n: u32, p: u32| u64::from(n) * 100 <= u64::from(p) * received;
+    let (kind, actions) = if at_least(stats.archived_unread, settings.archived_unread_percent_min) {
+        (
+            NoticeKind::ArchiveOnArrival,
+            vec![
+                RuleAction::Archive,
+                RuleAction::Surface {
+                    value: SurfaceWhen::Never,
+                },
+            ],
+        )
+    } else if at_most(stats.opened, settings.opened_percent_max) {
+        // Filed where the decide pass sorts most of it; mail it keeps in
+        // Primary goes to Updates.
+        let stream = if stats.stream == Stream::Primary {
+            Stream::Updates
         } else {
-            return None;
+            stats.stream
         };
+        (
+            NoticeKind::KeepOffHome,
+            vec![
+                RuleAction::MoveToStream { stream },
+                RuleAction::Surface {
+                    value: SurfaceWhen::Never,
+                },
+            ],
+        )
+    } else {
+        return None;
+    };
     Some(Noticed {
         kind,
         conditions: vec![RuleCondition::SenderAddress(stats.sender.clone())],
@@ -281,6 +283,15 @@ mod tests {
                 "one burst",
                 SenderStats {
                     days: 2,
+                    ..builds()
+                },
+            ),
+            (
+                // 8 of 31 is just over a quarter: never rounded down to 25%.
+                "opened over a quarter",
+                SenderStats {
+                    received: 31,
+                    opened: 8,
                     ..builds()
                 },
             ),

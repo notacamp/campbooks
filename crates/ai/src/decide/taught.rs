@@ -610,6 +610,11 @@ pub fn evaluate(rules: &[TaughtRule], facts: &Facts<'_>) -> Outcome {
         }
         out.paid = None;
     }
+    // A bill whose sender failed its checks may be a fake one: never marked
+    // paid without the member, whatever the model made of it.
+    if facts.auth_failed {
+        out.paid = None;
+    }
     out
 }
 

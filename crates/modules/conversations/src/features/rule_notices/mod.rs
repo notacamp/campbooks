@@ -672,18 +672,25 @@ pub async fn check_open(
     }
 }
 
-/// The member said yes to `notice`: `rule` is its smart rule.
+/// The member said yes to `notice`: `rule` is its smart rule. Only an open
+/// one: of two saves at once, the second waits for the first and is refused
+/// (`invalid_rule`), so a suggestion becomes one rule.
 pub async fn accept(conn: &mut PgConnection, notice: RuleNoticeId, rule: RuleId) -> Result<()> {
-    sqlx::query!(
+    let accepted = sqlx::query!(
         r#"UPDATE conversations.rule_notices
               SET state = 'accepted', rule_id = $2, accepted_at = now()
-            WHERE id = $1"#,
+            WHERE id = $1 AND state = 'open'"#,
         notice as RuleNoticeId,
         rule as RuleId,
     )
     .execute(conn)
-    .await?;
-    Ok(())
+    .await?
+    .rows_affected();
+    if accepted == 1 {
+        Ok(())
+    } else {
+        Err(Error::BadRequest(crate::MESSAGES.reason("invalid_rule")))
+    }
 }
 
 /// `rule` was removed within `minutes` of being saved from a suggestion

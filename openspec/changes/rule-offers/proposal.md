@@ -41,9 +41,9 @@ No new module and no new cross-module dependency.
   authentication results, never the text.
 - **Offers after an action.** After Report and delete, `suggest_rules`
   (`action=report`) offers to report mail like it: when the provider says the
-  sender failed its checks, "mail that says it is from paypal.com but fails
-  its sender checks" first, never the whole domain; else the sender, or its
-  domain. After Already paid (`action=paid`): the sender's bills, or its
+  sender explicitly failed DMARC, "mail that says it is from paypal.com but
+  fails its sender checks" first; else the sender; never a whole domain.
+  After Already paid (`action=paid`): the sender's bills, or its
   domain's. Both are offered even with nothing like it yet (they are about
   mail still to come); a person the inbox writes to is never offered a rule
   that hides their mail (paid is not hiding).

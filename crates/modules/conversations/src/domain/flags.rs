@@ -259,6 +259,65 @@ async fn bin(conn: &mut sqlx::PgConnection, id: ConversationId, flag: Flag) -> R
     }
 }
 
+/// Take `messages` (provider ids) of conversation `id` out of the trash or
+/// spam, as a rule's undo does: only the messages it binned. Each comes
+/// with the change the provider is asked to make, with its own direction.
+pub async fn unbin_messages(
+    conn: &mut sqlx::PgConnection,
+    id: ConversationId,
+    flag: Flag,
+    messages: &[String],
+) -> Result<Vec<(String, RequestedChange)>> {
+    let rows = match flag {
+        Flag::Untrash => sqlx::query!(
+            r#"UPDATE conversations.messages SET in_trash = false, updated_at = now()
+                WHERE conversation_id = $1 AND in_trash AND provider_message_id = ANY($2)
+               RETURNING provider_message_id, direction = 'inbound' AS "inbound!""#,
+            id as ConversationId,
+            messages,
+        )
+        .fetch_all(&mut *conn)
+        .await?
+        .into_iter()
+        .map(|r| {
+            (
+                r.provider_message_id,
+                RequestedChange::Untrash { inbound: r.inbound },
+            )
+        })
+        .collect(),
+        Flag::Unspam => sqlx::query!(
+            r#"UPDATE conversations.messages
+                  SET in_spam = false, in_inbox = direction = 'inbound', updated_at = now()
+                WHERE conversation_id = $1 AND in_spam AND provider_message_id = ANY($2)
+               RETURNING provider_message_id, direction = 'inbound' AS "inbound!""#,
+            id as ConversationId,
+            messages,
+        )
+        .fetch_all(&mut *conn)
+        .await?
+        .into_iter()
+        .map(|r| {
+            (
+                r.provider_message_id,
+                RequestedChange::Unspam { inbound: r.inbound },
+            )
+        })
+        .collect(),
+        Flag::Read
+        | Flag::Unread
+        | Flag::Star
+        | Flag::Unstar
+        | Flag::Archive
+        | Flag::Unarchive
+        | Flag::Trash
+        | Flag::Spam => {
+            return Err(Error::internal("only untrash and not spam take mail out"));
+        }
+    };
+    Ok(rows)
+}
+
 /// Take conversation `id`'s messages out of the trash (untrash) or spam (not
 /// spam), returning each message that changed with its change and whether
 /// it is mail the inbox received. Untrash leaves the inbox flag as it was;
