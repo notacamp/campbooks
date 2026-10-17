@@ -240,6 +240,7 @@ async fn keep_inbox(
         )
         .execute(&mut **tx)
         .await?;
+        crate::features::rule_notices::forget_inbox(tx, inbox).await?;
         state
             .events
             .publish(

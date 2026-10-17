@@ -53,7 +53,9 @@ pub mod scopes;
 #[cfg(test)]
 mod testkit;
 
-pub use config::{ConversationsConfig, DEFAULT_DECIDE_BACKFILL_DAYS, DEFAULT_NEEDS_WINDOW_DAYS};
+pub use config::{
+    ConversationsConfig, DEFAULT_DECIDE_BACKFILL_DAYS, DEFAULT_NEEDS_WINDOW_DAYS, NoticeSettings,
+};
 pub use domain::{
     decide::STATE_VERSION,
     policy::{Policy, Switch},
@@ -183,6 +185,7 @@ pub fn module(deps: ConversationsDeps) -> Module {
                 undo: chrono::TimeDelta::seconds(i64::from(deps.config.undo_send_seconds)),
             }))
             .layer(Extension(needs.clone()))
+            .layer(Extension(deps.config.notices))
             .layer(Extension(deps.policy.clone()))
             .layer(Extension(writer)),
         admin_router: None,
@@ -204,6 +207,9 @@ pub fn module(deps: ConversationsDeps) -> Module {
             .consumer(features::record_send::RecordSend)
             .handler(features::apply_rule::ApplyRules::new(needs.clone()))
             .handler(features::fill_templates::FillTemplates)
+            .handler(features::rule_notices::NoticeRules::new(
+                deps.config.notices,
+            ))
             .handler(features::refresh_need::RefreshNeed::new(needs.clone()))
             .handler(features::summarize_need::SummarizeNeed::new(summaries))
             .handler(features::apply_changes::ApplyChanges::new(
@@ -269,8 +275,8 @@ fn router() -> OpenApiRouter<AppState> {
     use features::{
         archive, create_draft, get_attachment, get_conversation, get_message_body, labels,
         list_conversations, list_drafts, list_inboxes, list_labels, list_senders, list_streams,
-        mark_read, move_to_stream, needs, reply, rules, send_draft, spam, star, suggest_rules,
-        trash, update_draft,
+        mark_read, move_to_stream, needs, reply, rule_notices, rules, send_draft, spam, star,
+        suggest_rules, trash, update_draft,
     };
     OpenApiRouter::new()
         .routes(routes!(list_inboxes::handler))
@@ -314,6 +320,8 @@ fn router() -> OpenApiRouter<AppState> {
         .routes(routes!(rules::restore))
         .routes(routes!(suggest_rules::suggest))
         .routes(routes!(suggest_rules::dismiss))
+        .routes(routes!(rule_notices::list))
+        .routes(routes!(rule_notices::answer, rule_notices::clear_answer))
         .routes(routes!(reply::suggest))
         .routes(routes!(reply::write))
 }
@@ -351,6 +359,7 @@ mod tests {
             "conversations.check_send",
             "conversations.apply_rule",
             "conversations.fill_templates",
+            "conversations.notice_rules",
             "conversations.refresh_need",
             "conversations.summarize_need",
             "conversations.backfill_needs",

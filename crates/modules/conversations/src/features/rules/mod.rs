@@ -30,8 +30,10 @@ use crate::{
         rules::{self, NewRule, RuleAction, RuleCondition, Stored},
     },
     events::RULE_RECORD,
+    features::rule_notices,
     model::{
-        ConversationId, InboxId, PausedReason, RuleId, RuleOrigin, RuleState, RunKind, TeachingId,
+        ConversationId, InboxId, PausedReason, RuleId, RuleNoticeId, RuleOrigin, RuleState,
+        RunKind, TeachingId,
     },
     scopes::{ConversationsRead, ConversationsWrite},
 };
@@ -550,6 +552,11 @@ pub struct CreateRule {
     /// inboxes.
     #[serde(default)]
     pub teaching_id: Option<TeachingId>,
+    /// The suggestion it answers ("Scout noticed"), which the member saw as
+    /// a smart rule and confirmed: the rule acts at once (origin
+    /// `suggestion`), and the suggestion is accepted.
+    #[serde(default)]
+    pub notice_id: Option<RuleNoticeId>,
 }
 
 const fn yes() -> bool {
@@ -633,7 +640,17 @@ pub async fn create_in(
     body: &CreateRule,
 ) -> Result<CreatedRule> {
     rules::labels_of_inbox(tx, inbox, &body.conditions, &body.actions).await?;
-    let from_evidence = matches!(body.origin, RuleOrigin::Correction | RuleOrigin::Suggestion);
+    if let Some(notice) = body.notice_id {
+        rule_notices::check_open(tx, notice, inbox).await?;
+    }
+    // A suggestion the member confirmed as a smart rule is theirs: it acts.
+    let origin = if body.notice_id.is_some() {
+        RuleOrigin::Suggestion
+    } else {
+        body.origin
+    };
+    let from_evidence = body.notice_id.is_none()
+        && matches!(origin, RuleOrigin::Correction | RuleOrigin::Suggestion);
     let (rule_state, acted_without_asking) = if from_evidence {
         // Rules from evidence act for the member only when they let
         // Campbooks act without asking, and never for others.
@@ -694,7 +711,7 @@ pub async fn create_in(
             teaching: body.teaching_id.unwrap_or_default(),
             conditions: &body.conditions,
             actions: &body.actions,
-            origin: body.origin,
+            origin,
             origin_text: body.origin_text.as_deref(),
             state: rule_state,
             taught_by: access.user,
@@ -703,6 +720,9 @@ pub async fn create_in(
     )
     .await?;
     let rule = rules::find(tx, id).await?.ok_or(Error::NotFound)?;
+    if let Some(notice) = body.notice_id {
+        rule_notices::accept(tx, notice, id).await?;
+    }
     if rule_state == RuleState::Active && body.apply_to_existing {
         rule_runs::start(tx, &state.events, &ws, &rule, RunKind::Apply).await?;
     } else {
@@ -1156,6 +1176,10 @@ pub async fn remove(
     .await?;
     let mut removed = rule.clone();
     removed.state = RuleState::Removed;
+    // Undone right after it was saved from a suggestion: offered again.
+    if query.restore {
+        rule_notices::reopen(&mut tx, rule.id, RESTORE_MINUTES).await?;
+    }
     let ws = access.workspace.to_string();
     // Nothing is put back in an inbox kept read-only.
     if query.restore && !rule.inbox_detached {

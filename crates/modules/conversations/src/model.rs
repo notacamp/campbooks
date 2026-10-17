@@ -48,6 +48,11 @@ define_id!(
     RuleRunId
 );
 define_id!(
+    /// Something Scout noticed about mail an inbox gets a lot of, with the
+    /// smart rule it offers ("Scout noticed").
+    RuleNoticeId
+);
+define_id!(
     /// The rules one teaching created, across inboxes.
     TeachingId
 );
@@ -518,6 +523,28 @@ vocabulary!(
         Correction => "correction",
         /// Something Campbooks noticed and proposed.
         Suggestion => "suggestion",
+    }
+);
+
+vocabulary!(
+    /// What Scout noticed about a sender's mail, and so the rule it offers.
+    NoticeKind {
+        /// Mail the member gets a lot of and rarely opens: keep it off Home
+        /// and file it under a stream.
+        KeepOffHome => "keep_off_home",
+        /// Mail the member archives or deletes unread: archive it as it
+        /// arrives.
+        ArchiveOnArrival => "archive_on_arrival",
+    }
+);
+
+vocabulary!(
+    /// A member's answer to a suggestion Scout made.
+    NoticeAnswer {
+        /// Ask another time.
+        NotNow => "not_now",
+        /// Never suggest this for that sender again.
+        Never => "never",
     }
 );
 

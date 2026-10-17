@@ -39,6 +39,56 @@ pub struct ConversationsConfig {
     /// (`CAMPBOOKS_CONVERSATIONS__NEEDS_WINDOW_DAYS`, default 14).
     #[serde(default = "default_needs_window_days")]
     pub needs_window_days: u32,
+    /// When Scout notices mail the member gets a lot of and offers a smart
+    /// rule for it (`CAMPBOOKS_CONVERSATIONS__NOTICES__*`).
+    #[serde(default)]
+    pub notices: NoticeSettings,
+}
+
+/// The thresholds of "Scout noticed" (campbooks-cloud#169). Priors, to be
+/// tuned on the owner's mail: nothing here was measured.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
+#[serde(default, deny_unknown_fields)]
+pub struct NoticeSettings {
+    /// How far back a sender's mail is looked at, in days (`WINDOW_DAYS`,
+    /// default 60).
+    pub window_days: u32,
+    /// Conversations from one sender in that window before anything is
+    /// noticed (`MIN_MESSAGES`, default 8).
+    pub min_messages: u32,
+    /// Distinct days they came on, at least: mail that keeps coming, not a
+    /// burst (`MIN_DAYS`, default 4).
+    pub min_days: u32,
+    /// "Keep them off Home" when the member opened at most this share of
+    /// them, in percent (`OPENED_PERCENT_MAX`, default 25).
+    pub opened_percent_max: u32,
+    /// "Archive them as they arrive" when the member archived or deleted at
+    /// least this share of them unread, in percent
+    /// (`ARCHIVED_UNREAD_PERCENT_MIN`, default 70).
+    pub archived_unread_percent_min: u32,
+    /// An inbox is looked at again at most this often, in hours
+    /// (`EVERY_HOURS`, default 24).
+    pub every_hours: u32,
+    /// "Not now" hides a suggestion for this many days (`NOT_NOW_DAYS`,
+    /// default 14).
+    pub not_now_days: u32,
+    /// Most suggestions kept per inbox (`MAX_PER_INBOX`, default 5).
+    pub max_per_inbox: u32,
+}
+
+impl Default for NoticeSettings {
+    fn default() -> Self {
+        Self {
+            window_days: 60,
+            min_messages: 8,
+            min_days: 4,
+            opened_percent_max: 25,
+            archived_unread_percent_min: 70,
+            every_hours: 24,
+            not_now_days: 14,
+            max_per_inbox: 5,
+        }
+    }
 }
 
 const fn default_needs_window_days() -> u32 {
@@ -59,6 +109,7 @@ impl Default for ConversationsConfig {
             decide_backfill_days: DEFAULT_DECIDE_BACKFILL_DAYS,
             undo_send_seconds: DEFAULT_UNDO_SEND_SECONDS,
             needs_window_days: DEFAULT_NEEDS_WINDOW_DAYS,
+            notices: NoticeSettings::default(),
         }
     }
 }
