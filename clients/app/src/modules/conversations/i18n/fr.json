@@ -189,7 +189,11 @@
     "from": "De",
     "sending": "Envoi à {{name}}",
     "sendingNoName": "Envoi en cours",
-    "draftSaved": "Brouillon enregistré",
+    "draftChip": "Brouillon enregistré · {{title}}",
+    "draftDeleted": "Brouillon supprimé",
+    "deleteDraft": "Supprimer le brouillon",
+    "deleteDraftNamed": "Supprimer le brouillon : {{title}}",
+    "draftNotRestored": "Impossible de récupérer le brouillon.",
     "saveState": {
       "saved": "Enregistré",
       "saving": "Enregistrement…",
@@ -572,7 +576,8 @@
       "limit": "Scout a écrit beaucoup de réponses cette heure-ci. Réessayez plus tard ou écrivez-la vous-même.",
       "dailyLimit": "Cet espace de travail a utilisé son quota d’IA du jour. Écrivez celle-ci vous-même.",
       "send": "Impossible d’envoyer à {{name}}. Votre brouillon est conservé.",
-      "open": "Impossible d’ouvrir l’éditeur. Votre brouillon reste ici."
+      "open": "Impossible d’ouvrir l’éditeur. Votre brouillon reste ici.",
+      "delete": "Impossible de supprimer le brouillon. Il reste enregistré."
     },
     "to": "À {{recipient}}",
     "replyToElsewhere": "Les réponses vont à {{recipient}}, pas à l’expéditeur {{sender}}. Vérifiez avant d’envoyer."

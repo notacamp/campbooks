@@ -84,7 +84,13 @@ export function DraftComposer({
   }
 
   async function discard() {
-    await editor.discard();
+    try {
+      await editor.discard();
+    } catch {
+      // Nothing changed: the draft is still here.
+      undoToast.notify(t("compose.errors.unknown"));
+      return;
+    }
     onDone();
   }
 

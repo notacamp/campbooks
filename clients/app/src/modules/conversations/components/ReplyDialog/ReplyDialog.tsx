@@ -29,6 +29,7 @@ import {
 import { useConversation, type MessageView } from "../../api/queries";
 import { useReplySuggestions, writeReply } from "../../api/replies";
 import { displayName, replyQuote, type QuoteWords } from "../../compose/quote";
+import { useDeleteDraft } from "../../compose/use-delete-draft";
 import type { Translate } from "../../model";
 
 /** A draft whose send was taken back in time, to pick up again. */
@@ -111,6 +112,7 @@ export function ReplyDialog({
   const t = typed as unknown as Translate;
   const queryClient = useQueryClient();
   const undo = useUndoToast();
+  const deleteWithUndo = useDeleteDraft(workspaceId);
   const detail = useConversation(workspaceId, conversationId);
   const messages = detail.data?.messages ?? [];
   // The newest message, as the reader's Reply answers it.
@@ -330,6 +332,24 @@ export function ReplyDialog({
     }
   };
 
+  /** Throw away the draft that exists (Undo writes it back as on screen) and leave. */
+  const discard = async () => {
+    if (working.current || saved === undefined) {
+      return;
+    }
+    working.current = true;
+    setBusy(true);
+    try {
+      await deleteWithUndo({ ...saved, body: text });
+      onClose();
+    } catch {
+      setProblem("errors.delete");
+    } finally {
+      working.current = false;
+      setBusy(false);
+    }
+  };
+
   const drafting = stage === "draft";
   useShortcut(
     "compose.send",
@@ -438,6 +458,16 @@ export function ReplyDialog({
             >
               {t("reply.openInComposer")}
             </Button>
+            {saved === undefined ? null : (
+              <Button
+                disabled={busy || rewriting !== undefined}
+                onClick={() => {
+                  void discard();
+                }}
+              >
+                {t("compose.deleteDraft")}
+              </Button>
+            )}
           </>
         ) : stage === "choose" ? (
           writeOwn

@@ -189,7 +189,11 @@
     "from": "From",
     "sending": "Sending to {{name}}",
     "sendingNoName": "Sending",
-    "draftSaved": "Draft saved",
+    "draftChip": "Draft saved · {{title}}",
+    "draftDeleted": "Draft deleted",
+    "deleteDraft": "Delete draft",
+    "deleteDraftNamed": "Delete draft: {{title}}",
+    "draftNotRestored": "Couldn't bring the draft back.",
     "saveState": {
       "saved": "Saved",
       "saving": "Saving…",
@@ -572,7 +576,8 @@
       "limit": "Scout has written a lot of replies this hour. Try again later, or write it yourself.",
       "dailyLimit": "This workspace has used today's AI allowance. Write this one yourself.",
       "send": "Couldn't send to {{name}}. Your draft is kept.",
-      "open": "Couldn't open the composer. Your draft is kept here."
+      "open": "Couldn't open the composer. Your draft is kept here.",
+      "delete": "Couldn't delete the draft. It is still saved."
     },
     "to": "To {{recipient}}",
     "replyToElsewhere": "Replies go to {{recipient}}, not to the sender {{sender}}. Check before you send."

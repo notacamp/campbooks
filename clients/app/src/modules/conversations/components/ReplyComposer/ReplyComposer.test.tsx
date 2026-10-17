@@ -93,9 +93,9 @@ describe("ReplyComposer", () => {
     // Once the composer's shortcuts are live (it focused itself on opening).
     await waitFor(() => {
       fireEvent.keyDown(box, { key: "Escape" });
-      expect(screen.getByRole("button", { name: "Draft saved" })).toBeVisible();
+      expect(screen.getByRole("button", { name: "Draft saved · Reply to Maya Okafor" })).toBeVisible();
     });
-    fireEvent.click(screen.getByRole("button", { name: "Draft saved" }));
+    fireEvent.click(screen.getByRole("button", { name: "Draft saved · Reply to Maya Okafor" }));
     expect(await screen.findByRole("textbox", { name: "Message" })).toBeVisible();
   });
 
@@ -192,5 +192,74 @@ describe("ReplyComposer", () => {
     });
     renderWithProviders(slot({ mode: "reply_all", messageId: FIRST, nonce: 1 }));
     expect(await screen.findByRole("alert")).toHaveTextContent("Something went wrong");
+  });
+
+  it("lists every draft left on the conversation and deletes each one, with Undo", async () => {
+    const forward = {
+      ...REPLY,
+      id: "0192f1a0-0000-7000-8000-000000000201",
+      kind: "forward" as const,
+      to: [],
+      subject: `Fwd: ${Q4.subject}`,
+    };
+    let stored: (typeof REPLY)[] = [REPLY, forward];
+    const api = mockApi({
+      [`GET ${D}`]: () => ({ body: { drafts: stored } }),
+      [`DELETE ${D}/${forward.id}`]: () => {
+        stored = stored.filter((d) => d.id !== forward.id);
+        return { status: 204 };
+      },
+      [`POST ${D}`]: (_request, body) => {
+        stored = [...stored, { ...forward, ...(body as object), id: "restored" }];
+        return { status: 201, body: stored.at(-1) };
+      },
+    });
+    renderWithProviders(slot(null));
+    const box = await screen.findByRole("textbox", { name: "Message" });
+    await waitFor(() => {
+      fireEvent.keyDown(box, { key: "Escape" });
+      expect(screen.getByRole("button", { name: "Draft saved · Forward" })).toBeVisible();
+    });
+    expect(screen.getByRole("button", { name: "Draft saved · Reply to Maya Okafor" })).toBeVisible();
+
+    fireEvent.click(screen.getByRole("button", { name: "Delete draft: Forward" }));
+    expect(await screen.findByText("Draft deleted")).toBeVisible();
+    await waitFor(() => {
+      expect(screen.queryByRole("button", { name: "Draft saved · Forward" })).toBeNull();
+    });
+    expect(screen.getByRole("button", { name: "Draft saved · Reply to Maya Okafor" })).toBeVisible();
+
+    fireEvent.click(screen.getByRole("button", { name: /^Undo/u }));
+    expect(await screen.findByRole("button", { name: "Draft saved · Forward" })).toBeVisible();
+    expect(api.calls.find((c) => c.route === `POST ${D}`)?.body).toMatchObject({
+      kind: "forward",
+      message_id: REPLY.message_id,
+      subject: `Fwd: ${Q4.subject}`,
+      quoted: REPLY.quoted,
+    });
+  });
+
+  it("puts a discarded draft back with Undo, as it was on screen", async () => {
+    const api = mockApi({
+      [`GET ${D}`]: { body: { drafts: [REPLY] } },
+      [`DELETE ${D}/${REPLY.id}`]: { status: 204 },
+      [`POST ${D}`]: { status: 201, body: REPLY },
+    });
+    renderWithProviders(slot({ mode: "reply", messageId: FIRST, nonce: 1 }));
+    const box = await screen.findByRole("textbox", { name: "Message" });
+    fireEvent.change(box, { target: { value: "Not saved yet." } });
+    fireEvent.click(screen.getByRole("button", { name: "Discard" }));
+    expect(await screen.findByText("Draft deleted")).toBeVisible();
+    // The pending autosave never reached the server.
+    expect(api.calls.some((c) => c.route.startsWith("PATCH"))).toBe(false);
+    fireEvent.click(screen.getByRole("button", { name: /^Undo/u }));
+    await waitFor(() => {
+      expect(api.calls.some((c) => c.route === `POST ${D}`)).toBe(true);
+    });
+    expect(api.calls.find((c) => c.route === `POST ${D}`)?.body).toMatchObject({
+      kind: "reply",
+      message_id: FIRST,
+      body: "Not saved yet.",
+    });
   });
 });
