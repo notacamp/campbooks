@@ -145,6 +145,31 @@ export const WithExcerpt: Story = {
   },
 };
 
+/** Opened with Scout's summary above the email (here a stand-in for it). */
+export const SummaryOpen: Story = {
+  args: {
+    who: "Marta Ferreira",
+    what: "Marta asks you to confirm Thursday’s walkthrough.",
+    avatar: { name: "Marta Ferreira" },
+    due: "Due Wed",
+    tags: [],
+    expanded: true,
+    detail: (
+      <ItemDetail
+        summaryLabel="Scout’s summary"
+        summary="Marta is arranging the walkthrough with the builders. She proposes Thursday at 10:00 and needs your answer by Wednesday."
+        mail={
+          <p>
+            Hi Sam, could you confirm Thursday’s walkthrough? The builders need to know by
+            Wednesday.
+          </p>
+        }
+        actions={<Button variant="secondary">Open conversation</Button>}
+      />
+    ),
+  },
+};
+
 /** A warning, opened: its tells before the quote. */
 export const WarningOpen: Story = {
   args: {

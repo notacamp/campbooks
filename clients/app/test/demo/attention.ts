@@ -259,6 +259,8 @@ export const MARTA_DETAIL: Detail = {
       reasons: [{ rule: "signals.no_phishing_tell", evidence: "" }],
     },
   ],
+  need_summary:
+    "Marta is arranging Thursday’s walkthrough with the builders and needs your yes by Wednesday.",
 };
 
 /** The phishing message's detail: its tells. */

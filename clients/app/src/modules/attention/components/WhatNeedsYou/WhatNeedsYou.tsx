@@ -903,6 +903,8 @@ function NeedDetail({ workspaceId, row, t, tc, locale, now, onOpen }: NeedDetail
   return (
     <ItemDetail
       reasons={warning ? [...warningReasons(tc, exists, decisions), tc("needs.mail.linksOff")] : []}
+      summaryLabel={tc("needs.summary.heading")}
+      summary={detail.data?.need_summary ?? undefined}
       mail={
         needMessageOf(detail.data?.messages ?? [], need) === undefined ? undefined : (
           <NeedMessage

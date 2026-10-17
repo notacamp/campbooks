@@ -66,6 +66,19 @@ All notable changes to Campbooks Next are documented here. The format follows
   Done or Not needed on Home. Two new operations, `conversations.suggest_replies` and
   `conversations.write_reply`, need `conversations:send`, count against the workspace's
   daily AI limit and a per-member hourly allowance, and store nothing.
+
+
+- **Scout's summary of the email on an opened Home item.** When an email raises a need, the
+  `complete` model writes one or two plain sentences saying what it is about, once, in the
+  background, and the opened item shows them first, under "Scout's summary" with the visor,
+  above the email, so you can decide without reading it. The summary is written in all four
+  languages in one call and you read yours. It is never written again and opening an item never
+  asks the model. It counts against the workspace's daily AI limit (one call per email that
+  raises a need) and appears only when a `complete` model is configured and may receive mail on
+  this server; otherwise, or when the call fails, the email shows as before. Mail that may be
+  phishing gets no summary, only its warning, so Scout never retells a scam in its own voice.
+  Needs that were open before the upgrade get theirs in the background, with nothing to do.
+
 - **Error reports to GlitchTip or Sentry.** Set `CAMPBOOKS_TELEMETRY__ERROR_DSN` and every
   internal error, job that failed for good and panic is reported, filed under the release
   and `CAMPBOOKS_TELEMETRY__ENVIRONMENT`. A report holds only ids (request, trace,

@@ -61,6 +61,10 @@ pub struct NeedSettings {
     pub window: TimeDelta,
     /// Which answers may act.
     pub policy: Policy,
+    /// Whether a need that opens queues Scout's summary of its email
+    /// (`conversations.summarize_need`): only when the `complete` role may
+    /// receive mail on this server.
+    pub summaries: bool,
 }
 
 impl NeedSettings {
@@ -69,7 +73,16 @@ impl NeedSettings {
         Self {
             window: TimeDelta::days(i64::from(days)),
             policy: policy.clone(),
+            summaries: false,
         }
+    }
+
+    /// The same settings, queueing a summary for each need that opens when
+    /// `on`.
+    #[must_use]
+    pub const fn with_summaries(mut self, on: bool) -> Self {
+        self.summaries = on;
+        self
     }
 
     /// The confidence from which a model suggestion becomes a question.
@@ -950,7 +963,7 @@ enum Pass {
     Again,
 }
 
-#[allow(clippy::too_many_arguments)]
+#[allow(clippy::too_many_arguments, clippy::too_many_lines)]
 async fn refresh_pass(
     tx: &mut Transaction<'_, Postgres>,
     events: &EventBus,
@@ -1040,6 +1053,18 @@ async fn refresh_pass(
     )
     .fetch_one(&mut **tx)
     .await?;
+    // A need that opens for a message (new, or back after being cleared)
+    // gets Scout's summary of the email, through a job: never here, and
+    // once per message however often the need is worked out again. Mail
+    // that may be phishing gets none: a summary would retell the scam in
+    // Scout's voice, and the warning is what matters there.
+    let opened = cause.is_none()
+        && row
+            .as_ref()
+            .is_none_or(|r| r.state != "open" || r.message_id != need.message);
+    if settings.summaries && opened && need.question != NeedQuestion::Suspicious {
+        crate::features::summarize_need::enqueue(tx, workspace, need.message).await?;
+    }
     events
         .publish(
             tx,

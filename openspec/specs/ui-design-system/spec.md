@@ -118,3 +118,13 @@ when the content is taller than the clamp.
 #### Scenario: A long email on Home
 - **WHEN** an opened item's email is taller than the clamp
 - **THEN** it ends in a fade with "Show the whole email", and pressing it shows all of it with "Show less"
+
+### Requirement: Item summary
+`ItemDetail` SHALL accept a `summary` (a model's plain sentences) and a
+`summaryLabel`, and draw them as a region named by the label, marked with the
+visor, after the reasons and above the email, as text only. It SHALL draw
+nothing without a summary.
+
+#### Scenario: A summary above the email
+- **WHEN** an opened item has a summary and an email
+- **THEN** the summary shows under its heading before the email, and without a summary only the email shows

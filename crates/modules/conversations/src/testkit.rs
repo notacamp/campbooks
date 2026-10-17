@@ -292,6 +292,16 @@ impl Kit {
         self.call(Method::GET, token, uri, None).await
     }
 
+    /// `GET uri` with `token`, asking for `language` (`Accept-Language`).
+    pub async fn get_in(&self, token: &str, uri: &str, language: &str) -> TestResponse {
+        let request = Request::get(uri)
+            .header(header::AUTHORIZATION, format!("Bearer {token}"))
+            .header(header::ACCEPT_LANGUAGE, language)
+            .body(Body::empty())
+            .unwrap();
+        testing::send(&self.app, request).await
+    }
+
     /// `GET uri` with `token`, whole: status, headers and body bytes.
     pub async fn get_raw(&self, token: &str, uri: &str) -> (StatusCode, HeaderMap, Vec<u8>) {
         let request = Request::get(uri)

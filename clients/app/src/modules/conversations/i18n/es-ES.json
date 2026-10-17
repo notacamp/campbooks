@@ -297,6 +297,9 @@
       "allPaidFailed_one": "No se ha podido marcar {{count}} factura como pagada. Inténtalo de nuevo.",
       "allPaidFailed_other": "No se han podido marcar {{count}} facturas como pagadas. Inténtalo de nuevo."
     },
+    "summary": {
+      "heading": "Resumen de Scout"
+    },
     "mail": {
       "more": "Mostrar el correo completo",
       "less": "Mostrar menos",

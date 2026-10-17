@@ -12426,6 +12426,13 @@
               "$ref": "#/components/schemas/MessageView"
             },
             "description": "Up to the 100 newest messages, oldest first."
+          },
+          "need_summary": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Scout's summary of the email behind the conversation's open need, in\nyour language (English when it has none in yours), written once when\nthe need was raised. None when there is no open need, the summary is\nnot written yet (it arrives with a change to this conversation), or no\nmodel may read mail on this server."
           }
         }
       },

@@ -4,10 +4,12 @@ import { pause, type ScenarioContext } from "../context.ts";
 
 import { caption, signedIn } from "./inbox.ts";
 
-// An opened Home item shows the email (campbooks-cloud#203) on the real
-// stack: start it as inbox.ts says, with a `decide` model configured
+// An opened Home item shows Scout's summary (campbooks-cloud#204), then the
+// email (campbooks-cloud#203), on the real stack: start it as inbox.ts says, with a `decide` model configured
 // (CAMPBOOKS_AI__DECIDE__*), since without one no need is raised (ADR
-// 0018). Fictional person and mail only; nothing is sent.
+// 0018), and a `complete` role (CAMPBOOKS_AI__COMPLETE__*) that may receive
+// mail, which writes the summaries: without one the summary is simply not
+// shown. Fictional person and mail only; nothing is sent.
 //
 //   INBOX_BASE_URL=http://localhost:5181 pnpm --dir clients record home-item-mail \
 //     --base-url http://localhost:5181
@@ -30,10 +32,19 @@ export default async function homeItemMail({ page }: ScenarioContext): Promise<v
   await homeFilled(page, workspace);
   await page.getByRole("group", { name: /^Actions for/u }).waitFor();
 
-  // Open a reply: the email shows under it, a few lines deep.
+  // Open a reply: Scout's summary first, then the email a few lines deep.
   await page.getByText("Maya Okafor is waiting for your reply").first().click();
   await page.getByRole("button", { name: "Show the whole email" }).first().waitFor();
-  await caption(page, "Open an item to read the email before you decide", 2600);
+  const summary = page.getByRole("region", { name: "Scout’s summary" }).first();
+  // Written when the need was raised; nothing shows where no `complete` role is set.
+  const summarised = await summary.waitFor({ timeout: 30_000 }).then(
+    () => true,
+    () => false,
+  );
+  if (summarised) {
+    await caption(page, "Scout’s summary says what it is about, so you can decide", 3000);
+  }
+  await caption(page, "Below it, the email itself", 2200);
   await page.getByRole("button", { name: "Show the whole email" }).first().click();
   await caption(page, "Show the whole email reads it in place", 2200);
   await page.getByRole("button", { name: "Show less" }).first().click();

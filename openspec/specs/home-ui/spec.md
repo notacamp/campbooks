@@ -28,8 +28,11 @@ module's batch read (`conversations.list` with `ids`), not from `attention`.
 - **THEN** the one due Wednesday is first
 
 ### Requirement: Acting from Home
-Enter SHALL open an item in place when no action is highlighted, showing the
-email the need is about as the reader renders it (sanitised, in the sandboxed
+Enter SHALL open an item in place when no action is highlighted, showing
+Scout's summary of the email first when there is one (under "Scout's summary",
+marked with the visor, as text only; nothing when no summary is written, no
+model may read mail here or the call failed), then the email the need is
+about as the reader renders it (sanitised, in the sandboxed
 frame, remote images held back, its links leading nowhere when the need is a
 warning), a few lines deep with "Show the whole email" to read it in place,
 and "How Campbooks decided" (closed by default); the sender's quote SHALL be
@@ -70,9 +73,17 @@ safe, since each of those writes in the inbox.
 - **WHEN** the user selects Marta's item and presses Enter
 - **THEN** her email shows under the item a few lines deep, and "Show the whole email" shows all of it in place
 
+#### Scenario: Scout's summary first
+- **WHEN** Marta's need has a summary and the user opens her item
+- **THEN** "Scout's summary" with the visor shows what the email is about, above the email, and nothing is asked of the model
+
+#### Scenario: No summary
+- **WHEN** an item's need has no summary
+- **THEN** the opened item shows the email without any summary or placeholder
+
 #### Scenario: A warning's links lead nowhere
 - **WHEN** the user opens a phishing warning on Home
-- **THEN** its email shows with links that open nothing, and a line says links are off in mail that may be phishing
+- **THEN** its email shows with links that open nothing, a line says links are off in mail that may be phishing, and there is no Scout's summary
 
 ### Requirement: Done today
 Home SHALL list what left the user's list today (`attention.list` with
