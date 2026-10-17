@@ -11,7 +11,6 @@ export type RuleAction = Schema<"RuleAction">;
 export type RuleSuggestion = Schema<"RuleSuggestion">;
 export type RuleSuggestions = Schema<"RuleSuggestions">;
 export type RuleException = Schema<"RuleException">;
-export type RulePreviewView = Schema<"RulePreview">;
 export type RuleNotice = Schema<"RuleNotice">;
 
 /** What a member did to one conversation, that a rule could repeat. */

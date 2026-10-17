@@ -103,6 +103,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: generated
+          include-hidden-files: true
           path: |
             .sqlx/
             openapi/

@@ -31,7 +31,6 @@ use axum::{Extension, Json, extract::State, http::StatusCode};
 use campbooks_ai::decide::signals::email::{Envelope, Party, is_machine_sender};
 use campbooks_kernel::{
     AppState, Error, JobContext, JobError, JobHandler, Operation, Problem, Result, Risk,
-    authz::Action,
     db::BeginFor as _,
     extract,
     jobs::{EnqueueOptions, Enqueued},
@@ -42,7 +41,7 @@ use serde::{Deserialize, Serialize};
 use sqlx::{PgConnection, Postgres, Transaction};
 use utoipa::ToSchema;
 
-pub use analysis::{Cadence, NoticeEvidence};
+pub use analysis::NoticeEvidence;
 
 use crate::{
     config::NoticeSettings,
