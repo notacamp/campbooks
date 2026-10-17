@@ -202,7 +202,10 @@ On upgrade to the money question, the needs checks SHALL accept the
 question `money` and the verdicts `already_paid` and `still_to_pay`, and
 every inbox SHALL be queued for the needs backfill, without any manual step,
 so each recent need is worked out again under the new rule (a `pay` need the
-old rule raised is withdrawn as `superseded`). When a trusted `decide` role
+old rule raised is withdrawn as `superseded` once its message's money answer
+says nothing is owed; until that message has a money answer it SHALL stay, so
+a pass that could not ask, at the daily AI cap or with a model failing the
+answers check, never drops a bill). When a trusted `decide` role
 is configured, the backfill SHALL ask the model about each conversation's
 newest inbound message sent within the decide backfill window that lacks a
 checked model answer to any triage question, once; the checked answers
@@ -213,7 +216,11 @@ answered.
 
 #### Scenario: A receipt that was Pay
 - **WHEN** a payment confirmation in Receipts had an open `pay` need raised by `asks_action`, and the upgrade runs with Jev configured
-- **THEN** the need is withdrawn as `superseded`, the model is asked about the message once, and since it answers `money` `paid` no need is raised again
+- **THEN** the model is asked about the message once, and since it answers `money` `paid` the need is withdrawn as `superseded` and not raised again
+
+#### Scenario: A bill the upgrade could not ask about
+- **WHEN** a recent bill had an open `pay` need raised by `asks_action`, and the model cannot be asked (its answers check has not passed)
+- **THEN** the `pay` need stays open
 
 #### Scenario: A bill that was Pay
 - **WHEN** a bill had an open `pay` need raised by `asks_action`, and the model answers `money` `owed` at 0.93

@@ -72,8 +72,7 @@ function senderCondition(sender: string): Condition {
 }
 
 /** The categories "what never needs you" offers. */
-export const NEVER_KINDS = ["lists", "automatic"] as const;
-export type NeverKind = (typeof NEVER_KINDS)[number];
+type NeverKind = "lists" | "automatic";
 
 /** "This header is present". */
 function headerPresent(name: "list_id" | "auto_submitted"): Condition {

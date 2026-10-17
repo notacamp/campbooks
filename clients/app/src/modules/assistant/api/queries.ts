@@ -8,6 +8,7 @@ export type Proposal = Schema<"Proposal">;
 export type Condition = Schema<"RuleCondition">;
 export type Action = Schema<"RuleAction">;
 export type RuleOrigin = Schema<"RuleOrigin">;
+export type Sender = Schema<"SenderView">;
 
 // Keyed by operationId, so the change feed refetches them.
 const keys = {
@@ -71,11 +72,11 @@ export function useCompile(workspaceId: string) {
 }
 
 /** `conversations.list_senders`: the people the caller replies to most, or those matching `q`. */
-export function useSenders(workspaceId: string, q = "") {
+export function useSenders(workspaceId: string, q = "", { enabled = true } = {}) {
   const query = q.trim();
   return useQuery({
     queryKey: keys.senders(workspaceId, query),
-    enabled: query.length === 0 || query.length >= 2,
+    enabled: enabled && (query.length === 0 || query.length >= 2),
     queryFn: async ({ signal }) =>
       unwrap(
         await api.GET("/api/v1/w/{workspace_id}/senders", {

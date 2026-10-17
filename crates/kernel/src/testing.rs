@@ -107,6 +107,12 @@ pub fn kernel_scope_setting() -> &'static str {
     db::KERNEL_SCOPE_SETTING
 }
 
+/// The name of the maintenance scope's setting, for tests that inspect the
+/// policies (the constant itself is the kernel's own).
+pub fn maintenance_scope_setting() -> &'static str {
+    db::MAINTENANCE_SCOPE_SETTING
+}
+
 /// Run `sql` on `db`, panicking on failure (test setup).
 async fn exec(db: &PgPool, sql: String) {
     sqlx::query(sqlx::AssertSqlSafe(sql))

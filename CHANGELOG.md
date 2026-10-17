@@ -32,6 +32,13 @@ All notable changes to Campbooks Next are documented here. The format follows
 
 ### Changed
 
+- **Find people by name in Scout's questions.** In "Whose mail should always reach you?"
+  and "What never needs you?", the address field is now a filter box. Type part of a name,
+  an address or a domain and the cards narrow at once, then Scout finds anyone in your mail
+  who matches, beyond the ten it suggests. The people you ticked stay listed. A full
+  address or a domain no one matches still shows as its own card to tick. With text in the
+  box, Enter ticks the first match and Esc clears it. "What never needs you?" no longer
+  suggests the people you reply to most.
 - **Settings pages are made of section cards.** Every Settings and Admin page now has a
   display-face title with its lead, then each section in its own card with a larger title,
   a count where it lists things ("Accounts · 2") and a one-line description. In Scout's
@@ -52,6 +59,15 @@ All notable changes to Campbooks Next are documented here. The format follows
 
 ### Security
 
+- **Background work shared by the whole instance can only be changed by the kernel.**
+  Account events, account jobs and scheduled ticks belong to no workspace. Work running in
+  a workspace could still read and add them, which it needs, but it could also complete,
+  requeue or delete them. Now only the kernel's own machinery (the worker, retention, the
+  admin's queue) can change them. The two schedulers that work across workspaces (polling
+  mailboxes, the needs backfill) now get a narrower scope that reads only their own
+  schedule and reaches no other workspace's events or jobs. The architecture check also
+  closes four ways around it (campbooks-cloud#196). Before redeploying an older version,
+  run the rollback in the change's design notes.
 - **The change feed reveals nothing about inboxes you can't see.** The live stream of
   what changed used to carry the workspace's own change count: as the `ready` frame's
   `head`, as every frame's cursor (so the gap between two of your changes counted the

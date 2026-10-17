@@ -524,3 +524,40 @@ async fn oversized_messages_are_skipped_and_never_fetched_again(db: PgPool) {
     kit.next_run().await;
     assert_eq!(kit.google.raw_fetches(&big), 1);
 }
+
+/// The dispatcher works in the maintenance scope (campbooks-cloud#196): it
+/// leases the due streams of every workspace and enqueues each run in its
+/// own workspace, as the runtime role.
+#[sqlx::test(migrations = "../../../migrations")]
+async fn the_dispatcher_runs_every_workspace_s_due_streams(db: PgPool) {
+    let kit = Kit::new(db.clone()).await;
+    let (ana_ws, _) = connected(&kit).await;
+    let bea_ws = WorkspaceId::new();
+    let bea = kit.user("bea");
+    kit.join(&bea, bea_ws, Role::Member);
+    kit.adopt(&bea, bea_ws, "bea-account", None)
+        .await
+        .unwrap_or_else(|e| panic!("adopting: {e:?}"));
+    kit.run_jobs().await;
+    let runs = |ws: WorkspaceId| {
+        let db = db.clone();
+        async move {
+            sqlx::query_scalar::<_, i64>(
+                "SELECT count(*) FROM kernel.jobs
+                  WHERE kind = 'connectors.sync_stream' AND workspace_id = $1
+                    AND state = 'succeeded'",
+            )
+            .bind(ws.to_string())
+            .fetch_one(&db)
+            .await
+            .unwrap()
+        }
+    };
+    let before = (runs(ana_ws).await, runs(bea_ws).await);
+    assert_eq!(kit.tick(TimeDelta::days(1)).await, 2);
+    assert_eq!(
+        (runs(ana_ws).await, runs(bea_ws).await),
+        (before.0 + 1, before.1 + 1),
+        "one more run in each workspace"
+    );
+}

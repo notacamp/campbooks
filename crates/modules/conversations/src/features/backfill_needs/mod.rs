@@ -10,8 +10,9 @@
 //! `conversations.needs_backfills`; then:
 //!
 //! - `conversations.dispatch_needs_backfills`, every minute, starts the
-//!   pending rows (a maintenance transaction in the kernel scope: it reads
-//!   ids and states only, through the table's maintenance policies);
+//!   pending rows (a transaction in the maintenance scope: it reads ids and
+//!   states only, through the table's maintenance policies, and enqueues
+//!   each page job in its inbox's workspace);
 //! - `conversations.backfill_needs` pages through one inbox's conversations
 //!   by id, in the inbox's workspace (row-level security applies), and runs
 //!   [`needs::refresh`] on each one whose last message falls within the
@@ -75,9 +76,10 @@ impl Job for DispatchNeedsBackfills {
 
     async fn run(self, ctx: &mut JobContext) -> Result<(), JobError> {
         // Across workspaces, through the table's maintenance policies (ids
-        // and states only): the kernel scope, allowed for this file in
-        // `architecture.toml`.
-        let tx = ctx.kernel_tx().await?;
+        // and states only): the maintenance scope, allowed for this file in
+        // `architecture.toml`. It reaches no kernel table: each page job is
+        // enqueued in its inbox's workspace, set just before.
+        let tx = ctx.maintenance_tx().await?;
         sqlx::query!(
             r#"UPDATE conversations.needs_backfills b SET state = 'running'
                 WHERE b.inbox_id IN (
@@ -107,6 +109,7 @@ impl Job for DispatchNeedsBackfills {
                 inbox: row.inbox,
                 after: row.after,
             };
+            db::set_workspace(tx, &row.workspace.to_string()).await?;
             let enqueued =
                 jobs::enqueue_to::<BackfillNeeds>(tx, &page, page.options(row.workspace)).await?;
             if matches!(enqueued, Enqueued::Created(_)) {
