@@ -287,6 +287,39 @@ impl Changed {
     }
 }
 
+/// Publish `changes_requested` for a member's change of `changed`'s
+/// conversation: each item's message with its own change. Nothing is
+/// published when there is none.
+pub async fn request_each(
+    events: &EventBus,
+    tx: &mut Transaction<'_, Postgres>,
+    changed: &Changed,
+    items: &[(String, RequestedChange)],
+) -> Result<()> {
+    if items.is_empty() {
+        return Ok(());
+    }
+    events
+        .publish(
+            tx,
+            &ChangesRequested {
+                workspace: changed.workspace.clone(),
+                inbox_id: changed.inbox,
+                conversation: changed.conversation,
+                origin: RequestOrigin::User,
+                items: items
+                    .iter()
+                    .map(|(message, change)| RequestedItem {
+                        provider_message_id: message.clone(),
+                        change: change.clone(),
+                    })
+                    .collect(),
+            },
+        )
+        .await?;
+    Ok(())
+}
+
 /// Publish `changes_requested` for a member's change: `change` for each of
 /// `provider_message_ids`. Nothing is published when the list is empty.
 pub async fn request(

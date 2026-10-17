@@ -10,8 +10,17 @@
 //! recorded in `identity.mailbox_links` count (see that module, which also
 //! fixes the lock order), so a way in some of whose mailboxes are unknown is
 //! never removed. Idempotent: a replay finds the record gone.
+//!
+//! The event alone is no proof that the connection went: any transaction
+//! working in the workspace could write it (campbooks-cloud#211). Before
+//! acting, the handler asks the connectors module (the grant-intake port)
+//! for the account's connection of that provider account there; while that
+//! is still the named connection, nothing happens. A port that cannot
+//! answer is retried, never guessed at.
 
-use campbooks_kernel::{AppState, Event, EventConsumer, JobContext, JobError, Result};
+use campbooks_kernel::{
+    AppState, Event, EventConsumer, JobContext, JobError, Result, tenancy::WorkspaceId,
+};
 use chrono::{DateTime, Utc};
 use sqlx::PgConnection;
 use uuid::Uuid;
@@ -82,8 +91,40 @@ impl EventConsumer for ForgetConnectedWayIn {
             .workspace
             .parse()
             .map_err(|_| JobError::fatal("connection_removed names an invalid workspace"))?;
-        let now = Utc::now();
         let state = ctx.state().clone();
+        let account = {
+            let mut conn = ctx.pool().acquire().await?;
+            mailbox_links::account_naming(
+                &mut conn,
+                workspace,
+                &removed.connection,
+                &provider,
+                &subject,
+            )
+            .await
+            .map_err(retry)?
+        };
+        let Some(account) = account else {
+            return Ok(());
+        };
+        let live = state
+            .grants
+            .connection_of(
+                &state,
+                &account.to_string(),
+                WorkspaceId::from_uuid(workspace),
+                &provider,
+                &subject,
+            )
+            .await
+            .map_err(retry)?;
+        if live.as_deref() == Some(removed.connection.as_str()) {
+            tracing::warn!(
+                "connection_removed names a connection that is still connected; not acted on"
+            );
+            return Ok(());
+        }
+        let now = Utc::now();
         let tx = ctx.tx().await?;
         let Some(gone) =
             mailbox_links::forget(tx, workspace, &removed.connection, &provider, &subject, now)

@@ -107,6 +107,9 @@ struct KindSpec {
     settles: bool,
     /// Whether an operator must hear when one dies.
     watch: Option<Watch>,
+    /// Whether a job of the kind may only be the instance's: one that
+    /// carries a workspace is refused, never run (campbooks-cloud#211).
+    instance_only: bool,
 }
 
 struct ScheduleSpec {
@@ -149,6 +152,7 @@ impl Background {
             consumes: None,
             settles: false,
             watch: J::WATCH,
+            instance_only: J::INSTANCE_ONLY,
         });
         self
     }
@@ -164,6 +168,8 @@ impl Background {
             consumes: Some((H::Event::NAME, H::Event::VERSION)),
             settles: H::Event::SETTLES,
             watch: H::WATCH,
+            // An instance-wide event's deliveries carry no workspace.
+            instance_only: !H::Event::WORKSPACE_SCOPED,
         });
         self
     }
@@ -190,6 +196,7 @@ impl Background {
             consumes: None,
             settles: false,
             watch: H::WATCH,
+            instance_only: H::INSTANCE_ONLY,
         });
         self
     }
@@ -213,6 +220,7 @@ impl Background {
             consumes: Some((C::Event::NAME, C::Event::VERSION)),
             settles: C::Event::SETTLES,
             watch: C::WATCH,
+            instance_only: !C::Event::WORKSPACE_SCOPED,
         });
         self
     }
@@ -220,10 +228,15 @@ impl Background {
     /// Run `J::default()` every `every`, on ticks aligned to the Unix epoch
     /// (every hour runs on the hour). Registers `J` too. However many
     /// workers run, each tick is enqueued once, and a tick is skipped while
-    /// the previous run is still pending or running.
+    /// the previous run is still pending or running. Its ticks are the
+    /// instance's: a job of `J`'s kind that carries a workspace is refused,
+    /// never run ([`Job::INSTANCE_ONLY`]).
     #[must_use]
     pub fn schedule<J: Job + Default>(self, every: Duration) -> Self {
         let mut this = self.job::<J>();
+        if let Some(kind) = this.kinds.last_mut() {
+            kind.instance_only = true;
+        }
         this.schedules.push(ScheduleSpec {
             name: J::NAME,
             every,
@@ -324,6 +337,8 @@ pub(crate) struct KindInfo {
     pub max_attempts: u32,
     pub run: RunFn,
     pub watch: Option<Watch>,
+    /// A job of it that carries a workspace is refused, never run.
+    pub instance_only: bool,
 }
 
 /// A registered event consumer.
@@ -591,6 +606,7 @@ impl Registry {
                     max_attempts: kind.max_attempts,
                     run: Arc::clone(&kind.run),
                     watch: kind.watch,
+                    instance_only: kind.instance_only,
                 },
             );
             if let Some((event, _)) = kind.consumes {
@@ -742,6 +758,19 @@ impl Registry {
     /// Every job kind (jobs and event handlers), sorted.
     pub fn kind_names(&self) -> Vec<&'static str> {
         self.kinds.keys().copied().collect()
+    }
+
+    /// The kinds that run instance-wide only, sorted: every schedule's, the
+    /// deliveries of every instance-wide event
+    /// ([`DomainEvent::WORKSPACE_SCOPED`] `false`) and the kinds declared
+    /// [`Job::INSTANCE_ONLY`]. The worker refuses a job of one of them that
+    /// carries a workspace (campbooks-cloud#211).
+    pub fn instance_only_kinds(&self) -> Vec<&'static str> {
+        self.kinds
+            .iter()
+            .filter(|(_, kind)| kind.instance_only)
+            .map(|(name, _)| *name)
+            .collect()
     }
 
     /// Every schedule's name.

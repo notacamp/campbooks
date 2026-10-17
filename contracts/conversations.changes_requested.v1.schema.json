@@ -34,11 +34,21 @@
       "oneOf": [
         {
           "type": "object",
-          "description": "A flag change. `trash` puts the message in the trash and `untrash` takes it out, back where it was; `spam` reports it as spam (into spam, out of the inbox) and `unspam` takes that back, to the inbox only if it was there before. Trash and spam exclude each other. The kinds `trash`, `untrash`, `spam` and `unspam` were added to v1 later: a consumer must decode a kind it does not know leniently (as unknown, and skip it, e.g. `#[serde(other)]`); a strict validator of the earlier revision of this schema would reject the event.",
+          "description": "A flag change. `trash` puts the message in the trash and `spam` reports it as spam (into spam, out of the inbox); the trash and spam exclude each other. The kinds `trash`, `untrash`, `spam` and `unspam` were added to v1 later: a consumer must decode a kind it does not know leniently (as unknown, and skip it, e.g. `#[serde(other)]`); a strict validator of the earlier revision of this schema would reject the event.",
           "required": ["kind"],
           "additionalProperties": false,
           "properties": {
-            "kind": { "enum": ["mark_read", "mark_unread", "star", "unstar", "archive", "unarchive", "trash", "untrash", "spam", "unspam"] }
+            "kind": { "enum": ["mark_read", "mark_unread", "star", "unstar", "archive", "unarchive", "trash", "spam"] }
+          }
+        },
+        {
+          "type": "object",
+          "description": "Out of the trash (`untrash`, back where it was) or out of spam (`unspam`). `inbound` says the message is mail the inbox received: not spam puts it back in the inbox, and where a provider cannot tell where a message was before the trash, received mail goes to the inbox. The member's own mail is never put in the inbox.",
+          "required": ["kind", "inbound"],
+          "additionalProperties": false,
+          "properties": {
+            "kind": { "enum": ["untrash", "unspam"] },
+            "inbound": { "type": "boolean" }
           }
         },
         {

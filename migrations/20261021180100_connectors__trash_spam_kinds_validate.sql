@@ -1,4 +1,4 @@
--- Validate the check `…160000_connectors__trash_spam_kinds` widened NOT VALID
+-- Validate the check `…180000_connectors__trash_spam_kinds` widened NOT VALID
 -- (campbooks-cloud#169). A migration of its own, so it runs in a transaction
 -- of its own: VALIDATE CONSTRAINT takes only SHARE UPDATE EXCLUSIVE, so reads
 -- and writes go on while it scans the rows.

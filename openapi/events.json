@@ -1921,9 +1921,14 @@
             "type": "object",
             "description": "Take the message out of the trash, back where it was.",
             "required": [
+              "inbound",
               "kind"
             ],
             "properties": {
+              "inbound": {
+                "type": "boolean",
+                "description": "It is mail the inbox received (not the member's own): where a\nprovider cannot tell where it was, it goes back to the inbox."
+              },
               "kind": {
                 "type": "string",
                 "enum": [
@@ -1949,11 +1954,16 @@
           },
           {
             "type": "object",
-            "description": "Take the message out of spam, back where it was (the inbox only if it\nwas there).",
+            "description": "Take the message out of spam: mail the inbox received goes back to\nthe inbox, the member's own mail is only taken out of spam.",
             "required": [
+              "inbound",
               "kind"
             ],
             "properties": {
+              "inbound": {
+                "type": "boolean",
+                "description": "It is mail the inbox received (not the member's own)."
+              },
               "kind": {
                 "type": "string",
                 "enum": [

@@ -37,22 +37,24 @@ No new module and no new cross-module dependency.
 - Report means spam: Gmail and Zoho both treat a move to spam as the member's
   report, which is what "Report and delete" asks for. Plain trash stays for
   deleting without reporting. Trash and spam exclude each other.
-- **Undo puts a message back where it was** (coordinator's decision), never
-  always in the inbox: untrash leaves the inbox flag as it was before the
-  trash; not spam returns a message to the inbox only if it was there before
-  it was reported (remembered per message), never the member's own sent mail.
-- Write-back: Gmail uses `messages.trash` / `messages.untrash` (Gmail puts
-  back the labels the message had); spam adds `SPAM` and removes `INBOX`, not
-  spam removes `SPAM` and adds `INBOX` only if the message was in the inbox.
-  Zoho trash moves to the account's Trash folder and spam uses Zoho's report
-  (`moveToSpam`); both remember the folder (and whether archived there), and
-  untrash / not spam move the message back to it. Zoho's "not spam" mode is
-  documented two ways and is not used: taking a message out of spam at Zoho is
-  a folder move that does not tell Zoho's filter. A folder the listing did not
-  show, or nowhere remembered, is never guessed (`not_movable`).
+- **Taking mail out again** (coordinator's decision, second review): untrash
+  puts a message back where it was (Gmail restores it; Zoho moves it back to
+  the folder it was in when that still holds, else received mail to the
+  Inbox); not spam puts mail the inbox received back in the inbox, as Gmail's
+  own button does, and never the member's own mail. Nothing is remembered for
+  spam.
+- Write-back: Gmail uses `messages.trash` / `messages.untrash`; spam adds
+  `SPAM` and removes `INBOX`, not spam removes `SPAM` and adds `INBOX` for
+  received mail. Zoho trash moves to the account's Trash folder (remembering
+  the folder the message was in) and spam uses Zoho's report (`moveToSpam`).
+  Zoho's "not spam" mode is documented two ways and is not used: taking a
+  message out of spam at Zoho is a folder move that does not tell Zoho's
+  filter. A folder the listing does not show is never guessed (`not_movable`).
+  Gmail's untrash and Zoho's `moveToSpam` still need a check on a live
+  account.
 - `connectors.outbound_changes` accepts the four kinds and keeps `restore_to`
-  (where a message was before the trash or spam); `conversations.messages`
-  keeps `inbox_before_spam`.
+  (where a message was before a Zoho trash); `untrash` and `unspam` carry the
+  message's direction.
 
 ## Non-goals
 

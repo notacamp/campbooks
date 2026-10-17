@@ -755,7 +755,10 @@ accepted grant, with its `provider`, `account_subject` and the grantor's
 account (`grantor_subject`); `identity.name_connected_mailbox`, consuming
 it, SHALL name the record of that provider account's way in in that
 workspace, and only when that way in belongs to the grantor's account and
-is tracked (has a record). Replaying the event SHALL change nothing.
+is tracked (has a record), and the connectors module, asked through the
+grant-intake port, holds that very connection as the grantor's connection
+of that provider account in that workspace. Replaying the event SHALL change
+nothing.
 A record still naming no connection a day after it was written SHALL be
 checked with the connectors module through the grant-intake port: when the
 connection of that provider account in that workspace, granted by that
@@ -771,7 +774,11 @@ afresh, so it is a day old only a day after the last attempt; a named
 record SHALL keep the time it was written. Should the hand-over task fail
 unexpectedly, the browser SHALL still go back with a `link_error`.
 `identity.forget_connected_way_in`, consuming `connectors.connection_removed`
-(its workspace, connection, `provider` and `account_subject`), SHALL lock
+(its workspace, connection, `provider` and `account_subject`), SHALL first
+ask the connectors module, through the grant-intake port, for the record's
+account's connection of that provider account in that workspace, and do
+nothing while that is still the named connection (or retry while the port
+cannot answer); it SHALL then lock
 the account, then act only on the record naming that very connection (a
 record that names none is never acted on), forget it and, when that way in
 has none left, was
@@ -791,6 +798,10 @@ the last way in SHALL stay. Replaying the event SHALL change nothing.
 - **WHEN** B connects support@ in a workspace without signing in with it, A (who made support@ a way in by connecting it in another workspace) then connects the same account in B's workspace and the grant is refused, and B later disconnects their connection
 - **THEN** A's way in is untouched, and no record of A's was left in B's workspace
 
+#### Scenario: A removal announced for a live connection
+- **WHEN** `connectors.connection_removed` arrives for the only mailbox of a way in a connect created while the connectors module still holds that connection, or while it cannot answer
+- **THEN** the way in, its record and its sessions stay
+
 #### Scenario: A failed hand-over
 - **WHEN** a connect adds a way in but mail access was declined at the provider, or the connectors module refuses the grant
 - **THEN** the way in it added is gone again and no mailbox record is left
@@ -802,6 +813,10 @@ the last way in SHALL stay. Replaying the event SHALL change nothing.
 #### Scenario: Someone else's connection names nothing
 - **WHEN** `connectors.connection_added` names the same provider account but a different grantor account
 - **THEN** no record is named or written
+
+#### Scenario: A connection that does not exist names nothing
+- **WHEN** `connectors.connection_added` names the grantor's provider account but a connection the connectors module does not hold
+- **THEN** no record is named, and the connection it holds still names the record
 
 #### Scenario: A record nothing ever named
 - **WHEN** a record still names no connection a day after it was written, and the connectors module holds no such connection

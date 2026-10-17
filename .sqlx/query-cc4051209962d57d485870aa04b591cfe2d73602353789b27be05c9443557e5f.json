@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "UPDATE conversations.messages SET in_trash = true, in_spam = false,\n                        updated_at = now()\n                  WHERE conversation_id = $1 AND (NOT in_trash OR in_spam)\n                 RETURNING provider_message_id",
+  "query": "UPDATE conversations.messages\n                SET in_spam = true, in_inbox = false, in_trash = false, updated_at = now()\n              WHERE conversation_id = $1 AND NOT in_spam RETURNING provider_message_id",
   "describe": {
     "columns": [
       {
@@ -24,5 +24,5 @@
       false
     ]
   },
-  "hash": "1c1e09e3e1806db12a76315777b7fd213c8df49d216aff91aa49e1e6775ef487"
+  "hash": "cc4051209962d57d485870aa04b591cfe2d73602353789b27be05c9443557e5f"
 }

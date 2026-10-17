@@ -214,14 +214,15 @@ rather than silently reaching no row.
 - **THEN** the attach fails and no reference is recorded
 
 ### Requirement: Instance-wide rows change only in the kernel scope
-A workspace transaction SHALL read the instance-wide rows (no workspace) of
-the event log and the job queue, but SHALL NOT update, delete or lock them,
-nor turn one of its own rows into an instance-wide one. It SHALL add an
+A workspace transaction SHALL NOT read, update, delete or lock the
+instance-wide rows (no workspace) of the event log and the job queue, nor
+turn one of its own rows into an instance-wide one. It SHALL add an
 instance-wide row only as a fresh event whose name, or a fresh delivery of
 such an event to a consumer whose kind, is listed in
 `kernel.instance_rows_from_workspaces` (pending, unclaimed, due now, keyed
 by its event, no ordering key), and SHALL NOT enqueue any other
-instance-wide job. The list SHALL hold exactly the events declared
+instance-wide job. The kernel SHALL publish such an event under an id it
+chooses, reading nothing back. The list SHALL hold exactly the events declared
 `DomainEvent::PUBLISHED_IN_WORKSPACES` and their consumers; the runtime role
 SHALL only read it. Outside the kernel scope no row, a workspace's own
 included, SHALL carry a schedule's unique key (`schedule:<name>`). The
@@ -238,6 +239,10 @@ instance-wide jobs, pruning and the admin's queue SHALL keep working there.
 #### Scenario: Changing an instance-wide job from a workspace
 - **WHEN** a transaction working in workspace A updates or deletes the queue's or the event log's instance-wide rows, or locks them with `FOR UPDATE`
 - **THEN** no row is changed or locked, and the rows are unchanged once it commits
+
+#### Scenario: Reading an account's events from a workspace
+- **WHEN** a transaction working in workspace A selects the event log's `identity.signed_out_everywhere` and `identity.account_suspended` rows, any row naming an account, or the queue's instance-wide deliveries
+- **THEN** it sees none of them, while the kernel scope sees them all
 
 #### Scenario: Moving a row out of the workspace
 - **WHEN** a transaction working in workspace A sets the workspace of one of its own jobs to none
@@ -265,7 +270,7 @@ instance-wide jobs, pruning and the admin's queue SHALL keep working there.
 
 #### Scenario: Adding instance-wide work from a workspace
 - **WHEN** a transaction working in workspace A publishes an instance-wide event declared `PUBLISHED_IN_WORKSPACES` (a member removes a workspace client; a departed member's consents are revoked; a removed mailbox takes the account's last way in)
-- **THEN** the event and its deliveries are added and the worker runs them
+- **THEN** the event and its deliveries are added under the id the publish returns, and the worker runs them
 
 #### Scenario: Refused by the kernel
 - **WHEN** a transaction working in workspace A enqueues an instance-wide job, or publishes an instance-wide event not declared `PUBLISHED_IN_WORKSPACES`
@@ -437,3 +442,42 @@ only.
 #### Scenario: A migration login that cannot create roles
 - **WHEN** the migration login is neither a superuser nor allowed to create roles and `campbooks_definer` does not exist or cannot be taken
 - **THEN** the migration fails, naming `CREATE ROLE campbooks_definer NOLOGIN NOINHERIT` and `GRANT campbooks_definer TO <login>`, and applies once an administrator has run them
+
+### Requirement: A workspace's event alone is no proof
+Any transaction working in a workspace can append that workspace's events,
+so a consumer whose action reaches past the workspace (an account's ways in
+and sessions, an app's refresh tokens, a grant at its provider) SHALL check
+the state the event claims, through the owning module's port, before
+acting, and SHALL do nothing while that state says otherwise. A port that
+cannot answer SHALL make the delivery retry, never act on a guess.
+`identity.forget_connected_way_in` (`connectors.connection_removed`) SHALL
+act only when the connectors module no longer holds that connection for the
+record's account; `identity.name_connected_mailbox`
+(`connectors.connection_added`) SHALL name a record only with the
+connection the connectors module holds for that grantor and provider
+account; `identity.revoke_departed_consents` and
+`connectors.revoke_departed_grants` (`workspaces.member_left`) SHALL act only
+when the person is no longer a member of the workspace;
+`identity.remove_workspace_clients` and `connectors.revoke_workspace_grants`
+(`workspaces.workspace_deleting`) SHALL act only when the workspace is no
+longer live. Consumers whose effects stay within the event's own workspace
+(its own data, which the same transaction could change directly) SHALL NOT
+be required to check.
+
+#### Scenario: A forged removal of a live connection
+- **WHEN** a transaction working in workspace A appends `connectors.connection_removed` for a connection the connectors module still holds, the only mailbox of a way in a connect created
+- **THEN** the way in, its mailbox record and its sessions stay, and no `identity.way_in_removed` is published
+
+#### Scenario: A forged connection names nothing
+- **WHEN** `connectors.connection_added` names a connection the connectors module does not hold for its grantor
+- **THEN** no mailbox record is named with it, and the connection it does hold still names the record
+
+#### Scenario: A forged departure
+- **WHEN** `workspaces.member_left` names someone who is still a member of that workspace
+- **THEN** the apps they allowed there keep their consents and refresh tokens, and their connections there stay, unrevoked at the provider
+- **AND** once they have left, the same event revokes them
+
+#### Scenario: A forged deletion
+- **WHEN** `workspaces.workspace_deleting` names a workspace that is still live
+- **THEN** its clients, the consents bound to it and its connections stay, unrevoked at the provider
+- **AND** once it is deleted, the same event removes and revokes them

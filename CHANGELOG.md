@@ -18,12 +18,14 @@ All notable changes to Campbooks Next are documented here. The format follows
   Nothing is saved before Save smart rule, and Undo takes it back. Rules run on their own,
   with no AI, and Scout noticed reads only counts and dates, never what the mail says.
 - **Trash and Report.** A conversation can go to the trash, or be reported as spam
-  ("Report and delete"), with Undo for both. Undo puts it back where it was: reported
-  mail goes back to the inbox only if it was there, and your own sent mail never moves.
-  The provider is told too: Gmail through its own trash and spam, Zoho by moving the
-  message to its Trash folder or with Zoho's spam report. Taking a message out of spam at
-  Zoho moves it back to its folder but does not tell Zoho's spam filter. Mail in the
-  trash or spam never needs you.
+  ("Report and delete"), with Undo for both. Untrash puts it back where it was. Not spam
+  puts mail you received back in your inbox, as Gmail's own button does, and never your
+  own sent mail. The provider is told too: Gmail through its own trash and spam, Zoho by
+  moving the message to its Trash folder (and back to the folder it was in, when that
+  folder still exists) or with Zoho's spam report. Taking a message out of spam at Zoho
+  moves it to the Inbox but does not tell Zoho's spam filter. Gmail's untrash and Zoho's
+  spam report work as their documentation says and still need checking on a live
+  account. Mail in the trash or spam never needs you.
 
 ### Fixed
 
@@ -165,6 +167,23 @@ All notable changes to Campbooks Next are documented here. The format follows
 
 ### Security
 
+- **A workspace can't plant maintenance jobs, fake a disconnect or read account events
+  (campbooks-cloud#211).** The worker now refuses, without running it, a job of a kind that
+  only ever runs instance-wide (every schedule, such as pruning and the mailbox poller, and
+  the deliveries of account events) when the row carries a workspace; such a row could
+  only have been written by hand. Six handlers no longer take an event from a workspace
+  as proof of what it says: a way in goes with its mailbox only once the connectors module
+  no longer holds that connection, a mailbox record is named only with a connection that
+  exists, and a departed member's app consents and provider grants, or a deleted
+  workspace's, are revoked only once the member is really gone or the workspace really
+  deleted. A transaction working in a workspace no longer reads any instance-wide row of
+  the event log or the job queue (they name accounts); the kernel publishes the account
+  events a workspace may announce without reading them back. A schedule's tick is counted
+  by the statement's clock, so a stalled tick can't move a newer one back. One kernel
+  migration drops the read policy; an image from before this change can't announce those
+  account events from a workspace on the upgraded database, so run the API and the worker
+  of the same version, and to go back run the rollback SQL in the change's `design.md`
+  first.
 - **One workspace can no longer hold up another's background work (campbooks-cloud#209).**
   The job queue's keys spanned workspaces: a workspace that knew another workspace's job
   key (most embed an id, such as `connectors.sync_stream:<stream>`) could keep a row of its
