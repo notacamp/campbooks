@@ -390,7 +390,7 @@ impl Measure {
         self.work.set(self.work.get().saturating_add(units));
         let calls = self.calls.get().wrapping_add(1);
         self.calls.set(calls);
-        if calls % 1024 == 0 && Instant::now() > self.deadline {
+        if calls.is_multiple_of(1024) && Instant::now() > self.deadline {
             std::panic::resume_unwind(Box::new(OverBudget));
         }
     }
@@ -783,6 +783,8 @@ mod tests {
                     nodes: RefCell::new(nodes),
                     elements: RefCell::new(0),
                     work: Rc::new(Cell::new(0)),
+                    deadline: Instant::now() + MAX_PARSE_TIME,
+                    calls: Cell::new(0),
                 };
                 tree.finish().deepest
             })
