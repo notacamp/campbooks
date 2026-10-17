@@ -5,6 +5,7 @@
 //!   and `openapi/admin.json`.
 //! - `cargo xtask events [--check]` regenerates (or verifies) `openapi/events.json`.
 //! - `cargo xtask eval decide` measures `decide` strategies on a labelled eval set.
+//! - `cargo xtask eval actions` scores the action catalogue on an owner's labels.
 //! - `cargo xtask migrations --base <ref>` checks that new migrations sort after
 //!   every migration on the base branch.
 //! - `cargo xtask i18n` checks that every server message catalogue is at parity.
@@ -115,6 +116,10 @@ enum EvalCommand {
     /// set and report accuracy, coverage and precision at the auto-act
     /// threshold, calibration and latency per question and locale.
     Decide(eval::DecideArgs),
+    /// Score the action catalogue's ratings against an owner's labelled
+    /// export at one or more floors: precision and recall per action, and
+    /// how often pairs of actions are done together (campbooks-cloud#166).
+    Actions(eval::ActionsArgs),
 }
 
 fn main() -> ExitCode {
@@ -127,6 +132,9 @@ fn main() -> ExitCode {
         Command::Eval {
             what: EvalCommand::Decide(args),
         } => eval::run_decide(&root, &args),
+        Command::Eval {
+            what: EvalCommand::Actions(args),
+        } => eval::run_actions(&args),
         Command::Migrations { base } => migrations::run(&root, &base),
         Command::I18n => i18n::run(&root),
         Command::NewModule { name, issue } => run_new_module(&root, &name, issue),

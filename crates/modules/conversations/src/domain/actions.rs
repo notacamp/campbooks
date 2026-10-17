@@ -32,10 +32,9 @@ pub const MAX_ACTIONS: usize = 3;
 pub struct SuggestedAction {
     /// The action, or the pair's two in the order they are done.
     pub actions: Vec<NeedAction>,
-    /// How likely the member is to want it, in percent, as the `decide`
-    /// model rated it (a pair: the less likely of the two).
-    #[schema(example = 86, maximum = 100)]
-    pub likelihood: u8,
+    /// How likely the member is to want it, in percent (0 to 100), as the
+    /// `decide` model rated it (a pair: the less likely of the two).
+    pub likelihood: u32,
 }
 
 /// One action's rating, as stored.
@@ -215,10 +214,10 @@ fn wire(action: ActionId) -> NeedAction {
 }
 
 /// `likelihood` (0 to 1) in whole percent.
-fn percent(likelihood: f64) -> u8 {
+fn percent(likelihood: f64) -> u32 {
     // Clamped to 0..=100 first, so the cast loses nothing.
     #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
-    let percent = (likelihood.clamp(0.0, 1.0) * 100.0).round() as u8;
+    let percent = (likelihood.clamp(0.0, 1.0) * 100.0).round() as u32;
     percent
 }
 

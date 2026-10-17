@@ -528,6 +528,7 @@ async fn instruct_model_answers_typed_questions_with_logprob_probabilities() {
             "model": "qwen3:8b",
             "stream": false,
             "temperature": 0.0,
+            "max_tokens": 4096,
             "logprobs": true,
             "top_logprobs": 20,
             "response_format": {

@@ -14782,6 +14782,20 @@
         },
         "additionalProperties": false
       },
+      "NeedAction": {
+        "type": "string",
+        "description": "One action of the catalogue a need may offer (campbooks-cloud#166),\nas `campbooks_ai::decide::signals::actions::ActionId` names it.",
+        "enum": [
+          "reply",
+          "remind",
+          "open_attachment",
+          "forward",
+          "report",
+          "safe",
+          "already_paid",
+          "still_to_pay"
+        ]
+      },
       "NeedBasis": {
         "type": "string",
         "description": "Whose answer raised a need.",
@@ -14833,6 +14847,16 @@
           "message_id"
         ],
         "properties": {
+          "actions": {
+            "type": [
+              "array",
+              "null"
+            ],
+            "items": {
+              "$ref": "#/components/schemas/SuggestedAction"
+            },
+            "description": "Its own actions, rated by the `decide` model from the action\ncatalogue, at most three, the first to offer first\n(campbooks-cloud#166). Absent unless the catalogue is switched on\n(`CAMPBOOKS_CONVERSATIONS__ACTIONS__ENABLED`) and the message was\nrated: the client then offers its fixed actions."
+          },
           "basis": {
             "$ref": "#/components/schemas/NeedBasis",
             "description": "Whose answer raised it."
@@ -17897,6 +17921,29 @@
           }
         },
         "additionalProperties": false
+      },
+      "SuggestedAction": {
+        "type": "object",
+        "description": "One action a need offers: one of the catalogue's, or a pair usually done\ntogether, offered as one.",
+        "required": [
+          "actions",
+          "likelihood"
+        ],
+        "properties": {
+          "actions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NeedAction"
+            },
+            "description": "The action, or the pair's two in the order they are done."
+          },
+          "likelihood": {
+            "type": "integer",
+            "format": "int32",
+            "description": "How likely the member is to want it, in percent (0 to 100), as the\n`decide` model rated it (a pair: the less likely of the two).",
+            "minimum": 0
+          }
+        }
       },
       "SurfaceKey": {
         "type": "string",

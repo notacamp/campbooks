@@ -582,7 +582,10 @@ impl Gateway {
                         model: &provider.model,
                         messages: &messages,
                         temperature: Some(0.0),
-                        max_tokens: None,
+                        // Room for a reasoning model to think before its
+                        // JSON: a server default of a few hundred tokens
+                        // cuts it off. The answer itself is short.
+                        max_tokens: Some(decide::openai::MAX_TOKENS),
                         response_format: Some(&format),
                         stream: false,
                     },

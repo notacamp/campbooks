@@ -68,7 +68,8 @@ pub use features::{
 /// The owner's money mail as an eval set to label (campbooks-cloud#167).
 pub mod labelling {
     pub use crate::features::labelling_export::{
-        LabellingItem, MAX_ITEMS, OWNER, export_for_labelling, manifest,
+        LabellingItem, LabellingSet, MAX_ITEMS, OWNER, export_for_labelling, export_set, manifest,
+        manifest_for,
     };
 }
 

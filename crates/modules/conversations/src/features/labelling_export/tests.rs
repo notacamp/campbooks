@@ -3,7 +3,7 @@
 use campbooks_kernel::tenancy::WorkspaceId;
 use sqlx::PgPool;
 
-use super::{OWNER, export_for_labelling, manifest};
+use super::{LabellingSet, OWNER, export_for_labelling, export_set, manifest, manifest_for};
 use crate::{model::InboxRole, testkit::Kit};
 
 /// Every fixture is recent enough.
@@ -75,4 +75,44 @@ async fn another_workspace_exports_nothing_of_it(db: PgPool) {
         .await
         .unwrap();
     assert!(recent.is_empty());
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn the_actions_set_lists_mail_that_had_a_need(db: PgPool) {
+    let kit = Kit::with_deps(db, crate::testkit::sorting_deps()).await;
+    let workspace = WorkspaceId::new();
+    let (_, sam) = kit.member("sam", workspace);
+    let inbox = kit
+        .inbox(workspace, "sam@example.com", &[(sam, InboxRole::Manager)])
+        .await;
+    kit.ingest(workspace, inbox, "needs").await;
+    let with_needs: i64 = sqlx::query_scalar(
+        "SELECT count(DISTINCT conversation_id) FROM conversations.needs WHERE workspace_id = $1",
+    )
+    .bind(workspace.as_uuid())
+    .fetch_one(&kit.db)
+    .await
+    .unwrap();
+    assert!(with_needs > 1);
+
+    let items = export_set(&kit.state, workspace, ALL, LabellingSet::Actions)
+        .await
+        .unwrap();
+    assert_eq!(
+        i64::try_from(items.len()).unwrap(),
+        with_needs,
+        "{:?}",
+        items.iter().map(|i| &i.subject).collect::<Vec<_>>()
+    );
+    assert!(
+        items
+            .iter()
+            .all(|i| i.item["labels"] == serde_json::json!({}))
+    );
+    let manifest = manifest_for(LabellingSet::Actions);
+    assert_eq!(manifest["name"], "owner-actions");
+    assert_eq!(manifest["private"], true);
+    assert_eq!(manifest["actions"][0], "reply");
+    // The money set is as it was.
+    assert_eq!(manifest_for(LabellingSet::Money), manifest());
 }
