@@ -21,6 +21,11 @@ All notable changes to Campbooks Next are documented here. The format follows
 
 ### Fixed
 
+- **Email HTML cleaning catches `URL(` in any case.** The sanitiser (ammonia 4.2.4,
+  RUSTSEC-2026-0373) matched CSS `url(` case-sensitively, so a style written `URL("…")`
+  could slip a remote image past the filter that holds images back until you choose
+  Show images.
+
 - **Scout's reply suggestions and drafts have room to think.** The model behind them
   (a reasoning model in production) spends its thinking from the same budget as its
   answer, and Reply gave it too little: suggestions and drafts could come back empty or cut
