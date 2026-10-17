@@ -1412,15 +1412,31 @@ async fn a_transaction_that_sets_nothing_sees_no_row_of_any_table(db: PgPool) {
     .await
     .unwrap();
 
-    let tables: Vec<String> = sqlx::query_scalar(
-        "SELECT format('%I.%I', n.nspname, c.relname)
+    // With whether the runtime role may read the table at all: one it may
+    // not (the rate-limit counters, reached through the kernel's functions
+    // only, campbooks-cloud#210) must refuse the read outright.
+    let listed: Vec<(String, bool)> = sqlx::query_as(
+        "SELECT format('%I.%I', n.nspname, c.relname),
+                has_table_privilege($1, c.oid, 'SELECT')
            FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
           WHERE c.relrowsecurity AND c.relkind IN ('r', 'p')
           ORDER BY 1",
     )
+    .bind(campbooks_kernel::db::DEFAULT_RUNTIME_ROLE)
     .fetch_all(&world.db)
     .await
     .unwrap();
+    let tables: Vec<String> = listed.iter().map(|(table, _)| table.clone()).collect();
+    let unreadable: BTreeSet<&str> = listed
+        .iter()
+        .filter(|(_, readable)| !readable)
+        .map(|(table, _)| table.as_str())
+        .collect();
+    assert_eq!(
+        unreadable,
+        BTreeSet::from(["kernel.rate_limits"]),
+        "tables the runtime role may not read at all"
+    );
     let mut populated = BTreeSet::new();
     for table in &tables {
         // The database owner (a superuser) is not subject to policies.
@@ -1457,12 +1473,20 @@ async fn a_transaction_that_sets_nothing_sees_no_row_of_any_table(db: PgPool) {
     let mut seen = Vec::new();
     for table in &tables {
         let mut tx = pool.begin().await.unwrap();
-        let rows: i64 =
+        let counted =
             sqlx::query_scalar(sqlx::AssertSqlSafe(format!("SELECT count(*) FROM {table}")))
                 .fetch_one(&mut *tx)
-                .await
-                .unwrap();
+                .await;
         tx.rollback().await.unwrap();
+        if unreadable.contains(table.as_str()) {
+            let refused = counted.unwrap_err();
+            assert!(
+                refused.to_string().contains("permission denied"),
+                "{table}: {refused}"
+            );
+            continue;
+        }
+        let rows: i64 = counted.unwrap();
         if rows > 0 {
             seen.push(format!("{table}: {rows}"));
         }
