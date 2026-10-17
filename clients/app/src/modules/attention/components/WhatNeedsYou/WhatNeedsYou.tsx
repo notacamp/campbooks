@@ -373,13 +373,11 @@ export function WhatNeedsYou({ workspaceId, now, offer }: WhatNeedsYouProps) {
   /** What a row offers, in words with keys: the shape #166's ranked actions drop into. */
   const actionsOf = (row: Row): { own: ItemAction[]; universal: ItemAction[] } => {
     const all = rowActionIds(kindOf(row.need));
-    // An inbox the member may only read offers no Reply, Done or Not needed.
+    // An inbox the member may only read: nothing that writes there (Reply,
+    // Yes, No, It's safe, Done, Not needed); Snooze is the member's own.
     const ids = writable(row)
       ? all
-      : {
-          own: all.own.filter((id) => id !== "reply"),
-          universal: all.universal.filter((id) => id !== "done" && id !== "not_needed"),
-        };
+      : { own: [], universal: all.universal.filter((id) => id === "snooze") };
     const ownLabel: Record<OwnActionId, string> = {
       reply: t("actions.reply"),
       yes: tc("needs.actions.yes"),

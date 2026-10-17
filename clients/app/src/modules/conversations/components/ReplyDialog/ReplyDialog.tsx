@@ -22,6 +22,7 @@ import {
   draftKeys,
   saveDraft,
   sendDraft,
+  useConversationDrafts,
   type Draft,
 } from "../../api/drafts";
 import { useConversation, type MessageView } from "../../api/queries";
@@ -58,6 +59,9 @@ export interface ReplyDialogProps {
 
 type Stage = "choose" | "writing" | "draft";
 
+/** Longest intent or change the server takes, in characters. */
+const MAX_ASK_CHARS = 300;
+
 /** Longest quote shown from the message answered, in characters. */
 const QUOTE_CHARS = 280;
 
@@ -70,7 +74,7 @@ function personOf(message: MessageView): string {
 
 /** The first name, for the title ("Reply to Marta"). */
 function firstName(name: string): string {
-  return name.includes("@") ? name : (name.split(/\s+/u)[0] ?? name);
+  return name.includes("@") ? name : (name.split(/\s+/u, 1)[0] ?? name);
 }
 
 /**
@@ -101,6 +105,7 @@ export function ReplyDialog({
   const answered = messages.at(-1);
   const theirs = messages.findLast((m) => m.direction === "inbound") ?? answered;
   const person = name ?? (answered === undefined ? "" : personOf(answered));
+  const drafts = useConversationDrafts(workspaceId, conversationId);
   const suggestions = useReplySuggestions(workspaceId, conversationId, answered?.id, {
     enabled: resume === undefined,
   });
@@ -115,6 +120,8 @@ export function ReplyDialog({
   const [result, setResult] = useState<DialogResult | undefined>();
   // Answers to a question no longer asked (Back, another pick) are dropped.
   const asking = useRef(0);
+  // One send or save at a time, even for two quick ⌘↵.
+  const working = useRef(false);
 
   const unavailable = problemCode(suggestions.error) === "reply_unavailable";
   const words: QuoteWords = {
@@ -196,39 +203,53 @@ export function ReplyDialog({
     setStage("choose");
   };
 
-  /** The reply draft holding what is on screen: created once, then saved. */
+  /**
+   * The reply draft holding what is on screen: the one this dialog saved,
+   * else an empty reply draft of the same message (never one with words the
+   * member wrote), else a new one.
+   */
   const keep = async (): Promise<Draft | undefined> => {
-    if (answered === undefined) {
+    const reusable =
+      saved ??
+      drafts.data?.find(
+        (d) =>
+          d.kind === "reply" &&
+          d.state === "draft" &&
+          d.message_id === answered?.id &&
+          d.body.trim() === "",
+      );
+    let draft: Draft;
+    if (reusable !== undefined) {
+      draft = await saveDraft(workspaceId, reusable.id, {
+        version: reusable.version,
+        body: text,
+      });
+    } else if (answered === undefined) {
       return undefined;
+    } else {
+      draft = await createDraft(workspaceId, {
+        kind: "reply",
+        message_id: answered.id,
+        body: text,
+        quoted: replyQuote(answered, i18n.language, words),
+      });
     }
-    const draft =
-      saved === undefined
-        ? await createDraft(workspaceId, {
-            kind: "reply",
-            message_id: answered.id,
-            body: text,
-            quoted: replyQuote(answered, i18n.language, words),
-          })
-        : await saveDraft(workspaceId, saved.id, { version: saved.version, body: text });
     setSaved(draft);
-    queryClient.setQueryData<Draft[]>(
-      draftKeys.forConversation(workspaceId, conversationId),
-      (list) => [draft, ...(list ?? []).filter((d) => d.id !== draft.id)],
-    );
     return draft;
   };
 
   const send = async () => {
-    if (busy || text.trim() === "" || answered === undefined) {
+    if (working.current || text.trim() === "") {
       return;
     }
+    working.current = true;
     setBusy(true);
     setProblem(undefined);
     const handle = undo.pending({ label: t("reply.pending", { name: person }) });
     try {
       const draft = await keep();
       if (draft === undefined) {
-        return;
+        throw new Error("nothing to answer yet");
       }
       const scheduled = await sendDraft(workspaceId, draft.id, draft.version);
       const window =
@@ -261,23 +282,33 @@ export function ReplyDialog({
       handle.fail({ label: t("reply.errors.send", { name: person }) });
       setProblem("errors.send");
     } finally {
+      working.current = false;
       setBusy(false);
     }
   };
 
   const openInComposer = async () => {
-    if (busy) {
+    if (working.current) {
       return;
     }
+    working.current = true;
     setBusy(true);
     try {
       const draft = await keep();
-      if (draft !== undefined) {
-        onOpenDraft(draft);
+      if (draft === undefined) {
+        throw new Error("nothing to answer yet");
       }
+      // The composer finds it at once (it reopens the reply draft of the
+      // newest message).
+      queryClient.setQueryData<Draft[]>(
+        draftKeys.forConversation(workspaceId, conversationId),
+        (list) => [draft, ...(list ?? []).filter((d) => d.id !== draft.id)],
+      );
+      onOpenDraft(draft);
     } catch {
       setProblem("errors.open");
     } finally {
+      working.current = false;
       setBusy(false);
     }
   };
@@ -406,6 +437,7 @@ export function ReplyDialog({
               label={t("reply.own.label")}
               placeholder={t("reply.own.placeholder")}
               action={t("reply.own.action")}
+              maxLength={MAX_ASK_CHARS}
               onSubmit={(own) => {
                 write(own);
               }}
@@ -450,6 +482,7 @@ export function ReplyDialog({
             label={t("reply.change.label")}
             placeholder={t("reply.change.placeholder")}
             action={t("reply.change.action")}
+            maxLength={MAX_ASK_CHARS}
             disabled={busy || rewriting !== undefined || text.trim() === ""}
             onSubmit={(change) => {
               write(intent, { change });

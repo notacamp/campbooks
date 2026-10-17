@@ -76,7 +76,7 @@ describe("ReplyDialog", () => {
     await waitFor(() => {
       expect(screen.getByRole("textbox", { name: "Your reply" })).toHaveValue(SHORT);
     });
-    expect(api.calls.filter((c) => c.route === `POST ${C}/reply/draft`).at(-1)?.body).toEqual({
+    expect(api.calls.findLast((c) => c.route === `POST ${C}/reply/draft`)?.body).toEqual({
       message_id: NEWEST,
       intent: "Say Thursday works",
       draft: DRAFT,

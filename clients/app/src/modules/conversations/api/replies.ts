@@ -2,8 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 
 import { api, unwrap, type Schema } from "~/lib/api";
 
-export type ReplySuggestions = Schema<"ReplySuggestions">;
-export type WriteReply = Schema<"WriteReply">;
+type WriteReply = Schema<"WriteReply">;
 
 // Not an operation key: the change feed never refetches these, since each
 // asks the model again. They live for the session, one per message.

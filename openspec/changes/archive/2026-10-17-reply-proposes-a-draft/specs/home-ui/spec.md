@@ -53,9 +53,11 @@ a click, and nothing SHALL be sent before Send. Send SHALL create a reply
 draft with the text and the quoted history and send it with the existing
 undo window: the dialog SHALL show "Sending to <name>" for about a second
 and close, a Home item SHALL fold with that confirmation, and the toast
-SHALL offer Undo (Z) until the send leaves. An undo in time SHALL bring the
-dialog back on the same draft (and the Home item back), and sending again
-SHALL send that draft, not a new one; a failed send SHALL keep the dialog
+SHALL offer Undo (Z) until the send leaves. An undo in time SHALL bring the item and the dialog back on the same draft on
+Home, and the composer on that draft in the reader; sending again SHALL send
+that draft, not a new one; a Send or Open in composer SHALL reuse an empty
+reply draft of the same message rather than add one, and SHALL never write
+over a draft holding the member's words; a failed send SHALL keep the dialog
 and the text and say so. "Open in composer" SHALL create the reply draft
 with the text and open the composer on it. Esc or a click outside SHALL
 close the dialog with nothing created. When the server answers

@@ -126,11 +126,27 @@ export function Dialog({
         event.stopPropagation();
       }
     };
+    // The focused control went away (a step replaced it): the focus is on
+    // the page, not in the dialog. Keys still belong to the dialog, never
+    // to the page behind it.
+    const onStrayKeyDown = (event: KeyboardEvent) => {
+      const target = event.target;
+      if (target !== document.body && target !== document.documentElement) {
+        return;
+      }
+      dialogElement.focus();
+      onKeyDown(event);
+      if (!event.metaKey && !event.ctrlKey && !event.altKey) {
+        event.stopPropagation();
+      }
+    };
     scrimElement.addEventListener("mousedown", onScrimDown);
     dialogElement.addEventListener("keydown", onKeyDown);
+    document.addEventListener("keydown", onStrayKeyDown, true);
     return () => {
       scrimElement.removeEventListener("mousedown", onScrimDown);
       dialogElement.removeEventListener("keydown", onKeyDown);
+      document.removeEventListener("keydown", onStrayKeyDown, true);
     };
   }, [open]);
 
@@ -238,7 +254,8 @@ export function DialogChoices({
 }: DialogChoicesProps) {
   const group = useRef<HTMLDivElement>(null);
   useEffect(() => {
-    if (focusOnShow) {
+    // Never away from someone typing (a digit would then pick a choice).
+    if (focusOnShow && !isTypingTarget(document.activeElement)) {
       group.current?.querySelector<HTMLElement>("[data-dialog-choice]")?.focus();
     }
   }, [focusOnShow]);

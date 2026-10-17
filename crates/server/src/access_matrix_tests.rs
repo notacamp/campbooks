@@ -869,11 +869,12 @@ fn body(world: &World, id: &str) -> Option<Value> {
         })
         .unwrap_or_default(),
         "conversations.update_rule" => json!({"actions": [{"action": "mark_read"}]}),
-        "conversations.confirm_rule" | "conversations.restore_rule" => json!({}),
+        "conversations.confirm_rule"
+        | "conversations.restore_rule"
+        | "conversations.suggest_replies" => json!({}),
         "conversations.dismiss_rule_suggestion" => json!({"key": "matrix"}),
         "assistant.update_profile" => json!({"proactivity": "ask_first", "asked": true}),
         "assistant.compile_instruction" => json!({"text": "newsletters never need me"}),
-        "conversations.suggest_replies" => json!({}),
         "conversations.write_reply" => json!({"intent": "Say yes"}),
         _ => return None,
     })

@@ -43,7 +43,7 @@ import { useTeachOnce } from "../TeachOnce/TeachOnce";
 import { useRuleActions } from "../TeachOnce/use-rule-actions";
 import type { InboxActions } from "../InboxScreen/use-inbox-actions";
 
-import { ReplyDialog, type ReplyResume } from "../ReplyDialog/ReplyDialog";
+import { ReplyDialog } from "../ReplyDialog/ReplyDialog";
 
 import { MovePicker } from "./MovePicker";
 import type { RenderReplySlot, ReplyMode, ReplyRequest, ReplySlotContext } from "./ReplySlot";
@@ -134,11 +134,8 @@ export function ConversationReader({
   const [images, setImages] = useState<Set<string>>(new Set());
   const [moving, setMoving] = useState(false);
   const [reply, setReply] = useState<ReplyRequest | null>(null);
-  // Reply first asks Scout (the reply dialog); `resume` is a draft whose
-  // send was undone.
-  const [replying, setReplying] = useState<
-    { resume?: ReplyResume | undefined; opened: number } | undefined
-  >();
+  // Reply first asks Scout (the reply dialog).
+  const [replying, setReplying] = useState<{ opened: number } | undefined>();
   const nonce = useRef(0);
 
   // Opening an unread conversation reads it (once).
@@ -169,9 +166,9 @@ export function ConversationReader({
     setReply({ mode, messageId: newest.id, nonce: nonce.current });
   };
   /** Reply: the dialog with Scout's likely replies. */
-  const openReply = (resume?: ReplyResume) => {
+  const openReply = () => {
     nonce.current += 1;
-    setReplying({ resume, opened: nonce.current });
+    setReplying({ opened: nonce.current });
   };
   // Home's R: answer the newest message as soon as it is here (once).
   const repliedOnce = useRef(false);
@@ -648,7 +645,6 @@ export function ConversationReader({
           key={replying.opened}
           workspaceId={workspaceId}
           conversationId={conversation.id}
-          resume={replying.resume}
           onClose={() => {
             setReplying(undefined);
           }}
@@ -660,8 +656,9 @@ export function ConversationReader({
             setReplying(undefined);
             askReply("reply");
           }}
-          onUndone={(resume) => {
-            openReply(resume);
+          onUndone={() => {
+            // The reply slot reopens the undone draft in the composer.
+            askReply("reply");
           }}
         />
       )}

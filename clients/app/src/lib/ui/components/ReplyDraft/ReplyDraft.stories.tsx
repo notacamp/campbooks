@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { useState } from "react";
-import { expect, fn, userEvent, within } from "storybook/test";
+import { expect, fn, userEvent, waitFor, within } from "storybook/test";
 
 import { Button } from "../Button/Button";
 import { Dialog, DialogChoices } from "../Dialog/Dialog";
@@ -145,6 +145,8 @@ export const InTheDialog: StoryObj = {
   play: async () => {
     const page = within(document.body);
     await userEvent.keyboard("1");
-    await expect(page.getByRole("textbox", { name: "Your reply" })).toHaveFocus();
+    await waitFor(async () => {
+      await expect(page.getByRole("textbox", { name: "Your reply" })).toHaveFocus();
+    });
   },
 };

@@ -258,7 +258,7 @@ async fn an_html_email_that_gives_orders_stays_data(db: PgPool) {
 
 #[sqlx::test(migrations = "../../../migrations")]
 async fn without_a_model_that_may_read_mail_nothing_is_asked(db: PgPool) {
-    let kit = Kit::new(db.clone()).await;
+    let kit = Kit::new(db).await;
     let (workspace, _, sam) = kit.sams_inbox().await;
     let id = kit.conversation_of("en-1").await;
     for (uri, body) in [
@@ -269,8 +269,10 @@ async fn without_a_model_that_may_read_mail_nothing_is_asked(db: PgPool) {
         assert_eq!(response.status, StatusCode::CONFLICT, "{uri}");
         assert_eq!(response.json["code"], "reply_unavailable");
     }
+}
 
-    // A model off this instance without the content opt-in gets nothing.
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_model_off_the_instance_without_the_opt_in_gets_nothing(db: PgPool) {
     let provider = ProviderConfig::new("https://ai.example.com/v1".parse().unwrap(), "m")
         .with_external_content(ExternalContent::Deny);
     let mut deps = sorting_deps();

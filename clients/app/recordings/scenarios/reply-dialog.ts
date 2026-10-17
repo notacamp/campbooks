@@ -35,6 +35,16 @@ async function homeFilled(page: Page, workspace: string): Promise<void> {
   }
 }
 
+/** Reply on the selected item: the button on a phone, R on a desktop. */
+async function openReply(page: Page, phone: boolean): Promise<void> {
+  await (phone
+    ? page
+        .getByRole("button", { name: /^Reply/u })
+        .first()
+        .click()
+    : page.keyboard.press("r"));
+}
+
 export default async function replyDialog({ page }: ScenarioContext): Promise<void> {
   const workspace = await signedIn(page);
   const phone = isPhone(page);
@@ -47,14 +57,7 @@ export default async function replyDialog({ page }: ScenarioContext): Promise<vo
     .first()
     .click();
   await caption(page, "Reply now asks Scout first", 1600);
-  if (phone) {
-    await page
-      .getByRole("button", { name: /^Reply/u })
-      .first()
-      .click();
-  } else {
-    await page.keyboard.press("r");
-  }
+  await openReply(page, phone);
 
   const dialog = page.getByRole("dialog", { name: /^Reply to/u });
   await dialog.waitFor();
@@ -65,22 +68,13 @@ export default async function replyDialog({ page }: ScenarioContext): Promise<vo
   await pause(900);
 
   // Open it again and pick the first: only now does Scout write the draft.
-  if (phone) {
-    await page
-      .getByRole("button", { name: /^Reply/u })
-      .first()
-      .click();
-  } else {
-    await page.keyboard.press("r");
-  }
+  await openReply(page, phone);
   await dialog.waitFor();
   await dialog.getByRole("button", { name: /Say yes/u }).waitFor();
   await caption(page, "Pick one: only then does Scout write the draft");
-  if (phone) {
-    await dialog.getByRole("button", { name: /Say yes/u }).click();
-  } else {
-    await page.keyboard.press("1");
-  }
+  await (phone
+    ? dialog.getByRole("button", { name: /Say yes/u }).click()
+    : page.keyboard.press("1"));
   const text = dialog.getByRole("textbox", { name: "Your reply" });
   await text.waitFor();
   await caption(page, "The draft is yours to edit, signed with your name", 2400);

@@ -195,6 +195,7 @@ pub fn write(context: &Context, ask: &Ask<'_>) -> ChatRequest {
 pub fn intents(answer: Intents) -> Vec<String> {
     let mut kept: Vec<String> = Vec::new();
     for intent in answer.intents {
+        let intent: String = intent.chars().filter(|c| kept_char(*c)).collect();
         let line = intent.split_whitespace().collect::<Vec<_>>().join(" ");
         let line = cut(&line, MAX_INTENT_CHARS);
         if !line.is_empty() && !kept.iter().any(|k| k.eq_ignore_ascii_case(&line)) {
@@ -214,10 +215,21 @@ pub fn reply(answer: &str) -> Option<String> {
     let text: String = answer
         .replace("\r\n", "\n")
         .chars()
-        .filter(|c| !c.is_control() || *c == '\n' || *c == '\t')
+        .filter(|c| kept_char(*c))
         .collect();
     let text = cut(text.trim(), MAX_REPLY_CHARS);
     (!text.is_empty()).then_some(text)
+}
+
+/// Whether a character of the model's text is kept: no control characters
+/// but line breaks and tabs, and no invisible direction or zero-width marks
+/// that could make the sent text read differently from what was shown.
+fn kept_char(c: char) -> bool {
+    let invisible = matches!(
+        c,
+        '\u{200B}'..='\u{200F}' | '\u{202A}'..='\u{202E}' | '\u{2066}'..='\u{2069}' | '\u{FEFF}'
+    );
+    (!c.is_control() || c == '\n' || c == '\t') && !invisible
 }
 
 /// `text` cut to at most `max` characters, trimmed.
@@ -316,7 +328,7 @@ mod tests {
 
     #[test]
     fn a_reply_is_plain_bounded_text() {
-        let text = reply("\r\nHi Marta,\r\n\r\nYes.\u{0007}\r\n\r\nSam\r\n").unwrap();
+        let text = reply("\r\nHi Marta,\r\n\r\nYes.\u{0007}\u{202E}\r\n\r\nSam\r\n").unwrap();
         assert_eq!(text, "Hi Marta,\n\nYes.\n\nSam");
         assert!(reply("  \n ").is_none());
         let long = reply(&"é".repeat(MAX_REPLY_CHARS + 10)).unwrap();

@@ -37,8 +37,8 @@ interface ChatRequest {
 }
 
 function firstName(input: ReplyInput): string {
-  const them = [...(input.conversation?.messages ?? [])].reverse().find((m) => m.from === "them");
-  return them?.name.split(/\s+/u)[0] ?? "there";
+  const them = (input.conversation?.messages ?? []).findLast((m) => m.from === "them");
+  return them?.name.split(/\s+/u, 1)[0] ?? "there";
 }
 
 function sentence(intent: string): string {

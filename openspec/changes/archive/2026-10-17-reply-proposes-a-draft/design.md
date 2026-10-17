@@ -148,16 +148,25 @@ edited draft is never lost on a failed rewrite.
   success the dialog shows its result ("Sending to Marta") for about a
   second and closes; the Home row folds with "Sending to Marta"; the toast
   says it with Undo for the server's window. Undo calls `cancel_send`; in
-  time, the dialog comes back on the draft (Home shows the row again) and
-  a second Send updates and sends that same draft, never a second one; too
-  late, the toast says so. A failure keeps the dialog open with the draft
+  time, on Home the row and the dialog come back on the draft, and a second
+  Send updates and sends that same draft, never a second one; in the reader
+  the composer reopens on it (the reader's reply slot already shows an
+  editable draft, so two editors never hold it). Too late, the toast says
+  so. Send and Open in composer reuse an empty reply draft of the same
+  message instead of adding one, and never write over one holding the
+  member's words. A failure keeps the dialog open with the draft
   and says it could not be sent.
 - "Open in composer" creates the reply draft with the text and opens the
   reader's composer on it (from Home: the reader with `?reply`).
 - Esc or a click outside closes with nothing changed: no draft is created
   until Send or Open in composer.
 - Read-only: the reader already hides Reply for a reader or a kept inbox;
-  Home now leaves Reply out for such items too.
+  Home now offers only Snooze on such items (no Reply, Yes, No, It's safe,
+  Done or Not needed), as its spec already said.
+- Keys: while a step replaces the focused control (writing, rewriting),
+  the dialog keeps the keys (Esc closes, page shortcuts never fire behind
+  it); choices that arrive late take the focus only if the member is not
+  typing; ⌘↵ in an ask line asks, it never sends.
 
 ## Testing
 

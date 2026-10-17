@@ -169,7 +169,10 @@ export const ReplyDialog: Story = {
     await userEvent.keyboard("r");
     const body = within(canvasElement.ownerDocument.body);
     await expect(await body.findByRole("dialog", { name: "Reply to Marta" })).toBeVisible();
-    await expect(await body.findByRole("button", { name: /Yes, Thursday works/u })).toHaveFocus();
+    const first = await body.findByRole("button", { name: /Yes, Thursday works/u });
+    await waitFor(async () => {
+      await expect(first).toHaveFocus();
+    });
   },
 };
 
@@ -184,7 +187,10 @@ export const ReplyDraft: Story = {
     const body = within(canvasElement.ownerDocument.body);
     await body.findByRole("button", { name: /Yes, Thursday works/u });
     await userEvent.keyboard("1");
-    await expect(await body.findByRole("textbox", { name: "Your reply" })).toHaveFocus();
+    const text = await body.findByRole("textbox", { name: "Your reply" });
+    await waitFor(async () => {
+      await expect(text).toHaveFocus();
+    });
   },
 };
 
