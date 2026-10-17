@@ -1,0 +1,52 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT message_id AS \"message_id: MessageId\", action, likelihood\n             FROM conversations.action_likelihoods\n            WHERE message_id = ANY($1)",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "message_id: MessageId",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "conversations.action_likelihoods",
+            "name": "message_id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "action",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "conversations.action_likelihoods",
+            "name": "action"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "likelihood",
+        "type_info": "Float8",
+        "origin": {
+          "Table": {
+            "table": "conversations.action_likelihoods",
+            "name": "likelihood"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "UuidArray"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "b5751666cabc4d73d627780bbb0eb47fd366b8d6a15ffd3d5cc96f03a7cec285"
+}

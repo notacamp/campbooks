@@ -1,6 +1,7 @@
 //! Types and helpers shared by several features of this module.
 
 pub mod access;
+pub mod actions;
 pub mod attachments;
 pub mod blobs;
 pub mod conversation;

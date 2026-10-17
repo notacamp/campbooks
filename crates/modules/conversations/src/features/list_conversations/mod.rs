@@ -1,7 +1,7 @@
 //! `GET /api/v1/w/{workspace_id}/conversations` — conversations by stream,
 //! pinned first (the provider's star), then newest first, a page at a time.
 
-use axum::{Json, extract::State};
+use axum::{Extension, Json, extract::State};
 use base64::{Engine as _, engine::general_purpose::URL_SAFE_NO_PAD};
 use campbooks_kernel::{
     AppState, Error, Operation, Problem, Result,
@@ -14,11 +14,13 @@ use serde::{Deserialize, Serialize};
 use sqlx::PgConnection;
 use utoipa::{IntoParams, ToSchema};
 
+use crate::config::ActionSettings;
 use crate::domain::resources;
 use crate::events::CONVERSATION_RECORD;
 use crate::{
     domain::{
         access::visible_inboxes,
+        actions,
         conversation::{ConversationSummary, SummaryRow},
         needs, rules, suggestions,
     },
@@ -85,6 +87,7 @@ pub struct ConversationList {
 )]
 pub async fn handler(
     State(state): State<AppState>,
+    Extension(settings): Extension<ActionSettings>,
     workspace: Workspace<ConversationsRead>,
     extract::Query(query): extract::Query<ListQuery>,
 ) -> Result<Json<ConversationList>> {
@@ -110,6 +113,7 @@ pub async fn handler(
             .collect::<Result<Vec<_>>>()?;
         suggestions::attach(&mut tx, &mut conversations).await?;
         needs::attach(&mut tx, &mut conversations).await?;
+        actions::attach(&mut tx, settings, &mut conversations).await?;
         rules::attach(&mut tx, access.user, &mut conversations).await?;
         tx.commit().await?;
         return Ok(Json(ConversationList {
@@ -130,6 +134,7 @@ pub async fn handler(
         .collect::<Result<Vec<_>>>()?;
     suggestions::attach(&mut tx, &mut conversations).await?;
     needs::attach(&mut tx, &mut conversations).await?;
+    actions::attach(&mut tx, settings, &mut conversations).await?;
     rules::attach(&mut tx, access.user, &mut conversations).await?;
     tx.commit().await?;
     let next_cursor = if conversations.len() > limit as usize {

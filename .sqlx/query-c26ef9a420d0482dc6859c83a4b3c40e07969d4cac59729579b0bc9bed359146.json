@@ -1,0 +1,18 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO conversations.action_likelihoods\n               (message_id, workspace_id, action, likelihood, model)\n           SELECT $1::uuid, $2::uuid, a.action, a.likelihood, $5::text\n             FROM unnest($3::text[], $4::float8[]) AS a(action, likelihood)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "TextArray",
+        "Float8Array",
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "c26ef9a420d0482dc6859c83a4b3c40e07969d4cac59729579b0bc9bed359146"
+}

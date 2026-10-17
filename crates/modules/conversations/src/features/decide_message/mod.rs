@@ -36,8 +36,12 @@ use std::sync::Arc;
 use campbooks_ai::{
     Gateway,
     decide::{
+        Question,
         check::{AnswersCheck, CheckOutcome},
-        signals::email::{Envelope, Recipient, triage_questions},
+        signals::{
+            actions::{action_questions, likelihoods},
+            email::{Envelope, Recipient, triage_questions},
+        },
         strategy::Strategy,
     },
     usage::Scope,
@@ -50,7 +54,9 @@ use chrono::{DateTime, TimeDelta, Utc};
 use serde::{Deserialize, Serialize};
 
 use crate::{
+    config::ActionSettings,
     domain::{
+        actions,
         blobs::read_text,
         conversation::{Changed, provider_message_ids},
         decide::{ENVELOPE_BODY_BYTES, MessageParts, PURPOSE, Source, envelope},
@@ -143,9 +149,40 @@ struct Pass {
     backfill: TimeDelta,
     policy: Policy,
     needs: NeedSettings,
+    /// The action catalogue (campbooks-cloud#166): off unless configured.
+    actions: ActionSettings,
 }
 
 impl Pass {
+    /// The questions asked about `envelope`: the triage questions, then,
+    /// with the catalogue on, its own (each in a slot of its own). With it
+    /// off, exactly the triage questions.
+    fn asked(&self, triage: &[Question], envelope: &Envelope) -> Vec<Question> {
+        let mut asked = triage.to_vec();
+        if self.actions.enabled {
+            asked.extend(action_questions(envelope));
+        }
+        asked
+    }
+
+    /// The catalogue's rating of every action from `answers` (and the model
+    /// that gave them), with the catalogue on.
+    fn rate(
+        &self,
+        envelope: &Envelope,
+        answers: &[Option<campbooks_ai::decide::strategy::Decided>],
+    ) -> Option<(
+        Vec<(campbooks_ai::decide::signals::actions::ActionId, f64)>,
+        String,
+    )> {
+        self.actions.enabled.then(|| {
+            let given: Vec<&campbooks_ai::decide::Answer> =
+                answers.iter().flatten().map(|d| &d.answer).collect();
+            let model = given.first().map(|a| a.model.clone()).unwrap_or_default();
+            (likelihoods(envelope, &given), model)
+        })
+    }
+
     /// Ask the model about `message` and store its answers: sort the
     /// conversation when its stream answer is accepted and the message is
     /// its first inbound one, then refresh its need.
@@ -173,8 +210,9 @@ impl Pass {
 
         // Counted against the workspace's daily AI limit (campbooks-cloud#152).
         let usage = Scope::workspace(ctx.state().db.clone(), workspace, PURPOSE);
-        let asked = model.strategy.decide(&loaded.envelope, &questions);
-        let answers = match usage.run(asked).await {
+        let all = self.asked(&questions, &loaded.envelope);
+        let asked = model.strategy.decide(&loaded.envelope, &all);
+        let mut answers = match usage.run(asked).await {
             Ok(decisions) => decisions.answers,
             // The model failed (or has not passed) its answers check: the
             // pass does what it does when no model is configured, and
@@ -188,6 +226,10 @@ impl Pass {
             }
             Err(error) => return Err(redact::ai(&error)),
         };
+        // The catalogue's answers are rated, never stored as decisions:
+        // the triage answers are recorded exactly as without it.
+        let rated = self.rate(&loaded.envelope, &answers);
+        answers.truncate(questions.len());
         let recorded = Recorded {
             message,
             conversation: loaded.conversation,
@@ -235,6 +277,9 @@ impl Pass {
             None => false,
         };
         recorded.store(tx, workspace, placed).await?;
+        if let Some((rated, model_name)) = &rated {
+            actions::store(tx, (*workspace.as_uuid(), message), rated, model_name).await?;
+        }
         if placed {
             // Not a member's change: nothing is sent back to the provider.
             let provider_message_ids = provider_message_ids(tx, loaded.conversation).await?;
@@ -274,7 +319,15 @@ impl DecideMessage {
             backfill: TimeDelta::days(i64::from(backfill_days)),
             policy,
             needs,
+            actions: ActionSettings::default(),
         })
+    }
+
+    /// The same pass, rating the action catalogue as `actions` says.
+    #[must_use]
+    pub fn with_actions(mut self, actions: ActionSettings) -> Self {
+        self.0.actions = actions;
+        self
     }
 }
 
@@ -335,6 +388,13 @@ impl DecideBacklog {
     ) -> Self {
         let DecideMessage(pass) = DecideMessage::new(model, backfill_days, policy, needs);
         Self(pass)
+    }
+
+    /// The same pass, rating the action catalogue as `actions` says.
+    #[must_use]
+    pub fn with_actions(mut self, actions: ActionSettings) -> Self {
+        self.0.actions = actions;
+        self
     }
 }
 
@@ -513,6 +573,8 @@ struct Bodies {
     text: Option<BlobRef>,
 }
 
+#[cfg(test)]
+mod actions_tests;
 #[cfg(test)]
 mod usage_tests;
 

@@ -26,6 +26,11 @@ use crate::{
 /// Most alternatives per token OpenAI-compatible servers return.
 pub(crate) const TOP_LOGPROBS: u8 = 20;
 
+/// The `max_tokens` a decide call allows: a cap, not a cost (the answer is
+/// a short JSON object), set so a reasoning model is never cut off before
+/// it answers.
+pub(crate) const MAX_TOKENS: u32 = 4096;
+
 const SYSTEM_PROMPT: &str = "You answer typed decision questions about a state. Base every \
 answer only on the state. Reply with one JSON object that has exactly one field per question \
 id: for a choice, one of its option labels; for a score, one of its level numbers; for a \

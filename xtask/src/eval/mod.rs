@@ -8,6 +8,7 @@
 //! `JEV_PATH` and `JEV_MODEL` defaulting to the decisions endpoint at `openrouter.ai`
 //! and `typesafe/jev-1.13`); without it they are reported as not run.
 
+mod actions;
 mod dataset;
 mod metrics;
 mod report;
@@ -19,6 +20,7 @@ use anyhow::{Context as _, Result, bail};
 use campbooks_ai::decide::{Question, knn::LexicalEmbedder, signals::email::triage_questions};
 use clap::Args;
 
+pub use actions::{ActionsArgs, run_actions};
 use dataset::Dataset;
 use report::{
     CurvePoint, NotRun, Report, RunReport, curve_points, markdown, regressions, run_report,

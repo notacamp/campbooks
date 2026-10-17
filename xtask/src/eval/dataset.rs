@@ -11,7 +11,10 @@ use std::{
 use anyhow::{Context as _, Result, bail};
 use campbooks_ai::decide::{
     AnswerValue, Question,
-    signals::email::{Envelope, Recipient},
+    signals::{
+        actions::ActionId,
+        email::{Envelope, Recipient},
+    },
 };
 use serde::Deserialize;
 
@@ -87,6 +90,11 @@ pub struct Labels {
     /// `owed`, `paid` or `neither` (campbooks-cloud#167).
     #[serde(default)]
     pub money: Option<String>,
+    /// Whether the owner would do each action of the catalogue
+    /// (campbooks-cloud#166), from the sheet of an actions export; empty when
+    /// the item is not labelled for actions.
+    #[serde(default)]
+    pub actions: BTreeMap<ActionId, bool>,
 }
 
 impl Labels {
@@ -278,9 +286,12 @@ impl Dataset {
     }
 }
 
-/// Fill each item's `money` label from the owner's sheet (`labels.csv`:
-/// a header row naming `id` and `money` columns, then one row per item;
-/// an empty `money` cell leaves the item unlabelled).
+/// Fill each item's labels from the owner's sheet (`labels.csv`: a header
+/// row naming an `id` column and a `money` column (campbooks-cloud#167) or
+/// one column per action of the catalogue (campbooks-cloud#166), then one
+/// row per item). An empty `money` cell leaves the item unlabelled; a row
+/// with no action cell filled in is unlabelled for actions, and in a row
+/// with any filled in, an empty action cell means "no".
 fn apply_sheet(text: &str, items: &mut [Item]) -> Result<()> {
     // A spreadsheet saving "CSV UTF-8" adds a byte-order mark, and in
     // pt-PT, es-ES or fr regional settings separates cells with `;`.
@@ -293,26 +304,51 @@ fn apply_sheet(text: &str, items: &mut [Item]) -> Result<()> {
     };
     let mut rows = text.lines().map(|line| csv_row(line, separator));
     let header = rows.next().unwrap_or_default();
-    let column = |name: &str| {
-        header
-            .iter()
-            .position(|h| h.trim() == name)
-            .with_context(|| format!("labels.csv has no `{name}` column"))
-    };
-    let (id, money) = (column("id")?, column("money")?);
+    let position = |name: &str| header.iter().position(|h| h.trim() == name);
+    let id = position("id").context("labels.csv has no `id` column")?;
+    let money = position("money");
+    let actions: Vec<(ActionId, usize)> = ActionId::ALL
+        .into_iter()
+        .filter_map(|a| Some((a, position(a.as_str())?)))
+        .collect();
+    if money.is_none() && actions.is_empty() {
+        bail!("labels.csv has no `money` column and no action column");
+    }
     for (n, row) in rows.enumerate() {
-        let (Some(row_id), Some(label)) = (row.get(id), row.get(money)) else {
+        let Some(row_id) = row.get(id) else {
             continue;
         };
-        let label = label.trim().to_lowercase();
-        if label.is_empty() {
+        let cell = |column: usize| {
+            row.get(column)
+                .map(|c| c.trim().to_lowercase())
+                .unwrap_or_default()
+        };
+        let label = money.map(cell).unwrap_or_default();
+        let marks: Vec<(ActionId, String)> = actions.iter().map(|(a, c)| (*a, cell(*c))).collect();
+        if label.is_empty() && marks.iter().all(|(_, m)| m.is_empty()) {
             continue;
         }
         let item = items
             .iter_mut()
             .find(|i| i.id == row_id.trim())
             .with_context(|| format!("labels.csv row {}: no item `{row_id}`", n + 2))?;
-        item.labels.money = Some(label);
+        if !label.is_empty() {
+            item.labels.money = Some(label);
+        }
+        if marks.iter().any(|(_, m)| !m.is_empty()) {
+            for (action, mark) in marks {
+                let yes = match mark.as_str() {
+                    "yes" | "y" | "x" | "1" | "true" | "sim" | "sí" | "si" | "oui" => true,
+                    "" | "no" | "n" | "0" | "false" | "não" | "nao" | "non" => false,
+                    other => bail!(
+                        "labels.csv row {}: `{other}` under `{}` (yes or no)",
+                        n + 2,
+                        action.as_str()
+                    ),
+                };
+                item.labels.actions.insert(action, yes);
+            }
+        }
     }
     Ok(())
 }
@@ -443,11 +479,40 @@ mod tests {
         assert_eq!(items[1].labels.money, None, "left blank: unlabelled");
         assert!(apply_sheet("id,money\nnope,paid\n", &mut items).is_err());
         assert!(apply_sheet("id,label\n", &mut items).is_err());
+        assert!(apply_sheet("label\n", &mut items).is_err());
         assert_eq!(csv_row(r#""a,b","c""d",e"#, ','), ["a,b", "c\"d", "e"]);
         let mut items = vec![set.items[0].clone()];
         let id = items[0].id.clone();
         apply_sheet(&format!("\u{feff}id;money\n{id};paid\n"), &mut items).unwrap();
         assert_eq!(items[0].labels.money.as_deref(), Some("paid"));
+    }
+
+    #[test]
+    fn the_owners_sheet_fills_the_action_labels() {
+        let set = set();
+        let mut items = vec![set.items[0].clone(), set.items[1].clone()];
+        let (a, b) = (items[0].id.clone(), items[1].id.clone());
+        let sheet = format!(
+            "id,date,from,subject,attachments,reply,remind,open_attachment,forward,report,safe,already_paid,still_to_pay\n\
+             \"{a}\",,,,,yes,,x,,,,,\n\"{b}\",,,,,,,,,,,,\n"
+        );
+        apply_sheet(&sheet, &mut items).unwrap();
+        let labels = &items[0].labels.actions;
+        assert_eq!(labels.get(&ActionId::Reply), Some(&true));
+        assert_eq!(labels.get(&ActionId::OpenAttachment), Some(&true));
+        assert_eq!(
+            labels.get(&ActionId::Remind),
+            Some(&false),
+            "blank in a labelled row: no"
+        );
+        assert_eq!(labels.len(), ActionId::ALL.len());
+        assert!(
+            items[1].labels.actions.is_empty(),
+            "nothing filled in: unlabelled"
+        );
+        let mut items = vec![set.items[0].clone()];
+        let id = items[0].id.clone();
+        assert!(apply_sheet(&format!("id,reply\n{id},maybe\n"), &mut items).is_err());
     }
 
     #[test]

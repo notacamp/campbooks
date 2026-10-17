@@ -43,6 +43,42 @@ pub struct ConversationsConfig {
     /// rule for it (`CAMPBOOKS_CONVERSATIONS__NOTICES__*`).
     #[serde(default)]
     pub notices: NoticeSettings,
+    /// Each item's own actions, rated by the `decide` model from the action
+    /// catalogue (`CAMPBOOKS_CONVERSATIONS__ACTIONS__*`); off by default.
+    #[serde(default)]
+    pub actions: ActionSettings,
+}
+
+/// The action catalogue (campbooks-cloud#166). Off by default: until the
+/// owner has labelled an eval and the floor is set from it, the decide
+/// request and every need are exactly as before.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
+#[serde(default, deny_unknown_fields)]
+pub struct ActionSettings {
+    /// Ask the catalogue's questions with triage and rate each need's
+    /// actions (`ENABLED`, default false).
+    pub enabled: bool,
+    /// The likelihood an action needs to be offered, in percent
+    /// (`FLOOR_PERCENT`, default 70): a placeholder until the owner's labels
+    /// set it (`cargo xtask eval actions --floor`). A need's own answers
+    /// (Report / It's safe, Already paid / Still to pay) are always offered.
+    pub floor_percent: u32,
+}
+
+impl Default for ActionSettings {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            floor_percent: 70,
+        }
+    }
+}
+
+impl ActionSettings {
+    /// The floor as a likelihood.
+    pub fn floor(&self) -> f64 {
+        f64::from(self.floor_percent.min(100)) / 100.0
+    }
 }
 
 /// The thresholds of "Scout noticed" (campbooks-cloud#169). Priors, to be
@@ -110,6 +146,7 @@ impl Default for ConversationsConfig {
             undo_send_seconds: DEFAULT_UNDO_SEND_SECONDS,
             needs_window_days: DEFAULT_NEEDS_WINDOW_DAYS,
             notices: NoticeSettings::default(),
+            actions: ActionSettings::default(),
         }
     }
 }

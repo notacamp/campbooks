@@ -1206,6 +1206,13 @@ pub struct NeedView {
     /// What the sender wrote, when an answer stored before ADR 0018 quoted
     /// it.
     pub quote: Option<Quote>,
+    /// Its own actions, rated by the `decide` model from the action
+    /// catalogue, at most three, the first to offer first
+    /// (campbooks-cloud#166). Absent unless the catalogue is switched on
+    /// (`CAMPBOOKS_CONVERSATIONS__ACTIONS__ENABLED`) and the message was
+    /// rated: the client then offers its fixed actions.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub actions: Option<Vec<super::actions::SuggestedAction>>,
 }
 
 /// Fill in each summary's open [`NeedView`].
@@ -1227,7 +1234,7 @@ pub async fn attach(conn: &mut PgConnection, summaries: &mut [ConversationSummar
         "#,
         &ids as &[ConversationId],
     )
-    .fetch_all(conn)
+    .fetch_all(&mut *conn)
     .await?;
     let today = Utc::now().date_naive();
     for row in rows {
@@ -1268,6 +1275,7 @@ pub async fn attach(conn: &mut PgConnection, summaries: &mut [ConversationSummar
             urgent: row.urgent,
             message_id: row.message_id,
             quote,
+            actions: None,
         });
     }
     Ok(())

@@ -3261,6 +3261,12 @@ export interface components {
             stream: components["schemas"]["Stream"];
         };
         /**
+         * @description One action of the catalogue a need may offer (campbooks-cloud#166),
+         *     as `campbooks_ai::decide::signals::actions::ActionId` names it.
+         * @enum {string}
+         */
+        NeedAction: "reply" | "remind" | "open_attachment" | "forward" | "report" | "safe" | "already_paid" | "still_to_pay";
+        /**
          * @description Whose answer raised a need.
          * @enum {string}
          */
@@ -3282,6 +3288,14 @@ export interface components {
         NeedTrust: "sure" | "check";
         /** @description A conversation's open need, as lists and the reader show it. */
         NeedView: {
+            /**
+             * @description Its own actions, rated by the `decide` model from the action
+             *     catalogue, at most three, the first to offer first
+             *     (campbooks-cloud#166). Absent unless the catalogue is switched on
+             *     (`CAMPBOOKS_CONVERSATIONS__ACTIONS__ENABLED`) and the message was
+             *     rated: the client then offers its fixed actions.
+             */
+            actions?: components["schemas"]["SuggestedAction"][] | null;
             /** @description Whose answer raised it. */
             basis: components["schemas"]["NeedBasis"];
             /**
@@ -4562,6 +4576,20 @@ export interface components {
         /** @description Which message to suggest replies to. */
         SuggestReplies: {
             message_id?: components["schemas"]["MessageId"] | null;
+        };
+        /**
+         * @description One action a need offers: one of the catalogue's, or a pair usually done
+         *     together, offered as one.
+         */
+        SuggestedAction: {
+            /** @description The action, or the pair's two in the order they are done. */
+            actions: components["schemas"]["NeedAction"][];
+            /**
+             * Format: int32
+             * @description How likely the member is to want it, in percent (0 to 100), as the
+             *     `decide` model rated it (a pair: the less likely of the two).
+             */
+            likelihood: number;
         };
         /**
          * @description Always or never show.

@@ -474,6 +474,29 @@ vocabulary!(
 );
 
 vocabulary!(
+    /// One action of the catalogue a need may offer (campbooks-cloud#166),
+    /// as `campbooks_ai::decide::signals::actions::ActionId` names it.
+    NeedAction {
+        /// Write back.
+        Reply => "reply",
+        /// Bring it back at a set time.
+        Remind => "remind",
+        /// Open the attachment.
+        OpenAttachment => "open_attachment",
+        /// Forward it.
+        Forward => "forward",
+        /// Report it as phishing and delete it.
+        Report => "report",
+        /// Say it is safe.
+        Safe => "safe",
+        /// The bill is already paid.
+        AlreadyPaid => "already_paid",
+        /// The bill is still to pay.
+        StillToPay => "still_to_pay",
+    }
+);
+
+vocabulary!(
     /// Why a need was cleared.
     ClearCause {
         /// A message was sent in the conversation after the one that raised it.

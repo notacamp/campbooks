@@ -9,13 +9,20 @@
 //!   attachments) with an empty `money` column to fill with `owed`, `paid`
 //!   or `neither`.
 //!
+//! `--set actions` (campbooks-cloud#166) exports the mail that had a need
+//! instead, with one empty column per action of the catalogue for the owner
+//! to mark (`yes`, or left blank for no), scored by `cargo xtask eval
+//! actions`. The same guards apply: operator only, a new private folder,
+//! real mail never committed.
+//!
 //! The folder holds real mail: it is the owner's, it is never committed,
 //! and `cargo xtask eval decide --set-dir <folder>` reads it where it is.
 
 use std::{fs, io::Write as _, path::Path, process::ExitCode};
 
+use campbooks_ai::decide::signals::actions::ActionId;
 use campbooks_conversations::labelling::{
-    LabellingItem, MAX_ITEMS, export_for_labelling, manifest,
+    LabellingItem, LabellingSet, MAX_ITEMS, export_set, manifest_for,
 };
 use campbooks_kernel::{AppState, Config, tenancy::WorkspaceId};
 use clap::Subcommand;
@@ -36,7 +43,37 @@ pub enum LabellingCommand {
         /// The folder to write (created; must not exist yet).
         #[arg(long)]
         out: std::path::PathBuf,
+        /// Which set: `money` (the money question) or `actions` (the action
+        /// catalogue: mail that had a need, one column per action).
+        #[arg(long, value_enum, default_value_t = Set::Money)]
+        set: Set,
     },
+}
+
+/// Which eval set an export is for.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, clap::ValueEnum)]
+pub enum Set {
+    /// The money question (campbooks-cloud#167).
+    Money,
+    /// The action catalogue (campbooks-cloud#166).
+    Actions,
+}
+
+impl Set {
+    const fn labelling(self) -> LabellingSet {
+        match self {
+            Self::Money => LabellingSet::Money,
+            Self::Actions => LabellingSet::Actions,
+        }
+    }
+
+    /// The columns the owner fills in.
+    fn columns(self) -> Vec<&'static str> {
+        match self {
+            Self::Money => vec!["money"],
+            Self::Actions => ActionId::ALL.iter().map(|a| a.as_str()).collect(),
+        }
+    }
 }
 
 /// Run `command`.
@@ -45,6 +82,7 @@ pub fn run(command: LabellingCommand) -> ExitCode {
         workspace,
         days,
         out,
+        set,
     } = command;
     let Ok(workspace) = workspace.parse::<WorkspaceId>() else {
         return super::fail("--workspace must be a workspace id (a UUID)");
@@ -67,7 +105,7 @@ pub fn run(command: LabellingCommand) -> ExitCode {
         let db = super::connect(&config).await?;
         let blobs = campbooks_kernel::blobs::BlobStore::from_config(&config.blobs, db.clone())?;
         let state = AppState::new(db.clone(), config).with_blobs(blobs);
-        let items = export_for_labelling(&state, workspace, days)
+        let items = export_set(&state, workspace, days, set.labelling())
             .await
             .map_err(|e| e.to_string());
         db.close().await;
@@ -83,28 +121,39 @@ pub fn run(command: LabellingCommand) -> ExitCode {
             "only the newest {MAX_ITEMS} messages: use fewer --days for an older window"
         );
     }
-    if let Err(e) = write(&out, &items) {
+    if let Err(e) = write(&out, &items, set) {
         return super::fail(&format!("could not write {}: {e}", out.display()));
     }
+    let next = match set {
+        Set::Money => format!(
+            "Fill the `money` column of labels.csv with owed, paid or neither, then run\n  \
+             cargo xtask eval decide --set-dir {} --question money --strategy jev",
+            out.display()
+        ),
+        Set::Actions => format!(
+            "For each email, write yes under every action you would take (leave the others\n\
+             blank; a row left all blank is skipped), then run\n  \
+             cargo xtask eval actions --set-dir {} --floor 0.6 --floor 0.7 --floor 0.8",
+            out.display()
+        ),
+    };
     let _ = writeln!(
         std::io::stdout(),
-        "wrote {} message(s) to {}\n\
-         Fill the `money` column of labels.csv with owed, paid or neither, then run\n  \
-         cargo xtask eval decide --set-dir {} --question money --strategy jev\n\
+        "wrote {} message(s) to {}\n{next}\n\
          This folder holds real mail: keep it on your own machine and never commit it.",
         items.len(),
         out.display(),
-        out.display()
     );
     ExitCode::SUCCESS
 }
 
-fn write(out: &Path, items: &[LabellingItem]) -> std::io::Result<()> {
+fn write(out: &Path, items: &[LabellingItem], set: Set) -> std::io::Result<()> {
     // Real mail: readable by the operator only, and never into a folder
     // that exists (no labels overwritten, no race with the check above).
     private_dir(out)?;
     private_dir(&out.join("items"))?;
-    let manifest = serde_json::to_string_pretty(&manifest()).map_err(std::io::Error::other)?;
+    let manifest = serde_json::to_string_pretty(&manifest_for(set.labelling()))
+        .map_err(std::io::Error::other)?;
     private_file(&out.join("manifest.json"), &(manifest + "\n"))?;
     let mut lines = String::new();
     for item in items {
@@ -112,16 +161,17 @@ fn write(out: &Path, items: &[LabellingItem]) -> std::io::Result<()> {
         lines.push('\n');
     }
     private_file(&out.join("items").join("owner.jsonl"), &lines)?;
-    let mut csv = String::from("id,date,from,subject,attachments,money\n");
+    let columns = set.columns();
+    let mut csv = format!("id,date,from,subject,attachments,{}\n", columns.join(","));
     for item in items {
-        let row = [
+        let mut row = vec![
             item.id.clone(),
             item.sent_at.format("%Y-%m-%d %H:%M").to_string(),
             item.from.clone(),
             item.subject.clone(),
             item.attachments.join("; "),
-            String::new(),
         ];
+        row.extend(columns.iter().map(|_| String::new()));
         let cells: Vec<String> = row.iter().map(|cell| csv_cell(cell)).collect();
         csv.push_str(&cells.join(","));
         csv.push('\n');
@@ -165,7 +215,25 @@ fn csv_cell(text: &str) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::csv_cell;
+    use super::{Set, csv_cell};
+
+    #[test]
+    fn each_set_has_its_own_columns() {
+        assert_eq!(Set::Money.columns(), ["money"]);
+        assert_eq!(
+            Set::Actions.columns(),
+            [
+                "reply",
+                "remind",
+                "open_attachment",
+                "forward",
+                "report",
+                "safe",
+                "already_paid",
+                "still_to_pay"
+            ]
+        );
+    }
 
     #[test]
     fn cells_are_quoted() {

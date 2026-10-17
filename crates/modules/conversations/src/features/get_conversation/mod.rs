@@ -21,9 +21,11 @@ use utoipa::ToSchema;
 use crate::domain::resources;
 use crate::events::CONVERSATION_RECORD;
 use crate::{
+    config::ActionSettings,
     domain::paths::ConversationPath,
     domain::{
         access::visible_inboxes,
+        actions,
         attachments::is_raster,
         blobs::read_text,
         conversation::{ConversationSummary, summary},
@@ -190,6 +192,7 @@ pub struct Bodies {
 pub async fn handler(
     State(state): State<AppState>,
     Extension(policy): Extension<Policy>,
+    Extension(settings): Extension<ActionSettings>,
     workspace: Workspace<ConversationsRead>,
     locale: Locale,
     extract::Path(path): extract::Path<ConversationPath>,
@@ -216,7 +219,8 @@ pub async fn handler(
     if visible.is_none() {
         return Err(Error::NotFound);
     }
-    let conversation = summary(&mut tx, access.user, id).await?;
+    let mut conversation = summary(&mut tx, access.user, id).await?;
+    actions::attach(&mut tx, settings, std::slice::from_mut(&mut conversation)).await?;
     let mut rows = sqlx::query!(
         r#"
         SELECT id AS "id: MessageId", direction, sender, recipients, subject, sent_at, read,

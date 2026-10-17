@@ -14,6 +14,11 @@
 //! and is never committed. `cargo xtask eval decide --set-dir <folder>`
 //! then reads the labels the owner filled in `labels.csv`.
 //!
+//! The same export serves the action catalogue (campbooks-cloud#166):
+//! [`LabellingSet::Actions`] lists the newest inbound message of every
+//! conversation that had a need (open or cleared), for the owner to say
+//! which actions they would take (`cargo xtask eval actions`).
+//!
 //! Nothing here decides anything: it reads stored messages only.
 
 use campbooks_kernel::{AppState, Error, Result, db::BeginFor as _, tenancy::WorkspaceId};
@@ -83,6 +88,16 @@ struct Bodies {
     text: Option<campbooks_kernel::blobs::BlobRef>,
 }
 
+/// Which eval set an export is for.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum LabellingSet {
+    /// The money question (campbooks-cloud#167): mail in Receipts, or that
+    /// had a Pay need.
+    Money,
+    /// The action catalogue (campbooks-cloud#166): mail that had a need.
+    Actions,
+}
+
 /// The newest inbound message of each of `workspace`'s conversations in
 /// Receipts, or that had a Pay need, sent within `days`, newest first (at
 /// most [`MAX_ITEMS`]).
@@ -90,6 +105,17 @@ pub async fn export_for_labelling(
     state: &AppState,
     workspace: WorkspaceId,
     days: u32,
+) -> Result<Vec<LabellingItem>> {
+    export_set(state, workspace, days, LabellingSet::Money).await
+}
+
+/// The newest inbound message of each of `workspace`'s conversations that
+/// `set` lists, sent within `days`, newest first (at most [`MAX_ITEMS`]).
+pub async fn export_set(
+    state: &AppState,
+    workspace: WorkspaceId,
+    days: u32,
+    set: LabellingSet,
 ) -> Result<Vec<LabellingItem>> {
     let since = Utc::now() - TimeDelta::days(i64::from(days));
     let mut tx = state.db.begin_for(workspace).await?;
@@ -111,9 +137,15 @@ pub async fn export_for_labelling(
              WHERE m.workspace_id = $3
                AND m.direction = 'inbound' AND NOT m.in_spam AND NOT m.in_trash
                AND m.sent_at >= $1
-               AND (c.stream = 'receipts'
-                    OR EXISTS (SELECT 1 FROM conversations.needs n
-                                WHERE n.conversation_id = c.id AND n.reason = 'pay'))
+               AND CASE WHEN $4
+                        -- The action catalogue: mail that had a need.
+                        THEN EXISTS (SELECT 1 FROM conversations.needs n
+                                      WHERE n.conversation_id = c.id)
+                        -- The money question: in Receipts, or had a Pay need.
+                        ELSE c.stream = 'receipts'
+                             OR EXISTS (SELECT 1 FROM conversations.needs n
+                                         WHERE n.conversation_id = c.id AND n.reason = 'pay')
+                   END
              ORDER BY m.conversation_id, m.sent_at DESC, m.id DESC
         ) newest
         ORDER BY sent_at DESC, id DESC
@@ -123,6 +155,7 @@ pub async fn export_for_labelling(
     .bind(since)
     .bind(MAX_ITEMS)
     .bind(workspace.as_uuid())
+    .bind(set == LabellingSet::Actions)
     .fetch_all(&mut *tx)
     .await?;
     tx.commit().await?;
@@ -212,6 +245,26 @@ async fn labelling_item(state: &AppState, ws: &str, n: usize, row: Row) -> Resul
 /// The locale and workspace name every exported item carries: the owner's
 /// own mail, in whatever language it is.
 pub const OWNER: &str = "owner";
+
+/// The `manifest.json` of an export of `set`.
+pub fn manifest_for(set: LabellingSet) -> Value {
+    match set {
+        LabellingSet::Money => manifest(),
+        LabellingSet::Actions => json!({
+            "name": "owner-actions",
+            "version": 1,
+            "purpose": "conversations.actions",
+            "private": true,
+            "locales": [OWNER],
+            "workspaces": {OWNER: "The owner's own mail (never committed)."},
+            "questions": [],
+            "actions": campbooks_ai::decide::signals::actions::ActionId::ALL
+                .iter()
+                .map(|a| a.as_str())
+                .collect::<Vec<_>>(),
+        }),
+    }
+}
 
 /// The `manifest.json` of an export: the owner's set, private (real mail:
 /// the reserved-domain checks do not apply), asking only `money`.
