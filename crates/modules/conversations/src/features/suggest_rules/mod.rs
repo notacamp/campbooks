@@ -59,6 +59,13 @@ pub enum TaughtAction {
     AddLabel,
     /// Marked its need Not needed.
     NotNeeded,
+    /// Reported it as spam or phishing ("Report and delete"): offers to
+    /// report mail like it as it arrives ("Never see emails like this
+    /// again?"), suspicious as it is.
+    Report,
+    /// Said its bill is already paid: offers to mark that sender's bills
+    /// paid from now on.
+    Paid,
 }
 
 /// The action to suggest a rule for.
@@ -86,6 +93,11 @@ pub enum Likeness {
     SenderTemplate,
     /// The domain's mail with this subject's template.
     DomainTemplate,
+    /// Everything from the sender's domain.
+    Domain,
+    /// Mail that says it is from the sender's domain but fails its sender
+    /// checks (someone pretending to be it).
+    Impersonation,
 }
 
 /// One rule the member could make.
@@ -221,18 +233,26 @@ async fn suggestions(
     let Some(candidate) = rules::candidate(conn, id).await? else {
         return Ok(RuleSuggestions::nothing(NoSuggestion::NotTeachable, shared));
     };
-    if candidate.suspicious {
+    // Reporting is about suspicious mail: the one offer it may start.
+    if candidate.suspicious && query.action != TaughtAction::Report {
         return Ok(RuleSuggestions::nothing(NoSuggestion::Suspicious, shared));
     }
     let Some(actions) = actions_for(conn, id, query).await? else {
         return Ok(RuleSuggestions::nothing(NoSuggestion::NotTeachable, shared));
     };
     let correspondent = rules::corresponds(conn, inbox, &candidate.sender_address).await?;
-    if correspondent && rules::hides(&actions) {
+    // "Paid" hides a question, never the mail: a correspondent's bills too.
+    if correspondent && rules::hides(&actions) && query.action != TaughtAction::Paid {
         return Ok(RuleSuggestions::nothing(
             NoSuggestion::Correspondent,
             shared,
         ));
+    }
+    // About mail still to come: offered even with no lookalike yet.
+    let ahead = matches!(query.action, TaughtAction::Report | TaughtAction::Paid);
+    if ahead {
+        return ahead_suggestions(conn, access, inbox, &candidate, &actions, shared, deadline)
+            .await;
     }
 
     let mut out = Vec::new();
@@ -280,8 +300,98 @@ async fn suggestions(
     if !offered {
         return Ok(RuleSuggestions::nothing(NoSuggestion::TooFew, shared));
     }
-    // The default's key; with no default, every likeness offered, since
-    // "Just this one" turns all of them down.
+    if dismissed(conn, access, inbox, &out, default).await? {
+        return Ok(RuleSuggestions::nothing(NoSuggestion::Dismissed, shared));
+    }
+    Ok(RuleSuggestions {
+        suggestions: out,
+        default: default.and_then(|i| u32::try_from(i).ok()),
+        shared,
+        none: None,
+    })
+}
+
+/// The offers about mail still to come (after Report and Already paid): the
+/// sender, or someone pretending to be its domain, or the whole domain,
+/// each with what it would do to the mail already here, the first the
+/// default.
+async fn ahead_suggestions(
+    conn: &mut PgConnection,
+    access: &Access,
+    inbox: InboxId,
+    candidate: &Candidate,
+    actions: &[RuleAction],
+    shared: bool,
+    deadline: std::time::Instant,
+) -> Result<RuleSuggestions> {
+    let mut out = Vec::new();
+    for (likeness, conditions) in ahead_likenesses(candidate) {
+        if rules::validate(&conditions, actions).is_err() {
+            continue;
+        }
+        let preview = compute_preview(conn, inbox, (&conditions, actions), deadline).await?;
+        let key = suggestion_key(likeness, &conditions, actions);
+        out.push(RuleSuggestion {
+            likeness,
+            conditions,
+            actions: actions.to_vec(),
+            preview,
+            key,
+        });
+    }
+    if out.is_empty() {
+        return Ok(RuleSuggestions::nothing(NoSuggestion::NotTeachable, shared));
+    }
+    let default = Some(0);
+    if dismissed(conn, access, inbox, &out, default).await? {
+        return Ok(RuleSuggestions::nothing(NoSuggestion::Dismissed, shared));
+    }
+    Ok(RuleSuggestions {
+        suggestions: out,
+        default: Some(0),
+        shared,
+        none: None,
+    })
+}
+
+/// Broad to narrow for mail still to come. When the provider says the
+/// sender failed its checks, the From domain is the one being pretended
+/// to: the offer is "pretending to be it" first, never the whole domain
+/// (its real mail would go too).
+fn ahead_likenesses(candidate: &Candidate) -> Vec<(Likeness, Vec<RuleCondition>)> {
+    let sender = candidate.sender_address.clone();
+    let domain = registrable_domain(&sender);
+    let own_domain = !domain.is_empty() && !is_free_mail(&domain);
+    let by_sender = (Likeness::Sender, vec![RuleCondition::SenderAddress(sender)]);
+    if candidate.auth_failed() && own_domain {
+        return vec![
+            (
+                Likeness::Impersonation,
+                vec![
+                    RuleCondition::SenderDomain(domain),
+                    RuleCondition::SenderChecksFail,
+                ],
+            ),
+            by_sender,
+        ];
+    }
+    let mut out = vec![by_sender];
+    if own_domain {
+        out.push((Likeness::Domain, vec![RuleCondition::SenderDomain(domain)]));
+    }
+    out
+}
+
+/// Whether the member turned the offer down: its default's key, or with no
+/// default every likeness offered, since "Just this one" turns all of them
+/// down.
+async fn dismissed(
+    conn: &mut PgConnection,
+    access: &Access,
+    inbox: InboxId,
+    out: &[RuleSuggestion],
+    default: Option<usize>,
+) -> Result<bool> {
     let keys: Vec<String> = match default.and_then(|i| out.get(i)) {
         Some(first) => vec![first.key.clone()],
         None => out.iter().map(|s| s.key.clone()).collect(),
@@ -300,16 +410,9 @@ async fn suggestions(
         )
         .fetch_one(&mut *conn)
         .await?;
-        if dismissed {
-            return Ok(RuleSuggestions::nothing(NoSuggestion::Dismissed, shared));
-        }
+        return Ok(dismissed);
     }
-    Ok(RuleSuggestions {
-        suggestions: out,
-        default: default.and_then(|i| u32::try_from(i).ok()),
-        shared,
-        none: None,
-    })
+    Ok(false)
 }
 
 /// The actions that repeat what the member did, or `None` when there is
@@ -345,6 +448,27 @@ async fn actions_for(
                 (_, "asks_action") => Some(vec![RuleAction::AsksAction { value: false }]),
                 _ => None,
             })
+        }
+        TaughtAction::Report => {
+            let reported = sqlx::query_scalar!(
+                r#"SELECT EXISTS (SELECT 1 FROM conversations.messages
+                                   WHERE conversation_id = $1 AND in_spam) AS "reported!""#,
+                id as ConversationId,
+            )
+            .fetch_one(conn)
+            .await?;
+            reported.then(|| vec![RuleAction::Spam])
+        }
+        TaughtAction::Paid => {
+            let paid = sqlx::query_scalar!(
+                r#"SELECT EXISTS (SELECT 1 FROM conversations.needs
+                                   WHERE conversation_id = $1 AND reason = 'pay'
+                                     AND verdict = 'already_paid') AS "paid!""#,
+                id as ConversationId,
+            )
+            .fetch_one(conn)
+            .await?;
+            paid.then(|| vec![RuleAction::MarkPaid])
         }
     })
 }

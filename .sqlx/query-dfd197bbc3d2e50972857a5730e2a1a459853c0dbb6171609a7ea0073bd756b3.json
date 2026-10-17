@@ -1,0 +1,23 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT EXISTS (SELECT 1 FROM conversations.needs\n                                   WHERE conversation_id = $1 AND reason = 'pay'\n                                     AND verdict = 'already_paid') AS \"paid!\"",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "paid!",
+        "type_info": "Bool",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "dfd197bbc3d2e50972857a5730e2a1a459853c0dbb6171609a7ea0073bd756b3"
+}

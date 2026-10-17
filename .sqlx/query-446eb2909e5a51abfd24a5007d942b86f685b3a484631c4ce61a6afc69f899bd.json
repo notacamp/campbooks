@@ -1,0 +1,23 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT EXISTS (SELECT 1 FROM conversations.messages\n                                   WHERE conversation_id = $1 AND in_spam) AS \"reported!\"",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "reported!",
+        "type_info": "Bool",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "446eb2909e5a51abfd24a5007d942b86f685b3a484631c4ce61a6afc69f899bd"
+}
