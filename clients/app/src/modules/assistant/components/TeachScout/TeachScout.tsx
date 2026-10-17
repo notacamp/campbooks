@@ -25,12 +25,16 @@ export interface TeachScoutProps {
   workspaceId: string;
 }
 
+/** Why the builder is shown instead of the sentence. */
+type BuilderReason = "chosen" | "failed";
+
 /**
  * "Teach Scout something": the member's sentence becomes rules to check
  * (`assistant.compile_instruction`, only when they press Enter). Scout asks
  * who someone is rather than guessing, says plainly what rules can't do, and
- * shows each rule with what it matches before Save. Without a language model
- * here, a rule builder instead.
+ * shows each rule with what it matches before Save. "Build a rule yourself"
+ * opens a rule builder at any time, with no model call; without a language
+ * model here, the builder is all there is.
  */
 export function TeachScout({ workspaceId }: TeachScoutProps) {
   const { t: typed } = useTranslation("assistant");
@@ -38,7 +42,7 @@ export function TeachScout({ workspaceId }: TeachScoutProps) {
   const compile = useCompile(workspaceId);
   const [text, setText] = useState("");
   const [result, setResult] = useState<CompileResult | undefined>();
-  const [manual, setManual] = useState(false);
+  const [builder, setBuilder] = useState<BuilderReason | undefined>();
 
   const code = compile.isError ? problemCode(compile.error) : undefined;
   const noModel = code === "compile_unavailable";
@@ -46,16 +50,34 @@ export function TeachScout({ workspaceId }: TeachScoutProps) {
     setResult(undefined);
     compile.reset();
   };
-  if (manual || noModel) {
+  const build = () => {
+    setBuilder("chosen");
+  };
+  if (builder !== undefined || noModel) {
+    const lead = noModel
+      ? t("memory.builder.noModel")
+      : builder === "failed"
+        ? t("memory.builder.byHand")
+        : t("memory.builder.lead");
     return (
       <div className="flex flex-col gap-3">
-        <Note
-          visor="unsure"
-          label={noModel ? t("memory.builder.noModel") : t("memory.builder.byHand")}
-        >
-          {noModel ? t("memory.builder.noModel") : t("memory.builder.byHand")}
+        <Note visor={noModel || builder === "failed" ? "unsure" : "idle"} label={lead}>
+          {lead}
         </Note>
         <RuleBuilder workspaceId={workspaceId} />
+        {noModel ? null : (
+          <div className="flex flex-wrap gap-2">
+            <Button
+              variant="ghost"
+              onClick={() => {
+                setBuilder(undefined);
+                reset();
+              }}
+            >
+              {t("memory.builder.back")}
+            </Button>
+          </div>
+        )}
       </div>
     );
   }
@@ -89,7 +111,12 @@ export function TeachScout({ workspaceId }: TeachScoutProps) {
           {t("memory.teach.submit")}
         </Button>
       </form>
-      <PrivacyLine>{t("memory.teach.privacy")}</PrivacyLine>
+      <div className="flex flex-col items-start gap-2 sm:flex-row sm:items-center sm:justify-between">
+        <PrivacyLine>{t("memory.teach.privacy")}</PrivacyLine>
+        <Button variant="ghost" onClick={build}>
+          {t("memory.builder.open")}
+        </Button>
+      </div>
       {compile.isPending ? (
         <Note visor="thinking" label={t("memory.teach.reading")}>
           <strong>{t("memory.teach.reading")}</strong> {t("memory.teach.readingLead")}
@@ -110,7 +137,7 @@ export function TeachScout({ workspaceId }: TeachScoutProps) {
             <Button
               variant="secondary"
               onClick={() => {
-                setManual(true);
+                setBuilder("failed");
               }}
             >
               {t("memory.builder.show")}
@@ -119,20 +146,28 @@ export function TeachScout({ workspaceId }: TeachScoutProps) {
         />
       ) : null}
       {result === undefined ? null : (
-        <Understood workspaceId={workspaceId} result={result} onDone={reset} />
+        <Understood workspaceId={workspaceId} result={result} onDone={reset} onBuild={build} />
       )}
     </div>
   );
 }
 
+/**
+ * What Scout understood: the rules, or, when it couldn't make one or the
+ * sentence asks for what rules can't do, why, with the builder one click
+ * away.
+ */
 function Understood({
   workspaceId,
   result,
   onDone,
+  onBuild,
 }: {
   workspaceId: string;
   result: CompileResult;
   onDone: () => void;
+  /** Open the rule builder instead. */
+  onBuild: () => void;
 }) {
   const { t: typed } = useTranslation("assistant");
   const t = typed as unknown as Translate;
@@ -165,7 +200,16 @@ function Understood({
       : t("memory.teach.unclear");
   return (
     <div className="flex flex-col gap-3">
-      <Note visor="unsure" quote={quote} label={message}>
+      <Note
+        visor="unsure"
+        quote={quote}
+        label={message}
+        actions={
+          <Button variant="secondary" onClick={onBuild}>
+            {t("memory.builder.open")}
+          </Button>
+        }
+      >
         {message}
       </Note>
       {proposals.length === 0 ? null : (

@@ -129,8 +129,16 @@ pub struct ModelInput<'a> {
     pub labels: Vec<&'a str>,
 }
 
+/// Most tokens the model may generate. The answer itself is a few hundred
+/// tokens at most (three small rules), but a reasoning model spends its
+/// thinking from the same budget before it writes a word: at 800 the
+/// thinking could use it all and leave the answer empty or cut short
+/// (campbooks-cloud#217). The schema still keeps the answer small.
+pub const MAX_TOKENS: u32 = 4096;
+
 /// The chat request for `input`: the fixed instruction, the input as one
-/// JSON object, temperature 0, a strict schema, no tools.
+/// JSON object, temperature 0, a strict schema, no tools, and room for a
+/// reasoning model to think ([`MAX_TOKENS`]).
 pub fn request(input: &ModelInput<'_>) -> ChatRequest {
     let mut request = ChatRequest::new(vec![
         Message::system(INSTRUCTION),
@@ -138,7 +146,7 @@ pub fn request(input: &ModelInput<'_>) -> ChatRequest {
     ])
     .with_json_schema("taught_rules", schema());
     request.temperature = Some(0.0);
-    request.max_tokens = Some(800);
+    request.max_tokens = Some(MAX_TOKENS);
     request
 }
 
@@ -202,6 +210,7 @@ mod tests {
         let input: Value = serde_json::from_str(user["content"].as_str().unwrap()).unwrap();
         assert_eq!(input["sentence"], sentence);
         assert_eq!(request.temperature, Some(0.0));
+        assert_eq!(request.max_tokens, Some(MAX_TOKENS));
         assert!(request.response_format.is_some());
     }
 }

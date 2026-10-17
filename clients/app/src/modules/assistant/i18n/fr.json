@@ -201,10 +201,8 @@
       "then": "Alors",
       "condition": "Quel courrier",
       "action": "Quoi faire",
-      "value": "Adresse, domaine ou mots",
       "conditions": {
-        "sender_address": "L’expéditeur est",
-        "sender_domain": "Le domaine de l’expéditeur est",
+        "from": "Il vient de",
         "subject_contains": "L’objet contient",
         "list": "Il vient d’une liste de diffusion",
         "automatic": "Il a été envoyé automatiquement"
@@ -217,7 +215,16 @@
         "archive": "L’archiver"
       },
       "show": "Afficher la règle",
-      "byHand": "Scout n’a pas pu lire votre phrase, alors créez la règle ici."
+      "byHand": "Scout n’a pas pu lire votre phrase, alors créez la règle ici.",
+      "title": "Créer une règle",
+      "lead": "Choisissez quel courrier, puis ce que Scout en fait. Aucune IA ne lit ceci.",
+      "open": "Créer une règle vous-même",
+      "back": "Le dire à Scout en une phrase",
+      "senders": "Expéditeurs",
+      "words": "Mots de l’objet",
+      "pickSender": "Cochez au moins un expéditeur, ou saisissez une adresse complète ou un domaine.",
+      "showMany": "Afficher les règles",
+      "oneEach": "Une règle par expéditeur, pour que le courrier de chacun d’eux compte."
     },
     "questions": {
       "title": "Vos réponses",

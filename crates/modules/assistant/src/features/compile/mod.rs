@@ -7,7 +7,9 @@
 //! every access check applies; never anyone's mail. It proposes in a strict
 //! schema with no tools; [`validate`] keeps only what the vocabulary allows
 //! and the input supports; a person named without an address becomes a
-//! question with candidates. Nothing is saved: the member previews and saves
+//! question with candidates. An answer that isn't the schema's JSON is the
+//! model's failure (503 `compile_failed`), never `unclear`, which would
+//! blame the member's words. Nothing is saved: the member previews and saves
 //! through `conversations.preview_rule` and `conversations.create_rule`.
 
 mod prompt;
@@ -37,8 +39,8 @@ use serde::Deserialize;
 use serde_json::{Value, json};
 
 use self::types::{
-    Candidate, CompileOutcome, CompileRequest, CompileResult, Proposal, ProposalInbox,
-    ProposedAction, ProposedCondition, ProposedHeader, WhoQuestion,
+    Candidate, CompileRequest, CompileResult, Proposal, ProposalInbox, ProposedAction,
+    ProposedCondition, ProposedHeader, WhoQuestion,
 };
 use self::{
     prompt::{ModelInput, ModelOutput, STREAMS},
@@ -112,7 +114,7 @@ impl Compiler {
             content_type = "application/problem+json"),
         (status = CONFLICT, description = "No language model may read sentences here (`compile_unavailable`): build the rule by hand.",
             body = Problem, content_type = "application/problem+json"),
-        (status = SERVICE_UNAVAILABLE, description = "The language model failed (`compile_failed`), \
+        (status = SERVICE_UNAVAILABLE, description = "The language model failed or its answer could not be read (`compile_failed`), \
             or the workspace used its whole daily AI limit (`ai_daily_limit_reached`).",
             body = Problem, content_type = "application/problem+json"),
     )
@@ -161,8 +163,8 @@ pub async fn handler(
     // daily AI limit kept for people (campbooks-cloud#152).
     let usage = Scope::workspace(state.db.clone(), workspace.id, "assistant.compile").interactive();
     let asked = gateway.chat(Role::Complete, prompt::request(&input));
-    let output = match usage.run(asked).await {
-        Ok(response) => response.json::<ModelOutput>().ok(),
+    let response = match usage.run(asked).await {
+        Ok(response) => response,
         // The workspace used its whole daily AI limit: 503, saying so.
         Err(error @ campbooks_ai::Error::OverDailyCap { .. }) => return Err(error.into()),
         Err(error) => {
@@ -171,14 +173,33 @@ pub async fn handler(
             return Err(Error::Unavailable(crate::MESSAGES.reason("compile_failed")));
         }
     };
-    let checked = output.as_ref().map_or_else(
-        || validate::Checked {
-            outcome: CompileOutcome::Unclear,
-            unsupported: None,
-            proposals: Vec::new(),
-        },
-        |output| validate::check(output, &ctx),
-    );
+    // Sizes and the stop reason only, never what the model wrote.
+    let finish_reason = finish_kind(response.finish_reason.as_deref());
+    let completion_tokens = response.usage.map(|usage| usage.completion_tokens);
+    let content_chars = response.content.chars().count();
+    let Ok(output) = response.json::<ModelOutput>() else {
+        // The model failed, not the member's words: 503, so the page offers
+        // to try again or build the rule by hand, never "say it
+        // differently" (campbooks-cloud#217). The kind only, never the
+        // parser's message: it can quote the answer.
+        let reason = if response.content.trim().is_empty() {
+            "empty"
+        } else if finish_reason == "length" {
+            "truncated"
+        } else {
+            "not_json"
+        };
+        tracing::warn!(
+            reason,
+            finish_reason,
+            completion_tokens,
+            content_chars,
+            latency_ms = elapsed_ms(started),
+            "compile: the model's answer did not parse"
+        );
+        return Err(Error::Unavailable(crate::MESSAGES.reason("compile_failed")));
+    };
+    let checked = validate::check(&output, &ctx);
     let mut proposals = checked.proposals;
     for proposal in &mut proposals {
         if let Some(who) = proposal.who.as_mut() {
@@ -189,8 +210,10 @@ pub async fn handler(
         outcome = ?checked.outcome,
         proposals = proposals.len(),
         questions = proposals.iter().filter(|p| p.who.is_some()).count(),
-        well_formed = output.is_some(),
-        latency_ms = u64::try_from(started.elapsed().as_millis()).unwrap_or(u64::MAX),
+        finish_reason,
+        completion_tokens,
+        content_chars,
+        latency_ms = elapsed_ms(started),
         "compile"
     );
     Ok(Json(CompileResult {
@@ -204,6 +227,24 @@ pub async fn handler(
 /// One counter per member and workspace.
 fn rate_key(workspace: WorkspaceId, user: UserId) -> RateKey {
     RateKey::text(&format!("{workspace}:{user}"))
+}
+
+/// Milliseconds since `started`, for the log.
+fn elapsed_ms(started: Instant) -> u64 {
+    u64::try_from(started.elapsed().as_millis()).unwrap_or(u64::MAX)
+}
+
+/// Why the model stopped, for the log: one of a few known words, never
+/// whatever string the provider sent.
+fn finish_kind(reason: Option<&str>) -> &'static str {
+    match reason {
+        None => "none",
+        Some("stop") => "stop",
+        Some("length") => "length",
+        Some("content_filter") => "content_filter",
+        Some("tool_calls") => "tool_calls",
+        Some(_) => "other",
+    }
 }
 
 /// What kind of failure, for the log: never the provider's words.
