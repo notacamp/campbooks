@@ -207,13 +207,22 @@ async fn on_its_questions_ride_along_and_change_no_triage_answer(db: PgPool) {
             .all(|(_, q, ..)| !q.starts_with("action_"))
     );
     assert!(on.rated > 0);
-    // A need raised by `needs_reply` (a Reply need, or a question about
-    // it) offers Reply first (0.9), then what else cleared the floor.
+    // Every need offers its own: Reply first where the sender can be
+    // answered (0.9), then what else cleared the floor; never a bill's or a
+    // warning's answers on a need that is neither.
+    assert!(on.needs.iter().all(|n| {
+        let actions = n["actions"].as_array().unwrap();
+        actions.len() <= 3
+            && actions.iter().all(|a| {
+                !["report", "safe", "already_paid", "still_to_pay"]
+                    .contains(&a["actions"][0].as_str().unwrap())
+            })
+    }));
     let reply = on
         .needs
         .iter()
-        .find(|n| n["question"] == "needs_reply")
-        .unwrap_or_else(|| panic!("a needs_reply need in {:?}", on.needs));
+        .find(|n| n["actions"][0]["actions"][0] == "reply")
+        .unwrap_or_else(|| panic!("a need offering Reply in {:?}", on.needs));
     assert_eq!(
         reply["actions"][0],
         json!({"actions": ["reply"], "likelihood": 90})
