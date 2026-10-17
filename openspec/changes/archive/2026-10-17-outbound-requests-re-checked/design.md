@@ -63,13 +63,17 @@ none and fails `not_connected`.
 
 ### A change stands
 
-`conversations::domain::conversation::request`, the one function every
-member change, rule and operation publishes `changes_requested` through,
+`conversations::domain::conversation::publish_request` is the only place
+`changes_requested` is published: `request` (one change for many messages:
+labels, a move, rules) and `request_each` (each message with its own change:
+the flags, read, star, archive, trash and spam) both go through it. It
 records each request in `conversations.change_requests` under the event's
 id (`EventBus::publish` returns it), in the same transaction: the inbox,
 the conversation and the items. The port answers, per item, whether the
 row of that id, conversation and inbox holds an equal item (the item is
-parsed, so key order or a missing optional field doesn't matter). A forged
+parsed on both sides, so key order or a missing optional field doesn't
+matter; `untrash` and `unspam` carry `inbound`, which the connector always
+writes back and which must match). A forged
 event gets a fresh id with no row: none of its items stands, even one that
 matches what the conversation already shows. An unknown kind (a later
 contract version) does not parse and does not stand; the connector skipped
@@ -84,11 +88,14 @@ the recorded request keeps today's behaviour (a change and its undo are
 both recorded, the run merges them, the later one wins) and refuses only
 requests this module never made.
 
-Rows go with their conversation (`ON DELETE CASCADE`, so with their inbox,
-a disconnect and a workspace purge), and those older than seven days with
-the next request on the same conversation. The connector asks within
-seconds; a delivery still retrying after seven days records nothing (its
-outbound change would have expired at the run anyway).
+Rows are deleted with their conversation (`ON DELETE CASCADE`, so with
+their inbox, a disconnect and a workspace purge), and rows older than seven
+days are deleted when the next request is made on the same conversation.
+There is no other sweep: a conversation that sees no further request keeps
+its last rows (ids and provider message ids only) until it goes. The
+connector asks within seconds; a delivery still retrying after seven days
+may find its row gone and record nothing (its outbound change would have
+expired at the run anyway).
 
 ## 3. Content comes from the stored message
 
@@ -121,6 +128,10 @@ key or message id is not written.
   duplicate, a planted row) one calls the provider; the other waits and
   then finds the outcome, or an unclear attempt to look up. Before, both
   recorded an attempt and both called;
+- clearing the unclear mark (a lookup proved the attempt unsent, or the
+  provider refused it) is guarded the same way: only while the last attempt
+  is still the one this run read or made, so a slow runner never clears a
+  newer claim and opens the way to a second send;
 - once the send is over, its draft is deleted (sent) or `failed`, so the port
   no longer confirms it and a replay is refused before anything is recorded;
 - `outbound_changes` is keyed by (request id, message): a replayed change
@@ -138,13 +149,18 @@ is not left `pending` for the give-up check and the draft, if there is one,
 becomes editable again. An unclear send that no longer stands is still
 looked up first: one that went out is recorded `sent` (so a draft that
 `check_send` already failed, or whose author left, still learns it went),
-and only one proven unsent is failed `unavailable`. A port error (the
+and only one proven unsent is failed `unavailable`. The lookup uses the
+port's document (its `Message-ID`) whenever the port returns the send, and
+the row's own only when the port returns nothing; a message found while the
+send does not stand is recorded `sent` without indexing or announcing the
+bytes this module built, so a tampered row's content never reaches a
+conversation. A port error (the
 database) is retried like any other.
 
 ## 7. Migrations
 
-The first free slots after `next`'s newest (`20261021170000`) and every open
-PR's (#540: `20261021180000`, `20261021180100`; #542: `20261021190000`):
+The first free slots after `next`'s newest (`20261021180500`, from #540) and
+every open PR's (#542: `20261021190000`):
 
 - `20261021200000_conversations__draft_send_document.sql`: `ALTER TABLE
   conversations.drafts ADD COLUMN send_document jsonb` (nullable, no default:
@@ -178,16 +194,22 @@ equal to `next`'s.
 ## 8. Rolling deploys
 
 - An older worker still running `release_send` after the migration marks a
-  draft `sending` without a document. The new `queue_send` does not record
-  that send (the port says it does not stand), so it is not sent; the
-  draft fails `unknown_outcome` after the hour `check_send` waits and can be
-  sent again. The window is the overlap of the two workers (seconds). Run
-  the API and the worker of the same version.
+  draft `sending` without a document, and that send is never made:
+  - when the new `queue_send` gets it, it records nothing (the port says it
+    does not stand), and the draft fails `unknown_outcome` after the hour
+    `check_send` waits;
+  - when an older `queue_send` had already recorded it, the new
+    `send_message` settles it `unavailable` at once (nothing went out) and
+    the draft is editable again.
+
+  Either way it can be sent again. The window is the overlap of the two
+  workers (seconds). Run the API and the worker of the same version.
 - An older API or worker publishing a change request records no row, so the
   new `request_changes` does not make it at the provider; the next sync
   then brings the provider's state back. Same window.
 - An older `queue_send` records the event's document unchecked until it is
-  replaced; the new `send_message` still asks the port before calling.
+  replaced; the new `send_message` still asks the port before calling (see
+  the first point for a send the older image released).
 
 ## Prod risks
 

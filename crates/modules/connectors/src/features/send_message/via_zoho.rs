@@ -13,8 +13,8 @@ use campbooks_kernel::{JobContext, JobError, db::BeginFor as _};
 use chrono::{DateTime, TimeDelta, Utc};
 
 use super::{
-    Attempt, MAX_MESSAGE_BYTES, SendMessage, Sent, Target, UNCLEAR_WAIT, finish_failed, read_blob,
-    record_attempt, set_unclear, unsent,
+    Attempt, MAX_MESSAGE_BYTES, SendMessage, Sent, Target, UNCLEAR_WAIT, clear_unclear,
+    finish_failed, read_blob, record_attempt, unsent,
 };
 use crate::{
     contract::{Address, OutgoingMessage},
@@ -80,14 +80,16 @@ impl SendMessage {
             match self.look_up(ctx, &mail, &attempt, at).await? {
                 Lookup::Found(id, sent_folder) => {
                     tracing::info!(%workspace, %send, "an earlier attempt was sent");
-                    let sent = self.fetch_sent(&mail, Some(sent_folder), id, now).await;
+                    // Indexed only while the send stands.
+                    let folder = stands.then_some(sent_folder);
+                    let sent = self.fetch_sent(&mail, folder, id, now).await;
                     return self
                         .finish_sent(ctx, workspace, send, &target, stream, sent, now)
                         .await;
                 }
                 Lookup::NotSent => {
                     // Proven not sent.
-                    set_unclear(ctx, workspace, send, false).await?;
+                    clear_unclear(ctx.pool(), workspace, send, target.attempted_at).await?;
                     target.unclear = false;
                 }
                 Lookup::Unclear(why) => {
@@ -151,7 +153,7 @@ impl SendMessage {
             }
             Err(err) => {
                 // A definite answer: this attempt did not send it.
-                set_unclear(ctx, workspace, send, false).await?;
+                clear_unclear(ctx.pool(), workspace, send, Some(now)).await?;
                 target.unclear = false;
                 self.refused(ctx, workspace, send, &target, &err).await
             }
@@ -178,8 +180,9 @@ impl SendMessage {
     }
 
     /// The sent message `id`, fetched to index and announce it. When it
-    /// cannot be fetched, the send is still sent: the next sync brings it
-    /// from the Sent folder.
+    /// cannot be fetched, or no Sent folder is given (a send that no longer
+    /// stands), the send is still sent: the next sync brings it from the
+    /// Sent folder.
     async fn fetch_sent(
         &self,
         mail: &ZohoMail<'_>,

@@ -1501,10 +1501,20 @@ async fn a_forged_change_request_is_refused_by_the_real_port(db: PgPool) {
     Worker::new(world.state.clone()).run_until_idle().await;
     assert_eq!(changes_recorded(&world).await, 0);
 
-    // Archive and unarchive it as a member: at least one of them changes
-    // something, and what changed is recorded.
+    // A member's own changes, through the flags (`request_each`), labels
+    // and trash and spam operations: each one that changes something is
+    // recorded.
     let token = world.token(Who::Connector.subject());
-    for action in ["archive", "unarchive"] {
+    for action in [
+        "archive",
+        "unarchive",
+        "unread",
+        "read",
+        "trash",
+        "untrash",
+        "spam",
+        "not-spam",
+    ] {
         let uri = format!(
             "/api/v1/w/{}/conversations/{conversation}/{action}",
             world.a
@@ -1519,6 +1529,26 @@ async fn a_forged_change_request_is_refused_by_the_real_port(db: PgPool) {
     }
     Worker::new(world.state.clone()).run_until_idle().await;
     assert!(changes_recorded(&world).await > 0);
+    let kinds: Vec<String> = sqlx::query_scalar(
+        "SELECT DISTINCT kind FROM connectors.outbound_changes WHERE workspace_id = $1 ORDER BY 1",
+    )
+    .bind(world.a.as_uuid())
+    .fetch_all(&world.db)
+    .await
+    .unwrap();
+    for kind in [
+        "mark_read",
+        "mark_unread",
+        "trash",
+        "untrash",
+        "spam",
+        "unspam",
+    ] {
+        assert!(
+            kinds.iter().any(|k| k == kind),
+            "{kind} not recorded: {kinds:?}"
+        );
+    }
 }
 
 /// campbooks-cloud#129: a transaction of the runtime role that sets neither

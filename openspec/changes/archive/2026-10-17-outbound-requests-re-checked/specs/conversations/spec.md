@@ -10,7 +10,8 @@ transaction ends. The port SHALL return the draft's inbox and that document.
 Every `conversations.changes_requested` the module publishes SHALL be
 recorded, in the same transaction, under the event's id with its inbox,
 conversation and items (ids and provider message ids only); a record SHALL
-go with its conversation, or after seven days. A requested change SHALL
+be deleted with its conversation, and a record older than seven days when
+the next request on that conversation is recorded. A requested change SHALL
 stand only when the request of that id, conversation and inbox holds an
 equal item. An item that does not parse SHALL NOT stand.
 

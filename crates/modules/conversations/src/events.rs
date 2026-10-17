@@ -328,6 +328,22 @@ pub enum RequestedChange {
     Archive,
     /// Put the message back in the inbox.
     Unarchive,
+    /// Move the message to the trash.
+    Trash,
+    /// Take the message out of the trash, back where it was.
+    Untrash {
+        /// It is mail the inbox received (not the member's own): where a
+        /// provider cannot tell where it was, it goes back to the inbox.
+        inbound: bool,
+    },
+    /// Report the message as spam (move it to the spam folder).
+    Spam,
+    /// Take the message out of spam: mail the inbox received goes back to
+    /// the inbox, the member's own mail is only taken out of spam.
+    Unspam {
+        /// It is mail the inbox received (not the member's own).
+        inbound: bool,
+    },
     /// Put a label on the message.
     AddLabel {
         /// The label.

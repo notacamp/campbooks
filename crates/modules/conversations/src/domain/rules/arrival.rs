@@ -102,7 +102,7 @@ pub async fn on_arrival(
         } else {
             ledger.of(rule).read = true;
         }
-        effects.add(flag.change(), messages, flag.requested());
+        effects.add(flag.change(), messages, flag.requested_for_all()?);
     }
     for applied in &outcome.labels {
         let Ok(label) = applied.value.parse::<LabelId>() else {

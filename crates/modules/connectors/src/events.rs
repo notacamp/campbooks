@@ -407,6 +407,24 @@ pub enum RequestedChange {
     Archive,
     /// Back in the inbox.
     Unarchive,
+    /// Into the trash.
+    Trash,
+    /// Out of the trash, back where it was.
+    Untrash {
+        /// Mail the inbox received: where the provider cannot tell where it
+        /// was, it goes to the inbox.
+        #[serde(default)]
+        inbound: bool,
+    },
+    /// Reported as spam: into the spam folder, out of the inbox.
+    Spam,
+    /// Not spam: out of the spam folder, and back in the inbox when it is
+    /// mail the inbox received.
+    Unspam {
+        /// Mail the inbox received.
+        #[serde(default)]
+        inbound: bool,
+    },
     /// Put a label on.
     AddLabel {
         /// The conversations label (not used here).

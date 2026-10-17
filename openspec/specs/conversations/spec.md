@@ -1697,7 +1697,8 @@ transaction ends. The port SHALL return the draft's inbox and that document.
 Every `conversations.changes_requested` the module publishes SHALL be
 recorded, in the same transaction, under the event's id with its inbox,
 conversation and items (ids and provider message ids only); a record SHALL
-go with its conversation, or after seven days. A requested change SHALL
+be deleted with its conversation, and a record older than seven days when
+the next request on that conversation is recorded. A requested change SHALL
 stand only when the request of that id, conversation and inbox holds an
 equal item. An item that does not parse SHALL NOT stand.
 
@@ -1716,3 +1717,40 @@ equal item. An item that does not parse SHALL NOT stand.
 #### Scenario: A forged change
 - **WHEN** the connector asks about a request id the module never recorded, an item the request did not hold, or a label key other than the one requested
 - **THEN** none of them stands, even a change the conversation already shows
+
+### Requirement: Trash and spam
+`POST …/conversations/{conversation_id}/trash` (`conversations.trash`) and
+`/untrash` (`conversations.untrash`), and `POST …/conversations/{conversation_id}/spam`
+(`conversations.report_spam`) and `/not-spam` (`conversations.not_spam`), SHALL
+be undo pairs (`conversations:write`, the catalogue's `write` on the
+conversation). Trash SHALL put every message of the conversation in the trash,
+leaving where it was otherwise unchanged, and untrash take them out, back
+there. Spam SHALL report every message as spam (in spam, out of the inbox);
+not spam SHALL take them out of spam and put the mail the inbox received back
+in the inbox, whoever reported it, and never a message the member sent. Trash
+and spam SHALL exclude each other. Each SHALL change only what is not already
+so, publish `conversations.conversation_changed` (change `messages`) and
+`conversations.changes_requested` with one `trash`, `untrash`, `spam` or
+`unspam` item per message that changed (`untrash` and `unspam` with the
+message's direction, `inbound`), and work out the conversation's need again:
+mail in the trash or spam needs nothing.
+
+#### Scenario: Report and delete
+- **WHEN** a member reports a phishing conversation as spam
+- **THEN** it leaves every list, each of its messages gets a `spam` item in `changes_requested`, its Review need is cleared, and not spam brings it back to the inbox
+
+#### Scenario: Spam the provider flagged
+- **WHEN** a member takes a conversation the provider put in spam, holding their own reply, out of spam
+- **THEN** the received messages are in the inbox, their reply is not, and each `unspam` item says whether its message was received
+
+#### Scenario: Trash after spam
+- **WHEN** a member reports a conversation as spam, then trashes it
+- **THEN** its messages are in the trash and no longer in spam
+
+#### Scenario: A reader
+- **WHEN** a reader of the inbox tries to trash a conversation
+- **THEN** the response is 403 `inbox_read_only` and nothing is published
+
+#### Scenario: Someone outside the inbox
+- **WHEN** a member who cannot see the conversation tries to trash it or report it
+- **THEN** the response is 404

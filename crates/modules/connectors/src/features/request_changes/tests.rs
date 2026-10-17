@@ -809,3 +809,102 @@ async fn only_the_changes_a_conversation_shows_are_made(db: PgPool) {
         labels(&["INBOX", "UNREAD"])
     );
 }
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn trash_and_spam_reach_gmail_and_come_back(db: PgPool) {
+    let kit = Kit::new(db).await;
+    let mailbox = mailbox(
+        &kit,
+        &[
+            &["INBOX", "UNREAD"],
+            &["CATEGORY_UPDATES"],
+            &["SPAM", "UNREAD"],
+            &["SENT"],
+        ],
+    )
+    .await;
+    let (inboxed, archived) = (&mailbox.ids[0], &mailbox.ids[1]);
+    let (flagged, sent) = (&mailbox.ids[2], &mailbox.ids[3]);
+    let before = changes(&kit, mailbox.ws).await.len();
+    let step = |id: &str, change: Value| {
+        let id = id.to_owned();
+        let mailbox = &mailbox;
+        let kit = &kit;
+        async move {
+            mailbox.request(kit, &[(id.as_str(), change)]).await;
+        }
+    };
+
+    // Trash and back: Gmail's own calls, its labels kept.
+    step(inboxed, json!({"kind": "trash"})).await;
+    assert_eq!(
+        kit.google.labels_of(inboxed),
+        labels(&["INBOX", "TRASH", "UNREAD"])
+    );
+    step(inboxed, json!({"kind": "untrash", "inbound": true})).await;
+    assert_eq!(kit.google.labels_of(inboxed), labels(&["INBOX", "UNREAD"]));
+    let writes = kit.google.writes();
+    assert!(writes.iter().any(|w| w.ends_with("/trash")), "{writes:?}");
+    assert!(writes.iter().any(|w| w.ends_with("/untrash")), "{writes:?}");
+
+    // Reported, then not spam: received mail back in the inbox, as Gmail's
+    // own button does, also mail Gmail flagged itself.
+    step(inboxed, json!({"kind": "spam"})).await;
+    assert_eq!(kit.google.labels_of(inboxed), labels(&["SPAM", "UNREAD"]));
+    step(inboxed, json!({"kind": "unspam", "inbound": true})).await;
+    assert_eq!(kit.google.labels_of(inboxed), labels(&["INBOX", "UNREAD"]));
+    step(flagged, json!({"kind": "unspam", "inbound": true})).await;
+    assert_eq!(kit.google.labels_of(flagged), labels(&["INBOX", "UNREAD"]));
+    // The member's own mail is never put in the inbox.
+    step(sent, json!({"kind": "spam"})).await;
+    step(sent, json!({"kind": "unspam", "inbound": false})).await;
+    assert_eq!(kit.google.labels_of(sent), labels(&["SENT"]));
+
+    // Trash and spam exclude each other.
+    step(archived, json!({"kind": "spam"})).await;
+    step(archived, json!({"kind": "trash"})).await;
+    assert_eq!(
+        kit.google.labels_of(archived),
+        labels(&["CATEGORY_UPDATES", "TRASH"])
+    );
+
+    assert!(ends(&kit).await.iter().all(|e| *e == end("applied", None)));
+    // The writes come back as nothing.
+    mailbox.run(&kit).await;
+    assert_eq!(changes(&kit, mailbox.ws).await.len(), before);
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_report_untrashes_only_mail_in_the_trash(db: PgPool) {
+    let kit = Kit::new(db).await;
+    let mailbox = mailbox(&kit, &[&["INBOX", "UNREAD"], &["TRASH"]]).await;
+    let (inboxed, trashed) = (&mailbox.ids[0], &mailbox.ids[1]);
+
+    // Not in the trash: a label change, no untrash.
+    kit.google.clear_calls();
+    mailbox
+        .request(&kit, &[(inboxed.as_str(), json!({"kind": "spam"}))])
+        .await;
+    let writes = kit.google.writes();
+    assert!(!writes.iter().any(|w| w.contains("/untrash")), "{writes:?}");
+    assert_eq!(writes.len(), 1, "{writes:?}");
+    assert_eq!(kit.google.labels_of(inboxed), labels(&["SPAM", "UNREAD"]));
+
+    // In the trash: untrashed first, then reported.
+    kit.google.clear_calls();
+    mailbox
+        .request(&kit, &[(trashed.as_str(), json!({"kind": "spam"}))])
+        .await;
+    let writes = kit.google.writes();
+    assert_eq!(writes.len(), 2, "{writes:?}");
+    assert!(
+        writes[0].contains(&format!("{trashed}/untrash")),
+        "{writes:?}"
+    );
+    assert!(
+        writes[1].contains(&format!("{trashed}/modify")),
+        "{writes:?}"
+    );
+    assert_eq!(kit.google.labels_of(trashed), labels(&["SPAM"]));
+    assert!(ends(&kit).await.iter().all(|e| *e == end("applied", None)));
+}

@@ -97,9 +97,25 @@ pub fn archived(tokens: &[String]) -> Vec<String> {
     out
 }
 
-/// The tokens Zoho can be asked to change: the flags of the intents.
+/// The tokens Zoho can be asked to change: the flags of the intents, and
+/// the trash and spam (moves between folders).
 pub fn writable(token: &str) -> bool {
-    matches!(token, "UNREAD" | "STARRED" | "INBOX")
+    matches!(token, "UNREAD" | "STARRED" | "INBOX" | "TRASH" | "SPAM")
+}
+
+/// Where a message with `tokens` is: its folder and the tokens that say
+/// what kind of place that is (and whether it is archived there). What a
+/// move to the trash or spam remembers, to put the message back.
+pub fn location(tokens: &[String]) -> Vec<String> {
+    let mut out: Vec<String> = tokens
+        .iter()
+        .filter(|t| {
+            t.starts_with("folder:") || matches!(t.as_str(), "INBOX" | "SENT" | "OWN" | "ARCHIVED")
+        })
+        .cloned()
+        .collect();
+    out.sort();
+    out
 }
 
 /// The contract's state of a message with `tokens`. Zoho has no categories,
@@ -164,6 +180,11 @@ mod tests {
         assert_eq!(sent.direction, Direction::Outbound);
         let trash = flags(&tokens("13", FolderKind::Trash, true, false, false));
         assert!(trash.mailbox.in_trash && !trash.mailbox.in_inbox);
-        assert!(writable("INBOX") && !writable("TRASH") && !writable("folder:11"));
+        assert!(writable("INBOX") && writable("TRASH") && writable("SPAM"));
+        assert!(!writable("folder:11") && !writable("SENT") && !writable("ARCHIVED"));
+        assert_eq!(
+            location(&tokens("11", FolderKind::Other, false, true, true)),
+            ["ARCHIVED", "OWN", "folder:11"]
+        );
     }
 }

@@ -666,6 +666,32 @@ async fn an_attempt_is_claimed_once(db: PgPool) {
 }
 
 #[sqlx::test(migrations = "../../../migrations")]
+async fn a_slow_runner_never_clears_a_newer_claim(db: PgPool) {
+    let kit = Kit::new(db).await;
+    let (ws, inbox, thread) = connected(&kit).await;
+    drain(&kit).await;
+    let send = request(&kit, ws, inbox, Some(&thread)).await;
+    kit.run_jobs().await;
+    let first = kit.clock.now();
+    super::record_attempt(&kit.state.db, ws, send, None, first)
+        .await
+        .unwrap();
+    // A runner that read the send before that claim proves "its" attempt
+    // unsent: the newer claim stays unclear.
+    assert!(
+        super::clear_unclear(&kit.state.db, ws, send, None)
+            .await
+            .is_err()
+    );
+    assert_eq!(row(&kit).await, ("pending".to_owned(), 1, true));
+    // The runner that made it may clear it.
+    super::clear_unclear(&kit.state.db, ws, send, Some(first))
+        .await
+        .unwrap();
+    assert_eq!(row(&kit).await, ("pending".to_owned(), 1, false));
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
 async fn two_jobs_for_one_send_call_gmail_once(db: PgPool) {
     let kit = Kit::new(db).await;
     let (ws, inbox, thread) = connected(&kit).await;
@@ -699,6 +725,26 @@ async fn two_jobs_for_one_send_call_gmail_once(db: PgPool) {
     let two = campbooks_kernel::jobs::Worker::new(kit.state.clone());
     futures_util::future::join(one.run_until_idle(), two.run_until_idle()).await;
     settle(&kit).await;
+    assert_eq!(kit.google.send_calls(), 1);
+    let done = completed(&kit, ws).await;
+    assert_eq!(done.len(), 1);
+    assert_eq!(done[0]["outcome"], "sent");
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn an_unclear_send_that_stops_standing_is_looked_up_not_lost(db: PgPool) {
+    let kit = Kit::new(db).await;
+    let (ws, inbox, thread) = connected(&kit).await;
+    // Gmail took it but the answer was lost; then the draft stopped
+    // waiting (the hour passed, or its author left).
+    kit.google.lose_next_send_answer();
+    let send = request(&kit, ws, inbox, Some(&thread)).await;
+    kit.run_jobs().await;
+    assert_eq!(row(&kit).await, ("pending".to_owned(), 1, true));
+    kit.outbound.withdraw(send);
+    settle(&kit).await;
+    // Looked up, never sent again, and recorded as sent: the draft learns
+    // it went.
     assert_eq!(kit.google.send_calls(), 1);
     let done = completed(&kit, ws).await;
     assert_eq!(done.len(), 1);

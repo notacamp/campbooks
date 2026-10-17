@@ -1391,10 +1391,24 @@ fn gmail_write(mailbox: &mut Mailbox, path: &str, body: &serde_json::Value) -> R
         }
         return ResponseTemplate::new(204);
     }
-    let Some(id) = path
+    // `messages.trash` / `messages.untrash`: the TRASH label on or off, the
+    // other labels kept (so untrash puts back what the message had).
+    let (id, add, remove) = if let Some(id) = path
+        .strip_prefix("messages/")
+        .and_then(|rest| rest.strip_suffix("/trash"))
+    {
+        (id, vec!["TRASH".to_owned()], Vec::new())
+    } else if let Some(id) = path
+        .strip_prefix("messages/")
+        .and_then(|rest| rest.strip_suffix("/untrash"))
+    {
+        (id, Vec::new(), vec!["TRASH".to_owned()])
+    } else if let Some(id) = path
         .strip_prefix("messages/")
         .and_then(|rest| rest.strip_suffix("/modify"))
-    else {
+    {
+        (id, add, remove)
+    } else {
         return ResponseTemplate::new(404);
     };
     if !mailbox.messages.contains_key(id) {

@@ -1904,6 +1904,76 @@
           },
           {
             "type": "object",
+            "description": "Move the message to the trash.",
+            "required": [
+              "kind"
+            ],
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "trash"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "description": "Take the message out of the trash, back where it was.",
+            "required": [
+              "inbound",
+              "kind"
+            ],
+            "properties": {
+              "inbound": {
+                "type": "boolean",
+                "description": "It is mail the inbox received (not the member's own): where a\nprovider cannot tell where it was, it goes back to the inbox."
+              },
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "untrash"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "description": "Report the message as spam (move it to the spam folder).",
+            "required": [
+              "kind"
+            ],
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "spam"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "description": "Take the message out of spam: mail the inbox received goes back to\nthe inbox, the member's own mail is only taken out of spam.",
+            "required": [
+              "inbound",
+              "kind"
+            ],
+            "properties": {
+              "inbound": {
+                "type": "boolean",
+                "description": "It is mail the inbox received (not the member's own)."
+              },
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "unspam"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
             "description": "Put a label on the message.",
             "required": [
               "label",

@@ -287,21 +287,34 @@ impl Changed {
     }
 }
 
+/// Publish `changes_requested` for a member's change of `changed`'s
+/// conversation: each item's message with its own change. Nothing is
+/// published when there is none.
+pub async fn request_each(
+    events: &EventBus,
+    tx: &mut Transaction<'_, Postgres>,
+    changed: &Changed,
+    items: &[(String, RequestedChange)],
+) -> Result<()> {
+    let items = items
+        .iter()
+        .map(|(message, change)| RequestedItem {
+            provider_message_id: message.clone(),
+            change: change.clone(),
+        })
+        .collect();
+    publish_request(events, tx, changed, items).await
+}
+
 /// Publish `changes_requested` for a member's change: `change` for each of
-/// `provider_message_ids`, and record it under the event's id, which the
-/// connector asks about before making it (the outbound-requests port).
-/// Requests on the conversation older than seven days go. Nothing is
-/// published when the list is empty.
+/// `provider_message_ids`. Nothing is published when the list is empty.
 pub async fn request(
     events: &EventBus,
     tx: &mut Transaction<'_, Postgres>,
     changed: &Changed,
     change: &RequestedChange,
 ) -> Result<()> {
-    if changed.provider_message_ids.is_empty() {
-        return Ok(());
-    }
-    let items: Vec<RequestedItem> = changed
+    let items = changed
         .provider_message_ids
         .iter()
         .map(|id| RequestedItem {
@@ -309,6 +322,23 @@ pub async fn request(
             change: change.clone(),
         })
         .collect();
+    publish_request(events, tx, changed, items).await
+}
+
+/// Publish `changes_requested` with `items` for `changed`'s conversation,
+/// and record it under the event's id, which the connector asks about
+/// before making it (the outbound-requests port). The only place the event
+/// is published. Requests on the same conversation older than seven days go
+/// with it. Nothing is published when there is no item.
+async fn publish_request(
+    events: &EventBus,
+    tx: &mut Transaction<'_, Postgres>,
+    changed: &Changed,
+    items: Vec<RequestedItem>,
+) -> Result<()> {
+    if items.is_empty() {
+        return Ok(());
+    }
     let recorded = serde_json::to_value(&items).map_err(Error::internal)?;
     let id = events
         .publish(

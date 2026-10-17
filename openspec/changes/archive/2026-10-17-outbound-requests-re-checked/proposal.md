@@ -70,5 +70,6 @@ event, scope or dependency.
   or change mail at the provider, by appending an event alone, nor choose
   the content sent by naming it in an event.
 - A draft released by an older image (no recorded document) during a rolling
-  deploy is not sent: it fails `unknown_outcome` after `check_send`'s hour
-  and can be sent again. See `design.md`.
+  deploy is not sent: it fails at once (`unavailable`) when an older worker
+  had already queued it, else `unknown_outcome` after `check_send`'s hour;
+  either way it can be sent again. See `design.md`.

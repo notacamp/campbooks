@@ -9,13 +9,15 @@ kernel's outbound-requests port, whether the send stands, from the inbox
 the event and the recorded send name, and SHALL send only while it does.
 The document it sends SHALL be the one that port returns (and the one it
 recorded), never one an event names. A send that no longer stands SHALL NOT
-be sent: an unclear earlier attempt SHALL still be looked up (a read), and
-otherwise the send SHALL be settled `unavailable` without calling the
-provider. A recorded send SHALL use a stream only of its own inbox, and
+be sent: an unclear earlier attempt SHALL still be looked up (a read), by
+the port's document whenever the port returns the send, and one found SHALL
+be recorded sent without indexing the bytes this module built; otherwise
+the send SHALL be settled `unavailable` without calling the provider. A recorded send SHALL use a stream only of its own inbox, and
 fail `not_connected` otherwise. Every call to the provider SHALL be
 preceded by an atomic claim of the attempt (the send still pending, no
 other attempt recorded since it was read), so two jobs of one send never
-both call. Before it records a change, or asks the provider for a history
+both call; the unclear mark SHALL be cleared only while the last attempt is
+still the one the clearing run read or made. Before it records a change, or asks the provider for a history
 stamp, the connector SHALL ask the same port which of the request's items
 the conversations module recorded under that event's id, and SHALL record
 only those. A request or a send that does not stand SHALL complete as a

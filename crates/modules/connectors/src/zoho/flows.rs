@@ -385,6 +385,141 @@ async fn members_changes_reach_zoho_and_never_echo(db: PgPool) {
     assert_eq!(changes(&kit, mailbox.ws).await.len(), before);
 }
 
+/// The change for `kind`, with the direction conversations sends for
+/// untrash and not spam (mail the inbox received).
+fn bin_change(kind: &str) -> Value {
+    match kind {
+        "untrash" | "unspam" => json!({ "kind": kind, "inbound": true }),
+        _ => json!({ "kind": kind }),
+    }
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn trash_and_spam_reach_zoho_and_come_back(db: PgPool) {
+    let kit = Kit::new(db).await;
+    let at = |hours: i64| kit.clock.now() - TimeDelta::hours(hours);
+    let one = kit.zoho.deliver(&synthetic(1), INBOX, false, at(3));
+    let filed = kit.zoho.deliver(&synthetic(2), CLIENTS, true, at(4));
+    let flagged = kit.zoho.deliver(&synthetic(3), SPAM, false, at(5));
+    let mailbox = connected(&kit).await;
+    let before = changes(&kit, mailbox.ws).await.len();
+    let last_end = || async {
+        sqlx::query_as::<_, (String, String, Option<String>)>(
+            "SELECT kind, state, reason FROM connectors.outbound_changes ORDER BY id DESC LIMIT 1",
+        )
+        .fetch_one(&kit.db)
+        .await
+        .unwrap()
+    };
+
+    for (id, kind, folder) in [
+        (&one, "trash", TRASH),
+        (&one, "untrash", INBOX),
+        (&one, "spam", SPAM),
+        (&one, "unspam", INBOX),
+        // Out of the trash, back to the member's own folder.
+        (&filed, "trash", TRASH),
+        (&filed, "untrash", CLIENTS),
+        // Spam Zoho flagged itself (nothing remembered): to the Inbox.
+        (&flagged, "unspam", INBOX),
+        // Trashed from spam: untrash brings it to the Inbox, not to spam.
+        (&flagged, "spam", SPAM),
+        (&flagged, "trash", TRASH),
+        (&flagged, "untrash", INBOX),
+    ] {
+        mailbox
+            .request(&kit, &[(id.as_str(), bin_change(kind))])
+            .await;
+        assert_eq!(kit.zoho.message(id).folder, folder, "{kind}");
+        assert_eq!(
+            last_end().await,
+            (kind.to_owned(), "applied".to_owned(), None),
+            "{kind}"
+        );
+        // The write comes back as nothing.
+        mailbox.run(&kit).await;
+        assert_eq!(changes(&kit, mailbox.ws).await.len(), before, "{kind}");
+    }
+    let calls = kit.zoho.calls();
+    let count = |mode: &str| {
+        calls
+            .iter()
+            .filter(|c| c.starts_with("PUT") && c.ends_with(mode))
+            .count()
+    };
+    // Spam is Zoho's report; the trash and every way back are moves.
+    assert_eq!(count("moveToSpam"), 2);
+    assert_eq!(count("moveMessage"), 8);
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn untrash_forgets_a_place_once_the_message_left_the_trash(db: PgPool) {
+    let kit = Kit::new(db).await;
+    let at = |hours: i64| kit.clock.now() - TimeDelta::hours(hours);
+    let filed = kit.zoho.deliver(&synthetic(2), CLIENTS, true, at(4));
+    let mailbox = connected(&kit).await;
+    mailbox
+        .request(&kit, &[(filed.as_str(), bin_change("trash"))])
+        .await;
+    assert_eq!(kit.zoho.message(&filed).folder, TRASH);
+    // At Zoho, moved out of the trash and back in: the place remembered
+    // when Campbooks trashed it no longer holds.
+    kit.zoho.change(&filed, |m| m.folder = INBOX.to_owned());
+    mailbox.run(&kit).await;
+    kit.zoho.change(&filed, |m| m.folder = TRASH.to_owned());
+    mailbox.run(&kit).await;
+    mailbox
+        .request(&kit, &[(filed.as_str(), bin_change("untrash"))])
+        .await;
+    assert_eq!(kit.zoho.message(&filed).folder, INBOX);
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn sent_mail_out_of_spam_is_never_put_in_the_inbox(db: PgPool) {
+    let kit = Kit::new(db).await;
+    let at = |hours: i64| kit.clock.now() - TimeDelta::hours(hours);
+    let sent = kit.zoho.deliver(&synthetic(4), SENT, true, at(2));
+    let mailbox = connected(&kit).await;
+    mailbox
+        .request(&kit, &[(sent.as_str(), bin_change("spam"))])
+        .await;
+    assert_eq!(kit.zoho.message(&sent).folder, SPAM);
+    mailbox
+        .request(
+            &kit,
+            &[(sent.as_str(), json!({ "kind": "unspam", "inbound": false }))],
+        )
+        .await;
+    assert_eq!(kit.zoho.message(&sent).folder, SPAM);
+    let end: (String, Option<String>) = sqlx::query_as(
+        "SELECT state, reason FROM connectors.outbound_changes ORDER BY id DESC LIMIT 1",
+    )
+    .fetch_one(&kit.db)
+    .await
+    .unwrap();
+    assert_eq!(end, ("skipped".to_owned(), Some("not_movable".to_owned())));
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_trash_folder_zoho_did_not_list_is_never_guessed(db: PgPool) {
+    let kit = Kit::new(db).await;
+    let at = |hours: i64| kit.clock.now() - TimeDelta::hours(hours);
+    let one = kit.zoho.deliver(&synthetic(1), INBOX, false, at(3));
+    kit.zoho.hide_trash_folder(true);
+    let mailbox = connected(&kit).await;
+
+    mailbox
+        .request(&kit, &[(one.as_str(), json!({ "kind": "trash" }))])
+        .await;
+    assert_eq!(kit.zoho.message(&one).folder, INBOX);
+    let end: (String, Option<String>) =
+        sqlx::query_as("SELECT state, reason FROM connectors.outbound_changes")
+            .fetch_one(&kit.db)
+            .await
+            .unwrap();
+    assert_eq!(end, ("skipped".to_owned(), Some("not_movable".to_owned())));
+}
+
 #[sqlx::test(migrations = "../../../migrations")]
 async fn a_change_zoho_refuses_fails_and_the_others_are_made(db: PgPool) {
     let kit = Kit::new(db).await;

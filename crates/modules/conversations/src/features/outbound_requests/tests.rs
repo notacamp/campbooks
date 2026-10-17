@@ -326,3 +326,50 @@ async fn a_forged_change_stands_for_nothing(db: PgPool) {
         [false, false, false, false]
     );
 }
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn trash_spam_and_flags_stand_as_requested(db: PgPool) {
+    let kit = Kit::new(db).await;
+    let (workspace, inbox, sam) = kit.sams_inbox().await;
+    let conversation = kit.conversation_of("en-1").await;
+    let base = format!("/api/v1/w/{workspace}/conversations/{conversation}");
+    // Each through its own operation, the flags through `request_each`:
+    // every one is recorded and stands as the connector re-reads it.
+    for (action, kind) in [
+        ("unread", "mark_unread"),
+        ("read", "mark_read"),
+        ("trash", "trash"),
+        ("untrash", "untrash"),
+        ("spam", "spam"),
+        ("not-spam", "unspam"),
+    ] {
+        let done = kit.post(&sam, &format!("{base}/{action}"), None).await;
+        assert_eq!(done.status, StatusCode::OK, "{action}: {:?}", done.json);
+        let (request, items) = last_request(&kit).await;
+        assert!(
+            items.iter().all(|item| item["change"]["kind"] == kind),
+            "{action}: {items:?}"
+        );
+        assert!(
+            every(&standing(&kit, workspace, &request, inbox, &conversation, &items).await),
+            "{action}"
+        );
+        // Untrash and unspam carry whether the message was received: the
+        // other value was not requested.
+        if matches!(kind, "untrash" | "unspam") {
+            let flipped: Vec<Value> = items
+                .iter()
+                .map(|item| {
+                    let mut item = item.clone();
+                    let inbound = item["change"]["inbound"].as_bool().unwrap();
+                    item["change"]["inbound"] = (!inbound).into();
+                    item
+                })
+                .collect();
+            assert!(
+                none(&standing(&kit, workspace, &request, inbox, &conversation, &flipped).await),
+                "{action}"
+            );
+        }
+    }
+}

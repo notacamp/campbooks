@@ -203,9 +203,8 @@ impl SendMessage {
         // (`queue_send`): one that differs was not written by it. A send
         // that does not stand is never sent; an unclear one is still looked
         // up (a read), so one that went out is recorded as sent.
-        let stands = standing_document(ctx, workspace, send, target.inbox)
-            .await?
-            .is_some_and(|stored| stored == target.document);
+        let port = standing_document(ctx, workspace, send, target.inbox).await?;
+        let stands = port.as_ref() == Some(&target.document);
         if !stands && !target.unclear {
             return not_standing(ctx, workspace, send, &target).await;
         }
@@ -215,8 +214,10 @@ impl SendMessage {
         else {
             return Ok(());
         };
-        // The recorded document: the port's whenever the send stands.
-        let document = read_document(ctx, workspace, &target.document).await?;
+        // The port's document whenever it returns the send (then equal to
+        // the recorded one when it stands); else the row's, for a lookup only.
+        let document =
+            read_document(ctx, workspace, port.as_ref().unwrap_or(&target.document)).await?;
         let attempt = Attempt {
             workspace,
             send,
@@ -273,14 +274,16 @@ impl SendMessage {
             match gmail.find_by_message_id(&document.rfc_message_id).await {
                 Ok(Some(meta)) => {
                     tracing::info!(%workspace, %send, "an earlier attempt was sent");
-                    let sent = gmail_sent(&meta, raw, now);
+                    // Indexed only while the send stands: these bytes are
+                    // the recorded document's.
+                    let sent = gmail_sent(&meta, stands.then_some(raw), now);
                     return self
                         .finish_sent(ctx, workspace, send, &target, stream, sent, now)
                         .await;
                 }
                 Ok(None) => {
                     // Proven not sent.
-                    set_unclear(ctx, workspace, send, false).await?;
+                    clear_unclear(ctx.pool(), workspace, send, target.attempted_at).await?;
                     target.unclear = false;
                 }
                 Err(err) => {
@@ -306,7 +309,7 @@ impl SendMessage {
                     label_ids: answer.label_ids,
                     internal_date: None,
                 };
-                let sent = gmail_sent(&meta, raw, now);
+                let sent = gmail_sent(&meta, Some(raw), now);
                 self.finish_sent(ctx, workspace, send, &target, stream, sent, now)
                     .await
             }
@@ -320,7 +323,7 @@ impl SendMessage {
             }
             Err(err) => {
                 // A definite answer: this attempt did not send it.
-                set_unclear(ctx, workspace, send, false).await?;
+                clear_unclear(ctx.pool(), workspace, send, Some(now)).await?;
                 target.unclear = false;
                 self.refused(ctx, workspace, send, &target, &err).await
             }
@@ -352,9 +355,9 @@ struct Sent {
     fetched: Option<Fetched>,
 }
 
-/// A message Gmail has (`meta`), sent as `raw`.
-fn gmail_sent(meta: &MessageMeta, raw: Vec<u8>, now: DateTime<Utc>) -> Sent {
-    let fetched_bytes = u64::try_from(raw.len()).unwrap_or(u64::MAX);
+/// A message Gmail has (`meta`), sent as `raw` (indexed and announced when
+/// given).
+fn gmail_sent(meta: &MessageMeta, raw: Option<Vec<u8>>, now: DateTime<Utc>) -> Sent {
     let meta = MessageMeta {
         internal_date: meta
             .internal_date
@@ -365,16 +368,19 @@ fn gmail_sent(meta: &MessageMeta, raw: Vec<u8>, now: DateTime<Utc>) -> Sent {
     Sent {
         id: Some(meta.id.clone()),
         thread_key: Some(meta.thread_id.clone()),
-        fetched: Some(gmail::fetched(
-            &meta.id.clone(),
-            MessageRaw {
-                meta,
-                raw,
-                fetched_bytes,
-            },
-            &HashMap::new(),
-            now,
-        )),
+        fetched: raw.map(|raw| {
+            let fetched_bytes = u64::try_from(raw.len()).unwrap_or(u64::MAX);
+            gmail::fetched(
+                &meta.id.clone(),
+                MessageRaw {
+                    meta,
+                    raw,
+                    fetched_bytes,
+                },
+                &HashMap::new(),
+                now,
+            )
+        }),
     }
 }
 
@@ -762,22 +768,32 @@ async fn not_standing(
     finish_failed(ctx, workspace, send, target, "unavailable").await
 }
 
-/// Record whether an attempt may have reached Gmail without an answer.
-async fn set_unclear(
-    ctx: &JobContext,
+/// Record that no attempt is out (a lookup proved it unsent, or the provider
+/// refused it), only while the last attempt is still the one at
+/// `attempted_at`: a slower runner never clears a newer claim.
+async fn clear_unclear(
+    pool: &sqlx::PgPool,
     workspace: WorkspaceId,
     send: SendId,
-    unclear: bool,
+    attempted_at: Option<DateTime<Utc>>,
 ) -> Result<(), JobError> {
-    let mut tx = ctx.pool().begin_for(workspace).await?;
-    sqlx::query!(
-        "UPDATE connectors.sends SET unclear = $2, updated_at = now() WHERE id = $1",
+    let mut tx = pool.begin_for(workspace).await?;
+    let cleared = sqlx::query_scalar!(
+        r#"UPDATE connectors.sends SET unclear = false, updated_at = now()
+            WHERE id = $1 AND attempted_at IS NOT DISTINCT FROM $2
+        RETURNING id"#,
         send as SendId,
-        unclear,
+        attempted_at,
     )
-    .execute(&mut *tx)
+    .fetch_optional(&mut *tx)
     .await?;
     tx.commit().await?;
+    if cleared.is_none() {
+        return Err(JobError::retry_after(
+            "another attempt at this send was claimed meanwhile",
+            UNCLEAR_WAIT,
+        ));
+    }
     Ok(())
 }
 
