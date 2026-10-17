@@ -7687,7 +7687,7 @@
             }
           },
           "403": {
-            "description": "Missing scope.",
+            "description": "Missing scope, or an app asked.",
             "content": {
               "application/problem+json": {
                 "schema": {

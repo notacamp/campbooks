@@ -9520,7 +9520,7 @@ export interface operations {
                     "application/problem+json": components["schemas"]["Problem"];
                 };
             };
-            /** @description Missing scope. */
+            /** @description Missing scope, or an app asked. */
             403: {
                 headers: {
                     [name: string]: unknown;

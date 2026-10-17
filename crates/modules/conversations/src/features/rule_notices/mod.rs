@@ -418,7 +418,7 @@ struct NoticeRow {
         (status = OK, description = "The suggestions.", body = RuleNoticeList),
         (status = UNAUTHORIZED, description = "No valid access token.", body = Problem,
             content_type = "application/problem+json"),
-        (status = FORBIDDEN, description = "Missing scope.", body = Problem,
+        (status = FORBIDDEN, description = "Missing scope, or an app asked.", body = Problem,
             content_type = "application/problem+json"),
     )
 )]
@@ -427,6 +427,9 @@ pub async fn list(
     Extension(settings): Extension<NoticeSettings>,
     workspace: Workspace<ConversationsRead>,
 ) -> Result<Json<RuleNoticeList>> {
+    // Suggestions are a member's to answer: an app is refused (403), as
+    // when it answers one.
+    member_only(&workspace.principal)?;
     let access = &workspace.access;
     let mut tx = state.db.begin_for(access.workspace).await?;
     let mut teachable = Vec::new();
