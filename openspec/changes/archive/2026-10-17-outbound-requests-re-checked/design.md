@@ -105,7 +105,7 @@ key or message id is not written.
 | Table | Read or written by | Scope |
 |---|---|---|
 | `conversations.drafts` (new column `send_document`) | the port (`FOR SHARE`), `release_send` (written with `send_id`) | the asking transaction: `queue_send`'s delivery transaction, or a short `begin_for(workspace)` in `send_message`; row-level security as before |
-| `conversations.change_requests` (new) | `conversation::request` (insert, prune), the port (read) | the publishing transaction; `request_changes`' first `begin_for(workspace)`; forced row-level security, `workspace_isolation`; the runtime role may select, insert and delete |
+| `conversations.change_requests` (new) | `conversation::request` (insert, prune), the port (read) | the publishing transaction; `request_changes`' first `begin_for(workspace)`; forced row-level security, `workspace_isolation`; the runtime role has the usual four privileges (it only selects, inserts and deletes) |
 | `connectors.sends` | `queue_send`, `send_message` (attempts now claimed with a guarded `UPDATE … RETURNING`) | unchanged |
 | `connectors.outbound_changes` | `request_changes`, `sync_stream` | unchanged |
 

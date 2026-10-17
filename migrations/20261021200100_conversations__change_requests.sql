@@ -29,4 +29,4 @@ ALTER TABLE conversations.change_requests FORCE ROW LEVEL SECURITY;
 CREATE POLICY workspace_isolation ON conversations.change_requests USING
     (workspace_id = nullif(current_setting('campbooks.workspace_id', true), '')::uuid);
 
-GRANT SELECT, INSERT, DELETE ON conversations.change_requests TO campbooks_app;
+GRANT SELECT, INSERT, UPDATE, DELETE ON conversations.change_requests TO campbooks_app;
