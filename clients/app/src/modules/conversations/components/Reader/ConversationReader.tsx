@@ -212,7 +212,8 @@ export function ConversationReader({
       return;
     }
     const address = message.from.address.trim().toLowerCase();
-    const domain = address.split("@")[1] ?? "";
+    const at = address.lastIndexOf("@");
+    const domain = at === -1 ? "" : address.slice(at + 1);
     const byAddress = {
       id: "address",
       title: t("smartRule.imagesAddress", { address }),

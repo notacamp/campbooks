@@ -27,14 +27,6 @@ import { ruleSentence } from "../../rules-text";
 /** Examples the confirmation shows. */
 const EXAMPLES = 3;
 
-/** One of the senders a rule may be about ("Only this address", "Anyone at …"). */
-export interface SmartRuleChoice {
-  id: string;
-  title: string;
-  description?: string | undefined;
-  conditions: RuleCondition[];
-}
-
 /** A rule an offer proposes, before the member confirms it. */
 export interface SmartRuleDraft {
   /** The inbox it would be saved in. */
@@ -55,7 +47,14 @@ export interface SmartRuleDraft {
    * Other senders the member may pick instead (the first is `conditions`):
    * the address, or anyone at its domain.
    */
-  choices?: readonly SmartRuleChoice[] | undefined;
+  choices?:
+    | readonly {
+        id: string;
+        title: string;
+        description?: string | undefined;
+        conditions: RuleCondition[];
+      }[]
+    | undefined;
 }
 
 /** Whether a rule only shows a sender's images: it changes no mail. */
