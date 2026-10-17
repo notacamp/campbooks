@@ -310,9 +310,13 @@ fn declares_by_macro(text: &str, id: &str) -> bool {
     text.contains(&format!("\"{id}\",\n"))
 }
 
-/// The code before the file's test module (by convention its last item).
+/// The code before the file's test module (by convention its last item;
+/// clippy's `items_after_test_module` keeps it so). The cut is looked for in
+/// code only, so the same text inside a comment or a string does not end the
+/// file early.
 fn without_tests(text: &str) -> &str {
-    text.find("#[cfg(test)]\nmod tests {")
+    code_only(text)
+        .find("#[cfg(test)]\nmod tests {")
         .map_or(text, |at| &text[..at])
 }
 
@@ -469,6 +473,11 @@ pub fn check_workspace_queries(
 /// The setting that opens the kernel scope (`kernel::db::KERNEL_SCOPE_SETTING`).
 pub const KERNEL_SCOPE_SETTING: &str = "campbooks.kernel_scope";
 
+/// The last part of the kernel scope's setting: outside the kernel, the word
+/// on its own (in code or a string, any case) usually means the setting's
+/// name is being built at runtime.
+const SCOPE_WORD_TEXT: &str = "kernel_scope";
+
 /// The kernel's names that open a cross-workspace scope or name its
 /// setting: outside the kernel, each is a violation wherever it appears in
 /// code (a call, a `use … as` rename, `JobContext::kernel_tx(ctx)`, a
@@ -485,9 +494,15 @@ const SCOPE_IDENTIFIERS: [(&str, bool); 4] = [
 /// in any code, tests included), and outside the kernel no code uses the
 /// identifiers `KERNEL_SCOPE_SETTING` or `ADMIN_READS_SETTING`, nor
 /// `begin_kernel` or `kernel_tx` except in the reviewed `kernel_scope`
-/// entries. Test code is exempt from the identifier rule. Entries need a
-/// reason and must name a file that uses one (no stale exceptions).
+/// entries. Nor, outside the kernel and those entries, does code or a string
+/// name the word `kernel_scope` on its own (a setting name built at runtime,
+/// tests included). Test code is exempt from the identifier rule. Entries need
+/// a reason and must name a file that uses one (no stale exceptions).
 pub fn check_kernel_scope(sources: &[(String, String)], file: &AccessFile) -> Vec<String> {
+    static SCOPE_WORD: LazyLock<Regex> = LazyLock::new(|| {
+        Regex::new(&format!(r"\b{SCOPE_WORD_TEXT}\b"))
+            .unwrap_or_else(|e| unreachable!("static regex compiles: {e}"))
+    });
     static IDENTIFIER: LazyLock<Regex> = LazyLock::new(|| {
         Regex::new(r"\b(KERNEL_SCOPE_SETTING|ADMIN_READS_SETTING|begin_kernel|kernel_tx)\b")
             .unwrap_or_else(|e| unreachable!("static regex compiles: {e}"))
@@ -508,17 +523,25 @@ pub fn check_kernel_scope(sources: &[(String, String)], file: &AccessFile) -> Ve
         if path.starts_with("crates/kernel/") {
             continue;
         }
+        let allowed = file.kernel_scope.iter().any(|entry| entry.path == *path);
         if text.to_lowercase().contains(KERNEL_SCOPE_SETTING) {
             violations.push(format!(
                 "{path}: names `{KERNEL_SCOPE_SETTING}`; only the kernel may (use \
                  `kernel::db::begin_kernel`)"
+            ));
+        } else if !allowed && SCOPE_WORD.is_match(&without_comments(text).to_lowercase()) {
+            // The setting's name pieced together (`'campbooks.' ||
+            // 'kernel_scope'`, `campbooks."kernel_scope"`, `concat!`,
+            // `stringify!`) still names the word, in code or in a string.
+            violations.push(format!(
+                "{path}: names `{SCOPE_WORD_TEXT}` (in code or a string), which builds the \
+                 kernel scope's setting; only the kernel may (use `kernel::db::begin_kernel`)"
             ));
         }
         if is_test_file(path) {
             continue;
         }
         let code = without_comments(without_tests(text));
-        let allowed = file.kernel_scope.iter().any(|entry| entry.path == *path);
         let mut found = BTreeSet::new();
         for name in IDENTIFIER.find_iter(&code) {
             found.insert(name.as_str());
@@ -555,105 +578,178 @@ pub fn check_kernel_scope(sources: &[(String, String)], file: &AccessFile) -> Ve
     violations
 }
 
-/// `code` without its comments (line, trailing and block comments), string
-/// and character literals kept as they are.
-fn without_comments(code: &str) -> String {
-    let chars: Vec<char> = code.chars().collect();
-    let mut out = String::with_capacity(code.len());
+/// What a stretch of Rust source is, for the text checks.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Lexeme {
+    /// Anything else.
+    Code,
+    /// A line comment (up to, not including, its newline).
+    LineComment,
+    /// A block comment, nested ones included.
+    BlockComment,
+    /// A string (plain, byte, C, raw, byte raw, C raw) or character literal.
+    Literal,
+}
+
+/// `code` cut into code, comments and literals, as byte ranges in order.
+/// Good enough for the checks, not a full lexer: a lifetime is code, a
+/// character literal is `'x'` or `'\…'`.
+fn lex(code: &str) -> Vec<(Lexeme, std::ops::Range<usize>)> {
+    let chars: Vec<(usize, char)> = code.char_indices().collect();
+    let at = |i: usize| chars.get(i).map(|&(_, c)| c);
+    let offset = |i: usize| chars.get(i).map_or(code.len(), |&(o, _)| o);
+    let mut out: Vec<(Lexeme, std::ops::Range<usize>)> = Vec::new();
+    let mut push = |kind: Lexeme, from: usize, to: usize| {
+        let range = offset(from)..offset(to);
+        if range.is_empty() {
+            return;
+        }
+        match out.last_mut() {
+            Some((Lexeme::Code, last)) if kind == Lexeme::Code && last.end == range.start => {
+                last.end = range.end;
+            }
+            _ => out.push((kind, range)),
+        }
+    };
     let mut i = 0;
     while i < chars.len() {
-        let (c, next) = (chars[i], chars.get(i + 1).copied());
-        match c {
+        let (c, next) = (chars[i].1, at(i + 1));
+        let end = match c {
             '/' if next == Some('/') => {
-                while i < chars.len() && chars[i] != '\n' {
-                    i += 1;
+                let mut j = i;
+                while j < chars.len() && chars[j].1 != '\n' {
+                    j += 1;
                 }
+                push(Lexeme::LineComment, i, j);
+                j
             }
             '/' if next == Some('*') => {
                 let mut depth = 0usize;
-                while i < chars.len() {
-                    if chars[i] == '/' && chars.get(i + 1) == Some(&'*') {
+                let mut j = i;
+                while j < chars.len() {
+                    if chars[j].1 == '/' && at(j + 1) == Some('*') {
                         depth += 1;
-                        i += 2;
-                    } else if chars[i] == '*' && chars.get(i + 1) == Some(&'/') {
+                        j += 2;
+                    } else if chars[j].1 == '*' && at(j + 1) == Some('/') {
                         depth -= 1;
-                        i += 2;
+                        j += 2;
                         if depth == 0 {
                             break;
                         }
                     } else {
-                        i += 1;
+                        j += 1;
                     }
                 }
-                out.push(' ');
+                let j = j.min(chars.len());
+                push(Lexeme::BlockComment, i, j);
+                j
             }
-            'r' | 'b' if raw_string_at(&chars, i) => {
+            'r' | 'b' | 'c' if raw_string_at(&chars, i) => {
                 let mut j = i + 1;
-                if chars.get(j) == Some(&'r') {
+                if at(j) == Some('r') {
                     j += 1;
                 }
                 let mut hashes = 0;
-                while chars.get(j) == Some(&'#') {
+                while at(j) == Some('#') {
                     hashes += 1;
                     j += 1;
                 }
                 j += 1;
                 while j < chars.len()
-                    && !(chars[j] == '"' && (1..=hashes).all(|k| chars.get(j + k) == Some(&'#')))
+                    && !(chars[j].1 == '"' && (1..=hashes).all(|k| at(j + k) == Some('#')))
                 {
                     j += 1;
                 }
-                let end = (j + 1 + hashes).min(chars.len());
-                out.extend(&chars[i..end]);
-                i = end;
+                let j = (j + 1 + hashes).min(chars.len());
+                push(Lexeme::Literal, i, j);
+                j
             }
             '"' => {
                 let mut j = i + 1;
-                while j < chars.len() && chars[j] != '"' {
-                    j += if chars[j] == '\\' { 2 } else { 1 };
+                while j < chars.len() && chars[j].1 != '"' {
+                    j += if chars[j].1 == '\\' { 2 } else { 1 };
                 }
-                let end = (j + 1).min(chars.len());
-                out.extend(&chars[i..end]);
-                i = end;
+                let j = (j + 1).min(chars.len());
+                push(Lexeme::Literal, i, j);
+                j
             }
-            '\'' if next == Some('\\') || chars.get(i + 2) == Some(&'\'') => {
+            '\'' if next == Some('\\') || at(i + 2) == Some('\'') => {
                 // A character literal (`'"'`, `'\n'`), not a lifetime.
                 let mut j = i + 1;
-                if chars.get(j) == Some(&'\\') {
+                if at(j) == Some('\\') {
                     j += 2;
                 }
-                while j < chars.len() && chars[j] != '\'' {
+                while j < chars.len() && chars[j].1 != '\'' {
                     j += 1;
                 }
-                let end = (j + 1).min(chars.len());
-                out.extend(&chars[i..end]);
-                i = end;
+                let j = (j + 1).min(chars.len());
+                push(Lexeme::Literal, i, j);
+                j
             }
             _ => {
-                out.push(c);
-                i += 1;
+                push(Lexeme::Code, i, i + 1);
+                i + 1
+            }
+        };
+        i = end;
+    }
+    out
+}
+
+/// `code` without its comments (line, trailing and block comments), string
+/// and character literals kept as they are.
+fn without_comments(code: &str) -> String {
+    let mut out = String::with_capacity(code.len());
+    for (kind, range) in lex(code) {
+        match kind {
+            Lexeme::Code | Lexeme::Literal => out.push_str(&code[range]),
+            Lexeme::BlockComment => out.push(' '),
+            Lexeme::LineComment => {}
+        }
+    }
+    out
+}
+
+/// `code` with every comment and literal blanked (spaces, newlines kept),
+/// byte for byte as long as `code`: positions found in it are positions in
+/// `code`.
+fn code_only(code: &str) -> String {
+    let mut out = String::with_capacity(code.len());
+    for (kind, range) in lex(code) {
+        let text = &code[range];
+        if kind == Lexeme::Code {
+            out.push_str(text);
+            continue;
+        }
+        for c in text.chars() {
+            if c == '\n' {
+                out.push('\n');
+            } else {
+                out.extend(std::iter::repeat_n(' ', c.len_utf8()));
             }
         }
     }
     out
 }
 
-/// Whether a raw string (`r"…"`, `r#"…"#`, `br"…"`) starts at `i`.
-fn raw_string_at(chars: &[char], i: usize) -> bool {
-    if i > 0 && (chars[i - 1].is_alphanumeric() || chars[i - 1] == '_') {
+/// Whether a raw string (`r"…"`, `r#"…"#`, `br"…"`, `cr#"…"#`) starts at
+/// `i`.
+fn raw_string_at(chars: &[(usize, char)], i: usize) -> bool {
+    let at = |j: usize| chars.get(j).map(|&(_, c)| c);
+    if i > 0 && at(i - 1).is_some_and(|c| c.is_alphanumeric() || c == '_') {
         return false;
     }
     let mut j = i + 1;
-    if chars[i] == 'b' {
-        if chars.get(j) != Some(&'r') {
+    if matches!(at(i), Some('b' | 'c')) {
+        if at(j) != Some('r') {
             return false;
         }
         j += 1;
     }
-    while chars.get(j) == Some(&'#') {
+    while at(j) == Some('#') {
         j += 1;
     }
-    chars.get(j) == Some(&'"')
+    at(j) == Some('"')
 }
 
 fn is_test_file(path: &str) -> bool {
@@ -1018,6 +1114,145 @@ mod tests {
         let tested =
             "fn f() {}\n#[cfg(test)]\nmod tests {\n    fn t() { let _ = db::begin_kernel; }\n}\n";
         assert!(check_kernel_scope(&source(tested), &none).is_empty());
+    }
+
+    #[test]
+    fn c_raw_strings_are_strings() {
+        let module = "crates/modules/mail/src/dispatch.rs";
+        let source = |text: &str| vec![(module.to_owned(), text.to_owned())];
+        let none = AccessFile::default();
+        for bypass in [
+            // A `//` inside a C raw string is not a comment.
+            "let s = cr#\"x\"//\"#; begin_kernel(pool);",
+            "let s = cr\"//\"; let open = begin_kernel;",
+            // Nor inside a byte raw string, as before.
+            "let s = br#\"x\"//\"#; begin_kernel(pool);",
+        ] {
+            let found = check_kernel_scope(&source(bypass), &none);
+            assert_eq!(found.len(), 1, "{bypass}: {found:?}");
+        }
+        assert_eq!(
+            without_comments("let s = cr#\"a // b\"#; x // y"),
+            "let s = cr#\"a // b\"#; x "
+        );
+        // An identifier ending in `c` or `b` before a string is no prefix.
+        assert_eq!(without_comments("f(abc\"//\"); g // h"), "f(abc\"//\"); g ");
+    }
+
+    #[test]
+    fn a_setting_name_built_at_runtime_still_names_the_word() {
+        let module = "crates/modules/mail/src/dispatch.rs";
+        let source = |path: &str, text: &str| vec![(path.to_owned(), text.to_owned())];
+        let none = AccessFile::default();
+        for bypass in [
+            r#"sqlx::query("SELECT set_config('campbooks.' || 'kernel_scope', 'on', true)")"#,
+            r#"sqlx::query("SET LOCAL campbooks.\"kernel_scope\" = 'on'")"#,
+            r#"sqlx::query("SET LOCAL campbooks.KERNEL_SCOPE = 'on'")"#,
+            r#"let name = concat!("campbooks.", stringify!(kernel_scope));"#,
+            r#"let name = format!("campbooks.{}", "kernel_scope");"#,
+            "let r#kernel_scope = 1;",
+        ] {
+            for path in [
+                module,
+                "crates/server/src/x.rs",
+                "crates/modules/mail/src/tests.rs",
+            ] {
+                let found = check_kernel_scope(&source(path, bypass), &none);
+                assert_eq!(found.len(), 1, "{path}: {bypass}: {found:?}");
+                assert!(found[0].contains("kernel_scope`"), "{found:?}");
+            }
+        }
+        // Longer names, comments and the kernel itself are fine.
+        for fine in [
+            "let pool = testing::kernel_scope_pool(&db).await;",
+            "let s = testing::kernel_scope_setting();",
+            "// the kernel_scope setting\nfn f() {}",
+            "/* \"kernel_scope\" */ fn f() {}",
+        ] {
+            assert!(
+                check_kernel_scope(&source(module, fine), &none).is_empty(),
+                "{fine}"
+            );
+        }
+        let in_kernel = r#"let s = format!("campbooks.{}", "kernel_scope");"#;
+        assert!(
+            check_kernel_scope(&source("crates/kernel/src/db.rs", in_kernel), &none).is_empty()
+        );
+        // A reviewed file may (it may open the scope anyway).
+        let allowed = AccessFile {
+            kernel_scope: vec![PoolAccess {
+                path: module.to_owned(),
+                reason: "the scheduler".to_owned(),
+            }],
+            ..AccessFile::default()
+        };
+        let reviewed = format!("{in_kernel}\nlet tx = db::begin_kernel(&pool).await?;");
+        assert!(check_kernel_scope(&source(module, &reviewed), &allowed).is_empty());
+    }
+
+    #[test]
+    fn test_module_text_in_a_string_or_comment_does_not_end_the_check() {
+        let module = "crates/modules/mail/src/dispatch.rs";
+        let source = |text: &str| vec![(module.to_owned(), text.to_owned())];
+        let none = AccessFile::default();
+        let tables = BTreeSet::from(["mail.threads".to_owned()]);
+        for hiding in [
+            "let s = \"#[cfg(test)]\nmod tests {\";\n",
+            "let s = r#\"#[cfg(test)]\nmod tests {\"#;\n",
+            "/* #[cfg(test)]\nmod tests { */\n",
+            "// #[cfg(test)]\n// mod tests {\n",
+        ] {
+            let opens = format!("{hiding}fn f() {{ let open = begin_kernel; }}\n");
+            let found = check_kernel_scope(&source(&opens), &none);
+            assert_eq!(found.len(), 1, "{hiding}: {found:?}");
+            let begins = format!("{hiding}fn f() {{ let tx = state.db.begin().await?; }}\n");
+            let found = check_workspace_queries(&source(&begins), &tables, &none);
+            assert_eq!(found.len(), 1, "{hiding}: {found:?}");
+            assert_eq!(without_tests(&begins), begins, "{hiding}");
+        }
+        // A real test module still ends it, multi-byte text before it included.
+        let real =
+            "// café ☕\nfn f() {}\n#[cfg(test)]\nmod tests {\n    fn t() { begin_kernel; }\n}\n";
+        assert_eq!(without_tests(real), "// café ☕\nfn f() {}\n");
+        assert!(check_kernel_scope(&source(real), &none).is_empty());
+    }
+
+    #[test]
+    fn a_new_bff_file_is_checked() {
+        let tables = BTreeSet::new();
+        let entry = |path: &str| PoolAccess {
+            path: path.to_owned(),
+            reason: "instance-wide sessions".to_owned(),
+        };
+        let file = AccessFile {
+            pool_access: vec![
+                entry("crates/server/src/bff/store.rs"),
+                entry("crates/server/src/bff/mod.rs"),
+            ],
+            ..AccessFile::default()
+        };
+        let opens = "let tx = self.db.begin().await?;";
+        let check = |path: &str| {
+            check_workspace_queries(&[(path.to_owned(), opens.to_owned())], &tables, &file)
+        };
+        assert!(check("crates/server/src/bff/store.rs").is_empty());
+        assert_eq!(check("crates/server/src/bff/sessions.rs").len(), 1);
+        // The repository's own entries name files, never the BFF's directory.
+        let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .parent()
+            .unwrap_or_else(|| unreachable!("xtask lives in the repository"));
+        let text = std::fs::read_to_string(root.join("architecture.toml"))
+            .unwrap_or_else(|e| panic!("reading architecture.toml: {e}"));
+        let parsed: crate::arch::ArchitectureFile =
+            toml::from_str(&text).unwrap_or_else(|e| panic!("parsing architecture.toml: {e}"));
+        let directories: Vec<&str> = parsed
+            .access
+            .pool_access
+            .iter()
+            .map(|entry| entry.path.as_str())
+            .filter(|path| path.starts_with("crates/server/") && path.ends_with('/'))
+            .collect();
+        assert!(directories.is_empty(), "{directories:?}");
     }
 
     #[test]

@@ -135,9 +135,14 @@ reason = "Provider budgets are instance-wide (no workspace); the dispatcher itse
 path = "crates/modules/connectors/src/zoho/flows.rs"
 reason = "A test file (`#[cfg(test)] mod flows;`): fixtures publish from plain transactions."
 
+
 [[access.pool_access]]
-path = "crates/server/src/bff/"
-reason = "The web BFF's sessions (schema `bff`) are instance-wide: none carries a workspace."
+path = "crates/server/src/bff/store.rs"
+reason = "The web BFF's session store (schema `bff`): sessions are instance-wide, none carries a workspace."
+
+[[access.pool_access]]
+path = "crates/server/src/bff/mod.rs"
+reason = "The BFF's single-flight token refresh locks its session row (schema `bff`, instance-wide) in a transaction of its own."
 
 [[access.pool_access]]
 path = "crates/kernel/src/db.rs"

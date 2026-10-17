@@ -2030,6 +2030,14 @@ mod kernel_scope {
 
     /// The test module's state over the runtime role, with blobs in memory.
     async fn runtime(db: &PgPool) -> AppState {
+        runtime_with(db, |_| {}).await
+    }
+
+    /// [`runtime`] with `tweak` applied to the jobs config.
+    async fn runtime_with(
+        db: &PgPool,
+        tweak: impl FnOnce(&mut crate::config::JobsConfig),
+    ) -> AppState {
         let _ = state(db.clone()).await;
         sqlx::query("GRANT SELECT, INSERT ON job_log TO campbooks_app")
             .execute(db)
@@ -2037,12 +2045,11 @@ mod kernel_scope {
             .unwrap();
         let pool = testing::app_role_pool(db).await;
         let registry = Registry::build(&[module(background())]).unwrap();
-        AppState::new(
-            pool.clone(),
-            testing::config("postgres://test@localhost/test"),
-        )
-        .with_registry(registry)
-        .with_blobs(BlobStore::memory(&BlobsConfig::default(), pool))
+        let mut config = testing::config("postgres://test@localhost/test");
+        tweak(&mut config.jobs);
+        AppState::new(pool.clone(), config)
+            .with_registry(registry)
+            .with_blobs(BlobStore::memory(&BlobsConfig::default(), pool))
     }
 
     fn refused<T: std::fmt::Debug>(result: &Result<T, sqlx::Error>) -> bool {
@@ -2504,6 +2511,265 @@ mod kernel_scope {
         assert_eq!(
             owner_count(&db, "SELECT count(*) FROM kernel.blobs").await,
             0
+        );
+    }
+
+    // --- instance-wide rows change only in the kernel scope (#196) ----------
+
+    /// `sql`'s affected rows in `tx`.
+    async fn affected(tx: &mut sqlx::PgConnection, sql: &str) -> u64 {
+        sqlx::query(sqlx::AssertSqlSafe(sql.to_owned()))
+            .execute(tx)
+            .await
+            .unwrap()
+            .rows_affected()
+    }
+
+    #[sqlx::test(migrations = "../../migrations")]
+    async fn a_workspace_transaction_reads_and_adds_instance_rows_but_never_changes_them(
+        db: PgPool,
+    ) {
+        let state = runtime(&db).await;
+        let ana = WorkspaceId::new();
+        // Instance-wide rows (an account's event and its two deliveries, a
+        // scheduled job), and one job of the workspace.
+        let mut tx = state.db.begin().await.unwrap();
+        state
+            .events
+            .publish(
+                &mut tx,
+                &Pinged {
+                    workspace: None,
+                    n: 1,
+                },
+            )
+            .await
+            .unwrap();
+        enqueue(
+            &mut tx,
+            &Probe::note("instance"),
+            EnqueueOptions::default().unique("tick"),
+        )
+        .await
+        .unwrap();
+        tx.commit().await.unwrap();
+        let mut tx = state.db.begin_for(ana).await.unwrap();
+        enqueue(
+            &mut tx,
+            &Probe::note("own"),
+            EnqueueOptions::for_workspace(ana.to_string()),
+        )
+        .await
+        .unwrap();
+        tx.commit().await.unwrap();
+        let before = owner_count(
+            &db,
+            "SELECT count(*) FROM kernel.jobs WHERE workspace_id IS NULL AND state = 'pending'",
+        )
+        .await;
+        assert_eq!(before, 3);
+
+        let mut tx = state.db.begin_for(ana).await.unwrap();
+        // It still sees them.
+        let seen: (i64, i64) = sqlx::query_as(
+            "SELECT (SELECT count(*) FROM kernel.jobs WHERE workspace_id IS NULL),
+                    (SELECT count(*) FROM kernel.events WHERE workspace_id IS NULL)",
+        )
+        .fetch_one(&mut *tx)
+        .await
+        .unwrap();
+        assert_eq!(seen, (3, 1));
+        // It cannot change or delete them: row-level security hides them
+        // from UPDATE and DELETE (and from a row lock).
+        for sql in [
+            "UPDATE kernel.jobs SET state = 'succeeded' WHERE workspace_id IS NULL",
+            "UPDATE kernel.jobs SET run_at = now() + interval '1 year' WHERE workspace_id IS NULL",
+            "DELETE FROM kernel.jobs WHERE workspace_id IS NULL",
+            "UPDATE kernel.events SET payload = '{}' WHERE workspace_id IS NULL",
+            "DELETE FROM kernel.events WHERE workspace_id IS NULL",
+        ] {
+            assert_eq!(affected(&mut tx, sql).await, 0, "{sql}");
+        }
+        let locked: Vec<uuid::Uuid> =
+            sqlx::query_scalar("SELECT id FROM kernel.jobs WHERE workspace_id IS NULL FOR UPDATE")
+                .fetch_all(&mut *tx)
+                .await
+                .unwrap();
+        assert!(locked.is_empty(), "{locked:?}");
+        // Nor turn its own job into an instance-wide one.
+        let mut step = db::savepoint(&mut tx).await.unwrap();
+        let moved =
+            sqlx::query("UPDATE kernel.jobs SET workspace_id = NULL WHERE kind = 'test.probe'")
+                .execute(&mut *step)
+                .await;
+        assert!(moved.is_err(), "{moved:?}");
+        drop(step);
+        // Its own rows it still changes.
+        assert_eq!(
+            affected(
+                &mut tx,
+                "UPDATE kernel.jobs SET priority = 1 WHERE workspace_id IS NOT NULL"
+            )
+            .await,
+            1
+        );
+        // It still adds instance-wide rows, reading them back (`RETURNING`),
+        // and a unique key held by an instance-wide job still dedups.
+        let added = enqueue(
+            &mut tx,
+            &Probe::note("follow-up"),
+            EnqueueOptions::default(),
+        )
+        .await
+        .unwrap();
+        assert!(matches!(added, Enqueued::Created(_)), "{added:?}");
+        let again = enqueue(
+            &mut tx,
+            &Probe::note("instance"),
+            EnqueueOptions::default().unique("tick"),
+        )
+        .await
+        .unwrap();
+        assert_eq!(again, Enqueued::Duplicate);
+        state
+            .events
+            .publish(
+                &mut tx,
+                &Pinged {
+                    workspace: None,
+                    n: 2,
+                },
+            )
+            .await
+            .unwrap();
+        tx.commit().await.unwrap();
+
+        assert_eq!(
+            owner_count(
+                &db,
+                "SELECT count(*) FROM kernel.jobs WHERE workspace_id IS NULL AND state = 'pending'
+                    AND run_at < now() + interval '1 day'"
+            )
+            .await,
+            before + 3,
+            "the old rows untouched, the follow-up and the two new deliveries added"
+        );
+        assert_eq!(
+            owner_count(
+                &db,
+                "SELECT count(*) FROM kernel.events WHERE workspace_id IS NULL
+                    AND payload <> '{}'::jsonb"
+            )
+            .await,
+            2
+        );
+
+        // The kernel scope still changes them (the worker, pruning).
+        let mut tx = db::begin_kernel(&state.db).await.unwrap();
+        assert_eq!(
+            affected(
+                &mut tx,
+                "UPDATE kernel.jobs SET priority = 2 WHERE workspace_id IS NULL"
+            )
+            .await,
+            u64::try_from(before).unwrap() + 3
+        );
+        tx.rollback().await.unwrap();
+        let stats = Worker::new(state.clone()).run_until_idle().await;
+        assert_eq!(
+            (stats.succeeded, stats.failed, stats.lost),
+            (7, 0, 0),
+            "{stats:?}"
+        );
+    }
+
+    #[sqlx::test(migrations = "../../migrations")]
+    async fn instance_wide_jobs_still_complete_retry_and_get_reaped(db: PgPool) {
+        let state = runtime_with(&db, |jobs| jobs.retry_base_ms = 60_000).await;
+        let ana = WorkspaceId::new();
+        // An instance-wide follow-up enqueued by a workspace's transaction,
+        // failing its first attempt.
+        let mut tx = state.db.begin_for(ana).await.unwrap();
+        let flaky = created(
+            enqueue(
+                &mut tx,
+                &Probe {
+                    fail_first: 1,
+                    ..Probe::note("flaky")
+                },
+                EnqueueOptions::default(),
+            )
+            .await
+            .unwrap(),
+        );
+        tx.commit().await.unwrap();
+        let worker = Worker::new(state.clone());
+        let stats = worker.run_until_idle().await;
+        assert_eq!((stats.retried, stats.succeeded), (1, 0), "{stats:?}");
+        let row = job(&db, flaky).await;
+        assert_eq!((row.state.as_str(), row.attempts), ("pending", 1));
+        sqlx::query("UPDATE kernel.jobs SET run_at = now() WHERE id = $1")
+            .bind(flaky)
+            .execute(&db)
+            .await
+            .unwrap();
+        let stats = worker.run_until_idle().await;
+        assert_eq!(stats.succeeded, 1, "{stats:?}");
+        let row = job(&db, flaky).await;
+        assert_eq!((row.state.as_str(), row.attempts), ("succeeded", 2));
+
+        // An instance-wide job whose worker died is reaped and run again.
+        let mut tx = state.db.begin().await.unwrap();
+        let orphan = created(
+            enqueue(&mut tx, &Probe::note("orphan"), EnqueueOptions::default())
+                .await
+                .unwrap(),
+        );
+        tx.commit().await.unwrap();
+        let crashed = Worker::new(state.clone());
+        assert_eq!(
+            crashed.claim_for_test("default", 1).await.unwrap(),
+            [(orphan, None, 1)]
+        );
+        sqlx::query("UPDATE kernel.jobs SET locked_until = now() - interval '1 second'")
+            .execute(&db)
+            .await
+            .unwrap();
+        let survivor = Worker::new(state.clone());
+        survivor.upkeep().await;
+        let row = job(&db, orphan).await;
+        assert_eq!(row.state, "pending");
+        assert!(row.last_error.unwrap().contains("lease expired"));
+        survivor.run_until_idle().await;
+        let row = job(&db, orphan).await;
+        assert_eq!((row.state.as_str(), row.attempts), ("succeeded", 2));
+
+        // One that fails for good is recorded as failed.
+        let mut tx = state.db.begin_for(ana).await.unwrap();
+        let dead = created(
+            enqueue(
+                &mut tx,
+                &Probe {
+                    fatal: true,
+                    ..Probe::note("dead")
+                },
+                EnqueueOptions::default(),
+            )
+            .await
+            .unwrap(),
+        );
+        tx.commit().await.unwrap();
+        survivor.run_until_idle().await;
+        assert_eq!(job(&db, dead).await.state, "failed");
+        let logged: Vec<(String, Option<String>)> =
+            sqlx::query_as("SELECT note, workspace FROM job_log ORDER BY at")
+                .fetch_all(&db)
+                .await
+                .unwrap();
+        assert_eq!(
+            logged,
+            [("flaky".to_owned(), None), ("orphan".to_owned(), None),],
+            "each ran with no workspace; failed attempts left no row"
         );
     }
 }
