@@ -174,7 +174,7 @@ pub async fn handler(
         }
     };
     // Sizes and the stop reason only, never what the model wrote.
-    let finish_reason = finish_kind(response.finish_reason.as_deref());
+    let finish_reason = response.finish_kind();
     let completion_tokens = response.usage.map(|usage| usage.completion_tokens);
     let content_chars = response.content.chars().count();
     let Ok(output) = response.json::<ModelOutput>() else {
@@ -232,19 +232,6 @@ fn rate_key(workspace: WorkspaceId, user: UserId) -> RateKey {
 /// Milliseconds since `started`, for the log.
 fn elapsed_ms(started: Instant) -> u64 {
     u64::try_from(started.elapsed().as_millis()).unwrap_or(u64::MAX)
-}
-
-/// Why the model stopped, for the log: one of a few known words, never
-/// whatever string the provider sent.
-fn finish_kind(reason: Option<&str>) -> &'static str {
-    match reason {
-        None => "none",
-        Some("stop") => "stop",
-        Some("length") => "length",
-        Some("content_filter") => "content_filter",
-        Some("tool_calls") => "tool_calls",
-        Some(_) => "other",
-    }
 }
 
 /// What kind of failure, for the log: never the provider's words.
