@@ -168,7 +168,11 @@ export const ReplyDialog: Story = {
     await userEvent.keyboard("j");
     await userEvent.keyboard("r");
     const body = within(canvasElement.ownerDocument.body);
-    await expect(await body.findByRole("dialog", { name: "Reply to Marta" })).toBeVisible();
+    const dialog = await body.findByRole("dialog", { name: "Reply to Marta" });
+    // The dialog fades in: wait until it is shown.
+    await waitFor(async () => {
+      await expect(dialog).toBeVisible();
+    });
     const first = await body.findByRole("button", { name: /Yes, Thursday works/u });
     await waitFor(async () => {
       await expect(first).toHaveFocus();
