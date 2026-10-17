@@ -13,7 +13,11 @@ All notable changes to Campbooks Next are documented here. The format follows
   payment confirmations showed up as "Pay". The decide model now answers one more
   question in the same call: does the email ask for a payment still owed, confirm one
   already made, or neither. Only a payment still owed raises Pay, and since Campbooks
-  can't see your bank it asks: Already paid clears it, Still to pay keeps it. Existing
+  can't see your bank it asks on Home: "Acme Hosting sent an invoice. Is it paid?" with
+  Already paid (1) and Still to pay (2), and "All N already paid" on the Pay group with one
+  Undo. Still to pay keeps it as "Pay Acme Hosting", says how many days overdue it is when
+  there's a due date, and offers a reminder first (two days before the due date, tomorrow
+  morning when overdue, Monday with no date). The reader asks the same. Existing
   needs are worked out again on upgrade, and mail from the last two weeks is asked the new
   question once; a Pay item on older mail goes away and doesn't come back.
   For operators, `campbooks-server labelling export` writes your recent money mail as a

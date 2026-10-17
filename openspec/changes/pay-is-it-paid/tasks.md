@@ -16,11 +16,11 @@
 - [x] 3.1 `campbooks-server labelling export` (manifest, items, labels.csv) with tests
 - [x] 3.2 `cargo xtask eval decide --set-dir`, optional labels, `labels.csv`, scored questions from the manifest
 
-## 4. Home (after campbooks#515)
-- [ ] 4.1 Pay question row, Already paid (1) / Still to pay (2), All N already paid with one Undo
-- [ ] 4.2 Still to pay: "Pay <payee>", due/overdue from `due_on`, reminder first action
-- [ ] 4.3 "How Scout chose these": the money answer
-- [ ] 4.4 Recording scenario
+## 4. Home (on campbooks#515)
+- [x] 4.1 Pay question row, Already paid (1) / Still to pay (2), All N already paid with one Undo
+- [x] 4.2 Still to pay: "Pay <payee>", due/overdue from `due_on`, reminder first action
+- [x] 4.3 "How Scout chose these": the money answer
+- [x] 4.4 Recording scenario (`pay-question`); the reader's bill choice
 
 ## 5. Last
 - [x] 5.1 OpenAPI and client types regenerated
