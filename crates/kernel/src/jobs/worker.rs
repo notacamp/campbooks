@@ -325,7 +325,8 @@ impl Shared {
     /// jobs offers its next jobs (by priority, then age), and the claim takes
     /// them in turns — every workspace's first job before any second one —
     /// starting with the workspace served least recently. A job waits while
-    /// an earlier job with its ordering key is unfinished. Across every
+    /// an earlier job of its workspace (or, instance-wide, of none) with its
+    /// ordering key is unfinished. Across every
     /// workspace: in the kernel scope.
     async fn claim(&self, queue: &str, limit: usize) -> Result<Vec<Claimed>, sqlx::Error> {
         let mut tx = db::begin_kernel(&self.state.db).await?;
@@ -385,6 +386,7 @@ impl Shared {
                          AND (j.ordering_key IS NULL OR NOT EXISTS (
                               SELECT 1 FROM kernel.jobs o
                                WHERE o.ordering_key = j.ordering_key
+                                 AND o.workspace_key = j.workspace_key
                                  AND o.state IN ('pending', 'running')
                                  AND o.seq < j.seq))
                        ORDER BY j.priority DESC, j.run_at, j.seq

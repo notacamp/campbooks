@@ -359,7 +359,7 @@ impl EventBus {
                AND ($5::timestamptz IS NULL OR e.occurred_at >= $5)
                AND ($6::uuid IS NULL OR e.id >= $6)
              ORDER BY e.id
-            ON CONFLICT (kind, unique_key)
+            ON CONFLICT (kind, unique_key, workspace_id)
                 WHERE unique_key IS NOT NULL AND state IN ('pending', 'running')
                 DO NOTHING
             "#,
