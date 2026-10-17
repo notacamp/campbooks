@@ -1,0 +1,41 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT id AS \"id: LabelId\", provider_key\n                     FROM conversations.labels\n                    WHERE inbox_id = $1 AND id = ANY($2)",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id: LabelId",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "conversations.labels",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "provider_key",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "conversations.labels",
+            "name": "provider_key"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "UuidArray"
+      ]
+    },
+    "nullable": [
+      false,
+      true
+    ]
+  },
+  "hash": "6ff06fe8793959f6a932be481adb38b69644268d24b8564158a9e9cb23c75f45"
+}

@@ -1,0 +1,65 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT provider_message_id, read, starred, in_inbox\n                     FROM conversations.messages\n                    WHERE conversation_id = $1 AND provider_message_id = ANY($2)",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "provider_message_id",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "conversations.messages",
+            "name": "provider_message_id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "read",
+        "type_info": "Bool",
+        "origin": {
+          "Table": {
+            "table": "conversations.messages",
+            "name": "read"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "starred",
+        "type_info": "Bool",
+        "origin": {
+          "Table": {
+            "table": "conversations.messages",
+            "name": "starred"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "in_inbox",
+        "type_info": "Bool",
+        "origin": {
+          "Table": {
+            "table": "conversations.messages",
+            "name": "in_inbox"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "TextArray"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "760729316bde3d77300a8cd2fd6b60e81b60611d80a6d4272f7ea151308ebc3a"
+}

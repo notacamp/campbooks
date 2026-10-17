@@ -32,9 +32,25 @@ async fn connected(kit: &Kit) -> (WorkspaceId, InboxId, String) {
 }
 
 /// A reply to Sender 1's message, as the conversations module would ask
-/// for it: the send's id.
+/// for it: the send's id. The module stores the send (the outbound-requests
+/// port, faked) before it announces it.
 async fn request(kit: &Kit, ws: WorkspaceId, inbox: InboxId, thread: Option<&str>) -> SendId {
     let send_id = SendId::new();
+    let blob = document(kit, ws, inbox, send_id, thread, "Thanks, see you Thursday.").await;
+    kit.outbound.release(send_id, inbox, blob.clone());
+    publish(kit, ws, inbox, send_id, blob).await;
+    send_id
+}
+
+/// The outgoing document of send `send_id`, saying `text`, stored as a blob.
+async fn document(
+    kit: &Kit,
+    ws: WorkspaceId,
+    inbox: InboxId,
+    send_id: SendId,
+    thread: Option<&str>,
+    text: &str,
+) -> campbooks_kernel::blobs::BlobRef {
     let document = OutgoingMessage {
         version: 1,
         inbox,
@@ -54,15 +70,14 @@ async fn request(kit: &Kit, ws: WorkspaceId, inbox: InboxId, thread: Option<&str
         in_reply_to: Some("m1@example.com".into()),
         references: vec!["m1@example.com".into()],
         thread_key: thread.map(ToOwned::to_owned),
-        text: "Thanks, see you Thursday.".into(),
-        html: Some("<div><p>Thanks, see you Thursday.</p></div>".into()),
+        text: text.into(),
+        html: Some(format!("<div><p>{text}</p></div>")),
         attachments: Vec::new(),
     };
     let mut value = serde_json::to_value(&document).unwrap();
     value["send_id"] = send_id.to_string().into();
     assert_contract("outgoing-message.v1.schema.json", &value);
-    let blob = kit
-        .state
+    kit.state
         .blobs
         .put(
             &ws.to_string(),
@@ -70,9 +85,7 @@ async fn request(kit: &Kit, ws: WorkspaceId, inbox: InboxId, thread: Option<&str
             OUTGOING_CONTENT_TYPE,
         )
         .await
-        .unwrap();
-    publish(kit, ws, inbox, send_id, blob).await;
-    send_id
+        .unwrap()
 }
 
 async fn publish(
@@ -438,4 +451,146 @@ async fn the_check_behind_a_send_that_never_called_gmail_frees_its_draft(db: PgP
     assert_eq!(kit.google.send_calls(), 0);
     let done = completed(&kit, ws).await;
     assert_eq!(done[0]["reason"], "unavailable");
+}
+
+/// How many sends were recorded.
+async fn recorded(kit: &Kit) -> i64 {
+    sqlx::query_scalar("SELECT count(*) FROM connectors.sends")
+        .fetch_one(&kit.db)
+        .await
+        .unwrap()
+}
+
+/// Leave the provider's budget empty, so a send job records its send and
+/// waits; [`refill`] lets it go on.
+async fn drain(kit: &Kit) {
+    sqlx::query!(
+        "UPDATE connectors.provider_budgets SET tokens = -1000000000, refilled_at = now()"
+    )
+    .execute(&kit.db)
+    .await
+    .unwrap();
+}
+
+async fn refill(kit: &Kit) {
+    sqlx::query("UPDATE connectors.provider_budgets SET tokens = 1000000, refilled_at = now()")
+        .execute(&kit.db)
+        .await
+        .unwrap();
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_forged_request_for_a_send_never_released_sends_nothing(db: PgPool) {
+    let kit = Kit::new(db).await;
+    let (ws, inbox, thread) = connected(&kit).await;
+    // An event appended in the workspace with no send behind it.
+    let send_id = SendId::new();
+    let blob = document(&kit, ws, inbox, send_id, Some(&thread), "Wire the money").await;
+    publish(&kit, ws, inbox, send_id, blob).await;
+    settle(&kit).await;
+    assert_eq!(kit.google.send_calls(), 0);
+    assert_eq!(recorded(&kit).await, 0);
+    assert!(completed(&kit, ws).await.is_empty());
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_forged_request_naming_another_inbox_sends_nothing(db: PgPool) {
+    let kit = Kit::new(db).await;
+    let (ws, inbox, thread) = connected(&kit).await;
+    // The send was released from another inbox; the event names this one.
+    let send_id = SendId::new();
+    let blob = document(&kit, ws, inbox, send_id, Some(&thread), "Thanks").await;
+    kit.outbound.release(send_id, InboxId::new(), blob.clone());
+    publish(&kit, ws, inbox, send_id, blob).await;
+    settle(&kit).await;
+    assert_eq!(kit.google.send_calls(), 0);
+    assert_eq!(recorded(&kit).await, 0);
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_forged_request_naming_other_content_sends_only_the_stored_message(db: PgPool) {
+    let kit = Kit::new(db).await;
+    let (ws, inbox, thread) = connected(&kit).await;
+    let send_id = SendId::new();
+    let stored = document(
+        &kit,
+        ws,
+        inbox,
+        send_id,
+        Some(&thread),
+        "Thanks, see you Thursday.",
+    )
+    .await;
+    let forged = document(&kit, ws, inbox, send_id, Some(&thread), "Wire the money").await;
+    kit.outbound.release(send_id, inbox, stored);
+    publish(&kit, ws, inbox, send_id, forged).await;
+    settle(&kit).await;
+    let sent = kit.google.sent();
+    assert_eq!(sent.len(), 1);
+    let parsed = normalize::parse(&sent[0].raw, crate::mail::Receiver::Gmail);
+    let text = parsed.text.unwrap_or_default();
+    assert!(text.contains("see you Thursday"), "{text}");
+    assert!(!text.contains("Wire the money"), "{text}");
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_send_that_stops_standing_before_its_call_is_not_made(db: PgPool) {
+    let kit = Kit::new(db).await;
+    let (ws, inbox, thread) = connected(&kit).await;
+    drain(&kit).await;
+    let send_id = request(&kit, ws, inbox, Some(&thread)).await;
+    kit.run_jobs().await;
+    assert_eq!(recorded(&kit).await, 1);
+    // Its draft is no longer being sent (its author left, say).
+    kit.outbound.withdraw(send_id);
+    refill(&kit).await;
+    settle(&kit).await;
+    assert_eq!(kit.google.send_calls(), 0);
+    let done = completed(&kit, ws).await;
+    assert_eq!(done.len(), 1);
+    assert_eq!(done[0]["outcome"], "failed");
+    assert_eq!(done[0]["reason"], "unavailable");
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_recorded_send_naming_another_document_than_the_stored_one_is_not_made(db: PgPool) {
+    let kit = Kit::new(db).await;
+    let (ws, inbox, thread) = connected(&kit).await;
+    drain(&kit).await;
+    let send_id = request(&kit, ws, inbox, Some(&thread)).await;
+    kit.run_jobs().await;
+    // What conversations stored is not what this module recorded.
+    let other = document(&kit, ws, inbox, send_id, Some(&thread), "Something else").await;
+    kit.outbound.release(send_id, inbox, other);
+    refill(&kit).await;
+    settle(&kit).await;
+    assert_eq!(kit.google.send_calls(), 0);
+    assert_eq!(completed(&kit, ws).await[0]["reason"], "unavailable");
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_request_replayed_after_its_send_sends_nothing_more(db: PgPool) {
+    let kit = Kit::new(db).await;
+    let (ws, inbox, thread) = connected(&kit).await;
+    let send_id = request(&kit, ws, inbox, Some(&thread)).await;
+    settle(&kit).await;
+    assert_eq!(kit.google.send_calls(), 1);
+    let blob = serde_json::from_value(
+        kit.payloads(ws, "conversations.send_requested").await[0]["message"].clone(),
+    )
+    .unwrap();
+    // Replayed while conversations still shows it sending, then once the
+    // draft is gone.
+    publish(&kit, ws, inbox, send_id, blob).await;
+    settle(&kit).await;
+    kit.outbound.withdraw(send_id);
+    let blob = serde_json::from_value(
+        kit.payloads(ws, "conversations.send_requested").await[0]["message"].clone(),
+    )
+    .unwrap();
+    publish(&kit, ws, inbox, send_id, blob).await;
+    settle(&kit).await;
+    assert_eq!(kit.google.send_calls(), 1);
+    assert_eq!(completed(&kit, ws).await.len(), 1);
+    assert_eq!(recorded(&kit).await, 1);
 }

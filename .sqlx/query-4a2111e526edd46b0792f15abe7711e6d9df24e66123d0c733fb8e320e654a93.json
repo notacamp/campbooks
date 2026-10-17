@@ -1,0 +1,28 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT label_id AS \"label: LabelId\"\n                     FROM conversations.conversation_labels\n                    WHERE conversation_id = $1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "label: LabelId",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "conversations.conversation_labels",
+            "name": "label_id"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "4a2111e526edd46b0792f15abe7711e6d9df24e66123d0c733fb8e320e654a93"
+}

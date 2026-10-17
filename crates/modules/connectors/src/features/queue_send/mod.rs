@@ -2,6 +2,13 @@
 //! (`conversations.send_requested`): record it once, keyed by its send id,
 //! hold its document, and enqueue `connectors.send_message`. A repeated
 //! delivery records and enqueues nothing new.
+//!
+//! The event is not taken as proof (campbooks-cloud#226): the conversations
+//! module is asked, through the kernel's outbound-requests port, whether
+//! the send stands (released, waiting for the provider, its author still
+//! allowed to send from that inbox), and the document recorded is the one
+//! it stored, never the one the event names. A send that does not stand,
+//! or names another inbox, is recorded nowhere.
 
 use campbooks_kernel::{
     Event, EventConsumer, JobContext, JobError, blobs::BlobOwner, jobs::EnqueueOptions,
@@ -9,6 +16,7 @@ use campbooks_kernel::{
 };
 use chrono::Utc;
 use serde_json::json;
+use uuid::Uuid;
 
 use crate::{
     domain::model::{InboxId, SendId, StreamId},
@@ -37,6 +45,19 @@ impl EventConsumer for QueueSend {
             .map_err(|_| JobError::fatal("send_requested names no workspace"))?;
         let state = ctx.state().clone();
         let tx = ctx.tx().await?;
+        let stored = state
+            .outbound
+            .stored_send(&state, tx, workspace, requested.send_id.into())
+            .await?;
+        let Some(stored) = stored.filter(|s| s.inbox == Uuid::from(requested.inbox_id)) else {
+            tracing::warn!(
+                %workspace,
+                send = %requested.send_id,
+                "send_requested names no send that stands; nothing is sent"
+            );
+            return Ok(());
+        };
+        let message = stored.message;
         let stream = sqlx::query_scalar!(
             r#"SELECT id AS "id: StreamId" FROM connectors.streams
                 WHERE inbox_id = $1 AND capability = 'messages'"#,
@@ -53,7 +74,7 @@ impl EventConsumer for QueueSend {
             workspace as WorkspaceId,
             stream as Option<StreamId>,
             requested.inbox_id as InboxId,
-            json!(requested.message),
+            json!(message),
         )
         .fetch_optional(&mut **tx)
         .await?;
@@ -65,7 +86,7 @@ impl EventConsumer for QueueSend {
             .attach(
                 tx,
                 &requested.workspace,
-                &requested.message,
+                &message,
                 &BlobOwner::new(SEND_OWNER, requested.send_id),
             )
             .await?;

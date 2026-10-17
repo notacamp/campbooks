@@ -9,6 +9,15 @@
 //! [`UNCLEAR_WAIT`] before that lookup, so Gmail's search has caught up. A
 //! definite refusal fails the send at once.
 //!
+//! Before any call to the provider, the conversations module is asked
+//! again, through the kernel's outbound-requests port, whether the send
+//! stands (campbooks-cloud#226): its draft is still being sent as this
+//! send, from this inbox, by an author who may still send from it. The
+//! document sent is the one that module stored, never one an event names,
+//! and this module's row must name that same one. A send that no longer
+//! stands is settled as failed (`unavailable`, or `unknown_outcome` after an
+//! attempt that may have gone) without calling the provider.
+//!
 //! On success, in the job's transaction: the sent message is indexed and
 //! announced in a change batch exactly as sync would (so it shows in its
 //! conversation now, and the next sync knows it), the send is marked sent,
@@ -190,13 +199,26 @@ impl SendMessage {
             }
         }
 
+        // The document recorded here came from that module too
+        // (`queue_send`): one that differs was not written by it.
+        let Some(stored) = standing_document(ctx, workspace, send, target.inbox)
+            .await?
+            .filter(|stored| *stored == target.document)
+        else {
+            tracing::warn!(
+                %workspace,
+                %send,
+                "a recorded send no longer stands; not sending"
+            );
+            return finish_failed(ctx, workspace, send, &target, "unavailable").await;
+        };
         let Some(token) = self
             .token(ctx, workspace, send, &target, connection)
             .await?
         else {
             return Ok(());
         };
-        let document = read_document(ctx, workspace, &target.document).await?;
+        let document = read_document(ctx, workspace, &stored).await?;
         let attempt = Attempt {
             workspace,
             send,
@@ -579,6 +601,27 @@ async fn load(
         paused: row.paused,
         cursor: row.cursor,
     }))
+}
+
+/// The document of send `send` as the conversations module stored it,
+/// while the send stands and is sent from `inbox` (the outbound-requests
+/// port, in a short transaction of its own); `None` otherwise.
+async fn standing_document(
+    ctx: &JobContext,
+    workspace: WorkspaceId,
+    send: SendId,
+    inbox: InboxId,
+) -> Result<Option<BlobRef>, JobError> {
+    let state = ctx.state().clone();
+    let mut tx = ctx.pool().begin_for(workspace).await?;
+    let stored = state
+        .outbound
+        .stored_send(&state, &mut tx, workspace, send.into())
+        .await?;
+    tx.commit().await?;
+    Ok(stored
+        .filter(|stored| stored.inbox == uuid::Uuid::from(inbox))
+        .map(|stored| stored.message))
 }
 
 /// The bytes of `blob`, at most `max` (`None` when larger).

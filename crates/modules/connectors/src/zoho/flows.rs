@@ -70,10 +70,13 @@ impl Connected {
 
     /// conversations asks for `items` (message id, change).
     async fn request(&self, kit: &Kit, items: &[(&str, Value)]) {
+        let conversation = uuid::Uuid::now_v7();
+        let ids: Vec<&str> = items.iter().map(|(id, _)| *id).collect();
+        kit.outbound.show(conversation, &ids);
         let payload = json!({
             "workspace": self.ws.to_string(),
             "inbox_id": self.inbox(),
-            "conversation": uuid::Uuid::now_v7(),
+            "conversation": conversation,
             "origin": "user",
             "items": items.iter().map(|(id, change)| json!({
                 "provider_message_id": id, "change": change
@@ -461,6 +464,7 @@ async fn reply(kit: &Kit, mailbox: &Connected, parent: &str) -> SendId {
         )
         .await
         .unwrap();
+    kit.outbound.release(send_id, mailbox.inbox(), blob.clone());
     let mut tx = kit.state.db.begin().await.unwrap();
     campbooks_kernel::db::set_workspace(&mut tx, &mailbox.ws.to_string())
         .await

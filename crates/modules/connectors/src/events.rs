@@ -298,7 +298,9 @@ pub struct SendRequested {
     pub inbox_id: InboxId,
     /// The send: recorded once.
     pub send_id: SendId,
-    /// The outgoing-message v1 document, a blob of the workspace.
+    /// The outgoing-message v1 document, a blob of the workspace. Not
+    /// trusted: the connector sends the document the conversations module
+    /// recorded for the send (the outbound-requests port).
     pub message: BlobRef,
 }
 

@@ -17,6 +17,7 @@ use crate::{
     i18n::{LocalePreferencePort, NoLocalePreference},
     jobs::Registry,
     operations::Operations,
+    outbound::{NoOutboundRequests, OutboundPort},
     preferences::{AskFirst, MemberPreferencesPort},
     rate_limit::{RateLimits, api::ApiLimits},
     search::SearchSources,
@@ -51,6 +52,12 @@ pub struct AppState {
     /// Answers which inboxes keeping a departing member's mail would leave
     /// unread. The server registers the `conversations` module's.
     pub kept_mail: KeptMailPort,
+    /// Answers whether a send or a provider change another module asked for
+    /// still stands in that module's records, before it is made
+    /// ([`outbound`](crate::outbound)). The server registers the
+    /// `conversations` module's; until then nothing stands, so nothing is
+    /// sent or changed.
+    pub outbound: OutboundPort,
     /// Answers which language a user chose, for the
     /// [`Locale`](crate::i18n::Locale) of their requests. The server
     /// registers the `workspaces` module's implementation; until then
@@ -136,6 +143,7 @@ impl AppState {
             membership: Arc::new(NoMembership),
             clients: Arc::new(NoClientDirectory),
             kept_mail: Arc::new(NoKeptMail),
+            outbound: Arc::new(NoOutboundRequests),
             grants: Arc::new(NoGrantIntake),
             consent: Arc::new(NoConsentDoor),
             invitations: Arc::new(NoInvitations),
@@ -180,6 +188,13 @@ impl AppState {
     #[must_use]
     pub fn with_kept_mail(mut self, kept_mail: KeptMailPort) -> Self {
         self.kept_mail = kept_mail;
+        self
+    }
+
+    /// The same state, re-checking outbound requests through `outbound`.
+    #[must_use]
+    pub fn with_outbound(mut self, outbound: OutboundPort) -> Self {
+        self.outbound = outbound;
         self
     }
 

@@ -1378,11 +1378,67 @@ async fn a_scheduled_send_follows_its_authors_real_membership(db: PgPool) {
             // `failed` once the connector answers).
             assert_ne!(state, "draft");
             assert_eq!(requested, 1);
+            // The connector asked conversations through the real
+            // outbound-requests port, which confirmed it (campbooks-cloud#226).
+            assert_eq!(sends_recorded(&world).await, 1);
         } else {
             assert_eq!(state, "draft");
             assert_eq!(requested, 0);
         }
     }
+}
+
+/// The sends the connector recorded in workspace A.
+async fn sends_recorded(world: &World) -> i64 {
+    sqlx::query_scalar("SELECT count(*) FROM connectors.sends WHERE workspace_id = $1")
+        .bind(world.a.as_uuid())
+        .fetch_one(&world.db)
+        .await
+        .unwrap()
+}
+
+/// campbooks-cloud#226: `conversations.send_requested` appended in workspace
+/// A by a transaction of the runtime role, naming a real draft that was
+/// never released, is checked by the connector against the real
+/// outbound-requests port: nothing is recorded, so nothing can be sent.
+#[sqlx::test(migrations = "../../migrations")]
+async fn a_forged_send_request_is_refused_by_the_real_port(db: PgPool) {
+    use campbooks_conversations::{
+        events::SendRequested,
+        model::{DraftId, InboxId, SendId},
+    };
+    let world = World::new(db).await;
+    let ws = world.a.to_string();
+    let message = world
+        .state
+        .blobs
+        .put(&ws, b"{}".to_vec(), "application/json")
+        .await
+        .unwrap();
+    let mut tx = world.state.db.begin_for(world.a).await.unwrap();
+    world
+        .state
+        .events
+        .publish(
+            &mut tx,
+            &SendRequested {
+                workspace: ws.clone(),
+                inbox_id: world.instances["conversations.inbox"]
+                    .parse::<InboxId>()
+                    .unwrap(),
+                draft: world.instances["conversations.draft"]
+                    .parse::<DraftId>()
+                    .unwrap(),
+                send_id: SendId::new(),
+                message,
+                author: Some(world.users[&Who::Sender]),
+            },
+        )
+        .await
+        .unwrap();
+    tx.commit().await.unwrap();
+    Worker::new(world.state.clone()).run_until_idle().await;
+    assert_eq!(sends_recorded(&world).await, 0);
 }
 
 /// campbooks-cloud#129: a transaction of the runtime role that sets neither

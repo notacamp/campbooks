@@ -3,12 +3,19 @@
 //! stamped with Gmail's history id (where they sit in Gmail's order of
 //! writes), and the stream runs now to make them
 //! (`contracts/conversations.changes_requested.v1.schema.json`).
+//!
+//! The event is not taken as proof (campbooks-cloud#226): before anything
+//! is recorded, or the provider asked for a stamp, the conversations module
+//! is asked through the kernel's outbound-requests port which of the
+//! changes its conversation still shows. Only those are recorded; a request
+//! none of whose changes stand records nothing.
 
 use std::collections::HashSet;
 
 use campbooks_kernel::{
-    Event, EventConsumer, JobContext, JobError, db::BeginFor as _, tenancy::WorkspaceId,
+    AppState, Event, EventConsumer, JobContext, JobError, db::BeginFor as _, tenancy::WorkspaceId,
 };
+use sqlx::PgConnection;
 use uuid::Uuid;
 
 use crate::{
@@ -19,7 +26,7 @@ use crate::{
         outbound::{self, Mapped, State},
         schedule,
     },
-    events::ChangesRequested,
+    events::{ChangesRequested, RequestedItem},
     zoho,
 };
 
@@ -77,6 +84,11 @@ impl EventConsumer for RequestChanges {
             tx.commit().await?;
             return Ok(());
         };
+        let items = standing(ctx.state(), &mut tx, workspace, &event.payload).await?;
+        if items.is_empty() {
+            tx.commit().await?;
+            return Ok(());
+        }
         let target = Target {
             stream: row.stream,
             connection: row.connection,
@@ -84,14 +96,7 @@ impl EventConsumer for RequestChanges {
             paused: row.paused,
             health: Health::parse(&row.health)?,
         };
-        let known: HashSet<String> = sqlx::query_scalar!(
-            "SELECT label_id FROM connectors.gmail_labels WHERE stream_id = $1 AND kind = 'user'",
-            target.stream as StreamId
-        )
-        .fetch_all(&mut *tx)
-        .await?
-        .into_iter()
-        .collect();
+        let known = user_labels(&mut tx, target.stream).await?;
         tx.commit().await?;
 
         let stamp = self.stamp(ctx, workspace, &target).await;
@@ -109,7 +114,7 @@ impl EventConsumer for RequestChanges {
             Provider::Google => outbound::writable(label),
             Provider::Zoho => zoho::state::writable(label),
         };
-        for item in &event.payload.items {
+        for item in items {
             let mapped = match target.provider {
                 Provider::Google => outbound::map(&item.change, &known),
                 Provider::Zoho => outbound::map_zoho(&item.change),
@@ -160,6 +165,63 @@ impl EventConsumer for RequestChanges {
         tracing::info!(%workspace, stream = %target.stream, pending, "outbound changes recorded");
         Ok(())
     }
+}
+
+/// The user labels Gmail has for `stream`, by key.
+async fn user_labels(
+    conn: &mut PgConnection,
+    stream: StreamId,
+) -> Result<HashSet<String>, JobError> {
+    Ok(sqlx::query_scalar!(
+        "SELECT label_id FROM connectors.gmail_labels WHERE stream_id = $1 AND kind = 'user'",
+        stream as StreamId
+    )
+    .fetch_all(conn)
+    .await?
+    .into_iter()
+    .collect())
+}
+
+/// The items of `request` its conversation still shows, as the
+/// conversations module answers in `conn` (the outbound-requests port);
+/// the others are logged and left out.
+async fn standing<'r>(
+    state: &AppState,
+    conn: &mut PgConnection,
+    workspace: WorkspaceId,
+    request: &'r ChangesRequested,
+) -> Result<Vec<&'r RequestedItem>, JobError> {
+    let asked: Vec<serde_json::Value> = request
+        .items
+        .iter()
+        .map(serde_json::to_value)
+        .collect::<Result<_, _>>()
+        .map_err(|e| JobError::fatal(format!("encoding requested changes: {e}")))?;
+    let standing = state
+        .outbound
+        .changes_standing(
+            conn,
+            workspace,
+            request.inbox_id.into(),
+            request.conversation,
+            &asked,
+        )
+        .await?;
+    let items: Vec<&RequestedItem> = request
+        .items
+        .iter()
+        .zip(standing.into_iter().chain(std::iter::repeat(false)))
+        .filter_map(|(item, stands)| stands.then_some(item))
+        .collect();
+    if items.len() < request.items.len() {
+        tracing::warn!(
+            %workspace,
+            asked = request.items.len(),
+            standing = items.len(),
+            "changes_requested names changes its conversation does not show; those are not made"
+        );
+    }
+    Ok(items)
 }
 
 impl RequestChanges {
