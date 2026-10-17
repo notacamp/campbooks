@@ -152,14 +152,17 @@ of a bounded number of permits per process for all of its queries, so the
 streams of a process together use at most that many connections at once.
 While it is behind the
 head (from the open until a read ends short of a full page, and again
-after any full page), it SHALL send at most one page per catch-up tick:
-each read made while behind SHALL release its frames one tick after the
-read began (when the client had taken the previous page's frames, before
-the read waits for anything), or after the fewest whole ticks that reach
-its end when it takes longer. The tick SHALL be
+after any full page, or after any step that did not begin from the
+stream's idle wait, such as one that follows frames a client held up), it
+SHALL send at most one page per catch-up tick: each read made while behind
+SHALL release its frames one tick after the read began (when the client
+had taken all but the last of the previous page's frames, before the read
+waits for anything), or after the fewest whole ticks that reach its end
+when it takes longer. The tick SHALL be
 configured (`CAMPBOOKS_CHANGES__CATCH_UP_TICK_MS`, 50 ms by default)
 between 50 ms and one second, checked at startup. A stream that has caught
-up SHALL send the changes a wake-up brings as soon as it reads them. The
+up SHALL send the changes a wake-up from its idle wait brings as soon as it
+reads them. The
 server SHALL limit open streams per caller and answer 429 beyond the
 limit, and SHALL limit how many streams a caller opens per configured
 window (across processes), answering 429 `rate_limited` beyond it, whatever
@@ -193,6 +196,10 @@ day, checked at startup.
 #### Scenario: A live change after catching up
 - **WHEN** a stream has caught up and a change it may see is recorded
 - **THEN** it sends that change as soon as it reads it, without waiting for a tick
+
+#### Scenario: A client that stalls
+- **WHEN** a caught-up client stops reading while changes it may not see are recorded, then a change it may see, and it reads again
+- **THEN** it receives that change one tick after it took its last frame, however many hidden changes were recorded meanwhile
 
 ### Requirement: Retention
 Changes SHALL be kept for a configured retention period (72 hours by

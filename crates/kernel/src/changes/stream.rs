@@ -31,8 +31,9 @@
 //!   page, each read's frames leave one catch-up tick after the read began
 //!   (when the client took the previous page, before the read's permit), so
 //!   when a page leaves does not depend on how many hidden changes its read
-//!   went past. A stream that has caught up sends what a
-//!   wake-up brings at once.
+//!   went past. Any step that does not begin from the idle wait (after
+//!   frames a client may have held up) is paced too; only what a wake-up
+//!   from the idle wait brings to a caught-up stream leaves at once.
 //! - **A stream runs in a task of its own** and hands its frames to the
 //!   response body over a channel of one, so a body that is not polled
 //!   holds no query permit or connection; every read and heartbeat holds one
@@ -232,10 +233,12 @@ fn start(
     }
 }
 
-/// A stream's catch-up pacing. A read that starts while the stream is
-/// behind (the first read after the open, or any read after a full page)
-/// releases its frames one tick after it began, or a whole number of ticks
-/// when it takes longer; one that starts caught up releases them at once.
+/// A stream's pacing. A read that starts while the stream is behind (the
+/// first read after the open, any read after a full page, and any step
+/// that does not begin from the idle wait: one that follows frames the
+/// client may have held up) releases its frames one tick after it began, or
+/// a whole number of ticks when it takes longer; only a read woken from the
+/// idle wait while caught up releases them at once.
 /// The read begins when the client took the previous page's frames (it
 /// knows when that was), before the read waits for its permit, so what it
 /// waited for and scanned (permit, listing, page, second look) never shows
@@ -253,6 +256,16 @@ impl Pacer {
         Self {
             tick: tick.max(Duration::from_millis(1)),
             catching_up: true,
+        }
+    }
+
+    /// The next step begins from the idle wait (`from_idle`: woken by a
+    /// change, the poll or a timer, with nothing to send) or not. One that
+    /// does not follows frames the client took when it chose, after a
+    /// backlog that could have built up meanwhile: it is paced.
+    fn begin(&mut self, from_idle: bool) {
+        if !from_idle {
+            self.catching_up = true;
         }
     }
 
@@ -619,6 +632,7 @@ pub async fn open(
         relist_unannounced: false,
         pacer: Pacer::new(Duration::from_millis(config.catch_up_tick_ms)),
         release_at: None,
+        woken: false,
         state: state.clone(),
         workspace,
         binding,
@@ -717,8 +731,10 @@ struct Feed {
     /// changes numbered in between that were skipped.
     relist_unannounced: bool,
     pacer: Pacer,
-    /// When the queued frames may leave (a catch-up read's tick).
+    /// When the queued frames may leave (a paced read's tick).
     release_at: Option<Instant>,
+    /// Whether the next step begins from the idle wait.
+    woken: bool,
     /// Where the next read starts: every change up to it was delivered or
     /// is not the caller's to see.
     cursor: i64,
@@ -763,6 +779,12 @@ impl Feed {
                 self.end("closing", &json!({ "reason": self.deadline_reason }));
                 continue;
             }
+            // A step that does not begin from the idle wait follows frames
+            // the client took when it chose (a client that stops reading
+            // holds the stream right here, while hidden changes pile up):
+            // it is paced, so that pile never times the next frames.
+            let from_idle = std::mem::take(&mut self.woken);
+            self.pacer.begin(from_idle);
             // Due even while busy: the cadence never depends on what was read.
             // Every database step of a stream (a heartbeat, a read) holds one
             // of the process's feed query permits throughout, so a wake-up
@@ -797,6 +819,11 @@ impl Feed {
             if !self.out.is_empty() {
                 continue;
             }
+            // A paced read that had nothing to send still holds the stream
+            // to its tick, so the poll counts from there.
+            if let Some(at) = self.release_at.take() {
+                tokio::time::sleep_until(at).await;
+            }
             // Nothing new: wait for a wake-up, the poll, a heartbeat or the end.
             let poll = tokio::time::sleep(self.poll);
             let heartbeat = tokio::time::sleep_until(self.next_heartbeat);
@@ -812,6 +839,7 @@ impl Feed {
                 () = heartbeat => {}
                 () = deadline => {}
             }
+            self.woken = true;
         }
     }
 
@@ -932,6 +960,9 @@ impl Feed {
                 let before = self.subscription.access;
                 self.check_access().await?;
                 if self.done {
+                    // `revoked` (and any `reset` before it) leaves on the
+                    // read's tick like its frames would have.
+                    self.release_at = self.pacer.after_read(started, Instant::now(), false);
                     return Ok(None);
                 }
                 self.members_seen = self.members_seen.max(page.head);
@@ -1104,6 +1135,7 @@ impl Feed {
         self.relist_unannounced = true;
         self.check_access().await?;
         if self.done {
+            self.release_at = self.pacer.after_read(started, Instant::now(), false);
             return Ok(());
         }
         let Some(page) = self.read(started).await? else {
@@ -1287,6 +1319,36 @@ mod tests {
             // 35,000 hidden changes: 72 ms of scanning, more than a tick.
             let slow = paced(delta, &reads([0, 35_000, 0, 0])).await;
             assert_eq!(slow[..3], [TICK, TICK * 2, TICK], "{delta:?}: {slow:?}");
+        }
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn a_read_after_a_stall_is_paced_whatever_piled_up() {
+        let per_hidden = Duration::from_micros(2);
+        for hidden in [0, 20_000] {
+            let mut pacer = Pacer::new(TICK);
+            let t = Instant::now();
+            // Caught up: a read woken from the idle wait leaves at once.
+            pacer.begin(true);
+            assert!(pacer.after_read(t, t, false).is_some(), "the first read");
+            pacer.begin(true);
+            assert_eq!(pacer.after_read(t, t, false), None);
+            // The client stops reading while `hidden` changes are numbered,
+            // a visible one comes, and it takes its frames again when it
+            // likes: the stream's next step does not begin from the idle
+            // wait, and its read scans the whole pile.
+            tokio::time::sleep(Duration::from_millis(737)).await;
+            let started = Instant::now();
+            pacer.begin(false);
+            tokio::time::sleep(Duration::from_millis(2) + per_hidden * hidden).await;
+            let at = pacer
+                .after_read(started, Instant::now(), false)
+                .expect("paced");
+            tokio::time::sleep_until(at).await;
+            assert_eq!(started.elapsed(), TICK, "{hidden} hidden");
+            // Then caught up again.
+            pacer.begin(true);
+            assert_eq!(pacer.after_read(at, at, false), None);
         }
     }
 

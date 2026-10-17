@@ -23,3 +23,4 @@
 - [x] 4.1 Pacing counts from when the read began (before its permit), not from the open: the client can no longer shift the tick's phase to time the scan
 - [x] 4.2 A container gained with no announcement, found at a heartbeat, sends `reset` (`access_changed`); server test
 - [x] 4.3 Membership changes looked for up to the head the read saw, past a full page; server test
+- [x] 4.4 Round 2: every step that does not begin from the idle wait is paced (a client that stalls cannot time a hidden backlog); `revoked` leaves on its read's tick; a paced empty read holds the stream to its tick before the idle wait; kernel test of a stalled read with 0 and 20,000 hidden changes

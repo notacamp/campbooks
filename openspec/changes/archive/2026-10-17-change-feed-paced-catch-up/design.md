@@ -45,11 +45,24 @@ tick would always wait two).
   rows refused by the second look) or ends the catch-up: it is one page a
   tick, which also bounds a catch-up's database load to one scan per tick
   per stream.
-- **The live tail is not paced.** A read that starts caught up (the
-  previous one was not full) releases at once, so a change that wakes a
-  caught-up stream keeps today's latency. Pacing it too would hide the
-  live read's own timing, but that timing is already the accepted residual
-  below (reads happen when any change is numbered).
+- **Only a read woken from the idle wait is unpaced.** A read that starts
+  caught up *and* begins from the stream's idle wait (woken by a change,
+  the poll or a timer, with nothing left to send) releases at once, so a
+  change that wakes a caught-up stream keeps today's latency. Every other
+  step is paced: a read after frames were queued (it begins when the
+  client took them), and a heartbeat that is not reached from the wait.
+  The round-2 review showed why: a caught-up client that stops reading
+  holds the stream's task in its send while hidden changes pile up; it
+  then makes one visible change and reads again at a moment of its choice,
+  and an unpaced read would deliver that change after a scan of the whole
+  pile, a direct measure of the hidden count on every stall. With the rule
+  above that read is paced, so the change leaves one tick after the
+  client's own resume. The narrower alternative (pace only after a send
+  that found the channel full) depends on the channel's state, which a
+  slow client influences in ways harder to reason about; pacing every step
+  that does not come from the wait is one rule, and costs the live tail
+  only a paced, usually empty read after each burst (the stream then waits
+  out that tick before listening again).
 - **The first read after the open is paced** (the stream does not know yet
   whether it is behind), so the first frames after `ready` wait up to one
   tick.
@@ -179,12 +192,18 @@ with the task, a step only waits on the database.
 
 ## What is left (accepted)
 
-- **The live tail's read timing** (unchanged from #514). A caught-up
-  stream reads when any change of the workspace is numbered (a hidden one
-  too) or on the poll. Two visible changes numbered in different runs may
-  leave in one burst or two depending on when the stream read, and a
-  visible change can wait (50 to 250 ms) behind producers in flight before
-  it is numbered. Millisecond timing of live delivery, not counts.
+- **The live tail's read timing** (from #514). A caught-up stream reads
+  when any change of the workspace is numbered (a hidden one too) or on
+  the poll. Two visible changes numbered in different runs may leave in one
+  burst or two depending on when the stream read, and a visible change can
+  wait (50 to 250 ms) behind producers in flight before it is numbered. A
+  read woken from the idle wait is unpaced and scans what was numbered
+  since the stream's previous read, so its duration does carry a count:
+  the hidden changes numbered in that short window (the stream reads at
+  every wake-up, so usually a handful, and microseconds each against
+  milliseconds of noise). A client cannot widen that window by stalling,
+  since a read that follows held-up frames is paced; the window is as long
+  as the time between two wake-ups of the workspace.
 - **A catch-up read longer than a tick.** Pacing hides scan time only while
   a read (its permit wait included) fits in a tick. A read that scans past enough hidden changes to
   take longer (at 1 to 5 µs a row, some 10,000 to 50,000 hidden changes
