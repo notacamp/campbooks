@@ -28,6 +28,12 @@ All notable changes to Campbooks Next are documented here. The format follows
 
 ### Security
 
+- **A message built to be slow to parse no longer ties up the server.** HTML made of
+  thousands of stray or unclosed tags could take minutes of CPU every time the message was
+  read, and again when search indexed it. The reader now measures the parse first and shows
+  such a message as plain text once it passes a fixed budget, and search reduces HTML to
+  text without building a tree. Ordinary mail is unchanged. No migration
+  (campbooks-cloud#205).
 - **The change feed reveals nothing about inboxes you can't see.** The live stream of
   what changed used to carry the workspace's own change count: as the `ready` frame's
   `head`, as every frame's cursor (so the gap between two of your changes counted the

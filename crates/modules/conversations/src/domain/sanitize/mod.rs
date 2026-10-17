@@ -39,7 +39,10 @@ use std::{
 };
 
 use ammonia::{Builder, UrlRelative};
+use campbooks_kernel::mail::escape_html;
 use regex::Regex;
+
+use super::plain_text::{self, Quotes};
 
 /// Sanitised HTML and what was held back.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -135,7 +138,10 @@ fn content_id(url: &str) -> Option<String> {
 /// `show_remote_images` is set; `cid:` images show their part from `inline`
 /// either way.
 ///
-/// Five steps: the style sheets are inlined ([`styles::inline`]); ammonia
+/// Six steps: the HTML is measured first ([`styles::measure`]: one parse
+/// that counts the tree builder's work, stopped at a fixed budget), and
+/// HTML past the budget is shown as its text alone; then the style sheets
+/// are inlined ([`styles::inline`]); ammonia
 /// cleans (allow-lists, schemes, links, style declarations) and the body's
 /// look moves to a wrapper; a best-effort pass drops tracking pixels from
 /// its canonical output; ammonia runs again with the image policy in its
@@ -145,7 +151,10 @@ fn content_id(url: &str) -> Option<String> {
 /// placeholder. A last check strips every image if any source other than
 /// those survived a blocked render.
 pub fn sanitize(html: &str, show_remote_images: bool, inline: &InlineImages) -> Sanitized {
-    let inlined = styles::inline(html);
+    let Some(tree) = styles::measure(html) else {
+        return as_text(html);
+    };
+    let inlined = styles::inline(html, &tree);
     let cleaned = builder(None).clean(&inlined.html).to_string();
     let wrapped = wrap_body(&cleaned, &inlined.body);
     let without_pixels = drop_tracking_pixels(&wrapped);
@@ -167,6 +176,21 @@ pub fn sanitize(html: &str, show_remote_images: bool, inline: &InlineImages) -> 
         html,
         remote_images: seen.load(Ordering::Relaxed),
         css: inlined.media,
+    }
+}
+
+/// The words of `html` in one `div` that keeps its line breaks, for HTML
+/// past the parse budget. Nothing from the message's markup survives, so
+/// nothing needs sanitising: the reader still shows the words.
+fn as_text(html: &str) -> Sanitized {
+    let text = plain_text::text_of(html, Quotes::Keep);
+    Sanitized {
+        html: format!(
+            r#"<div style="white-space: pre-wrap">{}</div>"#,
+            escape_html(&text)
+        ),
+        remote_images: 0,
+        css: None,
     }
 }
 
@@ -841,5 +865,39 @@ mod tests {
             "{}",
             result.html
         );
+    }
+
+    #[test]
+    fn html_built_to_be_slow_is_shown_as_its_text() {
+        let html = format!("<p>Hello</p>{}", "<div></span>".repeat(170_000));
+        assert!(html.len() < 2 * 1024 * 1024);
+        let result = run(&html, true);
+        assert!(
+            result
+                .html
+                .starts_with(r#"<div style="white-space: pre-wrap">"#),
+            "{}",
+            &result.html[..80]
+        );
+        assert!(result.html.contains("Hello"));
+        assert_eq!(result.html.matches('<').count(), 2, "only the wrapper");
+        assert_eq!(result.remote_images, 0);
+        assert_eq!(result.css, None);
+    }
+
+    #[test]
+    fn a_deep_but_cheap_body_is_sanitised_on_a_small_stack() {
+        let html = format!(
+            "<style>font {{ color: red }}</style>{}<img src=\"https://t.example/a.png\">",
+            "<font>x".repeat(4_000)
+        );
+        // Tokio's blocking threads have 2 MiB of stack.
+        let result = std::thread::Builder::new()
+            .stack_size(2 * 1024 * 1024)
+            .spawn(move || run(&html, false))
+            .expect("spawn")
+            .join()
+            .expect("sanitised without overflowing the stack");
+        assert!(result.html.contains('x'));
     }
 }

@@ -1,23 +1,23 @@
 //! A message's own words as plain text, for search: HTML reduced to text,
-//! quoted history removed, bounded.
+//! quoted history removed, bounded. The HTML is read with the tokenizer
+//! alone, in time linear in its size.
 
 use std::{
-    collections::{HashMap, HashSet},
+    cell::{Cell, RefCell},
     sync::LazyLock,
 };
 
-use ammonia::Builder;
+use html5ever::{
+    tendril::StrTendril,
+    tokenizer::{
+        BufferQueue, TagKind, Token, TokenSink, TokenSinkResult, Tokenizer, TokenizerOpts,
+        states::RawKind,
+    },
+};
 use regex::Regex;
 
 /// The most text handed on per message, in bytes.
 pub const MAX_BYTES: usize = 32 * 1024;
-
-/// Block-level closing tags (and `<br>`): a line break goes before each, so
-/// words on both sides don't run together once the tags are gone.
-static BLOCK: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r"(?i)<(br|/p|/div|/li|/tr|/td|/h[1-6]|/table|/ul|/ol)\b")
-        .unwrap_or_else(|e| unreachable!("static regex compiles: {e}"))
-});
 
 /// Where quoted history starts: an attribution line ("On Tue, Ana wrote:",
 /// possibly wrapped onto a second line) in the four languages, or an
@@ -39,17 +39,113 @@ static BLANK_LINES: LazyLock<Regex> = LazyLock::new(|| {
         .unwrap_or_else(|e| unreachable!("static regex compiles: {e}"))
 });
 
-/// The text of an HTML body: no tags, no scripts or styles, no quoted
-/// `<blockquote>`s, entities decoded.
+/// Whether `<blockquote>` text is kept by [`text_of`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Quotes {
+    /// Keep it: the reader shows the whole message.
+    Keep,
+    /// Drop it: search wants the message's own words.
+    Drop,
+}
+
+/// The text of an HTML body, without quoted `<blockquote>`s: see
+/// [`text_of`].
 pub fn from_html(html: &str) -> String {
-    let marked = BLOCK.replace_all(html, "\n<$1");
-    let removed: HashSet<&str> = ["script", "style", "head", "title", "blockquote"].into();
-    let text = Builder::empty()
-        .tag_attributes(HashMap::new())
-        .clean_content_tags(removed)
-        .clean(&marked)
-        .to_string();
-    unescape(&text)
+    text_of(html, Quotes::Drop)
+}
+
+/// The text of an HTML body, read with html5ever's tokenizer alone (no
+/// tree, so time linear in the input however the tags nest): no tags, no
+/// scripts, styles, head or title, entities decoded, a line break at each
+/// `br` and at the end of each block, and no `<blockquote>`s when `quotes`
+/// is [`Quotes::Drop`].
+pub fn text_of(html: &str, quotes: Quotes) -> String {
+    let tokenizer = Tokenizer::new(Reader::new(quotes), TokenizerOpts::default());
+    let queue = BufferQueue::default();
+    queue.push_back(StrTendril::from_slice(html));
+    let _ = tokenizer.feed(&queue);
+    tokenizer.end();
+    tokenizer.sink.text.take()
+}
+
+/// Collects the characters outside the elements whose content is not text
+/// to read.
+struct Reader {
+    quotes: Quotes,
+    text: RefCell<String>,
+    /// Open `script`, `style` or `title` (raw text switches back at their
+    /// end tag).
+    skipping: Cell<bool>,
+    in_head: Cell<bool>,
+    quote_depth: Cell<usize>,
+}
+
+impl Reader {
+    fn new(quotes: Quotes) -> Self {
+        Self {
+            quotes,
+            text: RefCell::new(String::new()),
+            skipping: Cell::new(false),
+            in_head: Cell::new(false),
+            quote_depth: Cell::new(0),
+        }
+    }
+}
+
+impl TokenSink for Reader {
+    type Handle = ();
+
+    fn process_token(&self, token: Token, _line: u64) -> TokenSinkResult<()> {
+        match token {
+            Token::TagToken(tag) => {
+                let name = &*tag.name;
+                if tag.kind == TagKind::EndTag {
+                    match name {
+                        "script" | "style" | "title" => self.skipping.set(false),
+                        "head" => self.in_head.set(false),
+                        "blockquote" => {
+                            self.quote_depth
+                                .set(self.quote_depth.get().saturating_sub(1));
+                        }
+                        "p" | "div" | "li" | "tr" | "td" | "h1" | "h2" | "h3" | "h4" | "h5"
+                        | "h6" | "table" | "ul" | "ol" => self.text.borrow_mut().push('\n'),
+                        _ => {}
+                    }
+                    return TokenSinkResult::Continue;
+                }
+                match name {
+                    "head" => self.in_head.set(true),
+                    "body" => self.in_head.set(false),
+                    "blockquote" => self.quote_depth.set(self.quote_depth.get() + 1),
+                    "br" => self.text.borrow_mut().push('\n'),
+                    "script" | "style" | "title" => self.skipping.set(true),
+                    _ => {}
+                }
+                // Raw-text switching as the tree builder does it
+                // (`styles::scan` does the same).
+                match name {
+                    "style" | "xmp" | "iframe" | "noembed" | "noframes" | "noscript" => {
+                        TokenSinkResult::RawData(RawKind::Rawtext)
+                    }
+                    "title" | "textarea" => TokenSinkResult::RawData(RawKind::Rcdata),
+                    "script" => TokenSinkResult::RawData(RawKind::ScriptData),
+                    "plaintext" => TokenSinkResult::Plaintext,
+                    _ => TokenSinkResult::Continue,
+                }
+            }
+            Token::CharacterTokens(text) => {
+                let hidden = self.skipping.get()
+                    || self.in_head.get()
+                    || (self.quotes == Quotes::Drop && self.quote_depth.get() > 0);
+                if !hidden {
+                    let mut out = self.text.borrow_mut();
+                    out.extend(text.chars().map(|c| if c == '\u{a0}' { ' ' } else { c }));
+                }
+                TokenSinkResult::Continue
+            }
+            _ => TokenSinkResult::Continue,
+        }
+    }
 }
 
 /// `text` without quoted history (the attribution line and everything after
@@ -80,16 +176,6 @@ fn truncate(text: &str, max: usize) -> &str {
         end -= 1;
     }
     &text[..end]
-}
-
-/// Decode the entities the HTML serialiser writes.
-fn unescape(text: &str) -> String {
-    text.replace("&nbsp;", " ")
-        .replace("&lt;", "<")
-        .replace("&gt;", ">")
-        .replace("&quot;", "\"")
-        .replace("&#39;", "'")
-        .replace("&amp;", "&")
 }
 
 #[cfg(test)]
@@ -145,5 +231,19 @@ mod tests {
         let own = own_words(&text);
         assert!(own.len() <= MAX_BYTES && own.len() > MAX_BYTES - 2);
         assert!(own.chars().all(|c| c == 'é'));
+    }
+
+    #[test]
+    fn hostile_nesting_is_read_in_linear_time() {
+        let html = format!("<p>Word</p>{}", "<div></span>".repeat(170_000));
+        assert!(from_html(&html).contains("Word"));
+    }
+
+    #[test]
+    fn the_reader_keeps_quotes_that_search_drops() {
+        let html = "<div>New</div><blockquote>Old</blockquote>";
+        assert!(text_of(html, Quotes::Keep).contains("Old"));
+        assert!(!from_html(html).contains("Old"));
+        assert!(from_html(html).contains("New"));
     }
 }
