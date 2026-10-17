@@ -11,7 +11,7 @@ const meta = {
   args: { state: "idle", size: "xl" },
   argTypes: {
     state: { control: "select", options: VISOR_STATES },
-    size: { control: "inline-radio", options: ["sm", "md", "lg", "xl"] },
+    size: { control: "inline-radio", options: ["xs", "sm", "md", "lg", "xl"] },
   },
 } satisfies Meta<typeof Visor>;
 
@@ -51,7 +51,7 @@ export const Announced: Story = {
   },
 };
 
-const SIZES = ["sm", "md", "lg", "xl"] as const;
+const SIZES = ["xs", "sm", "md", "lg", "xl"] as const;
 
 function StateTable({ tinted = false }: { tinted?: boolean }) {
   return (

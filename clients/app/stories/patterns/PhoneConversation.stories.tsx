@@ -32,7 +32,7 @@ function PhoneConversation() {
           {t("nav.home")}
         </ButtonLink>
         <Spacer />
-        <IconButton size="lg" label={t("item.later")} icon="clock" />
+        <IconButton size="lg" label={t("item.snooze")} icon="clock" />
         <IconButton size="lg" label="More actions" icon="more" />
       </header>
       <main className={styles["thread"]}>

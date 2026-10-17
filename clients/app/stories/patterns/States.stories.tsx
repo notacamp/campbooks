@@ -149,8 +149,8 @@ function StatesBoard() {
               De 2 a 6 de nov.
             </Button>
             <Button keys="2">De 16 a 20 de nov., coincide com o Porto</Button>
-            <Button variant="ghost" shortcut="item.later">
-              {pt("item.later")}
+            <Button variant="ghost" shortcut="item.snooze">
+              {pt("item.snooze")}
             </Button>
           </div>
         </BoardCell>
@@ -158,7 +158,7 @@ function StatesBoard() {
         <BoardCell title="Undo, for every action">
           <Line trailing={<Button variant="link">Undo</Button>}>Done · Sofia Pessoa</Line>
           <Line trailing={<Button variant="link">Undo</Button>}>
-            Later, back tomorrow · Rui Matos
+            Snoozed, back tomorrow · Rui Matos
           </Line>
           <Line undone trailing={<Button variant="link">Redo</Button>}>
             Mark as paid · Cloudhost

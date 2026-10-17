@@ -37,8 +37,9 @@ export const CONVERSATIONS_SHORTCUTS = [
     label: "conversations:shortcuts.newsletters",
   },
   {
+    // Pin: the provider's star (Gmail STARRED), named Pin in the UI.
     id: "conversations.star",
-    keys: "s",
+    keys: "p",
     scope: "item",
     group: "item",
     label: "conversations:shortcuts.star",

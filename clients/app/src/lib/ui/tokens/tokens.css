@@ -234,6 +234,7 @@
   --danger: light-dark(oklch(0.52 0.19 25), oklch(0.72 0.16 25));
   --danger-soft: light-dark(oklch(0.52 0.19 25 / 0.09), oklch(0.72 0.16 25 / 0.14));
   --success: light-dark(oklch(0.5 0.13 155), oklch(0.76 0.14 155));
+  --success-soft: light-dark(oklch(0.5 0.13 155 / 0.12), oklch(0.76 0.14 155 / 0.16));
 
   /* signals: dot colour; soft fills mix it at --signal-soft-mix */
   --signal-soft-mix: 15%;
@@ -305,6 +306,15 @@
   --toast-height: 44px;
   --toast-offset: var(--space-6);
   --overlay-width: 560px;
+  --dialog-width: 520px;
+  --dialog-result-width: 380px;
+  --dialog-sheet-max-height: 88dvh;
+  --dialog-drain-height: 3px;
+  --actions-divider-height: 18px;
+  /* A row acted on shows its confirmation, then folds away (under a second). */
+  --duration-confirm: 900ms;
+  /* A dialog's result stays about a second, then closes on its own. */
+  --duration-result: 1100ms;
   --popover-width: 300px;
   --offer-width: 420px;
   --offer-max-height: calc(100dvh - var(--toast-offset) - var(--toast-height) - var(--space-12));

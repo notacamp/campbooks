@@ -35,6 +35,20 @@ describe("Button", () => {
     expect(screen.getByRole("button")).toHaveTextContent("Primary1");
   });
 
+  it("marks an action that runs the AI with the visor, and only then", () => {
+    renderUi(
+      <>
+        <Button ai>Draft a reply</Button>
+        <Button>Done</Button>
+      </>,
+    );
+
+    const ai = screen.getByRole("button", { name: "Draft a reply" });
+    expect(ai).toHaveAttribute("data-ai", "true");
+    expect(ai.querySelector("[data-state='idle']")).toHaveAttribute("aria-hidden", "true");
+    expect(screen.getByRole("button", { name: "Done" }).querySelector("[data-state]")).toBeNull();
+  });
+
   it("renders a touch-size link with an icon", () => {
     renderUi(
       <ButtonLink href="#home" size="lg" icon="chevron-left" shortcut="nav.home" grow>

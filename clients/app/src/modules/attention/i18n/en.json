@@ -14,7 +14,7 @@
     "do": "Do",
     "pay": "Pay"
   },
-  "context": "Done today and keys",
+  "context": "Done today",
   "doneTodayTitle": "Done today",
   "doneTodayEmpty": "Nothing yet today.",
   "doneToday": {
@@ -22,24 +22,34 @@
     "notNeeded": "Not needed · {{subject}}",
     "replied": "Replied · {{subject}}",
     "archived": "Archived · {{subject}}",
-    "later": "Later · {{subject}}",
+    "snoozed": "Snoozed · {{subject}}",
     "gone": "No longer needed · {{subject}}"
   },
-  "later": {
-    "title": "Bring it back",
+  "snooze": {
+    "title": "Snooze {{name}} until…",
+    "description": "It leaves Home until then, and comes back on its own.",
+    "choices": "When",
     "today": "Later today",
-    "tomorrow": "Tomorrow",
-    "monday": "Monday",
-    "toast": "Later · {{name}}, back {{when}}",
-    "button": "Later",
-    "failed": "Could not put {{name}} off: nothing changed. Try again."
+    "tomorrow": "Tomorrow morning",
+    "monday": "Monday morning",
+    "nextWeek": "Next week",
+    "toast": "Snoozed · {{name}}, back {{when}}",
+    "button": "Snooze…",
+    "failed": "Couldn’t snooze {{name}}: nothing changed. Try again.",
+    "undoFailed": "Couldn’t bring {{name}} back: it stays snoozed. Try again."
   },
   "actions": {
     "reply": "Reply",
     "open": "Open conversation",
-    "undo": "Undo"
+    "undo": "Undo",
+    "label": "Actions for {{name}}"
   },
-  "keyboard": "Keyboard",
+  "confirm": {
+    "done": "Done · {{name}}",
+    "notNeeded": "Not needed · {{name}}",
+    "safe": "Marked safe · {{name}}",
+    "snoozed": "Snoozed · {{name}}, back {{when}}"
+  },
   "error": {
     "title": "Could not load what needs you",
     "body": "Campbooks could not reach the server. Nothing was lost.",

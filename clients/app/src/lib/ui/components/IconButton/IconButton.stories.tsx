@@ -25,7 +25,7 @@ export const Default: Story = {
 
 /** 44px, for touch. */
 export const Large: Story = {
-  args: { size: "lg", label: "Later", icon: "clock", shortcut: "item.later" },
+  args: { size: "lg", label: "Snooze", icon: "clock", shortcut: "item.snooze" },
 };
 
 export const WithVisor: Story = {

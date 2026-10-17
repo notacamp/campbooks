@@ -180,8 +180,8 @@ function InboxScreen({
           <Button shortcut="item.done" onClick={markDone}>
             {t("item.done")}
           </Button>
-          <Button variant="ghost" shortcut="item.later">
-            {t("item.later")}
+          <Button variant="ghost" shortcut="item.snooze">
+            {t("item.snooze")}
           </Button>
           <Button variant="ghost" shortcut="item.reply">
             {t("item.reply")}

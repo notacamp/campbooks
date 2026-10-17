@@ -2850,7 +2850,7 @@
         "tags": [
           "conversations"
         ],
-        "summary": "List conversations, newest first.",
+        "summary": "List conversations: pinned first, then newest first.",
         "operationId": "conversations.list",
         "parameters": [
           {
@@ -11858,7 +11858,7 @@
             "items": {
               "$ref": "#/components/schemas/ConversationSummary"
             },
-            "description": "Newest first."
+            "description": "Pinned first, then newest first (archived lists and `ids`: newest first)."
           },
           "next_cursor": {
             "type": [

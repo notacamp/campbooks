@@ -10,6 +10,7 @@ import {
 import { cx } from "../../internal/cx";
 import { Icon, type IconName } from "../Icon/Icon";
 import { KbdHint } from "../Kbd/Kbd";
+import { Visor } from "../Visor/Visor";
 
 import styles from "./Button.module.css";
 
@@ -28,6 +29,8 @@ interface ButtonLookProps {
   icon?: IconName | undefined;
   /** Anything drawn before the label (a Visor, an Avatar). */
   leading?: ReactNode | undefined;
+  /** The action runs the AI: the small visor goes before the label (never ✨). */
+  ai?: boolean | undefined;
   /** Take the remaining width in a row. */
   grow?: boolean | undefined;
   children: ReactNode;
@@ -43,12 +46,14 @@ function useKeyShortcutAttribute(shortcut: ShortcutId | undefined, keys: string 
 function Content({
   icon,
   leading,
+  ai,
   children,
   shortcut,
   keys,
-}: Pick<ButtonLookProps, "icon" | "leading" | "children" | "shortcut" | "keys">) {
+}: Pick<ButtonLookProps, "icon" | "leading" | "ai" | "children" | "shortcut" | "keys">) {
   return (
     <>
+      {ai === true ? <Visor size="xs" /> : null}
       {leading}
       {icon === undefined ? null : <Icon name={icon} />}
       <span className={styles["label"]}>{children}</span>
@@ -69,6 +74,7 @@ export function Button({
   keys,
   icon,
   leading,
+  ai = false,
   grow = false,
   className,
   children,
@@ -84,9 +90,10 @@ export function Button({
       data-variant={variant}
       data-size={size}
       data-grow={grow || undefined}
+      data-ai={ai || undefined}
       aria-keyshortcuts={rest["aria-keyshortcuts"] ?? keyShortcut}
     >
-      <Content icon={icon} leading={leading} shortcut={shortcut} keys={keys}>
+      <Content icon={icon} leading={leading} ai={ai} shortcut={shortcut} keys={keys}>
         {children}
       </Content>
     </button>
@@ -103,6 +110,7 @@ export function ButtonLink({
   keys,
   icon,
   leading,
+  ai = false,
   grow = false,
   className,
   children,
@@ -118,7 +126,7 @@ export function ButtonLink({
       data-grow={grow || undefined}
       aria-keyshortcuts={keyShortcut}
     >
-      <Content icon={icon} leading={leading} shortcut={shortcut} keys={keys}>
+      <Content icon={icon} leading={leading} ai={ai} shortcut={shortcut} keys={keys}>
         {children}
       </Content>
     </a>

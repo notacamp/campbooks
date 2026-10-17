@@ -216,7 +216,8 @@ describe("SignInChoices", () => {
     expect(screen.getByRole("button", { name: /Use a passkey/u })).toBeEnabled();
   });
 
-  it("says when the ceremony took too long or was tried too often", async () => {
+  // One ceremony per test: three in one ran past the 5 s timeout on CI.
+  it("says when the ceremony took too long", async () => {
     stubWebAuthn();
     mockApi({
       [OPTIONS]: { body: REQUEST_OPTIONS },
@@ -225,12 +226,20 @@ describe("SignInChoices", () => {
     renderWithProviders(<SignInChoices request={REQUEST} providers={["passkey"]} returnTo="/" />);
     fireEvent.keyDown(document.body, { key: "p" });
     expect(await screen.findByText("That took too long.")).toBeVisible();
+  });
 
+  it("says when it was tried too often", async () => {
+    stubWebAuthn();
     mockApi({ [OPTIONS]: problem(429, "rate_limited") });
+    renderWithProviders(<SignInChoices request={REQUEST} providers={["passkey"]} returnTo="/" />);
     fireEvent.keyDown(document.body, { key: "p" });
     expect(await screen.findByText("Too many tries.")).toBeVisible();
+  });
 
+  it("says when a passkey sign-in fails for another reason", async () => {
+    stubWebAuthn();
     mockApi({ [OPTIONS]: problem(503, "unavailable") });
+    renderWithProviders(<SignInChoices request={REQUEST} providers={["passkey"]} returnTo="/" />);
     fireEvent.keyDown(document.body, { key: "p" });
     expect(await screen.findByText("Couldn’t sign in with a passkey.")).toBeVisible();
   });

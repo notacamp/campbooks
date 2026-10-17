@@ -28,7 +28,7 @@ export const SEMANTIC_TOKENS = {
     "highlight",
     "focus-ring",
   ],
-  status: ["danger", "danger-soft", "success"],
+  status: ["danger", "danger-soft", "success", "success-soft"],
   signal: [
     "signal-reply",
     "signal-decide",
@@ -71,6 +71,8 @@ export const COMPONENT_TOKENS = [
   "content-max",
   "toast-height",
   "overlay-width",
+  "dialog-width",
+  "dialog-result-width",
   "popover-width",
   "offer-width",
   "offer-max-height",
