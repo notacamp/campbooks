@@ -364,7 +364,7 @@ describe("What needs you", () => {
       [`POST ${W}/conversations/${LUZ.id}/need/reopen`]: { body: asked },
     });
     renderHome();
-    fireEvent.click(await screen.findByRole("button", { name: "All 2 already paid" }));
+    fireEvent.click(await screen.findByRole("button", { name: /^All 2 already paid/u }));
     await waitFor(() => {
       expect(
         calls.calls.filter((c) => c.route.endsWith("/need/resolve")).map((c) => c.body),
