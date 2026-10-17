@@ -11,4 +11,4 @@
 - [x] 2.1 `deploy/README.md` mentions the alias
 - [x] 2.2 OpenAPI unchanged (`/up` is not an API operation; no client types to regenerate)
 - [x] 2.3 CHANGELOG updated
-- [ ] 2.4 Gates green in CI
+- [x] 2.4 Gates green in CI
