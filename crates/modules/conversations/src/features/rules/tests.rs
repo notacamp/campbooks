@@ -1352,3 +1352,38 @@ async fn confirm_and_decline_never_act_on_a_proposal_that_changed_meanwhile(db: 
             .unwrap();
     }
 }
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_proposal_whose_domain_became_a_public_suffix_is_not_kept(db: PgPool) {
+    let kit = kit(db).await;
+    let (workspace, inbox, sam, _) = sams_notifications(&kit, 2).await;
+    let mut proposed = move_github();
+    proposed["state"] = json!("proposed");
+    let created = kit
+        .post(
+            &sam,
+            &format!("/api/v1/w/{workspace}/inboxes/{inbox}/rules"),
+            Some(proposed),
+        )
+        .await;
+    let rule = created.json["rule"]["id"].as_str().unwrap().to_owned();
+    // Stored before the suffix list knew `github.io`.
+    sqlx::query(
+        "UPDATE conversations.rules
+            SET conditions = '[{\"field\":\"sender_domain\",\"value\":\"github.io\"}]'::jsonb
+          WHERE id = $1::uuid",
+    )
+    .bind(&rule)
+    .execute(&kit.db)
+    .await
+    .unwrap();
+    let kept = kit
+        .post(
+            &sam,
+            &format!("/api/v1/w/{workspace}/rules/{rule}/confirm"),
+            Some(json!({"apply_to_existing": false})),
+        )
+        .await;
+    assert_eq!(kept.status, StatusCode::BAD_REQUEST, "{:?}", kept.json);
+    assert_eq!(kept.json["code"], "invalid_rule");
+}

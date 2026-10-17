@@ -468,6 +468,7 @@
       "paused": {
         "inbox_read_only": "Em pausa: esta caixa de entrada é só de leitura",
         "author_cannot_write": "Em pausa: quem a ensinou já não pode alterar esta caixa de entrada",
+        "domain_too_broad": "Em pausa: o domínio é demasiado amplo",
         "paused_by_member": "Colocada em pausa por um membro",
         "author_unavailable": "Em pausa por agora; volta a agir sozinha"
       },
