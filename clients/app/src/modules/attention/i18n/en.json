@@ -46,7 +46,8 @@
     "openAttachment": "Open attachment",
     "forward": "Forward…",
     "combo": "{{first}}, then {{second}}",
-    "picked": "Scout picked these for this email"
+    "picked": "Scout picked these for this email",
+    "noAttachment": "This email has no file to open: only pictures shown in its text."
   },
   "confirm": {
     "done": "Done · {{name}}",

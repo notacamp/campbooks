@@ -42,6 +42,22 @@ export interface ForwardDialogProps {
   onForwarded: (draft: Draft) => void;
 }
 
+/**
+ * A forward draft nobody has written in yet: no text of the member's own,
+ * no copies, no files, at most the one person it was addressed to. Only
+ * such a draft is addressed again; any other stays as it was.
+ */
+function pristine(draft: Draft): boolean {
+  return (
+    draft.state === "draft" &&
+    draft.body.trim() === "" &&
+    draft.cc.length === 0 &&
+    draft.bcc.length === 0 &&
+    draft.attachments.length === 0 &&
+    draft.to.length <= 1
+  );
+}
+
 /** Lower-cased, without accents. */
 function fold(text: string): string {
   return text
@@ -112,14 +128,24 @@ export function ForwardDialog({
 
   // The pick a forward was started for (a failed one can be picked again).
   const started = useRef<Sender | null>(null);
-  // A forward of this email already started is addressed again, not doubled.
+  // Closed (Esc, Close) while the forward was being started: nothing more.
+  const closed = useRef(false);
+  useEffect(() => {
+    closed.current = false;
+    return () => {
+      closed.current = true;
+    };
+  }, []);
+  const close = () => {
+    closed.current = true;
+    onClose();
+  };
+  // An untouched forward of this email is addressed again rather than
+  // doubled; one the member wrote in stays theirs, and a new one starts.
   const start = useEffectEvent((person: Sender, message: MessageView, known: Draft[]) => {
     const to = [{ name: person.name ?? null, address: person.address }];
     const existing = known.find(
-      (draft) =>
-        (draft.state === "draft" || draft.state === "failed") &&
-        draft.kind === "forward" &&
-        draft.message_id === message.id,
+      (draft) => draft.kind === "forward" && draft.message_id === message.id && pristine(draft),
     );
     const saved =
       existing === undefined
@@ -132,6 +158,9 @@ export function ForwardDialog({
         : saveDraft(workspaceId, existing.id, { to, version: existing.version });
     void saved
       .then(async (draft) => {
+        if (closed.current) {
+          return;
+        }
         queryClient.setQueryData<Draft[]>(
           draftKeys.forConversation(workspaceId, conversationId),
           (list) => [draft, ...(list ?? []).filter((each) => each.id !== draft.id)],
@@ -149,6 +178,14 @@ export function ForwardDialog({
       });
   });
   const message = needMessageOf(detail.data?.messages ?? [], need);
+  // The email or its drafts can't be read: say so, and let another pick try.
+  const unavailable =
+    detail.isError || drafts.isError || (detail.data !== undefined && message === undefined);
+  if (chosen !== undefined && unavailable) {
+    setChosen(undefined);
+    setBusy(false);
+    setFailed(true);
+  }
   useEffect(() => {
     if (
       chosen !== undefined &&
@@ -174,7 +211,7 @@ export function ForwardDialog({
   return (
     <Dialog
       open
-      onClose={onClose}
+      onClose={close}
       title={t("forward.title", { name })}
       description={t("forward.description")}
     >

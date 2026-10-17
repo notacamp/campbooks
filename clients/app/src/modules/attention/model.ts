@@ -195,6 +195,12 @@ export interface OwnChoice {
 /** At most three own actions, on keys 1 to 3. */
 const MAX_OWN = 3;
 
+/** Own actions that ask a follow-up in a dialog: a pair holds at most one. */
+const FOLLOW_UPS: ReadonlySet<OwnActionId> = new Set(["reply", "remind_when", "forward"]);
+
+/** A warning's answers: whatever the server ranks, a warning offers only these. */
+const WARNING_ANSWERS: ReadonlySet<OwnActionId> = new Set(["report", "safe"]);
+
 /**
  * The answers a row can't do without, ranked or not: a bill's question, a
  * bill still to pay's Mark paid, a warning's verdict. Kept first, in their
@@ -212,8 +218,9 @@ const REQUIRED: Partial<Record<RowKind, readonly OwnActionId[]>> = {
  * order, `picked` by Scout; a pair is one button. Without them (the key is
  * missing), exactly the fixed actions of {@link rowActionIds}. A question
  * keeps Yes and No (its answer is the point), a bill already said to be
- * still to pay never offers Still to pay again, and a row's required answers
- * ({@link REQUIRED}) are always there. Nothing usable left in the ranking
+ * still to pay never offers Still to pay again, a warning offers only its
+ * answers, a pair never holds two follow-up dialogs, and a row's required
+ * answers ({@link REQUIRED}) are always there. Nothing usable left in the ranking
  * falls back to the fixed actions too.
  */
 export function rowChoices(
@@ -233,7 +240,12 @@ export function rowChoices(
   const own: OwnChoice[] = [];
   for (const suggestion of ranked ?? []) {
     const steps = suggestion.actions.map((action) => FROM_CATALOGUE[action]);
-    if (steps.length === 0 || (kind === "toPay" && steps.includes("to_pay"))) {
+    const skipped =
+      steps.length === 0 ||
+      (kind === "toPay" && steps.includes("to_pay")) ||
+      (kind === "warning" && !steps.every((step) => WARNING_ANSWERS.has(step))) ||
+      steps.filter((step) => FOLLOW_UPS.has(step)).length > 1;
+    if (skipped) {
       continue;
     }
     const id = steps.join("+");

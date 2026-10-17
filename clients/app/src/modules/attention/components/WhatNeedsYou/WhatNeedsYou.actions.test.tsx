@@ -14,6 +14,7 @@ import { describe, expect, it } from "vitest";
 import type { Schema } from "~/lib/api";
 
 import {
+  ACME,
   CLEARED,
   COUNTS,
   ITEMS,
@@ -24,7 +25,7 @@ import {
   PHISH_DETAIL,
   SOFIA,
 } from "../../../../../test/demo/attention";
-import { NOW, W } from "../../../../../test/demo/conversations";
+import { INBOX, NOW, W } from "../../../../../test/demo/conversations";
 import { REPLY } from "../../../../../test/demo/drafts";
 import { DUARTE } from "../../../../../test/demo/workspaces";
 import { mockApi, renderWithProviders } from "../../../../../test/render";
@@ -79,8 +80,34 @@ const FORWARD = {
 
 const MARTA_ITEM = ITEMS[1]?.id ?? "";
 
-function api(conversations: Summary[], detail = MARTA_DETAIL) {
+/** Marta's email with a file of its own. */
+const WITH_FILE: Schema<"ConversationDetail"> = {
+  ...MARTA_DETAIL,
+  messages: MARTA_DETAIL.messages.map((message) => ({
+    ...message,
+    attachments: [
+      {
+        id: "0192f1a0-0000-7000-8000-0000000000a1",
+        filename: "walkthrough-plan.pdf",
+        content_type: "application/pdf",
+        size: 48_000,
+        inline: false,
+        in_body: false,
+      },
+    ],
+  })),
+};
+
+interface Options {
+  /** The member's role in Sam's inbox. */
+  role?: "manager" | "reader";
+  /** Marta's drafts already there. */
+  drafts?: Schema<"DraftView">[];
+}
+
+function api(conversations: Summary[], detail = MARTA_DETAIL, options: Options = {}) {
   return mockApi({
+    [`GET ${W}/inboxes`]: { body: { inboxes: [{ ...INBOX, role: options.role ?? "manager" }] } },
     [`GET ${W}/attention`]: (request) =>
       new URL(request.url).searchParams.get("state") === "cleared"
         ? { body: { items: CLEARED, counts: [] } }
@@ -106,8 +133,9 @@ function api(conversations: Summary[], detail = MARTA_DETAIL) {
         },
       };
     },
-    [`GET ${W}/drafts`]: { body: { drafts: [] } },
+    [`GET ${W}/drafts`]: { body: { drafts: options.drafts ?? [] } },
     [`POST ${W}/drafts`]: { status: 201, body: FORWARD },
+    [`PATCH ${W}/drafts/${FORWARD.id}`]: { body: FORWARD },
   });
 }
 
@@ -251,31 +279,9 @@ describe("What needs you: the actions Scout picked", () => {
   });
 
   it("opens the item on its file with Open attachment", async () => {
-    const message = MARTA_DETAIL.messages[0];
-    const withFile = {
-      ...MARTA_DETAIL,
-      messages:
-        message === undefined
-          ? []
-          : [
-              {
-                ...message,
-                attachments: [
-                  {
-                    id: "0192f1a0-0000-7000-8000-0000000000a1",
-                    filename: "walkthrough-plan.pdf",
-                    content_type: "application/pdf",
-                    size: 48_000,
-                    inline: false,
-                    in_body: false,
-                  },
-                ],
-              },
-            ],
-    };
     api(
       [PHISH, ranked(MARTA, [{ actions: ["open_attachment"], likelihood: 77 }]), ...others],
-      withFile,
+      WITH_FILE,
     );
     renderHome();
     await actions(PHISH_NAME);
@@ -285,6 +291,188 @@ describe("What needs you: the actions Scout picked", () => {
     await waitFor(() => {
       expect(document.activeElement?.textContent).toContain("walkthrough-plan.pdf");
     });
+  });
+
+  it("keeps the focus in Forward's dialog when a pair opens the file first", async () => {
+    api(
+      [
+        PHISH,
+        ranked(MARTA, [{ actions: ["open_attachment", "forward"], likelihood: 80 }]),
+        ...others,
+      ],
+      WITH_FILE,
+    );
+    renderHome();
+    await actions(PHISH_NAME);
+    fireEvent.keyDown(document, { key: "j" });
+    await actions("Marta Ferreira");
+    fireEvent.keyDown(document, { key: "1" });
+    const dialog = await screen.findByRole("dialog", {
+      name: "Forward Marta Ferreira’s email to…",
+    });
+    // The item opened on its email, behind the dialog…
+    expect(await screen.findByText("walkthrough-plan.pdf")).toBeInTheDocument();
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    // …and the focus stayed in the dialog's search box.
+    expect(within(dialog).getByRole("searchbox", { name: "Find someone by name" })).toHaveFocus();
+  });
+
+  it("offers a read-only inbox only what doesn't write there", async () => {
+    api(
+      [
+        PHISH,
+        ranked(MARTA, [
+          { actions: ["reply"], likelihood: 92 },
+          { actions: ["forward"], likelihood: 86 },
+          { actions: ["remind"], likelihood: 82 },
+        ]),
+        ...others,
+      ],
+      MARTA_DETAIL,
+      { role: "reader" },
+    );
+    renderHome();
+    await actions(PHISH_NAME);
+    fireEvent.keyDown(document, { key: "j" });
+    const row = await actions("Marta Ferreira");
+    await waitFor(() => {
+      expect(row.queryByRole("button", { name: /^Reply/u })).toBeNull();
+    });
+    expect(row.queryByRole("button", { name: /^Forward…/u })).toBeNull();
+    expect(row.getByRole("button", { name: /^Remind me…/u })).toBeVisible();
+    expect(row.getByRole("button", { name: /^Snooze…/u })).toBeVisible();
+    expect(row.queryByRole("button", { name: /^Done/u })).toBeNull();
+  });
+
+  it("offers a bill's reminder before its due date first in Remind", async () => {
+    api([
+      PHISH,
+      MARTA,
+      ...others.map((summary) =>
+        summary.id === ACME.id
+          ? ranked(summary, [
+              { actions: ["already_paid"], likelihood: 40 },
+              { actions: ["still_to_pay"], likelihood: 60 },
+              { actions: ["remind"], likelihood: 85 },
+            ])
+          : summary,
+      ),
+    ]);
+    renderHome();
+    await actions(PHISH_NAME);
+    for (let step = 0; step < 5; step += 1) {
+      fireEvent.keyDown(document, { key: "j" });
+    }
+    const row = await actions("Acme Hosting");
+    fireEvent.click(row.getByRole("button", { name: /^Remind me…/u }));
+    const dialog = await screen.findByRole("dialog", { name: "Remind me about Acme Hosting…" });
+    const choices = within(dialog)
+      .getAllByRole("button")
+      .filter((button) => button.hasAttribute("data-dialog-choice"));
+    expect(choices[0]).toHaveTextContent(/Before it’s due/u);
+  });
+
+  it("addresses an untouched forward again, and starts a new one beside a written one", async () => {
+    const untouched = { ...FORWARD, to: [] };
+    const calls = api(
+      [PHISH, ranked(MARTA, [{ actions: ["forward"], likelihood: 88 }]), ...others],
+      MARTA_DETAIL,
+      { drafts: [untouched] },
+    );
+    renderHome();
+    await actions(PHISH_NAME);
+    fireEvent.keyDown(document, { key: "j" });
+    await actions("Marta Ferreira");
+    fireEvent.keyDown(document, { key: "1" });
+    const dialog = await screen.findByRole("dialog", {
+      name: "Forward Marta Ferreira’s email to…",
+    });
+    fireEvent.click(await within(dialog).findByRole("button", { name: /Rita Gomes/u }));
+    await waitFor(() => {
+      expect(calls.calls.find((c) => c.route === `PATCH ${W}/drafts/${FORWARD.id}`)?.body).toEqual({
+        to: [{ name: "Rita Gomes", address: "rita@silva-contas.example" }],
+        version: FORWARD.version,
+      });
+    });
+    expect(calls.calls.some((c) => c.route === `POST ${W}/drafts`)).toBe(false);
+  });
+
+  it("never re-addresses a forward the member wrote in", async () => {
+    const written = {
+      ...FORWARD,
+      to: [{ name: "Ana", address: "ana@example.com" }],
+      body: "For Ana",
+    };
+    const calls = api(
+      [PHISH, ranked(MARTA, [{ actions: ["forward"], likelihood: 88 }]), ...others],
+      MARTA_DETAIL,
+      { drafts: [written] },
+    );
+    renderHome();
+    await actions(PHISH_NAME);
+    fireEvent.keyDown(document, { key: "j" });
+    await actions("Marta Ferreira");
+    fireEvent.keyDown(document, { key: "1" });
+    const dialog = await screen.findByRole("dialog", {
+      name: "Forward Marta Ferreira’s email to…",
+    });
+    fireEvent.click(await within(dialog).findByRole("button", { name: /Rita Gomes/u }));
+    await waitFor(() => {
+      expect(calls.calls.some((c) => c.route === `POST ${W}/drafts`)).toBe(true);
+    });
+    expect(calls.calls.some((c) => c.route.startsWith("PATCH"))).toBe(false);
+  });
+
+  it("goes nowhere when Forward is closed while it starts", async () => {
+    api([PHISH, ranked(MARTA, [{ actions: ["forward"], likelihood: 88 }]), ...others]);
+    const { router } = renderHome();
+    await actions(PHISH_NAME);
+    fireEvent.keyDown(document, { key: "j" });
+    await actions("Marta Ferreira");
+    fireEvent.keyDown(document, { key: "1" });
+    const dialog = await screen.findByRole("dialog", {
+      name: "Forward Marta Ferreira’s email to…",
+    });
+    fireEvent.click(await within(dialog).findByRole("button", { name: /Rita Gomes/u }));
+    fireEvent.keyDown(dialog, { key: "Escape" });
+    await waitFor(() => {
+      expect(screen.queryByRole("dialog")).toBeNull();
+    });
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(router.state.location.pathname).not.toContain(MARTA.id);
+  });
+
+  it("says so when Open attachment finds no file to open", async () => {
+    api([PHISH, ranked(MARTA, [{ actions: ["open_attachment"], likelihood: 77 }]), ...others]);
+    renderHome();
+    await actions(PHISH_NAME);
+    fireEvent.keyDown(document, { key: "j" });
+    await actions("Marta Ferreira");
+    fireEvent.keyDown(document, { key: "1" });
+    expect(
+      await screen.findByText("This email has no file to open: only pictures shown in its text."),
+    ).toBeInTheDocument();
+  });
+
+  it("is never stuck starting when the email can't be read", async () => {
+    // Marta's conversation has no message the need names.
+    api([PHISH, ranked(MARTA, [{ actions: ["forward"], likelihood: 88 }]), ...others], {
+      ...MARTA_DETAIL,
+      messages: [],
+    });
+    renderHome();
+    await actions(PHISH_NAME);
+    fireEvent.keyDown(document, { key: "j" });
+    await actions("Marta Ferreira");
+    fireEvent.keyDown(document, { key: "1" });
+    const dialog = await screen.findByRole("dialog", {
+      name: "Forward Marta Ferreira’s email to…",
+    });
+    fireEvent.click(await within(dialog).findByRole("button", { name: /Rita Gomes/u }));
+    expect(
+      await within(dialog).findByText("Couldn’t start the forward: nothing was sent. Try again."),
+    ).toBeInTheDocument();
+    expect(within(dialog).queryByText("Starting the forward…")).toBeNull();
   });
 
   it("picks the first match with Enter in the search box", async () => {

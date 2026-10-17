@@ -128,6 +128,23 @@ describe("attention model", () => {
     expect(rowChoices("need", []).picked).toBe(false);
   });
 
+  it("offers a warning only its answers, and never a pair of two dialogs", () => {
+    expect(
+      rowChoices("warning", [
+        { actions: ["safe"], likelihood: 80 },
+        { actions: ["forward"], likelihood: 90 },
+        { actions: ["report"], likelihood: 20 },
+      ]).own.map((c) => c.id),
+    ).toEqual(["safe", "report"]);
+    // Reply with Forward would open two dialogs at once: skipped.
+    expect(
+      rowChoices("need", [
+        { actions: ["reply", "forward"], likelihood: 85 },
+        { actions: ["remind"], likelihood: 80 },
+      ]).own.map((c) => c.id),
+    ).toEqual(["remind_when"]);
+  });
+
   it("never drops a bill's question or a warning's verdict from a ranking", () => {
     // The paid pair went unrated: the bill still asks it, first.
     expect(

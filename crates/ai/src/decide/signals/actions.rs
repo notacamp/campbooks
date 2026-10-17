@@ -100,6 +100,13 @@ impl ActionId {
         }
     }
 
+    /// Whether the client asks a follow-up before doing it, in a dialog
+    /// (Reply: what to say; Remind: when; Forward: to whom). A pair holds
+    /// at most one of them, so one press never opens two dialogs.
+    pub const fn asks_follow_up(self) -> bool {
+        matches!(self, Self::Reply | Self::Remind | Self::Forward)
+    }
+
     /// The action named `name`, if one is.
     pub fn parse(name: &str) -> Option<Self> {
         Self::ALL.into_iter().find(|a| a.as_str() == name)
@@ -113,6 +120,22 @@ impl ActionId {
 /// the owner's labels say which pairs co-occur (`cargo xtask eval actions`
 /// reports it per pair).
 pub const COMBOS: &[(ActionId, ActionId)] = &[];
+
+// Every pair is two different actions with at most one follow-up dialog:
+// checked when the crate builds, so a pair like Reply with Forward can't
+// be added.
+const _: () = {
+    let mut i = 0;
+    while i < COMBOS.len() {
+        let (a, b) = COMBOS[i];
+        assert!(a as u8 != b as u8, "a combo pairs two different actions");
+        assert!(
+            !(a.asks_follow_up() && b.asks_follow_up()),
+            "a combo holds at most one action with a follow-up dialog"
+        );
+        i += 1;
+    }
+};
 
 /// The catalogue questions to ask about `envelope`, after the facts'
 /// vetoes: no attachment, no Open attachment question. Each is a `noul`
@@ -191,6 +214,25 @@ mod tests {
         AnswerValue, DecisionState,
         signals::email::{Attachment, Party, triage_questions},
     };
+
+    #[test]
+    fn a_combo_never_holds_two_follow_up_dialogs() {
+        let follow_ups: Vec<ActionId> = ActionId::ALL
+            .into_iter()
+            .filter(|a| a.asks_follow_up())
+            .collect();
+        assert_eq!(
+            follow_ups,
+            [ActionId::Reply, ActionId::Remind, ActionId::Forward]
+        );
+        for (a, b) in COMBOS {
+            assert_ne!(a, b);
+            assert!(
+                !(a.asks_follow_up() && b.asks_follow_up()),
+                "{a:?} with {b:?}"
+            );
+        }
+    }
 
     fn envelope(from: &str, attachments: usize) -> Envelope {
         Envelope {

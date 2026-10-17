@@ -48,6 +48,9 @@ All notable changes to Campbooks Next are documented here. The format follows
 
 ### Fixed
 
+- **A signature logo is no attachment to open.** With the action catalogue on, an image
+  shown in an email's text (a logo sent inline) no longer counts as an attachment, so
+  Open attachment is never offered for mail that has nothing else attached.
 - **One bad action answer never costs an email its sorting.** With the action catalogue
   on, an action answer the model leaves out or gets wrong (not a number, out of range)
   now just means no rating for that action; the email is sorted exactly as with the

@@ -28,20 +28,27 @@ a missing key falls back. A question (`check`) SHALL keep Yes and No, a
 bill already said to be still to pay SHALL never offer Still to pay again,
 and a bill's Already paid and Still to pay, a bill still to pay's Mark paid
 and a warning's Report and delete and It's safe SHALL always be there, first
-when the ranking left them out.
-Reply, Report and delete, It's safe, Already paid and Still to pay SHALL do
+when the ranking left them out; a warning SHALL offer only Report and delete
+and It's safe, whatever the ranking holds. Reply, Report and delete, It's safe, Already paid and Still to pay SHALL do
 what the fixed actions do, with the same confirmation and Undo. Remind SHALL
 open the Snooze dialog as "Remind me about <name>…", a bill's reminder
 before its due date first, and snooze it with Undo. Forward SHALL open a
 dialog that finds people by name (the people replied to most before
 anything is typed, the server's matches from two characters), never an
 address typed from memory, and picking one SHALL open the conversation with
-a forward draft addressed to them; nothing is sent from Home. Open
-attachment SHALL open the item with its email's first file focused. A pair
+a forward draft addressed to them; nothing is sent from Home. A forward of
+that email nobody wrote in yet (no text of the member's own, no copies, no
+files, at most one person) SHALL be addressed again rather than doubled; any
+other SHALL stay as it was and a new one start. When the email or its drafts
+can't be read, the dialog SHALL say so and let another pick try; closing it
+while the forward starts SHALL go nowhere. Open
+attachment SHALL open the item with its email's first file focused, and say
+so when there is no file to open. A pair
 the server offers as one SHALL be one button that runs both, in order. An
 inbox the member may only read SHALL offer only Remind and Open attachment
-among them. A pair SHALL open at most one dialog, and Open attachment
-before a dialog only opens the item.
+among them. A pair of two actions that ask a follow-up
+in a dialog SHALL never be offered, and Open attachment before a dialog only
+opens the item.
 
 #### Scenario: Ranked
 - **WHEN** the phishing warning carries It's safe (81) then Report and delete (19)

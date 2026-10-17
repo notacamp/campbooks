@@ -34,6 +34,16 @@ Tracking issue: https://github.com/notacamp/campbooks-cloud/issues/166
   button that runs both, in order.
 - A question (`check`) keeps Yes and No, and a bill already said to be still
   to pay never offers Still to pay again.
+- Server (conversations, the catalogue's facts): an image the message's
+  body shows (inline, with a Content-ID, a picture: a signature logo) is no
+  attachment, so Open attachment is neither asked nor rated for mail that
+  has only such images. The triage envelope is unchanged, and with the
+  catalogue off nothing more is read. The combo table is checked when the
+  crate builds: a pair never holds two actions that ask a follow-up in a
+  dialog (Reply, Remind, Forward), and the client skips such a pair too.
+- Forward re-addresses only a forward nobody wrote in yet; a warning offers
+  only its answers whatever the server sends; Open attachment says so when
+  there is no file to focus.
 - Test-only: the Laya decide-pass test of #547 compares the needs
   themselves (question, reason, trust, basis, urgency, due date) with the
   catalogue on and off, not only their count.

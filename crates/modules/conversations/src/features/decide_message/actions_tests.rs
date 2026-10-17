@@ -407,3 +407,30 @@ async fn over_openai_a_catalogue_answer_that_does_not_fit_fails_nothing(db: PgPo
     // Without log-probabilities nothing has a likelihood to rate.
     assert!(rated_actions(&on).await.is_empty());
 }
+
+#[test]
+fn an_image_the_body_shows_is_no_attachment_to_open() {
+    let row = |name: &str, content_type: &str, inline: bool, cid: bool| {
+        (name.to_owned(), content_type.to_owned(), inline, cid)
+    };
+    let files = super::files_only(vec![
+        // A signature logo: inline, with a Content-ID, a picture.
+        row("logo.png", "image/png", true, true),
+        row("lease.pdf", "application/pdf", false, false),
+        // A picture sent as a file, and an inline PDF: files both.
+        row("photo.jpg", "image/jpeg", false, false),
+        row("terms.pdf", "application/pdf", true, true),
+    ]);
+    let names: Vec<&str> = files.iter().map(|f| f.name.as_str()).collect();
+    assert_eq!(names, ["lease.pdf", "photo.jpg", "terms.pdf"]);
+    // Only the logo: nothing to open, so Open attachment is not asked.
+    let logo_only = Envelope {
+        attachments: super::files_only(vec![row("logo.png", "image/png", true, true)]),
+        ..Envelope::default()
+    };
+    assert!(
+        !campbooks_ai::decide::signals::actions::action_questions(&logo_only)
+            .iter()
+            .any(|q| q.id == question::OPEN_ATTACHMENT)
+    );
+}

@@ -24,15 +24,22 @@ function isPhone(page: Page): boolean {
   return (page.viewportSize()?.width ?? 1440) < 768;
 }
 
-/** Wait until Home shows actions Scout picked (the model pass runs after the sync). */
+/**
+ * Wait until Home shows actions Scout picked. The heading comes with the
+ * attention list, the ranked actions a moment later with the conversations:
+ * wait for the visor itself, and reload only when it doesn't come (the model
+ * pass runs after the sync).
+ */
 async function picked(page: Page, workspace: string): Promise<void> {
-  for (let attempt = 0; attempt < 90; attempt += 1) {
+  for (let attempt = 0; attempt < 30; attempt += 1) {
     await page.goto(`/w/${workspace}`);
     await page.getByRole("heading", { level: 1 }).waitFor();
-    if ((await page.getByRole("img", { name: PICKED }).count()) > 0) {
+    try {
+      await page.getByRole("img", { name: PICKED }).first().waitFor({ timeout: 5000 });
       return;
+    } catch {
+      await pause(1000);
     }
-    await pause(1000);
   }
   throw new Error("Home never showed actions Scout picked: is the catalogue on and rated?");
 }

@@ -943,8 +943,13 @@ export function WhatNeedsYou({ workspaceId, now, offer }: WhatNeedsYouProps) {
                         locale={i18n.language}
                         now={now}
                         focusAttachment={attachmentFor === row.item.id}
-                        onAttachmentFocused={() => {
+                        onAttachmentFocused={(found) => {
                           setAttachmentFor(undefined);
+                          // Nothing to focus (only images its body shows):
+                          // say so rather than do nothing.
+                          if (!found) {
+                            undo.notify(t("actions.noAttachment"));
+                          }
                         }}
                         onOpen={() => {
                           openConversation(row);
@@ -1048,7 +1053,8 @@ interface NeedDetailProps {
   now?: Date | undefined;
   /** Open attachment: move the focus to the email's first file once it shows. */
   focusAttachment?: boolean | undefined;
-  onAttachmentFocused?: (() => void) | undefined;
+  /** Whether a file took the focus (none: the email has no file to open). */
+  onAttachmentFocused?: ((found: boolean) => void) | undefined;
   onOpen: () => void;
 }
 
@@ -1072,8 +1078,8 @@ function NeedDetail({
   const warning = need.question === "suspicious";
   const box = useRef<HTMLDivElement>(null);
   const loaded = detail.data !== undefined;
-  const focused = useEffectEvent(() => {
-    onAttachmentFocused?.();
+  const focused = useEffectEvent((found: boolean) => {
+    onAttachmentFocused?.(found);
   });
   useEffect(() => {
     if (!focusAttachment || !loaded) {
@@ -1082,10 +1088,8 @@ function NeedDetail({
     // After the email has drawn its files; the clamp opens when one is focused.
     const frame = requestAnimationFrame(() => {
       // Never from behind a dialog.
-      if (box.current !== null && document.querySelector("[role='dialog']") === null) {
-        focusNextAttachment(box.current);
-      }
-      focused();
+      const behind = document.querySelector("[role='dialog']") !== null;
+      focused(behind || (box.current !== null && focusNextAttachment(box.current)));
     });
     return () => {
       cancelAnimationFrame(frame);
