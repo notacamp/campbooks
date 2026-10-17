@@ -48,8 +48,10 @@ export function withoutLinks(html: string): string {
  * second layer.
  */
 export function stripLinks(doc: Document): void {
-  for (const link of doc.querySelectorAll("a[href], area[href]")) {
-    link.setAttribute("data-href", link.getAttribute("href") ?? "");
+  for (const link of doc.querySelectorAll<HTMLAnchorElement | HTMLAreaElement>(
+    "a[href], area[href]",
+  )) {
+    link.dataset["href"] = link.getAttribute("href") ?? "";
     link.removeAttribute("href");
   }
 }

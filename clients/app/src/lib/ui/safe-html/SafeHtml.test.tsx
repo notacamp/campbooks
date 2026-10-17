@@ -52,7 +52,7 @@ describe("SafeHtml", () => {
     stripLinks(doc);
     const link = doc.querySelector("a");
     expect(link?.hasAttribute("href")).toBe(false);
-    expect(link?.getAttribute("data-href")).toBe("https://evil.example");
+    expect(link?.dataset["href"]).toBe("https://evil.example");
     expect(doc.querySelectorAll("[href]")).toHaveLength(0);
   });
 

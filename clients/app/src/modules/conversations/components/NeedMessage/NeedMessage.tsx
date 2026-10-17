@@ -52,7 +52,9 @@ export function NeedMessage({ workspaceId, conversation, need, now }: NeedMessag
         conversationId={conversation.id}
         message={message}
         open
-        onOpen={() => undefined}
+        onOpen={() => {
+          // Always open on Home.
+        }}
         showImages={showImages}
         onShowImages={() => {
           setShowImages(true);

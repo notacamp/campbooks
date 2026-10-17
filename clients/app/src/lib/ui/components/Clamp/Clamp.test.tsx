@@ -1,7 +1,7 @@
 import { act, fireEvent, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { renderUi } from "../../../../test/render";
+import { renderUi } from "../../../../../test/render";
 
 import { Clamp } from "./Clamp";
 

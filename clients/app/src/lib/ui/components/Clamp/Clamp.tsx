@@ -44,8 +44,17 @@ export function Clamp({ children, moreLabel, lessLabel }: ClampProps) {
     observer.observe(inner);
     observer.observe(outer);
     check();
+    // Focus landing in the clamped box (Tab into a link far down, a click
+    // into the frame) opens it, so it never sits out of sight.
+    const reveal = () => {
+      if (outer.dataset["open"] === undefined && inner.scrollHeight > outer.clientHeight + 1) {
+        setOpen(true);
+      }
+    };
+    outer.addEventListener("focusin", reveal);
     return () => {
       observer.disconnect();
+      outer.removeEventListener("focusin", reveal);
     };
   }, []);
 
@@ -57,11 +66,6 @@ export function Clamp({ children, moreLabel, lessLabel }: ClampProps) {
         className={styles["box"]}
         data-open={open ? "" : undefined}
         data-fade={!open && overflows ? "" : undefined}
-        onFocus={() => {
-          if (overflows) {
-            setOpen(true);
-          }
-        }}
       >
         <div ref={content}>{children}</div>
       </div>
