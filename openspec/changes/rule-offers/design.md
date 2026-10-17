@@ -40,7 +40,9 @@ a notice is the caller's to fetch, and rule changes publish
 (`EmailFacts::authentication_failed`: a DMARC fail, or neither a DMARC pass
 for the From domain nor an aligned DKIM pass; absent results say nothing).
 When it holds, the offer's default is the From domain *with* that condition,
-never the bare domain. The action is `spam` (Report and delete reports to the
+never the bare domain, and only for a rule that reports or deletes: the
+offer after Already paid never offers "pretending to be" (a pretender's
+bills are never marked paid). The action is `spam` (Report and delete reports to the
 provider); `trash` exists for rules that just delete, without a report. The
 brand a phishing mail imitates in its text is not read (no content rules,
 ADR 0018).
