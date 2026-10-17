@@ -218,6 +218,12 @@ function demoMessages(me: string, images: string): DemoMessage[] {
         "List-Unsubscribe": "<https://weekly-ledger.example/unsubscribe?u=demo>",
         "List-Id": "The Weekly Ledger <weekly.weekly-ledger.example>",
         Precedence: "bulk",
+        // Gmail's own results: the Ledger signs its mail and passes DMARC, so
+        // "Always show images from" can trust it (campbooks-cloud#200).
+        "Authentication-Results":
+          "mx.google.com; dkim=pass header.i=@weekly-ledger.example header.s=s1; " +
+          "spf=pass smtp.mailfrom=bounce@weekly-ledger.example; " +
+          "dmarc=pass (p=REJECT sp=REJECT dis=NONE) header.from=weekly-ledger.example",
       },
       text: "Five tax dates before year end, plus what changes for freelancers in 2027.\n\nUnsubscribe: https://weekly-ledger.example/unsubscribe",
       html: `<style>body{background:url(${images}/track.png?css=1)} .hero{color:#0b6}</style>
@@ -231,6 +237,22 @@ function demoMessages(me: string, images: string): DemoMessage[] {
 <img src="${images}/track.png?u=demo" width="1" height="1" alt="" style="display:none">
 <form action="https://weekly-ledger.example/login"><input name="password"></form>
 </td></tr></table>`,
+    },
+    {
+      // Pretends to be the Ledger and fails DMARC: trusting the Ledger never
+      // shows its images (campbooks-cloud#200).
+      from: "The Weekly Ledger <hello@weekly-ledger.example>",
+      to: me,
+      subject: "Your Ledger subscription could not be renewed",
+      hoursAgo: 28,
+      labels: ["INBOX", "CATEGORY_PROMOTIONS"],
+      headers: {
+        "Authentication-Results":
+          "mx.google.com; spf=pass smtp.mailfrom=bounce@ledger-renewals.example; " +
+          "dmarc=fail (p=REJECT sp=REJECT dis=REJECT) header.from=weekly-ledger.example",
+      },
+      text: "Your subscription could not be renewed. Update your card to keep reading.",
+      html: `<div style="font-family:Georgia,serif;max-width:560px"><img src="${images}/ledger-banner.svg" alt="The Weekly Ledger" width="560" height="120" style="width:100%;height:auto"><p>Your subscription could not be renewed. Update your card to keep reading.</p></div>`,
     },
     {
       from: "Cloudhost Billing <billing@cloudhost.example>",

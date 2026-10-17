@@ -69,7 +69,9 @@
     "showImages": "Show images",
     "imagesHidden_one": "{{count}} remote image hidden, so the sender cannot see when you read this.",
     "imagesHidden_other": "{{count}} remote images hidden, so the sender cannot see when you read this.",
-    "imagesShown": "Remote images shown."
+    "imagesShown": "Remote images shown.",
+    "trustImages": "Always show images from {{name}}",
+    "imagesTrusted": "Images shown: you trust {{name}}. Tracking pixels stay removed."
   },
   "toast": {
     "done": "Done · {{subject}}",
@@ -171,7 +173,8 @@
     "notNeeded": "Not needed (or it’s safe)",
     "undoAll": "Undo all a rule did",
     "allPaid": "All bills already paid",
-    "saveRule": "Save the smart rule"
+    "saveRule": "Save the smart rule",
+    "trustImages": "Always show images from this sender"
   },
   "compose": {
     "title": {
@@ -334,7 +337,8 @@
       "never": "never needs you",
       "trash": "put in the trash",
       "spam": "reported as spam",
-      "paid": "its bills are already paid"
+      "paid": "its bills are already paid",
+      "images": "its images always show"
     },
     "likeness": {
       "sender": "Everything from {{address}}",
@@ -459,7 +463,8 @@
       "others_other": "like {{n}} others {{from}}",
       "trash": "Campbooks put this in the trash",
       "spam": "Campbooks reported this as spam",
-      "paid": "Campbooks says this is already paid"
+      "paid": "Campbooks says this is already paid",
+      "images": "Campbooks shows this sender’s images"
     },
     "reader": {
       "stop": "Stop doing this"
@@ -523,7 +528,8 @@
       "failed": "Could not load the rules",
       "retry": "Try again",
       "inbox": "An inbox",
-      "emptyTitle": "No rules yet"
+      "emptyTitle": "No rules yet",
+      "removeImagesQuestion": "Remove this rule? Their images are held back again until you choose Show images."
     }
   },
   "reply": {
@@ -594,7 +600,17 @@
     "titleTeach": "A rule for mail like this",
     "titleReport": "A rule for mail like this",
     "titlePaid": "A rule for {{payee}}’s invoices",
-    "titleNotice": "A rule for mail from {{sender}}"
+    "titleNotice": "A rule for mail from {{sender}}",
+    "whose": "Show images from",
+    "imagesTitle": "Always show images from {{sender}}",
+    "imagesAddress": "Only {{address}}",
+    "imagesAddressDetail": "This address alone.",
+    "imagesDomain": "Anyone at {{domain}}",
+    "imagesDomainDetail": "Every address at {{domain}} and its subdomains, when the domain’s own checks pass.",
+    "imagesMatches_one": "Their images will show in {{n}} conversation already here, and in new mail.",
+    "imagesMatches_other": "Their images will show in {{n}} conversations already here, and in new mail.",
+    "imagesNew": "Their images will show in new mail from them that passes its sender checks.",
+    "imagesHow": "Only for mail that passes the sender’s checks, never for mail pretending to be them. Tracking pixels stay removed."
   },
   "ahead": {
     "reportTitle": "Never see emails like this again?",

@@ -134,7 +134,8 @@
       "surface_never": "il n’a jamais besoin de vous",
       "trash": "le mettre à la corbeille",
       "spam": "le signaler comme spam",
-      "mark_paid": "ses factures sont déjà payées"
+      "mark_paid": "ses factures sont déjà payées",
+      "show_images": "toujours afficher ses images"
     },
     "stream": {
       "primary": "Principal",

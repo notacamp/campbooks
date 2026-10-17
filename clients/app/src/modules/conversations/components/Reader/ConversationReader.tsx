@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { errorStatus } from "~/lib/api";
+import { isFreeMailDomain } from "~/lib/mail/free-mail";
 import { useShortcut } from "~/lib/shortcuts";
 import {
   ActionBar,
@@ -24,6 +25,7 @@ import {
   useConversation,
   useInboxes,
   type ConversationSummary,
+  type MessageView,
   type Stream,
 } from "../../api/queries";
 import {
@@ -51,6 +53,7 @@ import { useRuleActions } from "../TeachOnce/use-rule-actions";
 import type { InboxActions } from "../InboxScreen/use-inbox-actions";
 
 import { ReplyDialog } from "../ReplyDialog/ReplyDialog";
+import { SmartRuleConfirm, type SmartRuleDraft } from "../SmartRule/SmartRuleConfirm";
 
 import { MovePicker } from "./MovePicker";
 import type { RenderReplySlot, ReplyMode, ReplyRequest, ReplySlotContext } from "./ReplySlot";
@@ -147,6 +150,8 @@ export function ConversationReader({
   const [reply, setReply] = useState<ReplyRequest | null>(null);
   // Reply first asks Scout (the reply dialog).
   const [replying, setReplying] = useState<{ opened: number } | undefined>();
+  // "Always show images from <sender>": the smart rule being confirmed.
+  const [trusting, setTrusting] = useState<SmartRuleDraft | null>(null);
   const nonce = useRef(0);
 
   // Opening an unread conversation reads it (once).
@@ -198,6 +203,40 @@ export function ConversationReader({
   const showAllImages = () => {
     setImages(new Set(messages.map((message) => message.id)));
   };
+  /**
+   * Trust `message`'s sender with its images: a smart rule for the address,
+   * or anyone at its domain (never a free mail provider's), confirmed first.
+   */
+  const trustImages = (message: MessageView) => {
+    if (conversation === undefined || inbox === undefined) {
+      return;
+    }
+    const address = message.from.address.trim().toLowerCase();
+    const domain = address.split("@")[1] ?? "";
+    const byAddress = {
+      id: "address",
+      title: t("smartRule.imagesAddress", { address }),
+      description: t("smartRule.imagesAddressDetail"),
+      conditions: [{ field: "sender_address" as const, value: address }],
+    };
+    const byDomain = {
+      id: "domain",
+      title: t("smartRule.imagesDomain", { domain }),
+      description: t("smartRule.imagesDomainDetail", { domain }),
+      conditions: [{ field: "sender_domain" as const, value: domain }],
+    };
+    setTrusting({
+      inboxId: inbox.id,
+      conditions: byAddress.conditions,
+      actions: [{ action: "show_images" }],
+      title: t("smartRule.imagesTitle", { sender: address }),
+      fromConversation: conversation.id,
+      sharedInbox: inbox.shared ? inbox.address : undefined,
+      choices: domain === "" || isFreeMailDomain(domain) ? [byAddress] : [byAddress, byDomain],
+    });
+  };
+  // The newest message from someone else: the one the key trusts.
+  const newestInbound = messages.findLast((message) => message.direction === "inbound");
 
   useShortcut(
     "item.done",
@@ -236,13 +275,24 @@ export function ConversationReader({
   const viewing = conversation !== undefined;
   useShortcut("inbox.show_images", showAllImages, { enabled: viewing });
   useShortcut(
+    "inbox.trust_images",
+    () => {
+      if (newestInbound !== undefined) {
+        trustImages(newestInbound);
+      }
+    },
+    { enabled: active && newestInbound !== undefined && trusting === null },
+  );
+  useShortcut(
     "inbox.next_attachment",
     () => {
       focusNextAttachment();
     },
     { enabled: viewing },
   );
-  useShortcut("overlay.close", onBack, { enabled: !moving && replying === undefined });
+  useShortcut("overlay.close", onBack, {
+    enabled: !moving && replying === undefined && trusting === null,
+  });
   // J/K step between conversations; the arrows keep scrolling this one.
   useShortcut("list.next", onNext, { alternates: false });
   useShortcut("list.previous", onPrevious, { alternates: false });
@@ -671,6 +721,13 @@ export function ConversationReader({
             onShowImages={() => {
               setImages((current) => new Set([...current, message.id]));
             }}
+            onTrustImages={
+              writable && message.direction === "inbound"
+                ? () => {
+                    trustImages(message);
+                  }
+                : undefined
+            }
             kind={message.direction === "outbound" ? "person" : kind}
             inertLinks={conversation.need?.question === "suspicious"}
             now={now}
@@ -728,6 +785,13 @@ export function ConversationReader({
           }}
         />
       )}
+      <SmartRuleConfirm
+        workspaceId={workspaceId}
+        draft={trusting}
+        onClose={() => {
+          setTrusting(null);
+        }}
+      />
     </>
   );
 }

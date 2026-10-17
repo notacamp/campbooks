@@ -222,6 +222,111 @@ describe("the inbox", () => {
     expect(moved?.body).toEqual({ stream: "newsletters" });
   });
 
+  it("always shows a trusted sender's images, once the smart rule is confirmed", async () => {
+    // The server trusts the sender once the rule is saved.
+    let trusted = false;
+    const rule = {
+      ...LEDGER_RULE,
+      conditions: [{ field: "sender_domain" as const, value: "weekly-ledger.example" }],
+      actions: [{ action: "show_images" as const }],
+      applied_count: 0,
+    };
+    const api = inbox({
+      [`GET ${W}/conversations/${LEDGER.id}/messages/${LEDGER_DETAIL.messages[0]?.id ?? ""}/body`]:
+        (request) => ({
+          body: {
+            ...ledgerBody(
+              trusted || new URL(request.url).searchParams.get("show_images") === "true",
+            ),
+            images_trusted: trusted,
+          },
+        }),
+      [`POST ${W}/inboxes/${INBOX.id}/rules/preview`]: {
+        body: {
+          matching: 3,
+          would_change: 0,
+          samples: [],
+          skipped_suspicious: 0,
+          skipped_member: 0,
+          overrides: [],
+          complete: true,
+        },
+      },
+      [`POST ${W}/inboxes/${INBOX.id}/rules`]: () => {
+        trusted = true;
+        return { status: 201, body: { rule, acted_without_asking: false } };
+      },
+      [`GET ${W}/rules`]: { body: { rules: [rule] } },
+      [`GET ${W}/rules/${rule.id}`]: { body: rule },
+    });
+    renderAt(`/w/${DUARTE.id}/inbox/primary/${LEDGER.id}`);
+    const reader = await screen.findByRole("main", { name: "Conversation" });
+    await within(reader).findByText(/1 remote image hidden/u);
+
+    fireEvent.click(
+      within(reader).getByRole("button", { name: /^Always show images from The Weekly Ledger/u }),
+    );
+    const dialog = await screen.findByRole("dialog", {
+      name: "Always show images from hello@weekly-ledger.example",
+    });
+    // The address by default, or anyone at its domain; a rule with no AI.
+    expect(
+      within(dialog).getByRole("radio", { name: /Only hello@weekly-ledger.example/u }),
+    ).toBeChecked();
+    expect(
+      await within(dialog).findByText(
+        "Their images will show in 3 conversations already here, and in new mail.",
+      ),
+    ).toBeVisible();
+    expect(within(dialog).getByText(/Tracking pixels stay removed/u)).toBeVisible();
+    fireEvent.click(
+      within(dialog).getByRole("radio", { name: /Anyone at weekly-ledger.example/u }),
+    );
+    fireEvent.click(within(dialog).getByRole("button", { name: /Save smart rule/u }));
+
+    await waitFor(() => {
+      expect(
+        api.calls.find((call) => call.route === `POST ${W}/inboxes/${INBOX.id}/rules`)?.body,
+      ).toMatchObject({
+        conditions: [{ field: "sender_domain", value: "weekly-ledger.example" }],
+        actions: [{ action: "show_images" }],
+        apply_to_existing: false,
+        from_conversation_id: LEDGER.id,
+      });
+    });
+    // Its images show without asking, and the reader says why.
+    expect(
+      await within(reader).findByText(
+        "Images shown: you trust The Weekly Ledger. Tracking pixels stay removed.",
+      ),
+    ).toBeVisible();
+    expect(within(reader).queryByRole("button", { name: /^Show images/u })).toBeNull();
+    // Undo takes the rule back at once.
+    expect((await screen.findAllByRole("button", { name: /^Undo/u })).length).toBeGreaterThan(0);
+  });
+
+  it("opens the trust confirmation with Shift+A", async () => {
+    inbox();
+    renderAt(`/w/${DUARTE.id}/inbox/primary/${LEDGER.id}`);
+    const reader = await screen.findByRole("main", { name: "Conversation" });
+    await within(reader).findByText(/1 remote image hidden/u);
+    fireEvent.keyDown(document, { key: "A", shiftKey: true });
+    expect(
+      await screen.findByRole("dialog", {
+        name: "Always show images from hello@weekly-ledger.example",
+      }),
+    ).toBeVisible();
+  });
+
+  it("offers no trust in an inbox the member only reads", async () => {
+    inbox({ [`GET ${W}/inboxes`]: { body: { inboxes: [{ ...INBOX, role: "reader" }] } } });
+    renderAt(`/w/${DUARTE.id}/inbox/primary/${LEDGER.id}`);
+    const reader = await screen.findByRole("main", { name: "Conversation" });
+    await within(reader).findByText(/1 remote image hidden/u);
+    expect(within(reader).getByRole("button", { name: /^Show images/u })).toBeVisible();
+    expect(within(reader).queryByRole("button", { name: /^Always show images/u })).toBeNull();
+  });
+
   it("offers to do the same to every lookalike, then shows the rule's run with Undo all", async () => {
     const api = inbox({
       [`GET ${W}/conversations/${LEDGER.id}/rule-suggestions`]: { body: LEDGER_SUGGESTIONS },

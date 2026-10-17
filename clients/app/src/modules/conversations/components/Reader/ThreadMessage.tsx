@@ -33,6 +33,11 @@ export interface ThreadMessageProps {
   /** The member asked to see this message's remote images. */
   showImages: boolean;
   onShowImages: () => void;
+  /**
+   * "Always show images from <sender>": a smart rule for this sender
+   * (campbooks-cloud#200); absent where the member may not teach rules.
+   */
+  onTrustImages?: (() => void) | undefined;
   kind: "person" | "service";
   /** The conversation may be phishing: the body's links lead nowhere. */
   inertLinks?: boolean | undefined;
@@ -54,6 +59,7 @@ export function ThreadMessage({
   onOpen,
   showImages,
   onShowImages,
+  onTrustImages,
   kind,
   inertLinks = false,
   shortcuts = true,
@@ -145,7 +151,21 @@ export function ThreadMessage({
                 >
                   {t("actions.showImages")}
                 </Button>
+                {onTrustImages === undefined ? null : (
+                  <Button
+                    variant="secondary"
+                    shortcut={shortcuts ? "inbox.trust_images" : undefined}
+                    onClick={onTrustImages}
+                  >
+                    {t("actions.trustImages", { name: from })}
+                  </Button>
+                )}
               </>
+            ) : null}
+            {remote > 0 && body.data?.images_trusted === true ? (
+              <Text tone="tertiary" size="sm">
+                {t("actions.imagesTrusted", { name: from })}
+              </Text>
             ) : null}
           </>
         ) : undefined

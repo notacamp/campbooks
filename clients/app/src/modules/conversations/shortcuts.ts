@@ -88,6 +88,14 @@ export const CONVERSATIONS_SHORTCUTS = [
     label: "conversations:shortcuts.showImages",
   },
   {
+    // A smart rule that always shows this sender's images (campbooks-cloud#200).
+    id: "inbox.trust_images",
+    keys: "shift+a",
+    scope: "item",
+    group: "item",
+    label: "conversations:shortcuts.trustImages",
+  },
+  {
     // The smart-rule confirmation: save it (the dialog's own keys are
     // plain; ⌘↵ reaches the registry through it).
     id: "inbox.rule.save",

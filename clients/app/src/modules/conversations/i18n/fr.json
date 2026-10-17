@@ -69,7 +69,9 @@
     "showImages": "Afficher les images",
     "imagesHidden_one": "{{count}} image distante masquée, pour que l’expéditeur ne sache pas quand vous lisez ceci.",
     "imagesHidden_other": "{{count}} images distantes masquées, pour que l’expéditeur ne sache pas quand vous lisez ceci.",
-    "imagesShown": "Images distantes affichées."
+    "imagesShown": "Images distantes affichées.",
+    "trustImages": "Toujours afficher les images de {{name}}",
+    "imagesTrusted": "Images affichées : vous faites confiance à {{name}}. Les pixels de suivi restent supprimés."
   },
   "toast": {
     "done": "Terminé · {{subject}}",
@@ -171,7 +173,8 @@
     "notNeeded": "Pas nécessaire (ou c’est sûr)",
     "undoAll": "Annuler tout ce qu’a fait une règle",
     "allPaid": "Toutes les factures déjà payées",
-    "saveRule": "Enregistrer la règle intelligente"
+    "saveRule": "Enregistrer la règle intelligente",
+    "trustImages": "Toujours afficher les images de cet expéditeur"
   },
   "compose": {
     "title": {
@@ -334,7 +337,8 @@
       "never": "n’ont jamais besoin de vous",
       "trash": "va à la corbeille",
       "spam": "signalé comme spam",
-      "paid": "ses factures sont déjà payées"
+      "paid": "ses factures sont déjà payées",
+      "images": "ses images s’affichent toujours"
     },
     "likeness": {
       "sender": "Tout ce qui vient de {{address}}",
@@ -459,7 +463,8 @@
       "others_other": "comme {{n}} autres {{from}}",
       "trash": "Campbooks l’a mis à la corbeille",
       "spam": "Campbooks l’a signalé comme spam",
-      "paid": "Campbooks dit que c’est déjà payé"
+      "paid": "Campbooks dit que c’est déjà payé",
+      "images": "Campbooks affiche les images de cet expéditeur"
     },
     "reader": {
       "stop": "Arrêter de faire ça"
@@ -523,7 +528,8 @@
       "failed": "Impossible de charger les règles",
       "retry": "Réessayer",
       "inbox": "Une boîte de réception",
-      "emptyTitle": "Pas encore de règles"
+      "emptyTitle": "Pas encore de règles",
+      "removeImagesQuestion": "Retirer cette règle ? Ses images sont de nouveau retenues jusqu’à ce que vous choisissiez Afficher les images."
     }
   },
   "reply": {
@@ -594,7 +600,17 @@
     "titleTeach": "Une règle pour les e-mails comme celui-ci",
     "titleReport": "Une règle pour les e-mails comme celui-ci",
     "titlePaid": "Une règle pour les factures de {{payee}}",
-    "titleNotice": "Une règle pour les e-mails de {{sender}}"
+    "titleNotice": "Une règle pour les e-mails de {{sender}}",
+    "whose": "Afficher les images de",
+    "imagesTitle": "Toujours afficher les images de {{sender}}",
+    "imagesAddress": "Seulement {{address}}",
+    "imagesAddressDetail": "Cette adresse seulement.",
+    "imagesDomain": "Toute adresse de {{domain}}",
+    "imagesDomainDetail": "Toutes les adresses de {{domain}} et de ses sous-domaines, quand les vérifications du domaine lui-même réussissent.",
+    "imagesMatches_one": "Ses images s’afficheront dans {{n}} conversation déjà ici, et dans le nouveau courrier.",
+    "imagesMatches_other": "Ses images s’afficheront dans {{n}} conversations déjà ici, et dans le nouveau courrier.",
+    "imagesNew": "Ses images s’afficheront dans le nouveau courrier de cet expéditeur qui réussit ses vérifications.",
+    "imagesHow": "Seulement pour le courrier qui réussit les vérifications de l’expéditeur, jamais pour celui qui se fait passer pour lui. Les pixels de suivi restent supprimés."
   },
   "ahead": {
     "reportTitle": "Ne plus jamais voir d’e-mails comme celui-ci ?",

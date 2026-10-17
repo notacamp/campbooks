@@ -69,7 +69,9 @@
     "showImages": "Mostrar imagens",
     "imagesHidden_one": "{{count}} imagem remota oculta, para que o remetente não saiba quando lê isto.",
     "imagesHidden_other": "{{count}} imagens remotas ocultas, para que o remetente não saiba quando lê isto.",
-    "imagesShown": "Imagens remotas visíveis."
+    "imagesShown": "Imagens remotas visíveis.",
+    "trustImages": "Mostrar sempre as imagens de {{name}}",
+    "imagesTrusted": "Imagens visíveis: confia em {{name}}. Os píxeis de rastreio continuam removidos."
   },
   "toast": {
     "done": "Concluída · {{subject}}",
@@ -171,7 +173,8 @@
     "notNeeded": "Não é preciso (ou é seguro)",
     "undoAll": "Anular tudo o que uma regra fez",
     "allPaid": "Todas as faturas já pagas",
-    "saveRule": "Guardar a regra inteligente"
+    "saveRule": "Guardar a regra inteligente",
+    "trustImages": "Mostrar sempre as imagens deste remetente"
   },
   "compose": {
     "title": {
@@ -334,7 +337,8 @@
       "never": "nunca precisam de si",
       "trash": "vai para o lixo",
       "spam": "denunciado como spam",
-      "paid": "as faturas já estão pagas"
+      "paid": "as faturas já estão pagas",
+      "images": "as imagens aparecem sempre"
     },
     "likeness": {
       "sender": "Tudo de {{address}}",
@@ -459,7 +463,8 @@
       "others_other": "como {{n}} outras {{from}}",
       "trash": "O Campbooks pôs isto no lixo",
       "spam": "O Campbooks denunciou isto como spam",
-      "paid": "O Campbooks diz que isto já está pago"
+      "paid": "O Campbooks diz que isto já está pago",
+      "images": "O Campbooks mostra as imagens deste remetente"
     },
     "reader": {
       "stop": "Deixar de fazer isto"
@@ -523,7 +528,8 @@
       "failed": "Não foi possível carregar as regras",
       "retry": "Tentar de novo",
       "inbox": "Uma caixa de entrada",
-      "emptyTitle": "Ainda não há regras"
+      "emptyTitle": "Ainda não há regras",
+      "removeImagesQuestion": "Remover esta regra? As imagens voltam a ficar retidas até escolher Mostrar imagens."
     }
   },
   "reply": {
@@ -594,7 +600,17 @@
     "titleTeach": "Uma regra para emails como este",
     "titleReport": "Uma regra para emails como este",
     "titlePaid": "Uma regra para as faturas de {{payee}}",
-    "titleNotice": "Uma regra para emails de {{sender}}"
+    "titleNotice": "Uma regra para emails de {{sender}}",
+    "whose": "Mostrar imagens de",
+    "imagesTitle": "Mostrar sempre as imagens de {{sender}}",
+    "imagesAddress": "Só {{address}}",
+    "imagesAddressDetail": "Só este endereço.",
+    "imagesDomain": "Qualquer endereço de {{domain}}",
+    "imagesDomainDetail": "Todos os endereços de {{domain}} e dos seus subdomínios, quando as verificações do próprio domínio passam.",
+    "imagesMatches_one": "As imagens vão aparecer em {{n}} conversa que já cá está e no correio novo.",
+    "imagesMatches_other": "As imagens vão aparecer em {{n}} conversas que já cá estão e no correio novo.",
+    "imagesNew": "As imagens vão aparecer no correio novo deste remetente que passe as verificações.",
+    "imagesHow": "Só para correio que passa as verificações do remetente, nunca para correio que finge ser dele. Os píxeis de rastreio continuam removidos."
   },
   "ahead": {
     "reportTitle": "Nunca mais ver emails como este?",

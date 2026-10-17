@@ -1,6 +1,8 @@
 // What the assistant's screens decide without the server: how a rule reads
 // as a sentence, which rules the answers to the questions become, and where
 // a rule can be taught. Pure functions, so they are tested on their own.
+import { isFreeMailDomain } from "~/lib/mail/free-mail";
+
 import type { Action, Condition, Proposal, RuleShape } from "./api/queries";
 
 /** A translator for dynamic keys of the `assistant` namespace. */
@@ -19,32 +21,6 @@ export function teachable(inbox: TeachInbox): boolean {
   return inbox.role === "sender" || inbox.role === "manager";
 }
 
-/** Free mail providers: a rule for a whole domain of theirs would match strangers (as the server says). */
-const FREE_MAIL = new Set([
-  "gmail.com",
-  "googlemail.com",
-  "outlook.com",
-  "hotmail.com",
-  "live.com",
-  "msn.com",
-  "yahoo.com",
-  "ymail.com",
-  "icloud.com",
-  "me.com",
-  "mac.com",
-  "aol.com",
-  "proton.me",
-  "protonmail.com",
-  "gmx.com",
-  "gmx.net",
-  "zoho.com",
-  "sapo.pt",
-  "hotmail.fr",
-  "orange.fr",
-  "yahoo.es",
-  "mail.com",
-]);
-
 /** A sender the member typed: an address, a domain, or why not. */
 export type TypedSender =
   | { kind: "address"; value: string }
@@ -59,7 +35,7 @@ export function readSender(raw: string): TypedSender {
     return { kind: "address", value };
   }
   if (/^[a-z0-9-]+(\.[a-z0-9-]+)*\.[a-z]{2,}$/u.test(value)) {
-    return FREE_MAIL.has(value) ? { kind: "free_mail", value } : { kind: "domain", value };
+    return isFreeMailDomain(value) ? { kind: "free_mail", value } : { kind: "domain", value };
   }
   return { kind: "invalid" };
 }
