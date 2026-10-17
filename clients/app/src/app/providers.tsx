@@ -4,6 +4,7 @@ import { StrictMode } from "react";
 import { I18nextProvider } from "react-i18next";
 
 import { DEFAULT_SHORTCUTS, ShortcutProvider, ShortcutRegistry } from "~/lib/shortcuts";
+import { startTelemetry } from "~/lib/telemetry";
 import { UndoProvider } from "~/lib/ui";
 
 import { i18n } from "./i18n";
@@ -21,6 +22,9 @@ const queryClient = new QueryClient({
 });
 
 const router = createAppRouter(queryClient);
+
+// The route template shown (`/w/$workspaceId/inbox`), never its address.
+startTelemetry(() => router.state.matches.at(-1)?.routeId);
 
 // One registry for the app: the defaults plus every module's operation
 // shortcuts, conflict-checked once at startup.

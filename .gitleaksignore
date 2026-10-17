@@ -1,0 +1,3 @@
+# Invented test fixtures, not secrets (a JWT-shaped string planted to prove the
+# error report scrubber drops it). Later commits assemble it with concat!.
+93a49f558e5e6e670651f4d7a0f95b56adcd85fe:crates/server/tests/error_reports.rs:jwt:27
