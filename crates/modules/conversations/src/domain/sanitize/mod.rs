@@ -915,8 +915,8 @@ mod tests {
         assert!(result.html.contains('x'));
     }
 
-    /// The sanitised fixtures the client's WebKit test renders under the
-    /// desktop and web policies (campbooks-cloud#199) are this sanitiser's
+    /// The sanitised fixtures the client's policy test (`test:csp`) renders
+    /// under the desktop and web policies (campbooks-cloud#199) are this sanitiser's
     /// output, held back and shown: a change here shows up there.
     /// `UPDATE_SNAPSHOTS=1 cargo test -p campbooks-conversations webkit_snapshots`
     /// writes them again.
@@ -931,14 +931,14 @@ mod tests {
         for name in ["newsletter", "marketing-600", "outlook", "hostile"] {
             for show in [false, true] {
                 let html = sanitize(fixture(name), show, &InlineImages::new()).html;
-                let state = if show { "shown" } else { "held" };
-                let path = format!("{dir}/{name}.{state}.html");
+                let kind = if show { "shown" } else { "held" };
+                let path = format!("{dir}/{name}.{kind}.html");
                 if update {
                     std::fs::write(&path, format!("{html}\n")).expect("snapshot written");
                 } else if std::fs::read_to_string(&path).ok().as_deref()
                     != Some(format!("{html}\n").as_str())
                 {
-                    stale.push(format!("===== {name}.{state}.html\n{html}\n===== end"));
+                    stale.push(format!("===== {name}.{kind}.html\n{html}\n===== end"));
                 }
             }
         }

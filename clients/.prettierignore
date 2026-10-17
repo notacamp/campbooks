@@ -9,3 +9,6 @@ app/src-tauri/gen/
 app/src/lib/api/schema.gen.ts
 app/src/lib/api/admin.gen.ts
 app/src/lib/api/records.gen.ts
+# The server's sanitised output for the #160 fixtures, byte for byte (a Rust
+# test compares them); the mail frame's WebKit test renders them.
+app/test/webkit/fixtures/
