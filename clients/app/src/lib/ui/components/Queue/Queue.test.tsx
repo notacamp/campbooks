@@ -57,6 +57,23 @@ describe("Queue (home)", () => {
     expect(screen.getByRole("link", { name: "Primary" })).toHaveAttribute("href", "#inbox");
   });
 
+  it("puts a group's action in its heading row and its note under it", () => {
+    renderUi(
+      <QueueGroup
+        signal="pay"
+        name="Pay"
+        count={2}
+        note="Campbooks can’t see your bank."
+        action={<button type="button">All 2 already paid</button>}
+      >
+        <p>items</p>
+      </QueueGroup>,
+    );
+    expect(screen.getByRole("heading", { level: 2, name: "Pay 2" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "All 2 already paid" })).toBeInTheDocument();
+    expect(screen.getByText("Campbooks can’t see your bank.")).toBeInTheDocument();
+  });
+
   it("drops the visor in the compact hero", () => {
     const { container } = renderUi(<PageHero compact title="5 things need you" />);
 

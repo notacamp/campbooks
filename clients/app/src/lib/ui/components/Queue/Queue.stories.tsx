@@ -47,6 +47,30 @@ export const Group: Story = {
   ),
 };
 
+export const GroupWithAction: Story = {
+  args: {
+    signal: "pay",
+    name: "Pay",
+    count: 2,
+    note: "Campbooks can’t see your bank, so it asks whether each invoice is paid.",
+  },
+  render: (args) => (
+    <QueueGroup {...args} action={<Button onClick={fn()}>All 2 already paid</Button>}>
+      <Item
+        who="Lumen Energy"
+        what="Lumen Energy sent an invoice. Is it paid?"
+        avatar={{ name: "Lumen Energy", kind: "service" }}
+        selected
+      />
+      <Item
+        who="Atelier Sousa"
+        what="Atelier Sousa sent an invoice. Is it paid?"
+        avatar={{ name: "Atelier Sousa", kind: "service" }}
+      />
+    </QueueGroup>
+  ),
+};
+
 export const Hero: Story = {
   render: () => (
     <PageHero
