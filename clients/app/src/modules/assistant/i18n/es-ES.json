@@ -201,10 +201,8 @@
       "then": "Entonces",
       "condition": "Qué correo",
       "action": "Qué hacer",
-      "value": "Dirección, dominio o palabras",
       "conditions": {
-        "sender_address": "El remitente es",
-        "sender_domain": "El dominio del remitente es",
+        "from": "Es de",
         "subject_contains": "El asunto contiene",
         "list": "Viene de una lista de correo",
         "automatic": "Se envió automáticamente"
@@ -217,7 +215,16 @@
         "archive": "Archivarlo"
       },
       "show": "Mostrar la regla",
-      "byHand": "Scout no ha podido leer tu frase, así que crea la regla aquí."
+      "byHand": "Scout no ha podido leer tu frase, así que crea la regla aquí.",
+      "title": "Crear una regla",
+      "lead": "Elige qué correo y luego qué hace Scout con él. Ninguna IA lee esto.",
+      "open": "Crear una regla a mano",
+      "back": "Decírselo a Scout en una frase",
+      "senders": "Remitentes",
+      "words": "Palabras del asunto",
+      "pickSender": "Marca al menos un remitente, o escribe una dirección completa o un dominio.",
+      "showMany": "Mostrar las reglas",
+      "oneEach": "Una regla por remitente, así cuenta el correo de cualquiera de ellos."
     },
     "questions": {
       "title": "Tus respuestas",

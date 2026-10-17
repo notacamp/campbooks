@@ -201,10 +201,8 @@
       "then": "Then",
       "condition": "Which mail",
       "action": "What to do",
-      "value": "Address, domain or words",
       "conditions": {
-        "sender_address": "The sender is",
-        "sender_domain": "The sender’s domain is",
+        "from": "It’s from",
         "subject_contains": "The subject contains",
         "list": "It comes from a mailing list",
         "automatic": "It was sent automatically"
@@ -217,7 +215,16 @@
         "archive": "Archive it"
       },
       "show": "Show the rule",
-      "byHand": "Scout couldn’t read your sentence, so build the rule here."
+      "byHand": "Scout couldn’t read your sentence, so build the rule here.",
+      "title": "Build a rule",
+      "lead": "Pick which mail, then what Scout does with it. No AI reads this.",
+      "open": "Build a rule yourself",
+      "back": "Tell Scout in a sentence instead",
+      "senders": "Senders",
+      "words": "Words in the subject",
+      "pickSender": "Tick at least one sender, or type a full address or a domain.",
+      "showMany": "Show the rules",
+      "oneEach": "One rule for each sender, so mail from any of them counts."
     },
     "questions": {
       "title": "Your answers",

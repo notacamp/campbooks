@@ -229,14 +229,41 @@ pub struct ChatResponse {
 }
 
 impl ChatResponse {
-    /// Parse structured (`decide`) output.
+    /// Parse structured output. Some models wrap the JSON in one Markdown
+    /// code fence (` ```json … ``` ` or ` ``` … ``` `) even when a JSON
+    /// response format was asked for; that one fence and the whitespace
+    /// around it are dropped first. Nothing else is repaired:
+    /// prose or truncated JSON is still an error.
     pub fn json<T: DeserializeOwned>(&self) -> Result<T, Error> {
-        serde_json::from_str(&self.content).map_err(|e| {
+        serde_json::from_str(unfenced(&self.content)).map_err(|e| {
             Error::InvalidResponse(format!(
                 "content is not the expected JSON: {}",
                 campbooks_kernel::redact::json(&e)
             ))
         })
+    }
+}
+
+/// `content` without the whitespace around it and, when it is wrapped in
+/// one Markdown code fence whose info string is empty or `json`, without
+/// that fence. Anything else comes back trimmed, as it was.
+fn unfenced(content: &str) -> &str {
+    let trimmed = content.trim();
+    let Some(inner) = trimmed
+        .strip_prefix("```")
+        .and_then(|rest| rest.strip_suffix("```"))
+    else {
+        return trimmed;
+    };
+    // The opening fence's line ends at the first line break.
+    let Some((info, body)) = inner.split_once('\n') else {
+        return trimmed;
+    };
+    let info = info.trim();
+    if info.is_empty() || info.eq_ignore_ascii_case("json") {
+        body.trim()
+    } else {
+        trimmed
     }
 }
 
@@ -735,6 +762,49 @@ mod tests {
             "%2e%2e/decisions",
         ] {
             assert!(endpoint(&base, path).is_err(), "{path}");
+        }
+    }
+
+    /// A response whose content is `content`.
+    fn answer(content: &str) -> ChatResponse {
+        ChatResponse {
+            content: content.to_owned(),
+            model: "test-model".to_owned(),
+            finish_reason: Some("stop".to_owned()),
+            usage: None,
+        }
+    }
+
+    #[test]
+    fn json_reads_plain_and_fenced_json() {
+        let expected = serde_json::json!({ "outcome": "rules" });
+        for content in [
+            r#"{"outcome": "rules"}"#,
+            "  \n{\"outcome\": \"rules\"}\n ",
+            "```json\n{\"outcome\": \"rules\"}\n```",
+            "```JSON\n{\"outcome\": \"rules\"}\n```",
+            "\n```\n{\"outcome\": \"rules\"}\n```\n",
+        ] {
+            let value: serde_json::Value = answer(content).json().unwrap();
+            assert_eq!(value, expected, "{content:?}");
+        }
+    }
+
+    #[test]
+    fn json_repairs_nothing_else() {
+        for content in [
+            "",
+            "Sure! Here are your rules.",
+            "Here you go:\n```json\n{\"outcome\": \"rules\"}\n```",
+            "```json\n{\"outcome\": \"ru",
+            "```python\n{\"outcome\": \"rules\"}\n```",
+            "```{\"outcome\": \"rules\"}```",
+        ] {
+            let parsed = answer(content).json::<serde_json::Value>();
+            assert!(
+                matches!(parsed, Err(Error::InvalidResponse(_))),
+                "{content:?}"
+            );
         }
     }
 
