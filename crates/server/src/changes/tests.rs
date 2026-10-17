@@ -1707,6 +1707,11 @@ async fn an_inbox_gained_unannounced_makes_the_stream_resync_at_its_heartbeat(db
         .await
         .unwrap();
     assert!(feed.next_event().await.is("ready"));
+    // The stream lists her containers at its first read, after `ready`: an
+    // inbox made before that is simply in its first list (nothing was read
+    // past, so nothing to resync). Its first heartbeat comes after that
+    // listing whatever the scheduling, so the inbox below is made after it.
+    feed.next_beat().await;
 
     // An inbox made for her with no change announcing it (only a bug would
     // do that): its first mail is read past under her old list.
@@ -2234,9 +2239,22 @@ async fn assert_blind(db: PgPool, observers: &[Observer], hidden: &[Unseen]) {
             "{what}: the streams differ\nbusy: {seen:#?}\nquiet: {unseen:#?}"
         );
 
-        // Resuming from any token it was given replays the same.
+        // Resuming from any token it was given replays the same. The
+        // tokens are taken from the frames `canonical` compares (heartbeats
+        // left out): each stream's heartbeats are on its own timer from its
+        // own open, so a change may land just before a beat in one stream
+        // and just after it in the other, and counting the beats' tokens
+        // would pair different points of the two streams. The final
+        // heartbeat is the same point in both (each transcript ends on it),
+        // and resuming from it replays nothing.
         let tokens = |frames: &[(Duration, Frame)]| -> Vec<String> {
-            frames.iter().filter_map(|(_, f)| f.id.clone()).collect()
+            let mut tokens: Vec<String> = frames
+                .iter()
+                .filter(|(_, f)| !f.is_beat())
+                .filter_map(|(_, f)| f.id.clone())
+                .collect();
+            tokens.extend(frames.last().and_then(|(_, f)| f.id.clone()));
+            tokens
         };
         let (seen_tokens, unseen_tokens) = (tokens(seen), tokens(unseen));
         assert_eq!(seen_tokens.len(), unseen_tokens.len(), "{what}");
