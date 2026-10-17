@@ -547,8 +547,8 @@ async fn a_backfill_row_keeps_its_inbox_and_workspace(db: PgPool) {
         .unwrap();
     assert_eq!(seen, 0);
     tx.rollback().await.unwrap();
-    // The dispatcher's context (the kernel scope) may only start rows.
-    let mut tx = campbooks_kernel::db::begin_kernel(&kit.state.db)
+    // The dispatcher's context (the maintenance scope) may only start rows.
+    let mut tx = campbooks_kernel::db::begin_maintenance(&kit.state.db)
         .await
         .unwrap();
     let moved = sqlx::query(
@@ -559,7 +559,7 @@ async fn a_backfill_row_keeps_its_inbox_and_workspace(db: PgPool) {
     .await;
     assert!(moved.is_err(), "moved to another workspace");
     tx.rollback().await.unwrap();
-    let mut tx = campbooks_kernel::db::begin_kernel(&kit.state.db)
+    let mut tx = campbooks_kernel::db::begin_maintenance(&kit.state.db)
         .await
         .unwrap();
     let finished = sqlx::query("UPDATE conversations.needs_backfills SET state = 'done'")
@@ -740,4 +740,32 @@ async fn recent_mail_no_checked_model_answered_is_read_again_once(db: PgPool) {
     .await
     .unwrap();
     assert_eq!(asked_again, 5);
+}
+
+/// Only the maintenance scope reads the backfills across workspaces: the
+/// kernel scope (which reaches the kernel's tables) sees none of them, and
+/// neither does a transaction that set nothing (campbooks-cloud#196).
+#[sqlx::test(migrations = "../../../migrations")]
+async fn only_the_maintenance_scope_reads_the_backfills(db: PgPool) {
+    let kit = Kit::new(db.clone()).await;
+    mailbox(&kit, &["needs"]).await;
+    mailbox(&kit, &["needs"]).await;
+    seed(&db).await;
+    let count = "SELECT count(*) FROM conversations.needs_backfills";
+    let owner: i64 = sqlx::query_scalar(count).fetch_one(&db).await.unwrap();
+    assert_eq!(owner, 2);
+    let kernel = campbooks_kernel::testing::kernel_scope_pool(&db).await;
+    let seen: i64 = sqlx::query_scalar(count).fetch_one(&kernel).await.unwrap();
+    assert_eq!(seen, 0, "the kernel scope");
+    let seen: i64 = sqlx::query_scalar(count)
+        .fetch_one(&kit.state.db)
+        .await
+        .unwrap();
+    assert_eq!(seen, 0, "nothing set");
+    let mut tx = campbooks_kernel::db::begin_maintenance(&kit.state.db)
+        .await
+        .unwrap();
+    let seen: i64 = sqlx::query_scalar(count).fetch_one(&mut *tx).await.unwrap();
+    assert_eq!(seen, 2, "the maintenance scope");
+    tx.rollback().await.unwrap();
 }
