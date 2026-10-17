@@ -57,11 +57,10 @@ impl Op {
             Self::MarkRead => "markAsRead",
             Self::MarkUnread => "markAsUnread",
             Self::Flag(_) => "setFlag",
-            Self::Archive => "archiveMails",
+            Self::Archive | Self::Rearchive => "archiveMails",
             Self::Unarchive => "unArchiveMails",
             Self::MoveTo(_) => "moveMessage",
             Self::Spam => "moveToSpam",
-            Self::Rearchive => "archiveMails",
         }
     }
 

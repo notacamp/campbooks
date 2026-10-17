@@ -190,6 +190,15 @@ pub async fn change(
             .fetch_all(&mut *conn)
             .await?
         }
+        Flag::Trash | Flag::Untrash | Flag::Spam | Flag::Unspam => bin(conn, id, flag).await?,
+    };
+    Ok(changed)
+}
+
+/// [`change`] for the trash and spam: `flag` is one of [`Flag::Trash`],
+/// [`Flag::Untrash`], [`Flag::Spam`] and [`Flag::Unspam`].
+async fn bin(conn: &mut sqlx::PgConnection, id: ConversationId, flag: Flag) -> Result<Vec<String>> {
+    Ok(match flag {
         // Trash and spam exclude each other. Trash leaves the inbox flag as
         // it is (untrash puts the message back where it was); spam takes
         // the message out of the inbox and remembers whether it was there,
@@ -239,6 +248,6 @@ pub async fn change(
             .fetch_all(&mut *conn)
             .await?
         }
-    };
-    Ok(changed)
+        _ => Vec::new(),
+    })
 }
