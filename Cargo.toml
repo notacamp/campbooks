@@ -123,7 +123,7 @@ regex = "1.13.1"
 # Pinned: 4.2.3 is newer than the two-week rule because it fixes
 # RUSTSEC-2021-0157/0158 in 4.2.0. Relax to a caret requirement after
 # 2026-10-27.
-ammonia = "=4.2.3"
+ammonia = "=4.2.4"
 # Email: inlining a message's style sheets into `style` attributes before
 # ammonia cleans it (conversations, campbooks-cloud#160). No default
 # features: never fetches a remote sheet (`http`) or reads a file (`file`).

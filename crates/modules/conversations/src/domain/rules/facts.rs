@@ -20,6 +20,10 @@ use crate::{
 
 /// What the engine and the bulk runs read about one conversation.
 #[derive(Debug, Clone)]
+#[allow(
+    clippy::struct_excessive_bools,
+    reason = "independent facts about one conversation, read from its row"
+)]
 pub struct Candidate {
     /// The conversation.
     pub id: ConversationId,
@@ -379,13 +383,12 @@ async fn mark_correspondents(
     let mut known: std::collections::HashMap<String, bool> = std::collections::HashMap::new();
     for candidate in candidates.iter_mut().filter(|c| c.dmarc_refused()) {
         let sender = candidate.sender_address.to_lowercase();
-        let writes = match known.get(&sender) {
-            Some(writes) => *writes,
-            None => {
-                let writes = corresponds(conn, inbox, &sender).await?;
-                known.insert(sender, writes);
-                writes
-            }
+        let writes = if let Some(writes) = known.get(&sender) {
+            *writes
+        } else {
+            let writes = corresponds(conn, inbox, &sender).await?;
+            known.insert(sender, writes);
+            writes
         };
         candidate.correspondent = writes;
     }
