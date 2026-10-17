@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE connectors.outbound_changes o SET restore_to = NULL\n             FROM connectors.messages m\n            WHERE o.stream_id = $1 AND o.restore_to IS NOT NULL\n              AND m.stream_id = o.stream_id AND m.provider_message_id = o.provider_message_id\n              AND NOT ('TRASH' = ANY (m.label_ids))",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "3b160d50b8ebd769d6eca551d0cfb15493530a864873d86328806926ad88603d"
+}

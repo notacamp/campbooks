@@ -71,7 +71,18 @@ async fn requested_changes_follow_the_contract(db: PgPool) {
     let (workspace, _, sam) = kit.sams_inbox().await;
     let id = kit.conversation_of("en-1").await;
     let base = format!("/api/v1/w/{workspace}/conversations/{id}");
-    for action in ["read", "unread", "star", "unstar", "archive", "unarchive"] {
+    for action in [
+        "read",
+        "unread",
+        "star",
+        "unstar",
+        "archive",
+        "unarchive",
+        "trash",
+        "untrash",
+        "spam",
+        "not-spam",
+    ] {
         kit.post(&sam, &format!("{base}/{action}"), None).await;
     }
     kit.post(
@@ -92,7 +103,7 @@ async fn requested_changes_follow_the_contract(db: PgPool) {
         .flat_map(|e| e["items"].as_array().unwrap())
         .map(|i| i["change"]["kind"].as_str().unwrap())
         .collect();
-    assert_eq!(kinds.len(), 8, "{kinds:?}");
+    assert_eq!(kinds.len(), 12, "{kinds:?}");
     for event in &events {
         if let Err(error) = schemas.validate(event, index) {
             panic!("{event} breaks the contract: {error}");
