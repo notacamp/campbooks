@@ -273,10 +273,14 @@ builds that router with `kernel::operations::compose`.
 per-operation opt-out): the first request's response is stored in
 `kernel.idempotency` for 24 hours and replayed for an identical retry
 (`Idempotency-Replayed: true`); a different request with the same key is
-422, one still running is 409. Keys belong to the authenticated caller;
-server errors and auth failures release the key. GET and HEAD ignore the
-header. The kernel's `kernel.prune_idempotency` schedule deletes expired
-keys hourly.
+422, one still running is 409. Keys belong to the authenticated caller:
+row-level security admits a key only to a transaction naming its caller,
+which only the layer opens. Server errors and auth failures release the
+key. GET and HEAD ignore the header. An operation declaring
+`x-campbooks.secret_once` (its answer shows a secret once) has no answer
+stored: a replay of its key is 409 `idempotency_secret_shown_once`. The
+kernel's `kernel.prune_idempotency` schedule deletes expired keys hourly,
+in the kernel scope.
 
 **Record references.** A module that points at another module's record
 stores a `kernel::RecordRef { type, id }`, with `type` =
@@ -535,7 +539,9 @@ scope nor `admin:access`. Access tokens name the API's resource URI, `<origin>/a
 (RFC 8707); `/.well-known/oauth-protected-resource/api` describes it
 (RFC 9728), and the API's Bearer challenges point there, so an MCP agent that
 knows only the API's URL finds the issuer. Endpoints anyone can call are
-rate-limited per client address through `kernel::rate_limit`.
+rate-limited per client address through `kernel::rate_limit`, whose
+counters the runtime role reaches only through the kernel's
+`kernel.take_rate_limit` and `kernel.prune_rate_limits` functions.
 
 ### Instance administration (ADR 0015)
 

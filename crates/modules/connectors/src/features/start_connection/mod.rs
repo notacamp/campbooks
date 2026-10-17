@@ -63,7 +63,7 @@ pub struct StartedConnection {
     operation_id = "connectors.start_connection",
     tag = "connectors",
     security(("bearer" = ["connectors:write"])),
-    extensions(("x-campbooks" = json!(Operation::command(Risk::Low).records(["connectors.connection"]).access("connectors.connection", campbooks_kernel::authz::Action::Create)))),
+    extensions(("x-campbooks" = json!(Operation::command(Risk::Low).secret_once().records(["connectors.connection"]).access("connectors.connection", campbooks_kernel::authz::Action::Create)))),
     params(("workspace_id" = WorkspaceId, Path, description = "The workspace.")),
     request_body = StartConnection,
     responses(

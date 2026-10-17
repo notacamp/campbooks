@@ -164,6 +164,34 @@ pub async fn begin_kernel(pool: &PgPool) -> Result<Transaction<'static, Postgres
     Ok(tx)
 }
 
+/// The transaction-local Postgres setting that names the caller whose
+/// idempotency keys a transaction reaches (`user:<subject>` or
+/// `client:<client id>`; campbooks-cloud#210). `kernel.idempotency`'s
+/// row-level security admits a key only to its caller, so a workspace
+/// transaction, or one that set nothing, sees and writes no key. Only the
+/// kernel names it (crate-private): [`begin_as_idempotency_caller`], called
+/// by the idempotency layer alone, sets it, and `cargo xtask arch` rejects
+/// the setting and this constant's name anywhere else in Rust.
+pub(crate) const IDEMPOTENCY_CALLER_SETTING: &str = "campbooks.idempotency_caller";
+
+/// Begin a transaction that reaches `caller`'s idempotency keys and nothing
+/// else of the kernel's (no workspace, no kernel scope): the idempotency
+/// layer's claim, store and release.
+pub(crate) async fn begin_as_idempotency_caller(
+    pool: &PgPool,
+    caller: &str,
+) -> Result<Transaction<'static, Postgres>, sqlx::Error> {
+    let mut tx = pool.begin().await?;
+    sqlx::query_scalar!(
+        "SELECT set_config($1, $2, true)",
+        IDEMPOTENCY_CALLER_SETTING,
+        caller
+    )
+    .fetch_one(&mut *tx)
+    .await?;
+    Ok(tx)
+}
+
 /// The transaction-local Postgres setting that a module's **maintenance
 /// policies** trust, and nothing else: a scheduler's dispatcher reading and
 /// leasing its own index across workspaces (`connectors.sync_due`,

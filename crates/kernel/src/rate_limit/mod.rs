@@ -6,7 +6,11 @@
 //! usually the caller's address ([`ClientIp`]), sometimes an account or a
 //! client. Counters live in Postgres (`kernel.rate_limits`), so every `api`
 //! process of an install shares them. Keys are stored as an HMAC under a key
-//! derived from the instance secret, never as addresses. Over the limit,
+//! derived from the instance secret, never as addresses. The runtime role
+//! holds no privilege on the table: it counts through
+//! `kernel.take_rate_limit` and prunes through `kernel.prune_rate_limits`,
+//! functions running as the table's owner, so no transaction can read,
+//! lower or reset a counter (campbooks-cloud#210). Over the limit,
 //! [`RateLimits::check`] answers [`Error::RateLimited`]: 429 problem+json
 //! `rate_limited` with `Retry-After`.
 //!
@@ -181,33 +185,32 @@ impl RateLimits {
         let Some(key) = &key.0 else {
             return Ok(None);
         };
-        let bucket = self.bucket(limit, key);
-        let window = limit.window.as_secs_f64();
-        let row = sqlx::query!(
-            r#"
-            INSERT INTO kernel.rate_limits (bucket, hits, resets_at)
-            VALUES ($1, 1, now() + make_interval(secs => $2))
-            ON CONFLICT (bucket) DO UPDATE SET
-                hits = CASE WHEN kernel.rate_limits.resets_at <= now() THEN 1
-                            ELSE kernel.rate_limits.hits + 1 END,
-                resets_at = CASE WHEN kernel.rate_limits.resets_at <= now()
-                                 THEN now() + make_interval(secs => $2)
-                                 ELSE kernel.rate_limits.resets_at END
-            RETURNING hits,
-                      ceil(extract(epoch FROM resets_at - now()))::bigint AS "retry_after!"
-            "#,
-            bucket,
-            window,
-        )
-        .fetch_one(db)
-        .await?;
-        let hits = i64::from(row.hits);
+        let (hits, retry_after) = take(db, &self.bucket(limit, key), limit.window, 1).await?;
+        let hits = i64::from(hits);
         let max = i64::from(limit.max);
         Ok((hits > max).then(|| Refusal {
-            retry_after: row.retry_after.max(1).unsigned_abs(),
+            retry_after: retry_after.max(1).unsigned_abs(),
             first: hits == max + 1,
         }))
     }
+}
+
+/// Add `cost` hits to `bucket` in a window of `window` (one starts when the
+/// last ended): the bucket's hits now and the seconds left in its window.
+/// Through `kernel.take_rate_limit`, the runtime role's only door to the
+/// counters.
+async fn take(
+    db: &PgPool,
+    bucket: &[u8],
+    window: Duration,
+    cost: u32,
+) -> Result<(i32, i64), sqlx::Error> {
+    sqlx::query_as("SELECT hits, retry_after FROM kernel.take_rate_limit($1, $2, $3)")
+        .bind(bucket)
+        .bind(window.as_secs_f64())
+        .bind(i32::try_from(cost).unwrap_or(i32::MAX))
+        .fetch_one(db)
+        .await
 }
 
 /// A hit over its limit.
@@ -222,7 +225,9 @@ pub(crate) struct Refusal {
 
 impl RateLimits {
     /// Use up `key`'s whole budget under `limit` for a window, as if it had
-    /// been hit `max` times (tests of what happens past a large limit).
+    /// been hit `max` times more (tests of what happens past a large
+    /// limit). Through the same door as every hit: the runtime role cannot
+    /// write a counter directly.
     ///
     /// # Panics
     /// If the database refuses the write.
@@ -231,17 +236,9 @@ impl RateLimits {
         let Some(key) = &key.0 else {
             return;
         };
-        sqlx::query(
-            "INSERT INTO kernel.rate_limits (bucket, hits, resets_at)
-             VALUES ($1, $2, now() + make_interval(secs => $3))
-             ON CONFLICT (bucket) DO UPDATE SET hits = $2, resets_at = EXCLUDED.resets_at",
-        )
-        .bind(self.bucket(limit, key))
-        .bind(i32::try_from(limit.max).unwrap_or(i32::MAX))
-        .bind(limit.window.as_secs_f64())
-        .execute(db)
-        .await
-        .unwrap_or_else(|e| panic!("exhausting a rate limit: {e}"));
+        take(db, &self.bucket(limit, key), limit.window, limit.max.max(1))
+            .await
+            .unwrap_or_else(|e| panic!("exhausting a rate limit: {e}"));
     }
 }
 
@@ -370,21 +367,17 @@ impl crate::Job for PruneRateLimits {
     }
 }
 
-/// Delete every counter whose window ended; how many.
+/// Delete every counter whose window ended; how many. Through
+/// `kernel.prune_rate_limits` (the kernel scope, as the table's owner), a
+/// batch per call.
 async fn prune(db: &PgPool) -> Result<u64, sqlx::Error> {
     let mut pruned = 0_u64;
     loop {
-        let deleted = sqlx::query!(
-            r#"
-            DELETE FROM kernel.rate_limits
-             WHERE bucket IN (
-                 SELECT bucket FROM kernel.rate_limits WHERE resets_at <= now() LIMIT $1)
-            "#,
-            PRUNE_BATCH,
-        )
-        .execute(db)
-        .await?
-        .rows_affected();
+        let deleted: i64 = sqlx::query_scalar("SELECT kernel.prune_rate_limits($1)")
+            .bind(i32::try_from(PRUNE_BATCH).unwrap_or(i32::MAX))
+            .fetch_one(db)
+            .await?;
+        let deleted = deleted.unsigned_abs();
         pruned += deleted;
         if deleted < PRUNE_BATCH.unsigned_abs() {
             return Ok(pruned);
@@ -550,5 +543,78 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(left, 0);
+    }
+
+    /// The runtime role counts, and prunes ended windows, only through the
+    /// kernel's two functions: no transaction of it, in a workspace or not,
+    /// reads, resets, raises or forges a counter (campbooks-cloud#210).
+    #[sqlx::test(migrations = "../../migrations")]
+    async fn the_runtime_role_reaches_counters_only_through_the_kernels_functions(db: PgPool) {
+        use crate::db::BeginFor as _;
+
+        let pool = crate::testing::app_role_pool(&db).await;
+        let limits = RateLimits::default();
+        let limit = Limit::new("test.limit", 2, Duration::from_mins(1));
+        let key = RateKey::ip(ClientIp(Some(ip("198.51.100.4"))));
+        limits.check(&pool, &limit, &key).await.unwrap();
+        limits.check(&pool, &limit, &key).await.unwrap();
+        let refused = limits.check(&pool, &limit, &key).await.unwrap_err();
+        assert!(matches!(refused, Error::RateLimited { .. }), "{refused:?}");
+
+        for sql in [
+            "SELECT count(*) FROM kernel.rate_limits",
+            "UPDATE kernel.rate_limits SET hits = 0",
+            "DELETE FROM kernel.rate_limits",
+            "INSERT INTO kernel.rate_limits (bucket, hits, resets_at) VALUES ('\\x00', 0, now())",
+        ] {
+            let mut tx = pool
+                .begin_for(crate::tenancy::WorkspaceId::new())
+                .await
+                .unwrap();
+            let denied = sqlx::query(sql).execute(&mut *tx).await.unwrap_err();
+            assert!(
+                denied.to_string().contains("permission denied"),
+                "{sql}: {denied}"
+            );
+            drop(tx);
+            let denied = sqlx::query(sql).execute(&pool).await.unwrap_err();
+            assert!(
+                denied.to_string().contains("permission denied"),
+                "{sql}: {denied}"
+            );
+        }
+        // Still limited: nothing was reset.
+        assert!(limits.check(&pool, &limit, &key).await.is_err());
+        // An exhausted budget, through the same door.
+        let other = RateKey::text("account:a-1");
+        limits.exhaust(&pool, &limit, &other).await;
+        assert!(limits.check(&pool, &limit, &other).await.is_err());
+
+        // The function takes buckets, windows and costs the limiter makes,
+        // nothing else: no window longer than a day (a counter that never
+        // resets), no free or negative hit.
+        for (bucket, window, cost) in [
+            (vec![0_u8; 8], 60.0, 1),
+            (vec![0_u8; 32], 0.0, 1),
+            (vec![0_u8; 32], 86_401.0, 1),
+            (vec![0_u8; 32], 60.0, 0),
+            (vec![0_u8; 32], 60.0, -5),
+        ] {
+            let refused = sqlx::query("SELECT * FROM kernel.take_rate_limit($1, $2, $3)")
+                .bind(bucket)
+                .bind(window)
+                .bind(cost)
+                .execute(&pool)
+                .await;
+            assert!(refused.is_err(), "{window} {cost}");
+        }
+
+        // Ended windows are pruned by the runtime role, through the kernel.
+        sqlx::query("UPDATE kernel.rate_limits SET resets_at = now() - interval '1 second'")
+            .execute(&db)
+            .await
+            .unwrap();
+        assert_eq!(prune(&pool).await.unwrap(), 2);
+        limits.check(&pool, &limit, &key).await.unwrap();
     }
 }
