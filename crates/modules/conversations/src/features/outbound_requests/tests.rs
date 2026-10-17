@@ -336,15 +336,21 @@ async fn trash_spam_and_flags_stand_as_requested(db: PgPool) {
     // Each through its own operation, the flags through `request_each`:
     // every one is recorded and stands as the connector re-reads it.
     for (action, kind) in [
-        ("unread", "mark_unread"),
         ("read", "mark_read"),
+        ("unread", "mark_unread"),
         ("trash", "trash"),
         ("untrash", "untrash"),
         ("spam", "spam"),
         ("not-spam", "unspam"),
     ] {
+        let before = kit.events("conversations.changes_requested").await.len();
         let done = kit.post(&sam, &format!("{base}/{action}"), None).await;
         assert_eq!(done.status, StatusCode::OK, "{action}: {:?}", done.json);
+        assert_eq!(
+            kit.events("conversations.changes_requested").await.len(),
+            before + 1,
+            "{action} requested nothing"
+        );
         let (request, items) = last_request(&kit).await;
         assert!(
             items.iter().all(|item| item["change"]["kind"] == kind),

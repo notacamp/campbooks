@@ -1508,8 +1508,8 @@ async fn a_forged_change_request_is_refused_by_the_real_port(db: PgPool) {
     for action in [
         "archive",
         "unarchive",
-        "unread",
         "read",
+        "unread",
         "trash",
         "untrash",
         "spam",
