@@ -8,6 +8,12 @@ All notable changes to Campbooks Next are documented here. The format follows
 
 ### Fixed
 
+- **Scout's reply suggestions and drafts have room to think.** The model behind them
+  (a reasoning model in production) spends its thinking from the same budget as its
+  answer, and Reply gave it too little: suggestions and drafts could come back empty or cut
+  short, and Reply would say Scout couldn't write one. Both now allow 4,096 tokens. When
+  an answer still doesn't parse, the log says why the model stopped and how long the
+  answer was, never what it wrote.
 - **Sign in with Zoho works.** Signing in with Zoho, or connecting a Zoho mailbox,
   always ended on "The provider didn't let you in". Zoho publishes its signing key with
   an extra zero byte in front, and the server refused the key's every signature because

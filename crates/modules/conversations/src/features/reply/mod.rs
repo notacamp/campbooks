@@ -470,7 +470,24 @@ async fn ask<T: DeserializeOwned>(
     let usage = Scope::workspace(state.db.clone(), workspace, feature).interactive();
     match usage.run(gateway.chat(Role::Complete, request)).await {
         Ok(response) => response.json::<T>().map_err(|_| {
-            tracing::warn!(feature, "reply: the model's answer is not the schema");
+            // Why it stopped and how long its answer was, never what it
+            // wrote; nor the parser's message, which can quote it.
+            let finish_reason = response.finish_kind();
+            let reason = if response.content.trim().is_empty() {
+                "empty"
+            } else if finish_reason == "length" {
+                "truncated"
+            } else {
+                "not_json"
+            };
+            tracing::warn!(
+                feature,
+                reason,
+                finish_reason,
+                completion_tokens = response.usage.map(|usage| usage.completion_tokens),
+                content_chars = response.content.chars().count(),
+                "reply: the model's answer is not the schema"
+            );
             Error::Unavailable(crate::MESSAGES.reason("reply_failed"))
         }),
         // The workspace used its whole daily AI limit: 503, saying so.

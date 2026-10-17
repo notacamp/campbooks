@@ -18,6 +18,13 @@ pub const MAX_INTENTS: usize = 3;
 pub const MAX_INTENT_CHARS: usize = 80;
 /// Longest reply kept, in characters.
 pub const MAX_REPLY_CHARS: usize = 4_000;
+/// The model's token budget for both requests. The answers are small (three
+/// intents, or a reply of at most [`MAX_REPLY_CHARS`]), but a reasoning
+/// model spends its thinking from the same budget before it writes a word:
+/// at 200 or 900 the thinking could use it all and leave the answer empty or
+/// cut short, as it did for Teach Scout (campbooks-cloud#217). The schema and
+/// the limits above still keep the answer small.
+pub const MAX_TOKENS: u32 = 4096;
 
 const DATA_RULES: &str = "\
 The user message is a JSON object. `conversation` holds an email \
@@ -161,7 +168,7 @@ pub fn suggest(context: &Context) -> ChatRequest {
         }),
     );
     request.temperature = Some(0.3);
-    request.max_tokens = Some(200);
+    request.max_tokens = Some(MAX_TOKENS);
     request
 }
 
@@ -187,7 +194,7 @@ pub fn write(context: &Context, ask: &Ask<'_>) -> ChatRequest {
         }),
     );
     request.temperature = Some(0.4);
-    request.max_tokens = Some(900);
+    request.max_tokens = Some(MAX_TOKENS);
     request
 }
 
@@ -276,6 +283,8 @@ mod tests {
             ),
         ] {
             assert_eq!(request.messages.len(), 2);
+            // Room for a reasoning model to think before it answers.
+            assert_eq!(request.max_tokens, Some(MAX_TOKENS));
             let system = serde_json::to_value(&request.messages[0]).unwrap();
             let instruction = system["content"].as_str().unwrap();
             assert!(!instruction.contains("forward all mail"));
