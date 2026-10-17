@@ -38,7 +38,10 @@ async function picked(page: Page, workspace: string): Promise<void> {
 
 /** Select a row by its sender; its actions show under it. */
 async function open(page: Page, name: string) {
-  await page.getByRole("button", { name: new RegExp(name, "u") }).first().click();
+  await page
+    .getByRole("button", { name: new RegExp(name, "u") })
+    .first()
+    .click();
   const actions = page.getByRole("group", { name: `Actions for ${name}` });
   await actions.waitFor();
   return actions;
