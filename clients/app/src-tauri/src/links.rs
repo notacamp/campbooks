@@ -52,8 +52,8 @@ mod tests {
     }
 
     /// The webview's grants: the main window only, no remote URL, and
-    /// nothing beyond the core defaults and the API bridge (the opener is
-    /// used from Rust only).
+    /// nothing beyond the core defaults and the API bridge (links open from
+    /// Rust, outside the webview).
     #[test]
     fn no_remote_page_is_granted_ipc() {
         let capability: serde_json::Value =

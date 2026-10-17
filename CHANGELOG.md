@@ -55,6 +55,11 @@ All notable changes to Campbooks Next are documented here. The format follows
 
 ### Fixed
 
+- **HTML mail looks right in the desktop app.** The desktop app now shows HTML mail as the web
+  app does: styled, with its pictures, and remote images still held back until Show images or
+  a trusted sender. Its page policy allows only inline style attributes and `https:`, `data:`
+  and `blob:` images; nothing in a mail ever runs, posts or navigates. A link in a mail opens
+  in your browser, never inside the app. Plain `http:` images stay blocked on desktop.
 - **A signature logo is no attachment to open.** With the action catalogue on, an image
   shown in an email's text (a logo sent inline) no longer counts as an attachment, so
   Open attachment is never offered for mail that has nothing else attached.

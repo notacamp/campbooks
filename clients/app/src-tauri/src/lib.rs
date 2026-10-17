@@ -9,8 +9,6 @@ mod api;
 mod auth;
 mod links;
 
-use tauri_plugin_opener::OpenerExt as _;
-
 /// Starts the app.
 ///
 /// # Panics
@@ -21,7 +19,6 @@ use tauri_plugin_opener::OpenerExt as _;
 pub fn run() {
     let result = api::ApiForwarder::from_env().and_then(|forwarder| {
         tauri::Builder::default()
-            .plugin(tauri_plugin_opener::init())
             .manage(forwarder)
             .invoke_handler(tauri::generate_handler![api::api_request])
             .setup(main_window)
@@ -41,12 +38,12 @@ fn main_window(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
     let Some(config) = app.config().app.windows.first().cloned() else {
         return Err("tauri.conf.json has no window".into());
     };
-    let handle = app.handle().clone();
     tauri::WebviewWindowBuilder::from_config(app.handle(), &config)?
-        .on_new_window(move |url, _features| {
+        .on_new_window(|url, _features| {
             if let Some(link) = links::outside(&url) {
-                // Nowhere to say it failed: the link simply does not open.
-                let _ = handle.opener().open_url(link, None::<&str>);
+                // The system's own handler, outside every webview. Nowhere to
+                // say it failed: the link simply does not open.
+                let _ = open::that_detached(link);
             }
             tauri::webview::NewWindowResponse::Deny
         })
