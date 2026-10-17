@@ -457,6 +457,10 @@ impl TaughtRule {
 
 /// What the engine reads of one message and its conversation.
 #[derive(Debug, Clone, Default)]
+#[allow(
+    clippy::struct_excessive_bools,
+    reason = "independent facts about one message, each read by its own condition or guard"
+)]
 pub struct Facts<'a> {
     /// The sender's address.
     pub sender_address: &'a str,
