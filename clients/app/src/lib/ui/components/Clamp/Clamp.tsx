@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useId, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 
 import { Button } from "../Button/Button";
 
@@ -17,15 +17,18 @@ export interface ClampProps {
  * Long content shown a few lines deep (`--clamp-height`) with a fade, and a
  * button to read it all in place. The button shows only when there is more
  * to see; content that grows later (a message frame measuring itself) is
- * watched.
+ * watched. Focus moving into the hidden part opens it, so the keyboard never
+ * lands somewhere out of sight.
  */
 export function Clamp({ children, moreLabel, lessLabel }: ClampProps) {
+  const id = useId();
   const box = useRef<HTMLDivElement>(null);
   const content = useRef<HTMLDivElement>(null);
   const [open, setOpen] = useState(false);
-  const [overflows, setOverflows] = useState(true);
+  // Without a way to measure, offer the button rather than hide content.
+  const [overflows, setOverflows] = useState(() => typeof ResizeObserver === "undefined");
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const outer = box.current;
     const inner = content.current;
     if (outer === null || inner === null || typeof ResizeObserver === "undefined") {
@@ -50,9 +53,15 @@ export function Clamp({ children, moreLabel, lessLabel }: ClampProps) {
     <div className={styles["clamp"]}>
       <div
         ref={box}
+        id={id}
         className={styles["box"]}
         data-open={open ? "" : undefined}
         data-fade={!open && overflows ? "" : undefined}
+        onFocus={() => {
+          if (overflows) {
+            setOpen(true);
+          }
+        }}
       >
         <div ref={content}>{children}</div>
       </div>
@@ -60,6 +69,7 @@ export function Clamp({ children, moreLabel, lessLabel }: ClampProps) {
         <Button
           variant="link"
           aria-expanded={open}
+          aria-controls={id}
           onClick={() => {
             setOpen(!open);
           }}

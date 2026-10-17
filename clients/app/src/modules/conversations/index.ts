@@ -12,7 +12,7 @@ export {
   type NeedView,
 } from "./api/queries";
 export { useNeedActions } from "./components/Needs/use-need-actions";
-export { NeedMessage } from "./components/NeedMessage/NeedMessage";
+export { NeedMessage, needMessageOf } from "./components/NeedMessage/NeedMessage";
 export {
   dueLabel,
   howRows,

@@ -34,8 +34,18 @@ export const SANDBOX = "allow-same-origin allow-popups allow-popups-to-escape-sa
  */
 export const SANDBOX_INERT_LINKS = "allow-same-origin";
 
-/** How links look when they lead nowhere: as plain text, not as a link. */
-const INERT_LINKS_CSS = "a { pointer-events: none !important; cursor: default !important; }";
+/**
+ * Take the links out of a frame's document: each `href` moves to
+ * `data-href`, so a link is plain text (not focusable, no "Open in new
+ * tab", nothing the mail's CSS can switch back on). The sandbox without
+ * popups stays as the second layer, covering the moment before load.
+ */
+export function stripLinks(doc: Document): void {
+  for (const link of doc.querySelectorAll("a[href], area[href]")) {
+    link.setAttribute("data-href", link.getAttribute("href") ?? "");
+    link.removeAttribute("href");
+  }
+}
 
 /**
  * The frame's base look, as an attribute: the page's policy blocks style
@@ -122,18 +132,17 @@ export function fitZoom(contentWidth: number, frameWidth: number): number {
  * `<style>` element, which the page's policy blocks in the frame. Loads
  * the rules could still name are under the frame's policy all the same.
  */
-function adoptStyles(doc: Document, css: string | undefined, inertLinks: boolean): void {
+function adoptStyles(doc: Document, css: string | undefined): void {
   const view = doc.defaultView;
   if (view === null) {
     return;
   }
-  const rules = inertLinks ? `${INERT_LINKS_CSS}\n${css ?? ""}` : css;
-  if (rules === undefined || rules === "") {
+  if (css === undefined || css === "") {
     doc.adoptedStyleSheets = [];
     return;
   }
   const sheet = new view.CSSStyleSheet();
-  sheet.replaceSync(rules);
+  sheet.replaceSync(css);
   doc.adoptedStyleSheets = [sheet];
 }
 
@@ -219,7 +228,10 @@ export function SafeHtml({
       if (doc?.URL !== "about:srcdoc") {
         return;
       }
-      adoptStyles(doc, rules, inertLinks);
+      if (inertLinks) {
+        stripLinks(doc);
+      }
+      adoptStyles(doc, rules);
       resizes = 0;
       last = undefined;
       observer?.disconnect();
@@ -243,6 +255,8 @@ export function SafeHtml({
       ref={frame}
       className={styles["frame"]}
       title={title}
+      // Sandbox flags only apply when a frame loads: a new frame when they change.
+      key={inertLinks ? "inert" : "live"}
       sandbox={inertLinks ? SANDBOX_INERT_LINKS : SANDBOX}
       referrerPolicy="no-referrer"
       loading="lazy"

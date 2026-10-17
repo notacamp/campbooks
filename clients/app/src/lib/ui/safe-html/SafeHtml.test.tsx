@@ -10,6 +10,7 @@ import {
   SafeHtml,
   SANDBOX,
   SANDBOX_INERT_LINKS,
+  stripLinks,
 } from "./SafeHtml";
 
 function frame(container: HTMLElement): HTMLIFrameElement {
@@ -40,6 +41,18 @@ describe("SafeHtml", () => {
     );
     expect(frame(container).getAttribute("sandbox")).toBe(SANDBOX_INERT_LINKS);
     expect(SANDBOX_INERT_LINKS).not.toMatch(/allow-popups|allow-scripts|allow-top-navigation/u);
+  });
+
+  it("turns links into plain text, whatever the mail's styles say", () => {
+    const doc = new DOMParser().parseFromString(
+      '<a href="https://evil.example" style="pointer-events: auto !important"><span>Verify</span></a>',
+      "text/html",
+    );
+    stripLinks(doc);
+    const link = doc.querySelector("a");
+    expect(link?.hasAttribute("href")).toBe(false);
+    expect(link?.getAttribute("data-href")).toBe("https://evil.example");
+    expect(doc.querySelectorAll("[href]")).toHaveLength(0);
   });
 
   it("blocks remote images with its own policy until they are asked for", () => {

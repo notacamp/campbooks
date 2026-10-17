@@ -3,7 +3,12 @@ import { useTranslation } from "react-i18next";
 
 import { Clamp } from "~/lib/ui";
 
-import { useConversation, type ConversationSummary, type NeedView } from "../../api/queries";
+import {
+  useConversation,
+  type ConversationSummary,
+  type MessageView,
+  type NeedView,
+} from "../../api/queries";
 import { avatarKind, type Translate } from "../../model";
 import { ThreadMessage } from "../Reader/ThreadMessage";
 
@@ -12,6 +17,17 @@ export interface NeedMessageProps {
   conversation: ConversationSummary;
   need: NeedView;
   now?: Date | undefined;
+}
+
+/** The message a need is about, or the newest one the sender wrote. */
+export function needMessageOf(
+  messages: readonly MessageView[],
+  need: NeedView,
+): MessageView | undefined {
+  return (
+    messages.find((m) => m.id === need.message_id) ??
+    messages.findLast((m) => m.direction !== "outbound")
+  );
 }
 
 /**
@@ -24,11 +40,7 @@ export function NeedMessage({ workspaceId, conversation, need, now }: NeedMessag
   const t = typed as unknown as Translate;
   const detail = useConversation(workspaceId, conversation.id);
   const [showImages, setShowImages] = useState(false);
-  const messages = detail.data?.messages ?? [];
-  // The message the need is about, or the newest one the sender wrote.
-  const message =
-    messages.find((m) => m.id === need.message_id) ??
-    messages.findLast((m) => m.direction !== "outbound");
+  const message = needMessageOf(detail.data?.messages ?? [], need);
   if (message === undefined) {
     return null;
   }
@@ -47,6 +59,7 @@ export function NeedMessage({ workspaceId, conversation, need, now }: NeedMessag
         }}
         kind={avatarKind(conversation)}
         inertLinks={suspicious}
+        shortcuts={false}
         now={now}
       />
     </Clamp>

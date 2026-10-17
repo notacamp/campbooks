@@ -26,6 +26,7 @@ import {
   dueLabel,
   howRows,
   NeedMessage,
+  needMessageOf,
   needSender,
   needSentence,
   quoteAttribution,
@@ -731,12 +732,14 @@ function NeedDetail({ workspaceId, row, t, tc, locale, now, onOpen }: NeedDetail
     <ItemDetail
       reasons={warning ? [...warningReasons(tc, exists, decisions), tc("needs.mail.linksOff")] : []}
       mail={
-        <NeedMessage
-          workspaceId={workspaceId}
-          conversation={row.conversation}
-          need={need}
-          now={now}
-        />
+        needMessageOf(detail.data?.messages ?? [], need) === undefined ? undefined : (
+          <NeedMessage
+            workspaceId={workspaceId}
+            conversation={row.conversation}
+            need={need}
+            now={now}
+          />
+        )
       }
       quoteFrom={quoteAttribution(need, row.name, locale)}
       quote={need.quote?.text}
