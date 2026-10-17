@@ -510,7 +510,11 @@ export function ConversationReader({
             key={conversation.id}
             label={t("scout.label")}
             visor={need.question === "suspicious" ? "alert" : question ? "unsure" : "idle"}
-            reasons={need.question === "suspicious" ? warningReasons(t, exists, decisions) : []}
+            reasons={
+              need.question === "suspicious"
+                ? [...warningReasons(t, exists, decisions), t("needs.mail.linksOff")]
+                : []
+            }
             {...(need.quote === null || need.quote === undefined
               ? {}
               : {
@@ -598,6 +602,7 @@ export function ConversationReader({
               setImages((current) => new Set([...current, message.id]));
             }}
             kind={message.direction === "outbound" ? "person" : kind}
+            inertLinks={conversation.need?.question === "suspicious"}
             now={now}
           />
         ))}

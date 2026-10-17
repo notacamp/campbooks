@@ -34,6 +34,10 @@ export interface ThreadMessageProps {
   showImages: boolean;
   onShowImages: () => void;
   kind: "person" | "service";
+  /** The conversation may be phishing: the body's links lead nowhere. */
+  inertLinks?: boolean | undefined;
+  /** Show the reader's keys (⇧I, V) on its buttons; off where they are not bound. */
+  shortcuts?: boolean | undefined;
   now?: Date | undefined;
 }
 
@@ -51,6 +55,8 @@ export function ThreadMessage({
   showImages,
   onShowImages,
   kind,
+  inertLinks = false,
+  shortcuts = true,
   now,
 }: ThreadMessageProps) {
   const { t: typed, i18n } = useTranslation("conversations");
@@ -65,7 +71,7 @@ export function ThreadMessage({
   const from = displayName(message.from);
   const time = messageTime(message.sent_at, i18n.language, now);
   const text = message.text?.content ?? "";
-  const files = useAttachments(workspaceId, conversationId, message, t);
+  const files = useAttachments(workspaceId, conversationId, message, t, shortcuts);
 
   if (!open) {
     return (
@@ -103,6 +109,7 @@ export function ThreadMessage({
         title={t("reader.frameTitle", { name: from })}
         remoteImages={body.data?.images_shown ?? false}
         css={body.data?.css}
+        inertLinks={inertLinks}
       />
     );
   }
@@ -133,7 +140,7 @@ export function ThreadMessage({
                 <Button
                   variant="secondary"
                   icon="image"
-                  shortcut="inbox.show_images"
+                  shortcut={shortcuts ? "inbox.show_images" : undefined}
                   onClick={onShowImages}
                 >
                   {t("actions.showImages")}
@@ -159,6 +166,7 @@ function useAttachments(
   conversationId: string,
   message: MessageView,
   t: Translate,
+  shortcuts: boolean,
 ) {
   const [busy, setBusy] = useState<string | undefined>();
   const [error, setError] = useState<string | undefined>();
@@ -246,7 +254,7 @@ function useAttachments(
         }))}
         busy={busy}
         error={error}
-        shortcut="inbox.next_attachment"
+        shortcut={shortcuts ? "inbox.next_attachment" : undefined}
         onDownload={download}
         onPreview={showPreview}
       />

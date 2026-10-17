@@ -112,7 +112,7 @@ export function Item({
       </a>
     );
   return (
-    <div className={styles["wrapper"]}>
+    <div className={styles["wrapper"]} data-selected={selected || undefined}>
       {swipeActions === undefined ? (
         row
       ) : (
@@ -169,6 +169,8 @@ export interface ItemDetailProps {
   quote?: string | undefined;
   /** Why to be careful, before the quote (a warning's tells). */
   reasons?: string[] | undefined;
+  /** The email itself, after the reasons (in place of the quote). */
+  mail?: ReactNode | undefined;
   /** The assistant's context, next to the visor. */
   context?: string | undefined;
   /** Buttons: the item's own actions, then Later and Done. */
@@ -182,6 +184,7 @@ export function ItemDetail({
   quoteFrom,
   quote,
   reasons = [],
+  mail,
   context,
   actions,
   how,
@@ -195,7 +198,8 @@ export function ItemDetail({
           ))}
         </ul>
       )}
-      {quote === undefined ? null : (
+      {mail}
+      {quote === undefined || mail !== undefined ? null : (
         <p className={styles["quote"]}>
           {quoteFrom === undefined ? null : (
             <span className={styles["quoteFrom"]}>{quoteFrom}</span>
