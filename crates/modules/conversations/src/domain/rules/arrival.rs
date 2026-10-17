@@ -78,14 +78,14 @@ async fn flag_on_arrival(
         } else {
             ledger.of(rule).read = true;
         }
-        effects.add(flag.change(), messages, flag.requested());
+        effects.add(flag.change(), messages, flag.requested_for_all()?);
     }
     if let Some(applied) = &outcome.bin {
         let flag = super::apply::bin_flag(applied.value);
         let messages = effects::flag_message(tx, arrival.message, flag).await?;
         if !messages.is_empty() {
             ledger.of(&applied.rule).binned = Some(applied.value);
-            effects.add(flag.change(), messages, flag.requested());
+            effects.add(flag.change(), messages, flag.requested_for_all()?);
         }
     }
     Ok(())

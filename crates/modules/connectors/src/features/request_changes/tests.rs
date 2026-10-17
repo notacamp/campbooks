@@ -800,3 +800,38 @@ async fn trash_and_spam_reach_gmail_and_come_back(db: PgPool) {
     mailbox.run(&kit).await;
     assert_eq!(changes(&kit, mailbox.ws).await.len(), before);
 }
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_report_untrashes_only_mail_in_the_trash(db: PgPool) {
+    let kit = Kit::new(db).await;
+    let mailbox = mailbox(&kit, &[&["INBOX", "UNREAD"], &["TRASH"]]).await;
+    let (inboxed, trashed) = (&mailbox.ids[0], &mailbox.ids[1]);
+
+    // Not in the trash: a label change, no untrash.
+    kit.google.clear_calls();
+    mailbox
+        .request(&kit, &[(inboxed.as_str(), json!({"kind": "spam"}))])
+        .await;
+    let writes = kit.google.writes();
+    assert!(!writes.iter().any(|w| w.contains("/untrash")), "{writes:?}");
+    assert_eq!(writes.len(), 1, "{writes:?}");
+    assert_eq!(kit.google.labels_of(inboxed), labels(&["SPAM", "UNREAD"]));
+
+    // In the trash: untrashed first, then reported.
+    kit.google.clear_calls();
+    mailbox
+        .request(&kit, &[(trashed.as_str(), json!({"kind": "spam"}))])
+        .await;
+    let writes = kit.google.writes();
+    assert_eq!(writes.len(), 2, "{writes:?}");
+    assert!(
+        writes[0].contains(&format!("{trashed}/untrash")),
+        "{writes:?}"
+    );
+    assert!(
+        writes[1].contains(&format!("{trashed}/modify")),
+        "{writes:?}"
+    );
+    assert_eq!(kit.google.labels_of(trashed), labels(&["SPAM"]));
+    assert!(ends(&kit).await.iter().all(|e| *e == end("applied", None)));
+}

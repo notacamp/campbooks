@@ -173,14 +173,14 @@ async fn carry_out(
         } else {
             before.read = true;
         }
-        effects.add(flag.change(), messages, flag.requested());
+        effects.add(flag.change(), messages, flag.requested_for_all()?);
     }
     if let Some(bin) = mine.bin {
         let flag = bin_flag(bin);
         let messages = effects::flag_conversation(tx, candidate.id, flag).await?;
         if !messages.is_empty() {
             before.binned = Some(bin);
-            effects.add(flag.change(), messages, flag.requested());
+            effects.add(flag.change(), messages, flag.requested_for_all()?);
         }
     }
     for label in &mine.labels {
@@ -474,7 +474,7 @@ async fn undo(
         }
         let messages = effects::flag_conversation(conn, id, flag).await?;
         if !messages.is_empty() {
-            effects.add(flag.change(), messages, flag.requested());
+            effects.add(flag.change(), messages, flag.requested_for_all()?);
         }
     }
     for label in &before.labels {

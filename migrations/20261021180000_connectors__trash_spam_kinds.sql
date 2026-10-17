@@ -16,7 +16,7 @@ ALTER TABLE connectors.outbound_changes ADD CONSTRAINT outbound_changes_kind_che
                     'move_to_stream', 'unsupported')) NOT VALID;
 
 -- Nullable, no default: adding it rewrites nothing. A sync clears it once a
--- message leaves the trash; the partial index finds the few that hold one.
+-- message leaves the trash; the partial index that finds the few holding one
+-- is built in a migration of its own (20261021180500), never under this
+-- file's lock.
 ALTER TABLE connectors.outbound_changes ADD COLUMN IF NOT EXISTS restore_to text[];
-CREATE INDEX IF NOT EXISTS outbound_changes_restore_idx ON connectors.outbound_changes (stream_id)
-    WHERE restore_to IS NOT NULL;
