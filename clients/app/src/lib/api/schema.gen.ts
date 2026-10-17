@@ -719,7 +719,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Take a conversation out of spam, back in the inbox. */
+        /** Take a conversation out of spam, back where it was. */
         post: operations["conversations.not_spam"];
         delete?: never;
         options?: never;
