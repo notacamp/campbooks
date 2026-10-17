@@ -25,11 +25,11 @@ Measured with a standalone release build (counts are the sink's):
 - **A work budget, not a byte cap.** A byte cap low enough to stop the
   hostile cases (under ~50 KiB) would cut ordinary newsletters; the work
   separates them by two orders of magnitude.
-- **Counted by the sink, stopped between chunks.** A parse cannot be
-  cancelled from outside, and a timeout would leave the work running. The
-  measure feeds the HTML 8 KiB at a time and checks the count after each
-  chunk, so it stops within one chunk of the budget (a few tens of ms at
-  worst) instead of finishing a parse that would take minutes.
+- **Counted by the sink, stopped between chunks.** A timeout around a
+  later parse would leave the work running. The measure feeds the HTML
+  1 KiB at a time and checks the count after each chunk, so most crafted
+  bodies stop within a few tens of milliseconds instead of finishing a
+  parse that would take minutes.
 - **Both parse modes.** The inliner parses a whole document and ammonia a
   fragment in a `div` (its `make_parser`, default options), and the two can
   differ wholesale: after a leading `<frameset>` a document drops every
@@ -37,9 +37,25 @@ Measured with a standalone release build (counts are the sink's):
   exactly those options, and both must stay within the budget. The later
   parses then read serialisations of trees no bigger or deeper than the
   measured ones (css-inline only runs within 20,000 elements and 256 levels).
+- **A time limit too.** Two reviews found work html5ever does without the
+  sink, or before the count is read: the duplicate-attribute check inside one
+  start tag (quadratic in its attributes, no sink call until `>`), the
+  "Noah's ark" scan of the active formatting elements (attributes cloned and
+  sorted per comparison), and stack walks within one chunk or at end of
+  input. Counting cannot see those, so the measure also stops when both
+  parses together pass 500 ms (`MAX_PARSE_TIME`, about three times what the
+  densest ordinary 2 MiB mail needs on the production CPU): the sink reads
+  the clock every 1,024 calls and unwinds out of the parse (a running parse
+  cannot be stopped any other way; `resume_unwind` skips the panic hook, and
+  other panics propagate), and the clock is read after every 1 KiB chunk,
+  which bounds the tokenizer inside one long tag. Search's tokenizer pass is
+  fed the same way and keeps the words read within 500 ms.
 - **Units.** Every sink call is 1; `elem_name` is 1 (it is the scope scan);
-  `append_before_sibling` and `remove_from_parent` add the number of
-  children of the parent they touch; `reparent_children` adds the number of
+  creating an element adds its attributes, and `add_attrs_if_missing` adds
+  the element's attributes plus the new ones (ammonia's `RcDom` rebuilds a
+  set of the existing names on every call: `<html a1><html a2>…` cost it
+  5 s at 243 KiB); `append_before_sibling` and `remove_from_parent` add the
+  number of children of the parent they touch; `reparent_children` adds the number of
   children moved. Budget 10,000,000 (`MAX_PARSE_WORK`): a dense newsletter
   of nested tables, links and images costs about 830,000 units at 1.25 MiB,
   so about 1,400,000 at the 2 MiB read cap; most mail is under 100 KiB and

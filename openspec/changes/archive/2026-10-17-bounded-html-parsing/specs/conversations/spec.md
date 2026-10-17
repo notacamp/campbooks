@@ -6,10 +6,13 @@ returning it. Before any tree is built, the HTML SHALL be measured by
 parsing it as a whole document and as a fragment in a `div` (the modes the
 style inliner and the sanitiser parse it in), each parse counting the tree
 builder's work (each tree operation and each
-element name read in a scope check one unit; moving a node before a sibling
-or out of its parent adds the parent's number of children; moving children
-adds their number), fed in chunks of at most 8 KiB and stopped as soon as the
-work passes 10,000,000 units; HTML past that in either parse, or whose tree is deeper than
+element name read in a scope check one unit; creating an element adds its
+attributes; merging attributes into an element adds its attributes and the
+new ones; moving a node before a sibling or out of its parent adds the
+parent's number of children; moving children adds their number), fed in
+chunks of at most 1 KiB and stopped as soon as the work passes 10,000,000
+units or the two parses together have taken 500 ms; HTML past either limit
+in either parse, or whose tree is deeper than
 4,096 levels, SHALL be returned as its text instead: the characters outside
 scripts, styles, the head, the title and the markup a `noscript`, `iframe`,
 `noembed` or `noframes` holds, entities decoded, a line break at
@@ -83,6 +86,10 @@ placeholder otherwise. No other `data:` source survives.
 - **WHEN** a member reads a message whose 2 MiB HTML body is `<div></span>` repeated, which takes minutes to parse in full
 - **THEN** the measure stops within its budget, the HTML in the response is the body's text in one `pre-wrap` `div` with no other markup, `remote_images` is 0 and `css` is absent
 
+#### Scenario: Work the parser does without telling the tree
+- **WHEN** the body is one start tag with 60,000 attributes, or 20,000 nested `<b id=N>` with distinct ids
+- **THEN** measuring stops at the 500 ms limit and the body is shown as its text
+
 #### Scenario: A leading frameset
 - **WHEN** the same body starts with `<frameset>`, after which a whole-document parse drops the rest
 - **THEN** it is still shown as its text, because the fragment parse is measured too
@@ -98,8 +105,8 @@ time (its last message), subject, label names, facets (stream, unread,
 starred, archived, label ids) and, per message, its people (from, to, cc
 with names and addresses), plain text (the text part, or the HTML part
 reduced to text when there is none, quoted history removed, at most
-32 KiB; the HTML is reduced by html5ever's tokenizer alone, in time linear
-in its size, keeping the characters outside scripts, styles, the head, the
+32 KiB; the HTML is reduced by html5ever's tokenizer alone, with no tree,
+fed 1 KiB at a time and stopped after 500 ms with the words read so far, keeping the characters outside scripts, styles, the head, the
 title, the markup a `noscript`, `iframe`, `noembed` or `noframes` holds, and
 `blockquote`s, with a line break at each `br` and at the end of
 each block), attachment names, mailbox (`inbox`, `archive`, `spam`, `trash`),
@@ -121,4 +128,4 @@ Drafts SHALL NOT be returned.
 
 #### Scenario: HTML built to be slow to parse
 - **WHEN** search asks for an HTML-only message whose HTML would take minutes to build as a tree
-- **THEN** it gets the message's text in time linear in its size
+- **THEN** it gets the message's text, or the words read within 500 ms

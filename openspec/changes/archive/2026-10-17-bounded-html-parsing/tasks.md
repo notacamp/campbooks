@@ -10,4 +10,4 @@
 - [x] 2.4 Tests: hostile inputs stop at the budget; every fixture under `fixtures/email-html` passes it with room; the reader shows a hostile body as text; search text unchanged for the existing cases and linear on hostile input; a deep but cheap tree is sanitised on a 2 MiB-stack thread
 
 ## 3. Finish
-- [ ] 3.1 CHANGELOG (Security), recording, archive this change
+- [x] 3.1 CHANGELOG (Security), recording, archive this change

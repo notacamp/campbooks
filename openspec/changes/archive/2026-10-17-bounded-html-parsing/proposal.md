@@ -22,13 +22,15 @@ in under 10 ms.
   it as the parsers after it do (a whole document for the style inliner, a
   fragment in a `div` for ammonia), counting the work as they would do it, fed a
   chunk at a time and stopped as soon as the work passes a budget
-  (10,000,000 units, about seven times what a dense 2 MiB newsletter costs) or the tree is deeper than 4,096 levels. HTML within the budget is
+  (10,000,000 units, about seven times what a dense 2 MiB newsletter costs)
+  or measuring has taken 500 ms or the tree is deeper than 4,096 levels. HTML within the budget is
   sanitised as today. HTML past it is shown as its text: the characters the
   tokenizer reads, outside scripts, styles and the head, with line breaks at
   blocks, escaped, in one `div` that keeps the line breaks. No remote images,
   no `css`.
 - Search reduces HTML to text with html5ever's tokenizer alone (no tree, no
-  ammonia), in time linear in its size, keeping today's rules: no scripts,
+  ammonia), fed in chunks and stopped after 500 ms with the words read so
+  far (only crafted HTML gets near that), keeping today's rules: no scripts,
   styles, head or title, no `<blockquote>`s, line breaks at blocks.
 - The style inliner reads the measure's numbers instead of parsing again.
 

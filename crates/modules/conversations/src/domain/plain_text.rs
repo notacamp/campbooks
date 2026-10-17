@@ -1,6 +1,6 @@
 //! A message's own words as plain text, for search: HTML reduced to text,
 //! quoted history removed, bounded. The HTML is read with the tokenizer
-//! alone, in time linear in its size.
+//! alone (no tree), within [`MAX_TEXT_TIME`].
 
 use std::{
     cell::{Cell, RefCell},
@@ -64,7 +64,7 @@ pub const MAX_TEXT_TIME: Duration = Duration::from_millis(500);
 const CHUNK: usize = 1024;
 
 /// The text of an HTML body, read with html5ever's tokenizer alone (no
-/// tree, so time linear in the input however the tags nest): no tags, no
+/// tree, so however the tags nest; stopped at [`MAX_TEXT_TIME`]): no tags, no
 /// scripts, styles, head or title, entities decoded, a line break at each
 /// `br` and at the end of each block, and no `<blockquote>`s when `quotes`
 /// is [`Quotes::Drop`].
