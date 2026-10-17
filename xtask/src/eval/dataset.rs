@@ -1,4 +1,6 @@
-//! The eval set on disk: `manifest.json` and `items/<locale>.jsonl`.
+//! The eval set on disk: `manifest.json` and `items/<locale>.jsonl`, and
+//! for a private set (an owner's own mail, never committed) the labels the
+//! owner filled in `labels.csv` (campbooks-cloud#167).
 
 use std::{
     collections::{BTreeMap, HashSet},
@@ -21,6 +23,11 @@ pub struct Manifest {
     pub locales: Vec<String>,
     pub workspaces: BTreeMap<String, String>,
     pub questions: Vec<QuestionSpec>,
+    /// Real mail (an owner's export, `campbooks-server labelling export`):
+    /// the fictional set's reserved-domain and id checks do not apply, and
+    /// items may be unlabelled (left out of the scores).
+    #[serde(default)]
+    pub private: bool,
 }
 
 /// One question of the set and the precision an automatic action needs.
@@ -60,29 +67,41 @@ pub enum Split {
     Test,
 }
 
-#[derive(Debug, Clone, Deserialize)]
-#[allow(clippy::struct_excessive_bools)] // the labels are four yes/no questions
+/// One value per question; a question the set does not label is `None`
+/// (the fictional set labels every question but `money`, an owner's export
+/// only `money`).
+#[derive(Debug, Clone, Default, Deserialize)]
 pub struct Labels {
-    pub stream: String,
-    pub needs_reply: bool,
-    pub asks_action: bool,
-    pub has_deadline: bool,
-    pub urgency: u8,
-    pub suspicious: bool,
+    #[serde(default)]
+    pub stream: Option<String>,
+    #[serde(default)]
+    pub needs_reply: Option<bool>,
+    #[serde(default)]
+    pub asks_action: Option<bool>,
+    #[serde(default)]
+    pub has_deadline: Option<bool>,
+    #[serde(default)]
+    pub urgency: Option<u8>,
+    #[serde(default)]
+    pub suspicious: Option<bool>,
+    /// `owed`, `paid` or `neither` (campbooks-cloud#167).
+    #[serde(default)]
+    pub money: Option<String>,
 }
 
 impl Labels {
-    /// The true answer to question `id`.
+    /// The true answer to question `id`, when labelled.
     pub fn value(&self, id: &str) -> Option<AnswerValue> {
-        Some(match id {
-            "stream" => AnswerValue::Choice(self.stream.clone()),
-            "needs_reply" => AnswerValue::Noul(self.needs_reply),
-            "asks_action" => AnswerValue::Noul(self.asks_action),
-            "has_deadline" => AnswerValue::Noul(self.has_deadline),
-            "urgency" => AnswerValue::Score(f64::from(self.urgency)),
-            "suspicious" => AnswerValue::Noul(self.suspicious),
-            _ => return None,
-        })
+        match id {
+            "stream" => self.stream.clone().map(AnswerValue::Choice),
+            "needs_reply" => self.needs_reply.map(AnswerValue::Noul),
+            "asks_action" => self.asks_action.map(AnswerValue::Noul),
+            "has_deadline" => self.has_deadline.map(AnswerValue::Noul),
+            "urgency" => self.urgency.map(|u| AnswerValue::Score(f64::from(u))),
+            "suspicious" => self.suspicious.map(AnswerValue::Noul),
+            "money" => self.money.clone().map(AnswerValue::Choice),
+            _ => None,
+        }
     }
 }
 
@@ -96,9 +115,16 @@ pub fn truth_index(question: &Question, labels: &Labels) -> Option<usize> {
             _ => None,
         },
         AnswerValue::Noul(holds) => Some(usize::from(holds)),
-        AnswerValue::Score(_) => Some(usize::from(labels.urgency)),
+        AnswerValue::Score(level) => {
+            // Levels are small whole numbers (`urgency` is 0, 1 or 2).
+            #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+            Some(level as usize)
+        }
     }
 }
+
+/// The money question's labels.
+const MONEY: [&str; 3] = ["owed", "paid", "neither"];
 
 /// A loaded set.
 #[derive(Debug, Clone)]
@@ -140,6 +166,12 @@ impl Dataset {
                 items.push(item);
             }
         }
+        let csv = dir.join("labels.csv");
+        if manifest.private && csv.exists() {
+            let text =
+                fs::read_to_string(&csv).with_context(|| format!("reading {}", csv.display()))?;
+            apply_sheet(&text, &mut items)?;
+        }
         let dataset = Self { manifest, items };
         let problems = dataset.problems();
         if !problems.is_empty() {
@@ -166,7 +198,9 @@ impl Dataset {
             if !ids.insert(item.id.as_str()) {
                 bad("duplicate id");
             }
-            if !keys.insert(message_key(&item.message.envelope)) {
+            // Real mail repeats itself (a monthly statement): only the
+            // fictional set must not.
+            if !self.manifest.private && !keys.insert(message_key(&item.message.envelope)) {
                 bad("duplicate message");
             }
             if !self.manifest.locales.contains(&item.lang) {
@@ -175,55 +209,135 @@ impl Dataset {
             if !self.manifest.workspaces.contains_key(&item.workspace) {
                 bad("unknown workspace");
             }
-            if item.id
-                != format!(
-                    "{}-{}-{}",
-                    item.lang,
-                    item.workspace,
-                    item.id.rsplit('-').next().unwrap_or_default()
-                )
-            {
-                bad("id is not <locale>-<workspace>-<nn>");
-            }
-            let env = &item.message.envelope;
-            for party in std::iter::once(&env.from).chain(&env.to).chain(&env.cc) {
-                if !is_reserved(party.address.rsplit('@').next().unwrap_or_default()) {
-                    bad(&format!(
-                        "address on a non-reserved domain: {}",
-                        party.address
-                    ));
+            // An owner's export is real mail: its ids and domains are what
+            // they are, and an unlabelled item is simply left out.
+            if !self.manifest.private {
+                if item.id
+                    != format!(
+                        "{}-{}-{}",
+                        item.lang,
+                        item.workspace,
+                        item.id.rsplit('-').next().unwrap_or_default()
+                    )
+                {
+                    bad("id is not <locale>-<workspace>-<nn>");
                 }
-            }
-            for host in link_hosts(&env.body) {
-                if !is_reserved(&host) {
-                    bad(&format!("link to a non-reserved host: {host}"));
+                let env = &item.message.envelope;
+                for party in std::iter::once(&env.from).chain(&env.to).chain(&env.cc) {
+                    if !is_reserved(party.address.rsplit('@').next().unwrap_or_default()) {
+                        bad(&format!(
+                            "address on a non-reserved domain: {}",
+                            party.address
+                        ));
+                    }
+                }
+                for host in link_hosts(&env.body) {
+                    if !is_reserved(&host) {
+                        bad(&format!("link to a non-reserved host: {host}"));
+                    }
+                }
+                for question in &self.manifest.questions {
+                    if item.labels.value(&question.id).is_none() {
+                        bad(&format!("no `{}` label", question.id));
+                    }
                 }
             }
             let l = &item.labels;
-            if !streams.contains(&l.stream.as_str()) {
+            if let Some(stream) = &l.stream
+                && !streams.contains(&stream.as_str())
+            {
                 bad("unknown stream");
             }
-            if l.urgency > 2 {
+            if let Some(money) = &l.money
+                && !MONEY.contains(&money.as_str())
+            {
+                bad("money is owed, paid or neither");
+            }
+            let yes = |v: Option<bool>| v == Some(true);
+            let urgency = l.urgency.unwrap_or(0);
+            if urgency > 2 {
                 bad("urgency is 0, 1 or 2");
             }
-            if l.needs_reply && l.stream != "primary" {
+            if yes(l.needs_reply) && l.stream.as_deref().is_some_and(|s| s != "primary") {
                 bad("needs_reply outside primary");
             }
-            if l.needs_reply && !l.asks_action {
+            if yes(l.needs_reply) && l.asks_action == Some(false) {
                 bad("needs_reply without asks_action");
             }
-            if l.urgency > 0 && !l.asks_action {
+            if urgency > 0 && l.asks_action == Some(false) {
                 bad("urgency without asks_action");
             }
-            if l.urgency == 2 && !l.has_deadline {
+            if urgency == 2 && l.has_deadline == Some(false) {
                 bad("urgency 2 without has_deadline");
             }
-            if l.suspicious && (l.needs_reply || l.urgency != 0) {
+            if yes(l.suspicious) && (yes(l.needs_reply) || urgency != 0) {
                 bad("suspicious with needs_reply or urgency");
             }
         }
         out
     }
+}
+
+/// Fill each item's `money` label from the owner's sheet (`labels.csv`:
+/// a header row naming `id` and `money` columns, then one row per item;
+/// an empty `money` cell leaves the item unlabelled).
+fn apply_sheet(text: &str, items: &mut [Item]) -> Result<()> {
+    // A spreadsheet saving "CSV UTF-8" adds a byte-order mark, and in
+    // pt-PT, es-ES or fr regional settings separates cells with `;`.
+    let text = text.trim_start_matches('\u{feff}');
+    let header_line = text.lines().next().unwrap_or_default();
+    let separator = if header_line.contains(';') && !header_line.contains(',') {
+        ';'
+    } else {
+        ','
+    };
+    let mut rows = text.lines().map(|line| csv_row(line, separator));
+    let header = rows.next().unwrap_or_default();
+    let column = |name: &str| {
+        header
+            .iter()
+            .position(|h| h.trim() == name)
+            .with_context(|| format!("labels.csv has no `{name}` column"))
+    };
+    let (id, money) = (column("id")?, column("money")?);
+    for (n, row) in rows.enumerate() {
+        let (Some(row_id), Some(label)) = (row.get(id), row.get(money)) else {
+            continue;
+        };
+        let label = label.trim().to_lowercase();
+        if label.is_empty() {
+            continue;
+        }
+        let item = items
+            .iter_mut()
+            .find(|i| i.id == row_id.trim())
+            .with_context(|| format!("labels.csv row {}: no item `{row_id}`", n + 2))?;
+        item.labels.money = Some(label);
+    }
+    Ok(())
+}
+
+/// The cells of one CSV line: `separator`-separated, `"`-quoted cells with
+/// `""` for a quote (the sheet the export writes has no line breaks in
+/// cells).
+fn csv_row(line: &str, separator: char) -> Vec<String> {
+    let mut cells = Vec::new();
+    let mut cell = String::new();
+    let mut quoted = false;
+    let mut chars = line.chars().peekable();
+    while let Some(c) = chars.next() {
+        match (c, quoted) {
+            ('"', true) if chars.peek() == Some(&'"') => {
+                cell.push('"');
+                chars.next();
+            }
+            ('"', _) => quoted = !quoted,
+            (c, false) if c == separator => cells.push(std::mem::take(&mut cell)),
+            _ => cell.push(c),
+        }
+    }
+    cells.push(cell);
+    cells
 }
 
 /// What identifies a message's content (the eval set has no duplicates).
@@ -298,8 +412,8 @@ mod tests {
             .body
             .push_str("\nhttps://real-bank.com/login");
         bad.message.envelope.from.address = "ceo@real-company.com".into();
-        bad.labels.suspicious = true;
-        bad.labels.needs_reply = true;
+        bad.labels.suspicious = Some(true);
+        bad.labels.needs_reply = Some(true);
         set.items.push(bad);
         let problems = set.problems().join("\n");
         assert!(
@@ -314,6 +428,26 @@ mod tests {
             problems.contains("suspicious with needs_reply"),
             "{problems}"
         );
+    }
+
+    #[test]
+    fn the_owners_sheet_fills_the_money_labels() {
+        let set = set();
+        let mut items = vec![set.items[0].clone(), set.items[1].clone()];
+        let (a, b) = (items[0].id.clone(), items[1].id.clone());
+        let sheet = format!(
+            "id,date,from,subject,attachments,money\n\"{a}\",\"x\",\"A, B\",\"Re: \"\"hi\"\"\",\"\",\"Owed\"\n\"{b}\",,,,,\n"
+        );
+        apply_sheet(&sheet, &mut items).unwrap();
+        assert_eq!(items[0].labels.money.as_deref(), Some("owed"));
+        assert_eq!(items[1].labels.money, None, "left blank: unlabelled");
+        assert!(apply_sheet("id,money\nnope,paid\n", &mut items).is_err());
+        assert!(apply_sheet("id,label\n", &mut items).is_err());
+        assert_eq!(csv_row(r#""a,b","c""d",e"#, ','), ["a,b", "c\"d", "e"]);
+        let mut items = vec![set.items[0].clone()];
+        let id = items[0].id.clone();
+        apply_sheet(&format!("\u{feff}id;money\n{id};paid\n"), &mut items).unwrap();
+        assert_eq!(items[0].labels.money.as_deref(), Some("paid"));
     }
 
     #[test]

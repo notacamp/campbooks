@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { ItemView } from "./api/queries";
-import { doneTodayKind, groupByReason, rowActionIds, snoozeOptions } from "./model";
+import { doneTodayKind, groupByReason, remindTime, rowActionIds, snoozeOptions } from "./model";
 
 const item = (id: string, reason: ItemView["reason"], extra: Partial<ItemView> = {}): ItemView => ({
   id,
@@ -59,6 +59,14 @@ describe("attention model", () => {
       universal: ["done", "snooze", "not_needed"],
     });
     expect(rowActionIds("question")).toEqual({ own: ["yes", "no"], universal: ["snooze"] });
+    expect(rowActionIds("bill")).toEqual({
+      own: ["paid", "to_pay"],
+      universal: ["snooze", "not_needed"],
+    });
+    expect(rowActionIds("toPay")).toEqual({
+      own: ["remind", "paid"],
+      universal: ["snooze", "not_needed"],
+    });
     expect(rowActionIds("warning")).toEqual({ own: ["safe"], universal: ["done", "snooze"] });
   });
 
@@ -71,5 +79,31 @@ describe("attention model", () => {
     expect(doneTodayKind(done)).toEqual({ key: "doneToday.done", undo: "reopen" });
     const replied = item("c", "reply", { state: "cleared", cleared_because: "replied" });
     expect(doneTodayKind(replied)).toEqual({ key: "doneToday.replied", undo: undefined });
+  });
+});
+
+describe("a reminder for a bill still to pay", () => {
+  // Friday 16 October 2026, 15:00.
+  const now = new Date(2026, 9, 16, 15);
+  const at = (month: number, day: number) => new Date(2026, month - 1, day, 9).getTime();
+
+  it("comes two days before the due date", () => {
+    const remind = remindTime("2026-10-31", now);
+    expect(remind.kind).toBe("before");
+    expect(remind.until.getTime()).toBe(at(10, 29));
+  });
+
+  it("comes tomorrow at 09:00 when overdue or due too soon", () => {
+    for (const due of ["2026-10-14", "2026-10-17"]) {
+      const remind = remindTime(due, now);
+      expect(remind.kind).toBe("tomorrow");
+      expect(remind.until.getTime()).toBe(at(10, 17));
+    }
+  });
+
+  it("comes on Monday when there is no due date", () => {
+    const remind = remindTime(null, now);
+    expect(remind.kind).toBe("monday");
+    expect(remind.until.getTime()).toBe(at(10, 19));
   });
 });

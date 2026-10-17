@@ -11,6 +11,11 @@
 //! - `before`: the requests before that change (no context, the questions
 //!   as declarative statements).
 //!
+//! The recordings predate the money question and the check's last two
+//! emails (the bill and the payment confirmation): the replay answers those
+//! as a model that says "yes" to everything and picks each choice's first
+//! option would ([`yes_sayer`]), so the counts below include them.
+//!
 //! Only the fictional check emails went into them (reserved domains, and
 //! GitHub's notification address for the code-review case); they hold
 //! probabilities and the score levels' legend, nothing else.
@@ -54,12 +59,45 @@ fn case_of(request: &Request) -> usize {
         .expect("a check case")
 }
 
-/// Answers each case with the recorded response for it.
+/// What a model that says "yes" to everything and picks each choice's
+/// first option answers.
+fn yes_sayer() -> Value {
+    let noul = json!({"type": "noul", "noul": 0.95});
+    json!({
+        "model": "laya-rl-agent",
+        "answers": {
+            "stream": {"type": "choice", "choice": "primary",
+                       "probabilities": {"primary": 0.7, "updates": 0.1, "receipts": 0.1,
+                                         "newsletters": 0.1}},
+            "needs_reply": noul, "asks_action": noul, "has_deadline": noul,
+            "urgency": {"type": "score", "score": 2.0,
+                        "probabilities": {"0": 0.0, "1": 0.1, "2": 0.9}},
+            "suspicious": noul,
+            "money": money_first(),
+        }
+    })
+}
+
+fn money_first() -> Value {
+    json!({"type": "choice", "choice": "owed",
+           "probabilities": {"owed": 0.8, "paid": 0.1, "neither": 0.1}})
+}
+
+/// Answers each case with the recorded response for it; the money question
+/// and the cases recorded before it, as [`yes_sayer`].
 struct Replay(Vec<Value>);
 
 impl Respond for Replay {
     fn respond(&self, request: &Request) -> ResponseTemplate {
-        ResponseTemplate::new(200).set_body_json(&self.0[case_of(request)])
+        let mut body = self
+            .0
+            .get(case_of(request))
+            .cloned()
+            .unwrap_or_else(yes_sayer);
+        if body["answers"].get("money").is_none() {
+            body["answers"]["money"] = money_first();
+        }
+        ResponseTemplate::new(200).set_body_json(body)
     }
 }
 
@@ -77,7 +115,9 @@ impl Respond for Right {
             "needs_reply": noul(0.1), "asks_action": noul(0.1), "has_deadline": noul(0.1),
             "urgency": {"type": "score", "score": 0.2,
                         "probabilities": {"0": 0.8, "1": 0.2, "2": 0.0}},
-            "suspicious": noul(0.05)
+            "suspicious": noul(0.05),
+            "money": {"type": "choice", "choice": "neither",
+                      "probabilities": {"owed": 0.1, "paid": 0.1, "neither": 0.8}}
         });
         for (question, expected) in &case.expect {
             answers[*question] = match expected {
@@ -88,6 +128,11 @@ impl Respond for Right {
                                        "newsletters": 0.0});
                     p[*stream] = json!(1.0);
                     json!({"type": "choice", "choice": stream, "probabilities": p})
+                }
+                Expected::Money(option) => {
+                    let mut p = json!({"owed": 0.0, "paid": 0.0, "neither": 0.0});
+                    p[*option] = json!(1.0);
+                    json!({"type": "choice", "choice": option, "probabilities": p})
                 }
             };
         }
@@ -131,7 +176,7 @@ async fn the_recorded_laya_answers_fail_the_check() {
 
     let report = gateway.run_answers_check().await;
     assert_eq!(report.outcome, CheckOutcome::Failed);
-    assert_eq!((report.right, report.total), (8, 33));
+    assert_eq!((report.right, report.total), (11, 50));
     assert_eq!(
         report.model.as_deref(),
         Some("convaiinnovations/laya/multilingual")
@@ -145,7 +190,7 @@ async fn the_answers_before_the_context_failed_it_too() {
     let (_server, gateway) = laya(Replay(recorded("laya-multilingual-before"))).await;
     let report = gateway.run_answers_check().await;
     assert_eq!(report.outcome, CheckOutcome::Failed);
-    assert_eq!((report.right, report.total), (18, 33));
+    assert_eq!((report.right, report.total), (21, 50));
 }
 
 /// The "yes" is the model's own: each answer is what laya-serve said,
@@ -167,7 +212,11 @@ async fn recorded_answers_map_to_what_laya_said() {
             .unwrap();
         for answer in &answers {
             let said = &wire["answers"][&answer.question_id];
-            match said["type"].as_str().unwrap() {
+            // Not recorded: the money question came later.
+            let Some(kind) = said["type"].as_str() else {
+                continue;
+            };
+            match kind {
                 "noul" => {
                     let p = said["noul"].as_f64().unwrap();
                     assert!((answer.probability_true().unwrap() - p).abs() < 1e-9);
@@ -214,7 +263,7 @@ async fn a_model_that_gets_them_right_passes_and_its_answers_are_stamped() {
     let (_server, gateway) = laya(Right).await;
     let report = gateway.run_answers_check().await;
     assert_eq!(report.outcome, CheckOutcome::Passed);
-    assert_eq!((report.right, report.total), (33, 33));
+    assert_eq!((report.right, report.total), (50, 50));
 
     let model = Model::new("decide", gateway.clone(), "test.check").checked();
     let decided = model.decide(&sample(), &triage_questions()).await.unwrap();

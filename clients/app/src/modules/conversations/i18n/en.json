@@ -103,6 +103,7 @@
     "whyHasDeadline": "Mentions a date",
     "whyUrgent": "Urgent",
     "whySuspicious": "Suspicious",
+    "whyMoney": "Payment",
     "sortedTaught": "Campbooks put this in {{stream}}, by a rule"
   },
   "reasons": {
@@ -168,7 +169,8 @@
     "showImages": "Show images",
     "nextAttachment": "Next attachment",
     "notNeeded": "Not needed (or it’s safe)",
-    "undoAll": "Undo all a rule did"
+    "undoAll": "Undo all a rule did",
+    "allPaid": "All bills already paid"
   },
   "compose": {
     "title": {
@@ -223,10 +225,11 @@
       "reply": "{{name}} is waiting for your reply",
       "question": "{{name}} asked you a question",
       "do": "{{name}} asked you to do something",
-      "pay": "{{name}} sent a bill to pay",
+      "pay": "Pay {{name}}",
       "warning": "This may be phishing. Don’t use its links.",
       "checkReply": "Does {{name}} need a reply?",
       "checkDo": "Did {{name}} ask you to do something?",
+      "checkPay": "{{name}} sent an invoice. Is it paid?",
       "taughtReply": "{{name}}: a reply, by a rule",
       "taughtDo": "{{name}}: to do, by a rule"
     },
@@ -242,7 +245,9 @@
       "today": "Due today",
       "tomorrow": "Due tomorrow",
       "on": "Due {{date}}",
-      "overdue": "Overdue · was due {{date}}"
+      "overdue": "Overdue · was due {{date}}",
+      "daysOverdue_one": "{{count}} day overdue",
+      "daysOverdue_other": "{{count}} days overdue"
     },
     "how": {
       "yes": "Yes.",
@@ -250,6 +255,11 @@
       "urgency0": "No hurry.",
       "urgency1": "Within the next days.",
       "urgency2": "Today.",
+      "money": {
+        "owed": "Asks for a payment still owed.",
+        "paid": "Confirms a payment already made.",
+        "neither": "Neither asks for nor confirms a payment."
+      },
       "source": {
         "rules": "Rules",
         "model": "Model",
@@ -267,7 +277,11 @@
       "safe": "It’s safe",
       "yes": "Yes",
       "no": "No",
-      "questionPrompt": "Campbooks is not sure."
+      "questionPrompt": "Campbooks is not sure.",
+      "alreadyPaid": "Already paid",
+      "stillToPay": "Still to pay",
+      "markPaid": "Mark paid",
+      "billPrompt": "Campbooks can’t see your bank."
     },
     "toast": {
       "done": "Done · {{name}}",
@@ -275,7 +289,13 @@
       "safe": "Marked safe · {{name}}. Campbooks will learn from it",
       "confirmed": "Thanks · {{name}} stays on your list",
       "failed": "Could not change {{name}}: nothing changed. Try again.",
-      "changed": "{{name}} changed while you looked: have another look."
+      "changed": "{{name}} changed while you looked: have another look.",
+      "paid": "Marked paid · {{name}}",
+      "toPay": "Kept in Pay · {{name}}",
+      "allPaid_one": "Marked {{count}} invoice paid",
+      "allPaid_other": "Marked {{count}} invoices paid",
+      "allPaidFailed_one": "Couldn’t mark {{count}} invoice paid. Try again.",
+      "allPaidFailed_other": "Couldn’t mark {{count}} invoices paid. Try again."
     },
     "mail": {
       "more": "Show the whole email",

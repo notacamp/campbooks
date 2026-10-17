@@ -20,6 +20,7 @@
     "too_late": "It is too late to undo: the message has already left.",
     "invalid_ids": "Ask for between 1 and {{max}} conversation ids, separated by commas.",
     "no_open_need": "Nothing here needs you any more.",
+    "not_a_payment": "This isn't a payment to make.",
     "nothing_to_reopen": "There is nothing to bring back here.",
     "need_changed": "This changed while you were looking at it. Have another look.",
     "invalid_rule": "This rule can't be saved. It needs one to four conditions that say which mail it is about, and one to four actions of different kinds.",

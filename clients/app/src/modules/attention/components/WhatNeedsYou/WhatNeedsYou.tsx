@@ -23,6 +23,7 @@ import {
   type ItemAction,
 } from "~/lib/ui";
 import {
+  billKind,
   dueLabel,
   howRows,
   NeedMessage,
@@ -45,9 +46,11 @@ import { useAttention, useRefreshAttention, useSnooze, type ItemView } from "../
 import {
   doneTodayKind,
   groupByReason,
+  remindTime,
   rowActionIds,
   snoozeOptions,
   type OwnActionId,
+  type RowKind,
   type UniversalActionId,
 } from "../../model";
 
@@ -87,8 +90,17 @@ interface Row {
 
 type ActionId = OwnActionId | UniversalActionId;
 
-const kindOf = (need: NeedView) =>
-  need.question === "suspicious" ? "warning" : need.trust === "check" ? "question" : "need";
+const kindOf = (need: NeedView): RowKind => {
+  if (need.question === "suspicious") {
+    return "warning";
+  }
+  // A bill: asked "Is it paid?" until the member answers, then "Pay …".
+  const bill = billKind(need);
+  if (bill !== undefined) {
+    return bill === "ask" ? "bill" : "toPay";
+  }
+  return need.trust === "check" ? "question" : "need";
+};
 
 /**
  * Home: what needs the member, grouped Review, Reply, Decide, Do, Pay, due
@@ -275,6 +287,8 @@ export function WhatNeedsYou({ workspaceId, now, offer }: WhatNeedsYouProps) {
         show(row);
       }
     },
+    // campbooks-cloud#169 offers the paid rule for the sender here
+    // (`onPaid`), after Already paid.
   });
 
   const when = (until: Date) =>
@@ -295,6 +309,22 @@ export function WhatNeedsYou({ workspaceId, now, offer }: WhatNeedsYouProps) {
   };
   const confirm = (row: Row) => {
     needActions.confirm(row.conversation);
+  };
+  const paid = (row: Row) => {
+    hide(row, t("confirm.paid", { name: row.name }));
+    needActions.alreadyPaid(row.conversation);
+  };
+  // Still to pay: the row stays, now "Pay …", with a reminder first.
+  const stillToPay = (row: Row) => {
+    setHighlight(undefined);
+    needActions.stillToPay(row.conversation);
+  };
+  // Every bill of the Pay group still asked about, with one Undo.
+  const allPaid = (bills: readonly Row[]) => {
+    for (const row of bills) {
+      hide(row, t("confirm.paid", { name: row.name }));
+    }
+    needActions.allPaid(bills.map((row) => row.conversation));
   };
   // Each request settles on its own promise (`mutate`'s callbacks only fire
   // for the latest call). `entry` is the snooze's undo entry, taken back when
@@ -372,19 +402,62 @@ export function WhatNeedsYou({ workspaceId, now, offer }: WhatNeedsYouProps) {
     });
   };
 
+  const reminder = (row: Row) => remindTime(row.need.due_on, now ?? new Date());
+  // Said from the time it gives: today or tomorrow at 09:00, else the date.
+  const remindLabel = (row: Row) => {
+    const { until } = reminder(row);
+    const from = now ?? new Date();
+    const days = Math.round(
+      (new Date(until).setHours(0, 0, 0, 0) - new Date(from).setHours(0, 0, 0, 0)) / 86_400_000,
+    );
+    const time = new Intl.DateTimeFormat(i18n.language, {
+      hour: "2-digit",
+      minute: "2-digit",
+      hourCycle: "h23",
+    }).format(until);
+    if (days <= 1) {
+      return t(days <= 0 ? "remind.today" : "remind.tomorrow", { time });
+    }
+    const date = new Intl.DateTimeFormat(i18n.language, { day: "numeric", month: "long" }).format(
+      until,
+    );
+    return t("remind.on", { date });
+  };
+
   /** What a row offers, in words with keys: the shape #166's ranked actions drop into. */
   const actionsOf = (row: Row): { own: ItemAction[]; universal: ItemAction[] } => {
-    const all = rowActionIds(kindOf(row.need));
+    const kind = kindOf(row.need);
+    const all = rowActionIds(kind);
     // An inbox the member may only read: nothing that writes there (Reply,
-    // Yes, No, It's safe, Done, Not needed); Snooze is the member's own.
+    // Yes, No, It's safe, Already paid, Done, Not needed); Snooze is the
+    // member's own.
     const ids = writable(row)
       ? all
       : { own: [], universal: all.universal.filter((id) => id === "snooze") };
-    const ownLabel: Record<OwnActionId, string> = {
-      reply: t("actions.reply"),
-      yes: tc("needs.actions.yes"),
-      no: tc("needs.actions.no"),
-      safe: tc("needs.actions.safe"),
+    const ownLabel = (id: OwnActionId): string => {
+      switch (id) {
+        case "reply": {
+          return t("actions.reply");
+        }
+        case "yes": {
+          return tc("needs.actions.yes");
+        }
+        case "no": {
+          return tc("needs.actions.no");
+        }
+        case "safe": {
+          return tc("needs.actions.safe");
+        }
+        case "paid": {
+          return tc(kind === "bill" ? "needs.actions.alreadyPaid" : "needs.actions.markPaid");
+        }
+        case "to_pay": {
+          return tc("needs.actions.stillToPay");
+        }
+        case "remind": {
+          return remindLabel(row);
+        }
+      }
     };
     const universalLabel: Record<UniversalActionId, string> = {
       done: tc("needs.actions.done"),
@@ -394,7 +467,7 @@ export function WhatNeedsYou({ workspaceId, now, offer }: WhatNeedsYouProps) {
     return {
       own: ids.own.slice(0, CHOICE_KEYS.length).map((id, index) => ({
         id,
-        label: ownLabel[id],
+        label: ownLabel(id),
         // Reply asks Scout for likely replies: the visor marks it.
         ai: id === "reply",
         key: CHOICE_KEYS[index] ?? "item.choice1",
@@ -420,6 +493,18 @@ export function WhatNeedsYou({ workspaceId, now, offer }: WhatNeedsYouProps) {
       case "yes": {
         setHighlight(undefined);
         confirm(row);
+        return;
+      }
+      case "paid": {
+        paid(row);
+        return;
+      }
+      case "to_pay": {
+        stillToPay(row);
+        return;
+      }
+      case "remind": {
+        snoozeUntil(row, reminder(row).until);
         return;
       }
       case "no":
@@ -569,6 +654,15 @@ export function WhatNeedsYou({ workspaceId, now, offer }: WhatNeedsYouProps) {
     },
     { enabled: offered("not_needed") || offered("no") || offered("safe") },
   );
+  // Shift+E: every bill the Pay group asks about is already paid.
+  const askedBills = order.filter((row) => kindOf(row.need) === "bill");
+  useShortcut(
+    "item.all_paid",
+    () => {
+      allPaid(askedBills);
+    },
+    { enabled: askedBills.length > 1 },
+  );
   useShortcut(
     "item.reply",
     () => {
@@ -639,76 +733,93 @@ export function WhatNeedsYou({ workspaceId, now, offer }: WhatNeedsYouProps) {
       {offer}
       {loading ? <SkeletonList rows={4} /> : null}
       <div ref={list} className="flex flex-col">
-        {groups.map((group) => (
-          <QueueGroup
-            key={group.reason}
-            signal={group.reason}
-            name={t(`groups.${group.reason}`)}
-            count={group.rows.filter((row) => row.confirmation === undefined).length}
-          >
-            {group.rows.map((row) => {
-              const due = dueLabel(tc, row.need, i18n.language, now);
-              const expanded = expandedId === row.item.id;
-              const isSelected = row.item.id === selected?.item.id;
-              const actions = isSelected ? actionsOf(row) : undefined;
-              return (
-                <Item
-                  key={row.item.id}
-                  id={itemId(row.item.id)}
-                  who={row.name}
-                  what={needSentence(tc, row.need, row.name)}
-                  excerpt={row.need.quote?.text}
-                  avatar={{
-                    name: row.name,
-                    kind:
-                      row.item.reason === "pay" || row.need.question === "suspicious"
-                        ? "service"
-                        : "person",
-                  }}
-                  due={due?.text}
-                  soon={due?.soon === true}
-                  selected={isSelected}
-                  expanded={expanded}
-                  confirmation={row.confirmation}
-                  onConfirmEnd={() => {
-                    folded(row);
-                  }}
-                  onToggle={() => {
-                    select(row.item.id);
-                    setExpandedId(expanded ? undefined : row.item.id);
-                  }}
-                  actions={
-                    actions === undefined ? undefined : (
-                      <ItemActions
-                        label={t("actions.label", { name: row.name })}
-                        own={actions.own}
-                        universal={actions.universal}
-                        highlighted={highlight}
-                        onHighlight={setHighlight}
-                        onAction={(id) => {
-                          run(row, id as ActionId);
+        {groups.map((group) => {
+          const live = group.rows.filter((row) => row.confirmation === undefined);
+          const bills = live.filter((row) => kindOf(row.need) === "bill");
+          return (
+            <QueueGroup
+              key={group.reason}
+              signal={group.reason}
+              name={t(`groups.${group.reason}`)}
+              count={live.length}
+              note={bills.length > 0 ? t("pay.note") : undefined}
+              action={
+                bills.length > 1 ? (
+                  <Button
+                    shortcut="item.all_paid"
+                    onClick={() => {
+                      allPaid(bills);
+                    }}
+                  >
+                    {t("pay.allPaid", { count: bills.length })}
+                  </Button>
+                ) : undefined
+              }
+            >
+              {group.rows.map((row) => {
+                const due = dueLabel(tc, row.need, i18n.language, now);
+                const expanded = expandedId === row.item.id;
+                const isSelected = row.item.id === selected?.item.id;
+                const actions = isSelected ? actionsOf(row) : undefined;
+                return (
+                  <Item
+                    key={row.item.id}
+                    id={itemId(row.item.id)}
+                    who={row.name}
+                    what={needSentence(tc, row.need, row.name)}
+                    excerpt={row.need.quote?.text}
+                    avatar={{
+                      name: row.name,
+                      kind:
+                        row.item.reason === "pay" || row.need.question === "suspicious"
+                          ? "service"
+                          : "person",
+                    }}
+                    due={due?.text}
+                    soon={due?.soon === true}
+                    selected={isSelected}
+                    expanded={expanded}
+                    confirmation={row.confirmation}
+                    onConfirmEnd={() => {
+                      folded(row);
+                    }}
+                    onToggle={() => {
+                      select(row.item.id);
+                      setExpandedId(expanded ? undefined : row.item.id);
+                    }}
+                    actions={
+                      actions === undefined ? undefined : (
+                        <ItemActions
+                          label={t("actions.label", { name: row.name })}
+                          own={actions.own}
+                          universal={actions.universal}
+                          highlighted={highlight}
+                          onHighlight={setHighlight}
+                          onAction={(id) => {
+                            run(row, id as ActionId);
+                          }}
+                        />
+                      )
+                    }
+                    detail={
+                      <NeedDetail
+                        workspaceId={workspaceId}
+                        row={row}
+                        t={t}
+                        tc={tc}
+                        locale={i18n.language}
+                        now={now}
+                        onOpen={() => {
+                          openConversation(row);
                         }}
                       />
-                    )
-                  }
-                  detail={
-                    <NeedDetail
-                      workspaceId={workspaceId}
-                      row={row}
-                      t={t}
-                      tc={tc}
-                      locale={i18n.language}
-                      now={now}
-                      onOpen={() => {
-                        openConversation(row);
-                      }}
-                    />
-                  }
-                />
-              );
-            })}
-          </QueueGroup>
-        ))}
+                    }
+                  />
+                );
+              })}
+            </QueueGroup>
+          );
+        })}
       </div>
       <Dialog
         open={snoozing !== undefined}

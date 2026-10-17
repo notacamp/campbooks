@@ -1,0 +1,30 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT newest.id AS \"id!: MessageId\"\n                 FROM (SELECT DISTINCT ON (m.conversation_id) m.id, m.sent_at\n                         FROM conversations.messages m\n                        WHERE m.conversation_id = ANY($1) AND m.direction = 'inbound'\n                          AND NOT m.in_spam AND NOT m.in_trash\n                        ORDER BY m.conversation_id, m.sent_at DESC, m.id DESC) newest\n                WHERE newest.sent_at >= $2\n                  AND EXISTS (SELECT 1 FROM unnest($3::text[]) q (id)\n                               WHERE NOT EXISTS (\n                                     SELECT 1 FROM conversations.decisions d\n                                      WHERE d.message_id = newest.id AND d.source = 'model'\n                                        AND d.model_version LIKE 'checked:%'\n                                        AND d.question = q.id))",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id!: MessageId",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "conversations.messages",
+            "name": "id"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "UuidArray",
+        "Timestamptz",
+        "TextArray"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "5cab6eff8c08b7809236d60fb3251a686958b61bb4c666a2327142c355039a1b"
+}

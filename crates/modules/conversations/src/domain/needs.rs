@@ -4,17 +4,20 @@
 //! At most one need per conversation, kept in `conversations.needs`:
 //!
 //! - **Raised** ([`raise`], pure) from the decide pass's answers about the
-//!   newest inbound message that is not in spam or the trash: `pay`, `reply`
-//!   or `do` from answers the policy let act (`pay` is an action asked by
-//!   mail sorted to Receipts); `review` for a suspicious message (a warning)
-//!   or, when a model answers, for a suggestion put to the member as a
-//!   question. The facts only ever say "no" (ADR 0018), so a sure need comes
-//!   from the model; a facts "no" still wins over a model's "yes".
+//!   newest inbound message that is not in spam or the trash: `pay` when the
+//!   money answer says a payment is still owed, always as a question ("Is it
+//!   paid?", campbooks-cloud#167: Campbooks cannot see the bank); `reply` or
+//!   `do` from answers the policy let act; `review` for a suspicious message
+//!   (a warning) or, when a model answers, for a suggestion put to the
+//!   member as a question. Mail sorted to Receipts needs nothing but a
+//!   payment still owed: a receipt or a payment confirmation needs nothing.
+//!   The facts only ever say "no" (ADR 0018), so a sure need comes from the
+//!   model; a facts "no" still wins over a model's "yes".
 //! - **Settled** ([`settle`], pure) against what happened since: a reply
 //!   clears Reply and Do, an archive clears Reply and Review, the trash or
 //!   spam (the conversation's, or the need's own message's) clears
 //!   everything, and a member's verdict (Done, Not needed, a confirmed
-//!   question) wins.
+//!   question, Already paid, Still to pay) wins.
 //! - **Refreshed** ([`refresh`]) wherever those inputs change, publishing
 //!   `conversations.need_changed` with a growing revision when the need did.
 //!
@@ -42,7 +45,8 @@ use crate::{
 pub const SURFACE: &str = "surface";
 /// The `urgency` level meaning "today".
 const TODAY_LEVEL: f64 = 2.0;
-/// The stream whose mail asks for payment rather than an action.
+/// The stream of automated money mail: only a payment still owed needs
+/// anything there.
 const RECEIPTS: &str = "receipts";
 /// The stream of people writing personally.
 const PRIMARY: &str = "primary";
@@ -198,6 +202,40 @@ fn settled_no(answers: &[Answer], question: &str) -> bool {
         .any(|a| a.question == question && a.acted && !a.is_true())
 }
 
+/// The answer saying the message asks for a payment still owed, when one
+/// counts: the policy let it act, or it is the model's, at least
+/// [`NeedSettings::check_floor`] sure (a Pay need is a question either
+/// way). An acted answer saying otherwise wins.
+fn owed<'a>(answers: &'a [Answer], settings: &NeedSettings) -> Option<&'a Answer> {
+    let money = |a: &&Answer| a.question == triage::MONEY;
+    let says_owed = |a: &Answer| a.value.as_str() == Some(triage::OWED);
+    if taught_no_ask(answers)
+        || answers
+            .iter()
+            .filter(money)
+            .any(|a| a.acted && !says_owed(a))
+    {
+        return None;
+    }
+    answers
+        .iter()
+        .filter(money)
+        .filter(|a| says_owed(a))
+        .find(|a| {
+            a.acted
+                || (a.basis == NeedBasis::Model
+                    && a.confidence.is_some_and(|c| c >= settings.check_floor()))
+        })
+}
+
+/// Whether a rule the member taught says this mail asks nothing of them: no
+/// bill to pay either.
+fn taught_no_ask(answers: &[Answer]) -> bool {
+    answers
+        .iter()
+        .any(|a| a.basis == NeedBasis::Taught && a.question == triage::ASKS_ACTION && !a.is_true())
+}
+
 /// The need the answers about `message` raise, if any, under `settings`.
 pub fn raise(message: MessageId, answers: &[Answer], settings: &NeedSettings) -> Option<Need> {
     let check_floor = settings.check_floor();
@@ -236,15 +274,20 @@ pub fn raise(message: MessageId, answers: &[Answer], settings: &NeedSettings) ->
     });
     let may_ask = taught_ask || may_ask(stream, answers);
     let asks = accepted(answers, triage::ASKS_ACTION);
-    let raised = if let Some(asks) = asks.filter(|_| stream == Some(RECEIPTS)) {
+    let owed = owed(answers, settings).filter(|_| stream != Some(NEWSLETTERS));
+    let raised = if let Some(owed) = owed {
+        // Campbooks cannot see the bank: a payment still owed is always a
+        // question, "Is it paid?", until a member answers it.
         Some(need(
             NeedReason::Pay,
-            NeedTrust::Sure,
-            asks.basis,
-            NeedQuestion::AsksAction,
-            asks,
+            NeedTrust::Check,
+            owed.basis,
+            NeedQuestion::Money,
+            owed,
         ))
-    } else if !may_ask {
+    } else if !may_ask || (stream == Some(RECEIPTS) && !taught_ask) {
+        // Money mail asks for nothing but a payment, and the money answer
+        // says none is owed (a receipt, a payment confirmation): nothing.
         None
     } else if let Some(reply) = accepted(answers, triage::NEEDS_REPLY) {
         Some(need(
@@ -337,6 +380,7 @@ fn rule_clears(answers: &[Answer], question: NeedQuestion) -> bool {
         return false;
     }
     surfaces_never(answers)
+        || (question == NeedQuestion::Money && taught_no_ask(answers))
         || answers.iter().any(|a| {
             a.basis == NeedBasis::Taught && a.question == question.as_str() && !a.is_true()
         })
@@ -381,13 +425,17 @@ pub enum Settled {
 /// design).
 pub fn settle(mut need: Need, since: Since) -> Settled {
     match since.verdict {
-        Some(NeedVerdict::Done) => return Settled::Cleared(need, ClearCause::Done),
+        // Paid already is done for a Pay need: nothing is filed yet.
+        Some(NeedVerdict::Done | NeedVerdict::AlreadyPaid) => {
+            return Settled::Cleared(need, ClearCause::Done);
+        }
         Some(NeedVerdict::NotNeeded) => return Settled::Cleared(need, ClearCause::NotNeeded),
-        Some(NeedVerdict::Confirmed) => {
+        Some(NeedVerdict::Confirmed | NeedVerdict::StillToPay) => {
             // "Yes, it needs a reply": the question becomes what it asked.
             if need.trust == NeedTrust::Check {
                 need.reason = match need.question {
                     NeedQuestion::AsksAction => NeedReason::Do,
+                    NeedQuestion::Money => NeedReason::Pay,
                     NeedQuestion::NeedsReply | NeedQuestion::Suspicious => NeedReason::Reply,
                 };
             }
@@ -544,19 +592,36 @@ async fn candidate(
     // as it is, settled against what happened since.
     let mut raised = None;
     let mut reread = false;
+    let mut recent = false;
+    let mut money_asked = true;
     if let Some(newest) = &newest {
-        let recent = newest.sent_at >= Utc::now() - settings.window;
+        recent = newest.sent_at >= Utc::now() - settings.window;
         reread = row.is_some_and(|r| r.message_id == newest.id);
         if recent || reread {
             let answers = answers(tx, newest.id).await?;
+            money_asked = answers.iter().any(|a| a.question == triage::MONEY);
             raised = raise(newest.id, &answers, settings);
         }
     }
     let open = row.filter(|r| r.state == "open");
     let withdrawn = match open {
-        Some(row) if reread && raised.is_none() => {
-            row.verdict_on(row.message_id)? != Some(NeedVerdict::Confirmed)
+        // A bill raised before the money question, on mail recent enough to
+        // be asked it, stays until it is answered: a pass that could not ask
+        // (the daily AI cap, a model that failed the answers check) must not
+        // drop a bill that may still be owed.
+        Some(row)
+            if reread
+                && raised.is_none()
+                && recent
+                && !money_asked
+                && row.need()?.reason == NeedReason::Pay =>
+        {
+            false
         }
+        Some(row) if reread && raised.is_none() => !matches!(
+            row.verdict_on(row.message_id)?,
+            Some(NeedVerdict::Confirmed | NeedVerdict::StillToPay)
+        ),
         _ => false,
     };
     let need = match (raised, open) {
@@ -1318,26 +1383,112 @@ mod tests {
         assert!(!need.urgent);
     }
 
+    fn money(label: &str, confidence: f64, acted: bool) -> Answer {
+        confident(
+            answer(triage::MONEY, NeedBasis::Model, json!(label), acted),
+            confidence,
+        )
+    }
+
     #[test]
-    fn a_bill_sorted_to_receipts_is_pay() {
+    fn a_bill_is_a_pay_question() {
         let need = raised(&[
             stream(NeedBasis::Model, "receipts", true),
             answer(triage::ASKS_ACTION, NeedBasis::Model, json!(true), true),
             answer(triage::NEEDS_REPLY, NeedBasis::Model, json!(true), true),
             answer(triage::URGENCY, NeedBasis::Model, json!(2.0), true),
+            money("owed", 0.91, false),
         ])
         .unwrap();
-        assert_eq!(need.reason, NeedReason::Pay);
+        assert_eq!(
+            (need.reason, need.trust, need.question, need.basis),
+            (
+                NeedReason::Pay,
+                NeedTrust::Check,
+                NeedQuestion::Money,
+                NeedBasis::Model
+            )
+        );
         assert!(need.urgent);
+        assert_eq!(need.due_on, None, "no due date until one is read (#146)");
+    }
+
+    /// The bug of campbooks-cloud#167: an invoice already paid or a payment
+    /// confirmation the model reads as asking something became "Pay".
+    #[test]
+    fn a_receipt_or_a_payment_confirmation_needs_nothing() {
+        for label in ["paid", "neither"] {
+            let receipt = [
+                stream(NeedBasis::Model, "receipts", true),
+                answer(triage::ASKS_ACTION, NeedBasis::Model, json!(true), true),
+                answer(triage::HAS_DEADLINE, NeedBasis::Model, json!(true), true),
+                money(label, 0.95, false),
+            ];
+            assert_eq!(raised(&receipt), None, "{label}");
+        }
+        // Answered before the money question was asked: nothing until the
+        // model is asked again.
+        let unasked = [
+            stream(NeedBasis::Model, "receipts", true),
+            answer(triage::ASKS_ACTION, NeedBasis::Model, json!(true), true),
+        ];
+        assert_eq!(raised(&unasked), None);
     }
 
     #[test]
-    fn a_later_bill_in_a_receipts_conversation_is_pay() {
+    fn an_unsure_owed_is_no_pay() {
+        let unsure = [
+            stream(NeedBasis::Model, "receipts", true),
+            answer(triage::ASKS_ACTION, NeedBasis::Model, json!(true), true),
+            money("owed", 0.6, false),
+        ];
+        assert_eq!(raised(&unsure), None);
+        // An answer the policy let act counts at any confidence, and an
+        // acted answer saying otherwise wins over a confident "owed".
+        let acted = [money("owed", 0.6, true)];
+        assert_eq!(raised(&acted).unwrap().reason, NeedReason::Pay);
+        let settled = [money("paid", 0.6, true), money("owed", 0.95, false)];
+        assert_eq!(raised(&settled), None);
+    }
+
+    #[test]
+    fn a_taught_no_ask_is_no_bill() {
+        let answers = [
+            stream(NeedBasis::Model, "receipts", true),
+            money("owed", 0.95, false),
+            answer(triage::ASKS_ACTION, NeedBasis::Taught, json!(false), true),
+        ];
+        assert_eq!(raised(&answers), None);
+        assert!(rule_clears(&answers, NeedQuestion::Money));
+    }
+
+    #[test]
+    fn an_invoice_sent_by_hand_is_pay_and_a_newsletter_never() {
+        let by_hand = raised(&[
+            stream(NeedBasis::Model, "primary", true),
+            answer(triage::ASKS_ACTION, NeedBasis::Model, json!(true), true),
+            answer(triage::NEEDS_REPLY, NeedBasis::Model, json!(true), true),
+            money("owed", 0.9, false),
+        ])
+        .unwrap();
+        assert_eq!(
+            (by_hand.reason, by_hand.trust),
+            (NeedReason::Pay, NeedTrust::Check)
+        );
+        let promotion = [
+            stream(NeedBasis::Model, "newsletters", true),
+            money("owed", 0.9, false),
+        ];
+        assert_eq!(raised(&promotion), None);
+    }
+
+    #[test]
+    fn a_later_message_in_a_receipts_conversation() {
         // The conversation was placed by an earlier message: this stream
         // answer did not act, but the policy accepts it.
         let need = raised(&[
             stream(NeedBasis::Model, "receipts", false),
-            answer(triage::ASKS_ACTION, NeedBasis::Model, json!(true), true),
+            money("owed", 0.9, false),
         ])
         .unwrap();
         assert_eq!(need.reason, NeedReason::Pay);
@@ -1347,7 +1498,7 @@ mod tests {
         assert_eq!(
             raised(&[unsure.clone(), asks.clone()]),
             None,
-            "an unsure stream is no bill, and mail no answer sorted needs a deadline"
+            "mail no answer sorted needs a deadline"
         );
         let need = raised(&[
             unsure,
@@ -1386,16 +1537,6 @@ mod tests {
             answer(triage::HAS_DEADLINE, NeedBasis::Model, json!(true), true),
         ];
         assert_eq!(raised(&newsletter), None);
-    }
-
-    #[test]
-    fn an_invoice_sent_by_hand_is_do() {
-        let need = raised(&[
-            stream(NeedBasis::Model, "primary", true),
-            answer(triage::ASKS_ACTION, NeedBasis::Model, json!(true), true),
-        ])
-        .unwrap();
-        assert_eq!(need.reason, NeedReason::Do);
     }
 
     #[test]
@@ -1624,6 +1765,32 @@ mod tests {
                 );
             }
             Settled::Cleared(..) => panic!("a confirmed question stays open"),
+        }
+    }
+
+    #[test]
+    fn is_it_paid() {
+        let mut question = need(NeedReason::Pay);
+        question.trust = NeedTrust::Check;
+        question.question = NeedQuestion::Money;
+        let paid = Since {
+            verdict: Some(NeedVerdict::AlreadyPaid),
+            ..Since::default()
+        };
+        assert_eq!(
+            cause(&settle(question.clone(), paid)),
+            Some(ClearCause::Done)
+        );
+        let to_pay = Since {
+            verdict: Some(NeedVerdict::StillToPay),
+            ..Since::default()
+        };
+        match settle(question, to_pay) {
+            Settled::Open(need) => assert_eq!(
+                (need.reason, need.trust, need.basis),
+                (NeedReason::Pay, NeedTrust::Sure, NeedBasis::Member)
+            ),
+            Settled::Cleared(..) => panic!("still to pay stays open"),
         }
     }
 }

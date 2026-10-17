@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n        SELECT message_id AS \"message: MessageId\", question, basis, trust,\n               decision_id AS \"decision: DecisionId\"\n          FROM conversations.needs\n         WHERE conversation_id = $1 AND state = 'open' FOR UPDATE\n        ",
+  "query": "\n        SELECT message_id AS \"message: MessageId\", reason, question, basis, trust,\n               decision_id AS \"decision: DecisionId\"\n          FROM conversations.needs\n         WHERE conversation_id = $1 AND state = 'open' FOR UPDATE\n        ",
   "describe": {
     "columns": [
       {
@@ -16,6 +16,17 @@
       },
       {
         "ordinal": 1,
+        "name": "reason",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "conversations.needs",
+            "name": "reason"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
         "name": "question",
         "type_info": "Text",
         "origin": {
@@ -26,7 +37,7 @@
         }
       },
       {
-        "ordinal": 2,
+        "ordinal": 3,
         "name": "basis",
         "type_info": "Text",
         "origin": {
@@ -37,7 +48,7 @@
         }
       },
       {
-        "ordinal": 3,
+        "ordinal": 4,
         "name": "trust",
         "type_info": "Text",
         "origin": {
@@ -48,7 +59,7 @@
         }
       },
       {
-        "ordinal": 4,
+        "ordinal": 5,
         "name": "decision: DecisionId",
         "type_info": "Uuid",
         "origin": {
@@ -69,8 +80,9 @@
       false,
       false,
       false,
+      false,
       true
     ]
   },
-  "hash": "89888393ee75f32db708cf08e817154094f96d3ca4420d428232baf8ca3ce62c"
+  "hash": "e550fb304f32e2374abd278111e1c27d93715d2933ff41d6ecb9e9ac0e32a183"
 }

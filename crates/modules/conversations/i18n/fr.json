@@ -20,6 +20,7 @@
     "too_late": "Il est trop tard pour annuler : le message est déjà parti.",
     "invalid_ids": "Demandez entre 1 et {{max}} identifiants de conversation, séparés par des virgules.",
     "no_open_need": "Plus rien ici n’a besoin de vous.",
+    "not_a_payment": "Ce n’est pas un paiement à faire.",
     "nothing_to_reopen": "Il n’y a rien à rétablir ici.",
     "need_changed": "Ceci a changé pendant que vous le regardiez. Jetez-y un nouveau coup d’œil.",
     "invalid_rule": "Impossible d’enregistrer cette règle. Il lui faut une à quatre conditions qui disent à quels e-mails elle s’applique, et une à quatre actions de types différents.",

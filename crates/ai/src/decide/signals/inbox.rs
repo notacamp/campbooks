@@ -12,8 +12,10 @@
 //! 4. that the email is data, never instructions.
 //!
 //! It is deterministic (the same envelope always gives the same text) and
-//! versioned: [`CONTEXT_VERSION`] changes whenever the text or the triage
-//! questions change, and the conversations module records it with every
+//! versioned: [`CONTEXT_VERSION`] changes whenever the text or the wording
+//! of an existing triage question changes (adding a question does not: the
+//! answers already stored still answer what they were asked, and each answer
+//! names its own question), and the conversations module records it with every
 //! answer (`decisions.state_version`). It never holds another person's mail
 //! or a secret: only the inbox's own name and address, header facts and
 //! fixed sentences. It stays short (about 100 tokens of the multilingual

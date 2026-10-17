@@ -244,6 +244,7 @@ fn order(question: &str) -> usize {
         triage::HAS_DEADLINE,
         triage::URGENCY,
         triage::SUSPICIOUS,
+        triage::MONEY,
     ]
     .iter()
     .position(|q| *q == question)

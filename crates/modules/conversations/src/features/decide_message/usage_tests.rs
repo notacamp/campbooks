@@ -113,7 +113,8 @@ async fn laya(expected_calls: u64) -> MockServer {
                 "needs_reply": noul, "asks_action": noul, "has_deadline": noul,
                 "urgency": {"type": "score", "score": 0.2,
                     "probabilities": {"0": 0.8, "1": 0.2, "2": 0.0}},
-                "suspicious": noul
+                "suspicious": noul,
+                "money": {"type": "choice", "choice": "neither", "probabilities": {"owed": 0.1, "paid": 0.1, "neither": 0.8}}
             }
         })))
         .expect(expected_calls)

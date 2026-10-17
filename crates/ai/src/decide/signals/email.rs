@@ -33,8 +33,18 @@ pub mod triage {
     pub const URGENCY: &str = "urgency";
     /// Phishing, scam or impersonation (`noul`).
     pub const SUSPICIOUS: &str = "suspicious";
+    /// What the email says about money (`choice`: [`MONEY_OPTIONS`]).
+    pub const MONEY: &str = "money";
     /// The built-in streams, in option order.
     pub const STREAMS: [&str; 4] = ["primary", "updates", "receipts", "newsletters"];
+    /// It asks for a payment the recipient still owes.
+    pub const OWED: &str = "owed";
+    /// It confirms a payment already made (a receipt, a payment confirmation).
+    pub const PAID: &str = "paid";
+    /// Neither.
+    pub const NEITHER: &str = "neither";
+    /// The money question's options, in option order.
+    pub const MONEY_OPTIONS: [&str; 3] = [OWED, PAID, NEITHER];
 }
 
 /// The triage questions, worded for a `decide` model. The labels and their
@@ -42,7 +52,8 @@ pub mod triage {
 /// questions are yes/no questions, the form Laya documents; a declarative
 /// statement got the same answer as its negation (campbooks-cloud#128).
 /// Changing a wording changes what the model reads: bump
-/// [`super::inbox::CONTEXT_VERSION`] with it.
+/// [`super::inbox::CONTEXT_VERSION`] with it. Adding a question (as `money`
+/// was) leaves the others' answers valid and does not.
 pub fn triage_questions() -> Vec<Question> {
     vec![
         Question::choice(
@@ -101,6 +112,26 @@ pub fn triage_questions() -> Vec<Question> {
             "Is this email phishing, a scam or an impersonation, such as a look-alike sender \
              domain, credentials or payment asked for through a link, an urgent transfer or gift \
              cards?",
+        ),
+        Question::choice(
+            triage::MONEY,
+            "What does this email say about money the recipient pays?",
+            [
+                (
+                    triage::OWED,
+                    "It asks for a payment the recipient still owes: an invoice or bill to pay, \
+                     a payment due or overdue, an amount that will be debited",
+                ),
+                (
+                    triage::PAID,
+                    "It confirms a payment already made: a receipt, an order or payment \
+                     confirmation, a refund",
+                ),
+                (
+                    triage::NEITHER,
+                    "Neither: it asks for no payment and confirms none",
+                ),
+            ],
         ),
     ]
 }

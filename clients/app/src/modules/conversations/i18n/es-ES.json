@@ -103,6 +103,7 @@
     "whyHasDeadline": "Menciona una fecha",
     "whyUrgent": "Urgente",
     "whySuspicious": "Sospechosa",
+    "whyMoney": "Pago",
     "sortedTaught": "Campbooks la puso en {{stream}}, por una regla"
   },
   "reasons": {
@@ -168,7 +169,8 @@
     "showImages": "Mostrar imágenes",
     "nextAttachment": "Siguiente adjunto",
     "notNeeded": "No hace falta (o es seguro)",
-    "undoAll": "Deshacer todo lo que hizo una regla"
+    "undoAll": "Deshacer todo lo que hizo una regla",
+    "allPaid": "Todas las facturas ya pagadas"
   },
   "compose": {
     "title": {
@@ -223,10 +225,11 @@
       "reply": "{{name}} espera tu respuesta",
       "question": "{{name}} te ha hecho una pregunta",
       "do": "{{name}} te ha pedido que hagas algo",
-      "pay": "{{name}} ha enviado una factura para pagar",
+      "pay": "Pagar a {{name}}",
       "warning": "Esto puede ser phishing. No uses sus enlaces.",
       "checkReply": "¿{{name}} necesita respuesta?",
       "checkDo": "¿{{name}} te ha pedido que hagas algo?",
+      "checkPay": "{{name}} ha enviado una factura. ¿Ya está pagada?",
       "taughtReply": "{{name}}: responder, por una regla",
       "taughtDo": "{{name}}: por hacer, por una regla"
     },
@@ -242,7 +245,9 @@
       "today": "Vence hoy",
       "tomorrow": "Vence mañana",
       "on": "Vence el {{date}}",
-      "overdue": "Vencido · vencía el {{date}}"
+      "overdue": "Vencido · vencía el {{date}}",
+      "daysOverdue_one": "{{count}} día de retraso",
+      "daysOverdue_other": "{{count}} días de retraso"
     },
     "how": {
       "yes": "Sí.",
@@ -250,6 +255,11 @@
       "urgency0": "Sin prisa.",
       "urgency1": "En los próximos días.",
       "urgency2": "Hoy.",
+      "money": {
+        "owed": "Pide un pago que aún se debe.",
+        "paid": "Confirma un pago ya hecho.",
+        "neither": "No pide ni confirma ningún pago."
+      },
       "source": {
         "rules": "Reglas",
         "model": "Modelo",
@@ -267,7 +277,11 @@
       "safe": "Es seguro",
       "yes": "Sí",
       "no": "No",
-      "questionPrompt": "Campbooks no está seguro."
+      "questionPrompt": "Campbooks no está seguro.",
+      "alreadyPaid": "Ya está pagada",
+      "stillToPay": "Pendiente de pago",
+      "markPaid": "Marcar como pagada",
+      "billPrompt": "Campbooks no tiene acceso a tu banco."
     },
     "toast": {
       "done": "Hecho · {{name}}",
@@ -275,7 +289,13 @@
       "safe": "Marcado como seguro · {{name}}. Campbooks aprenderá de esto",
       "confirmed": "Gracias · {{name}} sigue en tu lista",
       "failed": "No se ha podido cambiar {{name}}: no ha cambiado nada. Vuelve a intentarlo.",
-      "changed": "{{name}} ha cambiado mientras lo mirabas: vuelve a mirarlo."
+      "changed": "{{name}} ha cambiado mientras lo mirabas: vuelve a mirarlo.",
+      "paid": "Marcada como pagada · {{name}}",
+      "toPay": "Se queda en Pagar · {{name}}",
+      "allPaid_one": "{{count}} factura marcada como pagada",
+      "allPaid_other": "{{count}} facturas marcadas como pagadas",
+      "allPaidFailed_one": "No se ha podido marcar {{count}} factura como pagada. Inténtalo de nuevo.",
+      "allPaidFailed_other": "No se han podido marcar {{count}} facturas como pagadas. Inténtalo de nuevo."
     },
     "mail": {
       "more": "Mostrar el correo completo",

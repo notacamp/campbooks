@@ -49,12 +49,23 @@
     "notNeeded": "Not needed · {{name}}",
     "safe": "Marked safe · {{name}}",
     "snoozed": "Snoozed · {{name}}, back {{when}}",
-    "replied": "Sending to {{name}}"
+    "replied": "Sending to {{name}}",
+    "paid": "Marked paid · {{name}}"
   },
   "error": {
     "title": "Could not load what needs you",
     "body": "Campbooks could not reach the server. Nothing was lost.",
     "retry": "Try again"
   },
-  "noSubject": "(no subject)"
+  "noSubject": "(no subject)",
+  "remind": {
+    "today": "Remind me today at {{time}}",
+    "tomorrow": "Remind me tomorrow at {{time}}",
+    "on": "Remind me on {{date}}"
+  },
+  "pay": {
+    "allPaid_one": "{{count}} already paid",
+    "allPaid_other": "All {{count}} already paid",
+    "note": "Campbooks can’t see your bank, so it asks whether each invoice is paid."
+  }
 }
