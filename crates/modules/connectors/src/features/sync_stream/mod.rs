@@ -338,10 +338,12 @@ impl SyncStream {
         }
         let mail = zoho.mail(&centre, token, &target.mailbox_key);
         if backlog.last().is_some() {
+            let listed: Vec<&str> = cursor.folders.iter().map(|f| f.id.as_str()).collect();
             let folders = zoho::write::Folders {
                 inbox: cursor.inbox(),
                 trash: cursor.folder_of_kind(zoho::state::FolderKind::Trash),
                 spam: cursor.folder_of_kind(zoho::state::FolderKind::Spam),
+                listed: &listed,
             };
             let pushed = zoho::write::push(&mail, backlog, &folders).await;
             if let Some(err) = Self::record_push(ctx, workspace, target.stream, pushed, now).await?
@@ -450,6 +452,7 @@ impl SyncStream {
             replace_labels(tx, workspace, target.stream, labels).await?;
         }
         emit::apply_index(tx, &state, workspace, target.stream, page.index).await?;
+        outbound::forget_left_trash(tx, target.stream).await?;
         if let Some(batch) = &batch {
             emit::store_batch(
                 tx,

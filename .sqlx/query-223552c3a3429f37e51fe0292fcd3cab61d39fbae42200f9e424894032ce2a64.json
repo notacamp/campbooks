@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT DISTINCT ON (provider_message_id) provider_message_id,\n                  restore_to AS \"restore_to!\"\n             FROM connectors.outbound_changes\n            WHERE stream_id = $1 AND provider_message_id = ANY($2)\n              AND kind IN ('trash', 'spam') AND state = 'applied' AND restore_to IS NOT NULL\n            ORDER BY provider_message_id, id DESC",
+  "query": "SELECT o.provider_message_id, o.restore_to AS \"restore_to!\"\n             FROM connectors.outbound_changes o\n            WHERE o.stream_id = $1 AND o.provider_message_id = ANY($2)\n              AND o.kind = 'trash' AND o.state = 'applied' AND o.restore_to IS NOT NULL\n              AND NOT EXISTS (\n                  SELECT 1 FROM connectors.outbound_changes l\n                   WHERE l.stream_id = o.stream_id\n                     AND l.provider_message_id = o.provider_message_id\n                     AND l.kind IN ('trash', 'untrash', 'spam', 'unspam')\n                     AND l.state = 'applied' AND l.id > o.id)",
   "describe": {
     "columns": [
       {
@@ -37,5 +37,5 @@
       true
     ]
   },
-  "hash": "54be48068601712516bfdf472db549b3de8c839d22370faf3e3249ef86e32bce"
+  "hash": "223552c3a3429f37e51fe0292fcd3cab61d39fbae42200f9e424894032ce2a64"
 }

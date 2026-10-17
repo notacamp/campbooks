@@ -97,19 +97,51 @@ async fn places(db: &PgPool, id: &str) -> Vec<(bool, bool, bool)> {
     .unwrap()
 }
 
+/// `(inbound, in_inbox, in_spam)` of each message of conversation `id`.
+async fn inboxed(db: &PgPool, id: &str) -> Vec<(bool, bool, bool)> {
+    sqlx::query_as(
+        "SELECT direction = 'inbound', in_inbox, in_spam FROM conversations.messages
+          WHERE conversation_id = $1::uuid ORDER BY sent_at, id",
+    )
+    .bind(id)
+    .fetch_all(db)
+    .await
+    .unwrap()
+}
+
 #[sqlx::test(migrations = "../../../migrations")]
-async fn not_spam_puts_it_back_where_it_was(db: PgPool) {
+async fn not_spam_puts_received_mail_in_the_inbox_and_never_sent_mail(db: PgPool) {
     let kit = Kit::new(db.clone()).await;
     let (workspace, _, sam) = kit.sams_inbox().await;
     let id = kit.conversation_of("en-1").await;
     let base = format!("/api/v1/w/{workspace}/conversations/{id}");
-    // Archived first: not spam leaves it archived, never in the inbox.
-    kit.post(&sam, &format!("{base}/archive"), None).await;
-    let archived = places(&db, &id).await;
-    kit.post(&sam, &format!("{base}/spam"), None).await;
+    // Spam the provider flagged itself, never reported here, the member's
+    // own reply included: nothing was remembered about it.
+    sqlx::query(
+        "UPDATE conversations.messages SET in_spam = true, in_inbox = false
+          WHERE conversation_id = $1::uuid",
+    )
+    .bind(&id)
+    .execute(&db)
+    .await
+    .unwrap();
     let back = kit.post(&sam, &format!("{base}/not-spam"), None).await;
-    assert_eq!(back.json["archived"], true);
-    assert_eq!(places(&db, &id).await, archived);
+    assert_eq!(back.status, StatusCode::OK);
+    let rows = inboxed(&db, &id).await;
+    assert!(rows.iter().any(|&(inbound, _, _)| inbound), "{rows:?}");
+    assert!(
+        rows.iter()
+            .all(|&(inbound, in_inbox, in_spam)| !in_spam && in_inbox == inbound),
+        "{rows:?}"
+    );
+    // The provider is told each message's direction.
+    let requested = kit.events("conversations.changes_requested").await;
+    let items = requested.last().unwrap()["items"]
+        .as_array()
+        .unwrap()
+        .clone();
+    assert!(items.iter().all(|i| i["change"]["kind"] == "unspam"));
+    assert!(items.iter().any(|i| i["change"]["inbound"] == true));
 }
 
 #[sqlx::test(migrations = "../../../migrations")]

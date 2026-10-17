@@ -112,9 +112,9 @@ pub const fn kind(change: &RequestedChange) -> &'static str {
         RequestedChange::Archive => "archive",
         RequestedChange::Unarchive => "unarchive",
         RequestedChange::Trash => "trash",
-        RequestedChange::Untrash => "untrash",
+        RequestedChange::Untrash { .. } => "untrash",
         RequestedChange::Spam => "spam",
-        RequestedChange::Unspam => "unspam",
+        RequestedChange::Unspam { .. } => "unspam",
         RequestedChange::AddLabel { .. } => "add_label",
         RequestedChange::RemoveLabel { .. } => "remove_label",
         RequestedChange::MoveToStream { .. } => "move_to_stream",
@@ -143,19 +143,19 @@ pub fn map(change: &RequestedChange, known: &HashSet<String>) -> Mapped {
         RequestedChange::Unarchive => add("INBOX"),
         // The trash and spam exclude each other. Trash is made with
         // `messages.trash` and taken back with `messages.untrash`, which puts
-        // back the labels the message had (`gmail/write.rs`); spam leaves the
-        // inbox, and "not spam" goes back to the inbox only when the message
-        // was there before it was reported (the push remembers it).
+        // back the labels the message had (`gmail/write.rs`). Spam leaves the
+        // inbox; "not spam" puts mail the inbox received back in it (as
+        // Gmail's own button does), never the member's own.
         RequestedChange::Trash => Mapped::Labels {
             add: vec!["TRASH".to_owned()],
             remove: vec!["SPAM".to_owned()],
         },
-        RequestedChange::Untrash => remove("TRASH"),
+        RequestedChange::Untrash { .. } => remove("TRASH"),
         RequestedChange::Spam => Mapped::Labels {
             add: vec!["SPAM".to_owned()],
             remove: vec!["INBOX".to_owned(), "TRASH".to_owned()],
         },
-        RequestedChange::Unspam => remove("SPAM"),
+        RequestedChange::Unspam { inbound } => out_of("SPAM", *inbound),
         RequestedChange::AddLabel { provider_key, .. }
         | RequestedChange::RemoveLabel { provider_key, .. } => {
             let key = provider_key
@@ -212,8 +212,9 @@ pub fn map_zoho(change: &RequestedChange) -> Mapped {
         RequestedChange::Unstar => set("STARRED", false),
         RequestedChange::Archive => set("INBOX", false),
         RequestedChange::Unarchive => set("INBOX", true),
-        // Into the trash or spam from wherever it is (the push remembers
-        // where); out of either, back to that place.
+        // Into the trash (the push remembers the folder it was in) or spam;
+        // out of either, mail the inbox received may go to the Inbox folder
+        // (`INBOX`) where Zoho cannot say better (`zoho/write.rs`).
         RequestedChange::Trash => Mapped::Labels {
             add: vec!["TRASH".to_owned()],
             remove: vec!["SPAM".to_owned()],
@@ -222,8 +223,8 @@ pub fn map_zoho(change: &RequestedChange) -> Mapped {
             add: vec!["SPAM".to_owned()],
             remove: vec!["TRASH".to_owned()],
         },
-        RequestedChange::Untrash => set("TRASH", false),
-        RequestedChange::Unspam => set("SPAM", false),
+        RequestedChange::Untrash { inbound } => out_of("TRASH", *inbound),
+        RequestedChange::Unspam { inbound } => out_of("SPAM", *inbound),
         RequestedChange::AddLabel { .. } | RequestedChange::RemoveLabel { .. } => {
             Mapped::Skip("label_not_at_provider")
         }
@@ -234,6 +235,19 @@ pub fn map_zoho(change: &RequestedChange) -> Mapped {
             _ => Mapped::Skip("unsupported"),
         },
         RequestedChange::Unsupported => Mapped::Skip("unsupported"),
+    }
+}
+
+/// Out of the trash or spam (`bin`), and into the inbox too for mail the
+/// inbox received.
+fn out_of(bin: &str, inbound: bool) -> Mapped {
+    Mapped::Labels {
+        add: if inbound {
+            vec!["INBOX".to_owned()]
+        } else {
+            Vec::new()
+        },
+        remove: vec![bin.to_owned()],
     }
 }
 
@@ -290,8 +304,8 @@ pub struct Backlog {
     pub labels: HashMap<String, Vec<String>>,
     /// Own earlier writes to those messages.
     pub own: HashMap<String, Vec<OwnWrite>>,
-    /// Where each of those messages was before Campbooks last put it in the
-    /// trash or spam (the provider's location tokens), so taking it out
+    /// Where each of those messages was before Campbooks put it in the
+    /// trash (Zoho's location tokens), while that still holds, so untrash
     /// puts it back there.
     pub restore: HashMap<String, Vec<String>>,
 }
@@ -389,15 +403,21 @@ pub async fn backlog(
                 }),
             });
     }
-    // Where each message was before Campbooks last put it in the trash or
-    // spam: the latest such change the provider made.
+    // Where each message was before Campbooks put it in the trash (Zoho):
+    // only when that is the latest trash or spam change made to it, and
+    // only while no sync has seen it leave the trash since (a sync clears
+    // the record then, `forget_left_trash`).
     let restore = sqlx::query!(
-        r#"SELECT DISTINCT ON (provider_message_id) provider_message_id,
-                  restore_to AS "restore_to!"
-             FROM connectors.outbound_changes
-            WHERE stream_id = $1 AND provider_message_id = ANY($2)
-              AND kind IN ('trash', 'spam') AND state = 'applied' AND restore_to IS NOT NULL
-            ORDER BY provider_message_id, id DESC"#,
+        r#"SELECT o.provider_message_id, o.restore_to AS "restore_to!"
+             FROM connectors.outbound_changes o
+            WHERE o.stream_id = $1 AND o.provider_message_id = ANY($2)
+              AND o.kind = 'trash' AND o.state = 'applied' AND o.restore_to IS NOT NULL
+              AND NOT EXISTS (
+                  SELECT 1 FROM connectors.outbound_changes l
+                   WHERE l.stream_id = o.stream_id
+                     AND l.provider_message_id = o.provider_message_id
+                     AND l.kind IN ('trash', 'untrash', 'spam', 'unspam')
+                     AND l.state = 'applied' AND l.id > o.id)"#,
         stream as StreamId,
         &ids,
     )
@@ -437,8 +457,8 @@ pub struct Outcome {
     pub reemit: Vec<String>,
     /// The history window the run wrote in.
     pub window: Option<(i64, Option<i64>)>,
-    /// Changes that put a message in the trash or spam, with where it was
-    /// before (the provider's location tokens).
+    /// Changes that put a message in the trash, with where it was before
+    /// (Zoho's location tokens).
     pub restore: Vec<(Uuid, Vec<String>)>,
 }
 
@@ -508,6 +528,24 @@ pub async fn record_outcome(
         .execute(&mut *conn)
         .await?;
     }
+    Ok(())
+}
+
+/// Forget where messages of `stream` were before Campbooks put them in the
+/// trash once the index no longer has them there: a sync saw them leave it
+/// (moved at the provider, or untrashed), so that place is no longer where
+/// to put them back.
+pub async fn forget_left_trash(conn: &mut PgConnection, stream: StreamId) -> Result<()> {
+    sqlx::query!(
+        r#"UPDATE connectors.outbound_changes o SET restore_to = NULL
+             FROM connectors.messages m
+            WHERE o.stream_id = $1 AND o.restore_to IS NOT NULL
+              AND m.stream_id = o.stream_id AND m.provider_message_id = o.provider_message_id
+              AND NOT ('TRASH' = ANY (m.label_ids))"#,
+        stream as StreamId,
+    )
+    .execute(conn)
+    .await?;
     Ok(())
 }
 
@@ -667,12 +705,22 @@ mod tests {
             (RequestedChange::Archive, Some((vec![], vec!["INBOX"]))),
             (RequestedChange::Unarchive, Some((vec!["INBOX"], vec![]))),
             (RequestedChange::Trash, Some((vec!["TRASH"], vec!["SPAM"]))),
-            (RequestedChange::Untrash, Some((vec![], vec!["TRASH"]))),
+            (
+                RequestedChange::Untrash { inbound: true },
+                Some((vec![], vec!["TRASH"])),
+            ),
             (
                 RequestedChange::Spam,
                 Some((vec!["SPAM"], vec!["INBOX", "TRASH"])),
             ),
-            (RequestedChange::Unspam, Some((vec![], vec!["SPAM"]))),
+            (
+                RequestedChange::Unspam { inbound: true },
+                Some((vec!["INBOX"], vec!["SPAM"])),
+            ),
+            (
+                RequestedChange::Unspam { inbound: false },
+                Some((vec![], vec!["SPAM"])),
+            ),
             (
                 RequestedChange::AddLabel {
                     label: lab,
@@ -778,14 +826,14 @@ mod tests {
             }
         );
         assert_eq!(
-            map_zoho(&RequestedChange::Untrash),
+            map_zoho(&RequestedChange::Untrash { inbound: true }),
             Mapped::Labels {
-                add: vec![],
+                add: labels(&["INBOX"]),
                 remove: labels(&["TRASH"])
             }
         );
         assert_eq!(
-            map_zoho(&RequestedChange::Unspam),
+            map_zoho(&RequestedChange::Unspam { inbound: false }),
             Mapped::Labels {
                 add: vec![],
                 remove: labels(&["SPAM"])

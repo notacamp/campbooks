@@ -1,11 +1,11 @@
 //! Read, star, archive, trash and spam: operations that set a flag on a conversation's
 //! messages, so the provider can be told message by message.
 
-use campbooks_kernel::{AppState, Result, db::BeginFor as _, tenancy::Access};
+use campbooks_kernel::{AppState, Error, Result, db::BeginFor as _, tenancy::Access};
 
 use super::{
     access::lock_conversation,
-    conversation::{Changed, ConversationSummary, request, summary},
+    conversation::{Changed, ConversationSummary, request_each, summary},
     needs::{self, NeedSettings},
     rules,
 };
@@ -50,9 +50,10 @@ impl Flag {
             Self::Archive => RequestedChange::Archive,
             Self::Unarchive => RequestedChange::Unarchive,
             Self::Trash => RequestedChange::Trash,
-            Self::Untrash => RequestedChange::Untrash,
+            // Each message's own direction is carried by `change_items`.
+            Self::Untrash => RequestedChange::Untrash { inbound: true },
             Self::Spam => RequestedChange::Spam,
-            Self::Unspam => RequestedChange::Unspam,
+            Self::Unspam => RequestedChange::Unspam { inbound: true },
         }
     }
 
@@ -79,7 +80,8 @@ pub async fn apply(
 ) -> Result<ConversationSummary> {
     let mut tx = state.db.begin_for(access.workspace).await?;
     let inbox = lock_conversation(state, &mut tx, access, id).await?;
-    let changed = change(&mut tx, id, flag).await?;
+    let items = change_items(&mut tx, id, flag).await?;
+    let changed: Vec<String> = items.iter().map(|(message, _)| message.clone()).collect();
     let undone = match flag {
         Flag::Unarchive => Some(rules::Undone::Archive),
         Flag::Unread => Some(rules::Undone::Read),
@@ -100,7 +102,7 @@ pub async fn apply(
             changes: vec![flag.change()],
             provider_message_ids: changed,
         };
-        request(&state.events, &mut tx, &changed, &flag.requested()).await?;
+        request_each(&state.events, &mut tx, &changed, &items).await?;
         changed.publish(&state.events, &mut tx).await?;
         if let Some(needs) = needs {
             needs::refresh(
@@ -117,6 +119,25 @@ pub async fn apply(
     summary.rule_exception = exception;
     tx.commit().await?;
     Ok(summary)
+}
+
+/// Set `flag` on conversation `id`'s messages in `conn`, returning each
+/// message that changed with the change the provider is asked to make: for
+/// untrash and not spam, with the message's own direction.
+pub async fn change_items(
+    conn: &mut sqlx::PgConnection,
+    id: ConversationId,
+    flag: Flag,
+) -> Result<Vec<(String, RequestedChange)>> {
+    if matches!(flag, Flag::Untrash | Flag::Unspam) {
+        return out_of_bin(conn, id, flag).await;
+    }
+    let requested = flag.requested();
+    Ok(change(conn, id, flag)
+        .await?
+        .into_iter()
+        .map(|message| (message, requested.clone()))
+        .collect())
 }
 
 /// Set `flag` on conversation `id`'s messages in `conn`, returning the
@@ -194,59 +215,95 @@ pub async fn change(
     Ok(changed)
 }
 
-/// [`change`] for the trash and spam: `flag` is one of [`Flag::Trash`],
-/// [`Flag::Untrash`], [`Flag::Spam`] and [`Flag::Unspam`].
+/// [`change`] for the trash and spam (into either, and out of either).
 async fn bin(conn: &mut sqlx::PgConnection, id: ConversationId, flag: Flag) -> Result<Vec<String>> {
-    Ok(match flag {
+    match flag {
         // Trash and spam exclude each other. Trash leaves the inbox flag as
-        // it is (untrash puts the message back where it was); spam takes
-        // the message out of the inbox and remembers whether it was there,
-        // so "not spam" puts it back only then, and never the member's own
-        // sent mail.
-        Flag::Trash => {
-            sqlx::query_scalar!(
-                "UPDATE conversations.messages SET in_trash = true, in_spam = false,
-                        updated_at = now()
-                  WHERE conversation_id = $1 AND (NOT in_trash OR in_spam)
-                 RETURNING provider_message_id",
-                id as ConversationId
-            )
-            .fetch_all(&mut *conn)
+        // it is, so untrash puts the message back where it was.
+        Flag::Trash => Ok(sqlx::query_scalar!(
+            "UPDATE conversations.messages SET in_trash = true, in_spam = false,
+                    updated_at = now()
+              WHERE conversation_id = $1 AND (NOT in_trash OR in_spam)
+             RETURNING provider_message_id",
+            id as ConversationId
+        )
+        .fetch_all(&mut *conn)
+        .await?),
+        // The whole conversation, as providers report a thread: into spam,
+        // out of the inbox.
+        Flag::Spam => Ok(sqlx::query_scalar!(
+            "UPDATE conversations.messages
+                SET in_spam = true, in_inbox = false, in_trash = false, updated_at = now()
+              WHERE conversation_id = $1 AND NOT in_spam RETURNING provider_message_id",
+            id as ConversationId
+        )
+        .fetch_all(&mut *conn)
+        .await?),
+        Flag::Untrash | Flag::Unspam => Ok(out_of_bin(conn, id, flag)
             .await?
+            .into_iter()
+            .map(|(message, _)| message)
+            .collect()),
+        Flag::Read | Flag::Unread | Flag::Star | Flag::Unstar | Flag::Archive | Flag::Unarchive => {
+            Err(Error::internal("only the trash and spam are binned"))
         }
-        Flag::Untrash => {
-            sqlx::query_scalar!(
-                "UPDATE conversations.messages SET in_trash = false, updated_at = now()
-                  WHERE conversation_id = $1 AND in_trash RETURNING provider_message_id",
-                id as ConversationId
+    }
+}
+
+/// Take conversation `id`'s messages out of the trash (untrash) or spam (not
+/// spam), returning each message that changed with its change and whether
+/// it is mail the inbox received. Untrash leaves the inbox flag as it was;
+/// not spam puts received mail back in the inbox (as a provider's own "Not
+/// spam" does, whoever reported it) and never the member's own mail.
+async fn out_of_bin(
+    conn: &mut sqlx::PgConnection,
+    id: ConversationId,
+    flag: Flag,
+) -> Result<Vec<(String, RequestedChange)>> {
+    let rows = match flag {
+        Flag::Untrash => sqlx::query!(
+            r#"UPDATE conversations.messages SET in_trash = false, updated_at = now()
+                WHERE conversation_id = $1 AND in_trash
+               RETURNING provider_message_id, direction = 'inbound' AS "inbound!""#,
+            id as ConversationId
+        )
+        .fetch_all(&mut *conn)
+        .await?
+        .into_iter()
+        .map(|r| {
+            (
+                r.provider_message_id,
+                RequestedChange::Untrash { inbound: r.inbound },
             )
-            .fetch_all(&mut *conn)
-            .await?
-        }
-        // The whole conversation, as providers report a thread.
-        Flag::Spam => {
-            sqlx::query_scalar!(
-                "UPDATE conversations.messages
-                    SET inbox_before_spam = in_inbox, in_spam = true, in_inbox = false,
-                        in_trash = false, updated_at = now()
-                  WHERE conversation_id = $1 AND NOT in_spam RETURNING provider_message_id",
-                id as ConversationId
+        })
+        .collect(),
+        Flag::Unspam => sqlx::query!(
+            r#"UPDATE conversations.messages
+                  SET in_spam = false, in_inbox = direction = 'inbound', updated_at = now()
+                WHERE conversation_id = $1 AND in_spam
+               RETURNING provider_message_id, direction = 'inbound' AS "inbound!""#,
+            id as ConversationId
+        )
+        .fetch_all(&mut *conn)
+        .await?
+        .into_iter()
+        .map(|r| {
+            (
+                r.provider_message_id,
+                RequestedChange::Unspam { inbound: r.inbound },
             )
-            .fetch_all(&mut *conn)
-            .await?
+        })
+        .collect(),
+        Flag::Read
+        | Flag::Unread
+        | Flag::Star
+        | Flag::Unstar
+        | Flag::Archive
+        | Flag::Unarchive
+        | Flag::Trash
+        | Flag::Spam => {
+            return Err(Error::internal("only untrash and not spam take mail out"));
         }
-        Flag::Unspam => {
-            sqlx::query_scalar!(
-                "UPDATE conversations.messages
-                    SET in_spam = false,
-                        in_inbox = coalesce(inbox_before_spam, false) AND direction = 'inbound',
-                        inbox_before_spam = NULL, updated_at = now()
-                  WHERE conversation_id = $1 AND in_spam RETURNING provider_message_id",
-                id as ConversationId
-            )
-            .fetch_all(&mut *conn)
-            .await?
-        }
-        _ => Vec::new(),
-    })
+    };
+    Ok(rows)
 }

@@ -738,51 +738,58 @@ async fn a_message_in_the_trash_or_spam_is_not_brought_back(db: PgPool) {
 }
 
 #[sqlx::test(migrations = "../../../migrations")]
-async fn trash_and_spam_reach_gmail_and_come_back_where_they_were(db: PgPool) {
+async fn trash_and_spam_reach_gmail_and_come_back(db: PgPool) {
     let kit = Kit::new(db).await;
-    let mailbox = mailbox(&kit, &[&["INBOX", "UNREAD"], &["CATEGORY_UPDATES"]]).await;
+    let mailbox = mailbox(
+        &kit,
+        &[
+            &["INBOX", "UNREAD"],
+            &["CATEGORY_UPDATES"],
+            &["SPAM", "UNREAD"],
+            &["SENT"],
+        ],
+    )
+    .await;
     let (inboxed, archived) = (&mailbox.ids[0], &mailbox.ids[1]);
+    let (flagged, sent) = (&mailbox.ids[2], &mailbox.ids[3]);
     let before = changes(&kit, mailbox.ws).await.len();
-    let step = |id: &str, kind: &str| {
+    let step = |id: &str, change: Value| {
         let id = id.to_owned();
-        let kind = kind.to_owned();
         let mailbox = &mailbox;
         let kit = &kit;
         async move {
-            mailbox
-                .request(kit, &[(id.as_str(), json!({ "kind": kind }))])
-                .await;
+            mailbox.request(kit, &[(id.as_str(), change)]).await;
         }
     };
 
     // Trash and back: Gmail's own calls, its labels kept.
-    step(inboxed, "trash").await;
+    step(inboxed, json!({"kind": "trash"})).await;
     assert_eq!(
         kit.google.labels_of(inboxed),
         labels(&["INBOX", "TRASH", "UNREAD"])
     );
-    step(inboxed, "untrash").await;
+    step(inboxed, json!({"kind": "untrash", "inbound": true})).await;
     assert_eq!(kit.google.labels_of(inboxed), labels(&["INBOX", "UNREAD"]));
     let writes = kit.google.writes();
     assert!(writes.iter().any(|w| w.ends_with("/trash")), "{writes:?}");
     assert!(writes.iter().any(|w| w.ends_with("/untrash")), "{writes:?}");
 
-    // Reported from the inbox: back to the inbox. Reported while archived:
-    // back to the archive, never the inbox.
-    step(inboxed, "spam").await;
+    // Reported, then not spam: received mail back in the inbox, as Gmail's
+    // own button does, also mail Gmail flagged itself.
+    step(inboxed, json!({"kind": "spam"})).await;
     assert_eq!(kit.google.labels_of(inboxed), labels(&["SPAM", "UNREAD"]));
-    step(inboxed, "unspam").await;
+    step(inboxed, json!({"kind": "unspam", "inbound": true})).await;
     assert_eq!(kit.google.labels_of(inboxed), labels(&["INBOX", "UNREAD"]));
-    step(archived, "spam").await;
-    step(archived, "unspam").await;
-    assert_eq!(
-        kit.google.labels_of(archived),
-        labels(&["CATEGORY_UPDATES"])
-    );
+    step(flagged, json!({"kind": "unspam", "inbound": true})).await;
+    assert_eq!(kit.google.labels_of(flagged), labels(&["INBOX", "UNREAD"]));
+    // The member's own mail is never put in the inbox.
+    step(sent, json!({"kind": "spam"})).await;
+    step(sent, json!({"kind": "unspam", "inbound": false})).await;
+    assert_eq!(kit.google.labels_of(sent), labels(&["SENT"]));
 
     // Trash and spam exclude each other.
-    step(archived, "spam").await;
-    step(archived, "trash").await;
+    step(archived, json!({"kind": "spam"})).await;
+    step(archived, json!({"kind": "trash"})).await;
     assert_eq!(
         kit.google.labels_of(archived),
         labels(&["CATEGORY_UPDATES", "TRASH"])

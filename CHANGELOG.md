@@ -9,12 +9,14 @@ All notable changes to Campbooks Next are documented here. The format follows
 ### Added
 
 - **Trash and Report.** A conversation can go to the trash, or be reported as spam
-  ("Report and delete"), with Undo for both. Undo puts it back where it was: reported
-  mail goes back to the inbox only if it was there, and your own sent mail never moves.
-  The provider is told too: Gmail through its own trash and spam, Zoho by moving the
-  message to its Trash folder or with Zoho's spam report. Taking a message out of spam at
-  Zoho moves it back to its folder but does not tell Zoho's spam filter. Mail in the
-  trash or spam never needs you.
+  ("Report and delete"), with Undo for both. Untrash puts it back where it was. Not spam
+  puts mail you received back in your inbox, as Gmail's own button does, and never your
+  own sent mail. The provider is told too: Gmail through its own trash and spam, Zoho by
+  moving the message to its Trash folder (and back to the folder it was in, when that
+  folder still exists) or with Zoho's spam report. Taking a message out of spam at Zoho
+  moves it to the Inbox but does not tell Zoho's spam filter. Gmail's untrash and Zoho's
+  spam report work as their documentation says and still need checking on a live
+  account. Mail in the trash or spam never needs you.
 
 ### Fixed
 

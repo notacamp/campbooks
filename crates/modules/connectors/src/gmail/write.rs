@@ -12,10 +12,8 @@
 //! - more than [`BATCH_FROM`]` - 1` messages with the same change go in one
 //!   `batchModify`, the rest are modified one by one;
 //! - the trash is made with `messages.trash` and taken back with
-//!   `messages.untrash` (Gmail puts back the labels the message had); a
-//!   message reported as spam leaves the inbox, and "not spam" brings it
-//!   back to the inbox only when it was there before (remembered when it
-//!   was reported).
+//!   `messages.untrash` (Gmail puts back the labels the message had);
+//!   reporting spam and "not spam" are label changes (`outbound::map`).
 
 use std::collections::BTreeMap;
 
@@ -71,7 +69,7 @@ pub async fn push(gmail: &Gmail<'_>, backlog: &Backlog) -> Push {
     };
     plan.atomic();
     let mut done = Results::default();
-    push.trouble = write(gmail, &plan.groups(), backlog, &mut done).await;
+    push.trouble = write(gmail, &plan.groups(), &mut done).await;
     // After writing: the window our writes fall in.
     if !done.written.is_empty() {
         let after = gmail
@@ -82,13 +80,10 @@ pub async fn push(gmail: &Gmail<'_>, backlog: &Backlog) -> Push {
         push.outcome.window = before.map(|from| (from, after));
     }
     plan.ends(backlog, &done, &mut push.outcome);
-    plan.restores(&done, &mut push.outcome);
     // The index holds what we set: Gmail's record of the write then
     // compares equal and nothing is emitted for it.
     for message in &done.written {
-        let (mut add, remove) = plan.change_of(message);
-        add.extend(back_to_inbox(backlog, message, &remove));
-        let labels = apply_labels(&backlog.labels[message], &[(add, remove)]);
+        let labels = apply_labels(&backlog.labels[message], &[plan.change_of(message)]);
         push.outcome.index.push((message.clone(), labels));
     }
     push.outcome.index.sort();
@@ -106,24 +101,12 @@ struct Single {
     trash: Option<bool>,
 }
 
-/// `INBOX`, when taking `message` out of spam (`remove` holds `SPAM`) and it
-/// was in the inbox before it was reported.
-fn back_to_inbox(backlog: &Backlog, message: &str, remove: &[String]) -> Option<String> {
-    let unspam = remove.iter().any(|l| l == "SPAM");
-    let was_in_inbox = backlog
-        .restore
-        .get(message)
-        .is_some_and(|tokens| tokens.iter().any(|t| t == "INBOX"));
-    (unspam && was_in_inbox).then(|| "INBOX".to_owned())
-}
-
 /// Write `groups`: a batch per chunk of a large group, one call per message
 /// otherwise (and for a batch Gmail refused, and for moves into or out of
-/// the trash or spam). Returns the trouble that stopped it.
+/// the trash). Returns the trouble that stopped it.
 async fn write(
     gmail: &Gmail<'_>,
     groups: &BTreeMap<LabelChange, Vec<String>>,
-    backlog: &Backlog,
     done: &mut Results,
 ) -> Option<ProviderError> {
     let mut singles: Vec<Single> = Vec::new();
@@ -138,28 +121,16 @@ async fn write(
                 })
                 .collect::<Vec<_>>()
         };
-        if has(add, "TRASH") || has(remove, "TRASH") || has(add, "SPAM") || has(remove, "SPAM") {
+        if has(add, "TRASH") || has(remove, "TRASH") {
+            let without = |list: &[String]| -> Vec<String> {
+                list.iter().filter(|l| *l != "TRASH").cloned().collect()
+            };
             for message in messages {
-                if has(add, "SPAM") {
-                    // Where it was, so "not spam" can put it back.
-                    let current = backlog.labels.get(message).cloned().unwrap_or_default();
-                    let inbox: Vec<String> = current.into_iter().filter(|l| l == "INBOX").collect();
-                    done.restore.insert(message.clone(), inbox);
-                }
-                let mut labels_add: Vec<String> =
-                    add.iter().filter(|l| *l != "TRASH").cloned().collect();
-                labels_add.extend(back_to_inbox(backlog, message, remove));
                 singles.push(Single {
                     message: message.clone(),
-                    add: labels_add,
-                    remove: remove.iter().filter(|l| *l != "TRASH").cloned().collect(),
-                    trash: if has(add, "TRASH") {
-                        Some(true)
-                    } else if has(remove, "TRASH") {
-                        Some(false)
-                    } else {
-                        None
-                    },
+                    add: without(add),
+                    remove: without(remove),
+                    trash: Some(has(add, "TRASH")),
                 });
             }
             continue;
