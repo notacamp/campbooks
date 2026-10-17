@@ -49,6 +49,7 @@ All notable changes to Campbooks Next are documented here. The format follows
   raises a need) and appears only when a `complete` model is configured and may receive mail on
   this server; otherwise, or when the call fails, the email shows as before. Needs that were open
   before the upgrade get theirs in the background, with nothing to do.
+
 - **Error reports to GlitchTip or Sentry.** Set `CAMPBOOKS_TELEMETRY__ERROR_DSN` and every
   internal error, job that failed for good and panic is reported, filed under the release
   and `CAMPBOOKS_TELEMETRY__ENVIRONMENT`. A report holds only ids (request, trace,
