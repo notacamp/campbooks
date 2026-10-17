@@ -163,7 +163,9 @@ declares, which holds no id or content. The suspension's deliveries
 administrator with
 `jobs.retry` SHALL be able to put one failed job, or the failed jobs of one
 kind (at most 1000 per call), back on their queue with their attempts reset,
-and to delete one failed job. Such an administrator SHALL also be able to
+and to delete one failed job; a failed job whose unique key an unfinished
+job of the same kind and workspace holds SHALL stay failed, and of failed
+jobs sharing a kind, workspace and unique key one at most SHALL come back. Such an administrator SHALL also be able to
 discard a schedule's pending or stuck run by the schedule's name (its row is
 pending, belongs to a workspace, or runs on a lease that expired or is
 longer than any worker gives), so the schedule's next tick enqueues afresh;
@@ -203,8 +205,12 @@ a run a live worker holds SHALL be kept, and an unknown name SHALL answer
 - **THEN** every job runs exactly once per retry
 
 #### Scenario: A unique key already waiting
-- **WHEN** a failed job's unique key is held by another pending or running job of the same kind
+- **WHEN** a failed job's unique key is held by another pending or running job of the same kind and workspace
 - **THEN** retrying it changes nothing and the answer says it was superseded
+
+#### Scenario: The same key in another workspace
+- **WHEN** a failed job's unique key is held by a pending job of the same kind in another workspace, and failed jobs of two other workspaces share that key
+- **THEN** retrying it puts it back on its queue, and retrying the kind brings back both of the others
 
 #### Scenario: Discarding a schedule's stuck run
 - **WHEN** an administrator with `jobs.retry` discards the run of `kernel.prune_jobs` while a row due never holds its key, then again, and then discards the run of a schedule a live worker is running

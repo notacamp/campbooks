@@ -9,8 +9,11 @@
 //!   it (`.schedule::<J>(every)`).
 //! - **Enqueue** it with [`enqueue`] inside a transaction, so it exists if and
 //!   only if the caller's change commits. [`EnqueueOptions`] sets a delay,
-//!   priority, a `unique_key` (at most one unfinished job per key) and an
-//!   `ordering_key` (jobs sharing it run one at a time, in enqueue order).
+//!   priority, a `unique_key` (at most one unfinished job per kind and key
+//!   in a workspace) and an `ordering_key` (a workspace's jobs sharing it
+//!   run one at a time, in enqueue order). Both keys are per workspace, with
+//!   instance-wide work as one more: a workspace cannot hold or delay
+//!   another's key (campbooks-cloud#209).
 //! - **Run**: a [`Worker`] claims jobs fairly across workspaces, runs each in
 //!   a [`JobContext`] whose transaction carries the job's workspace
 //!   (`campbooks.workspace_id`), retries [`JobError::Retry`] with
@@ -202,11 +205,15 @@ pub struct EnqueueOptions {
     /// The workspace the job works for: it runs with that workspace set and
     /// counts towards its fair share.
     pub workspace: Option<String>,
-    /// While a job of the same kind with this key is pending or running,
-    /// enqueueing another is a no-op ([`Enqueued::Duplicate`]).
+    /// While a job of the same kind with this key is pending or running in
+    /// the same workspace (or, for instance-wide work, in none), enqueueing
+    /// another is a no-op ([`Enqueued::Duplicate`]). Another workspace's
+    /// job with the same key is another job (campbooks-cloud#209).
     pub unique_key: Option<String>,
-    /// Jobs with the same key run strictly one at a time, in enqueue order.
-    /// Enqueuers sharing a key are serialized until their transactions end.
+    /// Jobs of one workspace (or instance-wide ones) with the same key run
+    /// strictly one at a time, in enqueue order; another workspace's jobs
+    /// with the same key do not wait for them. Enqueuers sharing a key in a
+    /// workspace are serialized until their transactions end.
     pub ordering_key: Option<String>,
     /// Higher runs first among the workspace's ready jobs.
     pub priority: i16,
@@ -257,7 +264,8 @@ impl EnqueueOptions {
 pub enum Enqueued {
     /// A new job.
     Created(JobId),
-    /// An unfinished job with the same kind and unique key exists already.
+    /// An unfinished job with the same kind and unique key exists already
+    /// in the same workspace (or, instance-wide, in none).
     Duplicate,
 }
 
@@ -426,10 +434,14 @@ async fn insert_row(
     options: EnqueueOptions,
 ) -> Result<Enqueued, sqlx::Error> {
     if let Some(key) = &options.ordering_key {
-        // Serialize enqueuers of one ordering key until they commit, so
-        // enqueue order (`seq`) is also commit order for that key.
+        // Serialize enqueuers of one ordering key in one workspace (or of
+        // the instance-wide one) until they commit, so enqueue order (`seq`)
+        // is also commit order for that key there. Another workspace's
+        // enqueuers of the same key take another lock (campbooks-cloud#209).
         sqlx::query_scalar!(
-            "SELECT pg_advisory_xact_lock(hashtextextended('kernel.jobs.ordering_key:' || $1, 0))",
+            "SELECT pg_advisory_xact_lock(hashtextextended(
+                 'kernel.jobs.ordering_key:' || jsonb_build_array($1::text, $2::text)::text, 0))",
+            options.workspace,
             key
         )
         .fetch_one(&mut **tx)
@@ -441,7 +453,7 @@ async fn insert_row(
             (queue, kind, payload, workspace_id, unique_key, ordering_key, priority,
              run_at, max_attempts, trace_context)
         VALUES ($1, $2, $3, $4, $5, $6, $7, coalesce($8, now()), $9, $10)
-        ON CONFLICT (kind, unique_key)
+        ON CONFLICT (kind, unique_key, workspace_id)
             WHERE unique_key IS NOT NULL AND state IN ('pending', 'running')
             DO NOTHING
         RETURNING id AS "id: JobId"

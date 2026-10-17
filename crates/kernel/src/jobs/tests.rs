@@ -892,6 +892,113 @@ async fn ordering_keys_run_one_at_a_time_in_order(db: PgPool) {
     );
 }
 
+/// Options in `workspace` (`None`: instance-wide).
+fn in_workspace(workspace: Option<&str>) -> EnqueueOptions {
+    EnqueueOptions {
+        workspace: workspace.map(str::to_owned),
+        ..EnqueueOptions::default()
+    }
+}
+
+/// Unique keys are per workspace (campbooks-cloud#209): two workspaces
+/// enqueue the same kind and key and both run, while within one workspace,
+/// and among instance-wide jobs, the key still dedupes.
+#[sqlx::test(migrations = "../../migrations")]
+async fn unique_keys_are_per_workspace(db: PgPool) {
+    let state = state(db.clone()).await;
+    let key = "connectors.sync_stream:s-1";
+    for (note, workspace) in [
+        ("ana", Some("ana")),
+        ("bob", Some("bob")),
+        ("instance", None),
+    ] {
+        let options = in_workspace(workspace).unique(key);
+        let first = enqueue_probe(&state, &Probe::note(note), options.clone()).await;
+        assert!(matches!(first, Enqueued::Created(_)), "{note}: {first:?}");
+        assert_eq!(
+            enqueue_probe(&state, &Probe::note(&format!("{note} again")), options).await,
+            Enqueued::Duplicate,
+            "{note}: the key still dedupes there"
+        );
+    }
+    let stats = Worker::new(state.clone()).run_until_idle().await;
+    assert_eq!(stats.succeeded, 3, "{stats:?}");
+    assert_eq!(
+        sorted_notes(&db, Probe::NAME).await,
+        ["ana", "bob", "instance"]
+    );
+}
+
+/// Ordering keys are per workspace (campbooks-cloud#209): jobs of two
+/// workspaces, and instance-wide ones, sharing an ordering key do not wait
+/// for each other, at claim or at enqueue, while a workspace's own jobs
+/// still run one at a time, in order.
+#[sqlx::test(migrations = "../../migrations")]
+async fn ordering_keys_are_per_workspace(db: PgPool) {
+    let state = state_with(db.clone(), |jobs| jobs.concurrency = 8).await;
+    let ordered = |workspace: Option<&str>| in_workspace(workspace).ordered_by("thread-1");
+    let mut ana = Vec::new();
+    for n in 1..=2 {
+        ana.push(created(
+            enqueue_probe(
+                &state,
+                &Probe::note(&format!("ana-{n}")),
+                ordered(Some("ana")),
+            )
+            .await,
+        ));
+    }
+    let bob = created(enqueue_probe(&state, &Probe::note("bob"), ordered(Some("bob"))).await);
+    let instance = created(enqueue_probe(&state, &Probe::note("instance"), ordered(None)).await);
+
+    let worker = Worker::new(state.clone());
+    let claimed: Vec<JobId> = worker
+        .claim_for_test("default", 10)
+        .await
+        .unwrap()
+        .into_iter()
+        .map(|(id, _, _)| id)
+        .collect();
+    assert_eq!(claimed.len(), 3, "{claimed:?}");
+    for id in [ana[0], bob, instance] {
+        assert!(
+            claimed.contains(&id),
+            "{id} waited for another workspace's job"
+        );
+    }
+    // Ana's second job still waits for her first.
+    assert!(
+        worker
+            .claim_for_test("default", 10)
+            .await
+            .unwrap()
+            .is_empty()
+    );
+    assert!(worker.complete_for_test(ana[0], 1).await.unwrap());
+    assert_eq!(
+        worker.claim_for_test("default", 10).await.unwrap(),
+        [(ana[1], Some("ana".to_owned()), 1)]
+    );
+
+    // An enqueuer of the key in an open transaction of ana's does not hold
+    // up bob's enqueuer of the same key.
+    let mut held = state.db.begin().await.unwrap();
+    crate::db::set_workspace(&mut held, "ana").await.unwrap();
+    enqueue(&mut held, &Probe::note("ana-3"), ordered(Some("ana")))
+        .await
+        .unwrap();
+    let bob_again = tokio::time::timeout(
+        Duration::from_secs(10),
+        enqueue_probe(&state, &Probe::note("bob-2"), ordered(Some("bob"))),
+    )
+    .await;
+    assert!(
+        matches!(bob_again, Ok(Enqueued::Created(_))),
+        "bob's enqueue waited for ana's transaction: {bob_again:?}"
+    );
+    held.rollback().await.unwrap();
+}
+
 // --- fairness ----------------------------------------------------------------
 
 async fn flood(state: &AppState, workspace: &str, jobs: usize) {
@@ -2014,6 +2121,41 @@ mod administration {
         );
     }
 
+    /// A dead job's unique key is held only by an unfinished job of its own
+    /// workspace (campbooks-cloud#209).
+    #[sqlx::test(migrations = "../../migrations")]
+    async fn a_unique_key_is_held_only_in_its_own_workspace(db: PgPool) {
+        let state = state(db.clone()).await;
+        let keyed = |workspace: &str| EnqueueOptions::for_workspace(workspace).unique("k");
+        let ana = die(&state, &doomed("a"), keyed("ana")).await;
+        let bob = die(&state, &doomed("b"), keyed("bob")).await;
+        let cy = die(&state, &doomed("c"), keyed("cy")).await;
+        let dee = die(&state, &doomed("d"), keyed("dee")).await;
+        // Ana's key is held again, by a pending job of hers.
+        created(enqueue_probe(&state, &Probe::note("held"), keyed("ana")).await);
+
+        assert_eq!(
+            admin::retry(&db, &grant(), ana).await.unwrap(),
+            Retry::Superseded
+        );
+        assert_eq!(
+            admin::retry(&db, &grant(), bob).await.unwrap(),
+            Retry::Requeued,
+            "ana's job does not hold bob's key"
+        );
+        // Dead jobs of two workspaces sharing the key both come back.
+        assert_eq!(
+            admin::retry_kind(&db, &grant(), "test.probe", None)
+                .await
+                .unwrap(),
+            2
+        );
+        for id in [cy, dee] {
+            assert_eq!(job(&db, id).await.state, "pending");
+        }
+        assert_eq!(job(&db, ana).await.state, "failed");
+    }
+
     /// Retrying while workers claim: every job runs exactly once per retry.
     #[sqlx::test(migrations = "../../migrations")]
     async fn retries_racing_workers_never_double_run(db: PgPool) {
@@ -3098,6 +3240,54 @@ mod kernel_scope {
             owner_count(&db, "SELECT count(*) FROM kernel.jobs").await,
             0,
             "nothing was added"
+        );
+    }
+
+    /// A workspace's own row holding another workspace's job key (raw SQL,
+    /// which the policies admit: its own workspace, no schedule key) no
+    /// longer stops that workspace's job: unique and ordering keys are per
+    /// workspace (campbooks-cloud#209).
+    #[sqlx::test(migrations = "../../migrations")]
+    async fn a_workspace_cannot_hold_another_workspace_s_job_key(db: PgPool) {
+        let state = runtime(&db).await;
+        let (ana, bob) = (WorkspaceId::new(), WorkspaceId::new());
+        let key = format!("connectors.sync_stream:{}", WorkspaceId::new());
+        let mut tx = state.db.begin_for(bob).await.unwrap();
+        sqlx::query(
+            "INSERT INTO kernel.jobs (queue, kind, payload, workspace_id, unique_key,
+                                      ordering_key, run_at, max_attempts)
+             VALUES ('default', 'test.probe', '{}', $1, $2, $2, 'infinity', 3)",
+        )
+        .bind(bob.to_string())
+        .bind(&key)
+        .execute(&mut *tx)
+        .await
+        .unwrap();
+        tx.commit().await.unwrap();
+
+        let mut tx = state.db.begin_for(ana).await.unwrap();
+        let enqueued = enqueue(
+            &mut tx,
+            &Probe::note("ana"),
+            EnqueueOptions::for_workspace(ana.to_string())
+                .unique(key.clone())
+                .ordered_by(key.clone()),
+        )
+        .await
+        .unwrap();
+        tx.commit().await.unwrap();
+        assert!(matches!(enqueued, Enqueued::Created(_)), "{enqueued:?}");
+        let stats = Worker::new(state.clone()).run_until_idle().await;
+        assert_eq!(stats.succeeded, 1, "{stats:?}");
+        assert_eq!(notes(&db, Probe::NAME).await, ["ana"]);
+        assert_eq!(
+            owner_count(
+                &db,
+                "SELECT count(*) FROM kernel.jobs WHERE state = 'pending' AND run_at = 'infinity'"
+            )
+            .await,
+            1,
+            "bob's row is still there, and never ran"
         );
     }
 

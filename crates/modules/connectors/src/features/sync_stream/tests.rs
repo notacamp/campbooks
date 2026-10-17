@@ -561,3 +561,55 @@ async fn the_dispatcher_runs_every_workspace_s_due_streams(db: PgPool) {
         "one more run in each workspace"
     );
 }
+
+/// Another workspace's row holding a stream's job key (raw SQL from its own
+/// transaction, which the policies admit: its own workspace, no schedule
+/// key), never due, no longer stops that stream's sync: job keys are per
+/// workspace (campbooks-cloud#209).
+#[sqlx::test(migrations = "../../../migrations")]
+async fn another_workspace_cannot_hold_a_stream_s_runs(db: PgPool) {
+    use campbooks_kernel::db::BeginFor as _;
+
+    let kit = Kit::new(db.clone()).await;
+    let (ana_ws, _) = connected(&kit).await;
+    kit.run_jobs().await;
+    let stream = kit.stream().await["id"].as_str().unwrap().to_owned();
+    let key = format!("connectors.sync_stream:{stream}");
+    let intruder = WorkspaceId::new();
+    let mut tx = kit.state.db.begin_for(intruder).await.unwrap();
+    sqlx::query(
+        "INSERT INTO kernel.jobs (queue, kind, payload, workspace_id, unique_key, ordering_key,
+                                  run_at, max_attempts)
+         VALUES ('sync', 'connectors.sync_stream', jsonb_build_object('stream', $2::text), $1,
+                 $3, $3, 'infinity', 1)",
+    )
+    .bind(intruder.to_string())
+    .bind(&stream)
+    .bind(&key)
+    .execute(&mut *tx)
+    .await
+    .unwrap();
+    tx.commit().await.unwrap();
+
+    let runs = || {
+        let db = db.clone();
+        async move {
+            sqlx::query_scalar::<_, i64>(
+                "SELECT count(*) FROM kernel.jobs
+                  WHERE kind = 'connectors.sync_stream' AND workspace_id = $1
+                    AND state = 'succeeded'",
+            )
+            .bind(ana_ws.to_string())
+            .fetch_one(&db)
+            .await
+            .unwrap()
+        }
+    };
+    let before = runs().await;
+    assert_eq!(kit.tick(TimeDelta::days(1)).await, 1);
+    assert_eq!(
+        runs().await,
+        before + 1,
+        "the stream's run was not held back"
+    );
+}

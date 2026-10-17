@@ -133,6 +133,16 @@ All notable changes to Campbooks Next are documented here. The format follows
 
 ### Security
 
+- **One workspace can no longer hold up another's background work (campbooks-cloud#209).**
+  The job queue's keys spanned workspaces: a workspace that knew another workspace's job
+  key (most embed an id, such as `connectors.sync_stream:<stream>`) could keep a row of its
+  own with that key, and the other workspace's next enqueue was dropped as a duplicate, or
+  waited behind it for ever. A mailbox's sync could stop that way. Unique keys and ordering
+  keys now count per workspace, with instance-wide work (schedules, account events) as one
+  more group, so it still runs once per tick. Three kernel migrations swap the indexes,
+  building the new ones concurrently. An image from before this change can no longer
+  enqueue keyed jobs on the upgraded database: run the API and the worker of the same
+  version, and to go back run the rollback SQL in the change's `design.md` first.
 - **Catching up on changes no longer times what you may not see.** A stream that is
   behind (after reconnecting, or after you stopped reading for a while) now sends one page
   of changes per tick, each a tick after you took the previous one, so when a page arrives
