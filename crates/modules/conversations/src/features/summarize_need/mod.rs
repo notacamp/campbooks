@@ -135,7 +135,8 @@ impl JobHandler for SummarizeNeed {
     type Payload = SummarizeNeedPayload;
     const NAME: &'static str = "conversations.summarize_need";
     const QUEUE: &'static str = "ai";
-    const MAX_ATTEMPTS: u32 = 4;
+    // Waiting out the daily limit uses attempts: 8 x 4 h covers a reset.
+    const MAX_ATTEMPTS: u32 = 8;
 
     async fn run(
         &self,
