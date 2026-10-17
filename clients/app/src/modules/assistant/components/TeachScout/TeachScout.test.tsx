@@ -1,7 +1,12 @@
-import { fireEvent, screen, waitFor } from "@testing-library/react";
+import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
-import { mockApi, problem, renderWithProviders } from "../../../../../test/render";
+import {
+  mockApi,
+  problem,
+  renderWithProviders,
+  type MockHandler,
+} from "../../../../../test/render";
 
 import { TeachScout } from "./TeachScout";
 
@@ -35,6 +40,32 @@ const PREVIEW = {
   skipped_suspicious: 0,
   skipped_member: 0,
   overrides: [],
+};
+
+const INBOXES = [
+  {
+    id: "inbox-own",
+    channel: "email",
+    address: "ines@ateliersousa.example",
+    role: "manager",
+    unread_count: 0,
+    shared: false,
+  },
+];
+const JOANA = {
+  address: "joana@northtax.example",
+  name: "Joana Reis",
+  received: 12,
+  replied: 7,
+};
+/** `list_senders`: Joana for any `q` her name or address contains. */
+const SENDERS_ROUTE: MockHandler = (request) => {
+  const q = new URL(request.url).searchParams.get("q")?.toLowerCase() ?? "";
+  return {
+    body: {
+      senders: `${JOANA.address} ${JOANA.name}`.toLowerCase().includes(q) ? [JOANA] : [],
+    },
+  };
 };
 
 function teach(text = SENTENCE) {
@@ -112,6 +143,113 @@ describe("TeachScout", () => {
       ),
     ).toBeVisible();
     expect(screen.getByRole("combobox", { name: /Which mail/u })).toBeVisible();
+    // No model to go back to.
+    expect(screen.queryByRole("button", { name: "Tell Scout in a sentence instead" })).toBeNull();
+  });
+
+  it("builds rules by hand without asking the model: one rule per sender, then starts again", async () => {
+    let next = 0;
+    const api = mockApi({
+      [`GET ${W}/inboxes`]: { body: { inboxes: INBOXES } },
+      [`GET ${W}/senders`]: SENDERS_ROUTE,
+      [`POST ${W}/inboxes/inbox-own/rules/preview`]: { body: PREVIEW },
+      [`POST ${W}/inboxes/inbox-own/rules`]: () => {
+        next += 1;
+        return {
+          status: 201,
+          body: { rule: { id: `rule-${String(next)}` }, acted_without_asking: false },
+        };
+      },
+    });
+    renderWithProviders(<TeachScout workspaceId={WS} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Build a rule yourself" }));
+    expect(
+      screen.getAllByText("Pick which mail, then what Scout does with it. No AI reads this.")[0],
+    ).toBeVisible();
+
+    // Found by name, then a domain no one in the mail matches.
+    const box = screen.getByRole("searchbox", { name: "Find someone" });
+    fireEvent.change(box, { target: { value: "tax" } });
+    fireEvent.click(await screen.findByRole("checkbox", { name: "Joana Reis" }));
+    fireEvent.change(box, { target: { value: "atelier-conseils.example" } });
+    fireEvent.click(await screen.findByRole("checkbox", { name: "atelier-conseils.example" }));
+    expect(screen.getByRole("checkbox", { name: "Joana Reis" })).toBeChecked();
+    fireEvent.click(screen.getByRole("button", { name: /Show the rules/u }));
+
+    expect(
+      await screen.findByText("One rule for each sender, so mail from any of them counts."),
+    ).toBeVisible();
+    expect(
+      screen.getByText(
+        "Mail from Joana Reis (joana@northtax.example) always stays in your inbox and never gets filed away.",
+      ),
+    ).toBeVisible();
+    expect(
+      screen.getByText(
+        "Mail from anyone at atelier-conseils.example always stays in your inbox and never gets filed away.",
+      ),
+    ).toBeVisible();
+    expect(screen.getAllByRole("button", { name: /Save rule/u })).toHaveLength(2);
+
+    // Joana's card comes first.
+    const joana = screen.getByRole("form", { name: /^Mail from Joana Reis/u });
+    fireEvent.click(within(joana).getByRole("button", { name: /Save rule/u }));
+    await waitFor(() => {
+      expect(screen.getAllByRole("button", { name: /Save rule/u })).toHaveLength(1);
+    });
+    fireEvent.click(screen.getByRole("button", { name: /Save rule/u }));
+
+    // Both saved, and the builder is back, empty.
+    expect(await screen.findByRole("searchbox", { name: "Find someone" })).toHaveValue("");
+    expect(screen.queryByRole("checkbox", { name: "Joana Reis" })).toBeNull();
+    const created = api.calls
+      .filter((call) => call.route === `POST ${W}/inboxes/inbox-own/rules`)
+      .map((call) => call.body);
+    expect(created).toMatchObject([
+      {
+        conditions: [{ field: "sender_address", value: "joana@northtax.example" }],
+        actions: [{ action: "surface", value: "always" }],
+        state: "active",
+      },
+      {
+        conditions: [{ field: "sender_domain", value: "atelier-conseils.example" }],
+        actions: [{ action: "surface", value: "always" }],
+        state: "active",
+      },
+    ]);
+    expect(api.calls.some((call) => call.route.endsWith("/assistant/compile"))).toBe(false);
+  });
+
+  it("asks for a sender before showing a rule from no one", () => {
+    mockApi({ [`GET ${W}/inboxes`]: { body: { inboxes: INBOXES } } });
+    renderWithProviders(<TeachScout workspaceId={WS} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Build a rule yourself" }));
+    fireEvent.click(screen.getByRole("button", { name: /Show the rule/u }));
+    expect(
+      screen.getByText("Tick at least one sender, or type a full address or a domain."),
+    ).toBeVisible();
+    expect(screen.queryByRole("button", { name: /Save rule/u })).toBeNull();
+  });
+
+  it("offers the builder when Scout couldn't make a rule of the sentence, and the way back", async () => {
+    mockApi({
+      [`POST ${W}/assistant/compile`]: {
+        body: { outcome: "unclear", unsupported: null, text: "do the thing", proposals: [] },
+      },
+    });
+    renderWithProviders(<TeachScout workspaceId={WS} />);
+
+    teach("do the thing");
+    const note = await screen.findByRole("region", {
+      name: /^Scout couldn’t turn that into a rule/u,
+    });
+    fireEvent.click(within(note).getByRole("button", { name: "Build a rule yourself" }));
+    expect(screen.getByRole("combobox", { name: /Which mail/u })).toBeVisible();
+
+    fireEvent.click(screen.getByRole("button", { name: "Tell Scout in a sentence instead" }));
+    expect(screen.getByRole("textbox", { name: "What should Scout do?" })).toBeVisible();
   });
 
   it("explains a refused sentence", async () => {

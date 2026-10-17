@@ -60,11 +60,51 @@ impl campbooks_kernel::tenancy::ClientDirectory for Agents {
     }
 }
 
+/// The server's container-visibility port, counting how often streams
+/// list a caller's containers.
+#[derive(Debug)]
+struct Counted {
+    inner: campbooks_kernel::changes::VisibilityPort,
+    listings: std::sync::Arc<std::sync::atomic::AtomicUsize>,
+}
+
+impl campbooks_kernel::changes::Visibility for Counted {
+    fn container_visible<'a>(
+        &'a self,
+        db: &'a PgPool,
+        access: &'a campbooks_kernel::tenancy::Access,
+        container: &'a RecordRef,
+    ) -> campbooks_kernel::changes::VisibilityFuture<'a> {
+        self.inner.container_visible(db, access, container)
+    }
+
+    fn access_records(&self) -> &'static [&'static str] {
+        self.inner.access_records()
+    }
+
+    fn container_types(&self) -> &'static [&'static str] {
+        self.inner.container_types()
+    }
+
+    fn visible_containers<'a>(
+        &'a self,
+        db: &'a PgPool,
+        access: &'a campbooks_kernel::tenancy::Access,
+        container_type: &'a str,
+    ) -> campbooks_kernel::changes::ContainersFuture<'a> {
+        self.listings
+            .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+        self.inner.visible_containers(db, access, container_type)
+    }
+}
+
 /// One server process over the test database.
 struct Replica {
     app: Router,
     state: AppState,
     agents: std::sync::Arc<Agents>,
+    /// How often this process's streams listed someone's containers.
+    listings: std::sync::Arc<std::sync::atomic::AtomicUsize>,
 }
 
 impl Replica {
@@ -100,6 +140,12 @@ impl Replica {
                 .with_registry(crate::registry().expect("valid registrations")),
         )
         .with_client_directory(agents.clone());
+        let listings = std::sync::Arc::<std::sync::atomic::AtomicUsize>::default();
+        let counted = Counted {
+            inner: state.visibility.clone(),
+            listings: listings.clone(),
+        };
+        let state = state.with_visibility(std::sync::Arc::new(counted));
         let state = match revocation {
             Some(port) => {
                 let auth = state.auth.clone().with_revocation(state.db.clone(), port);
@@ -111,7 +157,17 @@ impl Replica {
         let app = routes
             .fallback(|| async { campbooks_kernel::Error::NotFound })
             .with_state(state.clone());
-        Self { app, state, agents }
+        Self {
+            app,
+            state,
+            agents,
+            listings,
+        }
+    }
+
+    /// How often this process's streams listed someone's containers so far.
+    fn listings(&self) -> usize {
+        self.listings.load(std::sync::atomic::Ordering::SeqCst)
     }
 
     async fn call(
@@ -297,9 +353,9 @@ impl Feed {
         while let Ok(Some(_)) = tokio::time::timeout(window, self.read()).await {}
     }
 
-    /// Nothing but heartbeats arrives within `window`. The stream is left
-    /// mid-read when the window ends, so it may hold a feed query permit and
-    /// a connection until it is read again or dropped.
+    /// Nothing but heartbeats arrives within `window`. The body is left
+    /// unread when the window ends; the stream's task then waits to send,
+    /// holding nothing.
     async fn quiet_for(&mut self, window: Duration) {
         let deadline = tokio::time::Instant::now() + window;
         loop {
@@ -1133,12 +1189,9 @@ async fn many_subscribers_each_receive_every_change_once(db: PgPool) {
     world.rename(&ana, &ws, "Shop two").await;
     world.server.sequence().await;
     // Every stream's frame first, then the quiet window for all at once.
-    // A stream whose quiet window ended is left mid-read (the test stops
-    // polling its body) and may keep holding one of the process's four feed
-    // query permits, or a connection of the pool of five, until it is
-    // dropped. Once four had, a stream still waiting for its first frame
-    // could never read (seen on a loaded runner). After handing out a frame
-    // a stream holds nothing until it is polled again.
+    // (Streams read in tasks of their own, so a body left unread holds no
+    // query permit or connection; when the stream ran inside the body, one
+    // left mid-read did, and four froze the rest: #532.)
     let received = futures_util::future::join_all(feeds.iter_mut().map(Feed::next_event)).await;
     futures_util::future::join_all(
         feeds
@@ -1155,6 +1208,49 @@ async fn many_subscribers_each_receive_every_change_once(db: PgPool) {
     // Forty streams were mid-query a moment ago: close them and their pool
     // before the test database is dropped.
     drop(feeds);
+    world.server.state.db.close().await;
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn streams_left_unread_mid_read_hold_nothing_back(db: PgPool) {
+    // A fast poll keeps every stream reading, so leaving one is likely to
+    // leave it mid-read; the process has four query permits.
+    let world = World::with(db, |c| {
+        c.max_streams_per_principal = 16;
+        c.opens_per_window = 0;
+        c.poll_interval_ms = 20;
+    })
+    .await;
+    let ana = world.user("ana");
+    let ws = world.create_workspace(&ana, "Shop").await;
+    world.server.sequence().await;
+    let mut left = Vec::new();
+    for _ in 0..8 {
+        let mut feed = world.server.subscribe(Some(&ana), &ws, None).await.unwrap();
+        assert!(feed.next_event().await.is("ready"));
+        left.push(feed);
+    }
+    // Each is read for a moment, then left, again and again while the feed
+    // is busy.
+    for n in 0..10 {
+        world.rename(&ana, &ws, &format!("Shop {n}")).await;
+        world.server.sequence().await;
+        for feed in &mut left {
+            feed.drain(Duration::from_millis(1)).await;
+        }
+    }
+    // Their bodies hold no permit and no connection: a stream opened now
+    // still reads.
+    let mut reader = world.server.subscribe(Some(&ana), &ws, None).await.unwrap();
+    assert!(reader.next_event().await.is("ready"));
+    world.rename(&ana, &ws, "Last").await;
+    world.server.sequence().await;
+    assert_eq!(
+        record_of(&reader.next_event().await).0,
+        "workspaces.workspace"
+    );
+    drop(left);
+    drop(reader);
     world.server.state.db.close().await;
 }
 
@@ -1427,6 +1523,273 @@ async fn a_member_taken_out_of_an_inbox_stops_getting_its_ids(db: PgPool) {
         );
         assert!(!seen.contains(&id));
     }
+}
+
+/// The ids of `inbox`'s messages whose provider id starts with `prefix`.
+async fn message_ids(
+    db: &PgPool,
+    inbox: campbooks_conversations::model::InboxId,
+    prefix: &str,
+) -> Vec<String> {
+    sqlx::query_scalar(
+        "SELECT id::text FROM conversations.messages
+          WHERE inbox_id = $1 AND provider_message_id LIKE $2 || '%'",
+    )
+    .bind(inbox)
+    .bind(prefix)
+    .fetch_all(db)
+    .await
+    .unwrap()
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn a_stream_lists_its_inboxes_once_and_again_when_access_changes(db: PgPool) {
+    use campbooks_conversations::{dev, events::InboxChanged, model::InboxRole};
+
+    // No heartbeat (which lists again) falls within the test.
+    let world = World::with(db, |c| c.heartbeat_seconds = 600).await;
+    let ana = world.user("ana");
+    let ws = world.create_workspace(&ana, "Shop").await;
+    let ana_id = world.user_id("ana").await;
+    let (_, bea_id) = world.add_member(&ws, "bea", "member").await;
+    let shared = dev::create_inbox(
+        &world.server.state,
+        ws.parse().unwrap(),
+        "ana@example.com",
+        &[(ana_id, InboxRole::Manager), (bea_id, InboxRole::Reader)],
+    )
+    .await
+    .unwrap();
+    world.server.sequence().await;
+    let bea = world.token("bea", READ_ALL);
+    let mut feed = world.server.subscribe(Some(&bea), &ws, None).await.unwrap();
+    assert!(feed.next_event().await.is("ready"));
+    world.rename(&ana, &ws, "Shop 0").await;
+    world.server.sequence().await;
+    assert_eq!(
+        record_of(&feed.next_event().await).0,
+        "workspaces.workspace"
+    );
+    let listed = world.server.listings();
+    assert_eq!(listed, 1, "the first read lists Bea's inboxes");
+
+    // Woken again and again, by mail and by renames: the list is kept.
+    world.ingest(&ws, shared, EN).await;
+    let (record_type, _, _) = record_of(&feed.next_event().await);
+    assert!(record_type.starts_with("conversations."), "{record_type}");
+    feed.drain(Duration::from_millis(300)).await;
+    for n in 1..6 {
+        world.rename(&ana, &ws, &format!("Shop {n}")).await;
+        world.server.sequence().await;
+        assert_eq!(
+            record_of(&feed.next_event().await).0,
+            "workspaces.workspace"
+        );
+    }
+    assert_eq!(world.server.listings(), listed, "kept across wake-ups");
+
+    // Taken out of the inbox (announced within it): listed again before
+    // the next page, which holds none of its ids.
+    sqlx::query("DELETE FROM conversations.inbox_members WHERE user_id = $1")
+        .bind(bea_id.as_uuid())
+        .execute(&world.db)
+        .await
+        .unwrap();
+    world
+        .publish(&InboxChanged {
+            workspace: ws.clone(),
+            inbox: shared,
+        })
+        .await;
+    world.ingest(&ws, shared, FR).await;
+    let reset = feed.next_event().await;
+    assert!(reset.is("reset"), "{reset:?}");
+    assert_eq!(reset.json()["reason"], "access_changed");
+    assert!(world.server.listings() > listed, "listed again");
+    feed.drain(Duration::from_millis(500)).await;
+    let gone = message_ids(&world.db, shared, "fr-").await;
+    assert!(!gone.is_empty());
+    for id in &gone {
+        assert!(!feed.raw.contains(id), "{id} reached a former inbox member");
+    }
+
+    // Given an inbox of her own (announced within it, as a grant does): its
+    // first mail reaches her at once, long before a heartbeat.
+    let listed = world.server.listings();
+    let own = dev::create_inbox(
+        &world.server.state,
+        ws.parse().unwrap(),
+        "bea@example.com",
+        &[(bea_id, InboxRole::Manager)],
+    )
+    .await
+    .unwrap();
+    world
+        .publish(&InboxChanged {
+            workspace: ws.clone(),
+            inbox: own,
+        })
+        .await;
+    world.ingest(&ws, own, EN).await;
+    let arrived = message_ids(&world.db, own, "en-").await;
+    assert!(!arrived.is_empty());
+    tokio::time::timeout(Duration::from_secs(5), async {
+        while !arrived.iter().all(|id| feed.raw.contains(id)) {
+            feed.next_event().await;
+        }
+    })
+    .await
+    .unwrap_or_else(|_| panic!("the new inbox's mail did not arrive: {}", feed.raw));
+    assert!(world.server.listings() > listed, "listed again");
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn a_removal_the_caller_cannot_see_still_ends_the_stream_at_once(db: PgPool) {
+    // No heartbeat falls within the test: the end must not wait for one.
+    let world = World::with(db, |c| c.heartbeat_seconds = 600).await;
+    let ana = world.user("ana");
+    let ws = world.create_workspace(&ana, "Shop").await;
+    let (_, bea) = world.add_member(&ws, "bea", "member").await;
+    world.server.sequence().await;
+    let mut feed = world
+        .server
+        .subscribe(Some(&world.token("bea", READ_ALL)), &ws, None)
+        .await
+        .unwrap();
+    assert!(feed.next_event().await.is("ready"));
+
+    // Bea's membership goes, and the only membership change numbered is
+    // one she may not see (inside a container no one sees).
+    let mut tx = world.db.begin().await.unwrap();
+    campbooks_kernel::db::set_workspace(&mut tx, &ws)
+        .await
+        .unwrap();
+    sqlx::query("DELETE FROM workspaces.members WHERE workspace_id = $1::uuid AND user_id = $2")
+        .bind(&ws)
+        .bind(bea)
+        .execute(&mut *tx)
+        .await
+        .unwrap();
+    world
+        .server
+        .state
+        .events
+        .publish(
+            &mut tx,
+            &Hidden {
+                workspace: ws.clone(),
+            },
+        )
+        .await
+        .unwrap();
+    tx.commit().await.unwrap();
+    world.server.sequence().await;
+
+    let revoked = tokio::time::timeout(Duration::from_secs(5), feed.next_event())
+        .await
+        .unwrap_or_else(|_| panic!("not revoked at once: {}", feed.raw));
+    assert!(revoked.is("revoked"), "{revoked:?}");
+    assert!(feed.next().await.is_none(), "the stream ends");
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn an_inbox_gained_unannounced_makes_the_stream_resync_at_its_heartbeat(db: PgPool) {
+    use campbooks_conversations::{dev, model::InboxRole};
+
+    let world = World::with(db, |c| c.heartbeat_seconds = 1).await;
+    let ana = world.user("ana");
+    let ws = world.create_workspace(&ana, "Shop").await;
+    let (_, bea_id) = world.add_member(&ws, "bea", "member").await;
+    world.server.sequence().await;
+    let mut feed = world
+        .server
+        .subscribe(Some(&world.token("bea", READ_ALL)), &ws, None)
+        .await
+        .unwrap();
+    assert!(feed.next_event().await.is("ready"));
+
+    // An inbox made for her with no change announcing it (only a bug would
+    // do that): its first mail is read past under her old list.
+    let own = dev::create_inbox(
+        &world.server.state,
+        ws.parse().unwrap(),
+        "bea@example.com",
+        &[(bea_id, InboxRole::Manager)],
+    )
+    .await
+    .unwrap();
+    world.ingest(&ws, own, EN).await;
+    // The next heartbeat finds it and tells the client to refetch.
+    let reset = tokio::time::timeout(Duration::from_secs(5), feed.next_event())
+        .await
+        .unwrap_or_else(|_| panic!("no reset: {}", feed.raw));
+    assert!(reset.is("reset"), "{reset:?}");
+    assert_eq!(reset.json()["reason"], "access_changed");
+    // From then on its mail reaches her.
+    world.ingest(&ws, own, FR).await;
+    let arrived = message_ids(&world.db, own, "fr-").await;
+    assert!(!arrived.is_empty());
+    tokio::time::timeout(Duration::from_secs(5), async {
+        while !arrived.iter().all(|id| feed.raw.contains(id)) {
+            feed.next_event().await;
+        }
+    })
+    .await
+    .unwrap_or_else(|_| panic!("the inbox's mail did not arrive: {}", feed.raw));
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn a_removal_numbered_after_a_full_page_stops_that_page(db: PgPool) {
+    let world = World::with(db, |c| c.heartbeat_seconds = 600).await;
+    let busy = world.space("Busy").await;
+    let mut feed = world
+        .server
+        .subscribe(
+            Some(&world.observer_token(Observer::Member, &busy.ws)),
+            &busy.ws,
+            None,
+        )
+        .await
+        .unwrap();
+    assert!(feed.next_event().await.is("ready"));
+    // More than a page she may see, then her removal, numbered together.
+    let mut tx = world.db.begin().await.unwrap();
+    campbooks_kernel::db::set_workspace(&mut tx, &busy.ws)
+        .await
+        .unwrap();
+    world
+        .server
+        .state
+        .events
+        .publish(
+            &mut tx,
+            &Filed {
+                workspace: busy.ws.clone(),
+                into: (0..450)
+                    .map(|n| (busy.shared.to_string(), format!("c-{n}")))
+                    .collect(),
+            },
+        )
+        .await
+        .unwrap();
+    tx.commit().await.unwrap();
+    let (status, _) = world
+        .server
+        .call(
+            Some(&world.user("ana")),
+            "DELETE",
+            &format!("/api/v1/w/{}/members/{}", busy.ws, busy.bea),
+            None,
+        )
+        .await;
+    assert_eq!(status, StatusCode::NO_CONTENT);
+    world.server.sequence().await;
+
+    // The removal is past the first page's end, yet no page is shown.
+    let revoked = feed.next_event().await;
+    assert!(revoked.is("revoked"), "{revoked:?}");
+    assert!(feed.next().await.is_none(), "the stream ends");
+    assert!(!feed.raw.contains("event: change"), "{}", feed.raw);
 }
 
 #[sqlx::test(migrations = "../../migrations")]
@@ -1976,7 +2339,12 @@ impl DomainEvent for Filed {
 
 #[sqlx::test(migrations = "../../migrations")]
 async fn catching_up_past_more_hidden_changes_than_a_page_looks_the_same(db: PgPool) {
-    let world = World::with(db, |c| c.heartbeat_seconds = MATRIX_BEAT.as_secs()).await;
+    const TICK: Duration = Duration::from_millis(250);
+    let world = World::with(db, |c| {
+        c.heartbeat_seconds = MATRIX_BEAT.as_secs();
+        c.catch_up_tick_ms = u64::try_from(TICK.as_millis()).unwrap();
+    })
+    .await;
     let busy = world.space("Busy").await;
     let quiet = world.space("Quiet").await;
     let mut tokens = Vec::new();
@@ -2047,5 +2415,21 @@ async fn catching_up_past_more_hidden_changes_than_a_page_looks_the_same(db: PgP
             "ready, the changes, a heartbeat"
         );
         assert_tokens_fresh_and_beats_on_time(frames, "catch-up");
+        // One page per tick, each a tick after its read began, in the busy
+        // workspace as in the quiet one.
+        let left: Vec<Duration> = frames
+            .iter()
+            .filter(|(_, f)| f.is("change"))
+            .map(|(at, _)| *at)
+            .collect();
+        for (page, (first, last)) in [(0, 199), (200, 399), (400, 449)].into_iter().enumerate() {
+            let due = TICK * u32::try_from(page + 1).unwrap();
+            assert!(
+                left[first] >= due && left[last] < due + TICK / 2,
+                "page {page} left from {:?} to {:?}, due at {due:?}",
+                left[first],
+                left[last]
+            );
+        }
     }
 }

@@ -232,8 +232,11 @@ docker run --rm -v campbooks_blobs-data:/data -v "$PWD":/backup busybox:1.37.0-m
 Out of the box Campbooks exports nothing and opens no extra port. It writes JSON logs to
 stdout (`docker compose logs server`); every line inside a request or a job carries its
 `trace_id`, and each request ends with one `request finished` line giving the route, the
-status and the latency. `/api/v1/system/health` and `/api/v1/system/version` work as
-before.
+status and the latency (`latency_ms`), with the request's ids in its `span`: method,
+`http.route`, status, `request_id`, `trace_id`, and when known `workspace.id`,
+`principal.kind` and `error.type`. Never the path or query string. A web app call through
+the BFF is logged under the API route it ran (`campbooks.via=bff`), not `/bff/api/{*path}`.
+`/api/v1/system/health` and `/api/v1/system/version` work as before.
 
 **A Prometheus page.** Set an address for a separate metrics listener:
 

@@ -582,8 +582,9 @@ impl DomainEvent for CapabilityGranted {
 /// The connection-account v1 document, as this module reads it
 /// (`contracts/connection-account.v1.schema.json`).
 /// The inbox changed in a way that may change who sees it, or what they
-/// may do there: a membership ended, its owner left, or it was kept
-/// read-only after its connection was removed. Ids only.
+/// may do there: a member was given it, a membership ended, its owner
+/// left, or it was kept read-only after its connection was removed. Ids
+/// only.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 pub struct InboxChanged {
     /// The workspace.

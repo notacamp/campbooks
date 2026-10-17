@@ -32,6 +32,13 @@ All notable changes to Campbooks Next are documented here. The format follows
 
 ### Added
 
+- **Build a rule yourself, any time (campbooks-cloud#217).** In Scout's memory, "Build a
+  rule yourself" next to the privacy line opens the rule builder without sending anything
+  to a language model, and "Tell Scout in a sentence instead" goes back. When Scout can't
+  make a rule of a sentence, it offers the builder too. In the builder, "It's from" finds
+  senders by name, as in Scout's questions: type part of a name, or a full address or a
+  domain. Each sender you tick becomes its own rule, so mail from any of them counts, and
+  each rule shows what it matches before you save it.
 - **Reply proposes Scout's draft.** Reply (R, an item's Reply on Home, the reader's Reply)
   now opens a dialog with two or three likely replies, each with its number key ("Yes,
   Thursday works", "Ask to move it to the afternoon"), a line to say it in your own words,
@@ -65,6 +72,11 @@ All notable changes to Campbooks Next are documented here. The format follows
 
 ### Changed
 
+- **Web requests are logged and counted under the API route they ran.** A call the web app
+  makes through the BFF (`/bff/api/*`) used to appear in the request log, its trace and the
+  request metrics as `/bff/api/{*path}`; it now carries the API's route template
+  (`GET /api/v1/w/{workspace_id}/members`) and `campbooks.via=bff`. Dashboards and alerts
+  by `http_route` see the web app's traffic route by route.
 - **An opened Home item shows the email (campbooks-cloud#203).** Pressing Enter on an item
   (or clicking the selected row) now shows the email it is about, rendered as the reader
   renders it, a few lines deep with "Show the whole email" to read it all in place. Until
@@ -89,6 +101,14 @@ All notable changes to Campbooks Next are documented here. The format follows
 
 ### Fixed
 
+- **Teach Scout no longer blames your words when the model fails (campbooks-cloud#217).**
+  A sentence like "anything from my accountants at northtax or atelier conseils always
+  matters" could come back as "Scout couldn't turn that into a rule" when the model's
+  answer was empty, cut short or wrapped in a code fence. Scout now gives a thinking
+  model room to answer, reads an answer wrapped in a code fence, and when the answer
+  still can't be read says Scout couldn't read the sentence just now, with Try again and
+  "build the rule yourself". The server log says why the model stopped and how long its
+  answer was, never what it wrote.
 - **A taught rule that names a whole group of sites stops matching.** A rule saved with
   a sender domain like `github.io` (now known to cover every site under it) used to match
   all of them. It now matches nothing and shows as paused in Scout's memory, where you can
@@ -99,6 +119,19 @@ All notable changes to Campbooks Next are documented here. The format follows
 
 ### Security
 
+- **Catching up on changes no longer times what you may not see.** A stream that is
+  behind (after reconnecting, or after you stopped reading for a while) now sends one page
+  of changes per tick, each a tick after you took the previous one, so when a page arrives
+  no longer depends on how many changes it skipped in inboxes you are not in. A page whose
+  read takes longer than a tick still arrives a whole tick later. An inbox you were given
+  without notice now makes your stream start over at its next heartbeat instead of missing
+  that inbox's first changes. Set the tick with `CAMPBOOKS_CHANGES__CATCH_UP_TICK_MS`
+  (50 ms by default, 50 to 1000). Live changes still arrive at once.
+- **A stream lists your inboxes once, and again only when access changes.** It used to
+  list them on every wake-up. Now it keeps the list until someone's access to an inbox
+  changes, or until its next heartbeat. When you are given an inbox (connecting a
+  mailbox), its first mail still reaches open streams at once. When your membership ends,
+  your stream ends at once, even if you could not see the change that removed you.
 - **A message built to be slow to parse no longer ties up the server.** HTML made of
   thousands of stray or unclosed tags could take minutes of CPU every time the message was
   read, and again when search indexed it. The reader now measures the parse first and shows
