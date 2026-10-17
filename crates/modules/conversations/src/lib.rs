@@ -156,6 +156,12 @@ impl ConversationsDeps {
 /// The `conversations` module, composed with `deps`, ready for the server
 /// to mount.
 pub fn module(deps: ConversationsDeps) -> Module {
+    // Scout's summary of a need's email: only while the `complete` role may
+    // receive mail here.
+    let summaries = deps
+        .ai
+        .clone()
+        .filter(features::summarize_need::may_read_mail);
     let model = match deps.model {
         Some(strategy) => Some(features::decide_message::ModelPass::new(strategy, None)),
         None => deps.ai.filter(model_may_read_mail).map(|gateway| {
@@ -165,12 +171,6 @@ pub fn module(deps: ConversationsDeps) -> Module {
             features::decide_message::ModelPass::new(Arc::new(strategy), Some(gateway))
         }),
     };
-    // Scout's summary of a need's email: only while the `complete` role may
-    // receive mail here.
-    let summaries = deps
-        .ai
-        .clone()
-        .filter(features::summarize_need::may_read_mail);
     let needs = domain::needs::NeedSettings::new(deps.config.needs_window_days, &deps.policy)
         .with_summaries(summaries.is_some());
     Module {
