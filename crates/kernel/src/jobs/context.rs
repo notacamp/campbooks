@@ -128,6 +128,32 @@ impl JobContext {
         Ok(tx)
     }
 
+    /// The job's transaction in the **maintenance scope**
+    /// (`campbooks.maintenance_scope = on`): for an instance-wide dispatcher
+    /// that reads its module's index across workspaces through the table's
+    /// maintenance policies, and nothing else (the kernel's tables do not
+    /// admit it). Committed with the job's completion like [`tx`](Self::tx).
+    /// Enqueue each run in its workspace: set it first
+    /// ([`set_workspace`](crate::db::set_workspace)). Outside the kernel,
+    /// only the reviewed `[[access.maintenance_scope]]` entries of
+    /// `architecture.toml` may call it (`cargo xtask arch`).
+    ///
+    /// # Errors
+    /// [`JobError::Fatal`] for a job that belongs to a workspace.
+    pub async fn maintenance_tx(
+        &mut self,
+    ) -> Result<&mut Transaction<'static, Postgres>, JobError> {
+        if self.info.workspace.is_some() {
+            return Err(JobError::fatal(
+                "a workspace's job works in its workspace; the maintenance scope is for \
+                 instance-wide jobs",
+            ));
+        }
+        let tx = self.tx().await?;
+        crate::db::enter_maintenance_scope(tx).await?;
+        Ok(tx)
+    }
+
     /// Publish an event in the job's transaction.
     pub async fn publish<E: DomainEvent>(&mut self, event: &E) -> Result<EventId, JobError> {
         let events = self.state.events.clone();
