@@ -58,6 +58,17 @@ async fn whoami(
     }))
 }
 
+/// A session's id, current and previous token hashes, and sealed access,
+/// refresh and ID tokens, as stored.
+type StoredSession = (
+    uuid::Uuid,
+    Vec<u8>,
+    Option<Vec<u8>>,
+    Vec<u8>,
+    Option<Vec<u8>>,
+    Vec<u8>,
+);
+
 /// What a test reads back from `bff.sessions`.
 type SessionRow = (
     Vec<u8>,
@@ -1805,7 +1816,7 @@ async fn the_runtime_role_cannot_touch_the_bff_tables(db: PgPool) {
         assert_eq!(
             refused
                 .as_database_error()
-                .and_then(|e| e.code())
+                .and_then(sqlx::error::DatabaseError::code)
                 .as_deref(),
             Some("42501"),
             "{sql}: {refused}"
@@ -1949,14 +1960,7 @@ async fn nothing_secret_is_stored_in_plain_text(db: PgPool) {
     );
     let login_cookie = pending.cookie(LOGIN).unwrap().to_owned();
 
-    let (id, token_hash, previous, access, refresh, id_token): (
-        uuid::Uuid,
-        Vec<u8>,
-        Option<Vec<u8>>,
-        Vec<u8>,
-        Option<Vec<u8>>,
-        Vec<u8>,
-    ) = sqlx::query_as(
+    let (id, token_hash, previous, access, refresh, id_token): StoredSession = sqlx::query_as(
         "SELECT id, token_hash, previous_token_hash, access_token, refresh_token, id_token
            FROM bff.sessions",
     )
