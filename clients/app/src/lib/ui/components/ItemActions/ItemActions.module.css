@@ -5,6 +5,12 @@
   gap: var(--space-1-5);
 }
 
+.picked {
+  display: inline-flex;
+  align-items: center;
+  color: var(--text-secondary);
+}
+
 .divider {
   width: var(--border-width);
   height: var(--actions-divider-height);

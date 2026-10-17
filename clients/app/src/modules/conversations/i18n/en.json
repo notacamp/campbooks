@@ -626,5 +626,17 @@
     "neverDone": "Scout won’t suggest that again",
     "failed": "Campbooks could not record that. Try again.",
     "shared": "For everyone in {{inbox}}."
+  },
+  "forward": {
+    "title": "Forward {{name}}’s email to…",
+    "description": "Find them by name. You’ll see the email before it goes.",
+    "find": "Find someone by name",
+    "placeholder": "Name, or part of it",
+    "people": "People",
+    "starting": "Starting the forward…",
+    "failed": "Couldn’t start the forward: nothing was sent. Try again.",
+    "none": "No one by that name has written to you.",
+    "searchFailed": "Couldn’t search just now. Try again.",
+    "nobody": "No one has written to you yet."
   }
 }

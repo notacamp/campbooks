@@ -42,7 +42,11 @@
     "reply": "Répondre",
     "open": "Ouvrir la conversation",
     "undo": "Annuler",
-    "label": "Actions pour {{name}}"
+    "label": "Actions pour {{name}}",
+    "openAttachment": "Ouvrir la pièce jointe",
+    "forward": "Transférer…",
+    "combo": "{{first}}, puis {{second}}",
+    "picked": "Scout a choisi celles-ci pour cet e-mail"
   },
   "confirm": {
     "done": "Fait · {{name}}",
@@ -62,7 +66,11 @@
   "remind": {
     "today": "Me le rappeler aujourd’hui à {{time}}",
     "tomorrow": "Me le rappeler demain à {{time}}",
-    "on": "Me le rappeler le {{date}}"
+    "on": "Me le rappeler le {{date}}",
+    "button": "Me le rappeler…",
+    "title": "Rappel pour {{name}}…",
+    "description": "Il quitte l’accueil jusque-là, puis revient tout seul.",
+    "beforeDue": "Avant l’échéance"
   },
   "pay": {
     "allPaid_one": "J’ai déjà payé {{count}}",

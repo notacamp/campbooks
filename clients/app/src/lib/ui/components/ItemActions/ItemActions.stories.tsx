@@ -55,6 +55,18 @@ export const ThreeWithAi: Story = {
   },
 };
 
+/** Own actions the assistant picked for the item: the visor before them says so. */
+export const Picked: Story = {
+  args: {
+    picked: "Scout picked these",
+    own: [
+      { id: "reply", label: "Reply", key: "item.choice1", ai: true },
+      { id: "forward", label: "Forward…", key: "item.choice2" },
+      { id: "remind_when", label: "Remind me…", key: "item.choice3" },
+    ],
+  },
+};
+
 /** The arrow keys' highlight: a visible ring, and the focus. */
 export const Highlighted: Story = { args: { highlighted: "snooze" } };
 

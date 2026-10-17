@@ -626,5 +626,17 @@
     "neverDone": "Scout no volverá a sugerirlo",
     "failed": "Campbooks no pudo guardarlo. Inténtalo de nuevo.",
     "shared": "Para todos en {{inbox}}."
+  },
+  "forward": {
+    "title": "Reenviar el correo de {{name}} a…",
+    "description": "Búscalo por su nombre. Verás el correo antes de que se envíe.",
+    "find": "Buscar a alguien por su nombre",
+    "placeholder": "Nombre, o parte de él",
+    "people": "Personas",
+    "starting": "Preparando el reenvío…",
+    "failed": "No se ha podido preparar el reenvío: no se ha enviado nada. Vuelve a intentarlo.",
+    "none": "Nadie con ese nombre te ha escrito.",
+    "searchFailed": "No se ha podido buscar ahora. Vuelve a intentarlo.",
+    "nobody": "Todavía no te ha escrito nadie."
   }
 }

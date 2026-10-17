@@ -1,5 +1,5 @@
 import { useNavigate } from "@tanstack/react-router";
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useEffectEvent, useRef, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 
 import { useShortcut } from "~/lib/shortcuts";
@@ -9,6 +9,7 @@ import {
   Dialog,
   DialogChoices,
   EmptyState,
+  focusNextAttachment,
   HomeLayout,
   HowDecided,
   Item,
@@ -25,6 +26,7 @@ import {
 import {
   billKind,
   dueLabel,
+  ForwardDialog,
   howRows,
   NeedMessage,
   needMessageOf,
@@ -49,9 +51,10 @@ import {
   doneTodayKind,
   groupByReason,
   remindTime,
-  rowActionIds,
+  rowChoices,
   snoozeOptions,
   type OwnActionId,
+  type OwnChoice,
   type RowKind,
   type UniversalActionId,
 } from "../../model";
@@ -91,6 +94,9 @@ interface Row {
 }
 
 type ActionId = OwnActionId | UniversalActionId;
+
+/** What an own action needs to work in an inbox the member may only read. */
+const READ_ONLY_STEPS: ReadonlySet<OwnActionId> = new Set(["remind_when", "open_attachment"]);
 
 const kindOf = (need: NeedView): RowKind => {
   if (need.question === "suspicious") {
@@ -180,7 +186,12 @@ export function WhatNeedsYou({ workspaceId, now, offer }: WhatNeedsYouProps) {
   const [expandedId, setExpandedId] = useState<string | undefined>();
   // The action ←/→ are on, on the selected row.
   const [highlight, setHighlight] = useState<string | undefined>();
-  const [snoozing, setSnoozing] = useState<Row | undefined>();
+  // Snooze's dialog, or Remind's (the same times, a bill's due date first).
+  const [snoozing, setSnoozing] = useState<{ row: Row; remind: boolean } | undefined>();
+  // Forward's dialog: whom to send it to.
+  const [forwarding, setForwarding] = useState<Row | undefined>();
+  // Open attachment: the opened item whose first file takes the focus.
+  const [attachmentFor, setAttachmentFor] = useState<string | undefined>();
   // The reply dialog's item, and the draft to pick up again after an undone send.
   const [replying, setReplying] = useState<
     { row: Row; resume?: ReplyResume | undefined; opened: number } | undefined
@@ -219,13 +230,14 @@ export function WhatNeedsYou({ workspaceId, now, offer }: WhatNeedsYouProps) {
       selectedId === undefined ||
       highlight !== undefined ||
       snoozing !== undefined ||
-      replying !== undefined
+      replying !== undefined ||
+      forwarding !== undefined
     ) {
       return;
     }
     focusFollows.current = false;
     document.getElementById(itemId(selectedId))?.focus({ preventScroll: true });
-  }, [selectedId, highlight, snoozing, replying]);
+  }, [selectedId, highlight, snoozing, replying, forwarding]);
 
   const select = (id: string) => {
     setSelection({
@@ -440,16 +452,22 @@ export function WhatNeedsYou({ workspaceId, now, offer }: WhatNeedsYouProps) {
     return t("remind.on", { date });
   };
 
-  /** What a row offers, in words with keys: the shape #166's ranked actions drop into. */
-  const actionsOf = (row: Row): { own: ItemAction[]; universal: ItemAction[] } => {
+  /**
+   * What a row offers, in words with keys: the server's ranked actions when
+   * it sent them (campbooks-cloud#166), else the fixed ones.
+   */
+  const actionsOf = (
+    row: Row,
+  ): { own: ItemAction[]; universal: ItemAction[]; choices: OwnChoice[]; picked: boolean } => {
     const kind = kindOf(row.need);
-    const all = rowActionIds(kind);
+    const all = rowChoices(kind, row.need.actions);
     // An inbox the member may only read: nothing that writes there (Reply,
-    // Yes, No, It's safe, Already paid, Done, Not needed); Snooze is the
-    // member's own.
-    const ids = writable(row)
-      ? all
-      : { own: [], universal: all.universal.filter((id) => id === "snooze") };
+    // Yes, No, It's safe, Already paid, Forward, Done, Not needed); Snooze,
+    // Remind and Open attachment are the member's own.
+    const choices = writable(row)
+      ? all.own
+      : all.own.filter((choice) => choice.steps.every((step) => READ_ONLY_STEPS.has(step)));
+    const universal = writable(row) ? all.universal : all.universal.filter((id) => id === "snooze");
     const ownLabel = (id: OwnActionId): string => {
       switch (id) {
         case "reply": {
@@ -476,34 +494,64 @@ export function WhatNeedsYou({ workspaceId, now, offer }: WhatNeedsYouProps) {
         case "remind": {
           return remindLabel(row);
         }
+        case "remind_when": {
+          return t("remind.button");
+        }
+        case "open_attachment": {
+          return t("actions.openAttachment");
+        }
+        case "forward": {
+          return t("actions.forward");
+        }
       }
+    };
+    const choiceLabel = (choice: OwnChoice): string => {
+      const [first, second] = choice.steps.map(ownLabel);
+      return second === undefined
+        ? (first ?? "")
+        : t("actions.combo", { first: first ?? "", second });
     };
     const universalLabel: Record<UniversalActionId, string> = {
       done: tc("needs.actions.done"),
       snooze: t("snooze.button"),
       not_needed: tc("needs.actions.notNeeded"),
     };
+    const own = choices.slice(0, CHOICE_KEYS.length);
     return {
-      own: ids.own.slice(0, CHOICE_KEYS.length).map((id, index) => ({
-        id,
-        label: ownLabel(id),
+      own: own.map((choice, index) => ({
+        id: choice.id,
+        label: choiceLabel(choice),
         // Reply asks Scout for likely replies: the visor marks it.
-        ai: id === "reply",
+        ai: choice.steps.includes("reply"),
         key: CHOICE_KEYS[index] ?? "item.choice1",
       })),
-      universal: ids.universal.map((id) => ({
+      universal: universal.map((id) => ({
         id,
         label: universalLabel[id],
         key: UNIVERSAL_KEYS[id],
       })),
+      choices: own,
+      picked: all.picked && own.length > 0,
     };
   };
-  const startSnooze = (row: Row) => {
+  const startSnooze = (row: Row, remind = false) => {
     keepFocus();
     setHighlight(undefined);
-    setSnoozing(row);
+    setSnoozing({ row, remind });
   };
-  const run = (row: Row, id: ActionId) => {
+  // Open attachment: the item opens on the email, its first file focused
+  // (Enter previews or saves it, as in the reader).
+  const showAttachment = (row: Row) => {
+    setHighlight(undefined);
+    setExpandedId(row.item.id);
+    setAttachmentFor(row.item.id);
+  };
+  const forward = (row: Row) => {
+    keepFocus();
+    setHighlight(undefined);
+    setForwarding(row);
+  };
+  const step = (row: Row, id: ActionId) => {
     switch (id) {
       case "reply": {
         reply(row);
@@ -530,6 +578,18 @@ export function WhatNeedsYou({ workspaceId, now, offer }: WhatNeedsYouProps) {
         snoozeUntil(row, reminder(row).until);
         return;
       }
+      case "remind_when": {
+        startSnooze(row, true);
+        return;
+      }
+      case "open_attachment": {
+        showAttachment(row);
+        return;
+      }
+      case "forward": {
+        forward(row);
+        return;
+      }
       case "no":
       case "safe":
       case "not_needed": {
@@ -544,6 +604,19 @@ export function WhatNeedsYou({ workspaceId, now, offer }: WhatNeedsYouProps) {
         startSnooze(row);
         return;
       }
+    }
+  };
+  /** An action of the row: one of its own (a pair runs both, in order) or a universal one. */
+  const run = (row: Row, id: string) => {
+    const choice = actionsOf(row).choices.find((c) => c.id === id);
+    if (choice !== undefined) {
+      for (const each of choice.steps) {
+        step(row, each);
+      }
+      return;
+    }
+    if (id === "done" || id === "snooze" || id === "not_needed") {
+      step(row, id);
     }
   };
   const selectedActions = selected === undefined ? undefined : actionsOf(selected);
@@ -626,7 +699,7 @@ export function WhatNeedsYou({ workspaceId, now, offer }: WhatNeedsYouProps) {
       if (highlight === undefined) {
         setExpandedId((id) => (id === selected.item.id ? undefined : selected.item.id));
       } else {
-        run(selected, highlight as ActionId);
+        run(selected, highlight);
       }
     },
     { enabled: hasRows },
@@ -643,7 +716,7 @@ export function WhatNeedsYou({ workspaceId, now, offer }: WhatNeedsYouProps) {
   const own = (index: number) => () => {
     const action = selectedActions?.own[index];
     if (selected !== undefined && action !== undefined) {
-      run(selected, action.id as ActionId);
+      run(selected, action.id);
     }
   };
   // An offered smart rule holds 1 and Esc while it shows.
@@ -713,6 +786,17 @@ export function WhatNeedsYou({ workspaceId, now, offer }: WhatNeedsYouProps) {
   const count = order.length;
   const review = order.some((row) => row.item.reason === "review");
   const times = snoozeOptions(today);
+  // Remind's times: a bill's reminder before its due date first, then Snooze's.
+  const beforeDue =
+    snoozing?.remind === true && reminder(snoozing.row).kind === "before"
+      ? [{ key: "due" as const, until: reminder(snoozing.row).until }]
+      : [];
+  const asked: { key: string; until: Date }[] = [
+    ...beforeDue,
+    ...times.filter((option) =>
+      beforeDue.every((due) => due.until.getTime() !== option.until.getTime()),
+    ),
+  ];
 
   const aside = (
     <AsideSection title={t("doneTodayTitle")}>
@@ -825,8 +909,9 @@ export function WhatNeedsYou({ workspaceId, now, offer }: WhatNeedsYouProps) {
                           universal={actions.universal}
                           highlighted={highlight}
                           onHighlight={setHighlight}
+                          picked={actions.picked ? t("actions.picked") : undefined}
                           onAction={(id) => {
-                            run(row, id as ActionId);
+                            run(row, id);
                           }}
                         />
                       )
@@ -839,6 +924,10 @@ export function WhatNeedsYou({ workspaceId, now, offer }: WhatNeedsYouProps) {
                         tc={tc}
                         locale={i18n.language}
                         now={now}
+                        focusAttachment={attachmentFor === row.item.id}
+                        onAttachmentFocused={() => {
+                          setAttachmentFor(undefined);
+                        }}
                         onOpen={() => {
                           openConversation(row);
                         }}
@@ -858,19 +947,21 @@ export function WhatNeedsYou({ workspaceId, now, offer }: WhatNeedsYouProps) {
         onClose={() => {
           setSnoozing(undefined);
         }}
-        title={t("snooze.title", { name: snoozing?.name ?? "" })}
-        description={t("snooze.description")}
+        title={t(snoozing?.remind === true ? "remind.title" : "snooze.title", {
+          name: snoozing?.row.name ?? "",
+        })}
+        description={t(snoozing?.remind === true ? "remind.description" : "snooze.description")}
       >
         <DialogChoices
           label={t("snooze.choices")}
-          choices={times.map((option) => ({
+          choices={asked.map((option) => ({
             id: option.key,
-            label: t(`snooze.${option.key}`),
+            label: t(option.key === "due" ? "remind.beforeDue" : `snooze.${option.key}`),
             detail: when(option.until),
           }))}
           onChoose={(key) => {
-            const row = snoozing;
-            const option = times.find((o) => o.key === key);
+            const row = snoozing?.row;
+            const option = asked.find((o) => o.key === key);
             setSnoozing(undefined);
             if (row !== undefined && option !== undefined) {
               snoozeUntil(row, option.until);
@@ -878,6 +969,22 @@ export function WhatNeedsYou({ workspaceId, now, offer }: WhatNeedsYouProps) {
           }}
         />
       </Dialog>
+      {forwarding === undefined ? null : (
+        <ForwardDialog
+          workspaceId={workspaceId}
+          conversationId={forwarding.conversation.id}
+          need={forwarding.need}
+          name={forwarding.name}
+          onClose={() => {
+            setForwarding(undefined);
+          }}
+          onForwarded={() => {
+            // The draft waits in the reader, addressed, to read before it goes.
+            setForwarding(undefined);
+            openConversation(forwarding);
+          }}
+        />
+      )}
       {replying === undefined ? null : (
         <ReplyDialog
           key={replying.opened}
@@ -921,41 +1028,80 @@ interface NeedDetailProps {
   tc: Translate;
   locale: string;
   now?: Date | undefined;
+  /** Open attachment: move the focus to the email's first file once it shows. */
+  focusAttachment?: boolean | undefined;
+  onAttachmentFocused?: (() => void) | undefined;
   onOpen: () => void;
 }
 
 /** An opened item: the warning's tells, the email itself and how it was decided. */
-function NeedDetail({ workspaceId, row, t, tc, locale, now, onOpen }: NeedDetailProps) {
+function NeedDetail({
+  workspaceId,
+  row,
+  t,
+  tc,
+  locale,
+  now,
+  focusAttachment = false,
+  onAttachmentFocused,
+  onOpen,
+}: NeedDetailProps) {
   const { i18n } = useTranslation("conversations");
   const exists = (key: string) => i18n.exists(`conversations:${key}`);
   const detail = useConversation(workspaceId, row.conversation.id);
   const decisions = detail.data?.decisions ?? [];
   const { need } = row;
   const warning = need.question === "suspicious";
+  const box = useRef<HTMLDivElement>(null);
+  const loaded = detail.data !== undefined;
+  const focused = useEffectEvent(() => {
+    onAttachmentFocused?.();
+  });
+  useEffect(() => {
+    if (!focusAttachment || !loaded) {
+      return;
+    }
+    // After the email has drawn its files; the clamp opens when one is focused.
+    const frame = requestAnimationFrame(() => {
+      if (box.current !== null) {
+        focusNextAttachment(box.current);
+      }
+      focused();
+    });
+    return () => {
+      cancelAnimationFrame(frame);
+    };
+  }, [focusAttachment, loaded]);
   return (
-    <ItemDetail
-      reasons={warning ? [...warningReasons(tc, exists, decisions), tc("needs.mail.linksOff")] : []}
-      summaryLabel={tc("needs.summary.heading")}
-      summary={detail.data?.need_summary ?? undefined}
-      mail={
-        needMessageOf(detail.data?.messages ?? [], need) === undefined ? undefined : (
-          <NeedMessage
-            workspaceId={workspaceId}
-            conversation={row.conversation}
-            need={need}
-            now={now}
-          />
-        )
-      }
-      quoteFrom={quoteAttribution(need, row.name, locale)}
-      quote={need.quote?.text}
-      actions={
-        <Button variant="link" onClick={onOpen}>
-          {t("actions.open")}
-        </Button>
-      }
-      how={<HowDecided rows={howRows(tc, exists, decisions)} footnote={tc("needs.how.footnote")} />}
-    />
+    <div ref={box} className="contents">
+      <ItemDetail
+        reasons={
+          warning ? [...warningReasons(tc, exists, decisions), tc("needs.mail.linksOff")] : []
+        }
+        summaryLabel={tc("needs.summary.heading")}
+        summary={detail.data?.need_summary ?? undefined}
+        mail={
+          needMessageOf(detail.data?.messages ?? [], need) === undefined ? undefined : (
+            <NeedMessage
+              workspaceId={workspaceId}
+              conversation={row.conversation}
+              need={need}
+              now={now}
+            />
+          )
+        }
+        quoteFrom={quoteAttribution(need, row.name, locale)}
+        quote={need.quote?.text}
+        actions={
+          <Button variant="link" onClick={onOpen}>
+            {t("actions.open")}
+          </Button>
+        }
+        how={
+          <HowDecided rows={howRows(tc, exists, decisions)} footnote={tc("needs.how.footnote")} />
+        }
+      />
+    </div>
   );
 }
 

@@ -106,4 +106,24 @@ describe("ItemActions", () => {
 
     expect(container.querySelector("[aria-hidden='true'][class*='divider']")).toBeNull();
   });
+
+  it("marks own actions the assistant picked with the visor, named", () => {
+    renderUi(
+      <ItemActions
+        label="Actions"
+        own={OWN}
+        universal={UNIVERSAL}
+        picked="Scout picked these"
+        onAction={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByRole("img", { name: "Scout picked these" })).toBeInTheDocument();
+  });
+
+  it("says nothing was picked when nothing was", () => {
+    renderUi(<ItemActions label="Actions" own={OWN} universal={UNIVERSAL} onAction={vi.fn()} />);
+
+    expect(screen.queryByRole("img", { name: "Scout picked these" })).toBeNull();
+  });
 });

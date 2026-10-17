@@ -1,7 +1,14 @@
 import { describe, expect, it } from "vitest";
 
 import type { ItemView } from "./api/queries";
-import { doneTodayKind, groupByReason, remindTime, rowActionIds, snoozeOptions } from "./model";
+import {
+  doneTodayKind,
+  groupByReason,
+  remindTime,
+  rowActionIds,
+  rowChoices,
+  snoozeOptions,
+} from "./model";
 
 const item = (id: string, reason: ItemView["reason"], extra: Partial<ItemView> = {}): ItemView => ({
   id,
@@ -71,6 +78,54 @@ describe("attention model", () => {
       own: ["report", "safe"],
       universal: ["done", "snooze"],
     });
+  });
+
+  it("offers the fixed actions when the server sent no ranking", () => {
+    // The key is missing: exactly today's actions, not picked by Scout.
+    expect(rowChoices("need", undefined)).toEqual({
+      own: [{ id: "reply", steps: ["reply"] }],
+      universal: ["done", "snooze", "not_needed"],
+      picked: false,
+    });
+    expect(rowChoices("toPay", undefined).own.map((c) => c.id)).toEqual(["remind", "paid"]);
+  });
+
+  it("offers the ranked actions in the server's order, at most three", () => {
+    const choices = rowChoices("need", [
+      { actions: ["reply"], likelihood: 91 },
+      { actions: ["forward"], likelihood: 84 },
+      { actions: ["remind"], likelihood: 80 },
+      { actions: ["open_attachment"], likelihood: 75 },
+    ]);
+    expect(choices.picked).toBe(true);
+    expect(choices.own.map((c) => c.id)).toEqual(["reply", "forward", "remind_when"]);
+    // The universal actions stay as they are.
+    expect(choices.universal).toEqual(["done", "snooze", "not_needed"]);
+  });
+
+  it("offers a pair done together as one button, run in order", () => {
+    const choices = rowChoices("bill", [
+      { actions: ["already_paid"], likelihood: 70 },
+      { actions: ["still_to_pay"], likelihood: 30 },
+      { actions: ["open_attachment", "forward"], likelihood: 81 },
+    ]);
+    expect(choices.own).toEqual([
+      { id: "paid", steps: ["paid"] },
+      { id: "to_pay", steps: ["to_pay"] },
+      { id: "open_attachment+forward", steps: ["open_attachment", "forward"] },
+    ]);
+  });
+
+  it("keeps a question's Yes and No, and never asks Still to pay twice", () => {
+    const ranked = [
+      { actions: ["already_paid" as const], likelihood: 60 },
+      { actions: ["still_to_pay" as const], likelihood: 40 },
+      { actions: ["remind" as const], likelihood: 90 },
+    ];
+    expect(rowChoices("question", ranked).own.map((c) => c.id)).toEqual(["yes", "no"]);
+    expect(rowChoices("toPay", ranked).own.map((c) => c.id)).toEqual(["paid", "remind_when"]);
+    // Nothing usable: the fixed actions.
+    expect(rowChoices("need", []).picked).toBe(false);
   });
 
   it("words Done today and says what can be undone", () => {

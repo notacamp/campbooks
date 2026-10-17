@@ -42,7 +42,11 @@
     "reply": "Responder",
     "open": "Abrir conversa",
     "undo": "Anular",
-    "label": "Ações para {{name}}"
+    "label": "Ações para {{name}}",
+    "openAttachment": "Abrir anexo",
+    "forward": "Reencaminhar…",
+    "combo": "{{first}} e depois {{second}}",
+    "picked": "O Scout escolheu estas para este email"
   },
   "confirm": {
     "done": "Feito · {{name}}",
@@ -62,7 +66,11 @@
   "remind": {
     "today": "Lembrar-me hoje às {{time}}",
     "tomorrow": "Lembrar-me amanhã às {{time}}",
-    "on": "Lembrar-me a {{date}}"
+    "on": "Lembrar-me a {{date}}",
+    "button": "Lembrar-me…",
+    "title": "Lembrar-me de {{name}}…",
+    "description": "Sai da página inicial até lá e volta sozinho.",
+    "beforeDue": "Antes do prazo"
   },
   "pay": {
     "allPaid_one": "Já paguei {{count}}",

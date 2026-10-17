@@ -20,6 +20,7 @@ export type MessageView = Schema<"MessageView">;
 export type DecisionView = Schema<"DecisionView">;
 export type ReasonView = Schema<"ReasonView">;
 export type NeedView = Schema<"NeedView">;
+export type Sender = Schema<"SenderView">;
 
 /** A member's verdict on what a conversation needs (`conversations.resolve_need`, …). */
 export type NeedVerdict =
@@ -48,6 +49,8 @@ const keys = {
       workspace_id: workspaceId,
       conversation_id: conversationId,
     }),
+  senders: (workspaceId: string, q: string) =>
+    operationKey("conversations.list_senders", { workspace_id: workspaceId, q }),
   body: (workspaceId: string, conversationId: string, messageId: string, showImages: boolean) =>
     operationKey("conversations.get_message_body", {
       workspace_id: workspaceId,
@@ -445,5 +448,27 @@ export function useConversationAction(workspaceId: string) {
         queryClient.invalidateQueries({ queryKey: keys.inboxes(workspaceId) }),
       ]);
     },
+  });
+}
+
+/**
+ * `conversations.list_senders`: the people the caller replies to most, or
+ * those matching `q` by name or address (from two characters).
+ */
+export function useSenders(workspaceId: string, q = "", { enabled = true } = {}) {
+  const query = q.trim();
+  return useQuery({
+    queryKey: keys.senders(workspaceId, query),
+    enabled: enabled && (query.length === 0 || query.length >= 2),
+    queryFn: async ({ signal }) =>
+      unwrap(
+        await api.GET("/api/v1/w/{workspace_id}/senders", {
+          params: {
+            path: { workspace_id: workspaceId },
+            query: query.length === 0 ? {} : { q: query },
+          },
+          signal,
+        }),
+      ).senders,
   });
 }

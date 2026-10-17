@@ -1,6 +1,8 @@
 // Pure helpers of Home's "What needs you": grouping, Snooze's times, the
 // actions a row offers and the
 // sentences of Done today. No React, no fetching.
+import type { Schema } from "~/lib/api";
+
 import type { ItemView, Reason } from "./api/queries";
 
 /** The groups, in the order Home shows them. */
@@ -46,8 +48,25 @@ export function snoozeOptions(now: Date): { key: SnoozeKey; until: Date }[] {
   );
 }
 
-/** What a row offers: the item's own actions (keys 1 to 3), then the universal ones. */
-export type OwnActionId = "reply" | "yes" | "no" | "report" | "safe" | "paid" | "to_pay" | "remind";
+/**
+ * What a row offers: the item's own actions (keys 1 to 3), then the universal
+ * ones. `remind` is a bill's one-press reminder from its due date;
+ * `remind_when`, `open_attachment` and `forward` come from the ranked
+ * catalogue (campbooks-cloud#166): Remind asks when, Open attachment shows
+ * the file in the opened item, Forward asks to whom.
+ */
+export type OwnActionId =
+  | "reply"
+  | "yes"
+  | "no"
+  | "report"
+  | "safe"
+  | "paid"
+  | "to_pay"
+  | "remind"
+  | "remind_when"
+  | "open_attachment"
+  | "forward";
 export type UniversalActionId = "done" | "snooze" | "not_needed";
 
 /**
@@ -62,8 +81,8 @@ export type RowKind = "question" | "warning" | "need" | "bill" | "toPay";
  * and Done means nothing until it is answered); a warning is cleared with
  * "It's safe" (its not needed) or reported and deleted (into spam, with a
  * smart rule offered after, campbooks-cloud#169); anything else is replied
- * to. #166 will
- * replace the own actions with a ranked list from the server.
+ * to. A need the server ranked offers its own actions instead
+ * ({@link rowChoices}, campbooks-cloud#166).
  */
 export function rowActionIds(kind: RowKind): {
   own: OwnActionId[];
@@ -145,4 +164,72 @@ export function doneTodayKind(item: ItemView): {
       return { key: "doneToday.gone", undo: undefined };
     }
   }
+}
+
+/** One action of the catalogue, as the server names it (campbooks-cloud#166). */
+export type CatalogueAction = Schema<"NeedAction">;
+type SuggestedAction = Schema<"SuggestedAction">;
+
+/** A catalogue action as the row runs it. */
+const FROM_CATALOGUE: Record<CatalogueAction, OwnActionId> = {
+  reply: "reply",
+  remind: "remind_when",
+  open_attachment: "open_attachment",
+  forward: "forward",
+  report: "report",
+  safe: "safe",
+  already_paid: "paid",
+  still_to_pay: "to_pay",
+};
+
+/**
+ * One button of the row's own actions: one action, or a pair usually done
+ * together, offered as one and run in order.
+ */
+export interface OwnChoice {
+  /** Stable id: the action's, or both joined with `+`. */
+  id: string;
+  steps: OwnActionId[];
+}
+
+/** At most three own actions, on keys 1 to 3. */
+const MAX_OWN = 3;
+
+/**
+ * What a row offers. With the server's ranked `actions` (the catalogue is on
+ * and the message was rated), its own actions are those, in the server's
+ * order, `picked` by Scout; a pair is one button. Without them (the key is
+ * missing), exactly the fixed actions of {@link rowActionIds}. A question
+ * keeps Yes and No (its answer is the point), and a bill already said to be
+ * still to pay never offers Still to pay again. Nothing usable left in the
+ * ranking falls back to the fixed actions too.
+ */
+export function rowChoices(
+  kind: RowKind,
+  ranked: readonly SuggestedAction[] | null | undefined,
+): { own: OwnChoice[]; universal: UniversalActionId[]; picked: boolean } {
+  const fixed = rowActionIds(kind);
+  const fallback = {
+    own: fixed.own.map((id) => ({ id, steps: [id] })),
+    universal: fixed.universal,
+    picked: false,
+  };
+  // Only a missing key means "not rated": `null` never comes from the server.
+  if (ranked === undefined || kind === "question") {
+    return fallback;
+  }
+  const own: OwnChoice[] = [];
+  for (const suggestion of ranked ?? []) {
+    const steps = suggestion.actions.map((action) => FROM_CATALOGUE[action]);
+    if (steps.length === 0 || (kind === "toPay" && steps.includes("to_pay"))) {
+      continue;
+    }
+    const id = steps.join("+");
+    if (!own.some((choice) => choice.id === id)) {
+      own.push({ id, steps });
+    }
+  }
+  return own.length === 0
+    ? fallback
+    : { own: own.slice(0, MAX_OWN), universal: fixed.universal, picked: true };
 }
