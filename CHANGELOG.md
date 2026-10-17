@@ -32,6 +32,9 @@ All notable changes to Campbooks Next are documented here. The format follows
 
 ### Added
 
+- **`/up` works as a health check.** The server answers `/up` the same way as
+  `/api/v1/system/health`, so load balancers and uptime monitors that probe `/up` work
+  without being reconfigured.
 - **Build a rule yourself, any time (campbooks-cloud#217).** In Scout's memory, "Build a
   rule yourself" next to the privacy line opens the rule builder without sending anything
   to a language model, and "Tell Scout in a sentence instead" goes back. When Scout can't

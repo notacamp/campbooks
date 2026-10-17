@@ -73,6 +73,11 @@ pub const REQUEST_TIMEOUT: Duration = Duration::from_secs(30);
 /// Path the OpenAPI document is served at.
 pub const OPENAPI_PATH: &str = "/openapi.json";
 
+/// Path the health check also answers at, for load balancers and uptime
+/// monitors that probe `/up`. Not an API operation: it is mounted by
+/// [`compose`], outside the OpenAPI document.
+pub const UP_PATH: &str = "/up";
+
 /// Header carrying the request id, generated when the client sends none.
 pub const REQUEST_ID_HEADER: &str = "x-request-id";
 
@@ -90,6 +95,10 @@ pub const SECURITY_HEADERS: [(HeaderName, &str); 3] = [
 /// cache ([`no_store`]).
 pub const NO_STORE_PREFIXES: [&str; 3] = ["/api/", "/bff/", "/admin/"];
 
+/// Exact paths outside those prefixes that are never stored either: the
+/// probe alias, whose answer must always be live.
+const NO_STORE_PATHS: [&str; 1] = [UP_PATH];
+
 /// `Cache-Control: no-store` and `Pragma: no-cache` on every response under
 /// [`NO_STORE_PREFIXES`], whatever the handler set (a handler's own
 /// `no-store` variant, such as `private, no-store`, is kept). One layer, so
@@ -98,7 +107,8 @@ async fn no_store(request: AxumRequest, next: middleware::Next) -> axum::respons
     let path = request.uri().path();
     let private = NO_STORE_PREFIXES
         .iter()
-        .any(|prefix| path.starts_with(prefix) || path == prefix.trim_end_matches('/'));
+        .any(|prefix| path.starts_with(prefix) || path == prefix.trim_end_matches('/'))
+        || NO_STORE_PATHS.contains(&path);
     let mut response = next.run(request).await;
     if private {
         let headers = response.headers_mut();
@@ -636,6 +646,8 @@ fn compose(
             OPENAPI_PATH,
             get(move || async move { Json(spec.as_ref().clone()) }),
         )
+        // The health check again, for probes: same handler, so same answer.
+        .route(UP_PATH, get(campbooks_system::health))
         .with_state(state)
         .merge(bff.router())
         .merge(identity);
@@ -1793,6 +1805,48 @@ mod tests {
                 assert_eq!(header(&raw, name), Some(*value), "{name}");
             }
         }
+    }
+
+    #[sqlx::test(migrations = "../../migrations")]
+    async fn up_answers_like_the_health_check(db: sqlx::PgPool) {
+        let dir = WebDir::new();
+        let mut config = testing::config("postgres://test@localhost/test");
+        config.web_dir = Some(dir.0.clone());
+        let app = router(AppState::new(db, config), None);
+        let health = fetch(&app, "/api/v1/system/health", None).await;
+        // A browser navigation still gets the health answer, not the web client.
+        for accept in [None, HTML] {
+            let up = fetch(&app, UP_PATH, accept).await;
+            assert_eq!(up.status, StatusCode::OK, "{}", up.body);
+            assert_eq!(up.body, health.body);
+            assert_eq!(up.body, r#"{"status":"ok","database":"ok"}"#);
+            assert_eq!(header(&up, &header::CACHE_CONTROL), Some("no-store"));
+            assert_eq!(header(&up, &header::PRAGMA), Some("no-cache"));
+        }
+    }
+
+    #[tokio::test]
+    async fn up_is_a_503_problem_when_the_database_is_down() {
+        let dir = WebDir::new();
+        for app in [app(), web_app(&dir)] {
+            let up = fetch(&app, UP_PATH, HTML).await;
+            assert_eq!(up.status, StatusCode::SERVICE_UNAVAILABLE, "{}", up.body);
+            assert_eq!(
+                header(&up, &header::CONTENT_TYPE),
+                Some("application/problem+json")
+            );
+            assert_eq!(header(&up, &header::CACHE_CONTROL), Some("no-store"));
+            let problem: serde_json::Value = serde_json::from_str(&up.body).unwrap();
+            assert_eq!(problem["code"], "database_unreachable");
+        }
+    }
+
+    #[tokio::test]
+    async fn up_is_not_in_the_openapi_document() {
+        let spec = fetch(&app(), OPENAPI_PATH, None).await;
+        let spec: serde_json::Value = serde_json::from_str(&spec.body).unwrap();
+        assert!(spec["paths"].get(UP_PATH).is_none());
+        assert!(spec["paths"].get("/api/v1/system/health").is_some());
     }
 
     #[tokio::test]
