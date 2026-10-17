@@ -189,7 +189,11 @@
     "from": "De",
     "sending": "A enviar para {{name}}",
     "sendingNoName": "A enviar",
-    "draftSaved": "Rascunho guardado",
+    "draftChip": "Rascunho guardado · {{title}}",
+    "draftDeleted": "Rascunho eliminado",
+    "deleteDraft": "Eliminar rascunho",
+    "deleteDraftNamed": "Eliminar rascunho: {{title}}",
+    "draftNotRestored": "Não foi possível recuperar o rascunho.",
     "saveState": {
       "saved": "Guardado",
       "saving": "A guardar…",
@@ -572,7 +576,8 @@
       "limit": "O Scout escreveu muitas respostas nesta hora. Tente mais tarde ou escreva-a você mesmo.",
       "dailyLimit": "Este espaço de trabalho já usou a quota de IA de hoje. Escreva esta você mesmo.",
       "send": "Não foi possível enviar para {{name}}. O seu rascunho foi guardado.",
-      "open": "Não foi possível abrir o editor. O seu rascunho continua aqui."
+      "open": "Não foi possível abrir o editor. O seu rascunho continua aqui.",
+      "delete": "Não foi possível eliminar o rascunho. Continua guardado."
     },
     "to": "Para {{recipient}}",
     "replyToElsewhere": "As respostas vão para {{recipient}}, não para o remetente {{sender}}. Confirme antes de enviar."

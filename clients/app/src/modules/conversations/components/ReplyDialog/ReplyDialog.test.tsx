@@ -194,4 +194,49 @@ describe("ReplyDialog", () => {
       body: DRAFT,
     });
   });
+
+  it("deletes a resumed draft, closes, and brings it back with Undo", async () => {
+    const api = routes({ [`DELETE ${D}/${REPLY.id}`]: { status: 204 } });
+    const resume: ReplyResume = {
+      draft: { ...REPLY, message_id: NEWEST, body: DRAFT },
+      intent: "Say Thursday works",
+    };
+    const handlers = dialog({ resume });
+    const text = await screen.findByRole("textbox", { name: "Your reply" });
+    fireEvent.change(text, { target: { value: `${DRAFT} Edited.` } });
+    fireEvent.click(screen.getByRole("button", { name: "Delete draft" }));
+    await waitFor(() => {
+      expect(handlers.onClose).toHaveBeenCalled();
+    });
+    expect(api.calls.some((c) => c.route === `DELETE ${D}/${REPLY.id}`)).toBe(true);
+    expect(screen.getByText("Draft deleted")).toBeVisible();
+
+    fireEvent.click(await screen.findByRole("button", { name: /^Undo/u }));
+    await waitFor(() => {
+      expect(api.calls.some((c) => c.route === `POST ${D}`)).toBe(true);
+    });
+    expect(api.calls.find((c) => c.route === `POST ${D}`)?.body).toMatchObject({
+      kind: "reply",
+      message_id: NEWEST,
+      body: `${DRAFT} Edited.`,
+    });
+  });
+
+  it("offers Delete draft only once something is saved", async () => {
+    routes({
+      [`PATCH ${D}/${REPLY.id}`]: (_request, body) => ({
+        body: { ...REPLY, ...(body as object), version: 2 },
+      }),
+    });
+    dialog();
+    const first = await screen.findByRole("button", { name: /Say Thursday works/u });
+    fireEvent.keyDown(first, { key: "1" });
+    await screen.findByRole("textbox", { name: "Your reply" });
+    // Scout's text is not a draft yet.
+    expect(screen.queryByRole("button", { name: "Delete draft" })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Open in composer" }));
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "Delete draft" })).toBeVisible();
+    });
+  });
 });

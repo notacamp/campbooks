@@ -8,6 +8,12 @@ All notable changes to Campbooks Next are documented here. The format follows
 
 ### Added
 
+- **Delete a draft from wherever it shows, with Undo.** Under a thread, every draft you left
+  open appears by name ("Draft saved · Reply to Maya", "Draft saved · Forward") with its own
+  Delete draft, so a second draft is no longer hidden. The Reply dialog offers Delete draft
+  once it holds a saved draft. Every delete, the composer's Discard included, says "Draft
+  deleted" and offers Undo, which writes the draft back as you saw it. A forward's
+  attachments you had removed come back with it.
 - **Always show images from a sender you trust.** In the reader, beside Show images, "Always
   show images from <sender>" (⇧A) saves a smart rule, after the usual confirmation, for that
   address or anyone at its domain. Their images then show on their own, but only when the
