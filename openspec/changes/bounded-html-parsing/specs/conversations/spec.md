@@ -9,7 +9,8 @@ or out of its parent adds the parent's number of children; moving children
 adds their number), fed in chunks of at most 8 KiB and stopped as soon as the
 work passes 5,000,000 units; HTML past that, or whose tree is deeper than
 4,096 levels, SHALL be returned as its text instead: the characters outside
-scripts, styles, the head and the title, entities decoded, a line break at
+scripts, styles, the head, the title and the markup a `noscript`, `iframe`,
+`noembed` or `noframes` holds, entities decoded, a line break at
 each `br` and at the end of each `p`, `div`, `li`, `tr`, `td`, heading,
 `table`, `ul` and `ol`, escaped, as the only content of one
 `<div style="white-space: pre-wrap">`, with `remote_images` 0 and no `css`.
@@ -93,7 +94,8 @@ with names and addresses), plain text (the text part, or the HTML part
 reduced to text when there is none, quoted history removed, at most
 32 KiB; the HTML is reduced by html5ever's tokenizer alone, in time linear
 in its size, keeping the characters outside scripts, styles, the head, the
-title and `blockquote`s, with a line break at each `br` and at the end of
+title, the markup a `noscript`, `iframe`, `noembed` or `noframes` holds, and
+`blockquote`s, with a line break at each `br` and at the end of
 each block), attachment names, mailbox (`inbox`, `archive`, `spam`, `trash`),
 direction and a content stamp made of the hashes of the blobs it is read
 from. A conversation that no longer exists SHALL be reported as gone.

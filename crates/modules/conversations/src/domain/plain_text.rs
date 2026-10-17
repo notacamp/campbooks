@@ -73,8 +73,9 @@ pub fn text_of(html: &str, quotes: Quotes) -> String {
 struct Reader {
     quotes: Quotes,
     text: RefCell<String>,
-    /// Open `script`, `style` or `title` (raw text switches back at their
-    /// end tag).
+    /// Inside an element whose raw text is not words to read (`script`,
+    /// `style`, `title`, and the markup a `noscript`, `iframe`, `noembed` or
+    /// `noframes` holds); raw text cannot nest, so its end tag ends it.
     skipping: Cell<bool>,
     in_head: Cell<bool>,
     quote_depth: Cell<usize>,
@@ -101,7 +102,8 @@ impl TokenSink for Reader {
                 let name = &*tag.name;
                 if tag.kind == TagKind::EndTag {
                     match name {
-                        "script" | "style" | "title" => self.skipping.set(false),
+                        "script" | "style" | "title" | "noscript" | "iframe" | "noembed"
+                        | "noframes" => self.skipping.set(false),
                         "head" => self.in_head.set(false),
                         "blockquote" => {
                             self.quote_depth
@@ -118,7 +120,8 @@ impl TokenSink for Reader {
                     "body" => self.in_head.set(false),
                     "blockquote" => self.quote_depth.set(self.quote_depth.get() + 1),
                     "br" => self.text.borrow_mut().push('\n'),
-                    "script" | "style" | "title" => self.skipping.set(true),
+                    "script" | "style" | "title" | "noscript" | "iframe" | "noembed"
+                    | "noframes" => self.skipping.set(true),
                     _ => {}
                 }
                 // Raw-text switching as the tree builder does it
@@ -237,6 +240,15 @@ mod tests {
     fn hostile_nesting_is_read_in_linear_time() {
         let html = format!("<p>Word</p>{}", "<div></span>".repeat(170_000));
         assert!(from_html(&html).contains("Word"));
+    }
+
+    #[test]
+    fn markup_held_as_raw_text_is_not_words() {
+        let html = "<p>Hi</p><noscript><img src=\"https://t.example/p.gif\"></noscript>\
+                    <iframe><b>frame</b></iframe><xmp>shown</xmp>";
+        let text = from_html(html);
+        assert!(text.contains("Hi") && text.contains("shown"), "{text}");
+        assert!(!text.contains('<') && !text.contains("frame"), "{text}");
     }
 
     #[test]
