@@ -54,7 +54,8 @@ pub mod scopes;
 mod testkit;
 
 pub use config::{
-    ConversationsConfig, DEFAULT_DECIDE_BACKFILL_DAYS, DEFAULT_NEEDS_WINDOW_DAYS, NoticeSettings,
+    ActionSettings, ConversationsConfig, DEFAULT_DECIDE_BACKFILL_DAYS, DEFAULT_NEEDS_WINDOW_DAYS,
+    NoticeSettings,
 };
 pub use domain::{
     decide::STATE_VERSION,
@@ -226,18 +227,24 @@ pub fn module(deps: ConversationsDeps) -> Module {
             .schedule::<features::backfill_needs::DispatchNeedsBackfills>(
                 features::backfill_needs::EVERY,
             )
-            .consumer(features::decide_message::DecideMessage::new(
-                model.clone(),
-                deps.config.decide_backfill_days,
-                deps.policy.clone(),
-                needs.clone(),
-            ))
-            .handler(features::decide_message::DecideBacklog::new(
-                model,
-                deps.config.decide_backfill_days,
-                deps.policy,
-                needs,
-            ))
+            .consumer(
+                features::decide_message::DecideMessage::new(
+                    model.clone(),
+                    deps.config.decide_backfill_days,
+                    deps.policy.clone(),
+                    needs.clone(),
+                )
+                .with_actions(deps.config.actions),
+            )
+            .handler(
+                features::decide_message::DecideBacklog::new(
+                    model,
+                    deps.config.decide_backfill_days,
+                    deps.policy,
+                    needs,
+                )
+                .with_actions(deps.config.actions),
+            )
             .on_event::<features::ingest_messages::IngestMessages>()
             .on_event::<features::create_inbox::CreateInbox>()
             .on_event::<features::forget_connection::ForgetConnection>()
