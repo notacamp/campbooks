@@ -479,7 +479,12 @@ describe("the inbox", () => {
       },
     );
     await screen.findByRole("dialog", { name: /Moved 40 to Newsletters/u });
+    // Z undoes the latest action: saving the rule.
+    expect(screen.getByText(/^Smart rule saved · /u)).toBeVisible();
     fireEvent.keyDown(document.body, { key: "z" });
+    await waitFor(() => {
+      expect(api.calls.some((call) => call.route.startsWith("DELETE"))).toBe(true);
+    });
     expect(await screen.findByRole("dialog", { name: "Putting 40 back" })).toBeVisible();
     expect(
       await screen.findByText("Rule removed · Mail from hello@weekly-ledger.example → Newsletters"),
