@@ -16,11 +16,11 @@ complement, Already paid from `action_paid_automatically` and Still to pay
 from its complement; an answer without probabilities rates nothing. The
 facts SHALL only rule an action out and nothing SHALL read what an email
 says. The ratings SHALL be stored per message
-(`conversations.action_likelihoods`, with whether each cleared
-`CAMPBOOKS_CONVERSATIONS__ACTIONS__FLOOR_PERCENT`, default 70), never as
-decisions, so the triage answers are recorded and acted on exactly as
-without the catalogue. A need in a summary SHALL then carry `actions`, at
-most three: on a `review` need raised by `suspicious`, Report and It's safe;
+(`conversations.action_likelihoods`), never as decisions, so the triage
+answers are recorded and acted on exactly as without the catalogue. While
+the setting is on, a need in `conversations.list` and `conversations.get`
+SHALL carry `actions`, at most three, under the floor configured then
+(`CAMPBOOKS_CONVERSATIONS__ACTIONS__FLOOR_PERCENT`, default 70): on a `review` need raised by `suspicious`, Report and It's safe;
 on a `pay` need, Already paid and Still to pay, then Open attachment, Remind
 or Forward; on any other need, Reply, Open attachment, Remind or Forward.
 A need's own answers SHALL always be offered, likelier first; the others
@@ -28,7 +28,8 @@ only when they cleared the floor, likelier first, a pair of the combo table
 offered as one first among them when both did. A need with nothing rated or
 nothing to offer SHALL carry no `actions`. With the setting off, the
 `decide` request SHALL hold exactly the triage questions, nothing SHALL be
-rated, and every need SHALL read exactly as before, with no `actions`.
+rated or read, and every need SHALL read exactly as before, with no
+`actions`, even one rated while the setting was on (it is a kill switch).
 
 #### Scenario: Off
 - **WHEN** the catalogue is off and a message is decided
@@ -37,6 +38,10 @@ rated, and every need SHALL read exactly as before, with no `actions`.
 #### Scenario: On
 - **WHEN** the catalogue is on and Marta's question is decided with `needs_reply` at 0.9 and Remind at 0.8
 - **THEN** the same call carries the catalogue's questions, the triage answers stored are the same as with it off, and the Reply need offers Reply (90) first
+
+#### Scenario: Switched off again
+- **WHEN** the catalogue rated a need's message and is then switched off
+- **THEN** the need reads as before, with no `actions`
 
 #### Scenario: A warning
 - **WHEN** a phishing message's need is shown with `suspicious` at 0.2

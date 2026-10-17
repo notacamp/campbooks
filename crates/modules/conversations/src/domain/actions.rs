@@ -2,12 +2,13 @@
 //!
 //! The model pass rates every action of
 //! [`campbooks_ai::decide::signals::actions`] for a message and [`store`]s
-//! the likelihoods, marking those at or above the floor configured then
-//! (`CAMPBOOKS_CONVERSATIONS__ACTIONS__FLOOR_PERCENT`); it does so only
-//! while `CAMPBOOKS_CONVERSATIONS__ACTIONS__ENABLED` is on. [`attach`] then
-//! gives each open need the actions [`rank`] picks for it. With the flag
-//! off nothing is stored, so no need carries any and every need reads as
-//! before.
+//! the likelihoods, only while `CAMPBOOKS_CONVERSATIONS__ACTIONS__ENABLED`
+//! is on. [`attach`] then gives each open need, in `conversations.list` and
+//! `conversations.get`, the actions [`rank`] picks for it under the floor
+//! configured now (`CAMPBOOKS_CONVERSATIONS__ACTIONS__FLOOR_PERCENT`), and
+//! only while the flag is on: off, nothing is rated or read, so every need
+//! reads exactly as before, whatever was rated while it was on (the flag is
+//! a kill switch).
 //!
 //! [`rank`]: a need's own answers first (Report / It's safe on a warning,
 //! Already paid / Still to pay on a bill: the question it asks, always
@@ -22,7 +23,10 @@ use sqlx::{PgConnection, types::Uuid};
 use utoipa::ToSchema;
 
 use super::conversation::ConversationSummary;
-use crate::model::{MessageId, NeedAction, NeedQuestion, NeedReason};
+use crate::{
+    config::ActionSettings,
+    model::{MessageId, NeedAction, NeedQuestion, NeedReason},
+};
 
 /// The most actions a need offers.
 pub const MAX_ACTIONS: usize = 3;
@@ -45,17 +49,13 @@ pub struct Rated {
     pub action: ActionId,
     /// How likely the member is to want it.
     pub likelihood: f64,
-    /// Whether it cleared the floor when it was rated.
-    pub above_floor: bool,
 }
 
-/// Store `rated` for `message` in `workspace`, replacing what was stored:
-/// each action at or above `floor` marked as clearing it.
+/// Store `rated` for `message` in `workspace`, replacing what was stored.
 pub async fn store(
     conn: &mut PgConnection,
     (workspace, message): (Uuid, MessageId),
     rated: &[(ActionId, f64)],
-    floor: f64,
     model: &str,
 ) -> Result<()> {
     sqlx::query!(
@@ -66,17 +66,15 @@ pub async fn store(
     .await?;
     let actions: Vec<String> = rated.iter().map(|(a, _)| a.as_str().to_owned()).collect();
     let likelihoods: Vec<f64> = rated.iter().map(|(_, l)| *l).collect();
-    let above: Vec<bool> = rated.iter().map(|(_, l)| *l >= floor).collect();
     sqlx::query!(
         r#"INSERT INTO conversations.action_likelihoods
-               (message_id, workspace_id, action, likelihood, above_floor, model)
-           SELECT $1::uuid, $2::uuid, a.action, a.likelihood, a.above, $6::text
-             FROM unnest($3::text[], $4::float8[], $5::bool[]) AS a(action, likelihood, above)"#,
+               (message_id, workspace_id, action, likelihood, model)
+           SELECT $1::uuid, $2::uuid, a.action, a.likelihood, $5::text
+             FROM unnest($3::text[], $4::float8[]) AS a(action, likelihood)"#,
         message as MessageId,
         workspace,
         &actions,
         &likelihoods,
-        &above,
         model,
     )
     .execute(&mut *conn)
@@ -84,9 +82,18 @@ pub async fn store(
     Ok(())
 }
 
-/// Give each summary's open need the actions [`rank`] picks for it from
-/// what was stored about its message; none when nothing was (the flag off).
-pub async fn attach(conn: &mut PgConnection, summaries: &mut [ConversationSummary]) -> Result<()> {
+/// With the catalogue on, give each summary's open need the actions
+/// [`rank`] picks for it from what was stored about its message, under the
+/// floor `settings` configure now; nothing when it is off, or nothing was
+/// rated.
+pub async fn attach(
+    conn: &mut PgConnection,
+    settings: ActionSettings,
+    summaries: &mut [ConversationSummary],
+) -> Result<()> {
+    if !settings.enabled {
+        return Ok(());
+    }
     let messages: Vec<MessageId> = summaries
         .iter()
         .filter_map(|s| s.need.as_ref().map(|n| n.message_id))
@@ -95,7 +102,7 @@ pub async fn attach(conn: &mut PgConnection, summaries: &mut [ConversationSummar
         return Ok(());
     }
     let rows = sqlx::query!(
-        r#"SELECT message_id AS "message_id: MessageId", action, likelihood, above_floor
+        r#"SELECT message_id AS "message_id: MessageId", action, likelihood
              FROM conversations.action_likelihoods
             WHERE message_id = ANY($1)"#,
         &messages as &[MessageId],
@@ -116,19 +123,23 @@ pub async fn attach(conn: &mut PgConnection, summaries: &mut [ConversationSummar
                 Some(Rated {
                     action: ActionId::parse(&r.action)?,
                     likelihood: r.likelihood,
-                    above_floor: r.above_floor,
                 })
             })
             .collect();
-        let ranked = rank(need.reason, need.question, &rated);
+        let ranked = rank(need.reason, need.question, &rated, settings.floor());
         need.actions = (!ranked.is_empty()).then_some(ranked);
     }
     Ok(())
 }
 
 /// The actions a need of `reason`, raised by `question`, offers from
-/// `rated` (see the module's documentation).
-pub fn rank(reason: NeedReason, question: NeedQuestion, rated: &[Rated]) -> Vec<SuggestedAction> {
+/// `rated` under `floor` (see the module's documentation).
+pub fn rank(
+    reason: NeedReason,
+    question: NeedQuestion,
+    rated: &[Rated],
+    floor: f64,
+) -> Vec<SuggestedAction> {
     let (pair, allowed): (Option<[ActionId; 2]>, &[ActionId]) = match (reason, question) {
         (NeedReason::Review, NeedQuestion::Suspicious) => {
             (Some([ActionId::Report, ActionId::Safe]), &[])
@@ -169,7 +180,7 @@ pub fn rank(reason: NeedReason, question: NeedQuestion, rated: &[Rated]) -> Vec<
     let mut others: Vec<Rated> = allowed
         .iter()
         .filter_map(|a| find(*a))
-        .filter(|r| r.above_floor)
+        .filter(|r| r.likelihood >= floor)
         .copied()
         .collect();
     others.sort_by(likelier);
@@ -226,12 +237,10 @@ fn percent(likelihood: f64) -> u32 {
 mod tests {
     use super::*;
 
+    const FLOOR: f64 = 0.7;
+
     fn rated(action: ActionId, likelihood: f64) -> Rated {
-        Rated {
-            action,
-            likelihood,
-            above_floor: likelihood >= 0.7,
-        }
+        Rated { action, likelihood }
     }
 
     fn names(ranked: &[SuggestedAction]) -> Vec<Vec<&'static str>> {
@@ -252,7 +261,7 @@ mod tests {
             rated(ActionId::Safe, 0.98),
             rated(ActionId::AlreadyPaid, 0.9),
         ];
-        let ranked = rank(NeedReason::Reply, NeedQuestion::NeedsReply, &all);
+        let ranked = rank(NeedReason::Reply, NeedQuestion::NeedsReply, &all, FLOOR);
         assert_eq!(
             names(&ranked),
             [vec!["reply"], vec!["open_attachment"], vec!["forward"]]
@@ -260,7 +269,7 @@ mod tests {
         assert_eq!(ranked[0].likelihood, 93);
         // Below the floor, nothing.
         let low = [rated(ActionId::Reply, 0.4)];
-        assert!(rank(NeedReason::Do, NeedQuestion::AsksAction, &low).is_empty());
+        assert!(rank(NeedReason::Do, NeedQuestion::AsksAction, &low, FLOOR).is_empty());
     }
 
     #[test]
@@ -275,7 +284,8 @@ mod tests {
             names(&rank(
                 NeedReason::Review,
                 NeedQuestion::Suspicious,
-                &phishing
+                &phishing,
+                FLOOR
             )),
             [vec!["safe"], vec!["report"]]
         );
@@ -286,7 +296,7 @@ mod tests {
             rated(ActionId::Remind, 0.75),
         ];
         assert_eq!(
-            names(&rank(NeedReason::Pay, NeedQuestion::Money, &bill)),
+            names(&rank(NeedReason::Pay, NeedQuestion::Money, &bill, FLOOR)),
             [
                 vec!["still_to_pay"],
                 vec!["already_paid"],
@@ -343,7 +353,7 @@ mod tests {
 
     #[test]
     fn nothing_stored_offers_nothing() {
-        assert!(rank(NeedReason::Pay, NeedQuestion::Money, &[]).is_empty());
-        assert!(rank(NeedReason::Review, NeedQuestion::Suspicious, &[]).is_empty());
+        assert!(rank(NeedReason::Pay, NeedQuestion::Money, &[], FLOOR).is_empty());
+        assert!(rank(NeedReason::Review, NeedQuestion::Suspicious, &[], FLOOR).is_empty());
     }
 }

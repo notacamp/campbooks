@@ -20,7 +20,7 @@ use campbooks_ai::decide::{
     Answer, Question,
     signals::{
         actions::{ActionId, COMBOS, action_questions, likelihoods},
-        email::{Attachment, Envelope, Party, triage, triage_questions},
+        email::{Attachment, Envelope, Party, triage_questions},
     },
 };
 use clap::Args;
@@ -100,14 +100,11 @@ async fn actions(args: &ActionsArgs) -> Result<String> {
     Ok(format!("{report}\nwrote {}", path.display()))
 }
 
-/// The questions the catalogue reads: `needs_reply` and `suspicious` from
-/// triage, then its own (all of them: an item without an attachment simply
-/// gets no Open attachment rating).
+/// The questions the model pass asks with the catalogue on: every triage
+/// question, then the catalogue's (all of them: an item without an
+/// attachment simply gets no Open attachment rating, as in the pass).
 fn asked() -> Vec<Question> {
-    let mut questions: Vec<Question> = triage_questions()
-        .into_iter()
-        .filter(|q| q.id == triage::NEEDS_REPLY || q.id == triage::SUSPICIOUS)
-        .collect();
+    let mut questions = triage_questions();
     let attached = Envelope {
         from: Party {
             name: String::new(),
@@ -128,20 +125,21 @@ fn asked() -> Vec<Question> {
     questions
 }
 
-/// Each item's rating per action (empty where it was not run).
-fn ratings(dataset: &Dataset, run: &Run) -> Vec<BTreeMap<ActionId, f64>> {
+/// Each item's rating per action; `None` where it was not run, or its
+/// call failed (left out of the scores, not counted as "not offered").
+fn ratings(dataset: &Dataset, run: &Run) -> Vec<Option<BTreeMap<ActionId, f64>>> {
     dataset
         .items
         .iter()
         .zip(&run.items)
         .map(|(item, ran)| {
-            let Some(ran) = ran else {
-                return BTreeMap::new();
-            };
+            let ran = ran.as_ref().filter(|r| r.error.is_none())?;
             let given: Vec<&Answer> = ran.answers.iter().flatten().map(|d| &d.answer).collect();
-            likelihoods(&item.message.envelope, &given)
-                .into_iter()
-                .collect()
+            Some(
+                likelihoods(&item.message.envelope, &given)
+                    .into_iter()
+                    .collect(),
+            )
         })
         .collect()
 }
@@ -176,7 +174,7 @@ fn ratio(part: usize, whole: usize) -> Option<f64> {
 /// owner labelled is offered the action when its rating is at least the
 /// floor (no rating: not offered).
 fn score(
-    rated: &[BTreeMap<ActionId, f64>],
+    rated: &[Option<BTreeMap<ActionId, f64>>],
     labels: &[&BTreeMap<ActionId, bool>],
     action: ActionId,
     floor: f64,
@@ -187,7 +185,7 @@ fn score(
         wanted: 0,
     };
     for (ratings, labels) in rated.iter().zip(labels) {
-        let Some(&wanted) = labels.get(&action) else {
+        let (Some(ratings), Some(&wanted)) = (ratings, labels.get(&action)) else {
             continue;
         };
         let offered = ratings.get(&action).is_some_and(|r| *r >= floor);
@@ -221,25 +219,44 @@ fn one_question(a: ActionId, b: ActionId) -> bool {
     pair(ActionId::Report, ActionId::Safe) || pair(ActionId::AlreadyPaid, ActionId::StillToPay)
 }
 
+/// The actions a floor decides; the others are a need's own answers
+/// (Report / It's safe, Already paid / Still to pay), always offered and
+/// only ordered by their rating.
+const FLOORED: [ActionId; 4] = [
+    ActionId::Reply,
+    ActionId::Remind,
+    ActionId::OpenAttachment,
+    ActionId::Forward,
+];
+
 fn report(
-    rated: &[BTreeMap<ActionId, f64>],
+    rated: &[Option<BTreeMap<ActionId, f64>>],
     labels: &[&BTreeMap<ActionId, bool>],
     floors: &[f64],
     labelled: usize,
     strategy: &str,
 ) -> String {
     let pct = |v: Option<f64>| v.map_or_else(|| "—".to_owned(), |v| format!("{:.0}%", v * 100.0));
+    let failed = rated.iter().filter(|r| r.is_none()).count();
     let mut out = format!(
         "# Action catalogue ({strategy}) on {labelled} labelled emails\n\n\
          Precision: of the actions offered at the floor, how many the owner would do. \
-         Recall: of the actions the owner would do, how many were offered.\n"
+         Recall: of the actions the owner would do, how many were offered. \
+         Report / It's safe and Already paid / Still to pay are a need's own answers: \
+         always offered, so no floor applies to them.\n"
     );
+    if failed > 0 {
+        let _ = writeln!(
+            out,
+            "\n{failed} item(s) not rated (a failed call, or not asked): left out."
+        );
+    }
     for floor in floors {
         let _ = write!(
             out,
             "\n## Floor {floor:.2}\n\n| Action | Precision | Recall | Offered | Wanted |\n| --- | --- | --- | --- | --- |\n"
         );
-        for action in ActionId::ALL {
+        for action in FLOORED {
             let s = score(rated, labels, action, *floor);
             let _ = writeln!(
                 out,
@@ -284,14 +301,23 @@ mod tests {
     #[test]
     fn floors_are_scored_per_action_and_pairs_counted_from_labels() {
         let rated = vec![
-            BTreeMap::from([(ActionId::Reply, 0.9), (ActionId::Remind, 0.65)]),
-            BTreeMap::from([(ActionId::Reply, 0.55), (ActionId::Remind, 0.8)]),
-            BTreeMap::from([(ActionId::Reply, 0.2)]),
+            Some(BTreeMap::from([
+                (ActionId::Reply, 0.9),
+                (ActionId::Remind, 0.65),
+            ])),
+            Some(BTreeMap::from([
+                (ActionId::Reply, 0.55),
+                (ActionId::Remind, 0.8),
+            ])),
+            Some(BTreeMap::from([(ActionId::Reply, 0.2)])),
+            // A failed call: left out, not a miss.
+            None,
         ];
         let owner = [
             BTreeMap::from([(ActionId::Reply, true), (ActionId::Remind, true)]),
             BTreeMap::from([(ActionId::Reply, true), (ActionId::Remind, false)]),
             BTreeMap::from([(ActionId::Reply, false), (ActionId::Remind, false)]),
+            BTreeMap::from([(ActionId::Reply, true), (ActionId::Remind, true)]),
         ];
         let labels: Vec<&BTreeMap<ActionId, bool>> = owner.iter().collect();
         let reply = score(&rated, &labels, ActionId::Reply, 0.5);
@@ -314,23 +340,26 @@ mod tests {
         );
         assert_eq!(
             together(&labels, ActionId::Reply, ActionId::Remind),
-            (1, 2, 1)
+            (2, 3, 2)
         );
-        let report = report(&rated, &labels, &[0.5], 3, "test");
+        let report = report(&rated, &labels, &[0.5], 4, "test");
         assert!(
             report.contains("| reply | 100% | 100% | 2 | 2 |"),
             "{report}"
         );
         assert!(
-            report.contains("| reply + remind | 1 | 2 | 1 |"),
+            report.contains("| reply + remind | 2 | 3 | 2 |"),
             "{report}"
         );
+        assert!(report.contains("1 item(s) not rated"), "{report}");
+        assert!(!report.contains("| report |"), "{report}");
         assert!(!report.contains("report + safe"), "{report}");
     }
 
     #[test]
     fn the_questions_asked_are_the_catalogue_s() {
         let ids: Vec<String> = asked().into_iter().map(|q| q.id).collect();
+        use campbooks_ai::decide::signals::email::triage;
         assert!(ids.contains(&triage::NEEDS_REPLY.to_owned()));
         assert!(ids.contains(&triage::SUSPICIOUS.to_owned()));
         for id in campbooks_ai::decide::signals::actions::question::ALL {

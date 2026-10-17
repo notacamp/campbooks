@@ -189,6 +189,7 @@ pub fn module(deps: ConversationsDeps) -> Module {
             }))
             .layer(Extension(needs.clone()))
             .layer(Extension(deps.config.notices))
+            .layer(Extension(deps.config.actions))
             .layer(Extension(deps.policy.clone()))
             .layer(Extension(writer)),
         admin_router: None,

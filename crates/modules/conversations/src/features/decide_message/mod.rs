@@ -278,14 +278,7 @@ impl Pass {
         };
         recorded.store(tx, workspace, placed).await?;
         if let Some((rated, model_name)) = &rated {
-            actions::store(
-                tx,
-                (*workspace.as_uuid(), message),
-                rated,
-                self.actions.floor(),
-                model_name,
-            )
-            .await?;
+            actions::store(tx, (*workspace.as_uuid(), message), rated, model_name).await?;
         }
         if placed {
             // Not a member's change: nothing is sent back to the provider.

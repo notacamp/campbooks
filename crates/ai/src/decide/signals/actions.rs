@@ -153,7 +153,8 @@ pub fn likelihoods(envelope: &Envelope, answers: &[&Answer]) -> Vec<(ActionId, f
     let facts = Facts::of(envelope);
     let mut out = Vec::new();
     let mut push = |action: ActionId, likelihood: Option<f64>| {
-        if let Some(likelihood) = likelihood {
+        // A probability that is not a number rates nothing.
+        if let Some(likelihood) = likelihood.filter(|l| l.is_finite()) {
             out.push((action, likelihood.clamp(0.0, 1.0)));
         }
     };

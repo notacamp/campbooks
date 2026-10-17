@@ -1,8 +1,8 @@
 -- How likely the member is to want each action of the catalogue for a
--- message (campbooks-cloud#166): written by the model pass only while
--- `CAMPBOOKS_CONVERSATIONS__ACTIONS__ENABLED` is on, read when a need is
--- shown. A likelihood, whether it cleared the floor configured when it was
--- written, and nothing of the message itself. Every row carries its
+-- message (campbooks-cloud#166): written by the model pass and read when a
+-- need is shown, both only while `CAMPBOOKS_CONVERSATIONS__ACTIONS__ENABLED`
+-- is on (the floor applies when read). A likelihood and the model that gave
+-- it, nothing of the message itself. Every row carries its
 -- workspace (forced row-level security) and goes with its message. Only new
 -- objects are created; the timeout keeps an unexpected lock wait from
 -- holding up a deploy.
@@ -16,7 +16,6 @@ CREATE TABLE conversations.action_likelihoods (
     action text NOT NULL CHECK (action IN ('reply', 'remind', 'open_attachment', 'forward',
                                            'report', 'safe', 'already_paid', 'still_to_pay')),
     likelihood double precision NOT NULL CHECK (likelihood >= 0 AND likelihood <= 1),
-    above_floor boolean NOT NULL,
     -- The model that answered, as the provider names it.
     model text NOT NULL,
     created_at timestamptz NOT NULL DEFAULT now(),

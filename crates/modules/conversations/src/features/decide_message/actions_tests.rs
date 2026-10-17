@@ -20,8 +20,12 @@ use wiremock::{
     matchers::{method, path},
 };
 
+use campbooks_kernel::{db::BeginFor as _, tenancy::WorkspaceId};
+
 use crate::{
     ActionSettings, ConversationsDeps,
+    domain::{actions, conversation::summary},
+    model::ConversationId,
     testkit::{Kit, sorting_deps},
 };
 
@@ -84,6 +88,9 @@ struct Run {
     rated: i64,
     /// Every listed conversation's need, as the API gives it.
     needs: Vec<Value>,
+    /// A listed conversation with a need, and its workspace.
+    with_need: Option<(WorkspaceId, ConversationId)>,
+    kit: Kit,
 }
 
 async fn run(db: PgPool, enabled: bool) -> Run {
@@ -136,18 +143,23 @@ async fn run(db: PgPool, enabled: bool) -> Run {
             &format!("/api/v1/w/{workspace}/conversations?stream=primary"),
         )
         .await;
-    let needs = listed.json["conversations"]
+    let with_needs: Vec<&Value> = listed.json["conversations"]
         .as_array()
         .unwrap()
         .iter()
         .filter(|c| !c["need"].is_null())
-        .map(|c| c["need"].clone())
         .collect();
+    let needs = with_needs.iter().map(|c| c["need"].clone()).collect();
+    let with_need = with_needs
+        .first()
+        .map(|c| (workspace, c["id"].as_str().unwrap().parse().unwrap()));
     Run {
         bodies,
         decisions,
         rated,
         needs,
+        with_need,
+        kit,
     }
 }
 
@@ -211,7 +223,7 @@ async fn on_its_questions_ride_along_and_change_no_triage_answer(db: PgPool) {
     // answered (0.9), then what else cleared the floor; never a bill's or a
     // warning's answers on a need that is neither.
     assert!(on.needs.iter().all(|n| {
-        let actions = n["actions"].as_array().unwrap();
+        let actions = n["actions"].as_array().map_or(&[][..], Vec::as_slice);
         actions.len() <= 3
             && actions.iter().all(|a| {
                 !["report", "safe", "already_paid", "still_to_pay"]
@@ -228,6 +240,26 @@ async fn on_its_questions_ride_along_and_change_no_triage_answer(db: PgPool) {
         json!({"actions": ["reply"], "likelihood": 90})
     );
     assert!(reply["actions"].as_array().unwrap().len() <= 3);
+
+    // Switched off, what was rated is not read: the flag is a kill switch.
+    let (workspace, id) = on.with_need.expect("a conversation with a need");
+    let mut tx = on.kit.state.db.begin_for(workspace).await.unwrap();
+    let mut summaries = [summary(&mut tx, None, id).await.unwrap()];
+    actions::attach(&mut tx, ActionSettings::default(), &mut summaries)
+        .await
+        .unwrap();
+    assert!(summaries[0].need.as_ref().unwrap().actions.is_none());
+    actions::attach(
+        &mut tx,
+        ActionSettings {
+            enabled: true,
+            ..ActionSettings::default()
+        },
+        &mut summaries,
+    )
+    .await
+    .unwrap();
+    assert!(summaries[0].need.as_ref().unwrap().actions.is_some());
 }
 
 #[test]

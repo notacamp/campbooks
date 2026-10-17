@@ -1278,7 +1278,7 @@ pub async fn attach(conn: &mut PgConnection, summaries: &mut [ConversationSummar
             actions: None,
         });
     }
-    super::actions::attach(conn, summaries).await
+    Ok(())
 }
 
 #[cfg(test)]

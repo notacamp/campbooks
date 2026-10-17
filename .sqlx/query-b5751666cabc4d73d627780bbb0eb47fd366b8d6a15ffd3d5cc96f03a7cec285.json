@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT message_id AS \"message_id: MessageId\", action, likelihood, above_floor\n             FROM conversations.action_likelihoods\n            WHERE message_id = ANY($1)",
+  "query": "SELECT message_id AS \"message_id: MessageId\", action, likelihood\n             FROM conversations.action_likelihoods\n            WHERE message_id = ANY($1)",
   "describe": {
     "columns": [
       {
@@ -35,17 +35,6 @@
             "name": "likelihood"
           }
         }
-      },
-      {
-        "ordinal": 3,
-        "name": "above_floor",
-        "type_info": "Bool",
-        "origin": {
-          "Table": {
-            "table": "conversations.action_likelihoods",
-            "name": "above_floor"
-          }
-        }
       }
     ],
     "parameters": {
@@ -56,9 +45,8 @@
     "nullable": [
       false,
       false,
-      false,
       false
     ]
   },
-  "hash": "f95554c45a2ce546b96d2e2df0333e157fa6ed3027ed52b6c3090dca5251be11"
+  "hash": "b5751666cabc4d73d627780bbb0eb47fd366b8d6a15ffd3d5cc96f03a7cec285"
 }

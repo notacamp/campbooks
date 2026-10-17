@@ -29,13 +29,21 @@ questions in all; three for mail without an attachment.
 
 ## Storage
 
-`conversations.action_likelihoods` (message, action, likelihood, whether it
-cleared the floor configured when it was rated, model), row-level security,
-cascading with the message. Not `decisions`: that table feeds How decided,
-the needs and the backlog's "answered" count, and the catalogue must change
-none of them. The floor is applied when rating (the pass has the settings),
-so showing a need needs no settings; a new floor applies to mail rated after
-the change.
+`conversations.action_likelihoods` (message, action, likelihood, model),
+row-level security, cascading with the message. Not `decisions`: that table
+feeds How decided, the needs and the backlog's "answered" count, and the
+catalogue must change none of them.
+
+## Reading, and the kill switch
+
+`conversations.list` and `conversations.get` (what Home reads) attach the
+actions, and only while the flag is on: the handlers take the settings as a
+router extension, so the floor applies when read (a new floor applies at
+once) and switching the flag off hides every rating at once, even those
+stored while it was on. Summaries returned by actions (a need resolved, a
+star) carry none; Home refetches its rows after an action. Mail decided
+before the switch-on is not rated until a new message arrives in its
+conversation.
 
 ## Ranking
 
