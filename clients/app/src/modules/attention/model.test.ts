@@ -67,7 +67,10 @@ describe("attention model", () => {
       own: ["remind", "paid"],
       universal: ["snooze", "not_needed"],
     });
-    expect(rowActionIds("warning")).toEqual({ own: ["safe"], universal: ["done", "snooze"] });
+    expect(rowActionIds("warning")).toEqual({
+      own: ["report", "safe"],
+      universal: ["done", "snooze"],
+    });
   });
 
   it("words Done today and says what can be undone", () => {

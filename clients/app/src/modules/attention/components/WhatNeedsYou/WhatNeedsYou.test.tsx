@@ -217,7 +217,7 @@ describe("What needs you", () => {
     api();
     renderHome();
     await screen.findByText("This may be phishing. Don’t use its links.");
-    // The warning: It's safe, then Done and Snooze.
+    // The warning: Report and delete, It's safe, then Done and Snooze.
     const warning = screen.getByRole("group", {
       name: "Actions for it-support@at3lier-sol.example",
     });
@@ -225,7 +225,7 @@ describe("What needs you", () => {
       within(warning)
         .getAllByRole("button")
         .map((b) => b.textContent),
-    ).toEqual(["It’s safe1", "DoneE", "Snooze…S"]);
+    ).toEqual(["Report and delete1", "It’s safe2", "DoneE", "Snooze…S"]);
     expect(screen.getAllByRole("group", { name: /^Actions for/u })).toHaveLength(1);
     fireEvent.keyDown(document, { key: "j" });
     const marta = screen.getByRole("group", { name: "Actions for Marta Ferreira" });
