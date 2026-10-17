@@ -563,7 +563,8 @@
           "records": [
             "identity.link_ticket"
           ],
-          "risk": "low"
+          "risk": "low",
+          "secret_once": true
         }
       }
     },
@@ -2553,7 +2554,8 @@
           "records": [
             "connectors.connection"
           ],
-          "risk": "low"
+          "risk": "low",
+          "secret_once": true
         }
       }
     },
@@ -5933,7 +5935,8 @@
           "records": [
             "identity.client"
           ],
-          "risk": "high"
+          "risk": "high",
+          "secret_once": true
         }
       }
     },
@@ -6118,7 +6121,8 @@
           "records": [
             "identity.client"
           ],
-          "risk": "high"
+          "risk": "high",
+          "secret_once": true
         }
       }
     },
@@ -6720,7 +6724,8 @@
           "records": [
             "workspaces.invitation"
           ],
-          "risk": "high"
+          "risk": "high",
+          "secret_once": true
         }
       }
     },
@@ -15878,6 +15883,17 @@
               "null"
             ],
             "description": "The member's own words, for an instruction."
+          },
+          "paused_once_kept": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/PausedReason",
+                "description": "For a proposed rule, why it would be paused once kept (confirming\nkeeps its author): say so before a member says yes. Absent for any\nother rule, or when it would act."
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "paused_reason": {
             "oneOf": [

@@ -853,6 +853,69 @@
         }
       }
     },
+    "/admin/v1/system/schedules/{name}/run": {
+      "delete": {
+        "tags": [
+          "system"
+        ],
+        "summary": "Discard a schedule's pending or stuck run, so its next tick enqueues\nafresh. A run a live worker holds is kept.",
+        "operationId": "system.admin_discard_schedule_run",
+        "parameters": [
+          {
+            "name": "name",
+            "in": "path",
+            "description": "The schedule (`<module>.<job>`).",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Deleted, or nothing to do.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobAction"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "`admin_reauth_required`: sign in again.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such schedule, or not an administrator with `jobs.retry`.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "admin": [
+              "admin:access"
+            ]
+          }
+        ],
+        "x-campbooks-admin": {
+          "mutates": true,
+          "permission": "jobs.retry"
+        }
+      }
+    },
     "/admin/v1/workspaces/signup-codes": {
       "get": {
         "tags": [
@@ -2987,7 +3050,8 @@
         "description": "The queue at a glance: one row per queue and kind with unfinished or\nfailed work. Succeeded jobs are pruned and not counted.",
         "required": [
           "at",
-          "kinds"
+          "kinds",
+          "watched"
         ],
         "properties": {
           "at": {
@@ -3009,6 +3073,13 @@
             ],
             "format": "int64",
             "description": "Age of the oldest job that is ready to run and waiting, in seconds."
+          },
+          "watched": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/WatchedSummary"
+            },
+            "description": "The dead jobs of the kinds an operator must hear about, by what they\nare for (each kind's `Watch`), sorted by code; every watched code is\nlisted, with 0 when nothing died."
           }
         }
       },
@@ -3272,6 +3343,33 @@
         "type": "string",
         "format": "uuid",
         "description": "UserId (UUIDv7)"
+      },
+      "WatchedSummary": {
+        "type": "object",
+        "description": "The dead jobs of the kinds watched under one code.",
+        "required": [
+          "code",
+          "kinds",
+          "failed"
+        ],
+        "properties": {
+          "code": {
+            "type": "string",
+            "description": "What the kinds are for (`suspension_fanout`: a suspension, or its\nlift, reaching the rules a member taught); the client words it."
+          },
+          "failed": {
+            "type": "integer",
+            "format": "int64",
+            "description": "How many of their jobs are dead: until each is retried, what it\ncarried has not happened."
+          },
+          "kinds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "The kinds watched under it, sorted."
+          }
+        }
       },
       "WorkspaceAiUsage": {
         "type": "object",

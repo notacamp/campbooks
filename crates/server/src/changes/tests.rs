@@ -297,7 +297,9 @@ impl Feed {
         while let Ok(Some(_)) = tokio::time::timeout(window, self.read()).await {}
     }
 
-    /// Nothing but heartbeats arrives within `window`.
+    /// Nothing but heartbeats arrives within `window`. The stream is left
+    /// mid-read when the window ends, so it may hold a feed query permit and
+    /// a connection until it is read again or dropped.
     async fn quiet_for(&mut self, window: Duration) {
         let deadline = tokio::time::Instant::now() + window;
         loop {
@@ -1130,11 +1132,19 @@ async fn many_subscribers_each_receive_every_change_once(db: PgPool) {
     }
     world.rename(&ana, &ws, "Shop two").await;
     world.server.sequence().await;
-    let received = futures_util::future::join_all(feeds.iter_mut().map(|feed| async {
-        let frame = feed.next_event().await;
-        feed.quiet_for(Duration::from_millis(300)).await;
-        frame
-    }))
+    // Every stream's frame first, then the quiet window for all at once.
+    // A stream whose quiet window ended is left mid-read (the test stops
+    // polling its body) and may keep holding one of the process's four feed
+    // query permits, or a connection of the pool of five, until it is
+    // dropped. Once four had, a stream still waiting for its first frame
+    // could never read (seen on a loaded runner). After handing out a frame
+    // a stream holds nothing until it is polled again.
+    let received = futures_util::future::join_all(feeds.iter_mut().map(Feed::next_event)).await;
+    futures_util::future::join_all(
+        feeds
+            .iter_mut()
+            .map(|feed| feed.quiet_for(Duration::from_millis(300))),
+    )
     .await;
     for frame in received {
         assert_eq!(

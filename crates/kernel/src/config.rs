@@ -883,10 +883,13 @@ impl ChangesConfig {
                 self.max_streams_per_principal >= 1,
                 "at least 1",
             ),
+            // Counted by `kernel.take_rate_limit`, which refuses a window
+            // longer than a day (campbooks-cloud#213): a longer one would
+            // fail every stream's open.
             (
                 "OPENS_WINDOW_SECONDS",
-                self.opens_window_seconds >= 1,
-                "at least 1",
+                (1..=RateLimitsConfig::MAX_WINDOW_SECONDS).contains(&self.opens_window_seconds),
+                "between 1 and 86400",
             ),
         ];
         match checks.iter().find(|(_, ok, _)| !ok) {
@@ -1681,6 +1684,21 @@ mod tests {
                 .check()
                 .unwrap_err()
                 .contains("CAMPBOOKS_CHANGES__MAX_CONNECTION_SECONDS")
+        );
+        config.changes = ChangesConfig::default();
+        for seconds in [0, RateLimitsConfig::MAX_WINDOW_SECONDS + 1] {
+            config.changes.opens_window_seconds = seconds;
+            assert!(
+                config.check().unwrap_err().contains(
+                    "CAMPBOOKS_CHANGES__OPENS_WINDOW_SECONDS must be between 1 and 86400"
+                ),
+                "{seconds}"
+            );
+        }
+        config.changes.opens_window_seconds = RateLimitsConfig::MAX_WINDOW_SECONDS;
+        assert!(
+            config.changes.check().is_ok(),
+            "a day is the longest window"
         );
         config.changes = ChangesConfig::default();
         // The `code` policy needs no environment code: administrators mint

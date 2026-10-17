@@ -280,9 +280,16 @@ pub struct MemberSuspended {
     pub workspace: String,
     /// The member.
     pub user: UserId,
-    /// When the suspension took effect; of two changes to one member, the
-    /// later `at` is the truth, whatever order they arrive in.
+    /// When the suspension took effect; orders the change only when it
+    /// carries no `seq`.
     pub at: DateTime<Utc>,
+    /// The account's count of suspensions and lifts as of this change
+    /// (identity's `seq`): of two changes to one member, the higher `seq`
+    /// is the truth, whatever order they arrive in. Absent when the change
+    /// came from an event published before it existed: such a change is
+    /// older than any that carries one, and two of them are ordered by `at`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub seq: Option<i64>,
 }
 
 impl DomainEvent for MemberSuspended {
@@ -304,6 +311,10 @@ pub struct MemberUnsuspended {
     pub user: UserId,
     /// When the lift took effect, ordered like [`MemberSuspended::at`].
     pub at: DateTime<Utc>,
+    /// The account's count of suspensions and lifts as of this change,
+    /// ordered like [`MemberSuspended::seq`].
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub seq: Option<i64>,
 }
 
 impl DomainEvent for MemberUnsuspended {
@@ -325,6 +336,10 @@ pub struct AccountSuspended {
     /// When it took effect; absent on events published before it existed.
     #[serde(default)]
     pub at: Option<DateTime<Utc>>,
+    /// The account's count of suspensions and lifts; absent on events
+    /// published before it existed.
+    #[serde(default)]
+    pub seq: Option<i64>,
 }
 
 impl DomainEvent for AccountSuspended {
@@ -344,6 +359,10 @@ pub struct AccountUnsuspended {
     pub account: uuid::Uuid,
     /// When it took effect.
     pub at: DateTime<Utc>,
+    /// The account's count of suspensions and lifts; absent on events
+    /// published before it existed.
+    #[serde(default)]
+    pub seq: Option<i64>,
 }
 
 impl DomainEvent for AccountUnsuspended {

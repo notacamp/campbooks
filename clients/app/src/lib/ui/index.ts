@@ -235,6 +235,7 @@ export {
 } from "./components/RulePreview/RulePreview";
 export { SafeHtml, type SafeHtmlProps } from "./safe-html/SafeHtml";
 export { ShortcutSheet, type ShortcutSheetProps } from "./components/ShortcutSheet/ShortcutSheet";
+export { Clamp, type ClampProps } from "./components/Clamp/Clamp";
 export { Skeleton, SkeletonList, type SkeletonProps } from "./components/Skeleton/Skeleton";
 export {
   StatusText,

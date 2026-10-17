@@ -12,6 +12,7 @@ import {
   ListRow,
   SettingsEmpty,
   SkeletonList,
+  StatusText,
 } from "~/lib/ui";
 import { useMembers } from "~/modules/workspaces";
 
@@ -221,6 +222,10 @@ function RuleRow({
       </Button>
     ) : undefined;
 
+  // Keeping it keeps its author: one who is away for now leaves it paused,
+  // and the member is told before saying yes, never why.
+  const staysPaused = rule.state === "proposed" && rule.paused_once_kept === "author_unavailable";
+
   return (
     <ListRow
       title={ruleSentence(t, locale, rule)}
@@ -266,6 +271,8 @@ function RuleRow({
             />
           ) : null}
         </InlineConfirm>
+      ) : staysPaused ? (
+        <StatusText tone="waiting">{t("rules.list.keptStaysPaused")}</StatusText>
       ) : null}
     </ListRow>
   );

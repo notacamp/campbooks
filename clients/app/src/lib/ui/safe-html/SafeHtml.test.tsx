@@ -2,7 +2,17 @@ import { describe, expect, it } from "vitest";
 
 import { renderUi } from "../../../../test/render";
 
-import { estimateHeight, fitZoom, framePolicy, MIN_ZOOM, SafeHtml, SANDBOX } from "./SafeHtml";
+import {
+  estimateHeight,
+  fitZoom,
+  framePolicy,
+  MIN_ZOOM,
+  SafeHtml,
+  SANDBOX,
+  SANDBOX_INERT_LINKS,
+  stripLinks,
+  withoutLinks,
+} from "./SafeHtml";
 
 function frame(container: HTMLElement): HTMLIFrameElement {
   const element = container.querySelector("iframe");
@@ -24,6 +34,33 @@ describe("SafeHtml", () => {
     expect(SANDBOX).not.toMatch(/allow-scripts|allow-forms|allow-top-navigation|allow-modals/u);
     expect(element).toHaveAttribute("title", "Message from Maya");
     expect(element.getAttribute("srcdoc")).toContain("<p>Hi</p>");
+  });
+
+  it("lets no link open anything in mail that may be phishing", () => {
+    const { container } = renderUi(
+      <SafeHtml html='<a href="https://evil.example">x</a>' title="Message" inertLinks />,
+    );
+    expect(frame(container).getAttribute("sandbox")).toBe(SANDBOX_INERT_LINKS);
+    expect(SANDBOX_INERT_LINKS).not.toMatch(/allow-popups|allow-scripts|allow-top-navigation/u);
+  });
+
+  it("turns links into plain text, whatever the mail's styles say", () => {
+    const doc = new DOMParser().parseFromString(
+      '<a href="https://evil.example" style="pointer-events: auto !important"><span>Verify</span></a>',
+      "text/html",
+    );
+    stripLinks(doc);
+    const link = doc.querySelector("a");
+    expect(link?.hasAttribute("href")).toBe(false);
+    expect(link?.dataset["href"]).toBe("https://evil.example");
+    expect(doc.querySelectorAll("[href]")).toHaveLength(0);
+  });
+
+  it("gives an inert frame mail with no links in it from the start", () => {
+    const html = '<p>Hi <a href="https://evil.example">verify</a></p>';
+    expect(withoutLinks(html)).toBe('<p>Hi <a data-href="https://evil.example">verify</a></p>');
+    const { container } = renderUi(<SafeHtml html={html} title="Message" inertLinks />);
+    expect(frame(container).getAttribute("srcdoc")).not.toMatch(/\shref=/u);
   });
 
   it("blocks remote images with its own policy until they are asked for", () => {

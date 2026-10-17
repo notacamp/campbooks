@@ -15,12 +15,15 @@ extension with `mutates` (boolean), `automation` (boolean), `assistant`
 (boolean), `risk` (`low` or `high`), `records` (a list of the module's own
 `<module>.<record>` types) and optionally `undo` (an `operationId`) and
 `rate_limit` (`send`: the operation is counted in the send class of the
-per-caller rate limits instead of the write class). An
+per-caller rate limits instead of the write class) and `secret_once`
+(`true`: its successful answer shows a secret once, which the idempotency
+layer never stores). An
 operation with `mutates: true` SHALL use POST, PUT, PATCH or DELETE, and one
 with `mutates: false` SHALL use GET or HEAD. An `undo` SHALL name an existing
 mutating operation and SHALL only appear on a mutating operation. A
 `rate_limit` SHALL only appear on a mutating operation and SHALL only be
-`send`. The architecture check SHALL fail on any violation.
+`send`. A `secret_once` SHALL be a boolean and SHALL only appear on a
+mutating operation. The architecture check SHALL fail on any violation.
 
 #### Scenario: Health and version are catalogued
 - **WHEN** the OpenAPI document is generated
@@ -36,6 +39,10 @@ mutating operation and SHALL only appear on a mutating operation. A
 
 #### Scenario: A send class on a read
 - **WHEN** a non-mutating operation declares `x-campbooks.rate_limit: send`, or any operation declares another value
+- **THEN** `cargo xtask arch` fails naming the operation
+
+#### Scenario: A secret flag on a read
+- **WHEN** a non-mutating operation declares `x-campbooks.secret_once: true`, or any operation declares it as a string
 - **THEN** `cargo xtask arch` fails naming the operation
 
 ### Requirement: Events catalogue
@@ -87,7 +94,15 @@ request (operation, method, path, query or body) with the same key SHALL
 receive 422; a retry while the first request is running SHALL receive 409.
 Server errors and authentication or rate-limit failures SHALL release the
 key. GET and HEAD requests SHALL ignore the header, and no operation SHALL be
-able to opt out. Expired keys SHALL be deleted by an hourly job.
+able to opt out. Expired keys SHALL be deleted by an hourly job. For an
+operation declaring `x-campbooks.secret_once` (`identity.register_client`,
+`identity.rotate_client_secret`, `workspaces.invite_member`,
+`identity.start_link`, `connectors.start_connection`), a successful answer
+SHALL NOT be stored: the key SHALL be kept as used (`withheld`: its status
+and `Location`, no body), and a replay SHALL answer 409 problem+json
+`idempotency_secret_shown_once` with `Idempotency-Replayed: true`, in the
+caller's language, after the same authorization as any replay, without
+running the operation again or showing the secret.
 
 #### Scenario: Identical retry
 - **WHEN** a client sends the same POST twice with `Idempotency-Key: k-1`
@@ -100,6 +115,14 @@ able to opt out. Expired keys SHALL be deleted by an hourly job.
 #### Scenario: Server error
 - **WHEN** the first request with a key fails with 503
 - **THEN** a retry with the same key runs the operation again
+
+#### Scenario: A secret shown once
+- **WHEN** an admin registers a confidential app with `Idempotency-Key: register-1` and sends the same request again with the same key
+- **THEN** the first answer is 201 with the app's secret, the stored key holds no body and no secret, and the second answer is 409 `idempotency_secret_shown_once` marked replayed, without the secret
+
+#### Scenario: The key of a secret reused
+- **WHEN** the key of a withheld answer is reused for another request
+- **THEN** the answer is 422, as for any reused key
 
 ### Requirement: Record references
 The kernel SHALL provide a record reference `{ type, id }` whose `type` is

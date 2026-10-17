@@ -320,11 +320,82 @@ fn declares_by_macro(text: &str, id: &str) -> bool {
 /// The code before the file's test module (by convention its last item;
 /// clippy's `items_after_test_module` keeps it so). The cut is looked for in
 /// code only, so the same text inside a comment or a string does not end the
-/// file early.
+/// file early; only at the file's top level (bracket depth 0), so a test
+/// module inside another module or a `macro_rules!` body does not either;
+/// and only when nothing but whitespace (or comments) follows the module's
+/// closing brace (campbooks-cloud#207). Anything else is checked whole.
 fn without_tests(text: &str) -> &str {
-    code_only(text)
-        .find("#[cfg(test)]\nmod tests {")
-        .map_or(text, |at| &text[..at])
+    test_module_start(&code_only(text)).map_or(text, |at| &text[..at])
+}
+
+/// Where the trailing top-level `#[cfg(test)] mod tests { … }` of `code`
+/// (comments and literals blanked) starts.
+fn test_module_start(code: &str) -> Option<usize> {
+    const ATTRIBUTE: &str = "#[cfg(test)]";
+    let bytes = code.as_bytes();
+    let mut depth = 0usize;
+    for (i, &b) in bytes.iter().enumerate() {
+        match b {
+            b'{' | b'(' | b'[' => depth += 1,
+            b'}' | b')' | b']' => depth = depth.saturating_sub(1),
+            b'#' if depth == 0 && code[i..].starts_with(ATTRIBUTE) => {
+                let after = i + ATTRIBUTE.len();
+                let Some(open) = module_body(&code[after..]).map(|at| after + at) else {
+                    continue;
+                };
+                if let Some(close) = closing(bytes, open)
+                    && code[close + 1..].trim().is_empty()
+                {
+                    return Some(i);
+                }
+            }
+            _ => {}
+        }
+    }
+    None
+}
+
+/// In `rest` (what follows a `#[cfg(test)]`): more attributes, then
+/// `mod tests {`; the offset of that `{`.
+fn module_body(rest: &str) -> Option<usize> {
+    let bytes = rest.as_bytes();
+    let mut i = 0;
+    let skip_space = |i: &mut usize| {
+        while bytes.get(*i).is_some_and(u8::is_ascii_whitespace) {
+            *i += 1;
+        }
+    };
+    skip_space(&mut i);
+    while rest[i..].starts_with("#[") {
+        i = closing(bytes, i + 1)? + 1;
+        skip_space(&mut i);
+    }
+    let rest_here = &rest[i..];
+    let words = rest_here.strip_prefix("mod")?;
+    if !words.starts_with(|c: char| c.is_ascii_whitespace()) {
+        return None;
+    }
+    let name = words.trim_start();
+    let body = name.strip_prefix("tests")?.trim_start();
+    body.starts_with('{').then(|| rest.len() - body.len())
+}
+
+/// The bracket closing the one opened at `open` (any of `{[(`, nested).
+fn closing(bytes: &[u8], open: usize) -> Option<usize> {
+    let mut depth = 0usize;
+    for (i, &b) in bytes.iter().enumerate().skip(open) {
+        match b {
+            b'{' | b'(' | b'[' => depth += 1,
+            b'}' | b')' | b']' => {
+                depth = depth.checked_sub(1)?;
+                if depth == 0 {
+                    return Some(i);
+                }
+            }
+            _ => {}
+        }
+    }
+    None
 }
 
 /// Every `(METHOD path, operation)` of the document.
@@ -513,12 +584,34 @@ impl Door {
 /// `KERNEL_SCOPE_SETTING`, `MAINTENANCE_SCOPE_SETTING`), each with its last
 /// word: outside the kernel, the word on its own (in code or a string, any
 /// case) usually means the setting's name is being built at runtime.
-const SCOPE_SETTINGS: [(&str, &str, Door); 2] = [
-    ("campbooks.kernel_scope", "kernel_scope", Door::Kernel),
+/// Each with the kernel function that opens it. The admin reads' setting
+/// has no reviewed list: only `begin_admin` (with an `AdminGrant`) sets it;
+/// nor has the idempotency caller's (campbooks-cloud#210): only the kernel's
+/// idempotency layer sets it.
+const SCOPE_SETTINGS: [(&str, &str, Door, &str); 4] = [
+    (
+        "campbooks.kernel_scope",
+        "kernel_scope",
+        Door::Kernel,
+        "begin_kernel",
+    ),
     (
         "campbooks.maintenance_scope",
         "maintenance_scope",
         Door::Maintenance,
+        "begin_maintenance",
+    ),
+    (
+        "campbooks.admin_reads",
+        "admin_reads",
+        Door::Never,
+        "begin_admin",
+    ),
+    (
+        "campbooks.idempotency_caller",
+        "idempotency_caller",
+        Door::Never,
+        "begin_as_idempotency_caller",
     ),
 ];
 
@@ -526,10 +619,11 @@ const SCOPE_SETTINGS: [(&str, &str, Door); 2] = [
 /// setting: outside the kernel, each is a violation wherever it appears in
 /// code (a call, a `use … as` rename, `JobContext::kernel_tx(ctx)`, a
 /// function value), comments aside, unless its [`Door`] lists the file.
-const SCOPE_IDENTIFIERS: [(&str, Door); 7] = [
+const SCOPE_IDENTIFIERS: [(&str, Door); 8] = [
     ("KERNEL_SCOPE_SETTING", Door::Never),
     ("MAINTENANCE_SCOPE_SETTING", Door::Never),
     ("ADMIN_READS_SETTING", Door::Never),
+    ("IDEMPOTENCY_CALLER_SETTING", Door::Never),
     ("begin_kernel", Door::Kernel),
     ("kernel_tx", Door::Kernel),
     ("begin_maintenance", Door::Maintenance),
@@ -627,37 +721,33 @@ pub fn check_kernel_scope(sources: &[(String, String)], file: &AccessFile) -> Ve
 /// (`'campbooks.' || 'kernel_scope'`, `campbooks."kernel_scope"`, `concat!`,
 /// `stringify!`) still names the word.
 fn names_a_setting(path: &str, text: &str, listed: impl Fn(Door) -> bool) -> Vec<String> {
-    static WORDS: LazyLock<Vec<(Regex, &str, Door)>> = LazyLock::new(|| {
+    static WORDS: LazyLock<Vec<Regex>> = LazyLock::new(|| {
         SCOPE_SETTINGS
             .iter()
-            .map(|&(_, word, door)| {
-                let regex = Regex::new(&format!(r"\b{word}\b"))
-                    .unwrap_or_else(|e| unreachable!("static regex compiles: {e}"));
-                (regex, word, door)
+            .map(|&(_, word, ..)| {
+                Regex::new(&format!(r"\b{word}\b"))
+                    .unwrap_or_else(|e| unreachable!("static regex compiles: {e}"))
             })
             .collect()
     });
+    // As written, comments included, and with every literal's escapes
+    // decoded (`"kernel\x5fscope"`, `"kernel\u{5f}scope"`, a line
+    // continuation), comments dropped.
     let lowered = text.to_lowercase();
-    let mut code: Option<String> = None;
+    let decoded = decoded(text).to_lowercase();
     let mut violations = Vec::new();
-    for ((setting, _, door), (word_regex, word, _)) in SCOPE_SETTINGS.iter().zip(WORDS.iter()) {
-        if lowered.contains(setting) {
-            let opener = if *door == Door::Kernel {
-                "kernel"
-            } else {
-                "maintenance"
-            };
+    for ((setting, word, door, opener), word_regex) in SCOPE_SETTINGS.iter().zip(WORDS.iter()) {
+        if lowered.contains(setting) || decoded.contains(setting) {
             violations.push(format!(
                 "{path}: names `{setting}`; only the kernel may (use \
-                 `kernel::db::begin_{opener}`)"
+                 `kernel::db::{opener}`)"
             ));
             continue;
         }
         if listed(*door) {
             continue;
         }
-        let code = code.get_or_insert_with(|| without_comments(text).to_lowercase());
-        if word_regex.is_match(code) {
+        if word_regex.is_match(&decoded) {
             violations.push(format!(
                 "{path}: names `{word}` (in code or a string), which builds a scope's \
                  setting; only the kernel may"
@@ -794,6 +884,82 @@ fn without_comments(code: &str) -> String {
             Lexeme::Code | Lexeme::Literal => out.push_str(&code[range]),
             Lexeme::BlockComment => out.push(' '),
             Lexeme::LineComment => {}
+        }
+    }
+    out
+}
+
+/// `code` without its comments, every non-raw string and character
+/// literal with its escapes decoded (`\x5f`, `\u{5f}`, `\n`, a `\` line
+/// continuation): a name spelled with escapes reads as the name.
+fn decoded(code: &str) -> String {
+    let mut out = String::with_capacity(code.len());
+    for (kind, range) in lex(code) {
+        let text = &code[range];
+        match kind {
+            Lexeme::Literal if !is_raw(text) => out.push_str(&unescape(text)),
+            Lexeme::Code | Lexeme::Literal => out.push_str(text),
+            Lexeme::BlockComment => out.push(' '),
+            Lexeme::LineComment => {}
+        }
+    }
+    out
+}
+
+/// Whether a literal is raw (`r"…"`, `br#"…"#`, `cr"…"`): no escapes.
+fn is_raw(literal: &str) -> bool {
+    let rest = literal.strip_prefix(['b', 'c']).unwrap_or(literal);
+    rest.starts_with('r')
+}
+
+/// `literal` with its escapes decoded; one that does not decode is kept as
+/// written.
+fn unescape(literal: &str) -> String {
+    let mut out = String::with_capacity(literal.len());
+    let mut chars = literal.chars().peekable();
+    while let Some(c) = chars.next() {
+        if c != '\\' {
+            out.push(c);
+            continue;
+        }
+        match chars.next() {
+            Some('n') => out.push('\n'),
+            Some('t') => out.push('\t'),
+            Some('r') => out.push('\r'),
+            Some('0') => out.push('\0'),
+            Some('x') => {
+                let hex: String = chars.by_ref().take(2).collect();
+                if let Ok(byte) = u8::from_str_radix(&hex, 16) {
+                    out.push(char::from(byte));
+                } else {
+                    out.push_str("\\x");
+                    out.push_str(&hex);
+                }
+            }
+            Some('u') if chars.peek() == Some(&'{') => {
+                chars.next();
+                let hex: String = chars.by_ref().take_while(|&c| c != '}').collect();
+                let digits: String = hex.chars().filter(|&c| c != '_').collect();
+                if let Some(decoded) = u32::from_str_radix(&digits, 16)
+                    .ok()
+                    .and_then(char::from_u32)
+                {
+                    out.push(decoded);
+                } else {
+                    out.push_str("\\u{");
+                    out.push_str(&hex);
+                    out.push('}');
+                }
+            }
+            // A line continuation: the newline and the next line's leading
+            // whitespace are not part of the string.
+            Some('\n') => {
+                while chars.peek().is_some_and(|c| c.is_whitespace()) {
+                    chars.next();
+                }
+            }
+            Some(other) => out.push(other),
+            None => out.push('\\'),
         }
     }
     out
@@ -1362,6 +1528,167 @@ mod tests {
             "// café ☕\nfn f() {}\n#[cfg(test)]\nmod tests {\n    fn t() { begin_kernel; }\n}\n";
         assert_eq!(without_tests(real), "// café ☕\nfn f() {}\n");
         assert!(check_kernel_scope(&source(real), &none).is_empty());
+    }
+
+    #[test]
+    fn escapes_inside_a_literal_still_name_the_setting() {
+        let module = "crates/modules/mail/src/dispatch.rs";
+        let source = |text: &str| vec![(module.to_owned(), text.to_owned())];
+        let none = AccessFile::default();
+        for (bypass, named) in [
+            (
+                r#"let s = "campbooks.kernel\x5fscope";"#,
+                "campbooks.kernel_scope",
+            ),
+            (
+                r#"let s = "campbooks.kernel\u{5f}scope";"#,
+                "campbooks.kernel_scope",
+            ),
+            (
+                r#"let s = "campbooks.maintenance\u{005F}scope";"#,
+                "campbooks.maintenance_scope",
+            ),
+            (
+                r#"let s = b"campbooks.admin\x5Freads";"#,
+                "campbooks.admin_reads",
+            ),
+            (
+                "let s = \"campbooks.kernel\\\n        _scope\";",
+                "campbooks.kernel_scope",
+            ),
+            (
+                r#"let s = format!("campbooks.{}", "kernel\x5fscope");"#,
+                "`kernel_scope`",
+            ),
+            (
+                r#"let s = format!("campbooks.{}", "admin\u{5f}reads");"#,
+                "`admin_reads`",
+            ),
+        ] {
+            let found = check_kernel_scope(&source(bypass), &none);
+            assert_eq!(found.len(), 1, "{bypass}: {found:?}");
+            assert!(found[0].contains(named), "{bypass}: {found:?}");
+        }
+        // A raw string has no escapes: `\x5f` there is four characters.
+        assert!(check_kernel_scope(&source(r#"let s = r"kernel\x5fscope";"#), &none).is_empty());
+        assert_eq!(unescape(r#""a\x5fb\u{5f}c\n\"""#), "\"a_b_c\n\"\"");
+        assert_eq!(unescape(r#""bad\xzz""#), r#""bad\xzz""#);
+    }
+
+    #[test]
+    fn the_admin_reads_setting_is_a_bare_word_too() {
+        let source = |path: &str, text: &str| vec![(path.to_owned(), text.to_owned())];
+        let none = AccessFile::default();
+        for bypass in [
+            r#"sqlx::query("SELECT set_config('campbooks.' || 'admin_reads', 'on', true)")"#,
+            r#"let name = concat!("campbooks.", stringify!(admin_reads));"#,
+            r#"sqlx::query("SET LOCAL campbooks.\"ADMIN_READS\" = 'on'")"#,
+        ] {
+            for path in [
+                "crates/modules/mail/src/x.rs",
+                "crates/server/src/admin_tests.rs",
+            ] {
+                let found = check_kernel_scope(&source(path, bypass), &none);
+                assert_eq!(found.len(), 1, "{path}: {bypass}: {found:?}");
+                assert!(found[0].contains("`admin_reads`"), "{found:?}");
+            }
+        }
+        let named = r#"sqlx::query("SELECT set_config('campbooks.admin_reads', 'on', true)")"#;
+        let found = check_kernel_scope(&source("crates/modules/mail/src/x.rs", named), &none);
+        assert!(found[0].contains("kernel::db::begin_admin"), "{found:?}");
+        // A longer name, and the kernel, are fine.
+        for (path, fine) in [
+            (
+                "crates/server/src/admin_tests.rs",
+                "async fn admin_reads_reach_only() {}",
+            ),
+            (
+                "crates/kernel/src/db.rs",
+                "const S: &str = \"campbooks.admin_reads\";",
+            ),
+        ] {
+            assert!(
+                check_kernel_scope(&source(path, fine), &none).is_empty(),
+                "{fine}"
+            );
+        }
+    }
+
+    #[test]
+    fn only_the_kernel_names_the_idempotency_caller() {
+        let source = |path: &str, text: &str| vec![(path.to_owned(), text.to_owned())];
+        let none = AccessFile::default();
+        for (bypass, named) in [
+            (
+                r#"sqlx::query("SELECT set_config('campbooks.idempotency_caller', 'user:a', true)")"#,
+                "kernel::db::begin_as_idempotency_caller",
+            ),
+            (
+                r#"sqlx::query("SELECT set_config('campbooks.' || 'idempotency_caller', $1, true)")"#,
+                "`idempotency_caller`",
+            ),
+            (
+                "let s = campbooks_kernel::db::IDEMPOTENCY_CALLER_SETTING;",
+                "IDEMPOTENCY_CALLER_SETTING",
+            ),
+        ] {
+            let found = check_kernel_scope(&source("crates/modules/mail/src/x.rs", bypass), &none);
+            assert_eq!(found.len(), 1, "{bypass}: {found:?}");
+            assert!(found[0].contains(named), "{bypass}: {found:?}");
+        }
+        for (path, fine) in [
+            (
+                "crates/server/src/lib.rs",
+                "let name = testing::idempotency_caller_setting();",
+            ),
+            (
+                "crates/kernel/src/db.rs",
+                "const S: &str = \"campbooks.idempotency_caller\";",
+            ),
+        ] {
+            assert!(
+                check_kernel_scope(&source(path, fine), &none).is_empty(),
+                "{fine}"
+            );
+        }
+    }
+
+    #[test]
+    fn only_a_trailing_top_level_test_module_ends_the_check() {
+        let module = "crates/modules/mail/src/dispatch.rs";
+        let source = |text: &str| vec![(module.to_owned(), text.to_owned())];
+        let none = AccessFile::default();
+        let opens = "fn f() { let open = begin_kernel; }\n";
+        for hiding in [
+            // Inside another module.
+            format!("mod inner {{\n#[cfg(test)]\nmod tests {{\n}}\n}}\n{opens}"),
+            // Inside a macro's body, braces or parentheses.
+            format!("macro_rules! m {{ () => {{\n#[cfg(test)]\nmod tests {{}}\n}} }}\n{opens}"),
+            format!("macro_rules! m (\n#[cfg(test)]\nmod tests {{}}\n);\n{opens}"),
+            // Followed by more code.
+            format!("#[cfg(test)]\nmod tests {{\n}}\n{opens}"),
+            format!("#[cfg(test)]\nmod tests {{ fn t() {{ }} }} {opens}"),
+        ] {
+            assert_eq!(without_tests(&hiding), hiding, "{hiding}");
+            let found = check_kernel_scope(&source(&hiding), &none);
+            assert_eq!(found.len(), 1, "{hiding}: {found:?}");
+        }
+        // The real one ends it: last, at the top, comments or other
+        // attributes around it included.
+        for real in [
+            "fn f() {}\n#[cfg(test)]\nmod tests {\n    fn t() { begin_kernel; }\n}\n",
+            "fn f() {}\n#[cfg(test)]\n#[expect(clippy::x)]\nmod tests { fn t() { begin_kernel; } }\n// end\n",
+            "fn f() {}\n#[cfg(test)]\nmod  tests  {\n    mod nested { fn t() { begin_kernel; } }\n}",
+        ] {
+            assert_eq!(without_tests(real), "fn f() {}\n", "{real}");
+            assert!(
+                check_kernel_scope(&source(real), &none).is_empty(),
+                "{real}"
+            );
+        }
+        // Not a test module by that name: no cut.
+        let other = "fn f() {}\n#[cfg(test)]\nmod testsuite { fn t() { begin_kernel; } }\n";
+        assert_eq!(without_tests(other), other);
     }
 
     #[test]

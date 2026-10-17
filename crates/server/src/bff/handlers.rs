@@ -202,9 +202,9 @@ impl Inner {
         let now = Utc::now();
         let login = store::LoginTransaction {
             code_verifier: self.cipher.seal(&verifier, &verifier_context(&state_hash)),
+            nonce: self.cipher.seal(&nonce, &nonce_context(&state_hash)),
             state_hash,
             browser_hash: crypto::hash(&browser),
-            nonce,
             return_to,
             created_at: now,
             expires_at: now + self.timeouts.login,
@@ -227,9 +227,19 @@ impl Inner {
 }
 
 /// Associated data of a sign-in's sealed PKCE verifier.
-fn verifier_context(state_hash: &[u8]) -> Vec<u8> {
+pub(super) fn verifier_context(state_hash: &[u8]) -> Vec<u8> {
+    login_context(state_hash, "code_verifier")
+}
+
+/// Associated data of a sign-in's sealed nonce.
+pub(super) fn nonce_context(state_hash: &[u8]) -> Vec<u8> {
+    login_context(state_hash, "nonce")
+}
+
+/// Associated data binding a sealed sign-in value to its row and column.
+fn login_context(state_hash: &[u8], column: &str) -> Vec<u8> {
     format!(
-        "bff.login_transactions:{}:code_verifier",
+        "bff.login_transactions:{}:{column}",
         URL_SAFE_NO_PAD.encode(state_hash)
     )
     .into_bytes()
@@ -318,10 +328,7 @@ impl Inner {
         let Some(code) = query.code.as_deref() else {
             return problem(StatusCode::BAD_REQUEST, code::LOGIN_FAILED);
         };
-        let Ok(verifier) = self
-            .cipher
-            .open(&login.code_verifier, &verifier_context(&login.state_hash))
-        else {
+        let Some((verifier, nonce)) = self.open_login(&login) else {
             return invalid_state();
         };
         let tokens = match self.oidc.exchange_code(code, &verifier).await {
@@ -333,7 +340,7 @@ impl Inner {
         };
         let identity = match self
             .verifier
-            .verify_id_token(id_token, self.oidc.client_id(), &login.nonce)
+            .verify_id_token(id_token, self.oidc.client_id(), &nonce)
             .await
         {
             Ok(identity) => identity,
@@ -342,9 +349,11 @@ impl Inner {
         };
 
         // A sign-in always starts a new session with a new id; one this
-        // browser already had ends.
+        // browser already had ends here, its refresh token revoked
+        // (campbooks-cloud#214), the identity provider's session left as it
+        // is (this sign-in may have gone straight through it).
         if let Some(previous) = self.cookies.session(headers)
-            && let Err(err) = store::delete_by_token(&self.db, &crypto::hash(&previous)).await
+            && let Err(err) = self.retire(&crypto::hash(&previous)).await
         {
             return Error::from(err).into_response();
         }
@@ -389,6 +398,22 @@ impl Inner {
             self.cookies
                 .set_session(&token, seconds_until(expires_at, now)),
         )
+    }
+}
+
+impl Inner {
+    /// A sign-in's sealed PKCE verifier and nonce, opened; `None` when either
+    /// does not open (another key, or another row's value).
+    fn open_login(&self, login: &store::LoginTransaction) -> Option<(String, String)> {
+        let verifier = self
+            .cipher
+            .open(&login.code_verifier, &verifier_context(&login.state_hash))
+            .ok()?;
+        let nonce = self
+            .cipher
+            .open(&login.nonce, &nonce_context(&login.state_hash))
+            .ok()?;
+        Some((verifier, nonce))
     }
 }
 
@@ -542,7 +567,7 @@ pub async fn logout(State(bff): State<Bff>, headers: HeaderMap) -> Result<Respon
     // full here (the identity provider's session too), rather than being
     // retired by the lookup and leaving that session behind.
     if let Some(current) = inner.current_any_scopes(&headers).await? {
-        ended_here = inner.terminate(current.session.id).await?;
+        ended_here = inner.terminate(&current.session.presented).await?;
         tracing::info!("web sign-out");
     }
     let logout_url = if ended_here || inner.oidc.in_process() {

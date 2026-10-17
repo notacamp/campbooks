@@ -1,5 +1,11 @@
 //! `POST /api/v1/workspaces/invitations/accept` — join a workspace with an
 //! invitation token. The caller's verified email must be the invited one.
+//!
+//! The user's row is locked first, as announcing a suspension locks it
+//! (campbooks-cloud#197): joining waits for an announcement going on, and
+//! then announces the newest suspension change in the workspace joined, so
+//! a member who re-joins while being suspended is paused there too, and one
+//! whose lift no longer reached the workspace is told of it.
 
 use axum::{Json, extract::State};
 use campbooks_kernel::{
@@ -20,6 +26,7 @@ use crate::{
         invitation,
         model::{InvitationId, WorkspaceView},
         security::{self, SecurityKind},
+        suspension,
         users::ensure_user,
     },
     events::MemberJoined,
@@ -92,6 +99,8 @@ pub async fn execute(
     let user = ensure_user(&state.db, principal).await?;
 
     let mut tx = state.db.begin_for(workspace).await?;
+    // First, before any of the workspace's locks (see the module's docs).
+    let known = suspension::lock(&mut tx, user).await?;
     set_user(&mut tx, user).await?;
     let found = sqlx::query!(
         r#"SELECT i.id AS "id: InvitationId", i.email, i.role,
@@ -171,6 +180,9 @@ pub async fn execute(
             },
         )
         .await?;
+    if let Some(change) = known {
+        suspension::announce(&state.events, &mut tx, &workspace.to_string(), user, change).await?;
+    }
     let access = campbooks_kernel::tenancy::Access {
         workspace,
         user: Some(user),
