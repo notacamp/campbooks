@@ -1,5 +1,8 @@
 {
   "errors": {
+    "reply_unavailable": "This server has no language model that may read mail, so Scout can't write replies here. Write this one yourself.",
+    "reply_failed": "Scout couldn't write the reply just now. Try again in a moment, or write it yourself.",
+    "reply_ask_invalid": "Say what the reply should say in 1 to {{max}} characters.",
     "invalid_limit": "The limit must be between 1 and {{max}}.",
     "invalid_cursor": "This page link is not valid. Start again from the first page.",
     "invalid_label_name": "A label name must be 1 to {{max}} characters long.",
