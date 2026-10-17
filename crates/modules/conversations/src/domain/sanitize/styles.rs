@@ -619,6 +619,15 @@ mod tests {
 
     use super::*;
 
+    /// A string built by `add` called for 0..count.
+    fn repeated_with(count: usize, add: impl Fn(&mut String, usize)) -> String {
+        let mut text = String::new();
+        for i in 0..count {
+            add(&mut text, i);
+        }
+        text
+    }
+
     /// `super::inline` on the HTML's own measured shape.
     fn inline(html: &str) -> Inlined {
         super::inline(html, &accepted(html).expect("within the parse budget"))
@@ -627,7 +636,7 @@ mod tests {
     /// `measure` with minutes of time, for slow test machines: the work
     /// budget and depth cap still apply.
     fn accepted(html: &str) -> Option<Shape> {
-        measure_within(html, Duration::from_secs(60))
+        measure_within(html, Duration::from_mins(1))
     }
 
     const FIXTURES: [&str; 7] = [
@@ -891,20 +900,22 @@ mod tests {
     #[test]
     fn work_the_sink_cannot_see_is_refused() {
         // Attributes added to the same element again and again.
-        let repeated = (0..20_000)
-            .map(|i| format!("<html a{i}>"))
-            .collect::<String>();
+        let repeated = repeated_with(20_000, |s, i| {
+            let _ = write!(s, "<html a{i}>");
+        });
         assert!(measure(&repeated).is_none());
         // The active formatting list's duplicate check.
-        let formatting = (0..20_000)
-            .map(|i| format!("<b id={i}>"))
-            .collect::<String>();
+        let formatting = repeated_with(20_000, |s, i| {
+            let _ = write!(s, "<b id={i}>");
+        });
         assert!(measure(&formatting).is_none());
         // Many open elements, then end tags that scan them.
         let strays = "<span>".repeat(100_000) + &"</x>".repeat(2_048);
         assert!(measure(&strays).is_none());
         // One start tag with 60,000 attributes.
-        let many = (0..60_000).map(|i| format!("a{i} ")).collect::<String>();
+        let many = repeated_with(60_000, |s, i| {
+            let _ = write!(s, "a{i} ");
+        });
         assert!(measure(&format!("<p {many}>x</p>")).is_none());
         // Deep spans, then templates left open.
         let templates = "<span>".repeat(20_000) + &"<template>".repeat(10_000);

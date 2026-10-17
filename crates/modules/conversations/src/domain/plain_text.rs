@@ -202,7 +202,18 @@ fn truncate(text: &str, max: usize) -> &str {
 
 #[cfg(test)]
 mod tests {
+    use std::fmt::Write as _;
+
     use super::*;
+
+    /// A string built by `add` called for 0..count.
+    fn repeated_with(count: usize, add: impl Fn(&mut String, usize)) -> String {
+        let mut text = String::new();
+        for i in 0..count {
+            add(&mut text, i);
+        }
+        text
+    }
 
     #[test]
     fn html_becomes_words_without_markup() {
@@ -280,7 +291,9 @@ mod tests {
 
     #[test]
     fn a_tag_with_countless_attributes_returns() {
-        let many = (0..60_000).map(|i| format!("a{i} ")).collect::<String>();
+        let many = repeated_with(60_000, |s, i| {
+            let _ = write!(s, "a{i} ");
+        });
         let text = text_of(&format!("<p>x</p><p {many}>y</p>"), Quotes::Keep);
         assert!(text.contains('x'), "{text}");
     }
