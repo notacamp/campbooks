@@ -1982,14 +1982,17 @@ A taught rule MAY have the action `show_images` ("Always show images from
 or a sender domain (never a free mail domain alone); any other shape SHALL
 be refused (`invalid_rule`). Creating or changing such a rule SHALL need
 inbound mail from that sender (the address, or the domain and its
-subdomains) in the rule's inbox, and SHALL start no run: it changes no mail.
+subdomains) in the rule's inbox, and SHALL start no run, nor SHALL confirming, restoring or removing it: it
+changes no mail.
 `conversations.get_message_body` SHALL keep a message's remote images, as if
 `show_images` had been asked, when an active rule of its inbox trusts its
 sender and the receiving provider's authentication results authenticate that
 sender: a DMARC pass for the From domain, or a DKIM pass aligned with it
 that no DMARC result refuses, with no DMARC failure. No results, results
 that cannot be read, `none`, a failed DMARC check and a spoofed From SHALL
-never pass, nor SHALL mail whose conversation looks suspicious. The body
+never pass, nor SHALL mail whose conversation looks suspicious; and until the
+message has been judged not suspicious (a stored `suspicious` answer of
+`false`) its images SHALL stay held back (fail closed). The body
 SHALL say `images_trusted` when a rule kept the images. Tracking pixels SHALL
 be removed whether the images were trusted or not, and nothing else about
 fetching or sanitising changes. Removing the rule SHALL hold the images back

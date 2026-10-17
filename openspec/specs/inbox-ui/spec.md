@@ -326,7 +326,8 @@ and offer Undo. A message whose images a rule trusts SHALL say so ("Images
 shown: you trust <sender>") instead of offering Show images. Removing the rule
 in Scout's memory SHALL say, as it asks to confirm, that the images are held
 back again; once removed, Show images is back. A member who only reads the inbox SHALL not be
-offered it. No visor: no AI is involved.
+offered it, nor SHALL anyone on mail that may be phishing. No visor: no AI
+is involved.
 
 #### Scenario: Trust the Ledger
 - **WHEN** the member opens the Weekly Ledger's newsletter, presses Always show images from The Weekly Ledger, picks anyone at weekly-ledger.example and saves

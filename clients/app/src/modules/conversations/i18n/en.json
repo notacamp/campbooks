@@ -607,8 +607,8 @@
     "imagesAddressDetail": "This address alone.",
     "imagesDomain": "Anyone at {{domain}}",
     "imagesDomainDetail": "Every address at {{domain}} and its subdomains, when the domain’s own checks pass.",
-    "imagesMatches_one": "Their images will show in {{n}} conversation already here, and in new mail.",
-    "imagesMatches_other": "Their images will show in {{n}} conversations already here, and in new mail.",
+    "imagesMatches_one": "{{n}} conversation from them is already here. Their images show whenever their mail passes its checks.",
+    "imagesMatches_other": "{{n}} conversations from them are already here. Their images show whenever their mail passes its checks.",
     "imagesNew": "Their images will show in new mail from them that passes its sender checks.",
     "imagesHow": "Only for mail that passes the sender’s checks, never for mail pretending to be them. Tracking pixels stay removed."
   },

@@ -275,7 +275,7 @@ describe("the inbox", () => {
     ).toBeChecked();
     expect(
       await within(dialog).findByText(
-        "Their images will show in 3 conversations already here, and in new mail.",
+        "3 conversations from them are already here. Their images show whenever their mail passes its checks.",
       ),
     ).toBeVisible();
     expect(within(dialog).getByText(/Tracking pixels stay removed/u)).toBeVisible();

@@ -912,7 +912,7 @@ pub async fn confirm(
         .await?
         .ok_or(Error::NotFound)?;
     let ws = access.workspace.to_string();
-    if body.apply_to_existing {
+    if body.apply_to_existing && !rules::only_shows_images(&rule.actions) {
         rule_runs::start(&mut tx, &state.events, &ws, &rule, RunKind::Apply).await?;
     } else {
         rule_runs::announce(
@@ -1066,11 +1066,15 @@ pub async fn update(
         // A proposed rule acts only once someone says yes (`confirm_rule`).
         return Err(Error::Conflict(crate::MESSAGES.reason("rule_not_active")));
     }
+    let reshaped = body.conditions.is_some() || body.actions.is_some();
     let conditions = rules::normalise(&body.conditions.unwrap_or_else(|| rule.conditions.clone()));
     let actions = body.actions.unwrap_or_else(|| rule.actions.clone());
     rules::validate(&conditions, &actions)?;
     rules::labels_of_inbox(&mut tx, rule.inbox, &conditions, &actions).await?;
-    rules::sender_seen(&mut tx, rule.inbox, &conditions, &actions).await?;
+    // Pausing or resuming changes no sender: only a new shape is checked.
+    if reshaped {
+        rules::sender_seen(&mut tx, rule.inbox, &conditions, &actions).await?;
+    }
     let next_state = match body.paused {
         Some(true) => RuleState::Paused,
         Some(false) if rule.state == RuleState::Paused => RuleState::Active,
@@ -1201,7 +1205,8 @@ pub async fn remove(
     }
     let ws = access.workspace.to_string();
     // Nothing is put back in an inbox kept read-only.
-    if query.restore && !rule.inbox_detached {
+    // A rule that only showed images changed no mail: nothing to put back.
+    if query.restore && !rule.inbox_detached && !rules::only_shows_images(&rule.actions) {
         rule_runs::start(&mut tx, &state.events, &ws, &removed, RunKind::Revert).await?;
     } else {
         sqlx::query!(
@@ -1354,7 +1359,10 @@ pub async fn restore(
         .await?
         .ok_or(Error::NotFound)?;
     let ws = access.workspace.to_string();
-    if back == RuleState::Active && body.apply_to_existing {
+    if back == RuleState::Active
+        && body.apply_to_existing
+        && !rules::only_shows_images(&rule.actions)
+    {
         rule_runs::start(&mut tx, &state.events, &ws, &rule, RunKind::Apply).await?;
     } else {
         rule_runs::announce(

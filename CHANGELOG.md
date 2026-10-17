@@ -11,8 +11,9 @@ All notable changes to Campbooks Next are documented here. The format follows
 - **Always show images from a sender you trust.** In the reader, beside Show images, "Always
   show images from <sender>" (⇧A) saves a smart rule, after the usual confirmation, for that
   address or anyone at its domain. Their images then show on their own, but only when the
-  mail passes the sender's checks: mail pretending to be them, mail failing DMARC, and mail
-  with no checks keep their images held back. Tracking pixels stay removed either way, and
+  mail passes the sender's checks and Campbooks has found nothing suspicious about it: mail
+  pretending to be them, mail failing DMARC, and mail with no checks keep their images held
+  back. Tracking pixels stay removed either way, and
   no AI is involved. Remove the rule in Scout's memory and Show images is back.
 - **Home offers each email's own actions, picked by Scout (with the catalogue on).** When
   the action catalogue is switched on, the selected item's buttons are the ones the model

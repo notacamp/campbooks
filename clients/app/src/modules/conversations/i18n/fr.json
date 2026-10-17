@@ -607,8 +607,8 @@
     "imagesAddressDetail": "Cette adresse seulement.",
     "imagesDomain": "Toute adresse de {{domain}}",
     "imagesDomainDetail": "Toutes les adresses de {{domain}} et de ses sous-domaines, quand les vérifications du domaine lui-même réussissent.",
-    "imagesMatches_one": "Ses images s’afficheront dans {{n}} conversation déjà ici, et dans le nouveau courrier.",
-    "imagesMatches_other": "Ses images s’afficheront dans {{n}} conversations déjà ici, et dans le nouveau courrier.",
+    "imagesMatches_one": "{{n}} conversation de cet expéditeur est déjà ici. Ses images s’affichent chaque fois que son courrier réussit ses vérifications.",
+    "imagesMatches_other": "{{n}} conversations de cet expéditeur sont déjà ici. Ses images s’affichent chaque fois que son courrier réussit ses vérifications.",
     "imagesNew": "Ses images s’afficheront dans le nouveau courrier de cet expéditeur qui réussit ses vérifications.",
     "imagesHow": "Seulement pour le courrier qui réussit les vérifications de l’expéditeur, jamais pour celui qui se fait passer pour lui. Les pixels de suivi restent supprimés."
   },

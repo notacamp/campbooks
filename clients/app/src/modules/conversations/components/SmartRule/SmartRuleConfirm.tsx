@@ -52,6 +52,8 @@ export interface SmartRuleDraft {
         id: string;
         title: string;
         description?: string | undefined;
+        /** The dialog's title while it is picked. */
+        heading?: string | undefined;
         conditions: RuleCondition[];
       }[]
     | undefined;
@@ -109,8 +111,8 @@ function Confirm({
   const undo = useUndoToast();
   const { create, remove, restore, wasRemoved } = useRuleMutations(workspaceId);
   const [choice, setChoice] = useState(draft.choices?.[0]?.id);
-  const conditions =
-    draft.choices?.find((each) => each.id === choice)?.conditions ?? draft.conditions;
+  const chosen = draft.choices?.find((each) => each.id === choice);
+  const conditions = chosen?.conditions ?? draft.conditions;
   const images = showsImages(draft.actions);
   const rule = { conditions, actions: draft.actions };
   const preview = useRulePreview(workspaceId, draft.inboxId, rule);
@@ -208,7 +210,7 @@ function Confirm({
     <Dialog
       open
       onClose={onClose}
-      title={draft.title}
+      title={chosen?.heading ?? draft.title}
       description={t("smartRule.lead")}
       result={
         saved ? { title: t("smartRule.saved"), detail: t("smartRule.savedDetail") } : undefined

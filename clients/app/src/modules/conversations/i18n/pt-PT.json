@@ -607,8 +607,8 @@
     "imagesAddressDetail": "Só este endereço.",
     "imagesDomain": "Qualquer endereço de {{domain}}",
     "imagesDomainDetail": "Todos os endereços de {{domain}} e dos seus subdomínios, quando as verificações do próprio domínio passam.",
-    "imagesMatches_one": "As imagens vão aparecer em {{n}} conversa que já cá está e no correio novo.",
-    "imagesMatches_other": "As imagens vão aparecer em {{n}} conversas que já cá estão e no correio novo.",
+    "imagesMatches_one": "Já cá está {{n}} conversa deste remetente. As imagens aparecem sempre que o correio passa as verificações.",
+    "imagesMatches_other": "Já cá estão {{n}} conversas deste remetente. As imagens aparecem sempre que o correio passa as verificações.",
     "imagesNew": "As imagens vão aparecer no correio novo deste remetente que passe as verificações.",
     "imagesHow": "Só para correio que passa as verificações do remetente, nunca para correio que finge ser dele. Os píxeis de rastreio continuam removidos."
   },

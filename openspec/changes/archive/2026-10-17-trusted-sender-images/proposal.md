@@ -24,7 +24,8 @@ Tracking issue: https://github.com/notacamp/campbooks-cloud/issues/200
   authenticate that sender (a DMARC pass for the From domain, or an aligned
   DKIM pass that no DMARC result refuses). A spoofed From, a failed DMARC
   check, results that can't be read and no results at all never pass; nor
-  does mail that looks suspicious. Facts only (ADR 0018).
+  does mail that looks suspicious, and until a message has been judged not
+  suspicious its images stay held back (fail closed). Facts only (ADR 0018).
 - Trust only flips what is held back by default: the same sanitiser runs,
   tracking pixels are removed either way, there is no proxy, and the
   desktop CSP is unchanged (campbooks-cloud#199 is separate).

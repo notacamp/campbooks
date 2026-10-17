@@ -463,6 +463,22 @@ mod tests {
         kit.get(sam, &uri).await.json
     }
 
+    /// Every message stored as judged not suspicious by the model.
+    async fn judged_not_suspicious(db: &PgPool) {
+        sqlx::query(
+            "INSERT INTO conversations.decisions
+                    (id, workspace_id, message_id, conversation_id, question, source,
+                     strategy, value, model, acted, state_version)
+             SELECT gen_random_uuid(), workspace_id, id, conversation_id, 'suspicious',
+                    'model', 'laya', 'false'::jsonb, 'laya-test', false, 1
+               FROM conversations.messages
+             ON CONFLICT DO NOTHING",
+        )
+        .execute(db)
+        .await
+        .unwrap();
+    }
+
     #[sqlx::test(migrations = "../../../migrations")]
     async fn a_trusted_sender_s_images_show_only_when_it_is_authenticated(db: PgPool) {
         let kit = Kit::new(db.clone()).await;
@@ -514,6 +530,13 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(runs, 0);
+        // Not judged yet (no `suspicious` answer): nothing is trusted.
+        assert_eq!(
+            body_of(&kit, &sam, workspace, "trusted-1").await["images_trusted"],
+            false
+        );
+        // Judged not suspicious, every one of them.
+        judged_not_suspicious(&db).await;
 
         let shown = body_of(&kit, &sam, workspace, "trusted-1").await;
         assert_eq!(shown["images_trusted"], true);

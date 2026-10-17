@@ -20,23 +20,34 @@ use crate::{
 /// Whether an active rule of `message`'s inbox (one of `inboxes`, those the
 /// member may see) shows its remote images: its sender is trusted, the
 /// provider's results authenticate that sender (a spoofed From, failed
-/// checks or no results never pass), and nothing about the conversation
-/// looks suspicious. An outbound message, or one not in `inboxes`, never.
+/// checks or no results never pass), the message was judged not suspicious
+/// and nothing about its conversation looks suspicious. An outbound
+/// message, or one not in `inboxes`, never.
 pub async fn images_trusted(
     conn: &mut PgConnection,
     inboxes: &[InboxId],
     message: MessageId,
 ) -> Result<bool> {
+    // Fail closed: until the message has been judged not suspicious (a
+    // stored `suspicious` answer of `false`, never what it says), and while
+    // anything in its conversation looks suspicious, nothing is trusted.
     let row: Option<(InboxId, String, serde_json::Value, bool)> = sqlx::query_as(
         "SELECT m.inbox_id, m.sender_address, m.headers,
-                (EXISTS (SELECT 1 FROM conversations.decisions d
-                          WHERE d.conversation_id = m.conversation_id
-                            AND d.question = 'suspicious' AND d.value = 'true'::jsonb)
+                (NOT EXISTS (SELECT 1 FROM conversations.decisions d
+                              WHERE d.message_id = m.id AND d.question = 'suspicious'
+                                AND d.value = 'false'::jsonb)
+                 OR EXISTS (SELECT 1 FROM conversations.decisions d
+                             WHERE d.conversation_id = m.conversation_id
+                               AND d.question = 'suspicious' AND d.value = 'true'::jsonb)
                  OR EXISTS (SELECT 1 FROM conversations.needs n
                              WHERE n.conversation_id = m.conversation_id
                                AND n.state = 'open' AND n.reason = 'review'))
            FROM conversations.messages m
-          WHERE m.id = $1 AND m.inbox_id = ANY($2) AND m.direction = 'inbound'",
+          WHERE m.id = $1 AND m.inbox_id = ANY($2) AND m.direction = 'inbound'
+            -- Only when the inbox has a rule that shows images at all.
+            AND EXISTS (SELECT 1 FROM conversations.rules r
+                         WHERE r.inbox_id = m.inbox_id AND r.state = 'active'
+                           AND r.actions @> '[{\"action\": \"show_images\"}]'::jsonb)",
     )
     .bind(message)
     .bind(inboxes)

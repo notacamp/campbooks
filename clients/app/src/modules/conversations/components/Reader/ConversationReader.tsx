@@ -216,12 +216,14 @@ export function ConversationReader({
     const domain = at === -1 ? "" : address.slice(at + 1);
     const byAddress = {
       id: "address",
+      heading: t("smartRule.imagesTitle", { sender: address }),
       title: t("smartRule.imagesAddress", { address }),
       description: t("smartRule.imagesAddressDetail"),
       conditions: [{ field: "sender_address" as const, value: address }],
     };
     const byDomain = {
       id: "domain",
+      heading: t("smartRule.imagesTitle", { sender: domain }),
       title: t("smartRule.imagesDomain", { domain }),
       description: t("smartRule.imagesDomainDetail", { domain }),
       conditions: [{ field: "sender_domain" as const, value: domain }],
@@ -236,6 +238,8 @@ export function ConversationReader({
       choices: domain === "" || isFreeMailDomain(domain) ? [byAddress] : [byAddress, byDomain],
     });
   };
+  // Never offered on mail that may be phishing: trust is not the question.
+  const trustable = writable && conversation?.need?.question !== "suspicious";
   // The newest message from someone else: the one the key trusts.
   const newestInbound = messages.findLast((message) => message.direction === "inbound");
 
@@ -282,7 +286,7 @@ export function ConversationReader({
         trustImages(newestInbound);
       }
     },
-    { enabled: active && newestInbound !== undefined && trusting === null },
+    { enabled: active && trustable && newestInbound !== undefined && trusting === null },
   );
   useShortcut(
     "inbox.next_attachment",
@@ -723,7 +727,7 @@ export function ConversationReader({
               setImages((current) => new Set([...current, message.id]));
             }}
             onTrustImages={
-              writable && message.direction === "inbound"
+              trustable && message.direction === "inbound"
                 ? () => {
                     trustImages(message);
                   }
