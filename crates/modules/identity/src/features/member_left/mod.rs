@@ -4,8 +4,19 @@
 //! registered are removed (their tokens act for that member, and are
 //! refused from the moment the member is gone). Their access tokens already
 //! stop at the next membership check.
+//!
+//! The event alone is no proof that the member left: any transaction
+//! working in the workspace could write it (campbooks-cloud#211), and
+//! revoking an app's refresh tokens reaches past the workspace. Before
+//! acting, the handler asks the workspaces module (the membership port), in
+//! the delivery's transaction, whether they are a member there; while they
+//! are, nothing happens (someone removed and added back before this ran
+//! keeps the apps they had allowed).
 
-use campbooks_kernel::{Event, EventConsumer, JobContext, JobError};
+use campbooks_kernel::{
+    Event, EventConsumer, JobContext, JobError,
+    tenancy::{UserId, WorkspaceId},
+};
 use chrono::Utc;
 use uuid::Uuid;
 
@@ -30,7 +41,21 @@ impl EventConsumer for RevokeDepartedConsents {
             .parse()
             .map_err(|_| JobError::fatal("member_left without a workspace id"))?;
         let now = Utc::now();
+        let state = ctx.state().clone();
         let tx = ctx.tx().await?;
+        let member = state
+            .membership
+            .role_held(
+                tx,
+                WorkspaceId::from_uuid(workspace),
+                UserId::from_uuid(event.payload.user),
+            )
+            .await
+            .map_err(|e| JobError::retry(e.to_string()))?;
+        if member.is_some() {
+            tracing::warn!("member_left names someone who is still a member; not acted on");
+            return Ok(());
+        }
         let revoked = consents::revoke_in_workspace(
             tx,
             workspace,

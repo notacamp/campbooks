@@ -156,6 +156,23 @@ All notable changes to Campbooks Next are documented here. The format follows
 
 ### Security
 
+- **A workspace can't plant maintenance jobs, fake a disconnect or read account events
+  (campbooks-cloud#211).** The worker now refuses, without running it, a job of a kind that
+  only ever runs instance-wide (every schedule, such as pruning and the mailbox poller, and
+  the deliveries of account events) when the row carries a workspace; such a row could
+  only have been written by hand. Six handlers no longer take an event from a workspace
+  as proof of what it says: a way in goes with its mailbox only once the connectors module
+  no longer holds that connection, a mailbox record is named only with a connection that
+  exists, and a departed member's app consents and provider grants, or a deleted
+  workspace's, are revoked only once the member is really gone or the workspace really
+  deleted. A transaction working in a workspace no longer reads any instance-wide row of
+  the event log or the job queue (they name accounts); the kernel publishes the account
+  events a workspace may announce without reading them back. A schedule's tick is counted
+  by the statement's clock, so a stalled tick can't move a newer one back. One kernel
+  migration drops the read policy; an image from before this change can't announce those
+  account events from a workspace on the upgraded database, so run the API and the worker
+  of the same version, and to go back run the rollback SQL in the change's `design.md`
+  first.
 - **One workspace can no longer hold up another's background work (campbooks-cloud#209).**
   The job queue's keys spanned workspaces: a workspace that knew another workspace's job
   key (most embed an id, such as `connectors.sync_stream:<stream>`) could keep a row of its

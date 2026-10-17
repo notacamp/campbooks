@@ -1091,6 +1091,56 @@ async fn schedules_enqueue_each_tick_once_across_workers(db: PgPool) {
     assert_eq!(count(&db, done).await, 1);
 }
 
+/// A tick transaction that stalled for more than a period between its start
+/// and its upsert counts the tick by the statement's clock, not the
+/// transaction's start: it never moves a newer last tick back
+/// (campbooks-cloud#211).
+#[sqlx::test(migrations = "../../migrations")]
+async fn a_stalled_tick_never_moves_the_last_tick_back(db: PgPool) {
+    #[derive(Debug, Default, Serialize, Deserialize)]
+    struct Tick;
+    impl Job for Tick {
+        const NAME: &'static str = "test.tick";
+        const QUEUE: &'static str = "maintenance";
+        async fn run(self, _ctx: &mut JobContext) -> Result<(), JobError> {
+            Ok(())
+        }
+    }
+    const EVERY: Duration = Duration::from_secs(1);
+    let registry = Registry::build(&[module(Background::new().schedule::<Tick>(EVERY))]).unwrap();
+    let state = AppState::new(
+        db.clone(),
+        testing::config("postgres://test@localhost/test"),
+    )
+    .with_registry(registry);
+    let (stalled, live) = (Worker::new(state.clone()), Worker::new(state.clone()));
+    let last = || async {
+        sqlx::query_scalar::<_, i64>("SELECT last_tick FROM kernel.schedules WHERE name = $1")
+            .bind(Tick::NAME)
+            .fetch_optional(&db)
+            .await
+            .unwrap()
+    };
+
+    // One worker's tick transaction starts, then stalls past two periods
+    // while another worker ticks.
+    let mut tx = crate::db::begin_kernel(&state.db).await.unwrap();
+    sqlx::query("SELECT now()").execute(&mut *tx).await.unwrap();
+    tokio::time::sleep(EVERY * 5 / 2).await;
+    live.upkeep().await;
+    let newer = last().await.expect("the live worker ticked");
+
+    // The stalled one wakes: by the clock this is the same tick, so it
+    // records nothing and enqueues nothing.
+    let recorded = stalled.tick_in_for_test(&mut tx, Tick::NAME).await.unwrap();
+    tx.commit().await.unwrap();
+    assert!(
+        recorded.is_none_or(|tick| tick >= newer),
+        "moved back from {newer} to {recorded:?}"
+    );
+    assert!(last().await.unwrap() >= newer);
+}
+
 #[sqlx::test(migrations = "../../migrations")]
 async fn prune_deletes_finished_jobs_past_their_retention(db: PgPool) {
     let state = state(db.clone()).await;
@@ -1553,6 +1603,26 @@ fn published_events_are_owned_versioned_and_unique() {
     assert!(
         all.contains("`other.foreign`: VERSION must be at least 1"),
         "{all}"
+    );
+}
+
+/// The kinds that run instance-wide only (campbooks-cloud#211): every
+/// schedule's and the deliveries of an instance-wide event, not a job or a
+/// workspace event's consumer.
+#[test]
+fn registry_marks_the_instance_only_kinds() {
+    let registry = Registry::build(&[module(background())]).unwrap();
+    assert_eq!(
+        registry.instance_only_kinds(),
+        [
+            "kernel.prune_changes",
+            "kernel.prune_events",
+            "kernel.prune_idempotency",
+            "kernel.prune_jobs",
+            "kernel.prune_rate_limits",
+            "kernel.sweep_blobs",
+            "test.forget_fails",
+        ]
     );
 }
 
@@ -2784,7 +2854,7 @@ mod kernel_scope {
     }
 
     #[sqlx::test(migrations = "../../migrations")]
-    async fn a_workspace_transaction_reads_and_adds_instance_rows_but_never_changes_them(
+    async fn a_workspace_transaction_adds_instance_rows_but_never_reads_or_changes_them(
         db: PgPool,
     ) {
         let state = runtime(&db).await;
@@ -2828,7 +2898,8 @@ mod kernel_scope {
         assert_eq!(before, 3);
 
         let mut tx = state.db.begin_for(ana).await.unwrap();
-        // It still sees them.
+        // It does not see them (campbooks-cloud#211): an account's events
+        // name accounts.
         let seen: (i64, i64) = sqlx::query_as(
             "SELECT (SELECT count(*) FROM kernel.jobs WHERE workspace_id IS NULL),
                     (SELECT count(*) FROM kernel.events WHERE workspace_id IS NULL)",
@@ -2836,7 +2907,7 @@ mod kernel_scope {
         .fetch_one(&mut *tx)
         .await
         .unwrap();
-        assert_eq!(seen, (3, 1));
+        assert_eq!(seen, (0, 0));
         // It cannot change or delete them: row-level security hides them
         // from UPDATE and DELETE (and from a row lock).
         for sql in [
@@ -2873,8 +2944,8 @@ mod kernel_scope {
         );
         // It no longer enqueues instance-wide jobs (campbooks-cloud#207), a
         // duplicate of one included; it still publishes a listed
-        // instance-wide event with its deliveries, reading them back
-        // (`RETURNING`).
+        // instance-wide event with its deliveries, reading nothing back
+        // (campbooks-cloud#211).
         for options in [
             EnqueueOptions::default(),
             EnqueueOptions::default().unique("tick"),
@@ -2933,6 +3004,152 @@ mod kernel_scope {
             (stats.succeeded, stats.failed, stats.lost),
             (6, 0, 0),
             "{stats:?}"
+        );
+    }
+
+    /// A workspace transaction reads none of the instance-wide rows, an
+    /// account's events (which name accounts) and their deliveries
+    /// included (campbooks-cloud#211); what it publishes of them still gets
+    /// its id, and the kernel scope still reads them all.
+    #[sqlx::test(migrations = "../../migrations")]
+    async fn a_workspace_transaction_reads_no_account_events(db: PgPool) {
+        let state = runtime(&db).await;
+        let ana = WorkspaceId::new();
+        let account = uuid::Uuid::now_v7().to_string();
+        for name in [
+            "identity.signed_out_everywhere",
+            "identity.account_suspended",
+        ] {
+            sqlx::query(
+                "WITH e AS (
+                     INSERT INTO kernel.events (name, version, payload)
+                     VALUES ($1, 1, jsonb_build_object('account', $2::text)) RETURNING id)
+                 INSERT INTO kernel.jobs (queue, kind, payload, event_id, unique_key, max_attempts)
+                 SELECT 'events', 'bff.end_signed_out_sessions', '{}', id, id::text, 3 FROM e",
+            )
+            .bind(name)
+            .bind(&account)
+            .execute(&db)
+            .await
+            .unwrap();
+        }
+        let mut tx = state.db.begin_for(ana).await.unwrap();
+        for sql in [
+            "SELECT count(*) FROM kernel.events
+              WHERE name IN ('identity.signed_out_everywhere', 'identity.account_suspended')",
+            "SELECT count(*) FROM kernel.events WHERE payload ? 'account'",
+            "SELECT count(*) FROM kernel.jobs WHERE kind = 'bff.end_signed_out_sessions'",
+        ] {
+            let seen: i64 = sqlx::query_scalar(sqlx::AssertSqlSafe(sql.to_owned()))
+                .fetch_one(&mut *tx)
+                .await
+                .unwrap();
+            assert_eq!(seen, 0, "{sql}");
+        }
+        // Its own instance-wide event (declared `PUBLISHED_IN_WORKSPACES`)
+        // it still publishes, with its deliveries, and gets its id.
+        let id = state
+            .events
+            .publish(
+                &mut tx,
+                &Pinged {
+                    workspace: None,
+                    n: 7,
+                },
+            )
+            .await
+            .unwrap();
+        tx.commit().await.unwrap();
+        assert_eq!(
+            owner_count(
+                &db,
+                &format!(
+                    "SELECT count(*) FROM kernel.jobs WHERE event_id = '{id}'
+                        AND workspace_id IS NULL AND unique_key = '{id}'"
+                )
+            )
+            .await,
+            2
+        );
+        let mut tx = db::begin_kernel(&state.db).await.unwrap();
+        let seen: i64 =
+            sqlx::query_scalar("SELECT count(*) FROM kernel.events WHERE workspace_id IS NULL")
+                .fetch_one(&mut *tx)
+                .await
+                .unwrap();
+        assert_eq!(seen, 3);
+        tx.rollback().await.unwrap();
+    }
+
+    /// A job of an instance-only kind written by hand in a workspace (its
+    /// own row, no schedule key, which the policies admit) is refused, not
+    /// run; the schedule's own tick still runs (campbooks-cloud#211).
+    #[sqlx::test(migrations = "../../migrations")]
+    async fn a_workspace_s_row_of_an_instance_only_kind_is_refused_not_run(db: PgPool) {
+        let state = runtime(&db).await;
+        let ana = WorkspaceId::new();
+        // A succeeded job long past its retention: a prune deletes it.
+        let mut tx = state.db.begin().await.unwrap();
+        let old = created(
+            enqueue(&mut tx, &Probe::note("old"), EnqueueOptions::default())
+                .await
+                .unwrap(),
+        );
+        tx.commit().await.unwrap();
+        let worker = Worker::new(state.clone());
+        worker.run_until_idle().await;
+        sqlx::query(
+            "UPDATE kernel.jobs SET finished_at = now() - interval '30 days' WHERE id = $1",
+        )
+        .bind(old)
+        .execute(&db)
+        .await
+        .unwrap();
+
+        let mut tx = state.db.begin_for(ana).await.unwrap();
+        let forged: uuid::Uuid = sqlx::query_scalar(
+            "INSERT INTO kernel.jobs (queue, kind, payload, workspace_id, max_attempts)
+             VALUES ('maintenance', 'kernel.prune_jobs', 'null', $1, 3)
+             RETURNING id",
+        )
+        .bind(ana.to_string())
+        .fetch_one(&mut *tx)
+        .await
+        .unwrap();
+        tx.commit().await.unwrap();
+        let stats = Worker::new(state.clone()).run_until_idle().await;
+        assert_eq!((stats.failed, stats.succeeded), (1, 0), "{stats:?}");
+        let row = job(&db, JobId::from_uuid(forged)).await;
+        assert_eq!((row.state.as_str(), row.attempts), ("failed", 1));
+        assert!(
+            row.last_error
+                .as_deref()
+                .unwrap_or_default()
+                .contains("instance-wide only"),
+            "{:?}",
+            row.last_error
+        );
+        assert_eq!(job(&db, old).await.state, "succeeded", "nothing was pruned");
+
+        // The schedule's tick, instance-wide, prunes.
+        worker.upkeep().await;
+        worker.run_until_idle().await;
+        assert_eq!(
+            owner_count(
+                &db,
+                &format!("SELECT count(*) FROM kernel.jobs WHERE id = '{old}'")
+            )
+            .await,
+            0
+        );
+        assert_eq!(
+            owner_count(
+                &db,
+                "SELECT count(*) FROM kernel.jobs WHERE kind = 'kernel.prune_jobs'
+                    AND workspace_id IS NULL AND state = 'succeeded'"
+            )
+            .await,
+            1
         );
     }
 

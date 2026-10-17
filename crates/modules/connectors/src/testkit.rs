@@ -99,6 +99,8 @@ type Member = (UserId, Vec<(WorkspaceId, Role)>);
 #[derive(Debug, Default)]
 struct FakeMembership {
     members: Mutex<HashMap<String, Member>>,
+    /// Workspaces deleted ([`Kit::delete_workspace`]): no one belongs there.
+    deleted: Mutex<Vec<WorkspaceId>>,
 }
 
 impl Membership for FakeMembership {
@@ -108,7 +110,15 @@ impl Membership for FakeMembership {
         principal: &'a Principal,
         workspace: WorkspaceId,
     ) -> MembershipFuture<'a> {
+        let deleted = self
+            .deleted
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .contains(&workspace);
         Box::pin(async move {
+            if deleted {
+                return Ok(None);
+            }
             if principal.kind == PrincipalKind::Client {
                 let bound = principal.workspace.as_deref() == Some(&workspace.to_string());
                 return Ok(bound.then_some(Access {
@@ -131,6 +141,29 @@ impl Membership for FakeMembership {
                         })
                 }))
         })
+    }
+
+    fn role_held<'a>(
+        &'a self,
+        _conn: &'a mut sqlx::PgConnection,
+        workspace: WorkspaceId,
+        user: UserId,
+    ) -> campbooks_kernel::tenancy::RoleFuture<'a> {
+        let deleted = self
+            .deleted
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .contains(&workspace);
+        let role = self
+            .members
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .values()
+            .find(|(id, _)| *id == user)
+            .and_then(|(_, workspaces)| workspaces.iter().find(|(w, _)| *w == workspace))
+            .map(|&(_, role)| role)
+            .filter(|_| !deleted);
+        Box::pin(async move { Ok(role) })
     }
 }
 
@@ -292,6 +325,28 @@ impl Kit {
             .or_insert_with(|| (UserId::new(), Vec::new()));
         entry.1.push((workspace, role));
         entry.0
+    }
+
+    /// `caller` is no longer a member of `workspace`.
+    pub fn leave(&self, caller: &Caller, workspace: WorkspaceId) {
+        if let Some((_, workspaces)) = self
+            .membership
+            .members
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .get_mut(&caller.subject)
+        {
+            workspaces.retain(|(w, _)| *w != workspace);
+        }
+    }
+
+    /// `workspace` is deleted: no one belongs there any more.
+    pub fn delete_workspace(&self, workspace: WorkspaceId) {
+        self.membership
+            .deleted
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .push(workspace);
     }
 
     /// `GET uri`.

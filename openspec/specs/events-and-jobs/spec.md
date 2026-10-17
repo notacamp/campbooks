@@ -194,7 +194,9 @@ tick SHALL mark that row failed, with the reason, and enqueue afresh. A
 schedule's run is instance-wide, so only another instance-wide row holding
 its key counts as its previous run. A schedule's last tick recorded more
 than one period ahead SHALL count as the current tick, so the schedule
-runs. The kernel SHALL schedule `kernel.prune_jobs` hourly, which deletes
+runs. The current tick SHALL be read from the clock when the tick is
+recorded, not when its transaction began, so a tick transaction that
+stalled for more than a period SHALL NOT move a newer recorded tick back. The kernel SHALL schedule `kernel.prune_jobs` hourly, which deletes
 succeeded jobs older than `CAMPBOOKS_JOBS__RETENTION_HOURS` and keeps
 failed jobs and the event log.
 
@@ -210,6 +212,10 @@ failed jobs and the event log.
 #### Scenario: A last tick far ahead
 - **WHEN** a schedule's recorded last tick is the largest number there is and a worker checks the schedules
 - **THEN** the schedule's job is enqueued and its last tick is the current one
+
+#### Scenario: A stalled tick
+- **WHEN** one worker's tick transaction begins and stalls for more than two periods while another worker records a newer tick, and the stalled one then records its tick
+- **THEN** the recorded tick does not move back and the stalled worker enqueues nothing for a tick already run
 
 #### Scenario: Pruning
 - **WHEN** the prune runs while a succeeded and a failed job finished 30 days ago and another succeeded job finished just now
@@ -274,3 +280,21 @@ and when they stop. Job payloads and error messages SHALL not carry secrets.
 #### Scenario: A job's log line
 - **WHEN** a job succeeds
 - **THEN** its log line carries the job's kind, queue, attempt and workspace, and the elapsed time
+
+### Requirement: Instance-only job kinds
+A job kind SHALL be instance-only when it is a schedule's, when it delivers
+an instance-wide event type (`DomainEvent::WORKSPACE_SCOPED` false), or when
+its job type declares `INSTANCE_ONLY`. The worker SHALL refuse a claimed job
+of an instance-only kind that carries a workspace: it SHALL mark it failed
+for good after one attempt, with an error naming the kind, and SHALL NOT run
+its handler. The same kind's instance-wide jobs SHALL run as before. The
+registry SHALL list the instance-only kinds.
+
+#### Scenario: A prune written by hand in a workspace
+- **WHEN** a transaction working in workspace A inserts, as raw SQL, a `kernel.prune_jobs` job of its own workspace with no schedule key (which row-level security admits), and a worker runs
+- **THEN** the job is failed after one attempt with an error saying the kind runs instance-wide only, and nothing is pruned
+- **AND** the schedule's next tick enqueues the instance-wide prune, which runs and prunes
+
+#### Scenario: The registry lists them
+- **WHEN** the registry is built from a module with a job, consumers of a workspace event and of an instance-wide event, and the kernel's schedules
+- **THEN** its instance-only kinds are the kernel's schedules and the instance-wide event's consumer

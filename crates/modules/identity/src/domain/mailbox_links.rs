@@ -163,6 +163,53 @@ pub async fn name_from_event(
     Ok(true)
 }
 
+/// Whether `account` has a tracked way in (one with a record) of
+/// `provider` account `subject`: the way in [`name_from_event`] would name a
+/// connection on.
+pub async fn tracks(
+    conn: &mut PgConnection,
+    provider: &str,
+    subject: &str,
+    account: Uuid,
+) -> Result<bool> {
+    Ok(sqlx::query_scalar(
+        "SELECT EXISTS (
+             SELECT 1 FROM identity.provider_identities p
+               JOIN identity.mailbox_links l ON l.provider_identity_id = p.id
+              WHERE p.provider = $1 AND p.subject = $2 AND p.account_id = $3)",
+    )
+    .bind(provider)
+    .bind(subject)
+    .bind(account)
+    .fetch_one(conn)
+    .await?)
+}
+
+/// The account whose record in `workspace` names connection `connection`
+/// (of `provider` account `subject`), if one does: the record [`forget`]
+/// would act on.
+pub async fn account_naming(
+    conn: &mut PgConnection,
+    workspace: Uuid,
+    connection: &str,
+    provider: &str,
+    subject: &str,
+) -> Result<Option<Uuid>> {
+    Ok(sqlx::query_scalar(
+        "SELECT p.account_id
+           FROM identity.mailbox_links l
+           JOIN identity.provider_identities p ON p.id = l.provider_identity_id
+          WHERE l.in_workspace_id = $1 AND l.connection_id = $2
+            AND p.provider = $3 AND p.subject = $4",
+    )
+    .bind(workspace)
+    .bind(connection)
+    .bind(provider)
+    .bind(subject)
+    .fetch_optional(conn)
+    .await?)
+}
+
 /// A way in that went with its last mailbox.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Removed {
