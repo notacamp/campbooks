@@ -250,7 +250,10 @@ async fn a_failing_provider_writes_nothing(db: PgPool) {
     let inbox = kit
         .inbox(workspace, "sam@example.com", &[(sam, InboxRole::Manager)])
         .await;
-    kit.batch(workspace, inbox, "needs").await;
+    let batch = kit.batch(workspace, inbox, "needs").await;
+    crate::dev::submit(&kit.state, workspace, &batch)
+        .await
+        .unwrap();
     // Jobs may fail and retry: only that nothing was written matters here.
     let _ = campbooks_kernel::jobs::Worker::new(kit.state.clone())
         .run_until_idle()
@@ -285,7 +288,7 @@ async fn without_a_complete_role_nothing_is_queued_and_the_email_still_shows(db:
 async fn the_backfill_summarises_the_open_needs_that_have_none(db: PgPool) {
     // Needs raised before this shipped: no summary, no job.
     let off = Kit::new(db.clone()).await;
-    let (workspace, inbox, ..) = sams_needs(&off).await;
+    let (_, inbox, ..) = sams_needs(&off).await;
     assert!(stored(&off).await.is_empty());
 
     // The upgrade: the migration queues every inbox for the needs backfill,
@@ -318,7 +321,6 @@ async fn the_backfill_summarises_the_open_needs_that_have_none(db: PgPool) {
     assert!(rows.iter().all(|(_, state, _)| state == "written"));
     let after = calls(&server).await;
     assert_eq!(after, rows.len());
-    let _ = workspace;
 
     // A second run asks for nothing again.
     sqlx::query("UPDATE conversations.needs_backfills SET state = 'pending', after_id = NULL")

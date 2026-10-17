@@ -70,7 +70,7 @@ const LOAD: &str = "SELECT m.sender, m.subject, m.bodies, m.sent_at, m.conversat
        LEFT JOIN conversations.need_summaries s ON s.message_id = m.id \
       WHERE m.id = $1 AND m.direction = 'inbound' AND NOT m.in_spam AND NOT m.in_trash";
 
-/// A written summary, or the first failure, of a message: nothing changes
+/// A written summary, or a failure, of a message: nothing changes
 /// once it is written.
 const STORE: &str = "INSERT INTO conversations.need_summaries \
             (message_id, workspace_id, state, texts, attempts) \
@@ -81,16 +81,18 @@ const STORE: &str = "INSERT INTO conversations.need_summaries \
       WHERE need_summaries.state = 'failed'";
 
 /// A row of [`LOAD`].
-type Loaded = (
-    Value,
-    String,
-    Value,
-    DateTime<Utc>,
-    ConversationId,
-    InboxId,
-    Option<String>,
-    Option<i16>,
-);
+#[derive(sqlx::FromRow)]
+struct Loaded {
+    sender: Value,
+    subject: String,
+    bodies: Value,
+    sent_at: DateTime<Utc>,
+    conversation_id: ConversationId,
+    inbox_id: InboxId,
+    /// `need_summaries.state`, when a row exists.
+    state: Option<String>,
+    attempts: Option<i16>,
+}
 
 /// The message to summarise.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -120,7 +122,7 @@ pub fn may_read_mail(gateway: &Gateway) -> bool {
         .is_ok()
 }
 
-/// What `body` of a stored message holds, as its own words.
+/// `messages.bodies`.
 #[derive(Deserialize)]
 struct Bodies {
     #[serde(default)]
@@ -267,19 +269,18 @@ async fn load(
         .fetch_optional(&mut *tx)
         .await?;
     tx.commit().await?;
-    let Some((sender, subject, bodies, sent_at, conversation, inbox, stored, attempts)) = row
-    else {
+    let Some(row) = row else {
         return Ok(None);
     };
-    match stored.as_deref() {
+    match row.state.as_deref() {
         Some("written") => return Ok(None),
-        Some(_) if attempts.is_none_or(|n| n >= MAX_CALLS) => return Ok(None),
+        Some(_) if row.attempts.is_none_or(|n| n >= MAX_CALLS) => return Ok(None),
         _ => {}
     }
     let decode =
         |e: serde_json::Error| JobError::fatal(format!("stored message: {}", redact::json(&e)));
-    let sender: Address = serde_json::from_value(sender).map_err(decode)?;
-    let bodies: Bodies = serde_json::from_value(bodies).map_err(decode)?;
+    let sender: Address = serde_json::from_value(row.sender).map_err(decode)?;
+    let bodies: Bodies = serde_json::from_value(row.bodies).map_err(decode)?;
     let ws = workspace.to_string();
     let raw = match (&bodies.text, &bodies.html) {
         (Some(text), _) => read_text(&state.blobs, &ws, text, RAW_TEXT_BYTES).await,
@@ -306,12 +307,12 @@ async fn load(
     Ok(Some(Read {
         email: Email {
             from: cut_bytes(&from, SHORT_BYTES),
-            sent_at: sent_at.to_rfc3339_opts(SecondsFormat::Secs, true),
-            subject: cut_bytes(&subject, SHORT_BYTES),
+            sent_at: row.sent_at.to_rfc3339_opts(SecondsFormat::Secs, true),
+            subject: cut_bytes(&row.subject, SHORT_BYTES),
             text,
         },
-        conversation,
-        inbox,
+        conversation: row.conversation_id,
+        inbox: row.inbox_id,
     }))
 }
 
