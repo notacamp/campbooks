@@ -647,11 +647,12 @@ The dispatcher SHALL work in the maintenance scope (`begin_maintenance`,
 allowed for it under `[[access.maintenance_scope]]` in `architecture.toml`),
 in which it SHALL be able to read the scheduling index and lease due
 streams, and nothing else: no kernel table admits that scope, so it SHALL
-enqueue each stream's run in the stream's workspace, set in the same
-transaction as the lease. It SHALL NOT be able to insert or delete schedule
-rows, and a transaction that set neither a workspace nor the maintenance
-scope SHALL see no schedule row; the kernel scope SHALL NOT admit it to the
-schedule either.
+enqueue each stream's run in the stream's workspace, set for that enqueue
+only (`jobs::enqueue_to_in`) in the same transaction as the lease, so that
+nothing after it runs in the last stream's workspace. It SHALL NOT be able
+to insert or delete schedule rows, and a transaction that set neither a
+workspace nor the maintenance scope SHALL see no schedule row; the kernel
+scope SHALL NOT admit it to the schedule either.
 
 #### Scenario: The policies
 - **WHEN** the database's policies are listed
@@ -664,6 +665,10 @@ schedule either.
 #### Scenario: Due streams of two workspaces
 - **WHEN** streams of two workspaces are due and the dispatcher ticks, as the runtime role
 - **THEN** each stream's row is leased and its run is enqueued in its own workspace
+
+#### Scenario: No workspace left set
+- **WHEN** the dispatcher has enqueued the runs of streams of two workspaces in its transaction
+- **THEN** the transaction works in no workspace
 
 ### Requirement: The receiving provider's authentication results
 The mail adapters SHALL carry, with each message, the receiving provider's

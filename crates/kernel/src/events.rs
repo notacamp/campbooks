@@ -72,6 +72,18 @@ pub trait DomainEvent: Serialize + DeserializeOwned + Send + Sync + 'static {
     /// or is instance-wide. Listed in `openapi/events.json`; keep
     /// [`workspace`](Self::workspace) consistent with it.
     const WORKSPACE_SCOPED: bool = true;
+    /// Whether a transaction working in a workspace may publish an event of
+    /// this type that belongs to no workspace ([`workspace`](Self::workspace)
+    /// `None`; a workspace handler announcing an account's change).
+    /// Meaningless for an event that always names its workspace. Row-level
+    /// security refuses every other instance-wide event, and every delivery
+    /// to a consumer of one, from a workspace transaction
+    /// (campbooks-cloud#207): the event names and consumer kinds it admits are
+    /// listed in `kernel.instance_rows_from_workspaces`, by migration, and the
+    /// server's tests keep that list equal to these declarations. Because any
+    /// workspace transaction may then append one, a consumer must not take
+    /// such an event as proof of who published it.
+    const PUBLISHED_IN_WORKSPACES: bool = false;
     /// Whether something waits for every consumer to have acted on an event
     /// of this type ([`EventBus::unsettled`]): a delivery that fails for
     /// good is then kept, with the event, until an operator replays or
@@ -223,9 +235,18 @@ impl EventBus {
         // transaction that set no workspace: the kernel lifts it into its
         // scope for the append only (row-level security shows the event log
         // to no transaction that set nothing).
+        // From a workspace's transaction only an event declared
+        // `PUBLISHED_IN_WORKSPACES` (campbooks-cloud#207).
         let lifted = match event.workspace() {
             Some(_) => false,
-            None => crate::db::lift_for_instance_rows(tx).await?,
+            None => {
+                crate::db::lift_for_instance_rows(
+                    tx,
+                    &format!("event `{}`", E::NAME),
+                    E::PUBLISHED_IN_WORKSPACES,
+                )
+                .await?
+            }
         };
         let id = sqlx::query_scalar!(
             r#"
@@ -404,6 +425,8 @@ pub struct PublishedEvent {
     pub version: u16,
     /// `DomainEvent::WORKSPACE_SCOPED`.
     pub workspace_scoped: bool,
+    /// `DomainEvent::PUBLISHED_IN_WORKSPACES`.
+    pub published_in_workspaces: bool,
     pub(crate) schema: fn() -> RefOr<Schema>,
     pub(crate) schemas: fn(&mut Vec<(String, RefOr<Schema>)>),
 }

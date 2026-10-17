@@ -119,6 +119,9 @@ struct Pinged {
 impl DomainEvent for Pinged {
     const NAME: &'static str = "test.pinged";
     const VERSION: u16 = 1;
+    // Its instance-wide ones may come from a workspace's transaction (the
+    // tests below list them, and their deliveries, for row-level security).
+    const PUBLISHED_IN_WORKSPACES: bool = true;
 
     fn workspace(&self) -> Option<&str> {
         self.workspace.as_deref()
@@ -2044,7 +2047,8 @@ mod kernel_scope {
             .await
             .unwrap();
         let pool = testing::app_role_pool(db).await;
-        let registry = Registry::build(&[module(background())]).unwrap();
+        let registry = Registry::build(&[module(background().publishes::<Pinged>())]).unwrap();
+        testing::allow_instance_rows(db, &registry).await;
         let mut config = testing::config("postgres://test@localhost/test");
         tweak(&mut config.jobs);
         AppState::new(pool.clone(), config)
@@ -2613,24 +2617,19 @@ mod kernel_scope {
             .await,
             1
         );
-        // It still adds instance-wide rows, reading them back (`RETURNING`),
-        // and a unique key held by an instance-wide job still dedups.
-        let added = enqueue(
-            &mut tx,
-            &Probe::note("follow-up"),
+        // It no longer enqueues instance-wide jobs (campbooks-cloud#207), a
+        // duplicate of one included; it still publishes a listed
+        // instance-wide event with its deliveries, reading them back
+        // (`RETURNING`).
+        for options in [
             EnqueueOptions::default(),
-        )
-        .await
-        .unwrap();
-        assert!(matches!(added, Enqueued::Created(_)), "{added:?}");
-        let again = enqueue(
-            &mut tx,
-            &Probe::note("instance"),
             EnqueueOptions::default().unique("tick"),
-        )
-        .await
-        .unwrap();
-        assert_eq!(again, Enqueued::Duplicate);
+        ] {
+            let mut step = db::savepoint(&mut tx).await.unwrap();
+            let added = enqueue(&mut step, &Probe::note("follow-up"), options).await;
+            assert!(refused(&added), "{added:?}");
+            drop(step);
+        }
         state
             .events
             .publish(
@@ -2651,8 +2650,8 @@ mod kernel_scope {
                     AND run_at < now() + interval '1 day'"
             )
             .await,
-            before + 3,
-            "the old rows untouched, the follow-up and the two new deliveries added"
+            before + 2,
+            "the old rows untouched, the two new deliveries added"
         );
         assert_eq!(
             owner_count(
@@ -2672,13 +2671,13 @@ mod kernel_scope {
                 "UPDATE kernel.jobs SET priority = 2 WHERE workspace_id IS NULL"
             )
             .await,
-            u64::try_from(before).unwrap() + 3
+            u64::try_from(before).unwrap() + 2
         );
         tx.rollback().await.unwrap();
         let stats = Worker::new(state.clone()).run_until_idle().await;
         assert_eq!(
             (stats.succeeded, stats.failed, stats.lost),
-            (7, 0, 0),
+            (6, 0, 0),
             "{stats:?}"
         );
     }
@@ -2686,10 +2685,10 @@ mod kernel_scope {
     #[sqlx::test(migrations = "../../migrations")]
     async fn instance_wide_jobs_still_complete_retry_and_get_reaped(db: PgPool) {
         let state = runtime_with(&db, |jobs| jobs.retry_base_ms = 60_000).await;
-        let ana = WorkspaceId::new();
-        // An instance-wide follow-up enqueued by a workspace's transaction,
-        // failing its first attempt.
-        let mut tx = state.db.begin_for(ana).await.unwrap();
+        // An instance-wide job (from a transaction that set nothing: a
+        // workspace's may not add one, campbooks-cloud#207), failing its
+        // first attempt.
+        let mut tx = state.db.begin().await.unwrap();
         let flaky = created(
             enqueue(
                 &mut tx,
@@ -2745,7 +2744,7 @@ mod kernel_scope {
         assert_eq!((row.state.as_str(), row.attempts), ("succeeded", 2));
 
         // One that fails for good is recorded as failed.
-        let mut tx = state.db.begin_for(ana).await.unwrap();
+        let mut tx = state.db.begin().await.unwrap();
         let dead = created(
             enqueue(
                 &mut tx,
@@ -2878,5 +2877,268 @@ mod kernel_scope {
         ));
         let stats = Worker::new(state.clone()).run_until_idle().await;
         assert_eq!(stats.failed, 0, "{stats:?}");
+    }
+
+    // --- workspaces cannot forge instance-wide work (#207) ------------------
+
+    /// Run `sql` in a savepoint of `tx`: whether row-level security refused
+    /// it (`42501`, "new row violates row-level security policy").
+    async fn policy_refuses(
+        tx: &mut sqlx::Transaction<'static, sqlx::Postgres>,
+        sql: &str,
+    ) -> bool {
+        let mut step = db::savepoint(tx).await.unwrap();
+        let result = sqlx::query(sqlx::AssertSqlSafe(sql.to_owned()))
+            .execute(&mut *step)
+            .await;
+        drop(step);
+        match result {
+            Ok(_) => false,
+            Err(sqlx::Error::Database(e)) if e.code().as_deref() == Some("42501") => true,
+            Err(e) => panic!("{sql}: {e}"),
+        }
+    }
+
+    #[sqlx::test(migrations = "../../migrations")]
+    async fn a_workspace_cannot_forge_instance_wide_jobs_or_events(db: PgPool) {
+        let state = runtime(&db).await;
+        let ana = WorkspaceId::new();
+        let delivery = |columns: &str, values: &str| {
+            format!(
+                "INSERT INTO kernel.jobs (queue, kind, payload, event_id, unique_key, max_attempts{columns})
+                 SELECT 'events', 'test.count_a', '{{}}', id, id::text, 3{values}
+                   FROM (SELECT kernel.uuid_v7() AS id) e"
+            )
+        };
+        let mut tx = state.db.begin_for(ana).await.unwrap();
+        let forgeries = [
+            // A schedule's key, never due: every later tick would be its
+            // duplicate.
+            "INSERT INTO kernel.jobs (queue, kind, payload, unique_key, run_at, max_attempts)
+             VALUES ('maintenance', 'kernel.prune_jobs', 'null', 'schedule:kernel.prune_jobs',
+                     'infinity', 1)"
+                .to_owned(),
+            // The same as one of the workspace's own rows (the unique index
+            // spans workspaces).
+            format!(
+                "INSERT INTO kernel.jobs (queue, kind, payload, workspace_id, unique_key, max_attempts)
+                 VALUES ('maintenance', 'kernel.prune_jobs', 'null', '{ana}',
+                         'schedule:kernel.prune_jobs', 1)"
+            ),
+            // A listed consumer's delivery, but due never, already claimed,
+            // ordered behind another key, or with a key not its event's.
+            delivery(", run_at", ", 'infinity'"),
+            delivery(
+                ", state, locked_by, locked_until",
+                ", 'running', 'w', 'infinity'",
+            ),
+            delivery(", ordering_key", ", 'send:1'"),
+            "INSERT INTO kernel.jobs (queue, kind, payload, event_id, unique_key, max_attempts)
+             VALUES ('events', 'test.count_a', '{}', kernel.uuid_v7(),
+                     'schedule:test.count_a', 3)"
+                .to_owned(),
+            // A kind no listed event is delivered to.
+            "INSERT INTO kernel.jobs (queue, kind, payload, event_id, unique_key, max_attempts)
+             SELECT 'maintenance', 'kernel.prune_jobs', '{}', id, id::text, 1
+               FROM (SELECT kernel.uuid_v7() AS id) e"
+                .to_owned(),
+            // An account's event a workspace does not announce.
+            "INSERT INTO kernel.events (name, version, payload)
+             VALUES ('identity.account_suspended', 1, '{}')"
+                .to_owned(),
+            "INSERT INTO kernel.events (name, version, payload, occurred_at)
+             VALUES ('test.pinged', 1, '{}', 'infinity')"
+                .to_owned(),
+        ];
+        for sql in &forgeries {
+            assert!(policy_refuses(&mut tx, sql).await, "not refused: {sql}");
+        }
+        // What a workspace legitimately adds still passes: a listed event,
+        // and a fresh delivery of it to a listed consumer.
+        for sql in [
+            "INSERT INTO kernel.events (name, version, payload) VALUES ('test.pinged', 1, '{}')"
+                .to_owned(),
+            delivery("", ""),
+        ] {
+            assert!(!policy_refuses(&mut tx, &sql).await, "refused: {sql}");
+        }
+        // Through the kernel: an instance-wide job, or an instance-wide event
+        // not declared `PUBLISHED_IN_WORKSPACES`, is refused before the
+        // database is asked.
+        let mut step = db::savepoint(&mut tx).await.unwrap();
+        let job = enqueue(
+            &mut step,
+            &Probe::note("forged"),
+            EnqueueOptions::default().unique("schedule:test.probe"),
+        )
+        .await;
+        assert!(refused(&job), "{job:?}");
+        drop(step);
+        let mut step = db::savepoint(&mut tx).await.unwrap();
+        let event = state
+            .events
+            .publish(&mut step, &Departed { who: "x".into() })
+            .await;
+        assert!(refused(&event), "{event:?}");
+        drop(step);
+        tx.rollback().await.unwrap();
+        assert_eq!(
+            owner_count(&db, "SELECT count(*) FROM kernel.jobs").await,
+            0,
+            "nothing was added"
+        );
+    }
+
+    /// A schedule row: id, kind, state, workspace, last error.
+    type ScheduleRow = (uuid::Uuid, String, String, Option<String>, Option<String>);
+
+    #[sqlx::test(migrations = "../../migrations")]
+    async fn a_stuck_schedule_row_is_replaced_by_the_next_tick(db: PgPool) {
+        let state = runtime(&db).await;
+        let ana = WorkspaceId::new();
+        let row = |kind: &str, workspace: Option<String>, run_at: &str, leased: Option<&str>| {
+            let workspace = workspace.map_or_else(|| "NULL".to_owned(), |w| format!("'{w}'"));
+            let (state, by, until) = match leased {
+                Some(until) => ("running", "'w-1'".to_owned(), until.to_owned()),
+                None => ("pending", "NULL".to_owned(), "NULL".to_owned()),
+            };
+            format!(
+                "INSERT INTO kernel.jobs (queue, kind, payload, workspace_id, unique_key, state,
+                                          run_at, locked_by, locked_until, max_attempts)
+                 VALUES ('maintenance', '{kind}', 'null', {workspace}, 'schedule:{kind}',
+                         '{state}', {run_at}, {by}, {until}, 3)
+                 RETURNING id"
+            )
+        };
+        let insert = |sql: String| {
+            let db = db.clone();
+            async move {
+                sqlx::query_scalar::<_, uuid::Uuid>(sqlx::AssertSqlSafe(sql))
+                    .fetch_one(&db)
+                    .await
+                    .unwrap()
+            }
+        };
+        // Rows written before the policies refused them (as the owner here):
+        // one never due, one of a workspace, one leased forever. And two a
+        // schedule may legitimately have: waiting out a retry, and held by a
+        // live worker.
+        let never = insert(row("kernel.prune_jobs", None, "'infinity'", None)).await;
+        let theirs = insert(row(
+            "kernel.prune_events",
+            Some(ana.to_string()),
+            "now()",
+            None,
+        ))
+        .await;
+        let forever = insert(row(
+            "kernel.prune_changes",
+            None,
+            "now()",
+            Some("'infinity'"),
+        ))
+        .await;
+        let retrying = insert(row(
+            "kernel.prune_idempotency",
+            None,
+            "now() + interval '10 minutes'",
+            None,
+        ))
+        .await;
+        let live = insert(row(
+            "kernel.prune_rate_limits",
+            None,
+            "now()",
+            Some("now() + interval '30 seconds'"),
+        ))
+        .await;
+
+        Worker::new(state.clone()).upkeep().await;
+
+        let rows: Vec<ScheduleRow> = sqlx::query_as(
+            "SELECT id, kind, state, workspace_id, last_error FROM kernel.jobs
+                  WHERE unique_key LIKE 'schedule:%' ORDER BY kind, created_at",
+        )
+        .fetch_all(&db)
+        .await
+        .unwrap();
+        let of = |kind: &str| -> Vec<_> { rows.iter().filter(|r| r.1 == kind).collect() };
+        for (kind, stuck) in [
+            ("kernel.prune_jobs", never),
+            ("kernel.prune_events", theirs),
+            ("kernel.prune_changes", forever),
+        ] {
+            let rows = of(kind);
+            assert_eq!(rows.len(), 2, "{kind}: {rows:?}");
+            let old = rows.iter().find(|r| r.0 == stuck).unwrap();
+            assert_eq!(old.2, "failed", "{kind}");
+            assert!(
+                old.4.as_deref().unwrap().contains("stuck schedule row"),
+                "{kind}: {old:?}"
+            );
+            let fresh = rows.iter().find(|r| r.0 != stuck).unwrap();
+            assert_eq!(
+                (fresh.2.as_str(), fresh.3.as_ref()),
+                ("pending", None),
+                "{kind}"
+            );
+        }
+        for (kind, kept) in [
+            ("kernel.prune_idempotency", retrying),
+            ("kernel.prune_rate_limits", live),
+        ] {
+            let rows = of(kind);
+            assert_eq!(rows.len(), 1, "{kind}: {rows:?}");
+            assert_eq!(rows[0].0, kept);
+            assert_ne!(rows[0].2, "failed");
+        }
+    }
+
+    #[sqlx::test(migrations = "../../migrations")]
+    async fn enqueue_in_works_in_the_workspace_for_its_enqueue_only(db: PgPool) {
+        let state = runtime(&db).await;
+        let (ana, bob) = (
+            WorkspaceId::new().to_string(),
+            WorkspaceId::new().to_string(),
+        );
+        let mut tx = db::begin_maintenance(&state.db).await.unwrap();
+        for ws in [&ana, &bob] {
+            let enqueued =
+                super::super::enqueue_in(&mut tx, ws, &Probe::note(ws), EnqueueOptions::default())
+                    .await
+                    .unwrap();
+            assert!(matches!(enqueued, Enqueued::Created(_)), "{enqueued:?}");
+            assert_eq!(db::scope(&mut tx).await.unwrap().workspace, None, "cleared");
+        }
+        // Not from a transaction that works in a workspace already.
+        let mut step = db::savepoint(&mut tx).await.unwrap();
+        db::set_workspace(&mut step, &bob).await.unwrap();
+        let refused_here = super::super::enqueue_in(
+            &mut step,
+            &ana,
+            &Probe::note("x"),
+            EnqueueOptions::default(),
+        )
+        .await;
+        assert!(
+            refused(&refused_here),
+            "{refused_here:?}: it works in one already"
+        );
+        drop(step);
+        tx.commit().await.unwrap();
+        let stats = Worker::new(state.clone()).run_until_idle().await;
+        assert_eq!(stats.succeeded, 2, "{stats:?}");
+        let mut logged: Vec<(String, Option<String>)> =
+            sqlx::query_as("SELECT note, workspace FROM job_log")
+                .fetch_all(&db)
+                .await
+                .unwrap();
+        logged.sort();
+        let mut expected = vec![
+            (ana.clone(), Some(ana.clone())),
+            (bob.clone(), Some(bob.clone())),
+        ];
+        expected.sort();
+        assert_eq!(logged, expected);
     }
 }

@@ -35,6 +35,17 @@ All notable changes to Campbooks Next are documented here. The format follows
 
 ### Security
 
+- **A workspace can no longer forge background work for the whole instance.** Work running
+  in a workspace could add a job or event that belongs to no workspace. One such row could
+  stop the job pruning, or all mail polling, for good. It can now only add the account
+  events a workspace announces (an app's access revoked, a way to sign in removed) and their
+  deliveries, and no row of its own may hold a schedule's key. A schedule blocked by a row
+  that will never run is freed at its next tick, the old row kept as failed. Administrators
+  with `jobs.retry` can also discard a schedule's pending or stuck run. The mail and needs
+  dispatchers no longer leave the last workspace set after they queue work, and the
+  architecture checks catch scope names spelled with escapes and test modules hidden inside
+  other code (campbooks-cloud#207). Rolling back to an older image needs a one-off SQL step,
+  in the change's design.
 - **Background work shared by the whole instance can only be changed by the kernel.**
   Account events, account jobs and scheduled ticks belong to no workspace. Work running in
   a workspace could still read and add them, which it needs, but it could also complete,

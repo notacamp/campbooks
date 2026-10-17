@@ -81,6 +81,7 @@ pub fn module_with(deps: Deps) -> Module {
                 .routes(routes!(features::admin_job_actions::retry))
                 .routes(routes!(features::admin_job_actions::discard))
                 .routes(routes!(features::admin_job_actions::retry_kind))
+                .routes(routes!(features::admin_job_actions::discard_schedule_run))
                 .layer(Extension(deps)),
         ),
         background: Background::new(),

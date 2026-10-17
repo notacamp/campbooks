@@ -138,11 +138,7 @@ reason = "A test file (`#[cfg(test)] mod flows;`): fixtures publish from plain t
 
 [[access.pool_access]]
 path = "crates/server/src/bff/store.rs"
-reason = "The web BFF's session store (schema `bff`): sessions are instance-wide, none carries a workspace."
-
-[[access.pool_access]]
-path = "crates/server/src/bff/mod.rs"
-reason = "The BFF's single-flight token refresh locks its session row (schema `bff`, instance-wide) in a transaction of its own."
+reason = "The web BFF's session store (schema `bff`): sessions are instance-wide, none carries a workspace. It also opens the single-flight token refresh's transaction (`begin_refresh`), the one the refresh locks its session row in."
 
 [[access.pool_access]]
 path = "crates/kernel/src/db.rs"
