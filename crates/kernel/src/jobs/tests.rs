@@ -3141,4 +3141,146 @@ mod kernel_scope {
         expected.sort();
         assert_eq!(logged, expected);
     }
+
+    #[sqlx::test(migrations = "../../migrations")]
+    async fn a_workspace_cannot_reach_the_schedules_and_a_tick_far_ahead_heals(db: PgPool) {
+        let state = runtime(&db).await;
+        let worker = Worker::new(state.clone());
+        worker.upkeep().await;
+        assert!(owner_count(&db, "SELECT count(*) FROM kernel.schedules").await > 0);
+
+        // A workspace transaction, and one that set nothing, neither see nor
+        // change the schedules' last ticks (campbooks-cloud#207).
+        let mut tx = state.db.begin_for(WorkspaceId::new()).await.unwrap();
+        let seen: i64 = sqlx::query_scalar("SELECT count(*) FROM kernel.schedules")
+            .fetch_one(&mut *tx)
+            .await
+            .unwrap();
+        assert_eq!(seen, 0);
+        assert_eq!(
+            affected(
+                &mut tx,
+                "UPDATE kernel.schedules SET last_tick = 9223372036854775807"
+            )
+            .await,
+            0
+        );
+        assert!(
+            policy_refuses(
+                &mut tx,
+                "INSERT INTO kernel.schedules (name, last_tick)
+                 VALUES ('kernel.forged', 9223372036854775807)"
+            )
+            .await
+        );
+        tx.rollback().await.unwrap();
+        let mut tx = state.db.begin().await.unwrap();
+        assert_eq!(
+            affected(
+                &mut tx,
+                "UPDATE kernel.schedules SET last_tick = 9223372036854775807"
+            )
+            .await,
+            0
+        );
+        tx.rollback().await.unwrap();
+
+        // A last tick far ahead (written as the owner, as before the policy)
+        // counts as this tick: the schedule runs again.
+        sqlx::query(
+            "UPDATE kernel.schedules SET last_tick = 9223372036854775807
+              WHERE name = 'kernel.prune_jobs'",
+        )
+        .execute(&db)
+        .await
+        .unwrap();
+        sqlx::query("DELETE FROM kernel.jobs")
+            .execute(&db)
+            .await
+            .unwrap();
+        worker.upkeep().await;
+        assert_eq!(
+            owner_count(
+                &db,
+                "SELECT count(*) FROM kernel.jobs WHERE kind = 'kernel.prune_jobs'
+                    AND unique_key = 'schedule:kernel.prune_jobs' AND state = 'pending'"
+            )
+            .await,
+            1
+        );
+        assert!(
+            owner_count(
+                &db,
+                "SELECT last_tick FROM kernel.schedules WHERE name = 'kernel.prune_jobs'"
+            )
+            .await
+                < i64::MAX
+        );
+    }
+
+    #[sqlx::test(migrations = "../../migrations")]
+    async fn an_event_logged_outside_its_own_workspace_is_never_handled(db: PgPool) {
+        let state = runtime(&db).await;
+        let (ana, bob) = (
+            WorkspaceId::new().to_string(),
+            WorkspaceId::new().to_string(),
+        );
+        // Written by hand in ana's transaction, as the runtime role: an
+        // instance-wide event (its payload names no workspace) and an event
+        // naming bob, each logged in ana with a delivery there.
+        let mut tx = db::begin_in(&state.db, &ana).await.unwrap();
+        let mut forged = Vec::new();
+        for (payload, consumer) in [
+            (
+                serde_json::json!({ "workspace": null, "n": 1 }),
+                "test.count_a",
+            ),
+            (
+                serde_json::json!({ "workspace": bob, "n": 2 }),
+                "test.count_b",
+            ),
+        ] {
+            let id: uuid::Uuid = sqlx::query_scalar(
+                "WITH e AS (
+                     INSERT INTO kernel.events (name, version, workspace_id, payload)
+                     VALUES ('test.pinged', 1, $1, $2) RETURNING id)
+                 INSERT INTO kernel.jobs
+                     (queue, kind, payload, workspace_id, event_id, unique_key, max_attempts)
+                 SELECT 'events', $3, '{}', $1, id, id::text, 3 FROM e
+                 RETURNING id",
+            )
+            .bind(&ana)
+            .bind(payload)
+            .bind(consumer)
+            .fetch_one(&mut *tx)
+            .await
+            .unwrap();
+            forged.push(id);
+        }
+        tx.commit().await.unwrap();
+
+        let stats = Worker::new(state.clone()).run_until_idle().await;
+        assert_eq!((stats.failed, stats.succeeded), (2, 0), "{stats:?}");
+        for id in forged {
+            let (state_now, error): (String, Option<String>) =
+                sqlx::query_as("SELECT state, last_error FROM kernel.jobs WHERE id = $1")
+                    .bind(id)
+                    .fetch_one(&db)
+                    .await
+                    .unwrap();
+            assert_eq!(state_now, "failed");
+            assert!(
+                error
+                    .as_deref()
+                    .unwrap_or_default()
+                    .contains("another workspace"),
+                "{error:?}"
+            );
+        }
+        assert_eq!(
+            owner_count(&db, "SELECT count(*) FROM job_log").await,
+            0,
+            "no handler ran"
+        );
+    }
 }

@@ -48,6 +48,10 @@ INSERT INTO kernel.instance_rows_from_workspaces (row_kind, name) VALUES
 --   keyed by its event like `EventBus::publish` writes it, no ordering key,
 --   no schedule key.
 -- - `instance_rows_read` (`FOR SELECT`) is unchanged.
+-- The delivery is not checked against its event's row: `EventBus::publish`
+-- writes both in one statement, whose policy subqueries cannot see the
+-- event it is inserting; `load_event` refuses a delivery whose event was
+-- not logged where its type says (an account's event in a workspace).
 DROP POLICY workspace_isolation ON kernel.jobs;
 CREATE POLICY workspace_isolation ON kernel.jobs
     USING (current_setting('campbooks.kernel_scope', true) = 'on'
@@ -64,7 +68,11 @@ CREATE POLICY instance_rows_insert ON kernel.jobs FOR INSERT
                 AND attempts = 0
                 AND locked_by IS NULL
                 AND locked_until IS NULL
+                AND started_at IS NULL
+                AND finished_at IS NULL
+                AND last_error IS NULL
                 AND run_at <= now()
+                AND run_at >= now() - interval '5 minutes'
                 AND payload = '{}'::jsonb
                 AND event_id IS NOT NULL
                 AND unique_key = event_id::text
@@ -78,5 +86,19 @@ CREATE POLICY instance_rows_insert ON kernel.events FOR INSERT
     WITH CHECK (workspace_id IS NULL
                 AND nullif(current_setting('campbooks.workspace_id', true), '') IS NOT NULL
                 AND occurred_at <= now()
+                AND occurred_at >= now() - interval '5 minutes'
                 AND EXISTS (SELECT 1 FROM kernel.instance_rows_from_workspaces a
                              WHERE a.row_kind = 'event' AND a.name = events.name));
+
+-- The schedules' last ticks: only the schedule tick (the kernel scope) reads
+-- and writes them. Before this, the runtime role could set a schedule's
+-- `last_tick` far ahead from any transaction, and every later tick of that
+-- schedule found itself already done (`WHERE last_tick < excluded.last_tick`):
+-- pruning, polling, sequencing and the backfills stopped, before the heal
+-- above could run. The tick also resets a `last_tick` more than one period
+-- ahead.
+ALTER TABLE kernel.schedules ENABLE ROW LEVEL SECURITY;
+ALTER TABLE kernel.schedules FORCE ROW LEVEL SECURITY;
+CREATE POLICY kernel_scope_only ON kernel.schedules
+    USING (current_setting('campbooks.kernel_scope', true) = 'on')
+    WITH CHECK (current_setting('campbooks.kernel_scope', true) = 'on');

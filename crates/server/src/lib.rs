@@ -880,16 +880,29 @@ mod tests {
                 .collect::<Vec<_>>()
         };
         // The kernel scope: the kernel's own tables, each through its one
-        // `workspace_isolation` policy, and nothing else.
+        // `workspace_isolation` policy (the schedules' last ticks through
+        // `kernel_scope_only`), and nothing else.
         let kernel = mentioning(testing::kernel_scope_setting());
         assert!(!kernel.is_empty());
         let elsewhere: Vec<_> = kernel
             .iter()
             .filter(|(table, policy, cmd)| {
-                !table.starts_with("kernel.") || policy != "workspace_isolation" || cmd != "ALL"
+                let expected = if table == "kernel.schedules" {
+                    "kernel_scope_only"
+                } else {
+                    "workspace_isolation"
+                };
+                !table.starts_with("kernel.") || policy != expected || cmd != "ALL"
             })
             .collect();
         assert!(elsewhere.is_empty(), "{elsewhere:?}");
+        assert!(
+            kernel
+                .iter()
+                .any(|(table, policy, _)| table == "kernel.schedules"
+                    && policy == "kernel_scope_only"),
+            "the schedules' last ticks are the kernel scope's: {kernel:?}"
+        );
         // The maintenance scope: these four, on module tables.
         let policies = mentioning(testing::maintenance_scope_setting());
         let expected = [

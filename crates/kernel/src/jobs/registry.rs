@@ -285,9 +285,23 @@ async fn load_event<E: DomainEvent>(ctx: &JobContext) -> Result<Event<E>, JobErr
             E::VERSION
         )));
     }
-    let payload = serde_json::from_value(row.payload).map_err(|e| {
+    let payload: E = serde_json::from_value(row.payload).map_err(|e| {
         JobError::fatal(format!("event {id} does not decode as `{}`: {e}", E::NAME))
     })?;
+    // The log row's workspace must be the event's own: an instance-wide
+    // event logged in a workspace, or a workspace's event naming another
+    // workspace than the row it was logged in, was not published by
+    // `EventBus::publish` (which writes the event's own workspace) but
+    // written by hand, e.g. by a workspace forging an account's event for an
+    // instance-wide consumer (campbooks-cloud#207). It is never handled.
+    if (!E::WORKSPACE_SCOPED && row.workspace_id.is_some())
+        || DomainEvent::workspace(&payload) != row.workspace_id.as_deref()
+    {
+        return Err(JobError::fatal(format!(
+            "event {id} (`{}`) is logged in another workspace than its own; not handled",
+            E::NAME
+        )));
+    }
     Ok(Event {
         id,
         version: E::VERSION,

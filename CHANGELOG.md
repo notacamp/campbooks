@@ -39,7 +39,10 @@ All notable changes to Campbooks Next are documented here. The format follows
   in a workspace could add a job or event that belongs to no workspace. One such row could
   stop the job pruning, or all mail polling, for good. It can now only add the account
   events a workspace announces (an app's access revoked, a way to sign in removed) and their
-  deliveries, and no row of its own may hold a schedule's key. A schedule blocked by a row
+  deliveries, and no row of its own may hold a schedule's key. Nor can it touch the
+  schedules' record of their last runs any more, and an account's event it writes into its
+  own workspace by hand (to sign someone out everywhere, say) is never acted on. A schedule
+  blocked by a row
   that will never run is freed at its next tick, the old row kept as failed. Administrators
   with `jobs.retry` can also discard a schedule's pending or stuck run. The mail and needs
   dispatchers no longer leave the last workspace set after they queue work, and the

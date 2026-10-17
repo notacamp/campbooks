@@ -221,7 +221,11 @@ SHALL only read it. Outside the kernel scope no row, a workspace's own
 included, SHALL carry a schedule's unique key (`schedule:<name>`). The
 kernel SHALL refuse an instance-wide job, or an instance-wide event not
 declared `PUBLISHED_IN_WORKSPACES`, from a workspace transaction before
-asking the database. Only the kernel scope SHALL change instance-wide rows:
+asking the database. A delivery SHALL be handled only when its event is
+logged in the event's own workspace (none for an instance-wide type);
+otherwise it SHALL fail for good without running its handler. Only the
+kernel scope SHALL read or write the schedules' last ticks
+(`kernel.schedules`). Only the kernel scope SHALL change instance-wide rows:
 claiming, renewing, releasing, retrying, reaping and completing
 instance-wide jobs, pruning and the admin's queue SHALL keep working there.
 
@@ -240,6 +244,18 @@ instance-wide jobs, pruning and the admin's queue SHALL keep working there.
 #### Scenario: Forging other instance-wide work
 - **WHEN** a transaction working in workspace A inserts, as raw SQL, an instance-wide delivery due never, already claimed, ordered behind another key or keyed otherwise than by its event, a job of an unlisted kind, an event of an unlisted name (`identity.account_suspended`), or a listed event dated in the future
 - **THEN** row-level security refuses each one
+
+#### Scenario: An account's event forged in a workspace
+- **WHEN** a transaction working in workspace A writes, as raw SQL into its own workspace, an `identity.signed_out_everywhere` naming another person's account and a `bff.end_signed_out_sessions` delivery of it, and the worker runs
+- **THEN** the delivery fails for good, its handler never runs, and that person stays signed in
+
+#### Scenario: An event naming another workspace
+- **WHEN** a workspace's event whose payload names workspace B is logged in workspace A, with a delivery there
+- **THEN** the delivery fails for good and its handler never runs
+
+#### Scenario: The schedules' last ticks
+- **WHEN** a transaction working in a workspace, or one that set nothing, reads `kernel.schedules`, sets a schedule's `last_tick` far ahead, or inserts a row
+- **THEN** it sees no row, changes none, and the insert is refused
 
 #### Scenario: Adding instance-wide work from a workspace
 - **WHEN** a transaction working in workspace A publishes an instance-wide event declared `PUBLISHED_IN_WORKSPACES` (a member removes a workspace client; a departed member's consents are revoked; a removed mailbox takes the account's last way in)

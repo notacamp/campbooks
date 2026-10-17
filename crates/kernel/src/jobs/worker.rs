@@ -545,18 +545,22 @@ impl Shared {
     async fn tick(&self, schedule: &super::registry::ScheduleInfo) -> Result<(), sqlx::Error> {
         // Schedules are the instance's: their jobs belong to no workspace.
         let mut tx = db::begin_kernel(&self.state.db).await?;
-        let tick = sqlx::query_scalar!(
-            r#"
+        // A tick recorded more than one period ahead never comes due (no
+        // workspace can write the table, campbooks-cloud#207, but a clock
+        // that jumped could): it counts as this tick, so the schedule runs.
+        let tick: Option<i64> = sqlx::query_scalar(
+            r"
             INSERT INTO kernel.schedules (name, last_tick)
             VALUES ($1, floor(extract(epoch FROM now())::float8 / $2::float8)::bigint)
             ON CONFLICT (name) DO UPDATE
                SET last_tick = excluded.last_tick, updated_at = now()
              WHERE kernel.schedules.last_tick < excluded.last_tick
+                OR kernel.schedules.last_tick > excluded.last_tick + 1
             RETURNING last_tick
-            "#,
-            schedule.name,
-            schedule.every.as_secs_f64(),
+            ",
         )
+        .bind(schedule.name)
+        .bind(schedule.every.as_secs_f64())
         .fetch_optional(&mut *tx)
         .await?;
         let Some(tick) = tick else {

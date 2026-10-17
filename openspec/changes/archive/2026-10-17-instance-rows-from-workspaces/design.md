@@ -59,6 +59,17 @@ No production path enqueues an instance-wide job from a workspace
 transaction. The kernel test that did (an "instance-wide follow-up") now
 enqueues from an unset transaction.
 
+## Threat model
+
+These settings (`campbooks.workspace_id`, `kernel_scope`,
+`maintenance_scope`) are defence in depth against **code mistakes**, not
+against arbitrary SQL: any SQL the runtime role runs can `set_config` them,
+and the arch rule's word check still misses names split below the word
+(`concat!("campbooks.kernel", "_scope")`). A module that writes raw SQL
+into the kernel's tables by mistake is stopped; an attacker with SQL
+injection is not. The real fix for the latter is separate database roles
+per scope (the kernel's machinery on its own login), a separate change.
+
 ## Decisions
 
 ### The allowlist: a kernel table, written by migration, checked by a test
@@ -118,6 +129,17 @@ transaction may now append one.
   workspace job carries such a key.
 - The kernel scope passes `workspace_isolation` and is untouched: the tick,
   the heal, pruning and the admin queue.
+- A listed delivery must also have `started_at`, `finished_at` and
+  `last_error` empty and be due no more than five minutes ago; a listed
+  event must be dated within the last five minutes. Its queue is not
+  pinned: consumers choose their own.
+- A delivery is **not** checked against its event's row (`EXISTS (SELECT
+  … FROM kernel.events …)`), although the review suggested it:
+  `EventBus::publish` inserts the event and its deliveries in one statement
+  (a data-modifying `WITH`), and a policy subquery runs on that statement's
+  snapshot, which does not see the event being inserted (checked: such a
+  policy refuses every publish with a consumer). `load_event` covers the
+  case instead (B2).
 
 The kernel refuses the same things first, with a clear message
 (`sqlx::Error::InvalidArgument`): `lift_for_instance_rows` now takes what
@@ -141,6 +163,11 @@ with `last_error = 'stuck schedule row replaced by the schedule's tick'`
 and a warning log, then enqueues the tick as before. A failed row leaves
 the unique index, is listed in the Jobs panel and is pruned with the failed
 jobs. A row waiting out a retry, or held by a live worker, is left alone.
+The bound assumes a scheduled job's own `retry_after` stays within
+`CAMPBOOKS_JOBS__RETRY_MAX_SECONDS` (none asks for more today; one that did
+would be replaced at the next tick), and shrinking `LEASE_SECONDS` during a
+rolling deploy can make a new worker take a running schedule row leased by
+an old one for stuck, which may run that schedule's job twice once.
 It runs once per tick period (hourly for the kernel's prunes, every minute
 for the dispatchers).
 
@@ -152,6 +179,46 @@ it is pending (any due time), belongs to a workspace, or runs on a lease
 that expired or is longer than `2 × lease_seconds`; a run a live worker
 holds is kept. Unknown names are 404. It is by name, not by id, because the
 admin API lists only failed jobs' ids.
+
+### The schedules' last ticks (review B1)
+
+`kernel.schedules` (one row per schedule: its last enqueued tick) had no
+row-level security and the runtime role could write it, so any transaction
+could set `last_tick` to the largest bigint: every later tick's upsert
+(`WHERE last_tick < excluded.last_tick`) then returned no row, and the tick
+returned before the heal. Every schedule could stop (pruning, the stream
+dispatcher, change sequencing, session pruning, the needs backfills), and
+the admin discard could not help (there was no row to discard).
+
+- The migration enables and forces row-level security on it, with one
+  `kernel_scope_only` policy (`FOR ALL`, `USING` and `WITH CHECK`
+  `kernel_scope = 'on'`). Its only caller, `Worker::tick`, already runs in
+  `begin_kernel`; nothing else reads or writes it (tests included).
+- Backstop: the tick's upsert also takes over a `last_tick` more than one
+  period ahead (`OR last_tick > excluded.last_tick + 1`), so a clock that
+  jumped, or a row written before the policy, heals on the next tick.
+- The server's policy test admits the kernel scope on `kernel.schedules`
+  only through `kernel_scope_only`.
+
+### An event is handled only in its own workspace (review B2)
+
+`load_event` checked the event's name and version, and that the event row
+and the delivery share a workspace, but not that the row's workspace is the
+event's own. A workspace could write, into its own workspace (which
+`workspace_isolation` admits), an `identity.signed_out_everywhere` naming
+any account and a `bff.end_signed_out_sessions` delivery of it; the worker
+ran the handler, which ends that account's web sessions across the instance
+(`identity.notify_way_in_added` would send a security email with chosen
+text). Now `load_event` fails the delivery for good (`Fatal`, the handler
+never runs) unless the row's workspace equals the decoded event's own
+`workspace()`, and an instance-wide type (`WORKSPACE_SCOPED = false`) is
+never logged in a workspace. This also refuses a workspace's event whose
+payload names another workspace than the row (a handler that trusts the
+payload's workspace, on tables that are not workspace-isolated, would
+otherwise act there). `EventBus::publish` and replay always write the
+event's own workspace, so no legitimate delivery is refused. Both
+consumer paths (`on_event`, `consumer`) go through `load_event`; nothing
+else hands an event to a handler.
 
 ### The dispatchers clear the workspace (item 2)
 
@@ -213,6 +280,8 @@ the refresh. No new exempt file was needed.
   queue-wide index change (a concurrent index build outside a migration
   transaction) and belongs in its own change.
 - **Payloads of listed events** are not checked (see the proposal).
+- **`kernel.idempotency` and `kernel.rate_limits`** have no row-level
+  security either; they are filed separately.
 - **The text checks** keep the limits listed in the previous change (names
   split below the word, executors under other names, macros).
 
@@ -246,7 +315,7 @@ sqlx has no down migrations, and refuses to start with applied migrations
 it does not know. **Ops step: before redeploying an image older than this
 change, run this once as the migration login.** It restores the exact
 policies of `20261021010000_kernel__instance_rows_read_insert_only`, drops
-the list, and forgets this change's migration so a later upgrade applies it
+the list, takes row-level security off `kernel.schedules` again, and forgets this change's migration so a later upgrade applies it
 again. Checked against a database migrated only to the base: identical
 `pg_policies`, tables and `_sqlx_migrations`, and re-upgrading applies
 cleanly.
@@ -255,7 +324,8 @@ cleanly.
 -- Roll back campbooks-cloud#207 BEFORE redeploying an image older than it.
 -- Run once, as the migration login (the tables' owner). Restores the exact
 -- policies of 20261021010000 (kernel.events, kernel.jobs), drops the list of
--- instance-wide rows workspaces may add, and forgets this change's
+-- instance-wide rows workspaces may add, takes row-level security off
+-- kernel.schedules again, and forgets this change's
 -- migration, so the older image starts and a later upgrade applies it again.
 BEGIN;
 SET LOCAL lock_timeout = '5s';
@@ -272,6 +342,9 @@ CREATE POLICY instance_rows_insert ON kernel.events FOR INSERT
     WITH CHECK (workspace_id IS NULL
                 AND nullif(current_setting('campbooks.workspace_id', true), '') IS NOT NULL);
 DROP TABLE kernel.instance_rows_from_workspaces;
+DROP POLICY kernel_scope_only ON kernel.schedules;
+ALTER TABLE kernel.schedules NO FORCE ROW LEVEL SECURITY;
+ALTER TABLE kernel.schedules DISABLE ROW LEVEL SECURITY;
 DELETE FROM _sqlx_migrations WHERE version = 20261021040000;
 COMMIT;
 ```

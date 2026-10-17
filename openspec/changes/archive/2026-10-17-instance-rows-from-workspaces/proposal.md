@@ -49,6 +49,14 @@ module and no new cross-module dependency.
   carry a schedule's unique key (`schedule:%`) outside the kernel scope. The
   kernel refuses an instance-wide job, and an undeclared instance-wide
   event, from a workspace transaction before asking the database.
+- **The schedules' last ticks are the kernel scope's** (row-level security
+  on `kernel.schedules`; before, any transaction could set one far ahead
+  and stop that schedule for good), and the tick takes over a last tick
+  more than one period ahead.
+- **An event is handled only where it was logged as its own:** a delivery
+  whose event row sits in another workspace than the event's own (an
+  account's event forged into a workspace) fails without running its
+  handler.
 - **Stuck schedule rows heal.** Before a tick enqueues, the kernel marks
   failed (kept for inspection, with the reason) any row holding the
   schedule's key that belongs to a workspace, is due later than any tick or
