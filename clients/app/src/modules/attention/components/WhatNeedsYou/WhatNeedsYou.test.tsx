@@ -157,7 +157,7 @@ describe("What needs you", () => {
       "Marta is arranging Thursday’s walkthrough with the builders and needs your yes by Wednesday.",
     );
     await screen.findByText(/Hope the move went well/u);
-    const text = document.body.textContent ?? "";
+    const text = document.body.textContent;
     expect(text.indexOf("Marta is arranging")).toBeLessThan(
       text.indexOf("Hope the move went well"),
     );

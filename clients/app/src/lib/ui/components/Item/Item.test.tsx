@@ -60,7 +60,7 @@ describe("Item", () => {
     expect(summary).toHaveTextContent("Marta asks you to confirm Thursday. <b>Not bold</b>");
     expect(summary.querySelector("b")).toBeNull();
     expect(summary.querySelector("[data-size]")).not.toBeNull();
-    const text = document.body.textContent ?? "";
+    const text = document.body.textContent;
     expect(text.indexOf("Marta asks")).toBeLessThan(text.indexOf("The email"));
   });
 
