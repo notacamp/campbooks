@@ -3108,7 +3108,7 @@ export interface components {
          *     most passing one clears.
          * @enum {string}
          */
-        PausedReason: "inbox_read_only" | "author_cannot_write" | "paused_by_member" | "author_unavailable";
+        PausedReason: "inbox_read_only" | "domain_too_broad" | "author_cannot_write" | "paused_by_member" | "author_unavailable";
         /**
          * @description Where a stream is in its reading.
          * @enum {string}
@@ -8891,6 +8891,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["RuleView"];
+                };
+            };
+            /** @description Not a valid rule (any more). */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
                 };
             };
             /** @description No valid access token. */

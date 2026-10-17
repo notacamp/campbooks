@@ -96,6 +96,11 @@ impl Condition {
         match self {
             Self::SenderAddress(address) => facts.sender_address.eq_ignore_ascii_case(address),
             Self::SenderDomain(domain) => {
+                // Fail closed: a domain that is (now) a public suffix, like
+                // `github.io`, names every site under it and matches nothing.
+                if !is_owned_domain(domain) {
+                    return false;
+                }
                 let domain = domain.to_ascii_lowercase();
                 let host = facts
                     .sender_address

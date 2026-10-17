@@ -17,7 +17,7 @@ when it last acted, how many the user changed back, "For everyone" in a
 shared inbox, and, when it is paused, first on its line, why, from its `paused_reason`: its
 author can no longer change the inbox, its author is away for now (it acts
 again on its own; the list never says why the author is away), a member
-paused it, or the inbox is kept read-only. With no rule it SHALL say how
+paused it, the inbox is kept read-only, or it names a whole group of sites (a public suffix) and so matches nothing. With no rule it SHALL say how
 rules come about.
 
 #### Scenario: Two inboxes and a proposal
@@ -27,6 +27,10 @@ rules come about.
 #### Scenario: A rule whose author is away
 - **WHEN** a rule is listed with `state` `paused` and `paused_reason` `author_unavailable`
 - **THEN** it is muted and its line starts "Paused for now; it acts again on its own", naming no cause
+
+#### Scenario: A rule naming a public suffix
+- **WHEN** a rule is listed with `state` `paused` and `paused_reason` `domain_too_broad`
+- **THEN** its line starts "Paused: its domain is too broad" and Remove is offered
 
 ### Requirement: Keeping, turning down and removing a rule
 A proposed rule SHALL offer Keep this rule (`conversations.confirm_rule`) and

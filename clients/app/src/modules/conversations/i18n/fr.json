@@ -483,6 +483,7 @@
       "paused": {
         "inbox_read_only": "En pause : cette boîte est en lecture seule",
         "author_cannot_write": "En pause : la personne qui l’a enseignée ne peut plus modifier cette boîte",
+        "domain_too_broad": "En pause : le domaine est trop large",
         "paused_by_member": "Mise en pause par un membre",
         "author_unavailable": "En pause pour l’instant ; elle reprendra d’elle-même"
       },

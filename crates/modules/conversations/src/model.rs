@@ -542,6 +542,10 @@ vocabulary!(
     PausedReason {
         /// Its inbox is kept read-only: no rule acts there any more.
         InboxReadOnly => "inbox_read_only",
+        /// It names a sender domain that is a public suffix (`github.io`), so
+        /// it would cover every site under it and matches nothing. Only
+        /// removing it clears this.
+        DomainTooBroad => "domain_too_broad",
         /// Its author is no longer a sender or manager of the inbox, until
         /// a manager adopts or removes it.
         AuthorCannotWrite => "author_cannot_write",
