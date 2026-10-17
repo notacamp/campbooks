@@ -951,6 +951,14 @@ fn acts_in_the_inbox(id: &str) -> bool {
     )
 }
 
+/// Operations on one of Scout's suggestions (campbooks-cloud#169).
+fn answers_a_notice(id: &str) -> bool {
+    matches!(
+        id,
+        "conversations.answer_rule_notice" | "conversations.clear_rule_notice_answer"
+    )
+}
+
 /// The query string an operation needs to be understood at all.
 fn query_of(id: &str) -> &'static str {
     match id {
@@ -1274,6 +1282,10 @@ async fn a_disconnected_mailbox_answers_as_declared(db: PgPool) {
                             {
                                 Decision::NotFound
                             }
+                            // A kept inbox forgets what Scout noticed in it
+                            // (`forget_connection`): its suggestions are
+                            // nobody's any more either.
+                            (Mail::Kept, Some(_)) if answers_a_notice(&id) => Decision::NotFound,
                             _ => expected(&world, *who, resource, action, instance.as_deref(), &id),
                         };
                         (*who, decision)

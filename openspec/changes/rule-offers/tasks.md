@@ -15,16 +15,16 @@
 
 ## 3. Client
 
-- [ ] 3.1 `SmartRuleConfirm` (dialog) and the "Smart rule" card in `lib/ui`, stories and tests
-- [ ] 3.2 Teach once's accept opens the confirmation
-- [ ] 3.3 Report and delete on a warning; the offer after it
-- [ ] 3.4 The offer after Already paid
-- [ ] 3.5 "Scout noticed" at the bottom of Home
-- [ ] 3.6 Rule sentences for the new condition and actions; strings in en, pt-PT, es-ES, fr
+- [x] 3.1 `SmartRuleConfirm` (dialog, on `lib/ui`'s `Dialog` and the `RulePreview` card tagged "Smart rule") and tests
+- [x] 3.2 Teach once's accept opens the confirmation
+- [x] 3.3 Report and delete on a warning; the offer after it
+- [x] 3.4 The offer after Already paid
+- [x] 3.5 "Scout noticed" at the bottom of Home
+- [x] 3.6 Rule sentences for the new condition and actions; strings in en, pt-PT, es-ES, fr
 
 ## 4. Finish
 
-- [ ] 4.1 OpenAPI, events and client types regenerated; sqlx offline cache
-- [ ] 4.2 Recording scenario (375px and desktop)
-- [ ] 4.3 CHANGELOG
+- [x] 4.1 OpenAPI, events and client types regenerated; sqlx offline cache
+- [x] 4.2 Recording scenario (375px and desktop)
+- [x] 4.3 CHANGELOG
 - [ ] 4.4 Gates green in CI; review agent; archive the change
