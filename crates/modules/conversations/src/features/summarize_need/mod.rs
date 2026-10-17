@@ -164,7 +164,7 @@ impl JobHandler for SummarizeNeed {
                 let parsed = response.json::<Answer>().ok();
                 if parsed.is_none() {
                     // Sizes and the stop reason only, never what the model wrote.
-                    let finish = finish_kind(response.finish_reason.as_deref());
+                    let finish = response.finish_kind();
                     let reason = if response.content.trim().is_empty() {
                         "empty"
                     } else if finish == "length" {
@@ -252,19 +252,6 @@ fn retryable(error: &campbooks_ai::Error) -> bool {
             | campbooks_ai::Error::InvalidResponse(_)
             | campbooks_ai::Error::Metering
     )
-}
-
-/// Why the model stopped, for the log: one of a few known words.
-// TODO: share `ChatResponse::finish_kind` once it lands on next.
-fn finish_kind(reason: Option<&str>) -> &'static str {
-    match reason {
-        None => "none",
-        Some("stop") => "stop",
-        Some("length") => "length",
-        Some("content_filter") => "content_filter",
-        Some("tool_calls") => "tool_calls",
-        Some(_) => "other",
-    }
 }
 
 /// What kind of failure, for the log: never the provider's words.
