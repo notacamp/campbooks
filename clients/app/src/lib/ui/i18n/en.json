@@ -11,7 +11,10 @@
   "toast": {
     "region": "Notifications",
     "undone": "Undone: {{label}}",
-    "redone": "Redone: {{label}}"
+    "redone": "Redone: {{label}}",
+    "dismiss": "Dismiss",
+    "retry": "Retry",
+    "cancelled": "Stopped: {{label}}"
   },
   "note": {
     "label": "Where things stand"
@@ -64,7 +67,7 @@
   },
   "conversation": {
     "unread": "Unread",
-    "starred": "Starred",
+    "starred": "Pinned",
     "attachment": "Has attachments"
   },
   "recipients": {

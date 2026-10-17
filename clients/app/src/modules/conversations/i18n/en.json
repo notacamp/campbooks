@@ -58,8 +58,8 @@
     }
   },
   "actions": {
-    "star": "Star",
-    "unstar": "Unstar",
+    "star": "Pin",
+    "unstar": "Unpin",
     "read": "Mark read",
     "unread": "Mark unread",
     "move": "Move",
@@ -73,8 +73,8 @@
   },
   "toast": {
     "done": "Done · {{subject}}",
-    "starred": "Starred · {{subject}}",
-    "unstarred": "Unstarred · {{subject}}",
+    "starred": "Pinned · {{subject}}",
+    "unstarred": "Unpinned · {{subject}}",
     "read": "Marked read · {{subject}}",
     "unread": "Marked unread · {{subject}}",
     "moved": "Moved to {{stream}} · {{subject}}"
@@ -160,7 +160,7 @@
     "updates": "Go to Updates",
     "receipts": "Go to Receipts",
     "newsletters": "Go to Newsletters",
-    "star": "Star or unstar",
+    "star": "Pin or unpin",
     "unread": "Mark read or unread",
     "move": "Move to a stream",
     "replyAll": "Reply all",

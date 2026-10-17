@@ -16,11 +16,13 @@
   "item": {
     "reply": "Reply",
     "done": "Done",
-    "later": "Later",
+    "snooze": "Snooze",
     "hold": "Hold time",
-    "paid": "Mark as paid",
     "choice1": "First choice",
-    "choice2": "Second choice"
+    "choice2": "Second choice",
+    "choice3": "Third choice",
+    "nextAction": "Next action on the item",
+    "previousAction": "Previous action on the item"
   },
   "compose": {
     "draft": "Draft it for me",

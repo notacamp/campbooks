@@ -90,7 +90,7 @@ export function ConversationRow({
         ) : null}
         {starred ? (
           <span className={styles["flag"]} data-starred="true" title={t("conversation.starred")}>
-            <Icon name="star-filled" />
+            <Icon name="pin-filled" />
             <VisuallyHidden>{t("conversation.starred")}</VisuallyHidden>
           </span>
         ) : null}

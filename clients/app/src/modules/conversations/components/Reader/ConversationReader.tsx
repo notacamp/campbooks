@@ -395,7 +395,7 @@ export function ConversationReader({
             </span>
             <IconButton
               label={conversation.starred ? t("actions.unstar") : t("actions.star")}
-              icon={conversation.starred ? "star-filled" : "star"}
+              icon={conversation.starred ? "pin-filled" : "pin"}
               shortcut="conversations.star"
               aria-pressed={conversation.starred}
               onClick={() => {

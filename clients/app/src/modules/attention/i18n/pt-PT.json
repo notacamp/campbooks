@@ -14,7 +14,7 @@
     "do": "Fazer",
     "pay": "Pagar"
   },
-  "context": "Feito hoje e teclas",
+  "context": "Feito hoje",
   "doneTodayTitle": "Feito hoje",
   "doneTodayEmpty": "Ainda nada hoje.",
   "doneToday": {
@@ -22,24 +22,34 @@
     "notNeeded": "Não era preciso · {{subject}}",
     "replied": "Respondido · {{subject}}",
     "archived": "Arquivado · {{subject}}",
-    "later": "Mais tarde · {{subject}}",
+    "snoozed": "Adiado · {{subject}}",
     "gone": "Já não é preciso · {{subject}}"
   },
-  "later": {
-    "title": "Voltar a mostrar",
+  "snooze": {
+    "title": "Adiar {{name}} até…",
+    "description": "Sai da página inicial até lá e volta sozinho.",
+    "choices": "Quando",
     "today": "Mais logo",
-    "tomorrow": "Amanhã",
-    "monday": "Segunda-feira",
-    "toast": "Mais tarde · {{name}}, volta {{when}}",
-    "button": "Mais tarde",
-    "failed": "Não foi possível adiar {{name}}: nada mudou. Tente de novo."
+    "tomorrow": "Amanhã de manhã",
+    "monday": "Segunda de manhã",
+    "nextWeek": "Próxima semana",
+    "toast": "Adiado · {{name}}, volta {{when}}",
+    "button": "Adiar…",
+    "failed": "Não foi possível adiar {{name}}: nada mudou. Tente de novo.",
+    "undoFailed": "Não foi possível trazer {{name}} de volta: continua adiado. Tente de novo."
   },
   "actions": {
     "reply": "Responder",
     "open": "Abrir conversa",
-    "undo": "Anular"
+    "undo": "Anular",
+    "label": "Ações para {{name}}"
   },
-  "keyboard": "Teclado",
+  "confirm": {
+    "done": "Feito · {{name}}",
+    "notNeeded": "Não era preciso · {{name}}",
+    "safe": "Marcado como seguro · {{name}}",
+    "snoozed": "Adiado · {{name}}, volta {{when}}"
+  },
   "error": {
     "title": "Não foi possível carregar o que precisa de si",
     "body": "O Campbooks não conseguiu contactar o servidor. Nada se perdeu.",

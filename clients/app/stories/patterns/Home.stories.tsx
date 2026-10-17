@@ -93,9 +93,9 @@ function HomeScreen({ initialWorkspace }: { initialWorkspace: "business" | "pers
       act(current, t("item.done"));
     }
   });
-  useShortcut("item.later", () => {
+  useShortcut("item.snooze", () => {
     if (current !== undefined) {
-      act(current, "Later, back tomorrow");
+      act(current, "Snoozed, back tomorrow");
     }
   });
   useShortcut("command.open", () => {
@@ -312,12 +312,12 @@ function HomeScreen({ initialWorkspace }: { initialWorkspace: "business" | "pers
                             ))}
                             <Button
                               variant="ghost"
-                              shortcut="item.later"
+                              shortcut="item.snooze"
                               onClick={() => {
-                                act(item, "Later, back tomorrow");
+                                act(item, "Snoozed, back tomorrow");
                               }}
                             >
-                              {t("item.later")}
+                              {t("item.snooze")}
                             </Button>
                             <Button
                               variant="ghost"

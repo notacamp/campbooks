@@ -378,6 +378,29 @@ All notable changes to Campbooks Next are documented here. The format follows
 
 ### Added
 
+- **Home: every item says what you can do with it, right where you look.** The selected
+  item shows its actions under it, in one button style with each key: its own actions on
+  1 to 3 (Reply; Yes and No for a question; It's safe for a warning), then Done (E),
+  Snooze… (S) and Not needed (X). Other rows stay calm, with no buttons or bare key hints,
+  and the keyboard legend leaves the aside (every key is in the `?` sheet). ↑/↓ move
+  between items as J and K do, ←/→ move a highlight along the buttons, Enter presses it
+  and Esc clears it. An item you act on turns into a one-line confirmation ("Done · Marta
+  Ferreira") and folds away in under a second; the toast keeps Undo and Z
+  (campbooks-cloud#165).
+- **Snooze, in a dialog.** Later is now Snooze, on S: a dialog offers Later today,
+  Tomorrow morning, Monday morning and the new Next week, each with its number key; Esc
+  closes it with nothing changed, and on a phone it is a bottom sheet. It is the new
+  `lib/ui` Dialog, which the reply and smart-rule dialogs will reuse, with a result state
+  that closes by itself.
+- **The toast can wait and can stay.** Actions that take a moment can show "Sending…"
+  with the visor thinking (and Undo while it can still be taken back), and a failure now
+  stays until you choose Retry or dismiss it instead of fading after six seconds.
+- **Pin, on P.** Star is now called Pin, and pinned conversations stay at the top of
+  their stream in the inbox. It is still the provider's star (Gmail's STARRED), synced
+  as before. Migrations `20261020235000_conversations__pinned_stream_list_index` and
+  `20261020235100_conversations__pinned_inbox_list_index` add the matching indexes,
+  built concurrently.
+
 - **A daily AI limit per workspace (`CAMPBOOKS_AI__DAILY_CALLS_PER_WORKSPACE`, default
   5000, `0` for none).** Every model call (`decide`, `embed`, `complete`, `vision`) is
   now counted per workspace, role and feature, per UTC day, with the tokens the

@@ -101,17 +101,17 @@ async function record(page: Page): Promise<void> {
     : page.keyboard.press("z"));
   await pause(1500);
 
-  // L later.
-  await caption(page, phone ? "Later puts it off for you only" : "L puts it off for you only");
+  // S snooze.
+  await caption(page, phone ? "Snooze puts it off for you only" : "S puts it off for you only");
   const pedro = page.getByText("Pedro Alves asked you to do something");
   await pedro.click();
   await page
-    .getByRole("button", { name: /^Later/u })
+    .getByRole("button", { name: /^Snooze/u })
     .first()
     .click();
-  await page.getByRole("dialog", { name: "Bring it back" }).waitFor();
+  await page.getByRole("dialog", { name: /^Snooze Pedro Alves/u }).waitFor();
   await pause(900);
-  await page.getByRole("button", { name: "Monday" }).click();
+  await page.getByRole("button", { name: /Monday morning/u }).click();
   await pause(1500);
 
   // The phishing warning: its tells, then It's safe.

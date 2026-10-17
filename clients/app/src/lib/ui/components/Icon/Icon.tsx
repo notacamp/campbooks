@@ -109,6 +109,12 @@ const ICONS = {
       d="m12 4 2.4 5 5.4.7-4 3.7 1 5.4-4.8-2.6-4.8 2.6 1-5.4-4-3.7 5.4-.7Z"
     />,
   ],
+  // Pin: the provider's star, named Pin in the UI.
+  pin: [path("M9 4.5h6l-1 5 3 3v1.5H7V12.5l3-3Z"), path("M12 14v6")],
+  "pin-filled": [
+    <path key="p" fill="currentColor" d="M9 4.5h6l-1 5 3 3v1.5H7V12.5l3-3Z" />,
+    path("M12 14v6"),
+  ],
   archive: [
     <rect key="r" x="3.5" y="4.5" width="17" height="4.5" rx="1.5" />,
     path("M5 9v9a1.5 1.5 0 0 0 1.5 1.5h11A1.5 1.5 0 0 0 19 18V9M10 13h4"),
