@@ -224,11 +224,11 @@
       "reply": "{{name}} está à espera da sua resposta",
       "question": "{{name}} fez-lhe uma pergunta",
       "do": "{{name}} pediu-lhe para fazer algo",
-      "pay": "{{name}} enviou uma fatura para pagar",
+      "pay": "Pagar a {{name}}",
       "warning": "Isto pode ser phishing. Não use as ligações.",
       "checkReply": "{{name}} precisa de resposta?",
       "checkDo": "{{name}} pediu-lhe para fazer algo?",
-      "checkPay": "A fatura de {{name}} ainda está por pagar?",
+      "checkPay": "{{name}} enviou uma fatura. Já está paga?",
       "taughtReply": "{{name}}: responder, por uma regra",
       "taughtDo": "{{name}}: a fazer, por uma regra"
     },
@@ -244,7 +244,9 @@
       "today": "Até hoje",
       "tomorrow": "Até amanhã",
       "on": "Até {{date}}",
-      "overdue": "Em atraso · era até {{date}}"
+      "overdue": "Em atraso · era até {{date}}",
+      "daysOverdue_one": "{{count}} dia em atraso",
+      "daysOverdue_other": "{{count}} dias em atraso"
     },
     "how": {
       "yes": "Sim.",
@@ -274,7 +276,11 @@
       "safe": "É seguro",
       "yes": "Sim",
       "no": "Não",
-      "questionPrompt": "O Campbooks não tem a certeza."
+      "questionPrompt": "O Campbooks não tem a certeza.",
+      "alreadyPaid": "Já está paga",
+      "stillToPay": "Ainda por pagar",
+      "markPaid": "Marcar como paga",
+      "billPrompt": "O Campbooks não vê o seu banco."
     },
     "toast": {
       "done": "Feito · {{name}}",
@@ -282,7 +288,11 @@
       "safe": "Marcado como seguro · {{name}}. O Campbooks vai aprender com isto",
       "confirmed": "Obrigado · {{name}} fica na sua lista",
       "failed": "Não foi possível alterar {{name}}: nada mudou. Tente de novo.",
-      "changed": "{{name}} mudou enquanto via: volte a ver."
+      "changed": "{{name}} mudou enquanto via: volte a ver.",
+      "paid": "Marcada como paga · {{name}}",
+      "toPay": "Fica em Pagar · {{name}}",
+      "allPaid_one": "{{count}} fatura marcada como paga",
+      "allPaid_other": "{{count}} faturas marcadas como pagas"
     }
   },
   "rules": {

@@ -127,6 +127,8 @@ export function ConversationReader({
   const footerLine = (summary: NonNullable<typeof conversation>) =>
     ruleMark === undefined ? placementLine(t, summary) : ruleLine(t, ruleMark, i18n.language);
   const question = need?.trust === "check";
+  // A bill: Campbooks can't see the bank, so it asks whether it is paid.
+  const bill = question && need?.question === "money";
 
   const [opened, setOpened] = useState<Set<string>>(new Set());
   const [images, setImages] = useState<Set<string>>(new Set());
@@ -254,7 +256,9 @@ export function ConversationReader({
       if (conversation === undefined) {
         return;
       }
-      if (question) {
+      if (bill) {
+        needActions.alreadyPaid(conversation);
+      } else if (question) {
         needActions.confirm(conversation);
       } else if (suggestion !== undefined) {
         actions.move(conversation, suggestion.stream);
@@ -266,7 +270,11 @@ export function ConversationReader({
     "item.choice2",
     () => {
       if (conversation !== undefined) {
-        needActions.notNeeded(conversation);
+        if (bill) {
+          needActions.stillToPay(conversation);
+        } else {
+          needActions.notNeeded(conversation);
+        }
       }
     },
     { enabled: question && !offering },
@@ -526,25 +534,45 @@ export function ConversationReader({
             chips={<NeedChips need={need} now={now} />}
             {...(question
               ? {
-                  choice: {
-                    prompt: t("needs.actions.questionPrompt"),
-                    options: [
-                      {
-                        label: t("needs.actions.yes"),
-                        ...choiceKey("item.choice1"),
-                        onSelect: () => {
-                          needActions.confirm(conversation);
-                        },
+                  choice: bill
+                    ? {
+                        prompt: t("needs.actions.billPrompt"),
+                        options: [
+                          {
+                            label: t("needs.actions.alreadyPaid"),
+                            ...choiceKey("item.choice1"),
+                            onSelect: () => {
+                              needActions.alreadyPaid(conversation);
+                            },
+                          },
+                          {
+                            label: t("needs.actions.stillToPay"),
+                            ...choiceKey("item.choice2"),
+                            onSelect: () => {
+                              needActions.stillToPay(conversation);
+                            },
+                          },
+                        ],
+                      }
+                    : {
+                        prompt: t("needs.actions.questionPrompt"),
+                        options: [
+                          {
+                            label: t("needs.actions.yes"),
+                            ...choiceKey("item.choice1"),
+                            onSelect: () => {
+                              needActions.confirm(conversation);
+                            },
+                          },
+                          {
+                            label: t("needs.actions.no"),
+                            ...choiceKey("item.choice2"),
+                            onSelect: () => {
+                              needActions.notNeeded(conversation);
+                            },
+                          },
+                        ],
                       },
-                      {
-                        label: t("needs.actions.no"),
-                        ...choiceKey("item.choice2"),
-                        onSelect: () => {
-                          needActions.notNeeded(conversation);
-                        },
-                      },
-                    ],
-                  },
                   ...(stopButton === null ? {} : { actions: stopButton }),
                 }
               : {

@@ -22,7 +22,13 @@ export type ReasonView = Schema<"ReasonView">;
 export type NeedView = Schema<"NeedView">;
 
 /** A member's verdict on what a conversation needs (`conversations.resolve_need`, …). */
-export type NeedVerdict = "done" | "not_needed" | "confirm" | "reopen";
+export type NeedVerdict =
+  | "done"
+  | "not_needed"
+  | "confirm"
+  | "reopen"
+  | "already_paid"
+  | "still_to_pay";
 
 /** The built-in streams, in display order. */
 export const STREAMS: readonly Stream[] = ["primary", "updates", "receipts", "newsletters"];
@@ -191,13 +197,15 @@ function applied(summary: ConversationSummary, action: ConversationAction): Conv
     if ("need" in action) {
       switch (action.need) {
         case "done":
-        case "not_needed": {
+        case "not_needed":
+        case "already_paid": {
           return { ...summary, need: null };
         }
-        case "confirm": {
+        case "confirm":
+        case "still_to_pay": {
           return summary.need === null || summary.need === undefined
             ? summary
-            : { ...summary, need: { ...summary.need, trust: "sure" } };
+            : { ...summary, need: { ...summary.need, trust: "sure", basis: "member" } };
         }
         case "reopen": {
           return summary;
@@ -231,7 +239,8 @@ function applied(summary: ConversationSummary, action: ConversationAction): Conv
 type ListData = InfiniteData<ConversationList, string | undefined>;
 
 /**
- * The need operations: Done, Not needed, Yes to a question, and their undo.
+ * The need operations: Done, Not needed, Yes to a question, a bill's
+ * Already paid and Still to pay, and their undo.
  * Each names the message the need the member saw comes from (`seen`), so the
  * server refuses (409 `need_changed`) when the need changed meanwhile.
  */
@@ -242,7 +251,9 @@ async function needRequest(
 ): Promise<ConversationSummary> {
   switch (verdict) {
     case "done":
-    case "not_needed": {
+    case "not_needed":
+    case "already_paid":
+    case "still_to_pay": {
       return unwrap(
         await api.POST("/api/v1/w/{workspace_id}/conversations/{conversation_id}/need/resolve", {
           params,

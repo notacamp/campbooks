@@ -16,6 +16,8 @@ const TOASTS: Record<Exclude<NeedVerdict, "reopen">, string> = {
   done: "needs.toast.done",
   not_needed: "needs.toast.notNeeded",
   confirm: "needs.toast.confirmed",
+  already_paid: "needs.toast.paid",
+  still_to_pay: "needs.toast.toPay",
 };
 
 export interface NeedActionOptions {
@@ -27,6 +29,12 @@ export interface NeedActionOptions {
   onRedo?: (conversation: ConversationSummary) => void;
   /** When the server refused or failed: Home shows the item again. */
   onFailed?: (conversation: ConversationSummary) => void;
+  /**
+   * A bill was marked paid and the server agreed: where the paid rule for
+   * that sender is offered ("Mark their invoices paid from now on",
+   * campbooks-cloud#169).
+   */
+  onPaid?: (conversation: ConversationSummary) => void;
 }
 
 /**
@@ -36,7 +44,7 @@ export interface NeedActionOptions {
  */
 export function useNeedActions(
   workspaceId: string,
-  { onChanged, onUndo, onRedo, onFailed }: NeedActionOptions = {},
+  { onChanged, onUndo, onRedo, onFailed, onPaid }: NeedActionOptions = {},
 ) {
   const { t: typed } = useTranslation("conversations");
   const t = typed as unknown as Translate;
@@ -56,6 +64,9 @@ export function useNeedActions(
           // Not needed on a need (not a warning) can teach: "these never need me".
           if (verdict === "not_needed" && conversation.need?.question !== "suspicious") {
             teach?.after(conversation, { kind: "not_needed" });
+          }
+          if (verdict === "already_paid") {
+            onPaid?.(conversation);
           }
         },
         (error: unknown) => {
@@ -84,7 +95,7 @@ export function useNeedActions(
                   onUndo?.(conversation);
                   run(conversation, "reopen");
                 } else {
-                  if (verdict !== "confirm") {
+                  if (verdict !== "confirm" && verdict !== "still_to_pay") {
                     onRedo?.(conversation);
                   }
                   judge(conversation, verdict);
@@ -129,6 +140,38 @@ export function useNeedActions(
     },
     confirm: (conversation: ConversationSummary) => {
       judge(conversation, "confirm");
+    },
+    /** A bill is paid already: it leaves the list. */
+    alreadyPaid: (conversation: ConversationSummary) => {
+      judge(conversation, "already_paid");
+    },
+    /** A bill is still to pay: it stays, as Pay. */
+    stillToPay: (conversation: ConversationSummary) => {
+      judge(conversation, "still_to_pay");
+    },
+    /** Several bills paid at once, with one Undo for all of them. */
+    allPaid: (conversations: readonly ConversationSummary[]) => {
+      if (conversations.length === 0) {
+        return;
+      }
+      const entry = undo.push({
+        label: t("needs.toast.allPaid", { count: conversations.length }),
+        undo: () => {
+          for (const conversation of conversations) {
+            onUndo?.(conversation);
+            run(conversation, "reopen");
+          }
+        },
+        redo: () => {
+          for (const conversation of conversations) {
+            onRedo?.(conversation);
+            run(conversation, "already_paid");
+          }
+        },
+      });
+      for (const conversation of conversations) {
+        run(conversation, "already_paid", entry);
+      }
     },
     /** Take back a verdict (Done today's Undo). */
     reopen: (conversation: ConversationSummary) => {

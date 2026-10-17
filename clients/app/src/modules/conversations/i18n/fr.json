@@ -224,11 +224,11 @@
       "reply": "{{name}} attend votre réponse",
       "question": "{{name}} vous a posé une question",
       "do": "{{name}} vous a demandé de faire quelque chose",
-      "pay": "{{name}} a envoyé une facture à payer",
+      "pay": "Payer {{name}}",
       "warning": "Ceci pourrait être du hameçonnage. N’utilisez pas ses liens.",
       "checkReply": "Faut-il répondre à {{name}} ?",
       "checkDo": "Y a-t-il quelque chose à faire pour {{name}} ?",
-      "checkPay": "La facture de {{name}} reste-t-elle à payer ?",
+      "checkPay": "{{name}} a envoyé une facture. Est-elle payée ?",
       "taughtReply": "{{name}} : à répondre, selon une règle",
       "taughtDo": "{{name}} : à faire, selon une règle"
     },
@@ -244,7 +244,9 @@
       "today": "Pour aujourd’hui",
       "tomorrow": "Pour demain",
       "on": "Pour le {{date}}",
-      "overdue": "En retard · prévu le {{date}}"
+      "overdue": "En retard · prévu le {{date}}",
+      "daysOverdue_one": "{{count}} jour de retard",
+      "daysOverdue_other": "{{count}} jours de retard"
     },
     "how": {
       "yes": "Oui.",
@@ -274,7 +276,11 @@
       "safe": "C’est sûr",
       "yes": "Oui",
       "no": "Non",
-      "questionPrompt": "Campbooks n’en est pas sûr."
+      "questionPrompt": "Campbooks n’en est pas sûr.",
+      "alreadyPaid": "Déjà payée",
+      "stillToPay": "Reste à payer",
+      "markPaid": "Marquer payée",
+      "billPrompt": "Campbooks ne voit pas votre banque."
     },
     "toast": {
       "done": "Fait · {{name}}",
@@ -282,7 +288,11 @@
       "safe": "Marqué comme sûr · {{name}}. Campbooks en tiendra compte",
       "confirmed": "Merci · {{name}} reste dans votre liste",
       "failed": "Impossible de modifier {{name}} : rien n’a changé. Réessayez.",
-      "changed": "{{name}} a changé pendant que vous regardiez : jetez-y un nouveau coup d’œil."
+      "changed": "{{name}} a changé pendant que vous regardiez : jetez-y un nouveau coup d’œil.",
+      "paid": "Marquée payée · {{name}}",
+      "toPay": "Reste dans À payer · {{name}}",
+      "allPaid_one": "{{count}} facture marquée payée",
+      "allPaid_other": "{{count}} factures marquées payées"
     }
   },
   "rules": {

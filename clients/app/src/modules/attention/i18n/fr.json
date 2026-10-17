@@ -48,12 +48,23 @@
     "done": "Fait · {{name}}",
     "notNeeded": "Pas nécessaire · {{name}}",
     "safe": "Marqué comme sûr · {{name}}",
-    "snoozed": "Reporté · {{name}}, revient {{when}}"
+    "snoozed": "Reporté · {{name}}, revient {{when}}",
+    "paid": "Marquée payée · {{name}}"
   },
   "error": {
     "title": "Impossible de charger ce qui a besoin de vous",
     "body": "Campbooks n’a pas pu joindre le serveur. Rien n’a été perdu.",
     "retry": "Réessayer"
   },
-  "noSubject": "(sans objet)"
+  "noSubject": "(sans objet)",
+  "remind": {
+    "before": "Me le rappeler {{when}}",
+    "tomorrow": "Me le rappeler demain à {{time}}",
+    "monday": "Me le rappeler lundi"
+  },
+  "pay": {
+    "allPaid_one": "{{count}} déjà payée",
+    "allPaid_other": "Les {{count}} déjà payées",
+    "note": "Campbooks ne voit pas votre banque : il demande donc si chaque facture est payée."
+  }
 }

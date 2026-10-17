@@ -224,11 +224,11 @@
       "reply": "{{name}} is waiting for your reply",
       "question": "{{name}} asked you a question",
       "do": "{{name}} asked you to do something",
-      "pay": "{{name}} sent a bill to pay",
+      "pay": "Pay {{name}}",
       "warning": "This may be phishing. Don’t use its links.",
       "checkReply": "Does {{name}} need a reply?",
       "checkDo": "Did {{name}} ask you to do something?",
-      "checkPay": "Is {{name}}'s invoice still to pay?",
+      "checkPay": "{{name}} sent an invoice. Is it paid?",
       "taughtReply": "{{name}}: a reply, by a rule",
       "taughtDo": "{{name}}: to do, by a rule"
     },
@@ -244,7 +244,9 @@
       "today": "Due today",
       "tomorrow": "Due tomorrow",
       "on": "Due {{date}}",
-      "overdue": "Overdue · was due {{date}}"
+      "overdue": "Overdue · was due {{date}}",
+      "daysOverdue_one": "{{count}} day overdue",
+      "daysOverdue_other": "{{count}} days overdue"
     },
     "how": {
       "yes": "Yes.",
@@ -274,7 +276,11 @@
       "safe": "It’s safe",
       "yes": "Yes",
       "no": "No",
-      "questionPrompt": "Campbooks is not sure."
+      "questionPrompt": "Campbooks is not sure.",
+      "alreadyPaid": "Already paid",
+      "stillToPay": "Still to pay",
+      "markPaid": "Mark paid",
+      "billPrompt": "Campbooks can’t see your bank."
     },
     "toast": {
       "done": "Done · {{name}}",
@@ -282,7 +288,11 @@
       "safe": "Marked safe · {{name}}. Campbooks will learn from it",
       "confirmed": "Thanks · {{name}} stays on your list",
       "failed": "Could not change {{name}}: nothing changed. Try again.",
-      "changed": "{{name}} changed while you looked: have another look."
+      "changed": "{{name}} changed while you looked: have another look.",
+      "paid": "Marked paid · {{name}}",
+      "toPay": "Kept in Pay · {{name}}",
+      "allPaid_one": "Marked {{count}} invoice paid",
+      "allPaid_other": "Marked {{count}} invoices paid"
     }
   },
   "rules": {
