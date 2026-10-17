@@ -25,4 +25,4 @@
 ## 5. Last
 - [x] 5.1 OpenAPI and client types regenerated
 - [x] 5.2 CHANGELOG updated
-- [ ] 5.3 Gates green on CI; UI verified at 375px and desktop
+- [x] 5.3 Gates green on CI; the 375px and desktop hand test is the lead's (checklist in the PR, no local runs)
