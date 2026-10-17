@@ -299,6 +299,22 @@ pub async fn retired_session(
     .await
 }
 
+/// Begin the transaction a token refresh locks its session row in
+/// ([`lock_tokens`]). Sessions are instance-wide (no workspace), so it sets
+/// none; it is opened here, the one BFF file allowed to open transactions on
+/// the pool (`architecture.toml`).
+pub async fn begin_refresh(db: &PgPool) -> sqlx::Result<Transaction<'static, Postgres>> {
+    db.begin().await
+}
+
+/// [`delete_session`] on its own, outside any transaction.
+pub async fn end_session(
+    db: &PgPool,
+    id: Uuid,
+) -> sqlx::Result<Option<(Option<Vec<u8>>, Vec<u8>)>> {
+    delete_session(&mut *db.acquire().await?, id).await
+}
+
 /// The session's tokens, locked until `tx` ends; `None` if it is gone.
 pub async fn lock_tokens(
     tx: &mut Transaction<'_, Postgres>,

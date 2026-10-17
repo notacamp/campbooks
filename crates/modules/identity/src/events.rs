@@ -130,6 +130,9 @@ impl DomainEvent for WayInRemoved {
     const NAME: &'static str = "identity.way_in_removed";
     const VERSION: u16 = 1;
     const WORKSPACE_SCOPED: bool = false;
+    // A workspace's job announces it when a removed mailbox took the
+    // account's last way in with it (`identity.forget_connected_way_in`).
+    const PUBLISHED_IN_WORKSPACES: bool = true;
 
     fn workspace(&self) -> Option<&str> {
         None
@@ -265,6 +268,9 @@ impl DomainEvent for ConsentRevoked {
     const NAME: &'static str = "identity.consent_revoked";
     const VERSION: u16 = 1;
     const WORKSPACE_SCOPED: bool = false;
+    // Announced in a workspace's transaction when a workspace client is
+    // removed and when a member leaves.
+    const PUBLISHED_IN_WORKSPACES: bool = true;
 
     // A person's, not a workspace's (Campbooks' own apps name none): the
     // workspace is in the payload.

@@ -1105,6 +1105,67 @@ async fn signing_out_everywhere_ends_the_persons_web_sessions(db: PgPool) {
     );
 }
 
+/// A workspace writing an account's `identity.signed_out_everywhere` and its
+/// delivery into its own workspace by hand, as the runtime role, ends
+/// nobody's sessions: the delivery fails, its handler never runs
+/// (campbooks-cloud#207).
+#[sqlx::test(migrations = "../../migrations")]
+async fn a_sign_out_everywhere_forged_in_a_workspace_ends_nobody(db: PgPool) {
+    let h = harness(db).await;
+    let victim = uuid::Uuid::now_v7();
+    h.idp.set_user(TestUser {
+        subject: victim.to_string(),
+        name: "Ana Lima".to_owned(),
+        email: "ana@example.com".to_owned(),
+    });
+    let mut laptop = Browser::new(&h.app);
+    laptop.sign_in(&h.idp, "/").await;
+
+    let runtime = testing::app_role_pool(&h.db).await;
+    let workspace = uuid::Uuid::now_v7().to_string();
+    let mut tx = runtime.begin().await.unwrap();
+    campbooks_kernel::db::set_workspace(&mut tx, &workspace)
+        .await
+        .unwrap();
+    let job: uuid::Uuid = sqlx::query_scalar(
+        "WITH e AS (
+             INSERT INTO kernel.events (name, version, workspace_id, payload)
+             VALUES ('identity.signed_out_everywhere', 1, $1,
+                     jsonb_build_object('account', $2::text))
+             RETURNING id)
+         INSERT INTO kernel.jobs
+             (queue, kind, payload, workspace_id, event_id, unique_key, max_attempts)
+         SELECT 'events', 'bff.end_signed_out_sessions', '{}', $1, id, id::text, 3 FROM e
+         RETURNING id",
+    )
+    .bind(&workspace)
+    .bind(victim)
+    .fetch_one(&mut *tx)
+    .await
+    .unwrap();
+    tx.commit().await.unwrap();
+
+    let state = AppState::new(
+        runtime.clone(),
+        testing::config("postgres://test@localhost/test"),
+    )
+    .with_registry(crate::registry().unwrap());
+    campbooks_kernel::jobs::Worker::new(state)
+        .run_until_idle()
+        .await;
+    let job_state: String = sqlx::query_scalar("SELECT state FROM kernel.jobs WHERE id = $1")
+        .bind(job)
+        .fetch_one(&h.db)
+        .await
+        .unwrap();
+    assert_eq!(job_state, "failed");
+    assert_eq!(
+        laptop.get("/bff/session").await.json()["authenticated"],
+        true,
+        "the victim is still signed in"
+    );
+}
+
 // --- the API -------------------------------------------------------------------
 
 #[sqlx::test(migrations = "../../migrations")]

@@ -13,6 +13,12 @@
 //!   claimed, or that already succeeded, can never be touched, however the
 //!   calls race with the worker. Retrying is idempotent: the second call
 //!   finds the job pending (or running, or done) and changes nothing.
+//! - **And a schedule's stuck row.** [`discard_schedule`] deletes the one
+//!   unfinished row of a schedule (its `schedule:<name>` key) unless a live
+//!   worker holds it, so a row that blocks the schedule's ticks (forged
+//!   before campbooks-cloud#207, or wedged) can be cleared; the next tick
+//!   enqueues afresh. The tick heals such rows itself; this is the
+//!   operator's way not to wait for it.
 //! - **Across workspaces.** The queue is every workspace's: each function
 //!   runs in the kernel scope ([`begin_kernel`](crate::db::begin_kernel)).
 
@@ -132,6 +138,17 @@ pub enum Discard {
     Unchanged,
     /// There is no such job (already discarded).
     Missing,
+}
+
+/// What [`discard_schedule`] did.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DiscardSchedule {
+    /// Its pending or stuck row is gone; the next tick enqueues afresh.
+    Discarded,
+    /// Nothing to discard: no unfinished row, or a live worker is running it.
+    Unchanged,
+    /// No schedule has that name.
+    Unknown,
 }
 
 /// Counts of the queue by queue and kind.
@@ -346,6 +363,52 @@ pub async fn discard(db: &PgPool, _grant: &AdminGrant, id: JobId) -> Result<Disc
     } else {
         Discard::Missing
     })
+}
+
+/// Delete schedule `name`'s unfinished row (the job holding its
+/// `schedule:<name>` unique key) when it is pending, belongs to a workspace
+/// (a forgery), or runs on a lease that has expired or is longer than any
+/// worker gives: whatever blocks the schedule's next tick. A run a live
+/// worker holds is kept.
+pub async fn discard_schedule(
+    state: &crate::AppState,
+    _grant: &AdminGrant,
+    name: &str,
+) -> Result<DiscardSchedule, Error> {
+    let Some(schedule) = state
+        .events
+        .registry()
+        .schedules()
+        .iter()
+        .find(|s| s.name == name)
+    else {
+        return Ok(DiscardSchedule::Unknown);
+    };
+    let (_, leased) = super::worker::stuck_after(&state.config.jobs, schedule.every);
+    let mut tx = crate::db::begin_kernel(&state.db).await?;
+    let deleted = sqlx::query!(
+        r#"
+        DELETE FROM kernel.jobs
+         WHERE kind = $1 AND unique_key = 'schedule:' || $1
+           AND state IN ('pending', 'running')
+           AND (state = 'pending' OR workspace_id IS NOT NULL
+                OR locked_until < now() OR locked_until > now() + make_interval(secs => $2))
+        "#,
+        schedule.name,
+        leased,
+    )
+    .execute(&mut *tx)
+    .await?
+    .rows_affected();
+    tx.commit().await?;
+    if deleted > 0 {
+        tracing::warn!(
+            schedule = schedule.name,
+            "an administrator discarded a schedule's pending or stuck row"
+        );
+        return Ok(DiscardSchedule::Discarded);
+    }
+    Ok(DiscardSchedule::Unchanged)
 }
 
 async fn notify(conn: &mut sqlx::PgConnection, queue: &str) -> Result<(), sqlx::Error> {

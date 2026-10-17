@@ -847,15 +847,18 @@ mod tests {
     /// maintenance scope (the schedulers' dispatchers), and may only read and
     /// lease (or start): its maintenance policies are `FOR SELECT` and `FOR
     /// UPDATE`. No module policy admits the kernel scope (campbooks-cloud#196),
-    /// and none admits a transaction merely for setting no workspace
-    /// (campbooks-cloud#129).
+    /// no kernel policy admits the maintenance scope, and none admits a
+    /// transaction merely for setting no workspace (campbooks-cloud#129).
+    /// Every policy of every schema is read, `USING` and `WITH CHECK` alike,
+    /// for any mention of a setting (campbooks-cloud#207).
     #[sqlx::test(migrations = "../../migrations")]
     async fn maintenance_policies_only_read_and_lease(db: sqlx::PgPool) {
-        let rows: Vec<(String, String, String, String)> = sqlx::query_as(
-            "SELECT tablename::text, policyname::text, cmd::text, coalesce(qual, '')
+        let rows: Vec<(String, String, String, String, String)> = sqlx::query_as(
+            "SELECT schemaname::text, tablename::text, policyname::text, cmd::text,
+                    coalesce(qual, '') || ' ' || coalesce(with_check, '')
                FROM pg_policies
-              WHERE schemaname NOT IN ('kernel', 'admin', 'pg_catalog')
-              ORDER BY 1, 2",
+              WHERE schemaname <> 'pg_catalog'
+              ORDER BY 1, 2, 3",
         )
         .fetch_all(&db)
         .await
@@ -863,49 +866,111 @@ mod tests {
         let unset = "'campbooks.workspace_id'::text, true), ''::text) IS NULL";
         let admitting_unset: Vec<&String> = rows
             .iter()
-            .filter(|(_, _, _, qual)| qual.contains(unset))
-            .map(|(_, name, _, _)| name)
+            .filter(|(.., text)| text.contains(unset))
+            .map(|(_, _, name, ..)| name)
             .collect();
         assert!(admitting_unset.is_empty(), "{admitting_unset:?}");
-        let admitting = |setting: &str| {
-            let on = format!("'{setting}'::text, true) = 'on'::text");
+        let mentioning = |setting: &str| {
+            let name = format!("'{setting}'");
             rows.iter()
-                .filter(|(_, _, _, qual)| qual.contains(&on))
-                .map(|(table, name, cmd, _)| (table.clone(), name.clone(), cmd.clone()))
+                .filter(|(.., text)| text.contains(&name))
+                .map(|(schema, table, policy, cmd, _)| {
+                    (format!("{schema}.{table}"), policy.clone(), cmd.clone())
+                })
                 .collect::<Vec<_>>()
         };
-        // No module table admits the kernel scope: it reaches the kernel's
-        // tables only.
-        let kernel = admitting(testing::kernel_scope_setting());
-        assert!(kernel.is_empty(), "{kernel:?}");
-        // Policies admitting the maintenance scope.
-        let policies = admitting(testing::maintenance_scope_setting());
+        // The kernel scope: the kernel's own tables, each through its one
+        // `workspace_isolation` policy (the schedules' last ticks through
+        // `kernel_scope_only`), and nothing else.
+        let kernel = mentioning(testing::kernel_scope_setting());
+        assert!(!kernel.is_empty());
+        let elsewhere: Vec<_> = kernel
+            .iter()
+            .filter(|(table, policy, cmd)| {
+                let expected = if table == "kernel.schedules" {
+                    "kernel_scope_only"
+                } else {
+                    "workspace_isolation"
+                };
+                !table.starts_with("kernel.") || policy != expected || cmd != "ALL"
+            })
+            .collect();
+        assert!(elsewhere.is_empty(), "{elsewhere:?}");
+        assert!(
+            kernel
+                .iter()
+                .any(|(table, policy, _)| table == "kernel.schedules"
+                    && policy == "kernel_scope_only"),
+            "the schedules' last ticks are the kernel scope's: {kernel:?}"
+        );
+        // The maintenance scope: these four, on module tables.
+        let policies = mentioning(testing::maintenance_scope_setting());
+        let expected = [
+            // The stream dispatcher (connectors): reads and leases.
+            (
+                "connectors.sync_due",
+                "maintenance_leases_schedule",
+                "UPDATE",
+            ),
+            (
+                "connectors.sync_due",
+                "maintenance_reads_schedule",
+                "SELECT",
+            ),
+            // The needs backfill's dispatcher (conversations): reads ids and
+            // states, and may only start a row (`WITH CHECK`).
+            (
+                "conversations.needs_backfills",
+                "maintenance_reads_backfills",
+                "SELECT",
+            ),
+            (
+                "conversations.needs_backfills",
+                "maintenance_starts_backfills",
+                "UPDATE",
+            ),
+        ]
+        .map(|(table, policy, cmd)| (table.to_owned(), policy.to_owned(), cmd.to_owned()));
+        assert_eq!(policies, expected);
+    }
+
+    /// What a workspace transaction may add of the instance-wide rows
+    /// (`kernel.instance_rows_from_workspaces`, read by row-level security)
+    /// is what the registry derives: the events declared
+    /// `PUBLISHED_IN_WORKSPACES` and their consumers' deliveries
+    /// (campbooks-cloud#207). A new such event, or a new consumer of one,
+    /// needs a kernel migration adding it to the list.
+    #[sqlx::test(migrations = "../../migrations")]
+    async fn the_instance_rows_a_workspace_may_add_match_the_registry(db: sqlx::PgPool) {
+        let listed: Vec<(String, String)> = sqlx::query_as(
+            "SELECT row_kind, name FROM kernel.instance_rows_from_workspaces ORDER BY 1, 2",
+        )
+        .fetch_all(&db)
+        .await
+        .unwrap();
+        let derived = registry().unwrap().instance_rows_from_workspaces();
+        let mut expected: Vec<(String, String)> = derived
+            .events
+            .iter()
+            .map(|name| ("event".to_owned(), (*name).to_owned()))
+            .chain(
+                derived
+                    .kinds
+                    .iter()
+                    .map(|name| ("job".to_owned(), (*name).to_owned())),
+            )
+            .collect();
+        expected.sort();
         assert_eq!(
-            policies,
-            [
-                // The needs backfill's dispatcher (conversations): reads ids
-                // and states, and may only start a row (`WITH CHECK`).
-                (
-                    "needs_backfills".to_owned(),
-                    "maintenance_reads_backfills".to_owned(),
-                    "SELECT".to_owned()
-                ),
-                (
-                    "needs_backfills".to_owned(),
-                    "maintenance_starts_backfills".to_owned(),
-                    "UPDATE".to_owned()
-                ),
-                (
-                    "sync_due".to_owned(),
-                    "maintenance_leases_schedule".to_owned(),
-                    "UPDATE".to_owned()
-                ),
-                (
-                    "sync_due".to_owned(),
-                    "maintenance_reads_schedule".to_owned(),
-                    "SELECT".to_owned()
-                ),
-            ]
+            listed, expected,
+            "kernel.instance_rows_from_workspaces must list exactly what the registry \
+             derives; add (or remove) the rows in a kernel migration"
+        );
+        // Today: identity's two account events a workspace announces, with
+        // no consumer.
+        assert_eq!(
+            derived.events,
+            ["identity.consent_revoked", "identity.way_in_removed"]
         );
     }
 
@@ -913,7 +978,9 @@ mod tests {
     /// role the server queries as: each migration grants its own. The
     /// `admin` module's tables are the deliberate exception (ADR 0015): the
     /// runtime role may only read profiles and append to the trail, which
-    /// the `admin` crate's own tests pin.
+    /// the `admin` crate's own tests pin. So is the list of instance-wide
+    /// rows a workspace may add (`kernel.instance_rows_from_workspaces`,
+    /// campbooks-cloud#207), which it may only read: it changes by migration.
     #[sqlx::test(migrations = "../../migrations")]
     async fn the_runtime_role_may_use_every_table(db: sqlx::PgPool) {
         let role = campbooks_kernel::db::DEFAULT_RUNTIME_ROLE;
@@ -935,9 +1002,25 @@ mod tests {
         .fetch_all(&db)
         .await
         .unwrap();
+        let read_only = "kernel.instance_rows_from_workspaces";
+        let missing: Vec<String> = missing.into_iter().filter(|t| t != read_only).collect();
         assert!(
             missing.is_empty(),
             "`{role}` lacks privileges on {missing:?}"
+        );
+        let privileges: (bool, bool, bool, bool) = sqlx::query_as(
+            "SELECT has_table_privilege($1, $2, 'SELECT'), has_table_privilege($1, $2, 'INSERT'),
+                    has_table_privilege($1, $2, 'UPDATE'), has_table_privilege($1, $2, 'DELETE')",
+        )
+        .bind(role)
+        .bind(read_only)
+        .fetch_one(&db)
+        .await
+        .unwrap();
+        assert_eq!(
+            privileges,
+            (true, false, false, false),
+            "`{role}` only reads {read_only}"
         );
     }
 

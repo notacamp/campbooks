@@ -486,7 +486,7 @@ impl Inner {
         }
         let lock = &self.refresh_locks[lock_index(session.id)];
         let _guard = lock.lock().await;
-        let mut tx = self.db.begin().await?;
+        let mut tx = store::begin_refresh(&self.db).await?;
         let Some(tokens) = store::lock_tokens(&mut tx, session.id).await? else {
             return Err(AccessError::SessionEnded);
         };
@@ -576,9 +576,7 @@ impl Inner {
     /// session was ended here. Failures past the deletion are logged: the
     /// web session is gone either way.
     async fn terminate(&self, id: Uuid) -> sqlx::Result<bool> {
-        let Some((refresh_token, id_token)) =
-            store::delete_session(&mut *self.db.acquire().await?, id).await?
-        else {
+        let Some((refresh_token, id_token)) = store::end_session(&self.db, id).await? else {
             return Ok(false);
         };
         self.revoke_refresh(id, refresh_token).await;
@@ -601,9 +599,7 @@ impl Inner {
     /// leaving the identity provider's session as it is (a new sign-in may
     /// go straight through).
     async fn retire(&self, id: Uuid) -> sqlx::Result<()> {
-        if let Some((refresh_token, _)) =
-            store::delete_session(&mut *self.db.acquire().await?, id).await?
-        {
+        if let Some((refresh_token, _)) = store::end_session(&self.db, id).await? {
             self.revoke_refresh(id, refresh_token).await;
         }
         Ok(())
@@ -628,7 +624,7 @@ impl Inner {
     }
 
     async fn end(&self, id: Uuid) -> Result<String, AccessError> {
-        store::delete_session(&mut *self.db.acquire().await?, id).await?;
+        store::end_session(&self.db, id).await?;
         Err(AccessError::SessionEnded)
     }
 }

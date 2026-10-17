@@ -84,6 +84,7 @@ struct EventSpec {
     name: &'static str,
     version: u16,
     workspace_scoped: bool,
+    published_in_workspaces: bool,
     schema: fn() -> utoipa::openapi::RefOr<utoipa::openapi::schema::Schema>,
     schemas: fn(
         &mut Vec<(
@@ -128,6 +129,7 @@ impl Background {
             name: E::NAME,
             version: E::VERSION,
             workspace_scoped: E::WORKSPACE_SCOPED,
+            published_in_workspaces: E::PUBLISHED_IN_WORKSPACES,
             schema: <E as utoipa::PartialSchema>::schema,
             schemas: <E as utoipa::ToSchema>::schemas,
         });
@@ -283,9 +285,23 @@ async fn load_event<E: DomainEvent>(ctx: &JobContext) -> Result<Event<E>, JobErr
             E::VERSION
         )));
     }
-    let payload = serde_json::from_value(row.payload).map_err(|e| {
+    let payload: E = serde_json::from_value(row.payload).map_err(|e| {
         JobError::fatal(format!("event {id} does not decode as `{}`: {e}", E::NAME))
     })?;
+    // The log row's workspace must be the event's own: an instance-wide
+    // event logged in a workspace, or a workspace's event naming another
+    // workspace than the row it was logged in, was not published by
+    // `EventBus::publish` (which writes the event's own workspace) but
+    // written by hand, e.g. by a workspace forging an account's event for an
+    // instance-wide consumer (campbooks-cloud#207). It is never handled.
+    if (!E::WORKSPACE_SCOPED && row.workspace_id.is_some())
+        || DomainEvent::workspace(&payload) != row.workspace_id.as_deref()
+    {
+        return Err(JobError::fatal(format!(
+            "event {id} (`{}`) is logged in another workspace than its own; not handled",
+            E::NAME
+        )));
+    }
     Ok(Event {
         id,
         version: E::VERSION,
@@ -329,6 +345,15 @@ pub(crate) struct ScheduleInfo {
     pub max_attempts: u32,
     pub every: Duration,
     pub payload: Value,
+}
+
+/// What [`Registry::instance_rows_from_workspaces`] admits.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct InstanceRows {
+    /// Event names (`kernel.events.name`), sorted.
+    pub events: Vec<&'static str>,
+    /// Delivery kinds (`kernel.jobs.kind`), sorted.
+    pub kinds: Vec<&'static str>,
 }
 
 /// Every job kind, event consumer and schedule of the running system, built
@@ -573,6 +598,7 @@ impl Registry {
                 name: event.name,
                 version: event.version,
                 workspace_scoped: event.workspace_scoped,
+                published_in_workspaces: event.published_in_workspaces,
                 schema: event.schema,
                 schemas: event.schemas,
             });
@@ -655,6 +681,30 @@ impl Registry {
     /// Every event type a module declared it publishes.
     pub fn published(&self) -> &[PublishedEvent] {
         &self.published
+    }
+
+    /// The instance-wide rows a transaction working in a workspace may add
+    /// (campbooks-cloud#207): the events declared
+    /// [`DomainEvent::PUBLISHED_IN_WORKSPACES`] and the consumers of those
+    /// events (their deliveries), each sorted. Row-level security reads the
+    /// same lists from `kernel.instance_rows_from_workspaces`, which
+    /// migrations keep equal to this.
+    pub fn instance_rows_from_workspaces(&self) -> InstanceRows {
+        let mut events: Vec<&'static str> = self
+            .published
+            .iter()
+            .filter(|e| e.published_in_workspaces)
+            .map(|e| e.name)
+            .collect();
+        events.sort_unstable();
+        let mut kinds: Vec<&'static str> = self
+            .consumers
+            .iter()
+            .filter(|c| events.contains(&c.event))
+            .map(|c| c.name)
+            .collect();
+        kinds.sort_unstable();
+        InstanceRows { events, kinds }
     }
 
     /// Every job kind (jobs and event handlers), sorted.

@@ -80,21 +80,46 @@ pub async fn run_now(
     enqueue(tx, workspace, stream).await
 }
 
-/// Enqueue `connectors.sync_stream` for `stream`.
+/// Enqueue `connectors.sync_stream` for `stream`, in `tx`'s workspace.
 async fn enqueue(
     tx: &mut Transaction<'_, Postgres>,
     workspace: WorkspaceId,
     stream: StreamId,
 ) -> Result<()> {
-    let key = format!("{SYNC_STREAM}:{stream}");
     jobs::enqueue_to::<crate::features::sync_stream::SyncStream>(
         tx,
         &SyncStreamPayload { stream },
-        EnqueueOptions::for_workspace(workspace.to_string())
-            .unique(key.clone())
-            .ordered_by(key),
+        run_options(workspace, stream),
     )
     .await?;
+    Ok(())
+}
+
+/// A run's enqueue options: one unfinished run per stream, in order.
+fn run_options(workspace: WorkspaceId, stream: StreamId) -> EnqueueOptions {
+    let key = format!("{SYNC_STREAM}:{stream}");
+    EnqueueOptions::for_workspace(workspace.to_string())
+        .unique(key.clone())
+        .ordered_by(key)
+}
+
+/// Enqueue the runs of the `due` streams from the dispatcher's transaction,
+/// which works in no workspace: each in its stream's workspace, set for
+/// that enqueue only (`jobs::enqueue_to_in`), so nothing after it runs in
+/// the last stream's workspace (campbooks-cloud#207).
+async fn enqueue_due(
+    tx: &mut Transaction<'_, Postgres>,
+    due: &[(WorkspaceId, StreamId)],
+) -> Result<()> {
+    for &(workspace, stream) in due {
+        jobs::enqueue_to_in::<crate::features::sync_stream::SyncStream>(
+            tx,
+            &workspace.to_string(),
+            &SyncStreamPayload { stream },
+            run_options(workspace, stream),
+        )
+        .await?;
+    }
     Ok(())
 }
 
@@ -102,8 +127,9 @@ async fn enqueue(
 /// their runs. Runs in the maintenance scope (`begin_maintenance`, allowed
 /// for this file in `architecture.toml`): the scheduling index is the one
 /// thing it reads across workspaces (ids and times, through its maintenance
-/// policies), and each run is enqueued in its stream's workspace, set just
-/// before (the queue admits no other). Returns how many it enqueued.
+/// policies), and each run is enqueued in its stream's workspace, set for
+/// that enqueue only (the queue admits no other). Returns how many it
+/// enqueued.
 pub async fn dispatch(pool: &PgPool, now: DateTime<Utc>) -> Result<usize> {
     let mut tx = campbooks_kernel::db::begin_maintenance(pool).await?;
     let due = sqlx::query!(
@@ -121,10 +147,9 @@ pub async fn dispatch(pool: &PgPool, now: DateTime<Utc>) -> Result<usize> {
     )
     .fetch_all(&mut *tx)
     .await?;
-    for row in &due {
-        campbooks_kernel::db::set_workspace(&mut tx, &row.workspace.to_string()).await?;
-        enqueue(&mut tx, row.workspace, row.stream).await?;
-    }
+    let due: Vec<(WorkspaceId, StreamId)> =
+        due.iter().map(|row| (row.workspace, row.stream)).collect();
+    enqueue_due(&mut tx, &due).await?;
     tx.commit().await?;
     Ok(due.len())
 }
@@ -258,6 +283,39 @@ mod tests {
         assert_eq!(next_interval(600, false, &poll), 600);
         assert_eq!(next_interval(600, true, &poll), 60);
         assert_eq!(next_interval(1, false, &poll), 60);
+    }
+
+    /// The dispatcher's enqueues each run in their stream's workspace, and
+    /// leave its transaction working in none (campbooks-cloud#207).
+    #[sqlx::test(migrations = "../../../migrations")]
+    async fn dispatched_runs_leave_no_workspace_set(db: PgPool) {
+        let pool = campbooks_kernel::testing::app_role_pool(&db).await;
+        let due = [
+            (WorkspaceId::new(), StreamId::new()),
+            (WorkspaceId::new(), StreamId::new()),
+        ];
+        let mut tx = campbooks_kernel::db::begin_maintenance(&pool)
+            .await
+            .unwrap();
+        enqueue_due(&mut tx, &due).await.unwrap();
+        let workspace: Option<String> = sqlx::query_scalar(
+            "SELECT nullif(current_setting('campbooks.workspace_id', true), '')",
+        )
+        .fetch_one(&mut *tx)
+        .await
+        .unwrap();
+        assert_eq!(workspace, None);
+        tx.commit().await.unwrap();
+        let mut queued: Vec<String> = sqlx::query_scalar(
+            "SELECT workspace_id FROM kernel.jobs WHERE kind = 'connectors.sync_stream'",
+        )
+        .fetch_all(&db)
+        .await
+        .unwrap();
+        queued.sort();
+        let mut expected: Vec<String> = due.iter().map(|(w, _)| w.to_string()).collect();
+        expected.sort();
+        assert_eq!(queued, expected);
     }
 
     #[sqlx::test(migrations = "../../../migrations")]

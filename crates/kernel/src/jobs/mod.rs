@@ -35,7 +35,7 @@ use sqlx::{PgConnection, Postgres, Transaction};
 pub use context::JobContext;
 pub use maintenance::{PruneEvents, PruneJobs, purge_workspace};
 pub(crate) use registry::is_dotted;
-pub use registry::{Background, ConsumerInfo, Registry, RegistryError};
+pub use registry::{Background, ConsumerInfo, InstanceRows, Registry, RegistryError};
 pub use worker::{Worker, WorkerStats};
 
 crate::define_id!(
@@ -283,6 +283,88 @@ pub async fn enqueue_to<H: JobHandler>(
     .await
 }
 
+/// From a transaction that works in no workspace (a scheduler's dispatcher
+/// in the maintenance scope, campbooks-cloud#196): enqueue `job` in
+/// `workspace`, like [`enqueue`] with `options.workspace` set to it. The
+/// transaction works in `workspace` for this enqueue only: the kernel sets
+/// it, enqueues, and clears it again, so the next statement of the
+/// transaction (another workspace's enqueue, a read of the dispatcher's
+/// index) does not run in it (campbooks-cloud#207).
+///
+/// # Errors
+/// [`sqlx::Error::InvalidArgument`] when `tx` already works in a workspace
+/// (use [`enqueue`] there); the enqueue's own errors. On an error the
+/// workspace is cleared too, unless the database aborted the transaction.
+pub async fn enqueue_in<J: Job>(
+    tx: &mut Transaction<'_, Postgres>,
+    workspace: &str,
+    job: &J,
+    options: EnqueueOptions,
+) -> Result<Enqueued, sqlx::Error> {
+    let payload = serde_json::to_value(job).map_err(|e| sqlx::Error::Encode(e.into()))?;
+    insert_in(
+        tx,
+        workspace,
+        NewJob {
+            kind: J::NAME,
+            queue: J::QUEUE,
+            max_attempts: J::MAX_ATTEMPTS,
+            payload,
+        },
+        options,
+    )
+    .await
+}
+
+/// Enqueue a job of `H`'s kind in `workspace` from a transaction that works
+/// in none, like [`enqueue_in`].
+///
+/// # Errors
+/// As [`enqueue_in`].
+pub async fn enqueue_to_in<H: JobHandler>(
+    tx: &mut Transaction<'_, Postgres>,
+    workspace: &str,
+    payload: &H::Payload,
+    options: EnqueueOptions,
+) -> Result<Enqueued, sqlx::Error> {
+    let payload = serde_json::to_value(payload).map_err(|e| sqlx::Error::Encode(e.into()))?;
+    insert_in(
+        tx,
+        workspace,
+        NewJob {
+            kind: H::NAME,
+            queue: H::QUEUE,
+            max_attempts: H::MAX_ATTEMPTS,
+            payload,
+        },
+        options,
+    )
+    .await
+}
+
+/// Set `workspace`, insert `job` there, and clear the workspace again.
+async fn insert_in(
+    tx: &mut Transaction<'_, Postgres>,
+    workspace: &str,
+    job: NewJob,
+    mut options: EnqueueOptions,
+) -> Result<Enqueued, sqlx::Error> {
+    if crate::db::scope(tx).await?.workspace.is_some() {
+        return Err(sqlx::Error::InvalidArgument(format!(
+            "job `{}`: `enqueue_in` is for a transaction that works in no workspace; this one \
+             works in one already (use `enqueue`)",
+            job.kind
+        )));
+    }
+    options.workspace = Some(workspace.to_owned());
+    crate::db::set_workspace(tx, workspace).await?;
+    let enqueued = insert(tx, job, options).await;
+    let cleared = crate::db::clear_workspace(tx).await;
+    let enqueued = enqueued?;
+    cleared?;
+    Ok(enqueued)
+}
+
 /// A job row about to be inserted.
 struct NewJob {
     kind: &'static str,
@@ -298,15 +380,17 @@ async fn insert(
 ) -> Result<Enqueued, sqlx::Error> {
     // A workspace's job is enqueued where that workspace's rows are in
     // reach: refused in a transaction that set no workspace (row-level
-    // security would hide the queue from it). An instance-wide job may be
-    // enqueued from anywhere: the kernel lifts a transaction that set
-    // nothing for this one insert.
+    // security would hide the queue from it). An instance-wide job is
+    // enqueued from a transaction that set nothing (the kernel lifts it for
+    // this one insert) or from the kernel scope, never from a workspace's
+    // (campbooks-cloud#207: row-level security refuses it there).
+    let what = format!("job `{}`", job.kind);
     let lifted = match &options.workspace {
         Some(workspace) => {
-            crate::db::require_scope(tx, workspace, &format!("job `{}`", job.kind)).await?;
+            crate::db::require_scope(tx, workspace, &what).await?;
             false
         }
-        None => crate::db::lift_for_instance_rows(tx).await?,
+        None => crate::db::lift_for_instance_rows(tx, &what, false).await?,
     };
     let enqueued = insert_row(tx, job, options).await?;
     crate::db::lower(tx, lifted).await?;
