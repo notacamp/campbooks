@@ -231,6 +231,12 @@ jobs:
       - name: Storybook stories (render, interactions, axe in light and dark)
         if: always()
         run: pnpm test-storybook
+      - name: WebKit for the mail frame policy test
+        if: always()
+        run: pnpm --filter @campbooks/app exec playwright install --with-deps webkit
+      - name: Mail frame under the desktop and web page policies (WebKit)
+        if: always()
+        run: pnpm --filter @campbooks/app test:csp
       - name: Audit (prod deps)
         if: always()
         run: pnpm audit --prod
