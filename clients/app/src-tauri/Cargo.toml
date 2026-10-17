@@ -22,6 +22,9 @@ tauri-build = { version = "2.7.1", features = [] }
 
 [dependencies]
 tauri = { version = "2.12.1", features = [] }
+# Opens links from mail in the system browser (never in a webview); used from
+# Rust only, so no capability grants it to the webview.
+tauri-plugin-opener = "2.7.0"
 serde = { version = "1.0.229", features = ["derive"] }
 serde_json = "1.0.151"
 # rustls (aws-lc-rs provider) + the platform certificate verifier; no OpenSSL.

@@ -260,6 +260,9 @@ jobs:
       - name: Clippy
         if: always()
         run: cargo clippy --all-targets -- -D warnings
+      - name: Tests (links open outside, IPC grants, the page policy)
+        if: always()
+        run: cargo test
 
   image:
     # On a pull request: builds the release image exactly as published and
