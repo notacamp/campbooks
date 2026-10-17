@@ -54,6 +54,8 @@ async function read(page: Page, workspace: string, subject: string) {
 
 export default async function trustedImages({ page }: ScenarioContext): Promise<void> {
   const workspace = await signedIn(page);
+  // The recorded page starts blank: `api` fetches relative to the app's origin.
+  await page.goto(`/w/${workspace}`);
 
   let reader = await read(page, workspace, NEWSLETTER);
   await reader
