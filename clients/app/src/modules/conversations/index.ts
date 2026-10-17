@@ -26,6 +26,7 @@ export { useInboxes } from "./api/queries";
 export { ConversationReader } from "./components/Reader/ConversationReader";
 export { useInboxActions } from "./components/InboxScreen/use-inbox-actions";
 export { renderReplyComposer } from "./components/ReplyComposer/ReplyComposer";
+export { ReplyDialog, type ReplyResume } from "./components/ReplyDialog/ReplyDialog";
 export { displayName, listTime } from "./model";
 export { isStream, type Stream } from "./api/queries";
 /**

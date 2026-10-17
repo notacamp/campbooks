@@ -482,5 +482,48 @@
       "inbox": "Une boîte de réception",
       "emptyTitle": "Pas encore de règles"
     }
+  },
+  "reply": {
+    "title": "Répondre à {{name}}",
+    "reading": "Scout lit la conversation…",
+    "choose": "Que doit-elle dire ? Choisissez une option ou dites-le avec vos mots.",
+    "noSuggestions": "Scout n’a pas de suggestion cette fois. Dites-le avec vos mots ou écrivez-la vous-même.",
+    "suggestionsFailed": "Scout n’a pas pu suggérer de réponses pour l’instant. Dites-le avec vos mots ou écrivez-la vous-même.",
+    "unavailable": "Scout ne peut pas écrire de réponses sur ce serveur : écrivez celle-ci vous-même.",
+    "choices": "Réponses probables",
+    "quoteFrom": "{{name}}, {{date}}",
+    "own": {
+      "label": "Ou dites-le avec vos mots",
+      "placeholder": "p. ex. oui, mais j’aurai 15 minutes de retard",
+      "action": "Rédiger"
+    },
+    "writing": "Rédaction du brouillon…",
+    "draftDescription": "Le brouillon de Scout. Modifiez-le ici ou demandez un changement. Rien n’est envoyé avant que vous appuyiez sur Envoyer.",
+    "draftLabel": "Votre réponse",
+    "shorter": "Plus courte",
+    "shortening": "Raccourcissement…",
+    "changing": "Modification…",
+    "back": "Revenir aux choix",
+    "change": {
+      "label": "Demander un changement",
+      "placeholder": "p. ex. plus chaleureuse, ou mentionnez les plans",
+      "action": "Modifier"
+    },
+    "send": "Envoyer",
+    "openInComposer": "Ouvrir dans l’éditeur",
+    "writeOwn": "L’écrire moi-même",
+    "pending": "Envoi à {{name}}…",
+    "sending": "Envoi à {{name}}",
+    "result": "Envoi à {{name}}",
+    "resultDetail": "Elle part dans quelques secondes. D’ici là, vous pouvez annuler en bas.",
+    "undone": "Non envoyée. Votre brouillon est revenu.",
+    "tooLate": "Trop tard pour annuler : la réponse est déjà partie.",
+    "errors": {
+      "write": "Scout n’a pas pu écrire cela pour l’instant. Réessayez ou écrivez-la vous-même.",
+      "limit": "Scout a écrit beaucoup de réponses cette heure-ci. Réessayez plus tard ou écrivez-la vous-même.",
+      "dailyLimit": "Cet espace de travail a utilisé son quota d’IA du jour. Écrivez celle-ci vous-même.",
+      "send": "Impossible d’envoyer à {{name}}. Votre brouillon est conservé.",
+      "open": "Impossible d’ouvrir l’éditeur. Votre brouillon reste ici."
+    }
   }
 }

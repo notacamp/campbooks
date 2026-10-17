@@ -48,7 +48,8 @@
     "done": "Feito · {{name}}",
     "notNeeded": "Não era preciso · {{name}}",
     "safe": "Marcado como seguro · {{name}}",
-    "snoozed": "Adiado · {{name}}, volta {{when}}"
+    "snoozed": "Adiado · {{name}}, volta {{when}}",
+    "replied": "A enviar para {{name}}"
   },
   "error": {
     "title": "Não foi possível carregar o que precisa de si",

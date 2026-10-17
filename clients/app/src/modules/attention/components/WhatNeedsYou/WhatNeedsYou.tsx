@@ -28,12 +28,15 @@ import {
   needSender,
   needSentence,
   quoteAttribution,
+  ReplyDialog,
   useConversation,
   useConversationsByIds,
+  useInboxes,
   useNeedActions,
   warningReasons,
   type ConversationSummary,
   type NeedView,
+  type ReplyResume,
 } from "~/modules/conversations";
 
 import { useAttention, useRefreshAttention, useSnooze, type ItemView } from "../../api/queries";
@@ -162,6 +165,12 @@ export function WhatNeedsYou({ workspaceId, now, offer }: WhatNeedsYouProps) {
   // The action ←/→ are on, on the selected row.
   const [highlight, setHighlight] = useState<string | undefined>();
   const [snoozing, setSnoozing] = useState<Row | undefined>();
+  // The reply dialog's item, and the draft to pick up again after an undone send.
+  const [replying, setReplying] = useState<
+    { row: Row; resume?: ReplyResume | undefined; opened: number } | undefined
+  >();
+  const replies = useRef(0);
+  const inboxes = useInboxes(workspaceId).data;
   const foundAt = order.findIndex((row) => row.item.id === selection.id);
   if (order.length > 0 && (foundAt === -1 || foundAt !== selection.index)) {
     // Adjusting state while rendering, so the change never shows a stale frame.
@@ -180,7 +189,7 @@ export function WhatNeedsYou({ workspaceId, now, offer }: WhatNeedsYouProps) {
   const focusFollows = useRef(false);
   const keepFocus = () => {
     const active = document.activeElement;
-    // Inside the Snooze dialog: it was decided when the dialog opened.
+    // Inside a dialog (Snooze, Reply): it was decided when the dialog opened.
     if ((active?.closest("[role='dialog']") ?? null) !== null) {
       return;
     }
@@ -193,13 +202,14 @@ export function WhatNeedsYou({ workspaceId, now, offer }: WhatNeedsYouProps) {
       !focusFollows.current ||
       selectedId === undefined ||
       highlight !== undefined ||
-      snoozing !== undefined
+      snoozing !== undefined ||
+      replying !== undefined
     ) {
       return;
     }
     focusFollows.current = false;
     document.getElementById(itemId(selectedId))?.focus({ preventScroll: true });
-  }, [selectedId, highlight, snoozing]);
+  }, [selectedId, highlight, snoozing, replying]);
 
   const select = (id: string) => {
     setSelection({
@@ -321,7 +331,8 @@ export function WhatNeedsYou({ workspaceId, now, offer }: WhatNeedsYouProps) {
     });
     snoozeOrRollBack(row, until, entry);
   };
-  const reply = (row: Row) => {
+  /** The plain composer at the end of the conversation ("Write my own", "Open in composer"). */
+  const openComposer = (row: Row) => {
     void navigate({
       to: "/w/$workspaceId/inbox/$stream/$conversationId",
       params: {
@@ -331,6 +342,22 @@ export function WhatNeedsYou({ workspaceId, now, offer }: WhatNeedsYouProps) {
       },
       search: { reply: true },
     });
+  };
+  // Reply: Scout's likely replies and draft, in a dialog over Home.
+  const reply = (row: Row, resume?: ReplyResume) => {
+    keepFocus();
+    setHighlight(undefined);
+    replies.current += 1;
+    setReplying({ row, resume, opened: replies.current });
+  };
+  // Whether the member may write in the item's inbox (not a reader's, not
+  // one kept read-only). Until the inboxes are known, as before.
+  const writable = (row: Row) => {
+    if (inboxes === undefined) {
+      return true;
+    }
+    const inbox = inboxes.find((candidate) => candidate.id === row.conversation.inbox_id);
+    return inbox !== undefined && !inbox.read_only && inbox.role !== "reader";
   };
   const openConversation = (row: Row) => {
     void navigate({
@@ -345,7 +372,14 @@ export function WhatNeedsYou({ workspaceId, now, offer }: WhatNeedsYouProps) {
 
   /** What a row offers, in words with keys: the shape #166's ranked actions drop into. */
   const actionsOf = (row: Row): { own: ItemAction[]; universal: ItemAction[] } => {
-    const ids = rowActionIds(kindOf(row.need));
+    const all = rowActionIds(kindOf(row.need));
+    // An inbox the member may only read offers no Reply, Done or Not needed.
+    const ids = writable(row)
+      ? all
+      : {
+          own: all.own.filter((id) => id !== "reply"),
+          universal: all.universal.filter((id) => id !== "done" && id !== "not_needed"),
+        };
     const ownLabel: Record<OwnActionId, string> = {
       reply: t("actions.reply"),
       yes: tc("needs.actions.yes"),
@@ -361,6 +395,8 @@ export function WhatNeedsYou({ workspaceId, now, offer }: WhatNeedsYouProps) {
       own: ids.own.slice(0, CHOICE_KEYS.length).map((id, index) => ({
         id,
         label: ownLabel[id],
+        // Reply asks Scout for likely replies: the visor marks it.
+        ai: id === "reply",
         key: CHOICE_KEYS[index] ?? "item.choice1",
       })),
       universal: ids.universal.map((id) => ({
@@ -531,7 +567,7 @@ export function WhatNeedsYou({ workspaceId, now, offer }: WhatNeedsYouProps) {
         notNeeded(selected);
       }
     },
-    { enabled: hasRows },
+    { enabled: offered("not_needed") || offered("no") || offered("safe") },
   );
   useShortcut(
     "item.reply",
@@ -698,6 +734,33 @@ export function WhatNeedsYou({ workspaceId, now, offer }: WhatNeedsYouProps) {
           }}
         />
       </Dialog>
+      {replying === undefined ? null : (
+        <ReplyDialog
+          key={replying.opened}
+          workspaceId={workspaceId}
+          conversationId={replying.row.conversation.id}
+          name={replying.row.name}
+          resume={replying.resume}
+          onClose={() => {
+            setReplying(undefined);
+          }}
+          onWriteOwn={() => {
+            setReplying(undefined);
+            openComposer(replying.row);
+          }}
+          onOpenDraft={() => {
+            setReplying(undefined);
+            openComposer(replying.row);
+          }}
+          onSent={() => {
+            hide(replying.row, t("confirm.replied", { name: replying.row.name }));
+          }}
+          onUndone={(resume) => {
+            show(replying.row);
+            reply(replying.row, resume);
+          }}
+        />
+      )}
     </HomeLayout>
   );
 }

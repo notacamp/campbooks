@@ -43,6 +43,8 @@ import { useTeachOnce } from "../TeachOnce/TeachOnce";
 import { useRuleActions } from "../TeachOnce/use-rule-actions";
 import type { InboxActions } from "../InboxScreen/use-inbox-actions";
 
+import { ReplyDialog, type ReplyResume } from "../ReplyDialog/ReplyDialog";
+
 import { MovePicker } from "./MovePicker";
 import type { RenderReplySlot, ReplyMode, ReplyRequest, ReplySlotContext } from "./ReplySlot";
 import { ThreadMessage } from "./ThreadMessage";
@@ -132,6 +134,11 @@ export function ConversationReader({
   const [images, setImages] = useState<Set<string>>(new Set());
   const [moving, setMoving] = useState(false);
   const [reply, setReply] = useState<ReplyRequest | null>(null);
+  // Reply first asks Scout (the reply dialog); `resume` is a draft whose
+  // send was undone.
+  const [replying, setReplying] = useState<
+    { resume?: ReplyResume | undefined; opened: number } | undefined
+  >();
   const nonce = useRef(0);
 
   // Opening an unread conversation reads it (once).
@@ -160,6 +167,11 @@ export function ConversationReader({
     }
     nonce.current += 1;
     setReply({ mode, messageId: newest.id, nonce: nonce.current });
+  };
+  /** Reply: the dialog with Scout's likely replies. */
+  const openReply = (resume?: ReplyResume) => {
+    nonce.current += 1;
+    setReplying({ resume, opened: nonce.current });
   };
   // Home's R: answer the newest message as soon as it is here (once).
   const repliedOnce = useRef(false);
@@ -222,7 +234,7 @@ export function ConversationReader({
     },
     { enabled: viewing },
   );
-  useShortcut("overlay.close", onBack, { enabled: !moving });
+  useShortcut("overlay.close", onBack, { enabled: !moving && replying === undefined });
   // J/K step between conversations; the arrows keep scrolling this one.
   useShortcut("list.next", onNext, { alternates: false });
   useShortcut("list.previous", onPrevious, { alternates: false });
@@ -230,7 +242,7 @@ export function ConversationReader({
   useShortcut(
     "item.reply",
     () => {
-      askReply("reply");
+      openReply();
     },
     { enabled: canReply },
   );
@@ -337,7 +349,7 @@ export function ConversationReader({
           icon="reply"
           shortcut="item.reply"
           onClick={() => {
-            askReply("reply");
+            openReply();
           }}
         >
           {tShortcuts("item.reply")}
@@ -613,7 +625,7 @@ export function ConversationReader({
               icon="reply"
               grow
               onClick={() => {
-                askReply("reply");
+                openReply();
               }}
             >
               {tShortcuts("item.reply")}
@@ -631,6 +643,28 @@ export function ConversationReader({
           </Button>
         </ActionBar>
       ) : null}
+      {replying === undefined || renderReplySlot === undefined ? null : (
+        <ReplyDialog
+          key={replying.opened}
+          workspaceId={workspaceId}
+          conversationId={conversation.id}
+          resume={replying.resume}
+          onClose={() => {
+            setReplying(undefined);
+          }}
+          onWriteOwn={() => {
+            setReplying(undefined);
+            askReply("reply");
+          }}
+          onOpenDraft={() => {
+            setReplying(undefined);
+            askReply("reply");
+          }}
+          onUndone={(resume) => {
+            openReply(resume);
+          }}
+        />
+      )}
     </>
   );
 }

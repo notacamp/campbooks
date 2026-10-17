@@ -482,5 +482,48 @@
       "inbox": "An inbox",
       "emptyTitle": "No rules yet"
     }
+  },
+  "reply": {
+    "title": "Reply to {{name}}",
+    "reading": "Scout is reading the conversation…",
+    "choose": "What should it say? Pick one, or say it in your words.",
+    "noSuggestions": "Scout has no suggestions this time. Say it in your words, or write it yourself.",
+    "suggestionsFailed": "Scout couldn't suggest replies just now. Say it in your words, or write it yourself.",
+    "unavailable": "Scout can't write replies on this server, so you write this one.",
+    "choices": "Likely replies",
+    "quoteFrom": "{{name}}, {{date}}",
+    "own": {
+      "label": "Or say it in your words",
+      "placeholder": "e.g. yes, but I'll be 15 minutes late",
+      "action": "Draft it"
+    },
+    "writing": "Writing the draft…",
+    "draftDescription": "Scout's draft. Edit it here, or ask for a change. Nothing is sent until you press Send.",
+    "draftLabel": "Your reply",
+    "shorter": "Shorter",
+    "shortening": "Making it shorter…",
+    "changing": "Changing it…",
+    "back": "Back to the choices",
+    "change": {
+      "label": "Ask for a change",
+      "placeholder": "e.g. warmer, or mention the plans",
+      "action": "Change"
+    },
+    "send": "Send",
+    "openInComposer": "Open in composer",
+    "writeOwn": "Write my own",
+    "pending": "Sending to {{name}}…",
+    "sending": "Sending to {{name}}",
+    "result": "Sending to {{name}}",
+    "resultDetail": "It goes in a few seconds. Undo is at the bottom until then.",
+    "undone": "Not sent. Your draft is back.",
+    "tooLate": "Too late to undo: the reply has already left.",
+    "errors": {
+      "write": "Scout couldn't write that just now. Try again, or write it yourself.",
+      "limit": "Scout has written a lot of replies this hour. Try again later, or write it yourself.",
+      "dailyLimit": "This workspace has used today's AI allowance. Write this one yourself.",
+      "send": "Couldn't send to {{name}}. Your draft is kept.",
+      "open": "Couldn't open the composer. Your draft is kept here."
+    }
   }
 }

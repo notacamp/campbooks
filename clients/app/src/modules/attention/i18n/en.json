@@ -48,7 +48,8 @@
     "done": "Done · {{name}}",
     "notNeeded": "Not needed · {{name}}",
     "safe": "Marked safe · {{name}}",
-    "snoozed": "Snoozed · {{name}}, back {{when}}"
+    "snoozed": "Snoozed · {{name}}, back {{when}}",
+    "replied": "Sending to {{name}}"
   },
   "error": {
     "title": "Could not load what needs you",

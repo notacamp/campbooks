@@ -48,7 +48,8 @@
     "done": "Fait · {{name}}",
     "notNeeded": "Pas nécessaire · {{name}}",
     "safe": "Marqué comme sûr · {{name}}",
-    "snoozed": "Reporté · {{name}}, revient {{when}}"
+    "snoozed": "Reporté · {{name}}, revient {{when}}",
+    "replied": "Envoi à {{name}}"
   },
   "error": {
     "title": "Impossible de charger ce qui a besoin de vous",

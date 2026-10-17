@@ -172,4 +172,30 @@ describe("Dialog", () => {
     expect(screen.getByRole("button", { name: "Save smart rule" })).toBeInTheDocument();
     expect(screen.getByRole("dialog").querySelector("[data-state]")).toBeNull();
   });
+
+  it("gives the focus to choices that arrive after it opened, when asked", () => {
+    function Late() {
+      const [ready, setReady] = useState(false);
+      return (
+        <Dialog open onClose={vi.fn()} title="Reply to Marta">
+          <button
+            type="button"
+            onClick={() => {
+              setReady(true);
+            }}
+          >
+            Load
+          </button>
+          {ready ? (
+            <DialogChoices label="Replies" choices={TIMES} onChoose={vi.fn()} focusOnShow />
+          ) : null}
+        </Dialog>
+      );
+    }
+    renderUi(<Late />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Load" }));
+
+    expect(screen.getByRole("button", { name: /Later today/ })).toHaveFocus();
+  });
 });
