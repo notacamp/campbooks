@@ -4,7 +4,7 @@
 use campbooks_ai::decide::{
     signals::{
         email::subject_template,
-        facts::{dmarc_failed, sender_checks_failed},
+        facts::{dmarc_refused, sender_checks_failed},
     },
     taught::{Facts, normalise_list_id},
 };
@@ -48,6 +48,10 @@ pub struct Candidate {
     pub suspicious: bool,
     /// When the newest inbound message was sent.
     pub sent_at: DateTime<Utc>,
+    /// The inbox writes to its sender: worked out by [`scan`] only for mail
+    /// that pretends to be its sender ([`Candidate::dmarc_refused`]), the
+    /// one case it changes anything ("fails its sender checks").
+    pub correspondent: bool,
 }
 
 impl Candidate {
@@ -65,6 +69,8 @@ impl Candidate {
             stream: self.stream.as_str(),
             suspicious: self.suspicious,
             auth_failed: self.auth_failed(),
+            impersonated: self.dmarc_refused(),
+            correspondent: self.correspondent,
         }
     }
 
@@ -77,9 +83,10 @@ impl Candidate {
         )
     }
 
-    /// Whether they hold an explicit `dmarc=fail` ([`dmarc_failed`]).
-    pub fn dmarc_failed(&self) -> bool {
-        dmarc_failed(self.headers.authentication_results.as_deref())
+    /// Whether they hold an explicit DMARC failure under a reject or
+    /// quarantine policy ([`dmarc_refused`]).
+    pub fn dmarc_refused(&self) -> bool {
+        dmarc_refused(self.headers.authentication_results.as_deref())
     }
 }
 
@@ -156,6 +163,7 @@ impl TryFrom<CandidateRow> for Candidate {
             headers: serde_json::from_value(r.headers).unwrap_or_default(),
             suspicious: r.suspicious,
             sent_at: r.sent_at,
+            correspondent: false,
         })
     }
 }
@@ -211,7 +219,8 @@ pub async fn scan(
             examined,
         });
     }
-    let candidates = rows(conn, &ids, &Prefilter::of(conditions)).await?;
+    let mut candidates = rows(conn, &ids, &Prefilter::of(conditions)).await?;
+    mark_correspondents(conn, inbox, &mut candidates).await?;
     Ok(Window {
         candidates,
         next,
@@ -358,6 +367,30 @@ pub async fn candidate(conn: &mut PgConnection, id: ConversationId) -> Result<Op
 
 /// Sent messages [`corresponds`] looks through, newest first.
 pub const CORRESPONDENCE_WINDOW: i64 = 5_000;
+
+/// Mark the candidates whose sender the inbox writes to, among those that
+/// pretend to be their sender (the only ones where it matters): one lookup
+/// per sender.
+async fn mark_correspondents(
+    conn: &mut PgConnection,
+    inbox: InboxId,
+    candidates: &mut [Candidate],
+) -> Result<()> {
+    let mut known: std::collections::HashMap<String, bool> = std::collections::HashMap::new();
+    for candidate in candidates.iter_mut().filter(|c| c.dmarc_refused()) {
+        let sender = candidate.sender_address.to_lowercase();
+        let writes = match known.get(&sender) {
+            Some(writes) => *writes,
+            None => {
+                let writes = corresponds(conn, inbox, &sender).await?;
+                known.insert(sender, writes);
+                writes
+            }
+        };
+        candidate.correspondent = writes;
+    }
+    Ok(())
+}
 
 /// Whether `inbox` wrote to `address` in its last [`CORRESPONDENCE_WINDOW`]
 /// sent messages: they correspond, so mail from them is never hidden by a

@@ -27,7 +27,7 @@ use campbooks_ai::decide::{
     AnswerValue, Question,
     signals::{
         email::{subject_template, triage, triage_questions},
-        facts::sender_checks_failed,
+        facts::{dmarc_refused, sender_checks_failed},
     },
     strategy::{Decided, Strategy},
     taught::{Facts, Outcome, TaughtRule, evaluate},
@@ -688,6 +688,11 @@ impl Apply<'_> {
                         .is_some_and(|d| d.answer.value == AnswerValue::Noul(true))
             });
         let sender = message.from.address.to_lowercase();
+        let results = message.headers.authentication_results.as_deref();
+        let impersonated = dmarc_refused(results);
+        // Whether the inbox writes to them matters only for mail pretending
+        // to be them ("fails its sender checks" never acts on it).
+        let correspondent = impersonated && rules::corresponds(tx, self.inbox, &sender).await?;
         let facts = Facts {
             sender_address: &sender,
             subject: &message.subject,
@@ -699,10 +704,9 @@ impl Apply<'_> {
             labels: &labels,
             stream: &stream,
             suspicious,
-            auth_failed: sender_checks_failed(
-                &sender,
-                message.headers.authentication_results.as_deref(),
-            ),
+            auth_failed: sender_checks_failed(&sender, results),
+            impersonated,
+            correspondent,
         };
         Ok(evaluate(&acting, &facts))
     }

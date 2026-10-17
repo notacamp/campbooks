@@ -1343,6 +1343,7 @@ pub async fn restore(
     )
     .execute(&mut *tx)
     .await?;
+    rule_notices::reaccept(&mut tx, rule.id).await?;
     let rule = rules::find(&mut tx, rule.id)
         .await?
         .ok_or(Error::NotFound)?;

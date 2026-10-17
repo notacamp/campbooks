@@ -21,6 +21,10 @@ pub struct MethodResult {
     pub result: String,
     /// `ptype.property` (lower-case) and its value, in order.
     pub properties: Vec<(String, String)>,
+    /// The text of its own top-level comments (the receiver's notes, such as
+    /// Gmail's `p=REJECT sp=REJECT dis=NONE` after `dmarc=fail`), quoted
+    /// strings and nested comments left out.
+    pub comments: Vec<String>,
 }
 
 impl MethodResult {
@@ -55,10 +59,14 @@ pub fn parse(value: &str) -> Option<Vec<MethodResult>> {
     let segments = tokenise(value)?;
     let mut segments = segments.into_iter();
     // The authserv-id (and an optional version) comes first.
-    segments.next().filter(|tokens| !tokens.is_empty())?;
-    let sections: Vec<Vec<String>> = segments.filter(|tokens| !tokens.is_empty()).collect();
+    segments
+        .next()
+        .filter(|segment| !segment.tokens.is_empty())?;
+    let sections: Vec<Segment> = segments
+        .filter(|segment| !segment.tokens.is_empty())
+        .collect();
     if let [only] = sections.as_slice()
-        && let [word] = only.as_slice()
+        && let [word] = only.tokens.as_slice()
         && word.eq_ignore_ascii_case("none")
     {
         return Some(Vec::new());
@@ -67,8 +75,13 @@ pub fn parse(value: &str) -> Option<Vec<MethodResult>> {
         return None;
     }
     sections
-        .iter()
-        .map(|tokens| method_result(&glue(tokens)))
+        .into_iter()
+        .map(|segment| {
+            method_result(&glue(&segment.tokens)).map(|result| MethodResult {
+                comments: segment.comments,
+                ..result
+            })
+        })
         .collect()
 }
 
@@ -103,18 +116,28 @@ fn glue(tokens: &[String]) -> Vec<String> {
     out
 }
 
+/// One top-level `;`-separated part: its tokens, and its comments' text.
+#[derive(Default)]
+struct Segment {
+    tokens: Vec<String>,
+    comments: Vec<String>,
+}
+
 /// The header's top-level `;`-separated parts, each as its tokens, with
-/// comments dropped and quoted strings kept whole (without their quotes).
-fn tokenise(value: &str) -> Option<Vec<Vec<String>>> {
-    fn flush(token: &mut String, segments: &mut [Vec<String>]) {
+/// comments set apart (their own top-level text only) and quoted strings
+/// kept whole (without their quotes).
+fn tokenise(value: &str) -> Option<Vec<Segment>> {
+    fn flush(token: &mut String, segments: &mut [Segment]) {
         if !token.is_empty()
             && let Some(last) = segments.last_mut()
         {
-            last.push(std::mem::take(token));
+            last.tokens.push(std::mem::take(token));
         }
     }
-    let mut segments: Vec<Vec<String>> = vec![Vec::new()];
+    let mut segments: Vec<Segment> = vec![Segment::default()];
     let mut token = String::new();
+    // The comment being read, at depth 1.
+    let mut comment = String::new();
     let mut depth = 0_usize;
     let mut quoted = false;
     let mut escaped = false;
@@ -142,11 +165,20 @@ fn tokenise(value: &str) -> Option<Vec<Vec<String>>> {
                 flush(&mut token, &mut segments);
                 depth += 1;
             }
-            ')' => depth = depth.checked_sub(1)?,
+            ')' => {
+                depth = depth.checked_sub(1)?;
+                if depth == 0
+                    && let Some(last) = segments.last_mut()
+                {
+                    last.comments
+                        .push(std::mem::take(&mut comment).trim().to_owned());
+                }
+            }
+            c if depth == 1 => comment.push(c),
             _ if depth > 0 => {}
             ';' => {
                 flush(&mut token, &mut segments);
-                segments.push(Vec::new());
+                segments.push(Segment::default());
             }
             c if c.is_whitespace() => flush(&mut token, &mut segments),
             c => token.push(c),
@@ -178,6 +210,7 @@ fn method_result(tokens: &[String]) -> Option<MethodResult> {
         method,
         result,
         properties,
+        comments: Vec::new(),
     })
 }
 
@@ -214,6 +247,9 @@ mod tests {
             results[0].values("header.i").collect::<Vec<_>>(),
             ["@github.com"]
         );
+        // Each result keeps its own comments' text.
+        assert_eq!(results[2].comments, ["p=REJECT sp=REJECT dis=NONE"]);
+        assert!(results[0].comments.is_empty());
     }
 
     #[test]

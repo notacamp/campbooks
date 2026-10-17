@@ -37,10 +37,11 @@ export interface AheadOfferApi {
    */
   offer: (conversation: ConversationSummary, action: AheadAction) => void;
   /**
-   * The action was undone: an offer still to come, or still asking, goes
-   * (a confirmation already open stays, the member chose it).
+   * The action on `conversationId` was undone (any, when not given): its
+   * offer, still to come or still asking, goes (a confirmation already open
+   * stays, the member chose it).
    */
-  cancel: () => void;
+  cancel: (conversationId?: string) => void;
   /** The offer and its confirmation, rendered once by the screen. */
   element: ReactNode;
   /** An offer is up and holds 1 and Esc: the screen leaves its own unbound. */
@@ -57,11 +58,14 @@ export interface AheadOfferApi {
 export function useAheadOffer(workspaceId: string): AheadOfferApi {
   const [state, setState] = useState<Step>({ step: "idle" });
   const asked = useRef(0);
+  // The conversation the latest ask is about.
+  const askedFor = useRef<string | null>(null);
 
   const offer = useCallback(
     (conversation: ConversationSummary, action: AheadAction) => {
       const ask = asked.current + 1;
       asked.current = ask;
+      askedFor.current = conversation.id;
       const need = conversation.need;
       const payee = need === null || need === undefined ? "" : needSender(need, conversation);
       void suggestRules(workspaceId, conversation.id, action)
@@ -89,9 +93,14 @@ export function useAheadOffer(workspaceId: string): AheadOfferApi {
     setState({ step: "idle" });
   }, []);
 
-  const cancel = useCallback(() => {
-    asked.current += 1;
-    setState((current) => (current.step === "asking" ? { step: "idle" } : current));
+  const cancel = useCallback((conversationId?: string) => {
+    const about = (id: string | null) => conversationId === undefined || id === conversationId;
+    if (about(askedFor.current)) {
+      asked.current += 1;
+    }
+    setState((current) =>
+      current.step === "asking" && about(current.conversation.id) ? { step: "idle" } : current,
+    );
   }, []);
 
   let element: ReactNode = null;

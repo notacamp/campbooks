@@ -273,6 +273,8 @@ export function WhatNeedsYou({ workspaceId, now, offer }: WhatNeedsYouProps) {
   const needActions = useNeedActions(workspaceId, {
     onChanged: refresh,
     onUndo: (conversation) => {
+      // Undone (Already paid, Report and delete…): no offer about it.
+      ahead.cancel(conversation.id);
       const row = rowOf(conversation);
       if (row !== undefined) {
         show(row);
@@ -298,9 +300,6 @@ export function WhatNeedsYou({ workspaceId, now, offer }: WhatNeedsYouProps) {
     },
     onReported: (conversation) => {
       ahead.offer(conversation, { kind: "report" });
-    },
-    onReportUndone: () => {
-      ahead.cancel();
     },
   });
 

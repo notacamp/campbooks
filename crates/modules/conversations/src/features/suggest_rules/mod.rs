@@ -365,8 +365,9 @@ fn ahead_likenesses(candidate: &Candidate, bins: bool) -> Vec<(Likeness, Vec<Rul
     let by_sender = (Likeness::Sender, vec![RuleCondition::SenderAddress(sender)]);
     // Mail pretending to be a sender is only ever offered to the bin: never
     // marked paid, never filed.
-    // Only on an explicit DMARC failure: the domain's genuine mail passes.
-    if bins && candidate.dmarc_failed() && own_domain {
+    // Only on a DMARC failure under a reject or quarantine policy: the
+    // domain's genuine mail passes.
+    if bins && candidate.dmarc_refused() && own_domain {
         return vec![
             (
                 Likeness::Impersonation,

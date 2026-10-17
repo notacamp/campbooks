@@ -48,6 +48,8 @@ CREATE TABLE conversations.rule_notice_answers (
     PRIMARY KEY (inbox_id, user_id, kind, sender_address),
     CHECK ((answer = 'not_now') = (until IS NOT NULL))
 );
+-- A departing member's answers go (`forget_member`).
+CREATE INDEX rule_notice_answers_user_idx ON conversations.rule_notice_answers (user_id);
 
 -- When each inbox was last looked at, so a pass runs at most so often.
 CREATE TABLE conversations.rule_notice_scans (

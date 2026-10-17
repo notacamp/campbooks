@@ -137,7 +137,7 @@ impl Condition {
             }
             Self::Label(label) => facts.labels.iter().any(|l| l == label),
             Self::Stream(stream) => facts.stream == stream,
-            Self::SenderChecksFail => facts.auth_failed,
+            Self::SenderChecksFail => facts.impersonated && !facts.correspondent,
         }
     }
 }
@@ -265,6 +265,10 @@ pub enum Invalid {
     /// Neither the sender, a list, a header nor the subject is tested.
     #[error("a rule must say which mail it is about")]
     TooBroad,
+    /// The trash or spam for a whole domain: people the inbox writes to may
+    /// send from it.
+    #[error("a whole domain is never put in the trash or spam")]
+    DomainToBin,
 }
 
 /// Free mail providers: a domain of theirs on its own would match people.
@@ -421,6 +425,18 @@ impl TaughtRule {
                 return Err(Invalid::FreeMailDomain);
             }
         }
+        // The trash and spam need more than a domain: a narrowing condition,
+        // or "fails its sender checks" (mail pretending to be it).
+        let bins = actions
+            .iter()
+            .any(|a| matches!(a, Action::Trash | Action::Spam));
+        if bins
+            && !conditions
+                .iter()
+                .any(|c| narrows(c) || *c == Condition::SenderChecksFail)
+        {
+            return Err(Invalid::DomainToBin);
+        }
         Ok(())
     }
 
@@ -464,8 +480,17 @@ pub struct Facts<'a> {
     /// Review need.
     pub suspicious: bool,
     /// The receiving provider's authentication results say the sender's
-    /// domain failed its checks (`EmailFacts::authentication_failed`).
+    /// domain failed its checks (`EmailFacts::authentication_failed`): the
+    /// broad test, which keeps `mark_paid` off such mail.
     pub auth_failed: bool,
+    /// They hold an explicit DMARC failure under a published reject or
+    /// quarantine policy (`signals::facts::dmarc_refused`): the narrow test
+    /// "fails its sender checks" reads, since the domain's genuine mail
+    /// passes.
+    pub impersonated: bool,
+    /// The inbox writes to the sender: "fails its sender checks" never
+    /// matches their mail.
+    pub correspondent: bool,
 }
 
 /// One slot's answer and the rule that gave it.
@@ -681,6 +706,8 @@ impl Strategy for TaughtRules {
                 stream: "primary",
                 suspicious: false,
                 auth_failed: false,
+                impersonated: false,
+                correspondent: false,
             };
             let outcome = evaluate(&self.rules, &facts);
             let answers = questions

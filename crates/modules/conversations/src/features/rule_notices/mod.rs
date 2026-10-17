@@ -221,6 +221,33 @@ pub async fn scan(
     )
     .execute(&mut *conn)
     .await?;
+    record_scan(conn, (workspace, inbox), settings).await?;
+    Ok(kept)
+}
+
+/// Record that `inbox` was looked at, so the next pass waits
+/// `every_hours`.
+async fn record_scan(
+    conn: &mut PgConnection,
+    (workspace, inbox): (sqlx::types::Uuid, InboxId),
+    settings: &NoticeSettings,
+) -> Result<()> {
+    // An inbox with no mail in the window yet (its first sync still to
+    // come, as on a new member's first Home) is looked at again next time,
+    // not left for a day.
+    let window = i32::try_from(settings.window_days).unwrap_or(i32::MAX);
+    let has_mail = sqlx::query_scalar!(
+        r#"SELECT EXISTS (SELECT 1 FROM conversations.messages
+                           WHERE inbox_id = $1 AND direction = 'inbound'
+                             AND sent_at > now() - make_interval(days => $2)) AS "e!""#,
+        inbox as InboxId,
+        window,
+    )
+    .fetch_one(&mut *conn)
+    .await?;
+    if !has_mail {
+        return Ok(());
+    }
     sqlx::query!(
         r#"INSERT INTO conversations.rule_notice_scans (inbox_id, workspace_id, scanned_at)
            VALUES ($1, $2, now())
@@ -230,7 +257,7 @@ pub async fn scan(
     )
     .execute(&mut *conn)
     .await?;
-    Ok(kept)
+    Ok(())
 }
 
 /// Each sender's mail in `inbox` over the window, the most frequent first.
@@ -694,14 +721,29 @@ pub async fn accept(conn: &mut PgConnection, notice: RuleNoticeId, rule: RuleId)
 }
 
 /// `rule` was removed within `minutes` of being saved from a suggestion
-/// (Undo): the suggestion is offered again.
+/// (Undo): the suggestion is offered again. It keeps naming the rule, so
+/// bringing the rule back ([`reaccept`]) takes the suggestion with it.
 pub async fn reopen(conn: &mut PgConnection, rule: RuleId, minutes: i32) -> Result<()> {
     sqlx::query!(
         r#"UPDATE conversations.rule_notices
-              SET state = 'open', rule_id = NULL, accepted_at = NULL, refreshed_at = now()
+              SET state = 'open', accepted_at = NULL, refreshed_at = now()
             WHERE rule_id = $1 AND accepted_at > now() - make_interval(mins => $2)"#,
         rule as RuleId,
         minutes,
+    )
+    .execute(conn)
+    .await?;
+    Ok(())
+}
+
+/// `rule` was brought back (Undo of its removal): the suggestion it came
+/// from, offered again meanwhile, is accepted again, so Scout does not offer
+/// it twice and saving it cannot make a second rule.
+pub async fn reaccept(conn: &mut PgConnection, rule: RuleId) -> Result<()> {
+    sqlx::query!(
+        r#"UPDATE conversations.rule_notices SET state = 'accepted', accepted_at = now()
+            WHERE rule_id = $1 AND state = 'open'"#,
+        rule as RuleId,
     )
     .execute(conn)
     .await?;

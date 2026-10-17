@@ -24,15 +24,19 @@ function isPhone(page: Page): boolean {
   return (page.viewportSize()?.width ?? 1440) < 768;
 }
 
-/** Wait until Home shows `text` (the sync and the decide pass run first). */
+/**
+ * Wait until Home shows `text` (the sync and the decide pass run first).
+ * Reloads every few seconds: each load opens the change feed, which is
+ * rate-limited.
+ */
 async function homeShows(page: Page, workspace: string, text: string | RegExp): Promise<void> {
-  for (let attempt = 0; attempt < 90; attempt += 1) {
+  for (let attempt = 0; attempt < 24; attempt += 1) {
     await page.goto(`/w/${workspace}`);
     await page.getByRole("heading", { level: 1 }).waitFor();
     if ((await page.getByText(text).count()) > 0) {
       return;
     }
-    await pause(1000);
+    await pause(4500);
   }
 }
 

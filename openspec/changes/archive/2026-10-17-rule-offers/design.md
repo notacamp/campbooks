@@ -39,9 +39,17 @@ a notice is the caller's to fetch, and rule changes publish
 `Authentication-Results` read as the facts already read it
 (`EmailFacts::authentication_failed`: a DMARC fail, or neither a DMARC pass
 for the From domain nor an aligned DKIM pass; absent results say nothing).
-The offer uses it only on an explicit `dmarc=fail`: the domain publishes
-DMARC, so its genuine mail passes (for a domain that authenticates nothing,
-its genuine mail fails the checks too, and the offer is the sender instead).
+The offer, and the condition itself (`sender_checks_fail`), use only a
+`dmarc=fail` under a published `reject` or `quarantine` policy (Gmail's
+`dmarc=fail (p=REJECT …)`, read from the result's own comment): the domain
+asks for such mail to be refused, so its genuine mail passes. A domain that
+authenticates nothing, or publishes `p=none`, fails with genuine mail sent
+through other tools too, and a policy that cannot be read (some providers
+leave it out) offers nothing: the offer is then the sender. The condition
+never matches mail from an address the inbox writes to, on arrival and over
+existing mail. The broader test (`EmailFacts::authentication_failed`) still
+keeps `mark_paid` off a bill, where broader is safer. `create_rule` refuses a
+trash or spam rule with nothing narrower than a domain.
 Then the offer's default is the From domain *with* that condition,
 never the bare domain, and only for a rule that reports or deletes: the
 offer after Already paid never offers "pretending to be" (a pretender's

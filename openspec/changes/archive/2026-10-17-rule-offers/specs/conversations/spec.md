@@ -10,9 +10,11 @@ additive). Conditions SHALL be
 own), `list_id is`, `subject_template is`, `subject_contains` (whole words,
 case- and accent-insensitive), `header is|present` (a stored header),
 `label has`, `stream is` and `sender_checks_fail` (the receiving provider's
-authentication results say the sender's domain failed its checks: a DMARC
-fail, or neither a DMARC pass for the From domain nor an aligned DKIM pass;
-absent results never hold it; never on its own). Actions SHALL be
+authentication results hold `dmarc=fail` under a published `reject` or
+`quarantine` policy, so the domain's genuine mail passes; a policy that
+cannot be read, and absent results, never hold it; never on its own; never
+for mail from an address the inbox writes to, on arrival and over existing
+mail alike). Actions SHALL be
 `move_to_stream`, `archive`,
 `add_label`, `mark_read`, `needs_reply` true or false, `asks_action` true or
 false, `surface` always or never, `trash`, `spam` and `mark_paid`. A rule
@@ -43,6 +45,14 @@ now a public suffix answers 400 `invalid_rule` and is not kept.
 #### Scenario: Failed checks alone
 - **WHEN** a rule's only condition is `sender_checks_fail`
 - **THEN** the response is 400 with code `invalid_rule`
+
+#### Scenario: A whole domain to the bin
+- **WHEN** a rule would put all mail from `sender_domain is shop.example` in the trash or spam, with nothing narrower than the domain and no `sender_checks_fail`
+- **THEN** the response is 400 with code `invalid_rule`
+
+#### Scenario: Pretending, but someone the inbox writes to
+- **WHEN** a rule reports mail from paypal.com that fails its sender checks, and mail failing DMARC under p=REJECT arrives from billing@paypal.com, whom Sam writes to, and from service@paypal.com, whom he does not
+- **THEN** only the mail from service@paypal.com is reported, and mail failing DMARC under p=NONE is never
 
 #### Scenario: A stored rule naming a public suffix
 - **WHEN** a rule stored with `sender_domain is github.io` meets mail from `a@a.github.io`
@@ -83,8 +93,8 @@ two other conversations or the message has a List-Id, never for a suspicious
 conversation, and never while the member dismissed it. After the member
 reported the conversation as spam (`action=report`) it SHALL offer to report
 mail like it as it arrives, suspicious as it is: when the receiving provider
-says its sender explicitly failed DMARC (`dmarc=fail`, so the domain's genuine
-mail passes), the sender's domain with `sender_checks_fail` first, then the
+says its sender failed DMARC under a `reject` or `quarantine` policy (so the
+domain's genuine mail passes), the sender's domain with `sender_checks_fail` first, then the
 sender; else the sender only. A whole domain SHALL never be offered to the
 trash or spam (people the inbox writes to may send from it). After Already paid on its Pay
 need (`action=paid`) it SHALL offer `mark_paid` for the sender, then its
@@ -183,7 +193,10 @@ suggestion's `notice_id` SHALL create its rule active with origin
 `suggestion` (the member confirmed it) and accept the suggestion; a
 suggestion of another inbox, or not open, answers 400 `invalid_rule`.
 Removing that rule with `restore` within 15 minutes SHALL offer the
-suggestion again. A caller who cannot see the inbox SHALL get 404, a reader
+suggestion again, and bringing the rule back (`conversations.restore_rule`)
+SHALL accept it again, so it is neither offered twice nor saved as a second
+rule. A pass over an inbox with no inbound mail in the window yet (its first
+sync still to come) SHALL not count as one, so the next list looks again. A caller who cannot see the inbox SHALL get 404, a reader
 or an app 403. Removing an inbox's connection with its mail kept SHALL forget
 its suggestions; a departing member's answers SHALL go.
 
@@ -197,7 +210,11 @@ its suggestions; a departing member's answers SHALL go.
 
 #### Scenario: Saying yes
 - **WHEN** Sam saves the suggestion's rule with its `notice_id`, then undoes it
-- **THEN** the rule acted at once, its mail is put back, and the suggestion is offered again
+- **THEN** the rule acted at once, its mail is put back, and the suggestion is offered again; undoing that brings the rule back and the suggestion goes, and saving it again answers 400
+
+#### Scenario: Before the first sync
+- **WHEN** Home lists suggestions before any of Sam's mail arrived, and then his first sync lands
+- **THEN** the first pass finds nothing and is not counted, and the next list looks again and offers the suggestion
 
 #### Scenario: Someone else's inbox
 - **WHEN** Leo, who is not in Sam's inbox, lists suggestions or answers one by its id

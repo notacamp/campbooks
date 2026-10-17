@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE conversations.rule_notices\n              SET state = 'open', accepted_at = NULL, refreshed_at = now()\n            WHERE rule_id = $1 AND accepted_at > now() - make_interval(mins => $2)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Int4"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "f55c46195b1970cbeb9a19df90b755f91fcf63320e1ef59cf2db93a1e0bb7105"
+}

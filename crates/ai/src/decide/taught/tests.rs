@@ -411,6 +411,7 @@ fn a_rule_against_mail_failing_its_sender_checks_reports_it_even_when_suspicious
     let fake = Facts {
         suspicious: true,
         auth_failed: true,
+        impersonated: true,
         ..facts("service@paypal.com", "Your account has been limited", None)
     };
     let out = evaluate(&rules, &fake);
@@ -424,6 +425,18 @@ fn a_rule_against_mail_failing_its_sender_checks_reports_it_even_when_suspicious
     // The real sender passes its checks: the rule leaves it alone.
     let real = facts("service@paypal.com", "Your receipt", None);
     assert!(evaluate(&rules, &real).is_empty());
+    // Failing the broad checks only (no DMARC refusal): left alone too.
+    let unsigned = Facts {
+        auth_failed: true,
+        ..facts("service@paypal.com", "Your receipt", None)
+    };
+    assert!(evaluate(&rules, &unsigned).is_empty());
+    // Someone the inbox writes to is never reported by it.
+    let colleague = Facts {
+        correspondent: true,
+        ..fake
+    };
+    assert!(evaluate(&rules, &colleague).is_empty());
 }
 
 #[test]
@@ -483,6 +496,28 @@ fn paid_is_its_own_slot_and_never_for_suspicious_mail() {
         TaughtRule::validate(&[Condition::SenderChecksFail], &[Action::Spam]),
         Err(Invalid::TooBroad)
     );
+    // A whole domain is never binned; pretending to be it, or one sender
+    // of it, may be.
+    let domain = Condition::SenderDomain("shop.example".into());
+    assert_eq!(
+        TaughtRule::validate(std::slice::from_ref(&domain), &[Action::Trash]),
+        Err(Invalid::DomainToBin)
+    );
+    assert_eq!(
+        TaughtRule::validate(
+            &[domain.clone(), Condition::Stream("updates".into())],
+            &[Action::Spam]
+        ),
+        Err(Invalid::DomainToBin)
+    );
+    assert_eq!(
+        TaughtRule::validate(
+            &[domain.clone(), Condition::SenderChecksFail],
+            &[Action::Spam]
+        ),
+        Ok(())
+    );
+    assert_eq!(TaughtRule::validate(&[domain], &[Action::Archive]), Ok(()));
     let json = serde_json::to_value(Condition::SenderChecksFail).unwrap();
     assert_eq!(json, serde_json::json!({"field": "sender_checks_fail"}));
 }

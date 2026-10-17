@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE conversations.rule_notices SET state = 'accepted', accepted_at = now()\n            WHERE rule_id = $1 AND state = 'open'",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "a7d7251d90e78a850fcd47ce56b4cc5aef7ccecff682ab1349a7f55cda9665ff"
+}

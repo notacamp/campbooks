@@ -212,6 +212,9 @@ fn mail_with_results(prefix: &str, from: &str, results: &str, n: usize) -> serde
 }
 
 const FAILED: &str = "mx.google.com; spf=fail smtp.mailfrom=paypal.com; dmarc=fail (p=REJECT) header.from=paypal.com";
+/// A DMARC failure under a policy that asks for nothing to be refused.
+const MONITORED: &str =
+    "mx.google.com; spf=fail smtp.mailfrom=paypal.com; dmarc=fail (p=NONE) header.from=paypal.com";
 const PASSED: &str =
     "mx.google.com; dkim=pass header.i=@paypal.com; dmarc=pass (p=REJECT) header.from=paypal.com";
 
@@ -369,4 +372,91 @@ async fn already_paid_offers_to_mark_the_senders_bills_paid(db: PgPool) {
     let first = &offered.json["suggestions"][0];
     assert_eq!(first["likeness"], "sender");
     assert_eq!(first["actions"], json!([{"action": "mark_paid"}]));
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn an_impersonation_rule_never_reports_someone_the_inbox_writes_to(db: PgPool) {
+    let kit = Kit::with_deps(db, ConversationsDeps::offline()).await;
+    let workspace = WorkspaceId::new();
+    let (sam, sam_id) = kit.member("sam", workspace);
+    let inbox = kit
+        .inbox(
+            workspace,
+            "sam@example.com",
+            &[(sam_id, InboxRole::Manager)],
+        )
+        .await;
+    // Sam writes to billing@paypal.com.
+    kit.ingest_value(
+        workspace,
+        inbox,
+        &json!({"changes": [{"op": "upsert", "message": {
+            "provider_message_id": "to-billing", "thread_key": "thr-to-billing",
+            "from": {"name": "Sam Rivers", "address": "sam@example.com"},
+            "to": [{"name": "PayPal Billing", "address": "billing@paypal.com"}],
+            "subject": "Invoice question", "sent_at": "2026-09-30T08:00:00Z",
+            "direction": "outbound", "text": "Hello.",
+            "mailbox": {"in_inbox": false}, "read": true, "starred": false
+        }}]}),
+    )
+    .await;
+    for (prefix, from, results) in [
+        ("old-billing", "billing@paypal.com", FAILED),
+        ("old-service", "service@paypal.com", FAILED),
+        ("old-monitored", "notices@paypal.com", MONITORED),
+    ] {
+        kit.ingest_value(
+            workspace,
+            inbox,
+            &mail_with_results(prefix, from, results, 1),
+        )
+        .await;
+    }
+    let created = kit
+        .post(
+            &sam,
+            &format!("/api/v1/w/{workspace}/inboxes/{inbox}/rules"),
+            Some(json!({
+                "conditions": [
+                    {"field": "sender_domain", "value": "paypal.com"},
+                    {"field": "sender_checks_fail"}
+                ],
+                "actions": [{"action": "spam"}],
+            })),
+        )
+        .await;
+    assert_eq!(created.status, StatusCode::CREATED, "{:?}", created.json);
+    kit.run_jobs().await;
+    for (prefix, from, results) in [
+        ("new-billing", "billing@paypal.com", FAILED),
+        ("new-service", "service@paypal.com", FAILED),
+        ("new-monitored", "notices@paypal.com", MONITORED),
+    ] {
+        kit.ingest_value(
+            workspace,
+            inbox,
+            &mail_with_results(prefix, from, results, 1),
+        )
+        .await;
+    }
+    let spam: Vec<(String, bool)> = sqlx::query_as(
+        "SELECT provider_message_id, in_spam FROM conversations.messages
+          WHERE direction = 'inbound' ORDER BY provider_message_id",
+    )
+    .fetch_all(&kit.db)
+    .await
+    .unwrap();
+    // Over existing mail and on arrival alike: only the fake from an
+    // address Sam never wrote to, under a policy that refuses it.
+    assert_eq!(
+        spam,
+        [
+            ("new-billing-0".to_owned(), false),
+            ("new-monitored-0".to_owned(), false),
+            ("new-service-0".to_owned(), true),
+            ("old-billing-0".to_owned(), false),
+            ("old-monitored-0".to_owned(), false),
+            ("old-service-0".to_owned(), true),
+        ]
+    );
 }

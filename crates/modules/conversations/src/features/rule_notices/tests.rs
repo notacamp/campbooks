@@ -128,6 +128,54 @@ async fn mail_never_opened_is_noticed_and_offered_as_a_rule(db: PgPool) {
         .get(&sam, &format!("/api/v1/w/{workspace}/rule-notices"))
         .await;
     assert_eq!(again.json["notices"].as_array().unwrap().len(), 1);
+
+    // Undo of the Undo: the rule is back, and the suggestion with it is
+    // accepted again, never a second rule.
+    let restored = kit
+        .post(
+            &sam,
+            &format!("/api/v1/w/{workspace}/rules/{rule}/restore"),
+            Some(json!({"apply_to_existing": true})),
+        )
+        .await;
+    assert_eq!(restored.status, StatusCode::OK, "{:?}", restored.json);
+    let after = kit
+        .get(&sam, &format!("/api/v1/w/{workspace}/rule-notices"))
+        .await;
+    assert!(after.json["notices"].as_array().unwrap().is_empty());
+    let twice = kit
+        .post(
+            &sam,
+            &format!("/api/v1/w/{workspace}/inboxes/{inbox}/rules"),
+            Some(json!({
+                "conditions": notice["conditions"],
+                "actions": notice["actions"],
+                "origin": "suggestion",
+                "notice_id": notice["id"],
+            })),
+        )
+        .await;
+    assert_eq!(twice.status, StatusCode::BAD_REQUEST, "{:?}", twice.json);
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_pass_before_the_first_sync_looks_again_once_mail_arrives(db: PgPool) {
+    let kit = Kit::with_deps(db, ConversationsDeps::offline()).await;
+    let (workspace, inbox, sam) = sams_inbox(&kit).await;
+    // Home's first load, before any mail: nothing, and nothing recorded.
+    assert!(noticed(&kit, &sam, workspace).await.is_empty());
+    let scanned: Option<bool> =
+        sqlx::query_scalar("SELECT true FROM conversations.rule_notice_scans WHERE inbox_id = $1")
+            .bind(inbox)
+            .fetch_optional(&kit.db)
+            .await
+            .unwrap();
+    assert_eq!(scanned, None);
+    // The first sync lands: the next Home load looks again at once.
+    kit.ingest_value(workspace, inbox, &daily("ci", BUILDS, 12))
+        .await;
+    let notices = noticed(&kit, &sam, workspace).await;
+    assert_eq!(notices.len(), 1, "{notices:?}");
 }
 
 #[sqlx::test(migrations = "../../../migrations")]
