@@ -496,7 +496,11 @@ flow with PKCE as the confidential client `campbooks-web`; `/bff/callback`
 validates the ID token (with the kernel's JWKS cache) and starts a session.
 Sessions live in Postgres schema `bff`: the cookie value only as a hash, the
 access, refresh and ID tokens encrypted (AES-256-GCM, key derived from
-`CAMPBOOKS_SECRET_KEY`). The browser gets one `HttpOnly`, `SameSite=Strict`
+`CAMPBOOKS_SECRET_KEY`), as are a started sign-in's PKCE verifier and nonce.
+The runtime role holds no privilege on these tables: the BFF reaches them
+through `SECURITY DEFINER` functions in schema `bff`, each acting on the one
+session a presented cookie's hash names, one sign-in, or one account
+(campbooks-cloud#212). The browser gets one `HttpOnly`, `SameSite=Strict`
 `__Host-campbooks_session` cookie and nothing else. `/bff/api/*` attaches the
 session's access token (refreshed just before it expires, once per session
 however many requests race) and runs the request through the API router in

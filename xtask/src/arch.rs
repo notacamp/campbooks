@@ -289,13 +289,15 @@ static SCHEMA_STATEMENT: LazyLock<Regex> = LazyLock::new(|| {
     .unwrap_or_else(|e| unreachable!("static regex compiles: {e}"))
 });
 
-/// A function's own `SET search_path = pg_catalog, pg_temp` (not followed by
-/// `;`, which would end a statement changing the session's path): the
-/// hygiene a `SECURITY DEFINER` function needs, so names in its body cannot
-/// be shadowed by the caller's objects. The only mention of `search_path` a
-/// migration may make.
+/// A function's own `SET search_path = pg_catalog, pg_temp`: the hygiene a
+/// `SECURITY DEFINER` function needs, so names in its body cannot be
+/// shadowed by the caller's objects. The only mention of `search_path` a
+/// migration may make. Exactly those two entries, `pg_temp` last: a match
+/// followed by `,` (another entry), by `;` or by the end of the file (a
+/// statement changing the session's path) captures group 1 and is refused
+/// (campbooks-cloud#213).
 static PINNED_SEARCH_PATH: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r"\bset\s+search_path\s*(?:=|to)\s*pg_catalog\s*,\s*pg_temp\b(\s*;)?")
+    Regex::new(r"\bset\s+search_path\s*(?:=|to)\s*pg_catalog\s*,\s*pg_temp\b(\s*(?:[,;]|$))?")
         .unwrap_or_else(|e| unreachable!("static regex compiles: {e}"))
 });
 
@@ -1516,9 +1518,31 @@ mod tests {
                  SET search_path = pg_catalog, pg_temp AS $$ SELECT 1 $$; \
                  SET search_path TO kernel;",
             ),
+            // Another entry after `pg_temp`, so it is not last.
+            sql(
+                "20261012000004_kernel__path.sql",
+                "CREATE FUNCTION kernel.f() RETURNS int LANGUAGE sql SECURITY DEFINER \
+                 SET search_path = pg_catalog, pg_temp, kernel AS $$ SELECT 1 $$;",
+            ),
+            sql(
+                "20261012000005_kernel__path.sql",
+                "CREATE FUNCTION kernel.f() RETURNS int LANGUAGE sql SECURITY DEFINER \
+                 SET search_path = pg_catalog, pg_temp , public AS $$ SELECT 1 $$;",
+            ),
+            // `pg_temp` before another schema.
+            sql(
+                "20261012000006_kernel__path.sql",
+                "CREATE FUNCTION kernel.f() RETURNS int LANGUAGE sql SECURITY DEFINER \
+                 SET search_path = pg_temp, pg_catalog AS $$ SELECT 1 $$;",
+            ),
+            // A session-wide statement at the very end of the file.
+            sql(
+                "20261012000007_kernel__path.sql",
+                "SELECT 1;\nSET search_path = pg_catalog, pg_temp\n",
+            ),
         ];
         let v = check_migration_schemas(&bad, &modules);
-        assert_eq!(v.len(), 3, "{v:#?}");
+        assert_eq!(v.len(), 7, "{v:#?}");
         assert!(v.iter().all(|v| v.contains("search_path")), "{v:#?}");
     }
 
