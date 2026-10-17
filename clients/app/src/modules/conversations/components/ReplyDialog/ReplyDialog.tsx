@@ -12,6 +12,7 @@ import {
   DialogChoices,
   ReplyDraft,
   ReplyQuote,
+  Text,
   useUndoToast,
   type DialogResult,
 } from "~/lib/ui";
@@ -65,11 +66,15 @@ const MAX_ASK_CHARS = 300;
 /** Longest quote shown from the message answered, in characters. */
 const QUOTE_CHARS = 280;
 
-/** The person a reply to `message` goes to. */
-function personOf(message: MessageView): string {
-  const to =
-    message.direction === "outbound" ? message.to[0] : (message.reply_to[0] ?? message.from);
-  return to === undefined ? "" : displayName(to);
+/** Who a reply to `message` goes to: the server sends it there (Reply-To first). */
+function recipientOf(message: MessageView) {
+  return message.direction === "outbound" ? message.to[0] : (message.reply_to[0] ?? message.from);
+}
+
+/** "Marta Ferreira <marta@casa-lume.example>", or the address alone. */
+function addressLine(party: { name?: string | null; address: string }): string {
+  const name = party.name?.trim();
+  return name === undefined || name === "" ? party.address : `${name} <${party.address}>`;
 }
 
 /** The first name, for the title ("Reply to Marta"). */
@@ -103,8 +108,16 @@ export function ReplyDialog({
   const messages = detail.data?.messages ?? [];
   // The newest message, as the reader's Reply answers it.
   const answered = messages.at(-1);
-  const theirs = messages.findLast((m) => m.direction === "inbound") ?? answered;
-  const person = name ?? (answered === undefined ? "" : personOf(answered));
+  // Who it really goes to, never only the sender's display name: a Reply-To
+  // elsewhere is said out loud.
+  const recipient = answered === undefined ? undefined : recipientOf(answered);
+  const person = recipient === undefined ? (name ?? "") : displayName(recipient);
+  const elsewhere =
+    answered?.direction === "inbound" &&
+    answered.reply_to[0] !== undefined &&
+    answered.reply_to[0].address.toLowerCase() !== answered.from.address.toLowerCase()
+      ? answered.reply_to[0]
+      : undefined;
   const drafts = useConversationDrafts(workspaceId, conversationId);
   const suggestions = useReplySuggestions(workspaceId, conversationId, answered?.id, {
     enabled: resume === undefined,
@@ -323,19 +336,31 @@ export function ReplyDialog({
   );
 
   const intents = suggestions.data?.intents ?? [];
+  // The message answered, the one the draft replies to.
   const quote =
-    theirs?.text?.content === undefined || theirs.text.content.trim() === "" ? undefined : (
+    answered?.text?.content === undefined || answered.text.content.trim() === "" ? undefined : (
       <ReplyQuote
         from={t("reply.quoteFrom", {
-          name: displayName(theirs.from),
+          name: displayName(answered.from),
           date: new Intl.DateTimeFormat(i18n.language, {
             weekday: "short",
             day: "numeric",
             month: "short",
-          }).format(new Date(theirs.sent_at)),
+          }).format(new Date(answered.sent_at)),
         })}
-        text={theirs.text.content.trim().slice(0, QUOTE_CHARS)}
+        text={answered.text.content.trim().slice(0, QUOTE_CHARS)}
       />
+    );
+  const to =
+    recipient === undefined ? undefined : (
+      <Text tone={elsewhere === undefined ? "secondary" : "danger"} size="sm">
+        {elsewhere === undefined
+          ? t("reply.to", { recipient: addressLine(recipient) })
+          : t("reply.replyToElsewhere", {
+              recipient: addressLine(elsewhere),
+              sender: addressLine(answered?.from ?? elsewhere),
+            })}
+      </Text>
     );
   const problemLine =
     problem === undefined ? null : (
@@ -415,6 +440,7 @@ export function ReplyDialog({
         ) : undefined
       }
     >
+      {to}
       {quote}
       {stage === "choose" ? (
         <>
@@ -463,7 +489,7 @@ export function ReplyDialog({
               <>
                 <Button
                   ai
-                  disabled={busy || text.trim() === ""}
+                  disabled={busy || rewriting !== undefined || text.trim() === ""}
                   onClick={() => {
                     write(intent, { shorter: true });
                   }}

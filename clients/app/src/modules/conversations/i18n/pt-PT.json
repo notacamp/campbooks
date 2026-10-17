@@ -524,6 +524,8 @@
       "dailyLimit": "Este espaço de trabalho já usou a quota de IA de hoje. Escreva esta você mesmo.",
       "send": "Não foi possível enviar para {{name}}. O seu rascunho foi guardado.",
       "open": "Não foi possível abrir o editor. O seu rascunho continua aqui."
-    }
+    },
+    "to": "Para {{recipient}}",
+    "replyToElsewhere": "As respostas vão para {{recipient}}, não para o remetente {{sender}}. Confirme antes de enviar."
   }
 }

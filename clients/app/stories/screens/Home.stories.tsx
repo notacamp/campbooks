@@ -211,9 +211,12 @@ export const ReplyUnavailable: Story = {
     await userEvent.keyboard("j");
     await userEvent.keyboard("r");
     const body = within(canvasElement.ownerDocument.body);
-    await expect(
-      await body.findByText("Scout can't write replies on this server, so you write this one."),
-    ).toBeVisible();
+    // The dialog fades in: wait until its line is shown.
+    await waitFor(async () => {
+      await expect(
+        body.getByText("Scout can't write replies on this server, so you write this one."),
+      ).toBeVisible();
+    });
   },
 };
 

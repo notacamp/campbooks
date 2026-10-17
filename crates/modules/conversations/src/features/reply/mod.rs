@@ -51,6 +51,9 @@ const THREAD_MESSAGES: i64 = 8;
 const MESSAGE_BYTES: usize = 4 * 1024;
 /// Most of the conversation handed on, in bytes.
 const THREAD_BYTES: usize = 16 * 1024;
+/// Most bytes of a subject or a sender's name sent to the model: one long
+/// header must not grow every call on the conversation.
+const NAME_BYTES: usize = 300;
 /// Most of a text part read before quoted history is dropped, in bytes.
 const RAW_TEXT_BYTES: usize = 64 * 1024;
 /// Most of an HTML part read, in bytes.
@@ -376,7 +379,10 @@ async fn prepare<'a>(
 
     // Newest first, within the budget; then oldest first for the model.
     let ws = access.workspace.to_string();
-    let subject = rows.first().map(|row| row.3.clone()).unwrap_or_default();
+    let subject = rows
+        .first()
+        .map(|row| cut_bytes(&row.3, NAME_BYTES))
+        .unwrap_or_default();
     let mut messages = Vec::with_capacity(rows.len());
     let mut budget = THREAD_BYTES;
     for (_, direction, sender, _, sent, bodies) in rows {
@@ -398,10 +404,13 @@ async fn prepare<'a>(
             } else {
                 Author::Them
             },
-            name: sender
-                .name
-                .filter(|name| !name.trim().is_empty())
-                .unwrap_or(sender.address),
+            name: cut_bytes(
+                &sender
+                    .name
+                    .filter(|name| !name.trim().is_empty())
+                    .unwrap_or(sender.address),
+                NAME_BYTES,
+            ),
             sent_at: sent.to_rfc3339_opts(SecondsFormat::Secs, true),
             text,
         });

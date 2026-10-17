@@ -524,6 +524,8 @@
       "dailyLimit": "Este espacio de trabajo ya ha usado la cuota de IA de hoy. Escribe esta tú mismo.",
       "send": "No se ha podido enviar a {{name}}. Tu borrador se ha guardado.",
       "open": "No se ha podido abrir el editor. Tu borrador sigue aquí."
-    }
+    },
+    "to": "Para {{recipient}}",
+    "replyToElsewhere": "Las respuestas van a {{recipient}}, no al remitente {{sender}}. Compruébalo antes de enviar."
   }
 }

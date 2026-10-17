@@ -524,6 +524,8 @@
       "dailyLimit": "Cet espace de travail a utilisé son quota d’IA du jour. Écrivez celle-ci vous-même.",
       "send": "Impossible d’envoyer à {{name}}. Votre brouillon est conservé.",
       "open": "Impossible d’ouvrir l’éditeur. Votre brouillon reste ici."
-    }
+    },
+    "to": "À {{recipient}}",
+    "replyToElsewhere": "Les réponses vont à {{recipient}}, pas à l’expéditeur {{sender}}. Vérifiez avant d’envoyer."
   }
 }

@@ -56,7 +56,8 @@ cannot tell, in `my_language`. Greet the other person by their first name \
 when the conversation gives it, keep it short and natural, and end with \
 `my_name` on its own line when it is given. Say only what `intent` asks and \
 what the conversation supports: never invent dates, amounts, names or \
-commitments.
+commitments. Never add a link, an account, card or IBAN number, a password or \
+a code, and never offer to send money, unless `intent` or `change` gives it.
 
 When `draft` is given, it is the account holder's current reply: rewrite it \
 as `change` asks, or shorter when `shorter` is true, keeping its language, \

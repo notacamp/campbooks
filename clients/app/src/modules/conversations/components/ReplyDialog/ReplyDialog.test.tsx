@@ -110,6 +110,29 @@ describe("ReplyDialog", () => {
     });
   });
 
+  it("says who the reply goes to, and warns when Reply-To is elsewhere", async () => {
+    const newest = Q4_DETAIL.messages.at(-1);
+    if (newest === undefined) {
+      throw new Error("no message");
+    }
+    const elsewhere = {
+      ...Q4_DETAIL,
+      messages: [
+        ...Q4_DETAIL.messages.slice(0, -1),
+        {
+          ...newest,
+          direction: "inbound" as const,
+          reply_to: [{ name: "Billing", address: "pay@elsewhere.example" }],
+        },
+      ],
+    };
+    routes({ [`GET ${C}`]: { body: elsewhere } });
+    dialog();
+    expect(
+      await screen.findByText(/Replies go to Billing <pay@elsewhere\.example>, not to the sender/u),
+    ).toBeVisible();
+  });
+
   it("closes with Esc and creates nothing", async () => {
     const api = routes();
     const handlers = dialog();

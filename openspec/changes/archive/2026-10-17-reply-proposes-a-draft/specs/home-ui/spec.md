@@ -17,7 +17,8 @@ the server refuses or fails, the item SHALL come back and the toast SHALL
 say so and stay until Retry or dismiss (a changed need SHALL be said as
 such, with no Retry). The sender's words and name SHALL be isolated from
 the page's text direction. Items in an inbox the user may only read SHALL
-offer no Reply, Done or Not needed.
+offer only Snooze: no Reply, Done, Not needed, Yes, No or It's safe, since
+each of those writes in the inbox.
 
 #### Scenario: Done and Undo
 - **WHEN** the user presses J then E on Pedro's lease, then Z
@@ -42,8 +43,11 @@ Reply (R, a Home item's Reply, the reader's Reply) SHALL open a dialog
 titled "Reply to <first name>" that asks `conversations.suggest_replies`
 once per message for the session and lists the likely replies as choices
 marked with the visor, keys 1 to 3, a line to say it in your own words, and
-"Write my own", which SHALL open the plain composer as before. While the
-suggestions load the dialog SHALL say Scout is reading the conversation.
+"Write my own", which SHALL open the plain composer as before. The dialog
+SHALL say who the reply goes to, name and address, as the server will send
+it (the message's Reply-To first), and SHALL warn when that Reply-To differs
+from the sender's address. It SHALL quote the message being answered. While
+the suggestions load the dialog SHALL say Scout is reading the conversation.
 Picking an intent, or submitting your own words, SHALL call
 `conversations.write_reply` and show the draft in an editable text area,
 with "Shorter" and "Change…" (a plain-words instruction), both marked with
@@ -87,3 +91,7 @@ and fr.
 #### Scenario: No model on this server
 - **WHEN** the server answers `reply_unavailable`
 - **THEN** the dialog says Scout can't write replies here and offers only "Write my own"
+
+#### Scenario: A Reply-To elsewhere
+- **WHEN** Marta's message has a Reply-To on another address and the member presses R
+- **THEN** the dialog warns that replies go to that address, not to Marta's, before anything is drafted or sent
