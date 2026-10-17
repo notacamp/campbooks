@@ -6,6 +6,13 @@ All notable changes to Campbooks Next are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- **Trash and Report.** A conversation can go to the trash, or be reported as spam
+  ("Report and delete"), with Undo for both. The provider is told too: Gmail gets the
+  trash or spam label, Zoho moves the message to its Trash or Spam folder, and Undo puts
+  it back in the inbox. Mail in the trash or spam never needs you.
+
 ### Fixed
 
 - **Scout's reply suggestions and drafts have room to think.** The model behind them

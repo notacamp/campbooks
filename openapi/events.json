@@ -1904,6 +1904,66 @@
           },
           {
             "type": "object",
+            "description": "Move the message to the trash.",
+            "required": [
+              "kind"
+            ],
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "trash"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "description": "Take the message out of the trash.",
+            "required": [
+              "kind"
+            ],
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "untrash"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "description": "Report the message as spam (move it to the spam folder).",
+            "required": [
+              "kind"
+            ],
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "spam"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "description": "Take the message out of spam, back in the inbox.",
+            "required": [
+              "kind"
+            ],
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "unspam"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
             "description": "Put a label on the message.",
             "required": [
               "label",

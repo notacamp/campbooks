@@ -188,45 +188,34 @@ pub async fn change(
             .fetch_all(&mut *conn)
             .await?
         }
-        Flag::Trash => {
-            sqlx::query_scalar!(
-                "UPDATE conversations.messages SET in_trash = true, updated_at = now()
-                  WHERE conversation_id = $1 AND NOT in_trash RETURNING provider_message_id",
-                id as ConversationId
-            )
-            .fetch_all(&mut *conn)
-            .await?
-        }
-        Flag::Untrash => {
-            sqlx::query_scalar!(
-                "UPDATE conversations.messages SET in_trash = false, updated_at = now()
-                  WHERE conversation_id = $1 AND in_trash RETURNING provider_message_id",
-                id as ConversationId
-            )
-            .fetch_all(&mut *conn)
-            .await?
-        }
-        // The whole conversation, as providers report a thread.
-        Flag::Spam => {
-            sqlx::query_scalar!(
-                "UPDATE conversations.messages SET in_spam = true, in_inbox = false,
-                        updated_at = now()
-                  WHERE conversation_id = $1 AND NOT in_spam
-                 RETURNING provider_message_id",
-                id as ConversationId
-            )
-            .fetch_all(&mut *conn)
-            .await?
-        }
-        Flag::Unspam => {
-            sqlx::query_scalar!(
-                "UPDATE conversations.messages SET in_spam = false, in_inbox = true,
-                        updated_at = now()
-                  WHERE conversation_id = $1 AND in_spam RETURNING provider_message_id",
-                id as ConversationId
-            )
-            .fetch_all(&mut *conn)
-            .await?
+        // Runtime queries (no offline-cache entry needed): ids in, provider
+        // ids out, as the checked ones above.
+        Flag::Trash | Flag::Untrash | Flag::Spam | Flag::Unspam => {
+            let sql = match flag {
+                Flag::Trash => {
+                    "UPDATE conversations.messages SET in_trash = true, updated_at = now()
+                      WHERE conversation_id = $1 AND NOT in_trash RETURNING provider_message_id"
+                }
+                Flag::Untrash => {
+                    "UPDATE conversations.messages SET in_trash = false, updated_at = now()
+                      WHERE conversation_id = $1 AND in_trash RETURNING provider_message_id"
+                }
+                // The whole conversation, as providers report a thread.
+                Flag::Spam => {
+                    "UPDATE conversations.messages SET in_spam = true, in_inbox = false,
+                            updated_at = now()
+                      WHERE conversation_id = $1 AND NOT in_spam RETURNING provider_message_id"
+                }
+                _ => {
+                    "UPDATE conversations.messages SET in_spam = false, in_inbox = true,
+                            updated_at = now()
+                      WHERE conversation_id = $1 AND in_spam RETURNING provider_message_id"
+                }
+            };
+            sqlx::query_scalar::<_, String>(sql)
+                .bind(id.as_uuid())
+                .fetch_all(&mut *conn)
+                .await?
         }
     };
     Ok(changed)
