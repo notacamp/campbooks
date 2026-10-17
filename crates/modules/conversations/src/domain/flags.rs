@@ -41,8 +41,11 @@ pub enum Flag {
 }
 
 impl Flag {
-    pub const fn requested(self) -> RequestedChange {
-        match self {
+    /// The change the provider is asked to make, the same for every
+    /// message. `None` for untrash and not spam: theirs carries each
+    /// message's direction, so only [`change_items`] builds them.
+    pub const fn requested(self) -> Option<RequestedChange> {
+        Some(match self {
             Self::Read => RequestedChange::MarkRead,
             Self::Unread => RequestedChange::MarkUnread,
             Self::Star => RequestedChange::Star,
@@ -50,11 +53,16 @@ impl Flag {
             Self::Archive => RequestedChange::Archive,
             Self::Unarchive => RequestedChange::Unarchive,
             Self::Trash => RequestedChange::Trash,
-            // Each message's own direction is carried by `change_items`.
-            Self::Untrash => RequestedChange::Untrash { inbound: true },
             Self::Spam => RequestedChange::Spam,
-            Self::Unspam => RequestedChange::Unspam { inbound: true },
-        }
+            Self::Untrash | Self::Unspam => return None,
+        })
+    }
+
+    /// [`Flag::requested`], or an internal error for untrash and not spam.
+    pub fn requested_for_all(self) -> Result<RequestedChange> {
+        self.requested().ok_or_else(|| {
+            Error::internal("untrash and not spam carry each message's direction (change_items)")
+        })
     }
 
     pub const fn change(self) -> Change {
@@ -132,7 +140,7 @@ pub async fn change_items(
     if matches!(flag, Flag::Untrash | Flag::Unspam) {
         return out_of_bin(conn, id, flag).await;
     }
-    let requested = flag.requested();
+    let requested = flag.requested_for_all()?;
     Ok(change(conn, id, flag)
         .await?
         .into_iter()

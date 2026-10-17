@@ -721,6 +721,10 @@ account.
 - **WHEN** a member reports a conversation whose message is in Gmail's inbox, then takes it out of spam
 - **THEN** the message gains `SPAM` and loses `INBOX`, then loses `SPAM` and is back in the inbox; the member's own sent mail only loses `SPAM`
 
+#### Scenario: Report on trashed mail in Gmail
+- **WHEN** a member reports one message that is not in Gmail's trash and one that is
+- **THEN** the first gets a label change only, with no `messages.untrash`; the second is untrashed, then gains `SPAM`
+
 #### Scenario: Trash and back in Zoho
 - **WHEN** a member trashes a message filed in one of their own Zoho folders, then untrashes it
 - **THEN** Zoho receives `moveMessage` to the Trash folder, then back to that folder, both changes are `applied`, and neither write comes back as a change
@@ -736,3 +740,7 @@ account.
 #### Scenario: An unknown Trash folder
 - **WHEN** a Zoho account's folder listing shows no Trash folder and a member trashes a message there
 - **THEN** no move is made and the change is recorded `skipped` (`not_movable`)
+
+#### Scenario: An undo Zoho cannot make
+- **WHEN** a member untrashes, or takes out of spam, their own sent mail at Zoho, or a message with no remembered folder that is not received mail
+- **THEN** no move is made and the change is recorded `skipped` (`not_movable`); the conversation shows out of the trash or spam at once, and the run that skipped the change emits the message's Zoho state again, so it shows in the trash or spam again

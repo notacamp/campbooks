@@ -66,11 +66,21 @@ The coordinator decided (second review): remember as little as possible.
   and it is neither the Trash nor the Spam folder. Otherwise received mail
   goes to the Inbox folder and anything else is `skipped` (`not_movable`),
   never `message_gone`. Locally, trash and untrash leave `in_inbox` alone.
+- **An undo Zoho cannot make** (sent mail, or nothing remembered for mail
+  that was not received): the conversation shows out of the trash or spam
+  at once, the change ends `skipped` (`not_movable`), and the run emits the
+  message's Zoho state again, so it shows in the trash or spam again. A 409
+  at request time was weighed and not taken: the conversations module does
+  not know what the connector remembers, so it cannot tell beforehand.
 
 ## Provider mapping
 
 - **Gmail**: trash with `users.messages.trash`, untrash with
-  `users.messages.untrash`; spam adds `SPAM` and removes `INBOX` (and
+  `users.messages.untrash`, only for a message the index has in the trash
+  (or does not carry), so a report on mail that is not in the trash is a
+  plain label change and batches like one; the quota a push reserves counts
+  the calls it plans (a batch per chunk; per message its untrash, modify and
+  trash); spam adds `SPAM` and removes `INBOX` (and
   `TRASH`); not spam removes `SPAM` and adds `INBOX` for received mail only.
   `INBOX` is added by an explicit not-spam change and nothing else. `TRASH`
   and `SPAM` join the labels a change may write. A change that would bring a

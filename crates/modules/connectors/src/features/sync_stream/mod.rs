@@ -230,12 +230,11 @@ impl SyncStream {
         let Some(google) = self.deps.google.clone() else {
             return Ok(None);
         };
-        let messages = Self::messages(backlog);
         let cost = gmail::UNITS_PER_RUN
-            + if messages == 0 {
+            + if backlog.pending.is_empty() {
                 0
             } else {
-                gmail::write::units(messages)
+                gmail::write::units(backlog)
             };
         let rate = self.deps.config.google.units_per_second;
         if let Err(wait) = schedule::take_budget(ctx.pool(), target.provider, cost, rate).await? {

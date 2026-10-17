@@ -12,10 +12,12 @@
 //! - more than [`BATCH_FROM`]` - 1` messages with the same change go in one
 //!   `batchModify`, the rest are modified one by one;
 //! - the trash is made with `messages.trash` and taken back with
-//!   `messages.untrash` (Gmail puts back the labels the message had);
-//!   reporting spam and "not spam" are label changes (`outbound::map`).
+//!   `messages.untrash` (Gmail puts back the labels the message had), only
+//!   for a message the index has in the trash (or does not carry); reporting
+//!   spam and "not spam" are label changes (`outbound::map`), so a report on
+//!   mail that is not in the trash is batched like any other.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashMap};
 
 use futures_util::{StreamExt as _, stream::FuturesOrdered};
 
@@ -39,11 +41,32 @@ pub const BATCH_MAX: usize = 1_000;
 /// History pages read for the later-writer check.
 pub const HISTORY_PAGES: usize = 4;
 
-/// Gmail quota units a push of `messages` messages may spend: a profile
-/// call, the history pages and one modify per message.
-pub fn units(messages: usize) -> u32 {
-    let messages = u32::try_from(messages).unwrap_or(u32::MAX);
-    1 + 2 * u32::try_from(HISTORY_PAGES).unwrap_or(4) + messages.saturating_mul(5)
+/// Gmail quota units of `getProfile`.
+const PROFILE_UNITS: u32 = 1;
+/// Of a `history.list` page.
+const HISTORY_UNITS: u32 = 2;
+/// Of `batchModify`.
+const BATCH_UNITS: u32 = 50;
+/// Of `modify`, `trash` and `untrash` each.
+const CALL_UNITS: u32 = 5;
+
+/// Gmail quota units pushing `backlog` may spend: the profile before and
+/// after, the history pages, and the writes it plans (a batch per chunk;
+/// per message its untrash, modify and trash, as each is needed). Later
+/// writers only take writes away.
+pub fn units(backlog: &Backlog) -> u32 {
+    let writes = Writes::plan(&Plan::merge(backlog).groups(), &backlog.labels);
+    let pages = u32::try_from(HISTORY_PAGES).unwrap_or(u32::MAX);
+    let batches = u32::try_from(writes.batches.len()).unwrap_or(u32::MAX);
+    let calls = writes
+        .singles
+        .iter()
+        .map(Single::calls)
+        .fold(0_u32, u32::saturating_add);
+    (2 * PROFILE_UNITS)
+        .saturating_add(pages.saturating_mul(HISTORY_UNITS))
+        .saturating_add(batches.saturating_mul(BATCH_UNITS))
+        .saturating_add(calls.saturating_mul(CALL_UNITS))
 }
 
 /// Push `backlog` through `gmail`.
@@ -69,7 +92,8 @@ pub async fn push(gmail: &Gmail<'_>, backlog: &Backlog) -> Push {
     };
     plan.atomic();
     let mut done = Results::default();
-    push.trouble = write(gmail, &plan.groups(), &mut done).await;
+    let writes = Writes::plan(&plan.groups(), &backlog.labels);
+    push.trouble = write(gmail, writes, &mut done).await;
     // After writing: the window our writes fall in.
     if !done.written.is_empty() {
         let after = gmail
@@ -94,6 +118,7 @@ pub async fn push(gmail: &Gmail<'_>, backlog: &Backlog) -> Push {
 
 /// One message's write: its labels, and whether it goes into the trash
 /// (`Some(true)`) or out of it (`Some(false)`) first.
+#[derive(Debug, PartialEq, Eq)]
 struct Single {
     message: String,
     add: Vec<String>,
@@ -101,54 +126,107 @@ struct Single {
     trash: Option<bool>,
 }
 
-/// Write `groups`: a batch per chunk of a large group, one call per message
-/// otherwise (and for a batch Gmail refused, and for moves into or out of
-/// the trash). Returns the trouble that stopped it.
-async fn write(
-    gmail: &Gmail<'_>,
-    groups: &BTreeMap<LabelChange, Vec<String>>,
-    done: &mut Results,
-) -> Option<ProviderError> {
-    let mut singles: Vec<Single> = Vec::new();
-    for ((add, remove), messages) in groups {
-        let one_by_one = |list: &[String]| {
-            list.iter()
-                .map(|m| Single {
+impl Single {
+    /// The Gmail calls it makes ([`write_one`]).
+    fn calls(&self) -> u32 {
+        u32::from(self.trash.is_some()) + u32::from(!self.add.is_empty() || !self.remove.is_empty())
+    }
+}
+
+/// What a push writes: batches (one chunk each), messages one by one, and
+/// messages with nothing left to write.
+#[derive(Debug, Default, PartialEq, Eq)]
+struct Writes {
+    batches: Vec<(LabelChange, Vec<String>)>,
+    singles: Vec<Single>,
+    nothing: Vec<String>,
+}
+
+impl Writes {
+    /// Plan `groups` against the index's `labels`. Into the trash is
+    /// `messages.trash` per message. Out of it is `messages.untrash` per
+    /// message, but only for a message the index has in the trash (or does
+    /// not carry): for the rest, taking TRASH off is nothing, and the
+    /// change's other labels are written like any group's.
+    fn plan(
+        groups: &BTreeMap<LabelChange, Vec<String>>,
+        labels: &HashMap<String, Vec<String>>,
+    ) -> Self {
+        let mut writes = Self::default();
+        for ((add, remove), messages) in groups {
+            let (into, out_of) = (has(add, "TRASH"), has(remove, "TRASH"));
+            if !into && !out_of {
+                writes.group(add, remove, messages);
+                continue;
+            }
+            let without = |list: &[String]| -> Vec<String> {
+                list.iter().filter(|l| *l != "TRASH").cloned().collect()
+            };
+            let (add, remove) = (without(add), without(remove));
+            let mut plain = Vec::new();
+            for message in messages {
+                let trashed = labels.get(message).is_none_or(|l| has(l, "TRASH"));
+                if into || trashed {
+                    writes.singles.push(Single {
+                        message: message.clone(),
+                        add: add.clone(),
+                        remove: remove.clone(),
+                        trash: Some(into),
+                    });
+                } else {
+                    plain.push(message.clone());
+                }
+            }
+            writes.group(&add, &remove, &plain);
+        }
+        writes
+    }
+
+    /// `messages` all getting (`add`, `remove`): nothing, one by one, or in
+    /// batches.
+    fn group(&mut self, add: &[String], remove: &[String], messages: &[String]) {
+        if add.is_empty() && remove.is_empty() {
+            self.nothing.extend(messages.iter().cloned());
+        } else if messages.len() < BATCH_FROM {
+            self.singles.extend(messages.iter().map(|m| Single {
+                message: m.clone(),
+                add: add.to_vec(),
+                remove: remove.to_vec(),
+                trash: None,
+            }));
+        } else {
+            for chunk in messages.chunks(BATCH_MAX) {
+                self.batches
+                    .push(((add.to_vec(), remove.to_vec()), chunk.to_vec()));
+            }
+        }
+    }
+}
+
+/// Write `writes`: each batch (a batch Gmail refused is written one message
+/// at a time), then the messages one by one. Returns the trouble that
+/// stopped it.
+async fn write(gmail: &Gmail<'_>, writes: Writes, done: &mut Results) -> Option<ProviderError> {
+    let Writes {
+        batches,
+        mut singles,
+        nothing,
+    } = writes;
+    done.written.extend(nothing);
+    for ((add, remove), chunk) in &batches {
+        match gmail.batch_modify(chunk, add, remove).await {
+            Ok(()) => done.written.extend(chunk.iter().cloned()),
+            // Refused as a whole: find the message that refuses by asking
+            // one at a time.
+            Err(ProviderError::NotFound | ProviderError::Unexpected(_)) => {
+                singles.extend(chunk.iter().map(|m| Single {
                     message: m.clone(),
                     add: add.clone(),
                     remove: remove.clone(),
                     trash: None,
-                })
-                .collect::<Vec<_>>()
-        };
-        if has(add, "TRASH") || has(remove, "TRASH") {
-            let without = |list: &[String]| -> Vec<String> {
-                list.iter().filter(|l| *l != "TRASH").cloned().collect()
-            };
-            for message in messages {
-                singles.push(Single {
-                    message: message.clone(),
-                    add: without(add),
-                    remove: without(remove),
-                    trash: Some(has(add, "TRASH")),
-                });
+                }));
             }
-            continue;
-        }
-        if messages.len() < BATCH_FROM {
-            singles.extend(one_by_one(messages));
-            continue;
-        }
-        for chunk in messages.chunks(BATCH_MAX) {
-            match gmail.batch_modify(chunk, add, remove).await {
-                Ok(()) => done.written.extend(chunk.iter().cloned()),
-                // Refused as a whole: find the message that refuses by
-                // asking one at a time.
-                Err(ProviderError::NotFound | ProviderError::Unexpected(_)) => {
-                    singles.extend(one_by_one(chunk));
-                }
-                Err(trouble) => return Some(trouble),
-            }
+            Err(trouble) => return Some(trouble),
         }
     }
     modify_each(gmail, &singles, done).await
@@ -291,4 +369,55 @@ async fn modify_each(
         }
     }
     trouble
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn strings(list: &[&str]) -> Vec<String> {
+        list.iter().map(ToString::to_string).collect()
+    }
+
+    #[test]
+    fn only_mail_in_the_trash_is_untrashed() {
+        // Reports: SPAM on, INBOX and TRASH off. Twelve messages not in the
+        // trash and one in it.
+        let report = (strings(&["SPAM"]), strings(&["INBOX", "TRASH"]));
+        let mut messages: Vec<String> = (0..12).map(|i| format!("m{i:02}")).collect();
+        messages.push("trashed".to_owned());
+        let mut labels: HashMap<String, Vec<String>> = messages
+            .iter()
+            .map(|m| (m.clone(), strings(&["INBOX"])))
+            .collect();
+        labels.insert("trashed".to_owned(), strings(&["TRASH"]));
+        let groups = BTreeMap::from([(report, messages.clone())]);
+        let writes = Writes::plan(&groups, &labels);
+        // The twelve go in one batch, with no untrash.
+        assert_eq!(
+            writes.batches,
+            vec![(
+                (strings(&["SPAM"]), strings(&["INBOX"])),
+                messages[..12].to_vec()
+            )]
+        );
+        // The trashed one is untrashed, then reported.
+        assert_eq!(
+            writes.singles,
+            vec![Single {
+                message: "trashed".to_owned(),
+                add: strings(&["SPAM"]),
+                remove: strings(&["INBOX"]),
+                trash: Some(false),
+            }]
+        );
+        assert_eq!(writes.singles[0].calls(), 2);
+
+        // An untrash of a message the index has out of the trash is nothing.
+        let untrash = (Vec::new(), strings(&["TRASH"]));
+        let groups = BTreeMap::from([(untrash, strings(&["m00"]))]);
+        let writes = Writes::plan(&groups, &labels);
+        assert_eq!(writes.nothing, strings(&["m00"]));
+        assert!(writes.singles.is_empty() && writes.batches.is_empty());
+    }
 }

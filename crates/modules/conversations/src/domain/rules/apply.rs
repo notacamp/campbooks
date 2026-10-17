@@ -170,7 +170,7 @@ async fn carry_out(
         } else {
             before.read = true;
         }
-        effects.add(flag.change(), messages, flag.requested());
+        effects.add(flag.change(), messages, flag.requested_for_all()?);
     }
     for label in &mine.labels {
         let linked =
@@ -416,7 +416,7 @@ async fn undo(
         }
         let messages = effects::flag_conversation(conn, id, flag).await?;
         if !messages.is_empty() {
-            effects.add(flag.change(), messages, flag.requested());
+            effects.add(flag.change(), messages, flag.requested_for_all()?);
         }
     }
     for label in &before.labels {
