@@ -46,6 +46,12 @@ impl OperationInfo {
         )
     }
 
+    /// Whether its successful answer shows a secret this once
+    /// (`Operation::secret_once`), so the idempotency layer keeps no copy.
+    pub fn secret_once(&self) -> bool {
+        self.meta.as_ref().is_some_and(|meta| meta.secret_once)
+    }
+
     /// The path parameters of its template, in order (`{id}` → `id`).
     pub fn path_params(&self) -> impl Iterator<Item = &str> {
         self.path.split('/').filter_map(|segment| {

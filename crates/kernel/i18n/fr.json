@@ -29,6 +29,7 @@
     "idempotency_key_invalid": "L’Idempotency-Key doit comporter de 1 à {{max}} caractères ASCII visibles.",
     "idempotency_key_reused": "Cette Idempotency-Key a déjà servi pour une autre requête.",
     "idempotency_key_in_flight": "Une requête avec cette Idempotency-Key est encore en cours de traitement.",
+    "idempotency_secret_shown_once": "Cette requête a déjà été effectuée avec cette Idempotency-Key. Son secret n’est affiché qu’une fois et n’a pas été conservé : il ne peut plus être affiché.",
     "idempotency_body_too_large": "Le corps de la requête est trop volumineux pour être utilisé avec une Idempotency-Key.",
     "database_unavailable": "La base de données est indisponible pour le moment. Réessayez dans un instant.",
     "file_too_large": "Le fichier dépasse la limite de {{limit}} octets.",

@@ -35,6 +35,16 @@ All notable changes to Campbooks Next are documented here. The format follows
 
 ### Security
 
+- **Retried requests never bring back a secret, and keys and counters stay private.**
+  Requests sent with an `Idempotency-Key` used to have their answers cached for a day,
+  including a new app's client secret. That cache could be read from any workspace's work,
+  and anyone could reset or use up the rate-limit counters. Now each caller reaches only
+  their own keys. The answers that show something once (an app's client secret, a rotated
+  secret, an invitation link, a link or connection ticket) are never kept. Sending such a
+  request again with the same key answers 409 `idempotency_secret_shown_once` instead of
+  showing the secret twice. Answers of those requests cached before this release are
+  dropped. Rate-limit counters can only be counted and pruned through two database
+  functions. No connection can read, reset or rewrite them.
 - **A workspace can no longer forge background work for the whole instance.** Work running
   in a workspace could add a job or event that belongs to no workspace. One such row could
   stop the job pruning, or all mail polling, for good. It can now only add the account

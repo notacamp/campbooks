@@ -115,6 +115,13 @@ pub struct Operation {
     /// `cargo xtask arch`).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub rate_limit: Option<RateLimit>,
+    /// Its successful answer shows a secret this once (a new app's client
+    /// secret, an invitation's link, a single-use ticket): the
+    /// [idempotency](crate::idempotency) layer keeps no copy of it, and a
+    /// replay of the key answers 409 `idempotency_secret_shown_once`.
+    /// Only for mutating operations (checked by `cargo xtask arch`).
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub secret_once: bool,
 }
 
 /// A rate-limit class an operation declares to be counted in, tighter than
@@ -149,6 +156,7 @@ impl Operation {
             query_in: None,
             access: None,
             rate_limit: None,
+            secret_once: false,
         }
     }
 
@@ -218,6 +226,14 @@ impl Operation {
     #[must_use]
     pub fn rate_limit(mut self, class: RateLimit) -> Self {
         self.rate_limit = Some(class);
+        self
+    }
+
+    /// Its successful answer shows a secret this once: never stored for
+    /// replay (see the `secret_once` field).
+    #[must_use]
+    pub fn secret_once(mut self) -> Self {
+        self.secret_once = true;
         self
     }
 

@@ -585,8 +585,10 @@ impl Door {
 /// word: outside the kernel, the word on its own (in code or a string, any
 /// case) usually means the setting's name is being built at runtime.
 /// Each with the kernel function that opens it. The admin reads' setting
-/// has no reviewed list: only `begin_admin` (with an `AdminGrant`) sets it.
-const SCOPE_SETTINGS: [(&str, &str, Door, &str); 3] = [
+/// has no reviewed list: only `begin_admin` (with an `AdminGrant`) sets it;
+/// nor has the idempotency caller's (campbooks-cloud#210): only the kernel's
+/// idempotency layer sets it.
+const SCOPE_SETTINGS: [(&str, &str, Door, &str); 4] = [
     (
         "campbooks.kernel_scope",
         "kernel_scope",
@@ -605,16 +607,23 @@ const SCOPE_SETTINGS: [(&str, &str, Door, &str); 3] = [
         Door::Never,
         "begin_admin",
     ),
+    (
+        "campbooks.idempotency_caller",
+        "idempotency_caller",
+        Door::Never,
+        "begin_as_idempotency_caller",
+    ),
 ];
 
 /// The kernel's names that open a cross-workspace scope or name its
 /// setting: outside the kernel, each is a violation wherever it appears in
 /// code (a call, a `use … as` rename, `JobContext::kernel_tx(ctx)`, a
 /// function value), comments aside, unless its [`Door`] lists the file.
-const SCOPE_IDENTIFIERS: [(&str, Door); 7] = [
+const SCOPE_IDENTIFIERS: [(&str, Door); 8] = [
     ("KERNEL_SCOPE_SETTING", Door::Never),
     ("MAINTENANCE_SCOPE_SETTING", Door::Never),
     ("ADMIN_READS_SETTING", Door::Never),
+    ("IDEMPOTENCY_CALLER_SETTING", Door::Never),
     ("begin_kernel", Door::Kernel),
     ("kernel_tx", Door::Kernel),
     ("begin_maintenance", Door::Maintenance),
@@ -1596,6 +1605,45 @@ mod tests {
             (
                 "crates/kernel/src/db.rs",
                 "const S: &str = \"campbooks.admin_reads\";",
+            ),
+        ] {
+            assert!(
+                check_kernel_scope(&source(path, fine), &none).is_empty(),
+                "{fine}"
+            );
+        }
+    }
+
+    #[test]
+    fn only_the_kernel_names_the_idempotency_caller() {
+        let source = |path: &str, text: &str| vec![(path.to_owned(), text.to_owned())];
+        let none = AccessFile::default();
+        for (bypass, named) in [
+            (
+                r#"sqlx::query("SELECT set_config('campbooks.idempotency_caller', 'user:a', true)")"#,
+                "kernel::db::begin_as_idempotency_caller",
+            ),
+            (
+                r#"sqlx::query("SELECT set_config('campbooks.' || 'idempotency_caller', $1, true)")"#,
+                "`idempotency_caller`",
+            ),
+            (
+                "let s = campbooks_kernel::db::IDEMPOTENCY_CALLER_SETTING;",
+                "IDEMPOTENCY_CALLER_SETTING",
+            ),
+        ] {
+            let found = check_kernel_scope(&source("crates/modules/mail/src/x.rs", bypass), &none);
+            assert_eq!(found.len(), 1, "{bypass}: {found:?}");
+            assert!(found[0].contains(named), "{bypass}: {found:?}");
+        }
+        for (path, fine) in [
+            (
+                "crates/server/src/lib.rs",
+                "let name = testing::idempotency_caller_setting();",
+            ),
+            (
+                "crates/kernel/src/db.rs",
+                "const S: &str = \"campbooks.idempotency_caller\";",
             ),
         ] {
             assert!(

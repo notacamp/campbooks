@@ -880,28 +880,50 @@ mod tests {
                 .collect::<Vec<_>>()
         };
         // The kernel scope: the kernel's own tables, each through its one
-        // `workspace_isolation` policy (the schedules' last ticks through
-        // `kernel_scope_only`), and nothing else.
+        // `workspace_isolation` policy, except the schedules' last ticks and
+        // the rate-limit counters (`kernel_scope_only`) and the idempotency
+        // keys, of which it may only read and delete the expired
+        // (campbooks-cloud#210); and nothing else.
         let kernel = mentioning(testing::kernel_scope_setting());
         assert!(!kernel.is_empty());
+        let expected = |table: &str, policy: &str, cmd: &str| match table {
+            "kernel.schedules" | "kernel.rate_limits" => {
+                (policy, cmd) == ("kernel_scope_only", "ALL")
+            }
+            "kernel.idempotency" => matches!(
+                (policy, cmd),
+                ("kernel_scope_reads_expired", "SELECT")
+                    | ("kernel_scope_prunes_expired", "DELETE")
+            ),
+            table if table.starts_with("kernel.") => {
+                (policy, cmd) == ("workspace_isolation", "ALL")
+            }
+            _ => false,
+        };
         let elsewhere: Vec<_> = kernel
             .iter()
-            .filter(|(table, policy, cmd)| {
-                let expected = if table == "kernel.schedules" {
-                    "kernel_scope_only"
-                } else {
-                    "workspace_isolation"
-                };
-                !table.starts_with("kernel.") || policy != expected || cmd != "ALL"
-            })
+            .filter(|(table, policy, cmd)| !expected(table.as_str(), policy.as_str(), cmd.as_str()))
             .collect();
         assert!(elsewhere.is_empty(), "{elsewhere:?}");
-        assert!(
-            kernel
-                .iter()
-                .any(|(table, policy, _)| table == "kernel.schedules"
-                    && policy == "kernel_scope_only"),
-            "the schedules' last ticks are the kernel scope's: {kernel:?}"
+        for (table, policy) in [
+            ("kernel.schedules", "kernel_scope_only"),
+            ("kernel.rate_limits", "kernel_scope_only"),
+            ("kernel.idempotency", "kernel_scope_reads_expired"),
+            ("kernel.idempotency", "kernel_scope_prunes_expired"),
+        ] {
+            assert!(
+                kernel.iter().any(|(t, p, _)| t == table && p == policy),
+                "{table} `{policy}` admits the kernel scope: {kernel:?}"
+            );
+        }
+        // The idempotency layer's caller: its keys only, through one policy.
+        assert_eq!(
+            mentioning(testing::idempotency_caller_setting()),
+            [(
+                "kernel.idempotency".to_owned(),
+                "caller_isolation".to_owned(),
+                "ALL".to_owned()
+            )]
         );
         // The maintenance scope: these four, on module tables.
         let policies = mentioning(testing::maintenance_scope_setting());
@@ -980,7 +1002,9 @@ mod tests {
     /// runtime role may only read profiles and append to the trail, which
     /// the `admin` crate's own tests pin. So is the list of instance-wide
     /// rows a workspace may add (`kernel.instance_rows_from_workspaces`,
-    /// campbooks-cloud#207), which it may only read: it changes by migration.
+    /// campbooks-cloud#207), which it may only read: it changes by migration;
+    /// and the rate-limit counters (`kernel.rate_limits`, campbooks-cloud#210),
+    /// which it reaches only through the kernel's two functions.
     #[sqlx::test(migrations = "../../migrations")]
     async fn the_runtime_role_may_use_every_table(db: sqlx::PgPool) {
         let role = campbooks_kernel::db::DEFAULT_RUNTIME_ROLE;
@@ -1003,7 +1027,13 @@ mod tests {
         .await
         .unwrap();
         let read_only = "kernel.instance_rows_from_workspaces";
-        let missing: Vec<String> = missing.into_iter().filter(|t| t != read_only).collect();
+        // The rate-limit counters: no privilege at all; the runtime role
+        // counts and prunes through the kernel's functions (campbooks-cloud#210).
+        let functions_only = "kernel.rate_limits";
+        let missing: Vec<String> = missing
+            .into_iter()
+            .filter(|t| t != read_only && t != functions_only)
+            .collect();
         assert!(
             missing.is_empty(),
             "`{role}` lacks privileges on {missing:?}"
@@ -1022,6 +1052,81 @@ mod tests {
             (true, false, false, false),
             "`{role}` only reads {read_only}"
         );
+        let privileges: (bool, bool, bool, bool, bool, bool) = sqlx::query_as(
+            "SELECT has_table_privilege($1, $2, 'SELECT'), has_table_privilege($1, $2, 'INSERT'),
+                    has_table_privilege($1, $2, 'UPDATE'), has_table_privilege($1, $2, 'DELETE'),
+                    has_function_privilege($1,
+                        'kernel.take_rate_limit(bytea, double precision, integer)', 'EXECUTE'),
+                    has_function_privilege($1, 'kernel.prune_rate_limits(integer)', 'EXECUTE')",
+        )
+        .bind(role)
+        .bind(functions_only)
+        .fetch_one(&db)
+        .await
+        .unwrap();
+        assert_eq!(
+            privileges,
+            (false, false, false, false, true, true),
+            "`{role}` reaches {functions_only} through the kernel's functions only"
+        );
+    }
+
+    /// Every table of the kernel's schema has row-level security, enabled
+    /// and forced with a policy, or is listed here as instance-only with the
+    /// reason (campbooks-cloud#210): a new kernel table cannot be left open
+    /// to every transaction by omission. A listed table grants the runtime
+    /// role no write.
+    #[sqlx::test(migrations = "../../migrations")]
+    async fn every_kernel_table_has_row_level_security_or_a_reason(db: sqlx::PgPool) {
+        const INSTANCE_ONLY: [(&str, &str); 1] = [(
+            "kernel.instance_rows_from_workspaces",
+            "the instance-wide rows a workspace may add, read by the queue's and the event \
+             log's policies: written by migrations only, the runtime role may only read it, and \
+             it holds nothing of any caller or workspace",
+        )];
+        let tables: Vec<(String, bool)> = sqlx::query_as(
+            "SELECT n.nspname || '.' || c.relname,
+                    c.relrowsecurity AND c.relforcerowsecurity
+                        AND EXISTS (SELECT 1 FROM pg_policy p WHERE p.polrelid = c.oid)
+               FROM pg_class c
+               JOIN pg_namespace n ON n.oid = c.relnamespace
+              WHERE n.nspname = 'kernel' AND c.relkind IN ('r', 'p')
+              ORDER BY 1",
+        )
+        .fetch_all(&db)
+        .await
+        .unwrap();
+        assert!(tables.len() > INSTANCE_ONLY.len(), "{tables:?}");
+        let open: Vec<&str> = tables
+            .iter()
+            .filter(|(_, protected)| !protected)
+            .map(|(table, _)| table.as_str())
+            .collect();
+        let listed: Vec<&str> = INSTANCE_ONLY.iter().map(|(table, _)| *table).collect();
+        assert_eq!(
+            open, listed,
+            "every kernel table enables and forces row-level security with a policy, or is \
+             listed as instance-only with its reason"
+        );
+        let role = campbooks_kernel::db::DEFAULT_RUNTIME_ROLE;
+        for (table, reason) in INSTANCE_ONLY {
+            assert!(!reason.trim().is_empty(), "{table} needs a reason");
+            let writes: bool = sqlx::query_scalar(
+                "SELECT has_table_privilege($1, $2, 'INSERT')
+                     OR has_table_privilege($1, $2, 'UPDATE')
+                     OR has_table_privilege($1, $2, 'DELETE')
+                     OR has_table_privilege($1, $2, 'TRUNCATE')",
+            )
+            .bind(role)
+            .bind(table)
+            .fetch_one(&db)
+            .await
+            .unwrap();
+            assert!(
+                !writes,
+                "`{role}` may write {table}, which has no row-level security"
+            );
+        }
     }
 
     /// The worker runs as the runtime role in production: it can claim, run
