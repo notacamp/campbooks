@@ -131,6 +131,9 @@ pub type WorkspacesFuture<'a> =
 /// A future returned by [`Membership::role_held`].
 pub type RoleFuture<'a> = Pin<Box<dyn Future<Output = Result<Option<Role>, Error>> + Send + 'a>>;
 
+/// A future returned by [`Membership::workspace_live`].
+pub type LiveFuture<'a> = Pin<Box<dyn Future<Output = Result<bool, Error>> + Send + 'a>>;
+
 /// The port that answers "may this principal work in this workspace?".
 /// Implemented by the `workspaces` module; the server registers it with
 /// [`AppState::with_membership`].
@@ -165,6 +168,29 @@ pub trait Membership: std::fmt::Debug + Send + Sync + 'static {
         _user: UserId,
     ) -> RoleFuture<'a> {
         Box::pin(async { Ok(None) })
+    }
+
+    /// Whether `workspace` is live (not deleted): what
+    /// [`resolve`](Self::resolve) answers for a client bound to it. For a
+    /// handler that must not take an event alone as proof that a workspace
+    /// is going (campbooks-cloud#211).
+    fn workspace_live<'a>(&'a self, db: &'a PgPool, workspace: WorkspaceId) -> LiveFuture<'a> {
+        Box::pin(async move {
+            let client = Principal {
+                subject: String::new(),
+                kind: PrincipalKind::Client,
+                client_id: None,
+                scopes: std::collections::BTreeSet::new(),
+                workspace: Some(workspace.to_string()),
+                email: None,
+                email_verified: false,
+                name: None,
+                expires_at: None,
+                issued_at: None,
+                auth_time: None,
+            };
+            Ok(self.resolve(db, &client, workspace).await?.is_some())
+        })
     }
 
     /// Record types (`<module>.<record>`) whose changes may change who

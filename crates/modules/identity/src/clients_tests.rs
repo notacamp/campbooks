@@ -405,48 +405,72 @@ async fn a_member_leaving_or_a_workspace_going_ends_the_apps_allowed_there(db: P
     allow(&kit, &id, Some(HOME)).await;
     assert_eq!(live(&kit, &web).await, 2);
 
-    let home = campbooks_kernel::tenancy::WorkspaceId::from_uuid(HOME);
-    let mut tx = kit
-        .state
-        .db
-        .begin_for(home)
-        .await
-        .unwrap_or_else(|e| panic!("{e}"));
-    kit.state
-        .events
-        .publish(
-            &mut tx,
-            &crate::events::MemberLeft {
-                workspace: HOME.to_string(),
-                user: MEMBER_IN_HOME,
-                subject: None,
-            },
-        )
-        .await
-        .unwrap_or_else(|e| panic!("{e}"));
-    tx.commit().await.unwrap_or_else(|e| panic!("{e}"));
-    kit.run_jobs().await;
+    let member_left = || async {
+        let home = campbooks_kernel::tenancy::WorkspaceId::from_uuid(HOME);
+        let mut tx = kit
+            .state
+            .db
+            .begin_for(home)
+            .await
+            .unwrap_or_else(|e| panic!("{e}"));
+        kit.state
+            .events
+            .publish(
+                &mut tx,
+                &crate::events::MemberLeft {
+                    workspace: HOME.to_string(),
+                    user: MEMBER_IN_HOME,
+                    subject: None,
+                },
+            )
+            .await
+            .unwrap_or_else(|e| panic!("{e}"));
+        tx.commit().await.unwrap_or_else(|e| panic!("{e}"));
+        kit.run_jobs().await;
+    };
+    // Written in Home while they are still a member there: the event alone
+    // is not believed (campbooks-cloud#211).
+    kit.keep_member(HOME, MEMBER_IN_HOME);
+    member_left().await;
+    assert_eq!(
+        live(&kit, &web).await,
+        2,
+        "nothing ended while still a member"
+    );
+    kit.member_gone(HOME, MEMBER_IN_HOME);
+    member_left().await;
     assert_eq!(live(&kit, &web).await, 1, "the Home consent ended");
 
-    let work = campbooks_kernel::tenancy::WorkspaceId::from_uuid(WORK);
-    let mut tx = kit
-        .state
-        .db
-        .begin_for(work)
-        .await
-        .unwrap_or_else(|e| panic!("{e}"));
-    kit.state
-        .events
-        .publish(
-            &mut tx,
-            &crate::events::WorkspaceDeleting {
-                workspace: WORK.to_string(),
-            },
-        )
-        .await
-        .unwrap_or_else(|e| panic!("{e}"));
-    tx.commit().await.unwrap_or_else(|e| panic!("{e}"));
-    kit.run_jobs().await;
+    let deleting = || async {
+        let work = campbooks_kernel::tenancy::WorkspaceId::from_uuid(WORK);
+        let mut tx = kit
+            .state
+            .db
+            .begin_for(work)
+            .await
+            .unwrap_or_else(|e| panic!("{e}"));
+        kit.state
+            .events
+            .publish(
+                &mut tx,
+                &crate::events::WorkspaceDeleting {
+                    workspace: WORK.to_string(),
+                },
+            )
+            .await
+            .unwrap_or_else(|e| panic!("{e}"));
+        tx.commit().await.unwrap_or_else(|e| panic!("{e}"));
+        kit.run_jobs().await;
+    };
+    // Written in Work while it is live: not believed either.
+    deleting().await;
+    assert_eq!(
+        live(&kit, &web).await,
+        1,
+        "nothing ended while Work is live"
+    );
+    kit.delete_workspace(WORK);
+    deleting().await;
     assert_eq!(live(&kit, &web).await, 0, "the Work consent ended");
 }
 

@@ -243,6 +243,32 @@ impl Worker {
         self.shared.upkeep().await;
     }
 
+    /// Run schedule `name`'s tick in `tx`, as [`upkeep`](Self::upkeep)
+    /// does in a transaction of its own: the tick recorded, or `None`.
+    #[cfg(test)]
+    pub(crate) async fn tick_in_for_test(
+        &self,
+        tx: &mut sqlx::Transaction<'static, sqlx::Postgres>,
+        name: &str,
+    ) -> Result<Option<i64>, sqlx::Error> {
+        let Some(schedule) = self
+            .shared
+            .registry
+            .schedules()
+            .iter()
+            .find(|s| s.name == name)
+        else {
+            return Err(sqlx::Error::InvalidArgument(format!(
+                "no schedule `{name}`"
+            )));
+        };
+        Ok(self
+            .shared
+            .tick_in(tx, schedule)
+            .await?
+            .map(|(tick, _)| tick))
+    }
+
     /// Claim up to `limit` ready jobs of `queue` without running them.
     #[cfg(test)]
     pub(crate) async fn claim_for_test(
@@ -558,13 +584,34 @@ impl Shared {
     async fn tick(&self, schedule: &super::registry::ScheduleInfo) -> Result<(), sqlx::Error> {
         // Schedules are the instance's: their jobs belong to no workspace.
         let mut tx = db::begin_kernel(&self.state.db).await?;
+        let tick = self.tick_in(&mut tx, schedule).await?;
+        tx.commit().await?;
+        if let Some((tick, enqueued)) = tick {
+            tracing::debug!(schedule = schedule.name, tick, ?enqueued, "schedule ticked");
+        }
+        Ok(())
+    }
+
+    /// [`tick`](Self::tick)'s work in `tx` (the kernel scope): the tick it
+    /// recorded and what its enqueue did, or `None` when this tick was
+    /// recorded already.
+    async fn tick_in(
+        &self,
+        tx: &mut sqlx::Transaction<'static, sqlx::Postgres>,
+        schedule: &super::registry::ScheduleInfo,
+    ) -> Result<Option<(i64, super::Enqueued)>, sqlx::Error> {
         // A tick recorded more than one period ahead never comes due (no
         // workspace can write the table, campbooks-cloud#207, but a clock
         // that jumped could): it counts as this tick, so the schedule runs.
+        // The tick is the statement's clock (`clock_timestamp()`), not the
+        // transaction's start (`now()`): a tick transaction that stalled
+        // more than a period between its start and this upsert would
+        // otherwise find a newer tick "far ahead" and move it back, for one
+        // extra run (campbooks-cloud#211).
         let tick: Option<i64> = sqlx::query_scalar(
             r"
             INSERT INTO kernel.schedules (name, last_tick)
-            VALUES ($1, floor(extract(epoch FROM now())::float8 / $2::float8)::bigint)
+            VALUES ($1, floor(extract(epoch FROM clock_timestamp())::float8 / $2::float8)::bigint)
             ON CONFLICT (name) DO UPDATE
                SET last_tick = excluded.last_tick, updated_at = now()
              WHERE kernel.schedules.last_tick < excluded.last_tick
@@ -574,14 +621,14 @@ impl Shared {
         )
         .bind(schedule.name)
         .bind(schedule.every.as_secs_f64())
-        .fetch_optional(&mut *tx)
+        .fetch_optional(&mut **tx)
         .await?;
         let Some(tick) = tick else {
-            return Ok(());
+            return Ok(None);
         };
-        self.heal(&mut tx, schedule).await?;
+        self.heal(tx, schedule).await?;
         let enqueued = super::insert(
-            &mut tx,
+            tx,
             NewJob {
                 kind: schedule.name,
                 queue: schedule.queue,
@@ -591,9 +638,7 @@ impl Shared {
             EnqueueOptions::default().unique(format!("schedule:{}", schedule.name)),
         )
         .await?;
-        tx.commit().await?;
-        tracing::debug!(schedule = schedule.name, tick, ?enqueued, "schedule ticked");
-        Ok(())
+        Ok(Some((tick, enqueued)))
     }
 
     /// Before a tick enqueues: retire a row that holds `schedule`'s unique
@@ -953,6 +998,21 @@ async fn execute(shared: Arc<Shared>, job: Claimed) {
             shared.record(&info, outcome, started.elapsed());
             return;
         };
+        // A kind that is the instance's only (a schedule's, an instance-wide
+        // event's delivery, `INSTANCE_ONLY`) never runs from a workspace's
+        // row: one is not the kernel's, but written by hand in a workspace
+        // transaction (campbooks-cloud#211). Refused for good, kept for
+        // inspection.
+        if kind.instance_only && info.workspace.is_some() {
+            tracing::warn!(kind = %info.kind, "refused a workspace's job of an instance-only kind");
+            let error = JobError::fatal(format!(
+                "`{}` runs instance-wide only; a job of it in a workspace is refused, not run",
+                info.kind
+            ));
+            let outcome = shared.fail(&info, &error).await;
+            shared.record(&info, outcome, started.elapsed());
+            return;
+        }
         let mut ctx = JobContext::new(shared.state.clone(), info.clone());
         let result = with_heartbeat(&shared, &info, (kind.run)(&mut ctx, job.payload)).await;
         let tx = ctx.take_tx();
