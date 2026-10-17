@@ -31,10 +31,7 @@ export default async function homeItemMail({ page }: ScenarioContext): Promise<v
   await page.getByRole("group", { name: /^Actions for/u }).waitFor();
 
   // Open a reply: the email shows under it, a few lines deep.
-  await page
-    .getByText(/is waiting for your reply/u)
-    .first()
-    .click();
+  await page.getByText("Maya Okafor is waiting for your reply").first().click();
   await page.getByRole("button", { name: "Show the whole email" }).first().waitFor();
   await caption(page, "Open an item to read the email before you decide", 2600);
   await page.getByRole("button", { name: "Show the whole email" }).first().click();
