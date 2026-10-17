@@ -150,6 +150,9 @@ function conditionPhrase(condition: Condition, t: Translate, labels: Names): str
     case "stream": {
       return t("rule.cond.stream", { value: t(`rule.stream.${condition.value}`) });
     }
+    case "sender_checks_fail": {
+      return t("rule.cond.sender_checks_fail");
+    }
     default: {
       return t(`rule.cond.${condition.field}`, { value: condition.value });
     }

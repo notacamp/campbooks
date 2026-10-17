@@ -170,7 +170,8 @@
     "nextAttachment": "Pièce jointe suivante",
     "notNeeded": "Pas nécessaire (ou c’est sûr)",
     "undoAll": "Annuler tout ce qu’a fait une règle",
-    "allPaid": "Toutes les factures déjà payées"
+    "allPaid": "Toutes les factures déjà payées",
+    "saveRule": "Enregistrer la règle intelligente"
   },
   "compose": {
     "title": {
@@ -281,7 +282,8 @@
       "alreadyPaid": "Déjà payée",
       "stillToPay": "Reste à payer",
       "markPaid": "Marquer comme payée",
-      "billPrompt": "Campbooks n’a pas accès à votre banque."
+      "billPrompt": "Campbooks n’a pas accès à votre banque.",
+      "report": "Signaler et supprimer"
     },
     "toast": {
       "done": "Fait · {{name}}",
@@ -295,7 +297,8 @@
       "allPaid_one": "{{count}} facture marquée comme payée",
       "allPaid_other": "{{count}} factures marquées comme payées",
       "allPaidFailed_one": "Impossible de marquer {{count}} facture comme payée. Réessayez.",
-      "allPaidFailed_other": "Impossible de marquer {{count}} factures comme payées. Réessayez."
+      "allPaidFailed_other": "Impossible de marquer {{count}} factures comme payées. Réessayez.",
+      "reported": "Signalé · {{name}}. Il est dans les spams"
     },
     "summary": {
       "heading": "Résumé de Scout"
@@ -315,7 +318,9 @@
       "about": "sur « {{value}} »",
       "header": "avec un en-tête de liste",
       "label": "avec une étiquette",
-      "stream": "dans {{value}}"
+      "stream": "dans {{value}}",
+      "checksFail": "qui échoue aux vérifications de l’expéditeur",
+      "pretending": "qui dit venir de {{value}} mais échoue aux vérifications de l’expéditeur"
     },
     "do": {
       "archive": "archivés",
@@ -326,12 +331,17 @@
       "asksAction": "demandent quelque chose",
       "noAction": "ne demandent jamais rien",
       "always": "toujours gardés dans la boîte de réception",
-      "never": "n’ont jamais besoin de vous"
+      "never": "n’ont jamais besoin de vous",
+      "trash": "va à la corbeille",
+      "spam": "signalé comme spam",
+      "paid": "ses factures sont déjà payées"
     },
     "likeness": {
       "sender": "Tout ce qui vient de {{address}}",
       "list": "Seulement la liste {{list}}",
-      "template": "Seulement « {{template}} » de {{from}}"
+      "template": "Seulement « {{template}} » de {{from}}",
+      "domain": "Tout ce qui vient de {{domain}}",
+      "impersonation": "Les e-mails qui se font passer pour {{domain}}"
     },
     "offer": {
       "which": "Quels e-mails",
@@ -446,7 +456,10 @@
       "never": "Selon Campbooks, celui-ci n’a jamais besoin de vous",
       "withOthers": "{{line}} · {{others}}",
       "others_one": "comme {{n}} autre {{from}}",
-      "others_other": "comme {{n}} autres {{from}}"
+      "others_other": "comme {{n}} autres {{from}}",
+      "trash": "Campbooks l’a mis à la corbeille",
+      "spam": "Campbooks l’a signalé comme spam",
+      "paid": "Campbooks dit que c’est déjà payé"
     },
     "reader": {
       "stop": "Arrêter de faire ça"
@@ -557,5 +570,61 @@
     },
     "to": "À {{recipient}}",
     "replyToElsewhere": "Les réponses vont à {{recipient}}, pas à l’expéditeur {{sender}}. Vérifiez avant d’envoyer."
+  },
+  "smartRule": {
+    "tag": "Règle intelligente",
+    "lead": "Ceci est enregistré comme règle intelligente. Vérifiez-la avant qu’elle commence à agir.",
+    "how": "Elle agit désormais seule, sans IA. Vous la trouverez dans la mémoire de Scout → Règles intelligentes, où vous pouvez la modifier ou la désactiver à tout moment.",
+    "matches_one": "Elle correspond à {{n}} e-mail déjà ici.",
+    "matches_other": "Elle correspond à {{n}} e-mails déjà ici.",
+    "matchesAtLeast": "Elle correspond à au moins {{n}} e-mails déjà ici.",
+    "noMatches": "Rien ici ne correspond encore. Elle agit sur les nouveaux e-mails.",
+    "matchesUnknown": "Campbooks n’a pas pu compter ce qui correspond.",
+    "examples": "E-mails qui correspondent",
+    "existing_one": "L’appliquer aussi à celui qui est déjà ici",
+    "existing_other": "L’appliquer aussi aux {{n}} déjà ici",
+    "save": "Enregistrer la règle",
+    "retry": "Réessayer",
+    "cancel": "Annuler",
+    "failed": "Campbooks n’a pas pu enregistrer cette règle intelligente. Rien n’a changé.",
+    "saved": "Règle intelligente enregistrée",
+    "savedDetail": "Elle est dans la mémoire de Scout. Modifiez-la ou désactivez-la à tout moment.",
+    "toast": "Règle intelligente enregistrée · {{rule}}",
+    "shared": "Pour tout le monde dans {{inbox}}.",
+    "titleTeach": "Une règle pour les e-mails comme celui-ci",
+    "titleReport": "Une règle pour les e-mails comme celui-ci",
+    "titlePaid": "Une règle pour les factures de {{payee}}",
+    "titleNotice": "Une règle pour les e-mails de {{sender}}"
+  },
+  "ahead": {
+    "reportTitle": "Ne plus jamais voir d’e-mails comme celui-ci ?",
+    "reportPretending": "Campbooks peut signaler dès leur arrivée, sans demander, les e-mails qui disent venir de {{domain}} mais échouent aux vérifications de l’expéditeur. La règle apparaît dans la mémoire de Scout.",
+    "reportSender": "Campbooks peut signaler comme spam dès leur arrivée, sans demander, les e-mails de {{sender}}. La règle apparaît dans la mémoire de Scout.",
+    "paidTitle": "Les factures de {{payee}} sont-elles toujours payées pour vous ?",
+    "paidDetail": "Si elles sont prélevées automatiquement, Campbooks peut marquer comme payées les prochaines factures de {{payee}}, sans demander. La règle apparaît dans la mémoire de Scout.",
+    "accept": "Oui, désormais",
+    "loadFailed": "Campbooks n’a pas pu préparer cette règle. Rien n’a changé."
+  },
+  "noticed": {
+    "title": "Scout a remarqué",
+    "position": "{{n}} sur {{total}}",
+    "keepOffHome_one": "Vous avez reçu {{n}} e-mail de {{sender}} ces {{days}} derniers jours et en avez ouvert {{opened}}.",
+    "keepOffHome_other": "Vous avez reçu {{n}} e-mails de {{sender}} ces {{days}} derniers jours et en avez ouvert {{opened}}.",
+    "keepOffHomeAsk": "Les retirer de l’Accueil et les classer dans {{stream}} ?",
+    "archived_one": "{{sender}} vous a envoyé {{n}} e-mail ces {{days}} derniers jours, et vous en avez archivé ou supprimé {{archived}} sans les lire.",
+    "archived_other": "{{sender}} vous a envoyé {{n}} e-mails ces {{days}} derniers jours, et vous en avez archivé ou supprimé {{archived}} sans les lire.",
+    "archiveAsk": "Les archiver dès leur arrivée ?",
+    "cadence": {
+      "daily": "Ils arrivent presque tous les jours.",
+      "weekly": "Ils arrivent chaque semaine.",
+      "monthly": "Ils arrivent chaque mois."
+    },
+    "setUp": "Créer une règle intelligente…",
+    "notNow": "Pas maintenant",
+    "never": "Ne plus le proposer",
+    "notNowDone": "Scout redemandera plus tard",
+    "neverDone": "Scout ne le proposera plus",
+    "failed": "Campbooks n’a pas pu l’enregistrer. Réessayez.",
+    "shared": "Pour tout le monde dans {{inbox}}."
   }
 }

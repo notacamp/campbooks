@@ -28,6 +28,7 @@ import {
   type TaughtAction,
 } from "../../api/rules";
 import { listTime, streamName, type Translate } from "../../model";
+import { SmartRuleConfirm, type SmartRuleDraft } from "../SmartRule/SmartRuleConfirm";
 import {
   likenessTitle,
   ruleSentence,
@@ -99,6 +100,9 @@ export function TeachOnceProvider({
 }) {
   const [state, setState] = useState<Step>({ step: "idle" });
   const [announcement, setAnnouncement] = useState("");
+  // The smart rule being confirmed (campbooks-cloud#169): nothing is saved
+  // before Save smart rule; then its run shows as before.
+  const [confirming, setConfirming] = useState<Confirming | null>(null);
   // Undo of a new rule may run after its offer is gone: it needs a mutation
   // that lives as long as the inbox does.
   const { removeOnce, restoreRule } = useRuleActions(workspaceId);
@@ -151,8 +155,28 @@ export function TeachOnceProvider({
           announce={setAnnouncement}
           removeOnce={removeOnce}
           restoreRule={restoreRule}
+          confirm={setConfirming}
         />
       )}
+      <SmartRuleConfirm
+        workspaceId={workspaceId}
+        draft={confirming?.draft ?? null}
+        onClose={() => {
+          setConfirming(null);
+        }}
+        onSaved={(rule) => {
+          if (confirming === null) {
+            return;
+          }
+          setState({
+            step: "running",
+            ruleId: rule.id,
+            action: confirming.action,
+            expected: confirming.expected,
+            reverting: false,
+          });
+        }}
+      />
       {/* Mounted for good, so what the offer says is read out as it changes. */}
       <VisuallyHidden>
         <span role="status" aria-live="polite">
@@ -161,6 +185,13 @@ export function TeachOnceProvider({
       </VisuallyHidden>
     </TeachOnceContext>
   );
+}
+
+/** A rule from the offer, being confirmed as a smart rule. */
+interface Confirming {
+  draft: SmartRuleDraft;
+  action: TaughtAction;
+  expected: Expected;
 }
 
 interface StepProps<S extends Step["step"]> {
@@ -179,6 +210,8 @@ interface StepProps<S extends Step["step"]> {
   removeOnce: RemoveOnce;
   /** Bring a removed rule back, from a mutation that outlives the offer. */
   restoreRule: RestoreRule;
+  /** Open the smart-rule confirmation for a rule from the offer. */
+  confirm: (confirming: Confirming) => void;
 }
 
 type RemoveOnce = ReturnType<typeof useRuleActions>["removeOnce"];
@@ -196,6 +229,7 @@ function TeachOffer({
   announce,
   removeOnce,
   restoreRule,
+  confirm,
 }: {
   workspaceId: string;
   state: Exclude<Step, { step: "idle" }>;
@@ -203,6 +237,7 @@ function TeachOffer({
   announce: (text: string) => void;
   removeOnce: RemoveOnce;
   restoreRule: RestoreRule;
+  confirm: (confirming: Confirming) => void;
 }) {
   const ref = useRef<HTMLDivElement>(null);
   const [focused, setFocused] = useState(false);
@@ -247,7 +282,16 @@ function TeachOffer({
     setFocused(ref.current?.contains(document.activeElement) === true);
   }, [state.step]);
 
-  const common = { workspaceId, setState, announce, focused, spoken, removeOnce, restoreRule };
+  const common = {
+    workspaceId,
+    setState,
+    announce,
+    focused,
+    spoken,
+    removeOnce,
+    restoreRule,
+    confirm,
+  };
   return (
     <div ref={ref} className="contents">
       {state.step === "asking" ? <Asking {...common} state={state} /> : null}
@@ -282,13 +326,11 @@ function Asking({
   announce,
   focused,
   spoken,
-  removeOnce,
-  restoreRule,
+  confirm,
 }: StepProps<"asking">) {
   const { t, locale, number } = useT();
   const undo = useUndoToast();
   const inboxes = useInboxes(workspaceId);
-  const { create } = useRuleActions(workspaceId);
   const { offer, conversation, action } = state;
   const chosen = state.chosen === null ? undefined : offer.suggestions[state.chosen];
   const kind = taughtKind(action);
@@ -322,53 +364,25 @@ function Asking({
     });
     setState({ step: "idle" });
   };
+  // Yes opens the smart-rule confirmation: nothing is saved before Save
+  // smart rule there; its run follows.
   const accept_ = () => {
-    if (chosen === undefined || create.isPending) {
+    if (chosen === undefined) {
       return;
     }
-    create.mutate(
-      {
+    confirm({
+      draft: {
         inboxId: conversation.inbox_id,
         conditions: chosen.conditions,
         actions: chosen.actions,
+        title: t("smartRule.titleTeach"),
         fromConversation: conversation.id,
+        sharedInbox: offer.shared && inbox !== undefined ? inbox.address : undefined,
       },
-      {
-        onSuccess: ({ rule }) => {
-          setState({
-            step: "running",
-            ruleId: rule.id,
-            action,
-            expected: { count, complete },
-            reverting: false,
-          });
-          const sentence = ruleSentence(t, locale, rule);
-          undo.push({
-            label: t("rules.toast.made", { rule: sentence }),
-            undo: () => {
-              removeOnce(rule.id, true, () => {
-                // Its panel, if still up, follows the run putting mail back.
-                setState((current) =>
-                  current.step === "running" && current.ruleId === rule.id
-                    ? { ...current, reverting: true }
-                    : current,
-                );
-                undo.push({
-                  label: t("rules.toast.stopped", { rule: sentence }),
-                  undo: () => {
-                    restoreRule(rule.id, true);
-                  },
-                });
-              });
-            },
-          });
-        },
-        onError: () => {
-          undo.notify(t("rules.run.failed"));
-          setState({ step: "idle" });
-        },
-      },
-    );
+      action,
+      expected: { count, complete },
+    });
+    setState({ step: "idle" });
   };
   useShortcut("item.choice1", accept_, { enabled: chosen !== undefined });
   useShortcut("overlay.close", dismiss, { enabled: focused });
@@ -394,7 +408,7 @@ function Asking({
           <Button
             variant="primary"
             shortcut="item.choice1"
-            disabled={chosen === undefined || create.isPending}
+            disabled={chosen === undefined}
             onClick={accept_}
           >
             {accept}

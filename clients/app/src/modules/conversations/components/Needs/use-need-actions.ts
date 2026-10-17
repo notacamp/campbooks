@@ -35,6 +35,12 @@ export interface NeedActionOptions {
    * campbooks-cloud#169).
    */
   onPaid?: (conversation: ConversationSummary) => void;
+  /**
+   * A warning was reported as spam and the server agreed: where the rule
+   * for mail like it is offered ("Never see emails like this again?",
+   * campbooks-cloud#169).
+   */
+  onReported?: (conversation: ConversationSummary) => void;
 }
 
 /**
@@ -44,7 +50,7 @@ export interface NeedActionOptions {
  */
 export function useNeedActions(
   workspaceId: string,
-  { onChanged, onUndo, onRedo, onFailed, onPaid }: NeedActionOptions = {},
+  { onChanged, onUndo, onRedo, onFailed, onPaid, onReported }: NeedActionOptions = {},
 ) {
   const { t: typed } = useTranslation("conversations");
   const t = typed as unknown as Translate;
@@ -204,7 +210,53 @@ export function useNeedActions(
     });
   };
 
+  /**
+   * Report and delete: the conversation goes to spam (at the provider too),
+   * with Undo putting it back where it was.
+   */
+  const report = (conversation: ConversationSummary) => {
+    const need = conversation.need;
+    const name = need === null || need === undefined ? "" : needSender(need, conversation);
+    const entry = undo.push({
+      label: t("needs.toast.reported", { name }),
+      undo: () => {
+        onUndo?.(conversation);
+        void mutation
+          .mutateAsync({ conversation, action: "not_spam" })
+          .catch(() => {
+            undo.notify(t("needs.toast.failed", { name }));
+          })
+          .finally(() => {
+            onChanged?.();
+          });
+      },
+    });
+    void mutation
+      .mutateAsync({ conversation, action: "spam" })
+      .then(
+        () => {
+          onReported?.(conversation);
+        },
+        () => {
+          undo.retract(entry);
+          onFailed?.(conversation);
+          undo.fail({
+            label: t("needs.toast.failed", { name }),
+            retry: () => {
+              onRedo?.(conversation);
+              report(conversation);
+            },
+          });
+        },
+      )
+      .finally(() => {
+        onChanged?.();
+      });
+  };
+
   return {
+    /** Report and delete a warning: into spam, with Undo. */
+    report,
     done: (conversation: ConversationSummary) => {
       judge(conversation, "done");
     },

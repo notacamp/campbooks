@@ -11,6 +11,8 @@ export type RuleAction = Schema<"RuleAction">;
 export type RuleSuggestion = Schema<"RuleSuggestion">;
 export type RuleSuggestions = Schema<"RuleSuggestions">;
 export type RuleException = Schema<"RuleException">;
+export type RulePreviewView = Schema<"RulePreview">;
+export type RuleNotice = Schema<"RuleNotice">;
 
 /** What a member did to one conversation, that a rule could repeat. */
 export type TaughtAction =
@@ -19,6 +21,13 @@ export type TaughtAction =
   | { kind: "mark_read" }
   | { kind: "not_needed" };
 
+/**
+ * What a member did that offers a rule for mail still to come: reported a
+ * conversation as spam ("Never see emails like this again?"), or said a bill
+ * is already paid ("Mark their invoices paid from now on").
+ */
+export type AheadAction = { kind: "report" } | { kind: "paid" };
+
 // Keyed by operationId, so the change feed refetches them when a rule (its
 // run's progress) changes.
 const keys = {
@@ -26,13 +35,85 @@ const keys = {
     operationKey("conversations.get_rule", { workspace_id: workspaceId, rule_id: ruleId }),
   rules: (workspaceId: string) =>
     operationKey("conversations.list_rules", { workspace_id: workspaceId }),
+  notices: (workspaceId: string) =>
+    operationKey("conversations.list_rule_notices", { workspace_id: workspaceId }),
+  preview: (workspaceId: string, inboxId: string, rule: unknown) => [
+    ...operationKey("conversations.preview_rule", { workspace_id: workspaceId }),
+    inboxId,
+    rule,
+  ],
 };
+
+/** `conversations.preview_rule`: what a rule would do in an inbox now. */
+export function useRulePreview(
+  workspaceId: string,
+  inboxId: string,
+  rule: { conditions: RuleCondition[]; actions: RuleAction[] },
+) {
+  return useQuery({
+    queryKey: keys.preview(workspaceId, inboxId, rule),
+    queryFn: async ({ signal }) =>
+      unwrap(
+        await api.POST("/api/v1/w/{workspace_id}/inboxes/{inbox_id}/rules/preview", {
+          params: { path: { workspace_id: workspaceId, inbox_id: inboxId } },
+          body: { conditions: rule.conditions, actions: rule.actions },
+          signal,
+        }),
+      ),
+  });
+}
+
+/**
+ * `conversations.list_rule_notices`: what Scout noticed in the inboxes you
+ * may teach in, the most frequent sender first. Asking also starts a fresh
+ * look at an inbox not looked at lately; what it finds shows next time.
+ */
+export function useRuleNotices(workspaceId: string) {
+  return useQuery({
+    queryKey: keys.notices(workspaceId),
+    queryFn: async ({ signal }) =>
+      unwrap(
+        await api.GET("/api/v1/w/{workspace_id}/rule-notices", {
+          params: { path: { workspace_id: workspaceId } },
+          signal,
+        }),
+      ).notices,
+  });
+}
+
+/** "Not now", "Don't suggest this", and taking either back (Undo). */
+export function useNoticeAnswers(workspaceId: string) {
+  const queryClient = useQueryClient();
+  const settle = () => queryClient.invalidateQueries({ queryKey: keys.notices(workspaceId) });
+  const answer = useMutation({
+    mutationFn: async ({ noticeId, answer }: { noticeId: string; answer: "not_now" | "never" }) => {
+      unwrapEmpty(
+        await api.POST("/api/v1/w/{workspace_id}/rule-notices/{notice_id}/answer", {
+          params: { path: { workspace_id: workspaceId, notice_id: noticeId } },
+          body: { answer },
+        }),
+      );
+    },
+    onSettled: settle,
+  });
+  const clear = useMutation({
+    mutationFn: async ({ noticeId }: { noticeId: string }) => {
+      unwrapEmpty(
+        await api.DELETE("/api/v1/w/{workspace_id}/rule-notices/{notice_id}/answer", {
+          params: { path: { workspace_id: workspaceId, notice_id: noticeId } },
+        }),
+      );
+    },
+    onSettled: settle,
+  });
+  return { answer, clear };
+}
 
 /** `conversations.suggest_rules`: the rules that would repeat `action` on lookalikes. */
 export async function suggestRules(
   workspaceId: string,
   conversationId: string,
-  action: TaughtAction,
+  action: TaughtAction | AheadAction,
 ): Promise<RuleSuggestions> {
   return unwrap(
     await api.GET("/api/v1/w/{workspace_id}/conversations/{conversation_id}/rule-suggestions", {
@@ -112,6 +193,8 @@ interface RuleToMake {
   originText?: string | null | undefined;
   teachingId?: string | null | undefined;
   state?: "active" | "proposed" | undefined;
+  /** The "Scout noticed" suggestion it answers. */
+  noticeId?: string | null | undefined;
 }
 
 /** Whether this screen already removed `ruleId`: a stale Undo must not remove it twice. */
@@ -143,6 +226,8 @@ export function useRuleMutations(workspaceId: string) {
   const settle = async () => {
     await Promise.all([
       queryClient.invalidateQueries({ queryKey: keys.rules(workspaceId) }),
+      // A rule saved from a suggestion (or undone) changes what Scout offers.
+      queryClient.invalidateQueries({ queryKey: keys.notices(workspaceId) }),
       // Every rule of the workspace: its state and its run changed.
       queryClient.invalidateQueries({
         queryKey: operationKey("conversations.get_rule", { workspace_id: workspaceId }),
@@ -170,6 +255,9 @@ export function useRuleMutations(workspaceId: string) {
               ? {}
               : { teaching_id: rule.teachingId }),
             ...(rule.state === undefined ? {} : { state: rule.state }),
+            ...(rule.noticeId === undefined || rule.noticeId === null
+              ? {}
+              : { notice_id: rule.noticeId }),
           },
         }),
       ),

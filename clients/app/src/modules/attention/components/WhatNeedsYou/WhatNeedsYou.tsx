@@ -32,6 +32,8 @@ import {
   needSentence,
   quoteAttribution,
   ReplyDialog,
+  ScoutNoticed,
+  useAheadOffer,
   useConversation,
   useConversationsByIds,
   useInboxes,
@@ -267,6 +269,7 @@ export function WhatNeedsYou({ workspaceId, now, offer }: WhatNeedsYouProps) {
   // it needs nothing.
   const rowOf = (conversation: ConversationSummary) =>
     [...rows, ...gone.values()].find((row) => row.conversation.id === conversation.id);
+  const ahead = useAheadOffer(workspaceId);
   const needActions = useNeedActions(workspaceId, {
     onChanged: refresh,
     onUndo: (conversation) => {
@@ -287,8 +290,15 @@ export function WhatNeedsYou({ workspaceId, now, offer }: WhatNeedsYouProps) {
         show(row);
       }
     },
-    // campbooks-cloud#169 offers the paid rule for the sender here
-    // (`onPaid`), after Already paid.
+    // The smart rule for mail still to come (campbooks-cloud#169): after
+    // Already paid, the sender's bills; after Report and delete, mail like
+    // it. Only once the server agreed; the confirmation alone saves.
+    onPaid: (conversation) => {
+      ahead.offer(conversation, { kind: "paid" });
+    },
+    onReported: (conversation) => {
+      ahead.offer(conversation, { kind: "report" });
+    },
   });
 
   const when = (until: Date) =>
@@ -309,6 +319,10 @@ export function WhatNeedsYou({ workspaceId, now, offer }: WhatNeedsYouProps) {
   };
   const confirm = (row: Row) => {
     needActions.confirm(row.conversation);
+  };
+  const report = (row: Row) => {
+    hide(row, t("confirm.reported", { name: row.name }));
+    needActions.report(row.conversation);
   };
   const paid = (row: Row) => {
     hide(row, t("confirm.paid", { name: row.name }));
@@ -445,6 +459,9 @@ export function WhatNeedsYou({ workspaceId, now, offer }: WhatNeedsYouProps) {
         case "no": {
           return tc("needs.actions.no");
         }
+        case "report": {
+          return tc("needs.actions.report");
+        }
         case "safe": {
           return tc("needs.actions.safe");
         }
@@ -493,6 +510,10 @@ export function WhatNeedsYou({ workspaceId, now, offer }: WhatNeedsYouProps) {
       case "yes": {
         setHighlight(undefined);
         confirm(row);
+        return;
+      }
+      case "report": {
+        report(row);
         return;
       }
       case "paid": {
@@ -615,7 +636,7 @@ export function WhatNeedsYou({ workspaceId, now, offer }: WhatNeedsYouProps) {
       setHighlight(undefined);
       setExpandedId(undefined);
     },
-    { enabled: highlight !== undefined || expandedId !== undefined },
+    { enabled: (highlight !== undefined || expandedId !== undefined) && !ahead.offering },
   );
   const own = (index: number) => () => {
     const action = selectedActions?.own[index];
@@ -623,9 +644,16 @@ export function WhatNeedsYou({ workspaceId, now, offer }: WhatNeedsYouProps) {
       run(selected, action.id as ActionId);
     }
   };
-  useShortcut("item.choice1", own(0), { enabled: selectedActions?.own[0] !== undefined });
-  useShortcut("item.choice2", own(1), { enabled: selectedActions?.own[1] !== undefined });
-  useShortcut("item.choice3", own(2), { enabled: selectedActions?.own[2] !== undefined });
+  // An offered smart rule holds 1 and Esc while it shows.
+  useShortcut("item.choice1", own(0), {
+    enabled: selectedActions?.own[0] !== undefined && !ahead.offering,
+  });
+  useShortcut("item.choice2", own(1), {
+    enabled: selectedActions?.own[1] !== undefined && !ahead.offering,
+  });
+  useShortcut("item.choice3", own(2), {
+    enabled: selectedActions?.own[2] !== undefined && !ahead.offering,
+  });
   useShortcut(
     "item.done",
     () => {
@@ -821,6 +849,8 @@ export function WhatNeedsYou({ workspaceId, now, offer }: WhatNeedsYouProps) {
           );
         })}
       </div>
+      {loading ? null : <ScoutNoticed workspaceId={workspaceId} />}
+      {ahead.element}
       <Dialog
         open={snoozing !== undefined}
         onClose={() => {

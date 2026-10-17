@@ -170,7 +170,8 @@
     "nextAttachment": "Next attachment",
     "notNeeded": "Not needed (or it’s safe)",
     "undoAll": "Undo all a rule did",
-    "allPaid": "All bills already paid"
+    "allPaid": "All bills already paid",
+    "saveRule": "Save the smart rule"
   },
   "compose": {
     "title": {
@@ -281,7 +282,8 @@
       "alreadyPaid": "Already paid",
       "stillToPay": "Still to pay",
       "markPaid": "Mark paid",
-      "billPrompt": "Campbooks can’t see your bank."
+      "billPrompt": "Campbooks can’t see your bank.",
+      "report": "Report and delete"
     },
     "toast": {
       "done": "Done · {{name}}",
@@ -295,7 +297,8 @@
       "allPaid_one": "Marked {{count}} invoice paid",
       "allPaid_other": "Marked {{count}} invoices paid",
       "allPaidFailed_one": "Couldn’t mark {{count}} invoice paid. Try again.",
-      "allPaidFailed_other": "Couldn’t mark {{count}} invoices paid. Try again."
+      "allPaidFailed_other": "Couldn’t mark {{count}} invoices paid. Try again.",
+      "reported": "Reported · {{name}}. It’s in spam"
     },
     "summary": {
       "heading": "Scout’s summary"
@@ -315,7 +318,9 @@
       "about": "about “{{value}}”",
       "header": "with a list header",
       "label": "with a label",
-      "stream": "in {{value}}"
+      "stream": "in {{value}}",
+      "checksFail": "that fails its sender checks",
+      "pretending": "that says it’s from {{value}} but fails its sender checks"
     },
     "do": {
       "archive": "archived",
@@ -326,12 +331,17 @@
       "asksAction": "asks for something",
       "noAction": "never asks for anything",
       "always": "always kept in the inbox",
-      "never": "never needs you"
+      "never": "never needs you",
+      "trash": "put in the trash",
+      "spam": "reported as spam",
+      "paid": "its bills are already paid"
     },
     "likeness": {
       "sender": "Everything from {{address}}",
       "list": "Only the {{list}} list",
-      "template": "Only “{{template}}” from {{from}}"
+      "template": "Only “{{template}}” from {{from}}",
+      "domain": "Everything from {{domain}}",
+      "impersonation": "Mail pretending to be {{domain}}"
     },
     "offer": {
       "which": "Which mail",
@@ -446,7 +456,10 @@
       "never": "Campbooks says this never needs you",
       "withOthers": "{{line}} · {{others}}",
       "others_one": "like {{n}} other {{from}}",
-      "others_other": "like {{n}} others {{from}}"
+      "others_other": "like {{n}} others {{from}}",
+      "trash": "Campbooks put this in the trash",
+      "spam": "Campbooks reported this as spam",
+      "paid": "Campbooks says this is already paid"
     },
     "reader": {
       "stop": "Stop doing this"
@@ -557,5 +570,61 @@
     },
     "to": "To {{recipient}}",
     "replyToElsewhere": "Replies go to {{recipient}}, not to the sender {{sender}}. Check before you send."
+  },
+  "smartRule": {
+    "tag": "Smart rule",
+    "lead": "This is saved as a smart rule. Check it before it starts working.",
+    "how": "It runs on its own from now on, with no AI. You’ll find it in Scout’s memory → Smart rules, where you can change it or turn it off any time.",
+    "matches_one": "It matches {{n}} email already here.",
+    "matches_other": "It matches {{n}} emails already here.",
+    "matchesAtLeast": "It matches at least {{n}} emails already here.",
+    "noMatches": "Nothing here matches it yet. It acts on new mail.",
+    "matchesUnknown": "Campbooks could not count what it matches.",
+    "examples": "Emails it matches",
+    "existing_one": "Also apply it to the one already here",
+    "existing_other": "Also apply it to the {{n}} already here",
+    "save": "Save smart rule",
+    "retry": "Try again",
+    "cancel": "Cancel",
+    "failed": "Campbooks could not save this smart rule. Nothing changed.",
+    "saved": "Smart rule saved",
+    "savedDetail": "It’s in Scout’s memory. Change it or turn it off any time.",
+    "toast": "Smart rule saved · {{rule}}",
+    "shared": "For everyone in {{inbox}}.",
+    "titleTeach": "A rule for mail like this",
+    "titleReport": "A rule for mail like this",
+    "titlePaid": "A rule for {{payee}}’s invoices",
+    "titleNotice": "A rule for mail from {{sender}}"
+  },
+  "ahead": {
+    "reportTitle": "Never see emails like this again?",
+    "reportPretending": "Campbooks can report mail that says it’s from {{domain}} but fails its sender checks as it arrives, without asking. The rule shows in Scout’s memory.",
+    "reportSender": "Campbooks can report mail from {{sender}} as spam as it arrives, without asking. The rule shows in Scout’s memory.",
+    "paidTitle": "Are {{payee}}’s invoices always paid for you?",
+    "paidDetail": "If they’re on direct debit, Campbooks can mark future invoices from {{payee}} paid, without asking. The rule shows in Scout’s memory.",
+    "accept": "Yes, from now on",
+    "loadFailed": "Campbooks could not prepare that rule. Nothing changed."
+  },
+  "noticed": {
+    "title": "Scout noticed",
+    "position": "{{n}} of {{total}}",
+    "keepOffHome_one": "You got {{n}} email from {{sender}} in the last {{days}} days and opened {{opened}}.",
+    "keepOffHome_other": "You got {{n}} emails from {{sender}} in the last {{days}} days and opened {{opened}}.",
+    "keepOffHomeAsk": "Keep them off Home and file them under {{stream}}?",
+    "archived_one": "{{sender}} sent you {{n}} email in the last {{days}} days, and you archived or deleted {{archived}} of them unread.",
+    "archived_other": "{{sender}} sent you {{n}} emails in the last {{days}} days, and you archived or deleted {{archived}} of them unread.",
+    "archiveAsk": "Archive them as they arrive?",
+    "cadence": {
+      "daily": "They come most days.",
+      "weekly": "They come every week.",
+      "monthly": "They come every month."
+    },
+    "setUp": "Set up a smart rule…",
+    "notNow": "Not now",
+    "never": "Don’t suggest this",
+    "notNowDone": "Scout will ask another time",
+    "neverDone": "Scout won’t suggest that again",
+    "failed": "Campbooks could not record that. Try again.",
+    "shared": "For everyone in {{inbox}}."
   }
 }

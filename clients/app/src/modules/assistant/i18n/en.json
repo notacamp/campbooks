@@ -118,7 +118,8 @@
         "precedence": "it was sent in bulk"
       },
       "label": "it has the label {{value}}",
-      "stream": "it is in {{value}}"
+      "stream": "it is in {{value}}",
+      "sender_checks_fail": "it fails its sender checks"
     },
     "act": {
       "move_to_stream": "move it to {{value}}",
@@ -130,7 +131,10 @@
       "asks_action_true": "it asks you to do something",
       "asks_action_false": "it asks nothing of you",
       "surface_always": "keep it in your inbox and never file it away",
-      "surface_never": "it never needs you"
+      "surface_never": "it never needs you",
+      "trash": "put it in the trash",
+      "spam": "report it as spam",
+      "mark_paid": "its bills are already paid"
     },
     "stream": {
       "primary": "Primary",

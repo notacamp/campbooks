@@ -86,6 +86,10 @@ function inbox(extra: Parameters<typeof mockApi>[0] = {}) {
     [`POST ${W}/conversations/${LEDGER.id}/stream`]: (_request, body) => ({
       body: { ...LEDGER, ...(body as object), stream_source: "member", suggestion: null },
     }),
+    // The smart-rule confirmation counts what the rule matches.
+    [`POST ${W}/inboxes/${INBOX.id}/rules/preview`]: {
+      body: LEDGER_SUGGESTIONS.suggestions[0]?.preview,
+    },
     ...extra,
   });
 }
@@ -241,8 +245,17 @@ describe("the inbox", () => {
     expect(within(offer).getByText("What changes for freelancers in 2027")).toBeVisible();
     expect(within(offer).getByText("None of them looks suspicious.")).toBeVisible();
 
-    // 1 accepts: the rule is made from the chosen likeness.
+    // 1 accepts: the smart-rule confirmation shows the rule; nothing is
+    // saved before Save smart rule, then the rule is made from the chosen
+    // likeness.
     fireEvent.keyDown(document, { key: "1" });
+    const confirm = await screen.findByRole("dialog", { name: "A rule for mail like this" });
+    expect(within(confirm).getByText("Smart rule")).toBeVisible();
+    expect(api.calls.some((call) => call.route === `POST ${W}/inboxes/${INBOX.id}/rules`)).toBe(
+      false,
+    );
+    await within(confirm).findByText("It matches 40 emails already here.");
+    fireEvent.click(within(confirm).getByRole("button", { name: /Save smart rule/u }));
     expect(
       await screen.findByRole("dialog", {
         name: "Moved 40 to Newsletters. New ones will go there too.",
@@ -334,6 +347,9 @@ describe("the inbox", () => {
     fireEvent.keyDown(document, { key: "1" });
     await screen.findByRole("dialog", { name: /Move all 40/u });
     fireEvent.keyDown(document, { key: "1" });
+    const confirm = await screen.findByRole("dialog", { name: "A rule for mail like this" });
+    await within(confirm).findByText("It matches 40 emails already here.");
+    fireEvent.click(within(confirm).getByRole("button", { name: /Save smart rule/u }));
     return api;
   }
 

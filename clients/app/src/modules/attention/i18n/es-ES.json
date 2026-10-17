@@ -50,7 +50,8 @@
     "safe": "Marcado como seguro · {{name}}",
     "snoozed": "Pospuesto · {{name}}, vuelve {{when}}",
     "replied": "Enviando a {{name}}",
-    "paid": "Marcada como pagada · {{name}}"
+    "paid": "Marcada como pagada · {{name}}",
+    "reported": "Denunciado · {{name}}"
   },
   "error": {
     "title": "No se ha podido cargar lo que te necesita",

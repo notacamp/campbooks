@@ -50,7 +50,8 @@
     "safe": "Marqué comme sûr · {{name}}",
     "snoozed": "Reporté · {{name}}, revient {{when}}",
     "replied": "Envoi à {{name}}",
-    "paid": "Marquée comme payée · {{name}}"
+    "paid": "Marquée comme payée · {{name}}",
+    "reported": "Signalé · {{name}}"
   },
   "error": {
     "title": "Impossible de charger ce qui a besoin de vous",
