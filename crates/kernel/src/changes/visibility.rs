@@ -29,16 +29,22 @@ pub trait Visibility: std::fmt::Debug + Send + Sync + 'static {
     ) -> VisibilityFuture<'a>;
 
     /// Record types whose changes may change who sees inside a container
-    /// (a membership of an inbox). Change streams list the containers a
-    /// caller may see on every read, so they do not need it.
+    /// (a membership of an inbox ending, an inbox made for someone). A
+    /// change stream keeps the containers it listed until one of these is
+    /// numbered (whether or not its caller may see it) or its next
+    /// heartbeat, so every way of gaining or losing sight inside a
+    /// container must be announced by such a change. A gain that is not
+    /// has its changes until the next heartbeat skipped: that heartbeat
+    /// finds the container and sends `reset` (`access_changed`) so the
+    /// client refetches.
     fn access_records(&self) -> &'static [&'static str] {
         &[]
     }
 
     /// The container types this port answers for. A change stream lists the
     /// caller's containers of each ([`visible_containers`](Self::visible_containers))
-    /// on every read and asks the database only for changes in those (or in
-    /// none), so a change in a container of any other type reaches nobody.
+    /// and asks the database only for changes in those (or in none), so a
+    /// change in a container of any other type reaches nobody.
     fn container_types(&self) -> &'static [&'static str] {
         &[]
     }

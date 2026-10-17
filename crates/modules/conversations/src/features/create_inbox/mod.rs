@@ -3,13 +3,16 @@
 //! minted and the account behind it (a connection-account v1 blob), and this
 //! creates the inbox with the granting member as its `manager`
 //! (`contracts/connectors.capability_granted.v1.schema.json`). Idempotent:
-//! a replayed event changes nothing.
+//! a replayed event changes nothing. When it adds the member it publishes
+//! `conversations.inbox_changed`: open change streams then list the
+//! member's inboxes again before reading on, so the new inbox's first mail
+//! reaches them live.
 
 use campbooks_kernel::{Event, EventHandler, JobContext, JobError, tenancy::WorkspaceId};
 
 use crate::{
     domain::{blobs::read_bytes, redact},
-    events::{AccountDocument, CapabilityGranted},
+    events::{AccountDocument, CapabilityGranted, InboxChanged},
     model::{Channel, ConnectionId, InboxId, InboxRole},
 };
 
@@ -60,6 +63,7 @@ impl EventHandler for CreateInbox {
             ));
         }
 
+        let state = ctx.state().clone();
         let tx = ctx.tx().await?;
         sqlx::query!(
             r#"
@@ -99,6 +103,20 @@ impl EventHandler for CreateInbox {
         .execute(&mut **tx)
         .await?
         .rows_affected();
+        if added > 0 {
+            // Someone may now see inside it: announced within the inbox, so
+            // only its members receive the change itself.
+            state
+                .events
+                .publish(
+                    tx,
+                    &InboxChanged {
+                        workspace: granted.workspace.clone(),
+                        inbox,
+                    },
+                )
+                .await?;
+        }
         tracing::info!(%inbox, added_member = added > 0, "inbox for a messages grant");
         Ok(())
     }
@@ -167,8 +185,13 @@ mod tests {
         let (token, sam) = kit.member("sam", workspace);
         let inbox = InboxId::new();
         grant(&kit, workspace, inbox, sam, "messages").await;
+        // Who sees inside an inbox changed: open streams list theirs again.
+        let changed = kit.events("conversations.inbox_changed").await;
+        assert_eq!(changed.len(), 1, "{changed:?}");
+        assert_eq!(changed[0]["inbox"], inbox.to_string());
         // A replay, or an incremental consent, changes nothing.
         grant(&kit, workspace, inbox, sam, "messages").await;
+        assert_eq!(kit.events("conversations.inbox_changed").await.len(), 1);
 
         let inboxes = kit
             .get(&token, &format!("/api/v1/w/{workspace}/inboxes"))

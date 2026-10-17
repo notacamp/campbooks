@@ -1,0 +1,252 @@
+## Context
+
+Since #514 a page is up to 200 changes the caller may see, filtered in SQL
+before `LIMIT`, so how frames group never depends on hidden changes. Two
+things still did: when a catch-up page leaves (its read walks
+`changes_workspace_seq_idx` past every hidden change before the 200th
+visible one, about 1 to 5 µs a row), and how much a read costs (the
+caller's inboxes listed on every read, outside the feed's query permit).
+This change paces catch-up pages, keeps the containers per stream, and
+re-checks membership on any membership change.
+
+## Decisions
+
+### 1. Catch-up pages on a fixed tick
+
+A stream is **behind** from the open until a read ends short of a full
+page, and again after any full page. Each read made while behind releases
+its frames **one tick after the read began**, or the fewest whole ticks
+that reach its end when it takes longer (`Pacer`). A read begins when the
+stream's task is free again, that is when the client took the previous
+page's frames (the channel holds one), and `started` is taken in
+`Feed::next` before the read waits for its permit. So the release depends
+only on when the read began, which the client already knows, and on how
+many whole ticks the read took: the permit wait, the listing, the scan and
+the second look stay hidden while their total is under a tick, the same
+for a page that skipped no hidden change and one that skipped 20,000.
+
+A first version released at the first tick *after the read ended*, ticks
+counted from the open. The security review showed the client could then
+shift the phase: by taking page *n* at `open + n·tick + (tick − θ)` it
+makes the release cross a tick boundary exactly when the scan is longer
+than θ, and by replaying the same token (the same pages) it binary-searches
+θ in a handful of opens, which reads the hidden scan time to the
+millisecond. Counting from the read's own start removes the phase the
+client controls. Ticks counted from the read's start rather than from the
+open keep one page a tick (from the open, a read that began just after a
+tick would always wait two).
+
+- **Tick:** `CAMPBOOKS_CHANGES__CATCH_UP_TICK_MS`, 50 ms by default, 50 to
+  1000, checked at startup like the other change-feed settings. Below
+  50 ms an ordinary scan would spill past a tick more often; above a
+  second a catch-up becomes slow, and a tick could pass the shortest
+  heartbeat (1 s).
+- **Every behind read is paced**, even one that releases nothing (all its
+  rows refused by the second look) or ends the catch-up: it is one page a
+  tick, which also bounds a catch-up's database load to one scan per tick
+  per stream.
+- **Only a read woken from the idle wait is unpaced.** A read that starts
+  caught up *and* begins from the stream's idle wait (woken by a change,
+  the poll or a timer, with nothing left to send) releases at once, so a
+  change that wakes a caught-up stream keeps today's latency. Every other
+  step is paced: a read after frames were queued (it begins when the
+  client took them), and a heartbeat that is not reached from the wait.
+  The round-2 review showed why: a caught-up client that stops reading
+  holds the stream's task in its send while hidden changes pile up; it
+  then makes one visible change and reads again at a moment of its choice,
+  and an unpaced read would deliver that change after a scan of the whole
+  pile, a direct measure of the hidden count on every stall. With the rule
+  above that read is paced, so the change leaves one tick after the
+  client's own resume. The narrower alternative (pace only after a send
+  that found the channel full) depends on the channel's state, which a
+  slow client influences in ways harder to reason about; pacing every step
+  that does not come from the wait is one rule, and costs the live tail
+  only a paced, usually empty read after each burst (the stream then waits
+  out that tick before listening again).
+- **The first read after the open is paced** (the stream does not know yet
+  whether it is behind), so the first frames after `ready` wait up to one
+  tick.
+- **Heartbeats** are still due on their own timer. A heartbeat that falls
+  in a catch-up makes its read behind too, so the heartbeat frame leaves
+  one tick after the heartbeat's step began (taken before its permit, like
+  a read's), on a time set by the timer, the client and the tick alone.
+
+Alternatives: sleeping a fixed time *before* each read (the scan time would
+still show after it); padding each read to a fixed duration (the same as a
+tick, but drifting with the work around it); pacing every read (adds up to
+a tick to every live change for no gain while the live read timing stays).
+
+### 2. Containers kept per stream
+
+A stream lists the caller's containers on its first read and keeps them
+(`Containers`: the page query's `Sight` and `covers`, the head read just
+before the list). Every change up to `covers` was committed before the list
+was read, so what it did to access is in the list.
+
+The list is dropped, and the next read lists again:
+
+- **when a container-access change is numbered in a range the stream
+  read**: after each page query, in the same transaction, one more query
+  over the same range (`access_changes`) asks whether a change of a
+  `Visibility::access_records` type (`conversations.inbox`) was numbered
+  after `covers`. If so, the page is not shown: the stream lists again and
+  reads the same range anew. This looks at hidden changes too, on purpose:
+  an inbox made for someone is announced within that inbox, which their
+  old list does not hold, so only a hidden-inclusive look can see it.
+- **at every heartbeat**, so a change of access that nothing announced is
+  kept no longer than a heartbeat interval (25 s by default), the bound the
+  membership re-check already had. When that listing finds a container the
+  previous list lacked, the gain was not announced and the stream read past
+  its changes since: it sends `reset` (`access_changed`), and the client
+  refetches, so nothing is lost for good (a review asked for lossless by
+  construction rather than a guard on every place that grants access);
+- **when membership resolves to a different access** (a role change).
+
+Every way of gaining sight inside an inbox now publishes
+`conversations.inbox_changed`: the existing ones (a membership ended, an
+owner left, an inbox kept read-only) and a new one, `create_inbox` adding
+the granting member. Without that, a stream would have read past the new
+inbox's first mail with the old list and never shown it. Losing sight was
+already safe with a stale list: the second look (`container_visible` for
+every container of a page, before showing it) refuses the rows and sends
+`reset` (`access_changed`).
+
+**Worst case staleness.** For an announced change: none; the page that
+covers the announcement is read again under a fresh list before any of it
+is shown, and later changes come after it. For an unannounced one: one
+heartbeat interval. A lost container is never shown meanwhile (the second
+look); a gained one waits at most that long, its changes in between are
+read past, and the heartbeat's `reset` makes the client refetch them. A
+heartbeat listing that finds a gain whose announcement it has not read yet
+sends a `reset` it did not need; that is rare and harmless.
+
+**Under the query permit.** The listing (the head and the port's query)
+runs under the same permit as the page, one permit per read. That is safe:
+a permit is never taken inside another, and the port does not take one. It
+is cheap: with the cache the listing runs about once a heartbeat, so it
+rarely lengthens a permit; when a wake-up of thousands of streams follows
+an access change, the listings queue at the permit with their pages instead
+of taking the pool.
+
+### 3. Membership re-checked on any membership change
+
+The same query asks whether a change of a membership record type
+(`Membership::access_records`: `workspaces.member`, `workspaces.workspace`)
+was numbered after the last one looked for, up to the head the read saw
+(past the page, so a removal numbered after a full page stops that page
+too: the review found the first version looked only up to the page's end). If so, the stream
+resolves membership (and whether the token still stands) before showing
+the page, seen or not. Before, only a membership change the page showed
+did that; a caller who may not read `workspaces.member`, or a removal
+announced inside a container they cannot see, waited for the next
+heartbeat. Membership changes are rare (joins, leaves, role changes,
+renames), so the re-check costs a few queries now and then.
+
+### 4. A task per stream; one permit for all of a read
+
+The reviews of this change found two more things in the same code:
+
+- **The permit did not bound the pool.** Only the page query held the
+  feed's query permit; listing containers, the second look at a page's
+  containers and the membership re-check ran outside it, so a wake-up of
+  N streams sent up to N of those to the pool before they queued. Now each
+  database step of a stream (a read, a heartbeat) takes one permit in
+  `Feed::next` and holds it for every query of that step, one connection at
+  a time. A process's streams therefore use at most `CONCURRENT_QUERIES`
+  (4) connections at once. A permit holder waiting for a connection waits
+  at most the pool's acquire timeout, then the stream ends `unavailable`;
+  permits are never nested and no connection is held while waiting for a
+  permit, so they cannot deadlock.
+- **Production was safe by an invariant nobody enforced.** The stream ran
+  inside the response body: a body polled no more while a read was pending
+  (a consumer that stops polling mid-read) kept that read's permit and
+  connection. hyper never does that, but a test did, and four such bodies
+  froze every other stream of the process (the flaky
+  `many_subscribers_each_receive_every_change_once`, fixed in the test by
+  #532). Now `open` spawns the stream in a task of its own that sends each
+  frame over a channel of one (`run`); the body only receives
+  (`Frames`). A body that is not polled leaves the task waiting to send,
+  holding nothing; a dropped body ends the task at once (the read in flight
+  is dropped, giving back its permit and connection), and gives the
+  caller's stream slot back as it drops. A catch-up for a client that went
+  away used to stop at the next write; it now stops at once.
+
+The channel holds one frame, so the next page's read may start while the
+last frame of the previous page waits in it: backpressure is now "the
+client has taken the previous page's frames, but for one".
+
+No timeout on the permit-held section beyond the pool's acquire timeout:
+with the task, a step only waits on the database.
+
+## Left for later (from the security review)
+
+- A removal committed just before a stream opens (after the open's
+  membership check, numbered before the head the open read) is not looked
+  for until the next membership change or heartbeat.
+- A process that shuts down ends its streams without a `closing` frame.
+- A stalled client's next page waits in the stream (read under the access
+  it had then) and is sent when the client reads again, after any change of
+  access since; the `reset` follows it.
+- No end-to-end test runs a real `messages` grant through `create_inbox`
+  to an open stream (the server test publishes `inbox_changed` itself).
+
+## What is left (accepted)
+
+- **The live tail's read timing** (from #514). A caught-up stream reads
+  when any change of the workspace is numbered (a hidden one too) or on
+  the poll. Two visible changes numbered in different runs may leave in one
+  burst or two depending on when the stream read, and a visible change can
+  wait (50 to 250 ms) behind producers in flight before it is numbered. A
+  read woken from the idle wait is unpaced and scans what was numbered
+  since the stream's previous read, so its duration does carry a count:
+  the hidden changes numbered in that short window (the stream reads at
+  every wake-up, so usually a handful, and microseconds each against
+  milliseconds of noise). A client cannot widen that window by stalling,
+  since a read that follows held-up frames is paced; the window is as long
+  as the time between two wake-ups of the workspace.
+- **A catch-up read longer than a tick.** Pacing hides scan time only while
+  a read (its permit wait included) fits in a tick. A read that scans past enough hidden changes to
+  take longer (at 1 to 5 µs a row, some 10,000 to 50,000 hidden changes
+  between two visible ones at the default tick) leaves on a later tick, so
+  the delay still shows, rounded up to whole ticks. Its cause is noisy
+  (cache, load) and the open rate limit slows repeating it, but it is
+  repeatable; a longer tick narrows it, at the price of a slower catch-up.
+- **When a catch-up ends.** The stream stops pacing after the first read
+  that is not full; that depends on visible changes only. Frames a live
+  read sends right after it leave at once.
+- **Extra reads on access changes.** A change of who sees inside some
+  inbox, or of membership, numbered in a range a stream read makes that
+  stream list again (or re-check membership) and read the page anew, even
+  when the change is not theirs to see. It costs one listing and one page
+  query: what every read cost before this change. It can delay the frames
+  of that read by milliseconds; in a catch-up, the tick absorbs it.
+- **Access-loss timing** (unchanged): a `reset` for a container just lost
+  comes at the next read or heartbeat.
+- **Unannounced access changes** wait up to a heartbeat (section 2).
+- **`version`**, a full page at heartbeat time and resume cost: as #514
+  describes.
+
+## Testing
+
+- Kernel, on a paused clock (`tokio::time::pause`): with the client taking
+  each page 0 to 49 ms after it left (any phase of a tick), every page of a
+  catch-up with a few hidden changes or up to 23,000 per page (46 ms of
+  scanning) leaves exactly one tick after its read began, and the live read
+  after it at once; a 72 ms read leaves two ticks after it began; a live
+  full page makes the next read paced again. Config: the tick is refused outside 50
+  to 1000.
+- Server: a 450-change catch-up past more hidden changes than a page leaves
+  its pages at one, two and three ticks (250 ms) from the open in the busy
+  and in the quiet workspace, with the same frames. The containers are
+  listed once across mail and five wake-ups, listed again when the member
+  is taken out of an inbox (`reset`, no id of its new mail) and when an
+  inbox is made for her (its first mail arrives at once). A removal the
+  member cannot see ends her stream (`revoked`) well before the 25 s
+  heartbeat, and so does one numbered after more than a page she may see,
+  before any of it is shown. An inbox gained with no announcement makes
+  her stream send `reset` at its next heartbeat, and its later mail
+  arrives. `create_inbox` publishes `inbox_changed` once, not on replay.
+- Every server test reads streams through the task, so a test that stops
+  reading a stream mid-read (`quiet_for`, `drain`) no longer pins a permit
+  or a connection; the existing tests (and the matrix) cover that the frames
+  are unchanged.
