@@ -294,12 +294,25 @@ static SCHEMA_STATEMENT: LazyLock<Regex> = LazyLock::new(|| {
 /// shadowed by the caller's objects. The only mention of `search_path` a
 /// migration may make. Exactly those two entries, `pg_temp` last: a match
 /// followed by `,` (another entry), by `;` or by the end of the file (a
-/// statement changing the session's path) captures group 1 and is refused
-/// (campbooks-cloud#213).
+/// statement changing the session's path) captures group 2 and is refused
+/// (campbooks-cloud#213). `pg_temp` must end the name: a following
+/// identifier character, `$` included (`pg_temp$x` is another schema),
+/// captures group 1 and is refused too (campbooks-cloud#214; the `regex`
+/// crate has no look-ahead for `pg_temp(?![\w$])`).
 static PINNED_SEARCH_PATH: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r"\bset\s+search_path\s*(?:=|to)\s*pg_catalog\s*,\s*pg_temp\b(\s*(?:[,;]|$))?")
+    Regex::new(r"\bset\s+search_path\s*(?:=|to)\s*pg_catalog\s*,\s*pg_temp([\w$]*)(\s*(?:[,;]|$))?")
         .unwrap_or_else(|e| unreachable!("static regex compiles: {e}"))
 });
+
+/// A string literal naming `search_path` (`set_config('search_path', …)`)
+/// changes the path at run time: refused, as string literals are otherwise
+/// dropped before the schema checks read a migration (campbooks-cloud#214).
+fn names_search_path_in_a_string(sql: &str) -> bool {
+    SQL_NOISE.find_iter(sql).any(|m| {
+        let text = m.as_str();
+        text.starts_with('\'') && text.to_lowercase().contains("search_path")
+    })
+}
 
 static QUALIFIED_NAME: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(r"\b([a-z_][a-z0-9_]*)\s*\.\s*[a-z_]")
@@ -317,7 +330,7 @@ pub fn check_migration_schemas(
     modules: &BTreeSet<String>,
 ) -> Vec<String> {
     let mut violations = Vec::new();
-    for (name, sql) in files {
+    for (name, raw) in files {
         let Some(owner) = MIGRATION_NAME
             .captures(name)
             .and_then(|caps| caps.get(2))
@@ -326,7 +339,7 @@ pub fn check_migration_schemas(
             continue;
         };
         let sql = SQL_NOISE
-            .replace_all(sql, " ")
+            .replace_all(raw, " ")
             .to_lowercase()
             .replace('"', "");
         let mut touched = BTreeSet::new();
@@ -351,9 +364,9 @@ pub fn check_migration_schemas(
         }
         let pinned = PINNED_SEARCH_PATH
             .captures_iter(&sql)
-            .filter(|caps| caps.get(1).is_none())
+            .filter(|caps| caps.get(1).is_some_and(|tail| tail.is_empty()) && caps.get(2).is_none())
             .count();
-        if sql.matches("search_path").count() > pinned {
+        if sql.matches("search_path").count() > pinned || names_search_path_in_a_string(raw) {
             violations.push(format!(
                 "migrations/{name}: must not change `search_path`; qualify names with `{owner}.`"
             ));
@@ -1540,9 +1553,32 @@ mod tests {
                 "20261012000007_kernel__path.sql",
                 "SELECT 1;\nSET search_path = pg_catalog, pg_temp\n",
             ),
+            // `pg_temp$x` and `pg_tempx` are other schemas, not `pg_temp`
+            // (campbooks-cloud#214).
+            sql(
+                "20261012000008_kernel__path.sql",
+                "CREATE FUNCTION kernel.f() RETURNS int LANGUAGE sql SECURITY DEFINER \
+                 SET search_path = pg_catalog, pg_temp$x AS $$ SELECT 1 $$;",
+            ),
+            sql(
+                "20261012000009_kernel__path.sql",
+                "CREATE FUNCTION kernel.f() RETURNS int LANGUAGE sql SECURITY DEFINER \
+                 SET search_path = pg_catalog, pg_tempx AS $$ SELECT 1 $$;",
+            ),
+            // The path changed at run time, through a string.
+            sql(
+                "20261012000010_kernel__path.sql",
+                "CREATE FUNCTION kernel.f() RETURNS int LANGUAGE plpgsql SECURITY DEFINER \
+                 SET search_path = pg_catalog, pg_temp AS $$ BEGIN \
+                 PERFORM set_config('search_path', 'kernel', true); RETURN 1; END $$;",
+            ),
+            sql(
+                "20261012000011_kernel__path.sql",
+                "SELECT pg_catalog.set_config('SEARCH_PATH', 'public', false);",
+            ),
         ];
         let v = check_migration_schemas(&bad, &modules);
-        assert_eq!(v.len(), 7, "{v:#?}");
+        assert_eq!(v.len(), 11, "{v:#?}");
         assert!(v.iter().all(|v| v.contains("search_path")), "{v:#?}");
     }
 

@@ -631,6 +631,15 @@ async fn signing_in_again_replaces_the_session(db: PgPool) {
     browser.sign_in(&h.idp, "/").await;
     assert_ne!(browser.cookie(SESSION).unwrap(), first);
     assert_eq!(count(&h.db, "SELECT count(*) FROM bff.sessions").await, 1);
+    // The ended session's refresh token is revoked; the new one stays live
+    // (campbooks-cloud#214).
+    let revoked = h.idp.revoked_tokens();
+    assert_eq!(revoked.len(), 1, "the earlier session's refresh token");
+    assert!(!h.idp.is_live_refresh_token(&revoked[0]));
+    assert_eq!(
+        browser.get("/bff/api/v1/test/whoami").await.status,
+        StatusCode::OK
+    );
 }
 
 // --- session -------------------------------------------------------------------
@@ -1927,6 +1936,148 @@ async fn the_functions_never_reach_another_accounts_session(db: PgPool) {
         .unwrap();
     assert_eq!(count(&h.db, "SELECT count(*) FROM bff.sessions").await, 0);
     assert!(!ended.id_token.is_empty());
+}
+
+/// The functions refuse what the BFF never sends (campbooks-cloud#214): a
+/// landing that is not a same-origin path (`//`, a backslash, a space, the
+/// BFF's own paths, too long), a use with no time or no later deadline, a
+/// refresh that would store nothing, and a session longer than 366 days.
+#[sqlx::test(migrations = "../../migrations")]
+async fn the_functions_refuse_bad_input(db: PgPool) {
+    use chrono::{TimeDelta, Utc};
+
+    const START: &str = "SELECT bff.start_login(sha256(gen_random_uuid()::text::bytea),
+                                                sha256(gen_random_uuid()::text::bytea),
+                                                '\\x01', '\\x02', $1, now(),
+                                                now() + interval '10 minutes', NULL)";
+    const TOUCH: &str = "SELECT bff.touch_session($1, $2, $3)";
+    const STORE: &str = "SELECT bff.store_session_tokens($1, $2, $3, $4)";
+    const CREATE: &str = "SELECT bff.create_session(gen_random_uuid(),
+                                                    sha256(gen_random_uuid()::text::bytea),
+                                                    'test-user', NULL, NULL, NULL, '\\x01', now(),
+                                                    NULL, '\\x02', NULL, now(),
+                                                    now() + $1::text::interval,
+                                                    now() + $2::text::interval, NULL)";
+
+    let h = harness(db).await;
+    let mut browser = Browser::new(&h.app);
+    browser.sign_in(&h.idp, "/").await;
+    let presented = campbooks_kernel::crypto::hash(browser.cookie(SESSION).unwrap());
+    let runtime = testing::app_role_pool(&h.db).await;
+    let now = Utc::now();
+    let later = now + TimeDelta::hours(1);
+    let sealed: &[u8] = b"sealed";
+
+    let long = format!("/{}", "a".repeat(2048));
+    for landing in [
+        "//evil.example",
+        "/\\evil.example",
+        "/\\/evil.example",
+        "evil.example",
+        "",
+        "/a b",
+        "/a\tb",
+        "/\"><script>",
+        "/bff",
+        "/bff/logout",
+        long.as_str(),
+    ] {
+        invalid(
+            sqlx::query(START).bind(landing).execute(&runtime).await,
+            landing,
+        );
+    }
+    sqlx::query(START)
+        .bind("/inbox?view=all#top")
+        .execute(&runtime)
+        .await
+        .unwrap();
+
+    for (seen, idle_until) in [
+        (None, Some(later)),
+        (Some(now), None),
+        (Some(now), Some(now)),
+    ] {
+        invalid(
+            sqlx::query(TOUCH)
+                .bind(&presented)
+                .bind(seen)
+                .bind(idle_until)
+                .execute(&runtime)
+                .await,
+            "touch_session",
+        );
+    }
+    sqlx::query(TOUCH)
+        .bind(&presented)
+        .bind(now)
+        .bind(later)
+        .execute(&runtime)
+        .await
+        .unwrap();
+
+    for (access, until, refresh) in [
+        (None, Some(later), Some(sealed)),
+        (Some(sealed), None, Some(sealed)),
+        (Some(sealed), Some(later), None),
+        (Some(&b""[..]), Some(later), Some(sealed)),
+    ] {
+        invalid(
+            sqlx::query(STORE)
+                .bind(&presented)
+                .bind(access)
+                .bind(until)
+                .bind(refresh)
+                .execute(&runtime)
+                .await,
+            "store_session_tokens",
+        );
+    }
+
+    for (idle, ends) in [
+        ("1 hour", "367 days"),
+        ("0 seconds", "1 day"),
+        ("2 days", "1 day"),
+    ] {
+        invalid(
+            sqlx::query(CREATE)
+                .bind(idle)
+                .bind(ends)
+                .execute(&runtime)
+                .await,
+            ends,
+        );
+    }
+    sqlx::query(CREATE)
+        .bind("1 hour")
+        .bind("365 days")
+        .execute(&runtime)
+        .await
+        .unwrap();
+
+    assert_eq!(
+        browser.get("/bff/session").await.json()["authenticated"],
+        true,
+        "the session is untouched"
+    );
+    assert_eq!(
+        browser.get("/bff/api/v1/test/whoami").await.status,
+        StatusCode::OK,
+        "its tokens too"
+    );
+}
+
+/// A call the function refused as invalid input (`22023`).
+fn invalid(result: sqlx::Result<sqlx::postgres::PgQueryResult>, what: &str) {
+    let refused = result.expect_err(what);
+    assert_eq!(
+        refused
+            .as_database_error()
+            .and_then(sqlx::error::DatabaseError::code)
+            .as_deref(),
+        Some("22023"),
+        "{what}: {refused}"
+    );
 }
 
 /// What the BFF keeps at rest: cookies, previous and retired tokens, the

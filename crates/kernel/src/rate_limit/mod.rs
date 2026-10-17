@@ -9,8 +9,9 @@
 //! derived from the instance secret, never as addresses. The runtime role
 //! holds no privilege on the table: it counts through
 //! `kernel.take_rate_limit` and prunes through `kernel.prune_rate_limits`,
-//! functions running as the table's owner, so no transaction can read,
-//! lower or reset a counter (campbooks-cloud#210). Over the limit,
+//! functions running as `campbooks_definer` (a role that cannot log in and
+//! holds only what they need, campbooks-cloud#214), so no transaction can
+//! read, lower or reset a counter (campbooks-cloud#210). Over the limit,
 //! [`RateLimits::check`] answers [`Error::RateLimited`]: 429 problem+json
 //! `rate_limited` with `Retry-After`.
 //!
@@ -368,7 +369,7 @@ impl crate::Job for PruneRateLimits {
 }
 
 /// Delete every counter whose window ended; how many. Through
-/// `kernel.prune_rate_limits` (the kernel scope, as the table's owner), a
+/// `kernel.prune_rate_limits` (the kernel scope, as `campbooks_definer`), a
 /// batch per call.
 async fn prune(db: &PgPool) -> Result<u64, sqlx::Error> {
     let mut pruned = 0_u64;

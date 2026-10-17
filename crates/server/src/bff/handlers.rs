@@ -349,9 +349,11 @@ impl Inner {
         };
 
         // A sign-in always starts a new session with a new id; one this
-        // browser already had ends.
+        // browser already had ends here, its refresh token revoked
+        // (campbooks-cloud#214), the identity provider's session left as it
+        // is (this sign-in may have gone straight through it).
         if let Some(previous) = self.cookies.session(headers)
-            && let Err(err) = store::end_session(&self.db, &crypto::hash(&previous)).await
+            && let Err(err) = self.retire(&crypto::hash(&previous)).await
         {
             return Error::from(err).into_response();
         }
