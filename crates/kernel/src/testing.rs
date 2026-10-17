@@ -75,6 +75,28 @@ pub async fn app_role_pool(db: &PgPool) -> PgPool {
         .unwrap_or_else(|e| panic!("connecting as the runtime role: {e}"))
 }
 
+/// Let workspace transactions add the instance-wide rows `registry` derives
+/// ([`Registry::instance_rows_from_workspaces`](crate::jobs::Registry::instance_rows_from_workspaces)):
+/// the test's own events and consumers, which no migration lists. `db` is
+/// the owner's pool (the runtime role may only read the list).
+///
+/// # Panics
+/// If the database refuses the insert.
+pub async fn allow_instance_rows(db: &PgPool, registry: &crate::jobs::Registry) {
+    let rows = registry.instance_rows_from_workspaces();
+    sqlx::query(
+        "INSERT INTO kernel.instance_rows_from_workspaces (row_kind, name)
+         SELECT 'event', unnest($1::text[])
+         UNION ALL SELECT 'job', unnest($2::text[])
+         ON CONFLICT DO NOTHING",
+    )
+    .bind(&rows.events)
+    .bind(&rows.kinds)
+    .execute(db)
+    .await
+    .unwrap_or_else(|e| panic!("listing the test's instance rows: {e}"));
+}
+
 /// A pool on the same database as `db` whose connections run as the
 /// runtime role **in the kernel scope** for the whole session: for tests
 /// that inspect or adjust the kernel's tables (the event log, the queue)
@@ -111,6 +133,12 @@ pub fn kernel_scope_setting() -> &'static str {
 /// policies (the constant itself is the kernel's own).
 pub fn maintenance_scope_setting() -> &'static str {
     db::MAINTENANCE_SCOPE_SETTING
+}
+
+/// The name of the setting naming the idempotency layer's caller, for tests
+/// that inspect the policies (the constant itself is the kernel's own).
+pub fn idempotency_caller_setting() -> &'static str {
+    db::IDEMPOTENCY_CALLER_SETTING
 }
 
 /// Run `sql` on `db`, panicking on failure (test setup).

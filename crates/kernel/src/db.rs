@@ -68,6 +68,15 @@ pub async fn set_workspace(conn: &mut PgConnection, workspace: &str) -> Result<(
     Ok(())
 }
 
+/// Clear [`WORKSPACE_SETTING`] until the current transaction ends (or it is
+/// set again): the transaction works in no workspace.
+pub(crate) async fn clear_workspace(conn: &mut PgConnection) -> Result<(), sqlx::Error> {
+    sqlx::query_scalar!("SELECT set_config($1, '', true)", WORKSPACE_SETTING)
+        .fetch_one(conn)
+        .await?;
+    Ok(())
+}
+
 /// Opening a transaction that works in one workspace.
 pub trait BeginFor {
     /// Begin a transaction with `campbooks.workspace_id` set to `workspace`
@@ -152,6 +161,34 @@ pub(crate) const KERNEL_SCOPE_SETTING: &str = "campbooks.kernel_scope";
 pub async fn begin_kernel(pool: &PgPool) -> Result<Transaction<'static, Postgres>, sqlx::Error> {
     let mut tx = pool.begin().await?;
     enter_kernel_scope(&mut tx).await?;
+    Ok(tx)
+}
+
+/// The transaction-local Postgres setting that names the caller whose
+/// idempotency keys a transaction reaches (`user:<subject>` or
+/// `client:<client id>`; campbooks-cloud#210). `kernel.idempotency`'s
+/// row-level security admits a key only to its caller, so a workspace
+/// transaction, or one that set nothing, sees and writes no key. Only the
+/// kernel names it (crate-private): [`begin_as_idempotency_caller`], called
+/// by the idempotency layer alone, sets it, and `cargo xtask arch` rejects
+/// the setting and this constant's name anywhere else in Rust.
+pub(crate) const IDEMPOTENCY_CALLER_SETTING: &str = "campbooks.idempotency_caller";
+
+/// Begin a transaction that reaches `caller`'s idempotency keys and nothing
+/// else of the kernel's (no workspace, no kernel scope): the idempotency
+/// layer's claim, store and release.
+pub(crate) async fn begin_as_idempotency_caller(
+    pool: &PgPool,
+    caller: &str,
+) -> Result<Transaction<'static, Postgres>, sqlx::Error> {
+    let mut tx = pool.begin().await?;
+    sqlx::query_scalar!(
+        "SELECT set_config($1, $2, true)",
+        IDEMPOTENCY_CALLER_SETTING,
+        caller
+    )
+    .fetch_one(&mut *tx)
+    .await?;
     Ok(tx)
 }
 
@@ -300,10 +337,30 @@ pub(crate) async fn require_scope(
 ///   lost `select!`) would leave the scope on: a caller must then drop the
 ///   transaction too, never keep using it. Every caller awaits these to
 ///   completion inside its own transaction's lifetime.
-pub(crate) async fn lift_for_instance_rows(conn: &mut PgConnection) -> Result<bool, sqlx::Error> {
-    if scope(conn).await?.is_unset() {
+///
+/// From a transaction working in a workspace (and not in the kernel scope)
+/// it lifts nothing and adds only what a workspace may add
+/// (`from_workspaces`: an instance-wide event declared
+/// [`PUBLISHED_IN_WORKSPACES`](crate::events::DomainEvent::PUBLISHED_IN_WORKSPACES));
+/// anything else (`what`) is refused here, as row-level security would
+/// refuse it (campbooks-cloud#207).
+pub(crate) async fn lift_for_instance_rows(
+    conn: &mut PgConnection,
+    what: &str,
+    from_workspaces: bool,
+) -> Result<bool, sqlx::Error> {
+    let scope = scope(conn).await?;
+    if scope.is_unset() {
         enter_kernel_scope(conn).await?;
         return Ok(true);
+    }
+    if !scope.kernel && !from_workspaces {
+        return Err(sqlx::Error::InvalidArgument(format!(
+            "{what} is instance-wide, and a transaction working in a workspace may not add it: \
+             add it from a transaction that set no workspace, or declare an instance-wide \
+             event `PUBLISHED_IN_WORKSPACES` (and list it in \
+             `kernel.instance_rows_from_workspaces`)"
+        )));
     }
     Ok(false)
 }

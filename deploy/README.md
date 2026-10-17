@@ -75,7 +75,17 @@ CREATE ROLE campbooks_runtime LOGIN PASSWORD '...' NOSUPERUSER NOBYPASSRLS
 GRANT campbooks_app TO campbooks_runtime;
 -- Allow the migration user to run the first migration's grants:
 GRANT campbooks_app TO <migration user>;      -- skip for a superuser
+-- Only if the migration user is neither a superuser nor has CREATEROLE:
+CREATE ROLE campbooks_definer NOLOGIN NOINHERIT;
+GRANT campbooks_definer TO <migration user>;
 ```
+
+`campbooks_definer` owns the database functions that run with their owner's
+rights (`SECURITY DEFINER`), so they never run as the migration login. It
+cannot log in, holds only the few table privileges those functions need, and
+must not be granted to the runtime login. The migrations create it when the
+migration user may create roles; otherwise they stop, naming the statements
+above, until an administrator has run them.
 
 Then set `CAMPBOOKS_DATABASE_URL=postgres://campbooks_runtime:<password>@host/db`
 (or omit the password and point `CAMPBOOKS_DATABASE_PASSWORD_FILE` at a file

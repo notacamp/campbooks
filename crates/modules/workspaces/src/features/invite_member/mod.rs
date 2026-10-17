@@ -88,7 +88,7 @@ fn accept_url(public_url: &str, token: &str) -> String {
     tag = "workspaces",
     security(("bearer" = ["workspaces:admin"])),
     // Emails another person and grants access once accepted.
-    extensions(("x-campbooks" = json!(Operation::command(Risk::High).records(["workspaces.invitation"]).access("workspaces.invitation", campbooks_kernel::authz::Action::Write)))),
+    extensions(("x-campbooks" = json!(Operation::command(Risk::High).secret_once().records(["workspaces.invitation"]).access("workspaces.invitation", campbooks_kernel::authz::Action::Write)))),
     params(("workspace_id" = WorkspaceId, Path, description = "The workspace.")),
     request_body = InviteMember,
     responses(

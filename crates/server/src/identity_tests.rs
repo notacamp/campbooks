@@ -102,6 +102,19 @@ impl Browser {
     }
 
     pub(crate) async fn send(&mut self, method: Method, url: &str, body: Option<Value>) -> Reply {
+        let key = uuid::Uuid::now_v7().to_string();
+        self.send_keyed(method, url, body, &key).await
+    }
+
+    /// [`send`](Self::send) with the `Idempotency-Key` `key` (on anything
+    /// but a GET).
+    pub(crate) async fn send_keyed(
+        &mut self,
+        method: Method,
+        url: &str,
+        body: Option<Value>,
+        key: &str,
+    ) -> Reply {
         let path = url.strip_prefix(ORIGIN).unwrap_or(url);
         let mut request = Request::builder().method(method.clone()).uri(path);
         if !self.cookies.is_empty() {
@@ -117,7 +130,7 @@ impl Browser {
                 .header("x-campbooks-csrf", "1")
                 .header("sec-fetch-site", "same-origin")
                 .header(header::CONTENT_TYPE, "application/json")
-                .header("idempotency-key", uuid::Uuid::now_v7().to_string());
+                .header("idempotency-key", key);
         }
         let body = body.map_or_else(Body::empty, |v| Body::from(v.to_string()));
         let response = self
@@ -893,15 +906,11 @@ async fn an_agent_finds_the_issuer_registers_is_allowed_and_calls_one_workspace(
     step("an administrator's token bound to Home: admin API 404; unbound: 200");
 
     // A workspace's own server-to-server client.
+    let register = serde_json::json!({ "name": "Nightly export", "type": "confidential",
+        "scopes": ["conversations:read"] });
+    let clients = format!("/bff/api/v1/w/{work}/identity/clients");
     let created = browser
-        .send(
-            Method::POST,
-            &format!("/bff/api/v1/w/{work}/identity/clients"),
-            Some(
-                serde_json::json!({ "name": "Nightly export", "type": "confidential",
-                "scopes": ["conversations:read"] }),
-            ),
-        )
+        .send_keyed(Method::POST, &clients, Some(register.clone()), "register-1")
         .await;
     assert_eq!(created.status, StatusCode::CREATED, "{}", created.body);
     let sync = created.json()["client"]["client_id"]
@@ -912,6 +921,36 @@ async fn an_agent_finds_the_issuer_registers_is_allowed_and_calls_one_workspace(
     step(&format!(
         "Work's admin registers {sync}; its secret is shown once"
     ));
+    // The idempotency layer kept that the key was used, never the answer
+    // (campbooks-cloud#210): a replay answers 409, without the secret.
+    let kept: Vec<(String, Vec<u8>, Option<String>)> = sqlx::query_as(
+        "SELECT state, response_body, response_content_type FROM kernel.idempotency
+          WHERE operation_id = 'identity.register_client'",
+    )
+    .fetch_all(&db)
+    .await
+    .unwrap();
+    assert_eq!(kept, [("withheld".to_owned(), Vec::new(), None)]);
+    let bodies: Vec<Option<Vec<u8>>> =
+        sqlx::query_scalar("SELECT response_body FROM kernel.idempotency")
+            .fetch_all(&db)
+            .await
+            .unwrap();
+    assert!(
+        bodies
+            .iter()
+            .flatten()
+            .all(|body| !String::from_utf8_lossy(body).contains(&secret)),
+        "no stored key holds the secret"
+    );
+    let again = browser
+        .send_keyed(Method::POST, &clients, Some(register), "register-1")
+        .await;
+    assert_eq!(again.status, StatusCode::CONFLICT, "{}", again.body);
+    assert_eq!(again.json()["code"], "idempotency_secret_shown_once");
+    assert_eq!(again.headers["idempotency-replayed"], "true");
+    assert!(!again.body.contains(&secret), "{}", again.body);
+    step("the same request again (same key): 409, the secret is not shown twice");
     let token = browser
         .form(
             "/oauth2/token",

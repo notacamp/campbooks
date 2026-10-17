@@ -148,6 +148,7 @@ SHALL hold no database connection while waiting. The server SHALL limit
 open streams per caller and answer 429 beyond the limit, and SHALL limit how
 many streams a caller opens per configured window (across processes),
 answering 429 `rate_limited` beyond it, whatever happens in the workspace.
+That window SHALL be between one second and a day, checked at startup.
 
 #### Scenario: Many subscribers
 - **WHEN** many clients subscribe to the same workspace and one change is recorded
@@ -156,6 +157,10 @@ answering 429 `rate_limited` beyond it, whatever happens in the workspace.
 #### Scenario: Reconnecting in a loop
 - **WHEN** a caller opens more streams than the configured number within the window
 - **THEN** the next open answers 429 `rate_limited`, and other callers are not affected
+
+#### Scenario: A window longer than a day
+- **WHEN** `CAMPBOOKS_CHANGES__OPENS_WINDOW_SECONDS` is 0 or 86 401
+- **THEN** the server refuses to start, naming the setting
 
 ### Requirement: Retention
 Changes SHALL be kept for a configured retention period (72 hours by

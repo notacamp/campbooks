@@ -276,6 +276,11 @@
       "confirmed": "Merci · {{name}} reste dans votre liste",
       "failed": "Impossible de modifier {{name}} : rien n’a changé. Réessayez.",
       "changed": "{{name}} a changé pendant que vous regardiez : jetez-y un nouveau coup d’œil."
+    },
+    "mail": {
+      "more": "Afficher tout l’e-mail",
+      "less": "Afficher moins",
+      "linksOff": "Les liens sont désactivés dans les e-mails qui pourraient être du hameçonnage."
     }
   },
   "rules": {
@@ -401,6 +406,7 @@
       "made": "Nouvelle règle · {{rule}}",
       "stopped": "Règle retirée · {{rule}}",
       "kept": "Règle gardée · {{rule}}",
+      "keptPaused": "Règle gardée, en pause pour l’instant · {{rule}}",
       "declined": "Règle refusée · {{rule}}",
       "failed": "Campbooks n’a pas pu modifier cette règle. Rien n’a changé."
     },
@@ -467,6 +473,7 @@
         "paused_by_member": "Mise en pause par un membre",
         "author_unavailable": "En pause pour l’instant ; elle reprendra d’elle-même"
       },
+      "keptStaysPaused": "Si vous la gardez, elle reste en pause jusqu’au retour de la personne qui l’a enseignée, ou jusqu’à ce que quelqu’un la reprenne",
       "empty": "Apprenez à Scout ci-dessus ou répondez à ses questions plus bas. Quand vous déplacez, archivez ou retirez un e-mail, Campbooks propose aussi de faire de même pour ceux qui lui ressemblent.",
       "leave": "Les laisser tels quels",
       "changedMail": "Les e-mails qu’elle a modifiés",

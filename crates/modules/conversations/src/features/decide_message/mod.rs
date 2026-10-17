@@ -485,6 +485,9 @@ struct Bodies {
 }
 
 #[cfg(test)]
+mod usage_tests;
+
+#[cfg(test)]
 mod tests {
     use campbooks_ai::{
         AiConfig, Gateway, Protocol, ProviderConfig, Role,
@@ -1342,6 +1345,3 @@ mod tests {
         assert_eq!(versions, [Some("checked:ctx2".to_owned())]);
     }
 }
-
-#[cfg(test)]
-mod usage_tests;

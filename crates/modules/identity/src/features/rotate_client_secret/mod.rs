@@ -34,7 +34,7 @@ pub struct ClientPath {
     operation_id = "identity.rotate_client_secret",
     tag = "identity",
     security(("bearer" = ["identity:clients"])),
-    extensions(("x-campbooks" = json!(Operation::command(Risk::High).records(["identity.client"]).access("identity.client", campbooks_kernel::authz::Action::Write)))),
+    extensions(("x-campbooks" = json!(Operation::command(Risk::High).secret_once().records(["identity.client"]).access("identity.client", campbooks_kernel::authz::Action::Write)))),
     params(
         ("workspace_id" = WorkspaceId, Path, description = "The workspace."),
         ("client_id" = String, Path, description = "The app."),

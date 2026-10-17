@@ -8,6 +8,13 @@ All notable changes to Campbooks Next are documented here. The format follows
 
 ### Changed
 
+- **An opened Home item shows the email (campbooks-cloud#203).** Pressing Enter on an item
+  (or clicking the selected row) now shows the email it is about, rendered as the reader
+  renders it, a few lines deep with "Show the whole email" to read it all in place. Until
+  now an opened item showed only how it was decided. In mail that may be phishing, links
+  lead nowhere, on Home and in the reader, and a line says so. Plain-text mail now keeps
+  its line breaks and paragraphs instead of running together into one line. The selected item's
+  background now covers its actions and what opening it shows, not only its first line.
 - **Find people by name in Scout's questions.** In "Whose mail should always reach you?"
   and "What never needs you?", the address field is now a filter box. Type part of a name,
   an address or a domain and the cards narrow at once, then Scout finds anyone in your mail
@@ -41,6 +48,69 @@ All notable changes to Campbooks Next are documented here. The format follows
   such a message as plain text once it passes a fixed budget, and search reduces HTML to
   text without building a tree. Ordinary mail is unchanged. No migration
   (campbooks-cloud#205).
+- **A suspension and its lift always reach a member's rules in the right order.** Each
+  account now counts its suspensions and lifts, and the rules a member taught follow the
+  latest count, not the clock: a clock that stepped back can no longer leave them paused
+  after a lift. A member who joins or leaves a workspace at the moment they are suspended
+  or lifted now gets the right state there too. If a suspension fails to reach the rules,
+  Admin → Jobs shows it under "Work to watch" and the server logs "suspension fan-out
+  delivery died". Keeping a suggested rule whose author is away now says first that it
+  stays paused until they are back or someone takes it over.
+- **The database functions that act for the server no longer run as a superuser.** The
+  functions behind web sign-in and the rate limits run with their owner's rights. Their
+  owner was the login that applied the migrations, which on the bundled Postgres is a
+  superuser, so a bug in one of them would have had every right on the server. They now
+  belong to `campbooks_definer`, a role that cannot log in, owns no table and holds only
+  the few privileges those functions use. The migrations create it. If your migration
+  login is neither a superuser nor allowed to create roles, the upgrade stops and names
+  the two statements an administrator must run once (see `deploy/README.md`). The
+  functions also check their input more strictly: a sign-in can only land on a path of
+  this site, as the server already checks. `CAMPBOOKS_BFF__ABSOLUTE_TIMEOUT_HOURS` must
+  now be at most 8784 (366 days); the server refuses to start otherwise. Signing in again
+  in the same browser now also revokes the earlier session's refresh token. Nobody is
+  signed out by the upgrade. If you roll back, run the SQL in the change's design first
+  (campbooks-cloud#214).
+- **Web sign-in records are reachable only through the sign-in's own functions.** The
+  tables holding web sessions, sign-ins in progress and retired session tokens could be
+  read and changed by any of the server's database work. Now the server's database role
+  has no access to them at all. It goes through narrow functions, each acting on the one
+  session whose cookie a request presented, the one sign-in it is finishing, or one
+  person's sessions; only the clean-up of ended sessions reaches across people. A sign-in's
+  nonce, the one value that was stored in plain text, is now encrypted like the rest.
+  Nobody is signed out by the upgrade. A sign-in started in the ten minutes before it
+  answers "invalid state" once; start it again. Upgrade the server and the worker
+  together: a process of the previous version fails every web request until it is
+  replaced. If you roll back, run the SQL in the change's design first
+  (campbooks-cloud#212).
+- **Smaller fixes from the same review.** `CAMPBOOKS_CHANGES__OPENS_WINDOW_SECONDS` must
+  now be at most a day (a longer one made every change stream fail to open); the server
+  refuses to start otherwise. The rate-limit clean-up no longer deletes a counter renewed
+  at the same moment. Migrations may pin a function's `search_path` only to exactly
+  `pg_catalog, pg_temp` (campbooks-cloud#213).
+- **Retried requests never bring back a secret, and keys and counters stay private.**
+  Requests sent with an `Idempotency-Key` used to have their answers cached for a day,
+  including a new app's client secret. That cache could be read from any workspace's work,
+  and anyone could reset or use up the rate-limit counters. Now each caller reaches only
+  their own keys. The answers that show something once (an app's client secret, a rotated
+  secret, an invitation link, a link or connection ticket) are never kept. Sending such a
+  request again with the same key answers 409 `idempotency_secret_shown_once` instead of
+  showing the secret twice. Answers of those requests cached before this release are
+  dropped. Rate-limit counters can only be counted and pruned through two database
+  functions. No connection can read, reset or rewrite them.
+- **A workspace can no longer forge background work for the whole instance.** Work running
+  in a workspace could add a job or event that belongs to no workspace. One such row could
+  stop the job pruning, or all mail polling, for good. It can now only add the account
+  events a workspace announces (an app's access revoked, a way to sign in removed) and their
+  deliveries, and no row of its own may hold a schedule's key. Nor can it touch the
+  schedules' record of their last runs any more, and an account's event it writes into its
+  own workspace by hand (to sign someone out everywhere, say) is never acted on. A schedule
+  blocked by a row
+  that will never run is freed at its next tick, the old row kept as failed. Administrators
+  with `jobs.retry` can also discard a schedule's pending or stuck run. The mail and needs
+  dispatchers no longer leave the last workspace set after they queue work, and the
+  architecture checks catch scope names spelled with escapes and test modules hidden inside
+  other code (campbooks-cloud#207). Rolling back to an older image needs a one-off SQL step,
+  in the change's design.
 - **Background work shared by the whole instance can only be changed by the kernel.**
   Account events, account jobs and scheduled ticks belong to no workspace. Work running in
   a workspace could still read and add them, which it needs, but it could also complete,

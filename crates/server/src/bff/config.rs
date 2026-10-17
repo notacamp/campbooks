@@ -43,8 +43,8 @@ pub struct BffConfig {
     pub scopes: Option<String>,
     /// A session unused this long ends (`CAMPBOOKS_BFF__IDLE_TIMEOUT_MINUTES`).
     pub idle_timeout_minutes: u64,
-    /// A session ends this long after sign-in, used or not
-    /// (`CAMPBOOKS_BFF__ABSOLUTE_TIMEOUT_HOURS`).
+    /// A session ends this long after sign-in, used or not, at most 8 784
+    /// hours (366 days) (`CAMPBOOKS_BFF__ABSOLUTE_TIMEOUT_HOURS`).
     pub absolute_timeout_hours: u64,
     /// A session's cookie value is replaced this often
     /// (`CAMPBOOKS_BFF__ROTATE_MINUTES`).
@@ -250,6 +250,10 @@ pub fn settings(
     })))
 }
 
+/// The longest a session may last, 366 days: `bff.create_session` refuses
+/// a longer one (campbooks-cloud#214).
+const MAX_ABSOLUTE_TIMEOUT_HOURS: u64 = 366 * 24;
+
 fn timeouts(bff: &BffConfig) -> Result<Timeouts, String> {
     let checks = [
         (
@@ -257,10 +261,11 @@ fn timeouts(bff: &BffConfig) -> Result<Timeouts, String> {
             bff.idle_timeout_minutes >= 5,
             "at least 5",
         ),
+        // At most 366 days: the bound `bff.create_session` enforces.
         (
             "ABSOLUTE_TIMEOUT_HOURS",
-            bff.absolute_timeout_hours >= 1,
-            "at least 1",
+            (1..=MAX_ABSOLUTE_TIMEOUT_HOURS).contains(&bff.absolute_timeout_hours),
+            "between 1 and 8784",
         ),
         ("ROTATE_MINUTES", bff.rotate_minutes >= 5, "at least 5"),
         (
@@ -471,6 +476,30 @@ mod tests {
             )
             .contains("CAMPBOOKS_BFF__ROTATE_MINUTES")
         );
+        for hours in [0, MAX_ABSOLUTE_TIMEOUT_HOURS + 1] {
+            assert!(
+                err(
+                    BffConfig {
+                        absolute_timeout_hours: hours,
+                        ..with_secret()
+                    },
+                    Some(SecretKey::from_bytes([1; 32])),
+                    &base
+                )
+                .contains("CAMPBOOKS_BFF__ABSOLUTE_TIMEOUT_HOURS"),
+                "{hours}"
+            );
+        }
+        let longest = enabled(settings(
+            &base,
+            BffConfig {
+                absolute_timeout_hours: MAX_ABSOLUTE_TIMEOUT_HOURS,
+                ..with_secret()
+            },
+            Some(SecretKey::from_bytes([1; 32])),
+            &[],
+        ));
+        assert_eq!(longest.timeouts.absolute, TimeDelta::days(366));
     }
 
     #[test]

@@ -151,3 +151,92 @@ async fn retrying_a_kind_requeues_its_dead_jobs(db: PgPool) {
         .await;
     assert_eq!(bad.status, StatusCode::BAD_REQUEST);
 }
+
+/// A row holding schedule `name`'s unique key, as the database owner writes
+/// it: `state`, due at `run_at`, leased for `leased_secs`, of `workspace`.
+async fn schedule_row(
+    db: &PgPool,
+    name: &str,
+    state: &str,
+    run_at: &str,
+    leased_secs: Option<f64>,
+    workspace: Option<&str>,
+) -> Uuid {
+    sqlx::query_scalar(
+        "INSERT INTO kernel.jobs (queue, kind, payload, workspace_id, unique_key, state, run_at,
+                                  locked_by, locked_until, started_at, max_attempts)
+         VALUES ('maintenance', $1, 'null', $5, 'schedule:' || $1, $2, $3::timestamptz,
+                 CASE WHEN $4::float8 IS NOT NULL THEN 'w-1' END,
+                 now() + make_interval(secs => $4::float8),
+                 CASE WHEN $4::float8 IS NOT NULL THEN now() END, 3)
+         RETURNING id",
+    )
+    .bind(name)
+    .bind(state)
+    .bind(run_at)
+    .bind(leased_secs)
+    .bind(workspace)
+    .fetch_one(db)
+    .await
+    .unwrap()
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn discarding_a_schedule_run_clears_only_what_blocks_its_ticks(db: PgPool) {
+    let w = world(db.clone(), Deps::default()).await;
+    let uri = |name: &str| format!("/admin/v1/system/schedules/{name}/run");
+    // A forged pending row due never (campbooks-cloud#207).
+    let stuck = schedule_row(&db, "kernel.prune_jobs", "pending", "infinity", None, None).await;
+    let denied = w
+        .call(Method::DELETE, &uri("kernel.prune_jobs"), "ops", None)
+        .await;
+    assert_eq!(denied.status, StatusCode::NOT_FOUND);
+    assert!(state_of(&db, stuck).await.is_some());
+    let gone = w
+        .call(Method::DELETE, &uri("kernel.prune_jobs"), "fixer", None)
+        .await;
+    assert_eq!(gone.status, StatusCode::OK, "{}", gone.json);
+    assert_eq!(gone.json["outcome"], "applied");
+    assert!(state_of(&db, stuck).await.is_none());
+    let again = w
+        .call(Method::DELETE, &uri("kernel.prune_jobs"), "fixer", None)
+        .await;
+    assert_eq!(again.json["outcome"], "unchanged");
+    let recorded = w.trail.0.lock().unwrap().clone();
+    assert_eq!(
+        recorded.last().unwrap().operation,
+        "system.admin_discard_schedule_run"
+    );
+
+    // A run a live worker holds is kept; one leased forever is not.
+    let live = schedule_row(
+        &db,
+        "kernel.prune_events",
+        "running",
+        "now",
+        Some(30.0),
+        None,
+    )
+    .await;
+    let kept = w
+        .call(Method::DELETE, &uri("kernel.prune_events"), "fixer", None)
+        .await;
+    assert_eq!(kept.json["outcome"], "unchanged");
+    assert!(state_of(&db, live).await.is_some());
+    sqlx::query("UPDATE kernel.jobs SET locked_until = 'infinity' WHERE id = $1")
+        .bind(live)
+        .execute(&db)
+        .await
+        .unwrap();
+    let cleared = w
+        .call(Method::DELETE, &uri("kernel.prune_events"), "fixer", None)
+        .await;
+    assert_eq!(cleared.json["outcome"], "applied");
+    assert!(state_of(&db, live).await.is_none());
+
+    // Not a schedule: nothing to name.
+    let other = w
+        .call(Method::DELETE, &uri("mail.sync"), "fixer", None)
+        .await;
+    assert_eq!(other.status, StatusCode::NOT_FOUND);
+}

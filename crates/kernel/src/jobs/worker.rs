@@ -269,6 +269,19 @@ impl Worker {
     }
 }
 
+/// How far past now a schedule's row may be due (`.0`) and leased (`.1`), in
+/// seconds, before it counts as stuck: twice the longest wait a tick or a
+/// retry gives it (the schedule's period, the longest retry delay), and
+/// twice the lease a worker renews.
+#[expect(
+    clippy::cast_precision_loss,
+    reason = "periods and delays are far below 2^52 seconds"
+)]
+pub(crate) fn stuck_after(config: &JobsConfig, every: Duration) -> (f64, f64) {
+    let longest = every.as_secs_f64().max(config.retry_max_seconds as f64);
+    (2.0 * longest, 2.0 * config.lease_seconds as f64)
+}
+
 /// The jobs a worker is running, by task, with when they were claimed.
 #[derive(Default)]
 struct Tasks {
@@ -524,31 +537,47 @@ impl Shared {
         for job in reclaimed {
             tracing::warn!(job_id = %job.id, kind = %job.kind, state = %job.state,
                 "reclaimed a job whose lease expired");
+            if job.state == "failed" {
+                self.died(&job.kind);
+            }
         }
         Ok(())
+    }
+
+    /// A job of `kind` died: say so in the line its kind is watched by, if
+    /// it is ([`Watch`](super::Watch)).
+    fn died(&self, kind: &str) {
+        if let Some(watch) = self.registry.watch(kind) {
+            tracing::warn!(watch = watch.code, kind, "{}", watch.died);
+        }
     }
 
     /// Enqueue `schedule`'s job if this tick has not been enqueued yet.
     async fn tick(&self, schedule: &super::registry::ScheduleInfo) -> Result<(), sqlx::Error> {
         // Schedules are the instance's: their jobs belong to no workspace.
         let mut tx = db::begin_kernel(&self.state.db).await?;
-        let tick = sqlx::query_scalar!(
-            r#"
+        // A tick recorded more than one period ahead never comes due (no
+        // workspace can write the table, campbooks-cloud#207, but a clock
+        // that jumped could): it counts as this tick, so the schedule runs.
+        let tick: Option<i64> = sqlx::query_scalar(
+            r"
             INSERT INTO kernel.schedules (name, last_tick)
             VALUES ($1, floor(extract(epoch FROM now())::float8 / $2::float8)::bigint)
             ON CONFLICT (name) DO UPDATE
                SET last_tick = excluded.last_tick, updated_at = now()
              WHERE kernel.schedules.last_tick < excluded.last_tick
+                OR kernel.schedules.last_tick > excluded.last_tick + 1
             RETURNING last_tick
-            "#,
-            schedule.name,
-            schedule.every.as_secs_f64(),
+            ",
         )
+        .bind(schedule.name)
+        .bind(schedule.every.as_secs_f64())
         .fetch_optional(&mut *tx)
         .await?;
         let Some(tick) = tick else {
             return Ok(());
         };
+        self.heal(&mut tx, schedule).await?;
         let enqueued = super::insert(
             &mut tx,
             NewJob {
@@ -562,6 +591,50 @@ impl Shared {
         .await?;
         tx.commit().await?;
         tracing::debug!(schedule = schedule.name, tick, ?enqueued, "schedule ticked");
+        Ok(())
+    }
+
+    /// Before a tick enqueues: retire a row that holds `schedule`'s unique
+    /// key but would never run as the schedule's (campbooks-cloud#207), so
+    /// the tick does not count as its duplicate. Stuck is a row of a
+    /// workspace (only a forgery, from before the policies refused it), a
+    /// pending one due later than any tick or retry would put it, or a
+    /// running one leased longer than any worker leases. It is marked failed
+    /// with the reason (kept for inspection, then pruned), never run. A row
+    /// due soon, retrying, or held by a live worker is left alone.
+    async fn heal(
+        &self,
+        tx: &mut sqlx::Transaction<'static, sqlx::Postgres>,
+        schedule: &super::registry::ScheduleInfo,
+    ) -> Result<(), sqlx::Error> {
+        let (later, leased) = stuck_after(&self.config, schedule.every);
+        let healed = sqlx::query!(
+            r#"
+            UPDATE kernel.jobs
+               SET state = 'failed', finished_at = now(), locked_by = NULL, locked_until = NULL,
+                   last_error = 'stuck schedule row replaced by the schedule''s tick',
+                   updated_at = now()
+             WHERE kind = $1 AND unique_key = 'schedule:' || $1
+               AND state IN ('pending', 'running')
+               AND (workspace_id IS NOT NULL
+                    OR (state = 'pending' AND run_at > now() + make_interval(secs => $2))
+                    OR (state = 'running' AND locked_until > now() + make_interval(secs => $3)))
+            RETURNING id AS "id: JobId", workspace_id IS NOT NULL AS "of_a_workspace!"
+            "#,
+            schedule.name,
+            later,
+            leased,
+        )
+        .fetch_all(&mut **tx)
+        .await?;
+        for row in healed {
+            tracing::warn!(
+                schedule = schedule.name,
+                job_id = %row.id,
+                of_a_workspace = row.of_a_workspace,
+                "replaced a stuck schedule row; it is kept as failed for inspection"
+            );
+        }
         Ok(())
     }
 
@@ -679,6 +752,7 @@ impl Shared {
             Ok(Some(row)) if row.state == "failed" => {
                 bump(&self.counters.failed, 1);
                 tracing::error!(error = %message, "job failed for good");
+                self.died(&info.kind);
                 Some(JobOutcome::Failed)
             }
             Ok(Some(row)) => {

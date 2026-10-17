@@ -130,6 +130,24 @@ async fn delete_note(
     Json(json!({ "workspace": workspace, "id": id }))
 }
 
+/// Issue a secret, shown in this answer only.
+#[utoipa::path(
+    post,
+    path = "/api/v1/test/secrets",
+    operation_id = "test.issue_secret",
+    security(("bearer" = ["test:write"])),
+    extensions(("x-campbooks" = json!(Operation::command(Risk::High)
+        .secret_once()
+        .records(["test.secret"])))),
+    responses((status = CREATED, body = Value)),
+)]
+async fn issue_secret(_: Scoped<TestWrite>) -> (StatusCode, Json<Value>) {
+    (
+        StatusCode::CREATED,
+        Json(json!({ "secret": uuid::Uuid::now_v7().to_string() })),
+    )
+}
+
 /// Reasons of the test operations.
 static TEST_MESSAGES: crate::i18n::Catalogue =
     crate::i18n::Catalogue::new("test", [r#"{"errors": {"flaky": "Busy ({{run}})"}}"#; 4]);
@@ -188,6 +206,7 @@ fn api() -> OpenApiRouter<AppState> {
         .routes(routes!(list_notes))
         .routes(routes!(delete_note))
         .routes(routes!(flaky))
+        .routes(routes!(issue_secret))
 }
 
 /// The test API over `state`: the HTTP router and the state that invokes
@@ -226,7 +245,9 @@ fn status(error: &InvokeError) -> Option<StatusCode> {
 fn catalogue_reads_ids_metadata_and_routes() {
     let (_, spec) = api().split_for_parts();
     let catalogue = Catalogue::from_openapi(&spec);
-    assert_eq!(catalogue.len(), 6);
+    assert_eq!(catalogue.len(), 7);
+    assert!(catalogue.get("test.issue_secret").unwrap().secret_once());
+    assert!(!catalogue.get("test.archive").unwrap().secret_once());
 
     let archive = catalogue.get("test.archive").unwrap();
     assert_eq!(archive.method, axum::http::Method::POST);
@@ -735,7 +756,9 @@ async fn anonymous_requests_pass_through(db: PgPool) {
 
 #[sqlx::test(migrations = "../../migrations")]
 async fn expired_keys_are_pruned_and_reusable(db: PgPool) {
-    let state = testing::state(db.clone());
+    // As the runtime role, like the server: the prune works in the kernel
+    // scope, which may delete expired keys only.
+    let state = testing::state(testing::app_role_pool(&db).await);
     let (_, invoking) = app(state.clone());
     let call = || {
         Invocation::new(
@@ -761,18 +784,180 @@ async fn expired_keys_are_pruned_and_reusable(db: PgPool) {
         .execute(&db)
         .await
         .unwrap();
+    // A key still live is kept.
+    invoke(&invoking, call().idempotency_key("live"))
+        .await
+        .unwrap();
     let state = state.with_registry(Registry::build(&[]).unwrap());
     let mut tx = db.begin().await.unwrap();
     enqueue(&mut tx, &PruneIdempotency, EnqueueOptions::default())
         .await
         .unwrap();
     tx.commit().await.unwrap();
-    Worker::new(state).run_until_idle().await;
-    let rows: i64 = sqlx::query_scalar("SELECT count(*) FROM kernel.idempotency")
+    let stats = Worker::new(state).run_until_idle().await;
+    assert_eq!(stats.succeeded, 1, "{stats:?}");
+    let keys: Vec<String> = sqlx::query_scalar("SELECT key FROM kernel.idempotency")
+        .fetch_all(&db)
+        .await
+        .unwrap();
+    assert_eq!(keys, ["live"]);
+}
+
+const SECRETS: &str = "/api/v1/test/secrets";
+
+/// A stored key: its key, state, status, body and content type.
+type Kept = (String, String, Option<i16>, Option<Vec<u8>>, Option<String>);
+
+/// What `kernel.idempotency` holds, read as the table's owner.
+async fn stored(db: &PgPool) -> Vec<Kept> {
+    sqlx::query_as(
+        "SELECT key, state, response_status, response_body, response_content_type
+           FROM kernel.idempotency ORDER BY key",
+    )
+    .fetch_all(db)
+    .await
+    .unwrap()
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn a_secret_is_shown_once_and_never_stored(db: PgPool) {
+    let http = http(testing::app_role_pool(&db).await).await;
+    let (status, headers, first) = http.send("POST", SECRETS, Some("s-1"), None).await;
+    assert_eq!(status, StatusCode::CREATED);
+    assert!(!headers.contains_key(idempotency::REPLAYED_HEADER));
+    let secret = first["secret"].as_str().unwrap().to_owned();
+
+    // Only that the key was used: no body, no content type.
+    assert_eq!(
+        stored(&db).await,
+        [(
+            "s-1".to_owned(),
+            "withheld".to_owned(),
+            Some(201),
+            Some(Vec::new()),
+            None
+        )]
+    );
+    let everything: String = sqlx::query_scalar(
+        "SELECT coalesce(string_agg(row_to_json(i)::text || encode(i.response_body, 'escape'), ''), '')
+           FROM kernel.idempotency i",
+    )
+    .fetch_one(&db)
+    .await
+    .unwrap();
+    assert!(!everything.contains(&secret), "{everything}");
+
+    // A replay neither runs the operation again nor shows the secret.
+    let (status, headers, problem) = http.send("POST", SECRETS, Some("s-1"), None).await;
+    assert_eq!(status, StatusCode::CONFLICT, "{problem}");
+    assert_eq!(problem["code"], "idempotency_secret_shown_once");
+    assert_eq!(headers[idempotency::REPLAYED_HEADER], "true");
+    assert!(!problem.to_string().contains(&secret));
+    // The key stays bound to its first request.
+    let (status, ..) = http
+        .send("POST", ARCHIVE, Some("s-1"), Some(json!({ "reason": "x" })))
+        .await;
+    assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
+    // A new key is a new secret.
+    let (status, _, second) = http.send("POST", SECRETS, Some("s-2"), None).await;
+    assert_eq!(status, StatusCode::CREATED);
+    assert_ne!(second["secret"], first["secret"]);
+
+    // Ordinary operations still replay their stored answer.
+    let body = json!({ "reason": "done" });
+    let (_, _, archived) = http
+        .send("POST", ARCHIVE, Some("a-1"), Some(body.clone()))
+        .await;
+    let (status, headers, again) = http.send("POST", ARCHIVE, Some("a-1"), Some(body)).await;
+    assert_eq!((status, again), (StatusCode::CREATED, archived));
+    assert_eq!(headers[idempotency::REPLAYED_HEADER], "true");
+}
+
+/// What a kernel-scope transaction of `pool` sees of the keys, and how many
+/// it rewrites when it tries.
+async fn in_kernel_scope(pool: &PgPool) -> (i64, u64) {
+    let mut tx = crate::db::begin_kernel(pool).await.unwrap();
+    let seen: i64 = sqlx::query_scalar("SELECT count(*) FROM kernel.idempotency")
+        .fetch_one(&mut *tx)
+        .await
+        .unwrap();
+    let rewritten = sqlx::query("UPDATE kernel.idempotency SET response_body = ''::bytea")
+        .execute(&mut *tx)
+        .await
+        .unwrap()
+        .rows_affected();
+    tx.commit().await.unwrap();
+    (seen, rewritten)
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn idempotency_keys_are_their_callers_only(db: PgPool) {
+    use crate::db::{BeginFor as _, begin_as_idempotency_caller};
+
+    let pool = testing::app_role_pool(&db).await;
+    let http = http(pool.clone()).await;
+    let body = json!({ "reason": "done" });
+    let (status, ..) = http
+        .send("POST", ARCHIVE, Some("mine"), Some(body.clone()))
+        .await;
+    assert_eq!(status, StatusCode::CREATED);
+    let owner: String = sqlx::query_scalar("SELECT principal FROM kernel.idempotency")
         .fetch_one(&db)
         .await
         .unwrap();
-    assert_eq!(rows, 0);
+    let count = "SELECT count(*) FROM kernel.idempotency";
+
+    // A workspace transaction sees no key, changes none and forges none.
+    let mut tx = pool
+        .begin_for(crate::tenancy::WorkspaceId::new())
+        .await
+        .unwrap();
+    let seen: i64 = sqlx::query_scalar(count).fetch_one(&mut *tx).await.unwrap();
+    assert_eq!(seen, 0);
+    for change in [
+        "UPDATE kernel.idempotency SET response_body = '\\x7b7d'::bytea",
+        "DELETE FROM kernel.idempotency",
+    ] {
+        let done = sqlx::query(change).execute(&mut *tx).await.unwrap();
+        assert_eq!(done.rows_affected(), 0, "{change}");
+    }
+    let forged = sqlx::query(
+        "INSERT INTO kernel.idempotency (principal, key, operation_id, request_hash, expires_at)
+         VALUES ($1, 'forged', 'test.archive', '\\x00', now() + interval '1 day')",
+    )
+    .bind(&owner)
+    .execute(&mut *tx)
+    .await
+    .unwrap_err();
+    assert!(
+        forged.to_string().contains("row-level security"),
+        "{forged}"
+    );
+    drop(tx);
+
+    // Nor does a transaction that set nothing, or one naming another caller.
+    let seen: i64 = sqlx::query_scalar(count).fetch_one(&pool).await.unwrap();
+    assert_eq!(seen, 0);
+    for (caller, expected) in [("user:someone-else", 0), (owner.as_str(), 1)] {
+        let mut tx = begin_as_idempotency_caller(&pool, caller).await.unwrap();
+        let seen: i64 = sqlx::query_scalar(count).fetch_one(&mut *tx).await.unwrap();
+        assert_eq!(seen, expected, "{caller}");
+        tx.commit().await.unwrap();
+    }
+
+    // The kernel scope sees expired keys only, and may only delete them.
+    assert_eq!(in_kernel_scope(&pool).await, (0, 0));
+
+    // The caller's own replay still works.
+    let (status, headers, _) = http.send("POST", ARCHIVE, Some("mine"), Some(body)).await;
+    assert_eq!(status, StatusCode::CREATED);
+    assert_eq!(headers[idempotency::REPLAYED_HEADER], "true");
+
+    sqlx::query("UPDATE kernel.idempotency SET expires_at = now() - interval '1 second'")
+        .execute(&db)
+        .await
+        .unwrap();
+    assert_eq!(in_kernel_scope(&pool).await, (1, 0));
 }
 
 // --- a replay is authorized like the request it repeats ---------------------

@@ -9,7 +9,7 @@ use std::{
 
 use serde_json::Value;
 
-use super::{Job, JobContext, JobError, JobHandler, PruneEvents, PruneJobs};
+use super::{Job, JobContext, JobError, JobHandler, PruneEvents, PruneJobs, Watch};
 use crate::{
     Module,
     blobs::{SWEEP_EVERY, SweepBlobs},
@@ -84,6 +84,7 @@ struct EventSpec {
     name: &'static str,
     version: u16,
     workspace_scoped: bool,
+    published_in_workspaces: bool,
     schema: fn() -> utoipa::openapi::RefOr<utoipa::openapi::schema::Schema>,
     schemas: fn(
         &mut Vec<(
@@ -104,6 +105,8 @@ struct KindSpec {
     /// For event handlers: whether their event must settle
     /// ([`DomainEvent::SETTLES`]).
     settles: bool,
+    /// Whether an operator must hear when one dies.
+    watch: Option<Watch>,
 }
 
 struct ScheduleSpec {
@@ -128,6 +131,7 @@ impl Background {
             name: E::NAME,
             version: E::VERSION,
             workspace_scoped: E::WORKSPACE_SCOPED,
+            published_in_workspaces: E::PUBLISHED_IN_WORKSPACES,
             schema: <E as utoipa::PartialSchema>::schema,
             schemas: <E as utoipa::ToSchema>::schemas,
         });
@@ -144,6 +148,7 @@ impl Background {
             run: run_fn(run_job::<J>),
             consumes: None,
             settles: false,
+            watch: J::WATCH,
         });
         self
     }
@@ -158,6 +163,7 @@ impl Background {
             run: run_fn(run_handler::<H>),
             consumes: Some((H::Event::NAME, H::Event::VERSION)),
             settles: H::Event::SETTLES,
+            watch: H::WATCH,
         });
         self
     }
@@ -183,6 +189,7 @@ impl Background {
             }),
             consumes: None,
             settles: false,
+            watch: H::WATCH,
         });
         self
     }
@@ -205,6 +212,7 @@ impl Background {
             }),
             consumes: Some((C::Event::NAME, C::Event::VERSION)),
             settles: C::Event::SETTLES,
+            watch: C::WATCH,
         });
         self
     }
@@ -283,9 +291,23 @@ async fn load_event<E: DomainEvent>(ctx: &JobContext) -> Result<Event<E>, JobErr
             E::VERSION
         )));
     }
-    let payload = serde_json::from_value(row.payload).map_err(|e| {
+    let payload: E = serde_json::from_value(row.payload).map_err(|e| {
         JobError::fatal(format!("event {id} does not decode as `{}`: {e}", E::NAME))
     })?;
+    // The log row's workspace must be the event's own: an instance-wide
+    // event logged in a workspace, or a workspace's event naming another
+    // workspace than the row it was logged in, was not published by
+    // `EventBus::publish` (which writes the event's own workspace) but
+    // written by hand, e.g. by a workspace forging an account's event for an
+    // instance-wide consumer (campbooks-cloud#207). It is never handled.
+    if (!E::WORKSPACE_SCOPED && row.workspace_id.is_some())
+        || DomainEvent::workspace(&payload) != row.workspace_id.as_deref()
+    {
+        return Err(JobError::fatal(format!(
+            "event {id} (`{}`) is logged in another workspace than its own; not handled",
+            E::NAME
+        )));
+    }
     Ok(Event {
         id,
         version: E::VERSION,
@@ -301,6 +323,7 @@ pub(crate) struct KindInfo {
     pub queue: &'static str,
     pub max_attempts: u32,
     pub run: RunFn,
+    pub watch: Option<Watch>,
 }
 
 /// A registered event consumer.
@@ -329,6 +352,15 @@ pub(crate) struct ScheduleInfo {
     pub max_attempts: u32,
     pub every: Duration,
     pub payload: Value,
+}
+
+/// What [`Registry::instance_rows_from_workspaces`] admits.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct InstanceRows {
+    /// Event names (`kernel.events.name`), sorted.
+    pub events: Vec<&'static str>,
+    /// Delivery kinds (`kernel.jobs.kind`), sorted.
+    pub kinds: Vec<&'static str>,
 }
 
 /// Every job kind, event consumer and schedule of the running system, built
@@ -507,6 +539,30 @@ impl Registry {
                 kind.name
             ));
         }
+        if let Some(watch) = kind.watch {
+            if !is_snake(watch.code) {
+                errors.push(format!(
+                    "{what} `{}`: watch code `{}` must be lower-case snake case",
+                    kind.name, watch.code
+                ));
+            }
+            if watch.died.trim().is_empty() {
+                errors.push(format!(
+                    "{what} `{}`: watch `{}` needs the line logged when one dies",
+                    kind.name, watch.code
+                ));
+            }
+            let other = self.kinds.iter().find(|(_, info)| {
+                info.watch
+                    .is_some_and(|w| w.code == watch.code && w.died != watch.died)
+            });
+            if let Some((name, _)) = other {
+                errors.push(format!(
+                    "{what} `{}`: watch `{}` logs another line than `{name}`'s",
+                    kind.name, watch.code
+                ));
+            }
+        }
         if let Some((event, version)) = kind.consumes {
             if !is_dotted(event) {
                 errors.push(format!(
@@ -534,6 +590,7 @@ impl Registry {
                     queue: kind.queue,
                     max_attempts: kind.max_attempts,
                     run: Arc::clone(&kind.run),
+                    watch: kind.watch,
                 },
             );
             if let Some((event, _)) = kind.consumes {
@@ -573,6 +630,7 @@ impl Registry {
                 name: event.name,
                 version: event.version,
                 workspace_scoped: event.workspace_scoped,
+                published_in_workspaces: event.published_in_workspaces,
                 schema: event.schema,
                 schemas: event.schemas,
             });
@@ -657,6 +715,30 @@ impl Registry {
         &self.published
     }
 
+    /// The instance-wide rows a transaction working in a workspace may add
+    /// (campbooks-cloud#207): the events declared
+    /// [`DomainEvent::PUBLISHED_IN_WORKSPACES`] and the consumers of those
+    /// events (their deliveries), each sorted. Row-level security reads the
+    /// same lists from `kernel.instance_rows_from_workspaces`, which
+    /// migrations keep equal to this.
+    pub fn instance_rows_from_workspaces(&self) -> InstanceRows {
+        let mut events: Vec<&'static str> = self
+            .published
+            .iter()
+            .filter(|e| e.published_in_workspaces)
+            .map(|e| e.name)
+            .collect();
+        events.sort_unstable();
+        let mut kinds: Vec<&'static str> = self
+            .consumers
+            .iter()
+            .filter(|c| events.contains(&c.event))
+            .map(|c| c.name)
+            .collect();
+        kinds.sort_unstable();
+        InstanceRows { events, kinds }
+    }
+
     /// Every job kind (jobs and event handlers), sorted.
     pub fn kind_names(&self) -> Vec<&'static str> {
         self.kinds.keys().copied().collect()
@@ -675,6 +757,22 @@ impl Registry {
 
     pub(crate) fn kind(&self, name: &str) -> Option<KindInfo> {
         self.kinds.get(name).cloned()
+    }
+
+    /// How an operator hears that a job of kind `name` died, when they must.
+    pub fn watch(&self, name: &str) -> Option<Watch> {
+        self.kinds.get(name).and_then(|kind| kind.watch)
+    }
+
+    /// The watched kinds by code, each code's kinds sorted.
+    pub fn watched(&self) -> BTreeMap<&'static str, Vec<&'static str>> {
+        let mut watched: BTreeMap<&'static str, Vec<&'static str>> = BTreeMap::new();
+        for (name, kind) in &self.kinds {
+            if let Some(watch) = kind.watch {
+                watched.entry(watch.code).or_default().push(*name);
+            }
+        }
+        watched
     }
 
     pub(crate) fn schedules(&self) -> &[ScheduleInfo] {

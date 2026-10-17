@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import styles from "./SafeHtml.module.css";
 
@@ -27,6 +27,34 @@ export function framePolicy(remoteImages: boolean): string {
  * opener.
  */
 export const SANDBOX = "allow-same-origin allow-popups allow-popups-to-escape-sandbox";
+
+/**
+ * The sandbox for mail that may be phishing: no popups either, so a link
+ * cannot open anything at all (there is no other way out of the frame).
+ */
+export const SANDBOX_INERT_LINKS = "allow-same-origin";
+
+/** `html` with its links made plain text ({@link stripLinks}), parsed inertly. */
+export function withoutLinks(html: string): string {
+  const doc = new DOMParser().parseFromString(html, "text/html");
+  stripLinks(doc);
+  return doc.body.innerHTML;
+}
+
+/**
+ * Take the links out of a document: each `href` moves to `data-href`, so a
+ * link is plain text (not focusable, no "Open in new tab", nothing the
+ * mail's CSS can switch back on). The sandbox without popups stays as the
+ * second layer.
+ */
+export function stripLinks(doc: Document): void {
+  for (const link of doc.querySelectorAll<HTMLAnchorElement | HTMLAreaElement>(
+    "a[href], area[href]",
+  )) {
+    link.dataset["href"] = link.getAttribute("href") ?? "";
+    link.removeAttribute("href");
+  }
+}
 
 /**
  * The frame's base look, as an attribute: the page's policy blocks style
@@ -156,6 +184,8 @@ export interface SafeHtmlProps {
   remoteImages?: boolean | undefined;
   /** The message's `@media` rules, filtered by the server; frame only. */
   css?: string | null | undefined;
+  /** Mail that may be phishing: its links lead nowhere. */
+  inertLinks?: boolean | undefined;
 }
 
 /**
@@ -164,10 +194,21 @@ export interface SafeHtmlProps {
  * tall as its content and fitted to its width. The only place the app
  * renders HTML it did not write (AGENTS.md).
  */
-export function SafeHtml({ html, title, remoteImages = false, css }: SafeHtmlProps) {
+export function SafeHtml({
+  html,
+  title,
+  remoteImages = false,
+  css,
+  inertLinks = false,
+}: SafeHtmlProps) {
   const frame = useRef<HTMLIFrameElement>(null);
   const [measured, setMeasured] = useState<number | undefined>();
-  const srcDoc = frameDocument(html, remoteImages);
+  // Inert links are taken out before the frame ever parses the mail (an
+  // inert DOMParser document loads and runs nothing), and again on load.
+  const srcDoc = useMemo(
+    () => frameDocument(inertLinks ? withoutLinks(html) : html, remoteImages),
+    [html, remoteImages, inertLinks],
+  );
   const rules = css ?? undefined;
 
   useEffect(() => {
@@ -201,6 +242,9 @@ export function SafeHtml({ html, title, remoteImages = false, css }: SafeHtmlPro
       if (doc?.URL !== "about:srcdoc") {
         return;
       }
+      if (inertLinks) {
+        stripLinks(doc);
+      }
       adoptStyles(doc, rules);
       resizes = 0;
       last = undefined;
@@ -218,14 +262,16 @@ export function SafeHtml({ html, title, remoteImages = false, css }: SafeHtmlPro
       element.removeEventListener("load", attach);
       observer?.disconnect();
     };
-  }, [srcDoc, rules]);
+  }, [srcDoc, rules, inertLinks]);
 
   return (
     <iframe
       ref={frame}
       className={styles["frame"]}
       title={title}
-      sandbox={SANDBOX}
+      // Sandbox flags only apply when a frame loads: a new frame when they change.
+      key={inertLinks ? "inert" : "live"}
+      sandbox={inertLinks ? SANDBOX_INERT_LINKS : SANDBOX}
       referrerPolicy="no-referrer"
       loading="lazy"
       srcDoc={srcDoc}

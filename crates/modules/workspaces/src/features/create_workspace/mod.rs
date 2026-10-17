@@ -1,6 +1,10 @@
 //! `POST /api/v1/workspaces` — create a workspace; its creator becomes its
 //! owner. A user with no workspace yet is subject to the instance's signup
 //! policy (`CAMPBOOKS_SIGNUP__POLICY`).
+//!
+//! Like joining one, it locks the user's row first and, when they are
+//! being suspended at that moment, announces it in the new workspace
+//! ([`suspension`](crate::domain::suspension), campbooks-cloud#197).
 
 use axum::{Json, extract::State, http::StatusCode};
 use campbooks_kernel::{
@@ -19,6 +23,7 @@ use crate::{
         model::{Accent, Kind, WorkspaceView, workspace_name},
         security::{self, SecurityKind},
         signup::{self, Admission},
+        suspension,
         users::ensure_user,
     },
     events::{MemberJoined, WorkspaceCreated},
@@ -96,6 +101,8 @@ pub async fn execute(
 
     let id = WorkspaceId::new();
     let mut tx = state.db.begin_for(id).await?;
+    // First, before any other lock (see the module's docs).
+    let known = suspension::lock(&mut tx, user).await?;
     // A minted code is spent in this transaction: if anything below fails
     // the use is given back, and two attempts at its last use cannot both
     // succeed.
@@ -162,6 +169,10 @@ pub async fn execute(
             },
         )
         .await?;
+    // A new workspace holds nothing a lift would have to undo.
+    if let Some(change) = known.filter(|change| change.suspended) {
+        suspension::announce(&state.events, &mut tx, &id.to_string(), user, change).await?;
+    }
     tx.commit().await?;
     tracing::info!(workspace = %id, user = %user, "workspace created");
 

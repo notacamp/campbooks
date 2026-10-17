@@ -163,6 +163,14 @@
       "expiredLeases_one": "{{count}} tâche en cours a perdu son processus",
       "expiredLeases_other": "{{count}} tâches en cours ont perdu leur processus"
     },
+    "watched": {
+      "title": "Travail à surveiller",
+      "lead": "Travail en arrière-plan dont les échecs comptent tout de suite. Tant qu’une livraison en échec n’est pas relancée, ce qu’elle portait n’a pas eu lieu.",
+      "suspensionFanout": "Suspensions qui atteignent les règles des membres",
+      "none": "Aucune livraison en échec",
+      "dead_one": "{{count}} livraison en échec",
+      "dead_other": "{{count}} livraisons en échec"
+    },
     "retryAll": {
       "question_one": "Relancer la {{count}} tâche {{kind}} en échec ? Elle repart de sa première tentative.",
       "question_other": "Relancer les {{count}} tâches {{kind}} en échec ? Chacune repart de sa première tentative.",
