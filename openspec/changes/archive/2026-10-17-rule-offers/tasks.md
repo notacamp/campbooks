@@ -27,4 +27,4 @@
 - [x] 4.1 OpenAPI, events and client types regenerated; sqlx offline cache
 - [x] 4.2 Recording scenario (375px and desktop)
 - [x] 4.3 CHANGELOG
-- [ ] 4.4 Gates green in CI; review agent; archive the change
+- [x] 4.4 Gates green in CI; review agent; archive the change
