@@ -33,8 +33,12 @@ Measured with a standalone release build (counts are the sink's):
 - **Units.** Every sink call is 1; `elem_name` is 1 (it is the scope scan);
   `append_before_sibling` and `remove_from_parent` add the number of
   children of the parent they touch; `reparent_children` adds the number of
-  children moved. Budget 5,000,000 (`MAX_PARSE_WORK`); ordinary mail stays
-  under 1,000,000 at the 2 MiB read cap. Depth past 4,096
+  children moved. Budget 10,000,000 (`MAX_PARSE_WORK`): a dense newsletter
+  of nested tables, links and images costs about 830,000 units at 1.25 MiB,
+  so about 1,400,000 at the 2 MiB read cap; most mail is under 100 KiB and
+  costs a few tens of thousands. With the PR's measure, a crafted 2 MiB
+  message is refused in under 40 ms, and one crafted to stay just under the
+  budget costs each later parse a few tens of milliseconds. Depth past 4,096
   (`MAX_PARSE_DEPTH`) is refused too, so no later recursive code sees a
   tree that deep; ordinary mail is under 100.
 - **Shown as text, not refused.** The reader still shows the words, from
@@ -48,6 +52,6 @@ Measured with a standalone release build (counts are the sink's):
 
 ## Risks
 - A real message past the budget is shown as text. The margin over the
-  largest ordinary mail measured is more than ten times.
+  densest ordinary mail at the read cap is about seven times.
 - The measure adds one parse to messages without a style sheet: about 30 ms
   at the largest.

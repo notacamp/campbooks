@@ -21,8 +21,7 @@ in under 10 ms.
 - Before any tree is built for the reader, the HTML is measured by one
   parse that counts its work as the parsers after it would do it, fed a
   chunk at a time and stopped as soon as the work passes a budget
-  (5,000,000 units, more than ten times what the largest ordinary mail
-  costs) or the tree is deeper than 4,096 levels. HTML within the budget is
+  (10,000,000 units, about seven times what a dense 2 MiB newsletter costs) or the tree is deeper than 4,096 levels. HTML within the budget is
   sanitised as today. HTML past it is shown as its text: the characters the
   tokenizer reads, outside scripts, styles and the head, with line breaks at
   blocks, escaped, in one `div` that keeps the line breaks. No remote images,

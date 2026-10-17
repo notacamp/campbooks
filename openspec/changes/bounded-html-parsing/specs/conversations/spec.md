@@ -7,7 +7,7 @@ parse that counts the tree builder's work (each tree operation and each
 element name read in a scope check one unit; moving a node before a sibling
 or out of its parent adds the parent's number of children; moving children
 adds their number), fed in chunks of at most 8 KiB and stopped as soon as the
-work passes 5,000,000 units; HTML past that, or whose tree is deeper than
+work passes 10,000,000 units; HTML past that, or whose tree is deeper than
 4,096 levels, SHALL be returned as its text instead: the characters outside
 scripts, styles, the head, the title and the markup a `noscript`, `iframe`,
 `noembed` or `noframes` holds, entities decoded, a line break at

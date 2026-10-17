@@ -74,9 +74,10 @@ pub const MAX_MATCHING: usize = 50_000_000;
 /// Most declarations (per matched element) times [`MAX_WORK`]'s measure
 /// inlined: applying a declaration looks through the element's properties.
 pub const MAX_APPLYING: usize = 500_000_000;
-/// Most tree-builder work the measure allows (see [`measure`]): more than
-/// ten times what the largest ordinary mail costs.
-pub const MAX_PARSE_WORK: usize = 5_000_000;
+/// Most tree-builder work the measure allows (see [`measure`]): about seven
+/// times what a dense 2 MiB newsletter costs (the reader reads no more), and
+/// a few tens of milliseconds of parsing.
+pub const MAX_PARSE_WORK: usize = 10_000_000;
 /// Deepest tree the measure allows.
 pub const MAX_PARSE_DEPTH: usize = 4_096;
 /// Bytes of HTML fed to the measure between two reads of its work count.
