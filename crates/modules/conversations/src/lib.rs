@@ -165,7 +165,14 @@ pub fn module(deps: ConversationsDeps) -> Module {
             features::decide_message::ModelPass::new(Arc::new(strategy), Some(gateway))
         }),
     };
-    let needs = domain::needs::NeedSettings::new(deps.config.needs_window_days, &deps.policy);
+    // Scout's summary of a need's email: only while the `complete` role may
+    // receive mail here.
+    let summaries = deps
+        .ai
+        .clone()
+        .filter(features::summarize_need::may_read_mail);
+    let needs = domain::needs::NeedSettings::new(deps.config.needs_window_days, &deps.policy)
+        .with_summaries(summaries.is_some());
     Module {
         name: NAME,
         scopes: scopes::ALL,
@@ -187,6 +194,7 @@ pub fn module(deps: ConversationsDeps) -> Module {
             .publishes::<events::InboxChanged>()
             .publishes::<events::InboxRemoved>()
             .publishes::<events::NeedChanged>()
+            .publishes::<events::NeedSummarised>()
             .publishes::<events::RuleChanged>()
             .handler(features::release_send::ReleaseSend)
             .handler(features::check_send::CheckSend)
@@ -194,6 +202,7 @@ pub fn module(deps: ConversationsDeps) -> Module {
             .handler(features::apply_rule::ApplyRules::new(needs.clone()))
             .handler(features::fill_templates::FillTemplates)
             .handler(features::refresh_need::RefreshNeed::new(needs.clone()))
+            .handler(features::summarize_need::SummarizeNeed::new(summaries))
             .handler(features::apply_changes::ApplyChanges::new(
                 deps.rules,
                 deps.policy.clone(),
@@ -333,6 +342,7 @@ mod tests {
             "conversations.apply_rule",
             "conversations.fill_templates",
             "conversations.refresh_need",
+            "conversations.summarize_need",
             "conversations.backfill_needs",
             "conversations.dispatch_needs_backfills",
         ] {

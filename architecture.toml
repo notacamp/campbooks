@@ -180,6 +180,10 @@ name = "conversations.rule_changed"
 reason = "The change feed: clients follow a taught rule and its run's progress."
 
 [[access.unconsumed_events]]
+name = "conversations.need_summarised"
+reason = "The change feed: Scout's summary of a need's email was written, so an open Home item or reader asks for the conversation again and shows it."
+
+[[access.unconsumed_events]]
 name = "conversations.send_failed"
 reason = "The change feed: the draft shows why it failed; notifications to come."
 

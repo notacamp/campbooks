@@ -37,5 +37,6 @@ pub mod search_source;
 pub mod send_draft;
 pub mod star;
 pub mod suggest_rules;
+pub mod summarize_need;
 pub mod suspended_authors;
 pub mod update_draft;

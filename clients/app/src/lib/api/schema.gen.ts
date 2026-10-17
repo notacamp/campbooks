@@ -2359,6 +2359,14 @@ export interface components {
             decisions: components["schemas"]["DecisionView"][];
             /** @description Up to the 100 newest messages, oldest first. */
             messages: components["schemas"]["MessageView"][];
+            /**
+             * @description Scout's summary of the email behind the conversation's open need, in
+             *     your language (English when it has none in yours), written once when
+             *     the need was raised. None when there is no open need, the summary is
+             *     not written yet (it arrives with a change to this conversation), or no
+             *     model may read mail on this server.
+             */
+            need_summary?: string | null;
         };
         /**
          * Format: uuid

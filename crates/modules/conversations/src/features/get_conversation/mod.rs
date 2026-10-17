@@ -11,6 +11,7 @@ use campbooks_kernel::{
     blobs::BlobRef,
     db::BeginFor as _,
     extract,
+    i18n::Locale,
     tenancy::{Workspace, WorkspaceId},
 };
 use chrono::{DateTime, Utc};
@@ -108,7 +109,18 @@ pub struct ConversationDetail {
     /// The decide pass's answers about the newest inbound message, with
     /// their reasons: suggestions, except an answer marked `acted`.
     pub decisions: Vec<DecisionView>,
+    /// Scout's summary of the email behind the conversation's open need, in
+    /// your language (English when it has none in yours), written once when
+    /// the need was raised. None when there is no open need, the summary is
+    /// not written yet (it arrives with a change to this conversation), or no
+    /// model may read mail on this server.
+    pub need_summary: Option<String>,
 }
+
+/// The summary of the email behind the conversation's open need.
+const NEED_SUMMARY: &str = "SELECT s.texts FROM conversations.needs n \
+       JOIN conversations.need_summaries s ON s.message_id = n.message_id \
+      WHERE n.conversation_id = $1 AND n.state = 'open' AND s.state = 'written'";
 
 /// `messages.recipients`.
 #[derive(Deserialize)]
@@ -159,6 +171,7 @@ pub async fn handler(
     State(state): State<AppState>,
     Extension(policy): Extension<Policy>,
     workspace: Workspace<ConversationsRead>,
+    locale: Locale,
     extract::Path(path): extract::Path<ConversationPath>,
 ) -> Result<Json<ConversationDetail>> {
     let id = path.conversation_id;
@@ -211,6 +224,15 @@ pub async fn handler(
     for view in &mut decisions {
         view.threshold = suggestions::threshold(&policy, view);
     }
+    let texts: Option<serde_json::Value> = sqlx::query_scalar(NEED_SUMMARY)
+        .bind(id)
+        .fetch_optional(&mut *tx)
+        .await?;
+    let need_summary = texts.and_then(|texts| {
+        [locale, Locale::En]
+            .into_iter()
+            .find_map(|l| texts.get(l.tag())?.as_str().map(ToOwned::to_owned))
+    });
     let ids: Vec<MessageId> = rows.iter().map(|r| r.id).collect();
     let mut attachments = attachments_of(&mut tx, &ids).await?;
     tx.commit().await?;
@@ -251,6 +273,7 @@ pub async fn handler(
         conversation,
         messages,
         decisions,
+        need_summary,
     }))
 }
 

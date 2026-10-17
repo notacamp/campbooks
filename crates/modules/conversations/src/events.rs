@@ -281,6 +281,37 @@ impl DomainEvent for NeedChanged {
     }
 }
 
+/// Scout's summary of the email behind a conversation's need was written
+/// (campbooks-cloud#204). Ids only: never the summary. It exists so open
+/// Home items and readers ask for the conversation again and show it.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+pub struct NeedSummarised {
+    /// The workspace.
+    pub workspace: String,
+    /// The inbox: who may see the conversation.
+    pub inbox: InboxId,
+    /// The conversation.
+    pub conversation: ConversationId,
+    /// The message summarised.
+    pub message: MessageId,
+}
+
+impl DomainEvent for NeedSummarised {
+    const NAME: &'static str = "conversations.need_summarised";
+    const VERSION: u16 = 1;
+
+    fn workspace(&self) -> Option<&str> {
+        Some(&self.workspace)
+    }
+
+    fn changes(&self) -> Vec<FeedChange> {
+        vec![
+            FeedChange::upsert(RecordRef::new(CONVERSATION_RECORD, &self.conversation))
+                .within(inbox_record(self.inbox)),
+        ]
+    }
+}
+
 /// A change a member asked for, to be made at the provider too.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 #[serde(tag = "kind", rename_all = "snake_case")]

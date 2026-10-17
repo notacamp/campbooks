@@ -637,6 +637,40 @@
       }
     },
     {
+      "name": "conversations.need_summarised",
+      "module": "conversations",
+      "version": 1,
+      "workspaceScoped": true,
+      "payload": {
+        "type": "object",
+        "description": "Scout's summary of the email behind a conversation's need was written\n(campbooks-cloud#204). Ids only: never the summary. It exists so open\nHome items and readers ask for the conversation again and show it.",
+        "required": [
+          "workspace",
+          "inbox",
+          "conversation",
+          "message"
+        ],
+        "properties": {
+          "conversation": {
+            "$ref": "#/components/schemas/ConversationId",
+            "description": "The conversation."
+          },
+          "inbox": {
+            "$ref": "#/components/schemas/InboxId",
+            "description": "The inbox: who may see the conversation."
+          },
+          "message": {
+            "$ref": "#/components/schemas/MessageId",
+            "description": "The message summarised."
+          },
+          "workspace": {
+            "type": "string",
+            "description": "The workspace."
+          }
+        }
+      }
+    },
+    {
       "name": "conversations.rule_changed",
       "module": "conversations",
       "version": 1,

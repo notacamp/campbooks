@@ -31,6 +31,12 @@
 //!   (`conversations.decide_backlog`, one job per message, ids only), which
 //!   sorts it and works out its need again.
 //!
+//! - When the `complete` role may receive mail on this server, each open need
+//!   of those conversations whose email Scout has not summarised is queued
+//!   for `conversations.summarize_need` (campbooks-cloud#204): one job per
+//!   message, never on a request path, and a message already summarised is
+//!   not asked again.
+//!
 //! Running it again changes nothing: `refresh` publishes only when a need
 //! changed, and a message a checked model answered every question about is
 //! not asked again.
@@ -49,9 +55,19 @@ use sqlx::{Postgres, Transaction};
 
 use crate::{
     domain::needs::{self, NeedSettings},
-    features::decide_message::{Backlog, DecideBacklog, ModelPass},
+    features::{
+        decide_message::{Backlog, DecideBacklog, ModelPass},
+        summarize_need,
+    },
     model::{ConversationId, InboxId, MessageId},
 };
+
+/// The messages behind the open needs of some conversations that Scout has
+/// not summarised (or whose one failure may be tried again).
+const NEEDING_SUMMARY: &str = "SELECT n.message_id FROM conversations.needs n \
+       LEFT JOIN conversations.need_summaries s ON s.message_id = n.message_id \
+      WHERE n.conversation_id = ANY($1) AND n.state = 'open' \
+        AND (s.message_id IS NULL OR (s.state = 'failed' AND s.attempts < 2))";
 
 /// How often pending backfills are started.
 pub const EVERY: Duration = Duration::from_mins(1);
@@ -321,6 +337,9 @@ impl BackfillNeeds {
         if self.model.as_ref().is_some_and(|m| !m.refused()) {
             self.queue_model_pass(tx, workspace, &ids).await?;
         }
+        if self.needs.summaries {
+            Self::queue_summaries(tx, &ws, &ids).await?;
+        }
 
         let last = ids.last().copied().or(page.after);
         let finished = i64::try_from(ids.len()).unwrap_or(i64::MAX) < PAGE;
@@ -350,6 +369,25 @@ impl BackfillNeeds {
             after: last,
         };
         jobs::enqueue_to::<Self>(tx, &next, next.options(workspace)).await?;
+        Ok(())
+    }
+
+    /// Queue Scout's summary (`conversations.summarize_need`, ids only, one
+    /// pending job per message) for the email behind each open need of
+    /// `conversations` that has none, or only a first failure. A message
+    /// already summarised is not asked again.
+    async fn queue_summaries(
+        tx: &mut Transaction<'_, Postgres>,
+        workspace: &str,
+        conversations: &[ConversationId],
+    ) -> Result<(), JobError> {
+        let unsummarised: Vec<MessageId> = sqlx::query_scalar(NEEDING_SUMMARY)
+            .bind(conversations)
+            .fetch_all(&mut **tx)
+            .await?;
+        for message in unsummarised {
+            summarize_need::enqueue(tx, workspace, message).await?;
+        }
         Ok(())
     }
 
