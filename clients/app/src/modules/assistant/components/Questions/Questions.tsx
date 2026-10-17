@@ -3,7 +3,6 @@ import { useTranslation } from "react-i18next";
 
 import { useShortcut } from "~/lib/shortcuts";
 import {
-  Avatar,
   Banner,
   Brand,
   Button,
@@ -26,18 +25,11 @@ import {
   useUpdateProfile,
   type NewRule,
   type Proactivity,
+  type Sender,
 } from "../../api/queries";
-import {
-  answerRules,
-  NEVER_KINDS,
-  teachable,
-  teachingId,
-  type Answers,
-  type NeverKind,
-  type TeachInbox,
-} from "../../model";
-import { AddSender } from "../AddSender/AddSender";
+import { answerRules, teachable, teachingId, type Answers, type TeachInbox } from "../../model";
 import { RuleMatch } from "../RuleMatch/RuleMatch";
+import { SenderFilter } from "../SenderFilter/SenderFilter";
 
 /** The questions, then the review and what was saved. */
 type Step = "always" | "never" | "act" | "review" | "done";
@@ -70,6 +62,8 @@ export function Questions({ workspaceId, onHome, onMemory }: QuestionsProps) {
 
   const [step, setStep] = useState<Step>("always");
   const [answers, setAnswers] = useState<Answers>({ always: [], never: [], neverSenders: [] });
+  // Senders found in the filter box and ticked, so their names stay.
+  const [found, setFound] = useState<ReadonlyMap<string, Sender>>(new Map());
   const [chosen, setChosen] = useState<Proactivity | undefined>();
   const [sharedOn, setSharedOn] = useState<string[]>([]);
   const [existing, setExisting] = useState(true);
@@ -95,8 +89,17 @@ export function Questions({ workspaceId, onHome, onMemory }: QuestionsProps) {
   const shared = all.filter((inbox) => teachable(inbox) && inbox.shared);
   const readOnly = all.filter((inbox) => !teachable(inbox));
   const targets = [...mine, ...shared.filter((inbox) => sharedOn.includes(inbox.id))];
+  const known = new Map<string, Sender>([
+    ...(senders.data ?? []).map((sender) => [sender.address, sender] as const),
+    ...found,
+  ]);
+  const remember = (sender: Sender | undefined) => {
+    if (sender !== undefined) {
+      setFound((current) => new Map(current).set(sender.address, sender));
+    }
+  };
   const names = new Map(
-    (senders.data ?? []).flatMap((sender) =>
+    [...known.values()].flatMap((sender) =>
       sender.name === null || sender.name === undefined
         ? []
         : [[sender.address, sender.name] as const],
@@ -317,8 +320,6 @@ export function Questions({ workspaceId, onHome, onMemory }: QuestionsProps) {
 
   switch (step) {
     case "always": {
-      const suggested = (senders.data ?? []).map((sender) => sender.address);
-      const typed = answers.always.filter((sender) => !suggested.includes(sender));
       return (
         <FocusPage
           top={top}
@@ -329,33 +330,15 @@ export function Questions({ workspaceId, onHome, onMemory }: QuestionsProps) {
           onSubmit={next}
           actions={questionActions}
         >
-          {suggested.length === 0 && senders.data !== undefined ? (
-            <Text tone="secondary">{t("flow.always.noSenders")}</Text>
-          ) : null}
-          <CheckCards
+          <SenderFilter
+            workspaceId={workspaceId}
             label={t("flow.always.label")}
-            hideLabel
+            suggest
+            known={known}
             value={answers.always}
-            onChange={(always) => {
+            onChange={(always, ticked) => {
+              remember(ticked);
               setAnswers((a) => ({ ...a, always }));
-            }}
-            options={[
-              ...(senders.data ?? []).map((sender) => ({
-                value: sender.address,
-                title: sender.name ?? sender.address,
-                description:
-                  sender.name === null || sender.name === undefined ? undefined : sender.address,
-                meta: t("flow.always.count", { count: sender.received }),
-                leading: <Avatar name={sender.name ?? sender.address} />,
-              })),
-              ...typed.map((sender) => ({ value: sender, title: sender })),
-            ]}
-          />
-          <AddSender
-            onAdd={(sender) => {
-              setAnswers((a) =>
-                a.always.includes(sender) ? a : { ...a, always: [...a.always, sender] },
-              );
             }}
           />
           {becomes(answers.always.map((sender) => `always:${sender}`))}
@@ -376,39 +359,31 @@ export function Questions({ workspaceId, onHome, onMemory }: QuestionsProps) {
           <CheckCards
             label={t("flow.never.label")}
             hideLabel
-            value={[...answers.never, ...answers.neverSenders]}
-            onChange={(values) => {
-              setAnswers((a) => ({
-                ...a,
-                never: values.filter((value): value is NeverKind =>
-                  (NEVER_KINDS as readonly string[]).includes(value),
-                ),
-                neverSenders: values.filter(
-                  (value) => !(NEVER_KINDS as readonly string[]).includes(value),
-                ),
-              }));
+            value={answers.never}
+            onChange={(never) => {
+              setAnswers((a) => ({ ...a, never }));
             }}
             options={[
               {
-                value: "lists",
+                value: "lists" as const,
                 title: t("flow.never.lists"),
                 description: t("flow.never.listsHint"),
               },
               {
-                value: "automatic",
+                value: "automatic" as const,
                 title: t("flow.never.automatic"),
                 description: t("flow.never.automaticHint"),
               },
-              ...answers.neverSenders.map((sender) => ({ value: sender, title: sender })),
             ]}
           />
-          <AddSender
-            onAdd={(sender) => {
-              setAnswers((a) =>
-                a.neverSenders.includes(sender)
-                  ? a
-                  : { ...a, neverSenders: [...a.neverSenders, sender] },
-              );
+          <SenderFilter
+            workspaceId={workspaceId}
+            label={t("flow.never.senders")}
+            known={known}
+            value={answers.neverSenders}
+            onChange={(neverSenders, ticked) => {
+              remember(ticked);
+              setAnswers((a) => ({ ...a, neverSenders }));
             }}
           />
           {becomes([
