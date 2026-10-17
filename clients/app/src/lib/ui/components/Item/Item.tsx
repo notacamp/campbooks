@@ -169,7 +169,15 @@ export interface ItemDetailProps {
   quote?: string | undefined;
   /** Why to be careful, before the quote (a warning's tells). */
   reasons?: string[] | undefined;
-  /** The email itself, after the reasons (in place of the quote). */
+  /**
+   * Scout's summary of the email, in one or two plain sentences: a
+   * model's words about untrusted mail, shown as text only, marked with the
+   * visor, after the reasons and above the email. Nothing is drawn without it.
+   */
+  summary?: string | undefined;
+  /** The summary's heading: "Scout's summary". */
+  summaryLabel?: string | undefined;
+  /** The email itself, after the summary (in place of the quote). */
   mail?: ReactNode | undefined;
   /** The assistant's context, next to the visor. */
   context?: string | undefined;
@@ -184,6 +192,8 @@ export function ItemDetail({
   quoteFrom,
   quote,
   reasons = [],
+  summary,
+  summaryLabel,
   mail,
   context,
   actions,
@@ -197,6 +207,17 @@ export function ItemDetail({
             <li key={reason}>{reason}</li>
           ))}
         </ul>
+      )}
+      {summary === undefined || summary === "" ? null : (
+        <section className={styles["summary"]} aria-label={summaryLabel}>
+          {summaryLabel === undefined ? null : (
+            <span className={styles["summaryHead"]} aria-hidden="true">
+              <Visor size="xs" />
+              {summaryLabel}
+            </span>
+          )}
+          <p className={styles["summaryText"]}>{summary}</p>
+        </section>
       )}
       {mail}
       {quote === undefined || mail !== undefined ? null : (

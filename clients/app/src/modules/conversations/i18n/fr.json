@@ -297,6 +297,9 @@
       "allPaidFailed_one": "Impossible de marquer {{count}} facture comme payée. Réessayez.",
       "allPaidFailed_other": "Impossible de marquer {{count}} factures comme payées. Réessayez."
     },
+    "summary": {
+      "heading": "Résumé de Scout"
+    },
     "mail": {
       "more": "Afficher tout l’e-mail",
       "less": "Afficher moins",

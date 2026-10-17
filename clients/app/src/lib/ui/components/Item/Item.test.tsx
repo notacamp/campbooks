@@ -46,6 +46,37 @@ describe("Item", () => {
     expect(screen.getByText("You held Thursday.")).toBeInTheDocument();
   });
 
+  it("shows Scout's summary under its heading, before the email, as text only", () => {
+    renderUi(
+      <ItemDetail
+        summaryLabel="Scout’s summary"
+        summary="Marta asks you to confirm Thursday. <b>Not bold</b>"
+        mail={<p>The email</p>}
+        actions={<button type="button">Open</button>}
+      />,
+    );
+    const summary = screen.getByRole("region", { name: "Scout’s summary" });
+
+    expect(summary).toHaveTextContent("Marta asks you to confirm Thursday. <b>Not bold</b>");
+    expect(summary.querySelector("b")).toBeNull();
+    expect(summary.querySelector("[data-size]")).not.toBeNull();
+    const text = document.body.textContent ?? "";
+    expect(text.indexOf("Marta asks")).toBeLessThan(text.indexOf("The email"));
+  });
+
+  it("draws no summary without one, and the email still shows", () => {
+    renderUi(
+      <ItemDetail
+        summaryLabel="Scout’s summary"
+        mail={<p>The email</p>}
+        actions={<button type="button">Open</button>}
+      />,
+    );
+
+    expect(screen.queryByRole("region")).not.toBeInTheDocument();
+    expect(screen.getByText("The email")).toBeInTheDocument();
+  });
+
   it("keeps the detail out of the page while collapsed", () => {
     renderUi(<Item {...base} detail={<p>detail</p>} />);
 

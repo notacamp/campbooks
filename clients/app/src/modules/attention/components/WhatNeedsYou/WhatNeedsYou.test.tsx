@@ -146,6 +146,32 @@ describe("What needs you", () => {
     expect(screen.getByRole("button", { name: "Show the whole email" })).toBeVisible();
   });
 
+  it("opens an item to Scout's summary first, then the email", async () => {
+    api();
+    renderHome();
+    await screen.findByText("This may be phishing. Don’t use its links.");
+    fireEvent.keyDown(document, { key: "j" });
+    fireEvent.keyDown(document, { key: "Enter" });
+    const summary = await screen.findByRole("region", { name: "Scout’s summary" });
+    expect(summary).toHaveTextContent(
+      "Marta is arranging Thursday’s walkthrough with the builders and needs your yes by Wednesday.",
+    );
+    await screen.findByText(/Hope the move went well/u);
+    const text = document.body.textContent ?? "";
+    expect(text.indexOf("Marta is arranging")).toBeLessThan(
+      text.indexOf("Hope the move went well"),
+    );
+  });
+
+  it("shows no summary when there is none, and the email still shows", async () => {
+    api();
+    renderHome();
+    await screen.findByText("This may be phishing. Don’t use its links.");
+    fireEvent.keyDown(document, { key: "Enter" });
+    expect(await screen.findByText("How Campbooks decided")).toBeVisible();
+    expect(screen.queryByRole("region", { name: "Scout’s summary" })).not.toBeInTheDocument();
+  });
+
   it("moves with the arrow keys, even with an item open", async () => {
     api();
     renderHome();

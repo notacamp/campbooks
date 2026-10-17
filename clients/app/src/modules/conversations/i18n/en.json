@@ -297,6 +297,9 @@
       "allPaidFailed_one": "Couldn’t mark {{count}} invoice paid. Try again.",
       "allPaidFailed_other": "Couldn’t mark {{count}} invoices paid. Try again."
     },
+    "summary": {
+      "heading": "Scout’s summary"
+    },
     "mail": {
       "more": "Show the whole email",
       "less": "Show less",
