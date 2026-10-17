@@ -213,7 +213,8 @@
 }
 
 @media (width < 48rem) {
-  .actions {
+  .actions,
+  .detail {
     padding-left: var(--row-pad-x);
   }
 }

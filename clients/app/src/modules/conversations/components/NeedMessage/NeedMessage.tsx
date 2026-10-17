@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
-import { Clamp, Text } from "~/lib/ui";
+import { Clamp } from "~/lib/ui";
 
 import { useConversation, type ConversationSummary, type NeedView } from "../../api/queries";
 import { avatarKind, type Translate } from "../../model";
@@ -47,13 +47,9 @@ export function NeedMessage({ workspaceId, conversation, need, now }: NeedMessag
         }}
         kind={avatarKind(conversation)}
         inertLinks={suspicious}
+        note={suspicious ? t("needs.mail.linksOff") : undefined}
         now={now}
       />
-      {suspicious ? (
-        <Text tone="tertiary" size="sm">
-          {t("needs.mail.linksOff")}
-        </Text>
-      ) : null}
     </Clamp>
   );
 }
