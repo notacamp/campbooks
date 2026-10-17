@@ -109,7 +109,7 @@ transaction into its scope for its own insert only.
 
 #### Scenario: Every table, nothing set
 - **WHEN** rows exist in a sample of tables of every kind (the kernel's, modules', the workspaces themselves) and the runtime role opens a transaction that sets nothing
-- **THEN** every table with row-level security answers zero rows, a table added later included
+- **THEN** every table with row-level security answers zero rows, a table added later included, and the one the runtime role may not read at all (`kernel.rate_limits`) refuses the read
 
 #### Scenario: The kernel's machinery
 - **WHEN** jobs of two workspaces and an instance-wide job are queued, as the runtime role

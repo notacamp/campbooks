@@ -1513,15 +1513,29 @@ async fn a_transaction_that_sets_nothing_sees_no_row_of_any_table(db: PgPool) {
     }
 
     // Not vacuous for the kernel's tables either: in the kernel scope, the
-    // same pool sees every row of them.
+    // same pool sees every row of them, except the idempotency keys, of
+    // which it sees the expired only, and the rate-limit counters, which it
+    // reaches through the kernel's functions only (campbooks-cloud#210).
+    let expired_keys: i64 =
+        sqlx::query_scalar("SELECT count(*) FROM kernel.idempotency WHERE expires_at <= now()")
+            .fetch_one(&world.db)
+            .await
+            .unwrap();
     let mut tx = campbooks_kernel::db::begin_kernel(pool).await.unwrap();
-    for table in tables.iter().filter(|t| t.starts_with("kernel.")) {
+    for table in tables
+        .iter()
+        .filter(|t| t.starts_with("kernel.") && !unreadable.contains(t.as_str()))
+    {
         let rows: i64 =
             sqlx::query_scalar(sqlx::AssertSqlSafe(format!("SELECT count(*) FROM {table}")))
                 .fetch_one(&mut *tx)
                 .await
                 .unwrap();
-        assert_eq!(rows > 0, populated.contains(table.as_str()), "{table}");
+        if table == "kernel.idempotency" {
+            assert_eq!(rows, expired_keys, "{table}: the expired keys only");
+        } else {
+            assert_eq!(rows > 0, populated.contains(table.as_str()), "{table}");
+        }
     }
     tx.rollback().await.unwrap();
 }
