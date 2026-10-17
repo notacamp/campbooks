@@ -276,6 +276,11 @@
       "confirmed": "Obrigado · {{name}} fica na sua lista",
       "failed": "Não foi possível alterar {{name}}: nada mudou. Tente de novo.",
       "changed": "{{name}} mudou enquanto via: volte a ver."
+    },
+    "mail": {
+      "more": "Mostrar o email completo",
+      "less": "Mostrar menos",
+      "linksOff": "As ligações estão desativadas em emails que podem ser phishing."
     }
   },
   "rules": {

@@ -8,6 +8,13 @@ All notable changes to Campbooks Next are documented here. The format follows
 
 ### Changed
 
+- **An opened Home item shows the email (campbooks-cloud#203).** Pressing Enter on an item
+  (or clicking the selected row) now shows the email it is about, rendered as the reader
+  renders it, a few lines deep with "Show the whole email" to read it all in place. Until
+  now an opened item showed only how it was decided. In mail that may be phishing, links
+  lead nowhere, on Home and in the reader, and a line says so. Plain-text mail now keeps
+  its line breaks and paragraphs instead of running together into one line. The selected item's
+  background now covers its actions and what opening it shows, not only its first line.
 - **Find people by name in Scout's questions.** In "Whose mail should always reach you?"
   and "What never needs you?", the address field is now a filter box. Type part of a name,
   an address or a domain and the cards narrow at once, then Scout finds anyone in your mail
