@@ -582,7 +582,27 @@ export function ConversationReader({
                           },
                         ],
                       },
-                  ...(stopButton === null ? {} : { actions: stopButton }),
+                  // A bill can also be not needed (X): shown, as every key is.
+                  ...(bill
+                    ? {
+                        actions: (
+                          <>
+                            <Button
+                              variant="ghost"
+                              shortcut="conversations.resolve_need"
+                              onClick={() => {
+                                needActions.notNeeded(conversation);
+                              }}
+                            >
+                              {t("needs.actions.notNeeded")}
+                            </Button>
+                            {stopButton}
+                          </>
+                        ),
+                      }
+                    : stopButton === null
+                      ? {}
+                      : { actions: stopButton }),
                 }
               : {
                   actions: (

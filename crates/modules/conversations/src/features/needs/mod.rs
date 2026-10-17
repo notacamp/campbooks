@@ -371,6 +371,18 @@ async fn judge(
         // Done or Already paid file nothing: an earlier confirmation stays.
         None => earlier_correction,
     };
+    // Not needed after Still to pay (or a confirmation) on this message: the
+    // earlier "owed" correction no longer holds, so the labels never say both.
+    if verdict == NeedVerdict::NotNeeded
+        && let Some(earlier) = earlier_correction
+    {
+        sqlx::query!(
+            "UPDATE conversations.corrections SET withdrawn_at = now() WHERE id = $1",
+            earlier as CorrectionId,
+        )
+        .execute(&mut *tx)
+        .await?;
+    }
     sqlx::query!(
         r#"
         UPDATE conversations.needs

@@ -19,7 +19,13 @@ All notable changes to Campbooks Next are documented here. The format follows
   there's a due date, and offers a reminder first (two days before the due date, tomorrow
   morning when overdue, Monday with no date). The reader asks the same. Existing
   needs are worked out again on upgrade, and mail from the last two weeks is asked the new
-  question once; a Pay item on older mail goes away and doesn't come back.
+  question once; a Pay item on older mail goes away and doesn't come back. A bill on
+  recent mail stays until its question is answered, so one the upgrade could not ask (the
+  daily AI limit, or a self-hosted model failing the answers check) is never dropped. The
+  answers check now also requires the owed and paid cases to be right. Newsletters never
+  raise Pay; other streams can, when the model is sure the payment is owed. After this
+  upgrade, rolling back to an earlier image is not supported: the stored answers use the
+  new money question and verdicts.
   For operators, `campbooks-server labelling export` writes your recent money mail as a
   sheet to label on your own machine, and `cargo xtask eval decide --set-dir` measures the
   model on it (campbooks-cloud#167).

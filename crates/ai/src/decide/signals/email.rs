@@ -52,7 +52,8 @@ pub mod triage {
 /// questions are yes/no questions, the form Laya documents; a declarative
 /// statement got the same answer as its negation (campbooks-cloud#128).
 /// Changing a wording changes what the model reads: bump
-/// [`super::inbox::CONTEXT_VERSION`] with it.
+/// [`super::inbox::CONTEXT_VERSION`] with it. Adding a question (as `money`
+/// was) leaves the others' answers valid and does not.
 pub fn triage_questions() -> Vec<Question> {
     vec![
         Question::choice(

@@ -165,7 +165,19 @@ export function useNeedActions(
         mutation.mutateAsync({ conversation, action: { need: "already_paid" } }),
       ),
     ).then((results) => {
-      const failed = conversations.filter((_, index) => results[index]?.status === "rejected");
+      const failed: ConversationSummary[] = [];
+      // A bill that changed while the member looked is not retried, as for
+      // one bill: they should look at it again.
+      const retryable: ConversationSummary[] = [];
+      for (const [index, result] of results.entries()) {
+        const conversation = conversations[index];
+        if (result.status === "rejected" && conversation !== undefined) {
+          failed.push(conversation);
+          if (problemCode(result.reason) !== "need_changed") {
+            retryable.push(conversation);
+          }
+        }
+      }
       if (failed.length > 0) {
         undo.retract(entry);
         const done = conversations.filter((conversation) => !failed.includes(conversation));
@@ -177,12 +189,15 @@ export function useNeedActions(
         }
         undo.fail({
           label: t("needs.toast.allPaidFailed", { count: failed.length }),
-          retry: () => {
-            for (const conversation of failed) {
-              onRedo?.(conversation);
-            }
-            allPaid(failed);
-          },
+          retry:
+            retryable.length === 0
+              ? undefined
+              : () => {
+                  for (const conversation of retryable) {
+                    onRedo?.(conversation);
+                  }
+                  allPaid(retryable);
+                },
         });
       }
       onChanged?.();

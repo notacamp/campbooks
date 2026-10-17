@@ -592,16 +592,32 @@ async fn candidate(
     // as it is, settled against what happened since.
     let mut raised = None;
     let mut reread = false;
+    let mut recent = false;
+    let mut money_asked = true;
     if let Some(newest) = &newest {
-        let recent = newest.sent_at >= Utc::now() - settings.window;
+        recent = newest.sent_at >= Utc::now() - settings.window;
         reread = row.is_some_and(|r| r.message_id == newest.id);
         if recent || reread {
             let answers = answers(tx, newest.id).await?;
+            money_asked = answers.iter().any(|a| a.question == triage::MONEY);
             raised = raise(newest.id, &answers, settings);
         }
     }
     let open = row.filter(|r| r.state == "open");
     let withdrawn = match open {
+        // A bill raised before the money question, on mail recent enough to
+        // be asked it, stays until it is answered: a pass that could not ask
+        // (the daily AI cap, a model that failed the answers check) must not
+        // drop a bill that may still be owed.
+        Some(row)
+            if reread
+                && raised.is_none()
+                && recent
+                && !money_asked
+                && row.need()?.reason == NeedReason::Pay =>
+        {
+            false
+        }
         Some(row) if reread && raised.is_none() => !matches!(
             row.verdict_on(row.message_id)?,
             Some(NeedVerdict::Confirmed | NeedVerdict::StillToPay)

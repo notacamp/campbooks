@@ -480,6 +480,46 @@ async fn an_open_question_its_answers_no_longer_support_is_withdrawn(db: PgPool)
 }
 
 #[sqlx::test(migrations = "../../../migrations")]
+async fn a_bill_raised_before_the_money_question_stays_until_it_is_asked(db: PgPool) {
+    // A bill an earlier version raised as Pay, on recent mail never asked
+    // the money question; the upgraded model cannot be asked yet (its
+    // answers check has not run), as when the daily AI cap is reached.
+    let kit = Kit::new(db.clone()).await;
+    let (workspace, _) = mailbox(&kit, &["needs"]).await;
+    before_attention(&db, workspace).await;
+    let bill = kit.message_of("needs-3").await;
+    sqlx::query(
+        "DELETE FROM conversations.decisions WHERE message_id = $1::uuid AND question = 'money'",
+    )
+    .bind(&bill)
+    .execute(&db)
+    .await
+    .unwrap();
+    sqlx::query(
+        "INSERT INTO conversations.needs
+             (conversation_id, workspace_id, message_id, reason, trust, basis, question, state,
+              latest_inbound_id)
+         SELECT conversation_id, workspace_id, id, 'pay', 'check', 'model', 'asks_action',
+                'open', id
+           FROM conversations.messages WHERE id = $1::uuid",
+    )
+    .bind(&bill)
+    .execute(&db)
+    .await
+    .unwrap();
+
+    let (kit, _model) = upgraded(&db, sorting_deps()).await;
+    seed(&db).await;
+    tick(&kit).await;
+    let bills: Vec<_> = needs_of(&db, workspace)
+        .await
+        .into_iter()
+        .filter(|(message, ..)| message == "needs-3")
+        .collect();
+    assert_eq!(bills, [row("needs-3", "pay", "open", "")]);
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
 async fn a_conversation_that_cannot_be_worked_out_is_skipped(db: PgPool) {
     let kit = Kit::new(db.clone()).await;
     let (workspace, _) = mailbox(&kit, &["needs"]).await;

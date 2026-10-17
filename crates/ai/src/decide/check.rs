@@ -422,23 +422,46 @@ fn payment_confirmation() -> Case {
     }
 }
 
+/// Whether `answer` is what `expected` asks for.
+fn meets(answer: &Answer, expected: Expected) -> bool {
+    match expected {
+        Expected::Yes => answer.noul() == Some(true),
+        Expected::No => answer.noul() == Some(false),
+        Expected::Stream(label) | Expected::Money(label) => answer.choice() == Some(label),
+    }
+}
+
+/// Whether an expectation must be met whatever the share: a payment owed or
+/// made. Without this, a model always answering "neither" (never raising
+/// Pay) would still pass on the share.
+pub fn required(expected: Expected) -> bool {
+    matches!(expected, Expected::Money(triage::OWED | triage::PAID))
+}
+
 /// How many of `case`'s expectations `answers` meet: `(right, asked)`.
 pub fn grade(case: &Case, answers: &[Answer]) -> (u32, u32) {
     let mut right = 0;
     let mut asked = 0;
     for (question, expected) in &case.expect {
         asked += 1;
-        let Some(answer) = answers.iter().find(|a| a.question_id == *question) else {
-            continue;
-        };
-        let ok = match expected {
-            Expected::Yes => answer.noul() == Some(true),
-            Expected::No => answer.noul() == Some(false),
-            Expected::Stream(label) | Expected::Money(label) => answer.choice() == Some(label),
-        };
+        let ok = answers
+            .iter()
+            .find(|a| a.question_id == *question)
+            .is_some_and(|a| meets(a, *expected));
         right += u32::from(ok);
     }
     (right, asked)
+}
+
+/// Whether `answers` miss one of `case`'s [`required`] expectations.
+pub fn misses_required(case: &Case, answers: &[Answer]) -> bool {
+    case.expect.iter().any(|(question, expected)| {
+        required(*expected)
+            && !answers
+                .iter()
+                .find(|a| a.question_id == *question)
+                .is_some_and(|a| meets(a, *expected))
+    })
 }
 
 /// The outcome of `right` out of `total`.
@@ -480,6 +503,7 @@ impl Gateway {
         let mut total = 0;
         let mut model = None;
         let mut failed = false;
+        let mut missed_required = false;
         for case in cases() {
             // The instance's own check: counted against no workspace.
             let state = case.envelope.decision_state();
@@ -490,6 +514,7 @@ impl Gateway {
                     let (r, t) = grade(&case, &answers);
                     right += r;
                     total += t;
+                    missed_required |= misses_required(&case, &answers);
                     if model.is_none() {
                         model = answers.first().map(|a| a.model.clone());
                     }
@@ -504,6 +529,8 @@ impl Gateway {
         let report = CheckReport {
             outcome: if failed {
                 CheckOutcome::Unavailable
+            } else if missed_required {
+                CheckOutcome::Failed
             } else {
                 outcome(right, total)
             },
@@ -574,7 +601,8 @@ mod tests {
         assert_eq!(cases.len(), 10);
         let total: usize = cases.iter().map(|c| c.expect.len()).sum();
         assert_eq!(total, 50);
-        // Each money option has a case, or always-"neither" would pass it.
+        // Each money option has a case; owed and paid are required, so a
+        // model always answering "neither" fails whatever its share.
         let money: HashSet<_> = cases
             .iter()
             .flat_map(|c| &c.expect)
@@ -613,6 +641,19 @@ mod tests {
                 case.name
             );
         }
+    }
+
+    #[test]
+    fn a_payment_owed_or_made_must_be_right() {
+        assert!(required(Expected::Money(triage::OWED)));
+        assert!(required(Expected::Money(triage::PAID)));
+        assert!(!required(Expected::Money(triage::NEITHER)));
+        assert!(!required(Expected::Yes));
+        let required_cases = cases()
+            .iter()
+            .filter(|c| c.expect.iter().any(|(_, e)| required(*e)))
+            .count();
+        assert!(required_cases >= 2, "{required_cases}");
     }
 
     #[test]
