@@ -225,35 +225,41 @@ pub async fn scan(
     Ok(kept)
 }
 
+/// How soon an inbox with no mail yet is looked at again: soon after its
+/// first sync lands, never on every Home load.
+const RETRY_EMPTY_MINUTES: i32 = 10;
+
 /// Record that `inbox` was looked at, so the next pass waits
-/// `every_hours`.
+/// `every_hours`; or, with no mail in the window yet (its first sync still
+/// to come, as on a new member's first Home), only [`RETRY_EMPTY_MINUTES`].
 async fn record_scan(
     conn: &mut PgConnection,
     (workspace, inbox): (sqlx::types::Uuid, InboxId),
     settings: &NoticeSettings,
 ) -> Result<()> {
-    // An inbox with no mail in the window yet (its first sync still to
-    // come, as on a new member's first Home) is looked at again next time,
-    // not left for a day.
     let window = i32::try_from(settings.window_days).unwrap_or(i32::MAX);
     let has_mail = sqlx::query_scalar!(
         r#"SELECT EXISTS (SELECT 1 FROM conversations.messages
                            WHERE inbox_id = $1 AND direction = 'inbound'
+                             AND NOT in_spam AND NOT in_trash
                              AND sent_at > now() - make_interval(days => $2)) AS "e!""#,
         inbox as InboxId,
         window,
     )
     .fetch_one(&mut *conn)
     .await?;
-    if !has_mail {
-        return Ok(());
-    }
+    let every = i32::try_from(settings.every_hours).unwrap_or(i32::MAX);
     sqlx::query!(
         r#"INSERT INTO conversations.rule_notice_scans (inbox_id, workspace_id, scanned_at)
-           VALUES ($1, $2, now())
-           ON CONFLICT (inbox_id) DO UPDATE SET scanned_at = now()"#,
+           VALUES ($1, $2, CASE WHEN $3 THEN now()
+                                ELSE now() - make_interval(hours => $4)
+                                     + make_interval(mins => $5) END)
+           ON CONFLICT (inbox_id) DO UPDATE SET scanned_at = EXCLUDED.scanned_at"#,
         inbox as InboxId,
         workspace,
+        has_mail,
+        every,
+        RETRY_EMPTY_MINUTES,
     )
     .execute(&mut *conn)
     .await?;

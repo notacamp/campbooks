@@ -135,14 +135,23 @@ pub fn dmarc_refused(authentication_results: Option<&str>) -> bool {
         .and_then(auth_results::parse)
         .is_some_and(|results| {
             results.iter().any(|r| {
-                r.method == "dmarc"
-                    && r.result == "fail"
-                    && (r
-                        .comments
+                // `key=value` words of the result's own comments.
+                let said = |key: &str| {
+                    r.comments
                         .iter()
                         .flat_map(|comment| comment.split_whitespace())
                         .filter_map(|word| word.split_once('='))
-                        .any(|(key, value)| key.eq_ignore_ascii_case("p") && strict(value))
+                        .filter(move |(k, _)| k.eq_ignore_ascii_case(key))
+                        .map(|(_, value)| value)
+                        .collect::<Vec<_>>()
+                };
+                // `dis=NONE`: the receiver did not apply the policy (it
+                // trusted a forwarder or a list, by ARC): not a refusal.
+                let overridden = said("dis").iter().any(|d| d.eq_ignore_ascii_case("none"));
+                r.method == "dmarc"
+                    && r.result == "fail"
+                    && !overridden
+                    && (said("p").iter().any(|p| strict(p))
                         || r.values("policy.published-domain-policy").any(strict))
             })
         })
@@ -966,6 +975,10 @@ mod tests {
         let rejected =
             "mx.google.com; dmarc=fail (p=REJECT sp=REJECT dis=REJECT) header.from=bank.example";
         assert!(dmarc_refused(Some(rejected)));
+        // The receiver let it through anyway (a forwarder or a list it
+        // trusts, by ARC): not a refusal.
+        let overridden = "mx.google.com; arc=pass; dmarc=fail (p=REJECT sp=REJECT dis=NONE) header.from=bank.example";
+        assert!(!dmarc_refused(Some(overridden)));
         let quarantined = "mx.example; dmarc=fail (p=quarantine) header.from=bank.example";
         assert!(dmarc_refused(Some(quarantined)));
         // p=none asks for nothing to be refused: genuine mail sent through

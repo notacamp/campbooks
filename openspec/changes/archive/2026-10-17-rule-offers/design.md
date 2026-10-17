@@ -41,8 +41,10 @@ a notice is the caller's to fetch, and rule changes publish
 for the From domain nor an aligned DKIM pass; absent results say nothing).
 The offer, and the condition itself (`sender_checks_fail`), use only a
 `dmarc=fail` under a published `reject` or `quarantine` policy (Gmail's
-`dmarc=fail (p=REJECT …)`, read from the result's own comment): the domain
-asks for such mail to be refused, so its genuine mail passes. A domain that
+`dmarc=fail (p=REJECT …)`, read from the result's own comment), and not
+when the receiver says it did not apply it (`dis=NONE`, Gmail's sign of a
+forwarder or list it trusts by ARC): the domain asks for such mail to be
+refused, so its genuine mail passes. A domain that
 authenticates nothing, or publishes `p=none`, fails with genuine mail sent
 through other tools too, and a policy that cannot be read (some providers
 leave it out) offers nothing: the offer is then the sender. The condition

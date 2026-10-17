@@ -1,0 +1,18 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO conversations.rule_notice_scans (inbox_id, workspace_id, scanned_at)\n           VALUES ($1, $2, CASE WHEN $3 THEN now()\n                                ELSE now() - make_interval(hours => $4)\n                                     + make_interval(mins => $5) END)\n           ON CONFLICT (inbox_id) DO UPDATE SET scanned_at = EXCLUDED.scanned_at",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Bool",
+        "Int4",
+        "Int4"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "bb93c5180dbb712f5bb11c0cd330254647feb3a9f79beb39827a3130f2c641f8"
+}

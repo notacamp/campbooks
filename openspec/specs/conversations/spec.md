@@ -844,7 +844,8 @@ own), `list_id is`, `subject_template is`, `subject_contains` (whole words,
 case- and accent-insensitive), `header is|present` (a stored header),
 `label has`, `stream is` and `sender_checks_fail` (the receiving provider's
 authentication results hold `dmarc=fail` under a published `reject` or
-`quarantine` policy, so the domain's genuine mail passes; a policy that
+`quarantine` policy the receiver applied (not `dis=none`, its sign of a
+trusted forwarder or list), so the domain's genuine mail passes; a policy that
 cannot be read, and absent results, never hold it; never on its own; never
 for mail from an address the inbox writes to, on arrival and over existing
 mail alike). Actions SHALL be
@@ -1867,7 +1868,8 @@ Removing that rule with `restore` within 15 minutes SHALL offer the
 suggestion again, and bringing the rule back (`conversations.restore_rule`)
 SHALL accept it again, so it is neither offered twice nor saved as a second
 rule. A pass over an inbox with no inbound mail in the window yet (its first
-sync still to come) SHALL not count as one, so the next list looks again. A caller who cannot see the inbox SHALL get 404, a reader
+sync still to come) SHALL count for 10 minutes only, so a list soon after
+the first sync looks again, and a dormant inbox at most that often. A caller who cannot see the inbox SHALL get 404, a reader
 or an app 403. Removing an inbox's connection with its mail kept SHALL forget
 its suggestions; a departing member's answers SHALL go.
 
@@ -1885,7 +1887,7 @@ its suggestions; a departing member's answers SHALL go.
 
 #### Scenario: Before the first sync
 - **WHEN** Home lists suggestions before any of Sam's mail arrived, and then his first sync lands
-- **THEN** the first pass finds nothing and is not counted, and the next list looks again and offers the suggestion
+- **THEN** the first pass finds nothing and counts for ten minutes only, and a list after that looks again and offers the suggestion
 
 #### Scenario: Someone else's inbox
 - **WHEN** Leo, who is not in Sam's inbox, lists suggestions or answers one by its id

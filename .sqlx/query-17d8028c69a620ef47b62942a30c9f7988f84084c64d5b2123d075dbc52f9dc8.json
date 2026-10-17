@@ -1,0 +1,24 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT EXISTS (SELECT 1 FROM conversations.messages\n                           WHERE inbox_id = $1 AND direction = 'inbound'\n                             AND NOT in_spam AND NOT in_trash\n                             AND sent_at > now() - make_interval(days => $2)) AS \"e!\"",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "e!",
+        "type_info": "Bool",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Int4"
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "17d8028c69a620ef47b62942a30c9f7988f84084c64d5b2123d075dbc52f9dc8"
+}

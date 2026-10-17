@@ -162,18 +162,29 @@ async fn mail_never_opened_is_noticed_and_offered_as_a_rule(db: PgPool) {
 async fn a_pass_before_the_first_sync_looks_again_once_mail_arrives(db: PgPool) {
     let kit = Kit::with_deps(db, ConversationsDeps::offline()).await;
     let (workspace, inbox, sam) = sams_inbox(&kit).await;
-    // Home's first load, before any mail: nothing, and nothing recorded.
+    // Home's first load, before any mail: nothing, and the pass counts only
+    // for ten minutes, not a day.
     assert!(noticed(&kit, &sam, workspace).await.is_empty());
-    let scanned: Option<bool> =
-        sqlx::query_scalar("SELECT true FROM conversations.rule_notice_scans WHERE inbox_id = $1")
-            .bind(inbox)
-            .fetch_optional(&kit.db)
-            .await
-            .unwrap();
-    assert_eq!(scanned, None);
-    // The first sync lands: the next Home load looks again at once.
+    let due_in: f64 = sqlx::query_scalar(
+        "SELECT extract(epoch FROM scanned_at + interval '24 hours' - now())::float8
+           FROM conversations.rule_notice_scans WHERE inbox_id = $1",
+    )
+    .bind(inbox)
+    .fetch_one(&kit.db)
+    .await
+    .unwrap();
+    assert!((0.0..=600.0).contains(&due_in), "{due_in}");
+    // The first sync lands; ten minutes later, Home looks again.
     kit.ingest_value(workspace, inbox, &daily("ci", BUILDS, 12))
         .await;
+    sqlx::query(
+        "UPDATE conversations.rule_notice_scans SET scanned_at = scanned_at - interval '11 minutes'
+          WHERE inbox_id = $1",
+    )
+    .bind(inbox)
+    .execute(&kit.db)
+    .await
+    .unwrap();
     let notices = noticed(&kit, &sam, workspace).await;
     assert_eq!(notices.len(), 1, "{notices:?}");
 }
