@@ -345,6 +345,26 @@ fn broken(mut answers: Value) -> Value {
     answers
 }
 
+/// Each listed need as triage left it (question, reason, trust, basis,
+/// urgency and due date), sorted: ids differ between runs.
+fn need_shapes(run: &Run) -> Vec<String> {
+    let mut shapes: Vec<String> = run
+        .needs
+        .iter()
+        .map(|need| {
+            [
+                "question", "reason", "trust", "basis", "urgent", "overdue", "due_on",
+            ]
+            .iter()
+            .map(|field| format!("{field}={}", need[*field]))
+            .collect::<Vec<_>>()
+            .join(" ")
+        })
+        .collect();
+    shapes.sort();
+    shapes
+}
+
 /// The actions rated in `run`.
 async fn rated_actions(run: &Run) -> Vec<String> {
     sqlx::query_scalar("SELECT DISTINCT action FROM conversations.action_likelihoods ORDER BY 1")
@@ -360,7 +380,9 @@ async fn a_catalogue_answer_that_does_not_fit_drops_only_its_rating(db: PgPool) 
     // The job went through: triage is stored as with the catalogue off.
     assert!(!on.decisions.is_empty());
     assert_eq!(off.decisions, on.decisions);
-    assert_eq!(off.needs.len(), on.needs.len());
+    // The needs themselves, not just how many: what each asks, why, how
+    // sure and how urgent are the same.
+    assert_eq!(need_shapes(&off), need_shapes(&on));
     // Only the actions whose answers fit are rated: Open attachment (its
     // answer was fine), Reply (needs_reply), Report and It's safe
     // (suspicious); not Remind, Forward or the paid pair.
