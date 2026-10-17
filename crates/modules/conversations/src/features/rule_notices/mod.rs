@@ -511,25 +511,17 @@ pub struct AnswerRuleNotice {
     pub answer: NoticeAnswer,
 }
 
-/// A suggestion the caller may answer: its inbox, kind and sender. 404 when
-/// it is gone or the caller cannot see its inbox; 403 when they may only
-/// read it, or are an app.
-async fn answerable(
-    state: &AppState,
-    conn: &mut PgConnection,
-    workspace: &Workspace<ConversationsWrite>,
-    id: RuleNoticeId,
-) -> Result<(InboxId, String, String)> {
+/// A suggestion's inbox, kind and sender; 404 when it is gone or in another
+/// workspace (row-level security).
+async fn target(conn: &mut PgConnection, id: RuleNoticeId) -> Result<(InboxId, String, String)> {
     let row = sqlx::query!(
         r#"SELECT inbox_id AS "inbox: InboxId", kind, sender_address
              FROM conversations.rule_notices WHERE id = $1"#,
         id as RuleNoticeId,
     )
-    .fetch_optional(&mut *conn)
+    .fetch_optional(conn)
     .await?
     .ok_or(Error::NotFound)?;
-    may_teach(state, conn, &workspace.access, row.inbox).await?;
-    member_only(&workspace.principal)?;
     Ok((row.inbox, row.kind, row.sender_address))
 }
 
@@ -568,7 +560,11 @@ pub async fn answer(
 ) -> Result<StatusCode> {
     let access = &workspace.access;
     let mut tx = state.db.begin_for(access.workspace).await?;
-    let (inbox, kind, sender) = answerable(&state, &mut tx, &workspace, path.notice_id).await?;
+    let (inbox, kind, sender) = target(&mut tx, path.notice_id).await?;
+    // 404 unless the caller sees its inbox, 403 when they only read it; an
+    // app gets 403 too: answers are a member's own.
+    may_teach(&state, &mut tx, access, inbox).await?;
+    member_only(&workspace.principal)?;
     let user = access.user.ok_or(Error::NotFound)?;
     let days = match body.answer {
         NoticeAnswer::NotNow => Some(i32::try_from(settings.not_now_days).unwrap_or(i32::MAX)),
@@ -624,7 +620,11 @@ pub async fn clear_answer(
 ) -> Result<StatusCode> {
     let access = &workspace.access;
     let mut tx = state.db.begin_for(access.workspace).await?;
-    let (inbox, kind, sender) = answerable(&state, &mut tx, &workspace, path.notice_id).await?;
+    let (inbox, kind, sender) = target(&mut tx, path.notice_id).await?;
+    // 404 unless the caller sees its inbox, 403 when they only read it; an
+    // app gets 403 too: answers are a member's own.
+    may_teach(&state, &mut tx, access, inbox).await?;
+    member_only(&workspace.principal)?;
     let user = access.user.ok_or(Error::NotFound)?;
     sqlx::query!(
         r#"DELETE FROM conversations.rule_notice_answers
