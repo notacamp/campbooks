@@ -50,7 +50,7 @@ scope.
   `connectors.revoke_workspace_grants` ask it whether the workspace is live
   (`Membership::workspace_live`, a new provided method over `resolve`).
 - **The tick reads the statement's clock** (`clock_timestamp()`).
-- **Workspaces read no instance-wide row.** Migration `20261021150000` drops
+- **Workspaces read no instance-wide row.** Migration `20261021170000` drops
   `instance_rows_read` on `kernel.events` and `kernel.jobs`. The one
   workspace path that needed it, `EventBus::publish` of an event declared
   `PUBLISHED_IN_WORKSPACES` (it read the new event's id back, and Postgres

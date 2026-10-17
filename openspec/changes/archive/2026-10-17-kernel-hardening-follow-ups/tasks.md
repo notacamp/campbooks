@@ -25,7 +25,7 @@
 ## 5. Workspaces read no instance-wide row
 
 - [x] 5.1 `EventBus::publish` appends an instance-wide event under an id it chooses, reading nothing back
-- [x] 5.2 `20261021150000_kernel__instance_rows_unreadable_from_workspaces.sql` drops `instance_rows_read`, 5 s lock timeout, one transaction
+- [x] 5.2 `20261021170000_kernel__instance_rows_unreadable_from_workspaces.sql` drops `instance_rows_read`, 5 s lock timeout, one transaction
 - [x] 5.3 Rollback SQL checked against a database migrated to the base
 
 ## 6. Tests

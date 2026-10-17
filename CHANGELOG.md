@@ -150,7 +150,7 @@ All notable changes to Campbooks Next are documented here. The format follows
   (campbooks-cloud#211).** The worker now refuses, without running it, a job of a kind that
   only ever runs instance-wide (every schedule, such as pruning and the mailbox poller, and
   the deliveries of account events) when the row carries a workspace; such a row could
-  only have been written by hand. Five handlers no longer take an event from a workspace
+  only have been written by hand. Six handlers no longer take an event from a workspace
   as proof of what it says: a way in goes with its mailbox only once the connectors module
   no longer holds that connection, a mailbox record is named only with a connection that
   exists, and a departed member's app consents and provider grants, or a deleted

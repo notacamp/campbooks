@@ -1459,6 +1459,25 @@ mod tests {
         assert!(registry.kind_names().contains(&"kernel.prune_idempotency"));
     }
 
+    /// Every schedule's kind runs instance-wide only: the worker refuses a
+    /// workspace's job of it (campbooks-cloud#211).
+    #[test]
+    fn every_schedule_is_instance_only() {
+        let registry = registry().unwrap();
+        let instance_only = registry.instance_only_kinds();
+        let schedules = registry.schedule_names();
+        assert!(
+            schedules.contains(&"connectors.dispatch_due"),
+            "{schedules:?}"
+        );
+        for schedule in schedules {
+            assert!(
+                instance_only.contains(&schedule),
+                "{schedule} is not instance-only: {instance_only:?}"
+            );
+        }
+    }
+
     #[test]
     fn events_catalogue_lists_published_events() {
         let catalogue = serde_json::to_value(events_catalogue().unwrap()).unwrap();

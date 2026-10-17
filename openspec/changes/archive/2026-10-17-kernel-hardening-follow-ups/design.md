@@ -92,6 +92,12 @@ the one that publishes `workspace_deleting`, so by the time a delivery runs
 the state matches. A disconnect deletes the connection row in the
 transaction that publishes `connection_removed`.
 
+A disconnect that lands before `identity.name_connected_mailbox` runs (the
+connection already gone when it asks) leaves the record unnamed rather
+than naming it; `identity.prune`'s `sweep_unnamed_mailboxes` then finds no
+connection for it after the grace period, deletes the record and removes
+the way in it alone kept, as for any mailbox that never got connected.
+
 Trade-off: someone removed and added back to a workspace before
 `revoke_departed_consents` / `revoke_departed_grants` ran keeps the consents
 and grants they had (a forgery and a quick re-add look the same to the
@@ -138,7 +144,7 @@ or `RETURNING`).
   the event and its deliveries are one statement (a data-modifying CTE), and
   nothing is read back. Workspace events keep the `query_scalar!` statement
   as it was (same text, so the offline query cache is unchanged).
-- Migration `20261021150000_kernel__instance_rows_unreadable_from_workspaces`
+- Migration `20261021170000_kernel__instance_rows_unreadable_from_workspaces`
   drops `instance_rows_read` on both tables, in one transaction with a 5 s
   lock timeout.
 
@@ -174,7 +180,7 @@ CREATE POLICY instance_rows_read ON kernel.events FOR SELECT USING
 CREATE POLICY instance_rows_read ON kernel.jobs FOR SELECT USING
     (workspace_id IS NULL
      AND nullif(current_setting('campbooks.workspace_id', true), '') IS NOT NULL);
-DELETE FROM _sqlx_migrations WHERE version = 20261021150000;
+DELETE FROM _sqlx_migrations WHERE version = 20261021170000;
 COMMIT;
 ```
 
@@ -217,5 +223,5 @@ departed member's consents, a removed mailbox's last way in) is refused
   ← `changes_requested`) act on the workspace's own connections at the
   provider (send mail, apply label changes) and take the event as the
   request; a forgery inside the workspace could make its own mailbox send.
-  A follow-up issue: check the send or change request row in conversations
-  before acting.
+  Follow-up: campbooks-cloud#226 (check the send or change request row in
+  conversations before acting).
