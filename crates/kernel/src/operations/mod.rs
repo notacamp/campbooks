@@ -81,6 +81,10 @@ pub enum Risk {
 ///
 /// Start from [`query`](Self::query) (reads) or [`command`](Self::command)
 /// (writes); automation and the assistant are opted in explicitly.
+// The extension's flags are independent yes/no facts read by different
+// consumers (the catalogue, automation, the assistant, the idempotency
+// layer); an enum would only rename them.
+#[allow(clippy::struct_excessive_bools)]
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Operation {
