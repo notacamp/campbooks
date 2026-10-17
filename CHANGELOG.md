@@ -8,6 +8,11 @@ All notable changes to Campbooks Next are documented here. The format follows
 
 ### Fixed
 
+- **Sign in with Zoho works.** Signing in with Zoho, or connecting a Zoho mailbox,
+  always ended on "The provider didn't let you in". Zoho publishes its signing key with
+  an extra zero byte in front, and the server refused the key's every signature because
+  of it. The server now reads the key without the zero byte and checks everything else as
+  before.
 - **Pay asks "Is it paid?", and receipts never land in Pay.** Pay used to be raised for
   any money mail the decide model read as asking something, so invoices already paid and
   payment confirmations showed up as "Pay". The decide model now answers one more
