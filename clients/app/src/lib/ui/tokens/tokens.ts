@@ -74,6 +74,7 @@ export const COMPONENT_TOKENS = [
   "dialog-width",
   "clamp-height",
   "clamp-fade-height",
+  "clamp-fade-to",
   "dialog-result-width",
   "popover-width",
   "offer-width",

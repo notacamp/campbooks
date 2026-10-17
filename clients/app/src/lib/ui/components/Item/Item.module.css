@@ -1,6 +1,14 @@
 .wrapper {
   display: flex;
   flex-direction: column;
+  border-radius: var(--row-radius);
+}
+
+/* The selected item is one block: its row, its actions and what opening it shows. */
+.wrapper[data-selected] {
+  --clamp-fade-to: var(--accent-soft);
+
+  background: var(--accent-soft);
 }
 
 .item {
@@ -23,8 +31,9 @@
   background: var(--surface-hover);
 }
 
-.item[data-selected] {
-  background: var(--accent-soft);
+.item[data-selected],
+.item[data-selected]:hover {
+  background: none;
 }
 
 .item > :first-child {

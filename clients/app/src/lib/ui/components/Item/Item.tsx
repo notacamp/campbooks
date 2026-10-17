@@ -112,7 +112,7 @@ export function Item({
       </a>
     );
   return (
-    <div className={styles["wrapper"]}>
+    <div className={styles["wrapper"]} data-selected={selected || undefined}>
       {swipeActions === undefined ? (
         row
       ) : (

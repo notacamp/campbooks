@@ -22,6 +22,6 @@
   position: absolute;
   inset: auto 0 0;
   height: var(--clamp-fade-height);
-  background: linear-gradient(transparent, var(--surface-base));
+  background: linear-gradient(transparent, var(--clamp-fade-to));
   pointer-events: none;
 }

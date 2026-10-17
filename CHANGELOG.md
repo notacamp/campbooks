@@ -13,7 +13,8 @@ All notable changes to Campbooks Next are documented here. The format follows
   renders it, a few lines deep with "Show the whole email" to read it all in place. Until
   now an opened item showed only how it was decided. In mail that may be phishing, links
   lead nowhere, on Home and in the reader, and a line says so. Plain-text mail now keeps
-  its line breaks and paragraphs instead of running together into one line.
+  its line breaks and paragraphs instead of running together into one line. The selected item's
+  background now covers its actions and what opening it shows, not only its first line.
 - **Settings pages are made of section cards.** Every Settings and Admin page now has a
   display-face title with its lead, then each section in its own card with a larger title,
   a count where it lists things ("Accounts · 2") and a one-line description. In Scout's

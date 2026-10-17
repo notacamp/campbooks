@@ -314,6 +314,8 @@
   /* Long content opened in place (an email on Home) shows this deep, then a fade. */
   --clamp-height: 16rem;
   --clamp-fade-height: var(--space-12);
+  /* What the fade fades into: the surface the clamp sits on. */
+  --clamp-fade-to: var(--surface-base);
   /* A row acted on shows its confirmation, then folds away (under a second). */
   --duration-confirm: 900ms;
   /* A dialog's result stays about a second, then closes on its own. */
