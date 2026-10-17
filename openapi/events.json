@@ -475,7 +475,7 @@
       "workspaceScoped": true,
       "payload": {
         "type": "object",
-        "description": "The connection-account v1 document, as this module reads it\n(`contracts/connection-account.v1.schema.json`).\nThe inbox changed in a way that may change who sees it, or what they\nmay do there: a membership ended, its owner left, or it was kept\nread-only after its connection was removed. Ids only.",
+        "description": "The connection-account v1 document, as this module reads it\n(`contracts/connection-account.v1.schema.json`).\nThe inbox changed in a way that may change who sees it, or what they\nmay do there: a member was given it, a membership ended, its owner\nleft, or it was kept read-only after its connection was removed. Ids\nonly.",
         "required": [
           "workspace",
           "inbox"

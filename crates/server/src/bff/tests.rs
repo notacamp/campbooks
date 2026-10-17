@@ -90,16 +90,16 @@ async fn harness(db: PgPool) -> Harness {
 }
 
 async fn harness_with(db: PgPool, origin: &str, tweak: impl FnOnce(&mut BffConfig)) -> Harness {
-    harness_limited(db, origin, tweak, None).await
+    harness_limited(db, origin, tweak, |state| state).await
 }
 
-/// [`harness_with`], counting the per-caller rate limits with `limits`
-/// (the defaults when `None`).
+/// [`harness_with`], with the app state changed by `with` (the per-caller
+/// rate limits, the metrics).
 async fn harness_limited(
     db: PgPool,
     origin: &str,
     tweak: impl FnOnce(&mut BffConfig),
-    limits: Option<ApiLimits>,
+    with: impl FnOnce(AppState) -> AppState,
 ) -> Harness {
     let idp = TestIdp::start().await;
     let mut config = testing::config("postgres://test@localhost/test");
@@ -123,10 +123,10 @@ async fn harness_limited(
     };
     // The app runs as the runtime role, like the server (row-level security
     // applies); the test's own queries keep the superuser pool.
-    let mut state = crate::with_ports(AppState::new(testing::app_role_pool(&db).await, config));
-    if let Some(limits) = limits {
-        state = state.with_api_limits(limits);
-    }
+    let state = with(crate::with_ports(AppState::new(
+        testing::app_role_pool(&db).await,
+        config,
+    )));
     let app = app(state, Some(*settings));
     Harness { app, idp, db }
 }
@@ -2387,7 +2387,13 @@ async fn the_browsers_calls_count_against_the_person(db: PgPool) {
         reads: 3,
         ..campbooks_kernel::config::RateLimitsConfig::default()
     };
-    let h = harness_limited(db, ORIGIN, |_| {}, Some(ApiLimits::new(&limits))).await;
+    let h = harness_limited(
+        db,
+        ORIGIN,
+        |_| {},
+        |state| state.with_api_limits(ApiLimits::new(&limits)),
+    )
+    .await;
     let mut browser = Browser::new(&h.app);
     browser.sign_in(&h.idp, "/").await;
     for _ in 0..3 {
@@ -2422,4 +2428,47 @@ async fn the_browsers_calls_count_against_the_person(db: PgPool) {
     )
     .await;
     assert_eq!(reply.status, StatusCode::OK, "{}", reply.body);
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn api_calls_are_counted_under_the_api_route(db: PgPool) {
+    let telemetry = crate::telemetry::Telemetry::new(
+        &campbooks_kernel::config::TelemetryConfig {
+            metrics_addr: Some(([127, 0, 0, 1], 0).into()),
+            ..Default::default()
+        },
+        "all",
+    )
+    .unwrap();
+    let metrics = telemetry.metrics();
+    let h = harness_limited(db, ORIGIN, |_| {}, |state| state.with_metrics(metrics)).await;
+    let mut browser = Browser::new(&h.app);
+    browser.sign_in(&h.idp, "/").await;
+    let reply = browser.get("/bff/api/v1/test/whoami").await;
+    assert_eq!(reply.status, StatusCode::OK, "{}", reply.body);
+    let missing = browser.get("/bff/api/v1/nope").await;
+    assert_eq!(missing.status, StatusCode::NOT_FOUND);
+
+    // Counted under the API route it ran through; an unmatched call under
+    // the BFF's own (the request log is tested in tests/request_log.rs).
+    let page = telemetry.metrics_router().unwrap();
+    let scraped = page
+        .oneshot(Request::get("/metrics").body(Body::empty()).unwrap())
+        .await
+        .unwrap();
+    let text = String::from_utf8(
+        axum::body::to_bytes(scraped.into_body(), usize::MAX)
+            .await
+            .unwrap()
+            .to_vec(),
+    )
+    .unwrap();
+    let counted = |route: &str| {
+        text.lines().any(|line| {
+            line.starts_with("http_server_request_duration_seconds_count{")
+                && line.contains(&format!("http_route=\"{route}\""))
+        })
+    };
+    assert!(counted("/api/v1/test/whoami"), "{text}");
+    assert!(counted("/bff/api/{*path}"), "the unmatched call: {text}");
 }

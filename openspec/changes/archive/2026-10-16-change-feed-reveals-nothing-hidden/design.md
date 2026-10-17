@@ -145,7 +145,12 @@ process that sealed them, like search cursors: another process answers
   producers in flight in the workspace before it is numbered. That is
   millisecond timing of live delivery, not counts; closing it would need
   reads on a fixed clock only. In a catch-up the pages are fixed by the
-  visible changes alone.
+  visible changes alone, but that holds for how frames group, not for when
+  they leave: each page's read scans past the hidden changes before its
+  200th visible one, so the gap between catch-up bursts grew with the
+  hidden volume. Catch-up pages now leave on a fixed tick, and a read
+  longer than a tick still shows in whole ticks
+  (`2026-10-17-change-feed-paced-catch-up`, campbooks-cloud#198).
 - **Access-loss timing.** When a caller loses sight of a container they were
   shown, the `reset` comes at the next read (which a hidden change can
   trigger) or the next heartbeat. It concerns a container the caller just
