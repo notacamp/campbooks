@@ -25,13 +25,34 @@ describe("needs in words", () => {
     expect(needSentence(t, need(JONAS), "Jonas Weber")).toBe(
       'needs.line.question{"name":"Jonas Weber"}',
     );
+    expect(needSentence(t, need(LUZ), "Luz Energia")).toBe('needs.line.pay{"name":"Luz Energia"}');
     expect(needSentence(t, need(ACME), "Acme Hosting")).toBe(
-      'needs.line.pay{"name":"Acme Hosting"}',
+      'needs.line.checkPay{"name":"Acme Hosting"}',
     );
     expect(needSentence(t, { ...need(MARTA), trust: "check" }, "Inês")).toBe(
       'needs.line.checkReply{"name":"Inês"}',
     );
     expect(needSentence(t, need(PHISH), "x")).toBe("needs.line.warning");
+  });
+
+  it("asks whether a bill is paid, in Pay's colour", () => {
+    const bill: NeedView = { ...need(ACME), trust: "check", question: "money" };
+    expect(needSentence(t, bill, "Acme Hosting")).toBe(
+      'needs.line.checkPay{"name":"Acme Hosting"}',
+    );
+    expect(needChip(t, bill)).toBe("needs.chip.pay");
+  });
+
+  it("says the money answer in words", () => {
+    const base = MARTA_DETAIL.decisions[0];
+    if (base === undefined) {
+      throw new Error("no decision");
+    }
+    const [money] = howRows(t, () => true, [
+      { ...base, question: "money", value: "owed", reasons: [] },
+    ]);
+    expect(money?.question).toBe("scout.whyMoney");
+    expect(money?.answer).toBe("needs.how.money.owed");
   });
 
   it("says a need comes from a rule, never that the sender asked", () => {
@@ -61,11 +82,15 @@ describe("needs in words", () => {
       overdue: false,
       soon: true,
     });
+    // A bill still to pay says how late it is; anything else, since when.
     expect(dueLabel(t, need(LUZ), "en-GB", today)).toEqual({
-      text: 'needs.due.overdue{"date":"Mon"}',
+      text: 'needs.due.daysOverdue{"count":1}',
       overdue: true,
       soon: true,
     });
+    expect(dueLabel(t, { ...need(LUZ), reason: "do" }, "en-GB", today)?.text).toBe(
+      'needs.due.overdue{"date":"Mon"}',
+    );
     expect(dueLabel(t, need(ACME), "en-GB", today)?.text).toBe('needs.due.on{"date":"30 Oct"}');
     expect(dueLabel(t, need(JONAS), "en-GB", today)).toBeUndefined();
   });

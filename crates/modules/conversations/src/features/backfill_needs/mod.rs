@@ -25,15 +25,19 @@
 //!   check on its answers (a check still running, or one the provider did
 //!   not answer, still queues: the pass waits for it), each of those conversations' newest inbound message sent within
 //!   the decide window (`CAMPBOOKS_CONVERSATIONS__DECIDE_BACKFILL_DAYS`)
-//!   that no checked model answered is queued for the model pass
+//!   that no checked model answered, or that lacks a checked answer to a
+//!   triage question added since (the money question, campbooks-cloud#167),
+//!   is queued for the model pass
 //!   (`conversations.decide_backlog`, one job per message, ids only), which
 //!   sorts it and works out its need again.
 //!
 //! Running it again changes nothing: `refresh` publishes only when a need
-//! changed, and a message a checked model answered is not asked again.
+//! changed, and a message a checked model answered every question about is
+//! not asked again.
 
 use std::time::Duration;
 
+use campbooks_ai::decide::signals::email::triage_questions;
 use campbooks_kernel::{
     EventBus, Job, JobContext, JobError, JobHandler, db,
     jobs::{self, EnqueueOptions, Enqueued},
@@ -350,8 +354,8 @@ impl BackfillNeeds {
     }
 
     /// Queue the model pass for the newest inbound message of each of
-    /// `conversations` sent within the decide window that no checked model
-    /// answered.
+    /// `conversations` sent within the decide window that a checked model
+    /// has not answered every triage question about.
     async fn queue_model_pass(
         &self,
         tx: &mut Transaction<'_, Postgres>,
@@ -359,6 +363,7 @@ impl BackfillNeeds {
         conversations: &[ConversationId],
     ) -> Result<(), JobError> {
         let since = Utc::now() - self.decide_window;
+        let questions: Vec<String> = triage_questions().into_iter().map(|q| q.id).collect();
         let unanswered = sqlx::query_scalar!(
             r#"SELECT newest.id AS "id!: MessageId"
                  FROM (SELECT DISTINCT ON (m.conversation_id) m.id, m.sent_at
@@ -367,11 +372,15 @@ impl BackfillNeeds {
                           AND NOT m.in_spam AND NOT m.in_trash
                         ORDER BY m.conversation_id, m.sent_at DESC, m.id DESC) newest
                 WHERE newest.sent_at >= $2
-                  AND NOT EXISTS (SELECT 1 FROM conversations.decisions d
-                                   WHERE d.message_id = newest.id AND d.source = 'model'
-                                     AND d.model_version LIKE 'checked:%')"#,
+                  AND EXISTS (SELECT 1 FROM unnest($3::text[]) q (id)
+                               WHERE NOT EXISTS (
+                                     SELECT 1 FROM conversations.decisions d
+                                      WHERE d.message_id = newest.id AND d.source = 'model'
+                                        AND d.model_version LIKE 'checked:%'
+                                        AND d.question = q.id))"#,
             conversations as &[ConversationId],
             since,
+            &questions,
         )
         .fetch_all(&mut **tx)
         .await?;

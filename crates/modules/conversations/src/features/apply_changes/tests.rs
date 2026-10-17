@@ -180,9 +180,9 @@ async fn applying_a_batch_again_changes_nothing(db: PgPool) {
     let before = kit.threads(inbox).await;
     let events = count(&db, "SELECT count(*) FROM kernel.events").await;
     let decisions = count(&db, "SELECT count(*) FROM conversations.decisions").await;
-    // The model's six answers for each of the three inbound messages, and
+    // The model's seven answers for each of the three inbound messages, and
     // the facts' "no" for the newsletter and the sign-in alert.
-    assert_eq!(decisions, 3 * 6 + 2);
+    assert_eq!(decisions, 3 * 7 + 2);
 
     kit.ingest(workspace, inbox, "en").await;
     assert_eq!(kit.threads(inbox).await, before);

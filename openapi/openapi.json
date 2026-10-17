@@ -3918,7 +3918,7 @@
         "tags": [
           "conversations"
         ],
-        "summary": "Mark what a conversation needs as done, or as not needed.",
+        "summary": "Resolve what a conversation needs: done, not needed, already paid or still to pay.",
         "operationId": "conversations.resolve_need",
         "parameters": [
           {
@@ -4002,7 +4002,7 @@
             }
           },
           "409": {
-            "description": "It needs nothing (`no_open_need`), or not what you saw any more (`need_changed`).",
+            "description": "It needs nothing (`no_open_need`), not what you saw any more (`need_changed`), or a paid answer for a need that is not Pay (`not_a_payment`).",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -13864,7 +13864,8 @@
         "enum": [
           "needs_reply",
           "asks_action",
-          "suspicious"
+          "suspicious",
+          "money"
         ]
       },
       "NeedReason": {
@@ -14092,7 +14093,9 @@
         "description": "How a member resolves a need.",
         "enum": [
           "done",
-          "not_needed"
+          "not_needed",
+          "already_paid",
+          "still_to_pay"
         ]
       },
       "ParsedQuery": {
@@ -15151,7 +15154,7 @@
           },
           "outcome": {
             "$ref": "#/components/schemas/Outcome",
-            "description": "Done or Not needed."
+            "description": "Done, Not needed, or for a Pay need Already paid or Still to pay."
           }
         },
         "additionalProperties": false

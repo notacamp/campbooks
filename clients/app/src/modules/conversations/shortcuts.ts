@@ -96,6 +96,14 @@ export const CONVERSATIONS_SHORTCUTS = [
     label: "conversations:shortcuts.undoAll",
   },
   {
+    // Home's Pay group: every bill it asks about is already paid.
+    id: "item.all_paid",
+    keys: "shift+e",
+    scope: "item",
+    group: "item",
+    label: "conversations:shortcuts.allPaid",
+  },
+  {
     // Focus moves through the open messages' attachments; Enter opens one.
     id: "inbox.next_attachment",
     keys: "v",

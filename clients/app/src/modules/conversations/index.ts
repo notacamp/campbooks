@@ -14,6 +14,7 @@ export {
 export { useNeedActions } from "./components/Needs/use-need-actions";
 export { NeedMessage, needMessageOf } from "./components/NeedMessage/NeedMessage";
 export {
+  billKind,
   dueLabel,
   howRows,
   needSender,

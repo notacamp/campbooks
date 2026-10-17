@@ -48,12 +48,23 @@
     "done": "Feito · {{name}}",
     "notNeeded": "Não era preciso · {{name}}",
     "safe": "Marcado como seguro · {{name}}",
-    "snoozed": "Adiado · {{name}}, volta {{when}}"
+    "snoozed": "Adiado · {{name}}, volta {{when}}",
+    "paid": "Marcada como paga · {{name}}"
   },
   "error": {
     "title": "Não foi possível carregar o que precisa de si",
     "body": "O Campbooks não conseguiu contactar o servidor. Nada se perdeu.",
     "retry": "Tentar de novo"
   },
-  "noSubject": "(sem assunto)"
+  "noSubject": "(sem assunto)",
+  "remind": {
+    "today": "Lembrar-me hoje às {{time}}",
+    "tomorrow": "Lembrar-me amanhã às {{time}}",
+    "on": "Lembrar-me a {{date}}"
+  },
+  "pay": {
+    "allPaid_one": "Já paguei {{count}}",
+    "allPaid_other": "Já paguei as {{count}}",
+    "note": "O Campbooks não tem acesso ao seu banco, por isso pergunta se cada fatura está paga."
+  }
 }

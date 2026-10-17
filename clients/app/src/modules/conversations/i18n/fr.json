@@ -103,6 +103,7 @@
     "whyHasDeadline": "Mentionne une date",
     "whyUrgent": "Urgent",
     "whySuspicious": "Suspect",
+    "whyMoney": "Paiement",
     "sortedTaught": "Campbooks l’a rangée dans {{stream}}, selon une règle"
   },
   "reasons": {
@@ -168,7 +169,8 @@
     "showImages": "Afficher les images",
     "nextAttachment": "Pièce jointe suivante",
     "notNeeded": "Pas nécessaire (ou c’est sûr)",
-    "undoAll": "Annuler tout ce qu’a fait une règle"
+    "undoAll": "Annuler tout ce qu’a fait une règle",
+    "allPaid": "Toutes les factures déjà payées"
   },
   "compose": {
     "title": {
@@ -223,10 +225,11 @@
       "reply": "{{name}} attend votre réponse",
       "question": "{{name}} vous a posé une question",
       "do": "{{name}} vous a demandé de faire quelque chose",
-      "pay": "{{name}} a envoyé une facture à payer",
+      "pay": "Payer {{name}}",
       "warning": "Ceci pourrait être du hameçonnage. N’utilisez pas ses liens.",
       "checkReply": "Faut-il répondre à {{name}} ?",
       "checkDo": "Y a-t-il quelque chose à faire pour {{name}} ?",
+      "checkPay": "{{name}} a envoyé une facture. Est-elle payée ?",
       "taughtReply": "{{name}} : à répondre, selon une règle",
       "taughtDo": "{{name}} : à faire, selon une règle"
     },
@@ -242,7 +245,9 @@
       "today": "Pour aujourd’hui",
       "tomorrow": "Pour demain",
       "on": "Pour le {{date}}",
-      "overdue": "En retard · prévu le {{date}}"
+      "overdue": "En retard · prévu le {{date}}",
+      "daysOverdue_one": "{{count}} jour de retard",
+      "daysOverdue_other": "{{count}} jours de retard"
     },
     "how": {
       "yes": "Oui.",
@@ -250,6 +255,11 @@
       "urgency0": "Pas d’urgence.",
       "urgency1": "Dans les prochains jours.",
       "urgency2": "Aujourd’hui.",
+      "money": {
+        "owed": "Demande un paiement encore dû.",
+        "paid": "Confirme un paiement déjà effectué.",
+        "neither": "Ne demande ni ne confirme aucun paiement."
+      },
       "source": {
         "rules": "Règles",
         "model": "Modèle",
@@ -267,7 +277,11 @@
       "safe": "C’est sûr",
       "yes": "Oui",
       "no": "Non",
-      "questionPrompt": "Campbooks n’en est pas sûr."
+      "questionPrompt": "Campbooks n’en est pas sûr.",
+      "alreadyPaid": "Déjà payée",
+      "stillToPay": "Reste à payer",
+      "markPaid": "Marquer comme payée",
+      "billPrompt": "Campbooks n’a pas accès à votre banque."
     },
     "toast": {
       "done": "Fait · {{name}}",
@@ -275,7 +289,13 @@
       "safe": "Marqué comme sûr · {{name}}. Campbooks en tiendra compte",
       "confirmed": "Merci · {{name}} reste dans votre liste",
       "failed": "Impossible de modifier {{name}} : rien n’a changé. Réessayez.",
-      "changed": "{{name}} a changé pendant que vous regardiez : jetez-y un nouveau coup d’œil."
+      "changed": "{{name}} a changé pendant que vous regardiez : jetez-y un nouveau coup d’œil.",
+      "paid": "Marquée comme payée · {{name}}",
+      "toPay": "Reste dans À payer · {{name}}",
+      "allPaid_one": "{{count}} facture marquée comme payée",
+      "allPaid_other": "{{count}} factures marquées comme payées",
+      "allPaidFailed_one": "Impossible de marquer {{count}} facture comme payée. Réessayez.",
+      "allPaidFailed_other": "Impossible de marquer {{count}} factures comme payées. Réessayez."
     },
     "mail": {
       "more": "Afficher tout l’e-mail",

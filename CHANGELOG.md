@@ -6,6 +6,30 @@ All notable changes to Campbooks Next are documented here. The format follows
 
 ## [Unreleased]
 
+### Fixed
+
+- **Pay asks "Is it paid?", and receipts never land in Pay.** Pay used to be raised for
+  any money mail the decide model read as asking something, so invoices already paid and
+  payment confirmations showed up as "Pay". The decide model now answers one more
+  question in the same call: does the email ask for a payment still owed, confirm one
+  already made, or neither. Only a payment still owed raises Pay, and since Campbooks
+  can't see your bank it asks on Home: "Acme Hosting sent an invoice. Is it paid?" with
+  Already paid (1) and Still to pay (2), and "All N already paid" on the Pay group with one
+  Undo. Still to pay keeps it as "Pay Acme Hosting", says how many days overdue it is when
+  there's a due date, and offers a reminder first (two days before the due date, tomorrow
+  morning when overdue, Monday with no date). The reader asks the same. Existing
+  needs are worked out again on upgrade, and mail from the last two weeks is asked the new
+  question once; a Pay item on older mail goes away and doesn't come back. A bill on
+  recent mail stays until its question is answered, so one the upgrade could not ask (the
+  daily AI limit, or a self-hosted model failing the answers check) is never dropped. The
+  answers check now also requires the owed and paid cases to be right. Newsletters never
+  raise Pay; other streams can, when the model is sure the payment is owed. After this
+  upgrade, rolling back to an earlier image is not supported: the stored answers use the
+  new money question and verdicts.
+  For operators, `campbooks-server labelling export` writes your recent money mail as a
+  sheet to label on your own machine, and `cargo xtask eval decide --set-dir` measures the
+  model on it (campbooks-cloud#167).
+
 ### Added
 
 - **Error reports to GlitchTip or Sentry.** Set `CAMPBOOKS_TELEMETRY__ERROR_DSN` and every

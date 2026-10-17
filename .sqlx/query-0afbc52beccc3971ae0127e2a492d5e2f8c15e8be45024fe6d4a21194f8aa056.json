@@ -1,0 +1,23 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        INSERT INTO conversations.corrections\n            (id, workspace_id, conversation_id, message_id, question, from_value, to_value,\n             overridden_source, decision_ids, corrected_by)\n        VALUES ($1, $2, $3, $4, $5, $10, $6, $7, $8, $9)\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Uuid",
+        "Uuid",
+        "Text",
+        "Text",
+        "Text",
+        "UuidArray",
+        "Uuid",
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "0afbc52beccc3971ae0127e2a492d5e2f8c15e8be45024fe6d4a21194f8aa056"
+}

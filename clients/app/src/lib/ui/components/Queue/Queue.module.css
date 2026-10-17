@@ -49,14 +49,33 @@
   color: var(--text-secondary);
 }
 
+.groupHead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  margin-bottom: var(--space-2);
+}
+
 .groupTitle {
   display: flex;
   align-items: center;
   gap: var(--space-2);
-  margin-bottom: var(--space-2);
   padding: 0 var(--row-pad-x);
   font: var(--weight-semibold) var(--text-sm) / var(--leading-none) var(--font-sans);
   color: var(--text-secondary);
+}
+
+.groupAction {
+  padding: 0 var(--row-pad-x);
+}
+
+.groupNote {
+  margin-bottom: var(--space-2);
+  padding: 0 var(--row-pad-x);
+  font-size: var(--text-sm);
+  color: var(--text-tertiary);
 }
 
 .count {

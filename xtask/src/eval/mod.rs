@@ -58,6 +58,12 @@ pub struct DecideArgs {
     /// Eval set under crates/ai/evals/decide/.
     #[arg(long, default_value = "mail-triage")]
     set: String,
+    /// An eval set anywhere else: an owner's own labelled mail
+    /// (`campbooks-server labelling export`), which never enters the
+    /// repository. The report goes to `<set-dir>/report` unless `--out`
+    /// says otherwise.
+    #[arg(long, conflicts_with_all = ["set", "baseline", "check"])]
+    set_dir: Option<std::path::PathBuf>,
     /// Only strategies that need no model server.
     #[arg(long)]
     offline: bool,
@@ -84,16 +90,24 @@ pub fn run_decide(root: &Path, args: &DecideArgs) -> Result<String> {
 }
 
 async fn decide(root: &Path, args: &DecideArgs) -> Result<String> {
-    let set_dir = root.join("crates/ai/evals/decide").join(&args.set);
+    let set_dir = args
+        .set_dir
+        .clone()
+        .unwrap_or_else(|| root.join("crates/ai/evals/decide").join(&args.set));
     let dataset = Dataset::load(&set_dir)?;
     let (questions, specs) = plan(args, &dataset)?;
     let ctx = Context {
         dataset: &dataset,
         questions: &questions,
+        // An owner's export: only what they labelled goes to a model.
         selected: dataset
             .items
             .iter()
-            .map(|i| args.langs.is_empty() || args.langs.contains(&i.lang))
+            .map(|i| {
+                (args.langs.is_empty() || args.langs.contains(&i.lang))
+                    && (!dataset.manifest.private
+                        || questions.iter().any(|q| i.labels.value(&q.id).is_some()))
+            })
             .collect(),
     };
     let outcome = run_specs(&ctx, &specs, &Endpoints::from_env()).await?;
@@ -121,9 +135,10 @@ async fn decide(root: &Path, args: &DecideArgs) -> Result<String> {
         (reports_dir, "baseline")
     } else {
         (
-            args.out
-                .clone()
-                .unwrap_or_else(|| root.join("target/eval/decide").join(&args.set)),
+            args.out.clone().unwrap_or_else(|| match &args.set_dir {
+                Some(dir) => dir.join("report"),
+                None => root.join("target/eval/decide").join(&args.set),
+            }),
             "report",
         )
     };
@@ -145,10 +160,12 @@ async fn decide(root: &Path, args: &DecideArgs) -> Result<String> {
     Ok(format!("{md}\nwrote {}", written.join(", ")))
 }
 
-/// The questions and strategy specs to run, checked.
+/// The questions and strategy specs to run, checked: the triage questions
+/// the set labels (its manifest's), or those of them named.
 fn plan(args: &DecideArgs, dataset: &Dataset) -> Result<(Vec<Question>, Vec<String>)> {
     let questions: Vec<_> = triage_questions()
         .into_iter()
+        .filter(|q| dataset.manifest.questions.iter().any(|m| m.id == q.id))
         .filter(|q| args.questions.is_empty() || args.questions.contains(&q.id))
         .collect();
     if questions.is_empty() {

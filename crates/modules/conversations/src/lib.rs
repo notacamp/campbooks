@@ -61,6 +61,12 @@ pub use domain::{
 pub use features::{
     inbox_visibility::visibility, kept_mail::kept_mail, search_source::search_source,
 };
+/// The owner's money mail as an eval set to label (campbooks-cloud#167).
+pub mod labelling {
+    pub use crate::features::labelling_export::{
+        LabellingItem, MAX_ITEMS, OWNER, export_for_labelling, manifest,
+    };
+}
 
 /// Module name: crate directory, Postgres schema and OpenAPI tag.
 pub const NAME: &str = "conversations";
