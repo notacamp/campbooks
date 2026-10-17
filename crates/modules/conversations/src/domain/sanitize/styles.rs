@@ -36,7 +36,9 @@
 //! it (the inliner, ammonia): the tree builder's time grows with the depth
 //! of its stack of open elements times the tags it reads, so HTML built for
 //! it takes minutes. The measure counts that work in its tree sink, as the
-//! later parses will do it on the same tokens, and gives up past
+//! later parses will do it on the same tokens and in the same modes (a
+//! whole document for the inliner, a fragment in a `div` for ammonia), and
+//! gives up past
 //! [`MAX_PARSE_WORK`] units or [`MAX_PARSE_DEPTH`] levels. A parse cannot be
 //! cancelled, so the HTML is fed a chunk at a time and the count is read
 //! between chunks: a message built to be slow costs about one chunk past the
@@ -52,7 +54,7 @@ use std::{
 use super::css;
 use css_inline::{CSSInliner, InlineError, StylesheetResolver};
 use html5ever::{
-    Attribute, ParseOpts, QualName, local_name, ns, parse_document,
+    Attribute, ParseOpts, Parser, QualName, local_name, ns, parse_document, parse_fragment,
     tendril::{StrTendril, TendrilSink},
     tokenizer::{
         BufferQueue, TagKind, Token, TokenSink, TokenSinkResult, Tokenizer, TokenizerOpts,
@@ -238,20 +240,42 @@ pub struct Shape {
     pub work: usize,
 }
 
-/// Parse `html` as the inliner does (a whole document), counting the tree
-/// builder's work, and measure the tree it makes, walking it with an
-/// explicit stack: nothing here recurses. `None` when the work passes
-/// [`MAX_PARSE_WORK`] or the tree is deeper than [`MAX_PARSE_DEPTH`].
+/// Parse `html` as the inliner and ammonia do, counting the tree builder's
+/// work, and measure the tree, walking it with an explicit stack: nothing
+/// here recurses. `None` when the work passes [`MAX_PARSE_WORK`] or the tree
+/// is deeper than [`MAX_PARSE_DEPTH`].
 ///
-/// The ammonia passes run the same algorithm on the same tokens, so what
-/// this counts is what they would pay. The HTML is fed in chunks of at most
-/// 8 KiB and the count is checked after each, because a running parse cannot
-/// be stopped from outside: a message built to be slow costs about one chunk
-/// past the budget instead of minutes.
+/// The later parses run the same algorithm on the same tokens, so what this
+/// counts is what they would pay, as long as it parses the way each of them
+/// does: the inliner parses a whole document, ammonia a fragment in a `div`
+/// (its `make_parser`), and the two can differ wholesale (a leading
+/// `<frameset>` makes a document drop everything after it, while a fragment
+/// reads it all). So both are measured, and both must stay within the
+/// budget; the shape is the document's, which is what the inliner sees.
 pub fn measure(html: &str) -> Option<Shape> {
+    let fragment = measure_with(html, |sink| {
+        parse_fragment(
+            sink,
+            ParseOpts::default(),
+            QualName::new(None, ns!(html), local_name!("div")),
+            vec![],
+            false,
+        )
+    })?;
+    let document = measure_with(html, |sink| parse_document(sink, ParseOpts::default()))?;
+    Some(Shape {
+        work: document.work.max(fragment.work),
+        ..document
+    })
+}
+
+/// One measured parse of `html` by the parser `start` makes. The HTML is
+/// fed in chunks of at most 8 KiB and the count is checked after each,
+/// because a running parse cannot be stopped from outside: a message built
+/// to be slow costs about one chunk past the budget instead of minutes.
+fn measure_with(html: &str, start: impl FnOnce(Measure) -> Parser<Measure>) -> Option<Shape> {
     let work = Rc::new(Cell::new(0));
-    let sink = Measure::new(Rc::clone(&work));
-    let mut parser = parse_document(sink, ParseOpts::default());
+    let mut parser = start(Measure::new(Rc::clone(&work)));
     let mut rest = html;
     while !rest.is_empty() {
         let mut end = rest.len().min(CHUNK);
@@ -769,6 +793,15 @@ mod tests {
         assert!(measure(&"<div></span>".repeat(200_000)).is_none());
         assert!(measure(&"<div>".repeat(200_000)).is_none());
         assert!(measure(&"<a><table><a>x".repeat(50_000)).is_none());
+    }
+
+    #[test]
+    fn a_leading_frameset_does_not_hide_the_work() {
+        // A document drops what follows a leading `<frameset>`; ammonia's
+        // fragment parse reads it all, so the fragment is measured too.
+        assert!(measure(&format!("<frameset>{}", "<div></span>".repeat(200_000))).is_none());
+        assert!(measure(&format!("<frameset>{}", "<div>".repeat(200_000))).is_none());
+        assert!(measure("<frameset><p>x</p>").is_some());
     }
 
     #[test]

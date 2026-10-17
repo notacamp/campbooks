@@ -2,12 +2,14 @@
 
 ### Requirement: Sanitised email HTML
 `conversations.get_message_body` SHALL sanitise the HTML body before
-returning it. Before any tree is built, the HTML SHALL be measured by one
-parse that counts the tree builder's work (each tree operation and each
+returning it. Before any tree is built, the HTML SHALL be measured by
+parsing it as a whole document and as a fragment in a `div` (the modes the
+style inliner and the sanitiser parse it in), each parse counting the tree
+builder's work (each tree operation and each
 element name read in a scope check one unit; moving a node before a sibling
 or out of its parent adds the parent's number of children; moving children
 adds their number), fed in chunks of at most 8 KiB and stopped as soon as the
-work passes 10,000,000 units; HTML past that, or whose tree is deeper than
+work passes 10,000,000 units; HTML past that in either parse, or whose tree is deeper than
 4,096 levels, SHALL be returned as its text instead: the characters outside
 scripts, styles, the head, the title and the markup a `noscript`, `iframe`,
 `noembed` or `noframes` holds, entities decoded, a line break at
@@ -80,6 +82,10 @@ placeholder otherwise. No other `data:` source survives.
 #### Scenario: HTML built to be slow to parse
 - **WHEN** a member reads a message whose 2 MiB HTML body is `<div></span>` repeated, which takes minutes to parse in full
 - **THEN** the measure stops within its budget, the HTML in the response is the body's text in one `pre-wrap` `div` with no other markup, `remote_images` is 0 and `css` is absent
+
+#### Scenario: A leading frameset
+- **WHEN** the same body starts with `<frameset>`, after which a whole-document parse drops the rest
+- **THEN** it is still shown as its text, because the fragment parse is measured too
 
 #### Scenario: A large ordinary newsletter
 - **WHEN** a member reads a 1.5 MiB newsletter of nested tables, links and images

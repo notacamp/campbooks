@@ -18,8 +18,9 @@ parses in 31 ms; sloppy real-world HTML (unclosed `p`, `td`, `li`, `font`)
 in under 10 ms.
 
 ## What Changes
-- Before any tree is built for the reader, the HTML is measured by one
-  parse that counts its work as the parsers after it would do it, fed a
+- Before any tree is built for the reader, the HTML is measured by parsing
+  it as the parsers after it do (a whole document for the style inliner, a
+  fragment in a `div` for ammonia), counting the work as they would do it, fed a
   chunk at a time and stopped as soon as the work passes a budget
   (10,000,000 units, about seven times what a dense 2 MiB newsletter costs) or the tree is deeper than 4,096 levels. HTML within the budget is
   sanitised as today. HTML past it is shown as its text: the characters the

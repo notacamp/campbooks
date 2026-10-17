@@ -30,6 +30,13 @@ Measured with a standalone release build (counts are the sink's):
   measure feeds the HTML 8 KiB at a time and checks the count after each
   chunk, so it stops within one chunk of the budget (a few tens of ms at
   worst) instead of finishing a parse that would take minutes.
+- **Both parse modes.** The inliner parses a whole document and ammonia a
+  fragment in a `div` (its `make_parser`, default options), and the two can
+  differ wholesale: after a leading `<frameset>` a document drops every
+  token, while a fragment reads them all. The measure parses both ways, with
+  exactly those options, and both must stay within the budget. The later
+  parses then read serialisations of trees no bigger or deeper than the
+  measured ones (css-inline only runs within 20,000 elements and 256 levels).
 - **Units.** Every sink call is 1; `elem_name` is 1 (it is the scope scan);
   `append_before_sibling` and `remove_from_parent` add the number of
   children of the parent they touch; `reparent_children` adds the number of

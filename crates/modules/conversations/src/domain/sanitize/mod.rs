@@ -138,8 +138,9 @@ fn content_id(url: &str) -> Option<String> {
 /// `show_remote_images` is set; `cid:` images show their part from `inline`
 /// either way.
 ///
-/// Six steps: the HTML is measured first ([`styles::measure`]: one parse
-/// that counts the tree builder's work, stopped at a fixed budget), and
+/// Six steps: the HTML is measured first ([`styles::measure`]: a parse as a
+/// document and one as a fragment, as the inliner and ammonia parse it, each
+/// counting the tree builder's work and stopped at a fixed budget), and
 /// HTML past the budget is shown as its text alone; then the style sheets
 /// are inlined ([`styles::inline`]); ammonia
 /// cleans (allow-lists, schemes, links, style declarations) and the body's
@@ -883,6 +884,19 @@ mod tests {
         assert_eq!(result.html.matches('<').count(), 2, "only the wrapper");
         assert_eq!(result.remote_images, 0);
         assert_eq!(result.css, None);
+    }
+
+    #[test]
+    fn a_leading_frameset_is_shown_as_text_too() {
+        // A document drops what follows; ammonia's fragment parse would not.
+        let html = format!("<frameset><p>Hi</p>{}", "<div></span>".repeat(170_000));
+        let result = run(&html, false);
+        assert!(
+            result
+                .html
+                .starts_with(r#"<div style="white-space: pre-wrap">"#)
+        );
+        assert_eq!(result.html.matches('<').count(), 2, "only the wrapper");
     }
 
     #[test]
