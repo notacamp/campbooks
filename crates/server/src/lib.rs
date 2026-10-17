@@ -1054,9 +1054,10 @@ mod tests {
             (true, false, false, false),
             "`{role}` only reads {read_only}"
         );
-        let privileges: (bool, bool, bool, bool, bool, bool) = sqlx::query_as(
+        let privileges: (bool, bool, bool, bool, bool, bool, bool) = sqlx::query_as(
             "SELECT has_table_privilege($1, $2, 'SELECT'), has_table_privilege($1, $2, 'INSERT'),
                     has_table_privilege($1, $2, 'UPDATE'), has_table_privilege($1, $2, 'DELETE'),
+                    has_any_column_privilege($1, $2, 'SELECT, INSERT, UPDATE, REFERENCES'),
                     has_function_privilege($1,
                         'kernel.take_rate_limit(bytea, double precision, integer)', 'EXECUTE'),
                     has_function_privilege($1, 'kernel.prune_rate_limits(integer)', 'EXECUTE')",
@@ -1068,14 +1069,16 @@ mod tests {
         .unwrap();
         assert_eq!(
             privileges,
-            (false, false, false, false, true, true),
+            (false, false, false, false, false, true, true),
             "`{role}` reaches {functions_only} through the kernel's functions only"
         );
-        // The web sign-in's tables: no privilege at all, of any kind.
+        // The web sign-in's tables: no privilege at all, of any kind, on the
+        // table or on any of its columns.
         for table in BFF_TABLES {
             let any: bool = sqlx::query_scalar(
                 "SELECT has_table_privilege($1, $2,
-                            'SELECT, INSERT, UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER')",
+                            'SELECT, INSERT, UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER')
+                     OR has_any_column_privilege($1, $2, 'SELECT, INSERT, UPDATE, REFERENCES')",
             )
             .bind(role)
             .bind(table)
@@ -1171,21 +1174,11 @@ mod tests {
              it holds nothing of any caller or workspace",
         )];
         let role = campbooks_kernel::db::DEFAULT_RUNTIME_ROLE;
-        let tables: Vec<(String, bool)> = sqlx::query_as(
-            "SELECT n.nspname || '.' || c.relname,
-                    (c.relrowsecurity AND c.relforcerowsecurity
-                        AND EXISTS (SELECT 1 FROM pg_policy p WHERE p.polrelid = c.oid))
-                    OR NOT has_table_privilege($1, c.oid,
-                        'SELECT, INSERT, UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER')
-               FROM pg_class c
-               JOIN pg_namespace n ON n.oid = c.relnamespace
-              WHERE n.nspname IN ('kernel', 'bff') AND c.relkind IN ('r', 'p')
-              ORDER BY 1",
-        )
-        .bind(role)
-        .fetch_all(&db)
-        .await
-        .unwrap();
+        let tables: Vec<(String, bool)> = sqlx::query_as(KERNEL_TABLES_PROTECTED)
+            .bind(role)
+            .fetch_all(&db)
+            .await
+            .unwrap();
         for table in BFF_TABLES {
             assert!(
                 tables.iter().any(|(t, _)| t == table),
@@ -1210,7 +1203,8 @@ mod tests {
                 "SELECT has_table_privilege($1, $2, 'INSERT')
                      OR has_table_privilege($1, $2, 'UPDATE')
                      OR has_table_privilege($1, $2, 'DELETE')
-                     OR has_table_privilege($1, $2, 'TRUNCATE')",
+                     OR has_table_privilege($1, $2, 'TRUNCATE')
+                     OR has_any_column_privilege($1, $2, 'INSERT, UPDATE')",
             )
             .bind(role)
             .bind(table)
@@ -1222,6 +1216,204 @@ mod tests {
                 "`{role}` may write {table}, which has no row-level security"
             );
         }
+    }
+
+    /// Whether each table of the kernel's and the BFF's schemas is protected
+    /// from the runtime role (`$1`): row-level security enabled and forced
+    /// with a policy, or no privilege of any kind on the table or on any of
+    /// its columns (`has_table_privilege` does not see a column's grant).
+    const KERNEL_TABLES_PROTECTED: &str = "
+        SELECT n.nspname || '.' || c.relname,
+               (c.relrowsecurity AND c.relforcerowsecurity
+                   AND EXISTS (SELECT 1 FROM pg_policy p WHERE p.polrelid = c.oid))
+               OR NOT (has_table_privilege($1, c.oid,
+                           'SELECT, INSERT, UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER')
+                       OR has_any_column_privilege($1, c.oid,
+                           'SELECT, INSERT, UPDATE, REFERENCES'))
+          FROM pg_class c
+          JOIN pg_namespace n ON n.oid = c.relnamespace
+         WHERE n.nspname IN ('kernel', 'bff') AND c.relkind IN ('r', 'p')
+         ORDER BY 1";
+
+    /// A grant on one column of a BFF table is a privilege the coverage
+    /// test sees (campbooks-cloud#214, item 6).
+    #[sqlx::test(migrations = "../../migrations")]
+    async fn a_column_grant_leaves_a_table_open(db: sqlx::PgPool) {
+        let role = campbooks_kernel::db::DEFAULT_RUNTIME_ROLE;
+        sqlx::query("GRANT SELECT (subject) ON bff.sessions TO campbooks_app")
+            .execute(&db)
+            .await
+            .unwrap();
+        let tables: Vec<(String, bool)> = sqlx::query_as(KERNEL_TABLES_PROTECTED)
+            .bind(role)
+            .fetch_all(&db)
+            .await
+            .unwrap();
+        assert!(
+            tables.contains(&("bff.sessions".to_owned(), false)),
+            "{tables:?}"
+        );
+    }
+
+    /// The role every `SECURITY DEFINER` function belongs to
+    /// (campbooks-cloud#214).
+    const DEFINER_ROLE: &str = "campbooks_definer";
+
+    /// Every `SECURITY DEFINER` function belongs to the dedicated owner role,
+    /// never to a superuser or a role that can log in (such as the migration
+    /// login), so a bug in a body runs with that role's few rights
+    /// (campbooks-cloud#214). The role cannot log in, holds no privileged
+    /// attribute, is a member of no role, and no runtime role is a member of
+    /// it; it owns nothing but the functions and holds exactly the
+    /// privileges their statements need. A migration adding a definer
+    /// function hands it over (`ALTER FUNCTION … OWNER TO
+    /// campbooks_definer`), or this fails naming the function.
+    #[sqlx::test(migrations = "../../migrations")]
+    async fn definer_functions_belong_to_the_nologin_owner_role(db: sqlx::PgPool) {
+        let owners: Vec<(String, String, bool, bool)> = sqlx::query_as(
+            "SELECT p.oid::regprocedure::text, r.rolname::text, r.rolsuper, r.rolcanlogin
+               FROM pg_proc p
+               JOIN pg_namespace n ON n.oid = p.pronamespace
+               JOIN pg_roles r ON r.oid = p.proowner
+              WHERE p.prosecdef AND n.nspname NOT IN ('pg_catalog', 'information_schema')
+              ORDER BY 1",
+        )
+        .fetch_all(&db)
+        .await
+        .unwrap();
+        assert!(owners.len() >= BFF_FUNCTIONS.len() + 2, "{owners:?}");
+        for (function, owner, superuser, login) in &owners {
+            assert!(
+                !superuser && !login,
+                "{function} belongs to `{owner}`, a superuser or a role that can log in"
+            );
+            assert_eq!(owner, DEFINER_ROLE, "{function} belongs to the owner role");
+        }
+
+        let attributes: (bool, bool, bool, bool, bool, bool, i64) = sqlx::query_as(
+            "SELECT r.rolsuper, r.rolcanlogin, r.rolbypassrls, r.rolcreatedb, r.rolcreaterole,
+                    r.rolreplication,
+                    (SELECT count(*) FROM pg_auth_members m WHERE m.member = r.oid)
+               FROM pg_roles r
+              WHERE r.rolname = $1",
+        )
+        .bind(DEFINER_ROLE)
+        .fetch_one(&db)
+        .await
+        .unwrap();
+        assert_eq!(
+            attributes,
+            (false, false, false, false, false, false, 0),
+            "`{DEFINER_ROLE}`: no login, no privileged attribute, a member of no role"
+        );
+        let runtime_member: bool = sqlx::query_scalar("SELECT pg_has_role($1, $2, 'MEMBER')")
+            .bind(campbooks_kernel::db::DEFAULT_RUNTIME_ROLE)
+            .bind(DEFINER_ROLE)
+            .fetch_one(&db)
+            .await
+            .unwrap();
+        assert!(
+            !runtime_member,
+            "the runtime role cannot act as `{DEFINER_ROLE}`"
+        );
+
+        let owned: Vec<String> = sqlx::query_scalar(
+            "SELECT format('relation %s', c.oid::regclass) FROM pg_class c
+              WHERE c.relowner = $1::text::regrole
+             UNION ALL
+             SELECT format('schema %I', n.nspname) FROM pg_namespace n
+              WHERE n.nspowner = $1::text::regrole
+             UNION ALL
+             SELECT format('function %s', p.oid::regprocedure) FROM pg_proc p
+              WHERE p.proowner = $1::text::regrole AND NOT p.prosecdef
+             ORDER BY 1",
+        )
+        .bind(DEFINER_ROLE)
+        .fetch_all(&db)
+        .await
+        .unwrap();
+        assert!(owned.is_empty(), "`{DEFINER_ROLE}` owns {owned:?}");
+
+        let tables: Vec<(String, String)> = sqlx::query_as(
+            "SELECT n.nspname || '.' || c.relname,
+                    string_agg(a.privilege_type, ', ' ORDER BY a.privilege_type)
+               FROM pg_class c
+               JOIN pg_namespace n ON n.oid = c.relnamespace,
+                    aclexplode(c.relacl) a
+              WHERE a.grantee = $1::text::regrole
+              GROUP BY 1
+              ORDER BY 1",
+        )
+        .bind(DEFINER_ROLE)
+        .fetch_all(&db)
+        .await
+        .unwrap();
+        let expected = [
+            ("bff.login_transactions", "DELETE, INSERT, SELECT"),
+            ("bff.retired_tokens", "INSERT, SELECT"),
+            ("bff.sessions", "DELETE, INSERT, SELECT, UPDATE"),
+            ("kernel.rate_limits", "DELETE, INSERT, SELECT, UPDATE"),
+        ]
+        .map(|(table, privileges)| (table.to_owned(), privileges.to_owned()));
+        assert_eq!(
+            tables, expected,
+            "`{DEFINER_ROLE}` holds what the functions need"
+        );
+        let schemas: Vec<(String, String)> = sqlx::query_as(
+            "SELECT n.nspname::text, a.privilege_type
+               FROM pg_namespace n, aclexplode(n.nspacl) a
+              WHERE a.grantee = $1::text::regrole
+              ORDER BY 1, 2",
+        )
+        .bind(DEFINER_ROLE)
+        .fetch_all(&db)
+        .await
+        .unwrap();
+        assert_eq!(
+            schemas,
+            [("bff", "USAGE"), ("kernel", "USAGE")]
+                .map(|(schema, privilege)| (schema.to_owned(), privilege.to_owned())),
+            "`{DEFINER_ROLE}` may use the two schemas, and create nothing"
+        );
+        let elsewhere: i64 = sqlx::query_scalar(
+            "SELECT (SELECT count(*) FROM pg_attribute a, aclexplode(a.attacl) x
+                      WHERE x.grantee = $1::text::regrole)
+                  + (SELECT count(*) FROM pg_proc p, aclexplode(p.proacl) x
+                      WHERE x.grantee = $1::text::regrole AND p.proowner <> x.grantee)
+                  + (SELECT count(*) FROM pg_database d, aclexplode(d.datacl) x
+                      WHERE x.grantee = $1::text::regrole)",
+        )
+        .bind(DEFINER_ROLE)
+        .fetch_one(&db)
+        .await
+        .unwrap();
+        assert_eq!(elsewhere, 0, "no column, function or database grant");
+
+        // The functions still work for the runtime role, as their owner.
+        let runtime = testing::app_role_pool(&db).await;
+        let hits: Vec<i32> = sqlx::query_scalar(
+            "SELECT hits FROM kernel.take_rate_limit(sha256('a bucket'::bytea), 60, 1)
+             UNION ALL
+             SELECT hits FROM kernel.take_rate_limit(sha256('a bucket'::bytea), 60, 1)",
+        )
+        .fetch_all(&runtime)
+        .await
+        .unwrap();
+        assert_eq!(hits.iter().max(), Some(&2), "{hits:?}");
+        sqlx::query(
+            "SELECT bff.start_login(sha256('a state'::bytea), sha256('a browser'::bytea),
+                                    '\\x01', '\\x02', '/inbox', now(),
+                                    now() + interval '10 minutes', NULL)",
+        )
+        .execute(&runtime)
+        .await
+        .unwrap();
+        let landing: Option<String> =
+            sqlx::query_scalar("SELECT return_to FROM bff.take_login(sha256('a state'::bytea))")
+                .fetch_optional(&runtime)
+                .await
+                .unwrap();
+        assert_eq!(landing.as_deref(), Some("/inbox"));
     }
 
     /// The worker runs as the runtime role in production: it can claim, run

@@ -35,6 +35,20 @@ All notable changes to Campbooks Next are documented here. The format follows
 
 ### Security
 
+- **The database functions that act for the server no longer run as a superuser.** The
+  functions behind web sign-in and the rate limits run with their owner's rights. Their
+  owner was the login that applied the migrations, which on the bundled Postgres is a
+  superuser, so a bug in one of them would have had every right on the server. They now
+  belong to `campbooks_definer`, a role that cannot log in, owns no table and holds only
+  the few privileges those functions use. The migrations create it. If your migration
+  login is neither a superuser nor allowed to create roles, the upgrade stops and names
+  the two statements an administrator must run once (see `deploy/README.md`). The
+  functions also check their input more strictly: a sign-in can only land on a path of
+  this site, as the server already checks. `CAMPBOOKS_BFF__ABSOLUTE_TIMEOUT_HOURS` must
+  now be at most 8784 (366 days); the server refuses to start otherwise. Signing in again
+  in the same browser now also revokes the earlier session's refresh token. Nobody is
+  signed out by the upgrade. If you roll back, run the SQL in the change's design first
+  (campbooks-cloud#214).
 - **Web sign-in records are reachable only through the sign-in's own functions.** The
   tables holding web sessions, sign-ins in progress and retired session tokens could be
   read and changed by any of the server's database work. Now the server's database role

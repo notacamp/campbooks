@@ -500,7 +500,10 @@ access, refresh and ID tokens encrypted (AES-256-GCM, key derived from
 The runtime role holds no privilege on these tables: the BFF reaches them
 through `SECURITY DEFINER` functions in schema `bff`, each acting on the one
 session a presented cookie's hash names, one sign-in, or one account
-(campbooks-cloud#212). The browser gets one `HttpOnly`, `SameSite=Strict`
+(campbooks-cloud#212). Like the kernel's rate-limit functions, they run as
+`campbooks_definer`, a role that cannot log in, owns no table and holds only
+the privileges their statements need, never as the migration login
+(campbooks-cloud#214). The browser gets one `HttpOnly`, `SameSite=Strict`
 `__Host-campbooks_session` cookie and nothing else. `/bff/api/*` attaches the
 session's access token (refreshed just before it expires, once per session
 however many requests race) and runs the request through the API router in

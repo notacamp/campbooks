@@ -3,9 +3,10 @@
 //! module never sees plaintext tokens.
 //!
 //! The runtime role holds no privilege on those tables (campbooks-cloud#212):
-//! every statement here calls one of the `bff.*` functions, which run as the
-//! tables' owner. Each acts on the one session a cookie's token hash names
-//! (`presented`), the one sign-in a state hash names, or one account's
+//! every statement here calls one of the `bff.*` functions, which run as
+//! `campbooks_definer`, a role that cannot log in and holds only what they
+//! need (campbooks-cloud#214). Each acts on the one session a cookie's token
+//! hash names (`presented`), the one sign-in a state hash names, or one account's
 //! sessions; only the two prunes reach across accounts, deleting ended rows
 //! a bounded batch at a time.
 
