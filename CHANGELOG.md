@@ -8,6 +8,14 @@ All notable changes to Campbooks Next are documented here. The format follows
 
 ### Added
 
+- **Each item's own actions, from a catalogue (off for now).** The decide model can rate
+  what Campbooks can do about each email (reply, remind, open the attachment, forward,
+  report, it's safe, already paid or still to pay) in the same call that sorts it, and
+  each need then carries its top actions, a bill's or a warning's own answers always
+  first. The facts only rule an action out, and nothing reads what the email says. It
+  stays off (`CAMPBOOKS_CONVERSATIONS__ACTIONS__ENABLED`) until the owner has labelled
+  their own mail and the floor is set from it: `campbooks-server labelling export --set
+  actions` and `cargo xtask eval actions` are the tools for that. Off, nothing changes.
 - **Smart rules, offered when they help.** After Report and delete, Home asks "Never see
   emails like this again?" and offers a rule for that sender's address. When the mail
   failed DMARC and its domain publishes a reject or quarantine policy, it offers instead
@@ -33,6 +41,9 @@ All notable changes to Campbooks Next are documented here. The format follows
 
 ### Fixed
 
+- **Decide calls leave room to answer.** The OpenAI-compatible decide path now asks for up
+  to 4096 tokens, so a reasoning model is never cut off before its answer. It is a cap: a
+  model that answered before costs and takes the same.
 - **Email HTML cleaning catches `URL(` in any case.** The sanitiser (ammonia 4.2.4,
   RUSTSEC-2026-0373) matched CSS `url(` case-sensitively, so a style written `URL("…")`
   could slip a remote image past the filter that holds images back until you choose

@@ -295,6 +295,52 @@ mod tests {
     }
 
     #[test]
+    fn a_need_without_actions_reads_exactly_as_before() {
+        use crate::{
+            domain::needs::NeedView,
+            model::{NeedBasis, NeedTrust},
+        };
+        let need = NeedView {
+            reason: NeedReason::Reply,
+            trust: NeedTrust::Sure,
+            basis: NeedBasis::Model,
+            question: NeedQuestion::NeedsReply,
+            rule: None,
+            due_on: None,
+            overdue: false,
+            urgent: false,
+            message_id: MessageId::new(),
+            quote: None,
+            actions: None,
+        };
+        let json = serde_json::to_value(&need).unwrap();
+        let keys: std::collections::BTreeSet<&str> = json
+            .as_object()
+            .unwrap()
+            .keys()
+            .map(String::as_str)
+            .collect();
+        // The fields every need had before the catalogue, and no other.
+        assert_eq!(
+            keys,
+            [
+                "basis",
+                "due_on",
+                "message_id",
+                "overdue",
+                "question",
+                "quote",
+                "reason",
+                "rule",
+                "trust",
+                "urgent"
+            ]
+            .into_iter()
+            .collect()
+        );
+    }
+
+    #[test]
     fn nothing_stored_offers_nothing() {
         assert!(rank(NeedReason::Pay, NeedQuestion::Money, &[]).is_empty());
         assert!(rank(NeedReason::Review, NeedQuestion::Suspicious, &[]).is_empty());
