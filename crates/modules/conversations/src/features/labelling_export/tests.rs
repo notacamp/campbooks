@@ -94,6 +94,25 @@ async fn the_actions_set_lists_mail_that_had_a_need(db: PgPool) {
     .await
     .unwrap();
     assert!(with_needs > 1);
+    // A later inbound "Thanks!" that raised nothing: the newest inbound
+    // message of its conversation, but not the one the pass rated.
+    sqlx::query(
+        "INSERT INTO conversations.messages
+                (id, workspace_id, inbox_id, conversation_id, provider_message_id, direction,
+                 sender, sender_address, recipients, subject, sent_at, headers, in_inbox,
+                 bodies, participants)
+         SELECT gen_random_uuid(), m.workspace_id, m.inbox_id, m.conversation_id,
+                m.provider_message_id || '-thanks', 'inbound', m.sender, m.sender_address,
+                m.recipients, 'Thanks!', m.sent_at + interval '1 hour', m.headers, true,
+                m.bodies, m.participants
+           FROM conversations.needs n JOIN conversations.messages m ON m.id = n.message_id
+          WHERE n.workspace_id = $1
+          LIMIT 1",
+    )
+    .bind(workspace.as_uuid())
+    .execute(&kit.db)
+    .await
+    .unwrap();
 
     let items = export_set(&kit.state, workspace, ALL, LabellingSet::Actions)
         .await
@@ -124,6 +143,7 @@ async fn the_actions_set_lists_mail_that_had_a_need(db: PgPool) {
     raised.sort();
     exported.sort();
     assert_eq!(exported, raised);
+    assert!(!exported.iter().any(|s| s == "Thanks!"));
     let actions = manifest_for(LabellingSet::Actions);
     assert_eq!(actions["name"], "owner-actions");
     assert_eq!(actions["private"], true);

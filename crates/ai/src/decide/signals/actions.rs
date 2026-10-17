@@ -213,6 +213,17 @@ mod tests {
         }
     }
 
+    #[test]
+    fn no_triage_question_is_a_catalogue_question() {
+        // Only catalogue answers may go unanswered; a triage id that matched
+        // would silently lose its strict check.
+        assert!(
+            triage_questions()
+                .iter()
+                .all(|q| !question::is_catalogue(&q.id))
+        );
+    }
+
     fn noul(id: &str, holds: f64) -> Answer {
         Answer {
             question_id: id.into(),

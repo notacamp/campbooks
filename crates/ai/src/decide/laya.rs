@@ -175,7 +175,11 @@ impl Response {
                     });
                 match raw {
                     Ok(raw) => Ok(Some(raw)),
-                    Err(_) if super::signals::actions::question::is_catalogue(&q.id) => Ok(None),
+                    Err(error) if super::signals::actions::question::is_catalogue(&q.id) => {
+                        // The error names the question only, never the mail.
+                        tracing::debug!(question = %q.id, %error, "catalogue answer dropped");
+                        Ok(None)
+                    }
                     Err(error) => Err(error),
                 }
             })

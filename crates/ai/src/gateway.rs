@@ -518,7 +518,8 @@ impl Gateway {
 
     /// Answer typed `questions` about `state` with the `decide` role, all in
     /// one call. Answers come back in question order, calibrated with the
-    /// role's temperatures. The state is never logged.
+    /// role's temperatures; a catalogue question left unanswered has none.
+    /// The state is never logged.
     ///
     /// Questions are checked first ([`decide::MAX_OPTIONS`] options at most,
     /// unique ids and labels, …); a bad set fails with

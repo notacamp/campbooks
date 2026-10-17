@@ -192,7 +192,11 @@ impl Response {
                 // rating; any other fails the call, as it always has.
                 let value = match value {
                     Ok(value) => value,
-                    Err(_) if is_catalogue(&q.id) => return Ok(None),
+                    Err(error) if is_catalogue(&q.id) => {
+                        // The error names the question only, never the mail.
+                        tracing::debug!(question = %q.id, %error, "catalogue answer dropped");
+                        return Ok(None);
+                    }
                     Err(error) => return Err(error),
                 };
                 let probabilities = tokens.as_ref().and_then(|t| {
