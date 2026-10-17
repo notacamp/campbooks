@@ -551,10 +551,11 @@ mod tests {
     #[test]
     fn depth_is_the_tree_s_not_the_tags() {
         // Stray end tags the tree builder ignores: the tags balance out,
-        // the tree is thousands deep.
+        // the tree is past the cap. Just past it: the tree builder's work
+        // grows with depth squared, so thousands deep takes minutes here.
         let stray = format!(
             "<style>p {{ color: red }}</style>{}<p>x</p>",
-            "<div></span>".repeat(50_000)
+            "<div></span>".repeat(MAX_NESTING + 10)
         );
         assert!(shape(&stray).deepest > MAX_NESTING);
         assert_eq!(inline(&stray).html, stray);
@@ -573,6 +574,33 @@ mod tests {
                 deepest: 3
             }
         );
+    }
+
+    #[test]
+    fn measuring_a_deep_tree_does_not_recurse() {
+        // The walk keeps its own stack: a tree 100,000 deep is measured on a
+        // 64 KiB thread. (Built by hand: parsing one that deep takes hours.)
+        let deepest = std::thread::Builder::new()
+            .stack_size(64 * 1024)
+            .spawn(|| {
+                let count = 100_000;
+                let nodes = (0..count)
+                    .map(|i| {
+                        let mut node = Node::new(unnamed());
+                        node.first = (i + 1 < count).then_some(i + 1);
+                        node
+                    })
+                    .collect();
+                let tree = Measure {
+                    nodes: RefCell::new(nodes),
+                    elements: RefCell::new(0),
+                };
+                tree.finish().deepest
+            })
+            .expect("spawn")
+            .join()
+            .expect("measured without overflowing the stack");
+        assert_eq!(deepest, 99_999);
     }
 
     #[test]

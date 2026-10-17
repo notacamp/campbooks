@@ -97,9 +97,10 @@ app, its releases live in their own namespace so they never collide with the
 Rails `v0.x.y` tags and releases that `main` owns: tags `next-vX.Y.Z`, images
 `ghcr.io/notacamp/campbooks:next-vX.Y.Z` and `:next-vX.Y`.
 
-Every green push to `next` already publishes `:next` and `:next-<sha12>` and
-deploys staging (`publish-next.yml`). A *release* is the same image under a
-version, plus a tag and a GitHub **prerelease**.
+Every push to `next` builds, scans and attests the image in CI as
+`:ci-<sha>`; once CI is green, `publish-next.yml` tags that same image
+`:next` and `:next-<sha12>` and deploys staging and production. A *release*
+is the same recipe under a version, plus a tag and a GitHub **prerelease**.
 
 **To cut a release**, open one PR into `next` (title `chore: release next-vX.Y.Z`)
 that:
