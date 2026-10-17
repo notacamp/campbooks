@@ -509,5 +509,50 @@
       "inbox": "Una bandeja de entrada",
       "emptyTitle": "Aún no hay reglas"
     }
+  },
+  "reply": {
+    "title": "Responder a {{name}}",
+    "reading": "Scout está leyendo la conversación…",
+    "choose": "¿Qué debería decir? Elige una opción o dilo con tus palabras.",
+    "noSuggestions": "Esta vez Scout no tiene sugerencias. Dilo con tus palabras o escríbela tú mismo.",
+    "suggestionsFailed": "Scout no ha podido sugerir respuestas ahora. Dilo con tus palabras o escríbela tú mismo.",
+    "unavailable": "Scout no puede escribir respuestas en este servidor, así que escribe esta tú mismo.",
+    "choices": "Respuestas probables",
+    "quoteFrom": "{{name}}, {{date}}",
+    "own": {
+      "label": "O dilo con tus palabras",
+      "placeholder": "p. ej., sí, pero llegaré 15 minutos tarde",
+      "action": "Redactar"
+    },
+    "writing": "Redactando el borrador…",
+    "draftDescription": "El borrador de Scout. Edítalo aquí o pide un cambio. No se envía nada hasta que pulses Enviar.",
+    "draftLabel": "Tu respuesta",
+    "shorter": "Más corta",
+    "shortening": "Acortándola…",
+    "changing": "Cambiándola…",
+    "back": "Volver a las opciones",
+    "change": {
+      "label": "Pedir un cambio",
+      "placeholder": "p. ej., más cercana, o menciona los planes",
+      "action": "Cambiar"
+    },
+    "send": "Enviar",
+    "openInComposer": "Abrir en el editor",
+    "writeOwn": "Escribirla yo",
+    "pending": "Enviando a {{name}}…",
+    "sending": "Enviando a {{name}}",
+    "result": "Enviando a {{name}}",
+    "resultDetail": "Sale en unos segundos. Hasta entonces puedes deshacerlo abajo.",
+    "undone": "No se ha enviado. Tu borrador ha vuelto.",
+    "tooLate": "Es tarde para deshacer: la respuesta ya ha salido.",
+    "errors": {
+      "write": "Scout no ha podido escribir eso ahora. Inténtalo de nuevo o escríbela tú mismo.",
+      "limit": "Scout ha escrito muchas respuestas en esta hora. Inténtalo más tarde o escríbela tú mismo.",
+      "dailyLimit": "Este espacio de trabajo ya ha usado la cuota de IA de hoy. Escribe esta tú mismo.",
+      "send": "No se ha podido enviar a {{name}}. Tu borrador se ha guardado.",
+      "open": "No se ha podido abrir el editor. Tu borrador sigue aquí."
+    },
+    "to": "Para {{recipient}}",
+    "replyToElsewhere": "Las respuestas van a {{recipient}}, no al remitente {{sender}}. Compruébalo antes de enviar."
   }
 }

@@ -49,6 +49,7 @@
     "notNeeded": "Not needed · {{name}}",
     "safe": "Marked safe · {{name}}",
     "snoozed": "Snoozed · {{name}}, back {{when}}",
+    "replied": "Sending to {{name}}",
     "paid": "Marked paid · {{name}}"
   },
   "error": {

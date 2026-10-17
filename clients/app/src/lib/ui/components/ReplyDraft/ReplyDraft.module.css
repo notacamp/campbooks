@@ -1,0 +1,125 @@
+.quote {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-md);
+  background: var(--surface-sunken);
+}
+
+.quoteFrom {
+  font-size: var(--text-xs);
+  color: var(--text-tertiary);
+}
+
+.quoteText {
+  display: -webkit-box;
+  overflow: hidden;
+  font-size: var(--text-sm);
+  line-height: var(--leading-normal);
+  color: var(--text-secondary);
+  overflow-wrap: anywhere;
+  white-space: pre-line;
+  quotes: auto;
+  unicode-bidi: isolate;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 4;
+  line-clamp: 4;
+}
+
+.ask {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.askLabel {
+  flex-basis: 100%;
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+  color: var(--text-secondary);
+}
+
+.askInput {
+  flex: 1 1 0;
+  min-width: 0;
+  height: var(--btn-height);
+  padding: 0 var(--space-3);
+  border: 0;
+  border-radius: var(--btn-radius);
+  background: var(--surface-sunken);
+  box-shadow: inset 0 0 0 var(--border-width) var(--border-strong);
+  color: var(--text-primary);
+  font-size: var(--text-sm);
+}
+
+.askInput::placeholder {
+  color: var(--text-tertiary);
+}
+
+.askInput:focus-visible {
+  outline-offset: 0;
+}
+
+.askInput:disabled {
+  cursor: default;
+  opacity: var(--opacity-muted);
+}
+
+.draft {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1-5);
+  min-width: 0;
+}
+
+.text {
+  width: 100%;
+  min-width: 0;
+  min-height: calc(var(--space-12) * 4);
+  padding: var(--space-3);
+  border: 0;
+  border-radius: var(--radius-md);
+  background: var(--surface-sunken);
+  box-shadow: inset 0 0 0 var(--border-width) var(--border-strong);
+  color: var(--text-primary);
+  font: inherit;
+  font-size: var(--text-md);
+  line-height: var(--leading-relaxed);
+  overflow-wrap: anywhere;
+  resize: vertical;
+}
+
+.text:focus-visible {
+  outline-offset: 0;
+}
+
+.text[aria-busy="true"] {
+  color: var(--text-secondary);
+}
+
+.tools {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: var(--btn-height);
+}
+
+.busy {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+}
+
+@media (width < 48rem) {
+  .askInput {
+    height: var(--size-hit);
+    font-size: var(--text-md);
+  }
+}

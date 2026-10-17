@@ -172,4 +172,71 @@ describe("Dialog", () => {
     expect(screen.getByRole("button", { name: "Save smart rule" })).toBeInTheDocument();
     expect(screen.getByRole("dialog").querySelector("[data-state]")).toBeNull();
   });
+
+  it("gives the focus to choices that arrive after it opened, when asked", () => {
+    function Late() {
+      const [ready, setReady] = useState(false);
+      return (
+        <Dialog open onClose={vi.fn()} title="Reply to Marta">
+          <button
+            type="button"
+            onClick={() => {
+              setReady(true);
+            }}
+          >
+            Load
+          </button>
+          {ready ? (
+            <DialogChoices label="Replies" choices={TIMES} onChoose={vi.fn()} focusOnShow />
+          ) : null}
+        </Dialog>
+      );
+    }
+    renderUi(<Late />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Load" }));
+
+    expect(screen.getByRole("button", { name: /Later today/ })).toHaveFocus();
+  });
+
+  it("keeps keys when the focused control went away: Esc still closes, page shortcuts don't fire", () => {
+    const onClose = vi.fn();
+    const onPageDone = vi.fn();
+    renderUi(<Snooze onClose={onClose} onPageDone={onPageDone} />);
+    (document.activeElement as HTMLElement | null)?.blur();
+    expect(document.activeElement).toBe(document.body);
+
+    fireEvent.keyDown(document.body, { key: "e" });
+    expect(onPageDone).not.toHaveBeenCalled();
+    expect(screen.getByRole("dialog")).toHaveFocus();
+
+    (document.activeElement as HTMLElement | null)?.blur();
+    fireEvent.keyDown(document.body, { key: "Escape" });
+    expect(onClose).toHaveBeenCalledOnce();
+  });
+
+  it("leaves the focus with someone typing when choices arrive", () => {
+    function Typing() {
+      const [ready, setReady] = useState(false);
+      return (
+        <Dialog open onClose={vi.fn()} title="Reply to Marta">
+          <input
+            aria-label="Own words"
+            onChange={() => {
+              setReady(true);
+            }}
+          />
+          {ready ? (
+            <DialogChoices label="Replies" choices={TIMES} onChoose={vi.fn()} focusOnShow />
+          ) : null}
+        </Dialog>
+      );
+    }
+    renderUi(<Typing />);
+    const field = screen.getByRole("textbox", { name: "Own words" });
+    field.focus();
+    fireEvent.change(field, { target: { value: "Say 2" } });
+
+    expect(field).toHaveFocus();
+  });
 });
