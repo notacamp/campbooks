@@ -1,7 +1,8 @@
 // The Gmail API of the fake Google (scripts/fake-google.ts): a demo mailbox
 // per fake Google account, served as the connectors module's Gmail adapter
 // reads it (users.me only: profile, labels, messages list/get, history) and
-// writes to it (messages modify and batchModify, recorded in history).
+// writes to it (messages modify, batchModify, trash and untrash, recorded in
+// history).
 // Development and recordings only. Every person, company and address here is
 // fictional; domains are `.example`.
 import { randomBytes } from "node:crypto";
@@ -637,8 +638,11 @@ const strings = (value: unknown): string[] =>
   Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : [];
 
 /**
- * Answer a Gmail write (`POST …/messages/{id}/modify`, `…/messages/batchModify`)
- * for `mailbox`. Returns false when the path is not one this fake serves.
+ * Answer a Gmail write (`POST …/messages/{id}/modify`, `…/messages/batchModify`,
+ * `…/messages/{id}/trash`, `…/messages/{id}/untrash`) for `mailbox`. Trash adds
+ * `TRASH` (and takes the message out of spam), keeping its other labels, so
+ * untrash, which removes `TRASH`, puts it back where it was. Returns false when
+ * the path is not one this fake serves.
  */
 export async function writeGmail(
   request: IncomingMessage,
@@ -666,7 +670,7 @@ export async function writeGmail(
     response.end();
     return true;
   }
-  const id = /^messages\/(\w+)\/modify$/u.exec(path)?.[1];
+  const [, id, verb] = /^messages\/(\w+)\/(modify|trash|untrash)$/u.exec(path) ?? [];
   if (id === undefined) {
     return false;
   }
@@ -675,7 +679,13 @@ export async function writeGmail(
     json(response, 404, { error: { code: 404, message: "Not Found" } });
     return true;
   }
-  modifyLabels(mailbox, message, add, remove);
+  if (verb === "trash") {
+    modifyLabels(mailbox, message, ["TRASH"], ["SPAM"]);
+  } else if (verb === "untrash") {
+    modifyLabels(mailbox, message, [], ["TRASH"]);
+  } else {
+    modifyLabels(mailbox, message, add, remove);
+  }
   json(response, 200, meta(message));
   return true;
 }
