@@ -190,10 +190,11 @@ describe("TeachScout", () => {
         "Mail from anyone at atelier-conseils.example always stays in your inbox and never gets filed away.",
       ),
     ).toBeVisible();
-    const saves = screen.getAllByRole("button", { name: /Save rule/u });
-    expect(saves).toHaveLength(2);
+    expect(screen.getAllByRole("button", { name: /Save rule/u })).toHaveLength(2);
 
-    fireEvent.click(saves[0] as HTMLElement);
+    // Joana's card comes first.
+    const joana = screen.getByRole("form", { name: /^Mail from Joana Reis/u });
+    fireEvent.click(within(joana).getByRole("button", { name: /Save rule/u }));
     await waitFor(() => {
       expect(screen.getAllByRole("button", { name: /Save rule/u })).toHaveLength(1);
     });
