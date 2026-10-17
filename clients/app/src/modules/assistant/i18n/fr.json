@@ -19,7 +19,7 @@
       "title": "De qui voulez-vous toujours voir les messages ?",
       "lead": "Leurs messages restent dans votre boîte de réception et ne sont jamais classés. Ce sont les personnes à qui vous répondez le plus.",
       "label": "Personnes à toujours voir",
-      "noSenders": "Pas encore de courrier pour faire des suggestions. Ajoutez une adresse ou un domaine ci-dessous.",
+      "noSenders": "Pas encore de courrier pour faire des suggestions. Saisissez une adresse ou un domaine ci-dessus.",
       "count_one": "{{count}} e-mail",
       "count_other": "{{count}} e-mails"
     },
@@ -30,7 +30,8 @@
       "lists": "Newsletters et listes de diffusion",
       "listsHint": "Courrier avec un en-tête List-Id",
       "automatic": "Notifications automatiques",
-      "automaticHint": "Courrier marqué comme envoyé automatiquement"
+      "automaticHint": "Courrier marqué comme envoyé automatiquement",
+      "senders": "Expéditeurs qui n’ont jamais besoin de vous"
     },
     "add": {
       "label": "Quelqu’un d’autre",
@@ -38,6 +39,14 @@
       "button": "Ajouter",
       "invalid": "Saisissez une adresse complète (nom@example.com) ou un domaine (example.com).",
       "freeMail": "{{domain}} est un fournisseur de messagerie gratuit : une règle pour tout ce domaine toucherait des inconnus. Ajoutez plutôt l’adresse de la personne."
+    },
+    "find": {
+      "label": "Trouver quelqu’un",
+      "placeholder": "Un nom, une adresse ou un domaine",
+      "newAddress": "Pas encore de courrier de sa part",
+      "newDomain": "Tout le monde chez {{domain}}",
+      "none": "Personne dans votre courrier ne correspond à « {{text}} ». Pour ajouter quelqu’un de nouveau, saisissez son adresse complète ou un domaine.",
+      "failed": "Scout n’a pas pu faire la recherche pour l’instant. Réessayez dans un instant."
     },
     "act": {
       "title": "Quand Scout est sûr, doit-il agir ?",
