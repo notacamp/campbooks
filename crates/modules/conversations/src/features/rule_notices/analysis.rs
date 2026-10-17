@@ -18,6 +18,10 @@ use crate::{
 
 /// One sender's mail in an inbox over the window, as counted.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[allow(
+    clippy::struct_excessive_bools,
+    reason = "independent yes/no facts about a sender's mail, each a reason not to offer"
+)]
 pub struct SenderStats {
     /// The sender's address, lower-cased.
     pub sender: String,

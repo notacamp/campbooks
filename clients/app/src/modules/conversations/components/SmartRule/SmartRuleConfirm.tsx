@@ -89,7 +89,7 @@ function Confirm({
   const t = typed as unknown as Translate;
   const locale = i18n.language;
   const undo = useUndoToast();
-  const { create, remove } = useRuleMutations(workspaceId);
+  const { create, remove, restore, wasRemoved } = useRuleMutations(workspaceId);
   const preview = useRulePreview(workspaceId, draft.inboxId, {
     conditions: draft.conditions,
     actions: draft.actions,
@@ -145,9 +145,26 @@ function Confirm({
             // A promise, not mutate's callbacks: the dialog is gone by the
             // time Undo is pressed, and a failure must still be said.
             undo: () => {
-              remove.mutateAsync({ ruleId: rule.id, restore: true }).catch(() => {
-                undo.notify(t("rules.run.undoFailed"));
-              });
+              // Undo all on the run already removed it: never twice.
+              if (wasRemoved(rule.id)) {
+                return;
+              }
+              remove
+                .mutateAsync({ ruleId: rule.id, restore: true })
+                .then(() => {
+                  // Undo of the Undo brings the same rule back, applied again.
+                  undo.push({
+                    label: t("rules.toast.stopped", { rule: sentence }),
+                    undo: () => {
+                      restore.mutateAsync({ ruleId: rule.id, applyToExisting: true }).catch(() => {
+                        undo.notify(t("rules.toast.failed"));
+                      });
+                    },
+                  });
+                })
+                .catch(() => {
+                  undo.notify(t("rules.run.undoFailed"));
+                });
             },
           });
         },

@@ -325,7 +325,7 @@ async fn ahead_suggestions(
     deadline: std::time::Instant,
 ) -> Result<RuleSuggestions> {
     let mut out = Vec::new();
-    for (likeness, conditions) in ahead_likenesses(candidate) {
+    for (likeness, conditions) in ahead_likenesses(candidate, rules::bins(actions)) {
         if rules::validate(&conditions, actions).is_err() {
             continue;
         }
@@ -358,12 +358,14 @@ async fn ahead_suggestions(
 /// sender failed its checks, the From domain is the one being pretended
 /// to: the offer is "pretending to be it" first, never the whole domain
 /// (its real mail would go too).
-fn ahead_likenesses(candidate: &Candidate) -> Vec<(Likeness, Vec<RuleCondition>)> {
+fn ahead_likenesses(candidate: &Candidate, bins: bool) -> Vec<(Likeness, Vec<RuleCondition>)> {
     let sender = candidate.sender_address.clone();
     let domain = registrable_domain(&sender);
     let own_domain = !domain.is_empty() && !is_free_mail(&domain);
     let by_sender = (Likeness::Sender, vec![RuleCondition::SenderAddress(sender)]);
-    if candidate.auth_failed() && own_domain {
+    // Mail pretending to be a sender is only ever offered to the bin: never
+    // marked paid, never filed.
+    if bins && candidate.auth_failed() && own_domain {
         return vec![
             (
                 Likeness::Impersonation,

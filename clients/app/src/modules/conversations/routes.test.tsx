@@ -350,6 +350,13 @@ describe("the inbox", () => {
     const confirm = await screen.findByRole("dialog", { name: "A rule for mail like this" });
     await within(confirm).findByText("It matches 40 emails already here.");
     fireEvent.click(within(confirm).getByRole("button", { name: /Save smart rule/u }));
+    // Its result shows for a moment, then the run's progress is the news.
+    await waitFor(
+      () => {
+        expect(screen.queryByText("Smart rule saved")).toBeNull();
+      },
+      { timeout: 3000 },
+    );
     return api;
   }
 
@@ -543,6 +550,10 @@ describe("the inbox", () => {
       "aria-keyshortcuts",
     );
     fireEvent.keyDown(document, { key: "1" });
+    // The offer's 1 opens the smart-rule confirmation, which saves.
+    const confirm = await screen.findByRole("dialog", { name: "A rule for mail like this" });
+    await within(confirm).findByText("It matches 40 emails already here.");
+    fireEvent.click(within(confirm).getByRole("button", { name: /Save smart rule/u }));
     await waitFor(() => {
       expect(api.calls.some((call) => call.route === `POST ${W}/inboxes/${INBOX.id}/rules`)).toBe(
         true,

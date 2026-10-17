@@ -132,7 +132,9 @@ export function ruleSentence(
 export function likenessTitle(t: Translate, suggestion: RuleSuggestion): string {
   const value = (field: RuleCondition["field"]) => {
     const found = suggestion.conditions.find((condition) => condition.field === field);
-    return found === undefined || typeof found.value !== "string" ? "" : found.value;
+    return found !== undefined && "value" in found && typeof found.value === "string"
+      ? found.value
+      : "";
   };
   switch (suggestion.likeness) {
     case "sender": {

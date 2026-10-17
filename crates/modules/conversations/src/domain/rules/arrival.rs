@@ -55,6 +55,42 @@ impl Ledger {
     }
 }
 
+/// Archive, mark read, trash or report the message that just arrived, as
+/// `outcome` says, noting each in `ledger` and `effects`.
+async fn flag_on_arrival(
+    tx: &mut Transaction<'_, Postgres>,
+    arrival: &Arrival<'_>,
+    outcome: &Outcome,
+    ledger: &mut Ledger,
+    effects: &mut Effects,
+) -> Result<()> {
+    for (rule, flag) in [
+        (&outcome.archive, Flag::Archive),
+        (&outcome.read, Flag::Read),
+    ] {
+        let Some(rule) = rule else { continue };
+        let messages = effects::flag_message(tx, arrival.message, flag).await?;
+        if messages.is_empty() {
+            continue;
+        }
+        if flag == Flag::Archive {
+            ledger.of(rule).archived = true;
+        } else {
+            ledger.of(rule).read = true;
+        }
+        effects.add(flag.change(), messages, flag.requested());
+    }
+    if let Some(applied) = &outcome.bin {
+        let flag = super::apply::bin_flag(applied.value);
+        let messages = effects::flag_message(tx, arrival.message, flag).await?;
+        if !messages.is_empty() {
+            ledger.of(&applied.rule).binned = Some(applied.value);
+            effects.add(flag.change(), messages, flag.requested());
+        }
+    }
+    Ok(())
+}
+
 /// Carry out what `outcome` says about a message that just arrived: store
 /// the rules' answers as `taught` decisions, archive, mark read, label, trash
 /// or report the message (and ask the provider to do the same), and record each rule's
@@ -88,30 +124,7 @@ pub async fn on_arrival(
             RequestedChange::MoveToStream { stream },
         );
     }
-    for (rule, flag) in [
-        (&outcome.archive, Flag::Archive),
-        (&outcome.read, Flag::Read),
-    ] {
-        let Some(rule) = rule else { continue };
-        let messages = effects::flag_message(tx, arrival.message, flag).await?;
-        if messages.is_empty() {
-            continue;
-        }
-        if flag == Flag::Archive {
-            ledger.of(rule).archived = true;
-        } else {
-            ledger.of(rule).read = true;
-        }
-        effects.add(flag.change(), messages, flag.requested());
-    }
-    if let Some(applied) = &outcome.bin {
-        let flag = super::apply::bin_flag(applied.value);
-        let messages = effects::flag_message(tx, arrival.message, flag).await?;
-        if !messages.is_empty() {
-            ledger.of(&applied.rule).binned = Some(applied.value);
-            effects.add(flag.change(), messages, flag.requested());
-        }
-    }
+    flag_on_arrival(tx, arrival, outcome, &mut ledger, &mut effects).await?;
     for applied in &outcome.labels {
         let Ok(label) = applied.value.parse::<LabelId>() else {
             continue;

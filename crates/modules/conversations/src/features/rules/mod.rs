@@ -630,28 +630,18 @@ pub async fn create(
     Ok((StatusCode::CREATED, Json(created)))
 }
 
-/// Create `body` in `inbox` for `access` in `tx` (the caller checked they
-/// may teach there).
-pub async fn create_in(
+/// The state a new rule starts in, and whether it acts without asking.
+async fn starting_state(
     tx: &mut Transaction<'_, Postgres>,
     state: &AppState,
     access: &Access,
     inbox: InboxId,
     body: &CreateRule,
-) -> Result<CreatedRule> {
-    rules::labels_of_inbox(tx, inbox, &body.conditions, &body.actions).await?;
-    if let Some(notice) = body.notice_id {
-        rule_notices::check_open(tx, notice, inbox).await?;
-    }
-    // A suggestion the member confirmed as a smart rule is theirs: it acts.
-    let origin = if body.notice_id.is_some() {
-        RuleOrigin::Suggestion
-    } else {
-        body.origin
-    };
+    origin: RuleOrigin,
+) -> Result<(RuleState, bool)> {
     let from_evidence = body.notice_id.is_none()
         && matches!(origin, RuleOrigin::Correction | RuleOrigin::Suggestion);
-    let (rule_state, acted_without_asking) = if from_evidence {
+    Ok(if from_evidence {
         // Rules from evidence act for the member only when they let
         // Campbooks act without asking, and never for others.
         let personal = !rules::is_shared(tx, inbox).await?;
@@ -674,7 +664,30 @@ pub async fn create_in(
             NewRuleState::Active => (RuleState::Active, false),
             NewRuleState::Proposed => (RuleState::Proposed, false),
         }
+    })
+}
+
+/// Create `body` in `inbox` for `access` in `tx` (the caller checked they
+/// may teach there).
+pub async fn create_in(
+    tx: &mut Transaction<'_, Postgres>,
+    state: &AppState,
+    access: &Access,
+    inbox: InboxId,
+    body: &CreateRule,
+) -> Result<CreatedRule> {
+    rules::labels_of_inbox(tx, inbox, &body.conditions, &body.actions).await?;
+    if let Some(notice) = body.notice_id {
+        rule_notices::check_open(tx, notice, inbox).await?;
+    }
+    // A suggestion the member confirmed as a smart rule is theirs: it acts.
+    let origin = if body.notice_id.is_some() {
+        RuleOrigin::Suggestion
+    } else {
+        body.origin
     };
+    let (rule_state, acted_without_asking) =
+        starting_state(tx, state, access, inbox, body, origin).await?;
     let ws = access.workspace.to_string();
     if let Some(from) = body.from_conversation_id {
         let in_inbox = sqlx::query_scalar!(

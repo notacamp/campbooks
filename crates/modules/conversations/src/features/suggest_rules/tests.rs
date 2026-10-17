@@ -337,7 +337,12 @@ async fn already_paid_offers_to_mark_the_senders_bills_paid(db: PgPool) {
     kit.ingest_value(
         workspace,
         inbox,
-        &mail_with_results("bill", "faturas@edp.example", PASSED, 1),
+        &mail_with_results(
+            "bill",
+            "faturas@edp.example",
+            "mx.google.com; dkim=pass header.i=@edp.example; dmarc=pass (p=REJECT) header.from=edp.example",
+            1,
+        ),
     )
     .await;
     let bill = kit.conversation_of("bill-0").await;

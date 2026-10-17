@@ -111,6 +111,10 @@ async fn enqueue(
 }
 
 /// A sender's mail in the window, as one query counts it.
+#[allow(
+    clippy::struct_excessive_bools,
+    reason = "one row of independent yes/no facts, read straight from SQL"
+)]
 struct StatsRow {
     sender_address: String,
     sender_name: Option<String>,
@@ -439,7 +443,7 @@ pub async fn list(
     }
     // Inboxes not looked at lately get a pass; what it finds shows next time.
     let every = i32::try_from(settings.every_hours).unwrap_or(i32::MAX);
-    let stale = sqlx::query_scalar!(
+    let to_scan = sqlx::query_scalar!(
         r#"SELECT i.id AS "id!: InboxId"
              FROM unnest($1::uuid[]) AS i(id)
              LEFT JOIN conversations.rule_notice_scans s ON s.inbox_id = i.id
@@ -450,7 +454,7 @@ pub async fn list(
     .fetch_all(&mut *tx)
     .await?;
     let ws = access.workspace.to_string();
-    for inbox in stale {
+    for inbox in to_scan {
         enqueue(&mut tx, &ws, inbox).await?;
     }
     let rows = sqlx::query_as!(
