@@ -35,6 +35,8 @@ type Summary = Schema<"ConversationSummary">;
 type Suggested = Schema<"SuggestedAction">[];
 
 const PICKED = "Scout picked these for this email";
+/** A warning names its sender by address. */
+const PHISH_NAME = "it-support@at3lier-sol.example";
 
 /** `summary` with the server's ranked actions on its need. */
 function ranked(summary: Summary, actions: Suggested): Summary {
@@ -127,19 +129,20 @@ describe("What needs you: the actions Scout picked", () => {
       ...others,
     ]);
     renderHome();
-    const row = await actions("IT Support");
+    const row = await actions(PHISH_NAME);
     const own = row.getAllByRole("button").map((b) => b.textContent);
     // It's safe first, as ranked (the fixed order is Report first).
     expect(own[0]).toMatch(/^It’s safe/u);
     expect(own[1]).toMatch(/^Report and delete/u);
     expect(row.getByRole("img", { name: PICKED })).toBeInTheDocument();
-    expect(document.body).not.toHaveTextContent("81");
+    // No percentage anywhere.
+    expect(document.body).not.toHaveTextContent("%");
   });
 
   it("offers exactly the fixed actions when the server sent none", async () => {
     api([...NEEDS, SOFIA]);
     renderHome();
-    const row = await actions("IT Support");
+    const row = await actions(PHISH_NAME);
     const own = row.getAllByRole("button").map((b) => b.textContent);
     expect(own[0]).toMatch(/^Report and delete/u);
     expect(own[1]).toMatch(/^It’s safe/u);
@@ -156,7 +159,7 @@ describe("What needs you: the actions Scout picked", () => {
       ...others,
     ]);
     renderHome();
-    await actions("IT Support");
+    await actions(PHISH_NAME);
     // 1 is now It's safe: the warning is marked safe, not reported.
     fireEvent.keyDown(document, { key: "1" });
     await waitFor(() => {
@@ -178,7 +181,7 @@ describe("What needs you: the actions Scout picked", () => {
       ...others,
     ]);
     renderHome();
-    await actions("IT Support");
+    await actions(PHISH_NAME);
     fireEvent.keyDown(document, { key: "j" });
     const row = await actions("Marta Ferreira");
     expect(row.getByRole("button", { name: /^Open attachment, then Forward…/u })).toBeVisible();
@@ -200,7 +203,7 @@ describe("What needs you: the actions Scout picked", () => {
       ...others,
     ]);
     renderHome();
-    await actions("IT Support");
+    await actions(PHISH_NAME);
     fireEvent.keyDown(document, { key: "j" });
     const row = await actions("Marta Ferreira");
     fireEvent.click(row.getByRole("button", { name: /^Remind me…/u }));
@@ -219,7 +222,7 @@ describe("What needs you: the actions Scout picked", () => {
       ...others,
     ]);
     const { router } = renderHome();
-    await actions("IT Support");
+    await actions(PHISH_NAME);
     fireEvent.keyDown(document, { key: "j" });
     await actions("Marta Ferreira");
     fireEvent.keyDown(document, { key: "1" });
@@ -275,12 +278,38 @@ describe("What needs you: the actions Scout picked", () => {
       withFile,
     );
     renderHome();
-    await actions("IT Support");
+    await actions(PHISH_NAME);
     fireEvent.keyDown(document, { key: "j" });
     await actions("Marta Ferreira");
     fireEvent.keyDown(document, { key: "1" });
     await waitFor(() => {
       expect(document.activeElement?.textContent).toContain("walkthrough-plan.pdf");
+    });
+  });
+
+  it("picks the first match with Enter in the search box", async () => {
+    const calls = api([
+      PHISH,
+      ranked(MARTA, [{ actions: ["forward"], likelihood: 88 }]),
+      ...others,
+    ]);
+    renderHome();
+    await actions(PHISH_NAME);
+    fireEvent.keyDown(document, { key: "j" });
+    await actions("Marta Ferreira");
+    fireEvent.keyDown(document, { key: "1" });
+    const dialog = await screen.findByRole("dialog", {
+      name: "Forward Marta Ferreira’s email to…",
+    });
+    const box = within(dialog).getByRole("searchbox", { name: "Find someone by name" });
+    fireEvent.change(box, { target: { value: "rita" } });
+    await within(dialog).findByRole("button", { name: /Rita Gomes/u });
+    fireEvent.keyDown(box, { key: "Enter" });
+    await waitFor(() => {
+      expect(calls.calls.find((c) => c.route === `POST ${W}/drafts`)?.body).toMatchObject({
+        kind: "forward",
+        to: [{ name: "Rita Gomes", address: "rita@silva-contas.example" }],
+      });
     });
   });
 });

@@ -82,12 +82,12 @@ describe("attention model", () => {
 
   it("offers the fixed actions when the server sent no ranking", () => {
     // The key is missing: exactly today's actions, not picked by Scout.
-    expect(rowChoices("need", undefined)).toEqual({
+    expect(rowChoices("need")).toEqual({
       own: [{ id: "reply", steps: ["reply"] }],
       universal: ["done", "snooze", "not_needed"],
       picked: false,
     });
-    expect(rowChoices("toPay", undefined).own.map((c) => c.id)).toEqual(["remind", "paid"]);
+    expect(rowChoices("toPay").own.map((c) => c.id)).toEqual(["remind", "paid"]);
   });
 
   it("offers the ranked actions in the server's order, at most three", () => {
@@ -126,6 +126,22 @@ describe("attention model", () => {
     expect(rowChoices("toPay", ranked).own.map((c) => c.id)).toEqual(["paid", "remind_when"]);
     // Nothing usable: the fixed actions.
     expect(rowChoices("need", []).picked).toBe(false);
+  });
+
+  it("never drops a bill's question or a warning's verdict from a ranking", () => {
+    // The paid pair went unrated: the bill still asks it, first.
+    expect(
+      rowChoices("bill", [
+        { actions: ["remind"], likelihood: 85 },
+        { actions: ["forward"], likelihood: 80 },
+      ]).own.map((c) => c.id),
+    ).toEqual(["paid", "to_pay", "remind_when"]);
+    expect(
+      rowChoices("toPay", [{ actions: ["forward"], likelihood: 80 }]).own.map((c) => c.id),
+    ).toEqual(["paid", "forward"]);
+    expect(
+      rowChoices("warning", [{ actions: ["safe"], likelihood: 80 }]).own.map((c) => c.id),
+    ).toEqual(["report", "safe"]);
   });
 
   it("words Done today and says what can be undone", () => {

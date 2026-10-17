@@ -167,7 +167,7 @@ export function doneTodayKind(item: ItemView): {
 }
 
 /** One action of the catalogue, as the server names it (campbooks-cloud#166). */
-export type CatalogueAction = Schema<"NeedAction">;
+type CatalogueAction = Schema<"NeedAction">;
 type SuggestedAction = Schema<"SuggestedAction">;
 
 /** A catalogue action as the row runs it. */
@@ -196,17 +196,29 @@ export interface OwnChoice {
 const MAX_OWN = 3;
 
 /**
+ * The answers a row can't do without, ranked or not: a bill's question, a
+ * bill still to pay's Mark paid, a warning's verdict. Kept first, in their
+ * fixed order, when the ranking left one out (its rating was missing).
+ */
+const REQUIRED: Partial<Record<RowKind, readonly OwnActionId[]>> = {
+  bill: ["paid", "to_pay"],
+  toPay: ["paid"],
+  warning: ["report", "safe"],
+};
+
+/**
  * What a row offers. With the server's ranked `actions` (the catalogue is on
  * and the message was rated), its own actions are those, in the server's
  * order, `picked` by Scout; a pair is one button. Without them (the key is
  * missing), exactly the fixed actions of {@link rowActionIds}. A question
- * keeps Yes and No (its answer is the point), and a bill already said to be
- * still to pay never offers Still to pay again. Nothing usable left in the
- * ranking falls back to the fixed actions too.
+ * keeps Yes and No (its answer is the point), a bill already said to be
+ * still to pay never offers Still to pay again, and a row's required answers
+ * ({@link REQUIRED}) are always there. Nothing usable left in the ranking
+ * falls back to the fixed actions too.
  */
 export function rowChoices(
   kind: RowKind,
-  ranked: readonly SuggestedAction[] | null | undefined,
+  ranked?: readonly SuggestedAction[] | null,
 ): { own: OwnChoice[]; universal: UniversalActionId[]; picked: boolean } {
   const fixed = rowActionIds(kind);
   const fallback = {
@@ -229,7 +241,12 @@ export function rowChoices(
       own.push({ id, steps });
     }
   }
-  return own.length === 0
-    ? fallback
-    : { own: own.slice(0, MAX_OWN), universal: fixed.universal, picked: true };
+  if (own.length === 0) {
+    return fallback;
+  }
+  const missing = (REQUIRED[kind] ?? []).filter(
+    (id) => !own.some((choice) => choice.steps.length === 1 && choice.steps[0] === id),
+  );
+  const all = [...missing.map((id) => ({ id, steps: [id] })), ...own];
+  return { own: all.slice(0, MAX_OWN), universal: fixed.universal, picked: true };
 }

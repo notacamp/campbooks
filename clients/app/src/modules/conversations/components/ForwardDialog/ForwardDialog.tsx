@@ -1,12 +1,24 @@
 import { useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { useEffect, useEffectEvent, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { useDebounced } from "~/lib/hooks/use-debounced";
 import { Banner, Dialog, DialogChoices, SearchField, Text } from "~/lib/ui";
 
-import { createDraft, draftKeys, type Draft } from "../../api/drafts";
-import { useConversation, useSenders, type NeedView, type Sender } from "../../api/queries";
+import {
+  createDraft,
+  draftKeys,
+  saveDraft,
+  useConversationDrafts,
+  type Draft,
+} from "../../api/drafts";
+import {
+  useConversation,
+  useSenders,
+  type MessageView,
+  type NeedView,
+  type Sender,
+} from "../../api/queries";
 import { forwardQuote, type QuoteWords } from "../../compose/quote";
 import { needMessageOf } from "../NeedMessage/NeedMessage";
 
@@ -65,7 +77,10 @@ export function ForwardDialog({
   const { t, i18n } = useTranslation("conversations");
   const queryClient = useQueryClient();
   const detail = useConversation(workspaceId, conversationId);
+  const drafts = useConversationDrafts(workspaceId, conversationId);
   const [typed, setTyped] = useState("");
+  // The person picked: the forward starts once the email and its drafts are here.
+  const [chosen, setChosen] = useState<Sender | undefined>();
   const [busy, setBusy] = useState(false);
   const [failed, setFailed] = useState(false);
   const text = typed.trim();
@@ -95,34 +110,65 @@ export function ForwardDialog({
     to: t("compose.quote.to"),
   };
 
-  const pick = (address: string) => {
-    const person = listed.find((sender) => sender.address === address);
-    const message = needMessageOf(detail.data?.messages ?? [], need);
-    if (person === undefined || message === undefined || busy) {
-      return;
-    }
-    setBusy(true);
-    setFailed(false);
-    void createDraft(workspaceId, {
-      kind: "forward",
-      message_id: message.id,
-      quoted: forwardQuote(message, i18n.language, words),
-      to: [{ name: person.name ?? null, address: person.address }],
-    })
+  // The pick a forward was started for (a failed one can be picked again).
+  const started = useRef<Sender | null>(null);
+  // A forward of this email already started is addressed again, not doubled.
+  const start = useEffectEvent((person: Sender, message: MessageView, known: Draft[]) => {
+    const to = [{ name: person.name ?? null, address: person.address }];
+    const existing = known.find(
+      (draft) =>
+        (draft.state === "draft" || draft.state === "failed") &&
+        draft.kind === "forward" &&
+        draft.message_id === message.id,
+    );
+    const saved =
+      existing === undefined
+        ? createDraft(workspaceId, {
+            kind: "forward",
+            message_id: message.id,
+            quoted: forwardQuote(message, i18n.language, words),
+            to,
+          })
+        : saveDraft(workspaceId, existing.id, { to, version: existing.version });
+    void saved
       .then(async (draft) => {
         queryClient.setQueryData<Draft[]>(
           draftKeys.forConversation(workspaceId, conversationId),
-          (list) => [draft, ...(list ?? [])],
+          (list) => [draft, ...(list ?? []).filter((each) => each.id !== draft.id)],
         );
         onForwarded(draft);
         await queryClient.invalidateQueries({ queryKey: draftKeys.all(workspaceId) });
       })
       .catch(() => {
+        started.current = null;
         setFailed(true);
+        setChosen(undefined);
       })
       .finally(() => {
         setBusy(false);
       });
+  });
+  const message = needMessageOf(detail.data?.messages ?? [], need);
+  useEffect(() => {
+    if (
+      chosen !== undefined &&
+      chosen !== started.current &&
+      message !== undefined &&
+      drafts.data !== undefined
+    ) {
+      started.current = chosen;
+      start(chosen, message, drafts.data);
+    }
+  }, [chosen, message, drafts.data]);
+
+  const pick = (address: string) => {
+    const person = listed.find((sender) => sender.address === address);
+    if (person === undefined || busy) {
+      return;
+    }
+    setBusy(true);
+    setFailed(false);
+    setChosen(person);
   };
 
   return (
@@ -144,14 +190,28 @@ export function ForwardDialog({
           inputMode="search"
           variant="page"
           data-autofocus=""
-          onKeyDown={(event) => {
-            // With text in the box, Enter picks the first match.
-            if (text !== "" && event.key === "Enter") {
+          // Before the dialog's own keys (it closes on Esc and keeps the
+          // arrows for its choices): Enter picks the first match, ↓ goes to
+          // the people, Esc clears what was typed first.
+          onKeyDownCapture={(event) => {
+            if (event.key === "Enter" && text !== "") {
               event.preventDefault();
               const first = listed[0];
               if (first !== undefined) {
                 pick(first.address);
               }
+            } else if (event.key === "ArrowDown") {
+              const choice = event.currentTarget
+                .closest("[role='dialog']")
+                ?.querySelector<HTMLElement>("[data-dialog-choice]");
+              if (choice !== null && choice !== undefined) {
+                event.preventDefault();
+                choice.focus();
+              }
+            } else if (event.key === "Escape" && typed !== "") {
+              event.preventDefault();
+              event.stopPropagation();
+              setTyped("");
             }
           }}
         />

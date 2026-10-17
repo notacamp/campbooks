@@ -34,6 +34,7 @@ async function picked(page: Page, workspace: string): Promise<void> {
     }
     await pause(1000);
   }
+  throw new Error("Home never showed actions Scout picked: is the catalogue on and rated?");
 }
 
 /** Select a row by its sender; its actions show under it. */
@@ -63,11 +64,10 @@ export default async function homeRankedActions({ page }: ScenarioContext): Prom
   await caption(page, "Remind asks when: one decision", 2000);
   await remind.getByRole("button", { name: /Tomorrow morning/u }).click();
   await caption(page, "It folds away with a one-line confirmation; Undo stays", 2200);
-  if (phone) {
-    await page.getByRole("button", { name: /^Undo/u }).first().click();
-  } else {
-    await page.keyboard.press("z");
-  }
+  // The toast's Undo (a status region), not Done today's.
+  await (phone
+    ? page.getByRole("status").getByRole("button", { name: /^Undo/u }).first().click()
+    : page.keyboard.press("z"));
   await pause(1500);
 
   // Forward asks to whom: found by name, never an address typed from memory.

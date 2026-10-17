@@ -95,6 +95,9 @@ interface Row {
 
 type ActionId = OwnActionId | UniversalActionId;
 
+/** The steps that open a dialog: a pair runs at most one of them. */
+const DIALOG_STEPS: ReadonlySet<ActionId> = new Set(["reply", "remind_when", "forward", "snooze"]);
+
 /** What an own action needs to work in an inbox the member may only read. */
 const READ_ONLY_STEPS: ReadonlySet<OwnActionId> = new Set(["remind_when", "open_attachment"]);
 
@@ -540,11 +543,12 @@ export function WhatNeedsYou({ workspaceId, now, offer }: WhatNeedsYouProps) {
     setSnoozing({ row, remind });
   };
   // Open attachment: the item opens on the email, its first file focused
-  // (Enter previews or saves it, as in the reader).
-  const showAttachment = (row: Row) => {
+  // (Enter previews or saves it, as in the reader). Before a dialog of the
+  // same pair, it only opens: the focus stays in the dialog.
+  const showAttachment = (row: Row, focus = true) => {
     setHighlight(undefined);
     setExpandedId(row.item.id);
-    setAttachmentFor(row.item.id);
+    setAttachmentFor(focus ? row.item.id : undefined);
   };
   const forward = (row: Row) => {
     keepFocus();
@@ -606,12 +610,20 @@ export function WhatNeedsYou({ workspaceId, now, offer }: WhatNeedsYouProps) {
       }
     }
   };
-  /** An action of the row: one of its own (a pair runs both, in order) or a universal one. */
+  /**
+   * An action of the row: one of its own (a pair runs both, in order, with
+   * at most one dialog) or a universal one.
+   */
   const run = (row: Row, id: string) => {
     const choice = actionsOf(row).choices.find((c) => c.id === id);
     if (choice !== undefined) {
+      const dialog = choice.steps.find((each) => DIALOG_STEPS.has(each));
       for (const each of choice.steps) {
-        step(row, each);
+        if (each === "open_attachment") {
+          showAttachment(row, dialog === undefined);
+        } else if (!DIALOG_STEPS.has(each) || each === dialog) {
+          step(row, each);
+        }
       }
       return;
     }
@@ -622,7 +634,8 @@ export function WhatNeedsYou({ workspaceId, now, offer }: WhatNeedsYouProps) {
   const selectedActions = selected === undefined ? undefined : actionsOf(selected);
   const offered = (id: ActionId) =>
     selectedActions !== undefined &&
-    [...selectedActions.own, ...selectedActions.universal].some((action) => action.id === id);
+    (selectedActions.choices.some((choice) => choice.steps.some((each) => each === id)) ||
+      selectedActions.universal.some((action) => action.id === id));
 
   const move = (step: number) => {
     keepFocus();
@@ -787,8 +800,9 @@ export function WhatNeedsYou({ workspaceId, now, offer }: WhatNeedsYouProps) {
   const review = order.some((row) => row.item.reason === "review");
   const times = snoozeOptions(today);
   // Remind's times: a bill's reminder before its due date first, then Snooze's.
+  const billDue = (row: Row) => ["bill", "toPay"].includes(kindOf(row.need));
   const beforeDue =
-    snoozing?.remind === true && reminder(snoozing.row).kind === "before"
+    snoozing?.remind === true && billDue(snoozing.row) && reminder(snoozing.row).kind === "before"
       ? [{ key: "due" as const, until: reminder(snoozing.row).until }]
       : [];
   const asked: { key: string; until: Date }[] = [
@@ -1063,7 +1077,8 @@ function NeedDetail({
     }
     // After the email has drawn its files; the clamp opens when one is focused.
     const frame = requestAnimationFrame(() => {
-      if (box.current !== null) {
+      // Never from behind a dialog.
+      if (box.current !== null && document.querySelector("[role='dialog']") === null) {
         focusNextAttachment(box.current);
       }
       focused();
