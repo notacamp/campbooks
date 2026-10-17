@@ -6,6 +6,22 @@ All notable changes to Campbooks Next are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- **Reply proposes Scout's draft.** Reply (R, an item's Reply on Home, the reader's Reply)
+  now opens a dialog with two or three likely replies, each with its number key ("Yes,
+  Thursday works", "Ask to move it to the afternoon"), a line to say it in your own words,
+  and "Write my own" for the plain composer. Scout writes the draft only when you pick one,
+  in the conversation's language and signed with your name. Edit it in place, make it
+  shorter or ask for a change in plain words, then Send: it goes with the usual Undo
+  window, the Home item folds away, and Undo brings the draft back. "Open in composer"
+  moves it to the full composer. Nothing is sent until you press Send, and nothing is
+  written before you pick. Servers with no `complete` model that may read mail offer only
+  "Write my own", saying why. Items in an inbox you can only read no longer offer Reply,
+  Done or Not needed on Home. Two new operations, `conversations.suggest_replies` and
+  `conversations.write_reply`, need `conversations:send`, count against the workspace's
+  daily AI limit and a per-member hourly allowance, and store nothing.
+
 ### Changed
 
 - **Find people by name in Scout's questions.** In "Whose mail should always reach you?"
