@@ -1925,15 +1925,15 @@
               "kind"
             ],
             "properties": {
+              "inbound": {
+                "type": "boolean",
+                "description": "It is mail the inbox received (not the member's own): where a\nprovider cannot tell where it was, it goes back to the inbox."
+              },
               "kind": {
                 "type": "string",
                 "enum": [
                   "untrash"
                 ]
-              },
-              "inbound": {
-                "type": "boolean",
-                "description": "It is mail the inbox received (not the member's own): where a\nprovider cannot tell where it was, it goes back to the inbox."
               }
             }
           },
@@ -1960,15 +1960,15 @@
               "kind"
             ],
             "properties": {
+              "inbound": {
+                "type": "boolean",
+                "description": "It is mail the inbox received (not the member's own)."
+              },
               "kind": {
                 "type": "string",
                 "enum": [
                   "unspam"
                 ]
-              },
-              "inbound": {
-                "type": "boolean",
-                "description": "It is mail the inbox received (not the member's own)."
               }
             }
           },

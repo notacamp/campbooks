@@ -403,11 +403,28 @@ pub async fn backlog(
                 }),
             });
     }
+    let restore = restore_of(&mut tx, stream, &ids).await?;
+    tx.commit().await?;
+    Ok(Backlog {
+        pending,
+        labels,
+        own,
+        restore,
+    })
+}
+
+/// Where each of `ids` (messages of `stream`) was before Campbooks put it in
+/// the trash at Zoho, while that still holds.
+async fn restore_of(
+    conn: &mut PgConnection,
+    stream: StreamId,
+    ids: &[String],
+) -> Result<HashMap<String, Vec<String>>> {
     // Where each message was before Campbooks put it in the trash (Zoho):
     // only when that is the latest trash or spam change made to it, and
     // only while no sync has seen it leave the trash since (a sync clears
     // the record then, `forget_left_trash`).
-    let restore = sqlx::query!(
+    Ok(sqlx::query!(
         r#"SELECT o.provider_message_id, o.restore_to AS "restore_to!"
              FROM connectors.outbound_changes o
             WHERE o.stream_id = $1 AND o.provider_message_id = ANY($2)
@@ -419,20 +436,13 @@ pub async fn backlog(
                      AND l.kind IN ('trash', 'untrash', 'spam', 'unspam')
                      AND l.state = 'applied' AND l.id > o.id)"#,
         stream as StreamId,
-        &ids,
+        ids,
     )
-    .fetch_all(&mut *tx)
+    .fetch_all(conn)
     .await?
     .into_iter()
     .map(|row| (row.provider_message_id, row.restore_to))
-    .collect();
-    tx.commit().await?;
-    Ok(Backlog {
-        pending,
-        labels,
-        own,
-        restore,
-    })
+    .collect())
 }
 
 /// How one change ended in a run.
