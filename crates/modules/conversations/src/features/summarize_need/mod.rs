@@ -160,29 +160,7 @@ impl JobHandler for SummarizeNeed {
             .run(gateway.chat(Role::Complete, prompt::request(&email)))
             .await
         {
-            Ok(response) => {
-                let parsed = response.json::<Answer>().ok();
-                if parsed.is_none() {
-                    // Sizes and the stop reason only, never what the model wrote.
-                    let finish = response.finish_kind();
-                    let reason = if response.content.trim().is_empty() {
-                        "empty"
-                    } else if finish == "length" {
-                        "truncated"
-                    } else {
-                        "not_json"
-                    };
-                    tracing::warn!(
-                        feature = FEATURE,
-                        reason,
-                        finish_reason = finish,
-                        completion_tokens = response.usage.map(|u| u.completion_tokens),
-                        content_chars = response.content.chars().count(),
-                        "the summary answer did not parse"
-                    );
-                }
-                parsed
-            }
+            Ok(response) => parsed(&response),
             // The workspace used its whole daily limit: wait for it to
             // reset, as background work does.
             Err(campbooks_ai::Error::OverDailyCap { .. }) => {
@@ -197,9 +175,12 @@ impl JobHandler for SummarizeNeed {
                     error = error_kind(&error),
                     "the summary call failed"
                 );
-                // A provider that cannot be reached is tried again; the
-                // last attempt records the failure.
-                if !ctx.is_last_attempt() && retryable(&error) {
+                // A provider that cannot be reached is tried again, at most
+                // [`PROVIDER_ATTEMPTS`] calls in all (the other attempts are
+                // for waiting out the daily limit); then the failure is
+                // recorded.
+                if ctx.attempt() < PROVIDER_ATTEMPTS && !ctx.is_last_attempt() && retryable(&error)
+                {
                     return Err(redact::ai(&error));
                 }
                 None
@@ -242,14 +223,43 @@ impl JobHandler for SummarizeNeed {
     }
 }
 
-/// A failure that may pass: the provider could not be reached or answered
-/// badly, or the call could not be counted.
+/// The model's answer, or `None` with a warning saying why it did not
+/// parse: sizes and the stop reason only, never what the model wrote.
+fn parsed(response: &campbooks_ai::ChatResponse) -> Option<Answer> {
+    let answer = response.json::<Answer>().ok();
+    if answer.is_none() {
+        let finish = response.finish_kind();
+        let reason = if response.content.trim().is_empty() {
+            "empty"
+        } else if finish == "length" {
+            "truncated"
+        } else {
+            "not_json"
+        };
+        tracing::warn!(
+            feature = FEATURE,
+            reason,
+            finish_reason = finish,
+            completion_tokens = response.usage.map(|u| u.completion_tokens),
+            content_chars = response.content.chars().count(),
+            "the summary answer did not parse"
+        );
+    }
+    answer
+}
+
+/// Model calls one job may make for a provider that fails to answer, so a
+/// flapping provider costs at most this many metered calls per message.
+const PROVIDER_ATTEMPTS: u32 = 3;
+
+/// A failure that may pass: the provider could not be reached or refused
+/// for now, or the call could not be counted. A malformed answer is not
+/// tried again: the same mail would likely get the same answer.
 fn retryable(error: &campbooks_ai::Error) -> bool {
     matches!(
         error,
         campbooks_ai::Error::Transport(_)
             | campbooks_ai::Error::Status { .. }
-            | campbooks_ai::Error::InvalidResponse(_)
             | campbooks_ai::Error::Metering
     )
 }

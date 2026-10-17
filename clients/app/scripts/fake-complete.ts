@@ -1,7 +1,8 @@
 // A fake `complete` model for recordings and local development only: an
 // OpenAI-compatible `POST /v1/chat/completions` that answers Scout's reply
-// requests (campbooks-cloud#168) with canned, fictional text, so the reply
-// dialog can be shown without a real model reading anyone's mail. Point the
+// requests (campbooks-cloud#168) and need summaries (campbooks-cloud#204) with
+// canned, fictional text, so they can be shown without a real model reading
+// anyone's mail. Point the
 // server at it:
 //
 //   pnpm --dir clients fake-complete            # :9060
@@ -9,8 +10,9 @@
 //   CAMPBOOKS_AI__COMPLETE__MODEL=fake-complete … cargo run -p campbooks-server -- all
 //
 // It reads only the request's schema name and the JSON the server sends (the
-// other person's name, the intent, `shorter`, `change`), never anything else,
-// and keeps nothing. Any other request gets 404.
+// other person's name, the intent, `shorter`, `change`; a summary's sender and
+// subject), never the mail's words, and keeps nothing. Any other request gets
+// 404.
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { parseArgs } from "node:util";
 
@@ -29,6 +31,23 @@ interface ReplyInput {
   draft?: string;
   change?: string;
   shorter?: boolean;
+}
+
+interface SummaryInput {
+  from?: string;
+  subject?: string;
+}
+
+/** The same canned summary in each shipped language, from the sender and subject only. */
+function summary(input: SummaryInput): Record<string, string> {
+  const from = input.from ?? "Someone";
+  const subject = input.subject ?? "";
+  return {
+    en: `${from} wrote about “${subject}” and is waiting for your answer.`,
+    "pt-PT": `${from} escreveu sobre “${subject}” e está à espera da sua resposta.`,
+    "es-ES": `${from} ha escrito sobre «${subject}» y espera tu respuesta.`,
+    fr: `${from} a écrit au sujet de « ${subject} » et attend votre réponse.`,
+  };
 }
 
 interface ChatRequest {
@@ -76,6 +95,9 @@ function answer(request: ChatRequest): unknown {
   if (schema === "reply_draft") {
     return { reply: reply(input) };
   }
+  if (schema === "need_summary") {
+    return summary((JSON.parse(content) as { email?: SummaryInput }).email ?? {});
+  }
   return undefined;
 }
 
@@ -96,7 +118,7 @@ const server = createServer((request: IncomingMessage, response: ServerResponse)
       const body = JSON.parse(Buffer.concat(chunks).toString("utf8")) as ChatRequest;
       const content = answer(body);
       if (content === undefined) {
-        send(response, 404, { error: "only Scout's reply requests are answered" });
+        send(response, 404, { error: "only Scout's reply and summary requests are answered" });
         return;
       }
       // A moment, as a model would take.
