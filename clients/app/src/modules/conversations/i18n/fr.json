@@ -276,6 +276,11 @@
       "confirmed": "Merci · {{name}} reste dans votre liste",
       "failed": "Impossible de modifier {{name}} : rien n’a changé. Réessayez.",
       "changed": "{{name}} a changé pendant que vous regardiez : jetez-y un nouveau coup d’œil."
+    },
+    "mail": {
+      "more": "Afficher tout l’e-mail",
+      "less": "Afficher moins",
+      "linksOff": "Les liens sont désactivés dans les e-mails qui pourraient être du hameçonnage."
     }
   },
   "rules": {

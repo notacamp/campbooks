@@ -34,6 +34,8 @@ export interface ThreadMessageProps {
   showImages: boolean;
   onShowImages: () => void;
   kind: "person" | "service";
+  /** The conversation may be phishing: the body's links lead nowhere. */
+  inertLinks?: boolean | undefined;
   now?: Date | undefined;
 }
 
@@ -51,6 +53,7 @@ export function ThreadMessage({
   showImages,
   onShowImages,
   kind,
+  inertLinks = false,
   now,
 }: ThreadMessageProps) {
   const { t: typed, i18n } = useTranslation("conversations");
@@ -103,6 +106,7 @@ export function ThreadMessage({
         title={t("reader.frameTitle", { name: from })}
         remoteImages={body.data?.images_shown ?? false}
         css={body.data?.css}
+        inertLinks={inertLinks}
       />
     );
   }

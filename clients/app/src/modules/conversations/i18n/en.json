@@ -276,6 +276,11 @@
       "confirmed": "Thanks · {{name}} stays on your list",
       "failed": "Could not change {{name}}: nothing changed. Try again.",
       "changed": "{{name}} changed while you looked: have another look."
+    },
+    "mail": {
+      "more": "Show the whole email",
+      "less": "Show less",
+      "linksOff": "Links are off in mail that may be phishing."
     }
   },
   "rules": {

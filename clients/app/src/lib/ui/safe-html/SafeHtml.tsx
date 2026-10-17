@@ -29,6 +29,15 @@ export function framePolicy(remoteImages: boolean): string {
 export const SANDBOX = "allow-same-origin allow-popups allow-popups-to-escape-sandbox";
 
 /**
+ * The sandbox for mail that may be phishing: no popups either, so a link
+ * cannot open anything at all (there is no other way out of the frame).
+ */
+export const SANDBOX_INERT_LINKS = "allow-same-origin";
+
+/** How links look when they lead nowhere: as plain text, not as a link. */
+const INERT_LINKS_CSS = "a { pointer-events: none !important; cursor: default !important; }";
+
+/**
  * The frame's base look, as an attribute: the page's policy blocks style
  * sheets in the frame. Mail is written for a white page, so it gets one in
  * every theme, on a rounded card.
@@ -113,17 +122,18 @@ export function fitZoom(contentWidth: number, frameWidth: number): number {
  * `<style>` element, which the page's policy blocks in the frame. Loads
  * the rules could still name are under the frame's policy all the same.
  */
-function adoptStyles(doc: Document, css: string | undefined): void {
+function adoptStyles(doc: Document, css: string | undefined, inertLinks: boolean): void {
   const view = doc.defaultView;
   if (view === null) {
     return;
   }
-  if (css === undefined || css === "") {
+  const rules = inertLinks ? `${INERT_LINKS_CSS}\n${css ?? ""}` : css;
+  if (rules === undefined || rules === "") {
     doc.adoptedStyleSheets = [];
     return;
   }
   const sheet = new view.CSSStyleSheet();
-  sheet.replaceSync(css);
+  sheet.replaceSync(rules);
   doc.adoptedStyleSheets = [sheet];
 }
 
@@ -156,6 +166,8 @@ export interface SafeHtmlProps {
   remoteImages?: boolean | undefined;
   /** The message's `@media` rules, filtered by the server; frame only. */
   css?: string | null | undefined;
+  /** Mail that may be phishing: its links lead nowhere. */
+  inertLinks?: boolean | undefined;
 }
 
 /**
@@ -164,7 +176,13 @@ export interface SafeHtmlProps {
  * tall as its content and fitted to its width. The only place the app
  * renders HTML it did not write (AGENTS.md).
  */
-export function SafeHtml({ html, title, remoteImages = false, css }: SafeHtmlProps) {
+export function SafeHtml({
+  html,
+  title,
+  remoteImages = false,
+  css,
+  inertLinks = false,
+}: SafeHtmlProps) {
   const frame = useRef<HTMLIFrameElement>(null);
   const [measured, setMeasured] = useState<number | undefined>();
   const srcDoc = frameDocument(html, remoteImages);
@@ -201,7 +219,7 @@ export function SafeHtml({ html, title, remoteImages = false, css }: SafeHtmlPro
       if (doc?.URL !== "about:srcdoc") {
         return;
       }
-      adoptStyles(doc, rules);
+      adoptStyles(doc, rules, inertLinks);
       resizes = 0;
       last = undefined;
       observer?.disconnect();
@@ -218,14 +236,14 @@ export function SafeHtml({ html, title, remoteImages = false, css }: SafeHtmlPro
       element.removeEventListener("load", attach);
       observer?.disconnect();
     };
-  }, [srcDoc, rules]);
+  }, [srcDoc, rules, inertLinks]);
 
   return (
     <iframe
       ref={frame}
       className={styles["frame"]}
       title={title}
-      sandbox={SANDBOX}
+      sandbox={inertLinks ? SANDBOX_INERT_LINKS : SANDBOX}
       referrerPolicy="no-referrer"
       loading="lazy"
       srcDoc={srcDoc}

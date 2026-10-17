@@ -72,6 +72,8 @@ export const COMPONENT_TOKENS = [
   "toast-height",
   "overlay-width",
   "dialog-width",
+  "clamp-height",
+  "clamp-fade-height",
   "dialog-result-width",
   "popover-width",
   "offer-width",

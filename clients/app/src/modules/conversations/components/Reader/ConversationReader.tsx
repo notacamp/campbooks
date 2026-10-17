@@ -598,6 +598,7 @@ export function ConversationReader({
               setImages((current) => new Set([...current, message.id]));
             }}
             kind={message.direction === "outbound" ? "person" : kind}
+            inertLinks={conversation?.need?.question === "suspicious"}
             now={now}
           />
         ))}
