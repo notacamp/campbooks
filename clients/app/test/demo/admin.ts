@@ -397,6 +397,24 @@ export const JOBS_SUMMARY: QueueSummary = {
       oldest_ready_seconds: 20,
     },
   ],
+  watched: [
+    {
+      code: "suspension_fanout",
+      kinds: [
+        "conversations.pause_suspended_author",
+        "conversations.resume_unsuspended_author",
+        "workspaces.announce_member_suspended",
+        "workspaces.announce_member_unsuspended",
+      ],
+      failed: 0,
+    },
+  ],
+};
+
+/** The same queue, with two suspensions that never reached the rules. */
+export const JOBS_SUMMARY_SUSPENSIONS_DEAD: QueueSummary = {
+  ...JOBS_SUMMARY,
+  watched: JOBS_SUMMARY.watched.map((entry) => ({ ...entry, failed: 2 })),
 };
 
 /** Nothing queued at all. */
@@ -404,6 +422,7 @@ export const JOBS_SUMMARY_EMPTY: QueueSummary = {
   at: "2026-10-13T09:30:00Z",
   oldest_ready_seconds: null,
   kinds: [],
+  watched: [],
 };
 
 const failedJob = (n: number, overrides: Partial<FailedJob> = {}): FailedJob => ({

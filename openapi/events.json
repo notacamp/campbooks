@@ -825,6 +825,14 @@
             ],
             "format": "date-time",
             "description": "When the suspension took effect, read under the account's lock: a\nlater suspension or lift of the same account always has a later\n`at`. Absent on events published before it existed (use the event's\n`occurred_at`)."
+          },
+          "seq": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "The account's count of suspensions and lifts, this one included\n(odd: suspended). Of two changes to one account, the higher `seq` is\nthe later, whatever the clock said. Absent on events published\nbefore it existed (order those by `at`)."
           }
         }
       }
@@ -851,6 +859,14 @@
             "type": "string",
             "format": "date-time",
             "description": "When the lift took effect, ordered like [`AccountSuspended::at`]."
+          },
+          "seq": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "The account's count of suspensions and lifts, this one included\n(even: not suspended), ordered like [`AccountSuspended::seq`]. Absent\non events published before it existed."
           }
         }
       }
@@ -1262,7 +1278,15 @@
           "at": {
             "type": "string",
             "format": "date-time",
-            "description": "When the suspension took effect; of two changes to one member, the\nlater `at` is the truth, whatever order they arrive in."
+            "description": "When the suspension took effect; orders the change only when it\ncarries no `seq`."
+          },
+          "seq": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "The account's count of suspensions and lifts as of this change\n(identity's `seq`): of two changes to one member, the higher `seq`\nis the truth, whatever order they arrive in. Absent when the change\ncame from an event published before it existed: such a change is\nolder than any that carries one, and two of them are ordered by `at`."
           },
           "user": {
             "$ref": "#/components/schemas/UserId",
@@ -1293,6 +1317,14 @@
             "type": "string",
             "format": "date-time",
             "description": "When the lift took effect, ordered like [`MemberSuspended::at`]."
+          },
+          "seq": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "The account's count of suspensions and lifts as of this change,\nordered like [`MemberSuspended::seq`]."
           },
           "user": {
             "$ref": "#/components/schemas/UserId",

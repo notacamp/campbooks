@@ -537,8 +537,19 @@ impl Shared {
         for job in reclaimed {
             tracing::warn!(job_id = %job.id, kind = %job.kind, state = %job.state,
                 "reclaimed a job whose lease expired");
+            if job.state == "failed" {
+                self.died(&job.kind);
+            }
         }
         Ok(())
+    }
+
+    /// A job of `kind` died: say so in the line its kind is watched by, if
+    /// it is ([`Watch`](super::Watch)).
+    fn died(&self, kind: &str) {
+        if let Some(watch) = self.registry.watch(kind) {
+            tracing::warn!(watch = watch.code, kind, "{}", watch.died);
+        }
     }
 
     /// Enqueue `schedule`'s job if this tick has not been enqueued yet.
@@ -741,6 +752,7 @@ impl Shared {
             Ok(Some(row)) if row.state == "failed" => {
                 bump(&self.counters.failed, 1);
                 tracing::error!(error = %message, "job failed for good");
+                self.died(&info.kind);
                 Some(JobOutcome::Failed)
             }
             Ok(Some(row)) => {

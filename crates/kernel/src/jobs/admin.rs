@@ -28,7 +28,7 @@ use sqlx::PgPool;
 use utoipa::ToSchema;
 use uuid::Uuid;
 
-use super::{JobId, NOTIFY_CHANNEL};
+use super::{JobId, NOTIFY_CHANNEL, Registry};
 use crate::{Error, admin::AdminGrant, i18n};
 
 /// Most failed jobs [`retry_kind`] requeues per call; call again for more.
@@ -50,6 +50,23 @@ pub struct QueueSummary {
     pub oldest_ready_seconds: Option<i64>,
     /// Counts per queue and kind, sorted by queue then kind.
     pub kinds: Vec<KindSummary>,
+    /// The dead jobs of the kinds an operator must hear about, by what they
+    /// are for (each kind's `Watch`), sorted by code; every watched code is
+    /// listed, with 0 when nothing died.
+    pub watched: Vec<WatchedSummary>,
+}
+
+/// The dead jobs of the kinds watched under one code.
+#[derive(Debug, Clone, Serialize, ToSchema)]
+pub struct WatchedSummary {
+    /// What the kinds are for (`suspension_fanout`: a suspension, or its
+    /// lift, reaching the rules a member taught); the client words it.
+    pub code: String,
+    /// The kinds watched under it, sorted.
+    pub kinds: Vec<String>,
+    /// How many of their jobs are dead: until each is retried, what it
+    /// carried has not happened.
+    pub failed: i64,
 }
 
 /// The jobs of one kind on one queue.
@@ -151,8 +168,13 @@ pub enum DiscardSchedule {
     Unknown,
 }
 
-/// Counts of the queue by queue and kind.
-pub async fn summary(db: &PgPool, _grant: &AdminGrant) -> Result<QueueSummary, Error> {
+/// Counts of the queue by queue and kind, and of the dead jobs of the kinds
+/// `registry` watches.
+pub async fn summary(
+    db: &PgPool,
+    registry: &Registry,
+    _grant: &AdminGrant,
+) -> Result<QueueSummary, Error> {
     let mut tx = crate::db::begin_kernel(db).await?;
     let rows = sqlx::query!(
         r#"
@@ -188,10 +210,24 @@ pub async fn summary(db: &PgPool, _grant: &AdminGrant) -> Result<QueueSummary, E
             oldest_ready_seconds: row.oldest_ready_seconds,
         })
         .collect();
+    let watched = registry
+        .watched()
+        .into_iter()
+        .map(|(code, watched)| WatchedSummary {
+            code: code.to_owned(),
+            failed: kinds
+                .iter()
+                .filter(|k| watched.iter().any(|w| *w == k.kind))
+                .map(|k| k.failed)
+                .sum(),
+            kinds: watched.into_iter().map(str::to_owned).collect(),
+        })
+        .collect();
     Ok(QueueSummary {
         at: Utc::now(),
         oldest_ready_seconds: kinds.iter().filter_map(|k| k.oldest_ready_seconds).max(),
         kinds,
+        watched,
     })
 }
 

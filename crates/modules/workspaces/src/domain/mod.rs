@@ -10,4 +10,5 @@ pub mod page;
 pub mod resources;
 pub mod security;
 pub mod signup;
+pub mod suspension;
 pub mod users;

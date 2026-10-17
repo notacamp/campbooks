@@ -9,6 +9,7 @@ import { jobsSummaryQuery } from "../../api/jobs";
 import { FailedJobs } from "./FailedJobs";
 import { JobsSummary } from "./JobsSummary";
 import type { Notice } from "./notice";
+import { WatchedJobs } from "./WatchedJobs";
 
 /**
  * Admin → Jobs: the background queue by kind, and the jobs that gave up,
@@ -79,6 +80,7 @@ export function JobsAdminPanel() {
         </EmptyState>
       ) : (
         <div className="flex flex-col gap-5">
+          <WatchedJobs watched={summary.data.watched} />
           <JobsSummary summary={summary.data} onShowFailed={setKind} onNotice={setNotice} />
           <FailedJobs
             kind={kind}

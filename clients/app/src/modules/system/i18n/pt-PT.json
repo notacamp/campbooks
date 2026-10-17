@@ -163,6 +163,14 @@
       "expiredLeases_one": "{{count}} tarefa em execução perdeu o seu processo",
       "expiredLeases_other": "{{count}} tarefas em execução perderam o seu processo"
     },
+    "watched": {
+      "title": "Trabalho a vigiar",
+      "lead": "Trabalho em segundo plano cujas falhas contam de imediato. Enquanto uma entrega falhada não for repetida, o que levava não aconteceu.",
+      "suspensionFanout": "Suspensões a chegar às regras dos membros",
+      "none": "Nenhuma entrega falhada",
+      "dead_one": "{{count}} entrega falhada",
+      "dead_other": "{{count}} entregas falhadas"
+    },
     "retryAll": {
       "question_one": "Repetir a {{count}} tarefa {{kind}} falhada? Recomeça desde a primeira tentativa.",
       "question_other": "Repetir as {{count}} tarefas {{kind}} falhadas? Cada uma recomeça desde a primeira tentativa.",

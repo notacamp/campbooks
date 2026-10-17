@@ -53,6 +53,25 @@ pub const NOTIFY_CHANNEL: &str = "kernel_jobs";
 /// [`redact::job_error`](crate::redact::job_error) kept its first line.
 pub const MAX_ERROR_LEN: usize = 500;
 
+/// A kind of background work an operator must hear about when it dies: a
+/// dead job or delivery of it is counted under `code` in Admin → Jobs (with
+/// every other kind watched under the same code), and its death is logged
+/// at WARN as `died`, a stable line an alert can match. Declared with the
+/// work (`WATCH` on [`Job`], [`JobHandler`], [`EventHandler`] and
+/// [`EventConsumer`]); kinds sharing a code must share the line.
+///
+/// [`EventHandler`]: crate::EventHandler
+/// [`EventConsumer`]: crate::EventConsumer
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Watch {
+    /// What the watched kinds are for, lower-case snake case
+    /// (`suspension_fanout`); the admin client words it.
+    pub code: &'static str,
+    /// The WARN line logged when one dies (`suspension fan-out delivery
+    /// died`): no ids or content, so alerts and logs can quote it.
+    pub died: &'static str,
+}
+
 /// A unit of background work.
 ///
 /// The value is the job's payload, stored as JSON: keep it small and made of
@@ -75,6 +94,8 @@ pub trait Job: Serialize + DeserializeOwned + Send + Sync + 'static {
     const QUEUE: &'static str;
     /// Attempts before the job is marked failed (dead).
     const MAX_ATTEMPTS: u32 = DEFAULT_MAX_ATTEMPTS;
+    /// Whether an operator must hear when one dies ([`Watch`]).
+    const WATCH: Option<Watch> = None;
 
     /// Do the work.
     fn run(self, ctx: &mut JobContext) -> impl Future<Output = Result<(), JobError>> + Send;
@@ -97,6 +118,8 @@ pub trait JobHandler: Send + Sync + 'static {
     const QUEUE: &'static str;
     /// Attempts before the job is marked failed (dead).
     const MAX_ATTEMPTS: u32 = DEFAULT_MAX_ATTEMPTS;
+    /// Whether an operator must hear when one dies ([`Watch`]).
+    const WATCH: Option<Watch> = None;
 
     /// Do the work.
     fn run(

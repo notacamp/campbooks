@@ -35,6 +35,14 @@ All notable changes to Campbooks Next are documented here. The format follows
 
 ### Security
 
+- **A suspension and its lift always reach a member's rules in the right order.** Each
+  account now counts its suspensions and lifts, and the rules a member taught follow the
+  latest count, not the clock: a clock that stepped back can no longer leave them paused
+  after a lift. A member who joins or leaves a workspace at the moment they are suspended
+  or lifted now gets the right state there too. If a suspension fails to reach the rules,
+  Admin → Jobs shows it under "Work to watch" and the server logs "suspension fan-out
+  delivery died". Keeping a suggested rule whose author is away now says first that it
+  stays paused until they are back or someone takes it over.
 - **The database functions that act for the server no longer run as a superuser.** The
   functions behind web sign-in and the rate limits run with their owner's rights. Their
   owner was the login that applied the migrations, which on the bundled Postgres is a

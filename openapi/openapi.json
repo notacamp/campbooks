@@ -15573,6 +15573,17 @@
             ],
             "description": "The member's own words, for an instruction."
           },
+          "paused_once_kept": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/PausedReason",
+                "description": "For a proposed rule, why it would be paused once kept (confirming\nkeeps its author): say so before a member says yes. Absent for any\nother rule, or when it would act."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "paused_reason": {
             "oneOf": [
               {

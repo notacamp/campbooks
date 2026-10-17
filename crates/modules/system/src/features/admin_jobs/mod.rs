@@ -1,6 +1,7 @@
 //! `GET /admin/v1/system/jobs` and `GET /admin/v1/system/jobs/failed` — the
-//! Jobs panel's reads (ADR 0015): the queue's counts by queue and kind, and
-//! the dead jobs with their last error.
+//! Jobs panel's reads (ADR 0015): the queue's counts by queue and kind (with
+//! the dead jobs of the kinds an operator must hear about, by what they are
+//! for), and the dead jobs with their last error.
 //!
 //! Metadata only: a job's payload is never selected, so it cannot be
 //! returned. Requires `jobs.read` (or `super`).
@@ -36,7 +37,9 @@ pub async fn summary(
     admin: Admin<JobsRead>,
     State(state): State<AppState>,
 ) -> Result<Json<QueueSummary>> {
-    Ok(Json(admin::summary(&state.db, &admin.grant).await?))
+    Ok(Json(
+        admin::summary(&state.db, state.events.registry(), &admin.grant).await?,
+    ))
 }
 
 /// Which dead jobs to list.

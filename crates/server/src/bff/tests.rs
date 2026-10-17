@@ -1732,6 +1732,7 @@ async fn a_suspended_accounts_web_sessions_end_at_once(db: PgPool) {
             &AccountSuspended {
                 account: suspended,
                 at: None,
+                seq: None,
             },
         )
         .await
