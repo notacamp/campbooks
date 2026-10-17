@@ -32,6 +32,9 @@
   margin-top: var(--space-1-5);
   line-height: var(--leading-relaxed);
   color: var(--text-secondary);
+  /* Plain-text mail keeps its own line breaks and paragraphs. */
+  white-space: pre-line;
+  overflow-wrap: anywhere;
 }
 
 .recipients {

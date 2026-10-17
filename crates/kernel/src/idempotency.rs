@@ -29,6 +29,21 @@
 //! ([`checked_container`]); otherwise the answer is the same 404 the handler
 //! would give. A member removed from a workspace or an inbox never gets a
 //! stored response back.
+//!
+//! **A secret is never stored.** An operation declared
+//! `Operation::secret_once` (a new app's client secret, an invitation's
+//! link, a single-use ticket) shows its secret in its successful answer and
+//! nowhere else, ever: the layer keeps only that the key was used
+//! (`withheld`: the status and `Location`, no body), and a replay answers
+//! **409** `idempotency_secret_shown_once` instead of running the operation
+//! again or showing the secret twice.
+//!
+//! **Keys are their caller's** (campbooks-cloud#210). Every statement on
+//! `kernel.idempotency` runs in a transaction naming its caller
+//! ([`begin_as_idempotency_caller`](crate::db::begin_as_idempotency_caller)),
+//! whose row-level security admits that caller's keys only; a workspace
+//! transaction sees and writes none. The prune reads and deletes expired
+//! keys in the kernel scope, and nothing else.
 
 use std::time::Duration;
 
@@ -41,7 +56,7 @@ use axum::{
     response::{IntoResponse, Response},
 };
 use serde::{Deserialize, Serialize};
-use sqlx::PgPool;
+use sqlx::{PgConnection, PgPool};
 use std::sync::Arc;
 
 use crate::{
@@ -251,6 +266,15 @@ pub async fn middleware(State(idem): State<Idempotency>, request: Request, next:
                 None => stored.into_response(),
             };
         }
+        Ok(Claim::Withheld(containers)) => {
+            return match idem
+                .replay_refusal(&operation, &principal, &parts, &containers)
+                .await
+            {
+                Some(refusal) => refusal,
+                None => secret_shown_once(),
+            };
+        }
         Ok(Claim::Mismatch) => {
             return problem(StatusCode::UNPROCESSABLE_ENTITY, "idempotency_key_reused");
         }
@@ -269,7 +293,22 @@ pub async fn middleware(State(idem): State<Idempotency>, request: Request, next:
             (response, checked)
         })
         .await;
-    finish(&idem.db, &owner, &key, response, &checked).await
+    let keep = if operation.secret_once() {
+        Keep::WithheldOnSuccess
+    } else {
+        Keep::Body
+    };
+    finish(&idem.db, &owner, &key, response, &checked, keep).await
+}
+
+/// The answer to a replay of an operation whose first answer showed a
+/// secret: 409, marked as a replay (the operation did not run again).
+fn secret_shown_once() -> Response {
+    let mut response = problem(StatusCode::CONFLICT, "idempotency_secret_shown_once");
+    response
+        .headers_mut()
+        .insert(REPLAYED_HEADER, HeaderValue::from_static("true"));
+    response
 }
 
 /// The `{workspace_id}` segment of `path`, a request to `operation`'s route.
@@ -330,6 +369,9 @@ fn request_hash(parts: &Parts, body: &Bytes) -> Vec<u8> {
 enum Claim {
     Acquired,
     Replay(Stored),
+    /// The first run answered with a secret, which was not kept; the
+    /// containers its handler checked.
+    Withheld(Vec<RecordRef>),
     Mismatch,
     InFlight,
 }
@@ -371,6 +413,20 @@ async fn claim(
     operation_id: &str,
     hash: &[u8],
 ) -> Result<Claim, sqlx::Error> {
+    let mut tx = crate::db::begin_as_idempotency_caller(db, owner).await?;
+    let claim = claim_in(&mut tx, owner, key, operation_id, hash).await?;
+    tx.commit().await?;
+    Ok(claim)
+}
+
+/// [`claim`] in the caller's transaction.
+async fn claim_in(
+    conn: &mut PgConnection,
+    owner: &str,
+    key: &str,
+    operation_id: &str,
+    hash: &[u8],
+) -> Result<Claim, sqlx::Error> {
     let retention = seconds(RETENTION);
     let abandoned = seconds(ABANDONED_AFTER);
     // Two rounds: the row seen as a conflict may expire or be released before
@@ -405,7 +461,7 @@ async fn claim(
             retention,
             abandoned,
         )
-        .fetch_optional(db)
+        .fetch_optional(&mut *conn)
         .await?;
         if acquired.is_some() {
             return Ok(Claim::Acquired);
@@ -421,7 +477,7 @@ async fn claim(
             owner,
             key,
         )
-        .fetch_optional(db)
+        .fetch_optional(&mut *conn)
         .await?;
         let Some(row) = existing else {
             continue;
@@ -429,19 +485,22 @@ async fn claim(
         if row.operation_id != operation_id || row.request_hash != hash {
             return Ok(Claim::Mismatch);
         }
+        // Unreadable means "checked something": refuse the replay rather
+        // than skip the check.
+        let containers = || {
+            serde_json::from_value(row.containers.clone())
+                .unwrap_or_else(|_| vec![RecordRef::new("kernel.unreadable", "unreadable")])
+        };
         return Ok(
-            match (row.state.as_str(), row.response_status, row.response_body) {
+            match (row.state.as_str(), row.response_status, &row.response_body) {
                 ("completed", Some(status), Some(body)) => Claim::Replay(Stored {
                     status,
-                    content_type: row.response_content_type,
-                    location: row.response_location,
-                    body,
-                    // Unreadable means "checked something": refuse the
-                    // replay rather than skip the check.
-                    containers: serde_json::from_value(row.containers).unwrap_or_else(|_| {
-                        vec![RecordRef::new("kernel.unreadable", "unreadable")]
-                    }),
+                    content_type: row.response_content_type.clone(),
+                    location: row.response_location.clone(),
+                    body: body.clone(),
+                    containers: containers(),
                 }),
+                ("withheld", ..) => Claim::Withheld(containers()),
                 _ => Claim::InFlight,
             },
         );
@@ -463,13 +522,25 @@ fn storable(status: StatusCode) -> bool {
         )
 }
 
-/// Store the response for replay, or release the key.
+/// What [`finish`] keeps of a settled response.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Keep {
+    /// The whole response, for replay.
+    Body,
+    /// For a successful answer, only that the key was used (it showed a
+    /// secret: `Operation::secret_once`); any other answer whole.
+    WithheldOnSuccess,
+}
+
+/// Store the response for replay (or, for a secret, only that the key was
+/// used), or release the key.
 async fn finish(
     db: &PgPool,
     owner: &str,
     key: &str,
     response: Response,
     containers: &[RecordRef],
+    keep: Keep,
 ) -> Response {
     let status = response.status();
     if !storable(status) {
@@ -496,7 +567,37 @@ async fn finish(
             .and_then(|v: &HeaderValue| v.to_str().ok())
             .map(ToOwned::to_owned)
     };
-    let stored = sqlx::query!(
+    let stored = if keep == Keep::WithheldOnSuccess && status.is_success() {
+        withhold(db, owner, key, status, header(header::LOCATION), containers).await
+    } else {
+        store(db, owner, key, status, &parts, &body, containers).await
+    };
+    if let Err(error) = stored {
+        tracing::warn!(%error, "idempotency: cannot store the response");
+    }
+    Response::from_parts(parts, Body::from(body))
+}
+
+/// Keep `body` (and its headers) as the key's response, in the caller's
+/// transaction.
+async fn store(
+    db: &PgPool,
+    owner: &str,
+    key: &str,
+    status: StatusCode,
+    parts: &axum::http::response::Parts,
+    body: &Bytes,
+    containers: &[RecordRef],
+) -> Result<(), sqlx::Error> {
+    let header = |name| {
+        parts
+            .headers
+            .get(name)
+            .and_then(|v: &HeaderValue| v.to_str().ok())
+            .map(ToOwned::to_owned)
+    };
+    let mut tx = crate::db::begin_as_idempotency_caller(db, owner).await?;
+    sqlx::query!(
         r#"
         UPDATE kernel.idempotency
            SET state = 'completed', response_status = $3, response_content_type = $4,
@@ -511,25 +612,56 @@ async fn finish(
         body.as_ref(),
         serde_json::to_value(containers).unwrap_or_default(),
     )
-    .execute(db)
-    .await;
-    if let Err(error) = stored {
-        tracing::warn!(%error, "idempotency: cannot store the response");
-    }
-    Response::from_parts(parts, Body::from(body))
+    .execute(&mut *tx)
+    .await?;
+    tx.commit().await
+}
+
+/// Keep only that the key was used (its status and `Location`, an empty
+/// body), in the caller's transaction: the response showed a secret, which
+/// is never stored. The table refuses a `withheld` row with a body.
+async fn withhold(
+    db: &PgPool,
+    owner: &str,
+    key: &str,
+    status: StatusCode,
+    location: Option<String>,
+    containers: &[RecordRef],
+) -> Result<(), sqlx::Error> {
+    let mut tx = crate::db::begin_as_idempotency_caller(db, owner).await?;
+    sqlx::query(
+        "UPDATE kernel.idempotency
+            SET state = 'withheld', response_status = $3, response_content_type = NULL,
+                response_location = $4, response_body = ''::bytea, containers = $5
+          WHERE principal = $1 AND key = $2 AND state = 'pending'",
+    )
+    .bind(owner)
+    .bind(key)
+    .bind(i16::try_from(status.as_u16()).unwrap_or(i16::MAX))
+    .bind(location)
+    .bind(serde_json::to_value(containers).unwrap_or_default())
+    .execute(&mut *tx)
+    .await?;
+    tx.commit().await
 }
 
 async fn release(db: &PgPool, owner: &str, key: &str) {
-    let released = sqlx::query!(
+    if let Err(error) = release_key(db, owner, key).await {
+        tracing::warn!(%error, "idempotency: cannot release the key");
+    }
+}
+
+/// Delete the caller's pending `key`, in the caller's transaction.
+async fn release_key(db: &PgPool, owner: &str, key: &str) -> Result<(), sqlx::Error> {
+    let mut tx = crate::db::begin_as_idempotency_caller(db, owner).await?;
+    sqlx::query!(
         "DELETE FROM kernel.idempotency WHERE principal = $1 AND key = $2 AND state = 'pending'",
         owner,
         key,
     )
-    .execute(db)
-    .await;
-    if let Err(error) = released {
-        tracing::warn!(%error, "idempotency: cannot release the key");
-    }
+    .execute(&mut *tx)
+    .await?;
+    tx.commit().await
 }
 
 fn seconds(duration: Duration) -> f64 {
@@ -551,6 +683,9 @@ impl Job for PruneIdempotency {
     async fn run(self, ctx: &mut JobContext) -> Result<(), JobError> {
         let mut pruned = 0_u64;
         loop {
+            // The kernel scope, one batch per transaction: it reads and
+            // deletes expired keys only (row-level security), anyone's.
+            let mut tx = crate::db::begin_kernel(ctx.pool()).await?;
             let deleted = sqlx::query!(
                 r#"
                 DELETE FROM kernel.idempotency
@@ -561,9 +696,10 @@ impl Job for PruneIdempotency {
                 "#,
                 PRUNE_BATCH,
             )
-            .execute(ctx.pool())
+            .execute(&mut *tx)
             .await?
             .rows_affected();
+            tx.commit().await?;
             pruned += deleted;
             if deleted < PRUNE_BATCH.unsigned_abs() {
                 break;

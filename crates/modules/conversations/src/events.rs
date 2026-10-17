@@ -688,8 +688,13 @@ pub struct MemberSuspended {
     pub workspace: String,
     /// The member.
     pub user: UserId,
-    /// When it took effect: the newest `at` is the truth.
+    /// When it took effect: orders the change only when it has no `seq`.
     pub at: DateTime<Utc>,
+    /// The account's count of suspensions and lifts as of this change: the
+    /// highest is the truth. Absent on changes from before it existed,
+    /// which are older than any that has one.
+    #[serde(default)]
+    pub seq: Option<i64>,
 }
 
 impl DomainEvent for MemberSuspended {
@@ -708,8 +713,12 @@ pub struct MemberUnsuspended {
     pub workspace: String,
     /// The member.
     pub user: UserId,
-    /// When it took effect: the newest `at` is the truth.
+    /// When it took effect: orders the change only when it has no `seq`.
     pub at: DateTime<Utc>,
+    /// The account's count of suspensions and lifts as of this change, as
+    /// [`MemberSuspended::seq`].
+    #[serde(default)]
+    pub seq: Option<i64>,
 }
 
 impl DomainEvent for MemberUnsuspended {

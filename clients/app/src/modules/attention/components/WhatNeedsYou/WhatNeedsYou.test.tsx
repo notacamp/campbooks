@@ -136,6 +136,16 @@ describe("What needs you", () => {
     expect(screen.getByText("How Campbooks decided")).toBeVisible();
   });
 
+  it("opens an item to the email itself, a few lines deep", async () => {
+    api();
+    renderHome();
+    await screen.findByText("This may be phishing. Don’t use its links.");
+    fireEvent.keyDown(document, { key: "j" });
+    fireEvent.keyDown(document, { key: "Enter" });
+    expect(await screen.findByText(/Hope the move went well/u)).toBeVisible();
+    expect(screen.getByRole("button", { name: "Show the whole email" })).toBeVisible();
+  });
+
   it("moves with the arrow keys, even with an item open", async () => {
     api();
     renderHome();

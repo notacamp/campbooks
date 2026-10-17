@@ -26,6 +26,8 @@ import {
   billKind,
   dueLabel,
   howRows,
+  NeedMessage,
+  needMessageOf,
   needSender,
   needSentence,
   quoteAttribution,
@@ -771,6 +773,7 @@ export function WhatNeedsYou({ workspaceId, now, offer }: WhatNeedsYouProps) {
                         t={t}
                         tc={tc}
                         locale={i18n.language}
+                        now={now}
                         onOpen={() => {
                           openConversation(row);
                         }}
@@ -823,11 +826,12 @@ interface NeedDetailProps {
   t: Translate;
   tc: Translate;
   locale: string;
+  now?: Date | undefined;
   onOpen: () => void;
 }
 
-/** An opened item: the warning's tells, the sender's words and how it was decided. */
-function NeedDetail({ workspaceId, row, t, tc, locale, onOpen }: NeedDetailProps) {
+/** An opened item: the warning's tells, the email itself and how it was decided. */
+function NeedDetail({ workspaceId, row, t, tc, locale, now, onOpen }: NeedDetailProps) {
   const { i18n } = useTranslation("conversations");
   const exists = (key: string) => i18n.exists(`conversations:${key}`);
   const detail = useConversation(workspaceId, row.conversation.id);
@@ -836,7 +840,17 @@ function NeedDetail({ workspaceId, row, t, tc, locale, onOpen }: NeedDetailProps
   const warning = need.question === "suspicious";
   return (
     <ItemDetail
-      reasons={warning ? warningReasons(tc, exists, decisions) : []}
+      reasons={warning ? [...warningReasons(tc, exists, decisions), tc("needs.mail.linksOff")] : []}
+      mail={
+        needMessageOf(detail.data?.messages ?? [], need) === undefined ? undefined : (
+          <NeedMessage
+            workspaceId={workspaceId}
+            conversation={row.conversation}
+            need={need}
+            now={now}
+          />
+        )
+      }
       quoteFrom={quoteAttribution(need, row.name, locale)}
       quote={need.quote?.text}
       actions={

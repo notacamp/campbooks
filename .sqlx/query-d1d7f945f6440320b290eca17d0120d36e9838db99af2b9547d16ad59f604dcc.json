@@ -1,0 +1,37 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            UPDATE kernel.jobs\n               SET state = 'failed', finished_at = now(), locked_by = NULL, locked_until = NULL,\n                   last_error = 'stuck schedule row replaced by the schedule''s tick',\n                   updated_at = now()\n             WHERE kind = $1 AND unique_key = 'schedule:' || $1\n               AND state IN ('pending', 'running')\n               AND (workspace_id IS NOT NULL\n                    OR (state = 'pending' AND run_at > now() + make_interval(secs => $2))\n                    OR (state = 'running' AND locked_until > now() + make_interval(secs => $3)))\n            RETURNING id AS \"id: JobId\", workspace_id IS NOT NULL AS \"of_a_workspace!\"\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id: JobId",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "kernel.jobs",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "of_a_workspace!",
+        "type_info": "Bool",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Float8",
+        "Float8"
+      ]
+    },
+    "nullable": [
+      false,
+      null
+    ]
+  },
+  "hash": "d1d7f945f6440320b290eca17d0120d36e9838db99af2b9547d16ad59f604dcc"
+}

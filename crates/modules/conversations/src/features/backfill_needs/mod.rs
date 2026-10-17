@@ -12,7 +12,7 @@
 //! - `conversations.dispatch_needs_backfills`, every minute, starts the
 //!   pending rows (a transaction in the maintenance scope: it reads ids and
 //!   states only, through the table's maintenance policies, and enqueues
-//!   each page job in its inbox's workspace);
+//!   each page job in its inbox's workspace, set for that enqueue only);
 //! - `conversations.backfill_needs` pages through one inbox's conversations
 //!   by id, in the inbox's workspace (row-level security applies), and runs
 //!   [`needs::refresh`] on each one whose last message falls within the
@@ -78,7 +78,7 @@ impl Job for DispatchNeedsBackfills {
         // Across workspaces, through the table's maintenance policies (ids
         // and states only): the maintenance scope, allowed for this file in
         // `architecture.toml`. It reaches no kernel table: each page job is
-        // enqueued in its inbox's workspace, set just before.
+        // enqueued in its inbox's workspace, set for that enqueue only.
         let tx = ctx.maintenance_tx().await?;
         sqlx::query!(
             r#"UPDATE conversations.needs_backfills b SET state = 'running'
@@ -103,24 +103,47 @@ impl Job for DispatchNeedsBackfills {
         )
         .fetch_all(&mut **tx)
         .await?;
-        let mut queued = 0_usize;
-        for row in &running {
-            let page = Page {
-                inbox: row.inbox,
-                after: row.after,
-            };
-            db::set_workspace(tx, &row.workspace.to_string()).await?;
-            let enqueued =
-                jobs::enqueue_to::<BackfillNeeds>(tx, &page, page.options(row.workspace)).await?;
-            if matches!(enqueued, Enqueued::Created(_)) {
-                queued += 1;
-            }
-        }
+        let running: Vec<(WorkspaceId, Page)> = running
+            .iter()
+            .map(|row| {
+                let page = Page {
+                    inbox: row.inbox,
+                    after: row.after,
+                };
+                (row.workspace, page)
+            })
+            .collect();
+        let queued = queue_pages(tx, &running).await?;
         if queued > 0 {
             tracing::info!(inboxes = queued, "needs backfill pages queued");
         }
         Ok(())
     }
+}
+
+/// Enqueue each running backfill's page job from the dispatcher's
+/// transaction, which works in no workspace: each in its inbox's workspace,
+/// set for that enqueue only (`jobs::enqueue_to_in`), so nothing after it
+/// runs in the last inbox's workspace (campbooks-cloud#207). Returns how
+/// many were new.
+async fn queue_pages(
+    tx: &mut Transaction<'_, Postgres>,
+    running: &[(WorkspaceId, Page)],
+) -> Result<usize, sqlx::Error> {
+    let mut queued = 0_usize;
+    for (workspace, page) in running {
+        let enqueued = jobs::enqueue_to_in::<BackfillNeeds>(
+            tx,
+            &workspace.to_string(),
+            page,
+            page.options(*workspace),
+        )
+        .await?;
+        if matches!(enqueued, Enqueued::Created(_)) {
+            queued += 1;
+        }
+    }
+    Ok(queued)
 }
 
 /// One page of an inbox's backfill.

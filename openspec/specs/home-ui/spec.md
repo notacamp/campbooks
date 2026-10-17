@@ -28,8 +28,12 @@ module's batch read (`conversations.list` with `ids`), not from `attention`.
 - **THEN** the one due Wednesday is first
 
 ### Requirement: Acting from Home
-Enter SHALL open an item in place with its full quote and "How Campbooks
-decided" (closed by default) when no action is highlighted. ↑/↓ and J/K
+Enter SHALL open an item in place when no action is highlighted, showing the
+email the need is about as the reader renders it (sanitised, in the sandboxed
+frame, remote images held back, its links leading nowhere when the need is a
+warning), a few lines deep with "Show the whole email" to read it in place,
+and "How Campbooks decided" (closed by default); the sender's quote SHALL be
+shown only when there is no email to show. ↑/↓ and J/K
 SHALL move between items (closing an open one), R SHALL open the
 conversation's composer, E SHALL mark it done (`conversations.resolve_need`),
 S SHALL open the Snooze dialog (`attention.snooze`), X SHALL mark it not
@@ -56,6 +60,14 @@ read SHALL offer no Reply, Done or Not needed.
 #### Scenario: Later
 - **WHEN** the user presses S and chooses Monday morning
 - **THEN** the item leaves the list and comes back on Monday morning
+
+#### Scenario: Reading the email before deciding
+- **WHEN** the user selects Marta's item and presses Enter
+- **THEN** her email shows under the item a few lines deep, and "Show the whole email" shows all of it in place
+
+#### Scenario: A warning's links lead nowhere
+- **WHEN** the user opens a phishing warning on Home
+- **THEN** its email shows with links that open nothing, and a line says links are off in mail that may be phishing
 
 ### Requirement: Done today
 Home SHALL list what left the user's list today (`attention.list` with

@@ -211,6 +211,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/admin/v1/system/schedules/{name}/run": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Discard a schedule's pending or stuck run, so its next tick enqueues
+         *     afresh. A run a live worker holds is kept.
+         */
+        delete: operations["system.admin_discard_schedule_run"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/admin/v1/workspaces/signup-codes": {
         parameters: {
             query?: never;
@@ -1094,6 +1114,12 @@ export interface components {
              * @description Age of the oldest job that is ready to run and waiting, in seconds.
              */
             oldest_ready_seconds?: number | null;
+            /**
+             * @description The dead jobs of the kinds an operator must hear about, by what they
+             *     are for (each kind's `Watch`), sorted by code; every watched code is
+             *     listed, with 0 when nothing died.
+             */
+            watched: components["schemas"]["WatchedSummary"][];
         };
         /** @description Why a request is turned down. */
         RejectSignupRequest: {
@@ -1229,6 +1255,22 @@ export interface components {
          * @description UserId (UUIDv7)
          */
         UserId: string;
+        /** @description The dead jobs of the kinds watched under one code. */
+        WatchedSummary: {
+            /**
+             * @description What the kinds are for (`suspension_fanout`: a suspension, or its
+             *     lift, reaching the rules a member taught); the client words it.
+             */
+            code: string;
+            /**
+             * Format: int64
+             * @description How many of their jobs are dead: until each is retried, what it
+             *     carried has not happened.
+             */
+            failed: number;
+            /** @description The kinds watched under it, sorted. */
+            kinds: string[];
+        };
         /** @description One workspace's AI usage on the day. */
         WorkspaceAiUsage: {
             /**
@@ -1803,6 +1845,47 @@ export interface operations {
                 };
             };
             /** @description Not an administrator with `system.read` (the same answer as an unknown route). */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "system.admin_discard_schedule_run": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The schedule (`<module>.<job>`). */
+                name: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Deleted, or nothing to do. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JobAction"];
+                };
+            };
+            /** @description `admin_reauth_required`: sign in again. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No such schedule, or not an administrator with `jobs.retry`. */
             404: {
                 headers: {
                     [name: string]: unknown;

@@ -93,7 +93,7 @@ pub struct StartedLink {
     operation_id = "identity.start_link",
     tag = "identity",
     security(("bearer" = ["identity:write"])),
-    extensions(("x-campbooks" = json!(Operation::command(Risk::Low).records(["identity.link_ticket"]).access("identity.provider_identity", campbooks_kernel::authz::Action::Write)))),
+    extensions(("x-campbooks" = json!(Operation::command(Risk::Low).secret_once().records(["identity.link_ticket"]).access("identity.provider_identity", campbooks_kernel::authz::Action::Write)))),
     request_body = StartLink,
     responses(
         (status = CREATED, description = "Send the browser to `url`.", body = StartedLink),

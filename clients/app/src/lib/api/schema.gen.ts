@@ -3784,6 +3784,7 @@ export interface components {
             origin: components["schemas"]["RuleOrigin"];
             /** @description The member's own words, for an instruction. */
             origin_text?: string | null;
+            paused_once_kept?: components["schemas"]["PausedReason"] | null;
             paused_reason?: components["schemas"]["PausedReason"] | null;
             /**
              * Format: int32

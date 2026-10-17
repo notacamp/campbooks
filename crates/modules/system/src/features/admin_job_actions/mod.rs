@@ -1,7 +1,8 @@
 //! Retry and discard dead jobs (ADR 0015): one job, or every dead job of a
-//! kind. Requires `jobs.retry` (or `super`). Only dead jobs are ever
-//! touched, and repeating a call is a no-op success: the answer says
-//! whether anything changed.
+//! kind; and discard the pending or stuck row of a schedule
+//! (campbooks-cloud#207). Requires `jobs.retry` (or `super`). Only dead jobs
+//! and a schedule's blocking row are ever touched, and repeating a call is a
+//! no-op success: the answer says whether anything changed.
 
 use axum::{Json, extract::State};
 use campbooks_kernel::{
@@ -10,7 +11,7 @@ use campbooks_kernel::{
     extract::{Json as JsonBody, Path},
     jobs::{
         JobId,
-        admin::{self, Discard, Retry},
+        admin::{self, Discard, DiscardSchedule, Retry},
     },
 };
 use serde::{Deserialize, Serialize};
@@ -102,6 +103,45 @@ pub async fn discard(
     let outcome = match admin::discard(&state.db, &admin.grant, id).await? {
         Discard::Discarded => Outcome::Applied,
         Discard::Unchanged | Discard::Missing => Outcome::Unchanged,
+    };
+    Ok(Json(JobAction { outcome }))
+}
+
+/// The `{name}` of a schedule route (a struct for the same reason as
+/// [`JobPath`]).
+#[derive(Debug, Deserialize)]
+pub struct SchedulePath {
+    name: String,
+}
+
+/// Discard a schedule's pending or stuck run, so its next tick enqueues
+/// afresh. A run a live worker holds is kept.
+#[utoipa::path(
+    delete,
+    path = "/admin/v1/system/schedules/{name}/run",
+    operation_id = "system.admin_discard_schedule_run",
+    tag = "system",
+    params(("name" = String, Path, description = "The schedule (`<module>.<job>`).")),
+    security(("admin" = ["admin:access"])),
+    extensions(("x-campbooks-admin" = json!(AdminOperation::command::<JobsRetry>()))),
+    responses(
+        (status = OK, description = "Deleted, or nothing to do.", body = JobAction),
+        (status = UNAUTHORIZED, description = "`admin_reauth_required`: sign in again.",
+            body = campbooks_kernel::Problem, content_type = "application/problem+json"),
+        (status = NOT_FOUND, description = "No such schedule, or not an administrator with \
+            `jobs.retry`.", body = campbooks_kernel::Problem,
+            content_type = "application/problem+json"),
+    )
+)]
+pub async fn discard_schedule_run(
+    admin: Admin<JobsRetry>,
+    State(state): State<AppState>,
+    Path(SchedulePath { name }): Path<SchedulePath>,
+) -> Result<Json<JobAction>> {
+    let outcome = match admin::discard_schedule(&state, &admin.grant, &name).await? {
+        DiscardSchedule::Discarded => Outcome::Applied,
+        DiscardSchedule::Unchanged => Outcome::Unchanged,
+        DiscardSchedule::Unknown => return Err(Error::NotFound),
     };
     Ok(Json(JobAction { outcome }))
 }

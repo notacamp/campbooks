@@ -296,6 +296,11 @@
       "allPaid_other": "{{count}} facturas marcadas como pagadas",
       "allPaidFailed_one": "No se ha podido marcar {{count}} factura como pagada. Inténtalo de nuevo.",
       "allPaidFailed_other": "No se han podido marcar {{count}} facturas como pagadas. Inténtalo de nuevo."
+    },
+    "mail": {
+      "more": "Mostrar el correo completo",
+      "less": "Mostrar menos",
+      "linksOff": "Los enlaces están desactivados en los correos que pueden ser phishing."
     }
   },
   "rules": {
@@ -421,6 +426,7 @@
       "made": "Nueva regla · {{rule}}",
       "stopped": "Regla quitada · {{rule}}",
       "kept": "Regla mantenida · {{rule}}",
+      "keptPaused": "Regla mantenida, en pausa por ahora · {{rule}}",
       "declined": "Regla rechazada · {{rule}}",
       "failed": "Campbooks no pudo cambiar esa regla. No ha cambiado nada."
     },
@@ -487,6 +493,7 @@
         "paused_by_member": "Pausada por un miembro",
         "author_unavailable": "En pausa por ahora; volverá a actuar sola"
       },
+      "keptStaysPaused": "Si la mantienes, seguirá en pausa hasta que vuelva quien la enseñó o alguien se haga cargo de ella",
       "empty": "Enseña a Scout arriba o responde a sus preguntas más abajo. Cuando mueves, archivas o quitas un correo, Campbooks también se ofrece a hacer lo mismo con los parecidos.",
       "leave": "Dejarlos como están",
       "changedMail": "Los correos que cambió",

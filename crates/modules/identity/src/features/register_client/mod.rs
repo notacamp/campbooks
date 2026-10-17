@@ -58,7 +58,7 @@ pub struct RegisteredClient {
     operation_id = "identity.register_client",
     tag = "identity",
     security(("bearer" = ["identity:clients"])),
-    extensions(("x-campbooks" = json!(Operation::command(Risk::High).records(["identity.client"]).access("identity.client", campbooks_kernel::authz::Action::Create)))),
+    extensions(("x-campbooks" = json!(Operation::command(Risk::High).secret_once().records(["identity.client"]).access("identity.client", campbooks_kernel::authz::Action::Create)))),
     params(("workspace_id" = WorkspaceId, Path, description = "The workspace.")),
     request_body = RegisterClient,
     responses(

@@ -809,3 +809,28 @@ async fn only_the_maintenance_scope_reads_the_backfills(db: PgPool) {
     assert_eq!(seen, 2, "the maintenance scope");
     tx.rollback().await.unwrap();
 }
+
+/// The dispatcher's page jobs are each enqueued in their inbox's workspace,
+/// and leave its transaction working in none (campbooks-cloud#207).
+#[sqlx::test(migrations = "../../../migrations")]
+async fn the_dispatcher_leaves_no_workspace_set(db: PgPool) {
+    let kit = Kit::new(db.clone()).await;
+    let first = mailbox(&kit, &["needs"]).await;
+    let second = mailbox(&kit, &["needs"]).await;
+    let running: Vec<(WorkspaceId, super::Page)> = [first, second]
+        .into_iter()
+        .map(|(workspace, inbox)| (workspace, super::Page { inbox, after: None }))
+        .collect();
+    let mut tx = campbooks_kernel::db::begin_maintenance(&kit.state.db)
+        .await
+        .unwrap();
+    let queued = super::queue_pages(&mut tx, &running).await.unwrap();
+    assert_eq!(queued, 2);
+    let workspace: Option<String> =
+        sqlx::query_scalar("SELECT nullif(current_setting('campbooks.workspace_id', true), '')")
+            .fetch_one(&mut *tx)
+            .await
+            .unwrap();
+    assert_eq!(workspace, None);
+    tx.rollback().await.unwrap();
+}

@@ -1,5 +1,7 @@
 //! A member leaving a workspace, by their own choice or removed by a
-//! manager: shared by `remove_member` and `leave_workspace`.
+//! manager: shared by `remove_member` and `leave_workspace`. Like joining,
+//! it locks the member's row before the workspace's
+//! ([`suspension`](super::suspension)).
 
 use campbooks_kernel::{
     AppState, Error, Result,
@@ -10,6 +12,7 @@ use campbooks_kernel::{
 use super::{
     access::{keep_an_owner, lock_workspace, role_of},
     security::{self, SecurityKind},
+    suspension,
 };
 use crate::events::{MailChoice, MemberLeft};
 
@@ -33,6 +36,11 @@ pub async fn depart(
     how: Departure,
 ) -> Result<()> {
     let mut tx = state.db.begin_for(workspace).await?;
+    // The member's row first, as announcing their suspension locks it
+    // (campbooks-cloud#197): an announcement going on lists this workspace
+    // and is published here before they leave; one that starts after
+    // waits, and no longer lists it.
+    suspension::lock(&mut tx, member).await?;
     lock_workspace(&mut tx, workspace).await?;
     let role = role_of(&mut tx, workspace, member)
         .await?
