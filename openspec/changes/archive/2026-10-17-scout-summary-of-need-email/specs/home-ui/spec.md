@@ -51,4 +51,4 @@ read SHALL offer no Reply, Done or Not needed.
 
 #### Scenario: A warning's links lead nowhere
 - **WHEN** the user opens a phishing warning on Home
-- **THEN** its email shows with links that open nothing, and a line says links are off in mail that may be phishing
+- **THEN** its email shows with links that open nothing, a line says links are off in mail that may be phishing, and there is no Scout's summary

@@ -75,8 +75,9 @@ All notable changes to Campbooks Next are documented here. The format follows
   languages in one call and you read yours. It is never written again and opening an item never
   asks the model. It counts against the workspace's daily AI limit (one call per email that
   raises a need) and appears only when a `complete` model is configured and may receive mail on
-  this server; otherwise, or when the call fails, the email shows as before. Needs that were open
-  before the upgrade get theirs in the background, with nothing to do.
+  this server; otherwise, or when the call fails, the email shows as before. Mail that may be
+  phishing gets no summary, only its warning, so Scout never retells a scam in its own voice.
+  Needs that were open before the upgrade get theirs in the background, with nothing to do.
 
 - **Error reports to GlitchTip or Sentry.** Set `CAMPBOOKS_TELEMETRY__ERROR_DSN` and every
   internal error, job that failed for good and panic is reported, filed under the release

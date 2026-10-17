@@ -117,10 +117,12 @@ pub struct ConversationDetail {
     pub need_summary: Option<String>,
 }
 
-/// The summary of the email behind the conversation's open need.
+/// The summary of the email behind the conversation's open need; none for
+/// a phishing warning, even one written before the need became one.
 const NEED_SUMMARY: &str = "SELECT s.texts FROM conversations.needs n \
        JOIN conversations.need_summaries s ON s.message_id = n.message_id \
-      WHERE n.conversation_id = $1 AND n.state = 'open' AND s.state = 'written'";
+      WHERE n.conversation_id = $1 AND n.state = 'open' AND s.state = 'written' \
+        AND n.question <> 'suspicious'";
 
 /// The summary of the email behind the conversation's open need, in
 /// `locale`, else in English.

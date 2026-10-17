@@ -59,14 +59,15 @@ const MAX_CALLS: i16 = 2;
 /// How long a job over the daily AI limit waits before it tries again.
 const OVER_LIMIT_WAIT: Duration = Duration::from_hours(4);
 
-/// The message the summary is for, if its need is still open: its sender,
+/// The message the summary is for, if its need is still open and is not a
+/// phishing warning: its sender,
 /// subject, parts, where it is, and what is stored for it.
 const LOAD: &str = "SELECT m.sender, m.subject, m.bodies, m.sent_at, m.conversation_id, \
             m.inbox_id, s.state, s.attempts \
        FROM conversations.messages m \
        JOIN conversations.inboxes i ON i.id = m.inbox_id AND i.detached_at IS NULL \
        JOIN conversations.needs n ON n.conversation_id = m.conversation_id \
-        AND n.message_id = m.id AND n.state = 'open' \
+        AND n.message_id = m.id AND n.state = 'open' AND n.question <> 'suspicious' \
        LEFT JOIN conversations.need_summaries s ON s.message_id = m.id \
       WHERE m.id = $1 AND m.direction = 'inbound' AND NOT m.in_spam AND NOT m.in_trash";
 

@@ -89,11 +89,15 @@ async fn stored(kit: &Kit) -> Vec<(String, String, i16)> {
     .unwrap()
 }
 
+/// Open needs that get a summary: all but the phishing warnings.
 async fn open_needs(kit: &Kit) -> i64 {
-    sqlx::query_scalar("SELECT count(*) FROM conversations.needs WHERE state = 'open'")
-        .fetch_one(&kit.db)
-        .await
-        .unwrap()
+    sqlx::query_scalar(
+        "SELECT count(*) FROM conversations.needs
+          WHERE state = 'open' AND question <> 'suspicious'",
+    )
+    .fetch_one(&kit.db)
+    .await
+    .unwrap()
 }
 
 async fn requeue(kit: &Kit, workspace: WorkspaceId, provider_message_id: &str) {
@@ -164,6 +168,47 @@ async fn a_need_that_opens_gets_one_summary_in_every_language(db: PgPool) {
     );
     let japanese = detail(&kit, &sam, workspace, "needs-1", "ja").await;
     assert_eq!(japanese["need_summary"], english["need_summary"]);
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_phishing_warning_gets_no_summary(db: PgPool) {
+    let server = complete(&good()).await;
+    let kit = kit(db, &server).await;
+    let (workspace, _, sam, _) = sams_needs(&kit).await;
+    let phishing: Vec<String> = sqlx::query_scalar(
+        "SELECT m.provider_message_id FROM conversations.needs n
+           JOIN conversations.messages m ON m.id = n.message_id
+          WHERE n.state = 'open' AND n.question = 'suspicious'",
+    )
+    .fetch_all(&kit.db)
+    .await
+    .unwrap();
+    assert!(
+        !phishing.is_empty(),
+        "the fixtures raise a phishing warning"
+    );
+    // Nothing asked of the model or stored for it: a summary would retell
+    // the scam in Scout's voice.
+    let rows = stored(&kit).await;
+    assert!(
+        rows.iter().all(|(id, _, _)| !phishing.contains(id)),
+        "{rows:?}"
+    );
+    assert_eq!(calls(&server).await, rows.len());
+    // Even a summary written before the need became a warning stays hidden.
+    let message = kit.message_of(&phishing[0]).await;
+    sqlx::query(
+        "INSERT INTO conversations.need_summaries (message_id, workspace_id, state, texts, attempts)
+         VALUES ($1::uuid, $2, 'written', $3, 1)",
+    )
+    .bind(&message)
+    .bind(workspace.as_uuid())
+    .bind(good())
+    .execute(&kit.db)
+    .await
+    .unwrap();
+    let shown = detail(&kit, &sam, workspace, &phishing[0], "en").await;
+    assert!(shown["need_summary"].is_null(), "{shown:?}");
 }
 
 #[sqlx::test(migrations = "../../../migrations")]

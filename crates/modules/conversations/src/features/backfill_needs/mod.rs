@@ -67,6 +67,7 @@ use crate::{
 const NEEDING_SUMMARY: &str = "SELECT n.message_id FROM conversations.needs n \
        LEFT JOIN conversations.need_summaries s ON s.message_id = n.message_id \
       WHERE n.conversation_id = ANY($1) AND n.state = 'open' \
+        AND n.question <> 'suspicious' \
         AND (s.message_id IS NULL OR (s.state = 'failed' AND s.attempts < 2))";
 
 /// How often pending backfills are started.

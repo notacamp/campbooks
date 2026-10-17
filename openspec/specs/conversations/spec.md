@@ -1613,8 +1613,9 @@ the kernel scope, SHALL see no backfill row.
 - **THEN** it sees no row
 
 ### Requirement: Scout's summary of a need's email
-When a need opens for a message and the `complete` role is configured and may
-receive mail on this server, a job (`conversations.summarize_need`, queued in
+When a need that is not a phishing warning (question `suspicious`) opens for
+a message and the `complete` role is configured and may receive mail on this
+server, a job (`conversations.summarize_need`, queued in
 the transaction that stores the need, never inside the decide call or on a
 request path) SHALL ask the role for a summary of that message in one or two
 plain sentences, in English, European Portuguese, Spanish from Spain and
@@ -1644,6 +1645,10 @@ SHALL publish `conversations.need_summarised` (ids only).
 - **WHEN** the same need is refreshed, or its job runs a second time
 - **THEN** the model is not asked again and nothing is written
 
+#### Scenario: Mail that may be phishing
+- **WHEN** a message raises a phishing warning
+- **THEN** no summary is asked for or stored: a summary would retell the scam in Scout's voice, and the warning is what matters
+
 #### Scenario: Nothing usable
 - **WHEN** the model answers with nothing in English
 - **THEN** the message is stored as failed, nothing is shown, a later run asks once more, and after that never
@@ -1655,8 +1660,9 @@ SHALL publish `conversations.need_summarised` (ids only).
 ### Requirement: Reading the summary
 `conversations.get` SHALL return `need_summary`: the summary of the email
 behind the conversation's open need, in the caller's language (English when
-theirs is missing), or none when there is no open need, none is written yet,
-or none can be. It SHALL be read with the same access checks as the
+theirs is missing), or none when there is no open need, the need is a
+phishing warning (even with a summary written before it became one), none is
+written yet, or none can be. It SHALL be read with the same access checks as the
 conversation, so a caller who may not read the inbox gets 404 and no summary,
 and reading it SHALL never ask the model.
 
