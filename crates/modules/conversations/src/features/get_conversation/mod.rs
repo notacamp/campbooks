@@ -26,7 +26,7 @@ use crate::{
     domain::{
         access::visible_inboxes,
         actions,
-        attachments::is_raster,
+        attachments::in_body,
         blobs::read_text,
         conversation::{ConversationSummary, summary},
         policy::Policy,
@@ -312,7 +312,7 @@ async fn attachments_of(
     .fetch_all(conn)
     .await?
     {
-        let in_body = a.inline && a.has_content_id && is_raster(&a.content_type);
+        let in_body = in_body(a.inline, a.has_content_id, &a.content_type);
         attachments
             .entry(a.message_id)
             .or_default()

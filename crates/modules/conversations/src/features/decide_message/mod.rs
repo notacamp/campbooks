@@ -31,7 +31,7 @@
 //! re-queued. When the call cannot be counted, it is not made and the job
 //! retries.
 
-use std::sync::Arc;
+use std::{borrow::Cow, sync::Arc};
 
 use campbooks_ai::{
     Gateway,
@@ -40,7 +40,7 @@ use campbooks_ai::{
         check::{AnswersCheck, CheckOutcome},
         signals::{
             actions::{action_questions, likelihoods},
-            email::{Envelope, Recipient, triage_questions},
+            email::{Attachment, Envelope, Recipient, triage_questions},
         },
         strategy::Strategy,
     },
@@ -165,6 +165,36 @@ impl Pass {
         asked
     }
 
+    /// The envelope the catalogue's facts read: its attachments are the
+    /// message's files only, never an image its body shows (a signature
+    /// logo), so Open attachment is never asked or rated for one. With the
+    /// catalogue off, the envelope as it is, and nothing more is read.
+    async fn facts<'a>(
+        &self,
+        ctx: &JobContext,
+        workspace: WorkspaceId,
+        message: MessageId,
+        envelope: &'a Envelope,
+    ) -> Result<Cow<'a, Envelope>, JobError> {
+        if !self.actions.enabled {
+            return Ok(Cow::Borrowed(envelope));
+        }
+        let state = ctx.state();
+        let mut tx = state.db.begin_for(workspace).await?;
+        let rows: Vec<(String, String, bool, bool)> = sqlx::query_as(
+            "SELECT filename, content_type, inline, content_id IS NOT NULL
+               FROM conversations.attachments WHERE message_id = $1 ORDER BY position",
+        )
+        .bind(message)
+        .fetch_all(&mut *tx)
+        .await?;
+        tx.commit().await?;
+        Ok(Cow::Owned(Envelope {
+            attachments: files_only(rows),
+            ..envelope.clone()
+        }))
+    }
+
     /// The catalogue's rating of every action from `answers` (and the model
     /// that gave them), with the catalogue on.
     fn rate(
@@ -210,7 +240,10 @@ impl Pass {
 
         // Counted against the workspace's daily AI limit (campbooks-cloud#152).
         let usage = Scope::workspace(ctx.state().db.clone(), workspace, PURPOSE);
-        let all = self.asked(&questions, &loaded.envelope);
+        let facts = self
+            .facts(ctx, workspace, message, &loaded.envelope)
+            .await?;
+        let all = self.asked(&questions, &facts);
         let asked = model.strategy.decide(&loaded.envelope, &all);
         let mut answers = match usage.run(asked).await {
             Ok(decisions) => decisions.answers,
@@ -228,7 +261,7 @@ impl Pass {
         };
         // The catalogue's answers are rated, never stored as decisions:
         // the triage answers are recorded exactly as without it.
-        let rated = self.rate(&loaded.envelope, &answers);
+        let rated = self.rate(&facts, &answers);
         answers.truncate(questions.len());
         let recorded = Recorded {
             message,
@@ -428,6 +461,17 @@ impl JobHandler for DecideBacklog {
         }
         Ok(())
     }
+}
+
+/// A message's attachments as `(filename, content_type, inline, has a
+/// Content-ID)`, without the images its body shows: its files.
+fn files_only(rows: Vec<(String, String, bool, bool)>) -> Vec<Attachment> {
+    rows.into_iter()
+        .filter(|(_, content_type, inline, cid)| {
+            !crate::domain::attachments::in_body(*inline, *cid, content_type)
+        })
+        .map(|(name, content_type, _, _)| Attachment { name, content_type })
+        .collect()
 }
 
 /// A stored inbound message, read for the model pass.

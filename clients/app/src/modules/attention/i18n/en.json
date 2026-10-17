@@ -42,7 +42,12 @@
     "reply": "Reply",
     "open": "Open conversation",
     "undo": "Undo",
-    "label": "Actions for {{name}}"
+    "label": "Actions for {{name}}",
+    "openAttachment": "Open attachment",
+    "forward": "Forward…",
+    "combo": "{{first}}, then {{second}}",
+    "picked": "Scout picked these for this email",
+    "noAttachment": "This email has no file to open: only pictures shown in its text."
   },
   "confirm": {
     "done": "Done · {{name}}",
@@ -62,7 +67,11 @@
   "remind": {
     "today": "Remind me today at {{time}}",
     "tomorrow": "Remind me tomorrow at {{time}}",
-    "on": "Remind me on {{date}}"
+    "on": "Remind me on {{date}}",
+    "button": "Remind me…",
+    "title": "Remind me about {{name}}…",
+    "description": "It leaves Home until then, and comes back on its own.",
+    "beforeDue": "Before it’s due"
   },
   "pay": {
     "allPaid_one": "{{count}} already paid",

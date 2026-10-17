@@ -1898,10 +1898,11 @@ With `CAMPBOOKS_CONVERSATIONS__ACTIONS__ENABLED` on (off by default), the
 model pass SHALL ask, in the same `decide` call as the triage questions and
 each in a slot of its own, one likelihood question per action of the
 catalogue that no triage answer already gives: `action_remind`,
-`action_open_attachment` (only for a message with an attachment),
+`action_open_attachment` (only for a message with a file attached: an
+image its body shows, such as a signature logo, is no attachment),
 `action_forward` and `action_paid_automatically`. It SHALL rate every action:
 Reply from the `needs_reply` answer (never for a no-reply sender), Remind,
-Open attachment (never without an attachment) and Forward from their own
+Open attachment (never without a file attached) and Forward from their own
 questions, Report from the `suspicious` answer and It's safe from its
 complement, Already paid from `action_paid_automatically` and Still to pay
 from its complement; an answer without probabilities rates nothing, and a catalogue answer
@@ -1919,7 +1920,9 @@ on a `pay` need, Already paid and Still to pay, then Open attachment, Remind
 or Forward; on any other need, Reply, Open attachment, Remind or Forward.
 A need's own answers SHALL always be offered, likelier first; the others
 only when they cleared the floor, likelier first, a pair of the combo table
-offered as one first among them when both did. A need with nothing rated or
+offered as one first among them when both did; a pair SHALL never hold two
+actions that ask a follow-up in a dialog (Reply, Remind, Forward), which the
+table is checked for when it is built. A need with nothing rated or
 nothing to offer SHALL carry no `actions`. With the setting off, the
 `decide` request SHALL hold exactly the triage questions, nothing SHALL be
 rated or read, and every need SHALL read exactly as before, with no
@@ -1944,6 +1947,10 @@ rated or read, and every need SHALL read exactly as before, with no
 #### Scenario: A catalogue answer that does not fit
 - **WHEN** the catalogue is on and the model leaves out `action_remind`, answers `action_forward` out of range and `action_paid_automatically` with "NaN"
 - **THEN** the decision succeeds, its triage decisions and needs are the same as with the catalogue off, and Remind, Forward, Already paid and Still to pay are not rated
+
+#### Scenario: Only a logo
+- **WHEN** the catalogue is on and a message's only attachment is the signature logo its body shows
+- **THEN** `action_open_attachment` is not asked and Open attachment is not rated
 
 ### Requirement: Labelling the owner's actions
 `campbooks-server labelling export --set actions --workspace <id> --days <n>

@@ -345,6 +345,26 @@ fn broken(mut answers: Value) -> Value {
     answers
 }
 
+/// Each listed need as triage left it (question, reason, trust, basis,
+/// urgency and due date), sorted: ids differ between runs.
+fn need_shapes(run: &Run) -> Vec<String> {
+    let mut shapes: Vec<String> = run
+        .needs
+        .iter()
+        .map(|need| {
+            [
+                "question", "reason", "trust", "basis", "urgent", "overdue", "due_on",
+            ]
+            .iter()
+            .map(|field| format!("{field}={}", need[*field]))
+            .collect::<Vec<_>>()
+            .join(" ")
+        })
+        .collect();
+    shapes.sort();
+    shapes
+}
+
 /// The actions rated in `run`.
 async fn rated_actions(run: &Run) -> Vec<String> {
     sqlx::query_scalar("SELECT DISTINCT action FROM conversations.action_likelihoods ORDER BY 1")
@@ -360,7 +380,9 @@ async fn a_catalogue_answer_that_does_not_fit_drops_only_its_rating(db: PgPool) 
     // The job went through: triage is stored as with the catalogue off.
     assert!(!on.decisions.is_empty());
     assert_eq!(off.decisions, on.decisions);
-    assert_eq!(off.needs.len(), on.needs.len());
+    // The needs themselves, not just how many: what each asks, why, how
+    // sure and how urgent are the same.
+    assert_eq!(need_shapes(&off), need_shapes(&on));
     // Only the actions whose answers fit are rated: Open attachment (its
     // answer was fine), Reply (needs_reply), Report and It's safe
     // (suspicious); not Remind, Forward or the paid pair.
@@ -384,4 +406,31 @@ async fn over_openai_a_catalogue_answer_that_does_not_fit_fails_nothing(db: PgPo
     assert_eq!(off.decisions, on.decisions);
     // Without log-probabilities nothing has a likelihood to rate.
     assert!(rated_actions(&on).await.is_empty());
+}
+
+#[test]
+fn an_image_the_body_shows_is_no_attachment_to_open() {
+    let row = |name: &str, content_type: &str, inline: bool, cid: bool| {
+        (name.to_owned(), content_type.to_owned(), inline, cid)
+    };
+    let files = super::files_only(vec![
+        // A signature logo: inline, with a Content-ID, a picture.
+        row("logo.png", "image/png", true, true),
+        row("lease.pdf", "application/pdf", false, false),
+        // A picture sent as a file, and an inline PDF: files both.
+        row("photo.jpg", "image/jpeg", false, false),
+        row("terms.pdf", "application/pdf", true, true),
+    ]);
+    let names: Vec<&str> = files.iter().map(|f| f.name.as_str()).collect();
+    assert_eq!(names, ["lease.pdf", "photo.jpg", "terms.pdf"]);
+    // Only the logo: nothing to open, so Open attachment is not asked.
+    let logo_only = Envelope {
+        attachments: super::files_only(vec![row("logo.png", "image/png", true, true)]),
+        ..Envelope::default()
+    };
+    assert!(
+        !campbooks_ai::decide::signals::actions::action_questions(&logo_only)
+            .iter()
+            .any(|q| q.id == question::OPEN_ATTACHMENT)
+    );
 }

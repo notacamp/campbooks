@@ -626,5 +626,17 @@
     "neverDone": "O Scout não volta a sugerir isso",
     "failed": "O Campbooks não conseguiu registar isso. Tente de novo.",
     "shared": "Para todos em {{inbox}}."
+  },
+  "forward": {
+    "title": "Reencaminhar o email de {{name}} para…",
+    "description": "Encontre a pessoa pelo nome. Vê o email antes de ser enviado.",
+    "find": "Procurar alguém pelo nome",
+    "placeholder": "Nome, ou parte dele",
+    "people": "Pessoas",
+    "starting": "A preparar o reencaminhamento…",
+    "failed": "Não foi possível preparar o reencaminhamento: nada foi enviado. Tente de novo.",
+    "none": "Ninguém com esse nome lhe escreveu.",
+    "searchFailed": "Não foi possível procurar agora. Tente de novo.",
+    "nobody": "Ainda ninguém lhe escreveu."
   }
 }

@@ -42,7 +42,12 @@
     "reply": "Responder",
     "open": "Abrir conversación",
     "undo": "Deshacer",
-    "label": "Acciones para {{name}}"
+    "label": "Acciones para {{name}}",
+    "openAttachment": "Abrir adjunto",
+    "forward": "Reenviar…",
+    "combo": "{{first}} y después {{second}}",
+    "picked": "Scout ha elegido estas para este correo",
+    "noAttachment": "Este correo no tiene ningún archivo que abrir: solo imágenes en el texto."
   },
   "confirm": {
     "done": "Hecho · {{name}}",
@@ -62,7 +67,11 @@
   "remind": {
     "today": "Recordármelo hoy a las {{time}}",
     "tomorrow": "Recordármelo mañana a las {{time}}",
-    "on": "Recordármelo el {{date}}"
+    "on": "Recordármelo el {{date}}",
+    "button": "Recordármelo…",
+    "title": "Recordarme lo de {{name}}…",
+    "description": "Sale del inicio hasta entonces y vuelve solo.",
+    "beforeDue": "Antes de que venza"
   },
   "pay": {
     "allPaid_one": "Ya he pagado {{count}}",

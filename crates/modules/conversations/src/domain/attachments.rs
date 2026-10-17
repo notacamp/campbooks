@@ -71,6 +71,14 @@ pub fn is_raster(stored: &str) -> bool {
     RASTER_IMAGES.contains(&essence.as_str())
 }
 
+/// Whether an attachment is an image the message's body shows (sent inline
+/// with a `Content-ID`, a raster type), not a file of its own: a signature
+/// logo. The reader lists it in the body, and the action catalogue never
+/// counts it as an attachment to open.
+pub fn in_body(inline: bool, has_content_id: bool, stored: &str) -> bool {
+    inline && has_content_id && is_raster(stored)
+}
+
 /// Whether a served type may be shown inline (a raster image or a PDF).
 pub fn may_be_inline(served: &str) -> bool {
     served == "application/pdf" || RASTER_IMAGES.contains(&served)

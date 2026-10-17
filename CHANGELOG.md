@@ -8,6 +8,13 @@ All notable changes to Campbooks Next are documented here. The format follows
 
 ### Added
 
+- **Home offers each email's own actions, picked by Scout (with the catalogue on).** When
+  the action catalogue is switched on, the selected item's buttons are the ones the model
+  ranked for that email, likelier first on 1, 2 and 3, with the visor saying Scout picked
+  them. Remind asks when, Forward finds the person by name and opens the forward in the
+  composer (nothing is sent from Home), and Open attachment opens the item on its file.
+  Every action keeps its Undo. With the catalogue off, or for an email it didn't rate,
+  Home offers the same actions as before.
 - **Each item's own actions, from a catalogue (off for now).** The decide model can rate
   what Campbooks can do about each email (reply, remind, open the attachment, forward,
   report, it's safe, already paid or still to pay) in the same call that sorts it, and
@@ -41,6 +48,9 @@ All notable changes to Campbooks Next are documented here. The format follows
 
 ### Fixed
 
+- **A signature logo is no attachment to open.** With the action catalogue on, an image
+  shown in an email's text (a logo sent inline) no longer counts as an attachment, so
+  Open attachment is never offered for mail that has nothing else attached.
 - **One bad action answer never costs an email its sorting.** With the action catalogue
   on, an action answer the model leaves out or gets wrong (not a number, out of range)
   now just means no rating for that action; the email is sorted exactly as with the

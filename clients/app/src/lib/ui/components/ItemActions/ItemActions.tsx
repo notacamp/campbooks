@@ -3,6 +3,7 @@ import { useEffect, useRef } from "react";
 import type { ShortcutId } from "~/lib/shortcuts";
 
 import { Button } from "../Button/Button";
+import { Visor } from "../Visor/Visor";
 
 import styles from "./ItemActions.module.css";
 
@@ -33,11 +34,17 @@ export interface ItemActionsProps {
   onAction: (id: string) => void;
   /** Accessible name of the group: "Actions for Marta Ferreira". */
   label: string;
+  /**
+   * The own actions were picked by the assistant for this item: the visor
+   * goes before them, saying so ("Scout picked these").
+   */
+  picked?: string | undefined;
 }
 
 /**
  * The selected item's actions, all in one button style (label and key), in
- * two groups split by a divider. Roving tabindex: one button is in the tab
+ * two groups split by a divider; the visor before the own ones when the
+ * assistant picked them. Roving tabindex: one button is in the tab
  * order (the highlighted one, else the first); ←/→ move the highlight from
  * the screen's shortcuts and the focus follows it.
  */
@@ -48,6 +55,7 @@ export function ItemActions({
   onHighlight,
   onAction,
   label,
+  picked,
 }: ItemActionsProps) {
   const group = useRef<HTMLDivElement>(null);
   const all = [...own, ...universal];
@@ -97,6 +105,11 @@ export function ItemActions({
 
   return (
     <div ref={group} className={styles["actions"]} role="group" aria-label={label}>
+      {picked !== undefined && own.length > 0 ? (
+        <span className={styles["picked"]} role="img" aria-label={picked} title={picked}>
+          <Visor size="xs" />
+        </span>
+      ) : null}
       {own.map(render)}
       {own.length > 0 && universal.length > 0 ? (
         <span className={styles["divider"]} aria-hidden="true" />

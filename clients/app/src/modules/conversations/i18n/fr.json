@@ -626,5 +626,17 @@
     "neverDone": "Scout ne le proposera plus",
     "failed": "Campbooks n’a pas pu l’enregistrer. Réessayez.",
     "shared": "Pour tout le monde dans {{inbox}}."
+  },
+  "forward": {
+    "title": "Transférer l’e-mail de {{name}} à…",
+    "description": "Trouvez la personne par son nom. Vous verrez l’e-mail avant son envoi.",
+    "find": "Chercher quelqu’un par son nom",
+    "placeholder": "Nom, ou une partie",
+    "people": "Personnes",
+    "starting": "Préparation du transfert…",
+    "failed": "Impossible de préparer le transfert : rien n’a été envoyé. Réessayez.",
+    "none": "Personne de ce nom ne vous a écrit.",
+    "searchFailed": "Impossible de chercher pour le moment. Réessayez.",
+    "nobody": "Personne ne vous a encore écrit."
   }
 }

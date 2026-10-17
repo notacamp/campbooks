@@ -34,6 +34,9 @@ export { ConversationReader } from "./components/Reader/ConversationReader";
 export { useInboxActions } from "./components/InboxScreen/use-inbox-actions";
 export { renderReplyComposer } from "./components/ReplyComposer/ReplyComposer";
 export { ReplyDialog, type ReplyResume } from "./components/ReplyDialog/ReplyDialog";
+// Forward from Home (campbooks-cloud#166): find the person by name, then
+// finish the forward in the composer.
+export { ForwardDialog } from "./components/ForwardDialog/ForwardDialog";
 export { displayName, listTime } from "./model";
 export { isStream, type Stream } from "./api/queries";
 /**
