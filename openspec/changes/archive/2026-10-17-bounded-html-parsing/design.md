@@ -78,3 +78,10 @@ Measured with a standalone release build (counts are the sink's):
   densest ordinary mail at the read cap is about seven times.
 - The measure adds one parse to messages without a style sheet: about 30 ms
   at the largest.
+- The time limit depends on load: on a busy server a very large ordinary
+  message (a 1.5 MiB newsletter measures in about 70 ms, a seven-fold margin)
+  could be shown as text on one read and as HTML on the next.
+- A message tuned to land just under the limits still costs about 1 s per
+  read (the measure, css-inline re-tokenising it, then ammonia), against
+  about ten minutes before. Capping attributes per element in the inliner's
+  gate would trim it further.
