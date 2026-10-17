@@ -150,7 +150,17 @@ The admin API SHALL let an administrator with `jobs.read` see the background
 job queue as counts per queue and kind (ready, scheduled, running, running
 past its lease, failed, age of the oldest ready job) and list the failed jobs
 newest first with their kind, queue, workspace, attempts, last error and
-times, filtered by kind or queue and paged by cursor. An administrator with
+times, filtered by kind or queue and paged by cursor. The counts SHALL also
+list, for each code under which job kinds are watched (a kind's `Watch`),
+those kinds and how many of their jobs are dead, 0 when none; when a job of
+a watched kind dies the worker SHALL log, at WARN, the line its kind
+declares, which holds no id or content. The suspension's deliveries
+(`workspaces.announce_member_suspended`,
+`workspaces.announce_member_unsuspended`,
+`conversations.pause_suspended_author`,
+`conversations.resume_unsuspended_author`) SHALL be watched as
+`suspension_fanout`, logging `suspension fan-out delivery died`. An
+administrator with
 `jobs.retry` SHALL be able to put one failed job, or the failed jobs of one
 kind (at most 1000 per call), back on their queue with their attempts reset,
 and to delete one failed job. Such an administrator SHALL also be able to
@@ -167,6 +177,14 @@ a run a live worker holds SHALL be kept, and an unknown name SHALL answer
 #### Scenario: Failed jobs without payloads
 - **WHEN** an administrator lists the failed jobs and one of them carries a payload with free text
 - **THEN** the response lists its kind, queue, attempts and last error and contains no trace of the payload
+
+#### Scenario: A watched delivery dies
+- **WHEN** a delivery of a watched kind fails for good
+- **THEN** the worker logs its kind's line at WARN, and the queue's counts list its code with that kind and one dead job, while a dead job of an unwatched kind is not counted there
+
+#### Scenario: Watches that disagree
+- **WHEN** two kinds are watched under one code with different lines, or a code is not lower-case snake case
+- **THEN** the registry refuses to build, naming each
 
 #### Scenario: Retrying a failed job
 - **WHEN** an administrator retries a failed job
@@ -193,7 +211,10 @@ a run a live worker holds SHALL be kept, and an unknown name SHALL answer
 - **THEN** the first call deletes the row and is audited, the second changes nothing, and the live run is kept; an administrator with only `jobs.read` gets 404 and a name that is no schedule gets 404
 
 ### Requirement: The Jobs panel
-The admin dashboard SHALL have a Jobs panel showing the queue by kind and the
+The admin dashboard SHALL have a Jobs panel showing the work to watch (each
+watched code named in words, "Suspensions reaching members' rules" for
+`suspension_fanout`, with its kinds and either "No dead deliveries" or how
+many died), the queue by kind and the
 failed jobs with their last error in monospace, wrapped and copyable, and
 SHALL let an administrator retry a job, discard it after a confirmation, and
 retry every failed job of a kind after a confirmation. Every action SHALL say
@@ -204,6 +225,10 @@ bounded message the worker stored, never a handler's raw message.
 #### Scenario: Discarding asks first
 - **WHEN** an administrator chooses Discard on a failed job
 - **THEN** the panel asks for confirmation naming the kind and says the job is deleted for good, and nothing is deleted until they confirm
+
+#### Scenario: Suspensions that never reached the rules
+- **WHEN** two deliveries watched as `suspension_fanout` are dead
+- **THEN** the panel's "Work to watch" lists "Suspensions reaching members' rules" with "2 dead deliveries"
 
 ### Requirement: People and workspaces metadata for administrators
 The `workspaces` module SHALL serve, to administrators only, a list of
@@ -258,13 +283,15 @@ families, record `account_suspended` (with the administrator's account id)
 in the account's audit trail and publish `identity.account_suspended`; the
 web BFF SHALL then delete the account's web sessions. Unsuspending SHALL, in
 one transaction, lift the suspension, record `account_unsuspended` and
-publish `identity.account_unsuspended`. Both events SHALL carry `at`, read
-after the account's row is locked, so a later change to one account always
-carries a later `at`. Both operations SHALL be idempotent: repeating one
-changes, records and publishes nothing more and answers the account as it
-is. Suspending an account that has an admin profile SHALL be refused with
-409 `account_is_admin`, read through the kernel's `AdminProfiles` port, and
-change nothing.
+publish `identity.account_unsuspended`. Each change SHALL add one to the
+account's count of suspensions and lifts under the account's row lock, and
+both events SHALL carry that count as `seq`, so a later change to one
+account always carries a higher `seq` whatever the clock says, and `at`, the
+moment it took effect, read under the same lock. Both operations SHALL be
+idempotent: repeating one changes, counts, records and publishes nothing
+more and answers the account as it is. Suspending an account that has an
+admin profile SHALL be refused with 409 `account_is_admin`, read through the
+kernel's `AdminProfiles` port, and change nothing.
 
 #### Scenario: Suspend once, retry safely
 - **WHEN** a super admin suspends an account twice
@@ -273,6 +300,10 @@ change nothing.
 #### Scenario: Suspend, then lift
 - **WHEN** a super admin suspends an account and then unsuspends it twice
 - **THEN** one `identity.account_unsuspended` is published, with an `at` later than the suspension's
+
+#### Scenario: Counted, not timed
+- **WHEN** an account is suspended, lifted, lifted again and suspended again
+- **THEN** the three events published carry `seq` 1, 2 and 3, and the account's count is 3
 
 #### Scenario: An administrator cannot be suspended over HTTP
 - **WHEN** a super admin suspends an account that has an admin profile, asking in Portuguese

@@ -401,6 +401,7 @@
       "made": "New rule · {{rule}}",
       "stopped": "Rule removed · {{rule}}",
       "kept": "Rule kept · {{rule}}",
+      "keptPaused": "Rule kept, paused for now · {{rule}}",
       "declined": "Rule declined · {{rule}}",
       "failed": "Campbooks could not change that rule. Nothing changed."
     },
@@ -467,6 +468,7 @@
         "paused_by_member": "Paused by a member",
         "author_unavailable": "Paused for now; it acts again on its own"
       },
+      "keptStaysPaused": "If kept, it stays paused until whoever taught it is back or someone takes it over",
       "empty": "Teach Scout above, or answer its questions below. When you move, archive or clear an email, Campbooks also offers to do the same to the ones like it.",
       "leave": "Leave them as they are",
       "changedMail": "The mail it changed",

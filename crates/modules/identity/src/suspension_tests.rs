@@ -195,3 +195,62 @@ async fn suspending_and_lifting_publish_events_ordered_by_at(db: PgPool) {
     };
     assert!(at(1) > at(0), "{events:?}");
 }
+
+/// Suspend (or lift) `account` in a transaction of its own.
+async fn change(kit: &Kit, account: Uuid, suspend: bool) -> Outcome {
+    let mut tx = kit.state.db.begin().await.unwrap();
+    let outcome = if suspend {
+        suspension::suspend(&mut tx, &kit.state.events, account, "root", Utc::now()).await
+    } else {
+        suspension::unsuspend(&mut tx, &kit.state.events, account, "root", Utc::now()).await
+    };
+    tx.commit().await.unwrap();
+    outcome.unwrap()
+}
+
+/// Each suspension and lift bumps the account's counter by one under its
+/// row lock, and its event carries it; a repeat bumps nothing
+/// (campbooks-cloud#197).
+#[sqlx::test(migrations = "../../../migrations")]
+async fn every_change_carries_the_accounts_next_count(db: PgPool) {
+    let kit = Kit::new(db).await;
+    let account = Uuid::now_v7();
+    sqlx::query(
+        "INSERT INTO identity.accounts (id, primary_email_verified, created_at)
+         VALUES ($1, false, now())",
+    )
+    .bind(account)
+    .execute(&kit.state.db)
+    .await
+    .unwrap();
+
+    assert_eq!(change(&kit, account, true).await, Outcome::Changed);
+    assert_eq!(change(&kit, account, true).await, Outcome::Unchanged);
+    assert_eq!(change(&kit, account, false).await, Outcome::Changed);
+    assert_eq!(change(&kit, account, false).await, Outcome::Unchanged);
+    assert_eq!(change(&kit, account, true).await, Outcome::Changed);
+
+    let seq: i64 = sqlx::query_scalar("SELECT suspension_seq FROM identity.accounts WHERE id = $1")
+        .bind(account)
+        .fetch_one(&kit.state.db)
+        .await
+        .unwrap();
+    assert_eq!(seq, 3, "odd: suspended");
+    let published: Vec<(String, i64)> = sqlx::query_as(
+        "SELECT name, (payload->>'seq')::bigint FROM kernel.events
+          WHERE name LIKE 'identity.account_%suspended' AND (payload->>'account')::uuid = $1
+          ORDER BY id",
+    )
+    .bind(account)
+    .fetch_all(&kit.kernel)
+    .await
+    .unwrap();
+    assert_eq!(
+        published,
+        [
+            ("identity.account_suspended".to_owned(), 1),
+            ("identity.account_unsuspended".to_owned(), 2),
+            ("identity.account_suspended".to_owned(), 3),
+        ]
+    );
+}

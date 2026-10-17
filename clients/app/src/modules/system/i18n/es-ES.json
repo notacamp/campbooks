@@ -163,6 +163,14 @@
       "expiredLeases_one": "{{count}} trabajo en ejecución perdió su proceso",
       "expiredLeases_other": "{{count}} trabajos en ejecución perdieron su proceso"
     },
+    "watched": {
+      "title": "Trabajo que vigilar",
+      "lead": "Trabajo en segundo plano cuyos fallos importan enseguida. Hasta que se reintente una entrega fallida, lo que llevaba no ha ocurrido.",
+      "suspensionFanout": "Suspensiones que llegan a las reglas de los miembros",
+      "none": "Ninguna entrega fallida",
+      "dead_one": "{{count}} entrega fallida",
+      "dead_other": "{{count}} entregas fallidas"
+    },
     "retryAll": {
       "question_one": "¿Reintentar el {{count}} trabajo {{kind}} fallido? Empieza de nuevo desde el primer intento.",
       "question_other": "¿Reintentar los {{count}} trabajos {{kind}} fallidos? Cada uno empieza de nuevo desde el primer intento.",

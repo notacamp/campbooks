@@ -154,6 +154,12 @@ pub struct AccountSuspended {
     /// `occurred_at`).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub at: Option<DateTime<Utc>>,
+    /// The account's count of suspensions and lifts, this one included
+    /// (odd: suspended). Of two changes to one account, the higher `seq` is
+    /// the later, whatever the clock said. Absent on events published
+    /// before it existed (order those by `at`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub seq: Option<i64>,
 }
 
 impl DomainEvent for AccountSuspended {
@@ -175,6 +181,11 @@ pub struct AccountUnsuspended {
     pub account: Uuid,
     /// When the lift took effect, ordered like [`AccountSuspended::at`].
     pub at: DateTime<Utc>,
+    /// The account's count of suspensions and lifts, this one included
+    /// (even: not suspended), ordered like [`AccountSuspended::seq`]. Absent
+    /// on events published before it existed.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub seq: Option<i64>,
 }
 
 impl DomainEvent for AccountUnsuspended {

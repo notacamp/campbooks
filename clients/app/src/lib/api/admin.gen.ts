@@ -1114,6 +1114,12 @@ export interface components {
              * @description Age of the oldest job that is ready to run and waiting, in seconds.
              */
             oldest_ready_seconds?: number | null;
+            /**
+             * @description The dead jobs of the kinds an operator must hear about, by what they
+             *     are for (each kind's `Watch`), sorted by code; every watched code is
+             *     listed, with 0 when nothing died.
+             */
+            watched: components["schemas"]["WatchedSummary"][];
         };
         /** @description Why a request is turned down. */
         RejectSignupRequest: {
@@ -1249,6 +1255,22 @@ export interface components {
          * @description UserId (UUIDv7)
          */
         UserId: string;
+        /** @description The dead jobs of the kinds watched under one code. */
+        WatchedSummary: {
+            /**
+             * @description What the kinds are for (`suspension_fanout`: a suspension, or its
+             *     lift, reaching the rules a member taught); the client words it.
+             */
+            code: string;
+            /**
+             * Format: int64
+             * @description How many of their jobs are dead: until each is retried, what it
+             *     carried has not happened.
+             */
+            failed: number;
+            /** @description The kinds watched under it, sorted. */
+            kinds: string[];
+        };
         /** @description One workspace's AI usage on the day. */
         WorkspaceAiUsage: {
             /**

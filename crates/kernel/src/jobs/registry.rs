@@ -9,7 +9,7 @@ use std::{
 
 use serde_json::Value;
 
-use super::{Job, JobContext, JobError, JobHandler, PruneEvents, PruneJobs};
+use super::{Job, JobContext, JobError, JobHandler, PruneEvents, PruneJobs, Watch};
 use crate::{
     Module,
     blobs::{SWEEP_EVERY, SweepBlobs},
@@ -105,6 +105,8 @@ struct KindSpec {
     /// For event handlers: whether their event must settle
     /// ([`DomainEvent::SETTLES`]).
     settles: bool,
+    /// Whether an operator must hear when one dies.
+    watch: Option<Watch>,
 }
 
 struct ScheduleSpec {
@@ -146,6 +148,7 @@ impl Background {
             run: run_fn(run_job::<J>),
             consumes: None,
             settles: false,
+            watch: J::WATCH,
         });
         self
     }
@@ -160,6 +163,7 @@ impl Background {
             run: run_fn(run_handler::<H>),
             consumes: Some((H::Event::NAME, H::Event::VERSION)),
             settles: H::Event::SETTLES,
+            watch: H::WATCH,
         });
         self
     }
@@ -185,6 +189,7 @@ impl Background {
             }),
             consumes: None,
             settles: false,
+            watch: H::WATCH,
         });
         self
     }
@@ -207,6 +212,7 @@ impl Background {
             }),
             consumes: Some((C::Event::NAME, C::Event::VERSION)),
             settles: C::Event::SETTLES,
+            watch: C::WATCH,
         });
         self
     }
@@ -317,6 +323,7 @@ pub(crate) struct KindInfo {
     pub queue: &'static str,
     pub max_attempts: u32,
     pub run: RunFn,
+    pub watch: Option<Watch>,
 }
 
 /// A registered event consumer.
@@ -532,6 +539,30 @@ impl Registry {
                 kind.name
             ));
         }
+        if let Some(watch) = kind.watch {
+            if !is_snake(watch.code) {
+                errors.push(format!(
+                    "{what} `{}`: watch code `{}` must be lower-case snake case",
+                    kind.name, watch.code
+                ));
+            }
+            if watch.died.trim().is_empty() {
+                errors.push(format!(
+                    "{what} `{}`: watch `{}` needs the line logged when one dies",
+                    kind.name, watch.code
+                ));
+            }
+            let other = self.kinds.iter().find(|(_, info)| {
+                info.watch
+                    .is_some_and(|w| w.code == watch.code && w.died != watch.died)
+            });
+            if let Some((name, _)) = other {
+                errors.push(format!(
+                    "{what} `{}`: watch `{}` logs another line than `{name}`'s",
+                    kind.name, watch.code
+                ));
+            }
+        }
         if let Some((event, version)) = kind.consumes {
             if !is_dotted(event) {
                 errors.push(format!(
@@ -559,6 +590,7 @@ impl Registry {
                     queue: kind.queue,
                     max_attempts: kind.max_attempts,
                     run: Arc::clone(&kind.run),
+                    watch: kind.watch,
                 },
             );
             if let Some((event, _)) = kind.consumes {
@@ -725,6 +757,22 @@ impl Registry {
 
     pub(crate) fn kind(&self, name: &str) -> Option<KindInfo> {
         self.kinds.get(name).cloned()
+    }
+
+    /// How an operator hears that a job of kind `name` died, when they must.
+    pub fn watch(&self, name: &str) -> Option<Watch> {
+        self.kinds.get(name).and_then(|kind| kind.watch)
+    }
+
+    /// The watched kinds by code, each code's kinds sorted.
+    pub fn watched(&self) -> BTreeMap<&'static str, Vec<&'static str>> {
+        let mut watched: BTreeMap<&'static str, Vec<&'static str>> = BTreeMap::new();
+        for (name, kind) in &self.kinds {
+            if let Some(watch) = kind.watch {
+                watched.entry(watch.code).or_default().push(*name);
+            }
+        }
+        watched
     }
 
     pub(crate) fn schedules(&self) -> &[ScheduleInfo] {

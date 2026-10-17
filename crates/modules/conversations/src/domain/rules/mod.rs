@@ -381,6 +381,21 @@ impl Stored {
         })
     }
 
+    /// For a proposed rule, why it would be paused once a member says yes
+    /// (confirming keeps its author, campbooks-cloud#197): an author away
+    /// for now, one who can no longer change the inbox, an inbox kept
+    /// read-only. `None` for any other rule, or when it would act.
+    pub fn paused_once_kept(&self) -> Option<PausedReason> {
+        if self.state != RuleState::Proposed {
+            return None;
+        }
+        let kept = Self {
+            state: RuleState::Active,
+            ..self.clone()
+        };
+        kept.paused_reason()
+    }
+
     /// Whether a sender-domain condition names a public suffix: a rule
     /// stored before the Public Suffix List was complete may. The engine
     /// never matches it; only removing the rule clears this.
@@ -791,6 +806,23 @@ mod stored_tests {
         assert_eq!(rule.paused_reason(), Some(PausedReason::DomainTooBroad));
         rule.inbox_detached = true;
         assert_eq!(rule.paused_reason(), Some(PausedReason::InboxReadOnly));
+    }
+
+    #[test]
+    fn a_proposal_says_why_it_would_stay_paused_once_kept() {
+        let mut rule = stored("github.com", RuleState::Proposed);
+        assert_eq!(rule.effective_state(), RuleState::Proposed);
+        assert_eq!(rule.paused_reason(), None);
+        assert_eq!(rule.paused_once_kept(), None);
+        rule.author_suspended = true;
+        assert_eq!(
+            rule.paused_once_kept(),
+            Some(PausedReason::AuthorUnavailable)
+        );
+        // Only for a proposal: an active rule says so with `paused_reason`.
+        rule.state = RuleState::Active;
+        assert_eq!(rule.paused_once_kept(), None);
+        assert_eq!(rule.paused_reason(), Some(PausedReason::AuthorUnavailable));
     }
 
     #[test]

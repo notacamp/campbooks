@@ -27,20 +27,44 @@ async fn deliver<E: DomainEvent>(kit: &Kit, workspace: WorkspaceId, event: &E) {
     kit.run_jobs().await;
 }
 
+/// A suspension published before the account's counter existed (no `seq`).
 async fn suspend(kit: &Kit, workspace: WorkspaceId, user: UserId, at: DateTime<Utc>) {
+    suspend_counted(kit, workspace, user, None, at).await;
+}
+
+/// A lift published before the account's counter existed (no `seq`).
+async fn lift(kit: &Kit, workspace: WorkspaceId, user: UserId, at: DateTime<Utc>) {
+    lift_counted(kit, workspace, user, None, at).await;
+}
+
+async fn suspend_counted(
+    kit: &Kit,
+    workspace: WorkspaceId,
+    user: UserId,
+    seq: Option<i64>,
+    at: DateTime<Utc>,
+) {
     let event = MemberSuspended {
         workspace: workspace.to_string(),
         user,
         at,
+        seq,
     };
     deliver(kit, workspace, &event).await;
 }
 
-async fn lift(kit: &Kit, workspace: WorkspaceId, user: UserId, at: DateTime<Utc>) {
+async fn lift_counted(
+    kit: &Kit,
+    workspace: WorkspaceId,
+    user: UserId,
+    seq: Option<i64>,
+    at: DateTime<Utc>,
+) {
     let event = MemberUnsuspended {
         workspace: workspace.to_string(),
         user,
         at,
+        seq,
     };
     deliver(kit, workspace, &event).await;
 }
@@ -215,4 +239,113 @@ async fn leaving_ends_a_suspension_so_coming_back_resumes_the_rules(db: PgPool) 
     kit.add_to_inbox(inbox, leo, InboxRole::Sender).await;
     let got = kit.get(&sam, &one).await;
     assert_eq!(got.json["state"], "active", "{:?}", got.json);
+}
+
+// --- Ordered by the account's counter (campbooks-cloud#197) -----------------
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_lift_counted_later_wins_even_when_its_clock_is_earlier(db: PgPool) {
+    let kit = kit(db).await;
+    let (workspace, _, sam, leo, rule) = leos_rule(&kit).await;
+    let one = format!("/api/v1/w/{workspace}/rules/{rule}");
+    let before = announced(&kit, &rule).await.len();
+    let now = Utc::now();
+
+    suspend_counted(&kit, workspace, leo, Some(1), now).await;
+    // The clock stepped back between the suspension and its lift.
+    let stepped_back = now - Duration::minutes(5);
+    lift_counted(&kit, workspace, leo, Some(2), stepped_back).await;
+    assert_eq!(kit.get(&sam, &one).await.json["state"], "active");
+    assert_eq!(announced(&kit, &rule).await[before..], ["paused", "active"]);
+
+    // Replays change nothing and announce nothing.
+    suspend_counted(&kit, workspace, leo, Some(1), now).await;
+    lift_counted(&kit, workspace, leo, Some(2), stepped_back).await;
+    assert_eq!(kit.get(&sam, &one).await.json["state"], "active");
+    assert_eq!(announced(&kit, &rule).await[before..], ["paused", "active"]);
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_change_from_before_the_counter_never_overrides_a_counted_one(db: PgPool) {
+    let kit = kit(db).await;
+    let (workspace, _, sam, leo, rule) = leos_rule(&kit).await;
+    let one = format!("/api/v1/w/{workspace}/rules/{rule}");
+    let now = Utc::now();
+
+    // Recorded before the counter existed, then a counted lift: it wins
+    // whatever its clock says.
+    suspend(&kit, workspace, leo, now).await;
+    lift_counted(&kit, workspace, leo, Some(2), now - Duration::hours(1)).await;
+    assert_eq!(kit.get(&sam, &one).await.json["state"], "active");
+    // An uncounted suspension delivered late, however new its clock: older.
+    suspend(&kit, workspace, leo, now + Duration::hours(1)).await;
+    assert_eq!(kit.get(&sam, &one).await.json["state"], "active");
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn leaving_keeps_a_counted_suspension_until_joining_again_tells_the_truth(db: PgPool) {
+    let kit = kit(db).await;
+    let (workspace, inbox, sam, leo, rule) = leos_rule(&kit).await;
+    let one = format!("/api/v1/w/{workspace}/rules/{rule}");
+    let now = Utc::now();
+    suspend_counted(&kit, workspace, leo, Some(1), now).await;
+    let left = MemberLeft {
+        workspace: workspace.to_string(),
+        user: leo,
+    };
+    deliver(&kit, workspace, &left).await;
+    // Back in the inbox while still suspended (joining again announced the
+    // same suspension): his rule stays paused, never acting for him.
+    kit.add_to_inbox(inbox, leo, InboxRole::Sender).await;
+    suspend_counted(&kit, workspace, leo, Some(1), now).await;
+    let got = kit.get(&sam, &one).await;
+    assert_eq!(got.json["state"], "paused", "{:?}", got.json);
+    assert_eq!(got.json["paused_reason"], "author_unavailable");
+    // Lifted (joining after the lift announces it): it acts again.
+    lift_counted(&kit, workspace, leo, Some(2), now + Duration::seconds(5)).await;
+    assert_eq!(kit.get(&sam, &one).await.json["state"], "active");
+}
+
+// --- Keeping a proposal whose author is away (campbooks-cloud#197) ----------
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_proposal_whose_author_is_away_says_it_stays_paused_once_kept(db: PgPool) {
+    let kit = kit(db).await;
+    let (workspace, _, sam, leo, rule) = leos_rule(&kit).await;
+    let one = format!("/api/v1/w/{workspace}/rules/{rule}");
+    // Leo's rule waits for a yes.
+    sqlx::query(
+        "UPDATE conversations.rules SET state = 'proposed', confirmed_at = NULL WHERE id = $1::uuid",
+    )
+    .bind(&rule)
+    .execute(&kit.db)
+    .await
+    .unwrap();
+    let got = kit.get(&sam, &one).await;
+    assert_eq!(got.json["state"], "proposed");
+    assert!(got.json.get("paused_once_kept").is_none(), "{:?}", got.json);
+
+    suspend_counted(&kit, workspace, leo, Some(1), Utc::now()).await;
+    let got = kit.get(&sam, &one).await;
+    assert_eq!(got.json["state"], "proposed");
+    assert!(got.json.get("paused_reason").is_none(), "{:?}", got.json);
+    assert_eq!(got.json["paused_once_kept"], "author_unavailable");
+
+    // Sam keeps it anyway: it is Leo's still, and paused until he is back.
+    let kept = kit
+        .post(
+            &sam,
+            &format!("{one}/confirm"),
+            Some(serde_json::json!({ "apply_to_existing": false })),
+        )
+        .await;
+    assert_eq!(kept.status.as_u16(), 200, "{:?}", kept.json);
+    assert_eq!(kept.json["state"], "paused");
+    assert_eq!(kept.json["paused_reason"], "author_unavailable");
+    assert_eq!(kept.json["taught_by"], leo.to_string());
+    assert!(
+        kept.json.get("paused_once_kept").is_none(),
+        "{:?}",
+        kept.json
+    );
 }

@@ -172,10 +172,17 @@ impl DomainEvent for Departed {
 
 struct ForgetFails;
 
+/// How a dead [`ForgetFails`] delivery is counted and logged.
+const FORGETTING: Watch = Watch {
+    code: "test_forgetting",
+    died: "test forgetting delivery died",
+};
+
 impl EventHandler for ForgetFails {
     type Event = Departed;
     const NAME: &'static str = "test.forget_fails";
     const QUEUE: &'static str = "events";
+    const WATCH: Option<Watch> = Some(FORGETTING);
 
     async fn handle(_ctx: &mut JobContext, _event: Event<Departed>) -> Result<(), JobError> {
         Err(JobError::fatal("cannot forget"))
@@ -1463,6 +1470,68 @@ fn registry_rejects_bad_registrations() {
     assert!(all.contains("`kernel.prune_jobs`"), "{all}");
 }
 
+/// Another consumer watched under [`FORGETTING`]'s code, with another line.
+struct ForgetLoudly;
+
+impl EventHandler for ForgetLoudly {
+    type Event = Departed;
+    const NAME: &'static str = "test.forget_loudly";
+    const QUEUE: &'static str = "events";
+    const WATCH: Option<Watch> = Some(Watch {
+        code: "test_forgetting",
+        died: "another line",
+    });
+
+    async fn handle(_ctx: &mut JobContext, _event: Event<Departed>) -> Result<(), JobError> {
+        Ok(())
+    }
+}
+
+/// A watch whose code is no code.
+struct ForgetShouting;
+
+impl EventHandler for ForgetShouting {
+    type Event = Departed;
+    const NAME: &'static str = "test.forget_shouting";
+    const QUEUE: &'static str = "events";
+    const WATCH: Option<Watch> = Some(Watch {
+        code: "Not A Code",
+        died: "",
+    });
+
+    async fn handle(_ctx: &mut JobContext, _event: Event<Departed>) -> Result<(), JobError> {
+        Ok(())
+    }
+}
+
+#[test]
+fn registry_lists_watched_kinds_and_rejects_watches_that_disagree() {
+    let registry = Registry::build(&[module(background())]).unwrap();
+    assert_eq!(registry.watch("test.forget_fails"), Some(FORGETTING));
+    assert_eq!(registry.watch("test.count_a"), None);
+    assert_eq!(
+        registry.watched().into_iter().collect::<Vec<_>>(),
+        [("test_forgetting", vec!["test.forget_fails"])]
+    );
+
+    let err = Registry::build(&[module(
+        background()
+            .on_event::<ForgetLoudly>()
+            .on_event::<ForgetShouting>(),
+    )])
+    .unwrap_err();
+    let all = err.0.join("\n");
+    assert!(
+        all.contains("`test.forget_loudly`: watch `test_forgetting` logs another line than `test.forget_fails`'s"),
+        "{all}"
+    );
+    assert!(all.contains("watch code `Not A Code`"), "{all}");
+    assert!(
+        all.contains("watch `Not A Code` needs the line logged when one dies"),
+        "{all}"
+    );
+}
+
 #[test]
 fn registry_takes_work_owned_outside_modules() {
     #[derive(Debug, Default, Serialize, Deserialize)]
@@ -1635,6 +1704,45 @@ mod administration {
         id
     }
 
+    #[sqlx::test(migrations = "../../migrations")]
+    async fn the_summary_counts_the_dead_jobs_of_watched_kinds(db: PgPool) {
+        let state = state(db).await;
+        let watched = |summary: &admin::QueueSummary| {
+            summary
+                .watched
+                .iter()
+                .map(|w| (w.code.clone(), w.kinds.clone(), w.failed))
+                .collect::<Vec<_>>()
+        };
+        let summary = admin::summary(&state.db, state.events.registry(), &grant())
+            .await
+            .unwrap();
+        // Listed before anything died, so a panel can say all is well.
+        assert_eq!(
+            watched(&summary),
+            [(
+                "test_forgetting".to_owned(),
+                vec!["test.forget_fails".to_owned()],
+                0
+            )]
+        );
+        // A probe that dies is not watched: not counted there.
+        die(&state, &doomed("unwatched"), EnqueueOptions::default()).await;
+        let mut tx = state.db.begin().await.unwrap();
+        state
+            .events
+            .publish(&mut tx, &Departed { who: "sam".into() })
+            .await
+            .unwrap();
+        tx.commit().await.unwrap();
+        let stats = Worker::new(state.clone()).run_until_idle().await;
+        assert_eq!(stats.failed, 1, "{stats:?}");
+        let summary = admin::summary(&state.db, state.events.registry(), &grant())
+            .await
+            .unwrap();
+        assert_eq!(watched(&summary)[0].2, 1);
+    }
+
     /// Make a dead job runnable: the cause was fixed.
     async fn fix(db: &PgPool, id: JobId) {
         sqlx::query("UPDATE kernel.jobs SET payload = $2 WHERE id = $1")
@@ -1680,7 +1788,9 @@ mod administration {
         .await
         .unwrap();
 
-        let summary = admin::summary(&db, &grant()).await.unwrap();
+        let summary = admin::summary(&db, state.events.registry(), &grant())
+            .await
+            .unwrap();
         let [probe] = summary.kinds.as_slice() else {
             panic!("one kind expected: {summary:?}");
         };
@@ -2324,7 +2434,9 @@ mod kernel_scope {
         let stats = Worker::new(state.clone()).run_until_idle().await;
         assert_eq!(stats.failed, 1, "{stats:?}");
         let grant = AdminGrant::new("ops".into(), PermissionSet::from_names(["super"]));
-        let summary = admin::summary(&state.db, &grant).await.unwrap();
+        let summary = admin::summary(&state.db, state.events.registry(), &grant)
+            .await
+            .unwrap();
         assert_eq!(summary.kinds.iter().map(|k| k.failed).sum::<i64>(), 1);
         let page = admin::failed(&state.db, &grant, &FailedFilter::default(), None, None)
             .await

@@ -100,6 +100,11 @@ pub struct RuleView {
     /// Why it is paused; absent unless `state` is `paused`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub paused_reason: Option<PausedReason>,
+    /// For a proposed rule, why it would be paused once kept (confirming
+    /// keeps its author): say so before a member says yes. Absent for any
+    /// other rule, or when it would act.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub paused_once_kept: Option<PausedReason>,
     /// Who taught it; `None` when a client did.
     pub taught_by: Option<UserId>,
     /// The conversation it was taught from.
@@ -153,6 +158,7 @@ async fn views(
             origin_text: rule.origin_text.clone(),
             state: rule.effective_state(),
             paused_reason: rule.paused_reason(),
+            paused_once_kept: rule.paused_once_kept(),
             taught_by: rule.taught_by,
             from_conversation_id: rule.from_conversation,
             created_at: rule.created_at,

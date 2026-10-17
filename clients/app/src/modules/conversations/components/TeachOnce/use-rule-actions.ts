@@ -123,14 +123,19 @@ export function useRuleActions(workspaceId: string) {
     );
   };
 
-  /** Say yes to a proposed `rule`; Undo removes it and puts back what it changed. */
+  /**
+   * Say yes to a proposed `rule`; Undo removes it and puts back what it
+   * changed. Kept but paused (its author is away for now), the toast says so.
+   */
   const keepRule = (rule: RuleView) => {
     confirm.mutate(
       { ruleId: rule.id },
       {
-        onSuccess: () => {
+        onSuccess: (kept) => {
           undo.push({
-            label: t("rules.toast.kept", { rule: sentence(rule) }),
+            label: t(kept.state === "paused" ? "rules.toast.keptPaused" : "rules.toast.kept", {
+              rule: sentence(rule),
+            }),
             undo: () => {
               removeOnce(rule.id, true);
             },

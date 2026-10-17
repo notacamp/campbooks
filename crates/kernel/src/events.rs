@@ -137,6 +137,9 @@ pub trait EventHandler: Send + Sync + 'static {
     const QUEUE: &'static str;
     /// Attempts before a delivery is marked failed (dead).
     const MAX_ATTEMPTS: u32 = jobs::DEFAULT_MAX_ATTEMPTS;
+    /// Whether an operator must hear when a delivery dies
+    /// ([`Watch`](jobs::Watch)).
+    const WATCH: Option<jobs::Watch> = None;
 
     /// Handle one event.
     fn handle(
@@ -159,6 +162,9 @@ pub trait EventConsumer: Send + Sync + 'static {
     const QUEUE: &'static str;
     /// Attempts before a delivery is marked failed (dead).
     const MAX_ATTEMPTS: u32 = jobs::DEFAULT_MAX_ATTEMPTS;
+    /// Whether an operator must hear when a delivery dies
+    /// ([`Watch`](jobs::Watch)).
+    const WATCH: Option<jobs::Watch> = None;
 
     /// Handle one event.
     fn handle(

@@ -16,9 +16,13 @@
 //! [`AccountUnsuspended`](crate::events::AccountUnsuspended), on which the
 //! paused rules act again.
 //!
-//! Both events carry `at`, read after the account's row is locked: a change
-//! that waited for an earlier one to commit reads a later time, so consumers
-//! can order the two by `at` whatever order they arrive in.
+//! Both events carry `seq`, the account's count of suspensions and lifts
+//! (`identity.accounts.suspension_seq`), bumped by one under the account's
+//! row lock: of two changes to one account the later always has the higher
+//! `seq`, so consumers order them by it whatever order they arrive in and
+//! whatever the clock did between them (campbooks-cloud#197). They also
+//! carry `at`, the moment the change took effect, read under the same lock;
+//! consumers order by it only the events published before `seq` existed.
 
 use campbooks_kernel::{EventBus, Result};
 use chrono::{DateTime, Utc};
@@ -53,11 +57,14 @@ pub async fn suspend(
     if was_suspended {
         return Ok(Outcome::Unchanged);
     }
-    sqlx::query("UPDATE identity.accounts SET disabled_at = $2 WHERE id = $1")
-        .bind(account)
-        .bind(now)
-        .execute(&mut **tx)
-        .await?;
+    let seq: i64 = sqlx::query_scalar(
+        "UPDATE identity.accounts SET disabled_at = $2, suspension_seq = suspension_seq + 1
+          WHERE id = $1 RETURNING suspension_seq",
+    )
+    .bind(account)
+    .bind(now)
+    .fetch_one(&mut **tx)
+    .await?;
     accounts::revoke_tokens(tx, account, now).await?;
     let sessions = sqlx::query(
         "UPDATE identity.sessions SET ended_at = $2 WHERE account_id = $1 AND ended_at IS NULL",
@@ -95,6 +102,7 @@ pub async fn suspend(
             &AccountSuspended {
                 account,
                 at: Some(at),
+                seq: Some(seq),
             },
         )
         .await?;
@@ -117,10 +125,13 @@ pub async fn unsuspend(
     if !was_suspended {
         return Ok(Outcome::Unchanged);
     }
-    sqlx::query("UPDATE identity.accounts SET disabled_at = NULL WHERE id = $1")
-        .bind(account)
-        .execute(&mut **tx)
-        .await?;
+    let seq: i64 = sqlx::query_scalar(
+        "UPDATE identity.accounts SET disabled_at = NULL, suspension_seq = suspension_seq + 1
+          WHERE id = $1 RETURNING suspension_seq",
+    )
+    .bind(account)
+    .fetch_one(&mut **tx)
+    .await?;
     accounts::audit(
         tx,
         Some(account),
@@ -131,14 +142,22 @@ pub async fn unsuspend(
     .await?;
     let at = changed_at(tx).await?;
     events
-        .publish(tx, &AccountUnsuspended { account, at })
+        .publish(
+            tx,
+            &AccountUnsuspended {
+                account,
+                at,
+                seq: Some(seq),
+            },
+        )
         .await?;
     Ok(Outcome::Changed)
 }
 
-/// The moment a suspension or lift takes effect, for ordering: the
-/// database's clock now, while the account's row is locked (not the
-/// transaction's start, which may precede an earlier change's commit).
+/// The moment a suspension or lift takes effect: the database's clock now,
+/// while the account's row is locked (not the transaction's start, which may
+/// precede an earlier change's commit). Ordering goes by `seq`; this orders
+/// only events published before it existed.
 async fn changed_at(tx: &mut Transaction<'_, Postgres>) -> Result<DateTime<Utc>> {
     Ok(sqlx::query_scalar("SELECT clock_timestamp()")
         .fetch_one(&mut **tx)
