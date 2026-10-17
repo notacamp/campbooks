@@ -1,7 +1,8 @@
 //! `POST …/conversations/{conversation_id}/spam` and `/not-spam` — report a
 //! conversation as spam or phishing ("Report and delete"): every message
 //! moves to the provider's spam folder, which reports it there, and its need
-//! goes with it. Not spam puts it back in the inbox.
+//! goes with it. Not spam puts it back where it was: in the inbox only
+//! if it was there, never the member's own sent mail.
 
 use axum::{Extension, Json, extract::State};
 use campbooks_kernel::{
@@ -58,7 +59,7 @@ pub async fn report(
         .map(Json)
 }
 
-/// Take a conversation out of spam, back in the inbox.
+/// Take a conversation out of spam, back where it was.
 #[utoipa::path(
     post,
     path = "/api/v1/w/{workspace_id}/conversations/{conversation_id}/not-spam",

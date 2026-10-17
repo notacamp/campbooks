@@ -1,0 +1,41 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT DISTINCT ON (provider_message_id) provider_message_id,\n                  restore_to AS \"restore_to!\"\n             FROM connectors.outbound_changes\n            WHERE stream_id = $1 AND provider_message_id = ANY($2)\n              AND kind IN ('trash', 'spam') AND state = 'applied' AND restore_to IS NOT NULL\n            ORDER BY provider_message_id, id DESC",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "provider_message_id",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "connectors.outbound_changes",
+            "name": "provider_message_id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "restore_to!",
+        "type_info": "TextArray",
+        "origin": {
+          "Table": {
+            "table": "connectors.outbound_changes",
+            "name": "restore_to"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "TextArray"
+      ]
+    },
+    "nullable": [
+      false,
+      true
+    ]
+  },
+  "hash": "54be48068601712516bfdf472db549b3de8c839d22370faf3e3249ef86e32bce"
+}

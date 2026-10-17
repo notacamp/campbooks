@@ -7,7 +7,7 @@
 
 - [x] 2.1 Contract `changes_requested` v1: the four kinds
 - [x] 2.2 Migration widening `outbound_changes.kind`
-- [x] 2.3 Gmail mapping and Zoho folder moves; unit tests and a Zoho flow test
+- [x] 2.3 Gmail trash/untrash and spam, Zoho moves and `moveToSpam`, each remembering where the message was; unit tests and Gmail and Zoho flow tests (incl. a missing Trash folder)
 
 ## 3. Finish
 

@@ -7,10 +7,16 @@
 //! - `STARRED`: `setFlag` `important` / `flag_not_set`;
 //! - `INBOX` off: `archiveMails`; on: `unArchiveMails` for an archived
 //!   message, `moveMessage` to the Inbox folder for one in another folder.
-//! - `TRASH` / `SPAM` on: `moveMessage` to the account's Trash or Spam
-//!   folder; off (with `INBOX` on): `moveMessage` back to the Inbox folder.
-//!   A folder the account's listing did not show is never guessed: the
-//!   change is left unmade.
+//! - `TRASH` on: `moveMessage` to the account's Trash folder; `SPAM` on:
+//!   `moveToSpam`, Zoho's report (it moves the message to Spam). Either
+//!   remembers where the message was (its folder, and whether it was
+//!   archived there).
+//! - `TRASH` or `SPAM` off: `moveMessage` back to the folder it was in
+//!   (archived again if it was). Zoho's own "not spam" mode is documented
+//!   two ways (`moveNotSpam`, `markNotSpam`) and is not used. A folder the
+//!   account's listing did not show, or a message with nowhere remembered,
+//!   is never guessed: that part of the change is left unmade
+//!   (`not_movable`).
 //!
 //! Messages with the same mode go in one call; a call Zoho refuses as a
 //! whole is retried one message at a time to find the one that refuses.
@@ -38,6 +44,11 @@ enum Op {
     Archive,
     Unarchive,
     MoveTo(String),
+    /// Report as spam (Zoho moves it to Spam).
+    Spam,
+    /// Archive again where it was put back (after [`Op::MoveTo`]: calls go
+    /// in this order).
+    Rearchive,
 }
 
 impl Op {
@@ -49,6 +60,8 @@ impl Op {
             Self::Archive => "archiveMails",
             Self::Unarchive => "unArchiveMails",
             Self::MoveTo(_) => "moveMessage",
+            Self::Spam => "moveToSpam",
+            Self::Rearchive => "archiveMails",
         }
     }
 
@@ -89,15 +102,48 @@ pub struct Folders<'a> {
     pub spam: Option<&'a str>,
 }
 
+/// What a change does to a message's place.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Bin {
+    /// Into the trash.
+    Trash,
+    /// Reported as spam.
+    Spam,
+    /// Out of the trash or spam, back where it was.
+    Out,
+}
+
+fn bin(change: &LabelChange, current: &[String]) -> Option<Bin> {
+    let (add, remove) = change;
+    let has = |token: &str| current.iter().any(|t| t == token);
+    let adds = |token: &str| add.iter().any(|l| l == token);
+    let removes = |token: &str| remove.iter().any(|l| l == token);
+    if adds("TRASH") && !has("TRASH") {
+        Some(Bin::Trash)
+    } else if adds("SPAM") && !has("SPAM") {
+        Some(Bin::Spam)
+    } else if (removes("TRASH") && has("TRASH")) || (removes("SPAM") && has("SPAM")) {
+        Some(Bin::Out)
+    } else {
+        None
+    }
+}
+
 /// The calls that make `change` on a message whose tokens are `current`,
 /// and whether it asks for something Zoho must not be asked: putting back
 /// in the inbox a message that is not the member's to move there (their own
-/// sent mail, spam, the trash, a folder the adapter does not read), or a
-/// move to a folder the listing did not show. Only an archived message is
-/// unarchived, only one in the member's own folders is moved to the Inbox,
-/// and only a message in the trash (or spam) is taken out of it, back to
-/// the Inbox.
-fn ops(change: &LabelChange, current: &[String], folders: &Folders<'_>) -> (Vec<Op>, bool) {
+/// sent mail, spam, the trash, a folder the adapter does not read), a move
+/// to a folder the listing did not show, or out of the trash or spam with
+/// nowhere remembered (`restore`, the place it was in before). Only an
+/// archived message is unarchived, only one in the member's own folders is
+/// moved to the Inbox, and a message taken out of the trash or spam goes
+/// back to the folder it was in, archived again if it was.
+fn ops(
+    change: &LabelChange,
+    current: &[String],
+    folders: &Folders<'_>,
+    restore: Option<&[String]>,
+) -> (Vec<Op>, bool) {
     let (add, remove) = change;
     let inbox = folders.inbox;
     let has = |token: &str| current.iter().any(|t| t == token);
@@ -105,10 +151,6 @@ fn ops(change: &LabelChange, current: &[String], folders: &Folders<'_>) -> (Vec<
     let removes = |token: &str| remove.iter().any(|l| l == token);
     let mut ops = Vec::new();
     let mut unmovable = false;
-    let mut move_to = |ops: &mut Vec<Op>, folder: Option<&str>| match folder {
-        Some(folder) => ops.push(Op::MoveTo(folder.to_owned())),
-        None => unmovable = true,
-    };
     if adds("UNREAD") {
         ops.push(Op::MarkUnread);
     }
@@ -121,23 +163,31 @@ fn ops(change: &LabelChange, current: &[String], folders: &Folders<'_>) -> (Vec<
     if removes("STARRED") {
         ops.push(Op::Flag("flag_not_set"));
     }
-    let to_trash = adds("TRASH") && !has("TRASH");
-    let to_spam = adds("SPAM") && !has("SPAM") && !to_trash;
-    let out_of_bin = !to_trash
-        && !to_spam
-        && ((removes("TRASH") && has("TRASH")) || (removes("SPAM") && has("SPAM")));
-    if to_trash {
-        move_to(&mut ops, folders.trash);
-    } else if to_spam {
-        move_to(&mut ops, folders.spam);
-    } else if out_of_bin {
-        move_to(&mut ops, inbox);
+    let moved = bin(change, current);
+    match moved {
+        Some(Bin::Trash) => match folders.trash {
+            Some(folder) => ops.push(Op::MoveTo(folder.to_owned())),
+            None => unmovable = true,
+        },
+        Some(Bin::Spam) => ops.push(Op::Spam),
+        Some(Bin::Out) => match restore.and_then(state::folder_of) {
+            Some(folder) => {
+                ops.push(Op::MoveTo(folder.to_owned()));
+                if restore.is_some_and(|r| r.iter().any(|t| t == "ARCHIVED")) {
+                    ops.push(Op::Rearchive);
+                }
+            }
+            None => unmovable = true,
+        },
+        None => {}
     }
-    let binned = to_trash || to_spam;
-    if removes("INBOX") && has("INBOX") && !binned {
+    if moved.is_some() {
+        return (ops, unmovable);
+    }
+    if removes("INBOX") && has("INBOX") {
         ops.push(Op::Archive);
     }
-    if adds("INBOX") && !has("INBOX") && !binned && !out_of_bin {
+    if adds("INBOX") && !has("INBOX") {
         let folder = state::folder_of(current);
         let in_inbox_folder = folder.is_some() && folder == inbox;
         match inbox {
@@ -161,49 +211,56 @@ fn without_inbox(change: &LabelChange) -> LabelChange {
     let moves = |l: &&String| matches!(l.as_str(), "INBOX" | "TRASH" | "SPAM");
     (
         add.iter().filter(|l| !moves(l)).cloned().collect(),
-        remove
-            .iter()
-            .filter(|l| !matches!(l.as_str(), "TRASH" | "SPAM"))
-            .cloned()
-            .collect(),
+        remove.iter().filter(|l| !moves(l)).cloned().collect(),
     )
 }
 
 /// The tokens a message has once `change` is made: what the index keeps, so
 /// the next listing compares equal and nothing is emitted for the write.
-pub fn after(current: &[String], change: &LabelChange, folders: &Folders<'_>) -> Vec<String> {
+/// `restore` is where a message taken out of the trash or spam goes back to.
+pub fn after(
+    current: &[String],
+    change: &LabelChange,
+    folders: &Folders<'_>,
+    restore: Option<&[String]>,
+) -> Vec<String> {
     let (add, remove) = change;
     let inbox = folders.inbox;
-    let has = |token: &str| current.iter().any(|t| t == token);
-    let to_trash = add.iter().any(|l| l == "TRASH") && !has("TRASH");
-    let to_spam = add.iter().any(|l| l == "SPAM") && !has("SPAM") && !to_trash;
+    let moved = bin(change, current);
     let mut tokens = apply_labels(current, std::slice::from_ref(change));
-    let bin = if to_trash {
-        Some(("TRASH", folders.trash))
-    } else if to_spam {
-        Some(("SPAM", folders.spam))
-    } else {
-        None
-    };
-    if let Some((token, folder)) = bin {
-        // Moved to the trash or spam: in that folder, and nothing else.
+    let flags = |tokens: &mut Vec<String>| {
         tokens.retain(|t| matches!(t.as_str(), "UNREAD" | "STARRED"));
-        tokens.push(token.to_owned());
-        if let Some(folder) = folder {
-            tokens.push(state::folder_token(folder));
+    };
+    match moved {
+        Some(Bin::Trash | Bin::Spam) => {
+            // In that folder, and nothing else.
+            let (token, folder) = if moved == Some(Bin::Trash) {
+                ("TRASH", folders.trash)
+            } else {
+                ("SPAM", folders.spam)
+            };
+            flags(&mut tokens);
+            tokens.push(token.to_owned());
+            if let Some(folder) = folder {
+                tokens.push(state::folder_token(folder));
+            }
         }
-        tokens.sort();
-        tokens.dedup();
-        return tokens;
-    }
-    if remove.iter().any(|l| l == "INBOX") && current.iter().any(|t| t == "INBOX") {
-        tokens = state::archived(&tokens);
-    }
-    if add.iter().any(|l| l == "INBOX") {
-        tokens.retain(|t| t != "ARCHIVED" && t != "OWN" && t != "TRASH" && t != "SPAM");
-        if let Some(inbox) = inbox {
-            tokens.retain(|t| !t.starts_with("folder:"));
-            tokens.push(state::folder_token(inbox));
+        Some(Bin::Out) => {
+            // Back where it was.
+            flags(&mut tokens);
+            tokens.extend(restore.unwrap_or_default().iter().cloned());
+        }
+        None => {
+            if remove.iter().any(|l| l == "INBOX") && current.iter().any(|t| t == "INBOX") {
+                tokens = state::archived(&tokens);
+            }
+            if add.iter().any(|l| l == "INBOX") {
+                tokens.retain(|t| t != "ARCHIVED" && t != "OWN");
+                if let Some(inbox) = inbox {
+                    tokens.retain(|t| !t.starts_with("folder:"));
+                    tokens.push(state::folder_token(inbox));
+                }
+            }
         }
     }
     tokens.sort();
@@ -223,7 +280,13 @@ pub async fn push(mail: &ZohoMail<'_>, backlog: &Backlog, folders: &Folders<'_>)
     for (change, messages) in plan.groups() {
         for message in messages {
             let current = backlog.labels.get(&message).cloned().unwrap_or_default();
-            let (wanted, unmovable) = ops(&change, &current, folders);
+            let restore = backlog.restore.get(&message).map(Vec::as_slice);
+            let (wanted, unmovable) = ops(&change, &current, folders, restore);
+            if matches!(bin(&change, &current), Some(Bin::Trash | Bin::Spam)) && !unmovable {
+                // Where it was, so taking it out puts it back there.
+                done.restore
+                    .insert(message.clone(), state::location(&current));
+            }
             if unmovable {
                 done.unmovable.insert(message.clone());
                 if wanted.is_empty() {
@@ -271,13 +334,15 @@ pub async fn push(mail: &ZohoMail<'_>, backlog: &Backlog, folders: &Folders<'_>)
         return push;
     }
     plan.ends(backlog, &done, &mut push.outcome);
+    plan.restores(&done, &mut push.outcome);
     for message in &done.written {
         let current = backlog.labels.get(message).cloned().unwrap_or_default();
         let mut change = plan.change_of(message);
         if done.unmovable.contains(message) {
             change = without_inbox(&change);
         }
-        let tokens = after(&current, &change, folders);
+        let restore = backlog.restore.get(message).map(Vec::as_slice);
+        let tokens = after(&current, &change, folders, restore);
         push.outcome.index.push((message.clone(), tokens));
     }
     push.outcome.index.sort();
@@ -367,7 +432,7 @@ mod tests {
         };
         let in_inbox = list(&["INBOX", "UNREAD", "folder:1"]);
         let change = |add: &[&str], remove: &[&str]| (list(add), list(remove));
-        let made = |c: LabelChange, current: &[String]| ops(&c, current, &folders);
+        let made = |c: LabelChange, current: &[String]| ops(&c, current, &folders, None);
         assert_eq!(
             made(change(&[], &["UNREAD"]), &in_inbox),
             (vec![Op::MarkRead], false)
@@ -419,79 +484,113 @@ mod tests {
     }
 
     #[test]
-    fn trash_and_spam_move_between_folders() {
+    fn trash_and_spam_move_and_come_back_where_they_were() {
         let folders = Folders {
             inbox: Some("1"),
             trash: Some("5"),
             spam: Some("4"),
         };
         let change = |add: &[&str], remove: &[&str]| (list(add), list(remove));
-        let made = |c: LabelChange, current: &[String]| ops(&c, current, &folders);
+        let made = |c: LabelChange, current: &[String], restore: Option<&[String]>| {
+            ops(&c, current, &folders, restore)
+        };
         let in_inbox = list(&["INBOX", "UNREAD", "folder:1"]);
         let trashed = list(&["TRASH", "UNREAD", "folder:5"]);
         let spam = list(&["SPAM", "folder:4"]);
         assert_eq!(
-            made(change(&["TRASH"], &[]), &in_inbox),
+            made(change(&["TRASH"], &["SPAM"]), &in_inbox, None),
             (vec![Op::MoveTo("5".into())], false)
         );
+        // Spam is Zoho's report, which moves the message to Spam itself.
         assert_eq!(
-            made(change(&["SPAM"], &[]), &in_inbox),
-            (vec![Op::MoveTo("4".into())], false)
+            made(change(&["SPAM"], &["TRASH"]), &in_inbox, None),
+            (vec![Op::Spam], false)
         );
         // An archived message or one in an own folder goes too.
         assert_eq!(
-            made(change(&["TRASH"], &[]), &list(&["OWN", "folder:7"])),
+            made(change(&["TRASH"], &[]), &list(&["OWN", "folder:7"]), None),
             (vec![Op::MoveTo("5".into())], false)
         );
-        // Back to the Inbox folder, only from where it is.
+        // Back to the folder it was in, archived again if it was.
+        let was_inbox = list(&["INBOX", "folder:1"]);
+        let was_archived_own = list(&["ARCHIVED", "OWN", "folder:7"]);
         assert_eq!(
-            made(change(&["INBOX"], &["TRASH"]), &trashed),
+            made(
+                change(&[], &["TRASH"]),
+                &trashed,
+                Some(was_inbox.as_slice())
+            ),
             (vec![Op::MoveTo("1".into())], false)
         );
         assert_eq!(
-            made(change(&["INBOX"], &["SPAM"]), &spam),
-            (vec![Op::MoveTo("1".into())], false)
+            made(
+                change(&[], &["SPAM"]),
+                &spam,
+                Some(was_archived_own.as_slice())
+            ),
+            (vec![Op::MoveTo("7".into()), Op::Rearchive], false)
         );
+        // Nowhere remembered: never guessed.
         assert_eq!(
-            made(change(&["INBOX"], &["SPAM"]), &trashed),
+            made(change(&[], &["TRASH"]), &trashed, None),
             (vec![], true)
         );
+        // Not in spam: nothing to take out.
+        assert_eq!(
+            made(change(&[], &["SPAM"]), &trashed, Some(was_inbox.as_slice())),
+            (vec![], false)
+        );
         // Already there: nothing to call.
-        assert_eq!(made(change(&["TRASH"], &[]), &trashed), (vec![], false));
-        // A folder the listing did not show is never guessed.
+        assert_eq!(
+            made(change(&["TRASH"], &[]), &trashed, None),
+            (vec![], false)
+        );
+        // A Trash folder the listing did not show is never guessed.
         let unknown = Folders {
             inbox: Some("1"),
             ..Folders::default()
         };
         assert_eq!(
-            ops(&change(&["TRASH", "STARRED"], &[]), &in_inbox, &unknown),
+            ops(
+                &change(&["TRASH", "STARRED"], &[]),
+                &in_inbox,
+                &unknown,
+                None
+            ),
             (vec![Op::Flag("important")], true)
         );
         assert_eq!(
-            ops(&change(&["SPAM"], &[]), &in_inbox, &unknown),
-            (vec![], true)
-        );
-        assert_eq!(
-            without_inbox(&change(&["TRASH", "STARRED"], &["UNREAD"])),
+            without_inbox(&change(&["TRASH", "STARRED"], &["UNREAD", "SPAM"])),
             change(&["STARRED"], &["UNREAD"])
         );
         // What the index keeps.
         assert_eq!(
-            after(&in_inbox, &change(&["TRASH"], &[]), &folders),
+            after(&in_inbox, &change(&["TRASH"], &["SPAM"]), &folders, None),
             list(&["TRASH", "UNREAD", "folder:5"])
         );
         assert_eq!(
-            after(&in_inbox, &change(&["SPAM"], &[]), &folders),
+            after(&in_inbox, &change(&["SPAM"], &["TRASH"]), &folders, None),
             list(&["SPAM", "UNREAD", "folder:4"])
         );
         assert_eq!(
-            after(&trashed, &change(&["INBOX"], &["TRASH"]), &folders),
+            after(
+                &trashed,
+                &change(&[], &["TRASH"]),
+                &folders,
+                Some(was_inbox.as_slice())
+            ),
             list(&["INBOX", "UNREAD", "folder:1"])
         );
         assert_eq!(
-            after(&spam, &change(&["INBOX"], &["SPAM"]), &folders),
-            list(&["INBOX", "folder:1"])
+            after(
+                &spam,
+                &change(&[], &["SPAM"]),
+                &folders,
+                Some(was_archived_own.as_slice())
+            ),
+            list(&["ARCHIVED", "OWN", "folder:7"])
         );
+        assert_eq!(state::location(&in_inbox), list(&["INBOX", "folder:1"]));
     }
 
     #[test]
@@ -505,7 +604,8 @@ mod tests {
             after(
                 &list(&["INBOX", "UNREAD", "folder:1"]),
                 &(vec![], list(&["INBOX"])),
-                inbox
+                inbox,
+                None
             ),
             list(&["ARCHIVED", "UNREAD", "folder:1"])
         );
@@ -513,7 +613,8 @@ mod tests {
             after(
                 &list(&["OWN", "folder:7"]),
                 &(list(&["INBOX"]), vec![]),
-                inbox
+                inbox,
+                None
             ),
             list(&["INBOX", "folder:1"])
         );
@@ -521,7 +622,8 @@ mod tests {
             after(
                 &list(&["ARCHIVED", "folder:1"]),
                 &(list(&["INBOX", "STARRED"]), vec![]),
-                inbox
+                inbox,
+                None
             ),
             list(&["INBOX", "STARRED", "folder:1"])
         );

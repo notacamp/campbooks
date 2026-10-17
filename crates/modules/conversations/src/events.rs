@@ -330,11 +330,12 @@ pub enum RequestedChange {
     Unarchive,
     /// Move the message to the trash.
     Trash,
-    /// Take the message out of the trash.
+    /// Take the message out of the trash, back where it was.
     Untrash,
     /// Report the message as spam (move it to the spam folder).
     Spam,
-    /// Take the message out of spam, back in the inbox.
+    /// Take the message out of spam, back where it was (the inbox only if it
+    /// was there).
     Unspam,
     /// Put a label on the message.
     AddLabel {

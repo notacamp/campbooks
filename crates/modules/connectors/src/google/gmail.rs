@@ -222,6 +222,28 @@ impl<'a> Gmail<'a> {
         json(response).await
     }
 
+    /// `users.messages.trash`: into the trash.
+    pub async fn trash(&self, id: &str) -> Result<MessageMeta, ProviderError> {
+        let response = self
+            .post(
+                &format!("users/me/messages/{id}/trash"),
+                &serde_json::json!({}),
+            )
+            .await?;
+        json(response).await
+    }
+
+    /// `users.messages.untrash`: out of the trash, with the labels it had.
+    pub async fn untrash(&self, id: &str) -> Result<MessageMeta, ProviderError> {
+        let response = self
+            .post(
+                &format!("users/me/messages/{id}/untrash"),
+                &serde_json::json!({}),
+            )
+            .await?;
+        json(response).await
+    }
+
     /// `users.messages.batchModify`: the same change for up to 1,000
     /// messages. Gmail answers nothing per message.
     pub async fn batch_modify(

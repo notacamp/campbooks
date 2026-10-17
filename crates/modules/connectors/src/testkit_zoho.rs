@@ -73,6 +73,7 @@ struct State {
     refusing: Vec<String>,
     /// The folder list leaves the Sent folder out.
     sent_hidden: bool,
+    trash_hidden: bool,
     /// Messages whose download answers 500.
     failing: Vec<String>,
 }
@@ -118,6 +119,7 @@ impl FakeZoho {
             sends: Vec::new(),
             refusing: Vec::new(),
             sent_hidden: false,
+            trash_hidden: false,
             failing: Vec::new(),
         }));
         Mock::given(any())
@@ -280,6 +282,11 @@ impl FakeZoho {
         self.lock().sent_hidden = hidden;
     }
 
+    /// The folder list leaves the Trash folder out (or shows it again).
+    pub fn hide_trash_folder(&self, hidden: bool) {
+        self.lock().trash_hidden = hidden;
+    }
+
     /// Downloading message `id` answers 500 (or works again).
     pub fn fail_downloads_of(&self, id: &str, failing: bool) {
         let mut state = self.lock();
@@ -407,7 +414,7 @@ fn listed(message: &ZohoMessage) -> serde_json::Value {
     })
 }
 
-fn folders(sent_hidden: bool) -> serde_json::Value {
+fn folders(sent_hidden: bool, trash_hidden: bool) -> serde_json::Value {
     let mut folders = vec![
         serde_json::json!({"folderId": INBOX, "folderName": "Inbox", "folderType": "Inbox", "path": "/Inbox"}),
         serde_json::json!({"folderId": DRAFTS, "folderName": "Drafts", "folderType": "Drafts", "path": "/Drafts"}),
@@ -422,6 +429,9 @@ fn folders(sent_hidden: bool) -> serde_json::Value {
             2,
             serde_json::json!({"folderId": SENT, "folderName": "Sent", "folderType": "Sent", "path": "/Sent"}),
         );
+    }
+    if trash_hidden {
+        folders.retain(|f| f["folderId"] != TRASH);
     }
     serde_json::Value::Array(folders)
 }
@@ -538,7 +548,7 @@ fn mail(
 ) -> ResponseTemplate {
     let parts: Vec<&str> = path.split('/').collect();
     match (method, parts.as_slice()) {
-        ("GET", ["folders"]) => ok(&folders(state.sent_hidden)),
+        ("GET", ["folders"]) => ok(&folders(state.sent_hidden, state.trash_hidden)),
         ("GET", ["messages", "view"]) => {
             let folder = query.get("folderId").cloned().unwrap_or_default();
             let start: usize = query.get("start").and_then(|s| s.parse().ok()).unwrap_or(1);
@@ -627,6 +637,8 @@ fn update(state: &mut State, index: usize, body: &serde_json::Value) -> Response
             "setFlag" => message.flag = body["flagid"].as_str().unwrap_or_default().to_owned(),
             "archiveMails" => message.archived = true,
             "unArchiveMails" => message.archived = false,
+            // Zoho's report: the message moves to Spam.
+            "moveToSpam" => message.folder = SPAM.to_owned(),
             "moveMessage" => {
                 message.folder = body["destfolderId"]
                     .as_u64()

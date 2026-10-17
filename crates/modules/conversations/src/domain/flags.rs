@@ -31,11 +31,12 @@ pub enum Flag {
     Unarchive,
     /// Move every message to the trash.
     Trash,
-    /// Take every message out of the trash.
+    /// Take every message out of the trash, back where it was.
     Untrash,
     /// Report every message as spam: out of the inbox, into spam.
     Spam,
-    /// Take every message out of spam, back in the inbox.
+    /// Take every message out of spam, back where it was (in the inbox only
+    /// if it was there).
     Unspam,
 }
 
@@ -188,34 +189,54 @@ pub async fn change(
             .fetch_all(&mut *conn)
             .await?
         }
-        // Runtime queries (no offline-cache entry needed): ids in, provider
-        // ids out, as the checked ones above.
-        Flag::Trash | Flag::Untrash | Flag::Spam | Flag::Unspam => {
-            let sql = match flag {
-                Flag::Trash => {
-                    "UPDATE conversations.messages SET in_trash = true, updated_at = now()
-                      WHERE conversation_id = $1 AND NOT in_trash RETURNING provider_message_id"
-                }
-                Flag::Untrash => {
-                    "UPDATE conversations.messages SET in_trash = false, updated_at = now()
-                      WHERE conversation_id = $1 AND in_trash RETURNING provider_message_id"
-                }
-                // The whole conversation, as providers report a thread.
-                Flag::Spam => {
-                    "UPDATE conversations.messages SET in_spam = true, in_inbox = false,
-                            updated_at = now()
-                      WHERE conversation_id = $1 AND NOT in_spam RETURNING provider_message_id"
-                }
-                _ => {
-                    "UPDATE conversations.messages SET in_spam = false, in_inbox = true,
-                            updated_at = now()
-                      WHERE conversation_id = $1 AND in_spam RETURNING provider_message_id"
-                }
-            };
-            sqlx::query_scalar::<_, String>(sql)
-                .bind(id.as_uuid())
-                .fetch_all(&mut *conn)
-                .await?
+        // Trash and spam exclude each other. Trash leaves the inbox flag as
+        // it is (untrash puts the message back where it was); spam takes
+        // the message out of the inbox and remembers whether it was there,
+        // so "not spam" puts it back only then, and never the member's own
+        // sent mail.
+        Flag::Trash => {
+            sqlx::query_scalar!(
+                "UPDATE conversations.messages SET in_trash = true, in_spam = false,
+                        updated_at = now()
+                  WHERE conversation_id = $1 AND (NOT in_trash OR in_spam)
+                 RETURNING provider_message_id",
+                id as ConversationId
+            )
+            .fetch_all(&mut *conn)
+            .await?
+        }
+        Flag::Untrash => {
+            sqlx::query_scalar!(
+                "UPDATE conversations.messages SET in_trash = false, updated_at = now()
+                  WHERE conversation_id = $1 AND in_trash RETURNING provider_message_id",
+                id as ConversationId
+            )
+            .fetch_all(&mut *conn)
+            .await?
+        }
+        // The whole conversation, as providers report a thread.
+        Flag::Spam => {
+            sqlx::query_scalar!(
+                "UPDATE conversations.messages
+                    SET inbox_before_spam = in_inbox, in_spam = true, in_inbox = false,
+                        in_trash = false, updated_at = now()
+                  WHERE conversation_id = $1 AND NOT in_spam RETURNING provider_message_id",
+                id as ConversationId
+            )
+            .fetch_all(&mut *conn)
+            .await?
+        }
+        Flag::Unspam => {
+            sqlx::query_scalar!(
+                "UPDATE conversations.messages
+                    SET in_spam = false,
+                        in_inbox = coalesce(inbox_before_spam, false) AND direction = 'inbound',
+                        inbox_before_spam = NULL, updated_at = now()
+                  WHERE conversation_id = $1 AND in_spam RETURNING provider_message_id",
+                id as ConversationId
+            )
+            .fetch_all(&mut *conn)
+            .await?
         }
     };
     Ok(changed)

@@ -67,9 +67,13 @@ pub struct Results {
     /// Messages the provider no longer has.
     pub gone: HashSet<String>,
     /// Messages a change would put back in the inbox although they are not
-    /// the member's to move there (their own sent mail, at Zoho): that part
+    /// the member's to move there (their own sent mail, at Zoho), or would
+    /// move to or from a place the provider was not seen to have: that part
     /// is not made.
     pub unmovable: HashSet<String>,
+    /// Messages put in the trash or spam, with where they were before (the
+    /// provider's location tokens), so taking them out puts them back.
+    pub restore: HashMap<String, Vec<String>>,
 }
 
 impl Plan {
@@ -150,6 +154,32 @@ impl Plan {
         }
     }
 
+    /// The change that won `label` present on `message`, if one did.
+    pub fn winner(&self, message: &str, label: &str) -> Option<Uuid> {
+        self.wants
+            .get(message)
+            .and_then(|labels| labels.get(label))
+            .filter(|want| want.present)
+            .map(|want| want.row)
+    }
+
+    /// The changes that put each message of `restore` in the trash or spam,
+    /// with where the message was before, for `outcome`.
+    pub fn restores(&self, done: &Results, outcome: &mut Outcome) {
+        for (message, tokens) in &done.restore {
+            if !done.written.contains(message) {
+                continue;
+            }
+            let row = self
+                .winner(message, "TRASH")
+                .or_else(|| self.winner(message, "SPAM"));
+            if let Some(row) = row {
+                outcome.restore.push((row, tokens.clone()));
+            }
+        }
+        outcome.restore.sort();
+    }
+
     /// What is still to be written on `message`.
     pub fn change_of(&self, message: &str) -> LabelChange {
         let (mut add, mut remove) = (Vec::new(), Vec::new());
@@ -194,10 +224,16 @@ impl Plan {
             let pairs = self.won.get(&id).map(Vec::as_slice).unwrap_or_default();
             let fate_is = |fate| move |p: &(String, String)| self.fates[p] == fate;
             let ended = |state, reason| End { id, state, reason };
-            let only_inbox = !pairs.is_empty() && pairs.iter().all(|(_, label)| label == "INBOX");
+            // A change that only moves the message (to or from the inbox,
+            // the trash or spam) and could not be made: the provider's
+            // state stands.
+            let only_moves = !pairs.is_empty()
+                && pairs
+                    .iter()
+                    .all(|(_, label)| matches!(label.as_str(), "INBOX" | "TRASH" | "SPAM"));
             let end = if pairs.is_empty() {
                 ended(State::Superseded, Some("replaced"))
-            } else if done.unmovable.contains(message) && only_inbox {
+            } else if done.unmovable.contains(message) && only_moves {
                 // The provider's state stands: Campbooks is told so.
                 outcome.reemit.push(message.clone());
                 ended(State::Skipped, Some("not_movable"))

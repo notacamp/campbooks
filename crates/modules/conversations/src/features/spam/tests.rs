@@ -61,3 +61,80 @@ async fn readers_cannot_report(db: PgPool) {
             .is_empty()
     );
 }
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn strangers_see_nothing(db: PgPool) {
+    let kit = Kit::new(db).await;
+    let (workspace, _, _) = kit.sams_inbox().await;
+    let (leo, _) = kit.member("leo", workspace);
+    let id = kit.conversation_of("en-1").await;
+    for action in ["spam", "not-spam"] {
+        let hidden = kit
+            .post(
+                &leo,
+                &format!("/api/v1/w/{workspace}/conversations/{id}/{action}"),
+                None,
+            )
+            .await;
+        assert_eq!(hidden.status, StatusCode::NOT_FOUND, "{action}");
+    }
+    assert!(
+        kit.events("conversations.changes_requested")
+            .await
+            .is_empty()
+    );
+}
+
+/// `(in_inbox, in_trash, in_spam)` of each message of conversation `id`.
+async fn places(db: &PgPool, id: &str) -> Vec<(bool, bool, bool)> {
+    sqlx::query_as(
+        "SELECT in_inbox, in_trash, in_spam FROM conversations.messages
+          WHERE conversation_id = $1::uuid ORDER BY sent_at, id",
+    )
+    .bind(id)
+    .fetch_all(db)
+    .await
+    .unwrap()
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn not_spam_puts_it_back_where_it_was(db: PgPool) {
+    let kit = Kit::new(db.clone()).await;
+    let (workspace, _, sam) = kit.sams_inbox().await;
+    let id = kit.conversation_of("en-1").await;
+    let base = format!("/api/v1/w/{workspace}/conversations/{id}");
+    // Archived first: not spam leaves it archived, never in the inbox.
+    kit.post(&sam, &format!("{base}/archive"), None).await;
+    let archived = places(&db, &id).await;
+    kit.post(&sam, &format!("{base}/spam"), None).await;
+    let back = kit.post(&sam, &format!("{base}/not-spam"), None).await;
+    assert_eq!(back.json["archived"], true);
+    assert_eq!(places(&db, &id).await, archived);
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn trash_and_spam_exclude_each_other(db: PgPool) {
+    let kit = Kit::new(db.clone()).await;
+    let (workspace, _, sam) = kit.sams_inbox().await;
+    let id = kit.conversation_of("en-1").await;
+    let base = format!("/api/v1/w/{workspace}/conversations/{id}");
+    kit.post(&sam, &format!("{base}/spam"), None).await;
+    kit.post(&sam, &format!("{base}/trash"), None).await;
+    assert!(
+        places(&db, &id)
+            .await
+            .iter()
+            .all(|&(_, trash, spam)| trash && !spam),
+        "{:?}",
+        places(&db, &id).await
+    );
+    kit.post(&sam, &format!("{base}/spam"), None).await;
+    assert!(
+        places(&db, &id)
+            .await
+            .iter()
+            .all(|&(_, trash, spam)| !trash && spam),
+        "{:?}",
+        places(&db, &id).await
+    );
+}

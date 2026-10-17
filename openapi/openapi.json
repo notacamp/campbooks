@@ -4041,7 +4041,7 @@
         "tags": [
           "conversations"
         ],
-        "summary": "Take a conversation out of spam, back in the inbox.",
+        "summary": "Take a conversation out of spam, back where it was.",
         "operationId": "conversations.not_spam",
         "parameters": [
           {

@@ -736,3 +736,60 @@ async fn a_message_in_the_trash_or_spam_is_not_brought_back(db: PgPool) {
         ]
     );
 }
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn trash_and_spam_reach_gmail_and_come_back_where_they_were(db: PgPool) {
+    let kit = Kit::new(db).await;
+    let mailbox = mailbox(&kit, &[&["INBOX", "UNREAD"], &["CATEGORY_UPDATES"]]).await;
+    let (inboxed, archived) = (&mailbox.ids[0], &mailbox.ids[1]);
+    let before = changes(&kit, mailbox.ws).await.len();
+    let step = |id: &str, kind: &str| {
+        let id = id.to_owned();
+        let kind = kind.to_owned();
+        let mailbox = &mailbox;
+        let kit = &kit;
+        async move {
+            mailbox
+                .request(kit, &[(id.as_str(), json!({ "kind": kind }))])
+                .await;
+        }
+    };
+
+    // Trash and back: Gmail's own calls, its labels kept.
+    step(inboxed, "trash").await;
+    assert_eq!(
+        kit.google.labels_of(inboxed),
+        labels(&["INBOX", "TRASH", "UNREAD"])
+    );
+    step(inboxed, "untrash").await;
+    assert_eq!(kit.google.labels_of(inboxed), labels(&["INBOX", "UNREAD"]));
+    let writes = kit.google.writes();
+    assert!(writes.iter().any(|w| w.ends_with("/trash")), "{writes:?}");
+    assert!(writes.iter().any(|w| w.ends_with("/untrash")), "{writes:?}");
+
+    // Reported from the inbox: back to the inbox. Reported while archived:
+    // back to the archive, never the inbox.
+    step(inboxed, "spam").await;
+    assert_eq!(kit.google.labels_of(inboxed), labels(&["SPAM", "UNREAD"]));
+    step(inboxed, "unspam").await;
+    assert_eq!(kit.google.labels_of(inboxed), labels(&["INBOX", "UNREAD"]));
+    step(archived, "spam").await;
+    step(archived, "unspam").await;
+    assert_eq!(
+        kit.google.labels_of(archived),
+        labels(&["CATEGORY_UPDATES"])
+    );
+
+    // Trash and spam exclude each other.
+    step(archived, "spam").await;
+    step(archived, "trash").await;
+    assert_eq!(
+        kit.google.labels_of(archived),
+        labels(&["CATEGORY_UPDATES", "TRASH"])
+    );
+
+    assert!(ends(&kit).await.iter().all(|e| *e == end("applied", None)));
+    // The writes come back as nothing.
+    mailbox.run(&kit).await;
+    assert_eq!(changes(&kit, mailbox.ws).await.len(), before);
+}

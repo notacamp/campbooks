@@ -1,5 +1,6 @@
 //! `POST …/conversations/{conversation_id}/trash` and `/untrash` — move a
-//! conversation to the trash (its need goes with it), or take it back out.
+//! conversation to the trash (its need goes with it), or take it back out,
+//! back where it was.
 //! The provider is told message by message.
 
 use axum::{Extension, Json, extract::State};

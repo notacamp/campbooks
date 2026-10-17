@@ -34,7 +34,7 @@
       "oneOf": [
         {
           "type": "object",
-          "description": "A flag change. `trash` / `untrash` put the message in the trash and take it out again (back to the inbox); `spam` / `unspam` report it as spam (out of the inbox) and take that back (back to the inbox). Consumers of an older revision of v1 read the four as an unknown kind and skip them.",
+          "description": "A flag change. `trash` puts the message in the trash and `untrash` takes it out, back where it was; `spam` reports it as spam (into spam, out of the inbox) and `unspam` takes that back, to the inbox only if it was there before. Trash and spam exclude each other. The kinds `trash`, `untrash`, `spam` and `unspam` were added to v1 later: a consumer must decode a kind it does not know leniently (as unknown, and skip it, e.g. `#[serde(other)]`); a strict validator of the earlier revision of this schema would reject the event.",
           "required": ["kind"],
           "additionalProperties": false,
           "properties": {

@@ -1919,7 +1919,7 @@
           },
           {
             "type": "object",
-            "description": "Take the message out of the trash.",
+            "description": "Take the message out of the trash, back where it was.",
             "required": [
               "kind"
             ],
@@ -1949,7 +1949,7 @@
           },
           {
             "type": "object",
-            "description": "Take the message out of spam, back in the inbox.",
+            "description": "Take the message out of spam, back where it was (the inbox only if it\nwas there).",
             "required": [
               "kind"
             ],

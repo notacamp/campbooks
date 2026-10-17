@@ -10,7 +10,12 @@
 //!   writer: the change ends `superseded` (`changed_at_provider`) and the
 //!   message is re-emitted;
 //! - more than [`BATCH_FROM`]` - 1` messages with the same change go in one
-//!   `batchModify`, the rest are modified one by one.
+//!   `batchModify`, the rest are modified one by one;
+//! - the trash is made with `messages.trash` and taken back with
+//!   `messages.untrash` (Gmail puts back the labels the message had); a
+//!   message reported as spam leaves the inbox, and "not spam" brings it
+//!   back to the inbox only when it was there before (remembered when it
+//!   was reported).
 
 use std::collections::BTreeMap;
 
@@ -66,7 +71,7 @@ pub async fn push(gmail: &Gmail<'_>, backlog: &Backlog) -> Push {
     };
     plan.atomic();
     let mut done = Results::default();
-    push.trouble = write(gmail, &plan.groups(), &mut done).await;
+    push.trouble = write(gmail, &plan.groups(), backlog, &mut done).await;
     // After writing: the window our writes fall in.
     if !done.written.is_empty() {
         let after = gmail
@@ -77,10 +82,13 @@ pub async fn push(gmail: &Gmail<'_>, backlog: &Backlog) -> Push {
         push.outcome.window = before.map(|from| (from, after));
     }
     plan.ends(backlog, &done, &mut push.outcome);
+    plan.restores(&done, &mut push.outcome);
     // The index holds what we set: Gmail's record of the write then
     // compares equal and nothing is emitted for it.
     for message in &done.written {
-        let labels = apply_labels(&backlog.labels[message], &[plan.change_of(message)]);
+        let (mut add, remove) = plan.change_of(message);
+        add.extend(back_to_inbox(backlog, message, &remove));
+        let labels = apply_labels(&backlog.labels[message], &[(add, remove)]);
         push.outcome.index.push((message.clone(), labels));
     }
     push.outcome.index.sort();
@@ -89,21 +97,73 @@ pub async fn push(gmail: &Gmail<'_>, backlog: &Backlog) -> Push {
     push
 }
 
+/// One message's write: its labels, and whether it goes into the trash
+/// (`Some(true)`) or out of it (`Some(false)`) first.
+struct Single {
+    message: String,
+    add: Vec<String>,
+    remove: Vec<String>,
+    trash: Option<bool>,
+}
+
+/// `INBOX`, when taking `message` out of spam (`remove` holds `SPAM`) and it
+/// was in the inbox before it was reported.
+fn back_to_inbox(backlog: &Backlog, message: &str, remove: &[String]) -> Option<String> {
+    let unspam = remove.iter().any(|l| l == "SPAM");
+    let was_in_inbox = backlog
+        .restore
+        .get(message)
+        .is_some_and(|tokens| tokens.iter().any(|t| t == "INBOX"));
+    (unspam && was_in_inbox).then(|| "INBOX".to_owned())
+}
+
 /// Write `groups`: a batch per chunk of a large group, one call per message
-/// otherwise (and for a batch Gmail refused). Returns the trouble that
-/// stopped it.
+/// otherwise (and for a batch Gmail refused, and for moves into or out of
+/// the trash or spam). Returns the trouble that stopped it.
 async fn write(
     gmail: &Gmail<'_>,
     groups: &BTreeMap<LabelChange, Vec<String>>,
+    backlog: &Backlog,
     done: &mut Results,
 ) -> Option<ProviderError> {
-    let mut singles: Vec<(String, Vec<String>, Vec<String>)> = Vec::new();
+    let mut singles: Vec<Single> = Vec::new();
     for ((add, remove), messages) in groups {
         let one_by_one = |list: &[String]| {
             list.iter()
-                .map(|m| (m.clone(), add.clone(), remove.clone()))
+                .map(|m| Single {
+                    message: m.clone(),
+                    add: add.clone(),
+                    remove: remove.clone(),
+                    trash: None,
+                })
                 .collect::<Vec<_>>()
         };
+        if has(add, "TRASH") || has(remove, "TRASH") || has(add, "SPAM") || has(remove, "SPAM") {
+            for message in messages {
+                if has(add, "SPAM") {
+                    // Where it was, so "not spam" can put it back.
+                    let current = backlog.labels.get(message).cloned().unwrap_or_default();
+                    let inbox: Vec<String> = current.into_iter().filter(|l| l == "INBOX").collect();
+                    done.restore.insert(message.clone(), inbox);
+                }
+                let mut labels_add: Vec<String> =
+                    add.iter().filter(|l| *l != "TRASH").cloned().collect();
+                labels_add.extend(back_to_inbox(backlog, message, remove));
+                singles.push(Single {
+                    message: message.clone(),
+                    add: labels_add,
+                    remove: remove.iter().filter(|l| *l != "TRASH").cloned().collect(),
+                    trash: if has(add, "TRASH") {
+                        Some(true)
+                    } else if has(remove, "TRASH") {
+                        Some(false)
+                    } else {
+                        None
+                    },
+                });
+            }
+            continue;
+        }
         if messages.len() < BATCH_FROM {
             singles.extend(one_by_one(messages));
             continue;
@@ -121,6 +181,28 @@ async fn write(
         }
     }
     modify_each(gmail, &singles, done).await
+}
+
+/// Whether `list` holds `label`.
+fn has(list: &[String], label: &str) -> bool {
+    list.iter().any(|l| l == label)
+}
+
+/// Make one message's write: out of the trash first, then its labels, then
+/// into the trash.
+async fn write_one(gmail: &Gmail<'_>, single: &Single) -> Result<(), ProviderError> {
+    if single.trash == Some(false) {
+        gmail.untrash(&single.message).await?;
+    }
+    if !single.add.is_empty() || !single.remove.is_empty() {
+        gmail
+            .modify(&single.message, &single.add, &single.remove)
+            .await?;
+    }
+    if single.trash == Some(true) {
+        gmail.trash(&single.message).await?;
+    }
+    Ok(())
 }
 
 /// Read Gmail's history from the oldest stamp and mark the (message, label)
@@ -202,11 +284,11 @@ async fn profile_id(gmail: &Gmail<'_>) -> Result<Option<i64>, ProviderError> {
     Ok(gmail.profile().await?.history_id.parse::<i64>().ok())
 }
 
-/// `messages.modify` each of `singles`, [`FETCH_CONCURRENCY`] at a time,
-/// starting none after trouble. Returns the trouble.
+/// Write each of `singles` ([`write_one`]), [`FETCH_CONCURRENCY`] at a
+/// time, starting none after trouble. Returns the trouble.
 async fn modify_each(
     gmail: &Gmail<'_>,
-    singles: &[(String, Vec<String>, Vec<String>)],
+    singles: &[Single],
     done: &mut Results,
 ) -> Option<ProviderError> {
     let mut trouble = None;
@@ -214,15 +296,15 @@ async fn modify_each(
     let mut in_flight = FuturesOrdered::new();
     loop {
         while trouble.is_none() && in_flight.len() < FETCH_CONCURRENCY && next < singles.len() {
-            let (message, add, remove) = &singles[next];
+            let single = &singles[next];
             next += 1;
-            in_flight.push_back(async move { (message, gmail.modify(message, add, remove).await) });
+            in_flight.push_back(async move { (&single.message, write_one(gmail, single).await) });
         }
         let Some((message, result)) = in_flight.next().await else {
             break;
         };
         match result {
-            Ok(_) => {
+            Ok(()) => {
                 done.written.insert(message.clone());
             }
             Err(ProviderError::NotFound) => {
