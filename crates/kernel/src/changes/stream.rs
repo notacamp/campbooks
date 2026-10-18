@@ -566,7 +566,10 @@ fn opens_limit(config: &crate::config::ChangesConfig) -> Option<Limit> {
     })
 }
 
-/// `subscription`'s caller's access in its workspace now, as a heartbeat's
+/// `subscription`'s caller's access in its workspace now, asked once the
+/// open has read its head: the request resolved it before, and a removal
+/// numbered in between falls in no range the stream reads (it reads
+/// membership changes after the head only). As a heartbeat's
 /// `check_access` asks it: a token that no longer stands (its account
 /// suspended or signed out everywhere since it was verified), a former
 /// member or a revoked client is refused like any non-member (404), and a
@@ -631,10 +634,7 @@ pub async fn open(
     .fetch_one(&mut *tx)
     .await?;
     tx.commit().await?;
-    // The request resolved the caller's access before the head was read: a
-    // removal numbered in between falls in no read range (the stream reads
-    // membership changes after the head only). Resolved again now, every
-    // removal up to the head is seen (campbooks-cloud#216).
+    // Asked again after the head: see `access_now` (campbooks-cloud#216).
     subscription.access = access_now(state, &subscription).await?;
     let after = subscription
         .after
