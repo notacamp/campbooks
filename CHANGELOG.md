@@ -80,6 +80,10 @@ All notable changes to Campbooks Next are documented here. The format follows
 
 ### Fixed
 
+- **Forward's picker stays fast on a big inbox.** Checking that no one it offers was
+  reported or found suspicious now looks only at the senders it is about to show, through
+  a new index, instead of reading a year of the inbox's mail on every keystroke (three
+  indexes, built without blocking writes).
 - **Home no longer keeps an older need when two changes race.** When a conversation's
   need changed twice in quick succession before it had an item on Home, two workers could
   both create the item and the older change could land last, leaving Home on the older
