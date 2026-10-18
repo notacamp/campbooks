@@ -15,10 +15,13 @@ use super::{
     text::{clean, words},
 };
 
-/// The shape of what the index stores (configurations, weights, fields).
-/// Bump it when that changes: every workspace's next touch rebuilds its
-/// index in the background, answering from the old rows meanwhile.
-pub const INDEX_VERSION: i16 = 1;
+/// The shape of what the index stores (configurations, weights, fields), or
+/// what a source reads into it. Bump it when that changes: every
+/// workspace's next touch rebuilds its index in the background, answering
+/// from the old rows meanwhile, and an entry whose stamp changed is read
+/// again. 2: mail read from HTML with no `<body>` tag gets its words
+/// (campbooks-cloud#218).
+pub const INDEX_VERSION: i16 = 2;
 
 /// Group facet set by search itself: some entry carries files.
 pub const ATTACHMENT: &str = "attachment";

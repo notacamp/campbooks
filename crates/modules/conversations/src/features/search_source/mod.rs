@@ -6,9 +6,11 @@
 //! An entry's stamp is made of the hashes of the blobs its text is read from
 //! (participants document, text and HTML parts). Blobs are content-addressed,
 //! so the stamp changes exactly when the words do, and a flag change never
-//! makes search read a body again.
+//! makes search read a body again. An entry read from HTML also carries
+//! [`HTML_TEXT_VERSION`], so a change in how HTML becomes text reads those
+//! bodies again.
 
-use std::{collections::HashMap, sync::Arc};
+use std::{collections::HashMap, fmt::Write as _, sync::Arc};
 
 use campbooks_kernel::{
     Error, RecordRef, Result,
@@ -34,6 +36,10 @@ const MAX_PARTICIPANTS_BYTES: usize = 64 * 1024;
 const MAX_TEXT_BYTES: usize = 128 * 1024;
 /// The most of an HTML part read, in bytes.
 const MAX_HTML_BYTES: usize = 512 * 1024;
+/// How HTML becomes text ([`plain_text::from_html`]): part of the stamp of
+/// an entry read from HTML. 2: words after `<head>` with no `<body>` tag are
+/// read (campbooks-cloud#218).
+const HTML_TEXT_VERSION: u32 = 2;
 
 /// The port, for the server to register.
 pub fn search_source() -> Arc<dyn SearchSource> {
@@ -172,12 +178,16 @@ async fn group(conn: &mut PgConnection, id: ConversationId) -> Result<Option<Gro
         .map(|message| {
             let bodies = Bodies::parse(message.bodies);
             let participants: Option<BlobRef> = serde_json::from_value(message.participants).ok();
-            let stamp = format!(
+            let mut stamp = format!(
                 "{}:{}:{}",
                 hash_of(participants.as_ref()),
                 hash_of(bodies.text.as_ref()),
                 hash_of(bodies.html.as_ref()),
             );
+            // Its words come from its HTML (no text part).
+            if bodies.text.is_none() && bodies.html.is_some() {
+                let _ = write!(stamp, ":h{HTML_TEXT_VERSION}");
+            }
             let facets: Facets = [
                 (
                     facet::MAILBOX.to_owned(),

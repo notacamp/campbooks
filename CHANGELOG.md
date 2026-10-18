@@ -80,6 +80,11 @@ All notable changes to Campbooks Next are documented here. The format follows
 
 ### Fixed
 
+- **Search finds mail whose HTML has no body tag.** Mail written as a head followed straight
+  by its text, with no `<body>` (some mailers send it), was indexed with no words at all;
+  its words are found now. Existing mail is read again in the background after the
+  update, the first time anyone searches or new mail arrives in a workspace; search keeps
+  answering meanwhile.
 - **Forward's picker stays fast on a big inbox.** Checking that no one it offers was
   reported or found suspicious now looks only at the senders it is about to show, through
   a new index, instead of reading a year of the inbox's mail on every keystroke (three
