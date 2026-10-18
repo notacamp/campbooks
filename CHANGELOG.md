@@ -208,6 +208,10 @@ All notable changes to Campbooks Next are documented here. The format follows
   For operators, `campbooks-server labelling export` writes your recent money mail as a
   sheet to label on your own machine, and `cargo xtask eval decide --set-dir` measures the
   model on it (campbooks-cloud#167).
+- **Desktop app: a mail link's subject or body can't smuggle a field behind a semicolon or a
+  second encoding.** A subject or body holding `;` once decoded, or still holding an escape
+  such as `%0D` (it was encoded twice), is left out of what reaches your mail app; a
+  percent sign that is text, as in "50% off", stays.
 
 ### Added
 

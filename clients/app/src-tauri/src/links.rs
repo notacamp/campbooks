@@ -74,9 +74,11 @@ pub fn outside(url: &Url) -> Option<String> {
 }
 
 /// Whether a mail link's decoded `subject` or `body` is plain text a mail
-/// app can only read as such: valid UTF-8 with no `&` or `?` (a mail app
-/// that decodes before it splits would start another field there,
-/// `&attach=…`); a subject with no control character, line or paragraph
+/// app can only read as such: valid UTF-8 with no `&`, `;` or `?` (a mail
+/// app that decodes before it splits, on `;` too as some older parsers do,
+/// would start another field there, `&attach=…`) and no `%XX` escape left
+/// (encoded twice, it would decode into one of those, or a line break, in an
+/// app that decodes again; campbooks-cloud#253); a subject with no control character, line or paragraph
 /// separator (U+2028, U+2029) or invisible character, since a mail app
 /// that decodes first would put a raw line break in the Subject header and
 /// start another header (`Hi%0D%0ABcc:%20…`); a body with no control
@@ -85,8 +87,11 @@ fn plain_text(name: &str, decoded: &[u8]) -> bool {
     let Ok(text) = std::str::from_utf8(decoded) else {
         return false;
     };
+    if escaped(decoded) {
+        return false;
+    }
     let refused = |c: char| {
-        matches!(c, '&' | '?')
+        matches!(c, '&' | ';' | '?')
             || if name == "subject" {
                 c.is_control() || matches!(c, '\u{2028}' | '\u{2029}') || is_invisible(c)
             } else {
@@ -94,6 +99,14 @@ fn plain_text(name: &str, decoded: &[u8]) -> bool {
             }
     };
     !text.chars().any(refused)
+}
+
+/// Whether `decoded` still holds a `%` followed by two hex digits: text
+/// encoded twice.
+fn escaped(decoded: &[u8]) -> bool {
+    decoded
+        .windows(3)
+        .any(|w| w[0] == b'%' && w[1].is_ascii_hexdigit() && w[2].is_ascii_hexdigit())
 }
 
 /// Whether a mail link's address part (`path`, still percent-encoded) is
@@ -331,10 +344,15 @@ mod tests {
                 "mailto:x@weekly-ledger.example?subject=hi#&attach=/home/u/.ssh/id_rsa",
                 "mailto:x@weekly-ledger.example?subject=hi",
             ),
-            // Another separator inside a value.
+            // Another separator inside a value: some parsers split on `;`
+            // too (campbooks-cloud#253), so the field goes.
             (
                 "mailto:x@weekly-ledger.example?subject=x;attach=/etc/passwd",
-                "mailto:x@weekly-ledger.example?subject=x%3Battach%3D%2Fetc%2Fpasswd",
+                "mailto:x@weekly-ledger.example",
+            ),
+            (
+                "mailto:x@weekly-ledger.example?subject=Hi&body=x%3Battach%3D%2Fetc%2Fpasswd",
+                "mailto:x@weekly-ledger.example?subject=Hi",
             ),
             (
                 "mailto:x@weekly-ledger.example?subject=x?attach=/etc/passwd",
@@ -348,6 +366,36 @@ mod tests {
         ] {
             assert_eq!(outside(&parse(link)).as_deref(), Some(kept), "{link}");
         }
+    }
+
+    #[test]
+    fn a_subject_or_body_encoded_twice_is_dropped() {
+        // Decoded once, these still hold an escape that a mail app decoding
+        // again would turn into a line break or another field.
+        for (field, value) in [
+            ("subject", "Hi%250D%250ABcc:%20evil@x.example"),
+            ("subject", "Hi%2526attach=/etc/passwd"),
+            ("subject", "100%2541"),
+            ("body", "Hi%250Athere"),
+            ("body", "x%253Battach"),
+        ] {
+            let link = outside(&parse(&format!(
+                "mailto:rita@silva-contas.example?{field}={value}&cc=joao@silva-contas.example"
+            )));
+            assert_eq!(
+                link.as_deref(),
+                Some("mailto:rita@silva-contas.example?cc=joao%40silva-contas.example"),
+                "{field}={value}"
+            );
+        }
+        // A percent sign that is text stays.
+        let percent = outside(&parse(
+            "mailto:rita@silva-contas.example?subject=50%25%20off&body=100%25",
+        ));
+        assert_eq!(
+            percent.as_deref(),
+            Some("mailto:rita@silva-contas.example?subject=50%25%20off&body=100%25")
+        );
     }
 
     #[test]
