@@ -15,8 +15,10 @@ the mail goes out from W's mailbox. The same holds for a planted
 `conversations.change_requests` row (and its event), and for a row written
 straight into `connectors.outbound_changes`.
 
-After this change, SQL alone cannot make any mailbox send, or make a change
-at the provider.
+After this change, SQL alone cannot make any mailbox send, and a planted or
+edited change request or outbound change is not made at the provider. A
+change that a taught rule makes is still signed by the server, so SQL that
+plants or edits a rule can still change mail (campbooks-cloud#242).
 
 Modules touched: the kernel (a binding key and its canonical encoding),
 `conversations` (signs at the author's request, verifies at release and in
@@ -72,13 +74,15 @@ secret.
   and on cancel, which shortens the window to the undo window. See
   `design.md`.
 - **Rules and automation.** A change a taught rule makes is signed as made
-  by the server; SQL that plants a rule is out of scope here.
+  by the server; SQL that plants or edits a rule
+  can still change mail through it; binding rules is campbooks-cloud#242.
 - **Key rotation.** Designed in `design.md`, not built.
 
 ## Impact
 
-- SQL in a workspace can no longer make its mailbox send, or change mail at
-  the provider, by planting or editing rows.
+- SQL in a workspace can no longer make its mailbox send, or get a planted
+  change request or outbound change made at the provider. Rules are not yet
+  bound (campbooks-cloud#242).
 - A draft scheduled just before the deploy goes back to a draft (sent again
   by its author); one `sending` at the deploy fails as an unconfirmed send;
   a change pending at the deploy is not made (the next sync shows the
