@@ -80,6 +80,12 @@ All notable changes to Campbooks Next are documented here. The format follows
 
 ### Fixed
 
+- **A reply or forward never quotes nothing.** When an email's words were too slow to read
+  in time (a very large or heavy HTML email), the conversation arrives without them; Reply,
+  Reply all, Forward and Home's Forward picker now read them first, saying "Reading the email
+  to quote it…" meanwhile, and the folded message in the reader shows them too. If they
+  cannot be read, nothing is started or sent and the app says why, instead of quoting an
+  empty message.
 - **Mail whose HTML has no body tag gets its words.** Mail written as a head followed
   straight by its text, with no `<body>` (some mailers send it), was stored with a blank
   text in place of its words, so search found nothing in it, its preview and Scout's read
