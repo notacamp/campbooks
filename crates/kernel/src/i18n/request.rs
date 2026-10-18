@@ -63,6 +63,9 @@ struct Inputs {
     accept_language: Option<String>,
 }
 
+/// How long the localize layer waits for the caller's saved locale.
+const LOOKUP_LIMIT: std::time::Duration = std::time::Duration::from_secs(2);
+
 impl Inputs {
     fn of(headers: &HeaderMap, extensions: &Extensions) -> Self {
         Self {
@@ -75,6 +78,24 @@ impl Inputs {
                 .and_then(|value| value.to_str().ok())
                 .map(ToOwned::to_owned),
         }
+    }
+
+    /// [`resolve`](Self::resolve), within [`LOOKUP_LIMIT`]: past it, the
+    /// `Accept-Language` locale (campbooks-cloud#265). The localize layer
+    /// sits outside the request time limit, so a slow token check or saved
+    /// locale lookup must not stretch a timed-out request past it.
+    async fn resolve_within_limit(self, state: &AppState) -> Locale {
+        let fallback = self
+            .accept_language
+            .as_deref()
+            .and_then(Locale::from_accept_language)
+            .unwrap_or_default();
+        tokio::time::timeout(LOOKUP_LIMIT, self.resolve(state))
+            .await
+            .unwrap_or_else(|_| {
+                tracing::warn!("the caller's saved locale took too long; using Accept-Language");
+                fallback
+            })
     }
 
     /// The user's saved locale, then `Accept-Language`, then `en`.
@@ -150,7 +171,7 @@ pub async fn localize(State(state): State<AppState>, mut request: Request, next:
     let locale = if let Some(locale) = slot.0.get() {
         *locale
     } else {
-        let locale = inputs.resolve(&state).await;
+        let locale = inputs.resolve_within_limit(&state).await;
         let _ = slot.0.set(locale);
         locale
     };
@@ -178,12 +199,16 @@ mod tests {
         saved: Option<Locale>,
         fail: bool,
         calls: AtomicUsize,
+        delay: Option<std::time::Duration>,
     }
 
     impl LocalePreference for FakePort {
         fn preferred<'a>(&'a self, _db: &'a PgPool, principal: &'a Principal) -> LocaleFuture<'a> {
             self.calls.fetch_add(1, Ordering::SeqCst);
             Box::pin(async move {
+                if let Some(delay) = self.delay {
+                    tokio::time::sleep(delay).await;
+                }
                 if self.fail {
                     return Err(Error::internal("database down"));
                 }
@@ -271,6 +296,30 @@ mod tests {
 
     fn json(reply: &Reply) -> serde_json::Value {
         serde_json::from_str(&reply.body).unwrap()
+    }
+
+    /// A saved locale that takes too long is not waited for: the problem is
+    /// in the `Accept-Language` locale within the lookup limit
+    /// (campbooks-cloud#265).
+    #[tokio::test(start_paused = true)]
+    async fn a_slow_saved_locale_falls_back_to_accept_language() {
+        let port = Arc::new(FakePort {
+            saved: Some(Locale::Fr),
+            delay: Some(std::time::Duration::from_secs(10)),
+            ..FakePort::default()
+        });
+        let app = app(port);
+        let started = tokio::time::Instant::now();
+        let reply = call(
+            &app,
+            "/missing",
+            Some("pt-PT"),
+            Some(principal("saver", PrincipalKind::User)),
+        )
+        .await;
+        assert_eq!(reply.status, StatusCode::NOT_FOUND);
+        assert_eq!(reply.language.as_deref(), Some("pt-PT"));
+        assert!(started.elapsed() < std::time::Duration::from_secs(5));
     }
 
     #[tokio::test]

@@ -111,7 +111,14 @@ pub const RETENTION: Duration = Duration::from_hours(24);
 /// Longest key accepted, in bytes.
 pub const MAX_KEY_LEN: usize = 255;
 
-/// Largest request body hashed (and therefore accepted with a key).
+/// Largest request body hashed (and therefore accepted with a key): the
+/// layer holds a keyed body in memory to hash it. Blobs may be larger
+/// (`CAMPBOOKS_BLOBS__MAX_OBJECT_BYTES`, 50 MiB by default), so an upload
+/// route does not take a large file under a key (campbooks-cloud#265). It
+/// stores the file in its own step without a key: blobs are content
+/// addressed, so the same bytes sent again are the same blob, and a retry is
+/// idempotent by nature. A small keyed operation then attaches the blob by
+/// its reference. Raising this cap would hold that much memory per request.
 pub const MAX_REQUEST_BYTES: usize = 10 * 1024 * 1024;
 
 /// Largest response body stored for replay; larger responses release the key.

@@ -48,7 +48,8 @@ The system SHALL refuse bodies larger than `CAMPBOOKS_BLOBS__MAX_OBJECT_BYTES`
 store nothing for them. An operation refusing an over-limit upload SHALL answer
 413 problem+json `file_too_large`, whose detail names the limit in bytes, in the
 caller's language. A JSON request body over an operation's body limit SHALL be
-answered 413 `body_too_large`, not 400.
+answered 413 `body_too_large`, not 400. A job failing on an over-limit
+payload SHALL fail for good, not be retried.
 
 #### Scenario: One byte over
 - **WHEN** the limit is 1,000 bytes and a 1,001-byte stream is stored

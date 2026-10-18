@@ -195,13 +195,15 @@ impl From<sqlx::Error> for JobError {
     }
 }
 
-/// Kernel errors: missing records and bad requests are permanent, the rest
-/// is retried. Internal detail is not copied into the message.
+/// Kernel errors: missing records, bad requests and over-limit payloads are
+/// permanent, the rest is retried. Internal detail is not copied into the
+/// message.
 impl From<crate::Error> for JobError {
     fn from(err: crate::Error) -> Self {
         match err {
             crate::Error::NotFound
             | crate::Error::BadRequest(_)
+            | crate::Error::PayloadTooLarge(_)
             | crate::Error::Forbidden
             | crate::Error::Denied(_) => Self::fatal(err.to_string()),
             other => Self::retry(other.to_string()),
