@@ -50,23 +50,21 @@ const BATCH_UNITS: u32 = 50;
 /// Of `modify`, `trash` and `untrash` each.
 const CALL_UNITS: u32 = 5;
 
-/// Gmail quota units pushing `backlog` may spend: the profile before and
-/// after, the history pages, and the writes it plans (a batch per chunk;
-/// per message its untrash, modify and trash, as each is needed). Later
-/// writers only take writes away.
+/// Gmail quota units pushing `backlog` may spend at most: the profile
+/// before and after, the history pages, and the most its writes can cost
+/// (`Writes::most`), whatever the later-writer check leaves of them and
+/// whether or not Gmail refuses a batch (campbooks-cloud#228).
 pub fn units(backlog: &Backlog) -> u32 {
     let writes = Writes::plan(&Plan::merge(backlog).groups(), &backlog.labels);
-    let pages = u32::try_from(HISTORY_PAGES).unwrap_or(u32::MAX);
-    let batches = u32::try_from(writes.batches.len()).unwrap_or(u32::MAX);
-    let calls = writes
-        .singles
-        .iter()
-        .map(Single::calls)
-        .fold(0_u32, u32::saturating_add);
+    let pages = count(HISTORY_PAGES);
     (2 * PROFILE_UNITS)
         .saturating_add(pages.saturating_mul(HISTORY_UNITS))
-        .saturating_add(batches.saturating_mul(BATCH_UNITS))
-        .saturating_add(calls.saturating_mul(CALL_UNITS))
+        .saturating_add(writes.most())
+}
+
+/// `n` as a count of quota-bearing things.
+fn count(n: usize) -> u32 {
+    u32::try_from(n).unwrap_or(u32::MAX)
 }
 
 /// Push `backlog` through `gmail`.
@@ -180,6 +178,35 @@ impl Writes {
             writes.group(&add, &remove, &plain);
         }
         writes
+    }
+
+    /// The most these writes can cost, whatever happens after they are
+    /// planned. The later-writer check only takes labels away, so no
+    /// message ever needs more calls than planned for it on its own; but it
+    /// can split a group into groups under [`BATCH_FROM`] (written one by
+    /// one) or into several batches, or join messages into a new batch, and
+    /// Gmail can refuse a batch as a whole (each of its messages is then
+    /// modified on its own). So each message counts its own calls, as if
+    /// written alone, and every [`BATCH_FROM`] messages with labels to
+    /// change count one `batchModify` on top. Pushes are at most
+    /// [`PUSH_LIMIT`](crate::domain::outbound::PUSH_LIMIT) changes, so this
+    /// stays under about 7,300 units.
+    fn most(&self) -> u32 {
+        let batched: usize = self.batches.iter().map(|(_, chunk)| chunk.len()).sum();
+        let labelled = self
+            .singles
+            .iter()
+            .filter(|single| !single.add.is_empty() || !single.remove.is_empty())
+            .count();
+        let calls = self
+            .singles
+            .iter()
+            .map(Single::calls)
+            .fold(count(batched), u32::saturating_add);
+        let batches = count(batched.saturating_add(labelled) / BATCH_FROM);
+        calls
+            .saturating_mul(CALL_UNITS)
+            .saturating_add(batches.saturating_mul(BATCH_UNITS))
     }
 
     /// `messages` all getting (`add`, `remove`): nothing, one by one, or in
@@ -377,6 +404,110 @@ mod tests {
 
     fn strings(list: &[&str]) -> Vec<String> {
         list.iter().map(ToString::to_string).collect()
+    }
+
+    /// What `writes` cost when Gmail refuses every batch: each batch, then
+    /// each of its messages on its own, and every single's calls.
+    fn refused(writes: &Writes) -> u32 {
+        let batches: u32 = writes
+            .batches
+            .iter()
+            .map(|(_, chunk)| BATCH_UNITS + count(chunk.len()) * CALL_UNITS)
+            .sum();
+        batches + writes.singles.iter().map(Single::calls).sum::<u32>() * CALL_UNITS
+    }
+
+    fn messages(from: usize, to: usize) -> Vec<String> {
+        (from..to).map(|i| format!("m{i:03}")).collect()
+    }
+
+    #[test]
+    fn the_budget_covers_a_refused_batch_and_any_split() {
+        let archive = (Vec::new(), strings(&["INBOX"]));
+        let labels = HashMap::new();
+        let all = messages(0, 33);
+        let planned = Writes::plan(&BTreeMap::from([(archive.clone(), all.clone())]), &labels);
+        // One batch planned (50 units); reserved: the batch and each message
+        // on its own should Gmail refuse it.
+        assert_eq!(planned.batches.len(), 1);
+        assert_eq!(planned.most(), 33 * CALL_UNITS + 3 * BATCH_UNITS);
+        assert!(refused(&planned) <= planned.most());
+        // Later writers split the group (a second label overtaken on some):
+        // whatever the parts, refused or not, the reservation covers them.
+        let star = (strings(&["STARRED"]), strings(&["INBOX"]));
+        let important = (strings(&["IMPORTANT"]), strings(&["INBOX"]));
+        for sizes in [
+            vec![33],
+            vec![11, 22],
+            vec![11, 11, 11],
+            vec![10, 23],
+            vec![5, 5, 5, 5, 5, 8],
+            vec![1; 33],
+            vec![12, 21],
+        ] {
+            let mut groups = BTreeMap::new();
+            let mut at = 0;
+            for (part, size) in sizes.iter().enumerate() {
+                let change = match part % 3 {
+                    0 => archive.clone(),
+                    1 => star.clone(),
+                    _ => important.clone(),
+                };
+                // A part per distinct change: tag the change with its part.
+                let change = ([change.0, vec![format!("Label_{part}")]].concat(), change.1);
+                groups.insert(change, messages(at, at + size));
+                at += size;
+            }
+            let split = Writes::plan(&groups, &labels);
+            assert!(
+                refused(&split) <= planned.most(),
+                "{sizes:?}: {} > {}",
+                refused(&split),
+                planned.most()
+            );
+        }
+    }
+
+    #[test]
+    fn the_budget_covers_singles_joined_into_a_batch() {
+        let labels = HashMap::new();
+        // Six and seven messages with two changes: thirteen singles.
+        let one = (strings(&["STARRED"]), strings(&["INBOX"]));
+        let two = (strings(&["STARRED"]), strings(&["INBOX", "UNREAD"]));
+        let planned = Writes::plan(
+            &BTreeMap::from([(one.clone(), messages(0, 6)), (two, messages(6, 13))]),
+            &labels,
+        );
+        assert!(planned.batches.is_empty());
+        // UNREAD overtaken on the seven: all thirteen share one change and
+        // go in a batch, which Gmail may refuse.
+        let joined = Writes::plan(&BTreeMap::from([(one, messages(0, 13))]), &labels);
+        assert_eq!(joined.batches.len(), 1);
+        assert!(refused(&joined) <= planned.most());
+    }
+
+    #[test]
+    fn the_budget_covers_a_trash_dropped_into_a_batch() {
+        let labels = HashMap::new();
+        // Twelve put in the trash with a label: each trashed on its own.
+        let trash = (strings(&["Label_1", "TRASH"]), strings(&["INBOX"]));
+        let planned = Writes::plan(&BTreeMap::from([(trash, messages(0, 12))]), &labels);
+        assert!(planned.batches.is_empty());
+        assert_eq!(planned.singles[0].calls(), 2);
+        // TRASH overtaken: the label change alone, now one batch.
+        let plain = (strings(&["Label_1"]), strings(&["INBOX"]));
+        let left = Writes::plan(&BTreeMap::from([(plain, messages(0, 12))]), &labels);
+        assert_eq!(left.batches.len(), 1);
+        assert!(refused(&left) <= planned.most());
+        assert!(refused(&planned) <= planned.most());
+    }
+
+    #[test]
+    fn a_few_singles_reserve_what_they_plan() {
+        let labels = HashMap::new();
+        let archive = (Vec::new(), strings(&["INBOX"]));
+        let planned = Writes::plan(&BTreeMap::from([(archive, messages(0, 3))]), &labels);
+        assert_eq!(planned.most(), 3 * CALL_UNITS);
     }
 
     #[test]
