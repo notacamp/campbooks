@@ -80,6 +80,11 @@ All notable changes to Campbooks Next are documented here. The format follows
 
 ### Fixed
 
+- **The live feed resyncs whenever it finds an inbox nothing announced.** If an inbox ever
+  became visible to someone without the change that should announce it, only the
+  heartbeat's check noticed; a check triggered by a change to some other inbox let it in
+  silently, and mail read past in the meantime was never sent. Every check now resyncs
+  the client in that case, while an announced grant still needs none.
 - **Forward's picker stays fast on a big inbox.** Checking that no one it offers was
   reported or found suspicious now looks only at the senders it is about to show, through
   a new index, instead of reading a year of the inbox's mail on every keystroke (three
