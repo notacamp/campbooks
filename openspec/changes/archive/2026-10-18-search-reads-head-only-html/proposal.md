@@ -8,12 +8,22 @@ view, so it was affected too.
 
 ## What Changes
 
+- The connector stores a text part only when the message has a real
+  `text/plain` part. Before, its MIME parser made one out of the HTML with
+  its own reading, which for HTML with no `<body>` gave a few line breaks
+  that hid the HTML from every reader (found while recording).
+- Every reader of a message's words (search, the snippet and Scout's read
+  at ingest, the decide pass, the labelling export, reply context, need
+  summaries) reads them one way (`blobs::words`): the text part when it has
+  words, else the HTML through `plain_text::text_of`. A text part of blanks
+  only counts as none, which also fixes the rows already stored.
+
 - `plain_text::text_of` (search, the reader's plain text, Scout's reply and
   need summaries) ends the head where the tree builder would: at any start
   tag that cannot stand in a head, or at words outside its raw-text
   elements, besides `</head>` and `<body>`. Still the real tokenizer, never
   a regex; scripts, styles, the title and the head's own elements stay out.
-- A message read from its HTML carries the reading's version in its search
+- A message with an HTML part carries the reading's version in its search
   stamp, and the search index version goes to 2: each workspace's next
   search or event starts a background backfill, which reads those messages
   again; queries answer from the old rows meanwhile.
@@ -22,6 +32,7 @@ view, so it was affected too.
 
 ## Impact
 
-- Specs: conversations (Conversations as a search source), search (Backfill).
+- Specs: conversations (Conversations as a search source), search
+  (Backfill), connectors (Gmail messages adapter).
 - Code: `domain/plain_text.rs`, `features/search_source`, `search::domain::index`.
 - No migration; nothing changes on screen.

@@ -211,8 +211,57 @@ async fn mail_with_only_a_head_and_no_body_tag_is_read_for_search(db: PgPool) {
         !text.contains("Secret") && !text.contains("color"),
         "{text:?}"
     );
-    // A message with a text part is read from it: its stamp is as before.
+    // The thread of en-1 (text and HTML) and en-2 (text alone): only the
+    // message with HTML carries how HTML is read.
     let en = kit.conversation_of("en-1").await;
     let group = group_of(&kit, workspace, &en).await.unwrap();
-    assert!(group.entries.iter().all(|e| !e.stamp.contains(":h")));
+    let stamps: Vec<bool> = group
+        .entries
+        .iter()
+        .map(|e| e.stamp.ends_with(":h2"))
+        .collect();
+    assert_eq!(stamps, [true, false]);
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_text_part_of_blanks_only_falls_back_to_the_html(db: PgPool) {
+    // As stored before campbooks-cloud#218: the connector's parser made a
+    // text part of three line breaks out of HTML it could not read.
+    let kit = Kit::new(db).await;
+    let (workspace, inbox, _) = kit.sams_inbox().await;
+    kit.ingest_value(
+        workspace,
+        inbox,
+        &serde_json::json!({"changes": [{"op": "upsert", "message": {
+            "provider_message_id": "blank-text-1",
+            "from": {"name": "Quay Office", "address": "office@quay-moorings.example"},
+            "to": [{"address": "sam@example.com"}],
+            "subject": "Your berth for next season",
+            "sent_at": "2026-10-13T06:30:00Z",
+            "direction": "inbound",
+            "text": "\n\n\n",
+            "html": "<head><meta charset=utf-8><p>Your berth at the harbourlight pontoon is kept.",
+            "mailbox": {"in_inbox": true},
+            "read": false, "starred": false
+        }}]}),
+    )
+    .await;
+    let id = kit.conversation_of("blank-text-1").await;
+    let group = group_of(&kit, workspace, &id).await.unwrap();
+    assert!(group.entries[0].stamp.ends_with(":h2"));
+    let records: Vec<RecordRef> = group.entries.iter().map(|e| e.record.clone()).collect();
+    let texts = texts_of(&kit, workspace, &records).await;
+    assert!(
+        texts[0].text.contains("harbourlight pontoon"),
+        "{:?}",
+        texts[0].text
+    );
+    // Ingest read its words for the snippet too.
+    let snippet: String = sqlx::query_scalar(
+        "SELECT snippet FROM conversations.messages WHERE provider_message_id = 'blank-text-1'",
+    )
+    .fetch_one(&kit.db)
+    .await
+    .unwrap();
+    assert!(snippet.contains("harbourlight pontoon"), "{snippet:?}");
 }

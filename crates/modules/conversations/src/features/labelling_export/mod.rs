@@ -34,8 +34,9 @@ use serde_json::{Value, json};
 use crate::{
     domain::{
         access::visible_inboxes,
-        blobs::read_text,
-        decide::{ENVELOPE_BODY_BYTES, MessageParts, envelope},
+        blobs::{cut, words},
+        decide::{ENVELOPE_BODY_BYTES, ENVELOPE_BUDGET, MessageParts, envelope},
+        plain_text::Quotes,
         redact,
     },
     ingest::Headers,
@@ -93,6 +94,8 @@ struct Recipients {
 struct Bodies {
     #[serde(default)]
     text: Option<campbooks_kernel::blobs::BlobRef>,
+    #[serde(default)]
+    html: Option<campbooks_kernel::blobs::BlobRef>,
 }
 
 /// Which eval set an export is for.
@@ -214,14 +217,18 @@ async fn labelling_item(state: &AppState, ws: &str, n: usize, row: Row) -> Resul
     let recipients: Recipients = serde_json::from_value(row.recipients).map_err(decode)?;
     let headers: Headers = serde_json::from_value(row.headers).map_err(decode)?;
     let bodies: Bodies = serde_json::from_value(row.bodies).map_err(decode)?;
-    let body = match &bodies.text {
-        // A body that cannot be read is left out, not the message.
-        Some(text) => read_text(&state.blobs, ws, text, ENVELOPE_BODY_BYTES)
-            .await
-            .map(|(body, _)| body)
-            .unwrap_or_default(),
-        None => String::new(),
-    };
+    // Its text part, else its HTML read as text (campbooks-cloud#218); a
+    // body that cannot be read is left out, not the message.
+    let body = words(
+        &state.blobs,
+        ws,
+        (bodies.text.as_ref(), bodies.html.as_ref()),
+        ENVELOPE_BUDGET,
+        Quotes::Keep,
+    )
+    .await
+    .map(|(body, _)| cut(body, ENVELOPE_BODY_BYTES))
+    .unwrap_or_default();
     let attachments: Vec<(String, String)> = row
         .filenames
         .iter()

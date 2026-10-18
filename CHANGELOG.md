@@ -80,11 +80,12 @@ All notable changes to Campbooks Next are documented here. The format follows
 
 ### Fixed
 
-- **Search finds mail whose HTML has no body tag.** Mail written as a head followed straight
-  by its text, with no `<body>` (some mailers send it), was indexed with no words at all;
-  its words are found now. Existing mail is read again in the background after the
-  update, the first time anyone searches or new mail arrives in a workspace; search keeps
-  answering meanwhile.
+- **Mail whose HTML has no body tag gets its words.** Mail written as a head followed
+  straight by its text, with no `<body>` (some mailers send it), was stored with a blank
+  text in place of its words, so search found nothing in it and its preview and Scout's
+  read were empty. Its words are read from its HTML now, everywhere, and mail stored
+  earlier is read again in the background after the update, the first time anyone
+  searches or new mail arrives in a workspace; search keeps answering meanwhile.
 - **Desktop app: links stay where they belong.** On macOS and Linux the main window no
   longer treats `tauri.localhost` as the app (there it is the computer itself, where any
   local program could answer), only on Windows and Android, where the app is served from

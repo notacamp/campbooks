@@ -92,7 +92,9 @@ longer has SHALL trigger a resync of the window that emits upserts for new
 or changed messages and removals for indexed messages in the window that
 are gone. Messages SHALL be fetched as raw MIME; the raw message, text part,
 HTML part and attachments SHALL be stored as blobs before the batch that
-references them. A change of labels only SHALL be emitted without
+references them. A text part SHALL be stored only when the message has a
+`text/plain` part: none SHALL be made out of its HTML, which conversations
+reads as text itself. A change of labels only SHALL be emitted without
 downloading the message again. Drafts and chats SHALL be skipped.
 
 #### Scenario: Backfill then incremental
@@ -118,6 +120,10 @@ downloading the message again. Drafts and chats SHALL be skipped.
 #### Scenario: Expired history
 - **WHEN** `history.list` answers 404 for the stored history id
 - **THEN** the stream resyncs its window and emits a removal for an indexed message in the window that Gmail no longer lists
+
+#### Scenario: HTML alone
+- **WHEN** a message is a single `text/html` part opening with `<head><meta>` and no `<body>` tag
+- **THEN** its upsert carries its HTML part and no text part
 
 ### Requirement: The message change stream
 Each sync run that finds changes for a messages stream SHALL store one

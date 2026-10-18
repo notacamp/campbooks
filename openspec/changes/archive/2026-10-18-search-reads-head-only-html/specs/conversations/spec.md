@@ -5,8 +5,9 @@ The module SHALL implement the kernel's `SearchSource` port for the group
 type `conversations.conversation`: a conversation's container (its inbox),
 time (its last message), subject, label names, facets (stream, unread,
 starred, archived, label ids) and, per message, its people (from, to, cc
-with names and addresses), plain text (the text part, or the HTML part
-reduced to text when there is none, quoted history removed, at most
+with names and addresses), plain text (the text part when it has words, or
+the HTML part reduced to text when there is none or it holds blanks only,
+quoted history removed, at most
 32 KiB; the HTML is reduced by html5ever's tokenizer alone, with no tree,
 fed 1 KiB at a time and stopped after 500 ms with the words read so far, keeping the characters outside scripts, styles, the head, the
 title, the markup a `noscript`, `iframe`, `noembed` or `noframes` holds,
@@ -16,7 +17,10 @@ each block; the head ends where the tree builder would end it, at `</head>`,
 raw-text elements, so HTML with no `<body>` tag still gives its words),
 attachment names, mailbox (`inbox`, `archive`, `spam`, `trash`), direction
 and a content stamp made of the hashes of the blobs it is read from, plus,
-for a message read from its HTML, the version of how HTML becomes text. A conversation that no longer exists SHALL be reported as gone.
+for a message with an HTML part, the version of how HTML becomes text. The
+same reading SHALL give every other reader of a message its words: its
+snippet and Scout's read at ingest, the decide pass, the labelling export,
+reply context and need summaries. A conversation that no longer exists SHALL be reported as gone.
 Drafts SHALL NOT be returned.
 
 #### Scenario: HTML-only message
@@ -38,3 +42,7 @@ Drafts SHALL NOT be returned.
 #### Scenario: A head and no body tag
 - **WHEN** search asks for an HTML-only message `<head><meta charset=utf-8><title>T</title><p>Invoice due Friday`
 - **THEN** it gets "Invoice due Friday" and nothing of the title, styles or scripts, as for a doctype, a full document, a closed head with no body tag and Outlook's HTML
+
+#### Scenario: A text part of blanks only
+- **WHEN** a message stored earlier holds a text part of three line breaks beside its HTML
+- **THEN** search, its snippet and Scout read the words of its HTML, and its stamp names how HTML is read, so the backfill reads it again

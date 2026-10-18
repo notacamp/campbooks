@@ -6,9 +6,9 @@
 //! An entry's stamp is made of the hashes of the blobs its text is read from
 //! (participants document, text and HTML parts). Blobs are content-addressed,
 //! so the stamp changes exactly when the words do, and a flag change never
-//! makes search read a body again. An entry read from HTML also carries
-//! [`HTML_TEXT_VERSION`], so a change in how HTML becomes text reads those
-//! bodies again.
+//! makes search read a body again. An entry with an HTML part also carries
+//! [`HTML_TEXT_VERSION`] (its words may come from it), so a change in how
+//! HTML becomes text reads those bodies again.
 
 use std::{collections::HashMap, fmt::Write as _, sync::Arc};
 
@@ -25,7 +25,10 @@ use sqlx::PgConnection;
 
 use crate::{
     documents::ParticipantsDocument,
-    domain::{blobs::read_text, plain_text},
+    domain::{
+        blobs::{Budget, read_text, words},
+        plain_text::{self, Quotes},
+    },
     events::{CONVERSATION_RECORD, INBOX_RECORD, MESSAGE_RECORD},
     model::{Address, ConversationId, MessageId},
 };
@@ -37,8 +40,9 @@ const MAX_TEXT_BYTES: usize = 128 * 1024;
 /// The most of an HTML part read, in bytes.
 const MAX_HTML_BYTES: usize = 512 * 1024;
 /// How HTML becomes text ([`plain_text::from_html`]): part of the stamp of
-/// an entry read from HTML. 2: words after `<head>` with no `<body>` tag are
-/// read (campbooks-cloud#218).
+/// an entry with an HTML part. 2: words after `<head>` with no `<body>` tag
+/// are read, and a text part of blanks only falls back to the HTML
+/// (campbooks-cloud#218).
 const HTML_TEXT_VERSION: u32 = 2;
 
 /// The port, for the server to register.
@@ -184,8 +188,9 @@ async fn group(conn: &mut PgConnection, id: ConversationId) -> Result<Option<Gro
                 hash_of(bodies.text.as_ref()),
                 hash_of(bodies.html.as_ref()),
             );
-            // Its words come from its HTML (no text part).
-            if bodies.text.is_none() && bodies.html.is_some() {
+            // Its words may come from its HTML: no text part, or one of
+            // blanks only (read to tell, so every such entry is stamped).
+            if bodies.html.is_some() {
                 let _ = write!(stamp, ":h{HTML_TEXT_VERSION}");
             }
             let facets: Facets = [
@@ -312,12 +317,23 @@ async fn people(blobs: &BlobStore, workspace: &str, blob: &BlobRef) -> Result<Ve
 }
 
 async fn text(blobs: &BlobStore, workspace: &str, bodies: &Bodies) -> Result<String> {
-    let raw = match (&bodies.text, &bodies.html) {
-        (Some(text), _) => read(blobs, workspace, text, MAX_TEXT_BYTES).await?,
-        (None, Some(html)) => {
-            plain_text::from_html(&read(blobs, workspace, html, MAX_HTML_BYTES).await?)
-        }
-        (None, None) => String::new(),
+    // Its text part, else its HTML read as text: also when the text part is
+    // blanks only (campbooks-cloud#218).
+    let raw = match words(
+        blobs,
+        workspace,
+        (bodies.text.as_ref(), bodies.html.as_ref()),
+        Budget {
+            text: MAX_TEXT_BYTES,
+            html: MAX_HTML_BYTES,
+        },
+        Quotes::Drop,
+    )
+    .await
+    {
+        Ok((raw, _)) => raw,
+        Err(BlobError::NotFound) => String::new(),
+        Err(e) => return Err(Error::from(e)),
     };
     Ok(plain_text::own_words(&raw))
 }

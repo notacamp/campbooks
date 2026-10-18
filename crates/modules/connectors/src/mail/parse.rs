@@ -70,6 +70,15 @@ pub fn parse(raw: &[u8], receiver: Receiver) -> Parsed {
         .filter(|part| part.is_text_html())
         .and_then(|_| message.body_html(0))
         .map(std::borrow::Cow::into_owned);
+    // Only a text part the message really has: with none, the parser would
+    // make one out of the HTML with its own reading, which loses the words
+    // of HTML with no `<body>` tag (campbooks-cloud#218). The message is
+    // then its HTML alone, and conversations reads it as text itself.
+    let text = message
+        .text_part(0)
+        .filter(|part| !part.is_text_html())
+        .and_then(|_| message.body_text(0))
+        .map(std::borrow::Cow::into_owned);
     let attachments = message
         .attachments()
         .map(|part| {
@@ -118,7 +127,7 @@ pub fn parse(raw: &[u8], receiver: Receiver) -> Parsed {
             auto_submitted: raw_header(&message, "Auto-Submitted"),
             authentication_results: authentication_results(&message, receiver),
         },
-        text: message.body_text(0).map(std::borrow::Cow::into_owned),
+        text,
         html,
         attachments,
     }
@@ -333,6 +342,46 @@ mod tests {
             None
         );
         assert_eq!(logo.content_type, "image/png");
+    }
+
+    #[test]
+    fn html_alone_gets_no_text_made_up() {
+        // As the demo Gmail and some mailers send it: one `text/html` part
+        // opening with a head, no `<body>` tag (campbooks-cloud#218).
+        let raw = concat!(
+            "From: Quay Office <office@quay-moorings.example>\r\n",
+            "Subject: Your berth for next season\r\n",
+            "MIME-Version: 1.0\r\n",
+            "Content-Type: text/html; charset=utf-8\r\n",
+            "Content-Transfer-Encoding: base64\r\n",
+            "\r\n",
+            "PGhlYWQ+PG1ldGEgY2hhcnNldD0idXRmLTgiPjxwPkhlbGxvIFNhbSw8L3A+PHA+WW91ciBiZXJ0aCBh\r\n",
+            "dCB0aGUgaGFyYm91cmxpZ2h0IHBvbnRvb24gaXMga2VwdC48L3A+\r\n",
+        );
+        let parsed = parse(raw.as_bytes(), Receiver::Gmail);
+        assert_eq!(parsed.text, None);
+        assert!(
+            parsed
+                .html
+                .as_deref()
+                .is_some_and(|html| html.contains("harbourlight pontoon")),
+            "{:?}",
+            parsed.html
+        );
+        // Related parts around the HTML: still no text made up.
+        let related = parse(
+            concat!(
+                "From: a@example.com\r\n",
+                "MIME-Version: 1.0\r\n",
+                "Content-Type: multipart/related; boundary=\"r\"\r\n\r\n",
+                "--r\r\nContent-Type: text/html; charset=utf-8\r\n\r\n",
+                "<p>Only HTML</p>\r\n--r--\r\n",
+            )
+            .as_bytes(),
+            Receiver::Gmail,
+        );
+        assert_eq!(related.text, None);
+        assert!(related.html.is_some());
     }
 
     #[test]
