@@ -101,6 +101,14 @@ impl Browser {
         self.cookies.clear();
     }
 
+    /// Another device: the same app, its own (empty) cookie jar.
+    pub(crate) fn another(&self) -> Self {
+        Self {
+            app: self.app.clone(),
+            cookies: BTreeMap::new(),
+        }
+    }
+
     pub(crate) async fn send(&mut self, method: Method, url: &str, body: Option<Value>) -> Reply {
         let key = uuid::Uuid::now_v7().to_string();
         self.send_keyed(method, url, body, &key).await

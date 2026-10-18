@@ -40,15 +40,23 @@ still let that sign-in's access tokens run out their ten minutes
   new index is needed. A token minted before these claims existed is judged
   by its account alone, for the rest of its ten minutes.
 - Every other sign-in of the person keeps working.
+- **The web app signs in again at once:** the BFF holds an access token
+  until 30 s before it expires. Once that token's sign-in ended, the API
+  refused it while the web app kept saying "signed in", for up to ten
+  minutes. Now a 401 `invalid_token` from the API makes the BFF force one
+  refresh. If the refresh is refused, the session ends and the app gets
+  `session_required`, so it signs in again. If the refresh works, a read is
+  sent again once; a write gets the refusal back and is never sent twice.
 
 ## Impact
 
 - Spec: identity-authorization-server (Access and ID tokens; One sign-in's
-  access tokens stop at once).
+  access tokens stop at once); web-bff (API access through the BFF).
 - Code:
   - kernel `auth` (`Principal::sign_in`, `SignIn`, `TokenStanding`, the
     port's signature, the `sid`/`fam` claims);
   - identity `token_revocation`, `domain::tokens` (`fam`, `rotate` returns
     the family) and `protocol::token`.
+  - the server's BFF (`forward`, `Inner::refresh`).
 - Every `Principal` literal gains `sign_in: None`.
 - No migration.
