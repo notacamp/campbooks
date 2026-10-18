@@ -119,17 +119,7 @@ pub async fn export_set(
     let workspace = access.workspace;
     let since = Utc::now() - TimeDelta::days(i64::from(days));
     let mut tx = state.db.begin_for(workspace).await?;
-    // What the member can read, as the API decides it; one of those at most.
-    let mut inboxes = visible_inboxes(&mut tx, access).await?;
-    if inboxes.is_empty() {
-        return Err(Error::NotFound);
-    }
-    if let Some(inbox) = inbox {
-        if !inboxes.contains(&inbox) {
-            return Err(Error::NotFound);
-        }
-        inboxes = vec![inbox];
-    }
+    let inboxes = scope(&mut tx, access, inbox).await?;
     let rows: Vec<Row> = sqlx::query_as(
         r"
         SELECT * FROM (
@@ -179,6 +169,42 @@ pub async fn export_set(
         items.push(labelling_item(state, &ws, n, row).await?);
     }
     Ok(items)
+}
+
+/// The inboxes an export for `access`'s member reads: those they can read,
+/// as the API decides it, or only `inbox`. 404 when `inbox` is not one of
+/// them, or when they read no inbox at all. For the operator to see what an
+/// export covers before it runs (campbooks-cloud#219).
+pub async fn export_inboxes(
+    state: &AppState,
+    access: &Access,
+    inbox: Option<InboxId>,
+) -> Result<Vec<InboxId>> {
+    let mut tx = state.db.begin_for(access.workspace).await?;
+    let inboxes = scope(&mut tx, access, inbox).await?;
+    tx.commit().await?;
+    Ok(inboxes)
+}
+
+/// [`export_inboxes`], in `conn`.
+async fn scope(
+    conn: &mut sqlx::PgConnection,
+    access: &Access,
+    inbox: Option<InboxId>,
+) -> Result<Vec<InboxId>> {
+    // What the member can read, as the API decides it; one of those at most.
+    let mut inboxes = visible_inboxes(conn, access).await?;
+    if inboxes.is_empty() {
+        return Err(Error::NotFound);
+    }
+    if let Some(inbox) = inbox {
+        if !inboxes.contains(&inbox) {
+            return Err(Error::NotFound);
+        }
+        inboxes = vec![inbox];
+    }
+    inboxes.sort_unstable();
+    Ok(inboxes)
 }
 
 /// One stored message, as an item to label (`owner-<n + 1>`).

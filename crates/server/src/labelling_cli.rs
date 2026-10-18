@@ -33,13 +33,14 @@ use std::{
 };
 
 use campbooks_ai::decide::signals::actions::ActionId;
-use campbooks_conversations::labelling::{
-    LabellingItem, LabellingSet, MAX_ITEMS, export_set, manifest_for,
+use campbooks_conversations::{
+    labelling::{LabellingItem, LabellingSet, MAX_ITEMS, export_inboxes, export_set, manifest_for},
+    model::InboxId,
 };
 use campbooks_kernel::{
     AppState, Config, Error,
     db::BeginFor as _,
-    tenancy::{Access, WorkspaceId},
+    tenancy::{Access, Role, UserId, WorkspaceId},
 };
 use clap::Subcommand;
 
@@ -193,8 +194,8 @@ fn export(args: &Export) -> ExitCode {
         db.close().await;
         items
     });
-    let items = match exported {
-        Ok(items) => items,
+    let Scoped { scope, items } = match exported {
+        Ok(scoped) => scoped,
         Err(e) => return super::fail(&e),
     };
     if items.len() >= usize::try_from(MAX_ITEMS).unwrap_or(usize::MAX) {
@@ -203,7 +204,7 @@ fn export(args: &Export) -> ExitCode {
             "only the newest {MAX_ITEMS} messages: use fewer --days for an older window"
         );
     }
-    if let Err(e) = write(out, &items, set, workspace) {
+    if let Err(e) = write(out, &items, set, &scope) {
         return super::fail(&format!(
             "could not write {}: {e} (remove what was written with \
              campbooks-server labelling purge --out {})",
@@ -237,15 +238,46 @@ fn export(args: &Export) -> ExitCode {
     ExitCode::SUCCESS
 }
 
+/// Whom an export is for, and what it reads: said before it runs and kept
+/// in the folder's marker.
+struct Scope {
+    workspace: WorkspaceId,
+    member: UserId,
+    role: Role,
+    inboxes: Vec<InboxId>,
+}
+
+impl Scope {
+    /// The scope as the marker records it, one `key value` per line.
+    fn lines(&self, set: Set) -> String {
+        let inboxes: Vec<String> = self.inboxes.iter().map(ToString::to_string).collect();
+        format!(
+            "workspace {}\nmember {}\nrole {}\ninboxes {}\nset {}\n",
+            self.workspace,
+            self.member,
+            self.role,
+            inboxes.join(","),
+            set.name()
+        )
+    }
+}
+
+/// An export and whom it was for.
+struct Scoped {
+    scope: Scope,
+    items: Vec<LabellingItem>,
+}
+
 /// The export of `set`, bounded by the member `who` names (and `inbox`).
+/// Says first whom it is for and which inboxes it reads.
 async fn bounded_export(
     state: &AppState,
     workspace: WorkspaceId,
     who: &str,
-    inbox: Option<campbooks_conversations::model::InboxId>,
+    inbox: Option<InboxId>,
     days: u32,
     set: Set,
-) -> Result<Vec<LabellingItem>, String> {
+) -> Result<Scoped, String> {
     let mut tx = state
         .db
         .begin_for(workspace)
@@ -277,17 +309,34 @@ async fn bounded_export(
         user: Some(user),
         role: Some(role),
     };
-    export_set(state, &access, inbox, days, set.labelling())
+    let refused = |e: Error| match (e, inbox) {
+        (Error::NotFound, Some(inbox)) => format!(
+            "{who} cannot read inbox {inbox}: name one of their inboxes, or leave --inbox out"
+        ),
+        (Error::NotFound, None) => {
+            format!("{who} reads no inbox in workspace {workspace}: nothing to export")
+        }
+        (e, _) => e.to_string(),
+    };
+    let inboxes = export_inboxes(state, &access, inbox)
         .await
-        .map_err(|e| match (e, inbox) {
-            (Error::NotFound, Some(inbox)) => format!(
-                "{who} cannot read inbox {inbox}: name one of their inboxes, or leave --inbox out"
-            ),
-            (Error::NotFound, None) => {
-                format!("{who} reads no inbox in workspace {workspace}: nothing to export")
-            }
-            (e, _) => e.to_string(),
-        })
+        .map_err(&refused)?;
+    let scope = Scope {
+        workspace,
+        member: user,
+        role,
+        inboxes,
+    };
+    let listed: Vec<String> = scope.inboxes.iter().map(ToString::to_string).collect();
+    let _ = writeln!(
+        std::io::stdout(),
+        "exporting for member {user} ({role}) from inbox(es) {}",
+        listed.join(", ")
+    );
+    let items = export_set(state, &access, inbox, days, set.labelling())
+        .await
+        .map_err(&refused)?;
+    Ok(Scoped { scope, items })
 }
 
 /// What an export folder may hold: what `export` writes, and the reports
@@ -357,22 +406,14 @@ fn strangers(folder: &Path) -> std::io::Result<Vec<String>> {
     Ok(out)
 }
 
-fn write(
-    out: &Path,
-    items: &[LabellingItem],
-    set: Set,
-    workspace: WorkspaceId,
-) -> std::io::Result<()> {
+fn write(out: &Path, items: &[LabellingItem], set: Set, scope: &Scope) -> std::io::Result<()> {
     // Real mail: readable by the operator only, and never into a folder
     // that exists (no labels overwritten, no race with the check above).
     private_dir(out)?;
     // First, so `purge` can always remove what was started.
     private_file(
         &out.join(MARKER),
-        &format!(
-            "{MARKER_HEADER}\nworkspace {workspace}\nset {}\n",
-            set.name()
-        ),
+        &format!("{MARKER_HEADER}\n{}", scope.lines(set)),
     )?;
     private_dir(&out.join("items"))?;
     let manifest = serde_json::to_string_pretty(&manifest_for(set.labelling()))
@@ -440,7 +481,7 @@ fn csv_cell(text: &str) -> String {
 mod tests {
     use clap::Parser;
 
-    use super::{LabellingCommand, MARKER, Set, csv_cell, purge};
+    use super::{LabellingCommand, MARKER, Scope, Set, csv_cell, purge};
 
     /// The `labelling` subcommands, as the server parses them.
     #[derive(Parser)]
@@ -458,6 +499,27 @@ mod tests {
         ));
         std::fs::create_dir(&dir).expect("scratch folder");
         dir
+    }
+
+    #[test]
+    fn the_marker_records_whom_an_export_is_for() {
+        let scope = Scope {
+            workspace: "0192f1a0-0000-7000-8000-000000000001".parse().unwrap(),
+            member: "0192f1a0-0000-7000-8000-0000000000a1".parse().unwrap(),
+            role: campbooks_kernel::tenancy::Role::Member,
+            inboxes: vec![
+                "0192f1a0-0000-7000-8000-0000000000b1".parse().unwrap(),
+                "0192f1a0-0000-7000-8000-0000000000b2".parse().unwrap(),
+            ],
+        };
+        assert_eq!(
+            scope.lines(Set::Actions),
+            "workspace 0192f1a0-0000-7000-8000-000000000001\n\
+             member 0192f1a0-0000-7000-8000-0000000000a1\n\
+             role member\n\
+             inboxes 0192f1a0-0000-7000-8000-0000000000b1,0192f1a0-0000-7000-8000-0000000000b2\n\
+             set actions\n"
+        );
     }
 
     #[test]
