@@ -126,6 +126,9 @@ impl Fields {
 #[derive(Clone, Default)]
 pub struct Binding {
     key: Option<Arc<hmac::Key>>,
+    /// The previous instance secret's key, during a rotation: it verifies
+    /// what was bound before, and signs nothing (campbooks-cloud#191).
+    previous: Option<Arc<hmac::Key>>,
 }
 
 impl std::fmt::Debug for Binding {
@@ -141,12 +144,17 @@ impl std::fmt::Debug for Binding {
 impl Binding {
     /// The binding keyed by `secret` (the instance secret): every process
     /// of the install agrees.
+    /// A previous key set on `secret` verifies what it bound too.
     pub fn new(secret: &SecretKey) -> Self {
-        Self {
-            key: Some(Arc::new(hmac::Key::new(
+        let key = |secret: &SecretKey| {
+            Arc::new(hmac::Key::new(
                 hmac::HMAC_SHA256,
                 &derive_bytes(secret, KEY_PURPOSE),
-            ))),
+            ))
+        };
+        Self {
+            key: Some(key(secret)),
+            previous: secret.previous_key().map(|previous| key(&previous)),
         }
     }
 
@@ -180,7 +188,12 @@ impl Binding {
         let Some((&version, mac)) = tag.split_first() else {
             return false;
         };
-        version == TAG_VERSION && hmac::verify(key, &fields.bytes, mac).is_ok()
+        version == TAG_VERSION
+            && (hmac::verify(key, &fields.bytes, mac).is_ok()
+                || self
+                    .previous
+                    .as_ref()
+                    .is_some_and(|previous| hmac::verify(previous, &fields.bytes, mac).is_ok()))
     }
 }
 
@@ -269,6 +282,31 @@ mod tests {
 
     /// Length prefixes, presence bytes and counts: moving bytes between
     /// fields, or an empty value for a missing one, changes the encoding.
+    /// During a rotation a tag of the previous key still verifies, new tags
+    /// are the new key's, and without the previous key an old tag fails
+    /// closed (campbooks-cloud#191).
+    #[test]
+    fn a_previous_key_verifies_what_it_bound() {
+        let fields = sample();
+        let old = binding(7).tag(&fields).unwrap();
+        let rotated = Binding::new(
+            &SecretKey::from_bytes([8; SECRET_KEY_LEN])
+                .with_previous(&SecretKey::from_bytes([7; SECRET_KEY_LEN])),
+        );
+        assert!(rotated.verify(&fields, Some(&old)));
+        let fresh = rotated.tag(&fields).unwrap();
+        assert_eq!(
+            fresh,
+            binding(8).tag(&fields).unwrap(),
+            "signed with the new key"
+        );
+        assert!(!binding(7).verify(&fields, Some(&fresh)));
+        assert!(!binding(8).verify(&fields, Some(&old)));
+        let mut other = Fields::new("campbooks/test/v1");
+        other.str("hello");
+        assert!(!rotated.verify(&other, Some(&old)));
+    }
+
     #[test]
     fn the_encoding_is_unambiguous() {
         let encode = |build: fn(&mut Fields)| {

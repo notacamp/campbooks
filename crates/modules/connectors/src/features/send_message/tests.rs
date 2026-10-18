@@ -818,3 +818,87 @@ async fn a_send_during_a_slow_token_refresh_waits_for_it_and_uses_one_attempt(db
     .unwrap();
     assert_eq!(ran, [("succeeded".to_owned(), 1)]);
 }
+
+/// After the instance secret key is rotated, with the old key as the
+/// previous one, a connection's credentials still open and are sealed again
+/// with the new key as they are used: the access token at once, the refresh
+/// token at the next refresh. The new key alone then opens both; a wrong
+/// key opens neither (campbooks-cloud#191).
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_rotated_secret_key_opens_and_seals_the_credentials_again(db: PgPool) {
+    use std::sync::Arc;
+
+    use campbooks_kernel::crypto::{Cipher, SecretKey};
+
+    use crate::deps::CREDENTIALS_PURPOSE;
+
+    async fn stored(db: &PgPool, id: crate::domain::model::ConnectionId) -> (Vec<u8>, Vec<u8>) {
+        sqlx::query_as(
+            "SELECT access_token, refresh_token FROM connectors.credentials
+              WHERE connection_id = $1",
+        )
+        .bind(*id.as_uuid())
+        .fetch_one(db)
+        .await
+        .unwrap()
+    }
+
+    let kit = Kit::new(db).await;
+    let (ws, _, _) = connected(&kit).await;
+    let connection: crate::domain::model::ConnectionId =
+        serde_json::from_value(kit.stream().await["connection_id"].clone()).unwrap();
+    let old = SecretKey::from_bytes([3; 32]);
+    let new = SecretKey::from_bytes([4; 32]);
+    let cipher = |key: &SecretKey| Arc::new(Cipher::new(key, CREDENTIALS_PURPOSE));
+    let access_context = format!("connectors.credentials:access_token:{connection}");
+    let refresh_context = format!("connectors.credentials:refresh_token:{connection}");
+    let (access_before, refresh_before) = stored(&kit.db, connection).await;
+
+    // A wrong key opens nothing: the member must connect again.
+    let mut wrong = kit.deps.clone();
+    wrong.cipher = Some(cipher(&SecretKey::from_bytes([5; 32]).with_previous(&new)));
+    assert!(
+        crate::domain::credentials::access_token(&kit.state.db, &wrong, ws, connection)
+            .await
+            .is_err()
+    );
+
+    // Rotated: the stored access token opens and is sealed again.
+    let mut rotated = kit.deps.clone();
+    rotated.cipher = Some(cipher(&new.clone().with_previous(&old)));
+    let token = crate::domain::credentials::access_token(&kit.state.db, &rotated, ws, connection)
+        .await
+        .unwrap();
+    let (access_after, refresh_after) = stored(&kit.db, connection).await;
+    assert_ne!(access_after, access_before);
+    assert_eq!(refresh_after, refresh_before, "not used yet");
+    let new_only = cipher(&new);
+    assert_eq!(
+        new_only
+            .open(&access_after, access_context.as_bytes())
+            .as_deref(),
+        Ok(token.as_str())
+    );
+    assert!(
+        new_only
+            .open(&refresh_after, refresh_context.as_bytes())
+            .is_err()
+    );
+
+    // The next refresh seals the refresh token again too.
+    kit.clock.advance(TimeDelta::hours(2));
+    crate::domain::credentials::access_token(&kit.state.db, &rotated, ws, connection)
+        .await
+        .unwrap();
+    let (_, refresh_last) = stored(&kit.db, connection).await;
+    assert!(
+        new_only
+            .open(&refresh_last, refresh_context.as_bytes())
+            .is_ok()
+    );
+    assert!(
+        cipher(&old)
+            .open(&refresh_last, refresh_context.as_bytes())
+            .is_err()
+    );
+}

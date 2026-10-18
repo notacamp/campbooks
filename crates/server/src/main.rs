@@ -295,6 +295,13 @@ fn rate_limits() -> Result<campbooks_kernel::rate_limit::RateLimits, String> {
 /// them; without one, each process signs alone, which is said at startup.
 fn signer() -> Result<campbooks_kernel::crypto::Signer, String> {
     if let Some(secret) = campbooks_kernel::crypto::SecretKey::from_env()? {
+        if secret.has_previous() {
+            tracing::warn!(
+                "CAMPBOOKS_SECRET_KEY_PREVIOUS is set: what the previous instance secret key \
+                 sealed still opens and is sealed again with the current one as it is used; \
+                 remove it once the rotation is over (30 days, deploy/README.md)"
+            );
+        }
         return Ok(campbooks_kernel::crypto::Signer::new(&secret));
     }
     tracing::warn!(

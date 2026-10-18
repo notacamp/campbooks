@@ -533,21 +533,32 @@ impl Inner {
         };
         let Ok(refresh_token) = self
             .cipher
-            .open(sealed_refresh, &sealed_for(session.id, "refresh_token"))
+            .open_checked(sealed_refresh, &sealed_for(session.id, "refresh_token"))
         else {
             drop(tx);
             return self.unreadable(&session.presented).await;
         };
-        match self.oidc.refresh(&refresh_token).await {
+        match self.oidc.refresh(&refresh_token.value).await {
             Ok(fresh) => {
                 let expires_at = now + expires_in(fresh.expires_in);
                 let access = self
                     .cipher
                     .seal(&fresh.access_token, &sealed_for(session.id, "access_token"));
-                let refresh = fresh.refresh_token.as_deref().map(|token| {
-                    self.cipher
-                        .seal(token, &sealed_for(session.id, "refresh_token"))
-                });
+                // The refresh token the identity provider sent back, or the
+                // one used, sealed again when the previous instance secret
+                // sealed it (campbooks-cloud#191).
+                let refresh = fresh
+                    .refresh_token
+                    .as_deref()
+                    .or_else(|| {
+                        refresh_token
+                            .by_previous
+                            .then_some(refresh_token.value.as_str())
+                    })
+                    .map(|token| {
+                        self.cipher
+                            .seal(token, &sealed_for(session.id, "refresh_token"))
+                    });
                 store::update_tokens(
                     &mut tx,
                     &session.presented,
