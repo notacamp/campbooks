@@ -27,4 +27,4 @@
 - [x] 4.1 OpenAPI and client types updated
 - [x] 4.2 CHANGELOG updated
 - [x] 4.3 Gates green in CI
-- [ ] 4.4 UI verified at 375px and desktop (recording on the demo stack)
+- [x] 4.4 UI verified at 375px and desktop (recording on the demo stack)
