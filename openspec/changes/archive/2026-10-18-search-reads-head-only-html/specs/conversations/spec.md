@@ -20,7 +20,8 @@ and a content stamp made of the hashes of the blobs it is read from, plus,
 for a message with an HTML part, the version of how HTML becomes text. The
 same reading SHALL give every other reader of a message its words: its
 snippet and Scout's read at ingest, the decide pass, the labelling export,
-reply context and need summaries. A conversation that no longer exists SHALL be reported as gone.
+reply context, need summaries, and the text `conversations.get` returns for
+each message, which replies and forwards quote. A conversation that no longer exists SHALL be reported as gone.
 Drafts SHALL NOT be returned.
 
 #### Scenario: HTML-only message
@@ -46,3 +47,7 @@ Drafts SHALL NOT be returned.
 #### Scenario: A text part of blanks only
 - **WHEN** a message stored earlier holds a text part of three line breaks beside its HTML
 - **THEN** search, its snippet and Scout read the words of its HTML, and its stamp names how HTML is read, so the backfill reads it again
+
+#### Scenario: Forwarding HTML-only mail
+- **WHEN** a member forwards or replies to a message that is HTML alone, or one whose text part is blanks
+- **THEN** the message's text in `conversations.get` holds the words of its HTML, so the quote carries them

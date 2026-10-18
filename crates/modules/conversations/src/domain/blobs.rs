@@ -106,6 +106,56 @@ pub fn snippet(text: &str, chars: usize) -> String {
 mod tests {
     use super::*;
 
+    /// The words every reader gets (decide, reply context, summaries,
+    /// search, the conversation's text): campbooks-cloud#218.
+    #[sqlx::test(migrations = "../../../migrations")]
+    async fn words_fall_back_to_the_html_when_the_text_has_none(db: sqlx::PgPool) {
+        let kit = crate::testkit::Kit::new(db).await;
+        let blobs = &kit.state.blobs;
+        let workspace = campbooks_kernel::tenancy::WorkspaceId::new().to_string();
+        let ws = workspace.as_str();
+        let put = |body: &'static str, kind: &'static str| async move {
+            blobs.put(ws, body.as_bytes().to_vec(), kind).await.unwrap()
+        };
+        let html = put(
+            "<head><meta charset=utf-8><title>T</title><p>Hi</p><blockquote>Old</blockquote>",
+            "text/html; charset=utf-8",
+        )
+        .await;
+        let blank = put("\n\n\n", "text/plain; charset=utf-8").await;
+        let text = put("Plain words", "text/plain; charset=utf-8").await;
+        let budget = Budget {
+            text: 1024,
+            html: 1024,
+        };
+        let read = |parts, quotes| words(blobs, ws, parts, budget, quotes);
+        // HTML alone, or beside blanks: its words, quotes kept or dropped.
+        for parts in [(None, Some(&html)), (Some(&blank), Some(&html))] {
+            let (kept, _) = read(parts, Quotes::Keep).await.unwrap();
+            assert!(kept.contains("Hi") && kept.contains("Old") && !kept.contains('T'));
+            let (dropped, _) = read(parts, Quotes::Drop).await.unwrap();
+            assert!(
+                dropped.contains("Hi") && !dropped.contains("Old"),
+                "{dropped:?}"
+            );
+        }
+        // A text part with words wins; blanks with nothing else stay blanks.
+        assert_eq!(
+            read((Some(&text), Some(&html)), Quotes::Keep)
+                .await
+                .unwrap()
+                .0,
+            "Plain words"
+        );
+        assert_eq!(
+            read((Some(&blank), None), Quotes::Keep).await.unwrap().0,
+            "\n\n\n"
+        );
+        assert_eq!(read((None, None), Quotes::Keep).await.unwrap().0, "");
+        // A cut at a character boundary.
+        assert_eq!(cut("éé".to_owned(), 3), "é");
+    }
+
     #[test]
     fn snippets_collapse_whitespace() {
         assert_eq!(snippet("  Olá\n\n  Rui,\tveja ", 100), "Olá Rui, veja");

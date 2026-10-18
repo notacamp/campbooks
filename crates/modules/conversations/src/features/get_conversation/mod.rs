@@ -27,8 +27,9 @@ use crate::{
         access::visible_inboxes,
         actions,
         attachments::in_body,
-        blobs::read_text,
+        blobs::{Budget, cut, words},
         conversation::{ConversationSummary, summary},
+        plain_text::Quotes,
         policy::Policy,
         suggestions::{self, DecisionView},
     },
@@ -42,6 +43,9 @@ use campbooks_kernel::authz::Action;
 pub const MAX_MESSAGES: i64 = 100;
 /// Longest text body returned per message, in bytes.
 pub const MAX_TEXT_BYTES: usize = 256 * 1024;
+/// Bytes of an HTML part read when the text part has no words; the words
+/// read from it are cut to [`MAX_TEXT_BYTES`].
+const MAX_HTML_BYTES: usize = 1024 * 1024;
 
 /// An attachment of a message.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
@@ -260,13 +264,28 @@ pub async fn handler(
             .map_err(|e| Error::internal(crate::domain::redact::json(&e)))?;
         let bodies: Bodies = serde_json::from_value(row.bodies)
             .map_err(|e| Error::internal(crate::domain::redact::json(&e)))?;
-        let text = match &bodies.text {
-            Some(blob) => {
-                let (content, truncated) =
-                    read_text(&state.blobs, &ws, blob, MAX_TEXT_BYTES).await?;
-                Some(MessageText { content, truncated })
-            }
-            None => None,
+        // Its text part, else its HTML read as text: also when the text
+        // part is blanks only (campbooks-cloud#218). Quotes and forwards are
+        // built from it.
+        let text = if bodies.text.is_some() || bodies.html.is_some() {
+            let (content, cut_short) = words(
+                &state.blobs,
+                &ws,
+                (bodies.text.as_ref(), bodies.html.as_ref()),
+                Budget {
+                    text: MAX_TEXT_BYTES,
+                    html: MAX_HTML_BYTES,
+                },
+                Quotes::Keep,
+            )
+            .await?;
+            let truncated = cut_short || content.len() > MAX_TEXT_BYTES;
+            Some(MessageText {
+                content: cut(content, MAX_TEXT_BYTES),
+                truncated,
+            })
+        } else {
+            None
         };
         messages.push(MessageView {
             id: row.id,
@@ -366,6 +385,57 @@ mod tests {
         assert_eq!(response.json["conversation"]["unread_count"], 1);
         // No HTML in this response.
         assert!(!response.json.to_string().contains("<p>"));
+    }
+
+    #[sqlx::test(migrations = "../../../migrations")]
+    async fn html_alone_or_a_blank_text_part_gives_the_words_of_the_html(db: PgPool) {
+        // campbooks-cloud#218: quotes and forwards are built from this text.
+        let kit = Kit::new(db).await;
+        let (workspace, inbox, sam) = kit.sams_inbox().await;
+        let html = "<head><meta charset=utf-8><title>Quay Office</title>\
+                    <style>p{color:red}</style><p>Your berth at the harbourlight pontoon \
+                    is kept.</p><script>alert(1)</script>";
+        for (id, text) in [("html-only-1", None), ("blank-text-1", Some("\n\n\n"))] {
+            let mut message = serde_json::json!({
+                "provider_message_id": id,
+                "from": {"name": "Quay Office", "address": "office@quay-moorings.example"},
+                "to": [{"address": "sam@example.com"}],
+                "subject": "Your berth for next season",
+                "sent_at": "2026-10-13T06:30:00Z",
+                "direction": "inbound",
+                "html": html,
+                "mailbox": {"in_inbox": true},
+                "read": false, "starred": false
+            });
+            if let Some(text) = text {
+                message["text"] = text.into();
+            }
+            kit.ingest_value(
+                workspace,
+                inbox,
+                &serde_json::json!({"changes": [{"op": "upsert", "message": message}]}),
+            )
+            .await;
+            let conversation = kit.conversation_of(id).await;
+            let response = kit
+                .get(
+                    &sam,
+                    &format!("/api/v1/w/{workspace}/conversations/{conversation}"),
+                )
+                .await;
+            assert_eq!(response.status, StatusCode::OK, "{:?}", response.json);
+            let content = response.json["messages"][0]["text"]["content"]
+                .as_str()
+                .unwrap_or_default()
+                .to_owned();
+            assert!(
+                content.contains("harbourlight pontoon"),
+                "{id}: {content:?}"
+            );
+            for never in ["Quay Office", "color", "alert", "<"] {
+                assert!(!content.contains(never), "{id}: {never} in {content:?}");
+            }
+        }
     }
 
     #[sqlx::test(migrations = "../../../migrations")]

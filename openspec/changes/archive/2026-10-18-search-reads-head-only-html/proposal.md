@@ -14,7 +14,8 @@ view, so it was affected too.
   that hid the HTML from every reader (found while recording).
 - Every reader of a message's words (search, the snippet and Scout's read
   at ingest, the decide pass, the labelling export, reply context, need
-  summaries) reads them one way (`blobs::words`): the text part when it has
+  summaries, and the text `conversations.get` returns, which replies and
+  forwards quote) reads them one way (`blobs::words`): the text part when it has
   words, else the HTML through `plain_text::text_of`. A text part of blanks
   only counts as none, which also fixes the rows already stored.
 
@@ -35,4 +36,6 @@ view, so it was affected too.
 - Specs: conversations (Conversations as a search source), search
   (Backfill), connectors (Gmail messages adapter).
 - Code: `domain/plain_text.rs`, `features/search_source`, `search::domain::index`.
-- No migration; nothing changes on screen.
+- No migration. On screen: such mail is found by search, has a preview, and
+  its words are quoted when it is forwarded or replied to (before, only the
+  forward's header block came along).
