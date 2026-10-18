@@ -366,9 +366,7 @@ async fn run(
     }
     let db = connect(&config).await?;
     if !config.run_migrations {
-        let mut conn = db.acquire().await?;
-        check_server_version(&mut *conn).await?;
-        drop(conn);
+        check_server_version(&db).await?;
     }
     check_row_security(&db, &config).await?;
     telemetry.observe_pool(&db, config.database_max_connections);
@@ -566,7 +564,7 @@ async fn limit_migration_waits(conn: &mut PgConnection) -> Result<(), String> {
 
 /// Refuse a PostgreSQL older than Campbooks needs, before anything runs on
 /// it (campbooks-cloud#213, item 15).
-async fn check_server_version(conn: &mut PgConnection) -> Result<(), String> {
+async fn check_server_version<'c>(conn: impl sqlx::PgExecutor<'c>) -> Result<(), String> {
     let version = db::server_version_num(conn)
         .await
         .map_err(|e| format!("could not read the PostgreSQL version: {e}"))?;

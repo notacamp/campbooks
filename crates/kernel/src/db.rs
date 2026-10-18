@@ -469,6 +469,9 @@ pub fn with_runtime_role(options: PgPoolOptions, role: Option<&str>) -> PgPoolOp
 }
 
 /// What the database says about the role a pool's connections run as.
+// Each flag is one independent finding of the database, judged together by
+// `verdict`: not a state machine.
+#[allow(clippy::struct_excessive_bools)]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RoleReport {
     /// `current_user`: the role queries run as (after any `SET ROLE`).
@@ -643,7 +646,7 @@ pub async fn login_can_bypass(conn: &mut PgConnection) -> Result<bool, sqlx::Err
 pub const MIN_SERVER_VERSION_NUM: i32 = 150_000;
 
 /// The connected server's `server_version_num` (e.g. `170002`).
-pub async fn server_version_num(conn: &mut PgConnection) -> Result<i32, sqlx::Error> {
+pub async fn server_version_num<'c>(conn: impl sqlx::PgExecutor<'c>) -> Result<i32, sqlx::Error> {
     sqlx::query_scalar("SELECT current_setting('server_version_num')::int")
         .fetch_one(conn)
         .await
@@ -681,8 +684,7 @@ mod tests {
 
     #[sqlx::test(migrations = "../../migrations")]
     async fn the_test_server_is_new_enough(db: PgPool) {
-        let mut conn = db.acquire().await.unwrap();
-        let version = server_version_num(&mut conn).await.unwrap();
+        let version = server_version_num(&db).await.unwrap();
         assert!(check_server_version(version).is_ok(), "{version}");
     }
 
