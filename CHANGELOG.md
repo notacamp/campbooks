@@ -65,6 +65,14 @@ All notable changes to Campbooks Next are documented here. The format follows
 
 ### Fixed
 
+- **Home's Forward never offers a sender under review or a no-reply address.** The picker
+  lists only people it is safe to write to: the server leaves out no-reply addresses,
+  senders whose newest mail fails their sender checks or pretends to be them, and
+  senders with mail under review, from facts alone, never what the mail says. A name typed
+  for one of them finds nobody. Closing Forward while it starts, then forwarding again,
+  addresses the same draft rather than making a second one; a forward that fails while it
+  starts no longer opens the composer after saying so; and Open attachment with no file
+  says "This email has no file to open".
 - **The labelling export says whom it is for.** Before reading any mail, `campbooks-server
   labelling export` prints the member it resolved (id and role) and the inboxes it will
   read, and records them in the folder's `.campbooks-labelling` marker.

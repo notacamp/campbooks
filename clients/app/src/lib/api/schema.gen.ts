@@ -10346,6 +10346,12 @@ export interface operations {
                 q?: string;
                 /** @description How many, 1 to 10 (default 10). */
                 limit?: number;
+                /**
+                 * @description Only senders it is safe to write to (Forward's picker): never a
+                 *     no-reply address, nor a sender whose newest mail fails their checks
+                 *     or pretends to be them, nor one with mail under review. Default false.
+                 */
+                reachable?: boolean;
             };
             header?: never;
             path: {

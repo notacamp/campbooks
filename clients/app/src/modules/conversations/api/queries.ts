@@ -49,8 +49,8 @@ const keys = {
       workspace_id: workspaceId,
       conversation_id: conversationId,
     }),
-  senders: (workspaceId: string, q: string) =>
-    operationKey("conversations.list_senders", { workspace_id: workspaceId, q }),
+  senders: (workspaceId: string, q: string, reachable: boolean) =>
+    operationKey("conversations.list_senders", { workspace_id: workspaceId, q, reachable }),
   body: (workspaceId: string, conversationId: string, messageId: string, showImages: boolean) =>
     operationKey("conversations.get_message_body", {
       workspace_id: workspaceId,
@@ -453,19 +453,29 @@ export function useConversationAction(workspaceId: string) {
 
 /**
  * `conversations.list_senders`: the people the caller replies to most, or
- * those matching `q` by name or address (from two characters).
+ * those matching `q` by name or address (from two characters). With
+ * `reachable`, only those it is safe to write to (Forward's picker): the
+ * server leaves out no-reply addresses, senders whose mail fails their
+ * checks or pretends to be them, and senders under review.
  */
-export function useSenders(workspaceId: string, q = "", { enabled = true } = {}) {
+export function useSenders(
+  workspaceId: string,
+  q = "",
+  { enabled = true, reachable = false }: { enabled?: boolean; reachable?: boolean } = {},
+) {
   const query = q.trim();
   return useQuery({
-    queryKey: keys.senders(workspaceId, query),
+    queryKey: keys.senders(workspaceId, query, reachable),
     enabled: enabled && (query.length === 0 || query.length >= 2),
     queryFn: async ({ signal }) =>
       unwrap(
         await api.GET("/api/v1/w/{workspace_id}/senders", {
           params: {
             path: { workspace_id: workspaceId },
-            query: query.length === 0 ? {} : { q: query },
+            query: {
+              ...(query.length === 0 ? {} : { q: query }),
+              ...(reachable ? { reachable: true } : {}),
+            },
           },
           signal,
         }),
