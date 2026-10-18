@@ -208,6 +208,11 @@ All notable changes to Campbooks Next are documented here. The format follows
   For operators, `campbooks-server labelling export` writes your recent money mail as a
   sheet to label on your own machine, and `cargo xtask eval decide --set-dir` measures the
   model on it (campbooks-cloud#167).
+- **A send or sync no longer fails while another run refreshes the mailbox's sign-in.** When
+  two runs needed a fresh token at once, the second waited on the first's call to the
+  provider and, under the new 10-second lock limit, failed and used up one of its retries.
+  It now takes the token the first run stores. Replaying events and pruning expired
+  sign-in state also run in small batches, so neither meets the 30-second statement limit.
 
 ### Added
 
