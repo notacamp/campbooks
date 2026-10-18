@@ -35,7 +35,7 @@
 //! # }
 //! ```
 
-use std::future::Future;
+use std::{future::Future, time::Duration};
 
 use sqlx::{
     Connection as _, PgConnection, PgPool, Postgres, Transaction,
@@ -54,6 +54,46 @@ pub const WORKSPACE_SETTING: &str = "campbooks.workspace_id";
 /// `CAMPBOOKS_DATABASE_ROLE` says otherwise: `NOLOGIN`, not a superuser, no
 /// `BYPASSRLS`.
 pub const DEFAULT_RUNTIME_ROLE: &str = "campbooks_app";
+
+/// Longest one statement on a runtime connection may run
+/// (`statement_timeout`) before Postgres cancels it: a request never waits
+/// on the database for ever (campbooks-cloud#251).
+pub const STATEMENT_TIMEOUT: Duration = Duration::from_secs(30);
+
+/// Longest a runtime statement may wait for a lock (`lock_timeout`), for
+/// example behind the sequencer's `FOR UPDATE` on `kernel.change_heads`.
+pub const LOCK_TIMEOUT: Duration = Duration::from_secs(10);
+
+/// Longest one statement may run in a job's own transaction: jobs work in
+/// larger batches than requests, but never without a bound.
+pub const JOB_STATEMENT_TIMEOUT: Duration = Duration::from_mins(5);
+
+/// `options` whose connections start with [`STATEMENT_TIMEOUT`] and
+/// [`LOCK_TIMEOUT`] (the startup `options` parameter, so they hold before
+/// the first query and whatever role the connection switches to). The
+/// runtime pool's connections; migrations connect without them.
+pub fn with_session_limits(options: PgConnectOptions) -> PgConnectOptions {
+    options.options([
+        (
+            "statement_timeout",
+            format!("{}ms", STATEMENT_TIMEOUT.as_millis()),
+        ),
+        ("lock_timeout", format!("{}ms", LOCK_TIMEOUT.as_millis())),
+    ])
+}
+
+/// Let the statements of the current transaction run for up to `limit`
+/// (`statement_timeout`, until the transaction ends).
+pub(crate) async fn allow_statements_for(
+    conn: &mut PgConnection,
+    limit: Duration,
+) -> Result<(), sqlx::Error> {
+    sqlx::query("SELECT set_config('statement_timeout', $1, true)")
+        .bind(format!("{}ms", limit.as_millis()))
+        .execute(conn)
+        .await?;
+    Ok(())
+}
 
 /// Set [`WORKSPACE_SETTING`] to `workspace` until the current transaction
 /// ends. Outside a transaction it would last for one statement only.
@@ -541,7 +581,8 @@ pub fn connect_options(
     Ok(options.password(password.trim_end_matches(['\r', '\n'])))
 }
 
-/// Open the runtime pool. The `role` switch (`SET ROLE`) is applied only when
+/// Open the runtime pool, its connections bounded by [`with_session_limits`].
+/// The `role` switch (`SET ROLE`) is applied only when
 /// the login can bypass row-level security: an unprivileged login already
 /// inherits the runtime role's grants, and needs no way back to anything.
 ///
@@ -553,6 +594,7 @@ pub async fn connect_runtime(
     acquire_timeout: std::time::Duration,
     role: Option<&str>,
 ) -> Result<PgPool, sqlx::Error> {
+    let options = with_session_limits(options);
     let mut probe = PgConnection::connect_with(&options).await?;
     let privileged = login_can_bypass(&mut probe).await?;
     let _ = probe.close().await;
@@ -591,6 +633,85 @@ mod tests {
             owns_policy_tables: false,
             login_can_bypass: false,
         }
+    }
+
+    /// `name`'s value on a connection of `pool`.
+    async fn setting(pool: &PgPool, name: &str) -> String {
+        sqlx::query_scalar::<_, String>("SELECT current_setting($1)")
+            .bind(name)
+            .fetch_one(pool)
+            .await
+            .unwrap()
+    }
+
+    #[sqlx::test(migrations = "../../migrations")]
+    async fn runtime_connections_never_wait_for_ever(db: PgPool) {
+        let runtime = connect_runtime(
+            (*db.connect_options()).clone(),
+            2,
+            Duration::from_secs(5),
+            None,
+        )
+        .await
+        .unwrap();
+        assert_eq!(setting(&runtime, "statement_timeout").await, "30s");
+        assert_eq!(setting(&runtime, "lock_timeout").await, "10s");
+        // The tests' runtime-role pool too.
+        let app = crate::testing::app_role_pool(&db).await;
+        assert_eq!(setting(&app, "statement_timeout").await, "30s");
+        assert_eq!(setting(&app, "lock_timeout").await, "10s");
+        // A job's transaction may run longer statements, until it ends.
+        let mut tx = runtime.begin().await.unwrap();
+        allow_statements_for(&mut tx, JOB_STATEMENT_TIMEOUT)
+            .await
+            .unwrap();
+        let inside: String = sqlx::query_scalar("SELECT current_setting('statement_timeout')")
+            .fetch_one(&mut *tx)
+            .await
+            .unwrap();
+        assert_eq!(inside, "5min");
+        tx.rollback().await.unwrap();
+    }
+
+    #[sqlx::test(migrations = "../../migrations")]
+    async fn a_statement_or_lock_that_times_out_is_a_503(db: PgPool) {
+        use axum::http::StatusCode;
+
+        // A statement past its time.
+        let mut tx = db.begin().await.unwrap();
+        sqlx::query("SET LOCAL statement_timeout = '20ms'")
+            .execute(&mut *tx)
+            .await
+            .unwrap();
+        let slow = sqlx::query("SELECT pg_sleep(2)")
+            .execute(&mut *tx)
+            .await
+            .unwrap_err();
+        assert_eq!(
+            crate::Error::from(slow).status(),
+            StatusCode::SERVICE_UNAVAILABLE
+        );
+        tx.rollback().await.unwrap();
+        // A lock held elsewhere, waited on past its time.
+        let mut holder = db.begin().await.unwrap();
+        sqlx::query("LOCK TABLE kernel.change_heads IN ACCESS EXCLUSIVE MODE")
+            .execute(&mut *holder)
+            .await
+            .unwrap();
+        let mut waiter = db.begin().await.unwrap();
+        sqlx::query("SET LOCAL lock_timeout = '20ms'")
+            .execute(&mut *waiter)
+            .await
+            .unwrap();
+        let locked = sqlx::query("SELECT 1 FROM kernel.change_heads LIMIT 1")
+            .execute(&mut *waiter)
+            .await
+            .unwrap_err();
+        let error = crate::Error::from(locked);
+        assert_eq!(error.status(), StatusCode::SERVICE_UNAVAILABLE);
+        assert_eq!(error.code(), "database_unavailable");
+        waiter.rollback().await.unwrap();
+        holder.rollback().await.unwrap();
     }
 
     #[sqlx::test(migrations = "../../migrations")]

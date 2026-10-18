@@ -357,7 +357,19 @@ the mail app with only its address, copies, subject and body and no
 fragment, each value decoded and encoded again with everything but
 unreserved characters as `%XX` (a space as `%20`, never `+`; a plus as `%2B`;
 a line break, `;`, `?`, `=`, `/`, `&` or `#` encoded too, so no field hides in
-a value), anything else nowhere; no remote URL SHALL be granted
+a value), and only when it has no authority (`mailto://…`) and its address
+part and its `to`, `cc` and `bcc` fields are nothing but addresses (none, or
+comma-separated `local@domain`s, valid UTF-8, not starting with `/`, with no
+control character, Unicode blank, invisible character such as a bidi
+override, a zero-width space or a variation selector, or delimiter such as
+CR, LF, `&`, `;`, `?` or `\`, even encoded; other Unicode, as in an
+internationalised address, is kept); a subject or body holding `&` or `?`
+once decoded SHALL be dropped, since a mail app that decodes before it splits
+would read another field there, and so SHALL a subject that is not valid
+UTF-8 or holds a control character (CR and LF included), a line or paragraph
+separator (U+2028, U+2029) or an invisible character, and a body that is not
+valid UTF-8 or holds a control character other than CR, LF and tab, since a
+mail app that decodes first would start another header there; anything else nowhere; no remote URL SHALL be granted
 IPC. CI SHALL check the frame in WebKit under the desktop and web policies
 read from their definitions, with the app's own sandbox and referrer policy,
 and a control proving the check would see a script run.
@@ -385,6 +397,22 @@ and a control proving the check would see a script run.
 #### Scenario: A field hidden in a value or the fragment
 - **WHEN** the member clicks `mailto:rita@example.com?subject=hi#&attach=/etc/passwd` or `mailto:rita@example.com?subject=x;attach=/etc/passwd`
 - **THEN** the mail app gets `mailto:rita@example.com?subject=hi`, or `mailto:rita@example.com?subject=x%3Battach%3D%2Fetc%2Fpasswd`
+
+#### Scenario: A header hidden in the address
+- **WHEN** the member clicks `mailto:rita@example.com%0D%0Abcc:evil@example.org` or `mailto:rita@example.com%26attach=/etc/passwd`
+- **THEN** nothing opens, while `mailto:rita@example.com,joao@example.com` opens in the mail app
+
+#### Scenario: More addresses, or a field hidden in the body
+- **WHEN** the member clicks `mailto:?to=rita@example.com%0D%0Abcc:evil@example.org`, or `mailto:rita@example.com?body=x%26attach%3D/etc/passwd`
+- **THEN** the first opens nowhere, and the second opens with no body
+
+#### Scenario: An authority or an invisible character
+- **WHEN** the member clicks `mailto://x%0D%0Abcc:evil@example.org`, or an address holding U+202E, U+200B, U+0085 or a byte that is not UTF-8
+- **THEN** nothing opens, while `mailto:ana@exämple.example` opens in the mail app
+
+#### Scenario: A header hidden in the subject
+- **WHEN** a mail link reads `mailto:rita@x.example?subject=Hi%0D%0ABcc:%20evil@x.example&body=Thanks`, or its body holds a NUL
+- **THEN** the subject (or the body) is left out and the rest opens; a body over several lines, with tabs, is kept as written
 
 ### Requirement: Only offers that take effect
 The reader SHALL offer "Always show images from <sender>" and its ⇧A only
