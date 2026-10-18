@@ -162,7 +162,7 @@ pub async fn handler(
     )
     .fetch_all(&mut *tx)
     .await?;
-    let assessed = images(&mut tx, &inboxes, message).await?;
+    let assessed = images(&mut tx, &state.binding, &inboxes, message).await?;
     let trusted = assessed.trusted;
     tx.commit().await?;
     let bodies: Bodies = serde_json::from_value(bodies)

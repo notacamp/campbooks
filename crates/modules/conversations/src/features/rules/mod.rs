@@ -6,6 +6,8 @@
 //! is checked, stored and applied one way whatever taught it.
 
 #[cfg(test)]
+mod binding_tests;
+#[cfg(test)]
 pub(crate) mod tests;
 
 use axum::{Json, extract::State, http::StatusCode};
@@ -13,6 +15,7 @@ use campbooks_kernel::{
     AppState, Error, Operation, Problem, Result, Risk,
     auth::{Principal, PrincipalKind},
     authz::Action,
+    binding::Binding,
     db::BeginFor as _,
     extract,
     tenancy::{Access, UserId, Workspace, WorkspaceId},
@@ -27,7 +30,7 @@ use crate::{
         access::visible_inboxes,
         resources,
         rule_runs::{self, RunView, SCAN},
-        rules::{self, NewRule, RuleAction, RuleCondition, Stored},
+        rules::{self, NewRule, RuleAction, RuleCondition, Stored, binding as rule_binding},
     },
     events::RULE_RECORD,
     features::rule_notices,
@@ -127,16 +130,25 @@ pub struct RuleView {
     pub shared: bool,
     /// Whether the caller may change or remove it.
     pub may_change: bool,
+    /// Whether it waits for a member to confirm it again before it acts.
+    #[serde(default)]
+    pub needs_confirmation: bool,
 }
 
-async fn view(conn: &mut PgConnection, access: &Access, rule: &Stored) -> Result<RuleView> {
-    let mut views = views(conn, access, std::slice::from_ref(rule)).await?;
+async fn view(
+    conn: &mut PgConnection,
+    binding: &Binding,
+    access: &Access,
+    rule: &Stored,
+) -> Result<RuleView> {
+    let mut views = views(conn, binding, access, std::slice::from_ref(rule)).await?;
     views.pop().ok_or(Error::NotFound)
 }
 
 /// `stored` rules as the caller sees them, with a few queries for all of them.
 async fn views(
     conn: &mut PgConnection,
+    binding: &Binding,
     access: &Access,
     stored: &[Stored],
 ) -> Result<Vec<RuleView>> {
@@ -177,6 +189,9 @@ async fn views(
                     access.user,
                     rule.taught_by,
                 ),
+            // Kept, but not bound to the member who taught it
+            // (campbooks-cloud#242): it acts again once confirmed.
+            needs_confirmation: rule.needs_confirmation(binding),
         })
         .collect())
 }
@@ -734,6 +749,9 @@ pub async fn create_in(
         },
     )
     .await?;
+    // The member's own request, the row it just wrote: bound to them
+    // (campbooks-cloud#242). A proposal is signed when someone says yes.
+    rule_binding::sign(tx, &state.binding, id).await?;
     let rule = rules::find(tx, id).await?.ok_or(Error::NotFound)?;
     if let Some(notice) = body.notice_id {
         rule_notices::accept(tx, notice, id).await?;
@@ -757,7 +775,7 @@ pub async fn create_in(
         .await?;
     }
     Ok(CreatedRule {
-        rule: view(tx, access, &rule).await?,
+        rule: view(tx, &state.binding, access, &rule).await?,
         acted_without_asking,
     })
 }
@@ -801,6 +819,11 @@ async fn retire(
     rule: RuleId,
 ) -> Result<()> {
     rule_runs::lock_running(tx, rule).await?;
+    // Locked by `rules::replaced`: still bound as it is, it stays bound once
+    // removed, so Undo can bring it back acting.
+    let bound = rules::find_any(tx, rule)
+        .await?
+        .is_some_and(|r| r.bound(&state.binding));
     sqlx::query!(
         r#"UPDATE conversations.rules
               SET state = 'removed', removed_from = state, removed_at = now(),
@@ -817,6 +840,9 @@ async fn retire(
     )
     .execute(&mut **tx)
     .await?;
+    if bound {
+        rule_binding::sign(tx, &state.binding, rule).await?;
+    }
     rule_runs::announce(
         tx,
         &state.events,
@@ -884,8 +910,20 @@ pub async fn confirm(
     // Runs, then the rule row, then the check, so it holds to the end: a
     // decline or another confirm in between finds it no longer proposed.
     rule_runs::lock_running(&mut tx, rule.id).await?;
-    if rules::lock_state(&mut tx, rule.id).await? != Some(RuleState::Proposed) {
-        return Err(Error::Conflict(crate::MESSAGES.reason("rule_not_proposed")));
+    let locked = rules::lock_state(&mut tx, rule.id).await?;
+    // What the member says yes to: the rule as it is under the lock.
+    let rule = rules::find_any(&mut tx, rule.id)
+        .await?
+        .ok_or(Error::NotFound)?;
+    match locked {
+        Some(RuleState::Proposed) => {}
+        // A kept rule that is not bound to the member who taught it
+        // (campbooks-cloud#242): confirming it again binds it as it is,
+        // in its state, with its author.
+        Some(RuleState::Active | RuleState::Paused) if rule.needs_confirmation(&state.binding) => {
+            return confirm_again(&state, tx, access, &rule, &body).await;
+        }
+        _ => return Err(Error::Conflict(crate::MESSAGES.reason("rule_not_proposed"))),
     }
     // As `create` does: a proposal stored before its domain became a public
     // suffix is not kept (it could never act).
@@ -909,6 +947,8 @@ pub async fn confirm(
     )
     .execute(&mut *tx)
     .await?;
+    // A member's yes, in their request: the rule is bound as they kept it.
+    rule_binding::sign(&mut tx, &state.binding, rule.id).await?;
     let rule = rules::find(&mut tx, rule.id)
         .await?
         .ok_or(Error::NotFound)?;
@@ -927,7 +967,57 @@ pub async fn confirm(
         )
         .await?;
     }
-    let view = view(&mut tx, access, &rule).await?;
+    let view = view(&mut tx, &state.binding, access, &rule).await?;
+    tx.commit().await?;
+    Ok(Json(view))
+}
+
+/// Confirm again a kept rule that is not bound (campbooks-cloud#242): sign
+/// it as it is (its conditions, actions and state, which the member sees in
+/// the list), now taught by the member who confirms it: its stored author
+/// is SQL's to choose (or none, which no author check would stop), so it
+/// acts with the confirming member's rights from now on. Apply it to the
+/// mail already here when asked and it is active. Anyone who may teach in
+/// its inbox may, as for a proposal.
+async fn confirm_again(
+    state: &AppState,
+    mut tx: Transaction<'static, Postgres>,
+    access: &Access,
+    rule: &Stored,
+    body: &ConfirmRule,
+) -> Result<Json<RuleView>> {
+    rules::validate(&rule.conditions, &rule.actions)?;
+    let user = access
+        .user
+        .ok_or_else(|| Error::Denied(crate::MESSAGES.reason("rule_needs_member")))?;
+    sqlx::query("UPDATE conversations.rules SET taught_by = $2, updated_at = now() WHERE id = $1")
+        .bind(rule.id.as_uuid())
+        .bind(user.as_uuid())
+        .execute(&mut *tx)
+        .await?;
+    rule_binding::sign(&mut tx, &state.binding, rule.id).await?;
+    let rule = rules::find(&mut tx, rule.id)
+        .await?
+        .ok_or(Error::NotFound)?;
+    let ws = access.workspace.to_string();
+    if body.apply_to_existing
+        && rule.effective_state() == RuleState::Active
+        && !rules::only_shows_images(&rule.actions)
+    {
+        rule_runs::start(&mut tx, &state.events, &ws, &rule, RunKind::Apply).await?;
+    } else {
+        rule_runs::announce(
+            &mut tx,
+            &state.events,
+            &ws,
+            rule.inbox,
+            rule.id,
+            rule.effective_state(),
+            None,
+        )
+        .await?;
+    }
+    let view = view(&mut tx, &state.binding, access, &rule).await?;
     tx.commit().await?;
     Ok(Json(view))
 }
@@ -997,7 +1087,7 @@ pub async fn decline(
     .await?;
     let mut declined = rule;
     declined.state = RuleState::Removed;
-    let view = view(&mut tx, access, &declined).await?;
+    let view = view(&mut tx, &state.binding, access, &declined).await?;
     tx.commit().await?;
     Ok(Json(view))
 }
@@ -1063,11 +1153,29 @@ pub async fn update(
         path.rule_id,
     )
     .await?;
+    // Runs, then the rule row (the order every path keeps), then the rule as
+    // it is under the lock: what it keeps of it is what is checked below.
+    rule_runs::lock_running(&mut tx, rule.id).await?;
+    rules::lock_state(&mut tx, rule.id).await?;
+    let rule = rules::find(&mut tx, rule.id)
+        .await?
+        .ok_or(Error::NotFound)?;
     if body.paused.is_some() && rule.state == RuleState::Proposed {
         // A proposed rule acts only once someone says yes (`confirm_rule`).
         return Err(Error::Conflict(crate::MESSAGES.reason("rule_not_active")));
     }
     let reshaped = body.conditions.is_some() || body.actions.is_some();
+    // A kept rule keeps fields this request does not set (its author, the
+    // conditions or actions it leaves alone): it is signed again only when
+    // it is bound as it is (campbooks-cloud#242). One that is not may only be
+    // paused; anything else waits until a member confirms it again.
+    let bound = rule.bound(&state.binding);
+    let only_pauses = body.paused == Some(true) && !reshaped && !body.adopt;
+    if rule.state != RuleState::Proposed && !bound && !only_pauses {
+        return Err(Error::Conflict(
+            crate::MESSAGES.reason("rule_needs_confirmation"),
+        ));
+    }
     let conditions = rules::normalise(&body.conditions.unwrap_or_else(|| rule.conditions.clone()));
     let actions = body.actions.unwrap_or_else(|| rule.actions.clone());
     rules::validate(&conditions, &actions)?;
@@ -1108,6 +1216,9 @@ pub async fn update(
     )
     .execute(&mut *tx)
     .await?;
+    if bound {
+        rule_binding::sign(&mut tx, &state.binding, rule.id).await?;
+    }
     let rule = rules::find(&mut tx, rule.id)
         .await?
         .ok_or(Error::NotFound)?;
@@ -1121,7 +1232,7 @@ pub async fn update(
         None,
     )
     .await?;
-    let view = view(&mut tx, access, &rule).await?;
+    let view = view(&mut tx, &state.binding, access, &rule).await?;
     tx.commit().await?;
     Ok(Json(view))
 }
@@ -1191,6 +1302,11 @@ pub async fn remove(
     ) {
         return Err(Error::NotFound);
     }
+    // Bound as it is (under the lock), it stays bound once removed, so Undo
+    // brings it back acting (campbooks-cloud#242).
+    let bound = rules::find_any(&mut tx, rule.id)
+        .await?
+        .is_some_and(|r| r.bound(&state.binding));
     sqlx::query!(
         r#"UPDATE conversations.rules
               SET state = 'removed', removed_from = state, removed_at = now(), updated_at = now()
@@ -1199,6 +1315,9 @@ pub async fn remove(
     )
     .execute(&mut *tx)
     .await?;
+    if bound {
+        rule_binding::sign(&mut tx, &state.binding, rule.id).await?;
+    }
     let mut removed = rule.clone();
     removed.state = RuleState::Removed;
     // Undone right after it was saved from a suggestion: offered again.
@@ -1229,7 +1348,7 @@ pub async fn remove(
         )
         .await?;
     }
-    let view = view(&mut tx, access, &removed).await?;
+    let view = view(&mut tx, &state.binding, access, &removed).await?;
     tx.commit().await?;
     Ok(Json(view))
 }
@@ -1356,6 +1475,12 @@ pub async fn restore(
     )
     .execute(&mut *tx)
     .await?;
+    // Bound as it was removed (read under the lock): bound again as it comes
+    // back. One that was not stays waiting for a member to confirm it, and a
+    // proposal waits for its yes (campbooks-cloud#242).
+    if back != RuleState::Proposed && rule.bound(&state.binding) {
+        rule_binding::sign(&mut tx, &state.binding, rule.id).await?;
+    }
     rule_notices::reaccept(&mut tx, rule.id).await?;
     let rule = rules::find(&mut tx, rule.id)
         .await?
@@ -1378,7 +1503,7 @@ pub async fn restore(
         )
         .await?;
     }
-    let view = view(&mut tx, access, &rule).await?;
+    let view = view(&mut tx, &state.binding, access, &rule).await?;
     tx.commit().await?;
     Ok(Json(view))
 }
@@ -1435,7 +1560,7 @@ pub async fn list(
         inboxes = vec![inbox];
     }
     let stored = rules::of_inboxes(&mut tx, &inboxes).await?;
-    let mut views = views(&mut tx, access, &stored).await?;
+    let mut views = views(&mut tx, &state.binding, access, &stored).await?;
     views.sort_by_key(|v| v.state != RuleState::Proposed);
     tx.commit().await?;
     Ok(Json(RuleList { rules: views }))
@@ -1484,7 +1609,7 @@ pub async fn get(
     let rule = rules::find_any(&mut tx, path.rule_id)
         .await?
         .ok_or(Error::NotFound)?;
-    let view = view(&mut tx, access, &rule).await?;
+    let view = view(&mut tx, &state.binding, access, &rule).await?;
     tx.commit().await?;
     Ok(Json(view))
 }

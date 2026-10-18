@@ -11,7 +11,7 @@ use campbooks_ai::decide::{
     },
     taught::{self, Action, Facts, TaughtRule, is_free_mail, is_owned_domain, is_shared_sender},
 };
-use campbooks_kernel::Result;
+use campbooks_kernel::{Result, binding::Binding};
 use serde::{Deserialize, Serialize};
 use sqlx::PgConnection;
 use utoipa::ToSchema;
@@ -40,7 +40,8 @@ pub enum ImagesHeld {
     /// Scout has not checked the email yet: images wait for it, and stay held
     /// back while Scout is off or past its daily limit.
     NotChecked,
-    /// The rule that trusts the sender is paused or waiting for a yes.
+    /// The rule that trusts the sender is paused, or waiting for a yes (a
+    /// proposal, or a rule that needs confirming again).
     RulePaused,
 }
 
@@ -69,9 +70,12 @@ pub struct Images {
 /// stored `suspicious` answer of `false`), while anything in its
 /// conversation looks suspicious, and unless the provider's results
 /// authenticate the sender (a spoofed From, failed checks or no results
-/// never pass), nothing is trusted.
+/// never pass), nothing is trusted. Nor does a rule that is not bound to the
+/// member who taught it act (campbooks-cloud#242): one planted with SQL, or
+/// kept from before rules were bound, counts as waiting for a yes.
 pub async fn images(
     conn: &mut PgConnection,
+    binding: &Binding,
     inboxes: &[InboxId],
     message: MessageId,
 ) -> Result<Images> {
@@ -114,7 +118,15 @@ pub async fn images(
             continue;
         }
         if rule.effective_state() == RuleState::Active {
-            acting.push(engine.clone());
+            if rule.bound(binding) {
+                acting.push(engine.clone());
+            } else {
+                tracing::warn!(
+                    workspace = %rule.workspace,
+                    rule = %rule.id,
+                    "a taught rule is not bound to the member who taught it; it does not act"
+                );
+            }
         }
         taught_already.push(engine);
     }
