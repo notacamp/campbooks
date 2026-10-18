@@ -19,6 +19,9 @@ pub struct Push {
     pub outcome: Outcome,
     /// The provider failed in a way the run's backoff handles.
     pub trouble: Option<ProviderError>,
+    /// The provider quota units its calls spent, where the provider counts
+    /// them (Gmail); the run settles its reservation with it.
+    pub spent: u32,
 }
 
 /// One label's wanted state on one message: the change that won it.

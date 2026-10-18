@@ -299,11 +299,16 @@ longer has the history, a change SHALL apply in arrival order.
 Provider trouble while writing (429, 5xx, a network failure, a refused
 token) SHALL stop the push, keep the unwritten changes pending, and use the
 run's backoff, throttling and health rules; writes SHALL take Gmail quota
-from the shared provider budget before the push starts: the most its writes
-can cost, each message's own calls as if it were written alone plus one
-`batchModify` for every 11 messages with labels to change, so a batch Gmail
-refuses (each of its messages then modified on its own) or a group the
-later-writer check splits never spends more than was taken. A change Gmail refuses for good, or that
+from the shared provider budget: before the push, what it plans (both
+profile reads, the history pages it may read, a `batchModify` per chunk and
+each single message's calls), then, once it is done, what its calls really
+spent, counted call by call: what it did not spend SHALL be given back
+(never filling the budget past its two seconds' worth), and what it spent
+beyond the plan (a batch Gmail refused, a group the later-writer check
+split) SHALL be owed, taking the budget below zero until the rate pays it
+back. A run planned to cost more than the budget holds SHALL wait for a full
+budget and owe the rest, so no unit goes uncounted whatever rate is
+configured. A change Gmail refuses for good, or that
 has met trouble eight times, SHALL be recorded `failed` with a reason code
 and no content, and the message's Gmail state SHALL be emitted again. A
 message Gmail no longer has SHALL be recorded `skipped` (`message_gone`).
@@ -316,9 +321,13 @@ message Gmail no longer has SHALL be recorded `skipped` (`message_gone`).
 - **WHEN** Gmail refuses the change for one message of a conversation
 - **THEN** the other messages are changed, that one is recorded `failed` (`refused`), and conversations is told its Gmail state
 
-#### Scenario: A large batch reserves its fallback
-- **WHEN** a push plans one `batchModify` of 33 archives
-- **THEN** besides its reads it takes 315 units before writing (165 for the messages, 150 for batches), enough for the batch to be refused and each message archived on its own, or for any split of the group
+#### Scenario: A refused batch is owed
+- **WHEN** a push plans one `batchModify` of 12 archives and Gmail refuses the batch
+- **THEN** it takes 60 units before writing (both profiles, four history pages, the batch) and, once each message is archived on its own, settles the 112 it spent (one profile read before, the batch, twelve modifies, one after): 52 more are owed
+
+#### Scenario: A push spends less than planned
+- **WHEN** a push of one batch reads one history page and Gmail takes the batch
+- **THEN** the units it did not spend go back to the budget at once
 
 ### Requirement: Sending through Gmail
 On `conversations.send_requested` v1 the consumer `connectors.queue_send`

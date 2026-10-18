@@ -487,18 +487,19 @@ describe("ReplyDialog", () => {
   });
 
   it("says nothing of a newer message that is the member's own mail", async () => {
-    let arrived = false;
+    // First received mail: the note shows (the dialog does see newer mail);
+    // then the member's own reply lands after it: the note goes, and it
+    // never offers to answer the member's own mail.
+    let thread = Q4_DETAIL;
     const own = {
       ...NEWER,
+      id: "0192f1a0-0000-7000-8000-0000000000ea",
       direction: "outbound" as const,
       from: { name: "Sam Rivera", address: "sam@example.com" },
-      to: [LAST.from],
+      to: [NEWER.from],
+      sent_at: "2026-10-13T14:00:00Z",
     };
-    routes({
-      [`GET ${C}`]: () => ({
-        body: arrived ? { ...Q4_DETAIL, messages: [...Q4_DETAIL.messages, own] } : Q4_DETAIL,
-      }),
-    });
+    routes({ [`GET ${C}`]: () => ({ body: thread }) });
     const { queryClient } = renderWithProviders(
       <ReplyDialog
         workspaceId={DUARTE.id}
@@ -512,11 +513,17 @@ describe("ReplyDialog", () => {
       key: "1",
     });
     await screen.findByRole("textbox", { name: "Your reply" });
-    arrived = true;
+    thread = WITH_NEWER;
     await queryClient.refetchQueries();
-    await new Promise((resolve) => setTimeout(resolve, 50));
-    expect(screen.queryByText(/A newer message from/u)).toBeNull();
+    expect(await screen.findByText(/A newer message from Leo Brandt/u)).toBeVisible();
+
+    thread = { ...WITH_NEWER, messages: [...WITH_NEWER.messages, own] };
+    await queryClient.refetchQueries();
+    await waitFor(() => {
+      expect(screen.queryByText(/A newer message from/u)).toBeNull();
+    });
     expect(screen.queryByRole("button", { name: "Answer the newer one" })).toBeNull();
+    expect(screen.queryByText(/A newer message from Sam Rivera/u)).toBeNull();
   });
 
   it("offers no Undo when the send has no window to take it back in", async () => {
