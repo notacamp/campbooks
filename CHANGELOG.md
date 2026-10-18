@@ -80,6 +80,12 @@ All notable changes to Campbooks Next are documented here. The format follows
 
 ### Fixed
 
+- **Desktop app: links stay where they belong.** On macOS and Linux the main window no
+  longer treats `tauri.localhost` as the app (there it is the computer itself, where any
+  local program could answer), only on Windows and Android, where the app is served from
+  it. Mail links keep their spaces as `%20` instead of turning them into `+`, which mail
+  apps showed as plus signs; files (`attach=`) are still never handed to the mail app,
+  not even hidden after a `#` or inside another field's value.
 - **Forward's picker stays fast on a big inbox.** Checking that no one it offers was
   reported or found suspicious now looks only at the senders it is about to show, through
   a new index, instead of reading a year of the inbox's mail on every keystroke (three
