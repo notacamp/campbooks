@@ -235,6 +235,7 @@ impl OutboundRequests for FakeOutbound {
 
     fn changes_standing<'a>(
         &'a self,
+        _state: &'a AppState,
         _conn: &'a mut sqlx::PgConnection,
         _workspace: WorkspaceId,
         _request: uuid::Uuid,
@@ -592,6 +593,23 @@ impl Kit {
             .await;
         assert_eq!(read.status.as_u16(), 200, "{:?}", read.json);
         read.json
+    }
+
+    /// Bind every outbound change recorded without a binding, as
+    /// `request_changes` binds the ones it records: for tests that plant
+    /// rows to set up a state, not to forge one (campbooks-cloud#227).
+    pub async fn bind_planted_changes(&self, workspace: WorkspaceId) {
+        use campbooks_kernel::db::BeginFor as _;
+        let ids: Vec<uuid::Uuid> =
+            sqlx::query_scalar("SELECT id FROM connectors.outbound_changes WHERE mac IS NULL")
+                .fetch_all(&self.db)
+                .await
+                .unwrap();
+        let mut tx = self.state.db.begin_for(workspace).await.unwrap();
+        crate::domain::outbound::bind(&mut tx, &self.state.binding, workspace, &ids)
+            .await
+            .unwrap();
+        tx.commit().await.unwrap();
     }
 
     /// Run every ready job.

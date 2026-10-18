@@ -924,4 +924,39 @@ mod tests {
             .expect("sanitised without overflowing the stack");
         assert!(result.html.contains('x'));
     }
+
+    /// The sanitised fixtures the client's policy test (`test:csp`) renders
+    /// under the desktop and web policies (campbooks-cloud#199) are this sanitiser's
+    /// output, held back and shown: a change here shows up there.
+    /// `UPDATE_SNAPSHOTS=1 cargo test -p campbooks-conversations webkit_snapshots`
+    /// writes them again.
+    #[test]
+    fn the_webkit_snapshots_are_this_sanitiser_s_output() {
+        let dir = concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../../clients/app/test/webkit/fixtures"
+        );
+        let update = std::env::var_os("UPDATE_SNAPSHOTS").is_some();
+        let mut stale = Vec::new();
+        for name in ["newsletter", "marketing-600", "outlook", "hostile"] {
+            for show in [false, true] {
+                let html = sanitize(fixture(name), show, &InlineImages::new()).html;
+                let kind = if show { "shown" } else { "held" };
+                let path = format!("{dir}/{name}.{kind}.html");
+                if update {
+                    std::fs::write(&path, format!("{html}\n")).expect("snapshot written");
+                } else if std::fs::read_to_string(&path).ok().as_deref()
+                    != Some(format!("{html}\n").as_str())
+                {
+                    stale.push(format!("===== {name}.{kind}.html\n{html}\n===== end"));
+                }
+            }
+        }
+        assert!(
+            stale.is_empty(),
+            "stale WebKit snapshots (UPDATE_SNAPSHOTS=1 cargo test -p campbooks-conversations \
+             webkit_snapshots):\n{}",
+            stale.join("\n")
+        );
+    }
 }

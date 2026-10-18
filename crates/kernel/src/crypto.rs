@@ -103,7 +103,7 @@ pub fn derive_secret(secret: &SecretKey, purpose: &'static [u8]) -> SecretString
 }
 
 /// The 32 bytes behind [`derive_secret`] (HKDF-SHA256, `purpose` as `info`).
-fn derive_bytes(secret: &SecretKey, purpose: &'static [u8]) -> [u8; 32] {
+pub(crate) fn derive_bytes(secret: &SecretKey, purpose: &'static [u8]) -> [u8; 32] {
     struct Len32;
     impl hkdf::KeyType for Len32 {
         fn len(&self) -> usize {

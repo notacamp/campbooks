@@ -242,6 +242,7 @@ impl World {
         let pool = testing::app_role_pool(&db).await;
         let state = crate::with_ports(
             AppState::new(pool.clone(), config)
+                .with_binding(testing::binding())
                 .with_blobs(BlobStore::memory(&BlobsConfig::default(), pool))
                 .with_registry(crate::registry().expect("valid registrations")),
         )
@@ -1469,6 +1470,113 @@ async fn a_forged_send_request_is_refused_by_the_real_port(db: PgPool) {
                     .parse::<DraftId>()
                     .unwrap(),
                 send_id: SendId::new(),
+                message,
+                author: Some(world.users[&Who::Sender]),
+            },
+        )
+        .await
+        .unwrap();
+    tx.commit().await.unwrap();
+    Worker::new(world.state.clone()).run_until_idle().await;
+    assert_eq!(sends_recorded(&world).await, 0);
+}
+
+/// campbooks-cloud#227: with SQL as the runtime role in workspace A, a
+/// scheduled draft of the attacker's own (a member who may send as its
+/// author, a matching generation) and a planted `conversations.release_send`
+/// job: the real release verifies the author's binding first, so nothing is
+/// released and the connector records no send.
+#[sqlx::test(migrations = "../../migrations")]
+async fn a_planted_scheduled_send_is_never_released(db: PgPool) {
+    let world = World::new(db).await;
+    let draft = world.instances["conversations.draft"].clone();
+    let mut tx = world.state.db.begin_for(world.a).await.unwrap();
+    sqlx::query(
+        "UPDATE conversations.drafts
+            SET to_recipients = '[{\"address\": \"someone@example.net\"}]',
+                subject = 'Invoice', body = 'Pay to this account', state = 'scheduled',
+                send_generation = 1, send_at = now()
+          WHERE id = $1::uuid",
+    )
+    .bind(&draft)
+    .execute(&mut *tx)
+    .await
+    .unwrap();
+    sqlx::query(
+        "INSERT INTO kernel.jobs (queue, kind, payload, workspace_id, max_attempts)
+         VALUES ('default', 'conversations.release_send', $1, $2, 3)",
+    )
+    .bind(json!({"draft": draft, "generation": 1}))
+    .bind(world.a.to_string())
+    .execute(&mut *tx)
+    .await
+    .unwrap();
+    tx.commit().await.unwrap();
+    Worker::new(world.state.clone()).run_until_idle().await;
+    let requested: i64 = sqlx::query_scalar(
+        "SELECT count(*) FROM kernel.events
+          WHERE name = 'conversations.send_requested' AND workspace_id = $1",
+    )
+    .bind(world.a.to_string())
+    .fetch_one(&world.db)
+    .await
+    .unwrap();
+    assert_eq!(requested, 0);
+    let (state, document): (String, bool) = sqlx::query_as(
+        "SELECT state, send_document IS NOT NULL FROM conversations.drafts WHERE id = $1::uuid",
+    )
+    .bind(&draft)
+    .fetch_one(&world.db)
+    .await
+    .unwrap();
+    assert_eq!((state.as_str(), document), ("scheduled", false));
+    assert_eq!(sends_recorded(&world).await, 0);
+}
+
+/// campbooks-cloud#227: a `sending` draft planted by SQL with a document
+/// and a made-up binding, and the `send_requested` naming it: the real port
+/// verifies the stored send's binding, so the connector records nothing.
+#[sqlx::test(migrations = "../../migrations")]
+async fn a_planted_stored_send_is_refused_by_the_real_port(db: PgPool) {
+    use campbooks_conversations::{
+        events::SendRequested,
+        model::{DraftId, InboxId, SendId},
+    };
+    let world = World::new(db).await;
+    let ws = world.a.to_string();
+    let draft = world.instances["conversations.draft"].clone();
+    let message = world
+        .state
+        .blobs
+        .put(&ws, b"{}".to_vec(), "application/json")
+        .await
+        .unwrap();
+    let send_id = SendId::new();
+    let mut tx = world.state.db.begin_for(world.a).await.unwrap();
+    sqlx::query(
+        "UPDATE conversations.drafts
+            SET state = 'sending', send_id = $2, send_document = $3,
+                send_mac = '\\x01'::bytea || sha256('forged')
+          WHERE id = $1::uuid",
+    )
+    .bind(&draft)
+    .bind(send_id)
+    .bind(serde_json::to_value(&message).unwrap())
+    .execute(&mut *tx)
+    .await
+    .unwrap();
+    world
+        .state
+        .events
+        .publish(
+            &mut tx,
+            &SendRequested {
+                workspace: ws.clone(),
+                inbox_id: world.instances["conversations.inbox"]
+                    .parse::<InboxId>()
+                    .unwrap(),
+                draft: draft.parse::<DraftId>().unwrap(),
+                send_id,
                 message,
                 author: Some(world.users[&Who::Sender]),
             },

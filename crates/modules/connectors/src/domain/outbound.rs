@@ -5,7 +5,12 @@
 
 use std::collections::{HashMap, HashSet};
 
-use campbooks_kernel::{Result, db::BeginFor as _, tenancy::WorkspaceId};
+use campbooks_kernel::{
+    Result,
+    binding::{Binding, Fields},
+    db::BeginFor as _,
+    tenancy::WorkspaceId,
+};
 use chrono::{DateTime, Utc};
 use sqlx::{PgConnection, PgPool};
 use uuid::Uuid;
@@ -318,10 +323,148 @@ impl Backlog {
     }
 }
 
+/// The encoding of an outbound change's binding (campbooks-cloud#227).
+const OUTBOUND_CHANGE: &str = "campbooks/connectors.outbound-change/v1";
+
+/// An outbound change as recorded: what its binding covers.
+#[derive(sqlx::FromRow)]
+struct Recorded {
+    id: Uuid,
+    stream_id: StreamId,
+    request_id: Uuid,
+    provider_message_id: String,
+    kind: String,
+    add_labels: Vec<String>,
+    remove_labels: Vec<String>,
+    mac: Option<Vec<u8>>,
+}
+
+impl Recorded {
+    /// The row of `workspace`, field by field: the row, its stream, its
+    /// request, the message, the kind and the labels it adds and removes.
+    fn fields(&self, workspace: WorkspaceId) -> Fields {
+        let mut fields = Fields::new(OUTBOUND_CHANGE);
+        fields
+            .uuid(workspace.as_uuid())
+            .uuid(&self.id)
+            .uuid(self.stream_id.as_uuid())
+            .uuid(&self.request_id)
+            .str(&self.provider_message_id)
+            .str(&self.kind)
+            .count(self.add_labels.len());
+        for label in &self.add_labels {
+            fields.str(label);
+        }
+        fields.count(self.remove_labels.len());
+        for label in &self.remove_labels {
+            fields.str(label);
+        }
+        fields
+    }
+}
+
+/// The outbound changes `ids`, as recorded.
+async fn recorded(conn: &mut PgConnection, ids: &[Uuid]) -> Result<Vec<Recorded>> {
+    Ok(sqlx::query_as(
+        "SELECT id, stream_id, request_id, provider_message_id, kind, add_labels, remove_labels,
+                mac
+           FROM connectors.outbound_changes WHERE id = ANY($1)",
+    )
+    .bind(ids)
+    .fetch_all(conn)
+    .await?)
+}
+
+/// Bind the outbound changes `ids` of `workspace`, just recorded in `conn`
+/// (campbooks-cloud#227): a MAC over each row as written, under a key the
+/// database never holds, which a run verifies before it makes the change
+/// ([`backlog`]). Without a key the rows stay unbound, and are not made.
+pub async fn bind(
+    conn: &mut PgConnection,
+    binding: &Binding,
+    workspace: WorkspaceId,
+    ids: &[Uuid],
+) -> Result<()> {
+    if ids.is_empty() {
+        return Ok(());
+    }
+    for row in recorded(conn, ids).await? {
+        let mac = binding.tag(&row.fields(workspace));
+        sqlx::query("UPDATE connectors.outbound_changes SET mac = $2 WHERE id = $1")
+            .bind(row.id)
+            .bind(mac)
+            .execute(&mut *conn)
+            .await?;
+    }
+    Ok(())
+}
+
+/// The changes of `pending` whose binding verifies. The others (planted or
+/// edited by SQL, or recorded by an older version) are never made: they end
+/// `skipped` (`unverified`) and their messages are re-read from the
+/// provider, so Campbooks shows the provider's state.
+async fn verified(
+    conn: &mut PgConnection,
+    binding: &Binding,
+    workspace: WorkspaceId,
+    stream: StreamId,
+    pending: Vec<Pending>,
+    now: DateTime<Utc>,
+) -> Result<Vec<Pending>> {
+    if pending.is_empty() {
+        return Ok(pending);
+    }
+    let ids: Vec<Uuid> = pending.iter().map(|p| p.id).collect();
+    let bound: HashSet<Uuid> = recorded(conn, &ids)
+        .await?
+        .into_iter()
+        .filter(|row| row.stream_id == stream)
+        .filter(|row| binding.verify(&row.fields(workspace), row.mac.as_deref()))
+        .map(|row| row.id)
+        .collect();
+    let (kept, refused): (Vec<Pending>, Vec<Pending>) =
+        pending.into_iter().partition(|p| bound.contains(&p.id));
+    if refused.is_empty() {
+        return Ok(kept);
+    }
+    let ids: Vec<Uuid> = refused.iter().map(|p| p.id).collect();
+    let messages: Vec<String> = refused
+        .iter()
+        .map(|p| p.provider_message_id.clone())
+        .collect();
+    sqlx::query(
+        "UPDATE connectors.outbound_changes
+            SET state = 'skipped', reason = 'unverified', done_at = $2
+          WHERE id = ANY($1) AND state = 'pending'",
+    )
+    .bind(&ids)
+    .bind(now)
+    .execute(&mut *conn)
+    .await?;
+    sqlx::query(
+        "UPDATE connectors.messages SET reemit = true
+          WHERE stream_id = $1 AND provider_message_id = ANY($2)",
+    )
+    .bind(stream)
+    .bind(&messages)
+    .execute(&mut *conn)
+    .await?;
+    tracing::warn!(
+        %workspace,
+        %stream,
+        refused = refused.len(),
+        "outbound changes not bound to the request they were recorded for; they are not made"
+    );
+    Ok(kept)
+}
+
 /// The pending changes of `stream` (at most [`PUSH_LIMIT`]) with what the
-/// push needs to know about their messages.
+/// push needs to know about their messages. Only changes whose binding
+/// verifies (`binding`, campbooks-cloud#227) are taken; the others end
+/// `skipped` (`unverified`) and are never made.
 pub async fn backlog(
     pool: &PgPool,
+    binding: &Binding,
     workspace: WorkspaceId,
     stream: StreamId,
     now: DateTime<Utc>,
@@ -349,6 +492,7 @@ pub async fn backlog(
         created_at: row.created_at,
     })
     .collect();
+    let pending = verified(&mut tx, binding, workspace, stream, pending, now).await?;
     if pending.is_empty() {
         tx.commit().await?;
         return Ok(Backlog::default());

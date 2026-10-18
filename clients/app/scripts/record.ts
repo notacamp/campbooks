@@ -1,5 +1,7 @@
 // Records a scenario at 375px (mobile) and desktop widths as .webm files.
 // Usage: pnpm --dir clients record <scenario> [--base-url http://localhost:5173]
+//   [--browser chromium|webkit] (WebKit: the engine of the desktop app on macOS
+//   and Linux, for scenarios about it).
 // The base URL must be on this machine (localhost, 127.0.0.1, [::1]): a
 // recording is never made against a deployed instance. `--allow-remote`
 // overrides that, for a disposable instance holding demo data only.
@@ -7,7 +9,7 @@ import { existsSync, readdirSync, mkdirSync, renameSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
-import { chromium, type BrowserContextOptions } from "playwright";
+import { chromium, webkit, type BrowserContextOptions } from "playwright";
 import type { ScenarioContext } from "../recordings/context.ts";
 import { refuseTarget } from "./record-target.ts";
 
@@ -38,6 +40,7 @@ async function main(): Promise<void> {
     options: {
       "base-url": { type: "string", default: "http://localhost:5173" },
       "allow-remote": { type: "boolean", default: false },
+      browser: { type: "string", default: "chromium" },
     },
   });
   const baseURL = values["base-url"];
@@ -60,7 +63,10 @@ async function main(): Promise<void> {
 
   const scenario = (await import(file)) as { default: (ctx: ScenarioContext) => Promise<void> };
   mkdirSync(outDir, { recursive: true });
-  const browser = await chromium.launch();
+  if (values.browser !== "chromium" && values.browser !== "webkit") {
+    fail(`unknown browser "${values.browser}": chromium or webkit`);
+  }
+  const browser = await (values.browser === "webkit" ? webkit : chromium).launch();
   const written: string[] = [];
   try {
     for (const { name: profile, options } of profiles) {

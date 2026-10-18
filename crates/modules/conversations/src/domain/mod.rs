@@ -3,6 +3,7 @@
 pub mod access;
 pub mod actions;
 pub mod attachments;
+pub mod binding;
 pub mod blobs;
 pub mod conversation;
 pub mod decide;

@@ -62,3 +62,11 @@ ios|android dev` sets `TAURI_DEV_HOST`, which `vite.config.ts` already honours (
   (`tauri-plugin-deep-link`). Not implemented yet; see `src/auth.rs`.
 - **Icons:** replace the placeholder icons with `pnpm tauri icon <1024px-source.png>`, which
   also generates the iOS and Android sets.
+
+## Links from mail
+
+On desktop the shell denies every new-window request and keeps the main
+webview on the app's own pages, opening web and mail links in the system's
+browser or mail app (`src/links.rs`, campbooks-cloud#199). Tauri does not
+support the new-window handler on Android and iOS, so links there need their
+own handling before the mobile builds ship.

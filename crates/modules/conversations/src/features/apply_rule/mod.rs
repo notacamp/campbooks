@@ -46,6 +46,7 @@ impl JobHandler for ApplyRules {
             .ok_or_else(|| JobError::fatal("apply_rule enqueued outside a workspace"))?;
         let ws = workspace.to_string();
         let events = ctx.state().events.clone();
+        let binding = ctx.state().binding.clone();
         let tx = ctx.tx().await?;
         let run = sqlx::query!(
             r#"SELECT rule_id AS "rule: RuleId", kind, state, counted,
@@ -77,6 +78,7 @@ impl JobHandler for ApplyRules {
             return end(tx, batch.run, RunState::Cancelled).await;
         }
         let context = Context {
+            binding: &binding,
             events: &events,
             workspace: &ws,
             workspace_id: *workspace.as_uuid(),
