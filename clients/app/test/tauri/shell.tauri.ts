@@ -151,7 +151,7 @@ async function command(method: string, url: string, body?: unknown): Promise<unk
   const response = await fetch(`${DRIVER}${url}`, {
     method,
     headers: { "content-type": "application/json" },
-    body: body === undefined ? undefined : JSON.stringify(body),
+    ...(body === undefined ? {} : { body: JSON.stringify(body) }),
   });
   const json = (await response.json()) as { value: unknown };
   if (!response.ok) {
