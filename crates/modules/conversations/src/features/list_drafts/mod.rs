@@ -92,7 +92,7 @@ pub async fn list(
     let mut list = Vec::with_capacity(ids.len());
     for id in ids {
         if let Some(row) = drafts::find(&mut tx, access, id, false).await? {
-            list.push(row.view()?);
+            list.push(row.shown(&state.binding, access)?);
         }
     }
     tx.commit().await?;
@@ -131,7 +131,7 @@ pub async fn get(
     let mut tx = state.db.begin_for(access.workspace).await?;
     let draft = drafts::load(&state, &mut tx, access, path.draft_id, false, Action::Read)
         .await?
-        .view()?;
+        .shown(&state.binding, access)?;
     tx.commit().await?;
     Ok(Json(draft))
 }

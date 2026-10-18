@@ -2,6 +2,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useEffectEvent, useLayoutEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
+import { problemCode } from "~/lib/api";
 import { useDebounced } from "~/lib/hooks/use-debounced";
 import { Banner, Dialog, DialogChoices, SearchField, Text } from "~/lib/ui";
 
@@ -153,15 +154,29 @@ export function ForwardDialog({
     const existing = known.find(
       (draft) => draft.kind === "forward" && draft.message_id === message.id && pristine(draft),
     );
+    const fresh = () =>
+      createDraft(workspaceId, {
+        kind: "forward",
+        message_id: message.id,
+        quoted: forwardQuote(message, i18n.language, words),
+        to,
+      });
+    // Saved with the token that came with it; one that changed since
+    // (campbooks-cloud#242) is left alone and a new forward starts. Either
+    // way it opens in the composer, which shows all of it before Send.
     const saved =
       existing === undefined
-        ? createDraft(workspaceId, {
-            kind: "forward",
-            message_id: message.id,
-            quoted: forwardQuote(message, i18n.language, words),
+        ? fresh()
+        : saveDraft(workspaceId, existing.id, {
             to,
-          })
-        : saveDraft(workspaceId, existing.id, { to, version: existing.version });
+            version: existing.version,
+            content_token: existing.content_token ?? null,
+          }).catch(async (thrown: unknown) => {
+            if (problemCode(thrown) !== "content_changed") {
+              throw thrown;
+            }
+            return fresh();
+          });
     attempt.current += 1;
     const mine = attempt.current;
     void saved

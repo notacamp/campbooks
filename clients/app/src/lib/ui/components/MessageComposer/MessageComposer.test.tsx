@@ -1,4 +1,5 @@
 import { act, fireEvent, screen } from "@testing-library/react";
+import { useState } from "react";
 import { describe, expect, it, vi } from "vitest";
 
 import { renderUi } from "../../../../../test/render";
@@ -36,6 +37,31 @@ describe("MessageComposer", () => {
     // A reply keeps its subject: no field.
     expect(screen.queryByRole("textbox", { name: "Subject" })).not.toBeInTheDocument();
     expect(screen.getByRole("textbox", { name: "Message" })).toHaveFocus();
+  });
+
+  it("never hides copies, also ones that arrive after it opened", () => {
+    function Later() {
+      const [bcc, setBcc] = useState<MessageComposerProps["bcc"]>([]);
+      return (
+        <>
+          <button
+            type="button"
+            onClick={() => {
+              setBcc([{ name: null, address: "eve@example.com" }]);
+            }}
+          >
+            Shown again
+          </button>
+          <MessageComposer {...props({ bcc })} />
+        </>
+      );
+    }
+    renderUi(<Later />);
+    expect(screen.queryByRole("textbox", { name: "Bcc" })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Shown again" }));
+    expect(screen.getByRole("textbox", { name: "Bcc" })).toBeInTheDocument();
+    expect(screen.getByText("eve@example.com")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Cc Bcc" })).not.toBeInTheDocument();
   });
 
   it("sends with Ctrl+Enter, formats with Ctrl+B and closes with Escape, only while focused", () => {

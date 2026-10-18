@@ -97,6 +97,11 @@ export function MessageComposer({
   const id = useId();
   const [active, setActive] = useState(false);
   const [copies, setCopies] = useState(cc.length > 0 || bcc.length > 0);
+  // Copies that arrive after it opened (the draft shown again as the server
+  // holds it) open the fields too, and they stay open like the member's own.
+  if (!copies && (cc.length > 0 || bcc.length > 0)) {
+    setCopies(true);
+  }
   const [showQuoted, setShowQuoted] = useState(false);
   const bodyRef = useRef<HTMLTextAreaElement>(null);
   const toRef = useRef<HTMLInputElement>(null);

@@ -7,7 +7,7 @@ use campbooks_kernel::{db::BeginFor as _, jobs, tenancy::WorkspaceId};
 use serde_json::{Value, json};
 use sqlx::{PgPool, types::Uuid};
 
-use super::tests::{GITHUB, kit, move_github, sams_notifications};
+use super::tests::{GITHUB, as_shown, kit, move_github, sams_notifications};
 use crate::{
     domain::rule_runs::RunBatch,
     features::apply_rule::ApplyRules,
@@ -460,13 +460,8 @@ async fn what_members_teach_change_and_confirm_still_acts(db: PgPool) {
     assert_eq!(paused.json["needs_confirmation"], true);
     // Sam looks at it (it now reports spam) and confirms it again: bound as
     // it is, still paused until he resumes it.
-    let confirmed = kit
-        .post(
-            &sam,
-            &format!("{one}/confirm"),
-            Some(json!({"apply_to_existing": false})),
-        )
-        .await;
+    let body = as_shown(&kit, &sam, &one, json!({"apply_to_existing": false})).await;
+    let confirmed = kit.post(&sam, &format!("{one}/confirm"), Some(body)).await;
     assert_eq!(confirmed.status, StatusCode::OK, "{:?}", confirmed.json);
     assert_eq!(confirmed.json["needs_confirmation"], false);
     assert_eq!(confirmed.json["state"], "paused");
@@ -567,13 +562,8 @@ async fn confirming_again_makes_the_confirming_member_its_author(db: PgPool) {
     let got = kit.get(&sam, &one).await;
     assert_eq!(got.json["needs_confirmation"], true, "{:?}", got.json);
     // Leo confirms it again: it is his now, acting with his rights.
-    let confirmed = kit
-        .post(
-            &leo,
-            &format!("{one}/confirm"),
-            Some(json!({"apply_to_existing": false})),
-        )
-        .await;
+    let body = as_shown(&kit, &leo, &one, json!({"apply_to_existing": false})).await;
+    let confirmed = kit.post(&leo, &format!("{one}/confirm"), Some(body)).await;
     assert_eq!(confirmed.status, StatusCode::OK, "{:?}", confirmed.json);
     assert_eq!(confirmed.json["needs_confirmation"], false);
     assert_eq!(
@@ -584,4 +574,207 @@ async fn confirming_again_makes_the_confirming_member_its_author(db: PgPool) {
         .await;
     let (_, _, in_inbox, _) = flags(&kit, "late-0").await;
     assert!(!in_inbox, "the confirmed rule acts");
+}
+
+/// Sam's proposal "move what GitHub sends to Updates", created through the
+/// API (it waits for a yes): its URI.
+async fn proposal(kit: &Kit, sam: &str, workspace: WorkspaceId, inbox: InboxId) -> String {
+    let mut body = move_github();
+    body["state"] = json!("proposed");
+    let created = kit
+        .post(
+            sam,
+            &format!("/api/v1/w/{workspace}/inboxes/{inbox}/rules"),
+            Some(body),
+        )
+        .await;
+    assert_eq!(created.status, StatusCode::CREATED, "{:?}", created.json);
+    assert_eq!(created.json["rule"]["state"], "proposed");
+    format!(
+        "/api/v1/w/{workspace}/rules/{}",
+        created.json["rule"]["id"].as_str().unwrap()
+    )
+}
+
+/// What a refused yes must not have done: still a proposal, unsigned, with
+/// no run, and nothing asked of the provider.
+async fn still_proposed(kit: &Kit, one: &str) {
+    let id: Uuid = one.rsplit('/').next().unwrap().parse().unwrap();
+    let (state, mac): (String, Option<Vec<u8>>) =
+        sqlx::query_as("SELECT state, mac FROM conversations.rules WHERE id = $1")
+            .bind(id)
+            .fetch_one(&kit.db)
+            .await
+            .unwrap();
+    assert_eq!((state.as_str(), mac), ("proposed", None));
+    let runs: i64 =
+        sqlx::query_scalar("SELECT count(*) FROM conversations.rule_runs WHERE rule_id = $1")
+            .bind(id)
+            .fetch_one(&kit.db)
+            .await
+            .unwrap();
+    assert_eq!(runs, 0);
+    kit.run_jobs().await;
+    assert!(requested(kit).await.is_empty());
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_proposal_changed_with_sql_after_it_was_shown_is_not_kept(db: PgPool) {
+    let kit = kit(db).await;
+    let (workspace, inbox, sam, _) = sams_notifications(&kit, 2).await;
+    let one = proposal(&kit, &sam, workspace, inbox).await;
+    let id: Uuid = one.rsplit('/').next().unwrap().parse().unwrap();
+    let shown = as_shown(&kit, &sam, &one, json!({"apply_to_existing": true})).await;
+    // Between the view and the yes, SQL swaps what it does, then whose it is.
+    for sql in [
+        "UPDATE conversations.rules SET actions = '[{\"action\": \"trash\"}]' WHERE id = $1",
+        "UPDATE conversations.rules SET conditions = '[{\"field\": \"sender_address\", \"value\": \"boss@example.com\"}]' WHERE id = $1",
+        "UPDATE conversations.rules SET taught_by = NULL WHERE id = $1",
+    ] {
+        as_runtime_role(&kit, workspace, sql, id).await;
+        let refused = kit
+            .post(&sam, &format!("{one}/confirm"), Some(shown.clone()))
+            .await;
+        assert_eq!(
+            refused.status,
+            StatusCode::CONFLICT,
+            "{sql}: {:?}",
+            refused.json
+        );
+        assert_eq!(refused.json["code"], "content_changed", "{sql}");
+        still_proposed(&kit, &one).await;
+    }
+    // No token at all (a screen opened before tokens existed): refused too.
+    let missing = kit
+        .post(&sam, &format!("{one}/confirm"), Some(json!({})))
+        .await;
+    assert_eq!(missing.json["code"], "content_changed");
+    still_proposed(&kit, &one).await;
+    // Read again, it shows what it does now: kept, that is what Sam saw.
+    let read = kit.get(&sam, &one).await.json;
+    assert_eq!(read["actions"][0]["action"], "trash");
+    let body = as_shown(&kit, &sam, &one, json!({"apply_to_existing": false})).await;
+    let kept = kit.post(&sam, &format!("{one}/confirm"), Some(body)).await;
+    assert_eq!(kept.status, StatusCode::OK, "{:?}", kept.json);
+    assert_eq!(kept.json["state"], "active");
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_yes_takes_the_token_of_the_member_saying_it(db: PgPool) {
+    let kit = kit(db).await;
+    let (workspace, inbox, sam, _) = sams_notifications(&kit, 1).await;
+    let (leo, leo_id) = kit.member("leo", workspace);
+    kit.add_to_inbox(inbox, leo_id, InboxRole::Sender).await;
+    let one = proposal(&kit, &sam, workspace, inbox).await;
+    // Sam's token, sent by Leo (who may say yes too): not his.
+    let shown_to_sam = as_shown(&kit, &sam, &one, json!({"apply_to_existing": false})).await;
+    let refused = kit
+        .post(&leo, &format!("{one}/confirm"), Some(shown_to_sam))
+        .await;
+    assert_eq!(refused.status, StatusCode::CONFLICT, "{:?}", refused.json);
+    assert_eq!(refused.json["code"], "content_changed");
+    still_proposed(&kit, &one).await;
+    // Leo's own: kept.
+    let shown_to_leo = as_shown(&kit, &leo, &one, json!({"apply_to_existing": false})).await;
+    let kept = kit
+        .post(&leo, &format!("{one}/confirm"), Some(shown_to_leo))
+        .await;
+    assert_eq!(kept.status, StatusCode::OK, "{:?}", kept.json);
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_rule_needing_a_yes_again_is_confirmed_only_as_shown(db: PgPool) {
+    let kit = kit(db).await;
+    let (workspace, inbox, sam, _) = sams_notifications(&kit, 1).await;
+    let rule = archive_github(&kit, &sam, workspace, inbox).await;
+    let one = format!("/api/v1/w/{workspace}/rules/{rule}");
+    // Changed with SQL: it needs a yes again, and Sam is shown it.
+    as_runtime_role(
+        &kit,
+        workspace,
+        "UPDATE conversations.rules SET actions = '[{\"action\": \"spam\"}]' WHERE id = $1",
+        rule,
+    )
+    .await;
+    let shown = as_shown(&kit, &sam, &one, json!({"apply_to_existing": false})).await;
+    // Changed again before the yes: refused, still unbound.
+    as_runtime_role(
+        &kit,
+        workspace,
+        "UPDATE conversations.rules SET actions = '[{\"action\": \"trash\"}]' WHERE id = $1",
+        rule,
+    )
+    .await;
+    let refused = kit.post(&sam, &format!("{one}/confirm"), Some(shown)).await;
+    assert_eq!(refused.status, StatusCode::CONFLICT, "{:?}", refused.json);
+    assert_eq!(refused.json["code"], "content_changed");
+    assert_eq!(kit.get(&sam, &one).await.json["needs_confirmation"], true);
+    // Adopting it keeps what it holds: the same token rule.
+    let adopt = kit
+        .patch(&sam, &one, json!({"adopt": true, "paused": false}))
+        .await;
+    assert_eq!(adopt.status, StatusCode::CONFLICT, "{:?}", adopt.json);
+    // As read now: confirmed.
+    let body = as_shown(&kit, &sam, &one, json!({"apply_to_existing": false})).await;
+    let kept = kit.post(&sam, &format!("{one}/confirm"), Some(body)).await;
+    assert_eq!(kept.status, StatusCode::OK, "{:?}", kept.json);
+    assert_eq!(kept.json["needs_confirmation"], false);
+    assert_eq!(kept.json["actions"][0]["action"], "trash");
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_manager_adopts_only_the_rule_they_were_shown(db: PgPool) {
+    let kit = kit(db).await;
+    let (workspace, inbox, sam, _) = sams_notifications(&kit, 1).await;
+    let rule = archive_github(&kit, &sam, workspace, inbox).await;
+    let one = format!("/api/v1/w/{workspace}/rules/{rule}");
+    // A token of before the rule was signed again (a pause) no longer holds.
+    let before = as_shown(&kit, &sam, &one, json!({"adopt": true})).await;
+    let paused = kit.patch(&sam, &one, json!({"paused": true})).await;
+    assert_eq!(paused.status, StatusCode::OK, "{:?}", paused.json);
+    let stale = kit.patch(&sam, &one, before).await;
+    assert_eq!(stale.status, StatusCode::CONFLICT, "{:?}", stale.json);
+    assert_eq!(stale.json["code"], "content_changed");
+    let missing = kit.patch(&sam, &one, json!({"adopt": true})).await;
+    assert_eq!(missing.json["code"], "content_changed");
+    // The whole rule sent with the adopt signs what it sent: no token.
+    let mut whole = move_github();
+    whole["adopt"] = json!(true);
+    let rewritten = kit.patch(&sam, &one, whole).await;
+    assert_eq!(rewritten.status, StatusCode::OK, "{:?}", rewritten.json);
+    // As shown now: adopted.
+    let body = as_shown(&kit, &sam, &one, json!({"adopt": true})).await;
+    let adopted = kit.patch(&sam, &one, body).await;
+    assert_eq!(adopted.status, StatusCode::OK, "{:?}", adopted.json);
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn another_rules_token_does_not_hold(db: PgPool) {
+    let kit = kit(db).await;
+    let (workspace, inbox, sam, _) = sams_notifications(&kit, 1).await;
+    let one = proposal(&kit, &sam, workspace, inbox).await;
+    let other = json!({
+        "conditions": [{"field": "sender_address", "value": "marta@example.com"}],
+        "actions": [{"action": "mark_read"}],
+        "state": "proposed",
+    });
+    let created = kit
+        .post(
+            &sam,
+            &format!("/api/v1/w/{workspace}/inboxes/{inbox}/rules"),
+            Some(other),
+        )
+        .await;
+    assert_eq!(created.status, StatusCode::CREATED, "{:?}", created.json);
+    // The other proposal's token (same member, inbox, state, generation).
+    let theirs = json!({
+        "apply_to_existing": false,
+        "content_token": created.json["rule"]["content_token"],
+    });
+    let refused = kit
+        .post(&sam, &format!("{one}/confirm"), Some(theirs))
+        .await;
+    assert_eq!(refused.status, StatusCode::CONFLICT, "{:?}", refused.json);
+    assert_eq!(refused.json["code"], "content_changed");
+    still_proposed(&kit, &one).await;
 }

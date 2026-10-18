@@ -1,5 +1,6 @@
 import { useTranslation } from "react-i18next";
 
+import { problemCode } from "~/lib/api";
 import { useUndoToast } from "~/lib/ui";
 
 import {
@@ -124,12 +125,14 @@ export function useRuleActions(workspaceId: string) {
   };
 
   /**
-   * Say yes to a proposed `rule`; Undo removes it and puts back what it
-   * changed. Kept but paused (its author is away for now), the toast says so.
+   * Say yes to a proposed `rule`, as it is shown; Undo removes it and puts
+   * back what it changed. Kept but paused (its author is away for now), the
+   * toast says so. Changed since it was shown, it is not kept: the list
+   * shows it again as it is, to look at before saying yes again.
    */
   const keepRule = (rule: RuleView) => {
     confirm.mutate(
-      { ruleId: rule.id },
+      { rule },
       {
         onSuccess: (kept) => {
           undo.push({
@@ -141,7 +144,13 @@ export function useRuleActions(workspaceId: string) {
             },
           });
         },
-        onError: failed,
+        onError: (thrown) => {
+          if (problemCode(thrown) === "content_changed") {
+            undo.notify(t("rules.toast.changed"));
+          } else {
+            failed();
+          }
+        },
       },
     );
   };

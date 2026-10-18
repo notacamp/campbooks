@@ -13,6 +13,7 @@
     "invalid_subject": "El asunto es una sola línea de como máximo {{max}} caracteres.",
     "draft_too_long": "Este mensaje es demasiado largo para enviarlo.",
     "draft_changed": "Este borrador se ha cambiado en otro sitio. Vuelve a cargarlo para ver la última versión.",
+    "content_changed": "Esto ha cambiado desde que lo abriste. Revísalo y vuelve a intentarlo.",
     "draft_not_editable": "Este mensaje ya está en camino y no se puede cambiar.",
     "no_recipients": "Añade al menos un destinatario.",
     "invalid_address": "Esta dirección no es válida: {{address}}",

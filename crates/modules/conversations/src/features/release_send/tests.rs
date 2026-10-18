@@ -36,12 +36,12 @@ async fn scheduled(
     assert_eq!(draft.status, StatusCode::CREATED, "{:?}", draft.json);
     let id: DraftId = draft.json["id"].as_str().unwrap().parse().unwrap();
     let uri = format!("{uri}/{id}");
-    let version = kit.get(token, &uri).await.json["version"].clone();
+    let shown = kit.get(token, &uri).await.json;
     let sent = kit
         .post(
             token,
             &format!("{uri}/send"),
-            Some(json!({"version": version})),
+            Some(json!({"version": shown["version"], "content_token": shown["content_token"]})),
         )
         .await;
     assert_eq!(sent.status, StatusCode::ACCEPTED, "{:?}", sent.json);
@@ -367,12 +367,12 @@ async fn the_binding_is_spent_once_released_or_cancelled(db: PgPool) {
 
     // Sent again: a new binding, for the new generation, spent at release
     // and replaced by the stored send's.
-    let version = kit.get(&sam, &uri).await.json["version"].clone();
+    let shown = kit.get(&sam, &uri).await.json;
     let resent = kit
         .post(
             &sam,
             &format!("{uri}/send"),
-            Some(json!({"version": version})),
+            Some(json!({"version": shown["version"], "content_token": shown["content_token"]})),
         )
         .await;
     assert_eq!(resent.status, StatusCode::ACCEPTED, "{:?}", resent.json);
