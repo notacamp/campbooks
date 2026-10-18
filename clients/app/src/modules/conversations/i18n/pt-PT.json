@@ -71,7 +71,14 @@
     "imagesHidden_other": "{{count}} imagens remotas ocultas, para que o remetente não saiba quando lê isto.",
     "imagesShown": "Imagens remotas visíveis.",
     "trustImages": "Mostrar sempre as imagens de {{name}}",
-    "imagesTrusted": "Imagens visíveis: confia em {{name}}. Os píxeis de rastreio continuam removidos."
+    "imagesTrusted": "Imagens visíveis: confia em {{name}}. Os píxeis de rastreio continuam removidos.",
+    "imagesTrustedInbox": "Imagens visíveis: esta caixa confia em {{name}}. Os píxeis de rastreio continuam removidos.",
+    "imagesHeld": {
+      "under_review": "As imagens continuam retidas: este email está em revisão.",
+      "checks_fail": "As imagens continuam retidas: este email não passa as verificações do remetente.",
+      "cannot_authenticate": "As imagens continuam retidas: este fornecedor de email não partilha as verificações do remetente, por isso aqui não se pode confiar em nenhum remetente.",
+      "not_checked": "As imagens esperam que o Scout verifique este email. Enquanto o Scout estiver desligado ou acima do limite diário, continuam retidas."
+    }
   },
   "toast": {
     "done": "Concluída · {{subject}}",
@@ -610,7 +617,7 @@
     "imagesMatches_one": "Já cá está {{n}} conversa deste remetente. As imagens aparecem sempre que o correio passa as verificações.",
     "imagesMatches_other": "Já cá estão {{n}} conversas deste remetente. As imagens aparecem sempre que o correio passa as verificações.",
     "imagesNew": "As imagens vão aparecer no correio novo deste remetente que passe as verificações.",
-    "imagesHow": "Só para correio que passa as verificações do remetente, nunca para correio que finge ser dele. Os píxeis de rastreio continuam removidos."
+    "imagesHow": "Só para correio que passa as verificações do remetente e em que o Scout não encontrou nada suspeito; por isso, enquanto o Scout estiver desligado ou acima do limite diário, continuam retidas. Nunca para correio que finge ser dele. Os píxeis de rastreio continuam removidos."
   },
   "ahead": {
     "reportTitle": "Nunca mais ver emails como este?",

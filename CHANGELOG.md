@@ -13,8 +13,14 @@ All notable changes to Campbooks Next are documented here. The format follows
   address or anyone at its domain. Their images then show on their own, but only when the
   mail passes the sender's checks and Campbooks has found nothing suspicious about it: mail
   pretending to be them, mail failing DMARC, and mail with no checks keep their images held
-  back. Tracking pixels stay removed either way, and
-  no AI is involved. Remove the rule in Scout's memory and Show images is back.
+  back. Tracking pixels stay removed either way. The rule itself is plain (no AI), but
+  images wait for Scout's check of each email, so while Scout is off or past its daily
+  limit they stay held back. Remove the rule in Scout's memory and Show images is back.
+  The offer only appears where it can take effect (not for a sender already trusted, mail
+  failing its checks, mail under review, or a provider that shares no sender checks), and
+  otherwise the reader says in one line why images stay held back. "Anyone at" is never
+  offered for a free mail or internet provider's domain (over 300 of them, subdomains
+  included), and in a shared inbox the note says the inbox trusts the sender.
 - **Home offers each email's own actions, picked by Scout (with the catalogue on).** When
   the action catalogue is switched on, the selected item's buttons are the ones the model
   ranked for that email, likelier first on 1, 2 and 3, with the visor saying Scout picked

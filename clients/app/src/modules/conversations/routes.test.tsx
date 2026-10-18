@@ -239,6 +239,7 @@ describe("the inbox", () => {
               trusted || new URL(request.url).searchParams.get("show_images") === "true",
             ),
             images_trusted: trusted,
+            ...(trusted ? { images_offer: false, images_domain: null } : {}),
           },
         }),
       [`POST ${W}/inboxes/${INBOX.id}/rules/preview`]: {
@@ -315,6 +316,73 @@ describe("the inbox", () => {
       await screen.findByRole("dialog", {
         name: "Always show images from hello@weekly-ledger.example",
       }),
+    ).toBeVisible();
+  });
+
+  it("says why images stay held back where trusting the sender could not take effect", async () => {
+    inbox({
+      [`GET ${W}/conversations/${LEDGER.id}/messages/${LEDGER_DETAIL.messages[0]?.id ?? ""}/body`]:
+        {
+          body: {
+            ...ledgerBody(false),
+            images_offer: false,
+            images_domain: null,
+            images_held: "checks_fail",
+          },
+        },
+    });
+    renderAt(`/w/${DUARTE.id}/inbox/primary/${LEDGER.id}`);
+    const reader = await screen.findByRole("main", { name: "Conversation" });
+    expect(
+      await within(reader).findByText(
+        "Images stay held back: this email doesn’t pass its sender’s checks.",
+      ),
+    ).toBeVisible();
+    expect(within(reader).getByRole("button", { name: /^Show images/u })).toBeVisible();
+    expect(within(reader).queryByRole("button", { name: /^Always show images/u })).toBeNull();
+    // ⇧A trusts nobody here.
+    fireEvent.keyDown(document, { key: "A", shiftKey: true });
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(screen.queryByRole("dialog")).toBeNull();
+  });
+
+  it("offers the address alone when the server offers no domain", async () => {
+    inbox({
+      [`GET ${W}/conversations/${LEDGER.id}/messages/${LEDGER_DETAIL.messages[0]?.id ?? ""}/body`]:
+        { body: { ...ledgerBody(false), images_domain: null } },
+    });
+    renderAt(`/w/${DUARTE.id}/inbox/primary/${LEDGER.id}`);
+    const reader = await screen.findByRole("main", { name: "Conversation" });
+    fireEvent.click(
+      await within(reader).findByRole("button", {
+        name: /^Always show images from The Weekly Ledger/u,
+      }),
+    );
+    const dialog = await screen.findByRole("dialog", {
+      name: "Always show images from hello@weekly-ledger.example",
+    });
+    expect(within(dialog).queryByRole("radio")).toBeNull();
+  });
+
+  it("says the inbox trusts the sender when others use it", async () => {
+    inbox({
+      [`GET ${W}/inboxes`]: { body: { inboxes: [{ ...INBOX, shared: true }] } },
+      [`GET ${W}/conversations/${LEDGER.id}/messages/${LEDGER_DETAIL.messages[0]?.id ?? ""}/body`]:
+        {
+          body: {
+            ...ledgerBody(true),
+            images_trusted: true,
+            images_offer: false,
+            images_domain: null,
+          },
+        },
+    });
+    renderAt(`/w/${DUARTE.id}/inbox/primary/${LEDGER.id}`);
+    const reader = await screen.findByRole("main", { name: "Conversation" });
+    expect(
+      await within(reader).findByText(
+        "Images shown: this inbox trusts The Weekly Ledger. Tracking pixels stay removed.",
+      ),
     ).toBeVisible();
   });
 

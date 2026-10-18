@@ -71,7 +71,14 @@
     "imagesHidden_other": "{{count}} remote images hidden, so the sender cannot see when you read this.",
     "imagesShown": "Remote images shown.",
     "trustImages": "Always show images from {{name}}",
-    "imagesTrusted": "Images shown: you trust {{name}}. Tracking pixels stay removed."
+    "imagesTrusted": "Images shown: you trust {{name}}. Tracking pixels stay removed.",
+    "imagesTrustedInbox": "Images shown: this inbox trusts {{name}}. Tracking pixels stay removed.",
+    "imagesHeld": {
+      "under_review": "Images stay held back: this email is under review.",
+      "checks_fail": "Images stay held back: this email doesn’t pass its sender’s checks.",
+      "cannot_authenticate": "Images stay held back: this mail provider doesn’t share sender checks, so no sender can be trusted here.",
+      "not_checked": "Images wait for Scout to check this email. While Scout is off or past its daily limit, they stay held back."
+    }
   },
   "toast": {
     "done": "Done · {{subject}}",
@@ -610,7 +617,7 @@
     "imagesMatches_one": "{{n}} conversation from them is already here. Their images show whenever their mail passes its checks.",
     "imagesMatches_other": "{{n}} conversations from them are already here. Their images show whenever their mail passes its checks.",
     "imagesNew": "Their images will show in new mail from them that passes its sender checks.",
-    "imagesHow": "Only for mail that passes the sender’s checks, never for mail pretending to be them. Tracking pixels stay removed."
+    "imagesHow": "Only for mail that passes the sender’s checks and that Scout found nothing suspicious in, so while Scout is off or past its daily limit they stay held back. Never for mail pretending to be them. Tracking pixels stay removed."
   },
   "ahead": {
     "reportTitle": "Never see emails like this again?",
