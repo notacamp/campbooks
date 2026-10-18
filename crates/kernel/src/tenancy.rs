@@ -30,6 +30,7 @@ use utoipa::ToSchema;
 use crate::{
     AppState, Error,
     auth::{AuthFailure, Principal, PrincipalKind, ScopeName, Scoped},
+    operations::{Caller, InvokedBy},
 };
 
 crate::define_id!(
@@ -369,7 +370,26 @@ pub struct Workspace<S: ScopeName> {
     pub id: WorkspaceId,
     /// What the caller may do there.
     pub access: Access,
+    /// Who ran the request in-process for `principal`
+    /// ([`invoke`](crate::operations::invoke)): the assistant or an
+    /// automation rule acting on the person's behalf. `None` for a request
+    /// that arrived over HTTP with the person's own token (their client or
+    /// an app they allowed). Only the kernel sets it, from a request
+    /// extension nothing outside the process can attach and no module can
+    /// construct, so a client cannot claim to be the person when the
+    /// assistant is calling, nor the other way round.
+    pub invoked_by: Option<Caller>,
     scope: PhantomData<fn() -> S>,
+}
+
+impl<S: ScopeName> Workspace<S> {
+    /// Whether the request is the person's own: it arrived over HTTP, not
+    /// from the assistant or automation acting for them. A member's own
+    /// click is the only thing that may say yes to a rule
+    /// (campbooks-cloud#242).
+    pub fn on_own_request(&self) -> bool {
+        self.invoked_by.is_none()
+    }
 }
 
 impl<S: ScopeName> std::fmt::Debug for Workspace<S> {
@@ -379,6 +399,7 @@ impl<S: ScopeName> std::fmt::Debug for Workspace<S> {
             .field("id", &self.id)
             .field("access", &self.access)
             .field("principal", &self.principal)
+            .field("invoked_by", &self.invoked_by)
             .finish()
     }
 }
@@ -416,10 +437,15 @@ impl<S: ScopeName> FromRequestParts<AppState> for Workspace<S> {
             crate::telemetry::field::WORKSPACE_ID,
             tracing::field::display(id),
         );
+        let invoked_by = parts
+            .extensions
+            .get::<InvokedBy>()
+            .map(|InvokedBy(caller)| *caller);
         Ok(Self {
             principal,
             id,
             access,
+            invoked_by,
             scope: PhantomData,
         })
     }

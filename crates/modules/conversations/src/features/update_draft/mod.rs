@@ -172,7 +172,7 @@ pub async fn update(
     Ok(Json(draft))
 }
 
-/// Discard a draft (also a scheduled one, which then never leaves).
+/// Discard a draft (not one on its way: cancel its send first).
 #[utoipa::path(
     delete,
     path = "/api/v1/w/{workspace_id}/drafts/{draft_id}",
@@ -194,7 +194,7 @@ pub async fn update(
             body = Problem, content_type = "application/problem+json"),
         (status = NOT_FOUND, description = "No such draft, or it is not yours.",
             body = Problem, content_type = "application/problem+json"),
-        (status = CONFLICT, description = "On its way (`draft_not_editable`).",
+        (status = CONFLICT, description = "Scheduled or on its way (`draft_not_editable`): cancel its send first.",
             body = Problem, content_type = "application/problem+json"),
     )
 )]
@@ -207,7 +207,10 @@ pub async fn delete(
     let id = path.draft_id;
     let mut tx = state.db.begin_for(access.workspace).await?;
     let row = drafts::load(&state, &mut tx, access, id, true, Action::Delete).await?;
-    if row.state()? == DraftState::Sending {
+    // A scheduled send is taken back only by a deliberate cancel
+    // (`conversations.cancel_send`, the Undo), never as a side effect of a
+    // discard (campbooks-cloud#242): then it is a draft again and may go.
+    if !row.state()?.editable() {
         return Err(Error::Conflict(
             crate::MESSAGES.reason("draft_not_editable"),
         ));

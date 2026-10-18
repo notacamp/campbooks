@@ -516,16 +516,19 @@ impl Stored {
         })
     }
 
-    /// For a proposed rule, why it would be paused once a member says yes
-    /// (confirming keeps its author, campbooks-cloud#197): an author away
-    /// for now, one who can no longer change the inbox, an inbox kept
-    /// read-only. `None` for any other rule, or when it would act.
+    /// For a proposed rule, why it would be paused once a member says yes:
+    /// an inbox kept read-only, or a domain too broad. The member who says
+    /// yes becomes its author (campbooks-cloud#242), and may change the
+    /// inbox (confirming takes that), so its author's reasons never hold
+    /// once kept. `None` for any other rule, or when it would act.
     pub fn paused_once_kept(&self) -> Option<PausedReason> {
         if self.state != RuleState::Proposed {
             return None;
         }
         let kept = Self {
             state: RuleState::Active,
+            author_may_act: true,
+            author_suspended: false,
             ..self.clone()
         };
         kept.paused_reason()
@@ -1049,15 +1052,18 @@ mod stored_tests {
         assert_eq!(rule.effective_state(), RuleState::Proposed);
         assert_eq!(rule.paused_reason(), None);
         assert_eq!(rule.paused_once_kept(), None);
+        // Its stored author away or gone: whoever says yes becomes its
+        // author (campbooks-cloud#242), so it would act.
         rule.author_suspended = true;
-        assert_eq!(
-            rule.paused_once_kept(),
-            Some(PausedReason::AuthorUnavailable)
-        );
+        rule.author_may_act = false;
+        assert_eq!(rule.paused_once_kept(), None);
+        // Only what no yes clears is said.
+        rule.inbox_detached = true;
+        assert_eq!(rule.paused_once_kept(), Some(PausedReason::InboxReadOnly));
         // Only for a proposal: an active rule says so with `paused_reason`.
         rule.state = RuleState::Active;
         assert_eq!(rule.paused_once_kept(), None);
-        assert_eq!(rule.paused_reason(), Some(PausedReason::AuthorUnavailable));
+        assert_eq!(rule.paused_reason(), Some(PausedReason::InboxReadOnly));
     }
 
     #[test]

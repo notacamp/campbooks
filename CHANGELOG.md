@@ -260,6 +260,21 @@ All notable changes to Campbooks Next are documented here. The format follows
 
 ### Security
 
+- **Scout can propose rules but never keep them for you (campbooks-cloud#242).** When the
+  assistant (or an automation) calls the API on your behalf, the server now refuses (`rule_needs_your_yes`) to
+  say yes to a rule, to adopt one, to let a paused one act again, to change what a kept
+  rule does, or to bring a removed rule back acting, even with the token it read for you
+  and even if the call was marked as confirmed: nothing is signed and nothing changes. A
+  rule it saves is always a suggestion waiting for your yes in Scout's memory, whatever it
+  asked for and even if you let Campbooks act without asking. It may still pause, remove
+  or turn down a rule, and change a suggestion before you see it. Your own Keep works as
+  before. Which requests come from the assistant is decided inside the server and cannot
+  be set by an app. A yes to a suggestion now makes you its author, as a yes again already
+  did, so it acts with your rights rather than those of whoever it was stored under. A
+  message that is scheduled to send can no longer be discarded, only taken back with Undo
+  (then it can be deleted), and the Scout reply dialog never discards a message on its way.
+  No Scout feature in this release calls these on its own yet: this closes the door before
+  one does.
 - **Send, saves and Keep act only on what you were shown (campbooks-cloud#242).** Every
   draft and rule the server shows you now comes with a token bound to you and to exactly
   that draft or rule: a draft's recipients (Bcc too), subject, text, quoted text, reply

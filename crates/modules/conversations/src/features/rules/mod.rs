@@ -13,7 +13,7 @@ pub(crate) mod tests;
 use axum::{Json, extract::State, http::StatusCode};
 use campbooks_kernel::{
     AppState, Error, Operation, Problem, Result, Risk,
-    auth::{Principal, PrincipalKind},
+    auth::{Principal, PrincipalKind, ScopeName},
     authz::Action,
     binding::Binding,
     db::BeginFor as _,
@@ -105,9 +105,9 @@ pub struct RuleView {
     /// Why it is paused; absent unless `state` is `paused`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub paused_reason: Option<PausedReason>,
-    /// For a proposed rule, why it would be paused once kept (confirming
-    /// keeps its author): say so before a member says yes. Absent for any
-    /// other rule, or when it would act.
+    /// For a proposed rule, why it would be paused once kept (the member
+    /// who says yes becomes its author): say so before a member says yes.
+    /// Absent for any other rule, or when it would act.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub paused_once_kept: Option<PausedReason>,
     /// Who taught it; `None` when a client did.
@@ -225,6 +225,28 @@ pub(crate) fn member_only(principal: &Principal) -> Result<()> {
         return Err(Error::Denied(crate::MESSAGES.reason("rule_needs_member")));
     }
     Ok(())
+}
+
+/// 403 `rule_needs_your_yes` unless the request is the member's own
+/// (campbooks-cloud#242). The assistant, or an automation rule, acting for
+/// a member may propose a rule, pause one or take one away, but never say
+/// yes to one, adopt it, let it act again or change what a kept rule does:
+/// each of those signs a rule as the member's, and the member may never
+/// have seen it (mail is untrusted input to the assistant, so a message
+/// could ask for it). Only the kernel says who invoked a request
+/// ([`Workspace::invoked_by`]), from a request extension no client can
+/// send. Checked after the access checks, before anything changes.
+fn members_own_yes<S: ScopeName>(workspace: &Workspace<S>, rule: Option<RuleId>) -> Result<()> {
+    let Some(caller) = workspace.invoked_by else {
+        return Ok(());
+    };
+    tracing::warn!(
+        workspace = %workspace.id,
+        rule = %rule.map_or_else(|| "none".to_owned(), |id| id.to_string()),
+        caller = %caller,
+        "a rule was not signed: only a member's own request says yes to one"
+    );
+    Err(Error::Denied(crate::MESSAGES.reason("rule_needs_your_yes")))
 }
 
 /// Rule `id` (not removed) if the caller may read it (any role in its
@@ -656,7 +678,7 @@ pub struct CreatedRule {
             content_type = "application/problem+json"),
         (status = UNAUTHORIZED, description = "No valid access token.", body = Problem,
             content_type = "application/problem+json"),
-        (status = FORBIDDEN, description = "Missing scope, or you may only read this inbox.",
+        (status = FORBIDDEN, description = "Missing scope, you may only read this inbox, or a suggestion saved by the assistant rather than by you (`rule_needs_your_yes`).",
             body = Problem, content_type = "application/problem+json"),
         (status = NOT_FOUND, description = "No such inbox, or you cannot see it.",
             body = Problem, content_type = "application/problem+json"),
@@ -681,9 +703,29 @@ pub async fn create(
     let mut tx = state.db.begin_for(access.workspace).await?;
     may_teach(&state, &mut tx, access, path.inbox_id).await?;
     member_only(&workspace.principal)?;
-    let created = create_in(&mut tx, &state, access, path.inbox_id, &body).await?;
+    // A suggestion saved as a smart rule acts at once: the member's own yes.
+    if body.notice_id.is_some() {
+        members_own_yes(&workspace, None)?;
+    }
+    let teacher = if workspace.on_own_request() {
+        Teacher::Member
+    } else {
+        Teacher::OnTheirBehalf
+    };
+    let created = create_in(&mut tx, &state, access, path.inbox_id, &body, teacher).await?;
     tx.commit().await?;
     Ok((StatusCode::CREATED, Json(created)))
+}
+
+/// Who is creating a rule.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Teacher {
+    /// The member, in their own request: it starts as they ask.
+    Member,
+    /// The assistant or an automation rule acting for the member
+    /// (campbooks-cloud#242): it is only ever proposed, and acts once the
+    /// member says yes to it.
+    OnTheirBehalf,
 }
 
 /// The state a new rule starts in, and whether it acts without asking.
@@ -691,10 +733,13 @@ async fn starting_state(
     tx: &mut Transaction<'_, Postgres>,
     state: &AppState,
     access: &Access,
-    inbox: InboxId,
+    (inbox, teacher): (InboxId, Teacher),
     body: &CreateRule,
     origin: RuleOrigin,
 ) -> Result<(RuleState, bool)> {
+    if teacher == Teacher::OnTheirBehalf {
+        return Ok((RuleState::Proposed, false));
+    }
     let from_evidence = body.notice_id.is_none()
         && matches!(origin, RuleOrigin::Correction | RuleOrigin::Suggestion);
     Ok(if from_evidence {
@@ -724,13 +769,14 @@ async fn starting_state(
 }
 
 /// Create `body` in `inbox` for `access` in `tx` (the caller checked they
-/// may teach there).
+/// may teach there), taught by `teacher`.
 pub async fn create_in(
     tx: &mut Transaction<'_, Postgres>,
     state: &AppState,
     access: &Access,
     inbox: InboxId,
     body: &CreateRule,
+    teacher: Teacher,
 ) -> Result<CreatedRule> {
     rules::labels_of_inbox(tx, inbox, &body.conditions, &body.actions).await?;
     rules::sender_seen(tx, inbox, &body.conditions, &body.actions).await?;
@@ -745,7 +791,7 @@ pub async fn create_in(
         body.origin
     };
     let (rule_state, acted_without_asking) =
-        starting_state(tx, state, access, inbox, body, origin).await?;
+        starting_state(tx, state, access, (inbox, teacher), body, origin).await?;
     let ws = access.workspace.to_string();
     if let Some(from) = body.from_conversation_id {
         let in_inbox = sqlx::query_scalar!(
@@ -919,9 +965,10 @@ pub struct ConfirmRule {
     operation_id = "conversations.confirm_rule",
     tag = "conversations",
     security(("bearer" = ["conversations:write"])),
+    // Never the assistant's (campbooks-cloud#242): only a member's own
+    // request says yes to a rule.
     extensions(("x-campbooks" = json!(Operation::command(Risk::Low)
         .undo("conversations.remove_rule")
-        .assistant()
         .records(["conversations.rule", "conversations.conversation"]).access("conversations.inbox", campbooks_kernel::authz::Action::Write)))),
     params(
         ("workspace_id" = WorkspaceId, Path, description = "The workspace."),
@@ -934,7 +981,7 @@ pub struct ConfirmRule {
             content_type = "application/problem+json"),
         (status = UNAUTHORIZED, description = "No valid access token.", body = Problem,
             content_type = "application/problem+json"),
-        (status = FORBIDDEN, description = "Missing scope, or you may only read this inbox.",
+        (status = FORBIDDEN, description = "Missing scope, you may only read this inbox, or not your own request (`rule_needs_your_yes`): only you say yes to a rule.",
             body = Problem, content_type = "application/problem+json"),
         (status = NOT_FOUND, description = "No such rule, or you cannot see it.",
             body = Problem, content_type = "application/problem+json"),
@@ -953,6 +1000,10 @@ pub async fn confirm(
     let rule = visible_rule(&state, &mut tx, access, path.rule_id).await?;
     may_teach(&state, &mut tx, access, rule.inbox).await?;
     member_only(&workspace.principal)?;
+    members_own_yes(&workspace, Some(rule.id))?;
+    let user = access
+        .user
+        .ok_or_else(|| Error::Denied(crate::MESSAGES.reason("rule_needs_member")))?;
     // Runs, then the rule row, then the check, so it holds to the end: a
     // decline or another confirm in between finds it no longer proposed.
     rule_runs::lock_running(&mut tx, rule.id).await?;
@@ -987,13 +1038,17 @@ pub async fn confirm(
         Some(rule.id),
     )
     .await?;
+    // The member who says yes is its author from now on, as for a yes again
+    // (campbooks-cloud#242): the stored author is SQL's to choose, and was
+    // never on screen, so the rule acts with the rights of the member whose
+    // click signs it.
     sqlx::query!(
         r#"UPDATE conversations.rules
               SET state = 'active', confirmed_at = now(), updated_at = now(),
-                  taught_by = coalesce(taught_by, $2)
+                  taught_by = $2
             WHERE id = $1"#,
         rule.id as RuleId,
-        access.user.map(|u| *u.as_uuid()),
+        user.as_uuid(),
     )
     .execute(&mut *tx)
     .await?;
@@ -1188,7 +1243,7 @@ pub struct UpdateRule {
             content_type = "application/problem+json"),
         (status = UNAUTHORIZED, description = "No valid access token.", body = Problem,
             content_type = "application/problem+json"),
-        (status = FORBIDDEN, description = "Missing scope, or not your rule.", body = Problem,
+        (status = FORBIDDEN, description = "Missing scope, not your rule, or adopting, resuming or reshaping a kept rule other than in your own request (`rule_needs_your_yes`).", body = Problem,
             content_type = "application/problem+json"),
         (status = NOT_FOUND, description = "No such rule, or you cannot see it.",
             body = Problem, content_type = "application/problem+json"),
@@ -1218,11 +1273,17 @@ pub async fn update(
     let rule = rules::find(&mut tx, rule.id)
         .await?
         .ok_or(Error::NotFound)?;
+    // Adopting, letting it act again and changing what a kept rule does all
+    // sign it as the member's: their own request only. Pausing it, or
+    // reshaping a proposal (which still waits for a yes), signs nothing new.
+    let reshaped = body.conditions.is_some() || body.actions.is_some();
+    if body.adopt || body.paused == Some(false) || (reshaped && rule.state != RuleState::Proposed) {
+        members_own_yes(&workspace, Some(rule.id))?;
+    }
     if body.paused.is_some() && rule.state == RuleState::Proposed {
         // A proposed rule acts only once someone says yes (`confirm_rule`).
         return Err(Error::Conflict(crate::MESSAGES.reason("rule_not_active")));
     }
-    let reshaped = body.conditions.is_some() || body.actions.is_some();
     // A kept rule keeps fields this request does not set (its author, the
     // conditions or actions it leaves alone): it is signed again only when
     // it is bound as it is (campbooks-cloud#242). One that is not may only be
@@ -1463,7 +1524,7 @@ pub struct RestoreRule {
         (status = OK, description = "The rule, back as it was.", body = RuleView),
         (status = UNAUTHORIZED, description = "No valid access token.", body = Problem,
             content_type = "application/problem+json"),
-        (status = FORBIDDEN, description = "Missing scope, or not your rule.", body = Problem,
+        (status = FORBIDDEN, description = "Missing scope, not your rule, or bringing a kept rule back other than in your own request (`rule_needs_your_yes`).", body = Problem,
             content_type = "application/problem+json"),
         (status = NOT_FOUND, description = "No such rule, or you cannot see it.",
             body = Problem, content_type = "application/problem+json"),
@@ -1515,6 +1576,11 @@ pub async fn restore(
         )
     {
         return Err(Error::Denied(crate::MESSAGES.reason("rule_not_yours")));
+    }
+    // Back as kept, it is signed and acts again: the member's own request
+    // only. A proposal comes back waiting for its yes.
+    if back != RuleState::Proposed {
+        members_own_yes(&workspace, Some(rule.id))?;
     }
     if !found.restorable {
         return Err(Error::Conflict(

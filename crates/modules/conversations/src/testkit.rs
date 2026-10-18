@@ -26,10 +26,11 @@ use campbooks_ai::{
 };
 use campbooks_kernel::{
     AppState, Error,
-    auth::{Principal, PrincipalKind},
+    auth::{Principal, PrincipalKind, Scope},
     blobs::{BlobRef, BlobStore},
     config::BlobsConfig,
     jobs::{Registry, Worker, WorkerStats},
+    operations,
     tenancy::{Access, Membership, MembershipFuture, Role, UserId, WorkspaceId},
     testing::{self, TestIdp, TestResponse},
 };
@@ -343,6 +344,44 @@ impl Kit {
     /// `PATCH uri` with a JSON body.
     pub async fn patch(&self, token: &str, uri: &str, body: serde_json::Value) -> TestResponse {
         self.call(Method::PATCH, token, uri, Some(body)).await
+    }
+
+    /// Run `operation` by id as the assistant acting for member `sub` in
+    /// `workspace` ([`operations::invoke`]): the same routes, scope and
+    /// membership checks as their HTTP request, with an idempotency key, and
+    /// marked confirmed (the user said yes to the call) when `confirmed`.
+    pub async fn as_assistant(
+        &self,
+        sub: &str,
+        workspace: WorkspaceId,
+        (operation, input): (&str, Value),
+        confirmed: bool,
+    ) -> Result<operations::Output, operations::InvokeError> {
+        let module = crate::module(self.deps.clone());
+        let resources = campbooks_kernel::authz::Catalogue::new([&module.resources]).unwrap();
+        let state =
+            operations::compose(module.router, self.state.clone().with_resources(resources)).state;
+        let principal = Principal {
+            subject: sub.to_owned(),
+            kind: PrincipalKind::User,
+            client_id: None,
+            scopes: ALL_SCOPES.split(' ').map(Scope::new).collect(),
+            workspace: None,
+            email: Some(format!("{sub}@example.com")),
+            email_verified: true,
+            name: None,
+            expires_at: None,
+            issued_at: None,
+            auth_time: None,
+        };
+        let mut invocation =
+            operations::Invocation::new(operations::Caller::Assistant, principal, operation, input)
+                .in_workspace(workspace.to_string())
+                .idempotency_key(sqlx::types::Uuid::now_v7().to_string());
+        if confirmed {
+            invocation = invocation.confirmed();
+        }
+        operations::invoke(&state, invocation).await
     }
 
     /// The id of message `provider_message_id`.

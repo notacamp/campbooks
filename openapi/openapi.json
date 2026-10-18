@@ -5829,7 +5829,7 @@
         "tags": [
           "conversations"
         ],
-        "summary": "Discard a draft (also a scheduled one, which then never leaves).",
+        "summary": "Discard a draft (not one on its way: cancel its send first).",
         "operationId": "conversations.delete_draft",
         "parameters": [
           {
@@ -5886,7 +5886,7 @@
             }
           },
           "409": {
-            "description": "On its way (`draft_not_editable`).",
+            "description": "Scheduled or on its way (`draft_not_editable`): cancel its send first.",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -6894,7 +6894,7 @@
             }
           },
           "403": {
-            "description": "Missing scope, or you may only read this inbox.",
+            "description": "Missing scope, you may only read this inbox, or a suggestion saved by the assistant rather than by you (`rule_needs_your_yes`).",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -8326,7 +8326,7 @@
             }
           },
           "403": {
-            "description": "Missing scope, or not your rule.",
+            "description": "Missing scope, not your rule, or adopting, resuming or reshaping a kept rule other than in your own request (`rule_needs_your_yes`).",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -8447,7 +8447,7 @@
             }
           },
           "403": {
-            "description": "Missing scope, or you may only read this inbox.",
+            "description": "Missing scope, you may only read this inbox, or not your own request (`rule_needs_your_yes`): only you say yes to a rule.",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -8489,7 +8489,7 @@
             "action": "write",
             "resource": "conversations.inbox"
           },
-          "assistant": true,
+          "assistant": false,
           "automation": false,
           "mutates": true,
           "records": [
@@ -8662,7 +8662,7 @@
             }
           },
           "403": {
-            "description": "Missing scope, or not your rule.",
+            "description": "Missing scope, not your rule, or bringing a kept rule back other than in your own request (`rule_needs_your_yes`).",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -17289,7 +17289,7 @@
             "oneOf": [
               {
                 "$ref": "#/components/schemas/PausedReason",
-                "description": "For a proposed rule, why it would be paused once kept (confirming\nkeeps its author): say so before a member says yes. Absent for any\nother rule, or when it would act."
+                "description": "For a proposed rule, why it would be paused once kept (the member\nwho says yes becomes its author): say so before a member says yes.\nAbsent for any other rule, or when it would act."
               },
               {
                 "type": "null"

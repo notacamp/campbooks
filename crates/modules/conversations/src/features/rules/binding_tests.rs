@@ -2,12 +2,21 @@
 //! planted or changed with SQL as the runtime role changes nothing, and asks
 //! the provider for nothing; what members teach still acts.
 
+use std::sync::Arc;
+
 use axum::http::StatusCode;
-use campbooks_kernel::{db::BeginFor as _, jobs, tenancy::WorkspaceId};
+use campbooks_kernel::{
+    db::BeginFor as _,
+    jobs,
+    operations::{InvokeError, Output},
+    tenancy::WorkspaceId,
+};
 use serde_json::{Value, json};
 use sqlx::{PgPool, types::Uuid};
 
-use super::tests::{GITHUB, as_shown, kit, move_github, sams_notifications};
+use super::tests::{
+    ActsWithoutAsking, GITHUB, as_shown, from_corrections, kit, move_github, sams_notifications,
+};
 use crate::{
     domain::rule_runs::RunBatch,
     features::apply_rule::ApplyRules,
@@ -777,4 +786,222 @@ async fn another_rules_token_does_not_hold(db: PgPool) {
     assert_eq!(refused.status, StatusCode::CONFLICT, "{:?}", refused.json);
     assert_eq!(refused.json["code"], "content_changed");
     still_proposed(&kit, &one).await;
+}
+
+// --- The assistant proposes; only the member says yes (campbooks-cloud#242) --
+
+/// `(binding_generation, mac, state)` of rule `id`: what a refused request
+/// leaves exactly as it was.
+async fn signed(kit: &Kit, id: Uuid) -> (i64, Option<Vec<u8>>, String) {
+    sqlx::query_as("SELECT binding_generation, mac, state FROM conversations.rules WHERE id = $1")
+        .bind(id)
+        .fetch_one(&kit.db)
+        .await
+        .unwrap()
+}
+
+/// The assistant's call was refused by the rule, as only a member's own
+/// request may make it act.
+fn needs_the_members_yes(result: &Result<Output, InvokeError>) {
+    match result {
+        Err(InvokeError::Failed {
+            status, problem, ..
+        }) => {
+            assert_eq!(*status, StatusCode::FORBIDDEN, "{problem}");
+            assert_eq!(problem["code"], "rule_needs_your_yes", "{problem}");
+        }
+        other => panic!("not refused: {other:?}"),
+    }
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn the_assistant_never_says_yes_to_a_rule_the_member_does(db: PgPool) {
+    let kit = kit(db).await;
+    let (workspace, inbox, sam, sam_id) = sams_notifications(&kit, 2).await;
+    let one = proposal(&kit, &sam, workspace, inbox).await;
+    let rule = one.rsplit('/').next().unwrap().to_owned();
+    // The assistant reads the proposal as Sam, a read it may make: the token
+    // it gets is Sam's.
+    let read = kit
+        .as_assistant(
+            "sam",
+            workspace,
+            ("conversations.get_rule", json!({"rule_id": rule})),
+            false,
+        )
+        .await
+        .unwrap();
+    let token = read.body["content_token"].clone();
+    assert!(token.is_string(), "{}", read.body);
+    // Saying yes with it, even as a call the user confirmed: never run.
+    for confirmed in [false, true] {
+        let refused = kit
+            .as_assistant(
+                "sam",
+                workspace,
+                (
+                    "conversations.confirm_rule",
+                    json!({"rule_id": rule, "apply_to_existing": true, "content_token": token}),
+                ),
+                confirmed,
+            )
+            .await;
+        assert!(
+            matches!(refused, Err(InvokeError::NotAllowed { .. })),
+            "{refused:?}"
+        );
+        still_proposed(&kit, &one).await;
+    }
+    // Sam's own Keep, with the token Sam's screen got: kept, and Sam's.
+    let body = as_shown(&kit, &sam, &one, json!({"apply_to_existing": false})).await;
+    let kept = kit.post(&sam, &format!("{one}/confirm"), Some(body)).await;
+    assert_eq!(kept.status, StatusCode::OK, "{:?}", kept.json);
+    assert_eq!(kept.json["state"], "active");
+    assert_eq!(kept.json["taught_by"], sam_id.to_string());
+    assert!(signed(&kit, rule.parse().unwrap()).await.1.is_some());
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn what_the_assistant_saves_is_only_ever_proposed(db: PgPool) {
+    // Even for a member who lets Campbooks act without asking.
+    let kit = kit(db).await.with_preferences(Arc::new(ActsWithoutAsking));
+    let (workspace, inbox, _, _) = sams_notifications(&kit, 2).await;
+    let save = |rule: Value| {
+        let kit = &kit;
+        async move {
+            let mut input = rule;
+            input["inbox_id"] = json!(inbox.to_string());
+            kit.as_assistant(
+                "sam",
+                workspace,
+                ("conversations.create_rule", input),
+                false,
+            )
+            .await
+        }
+    };
+    // Asked to save it acting (the default), or from corrections: proposed,
+    // unsigned, applied to nothing.
+    let trash = json!({
+        "conditions": [{"field": "sender_address", "value": GITHUB}],
+        "actions": [{"action": "trash"}],
+    });
+    for rule in [trash.clone(), from_corrections()] {
+        let created = save(rule).await.unwrap();
+        assert_eq!(
+            created.body["rule"]["state"], "proposed",
+            "{}",
+            created.body
+        );
+        assert_eq!(created.body["acted_without_asking"], false);
+        let id = created.body["rule"]["id"].as_str().unwrap();
+        still_proposed(&kit, &format!("/api/v1/w/{workspace}/rules/{id}")).await;
+    }
+    // A suggestion saved as a smart rule acts at once: never the assistant's.
+    let mut answer = trash;
+    answer["notice_id"] = json!(Uuid::now_v7().to_string());
+    needs_the_members_yes(&save(answer).await);
+    let (_, _, in_inbox, _) = flags(&kit, "gh-0").await;
+    assert!(in_inbox, "nothing it proposed acted");
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn the_assistant_may_pause_or_remove_a_rule_but_never_make_it_act(db: PgPool) {
+    let kit = kit(db).await;
+    let (workspace, inbox, sam, _) = sams_notifications(&kit, 2).await;
+    let rule = archive_github(&kit, &sam, workspace, inbox).await;
+    let one = format!("/api/v1/w/{workspace}/rules/{rule}");
+    let id = rule.to_string();
+    let assistant = |operation: &'static str, input: Value| {
+        let kit = &kit;
+        async move {
+            kit.as_assistant("sam", workspace, (operation, input), false)
+                .await
+        }
+    };
+    let token = assistant("conversations.get_rule", json!({"rule_id": id}))
+        .await
+        .unwrap()
+        .body["content_token"]
+        .clone();
+    // Adopting it, or changing what it does: refused, nothing signed.
+    let before = signed(&kit, rule).await;
+    for input in [
+        json!({"rule_id": id, "adopt": true, "content_token": token}),
+        json!({"rule_id": id, "actions": [{"action": "trash"}]}),
+        json!({"rule_id": id, "conditions": [{"field": "sender_domain", "value": "github.com"}],
+               "actions": [{"action": "spam"}]}),
+    ] {
+        needs_the_members_yes(&assistant("conversations.update_rule", input).await);
+        assert_eq!(signed(&kit, rule).await, before);
+    }
+    // Pausing it: allowed, it acts less.
+    let paused = assistant(
+        "conversations.update_rule",
+        json!({"rule_id": id, "paused": true}),
+    )
+    .await
+    .unwrap();
+    assert_eq!(paused.body["state"], "paused");
+    // Letting it act again is Sam's.
+    let before = signed(&kit, rule).await;
+    needs_the_members_yes(
+        &assistant(
+            "conversations.update_rule",
+            json!({"rule_id": id, "paused": false}),
+        )
+        .await,
+    );
+    assert_eq!(signed(&kit, rule).await, before);
+    let resumed = kit.patch(&sam, &one, json!({"paused": false})).await;
+    assert_eq!(resumed.status, StatusCode::OK, "{:?}", resumed.json);
+    assert_eq!(resumed.json["state"], "active");
+    // Removing it: allowed. Bringing it back acting is Sam's (his Undo).
+    assert!(
+        assistant("conversations.remove_rule", json!({"rule_id": id}))
+            .await
+            .is_ok()
+    );
+    let before = signed(&kit, rule).await;
+    needs_the_members_yes(
+        &assistant(
+            "conversations.restore_rule",
+            json!({"rule_id": id, "apply_to_existing": false}),
+        )
+        .await,
+    );
+    assert_eq!(signed(&kit, rule).await, before);
+    let back = kit
+        .post(&sam, &format!("{one}/restore"), Some(json!({})))
+        .await;
+    assert_eq!(back.status, StatusCode::OK, "{:?}", back.json);
+    assert_eq!(back.json["state"], "active");
+    assert_eq!(back.json["needs_confirmation"], false);
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn the_assistant_may_reshape_a_proposal_that_still_waits_for_a_yes(db: PgPool) {
+    let kit = kit(db).await;
+    let (workspace, inbox, sam, _) = sams_notifications(&kit, 1).await;
+    let one = proposal(&kit, &sam, workspace, inbox).await;
+    let rule = one.rsplit('/').next().unwrap().to_owned();
+    let reshaped = kit
+        .as_assistant(
+            "sam",
+            workspace,
+            (
+                "conversations.update_rule",
+                json!({"rule_id": rule, "actions": [{"action": "archive"}]}),
+            ),
+            false,
+        )
+        .await
+        .unwrap();
+    assert_eq!(reshaped.body["state"], "proposed");
+    still_proposed(&kit, &one).await;
+    // Sam sees what it does now, and says yes to that.
+    let body = as_shown(&kit, &sam, &one, json!({"apply_to_existing": false})).await;
+    let kept = kit.post(&sam, &format!("{one}/confirm"), Some(body)).await;
+    assert_eq!(kept.status, StatusCode::OK, "{:?}", kept.json);
+    assert_eq!(kept.json["actions"][0]["action"], "archive");
 }
