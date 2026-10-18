@@ -222,6 +222,12 @@ All notable changes to Campbooks Next are documented here. The format follows
   the composer now says "This email is long: the quote holds its first part.", and the
   reply dialog says so too. When the dialog's preview shows only the start of a quote, it
   says the reply quotes all of it.
+- **A reply keeps answering the email its draft was written for.** If new mail arrives in
+  the conversation while you review Scout's draft, Send still replies to the email it was
+  written for; the dialog says a newer message arrived and offers "Answer the newer one",
+  which writes the draft again for it. A send that can't be taken back no longer offers an
+  Undo that could only say "too late", and keyboard shortcuts on the page are no longer
+  swallowed by an open dialog that lost its focus.
 
 ### Added
 

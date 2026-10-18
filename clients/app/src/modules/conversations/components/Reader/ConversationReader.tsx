@@ -75,6 +75,8 @@ export interface ConversationReaderProps {
   renderReplySlot?: RenderReplySlot | undefined;
   /** Open the reply composer once the conversation is loaded (Home's R). */
   startReply?: boolean | undefined;
+  /** The message that reply answers (a draft written for it), else the newest. */
+  replyTo?: string | undefined;
   now?: Date | undefined;
 }
 
@@ -95,6 +97,7 @@ export function ConversationReader({
   onDone,
   renderReplySlot: replySlot,
   startReply = false,
+  replyTo,
   now,
 }: ConversationReaderProps) {
   const { t: typed, i18n } = useTranslation("conversations");
@@ -173,19 +176,23 @@ export function ConversationReader({
   const suggestion = writable ? (conversation?.suggestion ?? undefined) : undefined;
   const active = conversation !== undefined && writable;
 
-  const askReply = (mode: ReplyMode) => {
-    if (newest === undefined) {
+  /** The composer on `messageId` (a draft written for it), else the newest message. */
+  const askReply = (mode: ReplyMode, messageId?: string | null) => {
+    const target = messages.find((m) => m.id === messageId) ?? newest;
+    if (target === undefined) {
       return;
     }
     nonce.current += 1;
-    setReply({ mode, messageId: newest.id, nonce: nonce.current });
+    setReply({ mode, messageId: target.id, nonce: nonce.current });
   };
   /** Reply: the dialog with Scout's likely replies. */
   const openReply = () => {
     nonce.current += 1;
     setReplying({ opened: nonce.current });
   };
-  // Home's R: answer the newest message as soon as it is here (once).
+  // The message Home's reply answers, when it is in this conversation.
+  const replyTarget = messages.find((m) => m.id === replyTo)?.id;
+  // Home's R: answer that message, else the newest, as soon as it is here (once).
   const repliedOnce = useRef(false);
   useEffect(() => {
     if (
@@ -196,9 +203,9 @@ export function ConversationReader({
     ) {
       repliedOnce.current = true;
       nonce.current += 1;
-      setReply({ mode: "reply", messageId: newest.id, nonce: nonce.current });
+      setReply({ mode: "reply", messageId: replyTarget ?? newest.id, nonce: nonce.current });
     }
-  }, [startReply, newest, renderReplySlot]);
+  }, [startReply, newest, renderReplySlot, replyTarget]);
   const showAllImages = () => {
     setImages(new Set(messages.map((message) => message.id)));
   };
@@ -774,13 +781,14 @@ export function ConversationReader({
             setReplying(undefined);
             askReply("reply");
           }}
-          onOpenDraft={() => {
+          onOpenDraft={(draft) => {
             setReplying(undefined);
-            askReply("reply");
+            // On the message the draft answers, which may not be the newest.
+            askReply("reply", draft.message_id);
           }}
-          onUndone={() => {
+          onUndone={(resume) => {
             // The reply slot reopens the undone draft in the composer.
-            askReply("reply");
+            askReply("reply", resume.draft.message_id);
           }}
         />
       )}

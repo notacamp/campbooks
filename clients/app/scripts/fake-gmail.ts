@@ -42,6 +42,8 @@ export interface Mailbox {
   /** The history id before the first record still kept. */
   baseHistoryId: number;
   historyId: number;
+  /** Each demo thread's Gmail thread id and first Message-ID, to answer in it later. */
+  threads?: Map<string, { threadId: string; messageId: string }>;
 }
 
 const LABELS = [
@@ -635,12 +637,38 @@ export function createMailbox(
   // The backfill reads the mailbox as it is; history starts after it.
   mailbox.history = [];
   mailbox.baseHistoryId = mailbox.historyId;
+  mailbox.threads = threads;
   return mailbox;
 }
 
-/** A message that arrives while the app is open (`POST /fake/deliver`). */
-export function deliverDemo(mailbox: Mailbox): StoredMessage {
+/**
+ * A message that arrives while the app is open (`POST /fake/deliver`), or
+ * with `?reply=q4` Leo's answer in the Q4 thread, for the reply dialog's
+ * "a newer message arrived" (campbooks-cloud#220).
+ */
+export function deliverDemo(mailbox: Mailbox, reply?: string): StoredMessage {
   const date = new Date();
+  const thread = reply === undefined ? undefined : mailbox.threads?.get(reply);
+  if (thread !== undefined) {
+    const raw = rfc822(
+      {
+        from: "Leo Brandt <leo@northwind-studio.example>",
+        to: mailbox.address,
+        cc: "Maya Okafor <maya@northwind-studio.example>",
+        subject: "Re: Q4 plan: can you review by Friday?",
+        hoursAgo: 0,
+        labels: [],
+        text: "Hi Sam,\n\nCould we look at it on Friday instead? I am away on Thursday.\n\nLeo",
+      },
+      date,
+      `<${hex(6)}@demo.example>`,
+      thread.messageId,
+    );
+    return appendMessage(mailbox, raw, ["INBOX", "UNREAD", "Label_1", "CATEGORY_PERSONAL"], {
+      threadId: thread.threadId,
+      internalDate: date.getTime(),
+    });
+  }
   const raw = rfc822(
     {
       from: "Rui Matos <rui@contabilidade-rm.example>",

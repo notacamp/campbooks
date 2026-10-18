@@ -597,7 +597,9 @@
     "readingQuote": "Leyendo el correo para citarlo…",
     "quoteUnread": "No se pudo leer el correo al que respondes, así que no se puede mostrar la cita. No se puede enviar nada hasta que se muestre.",
     "quoteCut": "Este correo es largo: tu respuesta cita la primera parte.",
-    "quoteShortened": "Se muestra en parte: tu respuesta lo cita entero."
+    "quoteShortened": "Se muestra en parte: tu respuesta lo cita entero.",
+    "newer": "Ha llegado un mensaje más reciente de {{name}}. Tu respuesta sigue respondiendo al citado abajo.",
+    "answerNewer": "Responder al más reciente"
   },
   "smartRule": {
     "tag": "Regla inteligente",

@@ -597,7 +597,9 @@
     "readingQuote": "Lecture de l’e-mail pour le citer…",
     "quoteUnread": "Impossible de lire l’e-mail auquel vous répondez : la citation ne peut pas s’afficher. Rien ne peut être envoyé tant qu’elle n’est pas affichée.",
     "quoteCut": "Cet e-mail est long : votre réponse en cite le début.",
-    "quoteShortened": "Affiché en partie : votre réponse le cite en entier."
+    "quoteShortened": "Affiché en partie : votre réponse le cite en entier.",
+    "newer": "Un message plus récent de {{name}} est arrivé. Votre réponse répond toujours à celui cité ci-dessous.",
+    "answerNewer": "Répondre au plus récent"
   },
   "smartRule": {
     "tag": "Règle intelligente",
