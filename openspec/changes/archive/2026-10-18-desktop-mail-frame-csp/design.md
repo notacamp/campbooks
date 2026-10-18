@@ -18,7 +18,11 @@ What a hostile mail could do, layer by layer:
 - **Navigation**: no `allow-top-navigation`; the frame cannot be navigated
   to a remote page (`frame-src` falls back to `default-src 'self'`), a meta
   refresh included. A link asking for a new window is denied as a webview
-  by the shell; a web or mail link opens in the system browser.
+  by the shell, and the main webview never leaves the app's own pages
+  (`on_navigation`: `tauri://localhost`, `tauri.localhost` on Windows,
+  `about:srcdoc`, the dev server in debug builds); a web link opens in the
+  system browser, a mail link in the mail app with only its mail fields
+  (no `attach=`), off the UI thread.
 - **CSS exfiltration**: style sheets stay blocked (`style-src 'self'`
   intersected with the frame's policy stops inline `<style>`, `@import` and
   `<link>`); attribute styles load only through `img-src`, which is `data:`

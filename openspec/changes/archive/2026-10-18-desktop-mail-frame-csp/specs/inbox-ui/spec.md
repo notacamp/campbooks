@@ -11,9 +11,10 @@ trust rule. The desktop page's policy SHALL add only `style-src-attr
 `form-action 'none'` and `frame-ancestors 'none'`, and leave frames under
 `default-src 'self'`; plain `http:` images stay blocked on desktop. Nothing
 in the mail frame SHALL run, so Tauri's IPC is out of its reach. A link that
-asks for a new window SHALL never open a webview: a web or mail link opens in
-the system's browser or mail app, anything else nowhere; no remote URL SHALL
-be granted IPC. CI SHALL check the frame in WebKit under the desktop and web
+asks for a new window SHALL never open a webview, and the main webview SHALL
+never leave the app's own pages: a web link opens in the system's browser, a
+mail link in the mail app with only its address, copies, subject and body,
+anything else nowhere; no remote URL SHALL be granted IPC. CI SHALL check the frame in WebKit under the desktop and web
 policies read from their definitions.
 
 #### Scenario: A newsletter on desktop

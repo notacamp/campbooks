@@ -19,12 +19,12 @@ import { fileURLToPath } from "node:url";
 import { webkit, type Browser, type Page } from "playwright";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import { frameDocument, SANDBOX } from "../../src/lib/ui/safe-html/frame.ts";
+import { frameDocument, framePolicy, SANDBOX } from "../../src/lib/ui/safe-html/frame.ts";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const read = (file: string) => readFileSync(path.join(here, file), "utf8");
 
-/** The desktop app's production policy, as Tauri serves it. */
+/** The desktop app's production policy (Tauri adds hashes for its own scripts only). */
 function desktopPolicy(): string {
   const config = JSON.parse(read("../../src-tauri/tauri.conf.json")) as {
     app: { security: { csp: string } };
@@ -40,7 +40,7 @@ function webPolicy(): string {
     throw new Error("CONTENT_SECURITY_POLICY not found in web.rs");
   }
   // A Rust string continued with `\` drops the line break and the indent.
-  return found.replaceAll(/\\\n\s*/gu, "");
+  return found.replaceAll(/\\\r?\n\s*/gu, "");
 }
 
 /** A 1×1 PNG, served for every remote image the page lets through. */
@@ -131,17 +131,18 @@ async function open(csp: string, html: string, remoteImages: boolean): Promise<O
   context.on("page", (popup) => {
     popups.push(popup);
   });
+  // Every page of the context, popups included.
+  context.on("request", (request) => {
+    if (!request.url().startsWith(origin)) {
+      requested.push(request.url());
+    }
+  });
   // Remote hosts answer from here: nothing leaves the machine, and every
   // request the page lets through is seen.
   await context.route(/^https?:\/\/(?!127\.0\.0\.1)/u, (route) =>
     route.fulfill({ status: 200, contentType: "image/png", body: PNG }),
   );
   const page = await context.newPage();
-  page.on("request", (request) => {
-    if (!request.url().startsWith(origin)) {
-      requested.push(request.url());
-    }
-  });
   await page.goto(`${origin}${at}`);
   await page.waitForLoadState("load");
   // Late loads (a refresh, a lazy image) get their chance.
@@ -159,6 +160,28 @@ function inFrame(page: Page, expression: string): Promise<unknown> {
     `(() => { const doc = document.getElementById("mail").contentDocument; return ${expression}; })()`,
   );
 }
+
+/** The remote images a sanitised body names: what Show images may load, and nothing else. */
+function remoteImages(html: string): string[] {
+  return [
+    ...new Set([...html.matchAll(/src="(https:\/\/[^"]+)"/gu)].map((match) => match[1] ?? "")),
+  ];
+}
+
+describe("the frame's own layers", () => {
+  it("never lets the mail run, post or navigate the app", () => {
+    const flags = SANDBOX.split(" ");
+    expect(flags).not.toContain("allow-scripts");
+    expect(flags).not.toContain("allow-forms");
+    expect(flags.filter((flag) => flag.startsWith("allow-top-navigation"))).toEqual([]);
+  });
+
+  it("allows nothing but data: images until Show images", () => {
+    expect(framePolicy(false).startsWith("default-src 'none'")).toBe(true);
+    expect(framePolicy(false)).toContain("img-src data:;");
+    expect(framePolicy(true)).not.toMatch(/script-src|connect-src|frame-src/u);
+  });
+});
 
 const POLICIES = [
   ["desktop", desktopPolicy()],
@@ -223,25 +246,46 @@ describe.each(POLICIES)("the mail frame under the %s policy", (_name, csp) => {
       it("renders styled with its images held back", async () => {
         const { page, requested } = await open(csp, read(`fixtures/${fixture}.held.html`), false);
         expect(requested).toEqual([]);
-        // The server writes every style as an attribute: some survive.
-        expect(await inFrame(page, `doc.querySelectorAll("[style]").length`)).toBeGreaterThan(1);
+        // The server writes every style as an attribute: they apply (one the
+        // policy blocked would leave its element's style empty).
+        expect(
+          await inFrame(
+            page,
+            `[...doc.body.querySelectorAll("[style]")].filter((e) => e.style.length > 0).length`,
+          ),
+        ).toBeGreaterThan(0);
         await page.context().close();
       });
 
-      it("shows its images once asked or trusted, never a tracker", async () => {
-        const { page, requested } = await open(csp, read(`fixtures/${fixture}.shown.html`), true);
-        expect(requested.filter((url) => url.includes("track.example"))).toEqual([]);
+      it("shows exactly its images once asked or trusted", async () => {
+        const html = read(`fixtures/${fixture}.shown.html`);
+        const { page, requested } = await open(csp, html, true);
+        expect([...new Set(requested)].toSorted()).toEqual(remoteImages(html).toSorted());
         await page.context().close();
       });
     },
   );
 
-  it("shows a trusted sender's images (#200), the tracking pixel still gone", async () => {
-    const { page, requested } = await open(csp, read("fixtures/marketing-600.shown.html"), true);
-    expect(requested).toContain("https://images.example/autumn-banner.jpg");
-    const pixels = await open(csp, read("fixtures/hostile.shown.html"), true);
-    expect(pixels.requested.filter((url) => url.includes("pixel"))).toEqual([]);
+  it("shows a trusted sender's images (#200): the real ones only, no pixel", async () => {
+    // The server drops tracking pixels before the frame sees the body: the
+    // hostile mail's three pixels are gone, its real logo loads.
+    const { page, requested } = await open(csp, read("fixtures/hostile.shown.html"), true);
+    expect([...new Set(requested)]).toEqual(["https://cdn.example/real-logo.png"]);
     await page.context().close();
-    await pixels.page.context().close();
+  });
+
+  it("loads nothing from the mail's @media rules before Show images", async () => {
+    const { page, requested } = await open(csp, HOSTILE, false);
+    // As the reader adopts the server's filtered rules: a constructed sheet,
+    // which style-src does not govern; img-src still does.
+    await page.evaluate(`(() => {
+      const frame = document.getElementById("mail");
+      const sheet = new frame.contentWindow.CSSStyleSheet();
+      sheet.replaceSync("@media all { body { background-image: url(https://evil.example/adopted.png) } }");
+      frame.contentDocument.adoptedStyleSheets = [sheet];
+    })()`);
+    await page.waitForTimeout(800);
+    expect(requested).toEqual([]);
+    await page.context().close();
   });
 });
