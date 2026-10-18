@@ -47,6 +47,9 @@ const APPLICATION: &str = "campbooks/conversations.rule-application/v1";
 /// Whose application it is: the workspace, the rule and the rule's inbox.
 pub type Owner = (Uuid, InboxId, RuleId);
 
+/// A locked row: its `before`, run, MAC, and whether it is not put back.
+type Locked = (Value, Option<Uuid>, Option<Vec<u8>>, bool);
+
 /// The fields an application's MAC covers, or `None` when its `before`
 /// does not encode.
 fn fields(
@@ -173,7 +176,7 @@ pub async fn claim(
     if claimed.is_some() {
         return Ok(empty);
     }
-    let row: Option<(Value, Option<Uuid>, Option<Vec<u8>>, bool)> = sqlx::query_as(
+    let row: Option<Locked> = sqlx::query_as(
         "SELECT before, run_id, mac, reverted_at IS NULL FROM conversations.rule_applications
           WHERE rule_id = $1 AND conversation_id = $2 FOR UPDATE",
     )
