@@ -373,7 +373,16 @@ valid UTF-8 or holds a control character other than CR, LF and tab, since a
 mail app that decodes first would start another header there; anything else nowhere; no remote URL SHALL be granted
 IPC. CI SHALL check the frame in WebKit under the desktop and web policies
 read from their definitions, with the app's own sandbox and referrer policy,
-and a control proving the check would see a script run.
+and a control proving the check would see a script run. A separate CI job
+SHALL drive a debug build of the real shell (tauri-driver, WebKitWebDriver,
+a virtual display) against a mock API serving hostile HTML mail, and SHALL
+check in the mail frame's realm that no Tauri IPC object exists (while the
+app's page has one), that none of the mail's scripts ran and no invoke
+reached the API, that inline styles apply and nothing remote loads, that a
+`target=_blank` link opens no webview but goes to the system opener alone,
+and that a meta refresh or a nested iframe never reaches the system opener.
+Only a debug build SHALL record the links it hands to the system opener
+(`CAMPBOOKS_DEV_OPEN_OUTSIDE_LOG`) instead of opening them.
 
 #### Scenario: A newsletter on desktop
 - **WHEN** the member opens the #160 newsletter on the desktop app
@@ -418,6 +427,10 @@ and a control proving the check would see a script run.
 #### Scenario: A field behind a semicolon or a second encoding
 - **WHEN** a mail link reads `mailto:x@x.example?subject=x;attach=/etc/passwd`, or its subject is `Hi%250D%250ABcc:%20evil@x.example`
 - **THEN** the subject is left out and the rest opens, while a subject of `50%25%20off` is kept as "50% off"
+
+#### Scenario: The real shell
+- **WHEN** CI's `tauri-shell` job opens the hostile mail in a debug build of the desktop app
+- **THEN** the mail frame has no `__TAURI_INTERNALS__` or `__TAURI__`, nothing of the mail ran, its `target=_blank` link reaches the system opener and no new webview, and its meta refresh and nested iframe reach nothing
 
 ### Requirement: Only offers that take effect
 The reader SHALL offer "Always show images from <sender>" and its ⇧A only
