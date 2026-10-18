@@ -127,7 +127,14 @@ the caller checks the result, then retries with a new key. A server error
 the operation itself answers still releases the key, so a retry runs it
 again. If the operation committed before that error (or before an
 acknowledgement was lost), only the operation's own guard (a draft's send
-state, for mail) keeps the work from running twice.
+state, for mail) keeps the work from running twice. Therefore an operation
+with an irreversible external effect (a send, a change at a provider, a
+payment) SHALL have a domain-level guard, a state machine or a unique key on
+the effect, and SHALL NOT rely on idempotency alone. A keyed request body
+SHALL be at most 10 MiB, since the layer holds it to hash it. A larger
+upload SHALL be stored in its own step without a key (blobs are content
+addressed, so the same bytes are the same blob) and attached by reference in
+a small keyed operation.
 Server errors and authentication or rate-limit failures SHALL release the
 key. GET and HEAD requests SHALL ignore the header, and no operation SHALL be
 able to opt out. Expired keys SHALL be deleted by an hourly job. For an

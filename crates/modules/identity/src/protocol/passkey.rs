@@ -262,9 +262,10 @@ pub struct SignInStart {
         (status = 200, description = "Options for `navigator.credentials.get` (any of this \
             site's passkeys, user verification required), with a ceremony cookie.",
             body = RequestOptions, headers(("set-cookie" = String))),
-        (status = 400, description = "`invalid_return_to`, or `invalid_body` (not JSON). A body over \
-            16 KiB is 413 `body_too_large`.", body = campbooks_kernel::Problem,
-            content_type = "application/problem+json"),
+        (status = 400, description = "`invalid_return_to`, or `invalid_body` (not JSON).",
+            body = campbooks_kernel::Problem, content_type = "application/problem+json"),
+        (status = 413, description = "`body_too_large`: the body is over 16 KiB.",
+            body = campbooks_kernel::Problem, content_type = "application/problem+json"),
         (status = 403, description = "`csrf_check_failed`.", body = campbooks_kernel::Problem,
             content_type = "application/problem+json"),
         (status = 404, description = "No such waiting sign-in request (or it expired), this \
@@ -348,8 +349,9 @@ async fn take_ceremony(
     responses(
         (status = 200, description = "Signed in.", body = SignedInWith,
             headers(("set-cookie" = String))),
-        (status = 400, description = "`invalid_body` (not a credential). A body over 16 KiB is 413 \
-            `body_too_large`.",
+        (status = 400, description = "`invalid_body` (not a credential).",
+            body = campbooks_kernel::Problem, content_type = "application/problem+json"),
+        (status = 413, description = "`body_too_large`: the body is over 16 KiB.",
             body = campbooks_kernel::Problem, content_type = "application/problem+json"),
         (status = 403, description = "`csrf_check_failed`, `passkey_not_accepted` (it did \
             not verify, or it is no longer a way into any account), `account_suspended` (it \
@@ -525,7 +527,9 @@ pub struct SignUpStart {
             discoverable passkey, user verification required, attestation `none`), with a \
             ceremony cookie.", body = CreationOptions, headers(("set-cookie" = String))),
         (status = 400, description = "`display_name_required`, `invalid_return_to`, or \
-            `invalid_body` (not JSON). A body over 16 KiB is 413 `body_too_large`.",
+            `invalid_body` (not JSON).",
+            body = campbooks_kernel::Problem, content_type = "application/problem+json"),
+        (status = 413, description = "`body_too_large`: the body is over 16 KiB.",
             body = campbooks_kernel::Problem, content_type = "application/problem+json"),
         (status = 403, description = "`csrf_check_failed`, `signup_invite_only` (this \
             instance takes invited people only, and a passkey proves no address), or \
@@ -593,8 +597,9 @@ pub async fn sign_up_options(
     responses(
         (status = 201, description = "Created and signed in.", body = SignedInWith,
             headers(("set-cookie" = String))),
-        (status = 400, description = "`invalid_body` (not a credential). A body over 16 KiB is 413 \
-            `body_too_large`.",
+        (status = 400, description = "`invalid_body` (not a credential).",
+            body = campbooks_kernel::Problem, content_type = "application/problem+json"),
+        (status = 413, description = "`body_too_large`: the body is over 16 KiB.",
             body = campbooks_kernel::Problem, content_type = "application/problem+json"),
         (status = 403, description = "`csrf_check_failed`, `passkey_not_accepted`, \
             `signup_invite_only`, or `sign_in_not_allowed`.", body = campbooks_kernel::Problem,

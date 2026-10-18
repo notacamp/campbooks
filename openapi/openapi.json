@@ -9875,7 +9875,7 @@
             }
           },
           "400": {
-            "description": "`invalid_body` (not a credential). A body over 16 KiB is 413 `body_too_large`.",
+            "description": "`invalid_body` (not a credential).",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -9899,6 +9899,16 @@
           },
           "409": {
             "description": "`passkey_expired`: no ceremony waits for this browser (it took more than five minutes, or was used).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "`body_too_large`: the body is over 16 KiB.",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -9983,7 +9993,7 @@
             }
           },
           "400": {
-            "description": "`invalid_return_to`, or `invalid_body` (not JSON). A body over 16 KiB is 413 `body_too_large`.",
+            "description": "`invalid_return_to`, or `invalid_body` (not JSON).",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -10004,6 +10014,16 @@
           },
           "404": {
             "description": "No such waiting sign-in request (or it expired), this instance offers no passkeys (not https), or another identity provider serves it."
+          },
+          "413": {
+            "description": "`body_too_large`: the body is over 16 KiB.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
           },
           "429": {
             "description": "`rate_limited`: too many ceremonies, or ten challenges waiting, for this address.",
@@ -10082,7 +10102,7 @@
             }
           },
           "400": {
-            "description": "`invalid_body` (not a credential). A body over 16 KiB is 413 `body_too_large`.",
+            "description": "`invalid_body` (not a credential).",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -10106,6 +10126,16 @@
           },
           "409": {
             "description": "`passkey_expired`, or `passkey_already_registered`.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "`body_too_large`: the body is over 16 KiB.",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -10192,7 +10222,7 @@
             }
           },
           "400": {
-            "description": "`display_name_required`, `invalid_return_to`, or `invalid_body` (not JSON). A body over 16 KiB is 413 `body_too_large`.",
+            "description": "`display_name_required`, `invalid_return_to`, or `invalid_body` (not JSON).",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -10213,6 +10243,16 @@
           },
           "404": {
             "description": "No such waiting sign-in request (or it expired), this instance offers no passkeys, or another identity provider serves it."
+          },
+          "413": {
+            "description": "`body_too_large`: the body is over 16 KiB.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
           },
           "429": {
             "description": "`rate_limited`: too many ceremonies, or ten challenges waiting, for this address.",
