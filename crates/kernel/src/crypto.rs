@@ -59,6 +59,8 @@ impl std::fmt::Debug for SecretKey {
 }
 
 /// Where the instance secret, and the one it replaced, may be set.
+// The fields are the variables' names (`CAMPBOOKS_SECRET_KEY*`).
+#[allow(clippy::struct_field_names)]
 #[derive(Debug, Default, Deserialize)]
 struct SecretEnv {
     secret_key: Option<SecretString>,
@@ -482,7 +484,7 @@ impl Signer {
         })
     }
 
-    fn open_with(sealer: &LessSafeKey, context: &[u8], sealed: &[u8]) -> Option<Vec<u8>> {
+    fn open_with(key: &LessSafeKey, context: &[u8], sealed: &[u8]) -> Option<Vec<u8>> {
         let (&format, rest) = sealed.split_first()?;
         if format != FORMAT_V1 || rest.len() < NONCE_LEN {
             return None;
@@ -490,7 +492,7 @@ impl Signer {
         let (nonce, body) = rest.split_at(NONCE_LEN);
         let nonce = Nonce::try_assume_unique_for_key(nonce).ok()?;
         let mut body = body.to_vec();
-        let value = sealer
+        let value = key
             .open_in_place(nonce, Aad::from(context), &mut body)
             .ok()?;
         Some(value.to_vec())
