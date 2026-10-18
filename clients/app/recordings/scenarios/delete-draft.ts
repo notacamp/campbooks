@@ -37,7 +37,10 @@ export default async function deleteDraft({ page }: ScenarioContext): Promise<vo
   await body.press("Escape");
   const chip = page.getByRole("button", { name: CHIP });
   await chip.waitFor();
-  await caption(page, "Esc keeps it: the draft waits under the thread, with Delete draft beside it");
+  await caption(
+    page,
+    "Esc keeps it: the draft waits under the thread, with Delete draft beside it",
+  );
 
   await page.getByRole("button", { name: /^Delete draft: Reply to/u }).click();
   await page.getByText("Draft deleted").waitFor();

@@ -93,7 +93,9 @@ describe("ReplyComposer", () => {
     // Once the composer's shortcuts are live (it focused itself on opening).
     await waitFor(() => {
       fireEvent.keyDown(box, { key: "Escape" });
-      expect(screen.getByRole("button", { name: "Draft saved · Reply to Maya Okafor" })).toBeVisible();
+      expect(
+        screen.getByRole("button", { name: "Draft saved · Reply to Maya Okafor" }),
+      ).toBeVisible();
     });
     fireEvent.click(screen.getByRole("button", { name: "Draft saved · Reply to Maya Okafor" }));
     expect(await screen.findByRole("textbox", { name: "Message" })).toBeVisible();
@@ -220,14 +222,18 @@ describe("ReplyComposer", () => {
       fireEvent.keyDown(box, { key: "Escape" });
       expect(screen.getByRole("button", { name: "Draft saved · Forward" })).toBeVisible();
     });
-    expect(screen.getByRole("button", { name: "Draft saved · Reply to Maya Okafor" })).toBeVisible();
+    expect(
+      screen.getByRole("button", { name: "Draft saved · Reply to Maya Okafor" }),
+    ).toBeVisible();
 
     fireEvent.click(screen.getByRole("button", { name: "Delete draft: Forward" }));
     expect(await screen.findByText("Draft deleted")).toBeVisible();
     await waitFor(() => {
       expect(screen.queryByRole("button", { name: "Draft saved · Forward" })).toBeNull();
     });
-    expect(screen.getByRole("button", { name: "Draft saved · Reply to Maya Okafor" })).toBeVisible();
+    expect(
+      screen.getByRole("button", { name: "Draft saved · Reply to Maya Okafor" }),
+    ).toBeVisible();
 
     fireEvent.click(screen.getByRole("button", { name: /^Undo/u }));
     expect(await screen.findByRole("button", { name: "Draft saved · Forward" })).toBeVisible();
