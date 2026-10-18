@@ -336,3 +336,32 @@ is involved.
 #### Scenario: Only reading
 - **WHEN** the member's role in the inbox is reader
 - **THEN** Show images is offered and Always show images is not
+
+### Requirement: HTML mail on the desktop app
+The desktop app SHALL render HTML mail as the web app does: the same
+sandboxed frame, its own policy and the same sanitised body, styled and with
+its `data:` and inline images, remote images held back until Show images or a
+trust rule. The desktop page's policy SHALL add only `style-src-attr
+'unsafe-inline'` and `img-src 'self' data: blob: https:` to `default-src
+'self'`, keep `script-src 'self'` and `style-src 'self'` (never
+`'unsafe-inline'` on either), `object-src 'none'`, `base-uri 'none'`,
+`form-action 'none'` and `frame-ancestors 'none'`, and leave frames under
+`default-src 'self'`; plain `http:` images stay blocked on desktop. Nothing
+in the mail frame SHALL run, so Tauri's IPC is out of its reach. A link that
+asks for a new window SHALL never open a webview, and the main webview SHALL
+never leave the app's own pages: a web link opens in the system's browser, a
+mail link in the mail app with only its address, copies, subject and body,
+anything else nowhere; no remote URL SHALL be granted IPC. CI SHALL check the frame in WebKit under the desktop and web
+policies read from their definitions.
+
+#### Scenario: A newsletter on desktop
+- **WHEN** the member opens the #160 newsletter on the desktop app
+- **THEN** it shows its inline styles and placeholders, nothing remote loads, and after Show images its https images load with no tracking pixel
+
+#### Scenario: Hostile markup
+- **WHEN** a body carries a script, an `onerror`, an `<svg onload>`, a `javascript:` link, a form, a meta refresh, `@import` or a remote style sheet
+- **THEN** nothing runs, posts, navigates or loads under the desktop policy
+
+#### Scenario: A link in a mail
+- **WHEN** the member clicks a web link in a mail on the desktop app
+- **THEN** it opens in the system browser, and no Campbooks window shows the remote page

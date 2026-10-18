@@ -15,6 +15,8 @@ const config: KnipConfig = {
       // scenario is loaded by name at runtime, so none is imported statically.
       entry: [
         "recordings/scenarios/*.ts",
+        // The mail frame's WebKit policy test (`pnpm test:csp`).
+        "test/webkit/*.webkit.ts",
         // Library surfaces modules build on: every export is public API,
         // used or not yet (AGENTS.md → UI).
         "src/lib/ui/index.ts",
