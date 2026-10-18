@@ -58,6 +58,29 @@ async fn whoami(
     }))
 }
 
+/// How many times [`record`] ran (only the replay test calls it).
+static RECORDED: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+
+/// A catalogued, mutating test operation (so the idempotency layer keys
+/// it) that counts its runs.
+#[utoipa::path(
+    post,
+    path = "/api/v1/test/record",
+    operation_id = "test.record",
+    security(("bearer" = ["test:read"])),
+    extensions(("x-campbooks" = json!(campbooks_kernel::Operation::command(
+        campbooks_kernel::Risk::Low
+    ).records(["test.note"])))),
+    responses((status = CREATED, body = Value)),
+)]
+async fn record(_: Scoped<TestRead>, body: String) -> (StatusCode, Json<Value>) {
+    let run = RECORDED.fetch_add(1, std::sync::atomic::Ordering::SeqCst) + 1;
+    (
+        StatusCode::CREATED,
+        Json(json!({ "run": run, "body": body })),
+    )
+}
+
 /// A session's id, current and previous token hashes, and sealed access,
 /// refresh and ID tokens, as stored.
 type StoredSession = (
@@ -139,7 +162,9 @@ fn app(state: AppState, settings: Option<config::Settings>) -> Router {
         spec,
         state,
     } = operations::compose(
-        crate::api().route("/api/v1/test/whoami", any(whoami)),
+        crate::api()
+            .route("/api/v1/test/whoami", any(whoami))
+            .routes(utoipa_axum::routes!(record)),
         state,
     );
     let api_only: Router = routes
@@ -1359,17 +1384,73 @@ async fn requests_refused_together_share_one_forced_refresh(db: PgPool) {
     browser.sign_in(&h.idp, "/").await;
     let before = h.idp.refreshes();
     hold_a_refused_token(&h).await;
-    // The refresh takes long enough for the second request to be refused
-    // and wait for it.
-    h.idp.delay_refreshes(std::time::Duration::from_millis(700));
+    // Both requests start together and present the stored token, which is
+    // refused; the stored token is replaced only once the (700 ms) refresh
+    // ends. So the one that did not refresh waited on the session's refresh
+    // lock and took the "already replaced" branch: one refresh for both,
+    // and both took at least as long as the refresh.
+    let delay = std::time::Duration::from_millis(700);
+    h.idp.delay_refreshes(delay);
     let mut other = browser.clone();
+    let started = std::time::Instant::now();
     let (first, second) = tokio::join!(
-        browser.get("/bff/api/v1/test/whoami?n=1"),
-        other.get("/bff/api/v1/test/whoami?n=2"),
+        async {
+            let reply = browser.get("/bff/api/v1/test/whoami?n=1").await;
+            (reply, started.elapsed())
+        },
+        async {
+            let reply = other.get("/bff/api/v1/test/whoami?n=2").await;
+            (reply, started.elapsed())
+        },
     );
-    assert_eq!(first.status, StatusCode::OK, "{}", first.body);
-    assert_eq!(second.status, StatusCode::OK, "{}", second.body);
+    assert_eq!(first.0.status, StatusCode::OK, "{}", first.0.body);
+    assert_eq!(second.0.status, StatusCode::OK, "{}", second.0.body);
     assert_eq!(h.idp.refreshes(), before + 1, "one refresh for both");
+    assert!(
+        first.1 >= delay && second.1 >= delay,
+        "both waited for the one refresh: {:?}, {:?}",
+        first.1,
+        second.1
+    );
+}
+
+/// A small keyed POST refused with the held token, then refreshed and sent
+/// again, is answered once: 201, its handler run exactly once, and the same
+/// key afterwards replays that answer (campbooks-cloud#263). The refused
+/// attempt never reached the handler, nor claimed the key.
+#[sqlx::test(migrations = "../../migrations")]
+async fn a_keyed_write_refused_then_replayed_runs_once(db: PgPool) {
+    let h = harness(db).await;
+    let mut browser = Browser::new(&h.app);
+    browser.sign_in(&h.idp, "/").await;
+    hold_a_refused_token(&h).await;
+    let before = RECORDED.load(std::sync::atomic::Ordering::SeqCst);
+    let keyed = |browser: &mut Browser| {
+        let request = Request::post("/bff/api/v1/test/record")
+            .header(CSRF_HEADER, "1")
+            .header("sec-fetch-site", "same-origin")
+            .header(header::CONTENT_TYPE, "application/json")
+            .header("idempotency-key", "record-1");
+        let mut browser = browser.clone();
+        async move { browser.send(request, Body::from(r#"{"a":1}"#)).await }
+    };
+    let reply = keyed(&mut browser).await;
+    assert_eq!(reply.status, StatusCode::CREATED, "{}", reply.body);
+    assert_eq!(reply.json()["body"], r#"{"a":1}"#);
+    assert_eq!(
+        RECORDED.load(std::sync::atomic::Ordering::SeqCst),
+        before + 1,
+        "the handler ran once"
+    );
+    // The same key again: the stored answer, not a second run.
+    let again = keyed(&mut browser).await;
+    assert_eq!(again.status, StatusCode::CREATED, "{}", again.body);
+    assert_eq!(again.header("idempotency-replayed"), Some("true"));
+    assert_eq!(again.json(), reply.json());
+    assert_eq!(
+        RECORDED.load(std::sync::atomic::Ordering::SeqCst),
+        before + 1
+    );
 }
 
 /// A refused token while the identity provider is down: 503

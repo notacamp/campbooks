@@ -25,6 +25,7 @@
     "missing_json_content_type": "O corpo do pedido tem de ser JSON (Content-Type: application/json).",
     "invalid_json": "O corpo do pedido não é JSON válido: {{reason}}",
     "invalid_body": "O corpo do pedido não corresponde ao que esta operação espera: {{reason}}",
+    "body_unreadable": "Não foi possível ler o corpo do pedido por completo.",
     "invalid_query": "Os parâmetros do pedido não correspondem ao que esta operação espera: {{reason}}",
     "idempotency_key_invalid": "A Idempotency-Key tem de ter entre 1 e {{max}} caracteres ASCII visíveis.",
     "idempotency_key_reused": "Esta Idempotency-Key já foi usada noutro pedido.",

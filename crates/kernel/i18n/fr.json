@@ -25,6 +25,7 @@
     "missing_json_content_type": "Le corps de la requête doit être en JSON (Content-Type: application/json).",
     "invalid_json": "Le corps de la requête n’est pas du JSON valide : {{reason}}",
     "invalid_body": "Le corps de la requête ne correspond pas à ce qu’attend cette opération : {{reason}}",
+    "body_unreadable": "Le corps de la requête n’a pas pu être lu en entier.",
     "invalid_query": "Les paramètres de la requête ne correspondent pas à ce qu’attend cette opération : {{reason}}",
     "idempotency_key_invalid": "L’Idempotency-Key doit comporter de 1 à {{max}} caractères ASCII visibles.",
     "idempotency_key_reused": "Cette Idempotency-Key a déjà servi pour une autre requête.",
