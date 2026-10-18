@@ -85,6 +85,11 @@ All notable changes to Campbooks Next are documented here. The format follows
   allow their own statements 5 minutes). A request that hits either, or finds no free
   connection in time, answers "The database is unavailable right now. Try again in a
   moment." (503) instead of waiting indefinitely or failing as an internal error.
+- **Gmail write-back stays within its quota budget.** Before writing your changes back to
+  Gmail, a sync now reserves the most those writes can cost, not just what it plans: enough
+  for Gmail to refuse a large batch (each message is then changed on its own) or for a
+  change made meanwhile in Gmail to split a batch into smaller writes. Before, such pushes
+  could spend far more than they took from the shared budget and run into Gmail's rate limit.
 - **Mail whose HTML has no body tag gets its words.** Mail written as a head followed
   straight by its text, with no `<body>` (some mailers send it), was stored with a blank
   text in place of its words, so search found nothing in it, its preview and Scout's read
