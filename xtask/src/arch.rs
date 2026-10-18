@@ -685,14 +685,6 @@ fn check_meta(
             ));
         }
     }
-    if meta
-        .get("risk")
-        .is_some_and(|risk| !matches!(risk.as_str(), Some("low" | "high")))
-    {
-        violations.push(format!(
-            "OpenAPI operation `{name}`: `x-campbooks.risk` must be \"low\" or \"high\""
-        ));
-    }
     match meta.get("records") {
         None => {}
         Some(serde_json::Value::Array(records)) => {
@@ -780,15 +772,24 @@ fn check_method(
     }
 }
 
-/// A high-risk operation (it sends mail in the person's name, deletes, or
-/// changes who may do what) is never automation's nor the assistant's: a
-/// person runs it with their own request (campbooks-cloud#242). Whether a
-/// call was "confirmed" is said by the code making it, so it proves no click.
+/// `risk` is `low` or `high`, and a high-risk operation (it sends mail in
+/// the person's name, deletes, or changes who may do what) is never
+/// automation's nor the assistant's: a person runs it with their own
+/// request (campbooks-cloud#242). Whether a call was "confirmed" is said by
+/// the code making it, so it proves no click.
 fn check_risk(
     name: &str,
     meta: &serde_json::Map<String, serde_json::Value>,
     violations: &mut Vec<String>,
 ) {
+    if meta
+        .get("risk")
+        .is_some_and(|risk| !matches!(risk.as_str(), Some("low" | "high")))
+    {
+        violations.push(format!(
+            "OpenAPI operation `{name}`: `x-campbooks.risk` must be \"low\" or \"high\""
+        ));
+    }
     if meta.get("risk").and_then(serde_json::Value::as_str) != Some("high") {
         return;
     }
