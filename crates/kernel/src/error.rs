@@ -149,8 +149,29 @@ impl From<sqlx::Error> for Error {
     fn from(err: sqlx::Error) -> Self {
         match err {
             sqlx::Error::RowNotFound => Self::NotFound,
+            ref waited if gave_up_waiting(waited) => {
+                // Logged by kind, like any database error: the client is
+                // told to try again (campbooks-cloud#251).
+                tracing::warn!(
+                    error = %crate::redact::sqlx(waited),
+                    "the database took too long; answered 503"
+                );
+                Self::Unavailable(i18n::MESSAGES.reason("database_unavailable"))
+            }
             other => Self::internal(other),
         }
+    }
+}
+
+/// Whether `err` is the database giving up on a wait rather than a fault:
+/// a statement cancelled at its `statement_timeout` (SQLSTATE 57014), a
+/// lock not had within `lock_timeout` (55P03), or no connection free within
+/// the pool's acquire timeout.
+pub fn gave_up_waiting(err: &sqlx::Error) -> bool {
+    match err {
+        sqlx::Error::PoolTimedOut => true,
+        sqlx::Error::Database(db) => matches!(db.code().as_deref(), Some("57014" | "55P03")),
+        _ => false,
     }
 }
 
@@ -457,6 +478,13 @@ mod tests {
             Error::from(sqlx::Error::RowNotFound),
             Error::NotFound
         ));
+    }
+
+    #[test]
+    fn no_free_connection_in_time_is_a_503() {
+        let error = Error::from(sqlx::Error::PoolTimedOut);
+        assert_eq!(error.status(), StatusCode::SERVICE_UNAVAILABLE);
+        assert_eq!(error.code(), "database_unavailable");
     }
 
     #[test]
