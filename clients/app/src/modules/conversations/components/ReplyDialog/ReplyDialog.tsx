@@ -284,7 +284,10 @@ export function ReplyDialog({
     const old = replaced.current;
     replaced.current = undefined;
     if (old !== undefined) {
-      void deleteDraft(workspaceId, old).catch(() => undefined);
+      // Best effort: left behind, it is only a draft the composer shows whole.
+      void deleteDraft(workspaceId, old).catch(() => {
+        // Nothing to say: the reply itself is saved.
+      });
     }
     return fresh;
   };
