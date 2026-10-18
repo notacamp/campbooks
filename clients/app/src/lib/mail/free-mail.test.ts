@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { FREE_MAIL, isFreeMailDomain } from "./free-mail";
+import { isFreeMailDomain } from "./free-mail";
 
 describe("free mail domains", () => {
   it("knows a free mail provider, whatever the case", () => {
