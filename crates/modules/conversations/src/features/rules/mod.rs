@@ -1568,18 +1568,12 @@ pub async fn restore(
     // Who may remove it may bring it back.
     may_teach(&state, &mut tx, access, rule.inbox).await?;
     member_only(&workspace.principal)?;
-    if back != RuleState::Proposed
-        && !rules::may_change(
-            rules::role_in(&mut tx, rule.inbox, access.user).await?,
-            access.user,
-            rule.taught_by,
-        )
-    {
-        return Err(Error::Denied(crate::MESSAGES.reason("rule_not_yours")));
-    }
-    // Back as kept, it is signed and acts again: the member's own request
-    // only. A proposal comes back waiting for its yes.
     if back != RuleState::Proposed {
+        let role = rules::role_in(&mut tx, rule.inbox, access.user).await?;
+        if !rules::may_change(role, access.user, rule.taught_by) {
+            return Err(Error::Denied(crate::MESSAGES.reason("rule_not_yours")));
+        }
+        // Back as kept, it is signed and acts again: the member's own request.
         members_own_yes(&workspace, Some(rule.id))?;
     }
     if !found.restorable {
