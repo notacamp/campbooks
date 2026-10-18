@@ -214,7 +214,12 @@ async fn standing<'r>(
         .iter()
         .map(serde_json::to_value)
         .collect::<Result<_, _>>()
-        .map_err(|e| JobError::fatal(format!("encoding requested changes: {e}")))?;
+        .map_err(|e| {
+            JobError::fatal(format!(
+                "encoding requested changes: {}",
+                campbooks_kernel::redact::json(&e)
+            ))
+        })?;
     let standing = state
         .outbound
         .changes_standing(

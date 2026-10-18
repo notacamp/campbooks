@@ -635,7 +635,7 @@ pub fn check_operations(spec: &serde_json::Value, owners: &Owners) -> Vec<String
 /// The words of a field name, lower-cased: split at `_`, `-`, `.`, a
 /// space, camelCase boundaries, the end of a run of capitals (`IDToken` is
 /// `id`, `token`) and before a trailing number (`token2` is `token`, `2`).
-fn name_words(name: &str) -> Vec<String> {
+pub(crate) fn name_words(name: &str) -> Vec<String> {
     let chars: Vec<char> = name.chars().collect();
     let mut words: Vec<String> = Vec::new();
     let mut word = String::new();

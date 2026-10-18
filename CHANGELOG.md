@@ -824,6 +824,13 @@ All notable changes to Campbooks Next are documented here. The format follows
   first line, at most 500 characters, with quoted text, email addresses,
   link paths and queries, and long tokens removed. Admin → Jobs shows the
   cleaned message. Errors already stored are left as they are.
+- **Why a background job failed no longer quotes your data.** The reason a failed job
+  keeps for an administrator, and the events and jobs the server keeps for up to 90 days,
+  hold ids, codes and references to stored files, never addresses, names, subjects or
+  what someone wrote. Some failure reasons used to repeat the piece of data they could
+  not read; they now say only what kind of error it was and where. A build check holds
+  every event, every job and every failure reason to this, with the reason written down
+  for each value it allows.
 
 ### Removed
 - **Due dates on needs, until they are extracted from the mail.** A need no longer

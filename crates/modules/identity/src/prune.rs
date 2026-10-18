@@ -12,7 +12,7 @@
 
 use std::time::Duration;
 
-use campbooks_kernel::{Job, JobContext, JobError, tenancy::WorkspaceId};
+use campbooks_kernel::{Job, JobContext, JobError, redact, tenancy::WorkspaceId};
 use chrono::{TimeDelta, Utc};
 use serde::{Deserialize, Serialize};
 
@@ -112,11 +112,11 @@ impl Job for Prune {
         .bind(unused)
         .execute(&mut *tx)
         .await
-        .map_err(|e| JobError::retry(format!("pruning identity state: {e}")))?
+        .map_err(|e| JobError::retry(format!("pruning identity state: {}", redact::sqlx(&e))))?
         .rows_affected();
-        tx.commit()
-            .await
-            .map_err(|e| JobError::retry(format!("pruning identity state: {e}")))?;
+        tx.commit().await.map_err(|e| {
+            JobError::retry(format!("pruning identity state: {}", redact::sqlx(&e)))
+        })?;
         let ways_in = sweep_unnamed_mailboxes(ctx, now)
             .await
             .map_err(|e| JobError::retry(format!("pruning mailbox records: {e}")))?;
@@ -144,7 +144,7 @@ async fn delete_in_batches(
             .bind(size)
             .execute(db)
             .await
-            .map_err(|e| JobError::retry(format!("pruning identity state: {e}")))?
+            .map_err(|e| JobError::retry(format!("pruning identity state: {}", redact::sqlx(&e))))?
             .rows_affected();
         deleted += batch;
         if batch < u64::try_from(size).unwrap_or(u64::MAX) {
