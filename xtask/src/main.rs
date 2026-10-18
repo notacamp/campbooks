@@ -22,6 +22,7 @@ mod events;
 mod i18n;
 mod migrations;
 mod openapi;
+mod payloads;
 mod scaffold;
 
 use std::{
@@ -272,6 +273,7 @@ fn run_arch(root: &Path) -> Result<String> {
         &spec,
         arch::ANSWER_FIELDS_ALLOWED,
     ));
+    violations.extend(check_payloads(root)?);
     violations.extend(check_admin(root, &spec, &owners)?);
     violations.extend(check_access(root, &spec, &arch_file, &migration_sql)?);
 
@@ -293,6 +295,27 @@ fn run_arch(root: &Path) -> Result<String> {
         violations.len(),
         list.join("\n")
     )
+}
+
+/// Personal data stays out of event payloads, job payloads and job errors
+/// (campbooks-cloud#65, `payloads`).
+fn check_payloads(root: &Path) -> Result<Vec<String>> {
+    let events = serde_json::to_value(
+        campbooks_server::events_catalogue().context("building the events catalogue")?,
+    )
+    .context("serializing the events catalogue")?;
+    let mut violations = payloads::check_event_payloads(&events, payloads::EVENT_FIELDS_ALLOWED);
+    let mut sources = Vec::new();
+    rust_sources(root, &root.join("crates"), &mut sources)?;
+    violations.extend(payloads::check_job_payloads(
+        &payloads::job_payloads(&sources),
+        payloads::JOB_PAYLOAD_FIELDS,
+    ));
+    violations.extend(payloads::check_job_errors(
+        &payloads::job_error_values(&sources),
+        payloads::JOB_ERROR_VALUES,
+    ));
+    Ok(violations)
 }
 
 /// Every consumed event is published, at the version read.

@@ -18,6 +18,7 @@ use campbooks_kernel::{
     blobs::BlobOwner,
     db::BeginFor as _,
     jobs::{EnqueueOptions, JobHandler},
+    redact,
     tenancy::{UserId, WorkspaceId},
 };
 use chrono::{DateTime, TimeDelta, Utc};
@@ -276,8 +277,9 @@ impl SyncStream {
         }
         let cursor: gmail::Cursor = serde_json::from_value(target.cursor.clone()).map_err(|e| {
             JobError::fatal(format!(
-                "stream {} has an unreadable cursor: {e}",
-                target.stream
+                "stream {} has an unreadable cursor: {}",
+                target.stream,
+                redact::json(&e)
             ))
         })?;
         let state = ctx.state().clone();
@@ -304,7 +306,7 @@ impl SyncStream {
         };
         Ok(Some(RunPage {
             cursor: serde_json::to_value(&page.cursor)
-                .map_err(|e| JobError::fatal(format!("encoding a cursor: {e}")))?,
+                .map_err(|e| JobError::fatal(format!("encoding a cursor: {}", redact::json(&e))))?,
             token: page.cursor.token(),
             read_up_to: page
                 .cursor
@@ -345,8 +347,9 @@ impl SyncStream {
         let cursor: zoho::read::Cursor =
             serde_json::from_value(target.cursor.clone()).map_err(|e| {
                 JobError::fatal(format!(
-                    "stream {} has an unreadable cursor: {e}",
-                    target.stream
+                    "stream {} has an unreadable cursor: {}",
+                    target.stream,
+                    redact::json(&e)
                 ))
             })?;
         let config = &self.deps.config.zoho;
@@ -397,7 +400,7 @@ impl SyncStream {
         };
         Ok(Some(RunPage {
             cursor: serde_json::to_value(&page.cursor)
-                .map_err(|e| JobError::fatal(format!("encoding a cursor: {e}")))?,
+                .map_err(|e| JobError::fatal(format!("encoding a cursor: {}", redact::json(&e))))?,
             token: page.cursor.token(),
             read_up_to: None,
             changes: page.changes,
@@ -458,7 +461,7 @@ impl SyncStream {
         let batch = if changed {
             let document = MessageChangeBatch::new(inbox, page.changes);
             let bytes = serde_json::to_vec(&document)
-                .map_err(|e| JobError::fatal(format!("encoding a batch: {e}")))?;
+                .map_err(|e| JobError::fatal(format!("encoding a batch: {}", redact::json(&e))))?;
             Some(state.blobs.put(&key, bytes, BATCH_CONTENT_TYPE).await?)
         } else {
             None

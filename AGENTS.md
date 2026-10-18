@@ -121,6 +121,19 @@ Use `ENV` with neutral `example.com` defaults. *(gitleaks in CI.)*
   (`kernel::redact::error_kind`, `server::error_reports`,
   `system::client_telemetry`). *(CI: the server's telemetry privacy test,
   its error report tests and the client telemetry scrubber tests.)*
+- **Personal data stays out of the queue and the event log** (campbooks-cloud#65).
+  Events are kept 90 days and finished jobs up to 30, longer than a member's
+  or a workspace's data once its deletion is asked for. So event payloads,
+  job payloads and job errors (`kernel.jobs.last_error`) hold ids, codes,
+  counts and blob references, never addresses, names, subjects or what
+  someone wrote: that travels as a blob, which the purges delete. A job's
+  error says what failed with ids and status codes (`redact::sqlx`,
+  `redact::json` for errors that quote data). *(CI: `cargo xtask arch` reads
+  every event payload's fields, every job payload's fields and every value a
+  job error is built from; an event field named like personal data must hold
+  an opaque value or be listed in `EVENT_FIELDS_ALLOWED`, and every job
+  payload field and job error value is listed with its reason in
+  `JOB_PAYLOAD_FIELDS` / `JOB_ERROR_VALUES`, in `xtask/src/payloads.rs`.)*
 - Untrusted HTML (email bodies) is rendered only in a sandboxed iframe with a
   strict CSP; never `dangerouslySetInnerHTML` outside `lib/ui/safe-html`.
 

@@ -196,7 +196,11 @@ impl Background {
                 let handler = Arc::clone(&handler);
                 Box::pin(async move {
                     let payload: H::Payload = serde_json::from_value(payload).map_err(|e| {
-                        JobError::fatal(format!("payload does not decode as `{}`: {e}", H::NAME))
+                        JobError::fatal(format!(
+                            "payload does not decode as `{}`: {}",
+                            H::NAME,
+                            crate::redact::json(&e)
+                        ))
                     })?;
                     handler.run(ctx, payload).await
                 })
@@ -275,7 +279,11 @@ impl Background {
 fn run_job<J: Job>(ctx: &mut JobContext, payload: Value) -> BoxFuture<'_, Result<(), JobError>> {
     Box::pin(async move {
         let job: J = serde_json::from_value(payload).map_err(|e| {
-            JobError::fatal(format!("payload does not decode as `{}`: {e}", J::NAME))
+            JobError::fatal(format!(
+                "payload does not decode as `{}`: {}",
+                J::NAME,
+                crate::redact::json(&e)
+            ))
         })?;
         job.run(ctx).await
     })
@@ -331,7 +339,11 @@ async fn load_event<E: DomainEvent>(ctx: &JobContext) -> Result<Event<E>, JobErr
         )));
     }
     let payload: E = serde_json::from_value(row.payload).map_err(|e| {
-        JobError::fatal(format!("event {id} does not decode as `{}`: {e}", E::NAME))
+        JobError::fatal(format!(
+            "event {id} does not decode as `{}`: {}",
+            E::NAME,
+            crate::redact::json(&e)
+        ))
     })?;
     // The log row's workspace must be the event's own: an instance-wide
     // event logged in a workspace, or a workspace's event naming another
