@@ -37,7 +37,7 @@ use std::{fmt::Write as _, sync::Arc, time::Duration};
 use axum::{
     Json, Router,
     extract::Request as AxumRequest,
-    http::{HeaderName, HeaderValue, StatusCode, header},
+    http::{HeaderName, HeaderValue, header},
     middleware,
     routing::get,
 };
@@ -704,7 +704,10 @@ async fn time_limit(
 
 #[cfg(test)]
 mod tests {
-    use axum::{body::Body, http::Request};
+    use axum::{
+        body::Body,
+        http::{Request, StatusCode},
+    };
     use campbooks_kernel::testing;
     use tower::ServiceExt;
 
