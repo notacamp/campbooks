@@ -301,6 +301,28 @@ browser's name and platform, and for an error its class, the head of its message
 file names and positions of its stack. Without a receiver the app is told to stop and
 sends nothing more.
 
+**Usage analytics.** To see which screens people use, point the server at a
+[Matomo](https://matomo.org) site:
+
+```sh
+CAMPBOOKS_ANALYTICS__MATOMO_URL=https://analytics.example.com
+CAMPBOOKS_ANALYTICS__MATOMO_SITE_ID=1
+CAMPBOOKS_ANALYTICS__MATOMO_VISITOR_KEY=<openssl rand -base64 32>     # secret
+```
+
+Off unless all three are set. The app loads no analytics script: after each navigation
+it tells its own server the screen's route template (`/w/:workspaceId/inbox`, never the
+address, an id, a search or a title), and nothing at all while the browser sends Do Not
+Track or Global Privacy Control. The server checks the template and sends it to Matomo's
+tracking API in the background, with the browser's user agent, the language when
+Campbooks ships it and a visitor id that is an HMAC of the account and the UTC day under
+the visitor key: daily unique visitors per screen, with no way to follow a person across
+days. No IP, user id, workspace or custom dimension is sent, and no `token_auth` is
+needed, so Matomo sees every visit coming from the server's address: set
+`trust_visitors_cookies = 1` in its `[Tracker]` section so visitors are told apart by
+that id. A slow or unreachable Matomo costs dropped views
+(`campbooks_screen_views_total{outcome="failed"}`), never a slower app.
+
 **What you get.**
 
 | Metric (Prometheus name) | What | Labels |
@@ -318,6 +340,7 @@ sends nothing more.
 | `campbooks_connector_overdue_streams` | Streams due for more than 5 minutes that no run picked up | |
 | `campbooks_errors_reported_total` | Error reports sent to the tracker | `source` |
 | `campbooks_client_telemetry_items_total` | The app's errors, timings and events | `kind`, `outcome` (`forwarded`, `dropped`) |
+| `campbooks_screen_views_total` | Screen views relayed to usage analytics | `outcome` (`forwarded`, `failed`, `dropped`: the queue was full) |
 | `campbooks_build_info` | Always 1 | `service_version`, `campbooks_role` |
 
 Good first alerts: a rising share of 5xx in `http_server_request_duration_seconds_count`,

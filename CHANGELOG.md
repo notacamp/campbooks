@@ -8,6 +8,16 @@ All notable changes to Campbooks Next are documented here. The format follows
 
 ### Added
 
+- **Usage analytics, without a tracking script (off by default).** An instance can count
+  which screens people use in its own Matomo (`CAMPBOOKS_ANALYTICS__MATOMO_URL`,
+  `__MATOMO_SITE_ID` and `__MATOMO_VISITOR_KEY`, all three or nothing). The app loads no
+  analytics script and its security policy is unchanged: after each navigation it tells
+  its own server the screen's route template, such as `/w/:workspaceId/inbox`, never the
+  address, an id, a search or a title, and it sends nothing while the browser asks not to
+  be tracked (Do Not Track or Global Privacy Control). The server checks the template and
+  passes it on in the background with the browser's user agent and a visitor id that
+  changes every day, so Matomo sees daily visitors per screen but never an IP, an account
+  or a workspace. A slow or unreachable Matomo only drops views; the app never waits for it.
 - **Always show images from a sender you trust.** In the reader, beside Show images, "Always
   show images from <sender>" (⇧A) saves a smart rule, after the usual confirmation, for that
   address or anyone at its domain. Their images then show on their own, but only when the

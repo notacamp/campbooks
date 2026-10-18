@@ -1,6 +1,7 @@
 {
   "errors": {
     "database_unreachable": "La base de données est injoignable. L’instance n’est pas prête à traiter des requêtes.",
-    "database_timeout": "La base de données n’a pas répondu à temps. L’instance n’est pas prête à traiter des requêtes."
+    "database_timeout": "La base de données n’a pas répondu à temps. L’instance n’est pas prête à traiter des requêtes.",
+    "invalid_route": "Seul un modèle de route peut être signalé : des mots en minuscules et des paramètres comme :workspaceId, sans identifiant, nombre, requête ni fragment."
   }
 }

@@ -54,6 +54,7 @@ pub fn config(database_url: &str) -> Config {
         telemetry: TelemetryConfig::default(),
         trusted_proxies: crate::rate_limit::TrustedProxies::default(),
         rate_limits: crate::config::RateLimitsConfig::default(),
+        analytics: crate::config::AnalyticsConfig::default(),
     }
 }
 
