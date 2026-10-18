@@ -32,11 +32,17 @@ use crate::{
 use campbooks_kernel::authz::Action;
 
 /// Which version of the draft to send: the one the member last saw saved.
-#[derive(Debug, Clone, Copy, Deserialize, ToSchema)]
+#[derive(Debug, Clone, Deserialize, ToSchema)]
 pub struct SendDraft {
     /// The draft's version as last saved by the caller; any other answers
     /// 409 `draft_changed`, so what is sent is what the member saw.
     pub version: u32,
+    /// The `content_token` that came with the draft on screen (its last
+    /// save's answer, or the draft as read). Missing, another member's, or
+    /// not the draft as it is now: 409 `content_changed`, and nothing is
+    /// sent (campbooks-cloud#242).
+    #[serde(default)]
+    pub content_token: Option<String>,
 }
 
 /// How sending behaves, from the module's settings.
@@ -75,7 +81,7 @@ pub struct SendSettings {
             body = Problem, content_type = "application/problem+json"),
         (status = NOT_FOUND, description = "No such draft, or it is not yours.",
             body = Problem, content_type = "application/problem+json"),
-        (status = CONFLICT, description = "Already on its way (`draft_not_editable`), or saved since that version (`draft_changed`).",
+        (status = CONFLICT, description = "Already on its way (`draft_not_editable`), saved since that version (`draft_changed`), or not what you were shown (`content_changed`): read it again, check it, and send again.",
             body = Problem, content_type = "application/problem+json"),
         (status = TOO_MANY_REQUESTS, description = "`rate_limited`: you sent too much mail in a short time; `Retry-After` says when to try again.",
             body = Problem, content_type = "application/problem+json"),
@@ -100,6 +106,15 @@ pub async fn send(
     if i64::from(body.version) != i64::from(row.version) {
         return Err(Error::Conflict(crate::MESSAGES.reason("draft_changed")));
     }
+    if !state.binding.is_enabled() {
+        tracing::warn!(
+            workspace = %access.workspace,
+            draft = %row.id,
+            "a send was refused: there is no key to bind it with (CAMPBOOKS_SECRET_KEY is unset)"
+        );
+        return Err(Error::internal("sends are not bound: no instance secret"));
+    }
+    let content = drafts::shown_to_author(&state, access, &row, body.content_token.as_deref())?;
     let (to, cc, bcc) = row.recipients()?;
     if to.len() + cc.len() + bcc.len() == 0 {
         return Err(Error::BadRequest(crate::MESSAGES.reason("no_recipients")));
@@ -138,7 +153,7 @@ pub async fn send(
     )
     .fetch_one(&mut *tx)
     .await?;
-    bind_request(&state, &mut tx, access, &row, generation).await?;
+    bind_request(&state, &mut tx, access, (&row, &content), generation).await?;
     campbooks_kernel::jobs::enqueue_to::<ReleaseSend>(
         &mut tx,
         &ReleaseSendPayload {
@@ -152,31 +167,33 @@ pub async fn send(
     .await?;
     let draft = drafts::load(&state, &mut tx, access, id, false, Action::Read)
         .await?
-        .view()?;
+        .shown(&state.binding, access)?;
     tx.commit().await?;
     Ok((StatusCode::ACCEPTED, Json(draft)))
 }
 
-/// Bind the author's request to send `row` at `generation` (scheduled in
-/// `tx`) with a MAC the database cannot forge (campbooks-cloud#227):
-/// `release_send` releases only a draft whose content, recipients, inbox,
-/// author and generation are still the ones signed here. Without the
-/// instance secret there is no key, and nothing is scheduled.
+/// Bind the author's request to send `row` (with `content`, its
+/// [`binding::content_hash`] as checked by [`drafts::shown_to_author`]) at
+/// `generation` (scheduled in `tx`) with a MAC the database cannot forge
+/// (campbooks-cloud#227): `release_send` releases only a draft whose
+/// content, recipients, inbox, author and generation are still the ones
+/// signed here. Without the instance secret there is no key, and nothing
+/// is scheduled.
 async fn bind_request(
     state: &AppState,
     tx: &mut sqlx::PgConnection,
     access: &campbooks_kernel::tenancy::Access,
-    row: &drafts::DraftRow,
+    draft: (&drafts::DraftRow, &[u8; 32]),
     generation: i32,
 ) -> Result<()> {
-    let content = binding::content_hash(row)?;
+    let (row, content) = draft;
     let request = binding::SendRequest {
         workspace: access.workspace,
         draft: row.id,
         generation,
         author: access.user,
         inbox: row.inbox_id,
-        content: &content,
+        content,
     };
     let Some(mac) = request.sign(&state.binding) else {
         tracing::warn!(
@@ -252,7 +269,7 @@ pub async fn cancel(
     }
     let draft = drafts::load(&state, &mut tx, access, id, false, Action::Read)
         .await?
-        .view()?;
+        .shown(&state.binding, access)?;
     tx.commit().await?;
     Ok(Json(draft))
 }

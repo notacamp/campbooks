@@ -332,13 +332,14 @@ async fn a_proposal_whose_author_is_away_says_it_stays_paused_once_kept(db: PgPo
     assert_eq!(got.json["paused_once_kept"], "author_unavailable");
 
     // Sam keeps it anyway: it is Leo's still, and paused until he is back.
-    let kept = kit
-        .post(
-            &sam,
-            &format!("{one}/confirm"),
-            Some(serde_json::json!({ "apply_to_existing": false })),
-        )
-        .await;
+    let body = crate::features::rules::tests::as_shown(
+        &kit,
+        &sam,
+        &one,
+        serde_json::json!({ "apply_to_existing": false }),
+    )
+    .await;
+    let kept = kit.post(&sam, &format!("{one}/confirm"), Some(body)).await;
     assert_eq!(kept.status.as_u16(), 200, "{:?}", kept.json);
     assert_eq!(kept.json["state"], "paused");
     assert_eq!(kept.json["paused_reason"], "author_unavailable");

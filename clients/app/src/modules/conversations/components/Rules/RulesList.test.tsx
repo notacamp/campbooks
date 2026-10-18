@@ -121,6 +121,43 @@ describe("the rules list", () => {
     expect(within(waiting).getByRole("button", { name: "Keep this rule" })).toBeVisible();
   });
 
+  it("keeps a rule only as it was shown: changed since, it shows again as it is", async () => {
+    const shown = { ...PROPOSED, content_token: "demo-token-shown" };
+    const changed = {
+      ...PROPOSED,
+      actions: [{ action: "trash" as const }],
+      content_token: "demo-token-changed",
+    };
+    let listed = 0;
+    const api = mockApi({
+      ...people,
+      [`GET ${W}/rules`]: () => {
+        listed += 1;
+        return { body: { rules: [listed === 1 ? shown : changed] } };
+      },
+      [`GET ${W}/inboxes`]: { body: { inboxes: [INBOX] } },
+      [`POST ${W}/rules/${PROPOSED.id}/confirm`]: problem(409, "content_changed"),
+    });
+    renderWithProviders(<RulesList workspaceId={DUARTE.id} />);
+    const waiting = await screen.findByRole("list", { name: "Waiting for you" });
+    fireEvent.click(within(waiting).getByRole("button", { name: "Keep this rule" }));
+    expect(
+      await screen.findByText("This rule changed since you opened it. Check it and keep it again."),
+    ).toBeVisible();
+    // The yes named what was on screen, and nothing was kept for the member.
+    expect(
+      api.calls.find((call) => call.route === `POST ${W}/rules/${PROPOSED.id}/confirm`)?.body,
+    ).toEqual({ apply_to_existing: true, content_token: "demo-token-shown" });
+    // Read again: it shows what it does now, still waiting for a yes.
+    expect(
+      await within(waiting).findByText("Mail from billing@hosting.example → put in the trash"),
+    ).toBeVisible();
+    expect(within(waiting).getByRole("button", { name: "Keep this rule" })).toBeVisible();
+    expect(
+      api.calls.filter((call) => call.route === `POST ${W}/rules/${PROPOSED.id}/confirm`),
+    ).toHaveLength(1);
+  });
+
   it("shows the rules while the inbox list cannot load, without naming the inbox", async () => {
     mockApi({
       [`GET ${W}/rules`]: { body: { rules: [LEDGER_RULE] } },

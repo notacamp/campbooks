@@ -2358,6 +2358,12 @@ export interface components {
         ConfirmRule: {
             /** @description Apply it to the mail already in the inbox too (default true). */
             apply_to_existing?: boolean;
+            /**
+             * @description The `content_token` that came with the rule on screen. Missing,
+             *     another member's, or not the rule as it is now: 409
+             *     `content_changed`, and nothing is kept (campbooks-cloud#242).
+             */
+            content_token?: string | null;
         };
         /** @description An app the caller let in. */
         ConnectedApp: {
@@ -2772,6 +2778,15 @@ export interface components {
             body?: string | null;
             /** @description Copied recipients. */
             cc?: components["schemas"]["Address"][] | null;
+            /**
+             * @description The `content_token` that came with the draft on screen (its last
+             *     save's answer, or the draft as read). Every save keeps fields it
+             *     cannot set (the inbox, the reply headers, the attachments' files),
+             *     so every save names what it was shown: missing, another member's, or
+             *     not the draft as it is now answers 409 `content_changed` and nothing
+             *     is saved (campbooks-cloud#242).
+             */
+            content_token?: string | null;
             /** @description The quoted history. */
             quoted?: string | null;
             /** @description The subject. */
@@ -2814,6 +2829,13 @@ export interface components {
             body: string;
             /** @description Copied recipients. */
             cc: components["schemas"]["Address"][];
+            /**
+             * @description What you were shown, bound to you (campbooks-cloud#242): send it
+             *     back with `conversations.send_draft`. Keep the one that came with
+             *     the content on screen (a save's answer replaces it); absent when the
+             *     server has no instance secret.
+             */
+            content_token?: string | null;
             conversation_id?: components["schemas"]["ConversationId"] | null;
             /**
              * Format: date-time
@@ -4219,6 +4241,12 @@ export interface components {
              */
             confirmed_at?: string | null;
             /**
+             * @description What you were shown, bound to you (campbooks-cloud#242): send it
+             *     back to say yes to it (`conversations.confirm_rule`) or to adopt it.
+             *     Absent when the server has no instance secret.
+             */
+            content_token?: string | null;
+            /**
              * Format: date-time
              * @description When it was made.
              */
@@ -4382,6 +4410,13 @@ export interface components {
         };
         /** @description Which version of the draft to send: the one the member last saw saved. */
         SendDraft: {
+            /**
+             * @description The `content_token` that came with the draft on screen (its last
+             *     save's answer, or the draft as read). Missing, another member's, or
+             *     not the draft as it is now: 409 `content_changed`, and nothing is
+             *     sent (campbooks-cloud#242).
+             */
+            content_token?: string | null;
             /**
              * Format: int32
              * @description The draft's version as last saved by the caller; any other answers
@@ -4733,6 +4768,13 @@ export interface components {
             adopt?: boolean;
             /** @description New conditions. */
             conditions?: components["schemas"]["RuleCondition"][] | null;
+            /**
+             * @description With `adopt`, unless this change sets both the conditions and the
+             *     actions: the `content_token` that came with the rule on screen, so
+             *     you adopt only what you were shown (409 `content_changed`
+             *     otherwise).
+             */
+            content_token?: string | null;
             /** @description `true` to pause it, `false` to let it act again. */
             paused?: boolean | null;
         };
@@ -8584,7 +8626,7 @@ export interface operations {
                     "application/problem+json": components["schemas"]["Problem"];
                 };
             };
-            /** @description Changed since that version (`draft_changed`), or on its way (`draft_not_editable`). */
+            /** @description Changed since that version (`draft_changed`), on its way (`draft_not_editable`), or not what you were shown (`content_changed`): read it again, then save. */
             409: {
                 headers: {
                     [name: string]: unknown;
@@ -8719,7 +8761,7 @@ export interface operations {
                     "application/problem+json": components["schemas"]["Problem"];
                 };
             };
-            /** @description Already on its way (`draft_not_editable`), or saved since that version (`draft_changed`). */
+            /** @description Already on its way (`draft_not_editable`), saved since that version (`draft_changed`), or not what you were shown (`content_changed`): read it again, check it, and send again. */
             409: {
                 headers: {
                     [name: string]: unknown;
@@ -10003,6 +10045,15 @@ export interface operations {
                     "application/problem+json": components["schemas"]["Problem"];
                 };
             };
+            /** @description It needs a yes again first (`rule_needs_confirmation`), or you adopt one that is not what you were shown (`content_changed`). */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
         };
     };
     "conversations.confirm_rule": {
@@ -10068,7 +10119,7 @@ export interface operations {
                     "application/problem+json": components["schemas"]["Problem"];
                 };
             };
-            /** @description It is not waiting for a yes. */
+            /** @description It is not waiting for a yes (`rule_not_proposed`), or it is not what you were shown (`content_changed`): read it again, check it, and say yes again. */
             409: {
                 headers: {
                     [name: string]: unknown;

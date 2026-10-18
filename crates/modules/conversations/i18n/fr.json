@@ -13,6 +13,7 @@
     "invalid_subject": "L’objet tient sur une seule ligne d’au plus {{max}} caractères.",
     "draft_too_long": "Ce message est trop long pour être envoyé.",
     "draft_changed": "Ce brouillon a été modifié ailleurs. Rechargez-le pour voir la dernière version.",
+    "content_changed": "Ceci a changé depuis que vous l’avez ouvert. Vérifiez-le et réessayez.",
     "draft_not_editable": "Ce message est en route et ne peut plus être modifié.",
     "no_recipients": "Ajoutez au moins un destinataire.",
     "invalid_address": "Cette adresse n’est pas valide : {{address}}",

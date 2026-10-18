@@ -37,13 +37,16 @@ use std::collections::HashMap;
 use campbooks_kernel::{
     Error, Result,
     binding::{Binding, Fields},
-    tenancy::UserId,
+    tenancy::{Access, UserId},
 };
 use sqlx::{PgConnection, types::Uuid};
 
 use super::{RuleAction, RuleCondition, Stored, find_any};
 use crate::{
-    domain::redact,
+    domain::{
+        binding::{ContentToken, Shown},
+        redact,
+    },
     model::{RuleId, RuleState},
 };
 
@@ -106,6 +109,25 @@ impl Stored {
     pub fn needs_confirmation(&self, binding: &Binding) -> bool {
         matches!(self.state, RuleState::Active | RuleState::Paused) && !self.bound(binding)
     }
+}
+
+/// The token of `rule` as it is stored now, shown to the caller of
+/// `access` (campbooks-cloud#242): over the same [`content_hash`] its MAC
+/// binds, with its id, binding generation, inbox, stored state and author.
+/// `conversations.confirm_rule` (and a manager adopting it) signs it only
+/// when the member sends this token back and it still holds.
+pub fn content_token(access: &Access, rule: &Stored) -> Result<ContentToken> {
+    Ok(ContentToken::for_caller(
+        access,
+        Shown::Rule {
+            id: rule.id,
+            generation: rule.generation,
+            inbox: rule.inbox,
+            state: rule.state,
+            taught_by: rule.taught_by,
+            content: content_hash(&rule.conditions, &rule.actions)?,
+        },
+    ))
 }
 
 /// Fill in the binding columns of `rules` (`workspace_id`,

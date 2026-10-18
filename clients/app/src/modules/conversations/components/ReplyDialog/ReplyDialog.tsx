@@ -20,10 +20,10 @@ import {
 import {
   cancelSend,
   createDraft,
+  deleteDraft,
   draftKeys,
   saveDraft,
   sendDraft,
-  useConversationDrafts,
   type Draft,
 } from "../../api/drafts";
 import { useConversation, type MessageView } from "../../api/queries";
@@ -69,6 +69,22 @@ const QUOTE_CHARS = 280;
 /** Who a reply to `message` goes to: the server sends it there (Reply-To first). */
 function recipientOf(message: MessageView) {
   return message.direction === "outbound" ? message.to[0] : (message.reply_to[0] ?? message.from);
+}
+
+/**
+ * Everyone a reply to `message` goes to, as the server fills a reply (its
+ * Reply-To, else its sender; for a message the inbox sent, its To). The
+ * dialog shows them all and saves exactly them, with no copies: a draft
+ * holds only what the member sees here (campbooks-cloud#242).
+ */
+function recipientsOf(message: MessageView): Draft["to"] {
+  let parties = [message.from];
+  if (message.direction === "outbound") {
+    parties = message.to;
+  } else if (message.reply_to.length > 0) {
+    parties = message.reply_to;
+  }
+  return parties.map((party) => ({ name: party.name ?? null, address: party.address }));
 }
 
 /** How long the send can still be undone, from its `send_at` (at least a second). */
@@ -118,6 +134,7 @@ export function ReplyDialog({
   // Who it really goes to, never only the sender's display name: a Reply-To
   // elsewhere is said out loud.
   const recipient = answered === undefined ? undefined : recipientOf(answered);
+  const recipients = answered === undefined ? [] : recipientsOf(answered);
   const person = recipient === undefined ? (name ?? "") : displayName(recipient);
   const elsewhere =
     answered?.direction === "inbound" &&
@@ -125,7 +142,6 @@ export function ReplyDialog({
     answered.reply_to[0].address.toLowerCase() !== answered.from.address.toLowerCase()
       ? answered.reply_to[0]
       : undefined;
-  const drafts = useConversationDrafts(workspaceId, conversationId);
   const suggestions = useReplySuggestions(workspaceId, conversationId, answered?.id, {
     enabled: resume === undefined,
   });
@@ -133,7 +149,11 @@ export function ReplyDialog({
   const [stage, setStage] = useState<Stage>(resume === undefined ? "choose" : "draft");
   const [intent, setIntent] = useState(resume?.intent ?? "");
   const [text, setText] = useState(resume?.draft.body ?? "");
-  const [saved, setSaved] = useState<Draft | undefined>(resume?.draft);
+  // The draft this dialog created and saved: the only one it saves again.
+  const [saved, setSaved] = useState<Draft | undefined>();
+  // A draft the next one replaces (the one an Undo handed back, or one that
+  // changed after it was saved): discarded once the new one exists.
+  const replaced = useRef<string | undefined>(resume?.draft.id);
   const [rewriting, setRewriting] = useState<"shorter" | "change" | undefined>();
   const [problem, setProblem] = useState<string | undefined>();
   const [busy, setBusy] = useState(false);
@@ -224,38 +244,52 @@ export function ReplyDialog({
   };
 
   /**
-   * The reply draft holding what is on screen: the one this dialog saved,
-   * else an empty reply draft of the same message (never one with words the
-   * member wrote), else a new one.
+   * The reply draft holding what is on screen (campbooks-cloud#242). Only a
+   * draft this dialog created is saved again, with its token, the
+   * recipients shown, its quoted text and no attachments. Any other (one
+   * already in the drafts list, the one an Undo handed back, one that
+   * changed after it was saved) is never reused: a fresh reply draft is
+   * created, so nothing the dialog does not show (attachments, reply
+   * headers, a subject someone else set) can go out. A draft it replaces is
+   * discarded once the new one exists.
    */
   const keep = async (): Promise<Draft | undefined> => {
-    const reusable =
-      saved ??
-      drafts.data?.find(
-        (d) =>
-          d.kind === "reply" &&
-          d.state === "draft" &&
-          d.message_id === answered?.id &&
-          d.body.trim() === "",
-      );
-    let draft: Draft;
-    if (reusable !== undefined) {
-      draft = await saveDraft(workspaceId, reusable.id, {
-        version: reusable.version,
-        body: text,
-      });
-    } else if (answered === undefined) {
+    if (answered === undefined) {
       return undefined;
-    } else {
-      draft = await createDraft(workspaceId, {
-        kind: "reply",
-        message_id: answered.id,
-        body: text,
-        quoted: replyQuote(answered, i18n.language, words),
+    }
+    // The recipients shown, and no copies: what is saved is what is seen.
+    const content = {
+      body: text,
+      quoted: replyQuote(answered, i18n.language, words),
+      to: recipients,
+      cc: [],
+      bcc: [],
+    };
+    if (saved !== undefined) {
+      const again = await saveDraft(workspaceId, saved.id, {
+        version: saved.version,
+        content_token: saved.content_token ?? null,
+        attachments: [],
+        ...content,
+      });
+      setSaved(again);
+      return again;
+    }
+    const fresh = await createDraft(workspaceId, {
+      kind: "reply",
+      message_id: answered.id,
+      ...content,
+    });
+    setSaved(fresh);
+    const old = replaced.current;
+    replaced.current = undefined;
+    if (old !== undefined) {
+      // Best effort: left behind, it is only a draft the composer shows whole.
+      void deleteDraft(workspaceId, old).catch(() => {
+        // Nothing to say: the reply itself is saved.
       });
     }
-    setSaved(draft);
-    return draft;
+    return fresh;
   };
 
   const send = async () => {
@@ -266,12 +300,22 @@ export function ReplyDialog({
     setBusy(true);
     setProblem(undefined);
     const handle = undo.pending({ label: t("reply.pending", { name: person }) });
+    let kept: Draft | undefined;
     try {
+      if (answered === undefined) {
+        // Who it goes to is not on screen yet: nothing is sent unseen.
+        throw new Error("nothing to answer yet");
+      }
       const draft = await keep();
       if (draft === undefined) {
         throw new Error("nothing to answer yet");
       }
-      const scheduled = await sendDraft(workspaceId, draft.id, draft.version);
+      kept = draft;
+      // As just saved: the save's answer is what the dialog shows.
+      const scheduled = await sendDraft(workspaceId, draft.id, {
+        version: draft.version,
+        contentToken: draft.content_token,
+      });
       const window = undoWindow(scheduled.send_at);
       const asked = intent;
       handle.done({
@@ -295,9 +339,19 @@ export function ReplyDialog({
         detail: t("reply.resultDetail"),
       });
       onSent?.(scheduled);
-    } catch {
-      handle.fail({ label: t("reply.errors.send", { name: person }) });
-      setProblem("errors.send");
+    } catch (thrown) {
+      if (problemCode(thrown) === "content_changed") {
+        // Changed after it was saved: nothing sent. Send again writes what
+        // is shown here into a fresh draft, and this one goes.
+        handle.fail({ label: t("reply.errors.changed") });
+        setProblem("errors.changed");
+        setSaved(undefined);
+        replaced.current = kept?.id;
+        void queryClient.invalidateQueries({ queryKey: draftKeys.all(workspaceId) });
+      } else {
+        handle.fail({ label: t("reply.errors.send", { name: person }) });
+        setProblem("errors.send");
+      }
     } finally {
       working.current = false;
       setBusy(false);
@@ -359,7 +413,7 @@ export function ReplyDialog({
     recipient === undefined ? undefined : (
       <Text tone={elsewhere === undefined ? "secondary" : "danger"} size="sm">
         {elsewhere === undefined
-          ? t("reply.to", { recipient: addressLine(recipient) })
+          ? t("reply.to", { recipient: recipients.map(addressLine).join(", ") })
           : t("reply.replyToElsewhere", {
               recipient: addressLine(elsewhere),
               sender: addressLine(answered?.from ?? elsewhere),
