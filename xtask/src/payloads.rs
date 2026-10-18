@@ -885,8 +885,7 @@ fn struct_fields(code: &[(String, String)], path: &str, name: &str) -> Result<Ve
         })
         .collect();
     let rest = match (local.first(), elsewhere.as_slice()) {
-        (Some(rest), _) => *rest,
-        (None, [(_, rest)]) => *rest,
+        (Some(rest), _) | (None, [(_, rest)]) => *rest,
         (None, []) => return Err(format!("its payload struct `{name}` is not in the sources")),
         (None, several) => {
             return Err(format!(
