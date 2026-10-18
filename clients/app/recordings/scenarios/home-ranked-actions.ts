@@ -83,9 +83,17 @@ export default async function homeRankedActions({ page }: ScenarioContext): Prom
   const forward = page.getByRole("dialog", { name: /^Forward Marta Ferreira/u });
   await forward.waitFor();
   await caption(page, "Forward asks to whom: find them by name", 2000);
-  await forward
-    .getByRole("searchbox", { name: "Find someone by name" })
-    .pressSequentially("Pedro", { delay: 120 });
+  // Never a sender under review or a no-reply address (campbooks-cloud#233):
+  // the phishing "IT Support" and no-reply@accounts.example find nobody.
+  const find = forward.getByRole("searchbox", { name: "Find someone by name" });
+  for (const typed of ["support", "accounts"]) {
+    await find.fill("");
+    await find.pressSequentially(typed, { delay: 120 });
+    await forward.getByText("No one by that name has written to you.").waitFor();
+    await caption(page, "Never a sender under review, nor a no-reply address", 1800);
+  }
+  await find.fill("");
+  await find.pressSequentially("Pedro", { delay: 120 });
   await pause(1200);
   await forward.getByRole("button", { name: /Pedro Alves/u }).click();
   // The composer, not the stream's heading: a phone shows the reader alone.

@@ -9018,6 +9018,15 @@
               "format": "int32",
               "minimum": 0
             }
+          },
+          {
+            "name": "reachable",
+            "in": "query",
+            "description": "Only senders it is safe to write to (Forward's picker): never a\nno-reply address, nor a sender whose newest mail fails their checks\nor pretends to be them, nor one with mail reported (in spam), under\nreview or found suspicious. Default false.",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
           }
         ],
         "responses": {
