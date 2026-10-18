@@ -152,6 +152,17 @@ impl Kit {
         self
     }
 
+    /// The same kit with no binding key (an instance with no secret): sends
+    /// are neither scheduled nor released (campbooks-cloud#227).
+    #[must_use]
+    pub fn keyless(mut self) -> Self {
+        self.state = self
+            .state
+            .with_binding(campbooks_kernel::binding::Binding::disabled());
+        self.app = testing::app(crate::module(self.deps.clone()), self.state.clone());
+        self
+    }
+
     /// The same kit, asking `clients` whom each client token acts for.
     #[must_use]
     pub fn with_clients(mut self, clients: campbooks_kernel::tenancy::ClientDirectoryPort) -> Self {

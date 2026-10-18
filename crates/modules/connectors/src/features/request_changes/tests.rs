@@ -487,6 +487,7 @@ async fn an_undo_during_a_write_is_not_taken_for_gmail(db: PgPool) {
     .execute(&kit.db)
     .await
     .unwrap();
+    kit.bind_planted_changes(m.ws).await;
     m.run(&kit).await;
     assert_eq!(kit.google.labels_of(&m.ids[0]), labels(&["INBOX"]));
     assert_eq!(
@@ -576,6 +577,7 @@ async fn a_pending_change_shows_as_the_member_left_it(db: PgPool) {
     .execute(&kit.db)
     .await
     .unwrap();
+    kit.bind_planted_changes(m.ws).await;
     kit.google.relabel(&m.ids[0], &[], &["UNREAD"]);
     let page = crate::features::sync_stream::read_page(&kit.state, &kit.deps, m.ws, m.stream).await;
     let message = &page[0];
@@ -603,6 +605,7 @@ async fn a_stale_change_is_given_up_not_made_late(db: PgPool) {
     .execute(&kit.db)
     .await
     .unwrap();
+    kit.bind_planted_changes(m.ws).await;
     let batches = kit.batches(m.ws).await.len();
     kit.google.clear_calls();
     m.run(&kit).await;
@@ -692,12 +695,15 @@ async fn a_write_window_left_open_is_closed(db: PgPool) {
     .await
     .unwrap();
     let own = |backlog: crate::domain::outbound::Backlog| backlog.own[&m.ids[0]][0].to;
-    let fresh = crate::domain::outbound::backlog(&kit.state.db, m.ws, m.stream, kit.clock.now())
-        .await
-        .unwrap();
+    kit.bind_planted_changes(m.ws).await;
+    let binding = &kit.state.binding;
+    let fresh =
+        crate::domain::outbound::backlog(&kit.state.db, binding, m.ws, m.stream, kit.clock.now())
+            .await
+            .unwrap();
     assert_eq!(own(fresh), None);
     let later = kit.clock.now() + TimeDelta::minutes(11);
-    let stale = crate::domain::outbound::backlog(&kit.state.db, m.ws, m.stream, later)
+    let stale = crate::domain::outbound::backlog(&kit.state.db, binding, m.ws, m.stream, later)
         .await
         .unwrap();
     assert_eq!(own(stale), row.applied_from);
@@ -907,4 +913,67 @@ async fn a_report_untrashes_only_mail_in_the_trash(db: PgPool) {
     );
     assert_eq!(kit.google.labels_of(trashed), labels(&["SPAM"]));
     assert!(ends(&kit).await.iter().all(|e| *e == end("applied", None)));
+}
+
+/// campbooks-cloud#227: a run makes only the changes `request_changes`
+/// recorded and bound. A change planted by SQL in the workspace, or a
+/// member's change edited after it was recorded, is never made: it ends
+/// `skipped` (`unverified`) and Gmail is not written.
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_planted_or_edited_outbound_change_is_never_made(db: PgPool) {
+    let kit = Kit::new(db).await;
+    let m = mailbox(&kit, &[&["INBOX"], &["INBOX"]]).await;
+    m.pause(&kit, true).await;
+    // An archive no member asked for, written as the runtime role.
+    let mut tx = kit.state.db.begin_for(m.ws).await.unwrap();
+    sqlx::query(
+        "INSERT INTO connectors.outbound_changes
+             (id, workspace_id, stream_id, request_id, provider_message_id, kind, remove_labels)
+         VALUES ($1, $2, $3, $4, $5, 'archive', '{INBOX}')",
+    )
+    .bind(uuid::Uuid::now_v7())
+    .bind(*m.ws.as_uuid())
+    .bind(m.stream)
+    .bind(uuid::Uuid::now_v7())
+    .bind(&m.ids[0])
+    .execute(&mut *tx)
+    .await
+    .unwrap();
+    tx.commit().await.unwrap();
+    // A member's star, then turned into an archive.
+    m.request(&kit, &[(m.ids[1].as_str(), json!({"kind": "star"}))])
+        .await;
+    let mut tx = kit.state.db.begin_for(m.ws).await.unwrap();
+    sqlx::query(
+        "UPDATE connectors.outbound_changes
+            SET kind = 'archive', add_labels = '{}', remove_labels = '{INBOX}'
+          WHERE provider_message_id = $1",
+    )
+    .bind(&m.ids[1])
+    .execute(&mut *tx)
+    .await
+    .unwrap();
+    tx.commit().await.unwrap();
+
+    m.pause(&kit, false).await;
+    kit.google.clear_calls();
+    m.run(&kit).await;
+    assert!(kit.google.writes().is_empty(), "{:?}", kit.google.writes());
+    assert_eq!(kit.google.labels_of(&m.ids[0]), labels(&["INBOX"]));
+    assert_eq!(kit.google.labels_of(&m.ids[1]), labels(&["INBOX"]));
+    assert_eq!(
+        ends(&kit).await,
+        [
+            end("skipped", Some("unverified")),
+            end("skipped", Some("unverified"))
+        ]
+    );
+
+    // A member's own change, as recorded, is made.
+    m.request(&kit, &[(m.ids[1].as_str(), json!({"kind": "star"}))])
+        .await;
+    assert_eq!(
+        kit.google.labels_of(&m.ids[1]),
+        labels(&["INBOX", "STARRED"])
+    );
 }

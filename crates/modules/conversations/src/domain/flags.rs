@@ -111,7 +111,7 @@ pub async fn apply(
             changes: vec![flag.change()],
             provider_message_ids: changed,
         };
-        request_each(&state.events, &mut tx, &changed, &items).await?;
+        request_each(&state.binding, &state.events, &mut tx, &changed, &items).await?;
         changed.publish(&state.events, &mut tx).await?;
         if let Some(needs) = needs {
             needs::refresh(

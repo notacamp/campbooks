@@ -8,6 +8,7 @@ use crate::{
     admin::{AdminAuditPort, AdminProfilesPort, NoAdmins, NoAudit},
     auth::TokenVerifier,
     authz,
+    binding::Binding,
     blobs::BlobStore,
     changes::{ChangeHub, NoContainers, VisibilityPort},
     config::Config,
@@ -105,6 +106,12 @@ pub struct AppState {
     /// installs one keyed by the instance secret; until then it signs per
     /// process.
     pub signer: Signer,
+    /// Binds sends and provider changes to the request that asked for
+    /// them, under a key the database never holds
+    /// ([`binding`](crate::binding), campbooks-cloud#227). The server
+    /// installs one derived from the instance secret; until then nothing
+    /// is signed or verifies, so nothing is sent or changed.
+    pub binding: Binding,
     /// The request and job instruments: from the meter provider installed
     /// when the state is built (the no-op without one).
     pub metrics: Metrics,
@@ -155,6 +162,7 @@ impl AppState {
             admin_audit: Arc::new(NoAudit),
             rate_limits: RateLimits::default(),
             signer: Signer::default(),
+            binding: Binding::disabled(),
             resources: authz::Catalogue::default(),
             mailer: Arc::new(crate::mail::NoMailer),
         }
@@ -291,6 +299,13 @@ impl AppState {
     #[must_use]
     pub fn with_signer(mut self, signer: Signer) -> Self {
         self.signer = signer;
+        self
+    }
+
+    /// The same state, binding outbound requests with `binding`.
+    #[must_use]
+    pub fn with_binding(mut self, binding: Binding) -> Self {
+        self.binding = binding;
         self
     }
 

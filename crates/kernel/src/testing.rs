@@ -232,11 +232,22 @@ pub async fn drop_runtime_login(db: &PgPool) {
 }
 
 /// App state over `db` (e.g. the pool `#[sqlx::test]` hands you), storing
-/// blobs in memory.
+/// blobs in memory and binding outbound requests with [`binding`].
 pub fn state(db: PgPool) -> AppState {
     let config = config("postgres://test@localhost/test");
     let blobs = BlobStore::memory(&config.blobs, db.clone());
-    AppState::new(db, config).with_blobs(blobs)
+    AppState::new(db, config)
+        .with_blobs(blobs)
+        .with_binding(binding())
+}
+
+/// The binding tests sign and verify sends and provider changes with: a
+/// fixed test key, as the server's would be derived from the instance
+/// secret.
+pub fn binding() -> crate::binding::Binding {
+    crate::binding::Binding::new(&crate::crypto::SecretKey::from_bytes(
+        [0x5a; crate::crypto::SECRET_KEY_LEN],
+    ))
 }
 
 /// A pool whose every acquire fails quickly: for "database is down" paths.

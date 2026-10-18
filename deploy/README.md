@@ -375,9 +375,11 @@ Sessions end after 48 hours unused or 30 days at most, or when you sign out. The
 
 The `server-secrets` volume holds one file, `secret-key`: `CAMPBOOKS_SECRET_KEY`, which
 encrypts the web sessions' tokens, connected accounts' credentials and the sign-in signing
-keys. It is generated on first boot by `server-init` and mounted read-only into the server
-(through group 10001). Back it up with the database: without it the stored keys and grants
-cannot be opened.
+keys, and signs every send and every change Campbooks makes at a mail provider (so rows
+written straight into the database never send mail). The server and the worker must share
+it: without it, or with a different one, nothing is sent. It is generated on first boot by
+`server-init` and mounted read-only into the server (through group 10001). Back it up with
+the database: without it the stored keys and grants cannot be opened.
 
 - **Instance secret key:** do not replace it casually; the server refuses to start when it
   cannot open the stored signing keys (see Built-in sign-in). To start over on purpose,
