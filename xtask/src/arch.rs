@@ -632,12 +632,57 @@ pub fn check_operations(spec: &serde_json::Value, owners: &Owners) -> Vec<String
     violations
 }
 
-/// A field name in an answer that looks like it may carry a secret: a
-/// secret, token, ticket or password, or a URL (a link may carry a ticket).
-static GUARDED_FIELD_NAME: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r"(?:^|_)(?:secret|token|ticket|password)s?(?:$|_)|(?:^|_)url$")
-        .unwrap_or_else(|e| unreachable!("static regex compiles: {e}"))
-});
+/// The words of a field name, lower-cased: split at `_`, `-`, `.` and
+/// camelCase boundaries (`clientSecret` is `client`, `secret`;
+/// `api_key` is `api`, `key`).
+fn name_words(name: &str) -> Vec<String> {
+    let mut words: Vec<String> = Vec::new();
+    let mut word = String::new();
+    let mut previous: Option<char> = None;
+    for c in name.chars() {
+        let boundary = matches!(c, '_' | '-' | '.' | ' ');
+        let camel = c.is_ascii_uppercase()
+            && previous.is_some_and(|p| p.is_ascii_lowercase() || p.is_ascii_digit());
+        if (boundary || camel) && !word.is_empty() {
+            words.push(std::mem::take(&mut word));
+        }
+        if !boundary {
+            word.push(c.to_ascii_lowercase());
+        }
+        previous = Some(c);
+    }
+    if !word.is_empty() {
+        words.push(word);
+    }
+    words
+}
+
+/// Whether a field name in an answer looks like it may carry a secret
+/// (campbooks-cloud#260), by its words, in any case: a secret, token,
+/// ticket, password or code (one-time, invitation, signup), an API,
+/// private, access or signing key, or a URL or link last (a link may carry
+/// a ticket). A word only starting like one (`tokenizer`, `secretary`,
+/// `codec`) is not.
+fn guarded_field(name: &str) -> bool {
+    const SECRET: [&str; 6] = ["secret", "token", "ticket", "password", "passwd", "code"];
+    const LINK: [&str; 3] = ["url", "uri", "link"];
+    const KEYED: [&str; 5] = ["api", "private", "access", "signing", "secret"];
+    let words = name_words(name);
+    let singular = |word: &str| word.strip_suffix('s').unwrap_or(word).to_owned();
+    words
+        .iter()
+        .any(|w| SECRET.contains(&singular(w).as_str()) || w == "apikey" || w == "otp")
+        || words
+            .last()
+            .is_some_and(|w| LINK.contains(&singular(w).as_str()))
+        || words
+            .windows(2)
+            .any(|pair| KEYED.contains(&pair[0].as_str()) && singular(&pair[1]) == "key")
+}
+
+/// The pseudo-field a redirect answers with: its `Location` (where the
+/// browser goes next, which may carry a ticket).
+const LOCATION_FIELD: &str = "Location";
 
 /// Secret-looking fields in the answers of mutating operations that show no
 /// secret, each with the reason: `(operationId, field, reason)`. Every other
@@ -652,6 +697,16 @@ pub const ANSWER_FIELDS_ALLOWED: &[(&str, &str, &str)] = &[
         "identity.register",
         "token_endpoint_auth_method",
         "names how the app signs in to the token endpoint (`none`); no secret",
+    ),
+    (
+        "identity.end_session_post",
+        LOCATION_FIELD,
+        "the app's registered post-logout redirect URI with the `state` it sent; no credential",
+    ),
+    (
+        "identity.register",
+        "redirect_uris",
+        "the redirect URIs the registering app sent, echoed back; no credential",
     ),
     ("conversations.create_draft", "content_token", CONTENT_TOKEN),
     ("conversations.update_draft", "content_token", CONTENT_TOKEN),
@@ -668,13 +723,16 @@ pub const ANSWER_FIELDS_ALLOWED: &[(&str, &str, &str)] = &[
 const CONTENT_TOKEN: &str =
     "a version tag of the content on screen, for conflict checks; not a credential";
 
-/// The idempotency layer stores the answers of mutating operations, unless
-/// they declare `x-campbooks.secret_once` (campbooks-cloud#213, item 4).
-/// Every field of a schema a mutating operation answers below 400 with is
-/// read (through `$ref`, `allOf`, `oneOf`, `anyOf`, `items` and
-/// `additionalProperties`): a secret-looking name needs `secret_once` or an
-/// entry in `allowed` with its reason. An entry naming a field no longer
-/// answered is stale and reported too.
+/// The idempotency layer stores the answers of mutating operations (only
+/// theirs: a read is never stored, so it is not checked), unless they
+/// declare `x-campbooks.secret_once` (campbooks-cloud#213, item 4). Every
+/// field of a schema a mutating operation answers below 400 with is read
+/// (through `$ref`, `allOf`, `oneOf`, `anyOf`, `items` and
+/// `additionalProperties`), and every redirect (3xx) counts as answering a
+/// [`LOCATION_FIELD`] (campbooks-cloud#260): a secret-looking name
+/// ([`guarded_field`]) or a redirect needs `secret_once` or an entry in
+/// `allowed` with its reason. An entry naming a field no longer answered is
+/// stale and reported too.
 pub fn check_answer_field_names(
     spec: &serde_json::Value,
     allowed: &[(&str, &str, &str)],
@@ -711,6 +769,9 @@ pub fn check_answer_field_names(
                 if !status.starts_with(['1', '2', '3']) {
                     continue;
                 }
+                if status.starts_with('3') {
+                    fields.insert(LOCATION_FIELD.to_owned());
+                }
                 let contents = response
                     .get("content")
                     .and_then(serde_json::Value::as_object);
@@ -720,7 +781,8 @@ pub fn check_answer_field_names(
                     }
                 }
             }
-            for field in fields.iter().filter(|f| GUARDED_FIELD_NAME.is_match(f)) {
+            let guarded = |f: &&String| f.as_str() == LOCATION_FIELD || guarded_field(f);
+            for field in fields.iter().filter(guarded) {
                 if allowed.iter().any(|(op, f, _)| *op == id && f == field) {
                     used.insert((id.to_owned(), field.clone()));
                 } else {
@@ -2139,6 +2201,19 @@ mod tests {
                         "303": { "content": { "application/json": { "schema": {
                             "type": "object",
                             "properties": { "accept_url": { "type": "string" } } } } } },
+                        "202": { "content": { "application/json": { "schema": {
+                            "type": "object",
+                            "properties": {
+                                "clientSecret": { "type": "string" },
+                                "accessToken": { "type": "string" },
+                                "api_key": { "type": "string" },
+                                "PrivateKey": { "type": "string" },
+                                "invite_link": { "type": "string" },
+                                "code": { "type": "string" },
+                                "codec": { "type": "string" },
+                                "keyboard": { "type": "string" },
+                                "key_id": { "type": "string" },
+                                "linked_at": { "type": "string" } } } } } },
                         "400": { "content": { "application/json": { "schema": {
                             "type": "object",
                             "properties": { "password": { "type": "string" } } } } } }
@@ -2174,8 +2249,20 @@ mod tests {
             ("mail.gone", "content_token", "stale"),
         ];
         let v = check_answer_field_names(&spec, &allowed);
-        assert_eq!(v.len(), 5, "{v:#?}");
-        for field in ["client_secret", "tokens", "refresh_token", "accept_url"] {
+        assert_eq!(v.len(), 12, "{v:#?}");
+        for field in [
+            "client_secret",
+            "tokens",
+            "refresh_token",
+            "accept_url",
+            "Location",
+            "clientSecret",
+            "accessToken",
+            "api_key",
+            "PrivateKey",
+            "invite_link",
+            "code",
+        ] {
             assert!(
                 v.iter()
                     .any(|m| m.contains(&format!("`mail.leak` answers `{field}`"))),
@@ -2195,9 +2282,24 @@ mod tests {
             "mail.tagged",
             "secretary",
             "tokenizer",
+            "codec",
+            "keyboard",
+            "key_id",
+            "linked_at",
         ] {
             assert!(!v.iter().any(|m| m.contains(quiet)), "{quiet}: {v:#?}");
         }
+    }
+
+    #[test]
+    fn field_names_split_into_words_in_any_case() {
+        assert_eq!(name_words("clientSecret"), ["client", "secret"]);
+        assert_eq!(name_words("refresh_token"), ["refresh", "token"]);
+        assert_eq!(name_words("X-Api-Key"), ["x", "api", "key"]);
+        assert_eq!(name_words("ID2Token"), ["id2", "token"]);
+        assert!(guarded_field("signupCodes") && guarded_field("REDIRECT_URI"));
+        assert!(guarded_field("apikey") && guarded_field("otp"));
+        assert!(!guarded_field("uriTemplate") && !guarded_field("links_count"));
     }
 
     #[test]

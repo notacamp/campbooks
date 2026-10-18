@@ -1267,8 +1267,10 @@ mod tests {
     /// Whether each table, view and materialized view of the kernel's and
     /// the BFF's schemas is protected from the runtime role (`$1`): a table
     /// with row-level security enabled and forced, a policy, and no
-    /// permissive policy for that role (or everyone) that admits every row
-    /// (`USING (true)`, `WITH CHECK (true)` or none); or no privilege of any
+    /// permissive policy for that role (or everyone) that admits every row:
+    /// one whose expressions, if any, read no column, call no function and
+    /// hold no subquery or parameter (`USING (true)`, `USING (1 = 1)`, none;
+    /// campbooks-cloud#260); or no privilege of any
     /// kind on the relation or on any of its columns (`has_table_privilege`
     /// does not see a column's grant). Row-level security does not apply
     /// through a view, so a view is protected by having no grant
@@ -1284,9 +1286,10 @@ mod tests {
                                OR EXISTS (SELECT 1 FROM unnest(p.polroles) AS r(oid)
                                            WHERE r.oid <> 0
                                              AND pg_has_role($1, r.oid, 'MEMBER')))
-                          AND coalesce(pg_get_expr(p.polqual, p.polrelid), 'true') = 'true'
-                          AND coalesce(pg_get_expr(p.polwithcheck, p.polrelid), 'true')
-                              = 'true'))
+                          AND (p.polqual IS NULL
+                               OR p.polqual::text !~ '[{](VAR|FUNCEXPR|SUBLINK|PARAM) ')
+                          AND (p.polwithcheck IS NULL
+                               OR p.polwithcheck::text !~ '[{](VAR|FUNCEXPR|SUBLINK|PARAM) ')))
                OR NOT (has_table_privilege($1, c.oid,
                            'SELECT, INSERT, UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER')
                        OR has_any_column_privilege($1, c.oid,
@@ -1344,6 +1347,22 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(protected(&tables, "kernel.peek"), Some(false));
+        assert_eq!(protected(&tables, "kernel.idempotency"), Some(false));
+
+        // Any constant expression admits every row, not only `true`
+        // (campbooks-cloud#260).
+        for statement in [
+            "DROP POLICY everyone ON kernel.idempotency",
+            "CREATE POLICY tautology ON kernel.idempotency FOR SELECT TO campbooks_app
+                 USING (1 = 1)",
+        ] {
+            sqlx::query(statement).execute(&db).await.unwrap();
+        }
+        let tables: Vec<(String, bool)> = sqlx::query_as(KERNEL_TABLES_PROTECTED)
+            .bind(role)
+            .fetch_all(&db)
+            .await
+            .unwrap();
         assert_eq!(protected(&tables, "kernel.idempotency"), Some(false));
     }
 
