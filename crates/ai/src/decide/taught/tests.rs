@@ -627,3 +627,136 @@ fn images_show_only_for_an_authenticated_trusted_sender() {
     // It changes nothing on arrival.
     assert!(evaluate(&rules[..2], &mail("news@brightloop.example")).is_empty());
 }
+
+#[test]
+fn a_lookalike_or_suffix_domain_is_never_trusted() {
+    let rules = [rule(
+        "domain",
+        vec![Condition::SenderDomain("paperkite.example".into())],
+        vec![Action::ShowImages],
+        1,
+    )];
+    for sender in [
+        "news@paperkite.example.evil",
+        "news@evilpaperkite.example",
+        "news@paperkite-example.com",
+        "news@paperkite.examples",
+    ] {
+        assert_eq!(
+            shows_images(&rules, &facts(sender, "This week", None), true),
+            None,
+            "{sender}"
+        );
+    }
+    assert_eq!(
+        shows_images(
+            &rules,
+            &facts("news@mail.paperkite.example", "This week", None),
+            true
+        ),
+        Some("domain")
+    );
+}
+
+#[test]
+fn a_free_mail_domain_is_refused_by_its_registrable_domain() {
+    for domain in [
+        "mail.yahoo.fr",
+        "qq.com",
+        "163.com",
+        "naver.com",
+        "yahoo.co.jp",
+        "outlook.de",
+        "hotmail.com.br",
+        "libero.it",
+        "wp.pl",
+        "seznam.cz",
+        "skynet.be",
+        "telenet.be",
+        "btinternet.com",
+        "comcast.net",
+        "iol.pt",
+    ] {
+        assert!(is_free_mail(domain), "{domain}");
+        assert_eq!(
+            TaughtRule::validate(
+                &[Condition::SenderDomain(domain.into())],
+                &[Action::ShowImages]
+            ),
+            Err(Invalid::FreeMailDomain),
+            "{domain}"
+        );
+    }
+    // A provider's name inside another domain is not the provider.
+    for domain in ["notqq.com", "qq.com.example", "brightloop.example"] {
+        assert!(!is_free_mail(domain), "{domain}");
+    }
+}
+
+#[test]
+fn a_whole_platform_anyone_sends_from_is_never_trusted_with_images() {
+    for domain in [
+        "substack.com",
+        "mail.beehiiv.com",
+        "googlegroups.com",
+        // Help desks: every customer sends from a subdomain of theirs.
+        "zendesk.com",
+        "acme.zendesk.com",
+        // Address relays, and the domain above one.
+        "privaterelay.appleid.com",
+        "appleid.com",
+        "simplelogin.com",
+    ] {
+        assert_eq!(
+            TaughtRule::validate(
+                &[Condition::SenderDomain(domain.into())],
+                &[Action::ShowImages]
+            ),
+            Err(Invalid::SharedSenderDomain),
+            "{domain}"
+        );
+        // Sorting its mail by domain is still fine.
+        assert_eq!(
+            TaughtRule::validate(
+                &[Condition::SenderDomain(domain.into())],
+                &[to_stream("newsletters")]
+            ),
+            Ok(()),
+            "{domain}"
+        );
+    }
+    // One newsletter's address on it may be trusted.
+    assert_eq!(
+        TaughtRule::validate(
+            &[Condition::SenderAddress("ledger@substack.com".into())],
+            &[Action::ShowImages]
+        ),
+        Ok(())
+    );
+}
+
+#[test]
+fn an_image_rule_kept_from_before_a_domain_was_listed_never_shows_images() {
+    // Stored before the lists grew: the engine still never acts on it.
+    let rules = [
+        rule(
+            "free",
+            vec![Condition::SenderDomain("yahoo.fr".into())],
+            vec![Action::ShowImages],
+            1,
+        ),
+        rule(
+            "platform",
+            vec![Condition::SenderDomain("substack.com".into())],
+            vec![Action::ShowImages],
+            2,
+        ),
+    ];
+    let mail = |sender| facts(sender, "This week", None);
+    assert_eq!(shows_images(&rules, &mail("sam@mail.yahoo.fr"), true), None);
+    assert_eq!(
+        shows_images(&rules, &mail("ledger@substack.com"), true),
+        None
+    );
+    assert!(rules.iter().all(TaughtRule::images_too_broad));
+}
