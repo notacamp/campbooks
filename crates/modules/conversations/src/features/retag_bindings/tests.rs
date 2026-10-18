@@ -9,7 +9,7 @@ use campbooks_kernel::{
     db::BeginFor as _,
     jobs::{self, DispatchRekeys, EnqueueOptions},
 };
-use sqlx::{PgPool, types::Uuid};
+use sqlx::PgPool;
 
 use super::{Tally, retag};
 use crate::{
