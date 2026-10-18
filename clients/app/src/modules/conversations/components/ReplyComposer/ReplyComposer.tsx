@@ -5,7 +5,7 @@ import { useTranslation } from "react-i18next";
 import { Banner, Button, Text } from "~/lib/ui";
 
 import { createDraft, draftKeys, useConversationDrafts, type Draft } from "../../api/drafts";
-import { withWords } from "../../api/queries";
+import { useMessageWords, withWords } from "../../api/queries";
 import { displayName, forwardQuote, replyQuote, type QuoteWords } from "../../compose/quote";
 import { DraftComposer } from "../DraftComposer/DraftComposer";
 import type { ReplyRequest, ReplySlotContext } from "../Reader/ReplySlot";
@@ -109,6 +109,14 @@ export function ReplyComposer({
     }
   }, [request, drafts.data]);
 
+  const open = drafts.data?.filter(editable) ?? [];
+  const draft = open.find((d) => d.id === draftId) ?? (request === null ? open[0] : undefined);
+  // The message it quotes, and whether its words were cut (a long email):
+  // the composer says the quote holds its first part.
+  const quotedMessage = messages.find((m) => m.id === draft?.message_id);
+  const quotedWords = useMessageWords(workspaceId, conversation.id, quotedMessage);
+  const quoteCut = quotedMessage?.text?.truncated === true || quotedWords.data?.truncated === true;
+
   if (failed !== false) {
     return (
       <Banner
@@ -125,8 +133,6 @@ export function ReplyComposer({
       </div>
     );
   }
-  const open = drafts.data?.filter(editable) ?? [];
-  const draft = open.find((d) => d.id === draftId) ?? (request === null ? open[0] : undefined);
   if (draft === undefined) {
     return null;
   }
@@ -158,6 +164,7 @@ export function ReplyComposer({
       title={title}
       withSubject={draft.kind === "forward"}
       focus={draft.kind === "forward" ? "to" : "body"}
+      quotedNote={quoteCut ? t("compose.quoteCut") : undefined}
       onClose={() => {
         setClosed(true);
         onClose();

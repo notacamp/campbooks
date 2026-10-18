@@ -56,7 +56,8 @@
       "title": "Mantida como histórico",
       "lead": "{{address}} foi desligada e o correio dela ficou aqui, só de leitura: nada de novo chega, e nada pode ser enviado nem alterado a partir dela."
     },
-    "readingText": "A ler…"
+    "readingText": "A ler…",
+    "textFailed": "Não foi possível ler o texto deste email."
   },
   "actions": {
     "star": "Fixar",
@@ -236,7 +237,8 @@
       "newMessage": "Nova mensagem"
     },
     "tooLate": "Já não é possível anular: a mensagem foi enviada.",
-    "readingQuote": "A ler o email para o citar…"
+    "readingQuote": "A ler o email para o citar…",
+    "quoteCut": "Este email é longo: a citação tem a primeira parte."
   },
   "needs": {
     "line": {
@@ -593,7 +595,7 @@
     "to": "Para {{recipient}}",
     "replyToElsewhere": "As respostas vão para {{recipient}}, não para o remetente {{sender}}. Confirme antes de enviar.",
     "readingQuote": "A ler o email para o citar…",
-    "quoteUnread": "Não foi possível ler o email para o citar. Feche e tente novamente."
+    "quoteUnread": "Não foi possível ler o email a que está a responder, por isso a citação não pode ser mostrada. Nada pode ser enviado até que seja."
   },
   "smartRule": {
     "tag": "Regra inteligente",

@@ -56,7 +56,8 @@
       "title": "Conservado como historial",
       "lead": "{{address}} se desconectó y su correo se conserva aquí, solo lectura: no llega nada nuevo y no se puede enviar ni cambiar nada desde él."
     },
-    "readingText": "Leyendo…"
+    "readingText": "Leyendo…",
+    "textFailed": "No se pudo leer el texto de este correo."
   },
   "actions": {
     "star": "Fijar",
@@ -236,7 +237,8 @@
       "newMessage": "Mensaje nuevo"
     },
     "tooLate": "Ya es tarde para deshacer: se ha enviado.",
-    "readingQuote": "Leyendo el correo para citarlo…"
+    "readingQuote": "Leyendo el correo para citarlo…",
+    "quoteCut": "Este correo es largo: la cita contiene la primera parte."
   },
   "needs": {
     "line": {
@@ -593,7 +595,7 @@
     "to": "Para {{recipient}}",
     "replyToElsewhere": "Las respuestas van a {{recipient}}, no al remitente {{sender}}. Compruébalo antes de enviar.",
     "readingQuote": "Leyendo el correo para citarlo…",
-    "quoteUnread": "No se pudo leer el correo para citarlo. Ciérralo e inténtalo de nuevo."
+    "quoteUnread": "No se pudo leer el correo al que respondes, así que no se puede mostrar la cita. No se puede enviar nada hasta que se muestre."
   },
   "smartRule": {
     "tag": "Regla inteligente",

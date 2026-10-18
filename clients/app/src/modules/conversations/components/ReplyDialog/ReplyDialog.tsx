@@ -26,7 +26,7 @@ import {
   sendDraft,
   type Draft,
 } from "../../api/drafts";
-import { useConversation, useMessageWords, withWords, type MessageView } from "../../api/queries";
+import { useConversation, useMessageWords, type MessageView } from "../../api/queries";
 import { useReplySuggestions, writeReply } from "../../api/replies";
 import { displayName, replyQuote, type QuoteWords } from "../../compose/quote";
 import type { Translate } from "../../model";
@@ -264,12 +264,15 @@ export function ReplyDialog({
     if (answered === undefined) {
       return undefined;
     }
-    // Its words, when they are still being read: never an empty quote.
-    const quoting = await withWords(queryClient, workspaceId, conversationId, answered);
+    // Only the quote the dialog shows: never words read after it said
+    // they could not be, sent unseen.
+    if (answered.text_unread === true) {
+      throw new Error("the quote is not shown yet");
+    }
     // The recipients shown, and no copies: what is saved is what is seen.
     const content = {
       body: text,
-      quoted: replyQuote(quoting, i18n.language, words),
+      quoted: replyQuote(answered, i18n.language, words),
       to: recipients,
       cc: [],
       bcc: [],
@@ -402,15 +405,21 @@ export function ReplyDialog({
     () => {
       void send();
     },
-    { enabled: drafting && rewriting === undefined && result === undefined },
+    {
+      enabled:
+        drafting &&
+        rewriting === undefined &&
+        result === undefined &&
+        answered?.text_unread !== true,
+    },
   );
 
   const intents = suggestions.data?.intents ?? [];
   // The message answered, the one the draft replies to.
   // Still reading its words, or they could not be read: said, never an
   // empty quote shown as if there were nothing.
-  const quoteUnread = newest?.text_unread === true && unread.isError;
-  const quoteReading = newest?.text_unread === true && unread.isPending;
+  const quoteUnread = newest?.text_unread === true && unread.isError && !unread.isFetching;
+  const quoteReading = newest?.text_unread === true && unread.data === undefined && !quoteUnread;
   const quote =
     answered?.text?.content === undefined || answered.text.content.trim() === "" ? undefined : (
       <ReplyQuote
@@ -493,7 +502,12 @@ export function ReplyDialog({
               variant="primary"
               icon="send"
               shortcut="compose.send"
-              disabled={busy || rewriting !== undefined || text.trim() === ""}
+              disabled={
+                busy ||
+                rewriting !== undefined ||
+                text.trim() === "" ||
+                answered?.text_unread === true
+              }
               onClick={() => {
                 void send();
               }}
@@ -501,7 +515,7 @@ export function ReplyDialog({
               {t("reply.send")}
             </Button>
             <Button
-              disabled={busy || rewriting !== undefined}
+              disabled={busy || rewriting !== undefined || answered?.text_unread === true}
               onClick={() => {
                 void openInComposer();
               }}
@@ -516,9 +530,20 @@ export function ReplyDialog({
     >
       {to}
       {quoteUnread ? (
-        <Text tone="danger" size="sm">
-          {t("reply.quoteUnread")}
-        </Text>
+        <Banner
+          tone="danger"
+          role="alert"
+          title={t("reply.quoteUnread")}
+          action={
+            <Button
+              onClick={() => {
+                void unread.refetch();
+              }}
+            >
+              {t("error.retry")}
+            </Button>
+          }
+        />
       ) : null}
       {quoteReading ? (
         <div role="status">

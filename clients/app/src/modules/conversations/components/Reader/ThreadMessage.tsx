@@ -114,9 +114,11 @@ export function ThreadMessage({
         time={time}
         dateTime={message.sent_at}
         snippet={
-          message.text_unread === true && unread.isPending
-            ? t("reader.readingText")
-            : text.replaceAll(/\s+/gu, " ").trim()
+          message.text_unread !== true || unread.data !== undefined
+            ? text.replaceAll(/\s+/gu, " ").trim()
+            : unread.isError
+              ? t("reader.textFailed")
+              : t("reader.readingText")
         }
         onOpen={onOpen}
       />

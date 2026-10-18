@@ -32,7 +32,7 @@ use crate::{
     domain::{
         access::visible_inboxes,
         attachments::{is_raster, sniff},
-        blobs::{Budget, read_bytes, read_text, words},
+        blobs::{Budget, read_bytes, read_text, words_until},
         plain_text::Quotes,
         rules::{ImagesHeld, images},
         sanitize::{InlineImages, sanitize},
@@ -232,16 +232,19 @@ async fn words_of(
 ) -> Result<Json<MessageBody>> {
     let bodies: Bodies = serde_json::from_value(bodies)
         .map_err(|e| Error::internal(crate::domain::redact::json(&e)))?;
+    // Cut at the text budget, or only some of the HTML's words: either way
+    // a quote of them says it is not whole.
     let text = if bodies.text.is_some() || bodies.html.is_some() {
-        let (words, cut) = words(
+        let read = words_until(
             &state.blobs,
             ws,
             (bodies.text.as_ref(), bodies.html.as_ref()),
             WORDS_BUDGET,
             Quotes::Keep,
+            None,
         )
         .await?;
-        Some((words, cut))
+        Some((read.text, read.cut || read.partial))
     } else {
         None
     };
@@ -894,6 +897,36 @@ mod tests {
         );
         assert!(html_only.json["html"].is_null());
         assert_eq!(html_only.json["truncated"], false);
+        // HTML past the 256 KiB read: its words come, marked cut, so a quote
+        // of them says it is not whole.
+        let long = "<p>The harbourlight pontoon schedule, week by week.</p>".repeat(6_000);
+        kit.ingest_value(
+            workspace,
+            inbox,
+            &json!({"changes": [{"op": "upsert", "message": {
+                "provider_message_id": "html-long-1",
+                "from": {"name": "Quay Office", "address": "office@quay-moorings.example"},
+                "to": [{"address": "sam@example.com"}],
+                "subject": "The season's schedule",
+                "sent_at": "2026-10-13T07:30:00Z",
+                "direction": "inbound",
+                "html": long,
+                "mailbox": {"in_inbox": true},
+                "read": false, "starred": false
+            }}]}),
+        )
+        .await;
+        let cut = words("html-long-1").await;
+        assert_eq!(cut.status, StatusCode::OK, "{}", cut.json);
+        assert!(
+            cut.json["text"]
+                .as_str()
+                .unwrap_or_default()
+                .starts_with("The harbourlight pontoon schedule"),
+            "{}",
+            cut.json["text"]
+        );
+        assert_eq!(cut.json["truncated"], true);
         // A message with a text part answers with it.
         let plain = words("en-1").await;
         assert!(

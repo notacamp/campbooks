@@ -56,7 +56,8 @@
       "title": "Kept as history",
       "lead": "{{address}} was disconnected and its mail kept here, read-only: nothing new arrives, and nothing can be sent or changed from it."
     },
-    "readingText": "Reading…"
+    "readingText": "Reading…",
+    "textFailed": "Couldn’t read this email’s text."
   },
   "actions": {
     "star": "Pin",
@@ -236,7 +237,8 @@
       "newMessage": "New message"
     },
     "tooLate": "Too late to undo: it was sent.",
-    "readingQuote": "Reading the email to quote it…"
+    "readingQuote": "Reading the email to quote it…",
+    "quoteCut": "This email is long: the quote holds its first part."
   },
   "needs": {
     "line": {
@@ -593,7 +595,7 @@
     "to": "To {{recipient}}",
     "replyToElsewhere": "Replies go to {{recipient}}, not to the sender {{sender}}. Check before you send.",
     "readingQuote": "Reading the email to quote it…",
-    "quoteUnread": "Couldn’t read the email to quote it. Close and try again."
+    "quoteUnread": "Couldn’t read the email you’re replying to, so its quote can’t be shown. Nothing can be sent until it is."
   },
   "smartRule": {
     "tag": "Smart rule",

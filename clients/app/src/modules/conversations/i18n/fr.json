@@ -56,7 +56,8 @@
       "title": "Gardée comme historique",
       "lead": "{{address}} a été déconnectée et ses e-mails sont gardés ici, en lecture seule : rien de nouveau n’arrive, et rien ne peut être envoyé ni modifié depuis cette boîte."
     },
-    "readingText": "Lecture…"
+    "readingText": "Lecture…",
+    "textFailed": "Impossible de lire le texte de cet e-mail."
   },
   "actions": {
     "star": "Épingler",
@@ -236,7 +237,8 @@
       "newMessage": "Nouveau message"
     },
     "tooLate": "Trop tard pour annuler : il a été envoyé.",
-    "readingQuote": "Lecture de l’e-mail pour le citer…"
+    "readingQuote": "Lecture de l’e-mail pour le citer…",
+    "quoteCut": "Cet e-mail est long : la citation en contient le début."
   },
   "needs": {
     "line": {
@@ -593,7 +595,7 @@
     "to": "À {{recipient}}",
     "replyToElsewhere": "Les réponses vont à {{recipient}}, pas à l’expéditeur {{sender}}. Vérifiez avant d’envoyer.",
     "readingQuote": "Lecture de l’e-mail pour le citer…",
-    "quoteUnread": "Impossible de lire l’e-mail pour le citer. Fermez et réessayez."
+    "quoteUnread": "Impossible de lire l’e-mail auquel vous répondez : la citation ne peut pas s’afficher. Rien ne peut être envoyé tant qu’elle n’est pas affichée."
   },
   "smartRule": {
     "tag": "Règle intelligente",

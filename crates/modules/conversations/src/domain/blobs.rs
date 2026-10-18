@@ -43,6 +43,10 @@ pub struct Words {
     /// Whether they were to come from the HTML and `deadline` passed first
     /// (no words), or came in part.
     pub late: bool,
+    /// Whether words read from HTML are only some of them: the HTML was cut
+    /// at its budget, or reading it stopped at its time cap. A quote of them
+    /// says so.
+    pub partial: bool,
 }
 
 /// [`words`], with the HTML read as text off the async workers (it is CPU
@@ -62,7 +66,7 @@ pub async fn words_until(
             return Ok(Words {
                 text: read,
                 cut,
-                late: false,
+                ..Words::default()
             });
         }
     }
@@ -75,7 +79,7 @@ pub async fn words_until(
             ..Words::default()
         });
     }
-    let (read, _) = read_text(blobs, workspace, html, budget.html).await?;
+    let (read, html_cut) = read_text(blobs, workspace, html, budget.html).await?;
     let until = deadline.map_or_else(
         || Instant::now() + MAX_TEXT_TIME,
         |deadline| deadline.min(Instant::now() + MAX_TEXT_TIME),
@@ -88,6 +92,7 @@ pub async fn words_until(
         text: words,
         cut: false,
         late: !complete && deadline.is_some(),
+        partial: html_cut || !complete,
     })
 }
 

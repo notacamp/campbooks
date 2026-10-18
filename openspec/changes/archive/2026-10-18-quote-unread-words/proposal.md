@@ -11,7 +11,9 @@ its folded line in the reader was blank (campbooks-cloud#250).
 - `conversations.get_message_body` takes `words=true`: the message's words
   alone, as `text` (its text part when it has words, else its HTML read as
   text with the usual half-second bound), no `html`, `truncated` when they
-  were cut at 256 KiB. Same access as the body; no new operation.
+  are not whole (the text or the HTML cut at 256 KiB, or the reading stopped
+  at its half-second cap); the composer then says the quote holds the
+  email's first part. Same access as the body; no new operation.
 - The client asks for those words, once per message (they never change),
   whenever a message is marked `text_unread`: before quoting it in the
   composer's reply, reply all or forward, before Home's Forward picker
@@ -20,6 +22,9 @@ its folded line in the reader was blank (campbooks-cloud#250).
 - While they are read, a neutral line says so ("Reading the email to quote
   it…", "Reading…"). When they cannot be read, nothing is started or sent
   and the member is told why; a forward never goes out with an empty quote.
+  In the reply dialog, Send waits until the quote is shown, with a "Try
+  again" that reads and shows it, so no quote goes out unseen. A folded line
+  whose words cannot be read says so.
 - A debug-only `CAMPBOOKS_DEV_TEXT_DEADLINE_MS` replaces the one-second
   deadline of `conversations.get`, so a recording can force `text_unread`
   deterministically (0 marks every message read from HTML). Release builds

@@ -85,7 +85,9 @@ All notable changes to Campbooks Next are documented here. The format follows
   Reply all, Forward and Home's Forward picker now read them first, saying "Reading the email
   to quote it…" meanwhile, and the folded message in the reader shows them too. If they
   cannot be read, nothing is started or sent and the app says why, instead of quoting an
-  empty message.
+  empty message; the reply dialog waits to send until the quote is shown, with Try again.
+  When only the start of a long email could be read, the composer says the quote holds its
+  first part.
 - **Mail whose HTML has no body tag gets its words.** Mail written as a head followed
   straight by its text, with no `<body>` (some mailers send it), was stored with a blank
   text in place of its words, so search found nothing in it, its preview and Scout's read

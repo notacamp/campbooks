@@ -359,6 +359,22 @@ describe("ReplyComposer", () => {
     ).toMatch(/Maya Okafor wrote:\n> Hi Sam, the plan only came as HTML/u);
   });
 
+  it("says the quote holds only the first part when the words were cut", async () => {
+    const stored: (typeof REPLY)[] = [];
+    mockApi({
+      [`GET ${D}`]: () => ({ body: { drafts: stored } }),
+      [WORDS]: { body: { ...WORDS_BODY, truncated: true } },
+      [`POST ${D}`]: () => {
+        stored.push({ ...REPLY, kind: "forward", message_id: FIRST });
+        return { status: 201, body: { ...REPLY, kind: "forward", message_id: FIRST } };
+      },
+    });
+    renderWithProviders(slot({ mode: "forward", messageId: FIRST, nonce: 1 }, vi.fn(), UNREAD));
+    expect(
+      await screen.findByText("This email is long: the quote holds its first part."),
+    ).toBeVisible();
+  });
+
   it("starts nothing when the words cannot be read, and says why", async () => {
     const api = mockApi({
       [`GET ${D}`]: { body: { drafts: [] } },
