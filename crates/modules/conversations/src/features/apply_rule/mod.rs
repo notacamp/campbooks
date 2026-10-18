@@ -7,6 +7,13 @@
 //! records its position and progress, publishes the changes and the run's
 //! `rule_changed`, and enqueues the next batch, so a run survives restarts
 //! and never changes a conversation twice.
+//!
+//! An apply run acts only for a rule bound to the member who taught it
+//! (campbooks-cloud#242): a run of a rule planted or changed with SQL stops
+//! before its first change, with a WARN carrying ids only, and is not tried
+//! again. The rules it competes with are the bound ones only
+//! (`rules::acting`). A revert run puts back only what the rule's own
+//! applications recorded, whatever its binding.
 
 #[cfg(test)]
 mod tests;
@@ -66,6 +73,8 @@ impl JobHandler for ApplyRules {
             return Ok(());
         }
         let kind: RunKind = run.kind.parse()?;
+        // Gone, or a row that does not decode (`find_any` WARNs with its id):
+        // the run ends, never retried.
         let Some(rule) = rules::find_any(tx, run.rule).await? else {
             return end(tx, batch.run, RunState::Cancelled).await;
         };
@@ -75,6 +84,16 @@ impl JobHandler for ApplyRules {
         if rule.inbox_detached
             || (kind == RunKind::Apply && rule.effective_state() != RuleState::Active)
         {
+            return end(tx, batch.run, RunState::Cancelled).await;
+        }
+        // Planted or changed with SQL: it changes nothing (campbooks-cloud#242).
+        if kind == RunKind::Apply && !rule.bound(&binding) {
+            tracing::warn!(
+                %workspace,
+                rule = %rule.id,
+                run = %batch.run,
+                "a taught rule is not bound to the member who taught it; its run is stopped"
+            );
             return end(tx, batch.run, RunState::Cancelled).await;
         }
         let context = Context {
@@ -160,7 +179,7 @@ async fn apply_batch(
     batch: &RunBatch,
     tally: &mut Tally,
 ) -> Result<Option<ConversationId>, JobError> {
-    let acting = rules::acting(tx, rule.inbox).await?;
+    let acting = rules::acting(tx, context.binding, rule.inbox).await?;
     let engine = rule.engine();
     // One window of the inbox at most, and at most [`BATCH`] changes.
     let window = rules::scan(tx, rule.inbox, &rule.conditions, batch.after, SCAN).await?;

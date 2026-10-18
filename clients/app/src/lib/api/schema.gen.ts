@@ -4217,6 +4217,8 @@ export interface components {
             last_applied_at?: string | null;
             /** @description Whether the caller may change or remove it. */
             may_change: boolean;
+            /** @description Whether it waits for a member to confirm it again before it acts. */
+            needs_confirmation?: boolean;
             /** @description Where it came from. */
             origin: components["schemas"]["RuleOrigin"];
             /** @description The member's own words, for an instruction. */

@@ -231,6 +231,19 @@ All notable changes to Campbooks Next are documented here. The format follows
 
 ### Security
 
+- **A taught rule planted or changed with SQL changes nothing (campbooks-cloud#242).**
+  Saving, confirming, changing, pausing, removing or bringing back a rule now signs it for
+  the member who did it, under the key of campbooks-cloud#227, over its conditions,
+  actions, inbox, author, state and precedence. A rule acts on arriving mail, on the mail
+  already in the inbox and on "Always show images" only while that signature holds, so a
+  rule written or edited with SQL is skipped (a warning in the log with ids only), asks
+  Gmail or Zoho for nothing, and the other rules still act. Arriving mail is never held up
+  by a bad rule. Such a rule is listed as needing a yes again (`needs_confirmation`), and
+  confirming it signs it as it is. The rules you have when you upgrade keep working: the
+  migration records a fingerprint of each one, and a job signs each rule once, only if it
+  is still exactly as the migration found it. A rule changed in between waits for you to
+  confirm it. Rules don't act for the first minute or so after the upgrade, until that job
+  has run, and without `CAMPBOOKS_SECRET_KEY` a rule can't be saved active.
 - **SQL alone can't make a mailbox send (campbooks-cloud#227).** Sending a
   draft now signs the author's request, under a key derived from the instance secret that
   never goes in the database, over the draft, its send, the author, the inbox and

@@ -17177,6 +17177,10 @@
             "type": "boolean",
             "description": "Whether the caller may change or remove it."
           },
+          "needs_confirmation": {
+            "type": "boolean",
+            "description": "Whether it waits for a member to confirm it again before it acts."
+          },
           "origin": {
             "$ref": "#/components/schemas/RuleOrigin",
             "description": "Where it came from."

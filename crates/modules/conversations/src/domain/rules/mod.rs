@@ -11,10 +11,12 @@
 //! rule acts only while its author still may change the inbox and is not
 //! suspended (`member_suspensions`, campbooks-cloud#147); a member who
 //! changed back what a rule did makes that conversation an **exception** the
-//! rule leaves alone ([`exceptions`]).
+//! rule leaves alone ([`exceptions`]). A rule acts only while its MAC binds
+//! it to the member who taught it ([`binding`], campbooks-cloud#242).
 
 mod apply;
 mod arrival;
+pub mod binding;
 mod effects;
 mod exceptions;
 mod facts;
@@ -24,7 +26,7 @@ use campbooks_ai::decide::{
     signals::email::{TEMPLATE_MAX_CHARS, subject_words},
     taught::{self, Surface, TaughtRule},
 };
-use campbooks_kernel::{Error, Result, tenancy::UserId};
+use campbooks_kernel::{Error, Result, binding::Binding, tenancy::UserId};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
@@ -401,6 +403,12 @@ pub struct Stored {
     /// Whether its inbox is kept read-only (its connection was removed): no
     /// rule acts there any more.
     pub inbox_detached: bool,
+    /// Its workspace.
+    pub workspace: sqlx::types::Uuid,
+    /// Its binding generation: one more at every signing ([`binding`]).
+    pub generation: i64,
+    /// Its MAC ([`binding`]); `None` until a member's request signs it.
+    pub mac: Option<Vec<u8>>,
 }
 
 impl Stored {
@@ -523,6 +531,10 @@ impl TryFrom<RuleRow> for Stored {
             author_may_act: row.author_may_act,
             author_suspended: row.author_suspended,
             inbox_detached: row.inbox_detached,
+            // Read next to the row (`binding::attach`).
+            workspace: sqlx::types::Uuid::nil(),
+            generation: 0,
+            mac: None,
         })
     }
 }
@@ -548,7 +560,8 @@ pub async fn find(conn: &mut PgConnection, id: RuleId) -> Result<Option<Stored>>
         .filter(|r| r.state != RuleState::Removed))
 }
 
-/// Rule `id`, removed or not.
+/// Rule `id`, removed or not; `None` when there is none, or its row does
+/// not decode (a WARN with its id).
 pub async fn find_any(conn: &mut PgConnection, id: RuleId) -> Result<Option<Stored>> {
     let row = sqlx::query_as!(
         RuleRow,
@@ -578,9 +591,19 @@ pub async fn find_any(conn: &mut PgConnection, id: RuleId) -> Result<Option<Stor
         "#,
         id as RuleId,
     )
-    .fetch_optional(conn)
+    .fetch_optional(&mut *conn)
     .await?;
-    row.map(Stored::try_from).transpose()
+    let Some(row) = row else { return Ok(None) };
+    // A row that does not even decode was not written by Campbooks: it is
+    // treated as no rule (it could never act), never as an error a job
+    // would retry or a request answer 500 with.
+    let id = row.id;
+    let Ok(mut rule) = Stored::try_from(row) else {
+        tracing::warn!(rule = %id, "a taught rule does not decode; it is left out");
+        return Ok(None);
+    };
+    binding::attach(conn, std::slice::from_mut(&mut rule)).await?;
+    Ok(Some(rule))
 }
 
 /// The rules of `inboxes` (not removed), newest first.
@@ -614,17 +637,51 @@ pub async fn of_inboxes(conn: &mut PgConnection, inboxes: &[InboxId]) -> Result<
         "#,
         inboxes as &[InboxId],
     )
-    .fetch_all(conn)
+    .fetch_all(&mut *conn)
     .await?;
-    rows.into_iter().map(Stored::try_from).collect()
+    // A row that does not even decode was not written by Campbooks: it is
+    // left out (it could never act), so it fails neither a list nor the
+    // mail arriving in its inbox.
+    let mut rules: Vec<Stored> = rows
+        .into_iter()
+        .filter_map(|row| {
+            let id = row.id;
+            Stored::try_from(row)
+                .inspect_err(|_| {
+                    tracing::warn!(rule = %id, "a taught rule does not decode; it is left out");
+                })
+                .ok()
+        })
+        .collect();
+    binding::attach(conn, &mut rules).await?;
+    Ok(rules)
 }
 
-/// The rules acting in `inbox`, as the engine reads them.
-pub async fn acting(conn: &mut PgConnection, inbox: InboxId) -> Result<Vec<TaughtRule>> {
+/// The rules acting in `inbox`, as the engine reads them: active, and bound
+/// to the member who taught them (campbooks-cloud#242). An active rule
+/// whose MAC does not verify (planted or changed with SQL, or kept from
+/// before rules were bound and not signed again) is left out, with a WARN
+/// carrying ids only: it changes nothing, and the other rules still act.
+pub async fn acting(
+    conn: &mut PgConnection,
+    binding: &Binding,
+    inbox: InboxId,
+) -> Result<Vec<TaughtRule>> {
     Ok(of_inboxes(conn, &[inbox])
         .await?
         .iter()
         .filter(|r| r.effective_state() == RuleState::Active)
+        .filter(|r| {
+            let bound = r.bound(binding);
+            if !bound {
+                tracing::warn!(
+                    workspace = %r.workspace,
+                    rule = %r.id,
+                    "a taught rule is not bound to the member who taught it; it does not act"
+                );
+            }
+            bound
+        })
         .map(Stored::engine)
         .collect())
 }
@@ -865,6 +922,9 @@ mod stored_tests {
             author_may_act: true,
             author_suspended: false,
             inbox_detached: false,
+            workspace: sqlx::types::Uuid::nil(),
+            generation: 0,
+            mac: None,
         }
     }
 

@@ -55,6 +55,9 @@ impl Server {
         let pool = testing::app_role_pool(db).await;
         let state = crate::with_ports(
             AppState::new(pool.clone(), config)
+                // Rules are bound to the member who saves them
+                // (campbooks-cloud#242): the instance's key.
+                .with_binding(testing::binding())
                 .with_blobs(BlobStore::memory(&BlobsConfig::default(), pool))
                 .with_registry(crate::registry_with(composition).expect("valid registrations")),
         );
