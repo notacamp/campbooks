@@ -496,8 +496,9 @@ async fn invalid_rules_are_refused(db: PgPool) {
     }
 }
 
+/// Members who let Campbooks act without asking.
 #[derive(Debug)]
-struct ActsWithoutAsking;
+pub(crate) struct ActsWithoutAsking;
 
 impl MemberPreferences for ActsWithoutAsking {
     fn acts_without_asking<'a>(
@@ -510,7 +511,7 @@ impl MemberPreferences for ActsWithoutAsking {
     }
 }
 
-fn from_corrections() -> Value {
+pub(crate) fn from_corrections() -> Value {
     json!({
         "conditions": [{"field": "sender_address", "value": GITHUB}],
         "actions": [{"action": "move_to_stream", "stream": "updates"}],
@@ -1236,25 +1237,29 @@ async fn rows_say_who_may_stop_the_rule_that_moved_them(db: PgPool) {
 }
 
 #[sqlx::test(migrations = "../../../migrations")]
-async fn anyone_who_teaches_confirms_or_declines_a_proposal_its_author_keeps(db: PgPool) {
+async fn anyone_who_teaches_confirms_or_declines_a_proposal_and_a_yes_makes_it_theirs(db: PgPool) {
     let kit = kit(db).await;
-    let (workspace, inbox, sam, sam_id) = sams_notifications(&kit, 2).await;
+    let (workspace, inbox, sam, _) = sams_notifications(&kit, 2).await;
     let (leo, leo_id) = kit.member("leo", workspace);
     kit.add_to_inbox(inbox, leo_id, InboxRole::Sender).await;
+    let (ana, ana_id) = kit.member("ana", workspace);
+    kit.add_to_inbox(inbox, ana_id, InboxRole::Sender).await;
     let rules = format!("/api/v1/w/{workspace}/inboxes/{inbox}/rules");
     let propose = || {
         let mut proposed = move_github();
         proposed["state"] = json!("proposed");
         proposed
     };
-    // Sam proposes; Leo, another sender, says yes: Sam stays its author.
+    // Sam proposes; Leo, another sender, says yes: the rule is his now
+    // (campbooks-cloud#242), acting with the rights of whoever said yes.
     let first = kit.post(&sam, &rules, Some(propose())).await;
     let first = first.json["rule"]["id"].as_str().unwrap().to_owned();
     let one = format!("/api/v1/w/{workspace}/rules/{first}");
     let body = as_shown(&kit, &leo, &one, json!({"apply_to_existing": false})).await;
     let confirmed = kit.post(&leo, &format!("{one}/confirm"), Some(body)).await;
     assert_eq!(confirmed.status, StatusCode::OK, "{:?}", confirmed.json);
-    assert_eq!(confirmed.json["taught_by"], sam_id.to_string());
+    assert_eq!(confirmed.json["taught_by"], leo_id.to_string());
+    assert_eq!(confirmed.json["may_change"], true);
     // Active now: only its author or a manager changes it.
     let refused = kit
         .post(
@@ -1265,7 +1270,7 @@ async fn anyone_who_teaches_confirms_or_declines_a_proposal_its_author_keeps(db:
         .await;
     assert_eq!(refused.status, StatusCode::CONFLICT);
     let refused = kit
-        .delete(&leo, &format!("/api/v1/w/{workspace}/rules/{first}"))
+        .delete(&ana, &format!("/api/v1/w/{workspace}/rules/{first}"))
         .await;
     assert_eq!(refused.json["code"], "rule_not_yours");
 

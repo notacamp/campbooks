@@ -219,6 +219,29 @@ describe("ReplyDialog", () => {
     });
   });
 
+  it("never discards a draft that is on its way: only its Undo takes a send back", async () => {
+    const api = routes({
+      [`POST ${D}`]: (_request, body) => ({
+        status: 201,
+        body: { ...FRESH, body: (body as { body: string }).body },
+      }),
+      [`DELETE ${D}/${REPLY.id}`]: { status: 204 },
+    });
+    // Handed in while it is scheduled (sent again elsewhere since).
+    const resume: ReplyResume = {
+      draft: { ...REPLY, message_id: NEWEST, body: DRAFT, state: "scheduled" },
+      intent: "Say Thursday works",
+    };
+    const handlers = dialog({ resume });
+    await screen.findByText("To Maya Okafor <maya@northwind-studio.example>");
+    fireEvent.click(screen.getByRole("button", { name: "Open in composer" }));
+    await waitFor(() => {
+      expect(handlers.onOpenDraft).toHaveBeenCalled();
+    });
+    expect(api.calls.some((c) => c.route === `POST ${D}`)).toBe(true);
+    expect(api.calls.some((c) => c.route.startsWith("DELETE"))).toBe(false);
+  });
+
   it("never sends what a reused draft held but the dialog did not show", async () => {
     const api = routes({
       [`POST ${D}`]: (_request, body) => ({

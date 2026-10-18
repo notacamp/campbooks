@@ -306,10 +306,10 @@ async fn leaving_keeps_a_counted_suspension_until_joining_again_tells_the_truth(
     assert_eq!(kit.get(&sam, &one).await.json["state"], "active");
 }
 
-// --- Keeping a proposal whose author is away (campbooks-cloud#197) ----------
+// --- Keeping a proposal whose author is away (campbooks-cloud#197, #242) ---
 
 #[sqlx::test(migrations = "../../../migrations")]
-async fn a_proposal_whose_author_is_away_says_it_stays_paused_once_kept(db: PgPool) {
+async fn a_proposal_whose_author_is_away_is_kept_by_whoever_says_yes(db: PgPool) {
     let kit = kit(db).await;
     let (workspace, _, sam, leo, rule) = leos_rule(&kit).await;
     let one = format!("/api/v1/w/{workspace}/rules/{rule}");
@@ -325,13 +325,15 @@ async fn a_proposal_whose_author_is_away_says_it_stays_paused_once_kept(db: PgPo
     assert_eq!(got.json["state"], "proposed");
     assert!(got.json.get("paused_once_kept").is_none(), "{:?}", got.json);
 
+    // Leo is away: whoever says yes becomes its author, so nothing says it
+    // would stay paused, and nothing discloses why Leo is away.
     suspend_counted(&kit, workspace, leo, Some(1), Utc::now()).await;
     let got = kit.get(&sam, &one).await;
     assert_eq!(got.json["state"], "proposed");
     assert!(got.json.get("paused_reason").is_none(), "{:?}", got.json);
-    assert_eq!(got.json["paused_once_kept"], "author_unavailable");
+    assert!(got.json.get("paused_once_kept").is_none(), "{:?}", got.json);
 
-    // Sam keeps it anyway: it is Leo's still, and paused until he is back.
+    // Sam keeps it: it is Sam's now, and acts.
     let body = crate::features::rules::tests::as_shown(
         &kit,
         &sam,
@@ -341,9 +343,9 @@ async fn a_proposal_whose_author_is_away_says_it_stays_paused_once_kept(db: PgPo
     .await;
     let kept = kit.post(&sam, &format!("{one}/confirm"), Some(body)).await;
     assert_eq!(kept.status.as_u16(), 200, "{:?}", kept.json);
-    assert_eq!(kept.json["state"], "paused");
-    assert_eq!(kept.json["paused_reason"], "author_unavailable");
-    assert_eq!(kept.json["taught_by"], leo.to_string());
+    assert_eq!(kept.json["state"], "active");
+    assert!(kept.json.get("paused_reason").is_none(), "{:?}", kept.json);
+    assert_ne!(kept.json["taught_by"], leo.to_string());
     assert!(
         kept.json.get("paused_once_kept").is_none(),
         "{:?}",

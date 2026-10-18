@@ -153,7 +153,7 @@ export function ReplyDialog({
   const [saved, setSaved] = useState<Draft | undefined>();
   // A draft the next one replaces (the one an Undo handed back, or one that
   // changed after it was saved): discarded once the new one exists.
-  const replaced = useRef<string | undefined>(resume?.draft.id);
+  const replaced = useRef<Draft | undefined>(resume?.draft);
   const [rewriting, setRewriting] = useState<"shorter" | "change" | undefined>();
   const [problem, setProblem] = useState<string | undefined>();
   const [busy, setBusy] = useState(false);
@@ -283,9 +283,11 @@ export function ReplyDialog({
     setSaved(fresh);
     const old = replaced.current;
     replaced.current = undefined;
-    if (old !== undefined) {
+    // Only a draft still being written: a send on its way is taken back by
+    // its Undo alone, never discarded here (campbooks-cloud#242).
+    if (old?.state === "draft") {
       // Best effort: left behind, it is only a draft the composer shows whole.
-      void deleteDraft(workspaceId, old).catch(() => {
+      void deleteDraft(workspaceId, old.id).catch(() => {
         // Nothing to say: the reply itself is saved.
       });
     }
@@ -346,7 +348,7 @@ export function ReplyDialog({
         handle.fail({ label: t("reply.errors.changed") });
         setProblem("errors.changed");
         setSaved(undefined);
-        replaced.current = kept?.id;
+        replaced.current = kept;
         void queryClient.invalidateQueries({ queryKey: draftKeys.all(workspaceId) });
       } else {
         handle.fail({ label: t("reply.errors.send", { name: person }) });
