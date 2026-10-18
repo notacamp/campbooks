@@ -266,6 +266,10 @@ All notable changes to Campbooks Next are documented here. The format follows
   - A queue index left broken by a hand-run migration is rebuilt.
   - A database clock behind the server's no longer fails web requests near a session's end.
   - The self-hosting guide says what the database separation protects, and when.
+- **Rotating the instance secret key keeps pending mailbox changes too.** A change you
+  asked for that is still waiting to be made at your mail provider (its mailbox paused, or
+  the provider down) is now signed again with the new key during a rotation, so it is
+  still made once the old key is removed. The logs say when none are left.
 
 ### Added
 

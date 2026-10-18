@@ -264,11 +264,12 @@ is used:
 - a web session's refresh and ID tokens at its next refresh.
 
 What the previous key signed SHALL be signed again with the current key in
-the background. While a previous key is set, a job SHALL run in every
+the background. While a previous key is set, a job of each module SHALL run in every
 workspace with a change feed, at most every 15 minutes. It SHALL re-tag
 every taught rule (at its generation), rule application, running rule run,
-change request and scheduled or stored send whose MAC verifies under the
-previous key only. Each update SHALL be a compare-and-set on the old MAC, so
+change request, scheduled or stored send and pending outbound change (a
+change waiting to be made at a mail provider) whose MAC verifies under the
+previous key only. The first run SHALL be at start-up. Each update SHALL be a compare-and-set on the old MAC, so
 a row signed again meanwhile is left as it is, and a row that verifies under
 neither key SHALL NOT be re-tagged. Each run SHALL log, per workspace,
 either that nothing is bound under the previous key any more or how many
@@ -298,3 +299,7 @@ key, what only it sealed SHALL fail closed, as for any wrong key.
 #### Scenario: A misconfigured previous key
 - **WHEN** `CAMPBOOKS_SECRET_KEY_PREVIOUS` is set without `CAMPBOOKS_SECRET_KEY`, equal to it, or not valid base64
 - **THEN** the server refuses to start with an error naming the variable and showing no key
+
+#### Scenario: Each kind of signed row
+- **WHEN** a running rule run, a change request, a scheduled send, a stored send and a pending outbound change are each signed under the old key, the key is rotated, the re-tag runs and the previous key is removed
+- **THEN** the run works through its mail, the change request stands, the scheduled send is released, the stored send stands and the outbound change is made, each under the new key alone
