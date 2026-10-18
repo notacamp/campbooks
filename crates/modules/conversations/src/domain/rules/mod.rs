@@ -14,9 +14,9 @@
 //! rule leaves alone ([`exceptions`]). A rule acts only while its MAC binds
 //! it to the member who taught it ([`binding`], campbooks-cloud#242), and
 //! what it changed is put back only where the application's own MAC binds it
-//! to the rule (`applications`).
+//! to the rule ([`applications`]).
 
-mod applications;
+pub mod applications;
 mod apply;
 mod arrival;
 pub mod binding;

@@ -537,27 +537,31 @@ impl Inner {
         };
         let Ok(refresh_token) = self
             .cipher
-            .open(sealed_refresh, &sealed_for(session.id, "refresh_token"))
+            .open_checked(sealed_refresh, &sealed_for(session.id, "refresh_token"))
         else {
             drop(tx);
             return self.unreadable(&session.presented).await;
         };
-        match self.oidc.refresh(&refresh_token).await {
+        match self.oidc.refresh(&refresh_token.value).await {
             Ok(fresh) => {
-                let expires_at = now + expires_in(fresh.expires_in);
-                let access = self
-                    .cipher
-                    .seal(&fresh.access_token, &sealed_for(session.id, "access_token"));
-                let refresh = fresh.refresh_token.as_deref().map(|token| {
-                    self.cipher
-                        .seal(token, &sealed_for(session.id, "refresh_token"))
-                });
+                let sealed = self.seal_refreshed(
+                    session.id,
+                    &fresh,
+                    &refresh_token,
+                    tokens.id_token.as_deref(),
+                );
                 store::update_tokens(
                     &mut tx,
                     &session.presented,
-                    &access,
-                    expires_at,
-                    refresh.as_deref().or(Some(sealed_refresh.as_slice())),
+                    &store::Refreshed {
+                        access_token: &sealed.access,
+                        access_expires_at: now + expires_in(fresh.expires_in),
+                        refresh_token: sealed
+                            .refresh
+                            .as_deref()
+                            .or(Some(sealed_refresh.as_slice())),
+                        id_token: sealed.id.as_deref(),
+                    },
                 )
                 .await?;
                 tx.commit().await?;
@@ -580,6 +584,37 @@ impl Inner {
                     )))
                 }
             }
+        }
+    }
+
+    /// What a refresh stores, sealed with the current key: the new access
+    /// token; the refresh token the identity provider sent back, or the one
+    /// used when the previous instance secret sealed it; and the stored ID
+    /// token, sealed again when the previous key sealed it
+    /// (campbooks-cloud#191). `None` keeps what is stored.
+    fn seal_refreshed(
+        &self,
+        id: Uuid,
+        fresh: &oidc::TokenResponse,
+        used: &campbooks_kernel::crypto::Opened,
+        stored_id: Option<&[u8]>,
+    ) -> SealedRefresh {
+        let refresh = fresh
+            .refresh_token
+            .as_deref()
+            .or_else(|| used.by_previous.then_some(used.value.as_str()))
+            .map(|token| self.cipher.seal(token, &sealed_for(id, "refresh_token")));
+        let context = sealed_for(id, "id_token");
+        let id_token = stored_id
+            .and_then(|sealed| self.cipher.open_checked(sealed, &context).ok())
+            .filter(|opened| opened.by_previous)
+            .map(|opened| self.cipher.seal(&opened.value, &context));
+        SealedRefresh {
+            access: self
+                .cipher
+                .seal(&fresh.access_token, &sealed_for(id, "access_token")),
+            refresh,
+            id: id_token,
         }
     }
 
@@ -666,6 +701,13 @@ impl Inner {
         store::end_session(&self.db, presented).await?;
         Err(AccessError::SessionEnded)
     }
+}
+
+/// The sealed tokens a refresh stores ([`Inner::seal_refreshed`]).
+struct SealedRefresh {
+    access: Vec<u8>,
+    refresh: Option<Vec<u8>>,
+    id: Option<Vec<u8>>,
 }
 
 /// Lifetime of a new access token: the IdP's `expires_in`, or a cautious

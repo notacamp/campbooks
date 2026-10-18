@@ -231,6 +231,7 @@ pub fn module(deps: ConversationsDeps) -> Module {
             )
             .schedule::<features::resign_rules::DispatchRuleResigns>(features::resign_rules::EVERY)
             .job::<features::resign_rules::ResignRules>()
+            .rekey::<features::retag_bindings::RetagBindings>()
             .consumer(
                 features::decide_message::DecideMessage::new(
                     model.clone(),
@@ -378,6 +379,7 @@ mod tests {
             "conversations.dispatch_needs_backfills",
             "conversations.dispatch_rule_resigns",
             "conversations.resign_rules",
+            "conversations.retag_bindings",
         ] {
             assert!(kinds.contains(&kind), "{kind}");
         }

@@ -424,7 +424,8 @@ it: without it, or with a different one, nothing is sent. It is generated on fir
 the database: without it the stored keys and grants cannot be opened.
 
 - **Instance secret key:** do not replace it casually; the server refuses to start when it
-  cannot open the stored signing keys (see Built-in sign-in). To start over on purpose,
+  cannot open the stored signing keys (see Built-in sign-in). To change it without signing
+  anyone out, rotate it (see "Rotating the instance secret key" below). To start over on purpose,
   delete the rows of `identity.signing_keys`, then
   `docker compose run --rm server-init rm /secrets/secret-key` and
   `docker compose up -d && docker compose restart server`. Everyone has to sign in again,
@@ -432,6 +433,65 @@ the database: without it the stored keys and grants cannot be opened.
   again. (Without compose, set `CAMPBOOKS_SECRET_KEY` to `openssl rand -base64 32`.)
 
 Settings (all optional; defaults shown in `.env.example`) are the `CAMPBOOKS_BFF__*` block.
+
+## Rotating the instance secret key
+
+`CAMPBOOKS_SECRET_KEY` seals the web sessions' tokens, connected accounts' credentials and
+the sign-in signing keys, and signs sends and changes at mail providers. To replace it
+without signing anyone out or disconnecting any mailbox, run the old key beside the new
+one for a while as `CAMPBOOKS_SECRET_KEY_PREVIOUS_FILE` (or `CAMPBOOKS_SECRET_KEY_PREVIOUS`).
+
+- **What the previous key does:**
+  - it only opens and verifies what was sealed or signed before the rotation;
+  - everything new is sealed, signed and derived with the new key;
+  - what it opens is sealed again with the new key as it is used: signing keys at once,
+    connected accounts within the hour, web sessions (all their tokens) at their next
+    token refresh (minutes of use);
+  - what it signed is signed again with the new key in the background: taught rules,
+    what each rule changed (so it can still be put back), rule runs, change requests and
+    scheduled sends. Every 15 minutes, in every workspace, a job re-tags what still
+    verifies only under the old key. Each run logs, per workspace, either
+    `binding re-tag: nothing in this workspace is bound under the previous key any more`
+    or a warning with how many rows are `left` for the next run.
+- **What it does not cover:** the rate-limit counters are keyed by the current key only,
+  so they start afresh, which is harmless.
+- **Errors:** the server refuses to start when the previous key is set without a current
+  one, or equals it. Neither key is ever logged.
+
+With compose:
+
+```sh
+# 1. Move the key to secret-key-previous and generate a new one.
+docker compose run --rm server-init sh /server/init.sh rotate
+# 2. Tell the server about the previous key (compose.override.yaml):
+#      services:
+#        server:
+#          environment:
+#            CAMPBOOKS_SECRET_KEY_PREVIOUS_FILE: /run/campbooks/secret-key-previous
+docker compose up -d && docker compose restart server
+# 3. Before forgetting the old key: the background re-tag has finished. Every workspace
+#    has logged "nothing ... bound under the previous key any more" since the restart,
+#    and no "binding re-tag" warning came after it:
+docker compose logs server | grep 'binding re-tag'
+# 4. After 30 days (the longest web session; held sign-up grants last 7), remove the
+#    variable, then delete the old key:
+docker compose run --rm server-init sh /server/init.sh forget-previous
+docker compose up -d && docker compose restart server
+```
+
+Without compose, set `CAMPBOOKS_SECRET_KEY` to the new key (`openssl rand -base64 32`) and
+`CAMPBOOKS_SECRET_KEY_PREVIOUS` to the old one, on every process (API and worker) at once;
+remove the previous key after 30 days, once the logs show the re-tag finished (step 3).
+
+- **Before removing the previous key:** wait for step 3. A rule still signed with the old
+  key would need confirming again, and its changes could not be put back. A web session
+  unused since the rotation (and so not refreshed) ends at its next use, and its member
+  signs in again. A connection whose credentials were not used since needs connecting
+  again. With mail syncing, connections are used every few minutes.
+- **If the old key leaked, do not set it as the previous key.** Whoever holds it could still
+  open and forge what it protects for as long as it is accepted. Start over instead (see
+  "Instance secret key" above): everyone signs in again, and connected accounts are
+  connected again.
 
 ## Built-in sign-in (Campbooks as its own identity provider)
 

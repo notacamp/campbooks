@@ -1357,6 +1357,74 @@ async fn a_refused_token_whose_refresh_is_refused_ends_the_session(db: PgPool) {
     );
 }
 
+/// The app over `h`'s database and identity provider, with the instance
+/// secret key `secret` (a rotated one, campbooks-cloud#191).
+async fn app_with_secret(h: &Harness, secret: campbooks_kernel::crypto::SecretKey) -> Router {
+    let mut config = testing::config("postgres://test@localhost/test");
+    config.auth = h.idp.auth_config();
+    ORIGIN.clone_into(&mut config.public_url);
+    let bff = BffConfig {
+        client_secret: Some(SecretString::from(WEB_CLIENT_SECRET)),
+        ..BffConfig::default()
+    };
+    let Ok(Loaded::Enabled(settings)) =
+        config::settings(&config, bff, Some(secret), &["test:read", "admin:access"])
+    else {
+        panic!("test BFF settings are valid");
+    };
+    let state = crate::with_ports(AppState::new(testing::app_role_pool(&h.db).await, config));
+    app(state, Some(*settings))
+}
+
+/// After the instance secret key is rotated (the old one kept as the
+/// previous key), a web session goes on, and its next refresh seals its
+/// refresh and ID tokens again with the new key: the new key alone opens
+/// them afterwards (campbooks-cloud#191).
+#[sqlx::test(migrations = "../../migrations")]
+async fn a_refresh_after_a_rotation_seals_the_sessions_tokens_again(db: PgPool) {
+    use campbooks_kernel::crypto::{Cipher, SecretKey};
+
+    let h = harness(db).await;
+    let mut browser = Browser::new(&h.app);
+    browser.sign_in(&h.idp, "/").await;
+    let old = SecretKey::from_bytes([7; 32]);
+    let new = SecretKey::from_bytes([8; 32]);
+    let mut rotated = Browser {
+        app: app_with_secret(&h, new.clone().with_previous(&old)).await,
+        jar: browser.jar.clone(),
+    };
+    // Due for a refresh.
+    exec(&h.db, "UPDATE bff.sessions SET access_expires_at = now()").await;
+    let before = h.idp.refreshes();
+    let reply = rotated.get("/bff/api/v1/test/whoami").await;
+    assert_eq!(reply.status, StatusCode::OK, "{}", reply.body);
+    assert_eq!(h.idp.refreshes(), before + 1);
+
+    let (id, access, refresh, id_token): (uuid::Uuid, Vec<u8>, Vec<u8>, Vec<u8>) =
+        sqlx::query_as("SELECT id, access_token, refresh_token, id_token FROM bff.sessions")
+            .fetch_one(&h.db)
+            .await
+            .unwrap();
+    let new_only = Cipher::new(&new, config::KEY_PURPOSE);
+    let old_only = Cipher::new(&old, config::KEY_PURPOSE);
+    for (column, sealed) in [
+        ("access_token", &access),
+        ("refresh_token", &refresh),
+        ("id_token", &id_token),
+    ] {
+        let context = super::sealed_for(id, column);
+        assert!(new_only.open(sealed, &context).is_ok(), "{column}");
+        assert!(old_only.open(sealed, &context).is_err(), "{column}");
+    }
+    // The previous key removed: the session still works.
+    let mut new_alone = Browser {
+        app: app_with_secret(&h, new).await,
+        jar: rotated.jar.clone(),
+    };
+    let reply = new_alone.get("/bff/api/v1/test/whoami").await;
+    assert_eq!(reply.status, StatusCode::OK, "{}", reply.body);
+}
+
 #[sqlx::test(migrations = "../../migrations")]
 async fn the_admin_api_is_reached_through_the_bff_by_administrators_only(db: PgPool) {
     let h = harness(db).await;
@@ -2058,7 +2126,7 @@ async fn the_functions_refuse_bad_input(db: PgPool) {
                                                 '\\x01', '\\x02', $1, now(),
                                                 now() + interval '10 minutes', NULL)";
     const TOUCH: &str = "SELECT bff.touch_session($1, $2, $3)";
-    const STORE: &str = "SELECT bff.store_session_tokens($1, $2, $3, $4)";
+    const STORE: &str = "SELECT bff.store_session_tokens($1, $2, $3, $4, $5)";
     const CREATE: &str = "SELECT bff.create_session(gen_random_uuid(),
                                                     sha256(gen_random_uuid()::text::bytea),
                                                     'test-user', NULL, NULL, NULL, '\\x01', now(),
@@ -2123,11 +2191,12 @@ async fn the_functions_refuse_bad_input(db: PgPool) {
         .await
         .unwrap();
 
-    for (access, until, refresh) in [
-        (None, Some(later), Some(sealed)),
-        (Some(sealed), None, Some(sealed)),
-        (Some(sealed), Some(later), None),
-        (Some(&b""[..]), Some(later), Some(sealed)),
+    for (access, until, refresh, id) in [
+        (None, Some(later), Some(sealed), None),
+        (Some(sealed), None, Some(sealed), None),
+        (Some(sealed), Some(later), None, None),
+        (Some(&b""[..]), Some(later), Some(sealed), None),
+        (Some(sealed), Some(later), Some(sealed), Some(&b""[..])),
     ] {
         invalid(
             sqlx::query(STORE)
@@ -2135,6 +2204,7 @@ async fn the_functions_refuse_bad_input(db: PgPool) {
                 .bind(access)
                 .bind(until)
                 .bind(refresh)
+                .bind(id)
                 .execute(&runtime)
                 .await,
             "store_session_tokens",

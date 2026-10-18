@@ -170,6 +170,7 @@ impl Keys {
         .bind(now)
         .fetch_all(db)
         .await?;
+        self.seal_again(db, &rows).await?;
         let active = rows
             .iter()
             .filter(|row| row.activate_at <= now && now < row.retire_at)
@@ -187,6 +188,29 @@ impl Keys {
             signer: Arc::new(signer),
             jwks,
         })
+    }
+
+    /// Seal again, with the current instance secret, every key the
+    /// previous one sealed (campbooks-cloud#191), so the keys still open
+    /// once the previous key is gone. A key that opens with neither is left
+    /// as it is: [`check`](Self::check) refuses it.
+    async fn seal_again(&self, db: &PgPool, rows: &[KeyRow]) -> Result<()> {
+        for row in rows {
+            let context = context(&row.kid);
+            let Ok(opened) = self.cipher.open_checked(&row.private_key, &context) else {
+                continue;
+            };
+            if !opened.by_previous {
+                continue;
+            }
+            sqlx::query("UPDATE identity.signing_keys SET private_key = $2 WHERE kid = $1")
+                .bind(&row.kid)
+                .bind(self.cipher.seal(&opened.value, &context))
+                .execute(db)
+                .await?;
+            tracing::info!(kid = %row.kid, "sealed a signing key again with the current secret key");
+        }
+        Ok(())
     }
 
     fn open(&self, row: &KeyRow) -> Result<Signer, ()> {
@@ -399,6 +423,48 @@ mod tests {
             .unwrap();
         assert_eq!(kept, [kid]);
         assert!(keys(&clock, 1).check(&db).await.is_ok());
+    }
+
+    /// After a rotation of the instance secret, with the previous key set,
+    /// the signing keys still open and are sealed again with the new one:
+    /// once the previous key is gone they open with the new key alone. A
+    /// wrong pair fails closed (campbooks-cloud#191).
+    #[sqlx::test(migrations = "../../../migrations")]
+    async fn a_rotated_secret_key_opens_and_seals_the_keys_again(db: PgPool) {
+        let db = testing::app_role_pool(&db).await;
+        let clock = Arc::new(FixedClock::new(Utc::now()));
+        let kid = keys(&clock, 1).signer(&db).await.unwrap().kid.clone();
+        let sealed_before: Vec<u8> =
+            sqlx::query_scalar("SELECT private_key FROM identity.signing_keys")
+                .fetch_one(&db)
+                .await
+                .unwrap();
+
+        let rotated = |current: u8, previous: u8| {
+            Keys::new(
+                Cipher::new(
+                    &SecretKey::from_bytes([current; 32])
+                        .with_previous(&SecretKey::from_bytes([previous; 32])),
+                    b"campbooks identity test v1",
+                ),
+                clock.clone(),
+            )
+        };
+        // A wrong pair: neither key sealed it.
+        assert!(rotated(3, 2).check(&db).await.is_err());
+        // The new key, with the old one as previous: opens, sealed again.
+        assert_eq!(rotated(2, 1).signer(&db).await.unwrap().kid, kid);
+        let sealed_after: Vec<u8> =
+            sqlx::query_scalar("SELECT private_key FROM identity.signing_keys")
+                .fetch_one(&db)
+                .await
+                .unwrap();
+        assert_ne!(sealed_after, sealed_before);
+        // The previous key gone: the new key alone opens it; the old alone
+        // no longer does.
+        assert!(keys(&clock, 2).check(&db).await.is_ok());
+        assert_eq!(keys(&clock, 2).signer(&db).await.unwrap().kid, kid);
+        assert!(keys(&clock, 1).check(&db).await.is_err());
     }
 
     #[sqlx::test(migrations = "../../../migrations")]

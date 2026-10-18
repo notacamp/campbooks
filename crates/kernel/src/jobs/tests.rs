@@ -1436,8 +1436,9 @@ async fn enqueue_notifications_wake_an_idle_worker(db: PgPool) {
     );
     wait_for_kernel_schedules(&db).await;
     stop.send(()).unwrap();
-    // The probe, and the kernel's prunes and blob sweep scheduled at start-up.
-    assert_eq!(worker.await.unwrap().succeeded, 7);
+    // The probe, and the kernel's prunes, blob sweep and rekey dispatch
+    // scheduled at start-up.
+    assert_eq!(worker.await.unwrap().succeeded, 8);
 }
 
 #[sqlx::test(migrations = "../../migrations")]
@@ -1447,8 +1448,8 @@ async fn shutdown_finishes_quick_jobs_and_releases_slow_ones(db: PgPool) {
         jobs.poll_interval_ms = 50;
         // Room for both probes and every start-up schedule at once (all
         // instance-wide, so one fairness bucket).
-        jobs.concurrency = 8;
-        jobs.per_workspace = 8;
+        jobs.concurrency = 9;
+        jobs.per_workspace = 9;
     })
     .await;
     let quick = created(
@@ -1483,9 +1484,9 @@ async fn shutdown_finishes_quick_jobs_and_releases_slow_ones(db: PgPool) {
 
     stop.send(()).unwrap();
     let stats = worker.await.unwrap();
-    // The quick probe and the kernel's prunes and blob sweep scheduled at
-    // start-up.
-    assert_eq!((stats.succeeded, stats.released), (7, 1));
+    // The quick probe and the kernel's prunes, blob sweep and rekey
+    // dispatch scheduled at start-up.
+    assert_eq!((stats.succeeded, stats.released), (8, 1));
     assert_eq!(job(&db, quick).await.state, "succeeded");
     let slow = job(&db, slow).await;
     assert_eq!((slow.state.as_str(), slow.attempts), ("pending", 0));
@@ -1513,6 +1514,7 @@ fn registry_collects_kernel_and_module_work() {
     assert_eq!(
         registry.kind_names(),
         [
+            "kernel.dispatch_rekeys",
             "kernel.prune_changes",
             "kernel.prune_events",
             "kernel.prune_idempotency",
@@ -1535,7 +1537,8 @@ fn registry_collects_kernel_and_module_work() {
             "kernel.sweep_blobs",
             "kernel.prune_idempotency",
             "kernel.prune_rate_limits",
-            "kernel.prune_changes"
+            "kernel.prune_changes",
+            "kernel.dispatch_rekeys"
         ]
     );
     assert_eq!(
@@ -1652,6 +1655,7 @@ fn registry_marks_the_instance_only_kinds() {
     assert_eq!(
         registry.instance_only_kinds(),
         [
+            "kernel.dispatch_rekeys",
             "kernel.prune_changes",
             "kernel.prune_events",
             "kernel.prune_idempotency",

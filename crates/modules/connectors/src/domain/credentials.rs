@@ -182,24 +182,23 @@ async fn refresh_locked(
     .await?
     .ok_or(TokenError::NeedsReauth("credentials_unreadable"))?;
     let refresh = cipher
-        .open(&sealed, &context("refresh_token", id))
+        .open_checked(&sealed, &context("refresh_token", id))
         .map_err(|_| TokenError::NeedsReauth("credentials_unreadable"))?;
-    let grant = match refresh_at_provider(&mut tx, deps, id, &refresh).await? {
+    let grant = match refresh_at_provider(&mut tx, deps, id, &refresh.value).await? {
         Ok(grant) => grant,
         Err(ProviderError::InvalidGrant) => return Err(TokenError::NeedsReauth("grant_revoked")),
         Err(other) => return Err(TokenError::Provider(other)),
     };
-    store(
-        &mut tx,
-        cipher,
-        workspace,
-        id,
-        grant.refresh_token.as_deref(),
-        &grant,
-        now,
-    )
-    .await
-    .map_err(TokenError::Database)?;
+    // A refresh token the previous instance secret sealed is sealed again
+    // with the current one when the provider sends none back
+    // (campbooks-cloud#191).
+    let kept = grant
+        .refresh_token
+        .as_deref()
+        .or_else(|| refresh.by_previous.then_some(refresh.value.as_str()));
+    store(&mut tx, cipher, workspace, id, kept, &grant, now)
+        .await
+        .map_err(TokenError::Database)?;
     tx.commit().await?;
     Ok(grant.access_token)
 }
@@ -253,15 +252,34 @@ async fn stored_access(
              FROM connectors.credentials WHERE connection_id = $1"#,
         id as ConnectionId
     )
-    .fetch_optional(conn)
+    .fetch_optional(&mut *conn)
     .await?
     .ok_or(TokenError::NeedsReauth("credentials_unreadable"))?;
-    Ok(match (row.access_token, row.access_expires_at) {
-        (Some(sealed), Some(expires_at)) if expires_at - EXPIRY_MARGIN > now => {
-            cipher.open(&sealed, &context("access_token", id)).ok()
-        }
-        _ => None,
-    })
+    let (Some(sealed), Some(expires_at)) = (row.access_token, row.access_expires_at) else {
+        return Ok(None);
+    };
+    if expires_at - EXPIRY_MARGIN <= now {
+        return Ok(None);
+    }
+    let Ok(opened) = cipher.open_checked(&sealed, &context("access_token", id)) else {
+        return Ok(None);
+    };
+    if opened.by_previous {
+        // Sealed with the previous instance secret: sealed again with the
+        // current one (campbooks-cloud#191). The refresh token follows at
+        // the next refresh.
+        // Compare-and-set: a refresh that stored a new token meanwhile wins.
+        sqlx::query(
+            "UPDATE connectors.credentials SET access_token = $2
+              WHERE connection_id = $1 AND access_token = $3",
+        )
+        .bind(*id.as_uuid())
+        .bind(cipher.seal(&opened.value, &context("access_token", id)))
+        .bind(&sealed)
+        .execute(&mut *conn)
+        .await?;
+    }
+    Ok(Some(opened.value))
 }
 
 /// Forget connection `id`'s access token, so the next run refreshes it

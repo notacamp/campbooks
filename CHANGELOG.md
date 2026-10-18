@@ -77,6 +77,14 @@ All notable changes to Campbooks Next are documented here. The format follows
   (your own sent mail, say), the message shows in the trash or spam again after the sync.
   Gmail's untrash and Zoho's spam report work as their documentation says and still need
   checking on a live account. Mail in the trash or spam never needs you.
+- **Rotate the instance secret key without signing anyone out (campbooks-cloud#191).** Set
+  the old key as `CAMPBOOKS_SECRET_KEY_PREVIOUS_FILE` (or `CAMPBOOKS_SECRET_KEY_PREVIOUS`)
+  beside the new one. Web sessions, connected mailboxes, the sign-in keys, taught rules and
+  what they changed, and scheduled sends keep working. What the old key sealed is sealed
+  again with the new one as it is used, and what it signed is signed again in the
+  background. The logs say when nothing is left under the old key, which is when to remove
+  it. With compose, `server-init` gains `rotate` and `forget-previous`; the self-hosting
+  guide has the steps. Never keep a leaked key as the previous one.
 
 ### Fixed
 

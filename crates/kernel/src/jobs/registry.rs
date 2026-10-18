@@ -9,7 +9,10 @@ use std::{
 
 use serde_json::Value;
 
-use super::{Job, JobContext, JobError, JobHandler, PruneEvents, PruneJobs, Watch};
+use super::{
+    Job, JobContext, JobError, JobHandler, PruneEvents, PruneJobs, Watch,
+    rekey::{DispatchRekeys, REKEY_EVERY},
+};
 use crate::{
     Module,
     blobs::{SWEEP_EVERY, SweepBlobs},
@@ -58,6 +61,7 @@ pub struct Background {
     kinds: Vec<KindSpec>,
     schedules: Vec<ScheduleSpec>,
     publishes: Vec<EventSpec>,
+    rekeys: Vec<ScheduleSpec>,
 }
 
 impl std::fmt::Debug for Background {
@@ -74,6 +78,10 @@ impl std::fmt::Debug for Background {
             .field(
                 "publishes",
                 &self.publishes.iter().map(|e| e.name).collect::<Vec<_>>(),
+            )
+            .field(
+                "rekeys",
+                &self.rekeys.iter().map(|r| r.name).collect::<Vec<_>>(),
             )
             .finish()
     }
@@ -223,6 +231,24 @@ impl Background {
             instance_only: !C::Event::WORKSPACE_SCOPED,
         });
         self
+    }
+
+    /// Run `J::default()` in every workspace while a previous instance
+    /// secret key is set (campbooks-cloud#191): `kernel.dispatch_rekeys`
+    /// enqueues it in each workspace with a change feed, once per tick
+    /// ([`REKEY_EVERY`]) and at most one pending per workspace. `J` re-tags,
+    /// with the current key, what its module bound under the previous one
+    /// (`Binding::retag`), so it still verifies once that key is gone.
+    /// Registers `J` too.
+    #[must_use]
+    pub fn rekey<J: Job + Default>(self) -> Self {
+        let mut this = self.job::<J>();
+        this.rekeys.push(ScheduleSpec {
+            name: J::NAME,
+            every: REKEY_EVERY,
+            payload: serde_json::to_value(J::default()).map_err(|e| e.to_string()),
+        });
+        this
     }
 
     /// Run `J::default()` every `every`, on ticks aligned to the Unix epoch
@@ -385,6 +411,9 @@ pub struct Registry {
     kinds: BTreeMap<&'static str, KindInfo>,
     consumers: Vec<ConsumerInfo>,
     schedules: Vec<ScheduleInfo>,
+    /// The per-workspace jobs re-tagging under the current key while a
+    /// previous one is set ([`Background::rekey`]).
+    rekeys: Vec<ScheduleInfo>,
     published: Vec<PublishedEvent>,
     /// Every declared resource type and its facts (ADR 0017), installed in
     /// the state with the registry.
@@ -399,6 +428,7 @@ impl std::fmt::Debug for Registry {
             .field("kinds", &self.kinds.keys().collect::<Vec<_>>())
             .field("consumers", &self.consumers)
             .field("schedules", &self.schedules)
+            .field("rekeys", &self.rekeys)
             .field(
                 "published",
                 &self.published.iter().map(|e| e.name).collect::<Vec<_>>(),
@@ -452,7 +482,8 @@ impl Registry {
             .schedule::<PruneIdempotency>(PRUNE_EVERY)
             .schedule::<PruneRateLimits>(PRUNE_EVERY)
             .job::<SequenceChanges>()
-            .schedule::<PruneChanges>(PRUNE_EVERY);
+            .schedule::<PruneChanges>(PRUNE_EVERY)
+            .schedule::<DispatchRekeys>(REKEY_EVERY);
         let owners = std::iter::once((KERNEL_OWNER, &kernel))
             .chain(modules.iter().map(|m| (m.name, &m.background)))
             .chain(others.iter().copied());
@@ -468,6 +499,9 @@ impl Registry {
             }
             for event in &background.publishes {
                 errors.extend(registry.add_published(owner, event));
+            }
+            for rekey in &background.rekeys {
+                errors.extend(registry.add_rekey(rekey));
             }
         }
         for module in modules {
@@ -806,6 +840,34 @@ impl Registry {
 
     pub(crate) fn schedules(&self) -> &[ScheduleInfo] {
         &self.schedules
+    }
+
+    /// The jobs to run in every workspace while a previous key is set.
+    pub(crate) fn rekeys(&self) -> &[ScheduleInfo] {
+        &self.rekeys
+    }
+
+    /// Register `rekey`, a kind already added (by [`Background::rekey`]).
+    fn add_rekey(&mut self, rekey: &ScheduleSpec) -> Vec<String> {
+        let Some(kind) = self.kinds.get(rekey.name) else {
+            return vec![format!(
+                "rekey job `{}` is not a registered kind",
+                rekey.name
+            )];
+        };
+        match &rekey.payload {
+            Ok(payload) => {
+                self.rekeys.push(ScheduleInfo {
+                    name: rekey.name,
+                    queue: kind.queue,
+                    max_attempts: kind.max_attempts,
+                    every: rekey.every,
+                    payload: payload.clone(),
+                });
+                Vec::new()
+            }
+            Err(e) => vec![format!("rekey job `{}`: payload: {e}", rekey.name)],
+        }
     }
 }
 
