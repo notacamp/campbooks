@@ -86,6 +86,11 @@ All notable changes to Campbooks Next are documented here. The format follows
   read were empty. Its words are read from its HTML now, everywhere, and mail stored
   earlier is read again in the background after the update, the first time anyone
   searches or new mail arrives in a workspace; search keeps answering meanwhile.
+- **The live feed resyncs whenever it finds an inbox nothing announced.** If an inbox ever
+  became visible to someone without the change that should announce it, only the
+  heartbeat's check noticed; a check triggered by a change to some other inbox let it in
+  silently, and mail read past in the meantime was never sent. Every check now resyncs
+  the client in that case, while an announced grant still needs none.
 - **Desktop app: links stay where they belong.** On macOS and Linux the main window no
   longer treats `tauri.localhost` as the app (there it is the computer itself, where any
   local program could answer), only on Windows and Android, where the app is served from
@@ -281,6 +286,21 @@ All notable changes to Campbooks Next are documented here. The format follows
 
 ### Security
 
+- **Scout can propose rules but never keep them for you (campbooks-cloud#242).** When the
+  assistant (or an automation) calls the API on your behalf, the server now refuses (`rule_needs_your_yes`) to
+  say yes to a rule, to adopt one, to let a paused one act again, to change what a kept
+  rule does, or to bring a removed rule back acting, even with the token it read for you
+  and even if the call was marked as confirmed: nothing is signed and nothing changes. A
+  rule it saves is always a suggestion waiting for your yes in Scout's memory, whatever it
+  asked for and even if you let Campbooks act without asking. It may still pause, remove
+  or turn down a rule, and change a suggestion before you see it. Your own Keep works as
+  before. Which requests come from the assistant is decided inside the server and cannot
+  be set by an app. A yes to a suggestion now makes you its author, as a yes again already
+  did, so it acts with your rights rather than those of whoever it was stored under. A
+  message that is scheduled to send can no longer be discarded, only taken back with Undo
+  (then it can be deleted), and the Scout reply dialog never discards a message on its way.
+  No Scout feature in this release calls these on its own yet: this closes the door before
+  one does.
 - **Send, saves and Keep act only on what you were shown (campbooks-cloud#242).** Every
   draft and rule the server shows you now comes with a token bound to you and to exactly
   that draft or rule: a draft's recipients (Bcc too), subject, text, quoted text, reply

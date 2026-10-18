@@ -241,9 +241,11 @@ numbered up to that page: it SHALL keep the list it made and list them
 again before showing a page whose range holds such a change (a change of a
 record type the container-visibility port names as changing access,
 whether or not the caller may see it), and at least once a heartbeat
-interval. When the list made at a heartbeat holds a container the previous
-list lacked (a gain no change announced), it SHALL send `reset` with
-reason `access_changed`. It SHALL resolve the caller's membership before
+interval. When any new list (at a heartbeat, after a change of access, or
+after a change about some other container) holds a container the previous
+list lacked and that no change behind that list named (as its record or
+its container), a gain nothing announced, it SHALL send `reset` with reason
+`access_changed`; a gain a change announced needs none. It SHALL resolve the caller's membership before
 showing a page when a change that may change who belongs to the workspace
 was numbered after what it last looked at, up to the head the read saw,
 whether or not the caller may see that change. When a container whose
@@ -273,6 +275,10 @@ shown.
 #### Scenario: Given an inbox nothing announced
 - **WHEN** an inbox is made for a member who follows the feed without a change announcing it, and mail arrives in it
 - **THEN** at their next heartbeat they receive `reset` (`access_changed`), and the inbox's later mail reaches them
+
+#### Scenario: Listed again for another inbox
+- **WHEN** an inbox nothing announced is made for a member, its mail is read past, and then a change about an inbox they cannot see is numbered
+- **THEN** the listing that change causes sends `reset` (`access_changed`) before their next heartbeat, and an inbox later granted with its announcement sends none
 
 #### Scenario: Removed after more than a page
 - **WHEN** more than a page of changes a member may see and then their removal are numbered together

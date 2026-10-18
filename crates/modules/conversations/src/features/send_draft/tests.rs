@@ -226,6 +226,37 @@ async fn send_waits_out_the_window_then_requests_the_send_once(db: PgPool) {
 }
 
 #[sqlx::test(migrations = "../../../migrations")]
+async fn a_scheduled_send_is_never_discarded_only_cancelled(db: PgPool) {
+    let kit = Kit::new(db).await;
+    let (workspace, _, sam) = kit.sams_inbox().await;
+    let draft = reply(&kit, workspace, &sam).await;
+
+    let sent = send(&kit, &sam, &draft).await;
+    assert_eq!(sent.status, StatusCode::ACCEPTED, "{:?}", sent.json);
+    // A discard of a send on its way (a stale screen, the assistant): refused,
+    // and it stays scheduled (campbooks-cloud#242).
+    let discarded = kit.delete(&sam, &draft).await;
+    assert_eq!(
+        discarded.status,
+        StatusCode::CONFLICT,
+        "{:?}",
+        discarded.json
+    );
+    assert_eq!(discarded.json["code"], "draft_not_editable");
+    assert_eq!(kit.get(&sam, &draft).await.json["state"], "scheduled");
+    // Its Undo, the deliberate cancel, makes it a draft again: then it goes.
+    let undone = kit.post(&sam, &format!("{draft}/cancel_send"), None).await;
+    assert_eq!(undone.status, StatusCode::OK, "{:?}", undone.json);
+    assert_eq!(
+        kit.delete(&sam, &draft).await.status,
+        StatusCode::NO_CONTENT
+    );
+    assert_eq!(kit.get(&sam, &draft).await.status, StatusCode::NOT_FOUND);
+    window_ends(&kit).await;
+    assert!(kit.events("conversations.send_requested").await.is_empty());
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
 async fn undo_then_send_again_releases_only_the_second(db: PgPool) {
     let kit = Kit::new(db).await;
     let (workspace, _, sam) = kit.sams_inbox().await;

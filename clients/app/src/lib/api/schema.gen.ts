@@ -997,7 +997,7 @@ export interface paths {
         get: operations["conversations.get_draft"];
         put?: never;
         post?: never;
-        /** Discard a draft (also a scheduled one, which then never leaves). */
+        /** Discard a draft (not one on its way: cancel its send first). */
         delete: operations["conversations.delete_draft"];
         options?: never;
         head?: never;
@@ -8552,7 +8552,7 @@ export interface operations {
                     "application/problem+json": components["schemas"]["Problem"];
                 };
             };
-            /** @description On its way (`draft_not_editable`). */
+            /** @description Scheduled or on its way (`draft_not_editable`): cancel its send first. */
             409: {
                 headers: {
                     [name: string]: unknown;
@@ -9161,7 +9161,7 @@ export interface operations {
                     "application/problem+json": components["schemas"]["Problem"];
                 };
             };
-            /** @description Missing scope, or you may only read this inbox. */
+            /** @description Missing scope, you may only read this inbox, or a suggestion saved by the assistant rather than by you (`rule_needs_your_yes`). */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -10027,7 +10027,7 @@ export interface operations {
                     "application/problem+json": components["schemas"]["Problem"];
                 };
             };
-            /** @description Missing scope, or not your rule. */
+            /** @description Missing scope, not your rule, or adopting, resuming or reshaping a kept rule other than in your own request (`rule_needs_your_yes`). */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -10101,7 +10101,7 @@ export interface operations {
                     "application/problem+json": components["schemas"]["Problem"];
                 };
             };
-            /** @description Missing scope, or you may only read this inbox. */
+            /** @description Missing scope, you may only read this inbox, or not your own request (`rule_needs_your_yes`): only you say yes to a rule. */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -10227,7 +10227,7 @@ export interface operations {
                     "application/problem+json": components["schemas"]["Problem"];
                 };
             };
-            /** @description Missing scope, or not your rule. */
+            /** @description Missing scope, not your rule, or bringing a kept rule back other than in your own request (`rule_needs_your_yes`). */
             403: {
                 headers: {
                     [name: string]: unknown;
