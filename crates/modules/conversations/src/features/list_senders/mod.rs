@@ -31,7 +31,6 @@ use campbooks_kernel::authz::Action;
 use crate::{
     domain::{access::visible_inboxes, resources},
     events::INBOX_RECORD,
-    model::InboxId,
     scopes::ConversationsRead,
 };
 
@@ -88,6 +87,78 @@ pub struct SenderList {
     pub senders: Vec<SenderView>,
 }
 
+/// One sender as the query reads them: address, name, received, replied,
+/// and their newest mail's authentication results.
+type Row = (String, Option<String>, i32, i32, Option<String>);
+
+/// The newest inbound mail only (`messages_inbound_recent_idx`); then one
+/// "was it answered" per thread, not per message, and only for the senders
+/// `q` keeps. With `reachable` ($6), a sender with mail under an open review
+/// is left out here, and the facts of their newest mail are read for the
+/// checks in Rust ([`may_write_to`]).
+const SENDERS: &str = r"
+    WITH recent AS (
+        SELECT m.sender_address AS address,
+               nullif(m.sender->>'name', '') AS name,
+               m.headers->>'authentication_results' AS results,
+               m.sent_at,
+               m.conversation_id
+          FROM conversations.messages m
+         WHERE m.inbox_id = ANY($1) AND m.direction = 'inbound'
+           AND NOT m.in_spam AND NOT m.in_trash
+           AND m.sent_at > now() - make_interval(days => $4)
+         ORDER BY m.sent_at DESC
+         LIMIT $5
+    ),
+    senders AS (
+        SELECT address,
+               (array_agg(name ORDER BY sent_at DESC) FILTER (WHERE name IS NOT NULL))[1]
+                 AS name,
+               (array_agg(results ORDER BY sent_at DESC))[1] AS newest_results,
+               count(*)::int AS received
+          FROM recent
+         GROUP BY address
+        HAVING $2::text[] IS NULL OR NOT EXISTS (
+                 SELECT 1 FROM unnest($2::text[]) AS w(word)
+                  WHERE public.unaccent(lower(address || ' ' || coalesce(string_agg(name, ' '), '')))
+                        NOT LIKE '%' || public.unaccent(lower(w.word)) || '%' ESCAPE '\')
+    ),
+    reviewed AS (
+        SELECT DISTINCT r.address
+          FROM recent r
+          JOIN senders s USING (address)
+         WHERE $6
+           AND EXISTS (SELECT 1 FROM conversations.needs n
+                        WHERE n.conversation_id = r.conversation_id
+                          AND n.state = 'open' AND n.reason = 'review')
+    ),
+    threads AS (
+        SELECT r.address, r.conversation_id, min(r.sent_at) AS first_at
+          FROM recent r
+          JOIN senders s USING (address)
+         GROUP BY r.address, r.conversation_id
+    ),
+    replied AS (
+        SELECT t.address, count(*)::int AS replied
+          FROM threads t
+         WHERE EXISTS (SELECT 1 FROM conversations.messages o
+                        WHERE o.conversation_id = t.conversation_id
+                          AND o.inbox_id = ANY($1)
+                          AND o.direction = 'outbound' AND o.sent_at > t.first_at)
+         GROUP BY t.address
+    )
+    SELECT s.address,
+           s.name,
+           s.received,
+           coalesce(r.replied, 0),
+           s.newest_results
+      FROM senders s
+      LEFT JOIN replied r USING (address)
+     WHERE s.address NOT IN (SELECT address FROM reviewed)
+     ORDER BY 4 DESC, 3 DESC, 1
+     LIMIT $3
+    ";
+
 /// List who writes to the inboxes you can read.
 #[utoipa::path(
     get,
@@ -128,83 +199,15 @@ pub async fn handler(
     let mut tx = state.db.begin_for(access.workspace).await?;
     let inboxes = visible_inboxes(&mut tx, access).await?;
     let reachable = query.reachable.unwrap_or(false);
-    // The newest inbound mail only (`messages_inbound_recent_idx`); then one
-    // "was it answered" per thread, not per message, and only for the
-    // senders `q` keeps. With `reachable`, a sender with mail under an open
-    // review is left out here, and the facts of their newest mail are read
-    // for the checks below.
-    let rows: Vec<(String, Option<String>, i32, i32, Option<String>)> = sqlx::query_as(
-        r"
-        WITH recent AS (
-            SELECT m.sender_address AS address,
-                   nullif(m.sender->>'name', '') AS name,
-                   m.headers->>'authentication_results' AS results,
-                   m.sent_at,
-                   m.conversation_id
-              FROM conversations.messages m
-             WHERE m.inbox_id = ANY($1) AND m.direction = 'inbound'
-               AND NOT m.in_spam AND NOT m.in_trash
-               AND m.sent_at > now() - make_interval(days => $4)
-             ORDER BY m.sent_at DESC
-             LIMIT $5
-        ),
-        senders AS (
-            SELECT address,
-                   (array_agg(name ORDER BY sent_at DESC) FILTER (WHERE name IS NOT NULL))[1]
-                     AS name,
-                   (array_agg(results ORDER BY sent_at DESC))[1] AS newest_results,
-                   count(*)::int AS received
-              FROM recent
-             GROUP BY address
-            HAVING $2::text[] IS NULL OR NOT EXISTS (
-                     SELECT 1 FROM unnest($2::text[]) AS w(word)
-                      WHERE public.unaccent(lower(address || ' ' || coalesce(string_agg(name, ' '), '')))
-                            NOT LIKE '%' || public.unaccent(lower(w.word)) || '%' ESCAPE '\')
-        ),
-        reviewed AS (
-            SELECT DISTINCT r.address
-              FROM recent r
-              JOIN senders s USING (address)
-             WHERE $6
-               AND EXISTS (SELECT 1 FROM conversations.needs n
-                            WHERE n.conversation_id = r.conversation_id
-                              AND n.state = 'open' AND n.reason = 'review')
-        ),
-        threads AS (
-            SELECT r.address, r.conversation_id, min(r.sent_at) AS first_at
-              FROM recent r
-              JOIN senders s USING (address)
-             GROUP BY r.address, r.conversation_id
-        ),
-        replied AS (
-            SELECT t.address, count(*)::int AS replied
-              FROM threads t
-             WHERE EXISTS (SELECT 1 FROM conversations.messages o
-                            WHERE o.conversation_id = t.conversation_id
-                              AND o.inbox_id = ANY($1)
-                              AND o.direction = 'outbound' AND o.sent_at > t.first_at)
-             GROUP BY t.address
-        )
-        SELECT s.address,
-               s.name,
-               s.received,
-               coalesce(r.replied, 0),
-               s.newest_results
-          FROM senders s
-          LEFT JOIN replied r USING (address)
-         WHERE s.address NOT IN (SELECT address FROM reviewed)
-         ORDER BY 4 DESC, 3 DESC, 1
-         LIMIT $3
-        ",
-    )
-    .bind(&inboxes)
-    .bind(words.as_deref())
-    .bind(i64::from(limit) + if reachable { REACHABLE_SLACK } else { 0 })
-    .bind(WINDOW_DAYS)
-    .bind(MAX_SCANNED)
-    .bind(reachable)
-    .fetch_all(&mut *tx)
-    .await?;
+    let rows: Vec<Row> = sqlx::query_as(SENDERS)
+        .bind(&inboxes)
+        .bind(words.as_deref())
+        .bind(i64::from(limit) + if reachable { REACHABLE_SLACK } else { 0 })
+        .bind(WINDOW_DAYS)
+        .bind(MAX_SCANNED)
+        .bind(reachable)
+        .fetch_all(&mut *tx)
+        .await?;
     tx.commit().await?;
     let senders = rows
         .into_iter()
