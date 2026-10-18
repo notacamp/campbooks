@@ -230,6 +230,7 @@ async fn a_member_never_exports_a_teammate_s_private_inbox(db: PgPool) {
         let leos = export_set(&kit.state, &member(workspace, leo), None, ALL, set)
             .await
             .unwrap();
+        assert!(!leos.is_empty(), "{set:?}");
         assert!(
             leos.iter().all(|i| {
                 i.item["message"]["recipient"]["addresses"]
@@ -238,7 +239,7 @@ async fn a_member_never_exports_a_teammate_s_private_inbox(db: PgPool) {
             "{set:?}"
         );
     }
-    // A member who reads no inbox exports nothing at all.
+    // A member who reads no inbox is refused: nothing to bound an export by.
     let (_, nobody) = kit.member("nobody", workspace);
     let none = export_set(
         &kit.state,
@@ -247,33 +248,53 @@ async fn a_member_never_exports_a_teammate_s_private_inbox(db: PgPool) {
         ALL,
         LabellingSet::Money,
     )
-    .await
-    .unwrap();
-    assert!(none.is_empty());
+    .await;
+    assert!(matches!(none, Err(Error::NotFound)), "{none:?}");
 }
 
 #[sqlx::test(migrations = "../../../migrations")]
 async fn an_inbox_the_member_cannot_read_is_refused(db: PgPool) {
     let kit = Kit::new(db).await;
-    let (workspace, (sam, sams), (_, leos)) = two_private_inboxes(&kit).await;
-    let refused = export_set(
-        &kit.state,
-        &member(workspace, sam),
-        Some(leos),
-        ALL,
-        LabellingSet::Money,
-    )
-    .await;
+    let (workspace, (sam, sams), (leo, leos)) = two_private_inboxes(&kit).await;
+    // A shared inbox Sam reads.
+    let team = kit
+        .inbox(
+            workspace,
+            "team@example.com",
+            &[(leo, InboxRole::Manager), (sam, InboxRole::Reader)],
+        )
+        .await;
+    kit.ingest(workspace, team, "needs").await;
+    let access = member(workspace, sam);
+    let export = |inbox| export_set(&kit.state, &access, inbox, ALL, LabellingSet::Money);
+    let addresses = |items: &[super::LabellingItem]| {
+        let mut found: Vec<String> = items
+            .iter()
+            .map(|i| {
+                i.item["message"]["recipient"]["addresses"][0]
+                    .as_str()
+                    .unwrap_or_default()
+                    .to_owned()
+            })
+            .collect();
+        found.sort();
+        found
+    };
+    // Everything Sam reads: their own inbox and the shared one.
+    assert_eq!(
+        addresses(&export(None).await.unwrap()),
+        ["sam@example.com", "team@example.com"]
+    );
+    // Narrowed to one of them.
+    assert_eq!(
+        addresses(&export(Some(sams)).await.unwrap()),
+        ["sam@example.com"]
+    );
+    assert_eq!(
+        addresses(&export(Some(team)).await.unwrap()),
+        ["team@example.com"]
+    );
+    // Leo's private inbox: refused.
+    let refused = export(Some(leos)).await;
     assert!(matches!(refused, Err(Error::NotFound)), "{refused:?}");
-    // Their own inbox, named: the same as without it.
-    let own = export_set(
-        &kit.state,
-        &member(workspace, sam),
-        Some(sams),
-        ALL,
-        LabellingSet::Money,
-    )
-    .await
-    .unwrap();
-    assert_eq!(own.len(), 1);
 }

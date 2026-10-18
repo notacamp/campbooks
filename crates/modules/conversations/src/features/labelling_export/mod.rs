@@ -108,7 +108,7 @@ pub enum LabellingSet {
 /// The newest inbound message of each conversation `set` lists, in the
 /// inboxes `access`'s member can read (only `inbox`, when given), sent within
 /// `days`, newest first (at most [`MAX_ITEMS`]). 404 when `inbox` is not one
-/// the member can read; a member who reads no inbox gets nothing.
+/// the member can read, or when they read no inbox at all.
 pub async fn export_set(
     state: &AppState,
     access: &Access,
@@ -121,6 +121,9 @@ pub async fn export_set(
     let mut tx = state.db.begin_for(workspace).await?;
     // What the member can read, as the API decides it; one of those at most.
     let mut inboxes = visible_inboxes(&mut tx, access).await?;
+    if inboxes.is_empty() {
+        return Err(Error::NotFound);
+    }
     if let Some(inbox) = inbox {
         if !inboxes.contains(&inbox) {
             return Err(Error::NotFound);

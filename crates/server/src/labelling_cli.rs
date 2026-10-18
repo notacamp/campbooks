@@ -204,7 +204,12 @@ fn export(args: &Export) -> ExitCode {
         );
     }
     if let Err(e) = write(out, &items, set, workspace) {
-        return super::fail(&format!("could not write {}: {e}", out.display()));
+        return super::fail(&format!(
+            "could not write {}: {e} (remove what was written with \
+             campbooks-server labelling purge --out {})",
+            out.display(),
+            out.display()
+        ));
     }
     let at = fs::canonicalize(out).unwrap_or_else(|_| out.clone());
     let next = match set {
@@ -278,34 +283,78 @@ async fn bounded_export(
             (Error::NotFound, Some(inbox)) => format!(
                 "{who} cannot read inbox {inbox}: name one of their inboxes, or leave --inbox out"
             ),
+            (Error::NotFound, None) => {
+                format!("{who} reads no inbox in workspace {workspace}: nothing to export")
+            }
             (e, _) => e.to_string(),
         })
 }
 
+/// What an export folder may hold: what `export` writes, and the reports
+/// `cargo xtask eval` writes beside it. `purge` removes nothing else.
+const FOLDER_FILES: [&str; 3] = [MARKER, "manifest.json", "labels.csv"];
+const FOLDER_DIRS: [&str; 3] = ["items", "report", "reports"];
+
 /// Remove `out`, a folder `export` wrote: a real folder (not a link) whose
-/// [`MARKER`] starts with [`MARKER_HEADER`]. Anything else is refused, and
-/// nothing is removed.
+/// [`MARKER`] starts with [`MARKER_HEADER`], holding only what an export and
+/// its eval write (no links anywhere). Anything else is refused, and nothing
+/// is removed. Every check is made on the folder's resolved path, the one
+/// removed.
 fn purge(out: &Path) -> Result<PathBuf, String> {
-    let meta = fs::symlink_metadata(out).map_err(|e| format!("{}: {e}", out.display()))?;
-    if !meta.is_dir() {
+    let named = fs::symlink_metadata(out).map_err(|e| format!("{}: {e}", out.display()))?;
+    if !named.is_dir() {
         return Err(format!(
             "{} is not a folder: nothing removed",
             out.display()
         ));
     }
-    let marker = out.join(MARKER);
+    let at = fs::canonicalize(out).map_err(|e| format!("{}: {e}", out.display()))?;
+    let marker = at.join(MARKER);
     let written = fs::symlink_metadata(&marker).is_ok_and(|m| m.is_file())
         && fs::read_to_string(&marker).is_ok_and(|text| text.lines().next() == Some(MARKER_HEADER));
     if !written {
         return Err(format!(
             "{} was not written by `campbooks-server labelling export` (no {MARKER} marker): \
              nothing removed",
-            out.display()
+            at.display()
         ));
     }
-    let at = fs::canonicalize(out).map_err(|e| format!("{}: {e}", out.display()))?;
+    let strangers = strangers(&at).map_err(|e| format!("{}: {e}", at.display()))?;
+    if !strangers.is_empty() {
+        return Err(format!(
+            "{} holds more than an export ({}): nothing removed",
+            at.display(),
+            strangers.join(", ")
+        ));
+    }
     fs::remove_dir_all(&at).map_err(|e| format!("could not remove {}: {e}", at.display()))?;
     Ok(at)
+}
+
+/// What in `folder` an export and its eval did not write: unknown names, a
+/// link, or a folder holding anything but files.
+fn strangers(folder: &Path) -> std::io::Result<Vec<String>> {
+    let mut out = Vec::new();
+    for entry in fs::read_dir(folder)? {
+        let entry = entry?;
+        let name = entry.file_name().to_string_lossy().into_owned();
+        let kind = entry.file_type()?;
+        if kind.is_file() && FOLDER_FILES.contains(&name.as_str()) {
+            continue;
+        }
+        if kind.is_dir() && FOLDER_DIRS.contains(&name.as_str()) {
+            for inner in fs::read_dir(entry.path())? {
+                let inner = inner?;
+                if !inner.file_type()?.is_file() {
+                    out.push(format!("{name}/{}", inner.file_name().to_string_lossy()));
+                }
+            }
+            continue;
+        }
+        out.push(name);
+    }
+    out.sort();
+    Ok(out)
 }
 
 fn write(
@@ -462,6 +511,19 @@ mod tests {
         assert!(purge(&file).is_err());
         std::fs::remove_file(&file).expect("cleaned up");
 
+        // A marker, but more than an export holds: refused.
+        let mixed = scratch("mixed");
+        std::fs::write(
+            mixed.join(MARKER),
+            "campbooks-server labelling export\nworkspace w\nset money\n",
+        )
+        .expect("a marker");
+        std::fs::write(mixed.join("thesis.docx"), "mine").expect("a file");
+        let refused = purge(&mixed).expect_err("a stranger");
+        assert!(refused.contains("thesis.docx"), "{refused}");
+        assert!(mixed.join("thesis.docx").exists());
+        std::fs::remove_dir_all(&mixed).expect("cleaned up");
+
         // An export's folder: removed, with what it holds.
         let ours = scratch("ours");
         std::fs::write(
@@ -471,6 +533,9 @@ mod tests {
         .expect("a marker");
         std::fs::create_dir(ours.join("items")).expect("items");
         std::fs::write(ours.join("items").join("owner.jsonl"), "{}\n").expect("items");
+        std::fs::write(ours.join("labels.csv"), "id\n").expect("labels");
+        std::fs::create_dir(ours.join("report")).expect("report");
+        std::fs::write(ours.join("report").join("actions.md"), "# report\n").expect("report");
         let removed = purge(&ours).expect("purged");
         assert!(!removed.exists());
         assert!(!ours.exists());

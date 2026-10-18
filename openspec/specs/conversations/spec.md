@@ -1560,8 +1560,10 @@ inside the workspace with row-level security, refuse a folder that exists,
 refuse to run without `--member` (there is no whole-workspace export), mark
 the folder as its own (`.campbooks-labelling`), and print its absolute path,
 that it holds real mail to keep off the repository, and to delete it from the
-server once copied. `campbooks-server labelling purge --out <folder>` SHALL
-remove a folder only when it carries that marker, never following a link and
+server once copied; a member who is suspended, of a workspace being deleted,
+or who reads no inbox is refused. `campbooks-server labelling purge --out
+<folder>` SHALL remove a folder only when it carries that marker and holds
+nothing but what an export and its eval write, never following a link and
 never any other folder. A committed eval set (under `crates/ai/evals/`) SHALL
 never be `private`. `cargo
 xtask eval decide --set-dir <folder>` SHALL read such a set where it is,

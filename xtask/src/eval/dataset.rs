@@ -465,6 +465,30 @@ mod tests {
         assert!(refuse_committed_private(&std::env::temp_dir(), true).is_ok());
     }
 
+    /// Every committed set says it is not private, loaded or not.
+    #[test]
+    fn no_committed_manifest_claims_private() {
+        fn manifests(dir: &Path, found: &mut Vec<PathBuf>) {
+            for entry in fs::read_dir(dir).into_iter().flatten().flatten() {
+                let path = entry.path();
+                if path.is_dir() {
+                    manifests(&path, found);
+                } else if path.file_name().is_some_and(|n| n == "manifest.json") {
+                    found.push(path);
+                }
+            }
+        }
+        let mut found = Vec::new();
+        manifests(&committed_sets(), &mut found);
+        assert!(!found.is_empty());
+        for path in found {
+            let text = fs::read_to_string(&path).unwrap_or_default();
+            let manifest: serde_json::Value =
+                serde_json::from_str(&text).unwrap_or_else(|e| panic!("{}: {e}", path.display()));
+            assert_ne!(manifest["private"], true, "{}", path.display());
+        }
+    }
+
     #[test]
     fn the_eval_set_is_consistent() {
         let set = set();
