@@ -106,11 +106,6 @@ impl Stored {
     pub fn needs_confirmation(&self, binding: &Binding) -> bool {
         matches!(self.state, RuleState::Active | RuleState::Paused) && !self.bound(binding)
     }
-
-    /// Whether the rule acts on mail: active as readers see it, and bound.
-    pub fn acts(&self, binding: &Binding) -> bool {
-        self.effective_state() == RuleState::Active && self.bound(binding)
-    }
 }
 
 /// Fill in the binding columns of `rules` (`workspace_id`,
@@ -183,6 +178,9 @@ mod tests {
     use super::*;
     use crate::model::{InboxId, LabelId, RuleOrigin, Stream, TeachingId};
 
+    /// A change SQL could make to a stored rule.
+    type Tamper = Box<dyn Fn(&mut Stored)>;
+
     fn binding() -> Binding {
         campbooks_kernel::testing::binding()
     }
@@ -222,10 +220,10 @@ mod tests {
     fn a_rule_is_bound_only_as_it_was_signed() {
         let rule = signed(rule());
         assert!(rule.bound(&binding()));
-        assert!(rule.acts(&binding()));
+        assert_eq!(rule.effective_state(), RuleState::Active);
         assert!(!rule.needs_confirmation(&binding()));
         let other_label = LabelId::new();
-        let changed: Vec<Box<dyn Fn(&mut Stored)>> = vec![
+        let changed: Vec<Tamper> = vec![
             Box::new(|r| r.actions = vec![RuleAction::Trash]),
             Box::new(|r| r.actions.push(RuleAction::Spam)),
             Box::new(move |r| {
@@ -256,7 +254,6 @@ mod tests {
             let mut tampered = rule.clone();
             change(&mut tampered);
             assert!(!tampered.bound(&binding()), "change {i} still verifies");
-            assert!(!tampered.acts(&binding()), "change {i} still acts");
         }
         // Another instance's key, or none.
         assert!(!rule.bound(&Binding::disabled()));
@@ -295,7 +292,7 @@ mod tests {
         assert!(!proposal.bound(&binding()));
         assert!(!proposal.needs_confirmation(&binding()));
         let unsigned = rule();
-        assert!(!unsigned.acts(&binding()));
+        assert!(!unsigned.bound(&binding()));
         assert!(unsigned.needs_confirmation(&binding()));
         let mut removed = rule();
         removed.state = RuleState::Removed;
@@ -304,7 +301,7 @@ mod tests {
         let mut away = signed(rule());
         away.author_suspended = true;
         assert!(away.bound(&binding()));
-        assert!(!away.acts(&binding()));
+        assert_ne!(away.effective_state(), RuleState::Active);
     }
 
     #[test]

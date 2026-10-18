@@ -939,7 +939,7 @@ mod tests {
                 "ALL".to_owned()
             )]
         );
-        // The maintenance scope: these four, on module tables.
+        // The maintenance scope: these five, on module tables.
         let policies = mentioning(testing::maintenance_scope_setting());
         let expected = [
             // The stream dispatcher (connectors): reads and leases.
@@ -964,6 +964,13 @@ mod tests {
                 "conversations.needs_backfills",
                 "maintenance_starts_backfills",
                 "UPDATE",
+            ),
+            // The re-sign of the rules kept at the deploy (campbooks-cloud#242):
+            // which workspaces still have rows, read only.
+            (
+                "conversations.rule_resigns",
+                "maintenance_reads_resigns",
+                "SELECT",
             ),
         ]
         .map(|(table, policy, cmd)| (table.to_owned(), policy.to_owned(), cmd.to_owned()));
@@ -1046,9 +1053,18 @@ mod tests {
         // The rate-limit counters: no privilege at all; the runtime role
         // counts and prunes through the kernel's functions (campbooks-cloud#210).
         let functions_only = "kernel.rate_limits";
+        // The snapshot of the rules kept when rules were bound
+        // (campbooks-cloud#242): read only; its rows leave through
+        // `conversations.take_rule_resign` alone.
+        let snapshot = "conversations.rule_resigns";
         let missing: Vec<String> = missing
             .into_iter()
-            .filter(|t| t != read_only && t != functions_only && !BFF_TABLES.contains(&t.as_str()))
+            .filter(|t| {
+                t != read_only
+                    && t != functions_only
+                    && t != snapshot
+                    && !BFF_TABLES.contains(&t.as_str())
+            })
             .collect();
         assert!(
             missing.is_empty(),
@@ -1067,6 +1083,21 @@ mod tests {
             privileges,
             (true, false, false, false),
             "`{role}` only reads {read_only}"
+        );
+        let privileges: (bool, bool, bool, bool, bool) = sqlx::query_as(
+            "SELECT has_table_privilege($1, $2, 'SELECT'), has_table_privilege($1, $2, 'INSERT'),
+                    has_table_privilege($1, $2, 'UPDATE'), has_table_privilege($1, $2, 'DELETE'),
+                    has_function_privilege($1, 'conversations.take_rule_resign(uuid)', 'EXECUTE')",
+        )
+        .bind(role)
+        .bind(snapshot)
+        .fetch_one(&db)
+        .await
+        .unwrap();
+        assert_eq!(
+            privileges,
+            (true, false, false, false, true),
+            "`{role}` only reads {snapshot}, and takes rows out through its function"
         );
         let privileges: (bool, bool, bool, bool, bool, bool, bool) = sqlx::query_as(
             "SELECT has_table_privilege($1, $2, 'SELECT'), has_table_privilege($1, $2, 'INSERT'),
