@@ -22,10 +22,15 @@
 //! block is marked.
 //!
 //! It reads the sanitiser's last output: html5ever's serialisation, where
-//! every element but a void one has its end tag, attribute values are
-//! double-quoted with `"`, `<` and `>` escaped, text has `<` escaped, and no
-//! comment or raw-text element survives. So a `<` always starts a tag, a tag
-//! always ends at the next `>`, and the nesting read here is the tree's.
+//! every element but a void one has its end tag, attribute values are always
+//! double-quoted and never hold a raw `"`, text never holds a raw `<`, and no
+//! comment or raw-text element survives. The version in use also escapes `<`
+//! and `>` inside attribute values, but the reading here does not rely on
+//! it: a tag ends at the first `>` outside a quoted value, so a `<` always
+//! starts a tag and the nesting read is the tree's. Anything that does not
+//! fit that shape (a tag that never ends, a name that is not a plain tag
+//! name, an end tag that does not close the innermost open element, an
+//! element left open) leaves the HTML unchanged: [`mark`] never guesses.
 //! The mark itself is never allowed through ammonia, so a sender cannot write
 //! one: the only `data-cb-quoted` in the output is the one added here.
 
@@ -123,9 +128,15 @@ impl Element {
 /// `html` (the sanitiser's output) with its trailing quoted history wrapped
 /// in `<div data-cb-quoted="1">`, or unchanged when it has none.
 pub fn mark(html: &str) -> String {
-    let tree = read(html);
+    let Some(tree) = read(html) else {
+        return html.to_owned();
+    };
     match quoted(&tree, html.len()) {
-        Some((start, end)) => {
+        // Only ever between two tags, never inside one.
+        Some((start, end))
+            if html[start..].starts_with('<')
+                && (end == html.len() || html[..end].ends_with('>')) =>
+        {
             let mut marked = String::with_capacity(html.len() + 40);
             marked.push_str(&html[..start]);
             let _ = write!(marked, r#"<div {MARK}="1">"#);
@@ -134,7 +145,7 @@ pub fn mark(html: &str) -> String {
             marked.push_str(&html[end..]);
             marked
         }
-        None => html.to_owned(),
+        _ => html.to_owned(),
     }
 }
 
@@ -230,8 +241,9 @@ impl Tree {
     }
 }
 
-/// Read `html` (html5ever's serialisation) as a tree.
-fn read(html: &str) -> Tree {
+/// Read `html` (html5ever's serialisation) as a tree, or `None` when it is
+/// not shaped as that serialisation always is.
+fn read(html: &str) -> Option<Tree> {
     let mut tree = Tree::default();
     // Open elements, innermost last.
     let mut open: Vec<usize> = Vec::new();
@@ -249,33 +261,33 @@ fn read(html: &str) -> Tree {
             tree.text(&html[at..at + offset], at, depth, &mut last_child);
         }
         let start = at + offset;
-        let Some(length) = html[start..].find('>') else {
-            break;
-        };
-        let close = start + length;
+        let close = tag_end(html, start)?;
         let tag = &html[start + 1..close];
         at = close + 1;
         if let Some(name) = tag.strip_prefix('/') {
-            let name = name.trim();
-            // The serialiser closes what it opened, innermost first.
-            while let Some(index) = open.pop() {
-                last_child.pop();
-                let element = &mut tree.elements[index];
-                element.inner_end = start;
-                if element.name == "blockquote" {
-                    depth = depth.saturating_sub(1);
-                }
-                if let Some(slot) = last_child.last_mut() {
-                    *slot = Some(index);
-                }
-                if tree.elements[index].name == name {
-                    break;
-                }
+            // The serialiser closes the innermost open element, by its name.
+            let index = open.pop()?;
+            if !name.eq_ignore_ascii_case(&tree.elements[index].name) {
+                return None;
+            }
+            last_child.pop();
+            tree.elements[index].inner_end = start;
+            if tree.elements[index].name == "blockquote" {
+                depth = depth.saturating_sub(1);
+            }
+            if let Some(slot) = last_child.last_mut() {
+                *slot = Some(index);
             }
             continue;
         }
-        let (name, attributes) = tag.split_once(char::is_whitespace).unwrap_or((tag, ""));
-        let name = name.trim_end_matches('/').to_ascii_lowercase();
+        let end_of_name = tag
+            .find(|c: char| c.is_ascii_whitespace() || c == '/')
+            .unwrap_or(tag.len());
+        let (name, attributes) = tag.split_at(end_of_name);
+        if name.is_empty() || !name.bytes().all(|b| b.is_ascii_alphanumeric()) {
+            return None;
+        }
+        let name = name.to_ascii_lowercase();
         let index = tree.elements.len();
         let previous = last_child.last().copied().flatten();
         let element = Element {
@@ -306,7 +318,21 @@ fn read(html: &str) -> Tree {
             last_child.push(None);
         }
     }
-    tree
+    open.is_empty().then_some(tree)
+}
+
+/// Where the tag starting at `start` ends: the first `>` outside a quoted
+/// attribute value, or `None` when there is none.
+fn tag_end(html: &str, start: usize) -> Option<usize> {
+    let mut quoted = false;
+    for (offset, byte) in html.as_bytes()[start..].iter().enumerate() {
+        match byte {
+            b'"' => quoted = !quoted,
+            b'>' if !quoted => return Some(start + offset),
+            _ => {}
+        }
+    }
+    None
 }
 
 /// Whether escaped `text` shows anything: a character other than a space
@@ -338,8 +364,80 @@ fn attribute<'a>(attributes: &'a str, name: &str) -> &'a str {
 
 #[cfg(test)]
 mod tests {
+    use std::cell::RefCell;
+
+    use html5ever::{
+        tendril::StrTendril,
+        tokenizer::{
+            BufferQueue, TagKind, Token, TokenSink, TokenSinkResult, Tokenizer, TokenizerOpts,
+        },
+    };
+
     use super::*;
     use crate::domain::sanitize::{InlineImages, sanitize};
+
+    /// A start tag as a browser reads it: its name and its attributes.
+    type Tag = (String, Vec<(String, String)>);
+
+    #[derive(Default)]
+    struct Tags(RefCell<Vec<Tag>>);
+
+    impl TokenSink for Tags {
+        type Handle = ();
+
+        fn process_token(&self, token: Token, _line: u64) -> TokenSinkResult<()> {
+            if let Token::TagToken(tag) = token
+                && tag.kind == TagKind::StartTag
+            {
+                let mut attributes: Vec<(String, String)> = tag
+                    .attrs
+                    .iter()
+                    .map(|a| (a.name.local.to_string(), a.value.to_string()))
+                    .collect();
+                attributes.sort();
+                self.0.borrow_mut().push((tag.name.to_string(), attributes));
+            }
+            TokenSinkResult::Continue
+        }
+    }
+
+    /// Every start tag of `html` as html5ever's tokenizer reads it, sorted.
+    fn tags(html: &str) -> Vec<Tag> {
+        let tokenizer = Tokenizer::new(Tags::default(), TokenizerOpts::default());
+        let queue = BufferQueue::default();
+        queue.push_back(StrTendril::from_slice(html));
+        let _ = tokenizer.feed(&queue);
+        tokenizer.end();
+        let mut found = tokenizer.sink.0.take();
+        found.sort();
+        found
+    }
+
+    /// Marking `html` adds exactly one `div[data-cb-quoted]` or nothing, and
+    /// changes no other element or attribute; the mark is never inside a value.
+    fn assert_mark_adds_only_the_wrapper(html: &str) -> String {
+        let marked = mark(html);
+        let before = tags(html);
+        let mut after = tags(&marked);
+        let wrapper = (String::from("div"), vec![(MARK.to_owned(), "1".to_owned())]);
+        if marked != html {
+            let position = after.iter().position(|tag| *tag == wrapper);
+            assert!(position.is_some(), "no wrapper in {marked}");
+            if let Some(position) = position {
+                after.remove(position);
+            }
+        }
+        assert_eq!(after, before, "{marked}");
+        for (_, attributes) in &after {
+            for (name, value) in attributes {
+                assert!(
+                    name != MARK && !value.contains(MARK),
+                    "the mark leaked into {name}={value:?}: {marked}"
+                );
+            }
+        }
+        marked
+    }
 
     fn clean(html: &str) -> String {
         sanitize(html, false, &InlineImages::new()).html
@@ -531,6 +629,76 @@ mod tests {
             folded("<div>Approved.</div><div>On Thu, Sam Rivera wrote:</div><div>&gt; old</div>")
                 .is_none()
         );
+    }
+
+    /// A `>` or `<` inside a value never ends a tag or starts one, even if a
+    /// serialiser wrote them raw (the one in use escapes them).
+    #[test]
+    fn a_tag_ends_only_outside_its_quoted_values() {
+        let payload = r#"<p>Hi</p><span title="x><img/src=https://t.example/p.gif" class="gmail_quote">Q</span>"#;
+        assert_eq!(
+            assert_mark_adds_only_the_wrapper(payload),
+            r#"<p>Hi</p><div data-cb-quoted="1"><span title="x><img/src=https://t.example/p.gif" class="gmail_quote">Q</span></div>"#
+        );
+        // A quote written inside a value is not one.
+        let lookalike = r#"<p>Hi</p><p title="a>b<blockquote type=&quot;cite&quot;>">x</p>"#;
+        assert_eq!(assert_mark_adds_only_the_wrapper(lookalike), lookalike);
+        // An end tag inside a value does not close anything.
+        assert_eq!(
+            assert_mark_adds_only_the_wrapper(
+                r#"<div>Hi</div><div class="gmail_quote"><div title="x</div>y">old</div></div>"#
+            ),
+            r#"<div>Hi</div><div data-cb-quoted="1"><div class="gmail_quote"><div title="x</div>y">old</div></div></div>"#
+        );
+    }
+
+    #[test]
+    fn html_not_shaped_as_the_serialisation_is_left_alone() {
+        for odd in [
+            // A tag that never ends, a value that never closes.
+            r#"<div>Hi</div><div class="gmail_quote""#,
+            r#"<div>Hi</div><div class="gmail_quote>old</div>"#,
+            // An end tag that closes the wrong element, or none.
+            r#"<div>Hi</div><blockquote type="cite">old</div>"#,
+            r#"<div>Hi</div></span><blockquote type="cite">old</blockquote>"#,
+            // A name that is not a plain tag name.
+            r#"<div>Hi</div><img/src="x" class="gmail_quote"><blockquote type="cite">old</blockquote><di!v>"#,
+            // An element left open.
+            r#"<div>Hi</div><blockquote type="cite">old"#,
+        ] {
+            assert_eq!(mark(odd), odd, "{odd}");
+        }
+    }
+
+    /// Whatever a sender writes, the sanitised output gains at most the one
+    /// wrapper, with every other element and attribute as it was.
+    #[test]
+    fn hostile_bodies_gain_only_the_wrapper() {
+        for body in [
+            r#"<p>Hi</p><span title='x><img/src=https://t.example/p.gif' class='gmail_quote'>Q</span>"#,
+            r#"<p>Hi</p><p title='a>b<blockquote type="cite">'>x</p><blockquote type="cite">old</blockquote>"#,
+            r#"<div>Hi</div><div class="gmail_quote"><div title="x</div>y">old</div></div>"#,
+            r#"<div>Hi</div><div class="gmail_quote" data-cb-quoted="1">old</div>"#,
+            r#"<p>Hi</p><a href="https://example.com/?a=<b>&c=>" class="gmail_quote">x</a>"#,
+            "<p>Hi<blockquote type=cite>unclosed",
+            r#"<table><tr><td>Hi</td></tr></table><div class="yahoo_quoted"><img src="https://t.example/a.png" alt=">"></div>"#,
+        ] {
+            for show in [false, true] {
+                let html = sanitize(body, show, &InlineImages::new()).html;
+                let wrappers = tags(&html)
+                    .iter()
+                    .filter(|(_, attributes)| attributes.iter().any(|(name, _)| name == MARK))
+                    .count();
+                assert!(wrappers <= 1, "{html}");
+                for (_, attributes) in tags(&html) {
+                    for (name, value) in attributes {
+                        assert!(!value.contains(MARK), "{name}={value:?} in {html}");
+                    }
+                }
+                // Marking again finds the same block or none, and adds nothing else.
+                let _ = assert_mark_adds_only_the_wrapper(&html.replace(OPEN, "<div>"));
+            }
+        }
     }
 
     #[test]

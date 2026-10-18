@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 
+import { MAIL_PAGE } from "../tokens/tokens";
+
 import { frameDocument, SANDBOX, SANDBOX_INERT_LINKS } from "./frame";
 import styles from "./SafeHtml.module.css";
 
@@ -35,9 +37,9 @@ const SUMMARY_STYLE = [
   "display: inline-block",
   "margin: 8px 0",
   "padding: 1px 10px",
-  "border: 1px dashed #c9c7c2",
+  `border: 1px dashed ${MAIL_PAGE.foldBorder}`,
   "border-radius: 999px",
-  "color: #5f5d59",
+  `color: ${MAIL_PAGE.foldText}`,
   "font-size: 12px",
   "line-height: 1.6",
   "cursor: pointer",

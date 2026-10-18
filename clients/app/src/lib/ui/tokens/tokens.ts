@@ -99,6 +99,17 @@ export function cssVar(name: Token): string {
 }
 
 /** The workspace accent presets (data-accent). `business` is ink: no hue. */
+/**
+ * Colours for the mail frame, which cannot read the app's CSS variables: mail
+ * is always shown on a white page, in every theme.
+ */
+export const MAIL_PAGE = {
+  /** The "Show quoted text" pill's dashed border. */
+  foldBorder: "#c9c7c2",
+  /** The pill's label, at AA contrast on white. */
+  foldText: "#5f5d59",
+} as const;
+
 export const ACCENTS = ["business", "personal", "forest"] as const;
 export type Accent = (typeof ACCENTS)[number];
 
