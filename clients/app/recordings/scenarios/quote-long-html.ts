@@ -46,7 +46,7 @@ export default async function quoteLongHtml({ page }: ScenarioContext): Promise<
   const quoted = forward.getByRole("textbox", { name: "Quoted text" });
   await quoted.waitFor();
   const quote = await quoted.inputValue();
-  if (!quote.includes("harbourlight pontoon tide tables")) {
+  if (!quote.includes("tide tables at the quay")) {
     throw new Error(`the forward does not quote the email's words: ${quote.slice(0, 200)}`);
   }
   await caption(page, "Forward: the composer says the quote holds the email's first part", 2800);

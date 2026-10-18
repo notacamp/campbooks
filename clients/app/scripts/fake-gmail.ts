@@ -279,13 +279,14 @@ function demoMessages(me: string, images: string): DemoMessage[] {
     {
       // HTML alone and long (over 256 KiB): read in time, but a reply or
       // forward quotes only its first part, and says so
-      // (campbooks-cloud#255; the quote-long-html recording).
+      // (campbooks-cloud#255; the quote-long-html recording). Its words never say
+      // "harbourlight": search-head-html finds the berth email by that word alone.
       from: "Quay Office <office@quay-moorings.example>",
       to: me,
       subject: "Tide tables for the season",
       hoursAgo: 23,
       labels: ["INBOX", "CATEGORY_UPDATES"],
-      html: `<div style="font-family:Georgia,serif"><p>Hello Sam,</p><p>Here are the harbourlight pontoon tide tables for the whole season.</p><table>${Array.from(
+      html: `<div style="font-family:Georgia,serif"><p>Hello Sam,</p><p>Here are the tide tables at the quay for the whole season.</p><table>${Array.from(
         { length: 3_000 },
         (_, day) =>
           `<tr><td>Day ${String(day + 1)}</td><td>High water 06:12 and 18:40</td><td>Low water 00:05 and 12:27</td></tr>`,
