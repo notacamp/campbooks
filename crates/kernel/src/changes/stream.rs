@@ -566,6 +566,44 @@ fn opens_limit(config: &crate::config::ChangesConfig) -> Option<Limit> {
     })
 }
 
+/// Count an open against `principal`'s limit of opens per window.
+async fn count_open(state: &AppState, principal: &Principal) -> Result<(), Error> {
+    if let Some(limit) = opens_limit(&state.config.changes) {
+        // Counted per caller, whatever happens in the workspace.
+        let key = RateKey::text(&caller(principal));
+        state.rate_limits.check(&state.db, &limit, &key).await?;
+    }
+    Ok(())
+}
+
+/// `subscription`'s caller's access in its workspace now, asked once the
+/// open has read its head: the request resolved it before, and a removal
+/// numbered in between falls in no range the stream reads (it reads
+/// membership changes after the head only). As a heartbeat's
+/// `check_access` asks it: a token that no longer stands (its account
+/// suspended or signed out everywhere since it was verified), a former
+/// member or a revoked client is refused like any non-member (404), and a
+/// changed role is the one the stream starts with.
+async fn access_now(state: &AppState, subscription: &Subscription) -> Result<Access, Error> {
+    if !state.auth.still_stands(&subscription.principal).await? {
+        return Err(Error::NotFound);
+    }
+    match crate::tenancy::resolve_access(
+        state.membership.as_ref(),
+        state.clients.as_ref(),
+        &state.db,
+        &subscription.principal,
+        subscription.workspace,
+    )
+    .await
+    {
+        Ok(Some(access)) => Ok(access),
+        // Gone, or a revoked client: as for anyone who is not a member.
+        Ok(None) | Err(Error::Unauthorized(_)) => Err(Error::NotFound),
+        Err(error) => Err(error),
+    }
+}
+
 /// Open `subscription`'s feed. The caller has been admitted to the
 /// workspace already (`Workspace<S>`); this checks the per-caller limits
 /// and decides where to start.
@@ -573,19 +611,17 @@ fn opens_limit(config: &crate::config::ChangesConfig) -> Option<Limit> {
 /// # Errors
 /// [`Error::RateLimited`] when the caller opened too many streams lately;
 /// [`Error::TooManyRequests`] (`too_many_streams`) beyond the per-caller
-/// limit of open streams; a database error reading the head.
+/// limit of open streams; [`Error::NotFound`] when the caller is no
+/// longer a member once the head is read; a database error reading the
+/// head.
 pub async fn open(
     state: &AppState,
-    subscription: Subscription,
+    mut subscription: Subscription,
 ) -> Result<impl Stream<Item = Result<Frame, Infallible>> + Send + 'static, Error> {
     let config = &state.config.changes;
     let workspace = subscription.workspace.to_string();
     let binding = binding(&workspace, &subscription.principal);
-    if let Some(limit) = opens_limit(config) {
-        // Counted per caller, whatever happens in the workspace.
-        let key = RateKey::text(&caller(&subscription.principal));
-        state.rate_limits.check(&state.db, &limit, &key).await?;
-    }
+    count_open(state, &subscription.principal).await?;
     let slot = state
         .changes
         .admit(&subscription.principal.subject)
@@ -604,6 +640,8 @@ pub async fn open(
     .fetch_one(&mut *tx)
     .await?;
     tx.commit().await?;
+    // Asked again after the head: see `access_now` (campbooks-cloud#216).
+    subscription.access = access_now(state, &subscription).await?;
     let after = subscription
         .after
         .as_deref()
