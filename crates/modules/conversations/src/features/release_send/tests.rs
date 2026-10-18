@@ -105,10 +105,11 @@ async fn plant_release(kit: &Kit, workspace: WorkspaceId, draft: DraftId, genera
 
 /// Whether `draft` was released (`send_requested` names it).
 async fn released(kit: &Kit, draft: DraftId) -> bool {
+    let draft = draft.to_string();
     kit.events("conversations.send_requested")
         .await
         .iter()
-        .any(|event| event["draft"] == draft.to_string())
+        .any(|event| event["draft"] == draft.as_str())
 }
 
 /// `draft` as stored: its state, whether a send was minted, whether a
@@ -212,7 +213,10 @@ async fn a_binding_holds_only_for_its_draft_generation_inbox_and_author(db: PgPo
         .inbox(
             workspace,
             "sam.other@example.com",
-            &[(sam_id.into(), InboxRole::Manager)],
+            &[(
+                campbooks_kernel::tenancy::UserId::from(sam_id),
+                InboxRole::Manager,
+            )],
         )
         .await;
     let (_, leo) = kit.member("leo", workspace);
@@ -364,27 +368,27 @@ async fn the_binding_is_spent_once_released_or_cancelled(db: PgPool) {
     // Sent again: a new binding, for the new generation, spent at release
     // and replaced by the stored send's.
     let version = kit.get(&sam, &uri).await.json["version"].clone();
-    let sent = kit
+    let resent = kit
         .post(
             &sam,
             &format!("{uri}/send"),
             Some(json!({"version": version})),
         )
         .await;
-    assert_eq!(sent.status, StatusCode::ACCEPTED, "{:?}", sent.json);
+    assert_eq!(resent.status, StatusCode::ACCEPTED, "{:?}", resent.json);
     let again = mac_of(&kit, draft).await;
     assert!(again.is_some() && again != mac);
     window_ends(&kit).await;
     assert!(released(&kit, draft).await);
-    let (request, send): (Option<Vec<u8>>, Option<Vec<u8>>) =
+    let (request_mac, send_mac): (Option<Vec<u8>>, Option<Vec<u8>>) =
         sqlx::query_as("SELECT request_mac, send_mac FROM conversations.drafts WHERE id = $1")
             .bind(draft)
             .fetch_one(&kit.db)
             .await
             .unwrap();
-    assert_eq!(request, None);
+    assert_eq!(request_mac, None);
     assert_eq!(
-        send.as_ref().map(Vec::len),
+        send_mac.as_ref().map(Vec::len),
         Some(campbooks_kernel::binding::TAG_LEN)
     );
 }

@@ -604,7 +604,9 @@ impl Apply<'_> {
                 if !by_rule {
                     outcome.stream = None;
                 }
-                let changes = rules::on_arrival(tx, self.events, &arrival, &outcome).await?;
+                let changes =
+                    rules::on_arrival(tx, &self.state.binding, self.events, &arrival, &outcome)
+                        .await?;
                 if !changes.is_empty() {
                     let entry = self.touched.entry(conversation).or_default();
                     entry.0.extend(changes);

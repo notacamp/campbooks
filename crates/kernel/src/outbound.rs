@@ -61,6 +61,9 @@ pub trait OutboundRequests: std::fmt::Debug + Send + Sync + 'static {
     /// parse, or that the request did not hold, is `false`; so is every
     /// item of a recorded request whose binding
     /// ([`state.binding`](crate::binding)) does not verify.
+    // The request is named by its parts (id, inbox, conversation, items),
+    // as the event carries them.
+    #[allow(clippy::too_many_arguments)]
     fn changes_standing<'a>(
         &'a self,
         state: &'a AppState,
