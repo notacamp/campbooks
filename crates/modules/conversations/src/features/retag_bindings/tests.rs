@@ -160,12 +160,12 @@ async fn a_running_run_retagged_after_a_rotation_finishes_under_the_new_key(db: 
         )
         .await;
     assert_eq!(created.status, StatusCode::CREATED, "{:?}", created.json);
-    assert_eq!(
-        created.json["run"]["state"], "running",
-        "{:?}",
-        created.json
-    );
     // No job ran: the run is still to do.
+    let states: Vec<String> = sqlx::query_scalar("SELECT state FROM conversations.rule_runs")
+        .fetch_all(&kit.db)
+        .await
+        .unwrap();
+    assert_eq!(states, ["running"]);
     let rotated = Binding::new(&new().with_previous(&old()));
     let kit = kit.with_binding(rotated.clone());
     let mut tx = kit.state.db.begin_for(workspace).await.unwrap();
