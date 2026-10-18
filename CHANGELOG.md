@@ -213,6 +213,10 @@ All notable changes to Campbooks Next are documented here. The format follows
   provider and, under the new 10-second lock limit, failed and used up one of its retries.
   It now takes the token the first run stores. Replaying events and pruning expired
   sign-in state also run in small batches, so neither meets the 30-second statement limit.
+- **Desktop app: a mail link's subject or body can't smuggle a field behind a semicolon or a
+  second encoding.** A subject or body holding `;` once decoded, or still holding an escape
+  such as `%0D` (it was encoded twice), is left out of what reaches your mail app; a
+  percent sign that is text, as in "50% off", stays.
 - **A long email's quote says it holds only the first part.** Replying to or forwarding an
   email that came as long HTML (over 256 KiB) quoted only its beginning without a word;
   the composer now says "This email is long: the quote holds its first part.", and the
