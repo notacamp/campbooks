@@ -238,6 +238,9 @@ All notable changes to Campbooks Next are documented here. The format follows
   a send failed, then sending another reply, now discards the failed draft instead of
   leaving it in your drafts, and your own sent mail arriving in the conversation no longer
   shows as "a newer message" to answer.
+- **Someone removed from a workspace gets no live updates from it, even in the moment
+  they were removed.** Opening the change feed now checks membership again once it knows
+  where it starts, so a removal made just before cannot slip past until the next heartbeat.
 
 ### Added
 

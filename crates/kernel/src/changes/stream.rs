@@ -573,10 +573,12 @@ fn opens_limit(config: &crate::config::ChangesConfig) -> Option<Limit> {
 /// # Errors
 /// [`Error::RateLimited`] when the caller opened too many streams lately;
 /// [`Error::TooManyRequests`] (`too_many_streams`) beyond the per-caller
-/// limit of open streams; a database error reading the head.
+/// limit of open streams; [`Error::NotFound`] when the caller is no
+/// longer a member once the head is read; a database error reading the
+/// head.
 pub async fn open(
     state: &AppState,
-    subscription: Subscription,
+    mut subscription: Subscription,
 ) -> Result<impl Stream<Item = Result<Frame, Infallible>> + Send + 'static, Error> {
     let config = &state.config.changes;
     let workspace = subscription.workspace.to_string();
@@ -604,6 +606,26 @@ pub async fn open(
     .fetch_one(&mut *tx)
     .await?;
     tx.commit().await?;
+    // The request resolved the caller's access before the head was read: a
+    // removal numbered in between falls in no read range (the stream reads
+    // membership changes after the head only). Resolved again now, every
+    // removal up to the head is seen: a former member is refused like any
+    // non-member, and a changed role is the one the stream starts with
+    // (campbooks-cloud#216).
+    subscription.access = match crate::tenancy::resolve_access(
+        state.membership.as_ref(),
+        state.clients.as_ref(),
+        &state.db,
+        &subscription.principal,
+        subscription.workspace,
+    )
+    .await
+    {
+        Ok(Some(access)) => access,
+        // Gone, or a revoked client: as for anyone who is not a member.
+        Ok(None) | Err(Error::Unauthorized(_)) => return Err(Error::NotFound),
+        Err(error) => return Err(error),
+    };
     let after = subscription
         .after
         .as_deref()

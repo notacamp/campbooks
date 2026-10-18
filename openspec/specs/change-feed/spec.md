@@ -248,7 +248,11 @@ its container), a gain nothing announced, it SHALL send `reset` with reason
 `access_changed`; a gain a change announced needs none. It SHALL resolve the caller's membership before
 showing a page when a change that may change who belongs to the workspace
 was numbered after what it last looked at, up to the head the read saw,
-whether or not the caller may see that change. When a container whose
+whether or not the caller may see that change. Opening a stream SHALL
+resolve the caller's membership again once it has read the head it starts
+from, so a removal numbered before that head, after the request resolved
+it, refuses the open like any non-member's (404) and a changed role is the
+one the stream starts with. When a container whose
 changes it has shown is no longer visible, it SHALL send `reset` with
 reason `access_changed` (the client drops what it cached and refetches)
 and show nothing more from that container. Every heartbeat SHALL ask again
@@ -287,6 +291,10 @@ shown.
 #### Scenario: Woken by changes that do not touch access
 - **WHEN** a stream is woken again and again by mail and renames
 - **THEN** it lists the caller's containers once, not once per wake-up
+
+#### Scenario: Removed just before the open
+- **WHEN** a member's request to open the feed was admitted and they are removed before the stream reads the head
+- **THEN** the open answers 404 and no stream starts
 
 ### Requirement: Private records reach their audience only
 A change MAY name an audience: one user, one user and the workspace's
