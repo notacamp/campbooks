@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 
-import { frameDocument, SANDBOX, SANDBOX_INERT_LINKS } from "./frame";
+import { frameDocument, REFERRER_POLICY, SANDBOX, SANDBOX_INERT_LINKS } from "./frame";
 import styles from "./SafeHtml.module.css";
 
 export { framePolicy, SANDBOX, SANDBOX_INERT_LINKS } from "./frame";
@@ -208,7 +208,7 @@ export function SafeHtml({
       // Sandbox flags only apply when a frame loads: a new frame when they change.
       key={inertLinks ? "inert" : "live"}
       sandbox={inertLinks ? SANDBOX_INERT_LINKS : SANDBOX}
-      referrerPolicy="no-referrer"
+      referrerPolicy={REFERRER_POLICY}
       loading="lazy"
       srcDoc={srcDoc}
       style={{ height: `${String(measured ?? estimateHeight(html))}px` }}
