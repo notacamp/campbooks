@@ -273,7 +273,7 @@ pub async fn handler(
 
     let ws = access.workspace.to_string();
     // One budget for reading HTML as text, all messages together.
-    let deadline = Instant::now() + TEXT_DEADLINE;
+    let deadline = Instant::now() + text_deadline();
     let mut messages = Vec::with_capacity(rows.len());
     for row in rows {
         let recipients: Recipients = serde_json::from_value(row.recipients)
@@ -340,6 +340,21 @@ async fn attachments_of(
             });
     }
     Ok(attachments)
+}
+
+/// [`TEXT_DEADLINE`]; in a debug build only, `CAMPBOOKS_DEV_TEXT_DEADLINE_MS`
+/// instead when set (0 marks every message read from HTML `text_unread`), so
+/// a recording can show what the reader does then. Release builds never
+/// read it.
+fn text_deadline() -> std::time::Duration {
+    if cfg!(debug_assertions)
+        && let Some(ms) = std::env::var("CAMPBOOKS_DEV_TEXT_DEADLINE_MS")
+            .ok()
+            .and_then(|ms| ms.parse::<u64>().ok())
+    {
+        return std::time::Duration::from_millis(ms);
+    }
+    TEXT_DEADLINE
 }
 
 /// A message's text: its text part, else its HTML read as text, also when

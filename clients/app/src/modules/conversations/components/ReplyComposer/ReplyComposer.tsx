@@ -2,9 +2,10 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useEffectEvent, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
-import { Banner, Button } from "~/lib/ui";
+import { Banner, Button, Text } from "~/lib/ui";
 
 import { createDraft, draftKeys, useConversationDrafts, type Draft } from "../../api/drafts";
+import { withWords } from "../../api/queries";
 import { displayName, forwardQuote, replyQuote, type QuoteWords } from "../../compose/quote";
 import { DraftComposer } from "../DraftComposer/DraftComposer";
 import type { ReplyRequest, ReplySlotContext } from "../Reader/ReplySlot";
@@ -37,7 +38,10 @@ export function ReplyComposer({
   const drafts = useConversationDrafts(workspaceId, conversation.id);
   const [draftId, setDraftId] = useState<string | undefined>();
   const [closed, setClosed] = useState(false);
-  const [failed, setFailed] = useState(false);
+  // Why starting the draft failed: its quote could not be read, or else.
+  const [failed, setFailed] = useState<"quote" | "draft" | false>(false);
+  // Reading the message's words for the quote (it came `text_unread`).
+  const [reading, setReading] = useState(false);
   const started = useRef<number | null>(null);
 
   const words: QuoteWords = {
@@ -62,16 +66,32 @@ export function ReplyComposer({
       setDraftId(existing.id);
       return;
     }
-    const message = messages.find((m) => m.id === request.messageId);
-    if (message === undefined) {
+    const found = messages.find((m) => m.id === request.messageId);
+    if (found === undefined) {
       return;
     }
-    const quoted =
-      request.mode === "forward"
-        ? forwardQuote(message, i18n.language, words)
-        : replyQuote(message, i18n.language, words);
-    void createDraft(workspaceId, { kind: request.mode, message_id: message.id, quoted })
-      .then(async (draft) => {
+    // Its words first when the conversation came without them: never an
+    // empty quote, silently.
+    setReading(found.text_unread === true);
+    void withWords(queryClient, workspaceId, conversation.id, found)
+      .catch((error: unknown) => {
+        setFailed("quote");
+        throw error;
+      })
+      .then(async (message) => {
+        setReading(false);
+        const quoted =
+          request.mode === "forward"
+            ? forwardQuote(message, i18n.language, words)
+            : replyQuote(message, i18n.language, words);
+        const draft = await createDraft(workspaceId, {
+          kind: request.mode,
+          message_id: message.id,
+          quoted,
+        }).catch((error: unknown) => {
+          setFailed("draft");
+          throw error;
+        });
         queryClient.setQueryData<Draft[]>(
           draftKeys.forConversation(workspaceId, conversation.id),
           (list) => [draft, ...(list ?? [])],
@@ -80,7 +100,7 @@ export function ReplyComposer({
         await queryClient.invalidateQueries({ queryKey: draftKeys.all(workspaceId) });
       })
       .catch(() => {
-        setFailed(true);
+        setReading(false);
       });
   });
   useEffect(() => {
@@ -89,8 +109,21 @@ export function ReplyComposer({
     }
   }, [request, drafts.data]);
 
-  if (failed) {
-    return <Banner tone="danger" role="alert" title={t("compose.errors.unknown")} />;
+  if (failed !== false) {
+    return (
+      <Banner
+        tone="danger"
+        role="alert"
+        title={failed === "quote" ? t("compose.errors.quote") : t("compose.errors.unknown")}
+      />
+    );
+  }
+  if (reading) {
+    return (
+      <div role="status">
+        <Text tone="secondary">{t("compose.readingQuote")}</Text>
+      </div>
+    );
   }
   const open = drafts.data?.filter(editable) ?? [];
   const draft = open.find((d) => d.id === draftId) ?? (request === null ? open[0] : undefined);
