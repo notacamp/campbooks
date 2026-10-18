@@ -7,4 +7,5 @@ pub mod admin_overview;
 pub mod ai_meter;
 pub mod client_telemetry;
 pub mod health;
+pub mod screen_views;
 pub mod version;

@@ -2,7 +2,8 @@
 //!
 //! Health and version are public. `system:read`, which every Campbooks app
 //! asks for at sign-in, is also what the app needs to report its own errors
-//! and timings (`client_telemetry`).
+//! and timings (`client_telemetry`) and the screens it shows
+//! (`screen_views`).
 
 use campbooks_kernel::auth::{ScopeInfo, ScopeName};
 

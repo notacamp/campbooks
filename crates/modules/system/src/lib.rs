@@ -1,5 +1,6 @@
 //! `campbooks-system` — instance health and version, the app's own error
-//! and timing reports (forwarded to the operator's collector), the admin dashboard's
+//! and timing reports (forwarded to the operator's collector), the screens
+//! the app shows (relayed to the operator's usage analytics), the admin dashboard's
 //! System panel (`GET /admin/v1/system/overview`, ADR 0015), and the AI
 //! usage ledger with its daily cap ([`AiUsageMeter`], read by
 //! `GET /admin/v1/system/ai-usage`).
@@ -32,6 +33,7 @@ pub use features::ai_meter::AiUsageMeter;
 /// The health check's handler, for the server to also mount at the probe
 /// path `/up` (outside the API's OpenAPI document).
 pub use features::health::handler as health;
+pub use features::screen_views::ScreenViewRelay;
 
 /// Module name: crate directory, Postgres schema and OpenAPI tag.
 pub const NAME: &str = "system";
@@ -41,7 +43,7 @@ pub static MESSAGES: Catalogue = campbooks_kernel::catalogue!(NAME);
 
 /// The system module composed with nothing (for catalogues and tests).
 /// The module's part of the access catalogue (ADR 0017).
-static RESOURCES: [campbooks_kernel::authz::ResourceType; 3] = {
+static RESOURCES: [campbooks_kernel::authz::ResourceType; 4] = {
     use campbooks_kernel::authz::{Action, Grant, Grantee, Owner, ResourceType, Tenancy};
     [
         ResourceType {
@@ -59,6 +61,17 @@ static RESOURCES: [campbooks_kernel::authz::ResourceType; 3] = {
                 "system.client_report",
                 "A report of the app's own errors and timings, sent by a signed-in person's \
                  app and forwarded, scrubbed, to the operator's collector: never read back.",
+                Tenancy::Account,
+            )
+        },
+        ResourceType {
+            owner: Owner::Account,
+            owner_actions: &[Action::Create],
+            ..ResourceType::new(
+                "system.screen_view",
+                "A screen the signed-in person's app shows, as its route template, relayed to \
+                 the operator's usage analytics under a daily visitor id: never stored or read \
+                 back.",
                 Tenancy::Account,
             )
         },
@@ -84,6 +97,9 @@ pub fn module_with(deps: Deps) -> Module {
         name: NAME,
         scopes: scopes::ALL,
         router: OpenApiRouter::new()
+            .routes(routes!(features::screen_views::handler))
+            // Only the route above sees the relay.
+            .layer(Extension(deps.screen_views.clone()))
             .routes(routes!(features::health::handler))
             .routes(routes!(features::version::handler))
             .routes(routes!(features::client_telemetry::handler)),

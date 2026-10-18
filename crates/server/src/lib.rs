@@ -166,6 +166,7 @@ impl Composition {
             facts: facts(config, &identity, &connectors),
             started_at: chrono::Utc::now(),
             ai_usage,
+            screen_views: campbooks_system::ScreenViewRelay::default(),
         };
         Ok(Self {
             connectors,

@@ -1394,6 +1394,78 @@
         }
       }
     },
+    "/api/v1/system/screen-views": {
+      "post": {
+        "tags": [
+          "system"
+        ],
+        "summary": "Report the screen the app shows.",
+        "operationId": "system.report_screen_view",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ScreenView"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Taken: relayed in the background when the instance records usage analytics, otherwise dropped."
+          },
+          "400": {
+            "description": "`invalid_route`: not a route template.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid access token.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The token lacks `system:read`.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [
+              "system:read"
+            ]
+          }
+        ],
+        "x-campbooks": {
+          "access": {
+            "action": "create",
+            "resource": "system.screen_view"
+          },
+          "assistant": false,
+          "automation": false,
+          "mutates": true,
+          "records": [],
+          "risk": "low"
+        }
+      }
+    },
     "/api/v1/system/version": {
       "get": {
         "tags": [
@@ -17276,6 +17348,20 @@
             "format": "int32",
             "description": "Conversations it matches (or will put back).",
             "minimum": 0
+          }
+        }
+      },
+      "ScreenView": {
+        "type": "object",
+        "description": "A screen the app shows.",
+        "required": [
+          "route"
+        ],
+        "properties": {
+          "route": {
+            "type": "string",
+            "description": "The screen's route template, never its address: `/`, or segments of\nlowercase letters, `-` and `_` and parameters `:name`, with no digit,\nquery or fragment.",
+            "example": "/w/:workspaceId/inbox"
           }
         }
       },

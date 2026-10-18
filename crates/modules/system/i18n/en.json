@@ -1,6 +1,7 @@
 {
   "errors": {
     "database_unreachable": "The database cannot be reached. The instance is not ready to serve requests.",
-    "database_timeout": "The database did not answer in time. The instance is not ready to serve requests."
+    "database_timeout": "The database did not answer in time. The instance is not ready to serve requests.",
+    "invalid_route": "Only a route template can be reported: lowercase words and parameters such as :workspaceId, with no ids, numbers, query or fragment."
   }
 }

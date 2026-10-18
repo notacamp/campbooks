@@ -16,6 +16,16 @@ All notable changes to Campbooks Next are documented here. The format follows
   at the bottom of the reader while the thread scrolls under it (phones keep the Reply and
   Done bar). In the list, a conversation where you wrote last starts its snippet with
   "You:".
+- **Usage analytics, without a tracking script (off by default).** An instance can count
+  which screens people use in its own Matomo (`CAMPBOOKS_ANALYTICS__MATOMO_URL`,
+  `__MATOMO_SITE_ID` and `__MATOMO_VISITOR_KEY`, all three or nothing). The app loads no
+  analytics script and its security policy is unchanged: after each navigation it tells
+  its own server the screen's route template, such as `/w/:workspaceId/inbox`, never the
+  address, an id, a search or a title, and it sends nothing while the browser asks not to
+  be tracked (Do Not Track or Global Privacy Control). The server checks the template and
+  passes it on in the background with the browser's user agent and a visitor id that
+  changes every day, so Matomo sees daily visitors per screen but never an IP, an account
+  or a workspace. A slow or unreachable Matomo only drops views; the app never waits for it.
 - **Always show images from a sender you trust.** In the reader, beside Show images, "Always
   show images from <sender>" (⇧A) saves a smart rule, after the usual confirmation, for that
   address or anyone at its domain. Their images then show on their own, but only when the
@@ -63,6 +73,12 @@ All notable changes to Campbooks Next are documented here. The format follows
 
 ### Fixed
 
+- **The labelling export stays within one member's inboxes.** `campbooks-server labelling export`
+  now requires `--member` (a member id or verified address) and exports only from the inboxes
+  that member can read, never a teammate's private inbox; `--inbox` narrows it to one of them.
+  The command prints where the folder is and how to delete it, and `campbooks-server labelling
+  purge --out <folder>` removes a folder only if the export wrote it. A committed eval set can
+  no longer claim `private` to skip its reserved-domain checks.
 - **HTML mail looks right in the desktop app.** The desktop app now shows HTML mail as the web
   app does: styled, with its pictures, and remote images still held back until Show images or
   a trusted sender. Its page policy allows only inline style attributes and `https:`, `data:`
