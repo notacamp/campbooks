@@ -45,7 +45,8 @@ export default async function replyNewerMail({ page }: ScenarioContext): Promise
   // Leo answers in the same thread while the draft is open.
   await page.request.post(`${FAKE_GOOGLE}/fake/deliver?reply=q4`);
   const note = dialog.getByText(/A newer message from Leo Brandt arrived/u);
-  for (let attempt = 0; attempt < 60; attempt += 1) {
+  // The stream's next incremental sync picks it up (minutes apart in dev).
+  for (let attempt = 0; attempt < 240; attempt += 1) {
     if (await note.isVisible()) {
       break;
     }
