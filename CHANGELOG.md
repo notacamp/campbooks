@@ -292,6 +292,9 @@ All notable changes to Campbooks Next are documented here. The format follows
 - **The 30-second request limit is a hard cap.** Telling a stopped request why, in your
   language, no longer waits on a slow lookup of your saved language: after two seconds it
   uses your browser's.
+- **A request body that cannot be read is explained in your language.** The web app's
+  error for a body that arrived incomplete was English only; it is now in all four
+  languages.
 
 ### Added
 

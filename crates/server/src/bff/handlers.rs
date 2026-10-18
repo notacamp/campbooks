@@ -919,11 +919,7 @@ async fn replayable(request: Request) -> Result<(Request, Option<Request>), Erro
     let bytes = axum::body::to_bytes(body, REPLAY_BODY_LIMIT)
         .await
         .map_err(|_| {
-            Error::BadRequest(
-                campbooks_kernel::i18n::MESSAGES
-                    .reason("invalid_body")
-                    .arg("reason", "it could not be read"),
-            )
+            Error::BadRequest(campbooks_kernel::i18n::MESSAGES.reason("body_unreadable"))
         })?;
     let first = Request::from_parts(parts, Body::from(bytes.clone()));
     let again = copy(&first, bytes);
