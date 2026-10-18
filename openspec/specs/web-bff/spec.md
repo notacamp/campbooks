@@ -149,10 +149,16 @@ refuses the session's access token as invalid (401 `invalid_token`: its
 sign-in ended, though the token has not expired), the BFF SHALL force one
 refresh for that request, unless another request already replaced the token.
 A refused refresh ends the session and the BFF answers 401
-`session_required`. A refresh that works SHALL send a `GET` or `HEAD` again,
-once, with the fresh token; any other method SHALL get the API's refusal
-back, never sent twice, with the fresh token held for the next request. One
-request SHALL cause at most one forced refresh.
+`session_required`. When the identity provider cannot be reached, the BFF
+SHALL answer 503 `idp_unavailable` and keep the session, so a later request
+refreshes. A refresh that works SHALL send the request again, once, with the
+fresh token, when its body is empty or of a known length of at most 1 MiB,
+held by the BFF. The API refuses a token while authenticating, before any
+handler runs, and the copy carries the same `Idempotency-Key`. A larger or
+streamed body SHALL get the API's refusal back, never sent twice, with the
+fresh token held for the next request. One request SHALL cause at most one
+forced refresh. The same applies to `/bff/admin`, though the admin API
+answers 404, never `invalid_token`, to a token it cannot accept.
 
 #### Scenario: Token attached
 - **WHEN** a signed-in browser requests `/bff/api/v1/<route>` of a scoped endpoint
@@ -172,7 +178,15 @@ request SHALL cause at most one forced refresh.
 
 #### Scenario: A refused token refreshed
 - **WHEN** the API refuses a session's access token as `invalid_token` and the refresh works
-- **THEN** a `GET` is sent again once with the fresh token and succeeds, while a `POST` gets the 401 back and the app's retry succeeds with the held fresh token
+- **THEN** a `GET`, and a `POST` with a small body, are sent again once with the fresh token and succeed with the same body, while a `POST` of more than 1 MiB gets the 401 back and the app's retry succeeds with the held fresh token
+
+#### Scenario: Two requests refused together
+- **WHEN** two requests of one session are refused with the same token at once
+- **THEN** one refresh is made, the second request uses the token it stored, and both succeed
+
+#### Scenario: A refused token with the identity provider down
+- **WHEN** the API refuses a session's access token and the identity provider's token endpoint answers 503
+- **THEN** the response is 503 with `code` = `idp_unavailable`, the session stays signed in, and once the identity provider is back the next request succeeds
 
 ### Requirement: CSRF protection
 Every request with an unsafe method (anything but GET, HEAD, OPTIONS, TRACE) to
