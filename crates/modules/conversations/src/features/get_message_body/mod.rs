@@ -147,7 +147,7 @@ pub async fn handler(
     )
     .fetch_all(&mut *tx)
     .await?;
-    let trusted = images_trusted(&mut tx, &inboxes, message).await?;
+    let trusted = images_trusted(&mut tx, &state.binding, &inboxes, message).await?;
     tx.commit().await?;
     let bodies: Bodies = serde_json::from_value(bodies)
         .map_err(|e| Error::internal(crate::domain::redact::json(&e)))?;

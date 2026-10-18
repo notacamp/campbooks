@@ -644,7 +644,7 @@ impl Apply<'_> {
         template: Option<&str>,
     ) -> Result<Outcome, JobError> {
         if self.taught.is_none() {
-            self.taught = Some(rules::acting(tx, self.inbox).await?);
+            self.taught = Some(rules::acting(tx, &self.state.binding, self.inbox).await?);
         }
         let all = self.taught.as_deref().unwrap_or_default();
         if all.is_empty() {

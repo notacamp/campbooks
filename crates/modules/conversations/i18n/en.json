@@ -29,6 +29,7 @@
     "rule_needs_member": "Rules are taught by a member of the inbox, not by an app.",
     "rule_not_active": "This rule is waiting for a yes. Keep it first, then you can pause it.",
     "rule_not_restorable": "This rule can't be brought back any more. Teach it again instead.",
+    "rule_needs_confirmation": "This rule needs a yes again before it acts. Confirm it first, then you can change it.",
     "invalid_senders_query": "Search with 2 to 100 characters, and ask for 1 to {{max}} senders."
   }
 }

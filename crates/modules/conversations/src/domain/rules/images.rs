@@ -8,7 +8,7 @@ use campbooks_ai::decide::{
     signals::facts::{dmarc_refused, sender_authenticated, sender_checks_failed},
     taught::{self, Action, Facts},
 };
-use campbooks_kernel::Result;
+use campbooks_kernel::{Result, binding::Binding};
 use sqlx::PgConnection;
 
 use super::acting;
@@ -22,9 +22,12 @@ use crate::{
 /// provider's results authenticate that sender (a spoofed From, failed
 /// checks or no results never pass), the message was judged not suspicious
 /// and nothing about its conversation looks suspicious. An outbound
-/// message, or one not in `inboxes`, never.
+/// message, or one not in `inboxes`, never; nor a rule that is not bound to
+/// the member who taught it (campbooks-cloud#242): a trusted sender planted
+/// with SQL shows nothing.
 pub async fn images_trusted(
     conn: &mut PgConnection,
+    binding: &Binding,
     inboxes: &[InboxId],
     message: MessageId,
 ) -> Result<bool> {
@@ -56,7 +59,7 @@ pub async fn images_trusted(
     let Some((inbox, sender, headers, suspicious)) = row else {
         return Ok(false);
     };
-    let rules: Vec<taught::TaughtRule> = acting(conn, inbox)
+    let rules: Vec<taught::TaughtRule> = acting(conn, binding, inbox)
         .await?
         .into_iter()
         .filter(|r| r.actions.contains(&Action::ShowImages))

@@ -229,6 +229,8 @@ pub fn module(deps: ConversationsDeps) -> Module {
             .schedule::<features::backfill_needs::DispatchNeedsBackfills>(
                 features::backfill_needs::EVERY,
             )
+            .schedule::<features::resign_rules::DispatchRuleResigns>(features::resign_rules::EVERY)
+            .job::<features::resign_rules::ResignRules>()
             .consumer(
                 features::decide_message::DecideMessage::new(
                     model.clone(),
@@ -374,14 +376,14 @@ mod tests {
             "conversations.summarize_need",
             "conversations.backfill_needs",
             "conversations.dispatch_needs_backfills",
+            "conversations.dispatch_rule_resigns",
+            "conversations.resign_rules",
         ] {
             assert!(kinds.contains(&kind), "{kind}");
         }
-        assert!(
-            registry
-                .schedule_names()
-                .contains(&"conversations.dispatch_needs_backfills")
-        );
+        let schedules = registry.schedule_names();
+        assert!(schedules.contains(&"conversations.dispatch_needs_backfills"));
+        assert!(schedules.contains(&"conversations.dispatch_rule_resigns"));
     }
 
     // A runtime query rather than `query!`, so this test needs no entry in

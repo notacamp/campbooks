@@ -29,6 +29,7 @@
     "rule_needs_member": "Les règles sont enseignées par un membre de la boîte de réception, pas par une application.",
     "rule_not_active": "Cette règle attend votre accord. Gardez-la d’abord, puis vous pourrez la mettre en pause.",
     "rule_not_restorable": "Cette règle ne peut plus être rétablie. Enseignez-la à nouveau.",
+    "rule_needs_confirmation": "Cette règle doit être confirmée à nouveau avant d’agir. Confirmez-la d’abord, puis vous pourrez la modifier.",
     "invalid_senders_query": "Recherchez avec 2 à 100 caractères et demandez entre 1 et {{max}} expéditeurs."
   }
 }

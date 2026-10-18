@@ -1366,6 +1366,9 @@ mod tests {
             ("bff.login_transactions", "DELETE, INSERT, SELECT"),
             ("bff.retired_tokens", "INSERT, SELECT"),
             ("bff.sessions", "DELETE, INSERT, SELECT, UPDATE"),
+            // `conversations.take_rule_resign` (campbooks-cloud#242).
+            ("conversations.rule_resigns", "DELETE, SELECT"),
+            ("conversations.rules", "SELECT"),
             ("kernel.rate_limits", "DELETE, INSERT, SELECT, UPDATE"),
         ]
         .map(|(table, privileges)| (table.to_owned(), privileges.to_owned()));
@@ -1385,9 +1388,13 @@ mod tests {
         .unwrap();
         assert_eq!(
             schemas,
-            [("bff", "USAGE"), ("kernel", "USAGE")]
-                .map(|(schema, privilege)| (schema.to_owned(), privilege.to_owned())),
-            "`{DEFINER_ROLE}` may use the two schemas, and create nothing"
+            [
+                ("bff", "USAGE"),
+                ("conversations", "USAGE"),
+                ("kernel", "USAGE")
+            ]
+            .map(|(schema, privilege)| (schema.to_owned(), privilege.to_owned())),
+            "`{DEFINER_ROLE}` may use the three schemas, and create nothing"
         );
         let elsewhere: i64 = sqlx::query_scalar(
             "SELECT (SELECT count(*) FROM pg_attribute a, aclexplode(a.attacl) x
