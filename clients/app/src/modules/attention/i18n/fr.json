@@ -47,7 +47,7 @@
     "forward": "Transférer…",
     "combo": "{{first}}, puis {{second}}",
     "picked": "Scout a choisi celles-ci pour cet e-mail",
-    "noAttachment": "Cet e-mail n’a aucun fichier à ouvrir : seulement des images dans le texte."
+    "noAttachment": "Cet e-mail n’a aucun fichier à ouvrir."
   },
   "confirm": {
     "done": "Fait · {{name}}",
