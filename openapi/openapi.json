@@ -14265,6 +14265,19 @@
           }
         }
       },
+      "ImagesHeld": {
+        "type": "string",
+        "description": "Why a message's remote images stay held back although its sender is, or\ncould be, trusted (campbooks-cloud#235).",
+        "enum": [
+          "under_review",
+          "checks_fail",
+          "unverified",
+          "cannot_authenticate",
+          "not_checked",
+          "rule_paused",
+          "rule_too_broad"
+        ]
+      },
       "InboxId": {
         "type": "string",
         "format": "uuid",
@@ -14720,7 +14733,8 @@
           "truncated",
           "remote_images",
           "images_shown",
-          "images_trusted"
+          "images_trusted",
+          "images_offer"
         ],
         "properties": {
           "css": {
@@ -14736,6 +14750,28 @@
               "null"
             ],
             "description": "The HTML part, sanitised; still to be shown only in a sandboxed frame."
+          },
+          "images_domain": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The sender's domain the member may trust instead of the address\n(owned, not a free mail provider's), when it may be offered."
+          },
+          "images_held": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/ImagesHeld",
+                "description": "Why the remote images stay held back although the sender is, or\ncould be, trusted."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "images_offer": {
+            "type": "boolean",
+            "description": "Whether \"Always show images from …\" can take effect here: remote\nimages were held back, no rule trusts the sender yet, and nothing\nabout the email would keep its images back."
           },
           "images_shown": {
             "type": "boolean",

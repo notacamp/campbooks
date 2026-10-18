@@ -32,6 +32,7 @@
     "rule_not_restorable": "Cette règle ne peut plus être rétablie. Enseignez-la à nouveau.",
     "rule_needs_confirmation": "Cette règle doit être confirmée à nouveau avant d’agir. Confirmez-la d’abord, puis vous pourrez la modifier.",
     "undo_unavailable": "Une partie de ce que cette règle a modifié ne peut pas être rétablie. Supprimez-la en gardant ses modifications.",
-    "invalid_senders_query": "Recherchez avec 2 à 100 caractères et demandez entre 1 et {{max}} expéditeurs."
+    "invalid_senders_query": "Recherchez avec 2 à 100 caractères et demandez entre 1 et {{max}} expéditeurs.",
+    "images_already_trusted": "Une règle intelligente couvre déjà les images de cet expéditeur, même si elle est en pause ou attend un oui. Vous la trouverez dans la mémoire de Scout."
   }
 }

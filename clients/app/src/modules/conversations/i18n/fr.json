@@ -71,7 +71,17 @@
     "imagesHidden_other": "{{count}} images distantes masquées, pour que l’expéditeur ne sache pas quand vous lisez ceci.",
     "imagesShown": "Images distantes affichées.",
     "trustImages": "Toujours afficher les images de {{name}}",
-    "imagesTrusted": "Images affichées : vous faites confiance à {{name}}. Les pixels de suivi restent supprimés."
+    "imagesTrusted": "Images affichées : vous faites confiance à {{name}}. Les pixels de suivi restent supprimés.",
+    "imagesTrustedInbox": "Images affichées : cette boîte fait confiance à {{name}}. Les pixels de suivi restent supprimés.",
+    "imagesHeld": {
+      "under_review": "Les images restent retenues : cet e-mail est en cours d’examen.",
+      "checks_fail": "Les images restent retenues : cet e-mail ne réussit pas les vérifications de l’expéditeur.",
+      "unverified": "Les images restent retenues : le fournisseur de messagerie n’a rien vérifié qui confirme cet expéditeur.",
+      "cannot_authenticate": "Les images restent retenues : ce fournisseur de messagerie ne partage pas les vérifications de l’expéditeur, donc aucun expéditeur ne peut être approuvé ici.",
+      "not_checked": "Les images attendent que Scout vérifie cet e-mail. Tant que Scout est désactivé ou a atteint sa limite quotidienne, elles restent retenues.",
+      "rule_paused": "Les images restent retenues : la règle intelligente qui fait confiance à cet expéditeur est en pause ou attend un oui.",
+      "rule_too_broad": "Les images restent retenues : la règle intelligente pour tout le domaine de cet expéditeur ferait confiance à des inconnus (n’importe qui peut envoyer depuis ce domaine), elle n’agit donc pas. Vous pouvez toujours faire confiance à cette adresse."
+    }
   },
   "toast": {
     "done": "Terminé · {{subject}}",
@@ -613,7 +623,8 @@
     "imagesMatches_one": "{{n}} conversation de cet expéditeur est déjà ici. Ses images s’affichent chaque fois que son courrier réussit ses vérifications.",
     "imagesMatches_other": "{{n}} conversations de cet expéditeur sont déjà ici. Ses images s’affichent chaque fois que son courrier réussit ses vérifications.",
     "imagesNew": "Ses images s’afficheront dans le nouveau courrier de cet expéditeur qui réussit ses vérifications.",
-    "imagesHow": "Seulement pour le courrier qui réussit les vérifications de l’expéditeur, jamais pour celui qui se fait passer pour lui. Les pixels de suivi restent supprimés."
+    "imagesHow": "Seulement pour le courrier qui réussit les vérifications de l’expéditeur et dans lequel Scout n’a rien trouvé de suspect : tant que Scout est désactivé ou a atteint sa limite quotidienne, elles restent retenues. Jamais pour celui qui se fait passer pour lui. Les pixels de suivi restent supprimés.",
+    "imagesAlready": "Une règle intelligente couvre déjà les images de cet expéditeur, même si elle est en pause ou attend un oui. Vous la trouverez dans la mémoire de Scout."
   },
   "ahead": {
     "reportTitle": "Ne plus jamais voir d’e-mails comme celui-ci ?",

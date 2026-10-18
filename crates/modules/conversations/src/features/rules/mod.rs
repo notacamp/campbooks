@@ -734,6 +734,7 @@ pub async fn create_in(
 ) -> Result<CreatedRule> {
     rules::labels_of_inbox(tx, inbox, &body.conditions, &body.actions).await?;
     rules::sender_seen(tx, inbox, &body.conditions, &body.actions).await?;
+    rules::not_trusted_yet(tx, inbox, &body.conditions, &body.actions, None).await?;
     if let Some(notice) = body.notice_id {
         rule_notices::check_open(tx, notice, inbox).await?;
     }
@@ -974,8 +975,9 @@ pub async fn confirm(
         _ => return Err(Error::Conflict(crate::MESSAGES.reason("rule_not_proposed"))),
     }
     // As `create` does: a proposal stored before its domain became a public
-    // suffix is not kept (it could never act).
-    rules::validate(&rule.conditions, &rule.actions)?;
+    // suffix, or a free mail or shared platform's (for images), is not kept
+    // (it could never act), nor a second rule trusting the same sender.
+    rules::may_keep_again(&mut tx, &rule).await?;
     replace(
         &mut tx,
         &state,
@@ -1034,7 +1036,7 @@ async fn confirm_again(
     rule: &Stored,
     body: &ConfirmRule,
 ) -> Result<Json<RuleView>> {
-    rules::validate(&rule.conditions, &rule.actions)?;
+    rules::may_keep_again(&mut tx, rule).await?;
     let user = access
         .user
         .ok_or_else(|| Error::Denied(crate::MESSAGES.reason("rule_needs_member")))?;
@@ -1246,6 +1248,7 @@ pub async fn update(
     // Pausing or resuming changes no sender: only a new shape is checked.
     if reshaped {
         rules::sender_seen(&mut tx, rule.inbox, &conditions, &actions).await?;
+        rules::not_trusted_yet(&mut tx, rule.inbox, &conditions, &actions, Some(rule.id)).await?;
     }
     let next_state = match body.paused {
         Some(true) => RuleState::Paused,
@@ -1518,6 +1521,10 @@ pub async fn restore(
             crate::MESSAGES.reason("rule_not_restorable"),
         ));
     }
+    // Brought back as if taught again: never a rule `create` would refuse
+    // (a domain that joined a list since, campbooks-cloud#235), nor a second
+    // rule trusting a sender another rule trusts by now.
+    rules::may_keep_again(&mut tx, &rule).await?;
     // The run putting its mail back stops where it is.
     sqlx::query!(
         r#"UPDATE conversations.rule_runs SET state = 'cancelled', finished_at = now()

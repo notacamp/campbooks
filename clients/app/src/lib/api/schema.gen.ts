@@ -2985,6 +2985,12 @@ export interface components {
             name?: string | null;
         };
         /**
+         * @description Why a message's remote images stay held back although its sender is, or
+         *     could be, trusted (campbooks-cloud#235).
+         * @enum {string}
+         */
+        ImagesHeld: "under_review" | "checks_fail" | "unverified" | "cannot_authenticate" | "not_checked" | "rule_paused" | "rule_too_broad";
+        /**
          * Format: uuid
          * @description InboxId (UUIDv7)
          */
@@ -3229,6 +3235,18 @@ export interface components {
             css?: string | null;
             /** @description The HTML part, sanitised; still to be shown only in a sandboxed frame. */
             html?: string | null;
+            /**
+             * @description The sender's domain the member may trust instead of the address
+             *     (owned, not a free mail provider's), when it may be offered.
+             */
+            images_domain?: string | null;
+            images_held?: components["schemas"]["ImagesHeld"] | null;
+            /**
+             * @description Whether "Always show images from …" can take effect here: remote
+             *     images were held back, no rule trusts the sender yet, and nothing
+             *     about the email would keep its images back.
+             */
+            images_offer: boolean;
             /** @description Whether the remote images were kept. */
             images_shown: boolean;
             /**

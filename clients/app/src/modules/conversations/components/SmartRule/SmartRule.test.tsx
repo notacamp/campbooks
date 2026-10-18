@@ -146,6 +146,30 @@ describe("the smart-rule confirmation", () => {
     ).toBeVisible();
     expect(within(dialog).getByRole("button", { name: /Try again/u })).toBeVisible();
   });
+
+  it("says when a smart rule already trusts the sender's images, and offers no retry", async () => {
+    mockApi({
+      [`POST ${W}/inboxes/${INBOX.id}/rules/preview`]: { body: PREVIEW },
+      [`POST ${W}/inboxes/${INBOX.id}/rules`]: {
+        status: 409,
+        body: { code: "images_already_trusted", title: "Conflict", status: 409 },
+      },
+    });
+    renderWithProviders(
+      <SmartRuleConfirm
+        workspaceId={DUARTE.id}
+        draft={{ ...DRAFT, actions: [{ action: "show_images" }] }}
+        onClose={vi.fn()}
+      />,
+    );
+    const dialog = await screen.findByRole("dialog", { name: "A rule for mail like this" });
+    fireEvent.click(within(dialog).getByRole("button", { name: /Save smart rule/u }));
+    expect(
+      await within(dialog).findByText(/A smart rule already covers this sender’s images/u),
+    ).toBeVisible();
+    expect(within(dialog).queryByRole("button", { name: /Try again/u })).toBeNull();
+    expect(within(dialog).getByRole("button", { name: /Save smart rule/u })).toBeDisabled();
+  });
 });
 
 describe("Scout noticed", () => {
