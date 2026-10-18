@@ -250,9 +250,10 @@ showing a page when a change that may change who belongs to the workspace
 was numbered after what it last looked at, up to the head the read saw,
 whether or not the caller may see that change. Opening a stream SHALL
 resolve the caller's membership again once it has read the head it starts
-from, so a removal numbered before that head, after the request resolved
-it, refuses the open like any non-member's (404) and a changed role is the
-one the stream starts with. When a container whose
+from, as a heartbeat does (the token still standing, then membership), so
+a removal, suspension or sign out everywhere since the request resolved it
+refuses the open like any non-member's (404) and a changed role is the one
+the stream starts with. When a container whose
 changes it has shown is no longer visible, it SHALL send `reset` with
 reason `access_changed` (the client drops what it cached and refetches)
 and show nothing more from that container. Every heartbeat SHALL ask again

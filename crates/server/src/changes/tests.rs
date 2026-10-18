@@ -1122,6 +1122,58 @@ async fn a_removal_numbered_just_before_the_open_is_seen_by_the_open(db: PgPool)
     );
 }
 
+#[sqlx::test(migrations = "../../migrations")]
+async fn a_token_revoked_just_before_the_open_opens_nothing(db: PgPool) {
+    // As a heartbeat asks: a suspension or sign out everywhere between the
+    // request's verification and the open refuses the open, without waiting
+    // for the stream's first heartbeat (campbooks-cloud#216).
+    let idp = TestIdp::start().await;
+    let standings = std::sync::Arc::new(Standings::default());
+    let server = Replica::revocable(&db, &idp, |_| {}, Some(standings.clone())).await;
+    let world = World { idp, db, server };
+    let ana = world.user("ana");
+    let ws = world.create_workspace(&ana, "Shop").await;
+    world.server.sequence().await;
+    let state = &world.server.state;
+    let principal = state.auth.verify(&ana).await.unwrap();
+    let workspace: campbooks_kernel::tenancy::WorkspaceId = ws.parse().unwrap();
+    let access = campbooks_kernel::tenancy::resolve_access(
+        state.membership.as_ref(),
+        state.clients.as_ref(),
+        &state.db,
+        &principal,
+        workspace,
+    )
+    .await
+    .unwrap()
+    .unwrap();
+    let subscription = |principal| campbooks_kernel::changes::Subscription {
+        workspace,
+        access,
+        principal,
+        after: None,
+    };
+    assert!(
+        campbooks_kernel::changes::open(state, subscription(principal.clone()))
+            .await
+            .is_ok(),
+        "standing, it opens"
+    );
+
+    standings.0.lock().unwrap().insert(
+        "ana".to_owned(),
+        TokenStanding {
+            suspended: true,
+            ..TokenStanding::default()
+        },
+    );
+    let opened = campbooks_kernel::changes::open(state, subscription(principal)).await;
+    assert!(
+        matches!(opened.err(), Some(campbooks_kernel::Error::NotFound)),
+        "a token that no longer stands opens nothing"
+    );
+}
+
 /// A change every member with `workspaces:admin` sees, and that changes
 /// nobody's membership: keeps a stream busy.
 #[derive(Debug, Serialize, Deserialize)]

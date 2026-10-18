@@ -566,10 +566,15 @@ fn opens_limit(config: &crate::config::ChangesConfig) -> Option<Limit> {
     })
 }
 
-/// `subscription`'s caller's access in its workspace now: a former member
-/// (or a revoked client) is refused like any non-member (404), and a
+/// `subscription`'s caller's access in its workspace now, as a heartbeat's
+/// `check_access` asks it: a token that no longer stands (its account
+/// suspended or signed out everywhere since it was verified), a former
+/// member or a revoked client is refused like any non-member (404), and a
 /// changed role is the one the stream starts with.
 async fn access_now(state: &AppState, subscription: &Subscription) -> Result<Access, Error> {
+    if !state.auth.still_stands(&subscription.principal).await? {
+        return Err(Error::NotFound);
+    }
     match crate::tenancy::resolve_access(
         state.membership.as_ref(),
         state.clients.as_ref(),
