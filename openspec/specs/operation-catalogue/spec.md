@@ -27,11 +27,17 @@ mutating operation. An operation with `risk: high` SHALL NOT opt
 automation or the assistant in (`automation` and `assistant` false): a
 high-risk operation is the person's own request only, since whether an
 invocation is "confirmed" is said by the code making it. A mutating operation
-whose answer below 400 has a field that looks like a secret (a name holding
-`secret`, `token`, `ticket` or `password` as a word, or ending in `url`), at
-any depth of its schema, SHALL declare `secret_once`, or the field SHALL be
+whose answer below 400 has a field that looks like a secret, at any depth
+of its schema, or that redirects (a 3xx, whose `Location` may carry a
+ticket), SHALL declare `secret_once`, or the field (or `Location`) SHALL be
 listed in the architecture check with the reason it is none; a listed field
-no longer answered SHALL be reported. The architecture check SHALL fail on
+no longer answered SHALL be reported. A field looks like a secret by its
+words, in any case: split at `_`, `-`, `.`, a space, camelCase, the end of
+a run of capitals (`IDToken`) and before a trailing number (`token2`). A
+guarded word is `secret`, `token`, `ticket`, `password`, `passwd`,
+`passphrase`, `credential`, `code`, `apikey` or `otp`, singular or plural.
+An API, private, access, signing or secret key anywhere is guarded, and so
+is `url`, `uri`, `link` or `key` as the last word. The architecture check SHALL fail on
 any violation.
 
 #### Scenario: Health and version are catalogued
@@ -59,8 +65,8 @@ any violation.
 - **THEN** `cargo xtask arch` fails naming the operation and the caller kind
 
 #### Scenario: A secret-looking answer
-- **WHEN** a mutating operation without `secret_once` answers 201 with a nested `refresh_token`, or 303 with an `accept_url`
-- **THEN** `cargo xtask arch` fails naming the operation and the field, unless the field is listed with its reason
+- **WHEN** a mutating operation without `secret_once` answers 201 with a nested `refresh_token`, `clientSecret`, `api_key`, `invite_link` or `code`, or redirects (303)
+- **THEN** `cargo xtask arch` fails naming the operation and the field (or `Location`), unless it is listed with its reason, while `tokenizer`, `codec` or `key_id` pass and `IDToken`, `OTPCode` or `public_key` do not
 
 ### Requirement: Events catalogue
 Modules SHALL declare the domain events they publish. The server SHALL

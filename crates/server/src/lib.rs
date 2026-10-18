@@ -1267,8 +1267,12 @@ mod tests {
     /// Whether each table, view and materialized view of the kernel's and
     /// the BFF's schemas is protected from the runtime role (`$1`): a table
     /// with row-level security enabled and forced, a policy, and no
-    /// permissive policy for that role (or everyone) that admits every row
-    /// (`USING (true)`, `WITH CHECK (true)` or none); or no privilege of any
+    /// permissive policy for that role (or everyone) that admits every row,
+    /// to read or to write: one with no expression, or an expression that
+    /// does not depend on the row (reads no column, calls no function, holds
+    /// no subquery or parameter: `USING (true)`, `USING (1 = 1)`) and is not
+    /// a lone `false`, on either side (campbooks-cloud#260); or no privilege
+    /// of any
     /// kind on the relation or on any of its columns (`has_table_privilege`
     /// does not see a column's grant). Row-level security does not apply
     /// through a view, so a view is protected by having no grant
@@ -1284,9 +1288,14 @@ mod tests {
                                OR EXISTS (SELECT 1 FROM unnest(p.polroles) AS r(oid)
                                            WHERE r.oid <> 0
                                              AND pg_has_role($1, r.oid, 'MEMBER')))
-                          AND coalesce(pg_get_expr(p.polqual, p.polrelid), 'true') = 'true'
-                          AND coalesce(pg_get_expr(p.polwithcheck, p.polrelid), 'true')
-                              = 'true'))
+                          AND ((p.polqual IS NULL AND p.polwithcheck IS NULL)
+                               OR (p.polqual IS NOT NULL
+                                   AND p.polqual::text !~ '[{](VAR|FUNCEXPR|SUBLINK|PARAM) '
+                                   AND pg_get_expr(p.polqual, p.polrelid) <> 'false')
+                               OR (p.polwithcheck IS NOT NULL
+                                   AND p.polwithcheck::text
+                                       !~ '[{](VAR|FUNCEXPR|SUBLINK|PARAM) '
+                                   AND pg_get_expr(p.polwithcheck, p.polrelid) <> 'false'))))
                OR NOT (has_table_privilege($1, c.oid,
                            'SELECT, INSERT, UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER')
                        OR has_any_column_privilege($1, c.oid,
@@ -1345,6 +1354,54 @@ mod tests {
             .unwrap();
         assert_eq!(protected(&tables, "kernel.peek"), Some(false));
         assert_eq!(protected(&tables, "kernel.idempotency"), Some(false));
+
+        // Any constant expression admits every row, not only `true`, and
+        // either side open is open: a policy reading every row whose writes
+        // are checked still lets every row be read (campbooks-cloud#260). A
+        // lone `false` admits nothing.
+        let after = |statements: &'static [&'static str]| {
+            let db = db.clone();
+            async move {
+                for &statement in statements {
+                    sqlx::query(statement).execute(&db).await.unwrap();
+                }
+                let tables: Vec<(String, bool)> = sqlx::query_as(KERNEL_TABLES_PROTECTED)
+                    .bind(role)
+                    .fetch_all(&db)
+                    .await
+                    .unwrap();
+                protected(&tables, "kernel.idempotency")
+            }
+        };
+        assert_eq!(
+            after(&[
+                "DROP POLICY everyone ON kernel.idempotency",
+                "CREATE POLICY tautology ON kernel.idempotency FOR SELECT TO campbooks_app
+                     USING (1 = 1)",
+            ])
+            .await,
+            Some(false)
+        );
+        assert_eq!(
+            after(&[
+                "DROP POLICY tautology ON kernel.idempotency",
+                "CREATE POLICY read_open ON kernel.idempotency FOR ALL TO campbooks_app
+                     USING (true) WITH CHECK (principal = current_user)",
+            ])
+            .await,
+            Some(false),
+            "readable by everyone, whatever its writes"
+        );
+        assert_eq!(
+            after(&[
+                "DROP POLICY read_open ON kernel.idempotency",
+                "CREATE POLICY closed ON kernel.idempotency FOR SELECT TO campbooks_app
+                     USING (false)",
+            ])
+            .await,
+            Some(true),
+            "`false` admits nothing"
+        );
     }
 
     /// A grant on one column of a BFF table is a privilege the coverage
