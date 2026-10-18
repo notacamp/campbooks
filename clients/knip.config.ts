@@ -27,6 +27,8 @@ const config: KnipConfig = {
         // by the first module that follows a workspace).
         "src/lib/api/index.ts",
       ],
+      // Installed by CI's `tauri-shell` job (`cargo install tauri-driver`).
+      ignoreBinaries: ["tauri-driver"],
       project: [
         "src/**/*.{ts,tsx,css}",
         "stories/**/*.{ts,tsx,css}",

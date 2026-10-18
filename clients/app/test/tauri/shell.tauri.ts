@@ -166,9 +166,17 @@ function run(script: string, args: unknown[] = []): Promise<unknown> {
 }
 
 /** Wait until `check` holds, for up to `seconds`. */
-async function until(what: string, check: () => Promise<boolean>, seconds = 60): Promise<void> {
+async function until(
+  what: string,
+  check: () => Promise<boolean> | boolean,
+  seconds = 60,
+): Promise<void> {
   for (let tick = 0; tick < seconds * 4; tick += 1) {
-    if (await check().catch(() => false)) {
+    if (
+      await Promise.resolve()
+        .then(check)
+        .catch(() => false)
+    ) {
       return;
     }
     await new Promise((resolve) => setTimeout(resolve, 250));
@@ -235,7 +243,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
   if (session !== "") {
-    await command("DELETE", `/session/${session}`).catch(() => undefined);
+    await command("DELETE", `/session/${session}`).catch(() => null);
   }
   driver.kill();
   await new Promise((resolve) => server.close(resolve));
@@ -297,7 +305,7 @@ describe("the mail frame in the desktop shell", () => {
     const id = Object.values(link)[0] ?? "";
     await command("POST", `/session/${session}/element/${id}/click`, {});
     await command("POST", `/session/${session}/frame/parent`, {});
-    await until("the link handed outside", async () =>
+    await until("the link handed outside", () =>
       handedOutside().includes("https://outside.example/blank"),
     );
     const windows = (await command("GET", `/session/${session}/window/handles`)) as string[];
