@@ -17,6 +17,8 @@ const config: KnipConfig = {
         "recordings/scenarios/*.ts",
         // The mail frame's WebKit policy test (`pnpm test:csp`).
         "test/webkit/*.webkit.ts",
+        // The mail frame in the real desktop shell (`pnpm test:tauri`).
+        "test/tauri/*.tauri.ts",
         // Library surfaces modules build on: every export is public API,
         // used or not yet (AGENTS.md → UI).
         "src/lib/ui/index.ts",

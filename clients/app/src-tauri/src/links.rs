@@ -280,6 +280,21 @@ pub fn inside_for(url: &Url, dev: Option<&Url>, build: Build) -> bool {
 /// call waits for the opener). Nowhere to say it failed: it simply does not
 /// open.
 pub fn open_outside(url: &Url) {
+    // Debug builds only: the real-shell test (`pnpm test:tauri`) records each
+    // link handed here instead of opening it (campbooks-cloud#237). Release
+    // builds never read the variable.
+    #[cfg(debug_assertions)]
+    if let Some(log) = std::env::var_os("CAMPBOOKS_DEV_OPEN_OUTSIDE_LOG") {
+        use std::io::Write as _;
+        if let Ok(mut file) = std::fs::OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(log)
+        {
+            let _ = writeln!(file, "{url}");
+        }
+        return;
+    }
     if let Some(link) = outside(url) {
         std::thread::spawn(move || {
             let _ = open::that_detached(link);
