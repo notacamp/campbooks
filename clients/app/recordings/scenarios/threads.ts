@@ -68,7 +68,7 @@ export default async function threads({ page }: ScenarioContext): Promise<void> 
 
   // Quoted history: folded in the newest message, opened and closed.
   await scroll(page, phone, -2000);
-  const newest = page.frameLocator('iframe[title="Message from Clara Nunes"]').first();
+  const newest = page.locator('iframe[title="Message from Clara Nunes"]').first().contentFrame();
   const show = newest.getByText("Show quoted text");
   await show.waitFor();
   await caption(page, "The quoted thread is folded behind “Show quoted text”", 2200);
@@ -84,7 +84,7 @@ export default async function threads({ page }: ScenarioContext): Promise<void> 
     .first()
     .click();
   await pause(900);
-  const inline = page.frameLocator('iframe[title="Message from Sam Rivera"]').first();
+  const inline = page.locator('iframe[title="Message from Sam Rivera"]').first().contentFrame();
   await inline.getByText("Oiled, with a natural finish", { exact: false }).scrollIntoViewIfNeeded();
   await caption(page, "An answer written between the quotes is never folded", 2400);
 

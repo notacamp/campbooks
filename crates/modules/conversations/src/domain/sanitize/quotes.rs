@@ -675,7 +675,7 @@ mod tests {
     #[test]
     fn hostile_bodies_gain_only_the_wrapper() {
         for body in [
-            r#"<p>Hi</p><span title='x><img/src=https://t.example/p.gif' class='gmail_quote'>Q</span>"#,
+            r"<p>Hi</p><span title='x><img/src=https://t.example/p.gif' class='gmail_quote'>Q</span>",
             r#"<p>Hi</p><p title='a>b<blockquote type="cite">'>x</p><blockquote type="cite">old</blockquote>"#,
             r#"<div>Hi</div><div class="gmail_quote"><div title="x</div>y">old</div></div>"#,
             r#"<div>Hi</div><div class="gmail_quote" data-cb-quoted="1">old</div>"#,
