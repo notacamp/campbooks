@@ -134,7 +134,10 @@ Use `ENV` with neutral `example.com` defaults. *(gitleaks in CI.)*
   by its path (`EVENT_FIELDS_ALLOWED`); every job payload field
   (`JOB_PAYLOAD_FIELDS`); and every value a job error is built from, per file
   with its number of uses (`JOB_ERROR_VALUES`). A job it cannot read, or a
-  `JobError` built where its message cannot be read, fails.)*
+  `JobError` built where its message cannot be read, fails. Known limit: a
+  count cannot catch a swap (one use of an expression removed and another use
+  of the same expression, holding something else, added in the same file);
+  review job errors in diffs as well.)*
 - Untrusted HTML (email bodies) is rendered only in a sandboxed iframe with a
   strict CSP; never `dangerouslySetInnerHTML` outside `lib/ui/safe-html`.
 

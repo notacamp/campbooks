@@ -131,17 +131,20 @@ pub const EVENT_FIELDS_ALLOWED: &[(&str, &str, &str)] = &[
     (
         "connectors.connection_needs_reauth",
         "reason",
-        "why the connection needs signing in again, a code from the code (`grant_revoked`, `credentials_unreadable`)",
+        "why the connection needs signing in again, a code from the code (e.g. `grant_revoked`, \
+         `credentials_unreadable`)",
     ),
     (
         "connectors.send_completed",
         "reason",
-        "why a send failed, a code from the code (`not_connected`, `needs_reauth`, `rejected`, `too_large`, `unavailable`)",
+        "why a send failed, a code from the code (e.g. `not_connected`, `needs_reauth`, \
+         `rejected`, `too_large`)",
     ),
     (
         "conversations.send_failed",
         "reason",
-        "why a send failed, a code from the code (`not_connected`, `rejected`, `unknown_outcome`)",
+        "why a send failed, a code from the code (e.g. `not_connected`, `rejected`, \
+         `unknown_outcome`)",
     ),
     (
         "identity.consent_revoked",
@@ -165,7 +168,7 @@ pub const EVENT_FIELDS_ALLOWED: &[(&str, &str, &str)] = &[
 const CLIENT_ID: &str = "an app's OAuth client id: an app identifier (a first-party id, a \
      generated id, or the app's own HTTPS metadata-document URL), not personal data";
 const PROVIDER_NAME: &str =
-    "a mail or sign-in provider's name, from the code (`google`, `zoho`, `microsoft`)";
+    "a mail or sign-in provider's name, from the code (e.g. `google`, `zoho`, `passkey`)";
 const METHOD_NAME: &str = "how someone signs in, from the code (`provider`, `passkey`)";
 
 const PROVIDER_MESSAGE_ID: &str = "the provider's id of a message (Gmail's hex id, Zoho's \
@@ -989,20 +992,88 @@ fn struct_fields(code: &[(String, String)], path: &str, name: &str) -> Result<Ve
 }
 
 /// Where the bracket opened just before `text` closes, as an index into
-/// `text`.
+/// `text`, skipping brackets inside string literals (plain, byte and raw)
+/// and character literals (a lifetime is not one).
 fn closing(text: &str, open: char, close: char) -> Option<usize> {
+    let chars: Vec<(usize, char)> = text.char_indices().collect();
     let mut depth = 1usize;
-    for (i, c) in text.char_indices() {
+    let mut i = 0;
+    while let Some(&(at, c)) = chars.get(i) {
+        if let Some(end) = literal_end(&chars, i) {
+            i = end;
+            continue;
+        }
         if c == open {
             depth += 1;
         } else if c == close {
             depth -= 1;
             if depth == 0 {
-                return Some(i);
+                return Some(at);
             }
         }
+        i += 1;
     }
     None
+}
+
+/// When a string or character literal starts at `chars[i]`, the index just
+/// past it (or past the end, for one that never closes).
+fn literal_end(chars: &[(usize, char)], i: usize) -> Option<usize> {
+    let at = |k: usize| chars.get(k).map(|&(_, c)| c);
+    let follows_word = i
+        .checked_sub(1)
+        .and_then(|k| at(k))
+        .is_some_and(|p| p.is_alphanumeric() || p == '_');
+    match at(i)? {
+        '"' => {
+            let mut k = i + 1;
+            while let Some(c) = at(k) {
+                match c {
+                    '\\' => k += 2,
+                    '"' => return Some(k + 1),
+                    _ => k += 1,
+                }
+            }
+            Some(k)
+        }
+        'r' if !follows_word => {
+            let mut k = i + 1;
+            while at(k) == Some('#') {
+                k += 1;
+            }
+            if at(k) != Some('"') {
+                return None;
+            }
+            let hashes = k - i - 1;
+            k += 1;
+            while let Some(c) = at(k) {
+                if c == '"' && (1..=hashes).all(|h| at(k + h) == Some('#')) {
+                    return Some(k + 1 + hashes);
+                }
+                k += 1;
+            }
+            Some(k)
+        }
+        '\'' => match (at(i + 1), at(i + 2)) {
+            (Some('\\'), Some(_)) => {
+                // An escape: `'\n'`, `'\''`, `'\u{…}'`.
+                let mut k = i + 3;
+                while let Some(c) = at(k) {
+                    k += 1;
+                    if c == '\'' {
+                        return Some(k);
+                    }
+                    if k > i + 12 {
+                        break;
+                    }
+                }
+                None
+            }
+            (Some(_), Some('\'')) => Some(i + 3),
+            _ => None,
+        },
+        _ => None,
+    }
 }
 
 /// `text` without its leading `#[…]` attributes.
@@ -1017,50 +1088,35 @@ fn strip_attributes(text: &str) -> &str {
     rest
 }
 
-/// `text` split at its top-level commas (outside brackets and strings; with
+/// `text` split at its top-level commas (outside brackets, strings and
+/// character literals; with
 /// `angles`, outside `<…>` too, for types), each part trimmed, empty parts
 /// dropped.
 fn split_top_level(text: &str, angles: bool) -> Vec<String> {
+    let chars: Vec<(usize, char)> = text.char_indices().collect();
     let mut parts = Vec::new();
     let mut depth = 0i32;
-    let mut current = String::new();
-    let mut chars = text.chars().peekable();
-    while let Some(c) = chars.next() {
-        match c {
-            '"' => {
-                current.push(c);
-                while let Some(s) = chars.next() {
-                    current.push(s);
-                    if s == '\\' {
-                        if let Some(escaped) = chars.next() {
-                            current.push(escaped);
-                        }
-                    } else if s == '"' {
-                        break;
-                    }
-                }
-            }
-            '(' | '[' | '{' => {
-                depth += 1;
-                current.push(c);
-            }
-            ')' | ']' | '}' => {
-                depth -= 1;
-                current.push(c);
-            }
-            '<' if angles => {
-                depth += 1;
-                current.push(c);
-            }
-            '>' if angles => {
-                depth -= 1;
-                current.push(c);
-            }
-            ',' if depth == 0 => parts.push(std::mem::take(&mut current)),
-            _ => current.push(c),
+    let mut start = 0usize;
+    let mut i = 0;
+    while let Some(&(at, c)) = chars.get(i) {
+        if let Some(end) = literal_end(&chars, i) {
+            i = end;
+            continue;
         }
+        match c {
+            '(' | '[' | '{' => depth += 1,
+            ')' | ']' | '}' => depth -= 1,
+            '<' if angles => depth += 1,
+            '>' if angles => depth -= 1,
+            ',' if depth == 0 => {
+                parts.push(&text[start..at]);
+                start = at + c.len_utf8();
+            }
+            _ => {}
+        }
+        i += 1;
     }
-    parts.push(current);
+    parts.push(&text[start..]);
     parts
         .into_iter()
         .map(|p| p.trim().to_owned())
@@ -1227,7 +1283,7 @@ fn constructor_values(
 
 /// Whether a `JobError` variant at `start` of `code`, followed by `rest`, is
 /// built (an expression) rather than matched (a pattern: followed by `=>`,
-/// `|` or `=`, or inside the parentheses of a `matches!`).
+/// `|` or `=`, or inside the parentheses of a `matches!` that closes).
 fn written_out(code: &str, start: usize, rest: &str) -> bool {
     let next = rest.trim_start();
     if next.starts_with("=>")
@@ -1240,7 +1296,9 @@ fn written_out(code: &str, start: usize, rest: &str) -> bool {
         .match_indices("matches!(")
         .any(|(at, opener)| {
             let inside = at + opener.len();
-            closing(&code[inside..], '(', ')').is_none_or(|end| inside + end > start)
+            // A `matches!(` that never closes (a parse this check cannot
+            // follow) holds nothing.
+            closing(&code[inside..], '(', ')').is_some_and(|end| inside + end > start)
         })
 }
 
@@ -1798,5 +1856,45 @@ mod tests {
             violations[0].contains("`id` 1 time(s)") && violations[0].contains("lists 2"),
             "{violations:?}"
         );
+    }
+
+    #[test]
+    fn brackets_inside_literals_do_not_count() {
+        assert_eq!(closing("c, '(') rest", '(', ')'), Some(6));
+        assert_eq!(closing(r#"s, "(") rest"#, '(', ')'), Some(6));
+        assert_eq!(closing(r##"s, r#"("#) x"##, '(', ')'), Some(9));
+        assert_eq!(closing(r"c, '\'') x", '(', ')'), Some(7));
+        assert_eq!(
+            closing("&'a str) x", '(', ')'),
+            Some(7),
+            "a lifetime is no literal"
+        );
+        assert_eq!(
+            split_top_level("',', \"a, b\", c", false),
+            ["','", "\"a, b\"", "c"]
+        );
+    }
+
+    #[test]
+    fn a_matches_that_never_closes_holds_nothing() {
+        let code = "matches!(x JobError::Fatal(m)";
+        assert!(written_out(
+            code,
+            code.find("JobError").unwrap_or_default(),
+            ";"
+        ));
+
+        let scan = job_error_values(&sources(&[(
+            "crates/x/src/m.rs",
+            r#"
+fn f() {
+    if matches!(c, '(') { JobError::Fatal(m1) } else { JobError::fatal("x") };
+    if matches!(s, "(") { JobError::Fatal(m2) } else { JobError::fatal("y") };
+    if matches!(e, JobError::Fatal(_)) {}
+}
+"#,
+        )]));
+        let values: Vec<&str> = scan.values.iter().map(|(_, v)| v.as_str()).collect();
+        assert_eq!(values, ["m1", "m2"], "{:?}", scan.problems);
     }
 }

@@ -363,12 +363,21 @@ async fn the_sweep_leaves_a_live_workspace_alone(db: PgPool) {
         delivered_events(&db, &workspace.to_string(), 2).await;
         change(&db, &workspace.to_string()).await;
     }
+    // A key of the live workspace stays: the key purge runs only after the
+    // live check (campbooks-cloud#267).
+    idempotency_key(&db, "k-live", Some(&live.to_string()), "1 day").await;
+    idempotency_key(&db, "k-gone", Some(&gone.to_string()), "1 day").await;
 
     sweep(&state).await;
 
     assert_eq!(rows_of(&db, &live.to_string()).await, 2 + 2 + 1 + 1);
     assert_eq!(rows_of(&db, &broken.to_string()).await, 2 + 2 + 1 + 1);
     assert_eq!(rows_of(&db, &gone.to_string()).await, 0, "the others go on");
+    let keys: Vec<String> = sqlx::query_scalar("SELECT key FROM kernel.idempotency")
+        .fetch_all(&db)
+        .await
+        .unwrap();
+    assert_eq!(keys, ["k-live"], "the live workspace's key survives");
     let mut left: Vec<String> =
         sqlx::query_scalar("SELECT workspace_id FROM kernel.purged_workspaces")
             .fetch_all(&db)
@@ -383,6 +392,22 @@ async fn the_sweep_leaves_a_live_workspace_alone(db: PgPool) {
     );
 }
 
+/// An idempotency key `key` first used on a route of `workspace` (none: a
+/// route outside any workspace), expiring in `expires` (an interval).
+async fn idempotency_key(db: &PgPool, key: &str, workspace: Option<&str>, expires: &str) {
+    sqlx::query(
+        "INSERT INTO kernel.idempotency
+             (principal, key, operation_id, request_hash, expires_at, workspace_id)
+         VALUES ('client:app', $1, 'test.op', '\\x00', now() + $3::interval, $2)",
+    )
+    .bind(key)
+    .bind(workspace)
+    .bind(expires)
+    .execute(db)
+    .await
+    .unwrap();
+}
+
 /// The purge deletes the workspace's idempotency keys too, expired or not,
 /// and leaves another workspace's and the instance-wide ones.
 #[sqlx::test(migrations = "../../migrations")]
@@ -394,17 +419,7 @@ async fn the_purge_deletes_the_workspaces_idempotency_keys(db: PgPool) {
         ("k-3", Some("other"), "1 day"),
         ("k-4", None, "1 day"),
     ] {
-        sqlx::query(
-            "INSERT INTO kernel.idempotency
-                 (principal, key, operation_id, request_hash, expires_at, workspace_id)
-             VALUES ('client:app', $1, 'test.op', '\\x00', now() + $3::interval, $2)",
-        )
-        .bind(key)
-        .bind(workspace)
-        .bind(expires)
-        .execute(&db)
-        .await
-        .unwrap();
+        idempotency_key(&db, key, workspace, expires).await;
     }
     let purged = purge_workspace(&state.db, "gone").await.unwrap();
     assert_eq!(purged.keys, 2);
