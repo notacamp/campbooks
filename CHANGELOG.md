@@ -80,6 +80,11 @@ All notable changes to Campbooks Next are documented here. The format follows
 
 ### Fixed
 
+- **A request can no longer hang on the database.** The server's database connections now
+  give up on a statement after 30 seconds and on a lock wait after 10 (background jobs
+  allow their own statements 5 minutes). A request that hits either, or finds no free
+  connection in time, answers "The database is unavailable right now. Try again in a
+  moment." (503) instead of waiting indefinitely or failing as an internal error.
 - **Desktop app: a mail link opens only when its addresses are plain addresses.** A link
   whose address part hides a line break, another field or header (`&`, `;`, `?`), even
   encoded, an invisible character (a bidi override, a zero-width space) or bytes that are
