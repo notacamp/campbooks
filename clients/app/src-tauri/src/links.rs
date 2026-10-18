@@ -130,7 +130,7 @@ fn addresses_only(path: &str) -> bool {
 
 /// Whether `c` is invisible: a Unicode format character (general category
 /// Cf, which changes how the text around it shows) or another
-/// Default_Ignorable_Code_Point (fillers, variation selectors).
+/// `Default_Ignorable_Code_Point` (fillers, variation selectors).
 fn is_invisible(c: char) -> bool {
     matches!(
         u32::from(c),
@@ -149,7 +149,6 @@ fn is_invisible(c: char) -> bool {
             | 0x070F
             | 0x0890..=0x0891
             | 0x08E2
-            | 0x180E
             | 0x200B..=0x200F
             | 0x202A..=0x202E
             | 0x2060..=0x2064
