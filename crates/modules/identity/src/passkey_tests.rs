@@ -883,8 +883,12 @@ async fn a_ceremony_names_only_a_waiting_request_and_reads_a_small_body(db: PgPo
             &json!({ "display_name": "Ana", "request": "a".repeat(20_000) }),
         )
         .await;
-        assert_eq!(huge.status, StatusCode::BAD_REQUEST, "{start}: {huge:?}");
-        assert_eq!(huge.json["code"], "invalid_body");
+        assert_eq!(
+            huge.status,
+            StatusCode::PAYLOAD_TOO_LARGE,
+            "{start}: {huge:?}"
+        );
+        assert_eq!(huge.json["code"], "body_too_large");
     }
     // Nothing of it was stored.
     assert_eq!(

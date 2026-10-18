@@ -28,6 +28,11 @@ where
             .await
             .map(|axum::Json(value)| Self(value))
             .map_err(|rejection| {
+                // Over the body limit: 413, not a malformed body
+                // (campbooks-cloud#179).
+                if rejection.status() == axum::http::StatusCode::PAYLOAD_TOO_LARGE {
+                    return Error::PayloadTooLarge(MESSAGES.reason("body_too_large"));
+                }
                 Error::BadRequest(match &rejection {
                     JsonRejection::MissingJsonContentType(_) => {
                         MESSAGES.reason("missing_json_content_type")
@@ -159,6 +164,25 @@ mod tests {
             assert!(response.json["detail"].is_string());
             assert_eq!(response.json["code"], code);
         }
+    }
+
+    /// A body over its limit is a 413, not a malformed body
+    /// (campbooks-cloud#179).
+    #[tokio::test]
+    async fn an_over_limit_body_is_a_problem_413() {
+        let app = app().layer(axum::extract::DefaultBodyLimit::max(16));
+        let request = axum::http::Request::post("/")
+            .header("content-type", "application/json")
+            .body(Body::from(format!(r#"{{"name":"{}"}}"#, "x".repeat(64))))
+            .unwrap();
+        let response = testing::send(&app, request).await;
+        assert_eq!(response.status, StatusCode::PAYLOAD_TOO_LARGE);
+        assert_eq!(
+            response.content_type.as_deref(),
+            Some("application/problem+json")
+        );
+        assert_eq!(response.json["code"], "body_too_large");
+        assert_eq!(response.json["status"], 413);
     }
 
     #[tokio::test]

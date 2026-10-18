@@ -10957,7 +10957,7 @@ export interface operations {
                     "application/json": components["schemas"]["SignedInWith"];
                 };
             };
-            /** @description `invalid_body` (not a credential, or over 16 KiB). */
+            /** @description `invalid_body` (not a credential). A body over 16 KiB is 413 `body_too_large`. */
             400: {
                 headers: {
                     [name: string]: unknown;
@@ -11028,7 +11028,7 @@ export interface operations {
                     "application/json": components["schemas"]["RequestOptions"];
                 };
             };
-            /** @description `invalid_return_to`, or `invalid_body` (not JSON, or over 16 KiB). */
+            /** @description `invalid_return_to`, or `invalid_body` (not JSON). A body over 16 KiB is 413 `body_too_large`. */
             400: {
                 headers: {
                     [name: string]: unknown;
@@ -11091,7 +11091,7 @@ export interface operations {
                     "application/json": components["schemas"]["SignedInWith"];
                 };
             };
-            /** @description `invalid_body` (not a credential, or over 16 KiB). */
+            /** @description `invalid_body` (not a credential). A body over 16 KiB is 413 `body_too_large`. */
             400: {
                 headers: {
                     [name: string]: unknown;
@@ -11162,7 +11162,7 @@ export interface operations {
                     "application/json": components["schemas"]["CreationOptions"];
                 };
             };
-            /** @description `display_name_required`, `invalid_return_to`, or `invalid_body` (not JSON, or over 16 KiB). */
+            /** @description `display_name_required`, `invalid_return_to`, or `invalid_body` (not JSON). A body over 16 KiB is 413 `body_too_large`. */
             400: {
                 headers: {
                     [name: string]: unknown;
