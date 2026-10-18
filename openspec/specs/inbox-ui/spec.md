@@ -357,7 +357,10 @@ the mail app with only its address, copies, subject and body and no
 fragment, each value decoded and encoded again with everything but
 unreserved characters as `%XX` (a space as `%20`, never `+`; a plus as `%2B`;
 a line break, `;`, `?`, `=`, `/`, `&` or `#` encoded too, so no field hides in
-a value), anything else nowhere; no remote URL SHALL be granted
+a value), and only when its address part is nothing but addresses (none, or
+comma-separated `local@domain`s with no control character, blank or
+delimiter such as CR, LF, `&`, `;` or `?`, even encoded), anything else
+nowhere; no remote URL SHALL be granted
 IPC. CI SHALL check the frame in WebKit under the desktop and web policies
 read from their definitions, with the app's own sandbox and referrer policy,
 and a control proving the check would see a script run.
@@ -385,6 +388,10 @@ and a control proving the check would see a script run.
 #### Scenario: A field hidden in a value or the fragment
 - **WHEN** the member clicks `mailto:rita@example.com?subject=hi#&attach=/etc/passwd` or `mailto:rita@example.com?subject=x;attach=/etc/passwd`
 - **THEN** the mail app gets `mailto:rita@example.com?subject=hi`, or `mailto:rita@example.com?subject=x%3Battach%3D%2Fetc%2Fpasswd`
+
+#### Scenario: A header hidden in the address
+- **WHEN** the member clicks `mailto:rita@example.com%0D%0Abcc:evil@example.org` or `mailto:rita@example.com%26attach=/etc/passwd`
+- **THEN** nothing opens, while `mailto:rita@example.com,joao@example.com` opens in the mail app
 
 ### Requirement: Only offers that take effect
 The reader SHALL offer "Always show images from <sender>" and its ⇧A only

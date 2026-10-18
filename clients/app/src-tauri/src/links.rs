@@ -30,6 +30,11 @@ pub fn outside(url: &Url) -> Option<String> {
     match url.scheme() {
         "https" | "http" => Some(url.as_str().to_owned()),
         "mailto" => {
+            // Its addresses, before `?`: plain addresses only, or it opens
+            // nowhere (campbooks-cloud#247).
+            if !addresses_only(url.path()) {
+                return None;
+            }
             let kept: Vec<String> = url
                 .query()
                 .unwrap_or_default()
@@ -48,6 +53,37 @@ pub fn outside(url: &Url) -> Option<String> {
         }
         _ => None,
     }
+}
+
+/// Whether a mail link's address part (`path`, still percent-encoded) is
+/// nothing but addresses: none, or comma-separated `local@domain`s with no
+/// control character, blank, or delimiter a mail app could read as another
+/// field or header (CR, LF, `&`, `;`, `?`, `#`, `<`, `>`, `"`, `\`), even
+/// encoded. A mail app that decodes the whole link before splitting it then
+/// finds no field hidden in it.
+fn addresses_only(path: &str) -> bool {
+    let decoded = decode(path);
+    if decoded.is_empty() {
+        return true;
+    }
+    let refused = |b: &u8| {
+        b.is_ascii_control()
+            || b.is_ascii_whitespace()
+            || matches!(
+                b,
+                b'&' | b';' | b'?' | b'#' | b'<' | b'>' | b'"' | b'\\' | b'%'
+            )
+    };
+    if decoded.iter().any(refused) {
+        return false;
+    }
+    decoded.split(|b| *b == b',').all(|address| {
+        let mut parts = address.split(|b| *b == b'@');
+        matches!(
+            (parts.next(), parts.next(), parts.next()),
+            (Some(local), Some(domain), None) if !local.is_empty() && !domain.is_empty()
+        )
+    })
 }
 
 /// `text` with its `%XX` escapes decoded, as bytes; a `%` not followed by
@@ -216,6 +252,35 @@ mod tests {
             ),
         ] {
             assert_eq!(outside(&parse(link)).as_deref(), Some(kept), "{link}");
+        }
+    }
+
+    #[test]
+    fn a_mail_link_whose_addresses_hide_more_opens_nowhere() {
+        for link in [
+            "mailto:a@b.example%0D%0Abcc:evil@x.example",
+            "mailto:a@b.example%0Abcc:evil@x.example",
+            "mailto:a@b.example%0d%0abcc:evil@x.example",
+            "mailto:a@b.example&bcc=evil@x.example",
+            "mailto:a@b.example;evil@x.example",
+            "mailto:a@b.example%3Fattach=/etc/passwd",
+            "mailto:a@b.example%26attach=/etc/passwd",
+            "mailto:a@b.example%2526attach=/etc/passwd",
+            "mailto:a%20b@x.example",
+            "mailto:not-an-address",
+            "mailto:a@b@c.example",
+            "mailto:a@b.example,,c@d.example",
+            "mailto:%3Cevil@x.example%3E",
+        ] {
+            assert_eq!(outside(&parse(link)), None, "{link}");
+        }
+        for link in [
+            "mailto:hello@weekly-ledger.example",
+            "mailto:a@x.example,b@y.example",
+            "mailto:?subject=Hi",
+            "mailto:rita.gomes+tax@silva-contas.example",
+        ] {
+            assert!(outside(&parse(link)).is_some(), "{link}");
         }
     }
 
