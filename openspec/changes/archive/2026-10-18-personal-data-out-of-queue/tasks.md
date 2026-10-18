@@ -17,3 +17,12 @@
 - [x] 3.1 The personal-name matcher; event fields (opaque kinds, nested, allow-listed, stale)
 - [x] 3.2 Job payloads read from sources (unit, handler with a constant name, attributes, comments and tests skipped); missing and stale audit entries
 - [x] 3.3 Job error values (literals, inline and positional and named arguments, strings with commas, `Self::` only in `JobError`'s file); missing and stale entries
+
+## 4. Review round 1
+
+- [x] 4.1 `BlobError::Database` names a database error by kind; `Self::…` in any `impl From<…> for JobError` is scanned
+- [x] 4.2 Job error values carry their number of uses per file: a new use fails until reviewed
+- [x] 4.3 `JobError` constructors passed as functions fail; variants written out are scanned (patterns are not)
+- [x] 4.4 A job whose name or payload cannot be read, an ambiguous payload struct, and a name constant with several values are reported
+- [x] 4.5 Every free-text event field is listed by its full path (`*` for a path in every event)
+- [x] 4.6 Gmail's raw message decode error uses `provider::unreadable`

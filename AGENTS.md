@@ -128,12 +128,13 @@ Use `ENV` with neutral `example.com` defaults. *(gitleaks in CI.)*
   counts and blob references, never addresses, names, subjects or what
   someone wrote: that travels as a blob, which the purges delete. A job's
   error says what failed with ids and status codes (`redact::sqlx`,
-  `redact::json` for errors that quote data). *(CI: `cargo xtask arch` reads
-  every event payload's fields, every job payload's fields and every value a
-  job error is built from; an event field named like personal data must hold
-  an opaque value or be listed in `EVENT_FIELDS_ALLOWED`, and every job
-  payload field and job error value is listed with its reason in
-  `JOB_PAYLOAD_FIELDS` / `JOB_ERROR_VALUES`, in `xtask/src/payloads.rs`.)*
+  `redact::json` for errors that quote data, in an error enum's message too).
+  *(CI: `cargo xtask arch` lists, each with its reason in
+  `xtask/src/payloads.rs`: every event payload field that can hold free text,
+  by its path (`EVENT_FIELDS_ALLOWED`); every job payload field
+  (`JOB_PAYLOAD_FIELDS`); and every value a job error is built from, per file
+  with its number of uses (`JOB_ERROR_VALUES`). A job it cannot read, or a
+  `JobError` built where its message cannot be read, fails.)*
 - Untrusted HTML (email bodies) is rendered only in a sandboxed iframe with a
   strict CSP; never `dangerouslySetInnerHTML` outside `lib/ui/safe-html`.
 

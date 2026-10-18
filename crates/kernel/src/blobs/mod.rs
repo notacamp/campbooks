@@ -266,8 +266,11 @@ pub enum BlobError {
     /// The object store failed.
     #[error("object store: {0}")]
     Store(#[from] object_store::Error),
-    /// The database failed.
-    #[error("database: {0}")]
+    /// The database failed. Shown by kind only (`redact::sqlx`): a database
+    /// error's message can quote the row it failed on, and this message
+    /// reaches `kernel.jobs.last_error` through `From<BlobError> for
+    /// JobError`.
+    #[error("database: {}", crate::redact::sqlx(.0))]
     Database(#[from] sqlx::Error),
 }
 

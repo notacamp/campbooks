@@ -5,17 +5,22 @@
 //! once they ask for it to go; personal data (addresses, names, subjects,
 //! bodies) travels as blob references instead, which the purges delete.
 //!
-//! - **Event payloads**: a field named like personal data ([`personal`])
-//!   must hold an opaque value (a blob reference, an id, a closed set of
-//!   values, a number or a flag) or be listed in [`EVENT_FIELDS_ALLOWED`]
-//!   with the reason it is none.
+//! - **Event payloads**: every field of every event's payload that can hold
+//!   free text (a string that is not an id, a date or one of a closed set)
+//!   is listed by its full path in [`EVENT_FIELDS_ALLOWED`] with the reason
+//!   it holds no personal data. Blob references, ids, enums, dates,
+//!   numbers and flags need no entry.
 //! - **Job payloads**: every field of every job kind's payload is listed in
 //!   [`JOB_PAYLOAD_FIELDS`] with the reason it is no personal data: a field
-//!   by field audit, so a new field is reviewed before it is stored.
+//!   by field audit, so a new field is reviewed before it is stored. A job
+//!   whose name or payload cannot be read is reported, never skipped.
 //! - **Failure reasons**: every value a job's error message is built from
-//!   (other than its own wording) is listed in [`JOB_ERROR_VALUES`] with the
-//!   reason it is no personal data. `redact::job_error` masks quotes,
-//!   addresses, links and tokens as well, but only as a backstop.
+//!   (other than its own wording) is listed per file, with how many times it
+//!   is used there, in [`JOB_ERROR_VALUES`] with the reason it is no personal
+//!   data; a new use fails until it is reviewed. A `JobError` built any other
+//!   way (a variant written out, `JobError::retry` passed as a function) is
+//!   reported. `redact::job_error` masks quotes, addresses, links and tokens
+//!   as well, but only as a backstop.
 //!
 //! Each list's entries must still match something: a stale entry is
 //! reported, so the lists stay an accurate audit.
@@ -26,49 +31,47 @@ use std::sync::LazyLock;
 use regex::Regex;
 
 use crate::access::{is_test_file, without_comments, without_tests};
-use crate::arch::name_words;
 
-/// Words that name personal data, matched against a field name's words
-/// (singular or plural): addresses and who sent or received, names, and
-/// what people wrote.
-const PERSONAL_WORDS: [&str; 24] = [
-    "email",
-    "mail",
-    "address",
-    "phone",
-    "from",
-    "to",
-    "cc",
-    "bcc",
-    "sender",
-    "recipient",
-    "participant",
-    "name",
-    "display",
-    "subject",
-    "title",
-    "body",
-    "text",
-    "content",
-    "snippet",
-    "summary",
-    "note",
-    "comment",
-    "message",
-    "signature",
-];
-
-/// Whether a field name reads like personal data, by its words.
-pub fn personal(name: &str) -> bool {
-    name_words(name).iter().any(|word| {
-        let singular = word.strip_suffix('s').unwrap_or(word);
-        PERSONAL_WORDS.contains(&word.as_str()) || PERSONAL_WORDS.contains(&singular)
-    })
-}
-
-/// Event payload fields named like personal data that hold none, each with
-/// the reason: `(event, field, reason)`.
+/// Event payload fields that can hold free text, by their full path
+/// (`items[].change.provider_key`; `[]` for a list's items, `{}` for a map's
+/// values), each with the reason it holds no personal data:
+/// `(event, path, reason)`. An event of `*` covers that path in every event.
 pub const EVENT_FIELDS_ALLOWED: &[(&str, &str, &str)] = &[
+    (
+        "*",
+        "workspace",
+        "a workspace's event routing field: the workspace's id as text (`DomainEvent::workspace`)",
+    ),
+    (
+        "*",
+        "client",
+        "an OAuth client's id: generated for the app, never a person's name or address",
+    ),
+    (
+        "*",
+        "provider",
+        "a mail or sign-in provider's name, from the code (`google`, `zoho`, `microsoft`)",
+    ),
+    (
+        "*",
+        "method",
+        "how someone signs in, from the code (`provider`, `passkey`)",
+    ),
+    (
+        "*",
+        "reason",
+        "a reason code, from the code (`grant_revoked`, `member_left`, `too_large`)",
+    ),
+    (
+        "attention.item_changed",
+        "container.type",
+        "a record type, from the code (`<module>.<record>`)",
+    ),
+    (
+        "attention.item_changed",
+        "container.id",
+        "a record's id (a UUID as text)",
+    ),
     (
         "connectors.connection_added",
         "account_subject",
@@ -86,18 +89,29 @@ pub const EVENT_FIELDS_ALLOWED: &[(&str, &str, &str)] = &[
          module's tables; never an address",
     ),
     (
+        "connectors.messages_changed",
+        "cursor",
+        "the stream's position at the provider (a history id or a time), opaque",
+    ),
+    (
         "connectors.send_completed",
         "provider_message_id",
         PROVIDER_MESSAGE_ID,
     ),
     (
         "conversations.changes_requested",
-        "provider_message_id",
+        "items[].provider_message_id",
         PROVIDER_MESSAGE_ID,
     ),
     (
+        "conversations.changes_requested",
+        "items[].change.provider_key",
+        "the provider's id of a label or folder (Gmail's `Label_12`, Zoho's number), never its \
+         name",
+    ),
+    (
         "conversations.conversation_changed",
-        "provider_message_ids",
+        "provider_message_ids[]",
         PROVIDER_MESSAGE_ID,
     ),
     (
@@ -111,10 +125,26 @@ pub const EVENT_FIELDS_ALLOWED: &[(&str, &str, &str)] = &[
         PROVIDER_MESSAGE_ID,
     ),
     (
+        "identity.client_registered",
+        "kind",
+        "the client's kind, from the code (`confidential`, `public`)",
+    ),
+    (
+        "identity.way_in_added",
+        "via",
+        "how the way in was added, from the code (`sign_up`, `link`, `connect`, `passkey`)",
+    ),
+    (
         "workspaces.member_left",
         "subject",
         "the former member's identity subject: an opaque account id, so the issuer removes \
          the apps they registered; never an address",
+    ),
+    (
+        "workspaces.workspace_updated",
+        "fields[]",
+        "the names of the settings that changed (`name`, `accent`), from the code; never their \
+         values",
     ),
 ];
 
@@ -201,217 +231,293 @@ const MESSAGE_ID: &str = "the message's id (a UUID), never its content";
 const CONVERSATION_CURSOR: &str = "the id of the last conversation done (a cursor), opaque";
 
 /// Every value a job's error message is built from, other than its own
-/// wording, each with the reason it is no personal data:
-/// `(path, expression, reason)`.
-pub const JOB_ERROR_VALUES: &[(&str, &str, &str)] = &[
+/// wording, each with how many times it is used in that file and the reason
+/// it is no personal data: `(path, expression, uses, reason)`.
+pub const JOB_ERROR_VALUES: &[(&str, &str, usize, &str)] = &[
+    (
+        "crates/kernel/src/blobs/mod.rs",
+        "err.to_string()",
+        1,
+        BLOB_ERROR,
+    ),
+    (
+        "crates/kernel/src/blobs/mod.rs",
+        "other.to_string()",
+        1,
+        BLOB_ERROR,
+    ),
     (
         "crates/kernel/src/jobs/mod.rs",
         "crate::redact::sqlx(&err)",
+        1,
         REDACTED_SQL,
     ),
     (
         "crates/kernel/src/jobs/mod.rs",
         "err.to_string()",
+        1,
         KERNEL_ERROR,
     ),
     (
         "crates/kernel/src/jobs/mod.rs",
         "other.to_string()",
+        1,
         KERNEL_ERROR,
     ),
-    ("crates/kernel/src/jobs/registry.rs", "E::NAME", CODE_NAME),
-    ("crates/kernel/src/jobs/registry.rs", "H::NAME", CODE_NAME),
-    ("crates/kernel/src/jobs/registry.rs", "J::NAME", CODE_NAME),
-    ("crates/kernel/src/jobs/registry.rs", "E::VERSION", VERSION),
-    ("crates/kernel/src/jobs/registry.rs", "row.version", VERSION),
+    (
+        "crates/kernel/src/jobs/registry.rs",
+        "E::NAME",
+        3,
+        CODE_NAME,
+    ),
+    (
+        "crates/kernel/src/jobs/registry.rs",
+        "H::NAME",
+        1,
+        CODE_NAME,
+    ),
+    (
+        "crates/kernel/src/jobs/registry.rs",
+        "J::NAME",
+        1,
+        CODE_NAME,
+    ),
+    (
+        "crates/kernel/src/jobs/registry.rs",
+        "E::VERSION",
+        1,
+        VERSION,
+    ),
+    (
+        "crates/kernel/src/jobs/registry.rs",
+        "row.version",
+        1,
+        VERSION,
+    ),
     (
         "crates/kernel/src/jobs/registry.rs",
         "row.name",
+        1,
         "the logged event's name, a name from the code",
     ),
     (
         "crates/kernel/src/jobs/registry.rs",
         "id",
+        5,
         "the event's id (a UUIDv7)",
     ),
     (
         "crates/kernel/src/jobs/registry.rs",
         "crate::redact::json(&e)",
+        3,
         REDACTED_JSON,
     ),
     (
         "crates/kernel/src/jobs/worker.rs",
         "crate::redact::sqlx(&e)",
+        1,
         REDACTED_SQL,
     ),
     (
         "crates/kernel/src/jobs/worker.rs",
         "info.kind",
+        2,
         "the queued job's kind, a name from the code",
     ),
     (
         "crates/modules/connectors/src/features/member_left/mod.rs",
         "e.to_string()",
+        1,
         KERNEL_ERROR,
     ),
     (
         "crates/modules/connectors/src/features/request_changes/mod.rs",
         "campbooks_kernel::redact::json(&e)",
+        1,
         REDACTED_JSON,
     ),
     (
         "crates/modules/connectors/src/features/send_message/mod.rs",
         "OUTGOING_CONTENT_TYPE",
+        1,
         "a content type constant",
     ),
     (
         "crates/modules/connectors/src/features/send_message/mod.rs",
         "document.version",
+        1,
         VERSION,
     ),
     (
         "crates/modules/connectors/src/features/send_message/mod.rs",
         "e.line()",
+        1,
         POSITION,
     ),
     (
         "crates/modules/connectors/src/features/send_message/mod.rs",
         "e.column()",
+        1,
         POSITION,
     ),
     (
         "crates/modules/connectors/src/features/send_message/mod.rs",
         "e.to_string()",
+        1,
         READ_ERROR,
     ),
     (
         "crates/modules/connectors/src/features/send_message/mod.rs",
         "err",
+        2,
         PROVIDER_ERROR,
     ),
     (
         "crates/modules/connectors/src/features/send_message/mod.rs",
         "redact::json(&e)",
+        3,
         REDACTED_JSON,
     ),
     (
         "crates/modules/connectors/src/features/send_message/mod.rs",
         "send",
+        1,
         "the send's id (a UUID)",
     ),
     (
         "crates/modules/connectors/src/features/send_message/via_zoho.rs",
         "err",
+        1,
         PROVIDER_ERROR,
     ),
     (
         "crates/modules/connectors/src/features/send_message/via_zoho.rs",
         "why",
+        1,
         "why Zoho could not say whether an attempt was sent: a provider failure (as for \
          `ProviderError`) or the code's own wording",
     ),
     (
         "crates/modules/connectors/src/features/sync_stream/mod.rs",
         "other.to_string()",
+        2,
         READ_ERROR,
     ),
     (
         "crates/modules/connectors/src/features/sync_stream/mod.rs",
         "redact::json(&e)",
+        5,
         REDACTED_JSON,
     ),
     (
         "crates/modules/connectors/src/features/sync_stream/mod.rs",
         "target.stream",
+        2,
         "the stream's id (a UUID)",
     ),
     (
         "crates/modules/connectors/src/features/workspace_deleting/mod.rs",
         "e.to_string()",
+        1,
         KERNEL_ERROR,
     ),
     (
         "crates/modules/conversations/src/domain/redact.rs",
         "status",
+        1,
         "an HTTP status code",
     ),
     (
         "crates/modules/conversations/src/features/apply_changes/mod.rs",
         "BATCH_VERSION",
+        1,
         VERSION,
     ),
     (
         "crates/modules/conversations/src/features/apply_changes/mod.rs",
         "batch.version",
+        1,
         VERSION,
     ),
     (
         "crates/modules/conversations/src/features/apply_changes/mod.rs",
         "blob.hash",
+        1,
         "a blob's content hash (SHA-256): it identifies bytes, it cannot be read back into them",
     ),
     (
         "crates/modules/conversations/src/features/apply_changes/mod.rs",
         "redact::json(&e)",
+        2,
         REDACTED_JSON,
     ),
     (
         "crates/modules/conversations/src/features/create_inbox/mod.rs",
         "redact::json(&e)",
+        1,
         REDACTED_JSON,
     ),
     (
         "crates/modules/conversations/src/features/decide_message/mod.rs",
         "redact::json(&e)",
+        1,
         REDACTED_JSON,
     ),
     (
         "crates/modules/conversations/src/features/release_send/mod.rs",
         "redact::json(&e)",
+        2,
         REDACTED_JSON,
     ),
     (
         "crates/modules/conversations/src/features/summarize_need/mod.rs",
         "redact::json(&e)",
+        1,
         REDACTED_JSON,
     ),
     (
         "crates/modules/identity/src/features/forget_connected_way_in/mod.rs",
         "e.to_string()",
+        1,
         KERNEL_ERROR,
     ),
     (
         "crates/modules/identity/src/features/member_left/mod.rs",
         "e.to_string()",
+        3,
         KERNEL_ERROR,
     ),
     (
         "crates/modules/identity/src/features/name_connected_mailbox/mod.rs",
         "e.to_string()",
+        1,
         KERNEL_ERROR,
     ),
     (
         "crates/modules/identity/src/features/notify_way_in_added/mod.rs",
         "err.to_string()",
+        1,
         "a mail transport failure (`MailError::Unavailable` or `NotConfigured`): fixed wording, \
          no recipient or content",
     ),
     (
         "crates/modules/identity/src/features/workspace_deleting/mod.rs",
         "e.to_string()",
+        1,
         KERNEL_ERROR,
     ),
-    ("crates/modules/identity/src/prune.rs", "e", KERNEL_ERROR),
+    ("crates/modules/identity/src/prune.rs", "e", 2, KERNEL_ERROR),
     (
         "crates/modules/identity/src/prune.rs",
         "redact::sqlx(&e)",
+        3,
         REDACTED_SQL,
     ),
     (
         "crates/modules/workspaces/src/features/delete_workspace/mod.rs",
         "e",
-        "a blob store error (`BlobError`): its kind, a limit, a content hash, or the storage \
-         backend's failure (its object keys are workspace ids and hashes, never names)",
+        1,
+        BLOB_ERROR,
     ),
 ];
 
@@ -428,15 +534,18 @@ const PROVIDER_ERROR: &str = "a provider failure (`ProviderError`): its kind and
      unavailable or unexpected answer, a description the clients build from status codes, error \
      codes, URLs without their path and decode errors; `redact::job_error` masks quotes, \
      addresses and tokens on top";
+const BLOB_ERROR: &str = "a blob store error (`BlobError`): its kind, a limit, a content hash, \
+     a database error by kind (`redact::sqlx`), or the object store's failure (its keys are \
+     workspace ids and hashes, never names)";
 const READ_ERROR: &str = "a mail read failure (`ReadError`): a provider failure (as for \
      `ProviderError`), a database error by kind, a blob store error, or what stored data did not \
      decode, never the data";
 
 /// [`EVENT_FIELDS_ALLOWED`] against the events catalogue (`events`, what
 /// `openapi/events.json` holds): every field of every event's payload, at
-/// any depth, named like personal data ([`personal`]) holds an opaque value
-/// ([`opaque`]) or is listed with its reason. An entry naming a field no
-/// event carries any more is stale.
+/// any depth, that can hold free text ([`free_text_fields`]) is listed for
+/// that event (or `*`) with its reason. An entry no event matches any more
+/// is stale.
 pub fn check_event_payloads(
     events: &serde_json::Value,
     allowed: &[(&str, &str, &str)],
@@ -457,77 +566,64 @@ pub fn check_event_payloads(
         let Some(payload) = event.get("payload") else {
             continue;
         };
-        let mut fields = BTreeMap::new();
-        properties(payload, schemas, &mut BTreeSet::new(), &mut fields);
-        for (field, schemas_of) in &fields {
-            if !personal(field) {
-                continue;
+        let mut fields = BTreeSet::new();
+        free_text_fields(payload, schemas, "", &mut BTreeSet::new(), &mut fields);
+        for path in &fields {
+            let entry = allowed
+                .iter()
+                .find(|(e, p, _)| *p == path && *e == name)
+                .or_else(|| allowed.iter().find(|(e, p, _)| *p == path && *e == "*"));
+            if let Some((e, p, _)) = entry {
+                used.insert(((*e).to_owned(), (*p).to_owned()));
+            } else {
+                violations.push(format!(
+                    "event `{name}` carries `{path}` as free text: send personal data as a blob \
+                     reference, use an id or a closed set of values, or list it in \
+                     `EVENT_FIELDS_ALLOWED` with the reason it is no personal data"
+                ));
             }
-            if allowed.iter().any(|(e, f, _)| *e == name && f == field) {
-                used.insert((name.to_owned(), field.clone()));
-                continue;
-            }
-            if schemas_of.iter().all(|schema| opaque(schema, schemas)) {
-                continue;
-            }
-            violations.push(format!(
-                "event `{name}` carries `{field}`, named like personal data, as a value that \
-                 can hold it: send it as a blob reference (personal data stays out of the \
-                 event log, AGENTS.md), or list it in `EVENT_FIELDS_ALLOWED` with the reason \
-                 it is none"
-            ));
         }
     }
-    for (event, field, reason) in allowed {
+    for (event, path, reason) in allowed {
         if reason.trim().is_empty() {
             violations.push(format!(
-                "`EVENT_FIELDS_ALLOWED` lists `{field}` of `{event}` without a reason"
+                "`EVENT_FIELDS_ALLOWED` lists `{path}` of `{event}` without a reason"
             ));
         }
-        if !used.contains(&((*event).to_owned(), (*field).to_owned())) {
+        if !used.contains(&((*event).to_owned(), (*path).to_owned())) {
             violations.push(format!(
-                "`EVENT_FIELDS_ALLOWED` lists `{field}` of `{event}`, which that event no \
-                 longer carries: remove the entry"
+                "`EVENT_FIELDS_ALLOWED` lists `{path}` of `{event}`, which no event carries as \
+                 free text any more: remove the entry"
             ));
         }
     }
     violations
 }
 
-/// Every property of `schema`, at any depth (through `$ref`, `allOf`,
-/// `oneOf`, `anyOf`, `items` and `additionalProperties`), with the schemas
-/// it is declared with.
-fn properties(
+/// The paths of `schema`'s fields that can hold free text, at any depth
+/// (through `$ref`, `allOf`, `oneOf`, `anyOf`, a list's `items` as `[]` and
+/// a map's `additionalProperties` as `{}`), below `path`. A blob reference
+/// ([`BLOB_REFERENCES`]) is opaque as a whole and not looked into.
+fn free_text_fields(
     schema: &serde_json::Value,
     schemas: Option<&serde_json::Value>,
-    seen: &mut BTreeSet<String>,
-    out: &mut BTreeMap<String, Vec<serde_json::Value>>,
+    path: &str,
+    seen: &mut BTreeSet<(String, String)>,
+    out: &mut BTreeSet<String>,
 ) {
     let Some(object) = schema.as_object() else {
         return;
     };
     if let Some(name) = reference(schema) {
-        // A blob reference is opaque as a whole: its own fields (a hash, a
-        // size, a media type) describe stored bytes, not a person.
-        if BLOB_REFERENCES.contains(&name) {
+        if BLOB_REFERENCES.contains(&name) || !seen.insert((name.to_owned(), path.to_owned())) {
             return;
         }
-        if seen.insert(name.to_owned())
-            && let Some(target) = schemas.and_then(|s| s.get(name))
-        {
-            properties(target, schemas, seen, out);
+        if let Some(target) = schemas.and_then(|s| s.get(name)) {
+            free_text_fields(target, schemas, path, seen, out);
         }
         return;
     }
-    if let Some(props) = object
-        .get("properties")
-        .and_then(serde_json::Value::as_object)
-    {
-        for (name, property) in props {
-            out.entry(name.clone()).or_default().push(property.clone());
-            properties(property, schemas, seen, out);
-        }
-    }
+    let mut container = false;
     for key in ["allOf", "oneOf", "anyOf"] {
         for part in object
             .get(key)
@@ -535,13 +631,41 @@ fn properties(
             .into_iter()
             .flatten()
         {
-            properties(part, schemas, seen, out);
+            container = true;
+            if part.get("type").and_then(serde_json::Value::as_str) == Some("null")
+                && reference(part).is_none()
+            {
+                continue;
+            }
+            free_text_fields(part, schemas, path, seen, out);
         }
     }
-    for key in ["items", "additionalProperties"] {
-        if let Some(inner) = object.get(key) {
-            properties(inner, schemas, seen, out);
+    if let Some(props) = object
+        .get("properties")
+        .and_then(serde_json::Value::as_object)
+    {
+        container = true;
+        for (name, property) in props {
+            let inner = if path.is_empty() {
+                name.clone()
+            } else {
+                format!("{path}.{name}")
+            };
+            free_text_fields(property, schemas, &inner, seen, out);
         }
+    }
+    if types(schema).contains(&"array") {
+        container = true;
+        if let Some(items) = object.get("items") {
+            free_text_fields(items, schemas, &format!("{path}[]"), seen, out);
+        }
+    }
+    if let Some(values) = object.get("additionalProperties").filter(|v| v.is_object()) {
+        container = true;
+        free_text_fields(values, schemas, &format!("{path}{{}}"), seen, out);
+    }
+    if !container && !opaque_leaf(schema) {
+        out.insert(path.to_owned());
     }
 }
 
@@ -558,43 +682,29 @@ fn reference(schema: &serde_json::Value) -> Option<&str> {
         .and_then(|r| r.rsplit('/').next())
 }
 
-/// Whether a value of `schema` cannot hold personal data inline: a blob
-/// reference ([`BLOB_REFERENCES`]), a UUID,
-/// a closed set of strings (`enum`), a number or a flag, a list of such, or
-/// a choice between such and `null`.
-fn opaque(schema: &serde_json::Value, schemas: Option<&serde_json::Value>) -> bool {
-    if let Some(name) = reference(schema) {
-        if BLOB_REFERENCES.contains(&name) {
-            return true;
-        }
-        return schemas
-            .and_then(|s| s.get(name))
-            .is_some_and(|target| reference(target).is_none() && opaque(target, schemas));
+/// A schema's `type`, one or several.
+fn types(schema: &serde_json::Value) -> Vec<&str> {
+    match schema.get("type") {
+        Some(serde_json::Value::String(t)) => vec![t.as_str()],
+        Some(serde_json::Value::Array(ts)) => ts.iter().filter_map(|t| t.as_str()).collect(),
+        _ => Vec::new(),
     }
-    for key in ["oneOf", "anyOf"] {
-        if let Some(parts) = schema.get(key).and_then(serde_json::Value::as_array) {
-            return parts.iter().all(|part| {
-                part.get("type").and_then(serde_json::Value::as_str) == Some("null")
-                    || opaque(part, schemas)
-            });
-        }
-    }
+}
+
+/// Whether a leaf value cannot hold free text: one of a closed set
+/// (`enum`), an id (`uuid`), a date or a time, a number, a flag, or `null`.
+fn opaque_leaf(schema: &serde_json::Value) -> bool {
     if schema.get("enum").is_some() {
         return true;
     }
-    let types: Vec<&str> = match schema.get("type") {
-        Some(serde_json::Value::String(t)) => vec![t.as_str()],
-        Some(serde_json::Value::Array(ts)) => ts.iter().filter_map(|t| t.as_str()).collect(),
-        _ => return false,
-    };
-    types.iter().all(|t| match *t {
-        "null" | "integer" | "number" | "boolean" => true,
-        "string" => schema.get("format").and_then(serde_json::Value::as_str) == Some("uuid"),
-        "array" => schema
-            .get("items")
-            .is_some_and(|items| opaque(items, schemas)),
-        _ => false,
-    })
+    let format = schema.get("format").and_then(serde_json::Value::as_str);
+    let types = types(schema);
+    !types.is_empty()
+        && types.iter().all(|t| match *t {
+            "null" | "integer" | "number" | "boolean" => true,
+            "string" => matches!(format, Some("uuid" | "date" | "date-time")),
+            _ => false,
+        })
 }
 
 /// A job kind's payload as the sources declare it.
@@ -604,9 +714,18 @@ pub struct JobPayload {
     pub kind: String,
     /// Where the job is implemented.
     pub path: String,
-    /// The payload's fields (none for a unit payload); `None` when its
-    /// struct was not found.
-    pub fields: Option<Vec<String>>,
+    /// The payload's fields (none for a unit payload).
+    pub fields: Vec<String>,
+}
+
+/// What [`job_payloads`] read: the payloads, and every job it could not
+/// read (each a violation, never skipped).
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct JobScan {
+    /// The job kinds and their payloads' fields.
+    pub payloads: Vec<JobPayload>,
+    /// What could not be read, and where.
+    pub problems: Vec<String>,
 }
 
 static JOB_IMPL: LazyLock<Regex> = LazyLock::new(|| {
@@ -628,58 +747,99 @@ static STR_CONST: LazyLock<Regex> = LazyLock::new(|| {
 
 /// Every job kind the sources implement (`impl Job for …`, `impl
 /// JobHandler for …`), outside tests and comments, with its payload's
-/// fields.
-pub fn job_payloads(sources: &[(String, String)]) -> Vec<JobPayload> {
+/// fields. A kind whose `NAME` or `Payload` cannot be read, a `NAME`
+/// constant defined with different values, and a payload struct that is
+/// missing or defined more than once outside the job's file are problems.
+pub fn job_payloads(sources: &[(String, String)]) -> JobScan {
     let code: Vec<(String, String)> = sources
         .iter()
         .filter(|(path, _)| !is_test_file(path))
         .map(|(path, text)| (path.clone(), without_comments(without_tests(text))))
         .collect();
-    let constants: BTreeMap<String, String> = code
-        .iter()
-        .flat_map(|(_, text)| STR_CONST.captures_iter(text))
-        .map(|c| (c[1].to_owned(), c[2].to_owned()))
-        .collect();
-    let mut payloads = Vec::new();
-    for (path, text) in &code {
-        for found in JOB_IMPL.captures_iter(text) {
-            let Some(whole) = found.get(0) else {
-                continue;
-            };
-            let Some(body) = block_after(text, whole.end()) else {
-                continue;
-            };
-            let Some(name) = KIND_NAME.captures(body) else {
-                continue;
-            };
-            let kind = match (name.get(1), name.get(2)) {
-                (Some(literal), _) => literal.as_str().to_owned(),
-                (None, Some(constant)) => {
-                    let last = constant.as_str().rsplit("::").next().unwrap_or_default();
-                    constants
-                        .get(last)
-                        .cloned()
-                        .unwrap_or_else(|| constant.as_str().to_owned())
-                }
-                (None, None) => continue,
-            };
-            let payload = if &found[1] == "Job" {
-                found[2].to_owned()
-            } else {
-                match PAYLOAD_TYPE.captures(body) {
-                    Some(t) => t[1].rsplit("::").next().unwrap_or_default().to_owned(),
-                    None => continue,
-                }
-            };
-            payloads.push(JobPayload {
-                kind,
-                path: path.clone(),
-                fields: struct_fields(&code, path, &payload),
-            });
+    let mut constants: BTreeMap<String, BTreeSet<String>> = BTreeMap::new();
+    for (_, text) in &code {
+        for found in STR_CONST.captures_iter(text) {
+            constants
+                .entry(found[1].to_owned())
+                .or_default()
+                .insert(found[2].to_owned());
         }
     }
-    payloads.sort_by(|a, b| a.kind.cmp(&b.kind));
-    payloads
+    let mut scan = JobScan::default();
+    for (path, text) in &code {
+        for found in JOB_IMPL.captures_iter(text) {
+            let implementor = &found[2];
+            let Some(body) = found
+                .get(0)
+                .and_then(|whole| block_after(text, whole.end()))
+            else {
+                scan.problems.push(format!(
+                    "{path}: the `{}` impl for `{implementor}` has no body that can be read",
+                    &found[1]
+                ));
+                continue;
+            };
+            let kind = match kind_name(body, &constants) {
+                Ok(kind) => kind,
+                Err(why) => {
+                    scan.problems
+                        .push(format!("{path}: job `{implementor}`: {why}"));
+                    continue;
+                }
+            };
+            let payload = if &found[1] == "Job" {
+                implementor.to_owned()
+            } else if let Some(t) = PAYLOAD_TYPE.captures(body) {
+                t[1].rsplit("::").next().unwrap_or_default().to_owned()
+            } else {
+                scan.problems.push(format!(
+                    "{path}: job `{kind}` declares no `type Payload` that can be read"
+                ));
+                continue;
+            };
+            match struct_fields(&code, path, &payload) {
+                Ok(fields) => scan.payloads.push(JobPayload {
+                    kind,
+                    path: path.clone(),
+                    fields,
+                }),
+                Err(why) => scan.problems.push(format!("{path}: job `{kind}`: {why}")),
+            }
+        }
+    }
+    scan.payloads.sort_by(|a, b| a.kind.cmp(&b.kind));
+    scan
+}
+
+/// The kind a job's impl body names: a literal `NAME`, or a string constant
+/// defined once (with one value) in the sources.
+fn kind_name(body: &str, constants: &BTreeMap<String, BTreeSet<String>>) -> Result<String, String> {
+    let Some(name) = KIND_NAME.captures(body) else {
+        return Err("no `const NAME: &str` that can be read".to_owned());
+    };
+    if let Some(literal) = name.get(1) {
+        return Ok(literal.as_str().to_owned());
+    }
+    let constant = name.get(2).map(|m| m.as_str()).unwrap_or_default();
+    let last = constant.rsplit("::").next().unwrap_or_default();
+    match constants
+        .get(last)
+        .map(|values| values.iter().collect::<Vec<_>>())
+    {
+        Some(values) if values.len() == 1 => Ok(values[0].clone()),
+        Some(values) => Err(format!(
+            "its NAME `{constant}` is a constant defined with several values ({}): give the \
+             constants distinct names",
+            values
+                .iter()
+                .map(|v| format!("`{v}`"))
+                .collect::<Vec<_>>()
+                .join(", ")
+        )),
+        None => Err(format!(
+            "its NAME `{constant}` names no string constant the sources define"
+        )),
+    }
 }
 
 /// The text of the `{ … }` block that starts after `from`.
@@ -701,46 +861,68 @@ fn block_after(text: &str, from: usize) -> Option<&str> {
     None
 }
 
-/// The fields of struct `name`, looked for in `path` first, then anywhere:
-/// none for a unit struct, `0`, `1`, … for a tuple struct.
-fn struct_fields(code: &[(String, String)], path: &str, name: &str) -> Option<Vec<String>> {
+/// The fields of struct `name` (none for a unit struct, `0`, `1`, … for a
+/// tuple struct): its definition in `path`, else its one definition in the
+/// other sources. Missing, or defined in several other files, is an error.
+fn struct_fields(code: &[(String, String)], path: &str, name: &str) -> Result<Vec<String>, String> {
     let header = Regex::new(&format!(
         r"\bstruct\s+{}\b\s*(?:<[^>{{;]*>)?",
         regex::escape(name)
     ))
-    .ok()?;
-    let ordered = code
+    .map_err(|e| format!("struct `{name}`: {e}"))?;
+    let local: Vec<&str> = code
         .iter()
         .filter(|(p, _)| p == path)
-        .chain(code.iter().filter(|(p, _)| p != path));
-    for (_, text) in ordered {
-        let Some(found) = header.find(text) else {
-            continue;
-        };
-        let rest = text[found.end()..].trim_start();
-        if rest.starts_with(';') {
-            return Some(Vec::new());
+        .filter_map(|(_, text)| header.find(text).map(|found| &text[found.end()..]))
+        .collect();
+    let elsewhere: Vec<(&str, &str)> = code
+        .iter()
+        .filter(|(p, _)| p != path)
+        .filter_map(|(p, text)| {
+            header
+                .find(text)
+                .map(|found| (p.as_str(), &text[found.end()..]))
+        })
+        .collect();
+    let rest = match (local.first(), elsewhere.as_slice()) {
+        (Some(rest), _) => *rest,
+        (None, [(_, rest)]) => *rest,
+        (None, []) => return Err(format!("its payload struct `{name}` is not in the sources")),
+        (None, several) => {
+            return Err(format!(
+                "its payload struct `{name}` is defined in several files ({}): keep it in the \
+                 job's file or give it a distinct name",
+                several
+                    .iter()
+                    .map(|(p, _)| *p)
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            ));
         }
-        if let Some(tuple) = rest.strip_prefix('(') {
-            let inner = &tuple[..closing(tuple, '(', ')')?];
-            let count = split_top_level(inner, true).len();
-            return Some((0..count).map(|i| i.to_string()).collect());
-        }
-        let body = block_after(rest, 0)?;
-        return Some(
-            split_top_level(body, true)
-                .iter()
-                .filter_map(|field| {
-                    let field = strip_attributes(field);
-                    let (name, _) = field.split_once(':')?;
-                    let name = name.trim();
-                    let name = name.rsplit(char::is_whitespace).next().unwrap_or(name);
-                    (!name.is_empty()).then(|| name.to_owned())
-                })
-                .collect(),
-        );
+    };
+    let rest = rest.trim_start();
+    if rest.starts_with(';') {
+        return Ok(Vec::new());
     }
-    None
+    if let Some(tuple) = rest.strip_prefix('(') {
+        let inner = closing(tuple, '(', ')')
+            .map(|end| &tuple[..end])
+            .ok_or_else(|| format!("its payload struct `{name}` does not close"))?;
+        let count = split_top_level(inner, true).len();
+        return Ok((0..count).map(|i| i.to_string()).collect());
+    }
+    let body = block_after(rest, 0)
+        .ok_or_else(|| format!("its payload struct `{name}` does not close"))?;
+    Ok(split_top_level(body, true)
+        .iter()
+        .filter_map(|field| {
+            let field = strip_attributes(field);
+            let (name, _) = field.split_once(':')?;
+            let name = name.trim();
+            let name = name.rsplit(char::is_whitespace).next().unwrap_or(name);
+            (!name.is_empty()).then(|| name.to_owned())
+        })
+        .collect())
 }
 
 /// Where the bracket opened just before `text` closes, as an index into
@@ -824,22 +1006,14 @@ fn split_top_level(text: &str, angles: bool) -> Vec<String> {
 }
 
 /// [`JOB_PAYLOAD_FIELDS`] against the job kinds the sources implement:
-/// every field of every payload is listed with its reason, a payload whose
-/// struct cannot be read is reported, and an entry naming a field no
+/// every job [`job_payloads`] could not read is reported, every field of
+/// every payload is listed with its reason, and an entry naming a field no
 /// payload has any more is stale.
-pub fn check_job_payloads(payloads: &[JobPayload], audit: &[(&str, &str, &str)]) -> Vec<String> {
-    let mut violations = Vec::new();
+pub fn check_job_payloads(scan: &JobScan, audit: &[(&str, &str, &str)]) -> Vec<String> {
+    let mut violations = scan.problems.clone();
     let mut used = BTreeSet::new();
-    for payload in payloads {
-        let Some(fields) = &payload.fields else {
-            violations.push(format!(
-                "{}: the payload of job `{}` could not be read: declare it as a struct in the \
-                 crate's sources",
-                payload.path, payload.kind
-            ));
-            continue;
-        };
-        for field in fields {
+    for payload in &scan.payloads {
+        for field in &payload.fields {
             if audit
                 .iter()
                 .any(|(k, f, _)| *k == payload.kind && f == field)
@@ -871,41 +1045,121 @@ pub fn check_job_payloads(payloads: &[JobPayload], audit: &[(&str, &str, &str)])
     violations
 }
 
-static ERROR_CALL: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r"\b(?:JobError|Self)::(?:fatal|retry|retry_after)\s*\(")
+static ERROR_NAME: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r"\bJobError::(fatal|retry|retry_after|Fatal|Retry)\b")
+        .unwrap_or_else(|e| unreachable!("static regex compiles: {e}"))
+});
+static FROM_IMPL: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r"\bimpl\s+From<[^{]*>\s+for\s+(?:[\w:]+::)?JobError\s*\{")
+        .unwrap_or_else(|e| unreachable!("static regex compiles: {e}"))
+});
+static SELF_CALL: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r"\bSelf::(?:fatal|retry|retry_after)\s*\(")
         .unwrap_or_else(|e| unreachable!("static regex compiles: {e}"))
 });
 
-/// Where a job's error message is built from values: `(path, expression)`
-/// for every value a `JobError::fatal`, `retry` or `retry_after` message
-/// interpolates (or is, when it is not a string literal), outside tests and
-/// comments. `Self::…` counts in `JobError`'s own file only.
-pub fn job_error_values(sources: &[(String, String)]) -> Vec<(String, String)> {
-    let mut values = Vec::new();
+/// What [`job_error_values`] read: every value a job error message is built
+/// from, and every `JobError` built in a way it cannot read.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct JobErrorScan {
+    /// `(path, expression)`, once per use.
+    pub values: Vec<(String, String)>,
+    /// `JobError::retry` passed as a function, and the like.
+    pub problems: Vec<String>,
+}
+
+/// Where a job's error message is built from values, outside tests and
+/// comments: every value a `JobError::fatal`, `retry` or `retry_after`
+/// message interpolates (or is, when it is not a string literal), the same
+/// for `Self::fatal` … in any `impl From<…> for JobError`, and for a
+/// `JobError::Fatal(…)` or `JobError::Retry { message, … }` written out
+/// (a pattern, in a `match` arm, `if let` or `matches!`, is not one).
+/// `JobError::retry` passed as a function (`.map_err(JobError::retry)`)
+/// hides what the message is built from: a problem.
+pub fn job_error_values(sources: &[(String, String)]) -> JobErrorScan {
+    let mut scan = JobErrorScan::default();
     for (path, text) in sources {
         if is_test_file(path) || path.starts_with("xtask/") {
             continue;
         }
         let code = without_comments(without_tests(text));
-        let own = path.ends_with("crates/kernel/src/jobs/mod.rs");
-        for call in ERROR_CALL.find_iter(&code) {
-            if call.as_str().starts_with("Self") && !own {
+        for found in ERROR_NAME.captures_iter(&code) {
+            let Some(whole) = found.get(0) else {
                 continue;
+            };
+            let after = code[whole.end()..].trim_start();
+            let message = match (&found[1], after.chars().next()) {
+                ("fatal" | "retry" | "retry_after", Some('(')) => {
+                    let rest = &after[1..];
+                    closing(rest, '(', ')')
+                        .and_then(|end| split_top_level(&rest[..end], false).into_iter().next())
+                }
+                ("fatal" | "retry" | "retry_after", _) => {
+                    scan.problems.push(format!(
+                        "{path}: `{}` is passed as a function, so what its message is built \
+                         from cannot be read: call it with the message (`|e| JobError::{}(…)`)",
+                        whole.as_str(),
+                        &found[1]
+                    ));
+                    None
+                }
+                ("Fatal", Some('(')) => {
+                    let rest = &after[1..];
+                    closing(rest, '(', ')').and_then(|end| {
+                        written_out(&code, whole.start(), &rest[end + 1..])
+                            .then(|| rest[..end].to_owned())
+                    })
+                }
+                ("Retry", Some('{')) => {
+                    let rest = &after[1..];
+                    closing(rest, '{', '}').and_then(|end| {
+                        if !written_out(&code, whole.start(), &rest[end + 1..]) {
+                            return None;
+                        }
+                        split_top_level(&rest[..end], false)
+                            .into_iter()
+                            .find_map(|field| {
+                                let (name, value) = field.split_once(':')?;
+                                (name.trim() == "message").then(|| value.trim().to_owned())
+                            })
+                    })
+                }
+                _ => None,
+            };
+            for value in message.iter().flat_map(|m| message_values(m)) {
+                scan.values.push((path.clone(), value));
             }
-            let rest = &code[call.end()..];
-            let Some(end) = closing(rest, '(', ')') else {
+        }
+        for block in FROM_IMPL.find_iter(&code) {
+            let Some(body) = block_after(&code, block.end() - 1) else {
                 continue;
             };
-            let arguments = split_top_level(&rest[..end], false);
-            let Some(message) = arguments.first() else {
-                continue;
-            };
-            for value in message_values(message) {
-                values.push((path.clone(), value));
+            for call in SELF_CALL.find_iter(body) {
+                let rest = &body[call.end()..];
+                let message = closing(rest, '(', ')')
+                    .and_then(|end| split_top_level(&rest[..end], false).into_iter().next());
+                for value in message.iter().flat_map(|m| message_values(m)) {
+                    scan.values.push((path.clone(), value));
+                }
             }
         }
     }
-    values
+    scan
+}
+
+/// Whether a `JobError` variant at `start` of `code`, followed by `rest`, is
+/// built (an expression) rather than matched (a pattern: followed by `=>`,
+/// `|` or `=`, or inside `matches!`).
+fn written_out(code: &str, start: usize, rest: &str) -> bool {
+    let next = rest.trim_start();
+    if next.starts_with("=>")
+        || next.starts_with('|')
+        || (next.starts_with('=') && !next.starts_with("=="))
+    {
+        return false;
+    }
+    let line_start = code[..start].rfind('\n').map_or(0, |at| at + 1);
+    !code[line_start..start].contains("matches!(")
 }
 
 /// The values `message` (a message argument) is built from: none for a
@@ -1001,32 +1255,39 @@ fn collapse(text: &str) -> String {
     text.split_whitespace().collect::<Vec<_>>().join(" ")
 }
 
-/// [`JOB_ERROR_VALUES`] against the sources' job errors: every value a
-/// message is built from is listed for its file with its reason, and an
-/// entry no message uses any more is stale.
-pub fn check_job_errors(values: &[(String, String)], audit: &[(&str, &str, &str)]) -> Vec<String> {
-    let mut violations = Vec::new();
-    let mut used = BTreeSet::new();
-    let mut reported = BTreeSet::new();
-    for (path, value) in values {
-        if audit.iter().any(|(p, v, _)| p == path && v == value) {
-            used.insert((path.clone(), value.clone()));
-        } else if reported.insert((path.clone(), value.clone())) {
-            violations.push(format!(
-                "{path}: a job's error message is built from `{value}`, which no audit lists: \
-                 say what failed with ids and status codes, or add it to `JOB_ERROR_VALUES` \
-                 with the reason it is no personal data (it is stored in \
-                 `kernel.jobs.last_error`)"
-            ));
+/// [`JOB_ERROR_VALUES`] against the sources' job errors: every problem
+/// [`job_error_values`] found is reported, every value a message is built
+/// from is listed for its file with how many times it is used there and its
+/// reason (a new use fails until it is reviewed), and an entry no message
+/// uses any more is stale.
+pub fn check_job_errors(scan: &JobErrorScan, audit: &[(&str, &str, usize, &str)]) -> Vec<String> {
+    let mut violations = scan.problems.clone();
+    let mut counts: BTreeMap<(&str, &str), usize> = BTreeMap::new();
+    for (path, value) in &scan.values {
+        *counts.entry((path.as_str(), value.as_str())).or_default() += 1;
+    }
+    for ((path, value), count) in &counts {
+        match audit.iter().find(|(p, v, _, _)| p == path && v == value) {
+            None => violations.push(format!(
+                "{path}: a job's error message is built from `{value}` ({count} use(s)), which \
+                 no audit lists: say what failed with ids and status codes, or add it to \
+                 `JOB_ERROR_VALUES` with its count and the reason it is no personal data (it is \
+                 stored in `kernel.jobs.last_error`)"
+            )),
+            Some((_, _, listed, _)) if listed != count => violations.push(format!(
+                "{path}: a job's error message is built from `{value}` {count} time(s), and \
+                 `JOB_ERROR_VALUES` lists {listed}: review the change and update the count"
+            )),
+            Some(_) => {}
         }
     }
-    for (path, value, reason) in audit {
+    for (path, value, _, reason) in audit {
         if reason.trim().is_empty() {
             violations.push(format!(
                 "`JOB_ERROR_VALUES` lists `{value}` in {path} without a reason"
             ));
         }
-        if !used.contains(&((*path).to_owned(), (*value).to_owned())) {
+        if !counts.contains_key(&(*path, *value)) {
             violations.push(format!(
                 "`JOB_ERROR_VALUES` lists `{value}` in {path}, which no job error there is built \
                  from any more: remove the entry"
@@ -1040,31 +1301,6 @@ pub fn check_job_errors(values: &[(String, String)], audit: &[(&str, &str, &str)
 mod tests {
     use super::*;
 
-    #[test]
-    fn personal_names_are_read_by_their_words() {
-        for name in [
-            "from",
-            "toAddress",
-            "display_name",
-            "subjects",
-            "email",
-            "body_text",
-            "provider_message_id",
-        ] {
-            assert!(personal(name), "{name}");
-        }
-        for name in [
-            "inbox_id",
-            "tomorrow",
-            "token",
-            "mailbox",
-            "count",
-            "workspace",
-        ] {
-            assert!(!personal(name), "{name}");
-        }
-    }
-
     fn catalogue(payload: &serde_json::Value) -> serde_json::Value {
         serde_json::json!({
             "events": [{ "name": "test.happened", "payload": payload }],
@@ -1073,46 +1309,66 @@ mod tests {
                     "content_type": { "type": "string" } } },
                 "Role": { "type": "string", "enum": ["owner", "member"] },
                 "UserId": { "type": "string", "format": "uuid" },
-                "Facts": { "type": "object", "properties": {
-                    "sender": { "type": "string" } } }
+                "Change": { "type": "object", "properties": {
+                    "key": { "type": ["string", "null"] },
+                    "label": { "$ref": "#/components/schemas/UserId" } } }
             } }
         })
     }
 
     #[test]
-    fn event_fields_named_like_personal_data_hold_opaque_values() {
+    fn every_free_text_event_field_is_listed_by_its_path() {
         let opaque = serde_json::json!({ "type": "object", "properties": {
             "participants": { "$ref": "#/components/schemas/BlobPointer" },
             "text": { "oneOf": [
                 { "$ref": "#/components/schemas/BlobPointer" }, { "type": "null" } ] },
             "from": { "$ref": "#/components/schemas/Role" },
-            "message": { "$ref": "#/components/schemas/UserId" },
-            "messages": { "type": "array", "items": { "type": "string", "format": "uuid" } },
-            "body_size": { "type": "integer" }
+            "author": { "oneOf": [{ "$ref": "#/components/schemas/UserId" }, { "type": "null" }] },
+            "ids": { "type": "array", "items": { "type": "string", "format": "uuid" } },
+            "sent_at": { "type": "string", "format": "date-time" },
+            "count": { "type": "integer" }
         } });
         assert_eq!(
             check_event_payloads(&catalogue(&opaque), &[]),
             Vec::<String>::new()
         );
 
-        let leaky = serde_json::json!({ "type": "object", "properties": {
+        let free = serde_json::json!({ "type": "object", "properties": {
+            "workspace": { "type": "string" },
             "subject": { "type": "string" },
-            "facts": { "$ref": "#/components/schemas/Facts" }
+            "items": { "type": "array", "items": { "type": "object", "properties": {
+                "change": { "$ref": "#/components/schemas/Change" },
+                "tags": { "type": "array", "items": { "type": "string" } } } } }
         } });
-        let violations = check_event_payloads(&catalogue(&leaky), &[]);
-        assert_eq!(violations.len(), 2, "{violations:?}");
-        assert!(violations[0].contains("`test.happened` carries `sender`"));
-        assert!(violations[1].contains("carries `subject`"));
+        let violations = check_event_payloads(&catalogue(&free), &[]);
+        let named: Vec<&str> = [
+            "items[].change.key",
+            "items[].tags[]",
+            "subject",
+            "workspace",
+        ]
+        .into_iter()
+        .filter(|path| violations.iter().any(|v| v.contains(&format!("`{path}`"))))
+        .collect();
+        assert_eq!(violations.len(), 4, "{violations:?}");
+        assert_eq!(named.len(), 4, "{violations:?}");
 
         let allowed = [
+            ("*", "workspace", "the routing field"),
             ("test.happened", "subject", "an opaque account id"),
-            ("test.happened", "sender", "an opaque account id"),
-            ("test.gone", "subject", "no longer carried"),
+            ("test.happened", "items[].change.key", "a provider key"),
+            ("test.happened", "items[].tags[]", "code names"),
+            (
+                "test.happened",
+                "change.key",
+                "the flattened name is not the path",
+            ),
+            ("*", "gone", "no longer carried"),
         ];
-        let violations = check_event_payloads(&catalogue(&leaky), &allowed);
-        assert_eq!(violations.len(), 1, "{violations:?}");
+        let violations = check_event_payloads(&catalogue(&free), &allowed);
+        assert_eq!(violations.len(), 2, "{violations:?}");
         assert!(
-            violations[0].contains("no longer carries"),
+            violations.iter().all(|v| v.contains("no event carries")),
             "{violations:?}"
         );
     }
@@ -1162,28 +1418,88 @@ mod tests {
 
     #[test]
     fn job_payloads_are_read_from_the_sources() {
-        let found = job_payloads(&sources(&[("crates/x/src/jobs.rs", JOBS)]));
+        let scan = job_payloads(&sources(&[("crates/x/src/jobs.rs", JOBS)]));
+        assert_eq!(scan.problems, Vec::<String>::new());
         assert_eq!(
-            found,
+            scan.payloads,
             [
                 JobPayload {
                     kind: "test.page".to_owned(),
                     path: "crates/x/src/jobs.rs".to_owned(),
-                    fields: Some(vec!["inbox".to_owned(), "after".to_owned()]),
+                    fields: vec!["inbox".to_owned(), "after".to_owned()],
                 },
                 JobPayload {
                     kind: "test.sweep".to_owned(),
                     path: "crates/x/src/jobs.rs".to_owned(),
-                    fields: Some(Vec::new()),
+                    fields: Vec::new(),
                 },
             ]
         );
     }
 
+    const UNREADABLE: &str = r#"
+const SHARED: &str = "test.one";
+
+impl Job for NoName {
+    async fn run(self) {}
+}
+
+impl JobHandler for NoPayload {
+    const NAME: &'static str = "test.no_payload";
+}
+
+impl JobHandler for Collides {
+    type Payload = Twice;
+    const NAME: &'static str = SHARED;
+}
+
+impl Job for Missing {
+    const NAME: &'static str = "test.missing";
+}
+"#;
+
+    #[test]
+    fn a_job_that_cannot_be_read_is_reported() {
+        let scan = job_payloads(&sources(&[
+            ("crates/x/src/odd.rs", UNREADABLE),
+            (
+                "crates/y/src/a.rs",
+                "const SHARED: &str = \"test.two\";\npub struct Twice;",
+            ),
+            ("crates/z/src/b.rs", "pub struct Twice { pub id: Id }"),
+        ]));
+        assert!(scan.payloads.is_empty(), "{:?}", scan.payloads);
+        let expected = [
+            "job `NoName`: no `const NAME",
+            "job `test.no_payload` declares no `type Payload`",
+            "constant defined with several values",
+            "job `test.missing`: its payload struct `Missing` is not in the sources",
+        ];
+        assert_eq!(scan.problems.len(), expected.len(), "{:?}", scan.problems);
+        for part in expected {
+            assert!(
+                scan.problems.iter().any(|p| p.contains(part)),
+                "{part}: {:?}",
+                scan.problems
+            );
+        }
+
+        let ambiguous = job_payloads(&sources(&[
+            (
+                "crates/x/src/job.rs",
+                "impl JobHandler for J { type Payload = Twice; const NAME: &'static str = \"test.j\"; }",
+            ),
+            ("crates/y/src/a.rs", "pub struct Twice;"),
+            ("crates/z/src/b.rs", "pub struct Twice { pub id: Id }"),
+        ]));
+        assert_eq!(ambiguous.problems.len(), 1, "{:?}", ambiguous.problems);
+        assert!(ambiguous.problems[0].contains("defined in several files"));
+    }
+
     #[test]
     fn every_job_payload_field_is_audited() {
-        let found = job_payloads(&sources(&[("crates/x/src/jobs.rs", JOBS)]));
-        let violations = check_job_payloads(&found, &[("test.page", "inbox", "an id")]);
+        let scan = job_payloads(&sources(&[("crates/x/src/jobs.rs", JOBS)]));
+        let violations = check_job_payloads(&scan, &[("test.page", "inbox", "an id")]);
         assert_eq!(violations.len(), 1, "{violations:?}");
         assert!(violations[0].contains("stores `after`"), "{violations:?}");
 
@@ -1192,16 +1508,9 @@ mod tests {
             ("test.page", "after", "a cursor"),
             ("test.page", "before", "gone"),
         ];
-        let violations = check_job_payloads(&found, &audit);
+        let violations = check_job_payloads(&scan, &audit);
         assert_eq!(violations.len(), 1, "{violations:?}");
         assert!(violations[0].contains("no longer has"), "{violations:?}");
-
-        let lost = [JobPayload {
-            kind: "test.lost".to_owned(),
-            path: "crates/x/src/lost.rs".to_owned(),
-            fields: None,
-        }];
-        assert!(check_job_payloads(&lost, &[])[0].contains("could not be read"));
     }
 
     #[test]
@@ -1231,8 +1540,22 @@ fn run() -> Result<(), JobError> {
         why,
         WAIT,
     );
-    let d = Self::retry(other.to_string());
+    let d = JobError::retry(format!("again {stream}"));
+    let e = Self::retry(other.to_string());
+    let f = JobError::Fatal(built.to_string());
+    let g = JobError::Retry { message: format!("{kind}"), after: None };
+    match err {
+        JobError::Fatal(_) => {}
+        JobError::Retry { after, .. } => {}
+    }
+    if matches!(err, JobError::Fatal(_)) {}
     // JobError::fatal(format!("{commented}"))
+}
+
+impl From<Problem> for crate::JobError {
+    fn from(err: Problem) -> Self {
+        Self::fatal(err.code())
+    }
 }
 
 #[cfg(test)]
@@ -1242,33 +1565,62 @@ mod tests {
 "#;
 
     #[test]
-    fn job_error_values_are_audited_per_file() {
-        let found = job_error_values(&sources(&[
+    fn job_error_values_are_audited_per_file_and_use() {
+        let scan = job_error_values(&sources(&[
             ("crates/x/src/run.rs", ERRORS),
             ("crates/x/src/run_tests.rs", ERRORS),
+            (
+                "crates/x/src/free.rs",
+                "fn f() { x.map_err(JobError::retry)?; }",
+            ),
         ]));
-        assert_eq!(
-            found,
-            [
-                ("crates/x/src/run.rs".to_owned(), "stream".to_owned()),
-                (
-                    "crates/x/src/run.rs".to_owned(),
-                    "redact::sqlx(&e)".to_owned()
-                ),
-                ("crates/x/src/run.rs".to_owned(), "why".to_owned()),
-            ],
-            "`Self::` counts in `JobError`'s own file only; tests and comments are skipped"
-        );
-        let audit = [
-            ("crates/x/src/run.rs", "stream", "an id"),
-            ("crates/x/src/run.rs", "redact::sqlx(&e)", "by kind"),
-            ("crates/x/src/other.rs", "why", "elsewhere"),
+        let mut values = scan.values.clone();
+        values.sort();
+        let at = |v: &str| ("crates/x/src/run.rs".to_owned(), v.to_owned());
+        let mut expected = vec![
+            at("stream"),
+            at("redact::sqlx(&e)"),
+            at("why"),
+            at("stream"),
+            at("built.to_string()"),
+            at("kind"),
+            at("err.code()"),
         ];
-        let violations = check_job_errors(&found, &audit);
-        assert_eq!(violations.len(), 2, "{violations:?}");
-        assert!(violations[0].contains("built from `why`"), "{violations:?}");
+        expected.sort();
+        assert_eq!(
+            values, expected,
+            "`Self::` counts only in a `From<…> for JobError`; patterns, tests and comments \
+             are skipped"
+        );
+        assert_eq!(scan.problems.len(), 1, "{:?}", scan.problems);
+        assert!(scan.problems[0].contains("passed as a function"));
+
+        let audit = [
+            ("crates/x/src/run.rs", "stream", 1, "an id"),
+            ("crates/x/src/run.rs", "redact::sqlx(&e)", 1, "by kind"),
+            ("crates/x/src/run.rs", "built.to_string()", 1, "a code"),
+            ("crates/x/src/run.rs", "kind", 1, "a name"),
+            ("crates/x/src/run.rs", "err.code()", 1, "a code"),
+            ("crates/x/src/other.rs", "why", 1, "elsewhere"),
+        ];
+        let violations = check_job_errors(&scan, &audit);
+        assert_eq!(violations.len(), 4, "{violations:?}");
         assert!(
-            violations[1].contains("no job error there"),
+            violations[0].contains("passed as a function"),
+            "{violations:?}"
+        );
+        assert!(
+            violations
+                .iter()
+                .any(|v| v.contains("`stream` 2 time(s)") && v.contains("lists 1")),
+            "{violations:?}"
+        );
+        assert!(
+            violations.iter().any(|v| v.contains("built from `why`")),
+            "{violations:?}"
+        );
+        assert!(
+            violations.iter().any(|v| v.contains("no job error there")),
             "{violations:?}"
         );
     }
