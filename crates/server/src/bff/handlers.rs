@@ -4,7 +4,7 @@ use axum::{
     Form, Json,
     body::Body,
     extract::{MatchedPath, Query, Request, State},
-    http::{HeaderMap, HeaderValue, Method, StatusCode, Uri, header},
+    http::{HeaderMap, HeaderValue, StatusCode, Uri, header},
     response::{IntoResponse, Response},
 };
 use base64::{Engine as _, engine::general_purpose::URL_SAFE_NO_PAD};
@@ -836,8 +836,9 @@ async fn forward(bff: &Bff, request: Request, target: Target) -> Result<Response
         Err(AccessError::SessionEnded) => return Ok(session_required()),
         Err(AccessError::Failed(err)) => return Err(err),
     };
-    // A request with no body can be sent again, once, with a fresh token.
-    let again = replayable(&request);
+    // A request with no body, or a small one held here, can be sent again,
+    // once, with a fresh token.
+    let (request, again) = replayable(request).await?;
     let router = match target {
         Target::Api => inner.api.clone(),
         Target::Admin => inner.admin.clone(),
@@ -848,9 +849,11 @@ async fn forward(bff: &Bff, request: Request, target: Target) -> Result<Response
         Err(never) => match never {},
     };
     // The API refused the token as invalid: its sign-in ended (a way in
-    // removed, signed out elsewhere, suspended; campbooks-cloud#143). One
-    // forced refresh: refused too, the session ends and the app signs in
-    // again, instead of failing until the token would have expired.
+    // removed, signed out elsewhere, suspended; campbooks-cloud#143), or
+    // it expired. One forced refresh: refused too, the session ends and the
+    // app signs in again, instead of failing until the token would have
+    // expired. The admin API answers 404, never this, to a token it cannot
+    // accept, so `/bff/admin` goes through here without ever refreshing.
     if refused_as_invalid(&response) {
         match inner.refresh(&current.session, Some(&access_token)).await {
             Ok(fresh) => {
@@ -872,20 +875,59 @@ async fn forward(bff: &Bff, request: Request, target: Target) -> Result<Response
     })
 }
 
-/// A copy of `request` to send again when it has no body (a `GET` or a
-/// `HEAD`), else `None`.
-fn replayable(request: &Request) -> Option<Request> {
-    if request.method() != Method::GET && request.method() != Method::HEAD {
-        return None;
+/// The largest request body held to send again after a forced refresh.
+pub(super) const REPLAY_BODY_LIMIT: usize = 1024 * 1024;
+
+/// `request`, and a copy of it to send again after a forced refresh when
+/// that is safe (campbooks-cloud#259): its body is empty (a `GET`, a
+/// `HEAD`, most `DELETE`s) or of a known length of at most
+/// [`REPLAY_BODY_LIMIT`] bytes, read here into memory. A write is safe to
+/// send again because the API refuses a token as invalid (401
+/// `invalid_token`) while authenticating, before any handler runs, so the
+/// refused attempt changed nothing; and the copy carries the same
+/// `Idempotency-Key`, so the idempotency layer still runs it at most once.
+/// A larger body, or one of unknown length (streamed), is passed through
+/// untouched and not sent again: the API's refusal comes back, with the
+/// fresh token held for the app's next try.
+async fn replayable(request: Request) -> Result<(Request, Option<Request>), Error> {
+    use axum::body::HttpBody as _;
+
+    let Some(length) = request
+        .body()
+        .size_hint()
+        .exact()
+        .and_then(|length| usize::try_from(length).ok())
+        .filter(|length| *length <= REPLAY_BODY_LIMIT)
+    else {
+        return Ok((request, None));
+    };
+    let copy = |request: &Request, body: axum::body::Bytes| {
+        let mut again = Request::new(Body::from(body));
+        *again.method_mut() = request.method().clone();
+        *again.uri_mut() = request.uri().clone();
+        *again.version_mut() = request.version();
+        *again.headers_mut() = request.headers().clone();
+        // The peer address and the like, as the first attempt had them.
+        *again.extensions_mut() = request.extensions().clone();
+        again
+    };
+    if length == 0 {
+        let again = copy(&request, axum::body::Bytes::new());
+        return Ok((request, Some(again)));
     }
-    let mut again = Request::new(Body::empty());
-    *again.method_mut() = request.method().clone();
-    *again.uri_mut() = request.uri().clone();
-    *again.version_mut() = request.version();
-    *again.headers_mut() = request.headers().clone();
-    // The peer address and the like, as the first attempt had them.
-    *again.extensions_mut() = request.extensions().clone();
-    Some(again)
+    let (parts, body) = request.into_parts();
+    let bytes = axum::body::to_bytes(body, REPLAY_BODY_LIMIT)
+        .await
+        .map_err(|_| {
+            Error::BadRequest(
+                campbooks_kernel::i18n::MESSAGES
+                    .reason("invalid_body")
+                    .arg("reason", "it could not be read"),
+            )
+        })?;
+    let first = Request::from_parts(parts, Body::from(bytes.clone()));
+    let again = copy(&first, bytes);
+    Ok((first, Some(again)))
 }
 
 /// Whether the API refused the request's token as invalid (401 with

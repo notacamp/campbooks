@@ -1318,10 +1318,23 @@ async fn a_token_the_api_refuses_is_refreshed_once_and_a_read_goes_through(db: P
     );
     assert_eq!(h.idp.refreshes(), before + 1, "the fresh token is kept");
 
-    // A write is never sent twice: the refusal comes back, the fresh token
-    // is held, and the app's retry goes through.
+    // A write with a small body is held and sent again too: the API refused
+    // it while authenticating, before its handler ran (campbooks-cloud#259).
     hold_a_refused_token(&h).await;
     let reply = browser.post("/bff/api/v1/test/whoami", r#"{"a":1}"#).await;
+    assert_eq!(reply.status, StatusCode::OK, "{}", reply.body);
+    assert_eq!(reply.json()["method"], "POST");
+    assert_eq!(reply.json()["body"], r#"{"a":1}"#, "the same body");
+    assert_eq!(h.idp.refreshes(), before + 2);
+
+    // A body larger than the BFF holds is not sent twice: the refusal comes
+    // back, the fresh token is held, and the app's retry goes through.
+    hold_a_refused_token(&h).await;
+    let large = format!(
+        r#"{{"a":"{}"}}"#,
+        "x".repeat(super::handlers::REPLAY_BODY_LIMIT)
+    );
+    let reply = browser.post("/bff/api/v1/test/whoami", &large).await;
     assert_eq!(reply.status, StatusCode::UNAUTHORIZED, "{}", reply.body);
     assert!(
         reply
@@ -1330,10 +1343,57 @@ async fn a_token_the_api_refuses_is_refreshed_once_and_a_read_goes_through(db: P
         "the API's own refusal: {:?}",
         reply.headers
     );
-    assert_eq!(h.idp.refreshes(), before + 2);
-    let retried = browser.post("/bff/api/v1/test/whoami", r#"{"a":1}"#).await;
+    assert_eq!(h.idp.refreshes(), before + 3);
+    let retried = browser.post("/bff/api/v1/test/whoami", &large).await;
     assert_eq!(retried.status, StatusCode::OK, "{}", retried.body);
-    assert_eq!(h.idp.refreshes(), before + 2);
+    assert_eq!(h.idp.refreshes(), before + 3);
+}
+
+/// Two requests refused with the same token at once: the first refreshes,
+/// the second (waiting on the session's refresh lock) finds the token
+/// replaced and uses it, with no second refresh (campbooks-cloud#259).
+#[sqlx::test(migrations = "../../migrations")]
+async fn requests_refused_together_share_one_forced_refresh(db: PgPool) {
+    let h = harness(db).await;
+    let mut browser = Browser::new(&h.app);
+    browser.sign_in(&h.idp, "/").await;
+    let before = h.idp.refreshes();
+    hold_a_refused_token(&h).await;
+    // The refresh takes long enough for the second request to be refused
+    // and wait for it.
+    h.idp.delay_refreshes(std::time::Duration::from_millis(700));
+    let mut other = browser.clone();
+    let (first, second) = tokio::join!(
+        browser.get("/bff/api/v1/test/whoami?n=1"),
+        other.get("/bff/api/v1/test/whoami?n=2"),
+    );
+    assert_eq!(first.status, StatusCode::OK, "{}", first.body);
+    assert_eq!(second.status, StatusCode::OK, "{}", second.body);
+    assert_eq!(h.idp.refreshes(), before + 1, "one refresh for both");
+}
+
+/// A refused token while the identity provider is down: 503
+/// `idp_unavailable`, the session kept, and the next request, with the
+/// identity provider back, goes through (campbooks-cloud#259).
+#[sqlx::test(migrations = "../../migrations")]
+async fn a_refused_token_with_the_identity_provider_down_is_a_503(db: PgPool) {
+    let h = harness(db).await;
+    let mut browser = Browser::new(&h.app);
+    browser.sign_in(&h.idp, "/").await;
+    hold_a_refused_token(&h).await;
+    h.idp.set_token_endpoint_down(true);
+    let reply = browser.get("/bff/api/v1/test/whoami").await;
+    reply.assert_problem(StatusCode::SERVICE_UNAVAILABLE, "idp_unavailable");
+    assert_eq!(count(&h.db, "SELECT count(*) FROM bff.sessions").await, 1);
+    assert_eq!(
+        browser.get("/bff/session").await.json()["authenticated"],
+        true,
+        "still signed in"
+    );
+
+    h.idp.set_token_endpoint_down(false);
+    let reply = browser.get("/bff/api/v1/test/whoami").await;
+    assert_eq!(reply.status, StatusCode::OK, "{}", reply.body);
 }
 
 #[sqlx::test(migrations = "../../migrations")]

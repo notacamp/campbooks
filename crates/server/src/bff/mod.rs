@@ -511,7 +511,16 @@ impl Inner {
         let current = match refused {
             // Replaced by another request while this one waited: use it.
             Some(refused) => {
-                let held = self.open_access(session, &tokens.access_token).await?;
+                let Ok(held) = self.cipher.open(
+                    &tokens.access_token,
+                    &sealed_for(session.id, "access_token"),
+                ) else {
+                    // Ending the session deletes its row on another
+                    // connection: this transaction's lock on it goes first
+                    // (campbooks-cloud#259).
+                    drop(tx);
+                    return self.unreadable(&session.presented).await;
+                };
                 (held != refused).then_some(held)
             }
             None => None,
