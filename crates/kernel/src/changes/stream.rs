@@ -566,6 +566,26 @@ fn opens_limit(config: &crate::config::ChangesConfig) -> Option<Limit> {
     })
 }
 
+/// `subscription`'s caller's access in its workspace now: a former member
+/// (or a revoked client) is refused like any non-member (404), and a
+/// changed role is the one the stream starts with.
+async fn access_now(state: &AppState, subscription: &Subscription) -> Result<Access, Error> {
+    match crate::tenancy::resolve_access(
+        state.membership.as_ref(),
+        state.clients.as_ref(),
+        &state.db,
+        &subscription.principal,
+        subscription.workspace,
+    )
+    .await
+    {
+        Ok(Some(access)) => Ok(access),
+        // Gone, or a revoked client: as for anyone who is not a member.
+        Ok(None) | Err(Error::Unauthorized(_)) => Err(Error::NotFound),
+        Err(error) => Err(error),
+    }
+}
+
 /// Open `subscription`'s feed. The caller has been admitted to the
 /// workspace already (`Workspace<S>`); this checks the per-caller limits
 /// and decides where to start.
@@ -609,23 +629,8 @@ pub async fn open(
     // The request resolved the caller's access before the head was read: a
     // removal numbered in between falls in no read range (the stream reads
     // membership changes after the head only). Resolved again now, every
-    // removal up to the head is seen: a former member is refused like any
-    // non-member, and a changed role is the one the stream starts with
-    // (campbooks-cloud#216).
-    subscription.access = match crate::tenancy::resolve_access(
-        state.membership.as_ref(),
-        state.clients.as_ref(),
-        &state.db,
-        &subscription.principal,
-        subscription.workspace,
-    )
-    .await
-    {
-        Ok(Some(access)) => access,
-        // Gone, or a revoked client: as for anyone who is not a member.
-        Ok(None) | Err(Error::Unauthorized(_)) => return Err(Error::NotFound),
-        Err(error) => return Err(error),
-    };
+    // removal up to the head is seen (campbooks-cloud#216).
+    subscription.access = access_now(state, &subscription).await?;
     let after = subscription
         .after
         .as_deref()
