@@ -1005,3 +1005,93 @@ async fn the_assistant_may_reshape_a_proposal_that_still_waits_for_a_yes(db: PgP
     assert_eq!(kept.status, StatusCode::OK, "{:?}", kept.json);
     assert_eq!(kept.json["actions"][0]["action"], "archive");
 }
+
+/// The assistant's call was refused by the rule, as only a member's own
+/// request trusts a sender's images.
+fn images_need_the_member(result: &Result<Output, InvokeError>) {
+    match result {
+        Err(InvokeError::Failed {
+            status, problem, ..
+        }) => {
+            assert_eq!(*status, StatusCode::FORBIDDEN, "{problem}");
+            assert_eq!(problem["code"], "images_need_you", "{problem}");
+        }
+        other => panic!("not refused: {other:?}"),
+    }
+}
+
+/// How many rules of any state but removed show a sender's images.
+async fn image_rules(kit: &Kit) -> i64 {
+    sqlx::query_scalar(
+        "SELECT count(*) FROM conversations.rules
+          WHERE actions @> '[{\"action\": \"show_images\"}]'::jsonb AND state <> 'removed'",
+    )
+    .fetch_one(&kit.db)
+    .await
+    .unwrap()
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn the_assistant_never_trusts_a_senders_images_so_never_blocks_the_members_own(db: PgPool) {
+    let kit = kit(db).await;
+    let (workspace, inbox, sam, sam_id) = sams_notifications(&kit, 1).await;
+    let rules = format!("/api/v1/w/{workspace}/inboxes/{inbox}/rules");
+    let trust = json!({
+        "conditions": [{"field": "sender_address", "value": GITHUB}],
+        "actions": [{"action": "show_images"}],
+    });
+    let assistant = |operation: &'static str, input: Value| {
+        let kit = &kit;
+        async move {
+            kit.as_assistant("sam", workspace, (operation, input), false)
+                .await
+        }
+    };
+    // Scout files "always show images from GitHub", as a proposal or
+    // acting: refused, nothing saved that could stand in Sam's way.
+    for state in ["proposed", "active"] {
+        let mut input = trust.clone();
+        input["inbox_id"] = json!(inbox.to_string());
+        input["state"] = json!(state);
+        images_need_the_member(&assistant("conversations.create_rule", input).await);
+    }
+    assert_eq!(image_rules(&kit).await, 0);
+
+    // Nor may it bring one back: Sam's own proposal, removed by Sam.
+    let mut waiting = trust.clone();
+    waiting["state"] = json!("proposed");
+    let proposed = kit.post(&sam, &rules, Some(waiting)).await;
+    assert_eq!(proposed.status, StatusCode::CREATED, "{:?}", proposed.json);
+    let id = proposed.json["rule"]["id"].as_str().unwrap().to_owned();
+    let removed = kit
+        .delete(&sam, &format!("/api/v1/w/{workspace}/rules/{id}"))
+        .await;
+    assert!(removed.status.is_success(), "{:?}", removed.json);
+    images_need_the_member(
+        &assistant(
+            "conversations.restore_rule",
+            json!({"rule_id": id, "apply_to_existing": false}),
+        )
+        .await,
+    );
+    assert_eq!(image_rules(&kit).await, 0);
+
+    // Sam's own "Always show images from GitHub": saved, nothing in the way.
+    let mine = kit.post(&sam, &rules, Some(trust)).await;
+    assert_eq!(mine.status, StatusCode::CREATED, "{:?}", mine.json);
+    assert_eq!(mine.json["rule"]["state"], "active");
+    assert_eq!(mine.json["rule"]["taught_by"], sam_id.to_string());
+
+    // Nor may Scout reshape a proposal into trusting images.
+    let one = proposal(&kit, &sam, workspace, inbox).await;
+    let other = one.rsplit('/').next().unwrap().to_owned();
+    images_need_the_member(
+        &assistant(
+            "conversations.update_rule",
+            json!({"rule_id": other, "actions": [{"action": "show_images"}]}),
+        )
+        .await,
+    );
+    still_proposed(&kit, &one).await;
+    assert_eq!(image_rules(&kit).await, 1);
+}

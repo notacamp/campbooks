@@ -249,6 +249,34 @@ fn members_own_yes<S: ScopeName>(workspace: &Workspace<S>, rule: Option<RuleId>)
     Err(Error::Denied(crate::MESSAGES.reason("rule_needs_your_yes")))
 }
 
+/// 403 `images_need_you` when a request run in-process for the member (the
+/// assistant, or an automation rule) would save, reshape or bring back a
+/// rule that shows a sender's images (campbooks-cloud#242). Showing images
+/// tells a sender their mail was opened, and mail is untrusted input to the
+/// assistant: only the member's own "Always show images" trusts a sender.
+/// A proposal filed for them would also hold back the member's own rule for
+/// that sender (`images_already_trusted`) until they declined it. Checked
+/// after the access checks, before anything changes.
+fn members_own_images<S: ScopeName>(
+    workspace: &Workspace<S>,
+    rule: Option<RuleId>,
+    actions: &[&[RuleAction]],
+) -> Result<()> {
+    let Some(caller) = workspace.invoked_by else {
+        return Ok(());
+    };
+    if !actions.iter().any(|a| a.contains(&RuleAction::ShowImages)) {
+        return Ok(());
+    }
+    tracing::warn!(
+        workspace = %workspace.id,
+        rule = %rule.map_or_else(|| "none".to_owned(), |id| id.to_string()),
+        caller = %caller,
+        "a rule showing a sender's images was refused: only a member's own request trusts one"
+    );
+    Err(Error::Denied(crate::MESSAGES.reason("images_need_you")))
+}
+
 /// Rule `id` (not removed) if the caller may read it (any role in its
 /// inbox), else 404.
 async fn visible_rule(
@@ -678,7 +706,7 @@ pub struct CreatedRule {
             content_type = "application/problem+json"),
         (status = UNAUTHORIZED, description = "No valid access token.", body = Problem,
             content_type = "application/problem+json"),
-        (status = FORBIDDEN, description = "Missing scope, you may only read this inbox, or a suggestion saved by the assistant rather than by you (`rule_needs_your_yes`).",
+        (status = FORBIDDEN, description = "Missing scope, you may only read this inbox, a suggestion saved by the assistant rather than by you (`rule_needs_your_yes`), or a rule showing a sender's images saved other than in your own request (`images_need_you`).",
             body = Problem, content_type = "application/problem+json"),
         (status = NOT_FOUND, description = "No such inbox, or you cannot see it.",
             body = Problem, content_type = "application/problem+json"),
@@ -703,6 +731,7 @@ pub async fn create(
     let mut tx = state.db.begin_for(access.workspace).await?;
     may_teach(&state, &mut tx, access, path.inbox_id).await?;
     member_only(&workspace.principal)?;
+    members_own_images(&workspace, None, &[body.actions.as_slice()])?;
     // A suggestion saved as a smart rule acts at once: the member's own yes.
     if body.notice_id.is_some() {
         members_own_yes(&workspace, None)?;
@@ -1243,7 +1272,7 @@ pub struct UpdateRule {
             content_type = "application/problem+json"),
         (status = UNAUTHORIZED, description = "No valid access token.", body = Problem,
             content_type = "application/problem+json"),
-        (status = FORBIDDEN, description = "Missing scope, not your rule, or adopting, resuming or reshaping a kept rule other than in your own request (`rule_needs_your_yes`).", body = Problem,
+        (status = FORBIDDEN, description = "Missing scope, not your rule, adopting, resuming or reshaping a kept rule other than in your own request (`rule_needs_your_yes`), or reshaping a rule that shows a sender's images other than in your own request (`images_need_you`).", body = Problem,
             content_type = "application/problem+json"),
         (status = NOT_FOUND, description = "No such rule, or you cannot see it.",
             body = Problem, content_type = "application/problem+json"),
@@ -1279,6 +1308,11 @@ pub async fn update(
     let reshaped = body.conditions.is_some() || body.actions.is_some();
     if body.adopt || body.paused == Some(false) || (reshaped && rule.state != RuleState::Proposed) {
         members_own_yes(&workspace, Some(rule.id))?;
+    }
+    // Nor may it reshape a rule into, or out of, trusting a sender's images.
+    if reshaped {
+        let new = body.actions.as_deref().unwrap_or_default();
+        members_own_images(&workspace, Some(rule.id), &[rule.actions.as_slice(), new])?;
     }
     if body.paused.is_some() && rule.state == RuleState::Proposed {
         // A proposed rule acts only once someone says yes (`confirm_rule`).
@@ -1524,7 +1558,7 @@ pub struct RestoreRule {
         (status = OK, description = "The rule, back as it was.", body = RuleView),
         (status = UNAUTHORIZED, description = "No valid access token.", body = Problem,
             content_type = "application/problem+json"),
-        (status = FORBIDDEN, description = "Missing scope, not your rule, or bringing a kept rule back other than in your own request (`rule_needs_your_yes`).", body = Problem,
+        (status = FORBIDDEN, description = "Missing scope, not your rule, bringing a kept rule back other than in your own request (`rule_needs_your_yes`), or bringing back a rule that shows a sender's images other than in your own request (`images_need_you`).", body = Problem,
             content_type = "application/problem+json"),
         (status = NOT_FOUND, description = "No such rule, or you cannot see it.",
             body = Problem, content_type = "application/problem+json"),
@@ -1576,6 +1610,7 @@ pub async fn restore(
         // Back as kept, it is signed and acts again: the member's own request.
         members_own_yes(&workspace, Some(rule.id))?;
     }
+    members_own_images(&workspace, Some(rule.id), &[rule.actions.as_slice()])?;
     if !found.restorable {
         return Err(Error::Conflict(
             crate::MESSAGES.reason("rule_not_restorable"),

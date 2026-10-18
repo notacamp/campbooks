@@ -422,7 +422,9 @@ The reply dialog SHALL show every recipient the reply goes to and SHALL
 NOT reuse a draft it did not create (one from the drafts list, or the one
 an Undo handed back): it SHALL create a fresh reply draft with exactly those
 recipients, no Cc or Bcc, its own quoted text and no attachments, discard
-the draft it replaces, and send with the token of that draft; it MAY save
+the draft it replaces while that one is editable (a `draft`, or a `failed`
+send) and never one that is `scheduled` or `sending`, which only its Undo
+takes back, and send with the token of that draft; it MAY save
 again only the draft it created, with its token. On 409 `content_changed`
 it SHALL say so and send nothing until the member sends again, in a fresh
 draft. The forward dialog SHALL save into an untouched forward draft with
@@ -443,3 +445,11 @@ its token and start a fresh forward when that is refused.
 #### Scenario: Opened before the upgrade
 - **WHEN** Sam types or presses Send in a composer opened before the upgrade
 - **THEN** the notice shows once, Sam's text is still there, and the next save and Send work
+
+#### Scenario: Replacing a draft whose send failed
+- **WHEN** the draft an Undo or a failed send handed back is `failed`, and Sam opens Scout's text in the composer
+- **THEN** a fresh reply draft is created and the failed one is discarded
+
+#### Scenario: Replacing a draft on its way
+- **WHEN** the draft handed back is `scheduled` (sent again elsewhere since)
+- **THEN** a fresh reply draft is created and the scheduled one is left alone

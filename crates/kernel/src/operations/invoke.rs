@@ -108,7 +108,11 @@ pub struct Invocation {
     /// Required for mutating operations: the same key replays the first
     /// result instead of running twice (e.g. a rule's job id).
     pub idempotency_key: Option<String>,
-    /// Whether the user confirmed the call; required for high-risk operations.
+    /// Whether the user confirmed the call; required for high-risk
+    /// operations. The caller sets it, so it is no proof of a click: no
+    /// catalogued high-risk operation opts automation or the assistant in
+    /// (`cargo xtask arch`), and a handler that must be the person's own
+    /// request checks [`Workspace::invoked_by`](crate::tenancy::Workspace).
     pub confirmed: bool,
 }
 

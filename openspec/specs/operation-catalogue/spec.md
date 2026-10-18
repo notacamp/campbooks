@@ -23,7 +23,11 @@ with `mutates: false` SHALL use GET or HEAD. An `undo` SHALL name an existing
 mutating operation and SHALL only appear on a mutating operation. A
 `rate_limit` SHALL only appear on a mutating operation and SHALL only be
 `send`. A `secret_once` SHALL be a boolean and SHALL only appear on a
-mutating operation. The architecture check SHALL fail on any violation.
+mutating operation. An operation with `risk: high` SHALL NOT opt
+automation or the assistant in (`automation` and `assistant` false): a
+high-risk operation is the person's own request only, since whether an
+invocation is "confirmed" is said by the code making it. The architecture
+check SHALL fail on any violation.
 
 #### Scenario: Health and version are catalogued
 - **WHEN** the OpenAPI document is generated
@@ -44,6 +48,10 @@ mutating operation. The architecture check SHALL fail on any violation.
 #### Scenario: A secret flag on a read
 - **WHEN** a non-mutating operation declares `x-campbooks.secret_once: true`, or any operation declares it as a string
 - **THEN** `cargo xtask arch` fails naming the operation
+
+#### Scenario: A high-risk operation opted in for an invoker
+- **WHEN** an operation declares `x-campbooks.risk: high` with `assistant: true` or `automation: true`
+- **THEN** `cargo xtask arch` fails naming the operation and the caller kind
 
 ### Requirement: Events catalogue
 Modules SHALL declare the domain events they publish. The server SHALL

@@ -8669,7 +8669,7 @@ export interface operations {
                     "application/problem+json": components["schemas"]["Problem"];
                 };
             };
-            /** @description Missing scope, or you only read its inbox. */
+            /** @description Missing scope, you only read its inbox, or not your own request (`send_needs_you`). */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -8743,7 +8743,7 @@ export interface operations {
                     "application/problem+json": components["schemas"]["Problem"];
                 };
             };
-            /** @description Missing scope, or you only read its inbox. */
+            /** @description Missing scope, you only read its inbox, or not your own request (`send_needs_you`): the assistant and automation never send. */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -9161,7 +9161,7 @@ export interface operations {
                     "application/problem+json": components["schemas"]["Problem"];
                 };
             };
-            /** @description Missing scope, you may only read this inbox, or a suggestion saved by the assistant rather than by you (`rule_needs_your_yes`). */
+            /** @description Missing scope, you may only read this inbox, a suggestion saved by the assistant rather than by you (`rule_needs_your_yes`), or a rule showing a sender's images saved other than in your own request (`images_need_you`). */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -10027,7 +10027,7 @@ export interface operations {
                     "application/problem+json": components["schemas"]["Problem"];
                 };
             };
-            /** @description Missing scope, not your rule, or adopting, resuming or reshaping a kept rule other than in your own request (`rule_needs_your_yes`). */
+            /** @description Missing scope, not your rule, adopting, resuming or reshaping a kept rule other than in your own request (`rule_needs_your_yes`), or reshaping a rule that shows a sender's images other than in your own request (`images_need_you`). */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -10227,7 +10227,7 @@ export interface operations {
                     "application/problem+json": components["schemas"]["Problem"];
                 };
             };
-            /** @description Missing scope, not your rule, or bringing a kept rule back other than in your own request (`rule_needs_your_yes`). */
+            /** @description Missing scope, not your rule, bringing a kept rule back other than in your own request (`rule_needs_your_yes`), or bringing back a rule that shows a sender's images other than in your own request (`images_need_you`). */
             403: {
                 headers: {
                     [name: string]: unknown;
