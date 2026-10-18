@@ -329,6 +329,7 @@ async fn minted_token(
         grant: &grant,
         profile: &profile,
         amr: &[],
+        family: None,
         now: chrono::Utc::now(),
     }
     .access_token()

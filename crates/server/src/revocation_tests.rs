@@ -42,6 +42,7 @@ async fn mint(
         grant: &grant,
         profile: &profile,
         amr: &[],
+        family: None,
         now: Utc::now(),
     }
     .access_token()
