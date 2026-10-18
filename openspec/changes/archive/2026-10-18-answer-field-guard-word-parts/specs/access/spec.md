@@ -3,9 +3,11 @@
 ### Requirement: Every kernel table has row-level security or a stated reason
 Every table of schemas `kernel` and `bff` SHALL enable and force row-level
 security and carry at least one policy, none of them a permissive policy for
-the runtime role (or everyone) admitting every row (expressions, if any,
-that read no column, call no function and hold no subquery or parameter:
-`USING (true)`, `USING (1 = 1)`, none), or SHALL grant the runtime role no
+the runtime role (or everyone) admitting every row, to read or to write:
+no expression at all, or a `USING` or `WITH CHECK` expression that does
+not depend on the row (`USING (true)`, `USING (1 = 1)`) and is not a lone
+`false`. A policy reading every row whose writes are checked counts as
+open. Otherwise the table SHALL grant the runtime role no
 privilege of any kind on the table or on any of its columns (reached through
 `SECURITY DEFINER` functions only), or SHALL be listed, in the server's
 test, as instance-only with the reason it needs none. A view or materialized
@@ -38,5 +40,5 @@ string (`set_config`) (`cargo xtask arch`).
 - **THEN** the server's test fails naming the function
 
 #### Scenario: An open view or an open policy
-- **WHEN** a migration adds a view or a materialized view to schema `kernel` that the runtime role may read, or a permissive policy `USING (true)` or `USING (1 = 1)` for everyone or the runtime role on a kernel table
-- **THEN** the server's test fails naming it, while a policy for another role, a restrictive one, or a view the runtime role may not read passes
+- **WHEN** a migration adds a view or a materialized view to schema `kernel` that the runtime role may read, or a permissive policy `USING (true)`, `USING (1 = 1)` or `USING (true) WITH CHECK (<a column test>)` for everyone or the runtime role on a kernel table
+- **THEN** the server's test fails naming it, while a policy for another role, a restrictive one, `USING (false)`, or a view the runtime role may not read passes

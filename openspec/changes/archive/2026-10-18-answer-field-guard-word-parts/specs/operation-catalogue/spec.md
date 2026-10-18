@@ -25,9 +25,12 @@ of its schema, or that redirects (a 3xx, whose `Location` may carry a
 ticket), SHALL declare `secret_once`, or the field (or `Location`) SHALL be
 listed in the architecture check with the reason it is none; a listed field
 no longer answered SHALL be reported. A field looks like a secret by its
-words, split at `_`, `-` and camelCase in any case: `secret`, `token`,
-`ticket`, `password` or `code` (or their plurals), an API, private,
-access or signing key, or `url`, `uri` or `link` last. The architecture check SHALL fail on
+words, in any case: split at `_`, `-`, `.`, a space, camelCase, the end of
+a run of capitals (`IDToken`) and before a trailing number (`token2`). A
+guarded word is `secret`, `token`, `ticket`, `password`, `passwd`,
+`passphrase`, `credential`, `code`, `apikey` or `otp`, singular or plural.
+An API, private, access, signing or secret key anywhere is guarded, and so
+is `url`, `uri`, `link` or `key` as the last word. The architecture check SHALL fail on
 any violation.
 
 #### Scenario: Health and version are catalogued
@@ -56,4 +59,4 @@ any violation.
 
 #### Scenario: A secret-looking answer
 - **WHEN** a mutating operation without `secret_once` answers 201 with a nested `refresh_token`, `clientSecret`, `api_key`, `invite_link` or `code`, or redirects (303)
-- **THEN** `cargo xtask arch` fails naming the operation and the field (or `Location`), unless it is listed with its reason, while `tokenizer`, `codec` or `key_id` pass
+- **THEN** `cargo xtask arch` fails naming the operation and the field (or `Location`), unless it is listed with its reason, while `tokenizer`, `codec` or `key_id` pass and `IDToken`, `OTPCode` or `public_key` do not

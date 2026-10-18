@@ -632,24 +632,32 @@ pub fn check_operations(spec: &serde_json::Value, owners: &Owners) -> Vec<String
     violations
 }
 
-/// The words of a field name, lower-cased: split at `_`, `-`, `.` and
-/// camelCase boundaries (`clientSecret` is `client`, `secret`;
-/// `api_key` is `api`, `key`).
+/// The words of a field name, lower-cased: split at `_`, `-`, `.`, a
+/// space, camelCase boundaries, the end of a run of capitals (`IDToken` is
+/// `id`, `token`) and before a trailing number (`token2` is `token`, `2`).
 fn name_words(name: &str) -> Vec<String> {
+    let chars: Vec<char> = name.chars().collect();
     let mut words: Vec<String> = Vec::new();
     let mut word = String::new();
-    let mut previous: Option<char> = None;
-    for c in name.chars() {
-        let boundary = matches!(c, '_' | '-' | '.' | ' ');
-        let camel = c.is_ascii_uppercase()
-            && previous.is_some_and(|p| p.is_ascii_lowercase() || p.is_ascii_digit());
-        if (boundary || camel) && !word.is_empty() {
+    for (i, &c) in chars.iter().enumerate() {
+        if matches!(c, '_' | '-' | '.' | ' ') {
+            if !word.is_empty() {
+                words.push(std::mem::take(&mut word));
+            }
+            continue;
+        }
+        let previous = i.checked_sub(1).map(|j| chars[j]);
+        let next = chars.get(i + 1).copied();
+        let boundary = previous.is_some_and(|p| {
+            let upper = c.is_ascii_uppercase();
+            (upper && (p.is_ascii_lowercase() || p.is_ascii_digit()))
+                || (upper && p.is_ascii_uppercase() && next.is_some_and(|n| n.is_ascii_lowercase()))
+                || (c.is_ascii_digit() && p.is_ascii_alphabetic())
+        });
+        if boundary && !word.is_empty() {
             words.push(std::mem::take(&mut word));
         }
-        if !boundary {
-            word.push(c.to_ascii_lowercase());
-        }
-        previous = Some(c);
+        word.push(c.to_ascii_lowercase());
     }
     if !word.is_empty() {
         words.push(word);
@@ -658,23 +666,33 @@ fn name_words(name: &str) -> Vec<String> {
 }
 
 /// Whether a field name in an answer looks like it may carry a secret
-/// (campbooks-cloud#260), by its words, in any case: a secret, token,
-/// ticket, password or code (one-time, invitation, signup), an API,
-/// private, access or signing key, or a URL or link last (a link may carry
-/// a ticket). A word only starting like one (`tokenizer`, `secretary`,
-/// `codec`) is not.
+/// (campbooks-cloud#260), by its words, in any case, singular or plural: a
+/// secret, token, ticket, password, passphrase, credential or code
+/// (one-time, invitation, signup), an API key or one-time password, an
+/// API, private, access, signing or secret key anywhere, or a URL, URI,
+/// link or key last (a link may carry a ticket). A word only starting like
+/// one (`tokenizer`, `secretary`, `codec`, `keyboard`) is not.
 fn guarded_field(name: &str) -> bool {
-    const SECRET: [&str; 6] = ["secret", "token", "ticket", "password", "passwd", "code"];
-    const LINK: [&str; 3] = ["url", "uri", "link"];
+    const SECRET: [&str; 10] = [
+        "secret",
+        "token",
+        "ticket",
+        "password",
+        "passwd",
+        "passphrase",
+        "credential",
+        "code",
+        "apikey",
+        "otp",
+    ];
+    const LAST: [&str; 4] = ["url", "uri", "link", "key"];
     const KEYED: [&str; 5] = ["api", "private", "access", "signing", "secret"];
     let words = name_words(name);
     let singular = |word: &str| word.strip_suffix('s').unwrap_or(word).to_owned();
-    words
-        .iter()
-        .any(|w| SECRET.contains(&singular(w).as_str()) || w == "apikey" || w == "otp")
+    words.iter().any(|w| SECRET.contains(&singular(w).as_str()))
         || words
             .last()
-            .is_some_and(|w| LINK.contains(&singular(w).as_str()))
+            .is_some_and(|w| LAST.contains(&singular(w).as_str()))
         || words
             .windows(2)
             .any(|pair| KEYED.contains(&pair[0].as_str()) && singular(&pair[1]) == "key")
@@ -704,6 +722,41 @@ pub const ANSWER_FIELDS_ALLOWED: &[(&str, &str, &str)] = &[
         "the app's registered post-logout redirect URI with the `state` it sent; no credential",
     ),
     (
+        "identity.start_passkey_registration",
+        "excludeCredentials",
+        PASSKEY_IDS,
+    ),
+    (
+        "identity.start_passkey_registration",
+        "requireResidentKey",
+        RESIDENT_KEY,
+    ),
+    (
+        "identity.start_passkey_registration",
+        "residentKey",
+        RESIDENT_KEY,
+    ),
+    (
+        "identity.start_passkey_sign_up",
+        "excludeCredentials",
+        PASSKEY_IDS,
+    ),
+    (
+        "identity.start_passkey_sign_up",
+        "requireResidentKey",
+        RESIDENT_KEY,
+    ),
+    (
+        "identity.start_passkey_sign_up",
+        "residentKey",
+        RESIDENT_KEY,
+    ),
+    (
+        "identity.start_passkey_sign_in",
+        "allowCredentials",
+        PASSKEY_IDS,
+    ),
+    (
         "identity.register",
         "redirect_uris",
         "the redirect URIs the registering app sent, echoed back; no credential",
@@ -719,6 +772,11 @@ pub const ANSWER_FIELDS_ALLOWED: &[(&str, &str, &str)] = &[
     ("conversations.decline_rule", "content_token", CONTENT_TOKEN),
     ("conversations.restore_rule", "content_token", CONTENT_TOKEN),
 ];
+
+const PASSKEY_IDS: &str = "WebAuthn: the ids of passkeys (public, as every authenticator \
+     shows them), so the browser offers or skips them; no secret";
+const RESIDENT_KEY: &str =
+    "WebAuthn: whether the authenticator keeps the passkey (`required`, a flag); no key";
 
 const CONTENT_TOKEN: &str =
     "a version tag of the content on screen, for conflict checks; not a credential";
@@ -2296,10 +2354,40 @@ mod tests {
         assert_eq!(name_words("clientSecret"), ["client", "secret"]);
         assert_eq!(name_words("refresh_token"), ["refresh", "token"]);
         assert_eq!(name_words("X-Api-Key"), ["x", "api", "key"]);
-        assert_eq!(name_words("ID2Token"), ["id2", "token"]);
+        assert_eq!(name_words("ID2Token"), ["id", "2", "token"]);
+        assert_eq!(name_words("token2"), ["token", "2"]);
+        for (name, words) in [
+            ("IDToken", ["id", "token"]),
+            ("APIToken", ["api", "token"]),
+            ("OTPCode", ["otp", "code"]),
+            ("JWTSecret", ["jwt", "secret"]),
+            ("TOTPSecret", ["totp", "secret"]),
+            ("SSOUrl", ["sso", "url"]),
+            ("user.name", ["user", "name"]),
+            ("user name", ["user", "name"]),
+        ] {
+            assert_eq!(name_words(name), words, "{name}");
+            assert!(
+                name == "user.name" || name == "user name" || guarded_field(name),
+                "{name}"
+            );
+        }
         assert!(guarded_field("signupCodes") && guarded_field("REDIRECT_URI"));
-        assert!(guarded_field("apikey") && guarded_field("otp"));
+        for name in [
+            "apikey",
+            "apikeys",
+            "otp",
+            "otps",
+            "token2",
+            "credentials",
+            "passphrase",
+            "public_key",
+            "signingKeys",
+        ] {
+            assert!(guarded_field(name), "{name}");
+        }
         assert!(!guarded_field("uriTemplate") && !guarded_field("links_count"));
+        assert!(!guarded_field("key_id") && !guarded_field("keyboard"));
     }
 
     #[test]
