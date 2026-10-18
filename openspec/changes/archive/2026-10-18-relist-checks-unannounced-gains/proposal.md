@@ -12,8 +12,11 @@ that is exactly what the heartbeat's check is a safety net for.
 - Every listing of a stream's containers checks for an unannounced gain:
   a gained container that none of the container changes behind the listing
   named (as its record or its container) makes the stream send `reset`
-  (`access_changed`). At a heartbeat, or after a change of access, nothing
-  was named, so any gain resets, as at a heartbeat before.
+  (`access_changed`). At a heartbeat nothing was named, so any gain resets,
+  as before. After a change of access (membership or role) nothing was named
+  either, so a gain now resets there too, which it never did before; today
+  that has no effect, since which inboxes a member sees does not depend on
+  their role.
 - An announced gain (a grant, a new inbox announced inside itself) still
   needs no reset.
 - The catch-up pacing test's slack becomes a fifth of a tick, and a comment
