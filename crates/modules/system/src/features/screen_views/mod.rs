@@ -43,7 +43,6 @@ use chrono::{NaiveDate, Utc};
 use opentelemetry::{KeyValue, metrics::Counter};
 use reqwest::Url;
 use serde::Deserialize;
-use serde_json::json;
 use tokio::sync::mpsc;
 use utoipa::ToSchema;
 

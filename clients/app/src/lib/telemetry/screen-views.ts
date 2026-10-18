@@ -66,12 +66,9 @@ export function createScreenViews(
       if (route === undefined) {
         return;
       }
-      send(route).then(
-        () => undefined,
-        () => {
-          // Dropped: usage analytics is best effort.
-        },
-      );
+      send(route).catch(() => {
+        // Dropped: usage analytics is best effort.
+      });
     },
   };
 }

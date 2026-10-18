@@ -43,7 +43,7 @@ describe("screenRoute", () => {
       "inbox",
       `/${"inbox/".repeat(30)}inbox`,
     ]) {
-      expect(screenRoute(path), String(path)).toBeUndefined();
+      expect(screenRoute(path)).toBeUndefined();
     }
   });
 });
@@ -81,7 +81,7 @@ describe("createScreenViews", () => {
   it("sends nothing for a path that is not a template", () => {
     const { send, views } = setup();
     views.viewed(`/w/${WORKSPACE}/inbox`);
-    views.viewed(undefined);
+    views.viewed("/search?q=boiler");
     expect(send).not.toHaveBeenCalled();
   });
 
