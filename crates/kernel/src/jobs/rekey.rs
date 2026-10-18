@@ -18,8 +18,8 @@ use serde::{Deserialize, Serialize};
 
 use super::{EnqueueOptions, Job, JobContext, JobError, NewJob};
 
-/// How often the jobs are enqueued while a previous key is set (the first
-/// tick within this long of a start).
+/// How often the jobs are enqueued while a previous key is set. Like every
+/// kernel schedule, the first tick runs at start-up.
 pub const REKEY_EVERY: Duration = Duration::from_mins(15);
 
 /// Enqueue every registered rekey job in every workspace, while a previous

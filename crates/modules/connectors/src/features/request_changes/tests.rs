@@ -1101,3 +1101,50 @@ async fn a_planted_or_edited_outbound_change_is_never_made(db: PgPool) {
         labels(&["INBOX", "STARRED"])
     );
 }
+
+/// campbooks-cloud#262: a change recorded under the old instance secret
+/// key and still pending (its stream paused) is re-tagged while the old key
+/// is the previous one, and made once only the new key is left.
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_pending_change_retagged_after_a_rotation_is_made_without_the_old_key(db: PgPool) {
+    use campbooks_kernel::{
+        binding::Binding,
+        crypto::{SECRET_KEY_LEN, SecretKey},
+    };
+
+    let mut kit = Kit::new(db).await;
+    let m = mailbox(&kit, &[&["INBOX"]]).await;
+    m.pause(&kit, true).await;
+    m.request(&kit, &[(m.ids[0].as_str(), json!({"kind": "star"}))])
+        .await;
+    // The kit's key (`testing::binding`) is the old one.
+    let old = SecretKey::from_bytes([0x5a; SECRET_KEY_LEN]);
+    let new = SecretKey::from_bytes([0x6b; SECRET_KEY_LEN]);
+    let rotated = Binding::new(&new.clone().with_previous(&old));
+
+    let mut tx = kit.state.db.begin_for(m.ws).await.unwrap();
+    let (retagged, left) = crate::domain::outbound::retag(&mut tx, &rotated, m.ws)
+        .await
+        .unwrap();
+    tx.commit().await.unwrap();
+    assert_eq!((retagged, left), (1, 0));
+    let mut tx = kit.state.db.begin_for(m.ws).await.unwrap();
+    assert_eq!(
+        crate::domain::outbound::retag(&mut tx, &rotated, m.ws)
+            .await
+            .unwrap(),
+        (0, 0),
+        "nothing left"
+    );
+    tx.commit().await.unwrap();
+
+    // The previous key removed: the change verifies under the new key alone.
+    kit.state = kit.state.clone().with_binding(Binding::new(&new));
+    m.pause(&kit, false).await;
+    m.run(&kit).await;
+    assert_eq!(
+        kit.google.labels_of(&m.ids[0]),
+        labels(&["INBOX", "STARRED"])
+    );
+    assert!(ends(&kit).await.iter().all(|e| *e == end("applied", None)));
+}
