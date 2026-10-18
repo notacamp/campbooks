@@ -28,7 +28,11 @@ override, a zero-width space or a variation selector, or delimiter such as
 CR, LF, `&`, `;`, `?` or `\`, even encoded; other Unicode, as in an
 internationalised address, is kept); a subject or body holding `&` or `?`
 once decoded SHALL be dropped, since a mail app that decodes before it splits
-would read another field there; anything else nowhere; no remote URL SHALL be granted
+would read another field there, and so SHALL a subject that is not valid
+UTF-8 or holds a control character (CR and LF included), a line or paragraph
+separator (U+2028, U+2029) or an invisible character, and a body that is not
+valid UTF-8 or holds a control character other than CR, LF and tab, since a
+mail app that decodes first would start another header there; anything else nowhere; no remote URL SHALL be granted
 IPC. CI SHALL check the frame in WebKit under the desktop and web policies
 read from their definitions, with the app's own sandbox and referrer policy,
 and a control proving the check would see a script run.
@@ -68,3 +72,7 @@ and a control proving the check would see a script run.
 #### Scenario: An authority or an invisible character
 - **WHEN** the member clicks `mailto://x%0D%0Abcc:evil@example.org`, or an address holding U+202E, U+200B, U+0085 or a byte that is not UTF-8
 - **THEN** nothing opens, while `mailto:ana@exämple.example` opens in the mail app
+
+#### Scenario: A header hidden in the subject
+- **WHEN** a mail link reads `mailto:rita@x.example?subject=Hi%0D%0ABcc:%20evil@x.example&body=Thanks`, or its body holds a NUL
+- **THEN** the subject (or the body) is left out and the rest opens; a body over several lines, with tabs, is kept as written

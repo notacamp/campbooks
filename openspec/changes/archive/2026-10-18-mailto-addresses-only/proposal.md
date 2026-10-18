@@ -18,7 +18,10 @@ app would read a field hidden in a value: `body=x%26attach%3D…` decodes to
   internationalised addresses. A link with an authority
   (`mailto://user:password@host`) is refused too, and so is an address part
   starting with `/`. The `to`, `cc` and `bcc` fields are held to the same
-  rule. A subject or body holding `&` or `?` once decoded is dropped.
+  rule. A subject or body holding `&` or `?` once decoded is dropped, and so
+  is a subject with a control character (CR, LF), U+2028/2029 or an invisible
+  character, or a body with a control character other than CR, LF and tab,
+  or either one not valid UTF-8 (a header hidden behind a line break).
   Unicode blanks (`char::is_whitespace`) and other default-ignorable
   characters are refused too. Anything else opens nowhere.
 

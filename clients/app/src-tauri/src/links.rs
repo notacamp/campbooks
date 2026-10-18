@@ -26,9 +26,8 @@ const MAILTO_FIELDS: [&str; 5] = ["to", "cc", "bcc", "subject", "body"];
 /// value as itself encoded (campbooks-cloud#243). The fragment goes: some
 /// mail apps split on `&` without minding `#` (CVE-2020-11880). The address
 /// part and `to`, `cc` and `bcc` must be plain addresses, or nothing opens;
-/// a subject or body holding `&` or `?` once decoded is dropped, since a
-/// mail app that decodes before it splits would read another field there
-/// (campbooks-cloud#247).
+/// a subject or body that is not plain text once decoded is dropped
+/// ([`plain_text`]; campbooks-cloud#247).
 pub fn outside(url: &Url) -> Option<String> {
     match url.scheme() {
         "https" | "http" => Some(url.as_str().to_owned()),
@@ -55,14 +54,8 @@ pub fn outside(url: &Url) -> Option<String> {
                 match name.as_str() {
                     // More addresses: held to the same rule, or nothing opens.
                     "to" | "cc" | "bcc" if !addresses_only(value) => return None,
-                    // A mail app that decodes before it splits would read a
-                    // `&` or `?` in the subject or body as the start of
-                    // another field (`&attach=…`): such a field is dropped.
-                    "subject" | "body"
-                        if decode(value).iter().any(|b| matches!(b, b'&' | b'?')) =>
-                    {
-                        continue;
-                    }
+                    // Text a mail app could read as more than text: dropped.
+                    "subject" | "body" if !plain_text(&name, &decode(value)) => continue,
                     _ => {}
                 }
                 kept.push(format!(
@@ -78,6 +71,29 @@ pub fn outside(url: &Url) -> Option<String> {
         }
         _ => None,
     }
+}
+
+/// Whether a mail link's decoded `subject` or `body` is plain text a mail
+/// app can only read as such: valid UTF-8 with no `&` or `?` (a mail app
+/// that decodes before it splits would start another field there,
+/// `&attach=…`); a subject with no control character, line or paragraph
+/// separator (U+2028, U+2029) or invisible character, since a mail app
+/// that decodes first would put a raw line break in the Subject header and
+/// start another header (`Hi%0D%0ABcc:%20…`); a body with no control
+/// character but its line breaks and tabs.
+fn plain_text(name: &str, decoded: &[u8]) -> bool {
+    let Ok(text) = std::str::from_utf8(decoded) else {
+        return false;
+    };
+    let refused = |c: char| {
+        matches!(c, '&' | '?')
+            || if name == "subject" {
+                c.is_control() || matches!(c, '\u{2028}' | '\u{2029}') || is_invisible(c)
+            } else {
+                c.is_control() && !matches!(c, '\r' | '\n' | '\t')
+            }
+    };
+    !text.chars().any(refused)
 }
 
 /// Whether a mail link's address part (`path`, still percent-encoded) is
@@ -421,6 +437,63 @@ mod tests {
         assert_eq!(
             copied.as_deref(),
             Some("mailto:?to=rita%40silva-contas.example%2Cjoao%40silva-contas.example&subject=Hi")
+        );
+    }
+
+    #[test]
+    fn a_subject_or_body_that_could_start_a_header_is_dropped() {
+        // A Bcc hidden in the subject behind a line break, however written:
+        // a mail app that decodes first would put it in its own header.
+        for subject in [
+            "Hi%0D%0ABcc:%20evil@x.example",
+            "Hi%0ABcc:%20evil@x.example",
+            "Hi%0D",
+            "Hi%09there",
+            "Hi%00",
+            "Hi%C2%85Bcc:%20evil@x.example",
+            "Hi%E2%80%A8Bcc:%20evil@x.example",
+            "Hi%E2%80%A9Bcc:%20evil@x.example",
+            "Hi%E2%80%8B",
+            "Hi%FF",
+        ] {
+            let link = outside(&parse(&format!(
+                "mailto:rita@silva-contas.example?subject={subject}&body=Thanks"
+            )));
+            assert_eq!(
+                link.as_deref(),
+                Some("mailto:rita@silva-contas.example?body=Thanks"),
+                "{subject}"
+            );
+        }
+        // A body with NUL, another control character or invalid UTF-8 goes.
+        for body in ["Hi%00there", "Hi%1Bthere", "Hi%7F", "Hi%C2%85", "Hi%FF"] {
+            let link = outside(&parse(&format!(
+                "mailto:rita@silva-contas.example?subject=Hi&body={body}"
+            )));
+            assert_eq!(
+                link.as_deref(),
+                Some("mailto:rita@silva-contas.example?subject=Hi"),
+                "{body}"
+            );
+        }
+        // A body over several lines, with a tab, stays as written.
+        let lines = outside(&parse(
+            "mailto:rita@silva-contas.example?body=Hi%20Rita,%0D%0A%0D%0A%09Thanks%0ASam",
+        ));
+        assert_eq!(
+            lines.as_deref(),
+            Some(
+                "mailto:rita@silva-contas.example\
+                 ?body=Hi%20Rita%2C%0D%0A%0D%0A%09Thanks%0ASam"
+            )
+        );
+        // Accents are text.
+        let accents = outside(&parse(
+            "mailto:rita@silva-contas.example?subject=Ol%C3%A1%20Jo%C3%A3o",
+        ));
+        assert_eq!(
+            accents.as_deref(),
+            Some("mailto:rita@silva-contas.example?subject=Ol%C3%A1%20Jo%C3%A3o")
         );
     }
 
