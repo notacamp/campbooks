@@ -1022,7 +1022,7 @@ fn literal_end(chars: &[(usize, char)], i: usize) -> Option<usize> {
     let at = |k: usize| chars.get(k).map(|&(_, c)| c);
     let follows_word = i
         .checked_sub(1)
-        .and_then(|k| at(k))
+        .and_then(&at)
         .is_some_and(|p| p.is_alphanumeric() || p == '_');
     match at(i)? {
         '"' => {
