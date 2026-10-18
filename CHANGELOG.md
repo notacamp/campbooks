@@ -241,6 +241,11 @@ All notable changes to Campbooks Next are documented here. The format follows
 - **Someone removed from a workspace gets no live updates from it, even in the moment
   they were removed.** Opening the change feed now checks membership again once it knows
   where it starts, so a removal made just before cannot slip past until the next heartbeat.
+- **Signing out of one place stops access there at once.** Signing out of one browser,
+  revoking an app, removing a way in, or revoking a refresh token now stops that sign-in's
+  access tokens on the very next request, instead of letting them run out their ten
+  minutes, and the web app there asks you to sign in again right away; your other sign-ins
+  keep working.
 
 ### Added
 

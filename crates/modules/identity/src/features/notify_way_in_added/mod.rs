@@ -110,6 +110,7 @@ async fn locale(state: &campbooks_kernel::AppState, account: Uuid) -> Locale {
         expires_at: None,
         issued_at: None,
         auth_time: None,
+        sign_in: None,
     };
     state
         .locales

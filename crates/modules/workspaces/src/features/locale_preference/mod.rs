@@ -60,6 +60,7 @@ mod tests {
             expires_at: None,
             issued_at: None,
             auth_time: None,
+            sign_in: None,
         }
     }
 

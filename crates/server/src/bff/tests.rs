@@ -1251,6 +1251,85 @@ async fn api_calls_carry_the_sessions_token_in_process(db: PgPool) {
     );
 }
 
+/// Replace the session's held access token with one the API refuses as
+/// invalid (as it refuses a token whose sign-in ended: a way in removed,
+/// signed out on another device), while the BFF still counts it as valid
+/// for minutes (campbooks-cloud#143).
+async fn hold_a_refused_token(h: &Harness) {
+    let mut claims = h.idp.claims("test:read");
+    let past = chrono::Utc::now().timestamp() - 3_600;
+    claims["iat"] = json!(past);
+    claims["nbf"] = json!(past);
+    claims["exp"] = json!(past + 600);
+    let token = h.idp.token(&claims);
+    let id: uuid::Uuid = sqlx::query_scalar("SELECT id FROM bff.sessions")
+        .fetch_one(&h.db)
+        .await
+        .unwrap();
+    sqlx::query("UPDATE bff.sessions SET access_token = $1")
+        .bind(cipher().seal(&token, &super::sealed_for(id, "access_token")))
+        .execute(&h.db)
+        .await
+        .unwrap();
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn a_token_the_api_refuses_is_refreshed_once_and_a_read_goes_through(db: PgPool) {
+    let h = harness(db).await;
+    let mut browser = Browser::new(&h.app);
+    browser.sign_in(&h.idp, "/").await;
+    let before = h.idp.refreshes();
+
+    // A read: one forced refresh, then sent again with the fresh token.
+    hold_a_refused_token(&h).await;
+    let reply = browser.get("/bff/api/v1/test/whoami?x=1").await;
+    assert_eq!(reply.status, StatusCode::OK, "{}", reply.body);
+    assert_eq!(h.idp.refreshes(), before + 1);
+    assert_eq!(
+        browser.get("/bff/api/v1/test/whoami").await.status,
+        StatusCode::OK
+    );
+    assert_eq!(h.idp.refreshes(), before + 1, "the fresh token is kept");
+
+    // A write is never sent twice: the refusal comes back, the fresh token
+    // is held, and the app's retry goes through.
+    hold_a_refused_token(&h).await;
+    let reply = browser.post("/bff/api/v1/test/whoami", r#"{"a":1}"#).await;
+    assert_eq!(reply.status, StatusCode::UNAUTHORIZED, "{}", reply.body);
+    assert!(
+        reply
+            .header(header::WWW_AUTHENTICATE)
+            .is_some_and(|value| value.contains("error=\"invalid_token\"")),
+        "the API's own refusal: {:?}",
+        reply.headers
+    );
+    assert_eq!(h.idp.refreshes(), before + 2);
+    let retried = browser.post("/bff/api/v1/test/whoami", r#"{"a":1}"#).await;
+    assert_eq!(retried.status, StatusCode::OK, "{}", retried.body);
+    assert_eq!(h.idp.refreshes(), before + 2);
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn a_refused_token_whose_refresh_is_refused_ends_the_session(db: PgPool) {
+    let h = harness(db).await;
+    let mut browser = Browser::new(&h.app);
+    browser.sign_in(&h.idp, "/").await;
+    let before = h.idp.token_requests();
+    hold_a_refused_token(&h).await;
+    h.idp.revoke_refresh_tokens();
+
+    // At once, not when the held token would have expired: the app signs in
+    // again. One refresh attempt, no loop.
+    let reply = browser.get("/bff/api/v1/test/whoami").await;
+    reply.assert_problem(StatusCode::UNAUTHORIZED, "session_required");
+    assert_eq!(h.idp.token_requests(), before + 1, "one refresh attempt");
+    assert_eq!(count(&h.db, "SELECT count(*) FROM bff.sessions").await, 0);
+    assert_eq!(
+        browser.get("/bff/session").await.json()["authenticated"],
+        false
+    );
+}
+
 #[sqlx::test(migrations = "../../migrations")]
 async fn the_admin_api_is_reached_through_the_bff_by_administrators_only(db: PgPool) {
     let h = harness(db).await;

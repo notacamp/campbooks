@@ -1559,6 +1559,7 @@ mod tests {
             expires_at: None,
             issued_at: None,
             auth_time: None,
+            sign_in: None,
         };
         // Probes opt neither automation nor the assistant in.
         let refused = operations::invoke(

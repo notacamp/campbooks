@@ -168,6 +168,7 @@ fn principal_of(account: Uuid) -> Principal {
         expires_at: None,
         issued_at: None,
         auth_time: None,
+        sign_in: None,
     }
 }
 

@@ -416,6 +416,7 @@ impl Kit {
             expires_at: None,
             issued_at: None,
             auth_time: None,
+            sign_in: None,
         };
         let mut invocation =
             operations::Invocation::new(operations::Caller::Assistant, principal, operation, input)

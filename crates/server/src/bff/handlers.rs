@@ -4,7 +4,7 @@ use axum::{
     Form, Json,
     body::Body,
     extract::{MatchedPath, Query, Request, State},
-    http::{HeaderMap, HeaderValue, StatusCode, Uri, header},
+    http::{HeaderMap, HeaderValue, Method, StatusCode, Uri, header},
     response::{IntoResponse, Response},
 };
 use base64::{Engine as _, engine::general_purpose::URL_SAFE_NO_PAD};
@@ -836,19 +836,67 @@ async fn forward(bff: &Bff, request: Request, target: Target) -> Result<Response
         Err(AccessError::SessionEnded) => return Ok(session_required()),
         Err(AccessError::Failed(err)) => return Err(err),
     };
-    let request = to_api_request(request, &access_token)?;
+    // A request with no body can be sent again, once, with a fresh token.
+    let again = replayable(&request);
     let router = match target {
         Target::Api => inner.api.clone(),
         Target::Admin => inner.admin.clone(),
     };
-    let response = match router.oneshot(request).await {
+    let request = to_api_request(request, &access_token)?;
+    let mut response = match router.clone().oneshot(request).await {
         Ok(response) => response,
         Err(never) => match never {},
     };
+    // The API refused the token as invalid: its sign-in ended (a way in
+    // removed, signed out elsewhere, suspended; campbooks-cloud#143). One
+    // forced refresh: refused too, the session ends and the app signs in
+    // again, instead of failing until the token would have expired.
+    if refused_as_invalid(&response) {
+        match inner.refresh(&current.session, Some(&access_token)).await {
+            Ok(fresh) => {
+                if let Some(again) = again {
+                    let request = to_api_request(again, &fresh)?;
+                    response = match router.oneshot(request).await {
+                        Ok(response) => response,
+                        Err(never) => match never {},
+                    };
+                }
+            }
+            Err(AccessError::SessionEnded) => return Ok(session_required()),
+            Err(AccessError::Failed(err)) => return Err(err),
+        }
+    }
     Ok(match current.rotated {
         Some(rotated) => with_cookie(response, rotated),
         None => response,
     })
+}
+
+/// A copy of `request` to send again when it has no body (a `GET` or a
+/// `HEAD`), else `None`.
+fn replayable(request: &Request) -> Option<Request> {
+    if request.method() != Method::GET && request.method() != Method::HEAD {
+        return None;
+    }
+    let mut again = Request::new(Body::empty());
+    *again.method_mut() = request.method().clone();
+    *again.uri_mut() = request.uri().clone();
+    *again.version_mut() = request.version();
+    *again.headers_mut() = request.headers().clone();
+    // The peer address and the like, as the first attempt had them.
+    *again.extensions_mut() = request.extensions().clone();
+    Some(again)
+}
+
+/// Whether the API refused the request's token as invalid (401 with
+/// `error="invalid_token"`), not for a missing scope or anything else.
+fn refused_as_invalid(response: &Response) -> bool {
+    response.status() == StatusCode::UNAUTHORIZED
+        && response
+            .headers()
+            .get(header::WWW_AUTHENTICATE)
+            .and_then(|value| value.to_str().ok())
+            .is_some_and(|value| value.contains("error=\"invalid_token\""))
 }
 
 /// `/bff/<api|admin>/<path>?<query>` → `/<api|admin>/<path>?<query>`, with

@@ -483,6 +483,20 @@ impl Inner {
         if Utc::now() + REFRESH_BEFORE_EXPIRY < session.access_expires_at {
             return self.open_access(session, &session.access_token).await;
         }
+        self.refresh(session, None).await
+    }
+
+    /// Refresh the session's access token: when it is about to expire, or,
+    /// given `refused` (the token the API just refused as invalid: its
+    /// sign-in ended, campbooks-cloud#143), now, unless another request
+    /// already replaced it. A refresh the identity provider refuses ends
+    /// the session, so the app signs in again instead of failing until the
+    /// refused token would have expired.
+    async fn refresh(
+        &self,
+        session: &Session,
+        refused: Option<&str>,
+    ) -> Result<String, AccessError> {
         let lock = &self.refresh_locks[lock_index(session.id)];
         let _guard = lock.lock().await;
         let mut tx = store::begin_refresh(&self.db).await?;
@@ -490,12 +504,25 @@ impl Inner {
             return Err(AccessError::SessionEnded);
         };
         let now = Utc::now();
-        if now + REFRESH_BEFORE_EXPIRY < tokens.access_expires_at {
+        let current = match refused {
+            // Replaced by another request while this one waited: use it.
+            Some(refused) => {
+                let held = self.open_access(session, &tokens.access_token).await?;
+                (held != refused).then_some(held)
+            }
+            None => None,
+        };
+        if let Some(held) = current {
+            tx.commit().await?;
+            return Ok(held);
+        }
+        if refused.is_none() && now + REFRESH_BEFORE_EXPIRY < tokens.access_expires_at {
             // Another request refreshed while this one waited.
             tx.commit().await?;
             return self.open_access(session, &tokens.access_token).await;
         }
-        let still_valid = now < tokens.access_expires_at;
+        // A refused token is no longer valid, whenever it would expire.
+        let still_valid = refused.is_none() && now < tokens.access_expires_at;
         let Some(sealed_refresh) = &tokens.refresh_token else {
             tx.commit().await?;
             return if still_valid {

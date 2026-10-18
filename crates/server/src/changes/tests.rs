@@ -970,12 +970,16 @@ async fn changes_the_caller_may_not_see_are_skipped_and_a_heartbeat_resumes_past
 struct Standings(std::sync::Mutex<std::collections::HashMap<String, TokenStanding>>);
 
 impl TokenRevocation for Standings {
-    fn standing<'a>(&'a self, _db: &'a PgPool, account: &'a str) -> StandingFuture<'a> {
+    fn standing<'a>(
+        &'a self,
+        _db: &'a PgPool,
+        principal: &'a campbooks_kernel::auth::Principal,
+    ) -> StandingFuture<'a> {
         let standing = self
             .0
             .lock()
             .unwrap()
-            .get(account)
+            .get(&principal.subject)
             .copied()
             .unwrap_or_default();
         Box::pin(async move { Ok(Some(standing)) })
@@ -1005,8 +1009,8 @@ async fn a_stream_ends_within_a_heartbeat_when_its_tokens_are_revoked(db: PgPool
     standings.0.lock().unwrap().insert(
         "ana".to_owned(),
         TokenStanding {
-            suspended: false,
             tokens_not_before: Some(chrono::Utc::now()),
+            ..TokenStanding::default()
         },
     );
     // Heartbeat comments keep coming until then: bound the wait.
