@@ -24,6 +24,10 @@ use crate::{
 /// run in `job_log` through the job transaction, so a failed attempt leaves
 /// no row behind.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[allow(
+    clippy::struct_excessive_bools,
+    reason = "a test fixture scripted by its payload: each flag is one behaviour"
+)]
 struct Probe {
     note: String,
     /// Fail (retryably) while the attempt number is at most this.
