@@ -12,13 +12,30 @@ import { ReplyComposer } from "./ReplyComposer";
 const D = `${W}/drafts`;
 const FIRST = Q4_DETAIL.messages[0]?.id ?? "";
 
-function slot(request: ReplyRequest | null, onClose = vi.fn()) {
+// The first message as `conversations.get` sends it when reading its HTML as
+// text ran out of time: no words, marked `text_unread`.
+const UNREAD = Q4_DETAIL.messages.map((message) =>
+  message.id === FIRST ? { ...message, text: null, text_unread: true } : message,
+);
+const WORDS = `GET ${W}/conversations/${Q4.id}/messages/${FIRST}/body`;
+const WORDS_BODY = {
+  text: "Hi Sam, the plan only came as HTML: the harbourlight pontoon budget is attached.",
+  html: null,
+  truncated: false,
+  remote_images: 0,
+  images_shown: false,
+  images_trusted: false,
+  images_offer: false,
+  images_domain: null,
+};
+
+function slot(request: ReplyRequest | null, onClose = vi.fn(), messages = Q4_DETAIL.messages) {
   return (
     <ReplyComposer
       workspaceId={DUARTE.id}
       inboxId={INBOX.id}
       conversation={Q4}
-      messages={Q4_DETAIL.messages}
+      messages={messages}
       request={request}
       onClose={onClose}
     />
@@ -282,6 +299,76 @@ describe("ReplyComposer", () => {
       content_token: "demo-token-changed",
       body: "Thursday works for me.",
     });
+  });
+
+  it("reads the words of a message that came without them before quoting it", async () => {
+    let answer: (() => void) | undefined;
+    const held = new Promise<void>((resolve) => {
+      answer = resolve;
+    });
+    const stored: (typeof REPLY)[] = [];
+    const api = mockApi({
+      [`GET ${D}`]: () => ({ body: { drafts: stored } }),
+      [WORDS]: (request) => {
+        expect(new URL(request.url).searchParams.get("words")).toBe("true");
+        return { body: WORDS_BODY };
+      },
+      [`POST ${D}`]: () => {
+        stored.push(REPLY);
+        return { status: 201, body: REPLY };
+      },
+    });
+    // The words arrive only once the reading state was seen.
+    const fetched = globalThis.fetch;
+    globalThis.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
+      const request = input instanceof Request ? input : new Request(input, init);
+      if (new URL(request.url).searchParams.get("words") === "true") {
+        await held;
+      }
+      return fetched(request);
+    };
+    renderWithProviders(slot({ mode: "forward", messageId: FIRST, nonce: 1 }, vi.fn(), UNREAD));
+
+    expect(await screen.findByText("Reading the email to quote it…")).toBeVisible();
+    expect(api.calls.some((call) => call.route === `POST ${D}`)).toBe(false);
+    answer?.();
+    await waitFor(() => {
+      expect(api.calls.some((call) => call.route === `POST ${D}`)).toBe(true);
+    });
+    const quoted = (
+      api.calls.find((call) => call.route === `POST ${D}`)?.body as { quoted: string }
+    ).quoted;
+    expect(quoted).toMatch(/^---------- Forwarded message ----------/u);
+    expect(quoted).toContain("the harbourlight pontoon budget is attached");
+  });
+
+  it("quotes the read words in a reply too", async () => {
+    const stored: (typeof REPLY)[] = [];
+    const api = mockApi({
+      [`GET ${D}`]: () => ({ body: { drafts: stored } }),
+      [WORDS]: { body: WORDS_BODY },
+      [`POST ${D}`]: () => {
+        stored.push(REPLY);
+        return { status: 201, body: REPLY };
+      },
+    });
+    renderWithProviders(slot({ mode: "reply", messageId: FIRST, nonce: 1 }, vi.fn(), UNREAD));
+    await screen.findByRole("textbox", { name: "Message" });
+    expect(
+      (api.calls.find((call) => call.route === `POST ${D}`)?.body as { quoted: string }).quoted,
+    ).toMatch(/Maya Okafor wrote:\n> Hi Sam, the plan only came as HTML/u);
+  });
+
+  it("starts nothing when the words cannot be read, and says why", async () => {
+    const api = mockApi({
+      [`GET ${D}`]: { body: { drafts: [] } },
+      [WORDS]: problem(503, "unavailable"),
+    });
+    renderWithProviders(slot({ mode: "forward", messageId: FIRST, nonce: 1 }, vi.fn(), UNREAD));
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "Couldn’t read the email to quote it. Nothing was started. Try again.",
+    );
+    expect(api.calls.some((call) => call.route === `POST ${D}`)).toBe(false);
   });
 
   it("says so when a draft cannot be started", async () => {

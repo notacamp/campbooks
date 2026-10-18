@@ -136,7 +136,7 @@ export function ReplyDialog({
   const unread = useMessageWords(workspaceId, conversationId, newest);
   const answered =
     newest?.text_unread === true && unread.data !== undefined
-      ? { ...newest, text: { content: unread.data, truncated: false }, text_unread: false }
+      ? { ...newest, text: unread.data, text_unread: false }
       : newest;
   // Who it really goes to, never only the sender's display name: a Reply-To
   // elsewhere is said out loud.

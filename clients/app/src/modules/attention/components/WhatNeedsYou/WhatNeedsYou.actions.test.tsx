@@ -28,7 +28,12 @@ import {
 import { INBOX, NOW, W } from "../../../../../test/demo/conversations";
 import { REPLY } from "../../../../../test/demo/drafts";
 import { DUARTE } from "../../../../../test/demo/workspaces";
-import { mockApi, renderWithProviders } from "../../../../../test/render";
+import {
+  mockApi,
+  problem,
+  renderWithProviders,
+  type MockHandler,
+} from "../../../../../test/render";
 
 import { WhatNeedsYou } from "./WhatNeedsYou";
 
@@ -109,7 +114,19 @@ interface Options {
   role?: "manager" | "reader";
   /** Marta's drafts already there. */
   drafts?: Schema<"DraftView">[];
+  /** The words of Marta's last email, asked for alone. */
+  words?: MockHandler;
 }
+
+const MARTA_LAST = MARTA_DETAIL.messages.at(-1)?.id ?? "";
+
+/** Marta's email as `conversations.get` sends it when its HTML was not read in time. */
+const TEXT_UNREAD: Schema<"ConversationDetail"> = {
+  ...MARTA_DETAIL,
+  messages: MARTA_DETAIL.messages.map((message) =>
+    message.id === MARTA_LAST ? { ...message, text: null, text_unread: true } : message,
+  ),
+};
 
 function api(conversations: Summary[], detail = MARTA_DETAIL, options: Options = {}) {
   // The drafts started here, as the server would list them afterwards.
@@ -150,6 +167,9 @@ function api(conversations: Summary[], detail = MARTA_DETAIL, options: Options =
       return { status: 201, body: FORWARD };
     },
     [`PATCH ${W}/drafts/${FORWARD.id}`]: { body: FORWARD },
+    ...(options.words === undefined
+      ? {}
+      : { [`GET ${W}/conversations/${MARTA.id}/messages/${MARTA_LAST}/body`]: options.words }),
   });
 }
 
@@ -290,6 +310,68 @@ describe("What needs you: the actions Scout picked", () => {
     expect(created.kind).toBe("forward");
     expect(created.to).toEqual([{ name: "João Matos", address: "joao@obras-matos.example" }]);
     expect(created.quoted).toContain("Forwarded message");
+  });
+
+  it("forwards an email that came without its words with them quoted", async () => {
+    const calls = api(
+      [PHISH, ranked(MARTA, [{ actions: ["forward"], likelihood: 88 }]), ...others],
+      TEXT_UNREAD,
+      {
+        words: {
+          body: {
+            text: "The walkthrough is on Thursday at the harbourlight pontoon.",
+            html: null,
+            truncated: false,
+            remote_images: 0,
+            images_shown: false,
+            images_trusted: false,
+            images_offer: false,
+            images_domain: null,
+          },
+        },
+      },
+    );
+    const { router } = renderHome();
+    await actions(PHISH_NAME);
+    fireEvent.keyDown(document, { key: "j" });
+    await actions("Marta Ferreira");
+    fireEvent.keyDown(document, { key: "1" });
+    const dialog = await screen.findByRole("dialog", {
+      name: "Forward Marta Ferreira’s email to…",
+    });
+    fireEvent.click(await within(dialog).findByRole("button", { name: /Rita Gomes/u }));
+    await waitFor(() => {
+      expect(router.state.location.pathname).toContain(MARTA.id);
+    });
+    const created = calls.calls.find((c) => c.route === `POST ${W}/drafts`)?.body as {
+      quoted: string;
+    };
+    expect(created.quoted).toContain("Forwarded message");
+    expect(created.quoted).toContain("The walkthrough is on Thursday at the harbourlight pontoon.");
+  });
+
+  it("sends nothing when the words of an email that came without them cannot be read", async () => {
+    const calls = api(
+      [PHISH, ranked(MARTA, [{ actions: ["forward"], likelihood: 88 }]), ...others],
+      TEXT_UNREAD,
+      { words: problem(503, "unavailable") },
+    );
+    const { router } = renderHome();
+    await actions(PHISH_NAME);
+    fireEvent.keyDown(document, { key: "j" });
+    await actions("Marta Ferreira");
+    fireEvent.keyDown(document, { key: "1" });
+    const dialog = await screen.findByRole("dialog", {
+      name: "Forward Marta Ferreira’s email to…",
+    });
+    fireEvent.click(await within(dialog).findByRole("button", { name: /Rita Gomes/u }));
+    expect(
+      await within(dialog).findByText(
+        "Couldn’t read the email to quote it: nothing was sent. Try again.",
+      ),
+    ).toBeVisible();
+    expect(calls.calls.some((c) => c.route === `POST ${W}/drafts`)).toBe(false);
+    expect(router.state.location.pathname).not.toContain(MARTA.id);
   });
 
   it("opens the item on its file with Open attachment", async () => {

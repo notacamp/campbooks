@@ -186,8 +186,9 @@ function wordsQuery(workspaceId: string, conversationId: string, messageId: stri
     queryKey: keys.words(workspaceId, conversationId, messageId),
     // A message's words never change once stored.
     staleTime: Number.POSITIVE_INFINITY,
-    queryFn: async ({ signal }: { signal: AbortSignal }) =>
-      unwrap(
+    // As a message's text: its words, and whether they were cut.
+    queryFn: async ({ signal }: { signal: AbortSignal }) => {
+      const body = unwrap(
         await api.GET(
           "/api/v1/w/{workspace_id}/conversations/{conversation_id}/messages/{message_id}/body",
           {
@@ -202,7 +203,9 @@ function wordsQuery(workspaceId: string, conversationId: string, messageId: stri
             signal,
           },
         ),
-      ).text ?? "",
+      );
+      return { content: body.text ?? "", truncated: body.truncated };
+    },
   };
 }
 
@@ -236,8 +239,8 @@ export async function withWords(
   if (message.text_unread !== true) {
     return message;
   }
-  const content = await queryClient.fetchQuery(wordsQuery(workspaceId, conversationId, message.id));
-  return { ...message, text: { content, truncated: false }, text_unread: false };
+  const text = await queryClient.fetchQuery(wordsQuery(workspaceId, conversationId, message.id));
+  return { ...message, text, text_unread: false };
 }
 
 /** The conversation-changing operations, by name. */

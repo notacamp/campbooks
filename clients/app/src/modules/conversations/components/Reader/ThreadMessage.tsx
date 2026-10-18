@@ -85,10 +85,10 @@ export function ThreadMessage({
   );
   const from = displayName(message.from);
   const time = messageTime(message.sent_at, i18n.language, now);
-  // Its words, asked for on their own when the conversation came without
-  // them (`text_unread`).
-  const unread = useMessageWords(workspaceId, conversationId, message);
-  const text = message.text?.content ?? unread.data ?? "";
+  // Its words for the folded snippet, asked for on their own when the
+  // conversation came without them (`text_unread`); open, it shows its HTML.
+  const unread = useMessageWords(workspaceId, conversationId, open ? undefined : message);
+  const text = message.text?.content ?? unread.data?.content ?? "";
   const files = useAttachments(workspaceId, conversationId, message, t, shortcuts);
   // Trusting the sender, only where the server says it can take effect.
   const domain = body.data?.images_domain ?? undefined;

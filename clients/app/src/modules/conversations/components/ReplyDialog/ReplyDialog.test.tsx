@@ -124,6 +124,67 @@ describe("ReplyDialog", () => {
     });
   });
 
+  it("quotes the words of a newest message that came without them", async () => {
+    const api = routes({
+      [`GET ${C}`]: {
+        body: {
+          ...Q4_DETAIL,
+          messages: Q4_DETAIL.messages.map((message) =>
+            message.id === NEWEST ? { ...message, text: null, text_unread: true } : message,
+          ),
+        },
+      },
+      [`GET ${C}/messages/${NEWEST}/body`]: {
+        body: {
+          text: "The harbourlight pontoon can move by two weeks.",
+          html: null,
+          truncated: false,
+          remote_images: 0,
+          images_shown: false,
+          images_trusted: false,
+          images_offer: false,
+          images_domain: null,
+        },
+      },
+    });
+    const handlers = dialog();
+    fireEvent.keyDown(await screen.findByRole("button", { name: /Say Thursday works/u }), {
+      key: "1",
+    });
+    await screen.findByRole("textbox", { name: "Your reply" });
+    fireEvent.click(screen.getByRole("button", { name: /^Send/u }));
+    await waitFor(() => {
+      expect(handlers.onSent).toHaveBeenCalled();
+    });
+    const created = api.calls.find((c) => c.route === `POST ${D}`)?.body as { quoted: string };
+    expect(created.quoted).toMatch(/Maya Okafor wrote:\n> The harbourlight pontoon can move/u);
+  });
+
+  it("sends nothing when a newest message's words cannot be read, and says so", async () => {
+    const api = routes({
+      [`GET ${C}`]: {
+        body: {
+          ...Q4_DETAIL,
+          messages: Q4_DETAIL.messages.map((message) =>
+            message.id === NEWEST ? { ...message, text: null, text_unread: true } : message,
+          ),
+        },
+      },
+      [`GET ${C}/messages/${NEWEST}/body`]: problem(503, "unavailable"),
+    });
+    dialog();
+    expect(
+      await screen.findByText("Couldn’t read the email to quote it. Close and try again."),
+    ).toBeVisible();
+    fireEvent.keyDown(await screen.findByRole("button", { name: /Say Thursday works/u }), {
+      key: "1",
+    });
+    await screen.findByRole("textbox", { name: "Your reply" });
+    fireEvent.click(screen.getByRole("button", { name: /^Send/u }));
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(api.calls.some((c) => c.route === `POST ${D}`)).toBe(false);
+  });
+
   it("says who the reply goes to, and warns when Reply-To is elsewhere", async () => {
     const newest = Q4_DETAIL.messages.at(-1);
     if (newest === undefined) {
