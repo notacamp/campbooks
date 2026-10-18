@@ -199,6 +199,10 @@ async function answer(route: Route): Promise<void> {
         409,
       );
     }
+    // A save keeps what it does not send: only the draft the token was given with.
+    if (sent["content_token"] !== draftView().content_token) {
+      return changed();
+    }
     for (const field of ["to", "cc", "bcc", "subject", "body"] as const) {
       if (sent[field] !== undefined) {
         Object.assign(draft, { [field]: sent[field] });
