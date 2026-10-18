@@ -38,7 +38,7 @@ unexpired: after a database restore, with the operator's `purge-again`
     `purge_workspace`);
   - the workspaces module's `PurgeWorkspace`;
   - the server's definer-grant test.
-- Migration `20261022050100_kernel__idempotency_workspace`. It is
+- Migration `20261022050300_kernel__idempotency_workspace`. It is
   catalog-only: a nullable column, a partial index on a table of a day's
   keys, two policies and the function.
 - Account erasure (deleting a caller's keys by principal) comes with
