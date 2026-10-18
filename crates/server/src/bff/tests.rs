@@ -1295,7 +1295,14 @@ async fn a_token_the_api_refuses_is_refreshed_once_and_a_read_goes_through(db: P
     // is held, and the app's retry goes through.
     hold_a_refused_token(&h).await;
     let reply = browser.post("/bff/api/v1/test/whoami", r#"{"a":1}"#).await;
-    reply.assert_problem(StatusCode::UNAUTHORIZED, "invalid_token");
+    assert_eq!(reply.status, StatusCode::UNAUTHORIZED, "{}", reply.body);
+    assert!(
+        reply
+            .header(header::WWW_AUTHENTICATE)
+            .is_some_and(|value| value.contains("error=\"invalid_token\"")),
+        "the API's own refusal: {:?}",
+        reply.headers
+    );
     assert_eq!(h.idp.refreshes(), before + 2);
     let retried = browser.post("/bff/api/v1/test/whoami", r#"{"a":1}"#).await;
     assert_eq!(retried.status, StatusCode::OK, "{}", retried.body);
