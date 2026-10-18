@@ -465,14 +465,16 @@ mod tests {
                 .await
                 .contains(&phish.to_owned())
         );
-        let flagged =
-            "(SELECT id FROM conversations.messages WHERE provider_message_id = 'needs-4')";
+        // The flagged message, `$1`.
+        let flagged = "needs-4";
         // A follow-up replaced the review: it is cleared as superseded.
-        sqlx::query(&format!(
+        sqlx::query(
             "UPDATE conversations.needs
                 SET state = 'cleared', cleared_because = 'superseded', cleared_at = now()
-              WHERE message_id = {flagged}"
-        ))
+              WHERE message_id =
+                    (SELECT id FROM conversations.messages WHERE provider_message_id = $1)",
+        )
+        .bind(flagged)
         .execute(&db)
         .await
         .unwrap();
@@ -483,9 +485,11 @@ mod tests {
         );
         // Rebuilt for a later message, the review leaves no trace in the
         // needs: the stored answer that it is suspicious still does.
-        sqlx::query(&format!(
-            "DELETE FROM conversations.needs WHERE message_id = {flagged}"
-        ))
+        sqlx::query(
+            "DELETE FROM conversations.needs WHERE message_id =
+                 (SELECT id FROM conversations.messages WHERE provider_message_id = $1)",
+        )
+        .bind(flagged)
         .execute(&db)
         .await
         .unwrap();
@@ -495,14 +499,15 @@ mod tests {
                 .contains(&phish.to_owned())
         );
         // A member said it is safe: they may be written to again.
-        sqlx::query(&format!(
+        sqlx::query(
             "INSERT INTO conversations.corrections
                  (id, workspace_id, conversation_id, message_id, question, from_value,
                   to_value, overridden_source)
              SELECT gen_random_uuid(), workspace_id, conversation_id, id, 'suspicious',
                     'true', 'false', 'model'
-               FROM conversations.messages WHERE id = {flagged}"
-        ))
+               FROM conversations.messages WHERE provider_message_id = $1",
+        )
+        .bind(flagged)
         .execute(&db)
         .await
         .unwrap();
