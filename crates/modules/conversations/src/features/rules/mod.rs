@@ -1158,10 +1158,8 @@ pub async fn update(
     // it is bound as it is (campbooks-cloud#242). One that is not may only be
     // paused; anything else waits until a member confirms it again.
     let bound = rule.bound(&state.binding);
-    if rule.state != RuleState::Proposed
-        && !bound
-        && !(body.paused == Some(true) && !reshaped && !body.adopt)
-    {
+    let only_pauses = body.paused == Some(true) && !reshaped && !body.adopt;
+    if rule.state != RuleState::Proposed && !bound && !only_pauses {
         return Err(Error::Conflict(
             crate::MESSAGES.reason("rule_needs_confirmation"),
         ));
