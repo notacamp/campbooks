@@ -350,10 +350,19 @@ jobs:
       - name: Changed?
         id: changed
         env:
-          BASE: ${{ github.event.pull_request.base.sha || github.event.before }}
+          BASE: ${{ github.event.before }}
+          EVENT: ${{ github.event_name }}
         run: |
           paths=(deploy/laya .github/workflows/ci.yml .github/workflows/image.yml)
-          if ! files=$(git diff --name-only "$BASE" HEAD -- "${paths[@]}" 2>/dev/null); then
+          # A PR: its own changes, between the merge ref's parents (the base
+          # tip now, the PR's head), never those of PRs merged since it was
+          # opened (campbooks-cloud#231). A push: since the previous tip.
+          if [ "$EVENT" = pull_request ] && git rev-parse -q --verify 'HEAD^2' >/dev/null; then
+            set -- 'HEAD^1...HEAD^2'
+          else
+            set -- "$BASE" HEAD
+          fi
+          if ! files=$(git diff --name-only "$@" -- "${paths[@]}" 2>/dev/null); then
             files=unknown   # no usable base (new branch, force push): build anyway
           fi
           if [ -n "$files" ]; then echo "run=true"; else echo "run=false"; fi >> "$GITHUB_OUTPUT"

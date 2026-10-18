@@ -80,6 +80,11 @@ All notable changes to Campbooks Next are documented here. The format follows
 
 ### Fixed
 
+- **Home no longer keeps an older need when two changes race.** When a conversation's
+  need changed twice in quick succession before it had an item on Home, two workers could
+  both create the item and the older change could land last, leaving Home on the older
+  need until the next change. The item now only ever moves to a newer revision. This was
+  also why a replay test failed now and then in CI.
 - **Home's Forward never offers a sender under review or a no-reply address.** The picker
   lists only people it is safe to write to: the server leaves out no-reply addresses,
   senders whose newest mail fails their sender checks or pretends to be them, and
