@@ -5,19 +5,28 @@
 //! The job does nothing unless the draft is still scheduled at the
 //! generation it was enqueued for: a cancel, a delete or a later send of
 //! the same draft wins.
+//!
+//! Nor unless the draft is still bound to its author's request
+//! (campbooks-cloud#227): `send_draft` signed the workspace, draft,
+//! generation, author, inbox and everything that goes out with a key the
+//! database never holds, and the job verifies that before it writes
+//! anything. A draft planted or edited by SQL is left as it is, with a
+//! WARN, and is not retried. The send it releases is signed in turn
+//! (`drafts.send_mac`), and the outbound-requests port verifies that before
+//! the connector sends.
 
 use campbooks_kernel::{
     JobContext, JobError, JobHandler,
     blobs::BlobOwner,
     db::BeginFor as _,
     jobs::EnqueueOptions,
-    tenancy::{Access, WorkspaceId},
+    tenancy::{Access, UserId, WorkspaceId},
 };
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    domain::{drafts, format, redact},
+    domain::{binding, drafts, format, redact},
     events::{DRAFT_RECORD, SendRequested},
     features::check_send::{CHECK_AFTER, CheckSend, CheckSendPayload},
     model::{DraftId, DraftState, SendId},
@@ -50,59 +59,45 @@ impl JobHandler for ReleaseSend {
         let state = ctx.state().clone();
         let ws = workspace.to_string();
 
-        // Read the draft as whoever wrote it; it cannot change while
-        // scheduled, so the document built from it stays true.
         let mut read = state.db.begin_for(workspace).await?;
-        let author = sqlx::query_scalar!(
-            "SELECT author FROM conversations.drafts WHERE id = $1",
-            payload.draft as DraftId
-        )
-        .fetch_optional(&mut *read)
-        .await?;
-        let Some(author) = author else {
-            return Ok(()); // Discarded meanwhile.
-        };
-        let access = Access {
-            workspace,
-            user: author.map(Into::into),
-            role: None,
-        };
-        let Some(row) = drafts::find(&mut read, &access, payload.draft, false).await? else {
-            return Ok(());
-        };
-        if !still_may_send(
-            &state,
-            &mut read,
-            workspace,
-            author.map(Into::into),
-            &payload,
-        )
-        .await?
-        {
-            read.commit().await?;
-            return Ok(());
-        }
+        let released = releasable(&state, &mut read, workspace, &payload).await?;
         read.commit().await?;
-        if row.state()? != DraftState::Scheduled || row.send_generation != payload.generation {
+        let Some((row, author)) = released else {
             return Ok(());
-        }
+        };
 
         let send_id = SendId::new();
         let document = outgoing(&row, send_id)?;
         let rfc_message_id = document.rfc_message_id.clone();
         let bytes = serde_json::to_vec(&document).map_err(|e| JobError::fatal(redact::json(&e)))?;
         let blob = state.blobs.put(&ws, bytes, OUTGOING_CONTENT_TYPE).await?;
+        // The send as stored, bound for the connector (the port verifies it).
+        let stored = binding::StoredSend {
+            workspace,
+            send: send_id,
+            inbox: row.inbox_id,
+            author,
+            document: &blob,
+        };
+        let Some(send_mac) = stored.sign(&state.binding) else {
+            return Ok(()); // No key: `releasable` already refused.
+        };
 
         let events = state.events.clone();
         let tx = ctx.tx().await?;
         // Again where the send is marked: the author's membership is held
         // until this commits, so a removal either comes after the send or
         // stops it.
-        if !still_may_send(&state, tx, workspace, author.map(Into::into), &payload).await? {
+        if !still_may_send(&state, tx, workspace, author, &payload).await? {
             return Ok(());
         }
-        let released = mark_sending(tx, &payload, send_id, &rfc_message_id, &blob).await?;
-        if !released {
+        let marked = Marked {
+            send_id,
+            rfc_message_id: &rfc_message_id,
+            blob: &blob,
+            send_mac: &send_mac,
+        };
+        if !mark_sending(tx, &payload, &marked).await? {
             return Ok(()); // Cancelled while the document was written.
         }
         state
@@ -118,7 +113,7 @@ impl JobHandler for ReleaseSend {
                     draft: payload.draft,
                     send_id,
                     message: blob,
-                    author: author.map(Into::into),
+                    author,
                 },
             )
             .await?;
@@ -137,6 +132,72 @@ impl JobHandler for ReleaseSend {
         tracing::info!(%workspace, draft = %payload.draft, %send_id, "send released");
         Ok(())
     }
+}
+
+/// The draft of `payload` and its author, read in `read` as whoever wrote
+/// it, when it may be released: still scheduled at the payload's
+/// generation, bound to its author's request (campbooks-cloud#227), and its
+/// author may still send it. It cannot change while scheduled, so the
+/// document built from it stays true. `None` otherwise; nothing is written
+/// before the binding is verified, and a draft whose binding does not
+/// verify is left as it is.
+async fn releasable(
+    state: &campbooks_kernel::AppState,
+    read: &mut sqlx::Transaction<'static, sqlx::Postgres>,
+    workspace: WorkspaceId,
+    payload: &ReleaseSendPayload,
+) -> Result<Option<(drafts::DraftRow, Option<UserId>)>, JobError> {
+    let author = sqlx::query_scalar!(
+        "SELECT author FROM conversations.drafts WHERE id = $1",
+        payload.draft as DraftId
+    )
+    .fetch_optional(&mut **read)
+    .await?;
+    let Some(author) = author else {
+        return Ok(None); // Discarded meanwhile.
+    };
+    let author: Option<UserId> = author.map(Into::into);
+    let access = Access {
+        workspace,
+        user: author,
+        role: None,
+    };
+    let Some(row) = drafts::find(read, &access, payload.draft, false).await? else {
+        return Ok(None);
+    };
+    if row.state()? != DraftState::Scheduled || row.send_generation != payload.generation {
+        return Ok(None);
+    }
+    let mac: Option<Option<Vec<u8>>> =
+        sqlx::query_scalar("SELECT request_mac FROM conversations.drafts WHERE id = $1")
+            .bind(payload.draft)
+            .fetch_optional(&mut **read)
+            .await?;
+    // A row that does not even decode was not written by `send_draft`.
+    let mac = mac.flatten();
+    let holds = binding::content_hash(&row).is_ok_and(|content| {
+        binding::SendRequest {
+            workspace,
+            draft: payload.draft,
+            generation: payload.generation,
+            author,
+            inbox: row.inbox_id,
+            content: &content,
+        }
+        .holds(&state.binding, mac.as_deref())
+    });
+    if !holds {
+        tracing::warn!(
+            %workspace,
+            draft = %payload.draft,
+            "a scheduled send is not bound to its author's request; it is not released"
+        );
+        return Ok(None);
+    }
+    if !still_may_send(state, read, workspace, author, payload).await? {
+        return Ok(None);
+    }
+    Ok(Some((row, author)))
 }
 
 /// Whether the author may still send the draft: still a member of the
@@ -166,20 +227,28 @@ async fn still_may_send(
     Ok(false)
 }
 
-/// Mark the draft as being sent as `send_id`, written as `blob`, in `tx`:
-/// `false` when it is no longer scheduled at the payload's generation
-/// (cancelled meanwhile). The document is recorded with the send: the
-/// connector asks for it (`outbound_requests`) and sends this one, never
-/// one an event names.
+/// What a released send is marked with.
+struct Marked<'a> {
+    send_id: SendId,
+    rfc_message_id: &'a str,
+    blob: &'a campbooks_kernel::blobs::BlobRef,
+    /// The send's binding (`binding::StoredSend`).
+    send_mac: &'a [u8],
+}
+
+/// Mark the draft as being sent as `marked.send_id`, written as
+/// `marked.blob`, in `tx`: `false` when it is no longer scheduled at the
+/// payload's generation (cancelled meanwhile). The document is recorded
+/// with the send, bound by `send_mac`: the connector asks for it
+/// (`outbound_requests`) and sends this one, never one an event names. The
+/// author's request is spent: its binding is cleared.
 async fn mark_sending(
     tx: &mut sqlx::PgConnection,
     payload: &ReleaseSendPayload,
-    send_id: SendId,
-    rfc_message_id: &str,
-    blob: &campbooks_kernel::blobs::BlobRef,
+    marked: &Marked<'_>,
 ) -> Result<bool, JobError> {
     let send_document =
-        serde_json::to_value(blob).map_err(|e| JobError::fatal(redact::json(&e)))?;
+        serde_json::to_value(marked.blob).map_err(|e| JobError::fatal(redact::json(&e)))?;
     let released = sqlx::query_scalar!(
         r#"
             UPDATE conversations.drafts
@@ -191,13 +260,21 @@ async fn mark_sending(
         payload.draft as DraftId,
         payload.generation,
         DraftState::Sending.as_str(),
-        send_id as SendId,
-        rfc_message_id,
+        marked.send_id as SendId,
+        marked.rfc_message_id,
         send_document,
     )
-    .fetch_optional(tx)
+    .fetch_optional(&mut *tx)
     .await?;
-    Ok(released.is_some())
+    if released.is_none() {
+        return Ok(false);
+    }
+    sqlx::query("UPDATE conversations.drafts SET send_mac = $2, request_mac = NULL WHERE id = $1")
+        .bind(payload.draft)
+        .bind(marked.send_mac)
+        .execute(&mut *tx)
+        .await?;
+    Ok(true)
 }
 
 /// Whether `author` may still send `draft`: a member of `workspace` (their
@@ -274,3 +351,6 @@ fn outgoing(row: &drafts::DraftRow, send_id: SendId) -> Result<OutgoingMessage, 
             .collect(),
     })
 }
+
+#[cfg(test)]
+mod tests;

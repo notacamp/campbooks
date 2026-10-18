@@ -144,7 +144,7 @@ pub async fn handler(
         let move_to = RequestedChange::MoveToStream {
             stream: body.stream,
         };
-        request(&state.events, &mut tx, &changed, &move_to).await?;
+        request(&state.binding, &state.events, &mut tx, &changed, &move_to).await?;
         changed.publish(&state.events, &mut tx).await?;
     }
     let mut summary = summary(&mut tx, access.user, id).await?;

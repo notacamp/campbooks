@@ -205,7 +205,7 @@ async fn announce(
         changes: vec![Change::Labels],
         provider_message_ids,
     };
-    request(&state.events, tx, &changed, change).await?;
+    request(&state.binding, &state.events, tx, &changed, change).await?;
     changed.publish(&state.events, tx).await
 }
 

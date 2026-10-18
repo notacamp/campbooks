@@ -41,8 +41,10 @@ pub type StandingFuture<'a> = Pin<Box<dyn Future<Output = Result<Vec<bool>, Erro
 pub trait OutboundRequests: std::fmt::Debug + Send + Sync + 'static {
     /// Send `send` of `workspace`, read in `conn` (a transaction working in
     /// that workspace): `Some` only while it waits for the provider (released,
-    /// not sent, failed or cancelled) and whoever asked for it may still
-    /// send from its inbox. `None` otherwise, or when there is no such send.
+    /// not sent, failed or cancelled), its stored binding verifies
+    /// ([`state.binding`](crate::binding): the release that wrote it held
+    /// the key) and whoever asked for it may still send from its inbox.
+    /// `None` otherwise, or when there is no such send.
     fn stored_send<'a>(
         &'a self,
         state: &'a AppState,
@@ -56,9 +58,12 @@ pub trait OutboundRequests: std::fmt::Debug + Send + Sync + 'static {
     /// module recorded that change as part of request `request` (the id of
     /// the event that carried it) for `conversation` in `inbox`. Read in
     /// `conn`, a transaction working in `workspace`. An item that does not
-    /// parse, or that the request did not hold, is `false`.
+    /// parse, or that the request did not hold, is `false`; so is every
+    /// item of a recorded request whose binding
+    /// ([`state.binding`](crate::binding)) does not verify.
     fn changes_standing<'a>(
         &'a self,
+        state: &'a AppState,
         conn: &'a mut PgConnection,
         workspace: WorkspaceId,
         request: Uuid,
@@ -85,6 +90,7 @@ impl OutboundRequests for NoOutboundRequests {
 
     fn changes_standing<'a>(
         &'a self,
+        _state: &'a AppState,
         _conn: &'a mut PgConnection,
         _workspace: WorkspaceId,
         _request: Uuid,

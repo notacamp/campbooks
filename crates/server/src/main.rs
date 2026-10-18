@@ -304,6 +304,21 @@ fn signer() -> Result<campbooks_kernel::crypto::Signer, String> {
     Ok(campbooks_kernel::crypto::Signer::default())
 }
 
+/// The key sends and changes at the mail provider are bound with
+/// (campbooks-cloud#227), derived from the instance secret so every process
+/// of the install agrees; without one nothing is signed or verifies, so no
+/// mailbox sends or changes anything, which is said at startup.
+fn binding() -> Result<campbooks_kernel::binding::Binding, String> {
+    if let Some(secret) = campbooks_kernel::crypto::SecretKey::from_env()? {
+        return Ok(campbooks_kernel::binding::Binding::new(&secret));
+    }
+    tracing::warn!(
+        "CAMPBOOKS_SECRET_KEY is not set: sends and changes at the mail provider are refused \
+         (each is bound to a key derived from it); set it to send mail"
+    );
+    Ok(campbooks_kernel::binding::Binding::disabled())
+}
+
 /// Startup checks of the settings `role` uses; the web BFF's settings when
 /// it serves the API with web sign-in.
 fn check(config: &Config, role: Role) -> Result<Option<bff::Settings>, String> {
@@ -362,6 +377,7 @@ async fn run(
         AppState::new(db.clone(), config)
             .with_rate_limits(rate_limits()?)
             .with_signer(signer()?)
+            .with_binding(binding()?)
             .with_metrics(telemetry.metrics())
             .with_registry(registry)
             .with_blobs(blobs)

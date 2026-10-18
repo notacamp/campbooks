@@ -1,7 +1,11 @@
 //! A conversation's derived state (counts, flags) and how features read it
 //! and announce its changes.
 
-use campbooks_kernel::{Error, EventBus, Result, tenancy::UserId};
+use campbooks_kernel::{
+    Error, EventBus, Result,
+    binding::Binding,
+    tenancy::{UserId, WorkspaceId},
+};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use sqlx::{PgConnection, Postgres, Transaction};
@@ -291,6 +295,7 @@ impl Changed {
 /// conversation: each item's message with its own change. Nothing is
 /// published when there is none.
 pub async fn request_each(
+    binding: &Binding,
     events: &EventBus,
     tx: &mut Transaction<'_, Postgres>,
     changed: &Changed,
@@ -303,12 +308,13 @@ pub async fn request_each(
             change: change.clone(),
         })
         .collect();
-    publish_request(events, tx, changed, items).await
+    publish_request(binding, events, tx, changed, items).await
 }
 
 /// Publish `changes_requested` for a member's change: `change` for each of
 /// `provider_message_ids`. Nothing is published when the list is empty.
 pub async fn request(
+    binding: &Binding,
     events: &EventBus,
     tx: &mut Transaction<'_, Postgres>,
     changed: &Changed,
@@ -322,15 +328,18 @@ pub async fn request(
             change: change.clone(),
         })
         .collect();
-    publish_request(events, tx, changed, items).await
+    publish_request(binding, events, tx, changed, items).await
 }
 
 /// Publish `changes_requested` with `items` for `changed`'s conversation,
 /// and record it under the event's id, which the connector asks about
 /// before making it (the outbound-requests port). The only place the event
 /// is published. Requests on the same conversation older than seven days go
-/// with it. Nothing is published when there is no item.
+/// with it. Nothing is published when there is no item. The record is
+/// bound with `binding` (campbooks-cloud#227); without a key it is recorded
+/// unbound, and none of its changes is made at the provider.
 async fn publish_request(
+    binding: &Binding,
     events: &EventBus,
     tx: &mut Transaction<'_, Postgres>,
     changed: &Changed,
@@ -340,6 +349,11 @@ async fn publish_request(
         return Ok(());
     }
     let recorded = serde_json::to_value(&items).map_err(Error::internal)?;
+    let workspace: WorkspaceId = changed
+        .workspace
+        .parse()
+        .map_err(|_| Error::internal("a change request outside a workspace"))?;
+    let signed = items.clone();
     let id = events
         .publish(
             tx,
@@ -371,5 +385,18 @@ async fn publish_request(
     )
     .execute(&mut **tx)
     .await?;
+    let mac = super::binding::ChangeRequest {
+        workspace,
+        request: *id.as_uuid(),
+        inbox: changed.inbox,
+        conversation: changed.conversation,
+        items: &signed,
+    }
+    .sign(binding)?;
+    sqlx::query("UPDATE conversations.change_requests SET mac = $2 WHERE id = $1")
+        .bind(*id.as_uuid())
+        .bind(mac)
+        .execute(&mut **tx)
+        .await?;
     Ok(())
 }
