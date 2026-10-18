@@ -97,7 +97,7 @@ export function DraftComposer({
   return (
     <MessageComposer
       title={title}
-      from={addressLine(draft.from)}
+      from={addressLine(editor.shown.from)}
       to={fields.to}
       onToChange={(to) => {
         update({ to });
@@ -122,7 +122,7 @@ export function DraftComposer({
       onQuotedChange={(quoted) => {
         update({ quoted });
       }}
-      attachments={draft.attachments.filter((a) => fields.attachments.includes(a.id))}
+      attachments={editor.shown.attachments.filter((a) => fields.attachments.includes(a.id))}
       onRemoveAttachment={(id) => {
         update({ attachments: fields.attachments.filter((kept) => kept !== id) });
       }}

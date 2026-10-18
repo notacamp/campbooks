@@ -244,6 +244,8 @@ pub enum Shown {
     Draft {
         /// The draft.
         id: DraftId,
+        /// The inbox it is sent from (the send request binds it too).
+        inbox: InboxId,
         /// Its version (bumped by every save).
         version: i32,
         /// [`content_hash`] of the row.
@@ -299,6 +301,7 @@ impl ContentToken {
             access,
             Shown::Draft {
                 id: row.id,
+                inbox: row.inbox_id,
                 version: row.version,
                 content: content_hash(row)?,
             },
@@ -313,12 +316,14 @@ impl ContentToken {
         match &self.shown {
             Shown::Draft {
                 id,
+                inbox,
                 version,
                 content,
             } => {
                 fields
                     .str(DRAFT_RECORD)
                     .uuid(id.as_uuid())
+                    .uuid(inbox.as_uuid())
                     .int(i64::from(*version))
                     .bytes(content);
             }
@@ -496,9 +501,10 @@ mod tests {
     fn a_content_token_holds_only_for_what_was_shown_to_whom() {
         let workspace = WorkspaceId::new();
         let member = Some(UserId::new());
-        let id = DraftId::new();
+        let (id, inbox) = (DraftId::new(), InboxId::new());
         let draft = Shown::Draft {
             id,
+            inbox,
             version: 3,
             content: [5_u8; 32],
         };
@@ -528,6 +534,7 @@ mod tests {
             ContentToken {
                 shown: Shown::Draft {
                     id,
+                    inbox,
                     version: 4,
                     content: [5_u8; 32],
                 },
@@ -536,6 +543,7 @@ mod tests {
             ContentToken {
                 shown: Shown::Draft {
                     id,
+                    inbox,
                     version: 3,
                     content: [6_u8; 32],
                 },
@@ -544,6 +552,16 @@ mod tests {
             ContentToken {
                 shown: Shown::Draft {
                     id: DraftId::new(),
+                    inbox,
+                    version: 3,
+                    content: [5_u8; 32],
+                },
+                ..token
+            },
+            ContentToken {
+                shown: Shown::Draft {
+                    id,
+                    inbox: InboxId::new(),
                     version: 3,
                     content: [5_u8; 32],
                 },
@@ -631,6 +649,7 @@ mod tests {
         let draft = ContentToken {
             shown: Shown::Draft {
                 id: DraftId::from_uuid(*id.as_uuid()),
+                inbox,
                 version: 0,
                 content,
             },

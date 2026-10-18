@@ -43,6 +43,7 @@ server gave that member's client when it showed them that content.
 | Request | Signs | Content from | Token |
 |---|---|---|---|
 | `send_draft` (and its schedule: the undo window is the schedule) | the send request (#552) | the row | **required** |
+| `update_draft` (every save: autosave, the reply dialog's save of its own draft, the forward dialog's recipient) | nothing, but its answer issues the next token | the request's fields, and the row for every field it does not send (always some: the inbox, the reply headers, the attachments' files) | **required**: a save may only keep what was shown (§4) |
 | `confirm_rule`, a proposal | the rule (#556) | the row | **required** |
 | `confirm_rule`, a rule that needs a yes again (`confirm_again`) | the rule, now taught by the confirming member | the row | **required** |
 | `update_rule` with `adopt` | the rule, now with the adopting manager's rights | the row (verified under #556's MAC) | **required**, unless the request sets both conditions and actions |
@@ -62,7 +63,7 @@ a new context label, `campbooks/conversations.content-token/v1`:
 ```
 content_token = base64url( 0x01 ‖ HMAC-SHA256(key,
     label, workspace, member (opt), kind,
-    draft: id, version, content_hash(row)                       -- #552's hash
+    draft: id, inbox_id, version, content_hash(row)              -- #552's hash
     rule:  id, binding_generation, content_hash(conditions, actions), -- #556's hash
            inbox, stored state, taught_by (opt) ) )
 ```
@@ -78,7 +79,12 @@ content_token = base64url( 0x01 ‖ HMAC-SHA256(key,
   tokens write, and cannot confirm or adopt rules.
 - **Bound to the version or generation**: a token of before a save, or of
   before a rule was signed again, does not hold.
-- **Kind** is in the encoding, so a draft's token is never a rule's.
+- **Kind** is in the encoding, so a draft's token is never a rule's, and
+  the id, so another draft's or rule's never holds.
+- **The draft's inbox id** is a field of the token beside the content hash
+  (which covers the inbox's address and name), as the send request binds
+  it. The #552 content hash itself is unchanged, so sends scheduled before
+  the deploy still release.
 - Never stored, logged or put in an event. Without an instance secret no
   token is issued (`content_token` absent) and nothing signs (500).
 
@@ -91,6 +97,19 @@ and the `version` check (409 `draft_changed`), `shown_to_author` recomputes
 the workspace and draft ids and `why = missing|mismatched`, before any
 write: no state change, no request MAC, no release job, nothing published.
 
+`update_draft`: the same check (`drafts::shown_to_author`), at the same
+place, against the row *before* the write. Every save keeps fields the
+request cannot send (the inbox, the reply headers and thread, the
+attachments' files, sizes and types: attachments are named by id), so
+every save takes the token; there is no full replace that needs none. A
+missing, foreign or stale token answers 409 `content_changed`: nothing
+written, an ids-only WARN. Only a save that holds writes, and its answer
+issues the next token, over what the save left. So the token chain runs
+from the response a client first read the draft from, through every save,
+to the send, and a save can no longer re-issue a token over fields SQL
+changed after that read. Without an instance secret no token exists and
+nothing can be signed: saves are not checked, and `send_draft` refuses.
+
 `confirm_rule`: after the access checks, the runs' and the rule's locks and
 the reload under the lock, a proposal and a rule that needs a yes again are
 verified the same way (`shown_to_caller`) before `validate`, `replace` or
@@ -101,23 +120,38 @@ check.
 ## 5. Client
 
 - **The composer** (`use-draft-editor`) keeps the token of the content on
-  screen in a ref: from the draft it opened with, then from each save's
-  answer (the save sends every field the composer shows, so the answer is
-  what is on screen). Never from a list or a read the editor does not show.
-  Send sends it with the version. On 409 `content_changed` it reads the
-  draft again and shows it as it is now, fields, version and token, with
-  "This changed since you opened it. Check it and send again." It never
-  sends again by itself.
+  screen in a ref, from the draft it opened with, then from each answer it
+  applies: a save's (the save sends every field the composer edits) or a
+  re-read after a 409. With the same answer it takes what it shows but
+  does not edit (From, the attachments' names). Every save and Send sends
+  the token with the version.
+- **An autosave refused** (409 `content_changed`, or `draft_changed` from
+  another tab) saves nothing. The composer keeps what the member typed,
+  reads the draft again for its version, token and attachments, shows
+  "This changed since you opened it. Check it and send again." once, and
+  saves nothing on its own: the next edit, or Send, saves the typed text
+  with the fresh token. No loop: one refusal, one read.
+- **A send refused** reads the draft again and shows it as it is now
+  (a send saves first, so nothing typed is lost), with the same notice.
+  It never sends again by itself.
 - **The message composer** shows Cc and Bcc whenever there are any, also
   ones that arrive after it opened, so a re-read draft's Bcc is on screen.
-- **The reply dialog** (Scout drafts) shows every recipient a reply goes to
-  and saves exactly those, with no Cc or Bcc, then sends with the save's
-  token. On 409 it says so, refreshes its draft's version, and the next Send
-  saves what it shows over it first.
+- **The reply dialog** (Scout drafts) never reuses a draft it did not
+  create. It used to save into an empty reply draft from the drafts list,
+  or the draft an Undo handed back, keeping that row's subject, quoted
+  text, attachments and headers, none of which it shows. Now it creates a
+  fresh reply draft with exactly the recipients it shows, no Cc or Bcc and
+  its own quoted text, and discards the draft it replaces (the undone one).
+  It saves again only the draft it created, with that draft's token,
+  sending the recipients, its quoted text and no attachments. After a 409
+  it says so, sends nothing, and the next Send creates a fresh draft.
+- **The forward dialog** saves the recipient into an untouched forward
+  draft with that draft's token; refused, it starts a fresh forward. Both
+  open in the composer, which shows the whole draft before Send.
 - **The rules list** sends the rule's token with Keep. On 409 it says
   "This rule changed since you opened it. Check it and keep it again." and
   the list it refetches shows the rule as it is now.
-- No other screen confirms a rule or sends a draft.
+- No other screen saves or sends a draft, or confirms a rule.
 
 ## 6. Judgement calls
 
@@ -139,22 +173,43 @@ check.
 
 ## 7. Residual risk
 
-- **Hidden fields.** A draft's reply headers, thread key, attachment blobs
-  (the composer shows names from when it opened), the inbox's address, and a
-  reply's subject (the reply composer shows no subject) are hashed but not
-  on screen. SQL that changes them *before* the member's client reads the
-  draft is shown, so signed. Changes after the read are refused.
+What is enforced: Send signs a draft only if its row, as stored, hashes to
+the content of the last response that client applied (the draft as read,
+listed or created, a save's answer, or a re-read after a 409), for that
+member, at that version and inbox. A save writes only under the same
+condition. A yes or an adoption signs a rule only if it is the rule the
+member's client last read. What that leaves:
+
+- **Before the first read.** SQL that changes a draft before the member's
+  client first reads it is in what that client is given, so it can be
+  signed. Fields on screen (recipients, Cc and Bcc, subject on a new
+  message or forward, text, quoted text, attachment names) are then shown;
+  the inbox's address is shown as From. Fields no screen shows (the reply
+  headers and thread, an attachment's file behind its name, a reply's
+  subject in the reply composer) are not. The token stops any change after
+  that read.
+- **A re-read is a read.** After a 409 the client reads the draft again
+  and takes its token: what changed by then is shown where the composer
+  shows it, and hidden fields are taken as they are.
 - **Replay** of a row exactly as the member was shown it makes their token
   hold again (#552 §8): it can only send what they saw.
 - **A list landing at the click.** The rules list updates the sentence and
   its token together; the member says yes to what the row showed.
+- **Not covered here** (filed separately): a proposal's author kept on
+  confirm, `confirmed_at` outside the rule token, the assistant confirming
+  rules with the member's token.
 
 ## 8. Deploy and rollback
 
-No migration. At the deploy an open composer or rules list has no token:
-the first Send or Keep answers 409, the client reads the content again
-(the same, since a send saves first), shows one notice, and the next click
-works. A tab still running the old client shows its generic error until
-reloaded. Scheduled sends were signed under #552 and release as before.
-Rollback is redeploying the previous image: the field is ignored by the
-old server.
+No migration. At the deploy an open composer, reply dialog or rules list
+holds no token. The composer's first autosave (or Send) answers 409: it
+keeps what was typed, reads the draft again, shows the notice once, and
+the next save or Send works with the fresh token; it never retries on its
+own, so there is no loop of 409s. The reply dialog's first Send after an
+Undo from before the deploy creates a fresh draft and needs no old token.
+Keep in the rules list answers 409 once and works after the refetch. A tab
+still running the old client shows its generic error on save, Send or
+Keep until reloaded; its text stays in the editor, and the last save
+before the deploy is kept. Scheduled sends were signed under #552 (whose
+content hash is unchanged) and release as before. Rollback is redeploying
+the previous image: the field is ignored by the old server.

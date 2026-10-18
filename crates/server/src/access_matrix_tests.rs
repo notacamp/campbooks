@@ -1365,8 +1365,10 @@ async fn a_scheduled_send_follows_its_authors_real_membership(db: PgPool) {
         let draft = world.instances["conversations.draft"].clone();
         let uri = format!("/api/v1/w/{}/drafts/{draft}", world.a);
         let sender = world.token(Who::Sender.subject());
-        let body =
-            json!({"version": 1, "subject": "Matrix", "to": [{"address": "leo@example.com"}]});
+        let (_, read, _) = world.call(Some(&sender), "GET", &uri, None).await;
+        let read: Value = serde_json::from_slice(&read).unwrap();
+        let body = json!({"version": 1, "subject": "Matrix", "to": [{"address": "leo@example.com"}],
+            "content_token": read["content_token"]});
         let (status, bytes, _) = world.call(Some(&sender), "PATCH", &uri, Some(&body)).await;
         assert_eq!(
             status,

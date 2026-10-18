@@ -747,3 +747,34 @@ async fn a_manager_adopts_only_the_rule_they_were_shown(db: PgPool) {
     let adopted = kit.patch(&sam, &one, body).await;
     assert_eq!(adopted.status, StatusCode::OK, "{:?}", adopted.json);
 }
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn another_rules_token_does_not_hold(db: PgPool) {
+    let kit = kit(db).await;
+    let (workspace, inbox, sam, _) = sams_notifications(&kit, 1).await;
+    let one = proposal(&kit, &sam, workspace, inbox).await;
+    let other = json!({
+        "conditions": [{"field": "sender_address", "value": "marta@example.com"}],
+        "actions": [{"action": "mark_read"}],
+        "state": "proposed",
+    });
+    let created = kit
+        .post(
+            &sam,
+            &format!("/api/v1/w/{workspace}/inboxes/{inbox}/rules"),
+            Some(other),
+        )
+        .await;
+    assert_eq!(created.status, StatusCode::CREATED, "{:?}", created.json);
+    // The other proposal's token (same member, inbox, state, generation).
+    let theirs = json!({
+        "apply_to_existing": false,
+        "content_token": created.json["rule"]["content_token"],
+    });
+    let refused = kit
+        .post(&sam, &format!("{one}/confirm"), Some(theirs))
+        .await;
+    assert_eq!(refused.status, StatusCode::CONFLICT, "{:?}", refused.json);
+    assert_eq!(refused.json["code"], "content_changed");
+    still_proposed(&kit, &one).await;
+}

@@ -42,8 +42,27 @@ function fieldsOf(draft: Draft): DraftFields {
   };
 }
 
-function changesOf(fields: DraftFields, version: number): DraftChanges {
-  return { version, ...fields };
+/** What the composer shows of a draft but does not edit. */
+export interface DraftShown {
+  from: Draft["from"];
+  attachments: Draft["attachments"];
+}
+
+function shownOf(draft: Draft): DraftShown {
+  return { from: draft.from, attachments: draft.attachments };
+}
+
+function changesOf(
+  fields: DraftFields,
+  version: number,
+  contentToken: string | null | undefined,
+): DraftChanges {
+  return { version, content_token: contentToken ?? null, ...fields };
+}
+
+/** A save or send refused because the draft is not what the composer holds. */
+function changedElsewhere(code: string | undefined): boolean {
+  return code === "content_changed" || code === "draft_changed";
 }
 
 /**
@@ -57,6 +76,9 @@ export function useDraftEditor(workspaceId: string, draft: Draft) {
   const [saveState, setSaveState] = useState<SaveState>("saved");
   const [error, setError] = useState<string | undefined>(draft.failure_reason ?? undefined);
   const [sending, setSending] = useState(false);
+  // What it shows but does not edit (From, the attachments' names), from the
+  // same answer as the token below.
+  const [shown, setShown] = useState<DraftShown>(() => shownOf(draft));
   const version = useRef(draft.version);
   // The token of the content on screen (campbooks-cloud#242): taken only
   // from an answer whose content is what the editor shows (the draft it
@@ -101,25 +123,41 @@ export function useDraftEditor(workspaceId: string, draft: Draft) {
     const run = async () => {
       setSaveState("saving");
       try {
-        let answer: Draft;
-        try {
-          answer = await saveDraft(workspaceId, draft.id, changesOf(current, version.current));
-        } catch (thrown) {
-          if (problemCode(thrown) !== "draft_changed") {
-            throw thrown;
-          }
-          // Saved elsewhere meanwhile (another tab): this edit is the latest.
-          version.current = (await fetchDraft(workspaceId, draft.id)).version;
-          answer = await saveDraft(workspaceId, draft.id, changesOf(current, version.current));
-        }
+        // A save keeps what it does not send (the attachments' files, the
+        // reply headers), so it names the token of what is on screen.
+        const answer = await saveDraft(
+          workspaceId,
+          draft.id,
+          changesOf(current, version.current, shownToken.current),
+        );
         version.current = answer.version;
         // What it saved is what is on screen: the answer's token is for it.
         shownToken.current = answer.content_token;
+        setShown(shownOf(answer));
         saved.current = current;
         setSaveState(latest.current === current ? "saved" : "unsaved");
         setError(undefined);
-      } catch {
-        setSaveState("failed");
+      } catch (thrown) {
+        const code = problemCode(thrown);
+        if (!changedElsewhere(code)) {
+          setSaveState("failed");
+          return;
+        }
+        // Changed since it was shown (elsewhere, or opened before the server
+        // checked): nothing was saved. Keep what the member typed, read the
+        // draft again for its version, token and what it shows, and say so
+        // once. The next save (an edit, or Send) saves the typed text over
+        // it; nothing is saved again on its own.
+        try {
+          const fresh = await fetchDraft(workspaceId, draft.id);
+          version.current = fresh.version;
+          shownToken.current = fresh.content_token;
+          setShown(shownOf(fresh));
+        } catch {
+          // The next save asks again.
+        }
+        setSaveState("unsaved");
+        setError("content_changed");
       }
     };
     inFlight.current = run();
@@ -166,6 +204,7 @@ export function useDraftEditor(workspaceId: string, draft: Draft) {
       saved.current = next;
       version.current = current.version;
       shownToken.current = current.content_token;
+      setShown(shownOf(current));
       setFields(next);
       setSaveState("saved");
       replace(current);
@@ -180,7 +219,8 @@ export function useDraftEditor(workspaceId: string, draft: Draft) {
       // Send only what the member sees: the server sends the saved version.
       const current = latest.current;
       if (!(await flush()) || latest.current !== current) {
-        setError("not_saved");
+        // A save refused as changed has said so already; keep that notice.
+        setError((shownError) => (shownError === "content_changed" ? shownError : "not_saved"));
         return undefined;
       }
       const scheduled = await sendDraft(workspaceId, draft.id, {
@@ -236,5 +276,5 @@ export function useDraftEditor(workspaceId: string, draft: Draft) {
     await refresh();
   }, [draft.id, refresh, replace, workspaceId]);
 
-  return { fields, update, saveState, error, sending, send, undo, discard, flush };
+  return { fields, shown, update, saveState, error, sending, send, undo, discard, flush };
 }

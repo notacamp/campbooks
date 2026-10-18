@@ -106,7 +106,15 @@ pub async fn send(
     if i64::from(body.version) != i64::from(row.version) {
         return Err(Error::Conflict(crate::MESSAGES.reason("draft_changed")));
     }
-    let content = shown_to_author(&state, access, &row, body.content_token.as_deref())?;
+    if !state.binding.is_enabled() {
+        tracing::warn!(
+            workspace = %access.workspace,
+            draft = %row.id,
+            "a send was refused: there is no key to bind it with (CAMPBOOKS_SECRET_KEY is unset)"
+        );
+        return Err(Error::internal("sends are not bound: no instance secret"));
+    }
+    let content = drafts::shown_to_author(&state, access, &row, body.content_token.as_deref())?;
     let (to, cc, bcc) = row.recipients()?;
     if to.len() + cc.len() + bcc.len() == 0 {
         return Err(Error::BadRequest(crate::MESSAGES.reason("no_recipients")));
@@ -164,51 +172,8 @@ pub async fn send(
     Ok((StatusCode::ACCEPTED, Json(draft)))
 }
 
-/// The content of `row` (locked by the caller), once `token` shows the
-/// member was shown it as it is now (campbooks-cloud#242): the
-/// [`ContentToken`](binding::ContentToken) a response gave this member
-/// with the draft, over the same hash [`bind_request`] signs. A draft
-/// changed since (a Bcc added with SQL, say), shown to someone else, or
-/// sent with no token answers 409 `content_changed`, before anything
-/// changes. Without the instance secret there is nothing to check with,
-/// and nothing is scheduled (500).
-fn shown_to_author(
-    state: &AppState,
-    access: &campbooks_kernel::tenancy::Access,
-    row: &drafts::DraftRow,
-    token: Option<&str>,
-) -> Result<[u8; 32]> {
-    if !state.binding.is_enabled() {
-        tracing::warn!(
-            workspace = %access.workspace,
-            draft = %row.id,
-            "a send was refused: there is no key to bind it with (CAMPBOOKS_SECRET_KEY is unset)"
-        );
-        return Err(Error::internal("sends are not bound: no instance secret"));
-    }
-    let content = binding::content_hash(row)?;
-    let shown = binding::ContentToken::for_caller(
-        access,
-        binding::Shown::Draft {
-            id: row.id,
-            version: row.version,
-            content,
-        },
-    );
-    if !shown.holds(&state.binding, token) {
-        tracing::warn!(
-            workspace = %access.workspace,
-            draft = %row.id,
-            why = if token.is_some() { "mismatched" } else { "missing" },
-            "a send was refused: the draft is not what its author was shown"
-        );
-        return Err(Error::Conflict(crate::MESSAGES.reason("content_changed")));
-    }
-    Ok(content)
-}
-
 /// Bind the author's request to send `row` (with `content`, its
-/// [`binding::content_hash`] as checked by [`shown_to_author`]) at
+/// [`binding::content_hash`] as checked by [`drafts::shown_to_author`]) at
 /// `generation` (scheduled in `tx`) with a MAC the database cannot forge
 /// (campbooks-cloud#227): `release_send` releases only a draft whose
 /// content, recipients, inbox, author and generation are still the ones

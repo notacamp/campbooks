@@ -2778,6 +2778,15 @@ export interface components {
             body?: string | null;
             /** @description Copied recipients. */
             cc?: components["schemas"]["Address"][] | null;
+            /**
+             * @description The `content_token` that came with the draft on screen (its last
+             *     save's answer, or the draft as read). Every save keeps fields it
+             *     cannot set (the inbox, the reply headers, the attachments' files),
+             *     so every save names what it was shown: missing, another member's, or
+             *     not the draft as it is now answers 409 `content_changed` and nothing
+             *     is saved (campbooks-cloud#242).
+             */
+            content_token?: string | null;
             /** @description The quoted history. */
             quoted?: string | null;
             /** @description The subject. */
@@ -8617,7 +8626,7 @@ export interface operations {
                     "application/problem+json": components["schemas"]["Problem"];
                 };
             };
-            /** @description Changed since that version (`draft_changed`), or on its way (`draft_not_editable`). */
+            /** @description Changed since that version (`draft_changed`), on its way (`draft_not_editable`), or not what you were shown (`content_changed`): read it again, then save. */
             409: {
                 headers: {
                     [name: string]: unknown;

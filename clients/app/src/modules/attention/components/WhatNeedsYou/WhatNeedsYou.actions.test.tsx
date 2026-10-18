@@ -407,6 +407,7 @@ describe("What needs you: the actions Scout picked", () => {
       expect(calls.calls.find((c) => c.route === `PATCH ${W}/drafts/${FORWARD.id}`)?.body).toEqual({
         to: [{ name: "Rita Gomes", address: "rita@silva-contas.example" }],
         version: FORWARD.version,
+        content_token: FORWARD.content_token,
       });
     });
     expect(calls.calls.some((c) => c.route === `POST ${W}/drafts`)).toBe(false);
@@ -513,6 +514,7 @@ describe("What needs you: the actions Scout picked", () => {
       expect(calls.calls.find((c) => c.route === `PATCH ${W}/drafts/${FORWARD.id}`)?.body).toEqual({
         to: [{ name: "João Matos", address: "joao@obras-matos.example" }],
         version: FORWARD.version,
+        content_token: FORWARD.content_token,
       });
     });
     expect(calls.calls.filter((c) => c.route === `POST ${W}/drafts`)).toHaveLength(1);

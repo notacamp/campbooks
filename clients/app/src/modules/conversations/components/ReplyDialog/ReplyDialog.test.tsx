@@ -13,6 +13,13 @@ const D = `${W}/drafts`;
 const NEWEST = Q4_DETAIL.messages.at(-1)?.id ?? "";
 const DRAFT = "Hi Maya,\n\nThursday works for me.\n\nSam Rivera";
 const SHORT = "Hi Maya, Thursday works.\n\nSam";
+/** The reply draft the dialog creates when it does not reuse one. */
+const FRESH = {
+  ...REPLY,
+  id: "0192f1a0-0000-7000-8000-000000000109",
+  message_id: NEWEST,
+  content_token: "demo-token-fresh",
+};
 
 function routes(extra: Parameters<typeof mockApi>[0] = {}) {
   return mockApi({
@@ -178,11 +185,13 @@ describe("ReplyDialog", () => {
     expect(screen.getByRole("textbox", { name: "Your reply" })).toHaveValue(`${DRAFT} Edited.`);
   });
 
-  it("opens Scout's text in the composer as a saved reply draft", async () => {
+  it("opens Scout's text in the composer as a fresh reply draft, discarding the undone one", async () => {
     const api = routes({
-      [`PATCH ${D}/${REPLY.id}`]: (_request, body) => ({
-        body: { ...REPLY, ...(body as object), version: 2 },
+      [`POST ${D}`]: (_request, body) => ({
+        status: 201,
+        body: { ...FRESH, body: (body as { body: string }).body },
       }),
+      [`DELETE ${D}/${REPLY.id}`]: { status: 204 },
     });
     const resume: ReplyResume = {
       draft: { ...REPLY, message_id: NEWEST, body: DRAFT },
@@ -195,15 +204,61 @@ describe("ReplyDialog", () => {
     await waitFor(() => {
       expect(handlers.onOpenDraft).toHaveBeenCalled();
     });
-    // The undone draft is saved again, never a second one.
-    expect(api.calls.some((c) => c.route === `POST ${D}`)).toBe(false);
-    // Saved with exactly who the dialog shows, and no copies.
-    expect(api.calls.find((c) => c.route === `PATCH ${D}/${REPLY.id}`)?.body).toEqual({
-      version: 1,
+    // The undone draft is never saved again: a new one holds what is shown,
+    // with exactly who the dialog shows and no copies, and the old one goes.
+    expect(api.calls.some((c) => c.route.startsWith("PATCH"))).toBe(false);
+    expect(api.calls.find((c) => c.route === `POST ${D}`)?.body).toMatchObject({
+      kind: "reply",
       body: DRAFT,
       to: REPLY.to,
       cc: [],
       bcc: [],
+    });
+    await waitFor(() => {
+      expect(api.calls.map((c) => c.route)).toContain(`DELETE ${D}/${REPLY.id}`);
+    });
+  });
+
+  it("never sends what a reused draft held but the dialog did not show", async () => {
+    const api = routes({
+      [`POST ${D}`]: (_request, body) => ({
+        status: 201,
+        body: { ...FRESH, body: (body as { body: string }).body },
+      }),
+      [`POST ${D}/${FRESH.id}/send`]: {
+        status: 202,
+        body: { ...FRESH, state: "scheduled", send_at: "2026-10-13T15:00:10Z" },
+      },
+      [`DELETE ${D}/${REPLY.id}`]: { status: 204 },
+    });
+    // The draft an Undo handed back now holds a Bcc and a file nobody here
+    // added (what SQL could plant).
+    const resume: ReplyResume = {
+      draft: {
+        ...REPLY,
+        message_id: NEWEST,
+        body: DRAFT,
+        bcc: [{ name: null, address: "eve@example.com" }],
+        attachments: [
+          { id: "a1", filename: "invoice.pdf.exe", content_type: "application/pdf", size: 1 },
+        ],
+      },
+      intent: "Say Thursday works",
+    };
+    const handlers = dialog({ resume });
+    await screen.findByText("To Maya Okafor <maya@northwind-studio.example>");
+    fireEvent.click(screen.getByRole("button", { name: /^Send/u }));
+    await waitFor(() => {
+      expect(handlers.onSent).toHaveBeenCalled();
+    });
+    expect(api.calls.some((c) => c.route.startsWith("PATCH"))).toBe(false);
+    expect(api.calls.some((c) => c.route === `POST ${D}/${REPLY.id}/send`)).toBe(false);
+    const created = api.calls.find((c) => c.route === `POST ${D}`)?.body as Record<string, unknown>;
+    expect(created).toMatchObject({ to: REPLY.to, cc: [], bcc: [], body: DRAFT });
+    expect(created).not.toHaveProperty("attachments");
+    expect(api.calls.find((c) => c.route === `POST ${D}/${FRESH.id}/send`)?.body).toEqual({
+      version: FRESH.version,
+      content_token: FRESH.content_token,
     });
   });
 });

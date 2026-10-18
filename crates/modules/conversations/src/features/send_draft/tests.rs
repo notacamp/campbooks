@@ -50,6 +50,20 @@ async fn send_shown(
     .await
 }
 
+/// Save `changes` to the draft at `uri` as it reads now: its version and
+/// the content token that came with it.
+async fn save(
+    kit: &Kit,
+    token: &str,
+    uri: &str,
+    mut changes: Value,
+) -> campbooks_kernel::testing::TestResponse {
+    let shown = kit.get(token, uri).await.json;
+    changes["version"] = shown["version"].clone();
+    changes["content_token"] = shown["content_token"].clone();
+    kit.patch(token, uri, changes).await
+}
+
 /// Run `sql` (binding the draft at `uri`) as the runtime role in
 /// `workspace`: what an attacker with SQL in the workspace can do.
 async fn as_runtime(kit: &Kit, workspace: WorkspaceId, uri: &str, sql: &'static str) {
@@ -222,12 +236,13 @@ async fn undo_then_send_again_releases_only_the_second(db: PgPool) {
     assert_eq!(undone.status, StatusCode::OK, "{:?}", undone.json);
     assert_eq!(undone.json["state"], "draft");
     assert!(undone.json["send_at"].is_null());
-    let version = undone.json["version"].clone();
+    // The draft shown again after Undo carries its own token.
     let edited = kit
         .patch(
             &sam,
             &draft,
-            json!({"version": version, "body": "Second thoughts"}),
+            json!({"version": undone.json["version"], "body": "Second thoughts",
+                "content_token": undone.json["content_token"]}),
         )
         .await;
     assert_eq!(edited.status, StatusCode::OK, "{:?}", edited.json);
@@ -305,10 +320,11 @@ async fn a_send_needs_valid_recipients(db: PgPool) {
     let response = send(&kit, &sam, &one).await;
     assert_eq!(response.status, StatusCode::BAD_REQUEST);
     assert_eq!(response.json["code"], "no_recipients");
-    kit.patch(
+    save(
+        &kit,
         &sam,
         &one,
-        json!({"version": 1, "to": [{"address": "not an address"}]}),
+        json!({"to": [{"address": "not an address"}]}),
     )
     .await;
     let response = send(&kit, &sam, &one).await;
@@ -323,9 +339,7 @@ async fn a_send_names_the_version_it_sends(db: PgPool) {
     let draft = reply(&kit, workspace, &sam).await;
     // Saved elsewhere since the composer last saved: refuse rather than send
     // something the member did not see.
-    let saved = kit
-        .patch(&sam, &draft, json!({"version": 1, "body": "Changed"}))
-        .await;
+    let saved = save(&kit, &sam, &draft, json!({"body": "Changed"})).await;
     assert_eq!(saved.json["version"], 2);
     let stale = kit
         .post(&sam, &format!("{draft}/send"), Some(json!({"version": 1})))
@@ -494,7 +508,8 @@ async fn a_save_answers_with_the_token_of_what_it_saved(db: PgPool) {
         .patch(
             &sam,
             &draft,
-            json!({"version": first["version"], "body": "Done, see you Thursday"}),
+            json!({"version": first["version"], "body": "Done, see you Thursday",
+                "content_token": first["content_token"]}),
         )
         .await;
     assert_eq!(saved.status, StatusCode::OK, "{:?}", saved.json);
@@ -525,4 +540,145 @@ async fn a_save_answers_with_the_token_of_what_it_saved(db: PgPool) {
             .unwrap()
             .starts_with("Done, see you Thursday")
     );
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_save_keeps_only_what_was_shown(db: PgPool) {
+    let kit = Kit::new(db).await;
+    let (workspace, _, sam) = kit.sams_inbox().await;
+    let message = kit.message_of("en-1").await;
+    let uri = format!("/api/v1/w/{workspace}/drafts");
+    let forward = kit
+        .post(
+            &sam,
+            &uri,
+            Some(json!({"kind": "forward", "message_id": message,
+                "to": [{"address": "leo@example.com"}]})),
+        )
+        .await;
+    assert_eq!(forward.status, StatusCode::CREATED, "{:?}", forward.json);
+    let draft = format!("{uri}/{}", forward.json["id"].as_str().unwrap());
+    let shown = forward.json;
+    let attachment = shown["attachments"][0]["id"].clone();
+    // Between the open and the next autosave, SQL changes what no save
+    // sends: an attachment's file, the quoted text, the reply headers.
+    for sql in [
+        r#"UPDATE conversations.drafts
+              SET attachments = jsonb_set(attachments, '{0,filename}', '"invoice.pdf.exe"')
+            WHERE id = $1"#,
+        "UPDATE conversations.drafts SET quoted = 'Pay the new account' WHERE id = $1",
+        "UPDATE conversations.drafts SET in_reply_to = 'planted@example.com' WHERE id = $1",
+    ] {
+        as_runtime(&kit, workspace, &draft, sql).await;
+        let autosave = kit
+            .patch(
+                &sam,
+                &draft,
+                json!({"version": shown["version"], "content_token": shown["content_token"],
+                    "to": [{"address": "leo@example.com"}], "subject": shown["subject"],
+                    "body": "Here it is", "attachments": [attachment]}),
+            )
+            .await;
+        assert_eq!(
+            autosave.status,
+            StatusCode::CONFLICT,
+            "{sql}: {:?}",
+            autosave.json
+        );
+        assert_eq!(autosave.json["code"], "content_changed");
+        // Nothing saved: no new version, no new token for what was planted.
+        let row: (i32, String) =
+            sqlx::query_as("SELECT version, body FROM conversations.drafts WHERE id = $1")
+                .bind(
+                    draft
+                        .rsplit('/')
+                        .next()
+                        .unwrap()
+                        .parse::<sqlx::types::Uuid>()
+                        .unwrap(),
+                )
+                .fetch_one(&kit.db)
+                .await
+                .unwrap();
+        assert_eq!(row, (1, String::new()));
+        // And a send with what Sam was shown signs nothing.
+        let sent = send_shown(&kit, &sam, &draft, &shown).await;
+        assert_eq!(sent.json["code"], "content_changed");
+        nothing_scheduled(&kit, &draft).await;
+    }
+    // Read again (the composer shows the attachment as it now is): saved.
+    let again = save(&kit, &sam, &draft, json!({"body": "Here it is"})).await;
+    assert_eq!(again.status, StatusCode::OK, "{:?}", again.json);
+    assert_eq!(again.json["attachments"][0]["filename"], "invoice.pdf.exe");
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn another_drafts_token_does_not_hold(db: PgPool) {
+    let kit = Kit::new(db).await;
+    let (workspace, _, sam) = kit.sams_inbox().await;
+    let one = reply(&kit, workspace, &sam).await;
+    let other = reply(&kit, workspace, &sam).await;
+    let theirs = kit.get(&sam, &other).await.json;
+    let mine = kit.get(&sam, &one).await.json;
+    assert_eq!(mine["version"], theirs["version"]);
+    // The other draft's token, same version, same author: not this draft's.
+    let saved = kit
+        .patch(
+            &sam,
+            &one,
+            json!({"version": mine["version"], "content_token": theirs["content_token"],
+                "body": "x"}),
+        )
+        .await;
+    assert_eq!(saved.status, StatusCode::CONFLICT, "{:?}", saved.json);
+    assert_eq!(saved.json["code"], "content_changed");
+    let sent = kit
+        .post(
+            &sam,
+            &format!("{one}/send"),
+            Some(json!({"version": mine["version"], "content_token": theirs["content_token"]})),
+        )
+        .await;
+    assert_eq!(sent.json["code"], "content_changed");
+    nothing_scheduled(&kit, &one).await;
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn an_autosave_takes_the_token_of_the_last_save(db: PgPool) {
+    let kit = Kit::new(db).await;
+    let (workspace, _, sam) = kit.sams_inbox().await;
+    let draft = reply(&kit, workspace, &sam).await;
+    let opened = kit.get(&sam, &draft).await.json;
+    let first = kit
+        .patch(
+            &sam,
+            &draft,
+            json!({"version": opened["version"], "content_token": opened["content_token"],
+                "body": "Thursday"}),
+        )
+        .await;
+    assert_eq!(first.status, StatusCode::OK, "{:?}", first.json);
+    // The next autosave with the token of the open: refused, nothing saved.
+    let stale = kit
+        .patch(
+            &sam,
+            &draft,
+            json!({"version": first.json["version"], "content_token": opened["content_token"],
+                "body": "Thursday works"}),
+        )
+        .await;
+    assert_eq!(stale.status, StatusCode::CONFLICT, "{:?}", stale.json);
+    assert_eq!(stale.json["code"], "content_changed");
+    assert_eq!(kit.get(&sam, &draft).await.json["body"], "Thursday");
+    // With the last save's: saved.
+    let fresh = kit
+        .patch(
+            &sam,
+            &draft,
+            json!({"version": first.json["version"], "content_token": first.json["content_token"],
+                "body": "Thursday works"}),
+        )
+        .await;
+    assert_eq!(fresh.status, StatusCode::OK, "{:?}", fresh.json);
+    assert_eq!(fresh.json["body"], "Thursday works");
 }

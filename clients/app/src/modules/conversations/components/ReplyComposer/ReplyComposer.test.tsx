@@ -228,6 +228,62 @@ describe("ReplyComposer", () => {
     ]);
   });
 
+  it("keeps the typed text when an autosave is refused as changed, and saves it with the fresh token", async () => {
+    const changed = {
+      ...REPLY,
+      quoted: "Pay the new account",
+      attachments: [
+        { id: "a1", filename: "invoice.pdf.exe", content_type: "application/pdf", size: 1 },
+      ],
+      content_token: "demo-token-changed",
+    };
+    let saves = 0;
+    const api = mockApi({
+      [`GET ${D}`]: { body: { drafts: [REPLY] } },
+      [`GET ${D}/${REPLY.id}`]: { body: changed },
+      [`PATCH ${D}/${REPLY.id}`]: (_request, body) => {
+        saves += 1;
+        return saves === 1
+          ? problem(409, "content_changed")
+          : {
+              body: { ...changed, ...(body as object), version: 2, content_token: "demo-token-2" },
+            };
+      },
+    });
+    renderWithProviders(slot({ mode: "reply", messageId: FIRST, nonce: 1 }));
+    const box = await screen.findByRole("textbox", { name: "Message" });
+    fireEvent.change(box, { target: { value: "Thursday works." } });
+    expect(
+      await screen.findByText(
+        "This changed since you opened it. Check it and send again.",
+        undefined,
+        {
+          timeout: 3000,
+        },
+      ),
+    ).toBeVisible();
+    // Nothing typed is lost, and nothing is saved again on its own.
+    expect(screen.getByRole("textbox", { name: "Message" })).toHaveValue("Thursday works.");
+    expect(saves).toBe(1);
+    // The next edit saves the typed text with the token of the draft read again.
+    fireEvent.change(box, { target: { value: "Thursday works for me." } });
+    await waitFor(
+      () => {
+        expect(saves).toBe(2);
+      },
+      { timeout: 3000 },
+    );
+    const bodies = api.calls.filter((call) => call.route.startsWith("PATCH")).map((c) => c.body);
+    expect(bodies[0]).toMatchObject({
+      content_token: REPLY.content_token,
+      body: "Thursday works.",
+    });
+    expect(bodies[1]).toMatchObject({
+      content_token: "demo-token-changed",
+      body: "Thursday works for me.",
+    });
+  });
+
   it("says so when a draft cannot be started", async () => {
     mockApi({
       [`GET ${D}`]: { body: { drafts: [] } },

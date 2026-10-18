@@ -33,43 +33,56 @@ field on three operations, one new problem code (`content_changed`).
   `content_token`: `0x01` and an HMAC-SHA256 under the binding key of
   campbooks-cloud#227, with its own label
   (`campbooks/conversations.content-token/v1`), over the workspace, the
-  member, the object kind and id, its version (a draft) or binding
+  member, the object kind and id, a draft's inbox id, its version (a draft) or binding
   generation (a rule), and the same content hash the signing step binds: the
   #552 draft content hash, or the #556 hash of a rule's conditions and
   actions with its inbox, stored state and author. It is never stored.
-- **Signing requires it back.** `send_draft`, `confirm_rule` (a proposal's
-  yes and a yes again) and `update_rule` with `adopt` (unless it sets the
-  whole rule) take `content_token`. Under the row lock, after every access
+- **Signing, and every save, requires it back.** `send_draft`,
+  `update_draft` (every save keeps fields it cannot send: the inbox, the
+  reply headers, the attachments' files), `confirm_rule` (a proposal's yes
+  and a yes again) and `update_rule` with `adopt` (unless it sets the whole
+  rule) take `content_token`. A save that holds issues the next token over
+  what it left, so the chain runs from the client's first read to the send. Under the row lock, after every access
   check, the server recomputes the hash and verifies the token in constant
   time; a missing, another member's or a stale token answers 409
   `content_changed` with no state change and a WARN carrying ids only.
 - **The client sends back the token of what is on screen** and, on 409
   `content_changed`, reads the draft or rule again, shows it as it is now
-  with a short notice, and never sends on the member's behalf. The reply
-  dialog saves exactly the recipients it shows, with no copies. The message
-  composer shows Cc and Bcc whenever there are any.
+  with a short notice, and never sends on the member's behalf. A refused
+  autosave keeps what was typed, reads the draft again, says so once, and
+  saves nothing on its own. The reply dialog never reuses a draft it did
+  not create: it creates one with exactly the recipients it shows, no
+  copies, its own quoted text and no attachments. The message composer
+  shows Cc and Bcc whenever there are any.
 
 ## Non-goals
 
-- **Fields no screen shows.** A draft's reply headers, thread and attachment
-  blobs, and a reply's subject in the composer, are in the hash but not on
-  screen: SQL that changes them before the member's client reads the draft
-  is shown and signed (see `design.md`). After it, the token stops them.
+- **Before the client's first read.** What SQL changes in a draft before
+  the member's client first reads it is in what it is given. Recipients,
+  Cc, Bcc, text, quoted text, attachment names and From are shown; the
+  reply headers, thread, the file behind an attachment's name and a
+  reply's subject in the reply composer are not, so those can be signed.
+  Any change after that read, to any field, is refused at save and Send.
+  A re-read after a 409 is a read too (see `design.md` §7).
 - **Replay of a state a member was shown** (the same limit as #552 §8): SQL
   that restores a row exactly as a member was shown it, version included,
   makes that member's token hold again. It can only make them send what
   they saw.
 - **The rest of campbooks-cloud#242** (items 3 to 7: replay of requests,
-  stream lookups, Zoho's `restore_to`, re-reads, key rotation).
+  stream lookups, Zoho's `restore_to`, re-reads, key rotation), and the
+  follow-ups filed separately (a proposal's author kept on confirm,
+  `confirmed_at` outside the token, the assistant confirming with the
+  member's token).
 - **Old tabs.** A tab still running the client from before the deploy
-  shows its generic error on Send or Keep until it is reloaded.
+  shows its generic error on save, Send or Keep until it is reloaded.
 
 ## Impact
 
 - SQL in a workspace can no longer change what a member's Send or Keep
-  signs once the member's client was shown the draft or rule.
+  signs, or what a save keeps, once the member's client has read the draft
+  or rule.
 - At the deploy, a composer or rules list opened before has no token: its
-  first Send or Keep answers 409, the content is read again (unchanged),
-  and the next click works. Scheduled sends, signed under #552, are not
+  first save, Send or Keep answers 409, the content is read again, typed
+  text is kept, one notice shows, and the next save or click works. Scheduled sends, signed under #552, are not
   affected.
 - Without an instance secret nothing can be signed, as before (500).
