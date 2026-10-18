@@ -52,6 +52,26 @@ describe("quotes", () => {
     ).toBe(true);
   });
 
+  it("quotes the words of an HTML-only message, as the server reads them (#218)", () => {
+    if (first === undefined) {
+      throw new Error("no message");
+    }
+    // `conversations.get` gives an HTML-only message its HTML's words as
+    // its text; a reply and a forward quote them.
+    const htmlOnly = {
+      ...first,
+      has_html: true,
+      text: {
+        content: "Hello Sam,\nYour berth at the harbourlight pontoon is kept.\n",
+        truncated: false,
+      },
+    };
+    expect(replyQuote(htmlOnly, "en", words)).toContain("> Your berth at the harbourlight pontoon");
+    expect(forwardQuote(htmlOnly, "en", words)).toContain(
+      "Your berth at the harbourlight pontoon is kept.",
+    );
+  });
+
   it("names people by name, else address", () => {
     expect(displayName({ address: "x@example.com" })).toBe("x@example.com");
     expect(displayName({ name: " ", address: "x@example.com" })).toBe("x@example.com");

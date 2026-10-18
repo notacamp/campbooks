@@ -57,11 +57,12 @@ use crate::{
     config::ActionSettings,
     domain::{
         actions,
-        blobs::read_text,
+        blobs::{cut, words},
         conversation::{Changed, provider_message_ids},
-        decide::{ENVELOPE_BODY_BYTES, MessageParts, PURPOSE, Source, envelope},
+        decide::{ENVELOPE_BODY_BYTES, ENVELOPE_BUDGET, MessageParts, PURPOSE, Source, envelope},
         decisions::Recorded,
         needs::{self, NeedSettings},
+        plain_text::Quotes,
         policy::Policy,
         redact,
         streams::{Inbound, sort_first_inbound},
@@ -538,24 +539,20 @@ async fn load(
     let recipients: Recipients = serde_json::from_value(row.recipients).map_err(decode)?;
     let headers: Headers = serde_json::from_value(row.headers).map_err(decode)?;
     let bodies: Bodies = serde_json::from_value(row.bodies).map_err(decode)?;
-    let body = match &bodies.text {
-        Some(text) => {
-            match read_text(
-                &state.blobs,
-                &workspace.to_string(),
-                text,
-                ENVELOPE_BODY_BYTES,
-            )
-            .await
-            {
-                Ok((body, _)) => body,
-                // Its blob went with the message (its inbox removed):
-                // nothing to do.
-                Err(_) if gone(state, workspace, message).await? => return Ok(None),
-                Err(error) => return Err(error.into()),
-            }
-        }
-        None => String::new(),
+    // Its text part, else its HTML read as text (campbooks-cloud#218).
+    let body = match words(
+        &state.blobs,
+        &workspace.to_string(),
+        (bodies.text.as_ref(), bodies.html.as_ref()),
+        ENVELOPE_BUDGET,
+        Quotes::Keep,
+    )
+    .await
+    {
+        Ok((body, _)) => cut(body, ENVELOPE_BODY_BYTES),
+        // Its blob went with the message (its inbox removed): nothing to do.
+        Err(_) if gone(state, workspace, message).await? => return Ok(None),
+        Err(error) => return Err(error.into()),
     };
     let attachments: Vec<(String, String)> =
         row.filenames.into_iter().zip(row.content_types).collect();
@@ -615,6 +612,8 @@ struct Recipients {
 struct Bodies {
     #[serde(default)]
     text: Option<BlobRef>,
+    #[serde(default)]
+    html: Option<BlobRef>,
 }
 
 #[cfg(test)]

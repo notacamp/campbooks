@@ -34,7 +34,11 @@ use self::prompt::{Ask, Author, Context, Thread, ThreadMessage};
 use self::types::{ReplySuggestions, ReplyText, SuggestReplies, WriteReply};
 use crate::{
     domain::{
-        access::visible_inboxes, blobs::read_text, paths::ConversationPath, plain_text, resources,
+        access::visible_inboxes,
+        blobs::{Budget, words},
+        paths::ConversationPath,
+        plain_text::{self, Quotes},
+        resources,
     },
     events::CONVERSATION_RECORD,
     features::get_conversation::Bodies,
@@ -421,19 +425,18 @@ async fn prepare<'a>(
 /// A message's own words: its text part, else its HTML part reduced to
 /// text, without quoted history. Text hygiene, not a decision.
 async fn own_words(state: &AppState, workspace: &str, bodies: &Bodies) -> Result<String> {
-    let raw = match (&bodies.text, &bodies.html) {
-        (Some(text), _) => {
-            read_text(&state.blobs, workspace, text, RAW_TEXT_BYTES)
-                .await?
-                .0
-        }
-        (None, Some(html)) => plain_text::from_html(
-            &read_text(&state.blobs, workspace, html, RAW_HTML_BYTES)
-                .await?
-                .0,
-        ),
-        (None, None) => String::new(),
-    };
+    // Its text part, else its HTML read as text (campbooks-cloud#218).
+    let (raw, _) = words(
+        &state.blobs,
+        workspace,
+        (bodies.text.as_ref(), bodies.html.as_ref()),
+        Budget {
+            text: RAW_TEXT_BYTES,
+            html: RAW_HTML_BYTES,
+        },
+        Quotes::Drop,
+    )
+    .await?;
     Ok(plain_text::own_words(&raw))
 }
 

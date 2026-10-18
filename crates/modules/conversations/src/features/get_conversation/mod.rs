@@ -3,7 +3,7 @@
 //! one message at a time (`conversations.get_message_body`) and shown only
 //! in the client's sandboxed frame.
 
-use std::collections::HashMap;
+use std::{collections::HashMap, time::Instant};
 
 use axum::{Extension, Json, extract::State};
 use campbooks_kernel::{
@@ -27,8 +27,9 @@ use crate::{
         access::visible_inboxes,
         actions,
         attachments::in_body,
-        blobs::read_text,
+        blobs::{Budget, cut, words_until},
         conversation::{ConversationSummary, summary},
+        plain_text::Quotes,
         policy::Policy,
         suggestions::{self, DecisionView},
     },
@@ -42,6 +43,14 @@ use campbooks_kernel::authz::Action;
 pub const MAX_MESSAGES: i64 = 100;
 /// Longest text body returned per message, in bytes.
 pub const MAX_TEXT_BYTES: usize = 256 * 1024;
+/// Bytes of an HTML part read when the text part has no words; the words
+/// read from it are cut to [`MAX_TEXT_BYTES`].
+const MAX_HTML_BYTES: usize = 256 * 1024;
+/// How long one answer may spend reading messages' HTML as text, all its
+/// messages together: crafted HTML threaded into one conversation cannot
+/// hold a request for long. Messages past it come without `text`, marked
+/// `text_unread`.
+const TEXT_DEADLINE: std::time::Duration = std::time::Duration::from_secs(1);
 
 /// An attachment of a message.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
@@ -72,6 +81,10 @@ pub struct MessageText {
 
 /// A message, with its plain-text body.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[allow(
+    clippy::struct_excessive_bools,
+    reason = "the wire shape: independent facts about one message"
+)]
 pub struct MessageView {
     /// The message.
     pub id: MessageId,
@@ -95,6 +108,11 @@ pub struct MessageView {
     pub starred: bool,
     /// The plain-text body, when it has one.
     pub text: Option<MessageText>,
+    /// Its words were to be read from its HTML and this answer ran out of
+    /// time first: `text` is absent, and the HTML is still whole
+    /// (`conversations.get_message_body`).
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub text_unread: bool,
     /// Whether it has an HTML body (`conversations.get_message_body`).
     pub has_html: bool,
     /// Its attachments, in order.
@@ -254,20 +272,15 @@ pub async fn handler(
     tx.commit().await?;
 
     let ws = access.workspace.to_string();
+    // One budget for reading HTML as text, all messages together.
+    let deadline = Instant::now() + TEXT_DEADLINE;
     let mut messages = Vec::with_capacity(rows.len());
     for row in rows {
         let recipients: Recipients = serde_json::from_value(row.recipients)
             .map_err(|e| Error::internal(crate::domain::redact::json(&e)))?;
         let bodies: Bodies = serde_json::from_value(row.bodies)
             .map_err(|e| Error::internal(crate::domain::redact::json(&e)))?;
-        let text = match &bodies.text {
-            Some(blob) => {
-                let (content, truncated) =
-                    read_text(&state.blobs, &ws, blob, MAX_TEXT_BYTES).await?;
-                Some(MessageText { content, truncated })
-            }
-            None => None,
-        };
+        let (text, text_unread) = text_of(&state, &ws, &bodies, deadline).await?;
         messages.push(MessageView {
             id: row.id,
             direction: row.direction.parse()?,
@@ -281,6 +294,7 @@ pub async fn handler(
             read: row.read,
             starred: row.starred,
             text,
+            text_unread,
             has_html: bodies.html.is_some(),
             attachments: attachments.remove(&row.id).unwrap_or_default(),
         });
@@ -328,8 +342,49 @@ async fn attachments_of(
     Ok(attachments)
 }
 
+/// A message's text: its text part, else its HTML read as text, also when
+/// the text part is blanks only (campbooks-cloud#218); replies and forwards
+/// quote it. `None` for a message with neither part; `(None, true)` when its
+/// HTML was not read by `deadline`.
+async fn text_of(
+    state: &AppState,
+    ws: &str,
+    bodies: &Bodies,
+    deadline: Instant,
+) -> Result<(Option<MessageText>, bool)> {
+    if bodies.text.is_none() && bodies.html.is_none() {
+        return Ok((None, false));
+    }
+    let read = words_until(
+        &state.blobs,
+        ws,
+        (bodies.text.as_ref(), bodies.html.as_ref()),
+        Budget {
+            text: MAX_TEXT_BYTES,
+            html: MAX_HTML_BYTES,
+        },
+        Quotes::Keep,
+        Some(deadline),
+    )
+    .await?;
+    if read.late {
+        return Ok((None, true));
+    }
+    // Cut short only when the text part was: words read from HTML are
+    // capped too, but the HTML the reader shows is whole.
+    Ok((
+        Some(MessageText {
+            content: cut(read.text, MAX_TEXT_BYTES),
+            truncated: read.cut,
+        }),
+        false,
+    ))
+}
+
 #[cfg(test)]
 mod tests {
+    use std::fmt::Write as _;
+
     use axum::http::StatusCode;
     use sqlx::PgPool;
 
@@ -366,6 +421,111 @@ mod tests {
         assert_eq!(response.json["conversation"]["unread_count"], 1);
         // No HTML in this response.
         assert!(!response.json.to_string().contains("<p>"));
+    }
+
+    #[sqlx::test(migrations = "../../../migrations")]
+    async fn html_alone_or_a_blank_text_part_gives_the_words_of_the_html(db: PgPool) {
+        // campbooks-cloud#218: quotes and forwards are built from this text.
+        let kit = Kit::new(db).await;
+        let (workspace, inbox, sam) = kit.sams_inbox().await;
+        let html = "<head><meta charset=utf-8><title>Quay Office</title>\
+                    <style>p{color:red}</style><p>Your berth at the harbourlight pontoon \
+                    is kept.</p><script>alert(1)</script>";
+        for (id, text) in [("html-only-1", None), ("blank-text-1", Some("\n\n\n"))] {
+            let mut message = serde_json::json!({
+                "provider_message_id": id,
+                "from": {"name": "Quay Office", "address": "office@quay-moorings.example"},
+                "to": [{"address": "sam@example.com"}],
+                "subject": "Your berth for next season",
+                "sent_at": "2026-10-13T06:30:00Z",
+                "direction": "inbound",
+                "html": html,
+                "mailbox": {"in_inbox": true},
+                "read": false, "starred": false
+            });
+            if let Some(text) = text {
+                message["text"] = text.into();
+            }
+            kit.ingest_value(
+                workspace,
+                inbox,
+                &serde_json::json!({"changes": [{"op": "upsert", "message": message}]}),
+            )
+            .await;
+            let conversation = kit.conversation_of(id).await;
+            let response = kit
+                .get(
+                    &sam,
+                    &format!("/api/v1/w/{workspace}/conversations/{conversation}"),
+                )
+                .await;
+            assert_eq!(response.status, StatusCode::OK, "{:?}", response.json);
+            let content = response.json["messages"][0]["text"]["content"]
+                .as_str()
+                .unwrap_or_default()
+                .to_owned();
+            assert!(
+                content.contains("harbourlight pontoon"),
+                "{id}: {content:?}"
+            );
+            for never in ["Quay Office", "color", "alert", "<"] {
+                assert!(!content.contains(never), "{id}: {never} in {content:?}");
+            }
+        }
+    }
+
+    #[sqlx::test(migrations = "../../../migrations")]
+    async fn crafted_html_threaded_into_one_conversation_cannot_hold_an_open(db: PgPool) {
+        // Twelve HTML-only messages in one thread, each a single tag with
+        // tens of thousands of attributes (slow to tokenize, within the
+        // HTML budget): each would take the whole per-message reading time,
+        // about 6 s in all. The answer shares one second instead, off the
+        // async workers, and says which texts it did not read.
+        let kit = Kit::new(db).await;
+        let (workspace, inbox, sam) = kit.sams_inbox().await;
+        let mut attributes = String::new();
+        for i in 0..34_000 {
+            let _ = write!(attributes, "a{i} ");
+        }
+        let changes: Vec<serde_json::Value> = (0..12)
+            .map(|n| {
+                serde_json::json!({"op": "upsert", "message": {
+                    "provider_message_id": format!("crafted-{n}"),
+                    "thread_key": "thr-crafted",
+                    "from": {"address": "mass@crafted.example"},
+                    "to": [{"address": "sam@example.com"}],
+                    "subject": "Crafted",
+                    "sent_at": format!("2026-10-13T06:{n:02}:00Z"),
+                    "direction": "inbound",
+                    "html": format!("<p>Word {n}</p><p {attributes}>tail</p>"),
+                    "mailbox": {"in_inbox": true},
+                    "read": false, "starred": false
+                }})
+            })
+            .collect();
+        kit.ingest_value(workspace, inbox, &serde_json::json!({ "changes": changes }))
+            .await;
+        let id = kit.conversation_of("crafted-0").await;
+        let started = std::time::Instant::now();
+        let response = kit
+            .get(&sam, &format!("/api/v1/w/{workspace}/conversations/{id}"))
+            .await;
+        let took = started.elapsed();
+        assert_eq!(response.status, StatusCode::OK, "{:?}", response.json);
+        assert!(took < std::time::Duration::from_secs(4), "took {took:?}");
+        let messages = response.json["messages"].as_array().unwrap();
+        assert_eq!(messages.len(), 12);
+        let unread = messages.iter().filter(|m| m["text_unread"] == true).count();
+        assert!(unread > 0, "{messages:?}");
+        for message in messages {
+            // Either its words, or said not read: never a "truncated" text.
+            let read = message["text"].is_object();
+            assert!(read != (message["text_unread"] == true), "{message}");
+            if read {
+                assert_eq!(message["text"]["truncated"], false);
+            }
+            assert_eq!(message["has_html"], true);
+        }
     }
 
     #[sqlx::test(migrations = "../../../migrations")]

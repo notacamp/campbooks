@@ -80,6 +80,13 @@ All notable changes to Campbooks Next are documented here. The format follows
 
 ### Fixed
 
+- **Mail whose HTML has no body tag gets its words.** Mail written as a head followed
+  straight by its text, with no `<body>` (some mailers send it), was stored with a blank
+  text in place of its words, so search found nothing in it, its preview and Scout's read
+  were empty, and forwarding or replying to it quoted nothing. Its words are read from
+  its HTML now, everywhere, and mail stored
+  earlier is read again in the background after the update, the first time anyone
+  searches or new mail arrives in a workspace; search keeps answering meanwhile.
 - **The live feed resyncs whenever it finds an inbox nothing announced.** If an inbox ever
   became visible to someone without the change that should announce it, only the
   heartbeat's check noticed; a check triggered by a change to some other inbox let it in
