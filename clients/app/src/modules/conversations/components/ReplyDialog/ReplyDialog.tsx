@@ -21,6 +21,7 @@ import {
   cancelSend,
   createDraft,
   draftKeys,
+  fetchDraft,
   saveDraft,
   sendDraft,
   useConversationDrafts,
@@ -71,6 +72,22 @@ function recipientOf(message: MessageView) {
   return message.direction === "outbound" ? message.to[0] : (message.reply_to[0] ?? message.from);
 }
 
+/**
+ * Everyone a reply to `message` goes to, as the server fills a reply (its
+ * Reply-To, else its sender; for a message the inbox sent, its To). The
+ * dialog shows them all and saves exactly them, with no copies: a draft
+ * holds only what the member sees here (campbooks-cloud#242).
+ */
+function recipientsOf(message: MessageView): Draft["to"] {
+  let parties = [message.from];
+  if (message.direction === "outbound") {
+    parties = message.to;
+  } else if (message.reply_to.length > 0) {
+    parties = message.reply_to;
+  }
+  return parties.map((party) => ({ name: party.name ?? null, address: party.address }));
+}
+
 /** How long the send can still be undone, from its `send_at` (at least a second). */
 function undoWindow(sendAt: string | null | undefined): number | undefined {
   return sendAt === null || sendAt === undefined
@@ -118,6 +135,7 @@ export function ReplyDialog({
   // Who it really goes to, never only the sender's display name: a Reply-To
   // elsewhere is said out loud.
   const recipient = answered === undefined ? undefined : recipientOf(answered);
+  const recipients = answered === undefined ? [] : recipientsOf(answered);
   const person = recipient === undefined ? (name ?? "") : displayName(recipient);
   const elsewhere =
     answered?.direction === "inbound" &&
@@ -239,10 +257,13 @@ export function ReplyDialog({
           d.body.trim() === "",
       );
     let draft: Draft;
+    // The recipients shown, and no copies: what is saved is what is seen.
+    const addressed = { to: recipients, cc: [], bcc: [] };
     if (reusable !== undefined) {
       draft = await saveDraft(workspaceId, reusable.id, {
         version: reusable.version,
         body: text,
+        ...addressed,
       });
     } else if (answered === undefined) {
       return undefined;
@@ -252,6 +273,7 @@ export function ReplyDialog({
         message_id: answered.id,
         body: text,
         quoted: replyQuote(answered, i18n.language, words),
+        ...addressed,
       });
     }
     setSaved(draft);
@@ -266,12 +288,18 @@ export function ReplyDialog({
     setBusy(true);
     setProblem(undefined);
     const handle = undo.pending({ label: t("reply.pending", { name: person }) });
+    let kept: Draft | undefined;
     try {
       const draft = await keep();
       if (draft === undefined) {
         throw new Error("nothing to answer yet");
       }
-      const scheduled = await sendDraft(workspaceId, draft.id, draft.version);
+      kept = draft;
+      // As just saved: the save's answer is what the dialog shows.
+      const scheduled = await sendDraft(workspaceId, draft.id, {
+        version: draft.version,
+        contentToken: draft.content_token,
+      });
       const window = undoWindow(scheduled.send_at);
       const asked = intent;
       handle.done({
@@ -295,9 +323,24 @@ export function ReplyDialog({
         detail: t("reply.resultDetail"),
       });
       onSent?.(scheduled);
-    } catch {
-      handle.fail({ label: t("reply.errors.send", { name: person }) });
-      setProblem("errors.send");
+    } catch (thrown) {
+      if (problemCode(thrown) === "content_changed") {
+        // Changed after it was saved: nothing sent. Send again saves what
+        // is shown here over it first.
+        handle.fail({ label: t("reply.errors.changed") });
+        setProblem("errors.changed");
+        if (kept !== undefined) {
+          void fetchDraft(workspaceId, kept.id)
+            .then(setSaved)
+            .catch(() => {
+              setSaved(undefined);
+            });
+        }
+        void queryClient.invalidateQueries({ queryKey: draftKeys.all(workspaceId) });
+      } else {
+        handle.fail({ label: t("reply.errors.send", { name: person }) });
+        setProblem("errors.send");
+      }
     } finally {
       working.current = false;
       setBusy(false);
@@ -359,7 +402,7 @@ export function ReplyDialog({
     recipient === undefined ? undefined : (
       <Text tone={elsewhere === undefined ? "secondary" : "danger"} size="sm">
         {elsewhere === undefined
-          ? t("reply.to", { recipient: addressLine(recipient) })
+          ? t("reply.to", { recipient: recipients.map(addressLine).join(", ") })
           : t("reply.replyToElsewhere", {
               recipient: addressLine(elsewhere),
               sender: addressLine(answered?.from ?? elsewhere),

@@ -217,7 +217,8 @@
       "unknown_outcome": "Campbooks n’a pas pu confirmer l’envoi de ce message. Vérifiez votre dossier Envoyés avant de le renvoyer.",
       "unknown": "Un problème est survenu. Réessayez.",
       "not_saved": "Vos dernières modifications n’ont pas pu être enregistrées, rien n’a donc été envoyé. Réessayez.",
-      "draft_changed": "Ce brouillon a été modifié ailleurs. Fermez-le et rouvrez-le pour voir la dernière version."
+      "draft_changed": "Ce brouillon a été modifié ailleurs. Fermez-le et rouvrez-le pour voir la dernière version.",
+      "content_changed": "Ceci a changé depuis que vous l’avez ouvert. Vérifiez-le et renvoyez-le."
     },
     "shortcuts": {
       "newMessage": "Nouveau message"
@@ -445,7 +446,8 @@
       "kept": "Règle gardée · {{rule}}",
       "keptPaused": "Règle gardée, en pause pour l’instant · {{rule}}",
       "declined": "Règle refusée · {{rule}}",
-      "failed": "Campbooks n’a pas pu modifier cette règle. Rien n’a changé."
+      "failed": "Campbooks n’a pas pu modifier cette règle. Rien n’a changé.",
+      "changed": "Cette règle a changé depuis que vous l’avez ouverte. Vérifiez-la et gardez-la à nouveau."
     },
     "row": {
       "move": "Campbooks a déplacé celui-ci",
@@ -572,7 +574,8 @@
       "limit": "Scout a écrit beaucoup de réponses cette heure-ci. Réessayez plus tard ou écrivez-la vous-même.",
       "dailyLimit": "Cet espace de travail a utilisé son quota d’IA du jour. Écrivez celle-ci vous-même.",
       "send": "Impossible d’envoyer à {{name}}. Votre brouillon est conservé.",
-      "open": "Impossible d’ouvrir l’éditeur. Votre brouillon reste ici."
+      "open": "Impossible d’ouvrir l’éditeur. Votre brouillon reste ici.",
+      "changed": "Cette réponse a changé depuis son enregistrement. Vérifiez-la et renvoyez-la."
     },
     "to": "À {{recipient}}",
     "replyToElsewhere": "Les réponses vont à {{recipient}}, pas à l’expéditeur {{sender}}. Vérifiez avant d’envoyer."

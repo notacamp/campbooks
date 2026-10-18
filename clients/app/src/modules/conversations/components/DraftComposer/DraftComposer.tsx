@@ -27,6 +27,7 @@ export interface DraftComposerProps {
 const KNOWN_ERRORS = new Set([
   "not_saved",
   "draft_changed",
+  "content_changed",
   "no_recipients",
   "invalid_address",
   "attachments_too_large",

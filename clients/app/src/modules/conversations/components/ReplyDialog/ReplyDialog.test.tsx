@@ -96,7 +96,14 @@ describe("ReplyDialog", () => {
       body: string;
       quoted: string;
     };
-    expect(created).toMatchObject({ kind: "reply", message_id: NEWEST, body: SHORT });
+    expect(created).toMatchObject({
+      kind: "reply",
+      message_id: NEWEST,
+      body: SHORT,
+      to: REPLY.to,
+      cc: [],
+      bcc: [],
+    });
     expect(created.quoted).toMatch(/Maya Okafor wrote:/u);
     expect(api.calls.map((c) => c.route)).toContain(`POST ${D}/${REPLY.id}/send`);
     expect(screen.getAllByText("Sending to Maya Okafor").length).toBeGreaterThan(0);
@@ -189,9 +196,13 @@ describe("ReplyDialog", () => {
     });
     // The undone draft is saved again, never a second one.
     expect(api.calls.some((c) => c.route === `POST ${D}`)).toBe(false);
+    // Saved with exactly who the dialog shows, and no copies.
     expect(api.calls.find((c) => c.route === `PATCH ${D}/${REPLY.id}`)?.body).toEqual({
       version: 1,
       body: DRAFT,
+      to: REPLY.to,
+      cc: [],
+      bcc: [],
     });
   });
 });

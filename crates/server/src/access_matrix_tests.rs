@@ -1374,7 +1374,8 @@ async fn a_scheduled_send_follows_its_authors_real_membership(db: PgPool) {
             "{}",
             String::from_utf8_lossy(&bytes)
         );
-        let send = json!({"version": 2});
+        let saved: Value = serde_json::from_slice(&bytes).unwrap();
+        let send = json!({"version": 2, "content_token": saved["content_token"]});
         let (status, bytes, _) = world
             .call(Some(&sender), "POST", &format!("{uri}/send"), Some(&send))
             .await;

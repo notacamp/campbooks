@@ -133,6 +133,11 @@ pub struct RuleView {
     /// Whether it waits for a member to confirm it again before it acts.
     #[serde(default)]
     pub needs_confirmation: bool,
+    /// What you were shown, bound to you (campbooks-cloud#242): send it
+    /// back to say yes to it (`conversations.confirm_rule`) or to adopt it.
+    /// Absent when the server has no instance secret.
+    #[serde(default)]
+    pub content_token: Option<String>,
 }
 
 async fn view(
@@ -192,6 +197,10 @@ async fn views(
             // Kept, but not bound to the member who taught it
             // (campbooks-cloud#242): it acts again once confirmed.
             needs_confirmation: rule.needs_confirmation(binding),
+            // What this answer shows, for a yes to sign only that.
+            content_token: rule_binding::content_token(access, rule)
+                .ok()
+                .and_then(|token| token.issue(binding)),
         })
         .collect())
 }
@@ -249,6 +258,38 @@ async fn changeable_rule(
         return Err(Error::Denied(crate::MESSAGES.reason("rule_not_yours")));
     }
     Ok(rule)
+}
+
+/// 409 `content_changed` unless `token` is the one a response gave the
+/// caller with `rule` as it is now, under its lock (campbooks-cloud#242): a
+/// yes signs only the conditions, actions, inbox, state and author the
+/// member was shown. Checked after every access check, before anything
+/// changes; without an instance secret nothing can be signed (500).
+fn shown_to_caller(
+    state: &AppState,
+    access: &Access,
+    rule: &Stored,
+    token: Option<&str>,
+) -> Result<()> {
+    if !state.binding.is_enabled() {
+        tracing::warn!(
+            workspace = %access.workspace,
+            rule = %rule.id,
+            "a taught rule was refused: there is no key to bind it with \
+             (CAMPBOOKS_SECRET_KEY is unset)"
+        );
+        return Err(Error::internal("rules are not bound: no instance secret"));
+    }
+    if rule_binding::content_token(access, rule)?.holds(&state.binding, token) {
+        return Ok(());
+    }
+    tracing::warn!(
+        workspace = %access.workspace,
+        rule = %rule.id,
+        why = if token.is_some() { "mismatched" } else { "missing" },
+        "a rule was not kept: it is not what the member was shown"
+    );
+    Err(Error::Conflict(crate::MESSAGES.reason("content_changed")))
 }
 
 // --- Preview -----------------------------------------------------------------
@@ -863,6 +904,11 @@ pub struct ConfirmRule {
     /// Apply it to the mail already in the inbox too (default true).
     #[serde(default = "yes")]
     pub apply_to_existing: bool,
+    /// The `content_token` that came with the rule on screen. Missing,
+    /// another member's, or not the rule as it is now: 409
+    /// `content_changed`, and nothing is kept (campbooks-cloud#242).
+    #[serde(default)]
+    pub content_token: Option<String>,
 }
 
 /// Say yes to a proposed rule.
@@ -891,8 +937,8 @@ pub struct ConfirmRule {
             body = Problem, content_type = "application/problem+json"),
         (status = NOT_FOUND, description = "No such rule, or you cannot see it.",
             body = Problem, content_type = "application/problem+json"),
-        (status = CONFLICT, description = "It is not waiting for a yes.", body = Problem,
-            content_type = "application/problem+json"),
+        (status = CONFLICT, description = "It is not waiting for a yes (`rule_not_proposed`), or it is not what you were shown (`content_changed`): read it again, check it, and say yes again.",
+            body = Problem, content_type = "application/problem+json"),
     )
 )]
 pub async fn confirm(
@@ -915,11 +961,14 @@ pub async fn confirm(
         .await?
         .ok_or(Error::NotFound)?;
     match locked {
-        Some(RuleState::Proposed) => {}
+        Some(RuleState::Proposed) => {
+            shown_to_caller(&state, access, &rule, body.content_token.as_deref())?;
+        }
         // A kept rule that is not bound to the member who taught it
         // (campbooks-cloud#242): confirming it again binds it as it is,
         // in its state, with its author.
         Some(RuleState::Active | RuleState::Paused) if rule.needs_confirmation(&state.binding) => {
+            shown_to_caller(&state, access, &rule, body.content_token.as_deref())?;
             return confirm_again(&state, tx, access, &rule, &body).await;
         }
         _ => return Err(Error::Conflict(crate::MESSAGES.reason("rule_not_proposed"))),
@@ -1108,6 +1157,12 @@ pub struct UpdateRule {
     /// inbox, so it acts again with their rights.
     #[serde(default)]
     pub adopt: bool,
+    /// With `adopt`, unless this change sets both the conditions and the
+    /// actions: the `content_token` that came with the rule on screen, so
+    /// you adopt only what you were shown (409 `content_changed`
+    /// otherwise).
+    #[serde(default)]
+    pub content_token: Option<String>,
 }
 
 /// Change a rule's conditions or actions, pause it or let it act again.
@@ -1134,6 +1189,8 @@ pub struct UpdateRule {
         (status = FORBIDDEN, description = "Missing scope, or not your rule.", body = Problem,
             content_type = "application/problem+json"),
         (status = NOT_FOUND, description = "No such rule, or you cannot see it.",
+            body = Problem, content_type = "application/problem+json"),
+        (status = CONFLICT, description = "It needs a yes again first (`rule_needs_confirmation`), or you adopt one that is not what you were shown (`content_changed`).",
             body = Problem, content_type = "application/problem+json"),
     )
 )]
@@ -1174,6 +1231,13 @@ pub async fn update(
         return Err(Error::Conflict(
             crate::MESSAGES.reason("rule_needs_confirmation"),
         ));
+    }
+    // Adopting keeps what the rule holds and makes it act with this
+    // member's rights: only what they were shown (campbooks-cloud#242). A
+    // change that sets the whole rule signs what it sent.
+    let whole = body.conditions.is_some() && body.actions.is_some();
+    if body.adopt && !whole {
+        shown_to_caller(&state, access, &rule, body.content_token.as_deref())?;
     }
     let conditions = rules::normalise(&body.conditions.unwrap_or_else(|| rule.conditions.clone()));
     let actions = body.actions.unwrap_or_else(|| rule.actions.clone());

@@ -27,12 +27,12 @@ async fn released(kit: &Kit, workspace: WorkspaceId, sam: &str) -> Value {
         .await;
     assert_eq!(draft.status, StatusCode::CREATED, "{:?}", draft.json);
     let uri = format!("{uri}/{}", draft.json["id"].as_str().unwrap());
-    let version = kit.get(sam, &uri).await.json["version"].clone();
+    let shown = kit.get(sam, &uri).await.json;
     let sent = kit
         .post(
             sam,
             &format!("{uri}/send"),
-            Some(json!({"version": version})),
+            Some(json!({"version": shown["version"], "content_token": shown["content_token"]})),
         )
         .await;
     assert_eq!(sent.status, StatusCode::ACCEPTED, "{:?}", sent.json);

@@ -29,6 +29,7 @@ export const REPLY: Draft = {
   failure_reason: null,
   created_at: "2026-10-13T14:00:00Z",
   updated_at: "2026-10-13T14:00:00Z",
+  content_token: "demo-token-reply",
 };
 
 /** A new message, still empty. */

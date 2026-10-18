@@ -234,6 +234,19 @@ All notable changes to Campbooks Next are documented here. The format follows
 
 ### Security
 
+- **Send and Keep sign only what you were shown (campbooks-cloud#242).** Every draft and
+  every rule the server shows you now comes with a token bound to you and to exactly what
+  it showed: the recipients (Bcc too), subject, text, reply headers and attachments of a
+  draft at its version, or a rule's conditions, actions, inbox, state and author. Send, a
+  yes to a suggested rule and adopting a rule take that token back, and the server signs
+  only if the draft or rule is still what you saw. A draft or suggestion changed with SQL
+  after you opened it, or a token of someone else's, is refused (`content_changed`, a
+  warning in the log with ids only) and nothing is sent or kept: the composer and Scout's
+  memory show it again as it is now, with "This changed since you opened it", and you
+  send or keep it again once you have looked. A composer or rules list opened before the
+  upgrade shows that notice once, keeps your text, and works on the next click. Scout's
+  reply dialog saves exactly the recipients it shows, and the composer always shows Cc and
+  Bcc when there are any. Scheduled sends are not affected.
 - **A planted rule run or undo changes nothing (campbooks-cloud#242).** Applying a rule to
   the mail already in your inbox, and removing a rule while putting back what it changed,
   now sign the run for the member who asked, under the key of campbooks-cloud#227, and each

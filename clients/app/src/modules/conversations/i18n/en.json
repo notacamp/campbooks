@@ -217,7 +217,8 @@
       "unknown_outcome": "Campbooks could not confirm that this message was sent. Check your Sent folder before sending it again.",
       "unknown": "Something went wrong. Try again.",
       "not_saved": "Your last changes could not be saved, so nothing was sent. Try again.",
-      "draft_changed": "This draft changed somewhere else. Close it and open it again to see the latest version."
+      "draft_changed": "This draft changed somewhere else. Close it and open it again to see the latest version.",
+      "content_changed": "This changed since you opened it. Check it and send again."
     },
     "shortcuts": {
       "newMessage": "New message"
@@ -445,7 +446,8 @@
       "kept": "Rule kept · {{rule}}",
       "keptPaused": "Rule kept, paused for now · {{rule}}",
       "declined": "Rule declined · {{rule}}",
-      "failed": "Campbooks could not change that rule. Nothing changed."
+      "failed": "Campbooks could not change that rule. Nothing changed.",
+      "changed": "This rule changed since you opened it. Check it and keep it again."
     },
     "row": {
       "move": "Campbooks moved this",
@@ -572,7 +574,8 @@
       "limit": "Scout has written a lot of replies this hour. Try again later, or write it yourself.",
       "dailyLimit": "This workspace has used today's AI allowance. Write this one yourself.",
       "send": "Couldn't send to {{name}}. Your draft is kept.",
-      "open": "Couldn't open the composer. Your draft is kept here."
+      "open": "Couldn't open the composer. Your draft is kept here.",
+      "changed": "This reply changed since it was saved. Check it and send again."
     },
     "to": "To {{recipient}}",
     "replyToElsewhere": "Replies go to {{recipient}}, not to the sender {{sender}}. Check before you send."

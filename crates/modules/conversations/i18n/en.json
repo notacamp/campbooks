@@ -13,6 +13,7 @@
     "invalid_subject": "A subject is one line of at most {{max}} characters.",
     "draft_too_long": "This message is too long to send.",
     "draft_changed": "This draft was changed somewhere else. Reload it to see the latest version.",
+    "content_changed": "This changed since you opened it. Check it and try again.",
     "draft_not_editable": "This message is on its way and can no longer be changed.",
     "no_recipients": "Add at least one recipient.",
     "invalid_address": "This address is not valid: {{address}}",

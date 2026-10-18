@@ -96,7 +96,10 @@ export function MessageComposer({
   const { t, i18n } = useTranslation("ui");
   const id = useId();
   const [active, setActive] = useState(false);
-  const [copies, setCopies] = useState(cc.length > 0 || bcc.length > 0);
+  const [askedForCopies, setCopies] = useState(cc.length > 0 || bcc.length > 0);
+  // Copies are never hidden while there are any, also ones that arrive
+  // after it opened (the draft shown again as the server holds it).
+  const copies = askedForCopies || cc.length > 0 || bcc.length > 0;
   const [showQuoted, setShowQuoted] = useState(false);
   const bodyRef = useRef<HTMLTextAreaElement>(null);
   const toRef = useRef<HTMLInputElement>(null);

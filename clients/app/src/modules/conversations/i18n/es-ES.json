@@ -217,7 +217,8 @@
       "unknown_outcome": "Campbooks no ha podido confirmar que este mensaje se haya enviado. Revisa la carpeta Enviados antes de enviarlo de nuevo.",
       "unknown": "Algo ha salido mal. Inténtalo de nuevo.",
       "not_saved": "No se han podido guardar los últimos cambios, así que no se ha enviado nada. Inténtalo de nuevo.",
-      "draft_changed": "Este borrador ha cambiado en otro sitio. Ciérralo y vuelve a abrirlo para ver la última versión."
+      "draft_changed": "Este borrador ha cambiado en otro sitio. Ciérralo y vuelve a abrirlo para ver la última versión.",
+      "content_changed": "Esto ha cambiado desde que lo abriste. Revísalo y vuelve a enviarlo."
     },
     "shortcuts": {
       "newMessage": "Mensaje nuevo"
@@ -445,7 +446,8 @@
       "kept": "Regla mantenida · {{rule}}",
       "keptPaused": "Regla mantenida, en pausa por ahora · {{rule}}",
       "declined": "Regla rechazada · {{rule}}",
-      "failed": "Campbooks no pudo cambiar esa regla. No ha cambiado nada."
+      "failed": "Campbooks no pudo cambiar esa regla. No ha cambiado nada.",
+      "changed": "Esta regla ha cambiado desde que la abriste. Revísala y vuelve a mantenerla."
     },
     "row": {
       "move": "Campbooks movió este",
@@ -572,7 +574,8 @@
       "limit": "Scout ha escrito muchas respuestas en esta hora. Inténtalo más tarde o escríbela tú mismo.",
       "dailyLimit": "Este espacio de trabajo ya ha usado la cuota de IA de hoy. Escribe esta tú mismo.",
       "send": "No se ha podido enviar a {{name}}. Tu borrador se ha guardado.",
-      "open": "No se ha podido abrir el editor. Tu borrador sigue aquí."
+      "open": "No se ha podido abrir el editor. Tu borrador sigue aquí.",
+      "changed": "Esta respuesta ha cambiado desde que se guardó. Revísala y vuelve a enviarla."
     },
     "to": "Para {{recipient}}",
     "replyToElsewhere": "Las respuestas van a {{recipient}}, no al remitente {{sender}}. Compruébalo antes de enviar."

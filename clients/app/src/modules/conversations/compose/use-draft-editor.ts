@@ -58,6 +58,11 @@ export function useDraftEditor(workspaceId: string, draft: Draft) {
   const [error, setError] = useState<string | undefined>(draft.failure_reason ?? undefined);
   const [sending, setSending] = useState(false);
   const version = useRef(draft.version);
+  // The token of the content on screen (campbooks-cloud#242): taken only
+  // from an answer whose content is what the editor shows (the draft it
+  // opened with, a save of what it sent, a re-read it then shows), never
+  // from a list or a read the editor does not show.
+  const shownToken = useRef(draft.content_token);
   const latest = useRef(fields);
   const saved = useRef(fields);
   const inFlight = useRef<Promise<void> | null>(null);
@@ -108,6 +113,8 @@ export function useDraftEditor(workspaceId: string, draft: Draft) {
           answer = await saveDraft(workspaceId, draft.id, changesOf(current, version.current));
         }
         version.current = answer.version;
+        // What it saved is what is on screen: the answer's token is for it.
+        shownToken.current = answer.content_token;
         saved.current = current;
         setSaveState(latest.current === current ? "saved" : "unsaved");
         setError(undefined);
@@ -147,6 +154,25 @@ export function useDraftEditor(workspaceId: string, draft: Draft) {
     [flush],
   );
 
+  /**
+   * Show `current` (the draft as the server holds it now) in place of what
+   * is on screen, with its version and token: nothing local is lost, since
+   * a send saves first.
+   */
+  const showCurrent = useCallback(
+    (current: Draft) => {
+      const next = fieldsOf(current);
+      latest.current = next;
+      saved.current = next;
+      version.current = current.version;
+      shownToken.current = current.content_token;
+      setFields(next);
+      setSaveState("saved");
+      replace(current);
+    },
+    [replace],
+  );
+
   /** Send: save first, then schedule. Resolves with the scheduled draft, or undefined. */
   const send = useCallback(async (): Promise<Draft | undefined> => {
     setSending(true);
@@ -157,23 +183,38 @@ export function useDraftEditor(workspaceId: string, draft: Draft) {
         setError("not_saved");
         return undefined;
       }
-      const scheduled = await sendDraft(workspaceId, draft.id, version.current);
+      const scheduled = await sendDraft(workspaceId, draft.id, {
+        version: version.current,
+        contentToken: shownToken.current,
+      });
       replace(scheduled);
       void refresh();
       return scheduled;
     } catch (thrown) {
-      setError(problemCode(thrown) ?? "unknown");
+      const code = problemCode(thrown) ?? "unknown";
+      if (code === "content_changed") {
+        // Not what the member was shown (changed elsewhere, or opened
+        // before the server checked): show it as it is now and let them
+        // send again. Never sent on their behalf.
+        try {
+          showCurrent(await fetchDraft(workspaceId, draft.id));
+        } catch {
+          // The notice still says to check it; the next send asks again.
+        }
+      }
+      setError(code);
       return undefined;
     } finally {
       setSending(false);
     }
-  }, [draft.id, flush, refresh, replace, workspaceId]);
+  }, [draft.id, flush, refresh, replace, showCurrent, workspaceId]);
 
   /** Take a scheduled send back. Whether it was in time. */
   const undo = useCallback(async (): Promise<boolean> => {
     try {
       const back = await cancelSend(workspaceId, draft.id);
       version.current = back.version;
+      // Its token is not taken: the draft shown again opens with its own.
       replace(back);
       return true;
     } catch {

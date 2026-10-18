@@ -155,7 +155,7 @@ pub async fn update(
     .await?;
     let draft = drafts::load(&state, &mut tx, access, id, false, Action::Read)
         .await?
-        .view()?;
+        .shown(&state.binding, access)?;
     tx.commit().await?;
     Ok(Json(draft))
 }

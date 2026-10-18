@@ -217,7 +217,8 @@
       "unknown_outcome": "O Campbooks não conseguiu confirmar que esta mensagem foi enviada. Verifique a pasta Enviados antes de a enviar de novo.",
       "unknown": "Algo correu mal. Tente de novo.",
       "not_saved": "Não foi possível guardar as últimas alterações, por isso nada foi enviado. Tente de novo.",
-      "draft_changed": "Este rascunho foi alterado noutro sítio. Feche-o e abra-o de novo para ver a versão mais recente."
+      "draft_changed": "Este rascunho foi alterado noutro sítio. Feche-o e abra-o de novo para ver a versão mais recente.",
+      "content_changed": "Isto mudou desde que o abriu. Verifique-o e envie de novo."
     },
     "shortcuts": {
       "newMessage": "Nova mensagem"
@@ -445,7 +446,8 @@
       "kept": "Regra mantida · {{rule}}",
       "keptPaused": "Regra mantida, em pausa por agora · {{rule}}",
       "declined": "Regra recusada · {{rule}}",
-      "failed": "O Campbooks não conseguiu alterar essa regra. Nada mudou."
+      "failed": "O Campbooks não conseguiu alterar essa regra. Nada mudou.",
+      "changed": "Esta regra mudou desde que a abriu. Verifique-a e mantenha-a de novo."
     },
     "row": {
       "move": "O Campbooks moveu esta",
@@ -572,7 +574,8 @@
       "limit": "O Scout escreveu muitas respostas nesta hora. Tente mais tarde ou escreva-a você mesmo.",
       "dailyLimit": "Este espaço de trabalho já usou a quota de IA de hoje. Escreva esta você mesmo.",
       "send": "Não foi possível enviar para {{name}}. O seu rascunho foi guardado.",
-      "open": "Não foi possível abrir o editor. O seu rascunho continua aqui."
+      "open": "Não foi possível abrir o editor. O seu rascunho continua aqui.",
+      "changed": "Esta resposta mudou desde que foi guardada. Verifique-a e envie de novo."
     },
     "to": "Para {{recipient}}",
     "replyToElsewhere": "As respostas vão para {{recipient}}, não para o remetente {{sender}}. Confirme antes de enviar."

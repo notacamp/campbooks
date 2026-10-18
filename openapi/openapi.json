@@ -6227,7 +6227,7 @@
             }
           },
           "409": {
-            "description": "Already on its way (`draft_not_editable`), or saved since that version (`draft_changed`).",
+            "description": "Already on its way (`draft_not_editable`), saved since that version (`draft_changed`), or not what you were shown (`content_changed`): read it again, check it, and send again.",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -8344,6 +8344,16 @@
                 }
               }
             }
+          },
+          "409": {
+            "description": "It needs a yes again first (`rule_needs_confirmation`), or you adopt one that is not what you were shown (`content_changed`).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -8457,7 +8467,7 @@
             }
           },
           "409": {
-            "description": "It is not waiting for a yes.",
+            "description": "It is not waiting for a yes (`rule_not_proposed`), or it is not what you were shown (`content_changed`): read it again, check it, and say yes again.",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -12775,6 +12785,13 @@
           "apply_to_existing": {
             "type": "boolean",
             "description": "Apply it to the mail already in the inbox too (default true)."
+          },
+          "content_token": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The `content_token` that came with the rule on screen. Missing,\nanother member's, or not the rule as it is now: 409\n`content_changed`, and nothing is kept (campbooks-cloud#242)."
           }
         },
         "additionalProperties": false
@@ -13875,6 +13892,13 @@
               "$ref": "#/components/schemas/Address"
             },
             "description": "Copied recipients."
+          },
+          "content_token": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "What you were shown, bound to you (campbooks-cloud#242): send it\nback with `conversations.send_draft`. Keep the one that came with\nthe content on screen (a save's answer replaces it); absent when the\nserver has no instance secret."
           },
           "conversation_id": {
             "oneOf": [
@@ -17151,6 +17175,13 @@
             "format": "date-time",
             "description": "When a member said yes to it."
           },
+          "content_token": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "What you were shown, bound to you (campbooks-cloud#242): send it\nback to say yes to it (`conversations.confirm_rule`) or to adopt it.\nAbsent when the server has no instance secret."
+          },
           "created_at": {
             "type": "string",
             "format": "date-time",
@@ -17493,6 +17524,13 @@
           "version"
         ],
         "properties": {
+          "content_token": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The `content_token` that came with the draft on screen (its last\nsave's answer, or the draft as read). Missing, another member's, or\nnot the draft as it is now: 409 `content_changed`, and nothing is\nsent (campbooks-cloud#242)."
+          },
           "version": {
             "type": "integer",
             "format": "int32",
@@ -18258,6 +18296,13 @@
               "$ref": "#/components/schemas/RuleCondition"
             },
             "description": "New conditions."
+          },
+          "content_token": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "With `adopt`, unless this change sets both the conditions and the\nactions: the `content_token` that came with the rule on screen, so\nyou adopt only what you were shown (409 `content_changed`\notherwise)."
           },
           "paused": {
             "type": [

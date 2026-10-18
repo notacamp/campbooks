@@ -6,7 +6,8 @@
 //! `sender` role or above on its inbox.
 
 use campbooks_kernel::{
-    AppState, Error, RecordRef, Result, authz::Action, blobs::BlobRef, tenancy::Access,
+    AppState, Error, RecordRef, Result, authz::Action, binding::Binding, blobs::BlobRef,
+    tenancy::Access,
 };
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
@@ -14,7 +15,7 @@ use sqlx::PgConnection;
 use utoipa::ToSchema;
 
 use crate::{
-    domain::{redact, resources},
+    domain::{binding::ContentToken, redact, resources},
     events::DRAFT_RECORD,
     model::{
         Address, AttachmentId, ConversationId, DraftId, DraftKind, DraftState, InboxId, MessageId,
@@ -103,6 +104,12 @@ pub struct DraftView {
     pub created_at: DateTime<Utc>,
     /// When it was last saved.
     pub updated_at: DateTime<Utc>,
+    /// What you were shown, bound to you (campbooks-cloud#242): send it
+    /// back with `conversations.send_draft`. Keep the one that came with
+    /// the content on screen (a save's answer replaces it); absent when the
+    /// server has no instance secret.
+    #[serde(default)]
+    pub content_token: Option<String>,
 }
 
 /// A draft row with its inbox's address.
@@ -198,7 +205,16 @@ impl DraftRow {
             failure_reason: self.failure_reason.clone(),
             created_at: self.created_at,
             updated_at: self.updated_at,
+            content_token: None,
         })
+    }
+
+    /// The draft as the API shows it to the caller of `access`, with the
+    /// token of what it shows ([`ContentToken`]).
+    pub fn shown(&self, binding: &Binding, access: &Access) -> Result<DraftView> {
+        let mut view = self.view()?;
+        view.content_token = ContentToken::of_draft(access, self)?.issue(binding);
+        Ok(view)
     }
 }
 
