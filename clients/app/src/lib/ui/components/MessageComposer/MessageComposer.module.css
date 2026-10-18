@@ -128,6 +128,12 @@
   color: var(--text-secondary);
 }
 
+.quotedNote {
+  margin: 0;
+  font-size: var(--text-xs);
+  color: var(--text-tertiary);
+}
+
 .attachments {
   display: flex;
   flex-direction: column;

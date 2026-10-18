@@ -26,7 +26,7 @@ import {
   sendDraft,
   type Draft,
 } from "../../api/drafts";
-import { useConversation, type MessageView } from "../../api/queries";
+import { useConversation, useMessageWords, type MessageView } from "../../api/queries";
 import { useReplySuggestions, writeReply } from "../../api/replies";
 import { displayName, replyQuote, type QuoteWords } from "../../compose/quote";
 import type { Translate } from "../../model";
@@ -130,7 +130,14 @@ export function ReplyDialog({
   const detail = useConversation(workspaceId, conversationId);
   const messages = detail.data?.messages ?? [];
   // The newest message, as the reader's Reply answers it.
-  const answered = messages.at(-1);
+  const newest = messages.at(-1);
+  // Its words, asked for on their own when the conversation came without
+  // them (`text_unread`).
+  const unread = useMessageWords(workspaceId, conversationId, newest);
+  const answered =
+    newest?.text_unread === true && unread.data !== undefined
+      ? { ...newest, text: unread.data, text_unread: false }
+      : newest;
   // Who it really goes to, never only the sender's display name: a Reply-To
   // elsewhere is said out loud.
   const recipient = answered === undefined ? undefined : recipientOf(answered);
@@ -256,6 +263,11 @@ export function ReplyDialog({
   const keep = async (): Promise<Draft | undefined> => {
     if (answered === undefined) {
       return undefined;
+    }
+    // Only the quote the dialog shows: never words read after it said
+    // they could not be, sent unseen.
+    if (answered.text_unread === true) {
+      throw new Error("the quote is not shown yet");
     }
     // The recipients shown, and no copies: what is saved is what is seen.
     const content = {
@@ -393,11 +405,21 @@ export function ReplyDialog({
     () => {
       void send();
     },
-    { enabled: drafting && rewriting === undefined && result === undefined },
+    {
+      enabled:
+        drafting &&
+        rewriting === undefined &&
+        result === undefined &&
+        answered?.text_unread !== true,
+    },
   );
 
   const intents = suggestions.data?.intents ?? [];
   // The message answered, the one the draft replies to.
+  // Still reading its words, or they could not be read: said, never an
+  // empty quote shown as if there were nothing.
+  const quoteUnread = newest?.text_unread === true && unread.isError && !unread.isFetching;
+  const quoteReading = newest?.text_unread === true && unread.data === undefined && !quoteUnread;
   const quote =
     answered?.text?.content === undefined || answered.text.content.trim() === "" ? undefined : (
       <ReplyQuote
@@ -480,7 +502,12 @@ export function ReplyDialog({
               variant="primary"
               icon="send"
               shortcut="compose.send"
-              disabled={busy || rewriting !== undefined || text.trim() === ""}
+              disabled={
+                busy ||
+                rewriting !== undefined ||
+                text.trim() === "" ||
+                answered?.text_unread === true
+              }
               onClick={() => {
                 void send();
               }}
@@ -488,7 +515,7 @@ export function ReplyDialog({
               {t("reply.send")}
             </Button>
             <Button
-              disabled={busy || rewriting !== undefined}
+              disabled={busy || rewriting !== undefined || answered?.text_unread === true}
               onClick={() => {
                 void openInComposer();
               }}
@@ -502,7 +529,30 @@ export function ReplyDialog({
       }
     >
       {to}
-      {quote}
+      {quoteUnread ? (
+        <Banner
+          tone="danger"
+          role="alert"
+          title={t("reply.quoteUnread")}
+          action={
+            <Button
+              onClick={() => {
+                void unread.refetch();
+              }}
+            >
+              {t("error.retry")}
+            </Button>
+          }
+        />
+      ) : null}
+      {quoteReading ? (
+        <div role="status">
+          <Text tone="secondary" size="sm">
+            {t("reply.readingQuote")}
+          </Text>
+        </div>
+      ) : null}
+      {quoteUnread || quoteReading ? null : quote}
       {stage === "choose" ? (
         <>
           {problemLine}

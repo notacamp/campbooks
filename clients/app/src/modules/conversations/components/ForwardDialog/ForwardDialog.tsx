@@ -16,6 +16,7 @@ import {
 import {
   useConversation,
   useSenders,
+  withWords,
   type MessageView,
   type NeedView,
   type Sender,
@@ -100,6 +101,8 @@ export function ForwardDialog({
   const [chosen, setChosen] = useState<Sender | undefined>();
   const [busy, setBusy] = useState(false);
   const [failed, setFailed] = useState(false);
+  // The failure was the quote: the email's words could not be read.
+  const [quoteFailed, setQuoteFailed] = useState(false);
   const text = typed.trim();
   const settled = useDebounced(text, DEBOUNCE_MS);
   const searching = settled.length >= MIN_CHARS;
@@ -154,13 +157,22 @@ export function ForwardDialog({
     const existing = known.find(
       (draft) => draft.kind === "forward" && draft.message_id === message.id && pristine(draft),
     );
+    // Its words first when the conversation came without them
+    // (`text_unread`): a forward never quotes nothing, silently.
     const fresh = () =>
-      createDraft(workspaceId, {
-        kind: "forward",
-        message_id: message.id,
-        quoted: forwardQuote(message, i18n.language, words),
-        to,
-      });
+      withWords(queryClient, workspaceId, conversationId, message)
+        .catch((thrown: unknown) => {
+          setQuoteFailed(true);
+          throw thrown;
+        })
+        .then((quoting) =>
+          createDraft(workspaceId, {
+            kind: "forward",
+            message_id: message.id,
+            quoted: forwardQuote(quoting, i18n.language, words),
+            to,
+          }),
+        );
     // Saved with the token that came with it; one that changed since
     // (campbooks-cloud#242) is left alone and a new forward starts. Either
     // way it opens in the composer, which shows all of it before Send.
@@ -238,6 +250,7 @@ export function ForwardDialog({
     }
     setBusy(true);
     setFailed(false);
+    setQuoteFailed(false);
     setChosen(person);
   };
 
@@ -299,7 +312,10 @@ export function ForwardDialog({
         )}
         <div role="status">
           {failed ? (
-            <Banner tone="danger" title={t("forward.failed")} />
+            <Banner
+              tone="danger"
+              title={quoteFailed ? t("forward.quoteFailed") : t("forward.failed")}
+            />
           ) : busy ? (
             <Text tone="secondary">{t("forward.starting")}</Text>
           ) : text !== "" && listed.length === 0 && !looking ? (

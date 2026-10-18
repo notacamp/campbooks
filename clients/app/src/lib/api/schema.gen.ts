@@ -7260,6 +7260,13 @@ export interface operations {
                  *     tracking pixels are removed either way.
                  */
                 show_images?: boolean;
+                /**
+                 * @description `true` for the message's words only, as `text`: its text part when it
+                 *     has any, else its HTML read as text (at most half a second). `html`
+                 *     is then absent. What a reply or forward quotes when
+                 *     `conversations.get` marked the message `text_unread`.
+                 */
+                words?: boolean;
             };
             header?: never;
             path: {

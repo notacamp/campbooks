@@ -80,6 +80,14 @@ All notable changes to Campbooks Next are documented here. The format follows
 
 ### Fixed
 
+- **A reply or forward never quotes nothing.** When an email's words were too slow to read
+  in time (a very large or heavy HTML email), the conversation arrives without them; Reply,
+  Reply all, Forward and Home's Forward picker now read them first, saying "Reading the email
+  to quote it…" meanwhile, and the folded message in the reader shows them too. If they
+  cannot be read, nothing is started or sent and the app says why, instead of quoting an
+  empty message; the reply dialog waits to send until the quote is shown, with Try again.
+  When only the start of a long email could be read, the composer says the quote holds its
+  first part.
 - **A request can no longer hang on the database.** The server's database connections now
   give up on a statement after 30 seconds and on a lock wait after 10 (background jobs
   allow their own statements 5 minutes). A request that hits either, or finds no free
