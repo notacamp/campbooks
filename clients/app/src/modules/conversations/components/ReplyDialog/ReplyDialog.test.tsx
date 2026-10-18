@@ -190,6 +190,7 @@ describe("ReplyDialog", () => {
     };
     const handlers = dialog({ resume });
     await screen.findByRole("textbox", { name: "Your reply" });
+    await screen.findByText("To Maya Okafor <maya@northwind-studio.example>");
     fireEvent.click(screen.getByRole("button", { name: "Open in composer" }));
     await waitFor(() => {
       expect(handlers.onOpenDraft).toHaveBeenCalled();

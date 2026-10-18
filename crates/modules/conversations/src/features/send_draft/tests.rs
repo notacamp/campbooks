@@ -1,5 +1,5 @@
 use axum::http::StatusCode;
-use campbooks_kernel::{blobs::BlobRef, tenancy::WorkspaceId};
+use campbooks_kernel::{blobs::BlobRef, db::BeginFor as _, tenancy::WorkspaceId};
 use serde_json::{Value, json};
 use sqlx::PgPool;
 

@@ -96,10 +96,12 @@ export function MessageComposer({
   const { t, i18n } = useTranslation("ui");
   const id = useId();
   const [active, setActive] = useState(false);
-  const [askedForCopies, setCopies] = useState(cc.length > 0 || bcc.length > 0);
-  // Copies are never hidden while there are any, also ones that arrive
-  // after it opened (the draft shown again as the server holds it).
-  const copies = askedForCopies || cc.length > 0 || bcc.length > 0;
+  const [copies, setCopies] = useState(cc.length > 0 || bcc.length > 0);
+  // Copies that arrive after it opened (the draft shown again as the server
+  // holds it) open the fields too, and they stay open like the member's own.
+  if (!copies && (cc.length > 0 || bcc.length > 0)) {
+    setCopies(true);
+  }
   const [showQuoted, setShowQuoted] = useState(false);
   const bodyRef = useRef<HTMLTextAreaElement>(null);
   const toRef = useRef<HTMLInputElement>(null);

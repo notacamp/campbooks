@@ -258,7 +258,10 @@ export function ReplyDialog({
       );
     let draft: Draft;
     // The recipients shown, and no copies: what is saved is what is seen.
-    const addressed = { to: recipients, cc: [], bcc: [] };
+    // Before the conversation has loaded none are shown: the draft keeps
+    // its own, and only the composer (which shows them) may use it.
+    const addressed =
+      answered === undefined ? { cc: [], bcc: [] } : { to: recipients, cc: [], bcc: [] };
     if (reusable !== undefined) {
       draft = await saveDraft(workspaceId, reusable.id, {
         version: reusable.version,
@@ -290,6 +293,10 @@ export function ReplyDialog({
     const handle = undo.pending({ label: t("reply.pending", { name: person }) });
     let kept: Draft | undefined;
     try {
+      if (answered === undefined) {
+        // Who it goes to is not on screen yet: nothing is sent unseen.
+        throw new Error("nothing to answer yet");
+      }
       const draft = await keep();
       if (draft === undefined) {
         throw new Error("nothing to answer yet");
