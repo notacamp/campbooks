@@ -84,6 +84,7 @@ async fn another_workspace_exports_nothing_of_it(db: PgPool) {
         .await;
     kit.ingest(workspace, inbox, "needs").await;
 
+    // In another workspace Sam reads no inbox: refused, nothing written.
     let other = export_set(
         &kit.state,
         &member(WorkspaceId::new(), sam),
@@ -91,9 +92,8 @@ async fn another_workspace_exports_nothing_of_it(db: PgPool) {
         ALL,
         LabellingSet::Money,
     )
-    .await
-    .unwrap();
-    assert!(other.is_empty());
+    .await;
+    assert!(matches!(other, Err(Error::NotFound)), "{other:?}");
     // Old mail is left out.
     let recent = export_set(
         &kit.state,
