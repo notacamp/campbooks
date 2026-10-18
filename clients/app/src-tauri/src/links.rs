@@ -22,10 +22,13 @@ const MAILTO_FIELDS: [&str; 5] = ["to", "cc", "bcc", "subject", "body"];
 /// A mail link's kept values are decoded and encoded again with everything
 /// but RFC 3986's unreserved characters as `%XX` ([`strict`]): a space goes
 /// out as `%20` (never `+`, which RFC 6068 reads as a plus), a plus as
-/// `%2B`, a line break as `%0D%0A`, and a `;`, `?`, `=`, `/`, `&` or `#`
-/// inside a value as itself encoded, so no mail app can read a field of its
-/// own out of a value (campbooks-cloud#243). The fragment goes: some mail
-/// apps split on `&` without minding `#` (CVE-2020-11880).
+/// `%2B`, a line break as `%0D%0A`, and a `;`, `=`, `/` or `#` inside a
+/// value as itself encoded (campbooks-cloud#243). The fragment goes: some
+/// mail apps split on `&` without minding `#` (CVE-2020-11880). The address
+/// part and `to`, `cc` and `bcc` must be plain addresses, or nothing opens;
+/// a subject or body holding `&` or `?` once decoded is dropped, since a
+/// mail app that decodes before it splits would read another field there
+/// (campbooks-cloud#247).
 pub fn outside(url: &Url) -> Option<String> {
     match url.scheme() {
         "https" | "http" => Some(url.as_str().to_owned()),
@@ -42,17 +45,32 @@ pub fn outside(url: &Url) -> Option<String> {
             {
                 return None;
             }
-            let kept: Vec<String> = url
-                .query()
-                .unwrap_or_default()
-                .split('&')
-                .filter_map(|field| {
-                    let (key, value) = field.split_once('=').unwrap_or((field, ""));
-                    MAILTO_FIELDS
-                        .contains(&key.to_ascii_lowercase().as_str())
-                        .then(|| format!("{}={}", strict(&decode(key)), strict(&decode(value))))
-                })
-                .collect();
+            let mut kept: Vec<String> = Vec::new();
+            for field in url.query().unwrap_or_default().split('&') {
+                let (key, value) = field.split_once('=').unwrap_or((field, ""));
+                let name = key.to_ascii_lowercase();
+                if !MAILTO_FIELDS.contains(&name.as_str()) {
+                    continue;
+                }
+                match name.as_str() {
+                    // More addresses: held to the same rule, or nothing opens.
+                    "to" | "cc" | "bcc" if !addresses_only(value) => return None,
+                    // A mail app that decodes before it splits would read a
+                    // `&` or `?` in the subject or body as the start of
+                    // another field (`&attach=…`): such a field is dropped.
+                    "subject" | "body"
+                        if decode(value).iter().any(|b| matches!(b, b'&' | b'?')) =>
+                    {
+                        continue;
+                    }
+                    _ => {}
+                }
+                kept.push(format!(
+                    "{}={}",
+                    strict(&decode(key)),
+                    strict(&decode(value))
+                ));
+            }
             let mut clean = url.clone();
             clean.set_query((!kept.is_empty()).then(|| kept.join("&")).as_deref());
             clean.set_fragment(None);
@@ -73,6 +91,10 @@ fn addresses_only(path: &str) -> bool {
     if decoded.is_empty() {
         return true;
     }
+    // Never a path a mail app could take for an authority or a file.
+    if decoded.first() == Some(&b'/') {
+        return false;
+    }
     let refused = |b: &u8| {
         b.is_ascii_control()
             || b.is_ascii_whitespace()
@@ -91,7 +113,10 @@ fn addresses_only(path: &str) -> bool {
     let Ok(text) = std::str::from_utf8(&decoded) else {
         return false;
     };
-    if text.chars().any(|c| c.is_control() || is_format(c)) {
+    if text
+        .chars()
+        .any(|c| c.is_control() || c.is_whitespace() || is_invisible(c))
+    {
         return false;
     }
     decoded.split(|b| *b == b',').all(|address| {
@@ -103,12 +128,21 @@ fn addresses_only(path: &str) -> bool {
     })
 }
 
-/// Whether `c` is a Unicode format character (general category Cf):
-/// invisible, it changes how the text around it shows.
-fn is_format(c: char) -> bool {
+/// Whether `c` is invisible: a Unicode format character (general category
+/// Cf, which changes how the text around it shows) or another
+/// Default_Ignorable_Code_Point (fillers, variation selectors).
+fn is_invisible(c: char) -> bool {
     matches!(
         u32::from(c),
         0x00AD
+            | 0x034F
+            | 0x115F..=0x1160
+            | 0x17B4..=0x17B5
+            | 0x180B..=0x180F
+            | 0x3164
+            | 0xFE00..=0xFE0F
+            | 0xFFA0
+            | 0xE0100..=0xE01EF
             | 0x0600..=0x0605
             | 0x061C
             | 0x06DD
@@ -289,12 +323,12 @@ mod tests {
             ),
             (
                 "mailto:x@weekly-ledger.example?subject=x?attach=/etc/passwd",
-                "mailto:x@weekly-ledger.example?subject=x%3Fattach%3D%2Fetc%2Fpasswd",
+                "mailto:x@weekly-ledger.example",
             ),
-            // An encoded `&` stays inside its value.
+            // A `?` or an encoded `&` in a subject or body: the field goes.
             (
                 "mailto:x@weekly-ledger.example?body=a%26attach%3D%2Fetc%2Fpasswd",
-                "mailto:x@weekly-ledger.example?body=a%26attach%3D%2Fetc%2Fpasswd",
+                "mailto:x@weekly-ledger.example",
             ),
         ] {
             assert_eq!(outside(&parse(link)).as_deref(), Some(kept), "{link}");
@@ -330,6 +364,22 @@ mod tests {
             "mailto:rita@silva-contas.example%E2%80",
             // A truncated escape.
             "mailto:rita@silva-contas.example%2",
+            // A path a mail app could take for an authority or a file.
+            "mailto:/x@y.example",
+            "mailto:%2F%2Fx@y.example",
+            "MAILTO://x@y.example",
+            // A backslash, raw or encoded.
+            "mailto:a\\b@y.example",
+            "mailto:a%5Cb@y.example",
+            // Unicode blanks and other invisible characters.
+            "mailto:rita@silva-contas.example%C2%A0",
+            "mailto:rita%E3%80%80@silva-contas.example",
+            "mailto:rita%CD%8F@silva-contas.example",
+            "mailto:rita@silva-contas.example%EF%B8%8F",
+            // More addresses in a field, hiding a header.
+            "mailto:?to=a@b.example%0D%0Abcc:evil@x.example",
+            "mailto:rita@silva-contas.example?cc=x@y.example%26attach%3D/etc/passwd",
+            "mailto:rita@silva-contas.example?bcc=not-an-address",
         ] {
             assert_eq!(outside(&parse(link)), None, "{link}");
         }
@@ -344,6 +394,35 @@ mod tests {
         ] {
             assert!(outside(&parse(link)).is_some(), "{link}");
         }
+    }
+
+    #[test]
+    fn a_subject_or_body_that_could_split_into_another_field_is_dropped() {
+        // A mail app that decodes before it splits would read
+        // `&attach=…` out of these.
+        let link = outside(&parse(
+            "mailto:rita@silva-contas.example?subject=Hi\
+             &body=x%26attach%3D/etc/passwd&cc=joao@silva-contas.example",
+        ));
+        assert_eq!(
+            link.as_deref(),
+            Some("mailto:rita@silva-contas.example?subject=Hi&cc=joao%40silva-contas.example")
+        );
+        let asked = outside(&parse(
+            "mailto:rita@silva-contas.example?subject=Free%3F&body=Thanks",
+        ));
+        assert_eq!(
+            asked.as_deref(),
+            Some("mailto:rita@silva-contas.example?body=Thanks")
+        );
+        // More addresses that are addresses still go.
+        let copied = outside(&parse(
+            "mailto:?to=rita@silva-contas.example,joao@silva-contas.example&subject=Hi",
+        ));
+        assert_eq!(
+            copied.as_deref(),
+            Some("mailto:?to=rita%40silva-contas.example%2Cjoao%40silva-contas.example&subject=Hi")
+        );
     }
 
     #[test]

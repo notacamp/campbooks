@@ -3,9 +3,9 @@
 The re-review of #566 (campbooks-cloud#243) found that a desktop mail link's
 address part, before `?`, reached the mail app as written:
 `mailto:a@b.example%0D%0Abcc:evil@x` could carry a header to a mail app that
-decodes the whole link before splitting it (campbooks-cloud#247). It cannot
-carry a file (`attach` only travels as a filtered field), so this is
-defence in depth.
+decodes the whole link before splitting it (campbooks-cloud#247). The same
+app would read a field hidden in a value: `body=x%26attach%3D…` decodes to
+`&attach=…`, and `to`, `cc` and `bcc` could carry a header too.
 
 ## What Changes
 
@@ -16,8 +16,11 @@ defence in depth.
   valid UTF-8 with no Unicode control (C0, C1) or format character (bidi
   overrides, zero-width characters); other Unicode is kept for
   internationalised addresses. A link with an authority
-  (`mailto://user:password@host`) is refused too. Anything else opens
-  nowhere.
+  (`mailto://user:password@host`) is refused too, and so is an address part
+  starting with `/`. The `to`, `cc` and `bcc` fields are held to the same
+  rule. A subject or body holding `&` or `?` once decoded is dropped.
+  Unicode blanks (`char::is_whitespace`) and other default-ignorable
+  characters are refused too. Anything else opens nowhere.
 
 ## Impact
 

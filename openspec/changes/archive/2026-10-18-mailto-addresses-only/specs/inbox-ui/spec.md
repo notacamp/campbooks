@@ -21,11 +21,14 @@ fragment, each value decoded and encoded again with everything but
 unreserved characters as `%XX` (a space as `%20`, never `+`; a plus as `%2B`;
 a line break, `;`, `?`, `=`, `/`, `&` or `#` encoded too, so no field hides in
 a value), and only when it has no authority (`mailto://…`) and its address
-part is nothing but addresses (none, or comma-separated `local@domain`s,
-valid UTF-8, with no control character, invisible format character such as
-a bidi override or a zero-width space, blank or delimiter such as CR, LF,
-`&`, `;` or `?`, even encoded; other Unicode, as in an internationalised
-address, is kept), anything else nowhere; no remote URL SHALL be granted
+part and its `to`, `cc` and `bcc` fields are nothing but addresses (none, or
+comma-separated `local@domain`s, valid UTF-8, not starting with `/`, with no
+control character, Unicode blank, invisible character such as a bidi
+override, a zero-width space or a variation selector, or delimiter such as
+CR, LF, `&`, `;`, `?` or `\`, even encoded; other Unicode, as in an
+internationalised address, is kept); a subject or body holding `&` or `?`
+once decoded SHALL be dropped, since a mail app that decodes before it splits
+would read another field there; anything else nowhere; no remote URL SHALL be granted
 IPC. CI SHALL check the frame in WebKit under the desktop and web policies
 read from their definitions, with the app's own sandbox and referrer policy,
 and a control proving the check would see a script run.
@@ -57,6 +60,10 @@ and a control proving the check would see a script run.
 #### Scenario: A header hidden in the address
 - **WHEN** the member clicks `mailto:rita@example.com%0D%0Abcc:evil@example.org` or `mailto:rita@example.com%26attach=/etc/passwd`
 - **THEN** nothing opens, while `mailto:rita@example.com,joao@example.com` opens in the mail app
+
+#### Scenario: More addresses, or a field hidden in the body
+- **WHEN** the member clicks `mailto:?to=rita@example.com%0D%0Abcc:evil@example.org`, or `mailto:rita@example.com?body=x%26attach%3D/etc/passwd`
+- **THEN** the first opens nowhere, and the second opens with no body
 
 #### Scenario: An authority or an invisible character
 - **WHEN** the member clicks `mailto://x%0D%0Abcc:evil@example.org`, or an address holding U+202E, U+200B, U+0085 or a byte that is not UTF-8
