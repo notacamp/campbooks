@@ -89,8 +89,9 @@ So:
 - `confirm_rule` signs the proposal the member says yes to, read under the
   lock (the member saw it in the list). A kept rule that does not verify is
   confirmed again the same way: anyone who may teach in its inbox, as for a
-  proposal; it keeps its state and author, and a run starts only when asked
-  and it is active.
+  proposal. It keeps its state, but its author becomes the confirming
+  member: the stored `taught_by` is SQL's to choose, and a NULL one would
+  skip every author check. A run starts only when asked and it is active.
 - `update_rule` now takes the rule's runs' and row locks first (the order
   `confirm_rule` keeps), reads it again and verifies it. A bound rule is
   signed again after the change. An unbound one may only be paused (unsigned,
@@ -118,8 +119,9 @@ Without a key `sign` fails the request (500, a WARN with ids), as
 - `resign_rules`: `WARN a taught rule changed since rules were bound; it
   waits for a member to confirm it` (workspace, rule).
 - A row that does not decode (conditions or actions that are not a rule's) is
-  left out of every list with `WARN a taught rule does not decode; it is left
-  out` (rule): it cannot fail ingest, a run or a list.
+  treated as no rule, in every list and lookup, with `WARN a taught rule does
+  not decode; it is left out` (rule): it cannot fail ingest or a request, and
+  its apply run ends `cancelled` with no retry.
 
 No WARN carries a condition, an action, an address or the tag.
 
@@ -194,7 +196,8 @@ read every rule but change nothing.
   trash or spam, unread, labels off, back to its stream, archive again what a
   spam rule took from the archive), and those rows, like the run rows, are
   not bound. A planted revert run can therefore put back what planted
-  `before` rows say. Gating it on the rule's MAC would not help (a member's
+  `before` rows say. Planted revert or apply runs (MACs on `rule_runs` and
+  `rule_applications`) are tracked in campbooks-cloud#242. Gating it on the rule's MAC would not help (a member's
   own rule's id is enough) and would stop a member putting back what a rule
   did before it was changed with SQL. Binding the applications is a
   follow-up.

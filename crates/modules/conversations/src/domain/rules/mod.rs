@@ -560,7 +560,8 @@ pub async fn find(conn: &mut PgConnection, id: RuleId) -> Result<Option<Stored>>
         .filter(|r| r.state != RuleState::Removed))
 }
 
-/// Rule `id`, removed or not.
+/// Rule `id`, removed or not; `None` when there is none, or its row does
+/// not decode (a WARN with its id).
 pub async fn find_any(conn: &mut PgConnection, id: RuleId) -> Result<Option<Stored>> {
     let row = sqlx::query_as!(
         RuleRow,
@@ -593,7 +594,14 @@ pub async fn find_any(conn: &mut PgConnection, id: RuleId) -> Result<Option<Stor
     .fetch_optional(&mut *conn)
     .await?;
     let Some(row) = row else { return Ok(None) };
-    let mut rule = Stored::try_from(row)?;
+    // A row that does not even decode was not written by Campbooks: it is
+    // treated as no rule (it could never act), never as an error a job
+    // would retry or a request answer 500 with.
+    let id = row.id;
+    let Ok(mut rule) = Stored::try_from(row) else {
+        tracing::warn!(rule = %id, "a taught rule does not decode; it is left out");
+        return Ok(None);
+    };
     binding::attach(conn, std::slice::from_mut(&mut rule)).await?;
     Ok(Some(rule))
 }

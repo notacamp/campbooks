@@ -52,7 +52,7 @@ one new problem code (`rule_needs_confirmation`), two new background jobs.
   and removes it from the snapshot either way.
 - **A rule that needs a yes again says so** (`RuleView.needs_confirmation`),
   and `conversations.confirm_rule` confirms it again: it signs the rule as it
-  is, in its state, with its author.
+  is, in its state, with the confirming member as its author.
 
 ## Non-goals
 

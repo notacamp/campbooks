@@ -2093,8 +2093,9 @@ not verify or does not decode SHALL never fail ingest.
 
 A kept rule (active or paused) that does not verify SHALL be listed with
 `needs_confirmation: true`; `conversations.confirm_rule` SHALL confirm it
-again: anyone who may teach in its inbox, signing it as it is, in its state
-and with its author. A rule that verifies SHALL NOT be confirmed again (409
+again: anyone who may teach in its inbox, signing it as it is, in its state,
+with the confirming member as its author (its stored author is SQL's to
+choose). A rule that verifies SHALL NOT be confirmed again (409
 `rule_not_proposed`).
 
 #### Scenario: A rule planted with SQL
@@ -2114,8 +2115,8 @@ and with its author. A rule that verifies SHALL NOT be confirmed again (409
 - **THEN** it acts on the next mail and its changes are requested from the provider
 
 #### Scenario: Confirming again
-- **WHEN** a rule changed with SQL is listed as needing confirmation and Sam confirms it
-- **THEN** it is bound as it is, in its state, and acts once active
+- **WHEN** a rule changed with SQL (its author removed, say) is listed as needing confirmation and Leo confirms it
+- **THEN** it is bound as it is, in its state, with Leo as its author, and acts once active
 
 #### Scenario: No instance secret
 - **WHEN** the server has no `CAMPBOOKS_SECRET_KEY` and a member saves an active rule

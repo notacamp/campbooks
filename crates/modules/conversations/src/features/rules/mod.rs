@@ -972,9 +972,12 @@ pub async fn confirm(
 }
 
 /// Confirm again a kept rule that is not bound (campbooks-cloud#242): sign
-/// it as it is (its conditions, actions, state and author, which the member
-/// sees in the list), and apply it to the mail already here when asked and
-/// it is active. Anyone who may teach in its inbox may, as for a proposal.
+/// it as it is (its conditions, actions and state, which the member sees in
+/// the list), now taught by the member who confirms it: its stored author
+/// is SQL's to choose (or none, which no author check would stop), so it
+/// acts with the confirming member's rights from now on. Apply it to the
+/// mail already here when asked and it is active. Anyone who may teach in
+/// its inbox may, as for a proposal.
 async fn confirm_again(
     state: &AppState,
     mut tx: Transaction<'static, Postgres>,
@@ -983,6 +986,14 @@ async fn confirm_again(
     body: &ConfirmRule,
 ) -> Result<Json<RuleView>> {
     rules::validate(&rule.conditions, &rule.actions)?;
+    let user = access
+        .user
+        .ok_or_else(|| Error::Denied(crate::MESSAGES.reason("rule_needs_member")))?;
+    sqlx::query("UPDATE conversations.rules SET taught_by = $2, updated_at = now() WHERE id = $1")
+        .bind(rule.id.as_uuid())
+        .bind(user.as_uuid())
+        .execute(&mut *tx)
+        .await?;
     rule_binding::sign(&mut tx, &state.binding, rule.id).await?;
     let rule = rules::find(&mut tx, rule.id)
         .await?

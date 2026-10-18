@@ -502,7 +502,7 @@ async fn a_bad_rule_never_fails_ingest(db: PgPool) {
         )
         .await;
     assert_eq!(created.status, StatusCode::CREATED, "{:?}", created.json);
-    plant(
+    let undecodable = plant(
         &kit,
         workspace,
         inbox,
@@ -514,6 +514,8 @@ async fn a_bad_rule_never_fails_ingest(db: PgPool) {
         None,
     )
     .await;
+    // Its run, planted too: it ends, never failing or retried.
+    plant_run(&kit, workspace, undecodable).await;
     plant(
         &kit,
         workspace,
@@ -531,4 +533,55 @@ async fn a_bad_rule_never_fails_ingest(db: PgPool) {
         assert!(read, "{id}: Sam's rule still acts");
         assert!(!trashed, "{id}: the planted rule acted");
     }
+    // `run_jobs` saw no job fail: the run just ended.
+    let run: String =
+        sqlx::query_scalar("SELECT state FROM conversations.rule_runs WHERE rule_id = $1")
+            .bind(undecodable)
+            .fetch_one(&kit.db)
+            .await
+            .unwrap();
+    assert_eq!(run, "cancelled");
+    // Nor does it answer 500 when read: there is no such rule.
+    let got = kit
+        .get(&sam, &format!("/api/v1/w/{workspace}/rules/{undecodable}"))
+        .await;
+    assert_eq!(got.status, StatusCode::NOT_FOUND);
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn confirming_again_makes_the_confirming_member_its_author(db: PgPool) {
+    let kit = kit(db).await;
+    let (workspace, inbox, sam, _) = sams_notifications(&kit, 1).await;
+    let (leo, leo_id) = kit.member("leo", workspace);
+    kit.add_to_inbox(inbox, leo_id, InboxRole::Sender).await;
+    let rule = archive_github(&kit, &sam, workspace, inbox).await;
+    // SQL takes its author away: no author check would stop it.
+    as_runtime_role(
+        &kit,
+        workspace,
+        "UPDATE conversations.rules SET taught_by = NULL WHERE id = $1",
+        rule,
+    )
+    .await;
+    let one = format!("/api/v1/w/{workspace}/rules/{rule}");
+    let got = kit.get(&sam, &one).await;
+    assert_eq!(got.json["needs_confirmation"], true, "{:?}", got.json);
+    // Leo confirms it again: it is his now, acting with his rights.
+    let confirmed = kit
+        .post(
+            &leo,
+            &format!("{one}/confirm"),
+            Some(json!({"apply_to_existing": false})),
+        )
+        .await;
+    assert_eq!(confirmed.status, StatusCode::OK, "{:?}", confirmed.json);
+    assert_eq!(confirmed.json["needs_confirmation"], false);
+    assert_eq!(
+        confirmed.json["taught_by"].as_str(),
+        Some(leo_id.as_uuid().to_string().as_str())
+    );
+    kit.ingest_value(workspace, inbox, &notifications("late", 1, GITHUB, None))
+        .await;
+    let (_, _, in_inbox, _) = flags(&kit, "late-0").await;
+    assert!(!in_inbox, "the confirmed rule acts");
 }

@@ -73,6 +73,8 @@ impl JobHandler for ApplyRules {
             return Ok(());
         }
         let kind: RunKind = run.kind.parse()?;
+        // Gone, or a row that does not decode (`find_any` WARNs with its id):
+        // the run ends, never retried.
         let Some(rule) = rules::find_any(tx, run.rule).await? else {
             return end(tx, batch.run, RunState::Cancelled).await;
         };
