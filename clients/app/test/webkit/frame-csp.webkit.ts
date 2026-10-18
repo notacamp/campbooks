@@ -207,8 +207,9 @@ describe("the frame's own layers", () => {
       sandbox: `${SANDBOX} allow-scripts`,
       framePolicy: false,
     });
-    await page.frameLocator("#mail").locator("#script-link").click();
-    await page.waitForTimeout(800);
+    // Its <script>, onerror and onload run as the frame loads (with no
+    // policy its meta refresh then takes the frame away, so nothing is
+    // clicked here).
     expect(await page.evaluate("window.pwned")).toEqual(expect.any(String));
     await page.context().close();
   });
