@@ -800,8 +800,8 @@ with names and addresses), plain text (the text part, or the HTML part
 reduced to text when there is none, quoted history removed, at most
 32 KiB; the HTML is reduced by html5ever's tokenizer alone, with no tree,
 fed 1 KiB at a time and stopped after 500 ms with the words read so far, keeping the characters outside scripts, styles, the head, the
-title, the markup a `noscript`, `iframe`, `noembed` or `noframes` holds, and
-`blockquote`s, with a line break at each `br` and at the end of
+title, the markup a `noscript`, `iframe`, `noembed` or `noframes` holds,
+`template`s and `blockquote`s, with a line break at each `br` and at the end of
 each block; the head ends where the tree builder would end it, at `</head>`,
 `<body>`, any start tag that cannot stand in a head, or words outside its
 raw-text elements, so HTML with no `<body>` tag still gives its words),

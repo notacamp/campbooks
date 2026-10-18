@@ -65,7 +65,7 @@ const CHUNK: usize = 1024;
 
 /// The text of an HTML body, read with html5ever's tokenizer alone (no
 /// tree, so however the tags nest; stopped at [`MAX_TEXT_TIME`]): no tags, no
-/// scripts, styles, head or title, entities decoded, a line break at each
+/// scripts, styles, head, title or `<template>`s, entities decoded, a line break at each
 /// `br` and at the end of each block, and no `<blockquote>`s when `quotes`
 /// is [`Quotes::Drop`].
 pub fn text_of(html: &str, quotes: Quotes) -> String {
@@ -106,6 +106,9 @@ struct Reader {
     /// Inside `<head>`, until anything that cannot be in it starts the body
     /// (as the tree builder decides, campbooks-cloud#218).
     in_head: Cell<bool>,
+    /// Inside a `<template>`: markup never shown (templates nest, so a
+    /// depth).
+    template_depth: Cell<usize>,
     quote_depth: Cell<usize>,
 }
 
@@ -116,6 +119,7 @@ impl Reader {
             text: RefCell::new(String::new()),
             skipping: Cell::new(false),
             in_head: Cell::new(false),
+            template_depth: Cell::new(0),
             quote_depth: Cell::new(0),
         }
     }
@@ -133,6 +137,10 @@ impl TokenSink for Reader {
                         "script" | "style" | "title" | "noscript" | "iframe" | "noembed"
                         | "noframes" => self.skipping.set(false),
                         "head" => self.in_head.set(false),
+                        "template" => {
+                            self.template_depth
+                                .set(self.template_depth.get().saturating_sub(1));
+                        }
                         "blockquote" => {
                             self.quote_depth
                                 .set(self.quote_depth.get().saturating_sub(1));
@@ -153,6 +161,7 @@ impl TokenSink for Reader {
                     "head" => self.in_head.set(true),
                     "body" => self.in_head.set(false),
                     "blockquote" => self.quote_depth.set(self.quote_depth.get() + 1),
+                    "template" => self.template_depth.set(self.template_depth.get() + 1),
                     "br" => self.text.borrow_mut().push('\n'),
                     "script" | "style" | "title" | "noscript" | "iframe" | "noembed"
                     | "noframes" => self.skipping.set(true),
@@ -182,6 +191,7 @@ impl TokenSink for Reader {
                 }
                 let hidden = self.skipping.get()
                     || self.in_head.get()
+                    || self.template_depth.get() > 0
                     || (self.quotes == Quotes::Drop && self.quote_depth.get() > 0);
                 if !hidden {
                     let mut out = self.text.borrow_mut();
@@ -387,5 +397,22 @@ mod tests {
                     <body><p>Hi</p></body>";
         let text = from_html(html);
         assert!(text.contains("Hi") && !text.contains("Secret"), "{text:?}");
+    }
+
+    #[test]
+    fn noscript_templates_and_uppercase_tags_in_a_head_are_not_words() {
+        let html = "<HEAD><META CHARSET=utf-8><NOSCRIPT><img src=x>Secret noscript</NOSCRIPT>\
+                    <TEMPLATE><p>Secret template <template>nested</template> still</p></TEMPLATE>\
+                    <TITLE>Secret title</TITLE></HEAD><P>Invoice due Friday</P>\
+                    <template><b>Secret body template</b></template><p>Thanks</p>";
+        let text = from_html(html);
+        assert!(
+            text.contains("Invoice due Friday") && text.contains("Thanks"),
+            "{text:?}"
+        );
+        assert!(
+            !text.contains("Secret") && !text.contains("still"),
+            "{text:?}"
+        );
     }
 }
