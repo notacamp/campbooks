@@ -8,6 +8,8 @@
 //! and anything else (`javascript:`, `file:`, `data:`, the app's own
 //! schemes) opens nowhere.
 
+use std::fmt::Write as _;
+
 use url::Url;
 
 /// The `mailto:` fields a mail app is handed; anything else (`attach=`,
@@ -80,7 +82,7 @@ fn strict(bytes: &[u8]) -> String {
         if b.is_ascii_alphanumeric() || matches!(b, b'-' | b'.' | b'_' | b'~') {
             out.push(char::from(b));
         } else {
-            out.push_str(&format!("%{b:02X}"));
+            let _ = write!(out, "%{b:02X}");
         }
     }
     out
