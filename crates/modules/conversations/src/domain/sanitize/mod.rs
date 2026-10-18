@@ -23,9 +23,14 @@
 //!   (`cid:`) shows the message's own part as a `data:` URL the caller
 //!   built; every image left without a source shows [`PLACEHOLDER`], so the
 //!   reader never shows the browser's broken-image icon. Those two are the
-//!   only `data:` sources that leave.
+//!   only `data:` sources that leave;
+//! - **quoted history**: a reply's trailing quote, found from its markup
+//!   alone ([`quotes`]), is wrapped in one `<div data-cb-quoted="1">` for the
+//!   reader to fold. Ammonia never lets that attribute in, so the only mark
+//!   is the one added here.
 
 pub mod css;
+pub mod quotes;
 pub mod styles;
 
 use std::{
@@ -138,7 +143,7 @@ fn content_id(url: &str) -> Option<String> {
 /// `show_remote_images` is set; `cid:` images show their part from `inline`
 /// either way.
 ///
-/// Six steps: the HTML is measured first ([`styles::measure`]: a parse as a
+/// Seven steps: the HTML is measured first ([`styles::measure`]: a parse as a
 /// document and one as a fragment, as the inliner and ammonia parse it, each
 /// counting the tree builder's work and stopped at a fixed budget), and
 /// HTML past the budget is shown as its text alone; then the style sheets
@@ -150,7 +155,8 @@ fn content_id(url: &str) -> Option<String> {
 /// and, unless shown, removed, and every `cid:` source becomes its part's
 /// `data:` URL; then every image left without a source gets the
 /// placeholder. A last check strips every image if any source other than
-/// those survived a blocked render.
+/// those survived a blocked render. Last, the trailing quoted history is
+/// marked for the reader to fold ([`quotes::mark`]).
 pub fn sanitize(html: &str, show_remote_images: bool, inline: &InlineImages) -> Sanitized {
     let Some(tree) = styles::measure(html) else {
         return as_text(html);
@@ -174,7 +180,7 @@ pub fn sanitize(html: &str, show_remote_images: bool, inline: &InlineImages) -> 
         html = strict.clean(&html).to_string();
     }
     Sanitized {
-        html,
+        html: quotes::mark(&html),
         remote_images: seen.load(Ordering::Relaxed),
         css: inlined.media,
     }
@@ -232,6 +238,10 @@ fn builder(images: Option<Images>) -> Builder<'static> {
         .add_tag_attributes("td", ["colspan", "rowspan"])
         .add_tag_attributes("th", ["colspan", "rowspan"])
         .add_tag_attributes("table", ["cellpadding", "cellspacing"])
+        // The structure quoted history is found by ([`quotes`]), with only
+        // the values it reads.
+        .add_tag_attribute_values("blockquote", "type", ["cite"])
+        .add_tag_attribute_values("div", "id", quotes::OUTLOOK_IDS)
         // `cid` survives only on images (the filter drops it elsewhere).
         .url_schemes(HashSet::from(["http", "https", "mailto", "tel", "cid"]))
         // Mail has no base URL: a relative link or image goes nowhere.

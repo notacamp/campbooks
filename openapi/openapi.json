@@ -13120,6 +13120,7 @@
           "unread_count",
           "starred",
           "archived",
+          "latest_from_you",
           "snippet",
           "labels"
         ],
@@ -13158,6 +13159,10 @@
                 "type": "null"
               }
             ]
+          },
+          "latest_from_you": {
+            "type": "boolean",
+            "description": "Whether the newest message is one the inbox sent (outbound)."
           },
           "message_count": {
             "type": "integer",

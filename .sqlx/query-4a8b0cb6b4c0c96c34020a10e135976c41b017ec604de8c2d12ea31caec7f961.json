@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n        SELECT c.id AS \"id: ConversationId\", c.inbox_id AS \"inbox_id: InboxId\", c.subject,\n               c.stream, c.stream_source, c.last_message_at, c.message_count, c.unread_count,\n               c.starred, c.archived_at IS NOT NULL AS \"archived!\",\n               m.sender AS \"sender?\", m.snippet AS \"snippet?\",\n               coalesce((SELECT jsonb_agg(jsonb_build_object('id', l.id, 'name', l.name)\n                                          ORDER BY l.name)\n                           FROM conversations.conversation_labels cl\n                           JOIN conversations.labels l ON l.id = cl.label_id\n                          WHERE cl.conversation_id = c.id), '[]') AS \"labels!\"\n          FROM conversations.conversations c\n          LEFT JOIN LATERAL (\n              SELECT sender, snippet FROM conversations.messages\n               WHERE conversation_id = c.id ORDER BY sent_at DESC, id DESC LIMIT 1\n          ) m ON true\n         WHERE c.inbox_id = ANY($1) AND c.id = ANY($2)\n         ORDER BY c.last_message_at DESC, c.id DESC\n        ",
+  "query": "\n        SELECT c.id AS \"id: ConversationId\", c.inbox_id AS \"inbox_id: InboxId\", c.subject,\n               c.stream, c.stream_source, c.last_message_at, c.message_count, c.unread_count,\n               c.starred, c.archived_at IS NOT NULL AS \"archived!\",\n               m.sender AS \"sender?\", m.snippet AS \"snippet?\",\n               coalesce(m.direction = 'outbound', false) AS \"latest_from_you!\",\n               coalesce((SELECT jsonb_agg(jsonb_build_object('id', l.id, 'name', l.name)\n                                          ORDER BY l.name)\n                           FROM conversations.conversation_labels cl\n                           JOIN conversations.labels l ON l.id = cl.label_id\n                          WHERE cl.conversation_id = c.id), '[]') AS \"labels!\"\n          FROM conversations.conversations c\n          LEFT JOIN LATERAL (\n              SELECT sender, snippet, direction FROM conversations.messages\n               WHERE conversation_id = c.id ORDER BY sent_at DESC, id DESC LIMIT 1\n          ) m ON true\n         WHERE c.inbox_id = ANY($1) AND c.id = ANY($2)\n         ORDER BY c.last_message_at DESC, c.id DESC\n        ",
   "describe": {
     "columns": [
       {
@@ -132,6 +132,12 @@
       },
       {
         "ordinal": 12,
+        "name": "latest_from_you!",
+        "type_info": "Bool",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 13,
         "name": "labels!",
         "type_info": "Jsonb",
         "origin": "Expression"
@@ -156,8 +162,9 @@
       null,
       false,
       false,
+      null,
       null
     ]
   },
-  "hash": "b3de20e7c0a4a9b5ab4bdb333730f32de5eeb408a77e0cc6a814fdf96049dca7"
+  "hash": "4a8b0cb6b4c0c96c34020a10e135976c41b017ec604de8c2d12ea31caec7f961"
 }
