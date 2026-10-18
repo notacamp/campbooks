@@ -170,6 +170,24 @@ async fn issue_link(_: Scoped<TestWrite>) -> (StatusCode, [(header::HeaderName, 
     )
 }
 
+/// Take a while, then answer with a fresh run id (a request still in flight
+/// when another arrives with its key).
+#[utoipa::path(
+    post,
+    path = "/api/v1/test/slow",
+    operation_id = "test.slow",
+    security(("bearer" = ["test:write"])),
+    extensions(("x-campbooks" = json!(Operation::command(Risk::Low).records(["test.note"])))),
+    responses((status = CREATED, body = Value)),
+)]
+async fn slow(_: Scoped<TestWrite>) -> (StatusCode, Json<Value>) {
+    tokio::time::sleep(std::time::Duration::from_millis(400)).await;
+    (
+        StatusCode::CREATED,
+        Json(json!({ "run": uuid::Uuid::now_v7() })),
+    )
+}
+
 /// Reasons of the test operations.
 static TEST_MESSAGES: crate::i18n::Catalogue =
     crate::i18n::Catalogue::new("test", [r#"{"errors": {"flaky": "Busy ({{run}})"}}"#; 4]);
@@ -230,6 +248,7 @@ fn api() -> OpenApiRouter<AppState> {
         .routes(routes!(flaky))
         .routes(routes!(issue_secret))
         .routes(routes!(issue_link))
+        .routes(routes!(slow))
 }
 
 /// The test API over `state`: the HTTP router and the state that invokes
@@ -269,7 +288,7 @@ fn status(error: &InvokeError) -> Option<StatusCode> {
 fn catalogue_reads_ids_metadata_and_routes() {
     let (_, spec) = api().split_for_parts();
     let catalogue = Catalogue::from_openapi(&spec);
-    assert_eq!(catalogue.len(), 8);
+    assert_eq!(catalogue.len(), 9);
     assert!(catalogue.get("test.issue_secret").unwrap().secret_once());
     assert!(!catalogue.get("test.archive").unwrap().secret_once());
 
@@ -686,14 +705,37 @@ async fn a_key_still_in_flight_is_409(db: PgPool) {
     assert_eq!(status, StatusCode::CONFLICT);
     assert_eq!(problem["status"], 409);
 
-    // Once abandoned (its process died), the same request takes it over.
+    assert_eq!(problem["code"], "idempotency_key_in_flight");
+
+    // Once abandoned (its process died), it is never run again: it may have
+    // committed before its answer was stored (campbooks-cloud#63).
     sqlx::query(
         "UPDATE kernel.idempotency SET created_at = now() - interval '1 hour' WHERE key = 'busy'",
     )
     .execute(&db)
     .await
     .unwrap();
-    let (status, headers, _) = http
+    let (status, headers, problem) = http
+        .send(
+            "POST",
+            ARCHIVE,
+            Some("busy"),
+            Some(json!({ "reason": "x" })),
+        )
+        .await;
+    assert_eq!(status, StatusCode::CONFLICT);
+    assert_eq!(problem["code"], "idempotency_outcome_unknown");
+    assert!(!headers.contains_key(idempotency::REPLAYED_HEADER));
+
+    // Once expired, the key is free again.
+    sqlx::query(
+        "UPDATE kernel.idempotency SET expires_at = now() - interval '1 second'
+          WHERE key = 'busy'",
+    )
+    .execute(&db)
+    .await
+    .unwrap();
+    let (status, ..) = http
         .send(
             "POST",
             ARCHIVE,
@@ -702,7 +744,86 @@ async fn a_key_still_in_flight_is_409(db: PgPool) {
         )
         .await;
     assert_eq!(status, StatusCode::CREATED);
-    assert!(!headers.contains_key(idempotency::REPLAYED_HEADER));
+}
+
+/// A request that committed its effects, then stopped before its answer was
+/// stored (simulated: the key left pending, with no answer, its process
+/// gone), is never run again with its key: a retry right away hears it is
+/// in flight, and once it is abandoned that its outcome is unknown
+/// (campbooks-cloud#63).
+#[sqlx::test(migrations = "../../migrations")]
+async fn a_crash_between_the_commit_and_the_stored_answer_never_runs_twice(db: PgPool) {
+    let http = http(db.clone()).await;
+    let body = json!({ "reason": "x" });
+    let (status, ..) = http
+        .send("POST", ARCHIVE, Some("crash"), Some(body.clone()))
+        .await;
+    assert_eq!(status, StatusCode::CREATED);
+    // What a crash after the commit and before the store leaves.
+    sqlx::query(
+        "UPDATE kernel.idempotency
+            SET state = 'pending', response_status = NULL, response_content_type = NULL,
+                response_location = NULL, response_body = NULL
+          WHERE key = 'crash'",
+    )
+    .execute(&db)
+    .await
+    .unwrap();
+    let (status, _, problem) = http
+        .send("POST", ARCHIVE, Some("crash"), Some(body.clone()))
+        .await;
+    assert_eq!(status, StatusCode::CONFLICT);
+    assert_eq!(problem["code"], "idempotency_key_in_flight");
+    sqlx::query(
+        "UPDATE kernel.idempotency SET created_at = now() - interval '3 minutes'
+          WHERE key = 'crash'",
+    )
+    .execute(&db)
+    .await
+    .unwrap();
+    for _ in 0..2 {
+        let (status, headers, problem) = http
+            .send("POST", ARCHIVE, Some("crash"), Some(body.clone()))
+            .await;
+        assert_eq!(status, StatusCode::CONFLICT, "{problem}");
+        assert_eq!(problem["code"], "idempotency_outcome_unknown");
+        assert!(problem["run"].is_null(), "the handler did not run");
+        assert!(!headers.contains_key(idempotency::REPLAYED_HEADER));
+    }
+    // Another request with the key is still another request.
+    let (status, ..) = http
+        .send(
+            "POST",
+            ARCHIVE,
+            Some("crash"),
+            Some(json!({ "reason": "y" })),
+        )
+        .await;
+    assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
+}
+
+/// Two requests with one key at once: one runs, the other hears it is in
+/// flight, and a retry afterwards replays the one answer.
+#[sqlx::test(migrations = "../../migrations")]
+async fn concurrent_requests_with_one_key_run_once(db: PgPool) {
+    let http = http(db).await;
+    let (first, second) = tokio::join!(
+        http.send("POST", "/api/v1/test/slow", Some("together"), None),
+        async {
+            tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+            http.send("POST", "/api/v1/test/slow", Some("together"), None)
+                .await
+        },
+    );
+    assert_eq!(first.0, StatusCode::CREATED, "{}", first.2);
+    assert_eq!(second.0, StatusCode::CONFLICT, "{}", second.2);
+    assert_eq!(second.2["code"], "idempotency_key_in_flight");
+    let (status, headers, again) = http
+        .send("POST", "/api/v1/test/slow", Some("together"), None)
+        .await;
+    assert_eq!(status, StatusCode::CREATED);
+    assert_eq!(headers[idempotency::REPLAYED_HEADER], "true");
+    assert_eq!(again["run"], first.2["run"], "it ran once");
 }
 
 #[sqlx::test(migrations = "../../migrations")]
