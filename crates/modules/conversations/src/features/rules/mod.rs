@@ -1569,8 +1569,8 @@ pub async fn restore(
     may_teach(&state, &mut tx, access, rule.inbox).await?;
     member_only(&workspace.principal)?;
     if back != RuleState::Proposed {
-        let role = rules::role_in(&mut tx, rule.inbox, access.user).await?;
-        if !rules::may_change(role, access.user, rule.taught_by) {
+        let inbox_role = rules::role_in(&mut tx, rule.inbox, access.user).await?;
+        if !rules::may_change(inbox_role, access.user, rule.taught_by) {
             return Err(Error::Denied(crate::MESSAGES.reason("rule_not_yours")));
         }
         // Back as kept, it is signed and acts again: the member's own request.
