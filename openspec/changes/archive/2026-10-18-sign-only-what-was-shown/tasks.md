@@ -37,4 +37,4 @@
 
 - [x] 6.1 OpenAPI regenerated, client types regenerated
 - [x] 6.2 CHANGELOG updated
-- [ ] 6.3 Gates green in CI; UI recorded at 375px and desktop
+- [x] 6.3 Gates green in CI; UI recorded at 375px and desktop
