@@ -79,6 +79,10 @@ impl std::fmt::Debug for Background {
                 "publishes",
                 &self.publishes.iter().map(|e| e.name).collect::<Vec<_>>(),
             )
+            .field(
+                "rekeys",
+                &self.rekeys.iter().map(|r| r.name).collect::<Vec<_>>(),
+            )
             .finish()
     }
 }
@@ -424,6 +428,7 @@ impl std::fmt::Debug for Registry {
             .field("kinds", &self.kinds.keys().collect::<Vec<_>>())
             .field("consumers", &self.consumers)
             .field("schedules", &self.schedules)
+            .field("rekeys", &self.rekeys)
             .field(
                 "published",
                 &self.published.iter().map(|e| e.name).collect::<Vec<_>>(),
