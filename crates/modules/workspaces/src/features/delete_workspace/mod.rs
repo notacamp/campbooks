@@ -129,8 +129,8 @@ pub async fn execute(state: &AppState, access: &Access) -> Result<WorkspaceDelet
 /// Hard-delete a deleted workspace's records once its grace period is over:
 /// its blobs (`BlobStore::purge_workspace`), then the workspace row, and with
 /// it (foreign keys cascade) its members, invitations and security events,
-/// and the kernel's change feed, event log and finished jobs of the
-/// workspace. Runs in the workspace, so row-level security applies; a
+/// and the kernel's change feed, event log, finished jobs and idempotency
+/// keys of the workspace. Runs in the workspace, so row-level security applies; a
 /// workspace that is gone already is a no-op.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct PurgeWorkspace {
@@ -190,6 +190,9 @@ impl Job for PurgeWorkspace {
         // still queued, such as other modules' purges, stay to run).
         campbooks_kernel::changes::purge_workspace(tx, &workspace).await?;
         let (jobs, events) = campbooks_kernel::jobs::purge_workspace(tx, &workspace).await?;
+        // Its idempotency keys too, the stored answers with them, expired
+        // or not (campbooks-cloud#65).
+        campbooks_kernel::idempotency::purge_workspace(tx, &workspace).await?;
         tracing::info!(workspace = %id, jobs, events, "workspace purged");
         Ok(())
     }
@@ -267,6 +270,25 @@ mod tests {
         .execute(&kit.db)
         .await
         .unwrap();
+        // Unexpired idempotency keys: one of the workspace's routes, one of
+        // another workspace's, one outside any workspace.
+        let other = kit.create_workspace(&ana, "Elsewhere").await;
+        for (key, workspace) in [
+            ("k-1", Some(ws.to_string())),
+            ("k-2", Some(other.to_string())),
+            ("k-0", None),
+        ] {
+            sqlx::query(
+                "INSERT INTO kernel.idempotency
+                     (principal, key, operation_id, request_hash, expires_at, workspace_id)
+                 VALUES ('user:3:ana|azp:', $1, 'test.op', '\\x00', now() + interval '1 day', $2)",
+            )
+            .bind(key)
+            .bind(workspace)
+            .execute(&kit.db)
+            .await
+            .unwrap();
+        }
         let stats = worker.run_until_idle().await;
         assert_eq!(stats.failed, 0, "{stats:?}");
         let purged: String = sqlx::query_scalar(
@@ -295,6 +317,16 @@ mod tests {
         .await
         .unwrap();
         assert_eq!(history, (0, 0), "its events and finished jobs went with it");
+        let keys: Vec<Option<String>> =
+            sqlx::query_scalar("SELECT workspace_id FROM kernel.idempotency ORDER BY key")
+                .fetch_all(&kit.db)
+                .await
+                .unwrap();
+        assert_eq!(
+            keys,
+            [None, Some(other.to_string())],
+            "its idempotency keys went with it, unexpired too; others' stay"
+        );
     }
 
     #[sqlx::test(migrations = "../../../migrations")]

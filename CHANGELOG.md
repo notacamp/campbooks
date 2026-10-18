@@ -295,6 +295,12 @@ All notable changes to Campbooks Next are documented here. The format follows
 - **A request body that cannot be read is explained in your language.** The web app's
   error for a body that arrived incomplete was English only; it is now in all four
   languages.
+- **Purging a workspace also deletes its saved retry answers.** When a request is sent with
+  an idempotency key, the server keeps its answer for a day so a retry gets the same
+  answer, and that answer can include what you wrote. Each saved answer now records the
+  workspace in the request's address (never one named in the request itself), and purging
+  the workspace deletes them at once, even ones less than a day old. Saved answers stay
+  readable only by the person and app that made the request.
 
 ### Added
 

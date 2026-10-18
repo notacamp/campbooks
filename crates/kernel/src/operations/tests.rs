@@ -1305,3 +1305,103 @@ async fn a_replay_needs_the_access_the_first_run_had(db: PgPool) {
     let (status, _, last) = http.send("POST", &uri, Some("k-box"), None).await;
     assert_eq!((status, last), (StatusCode::OK, first));
 }
+
+// --- a workspace's keys go with it (campbooks-cloud#65) ---------------------
+
+/// Every key with the workspace it records, as the database owner.
+async fn workspace_keys(db: &PgPool) -> Vec<(String, Option<String>)> {
+    sqlx::query_as("SELECT key, workspace_id FROM kernel.idempotency ORDER BY key")
+        .fetch_all(db)
+        .await
+        .unwrap()
+}
+
+/// A key of a `{workspace_id}` route records that workspace, taken from the
+/// matched route alone: a `workspace_id` in the body changes nothing, and a
+/// route outside a workspace records none. The workspace's purge deletes its
+/// keys through `kernel.purge_workspace_idempotency`, only in a transaction
+/// working in that workspace, and leaves every other key.
+#[sqlx::test(migrations = "../../migrations")]
+async fn a_workspace_routes_keys_name_it_and_go_with_its_purge(db: PgPool) {
+    use crate::db::BeginFor as _;
+
+    let idp = TestIdp::start().await;
+    let switches = SwitchPorts(std::sync::Arc::default());
+    let state = idp
+        .state(db.clone())
+        .with_membership(std::sync::Arc::new(switches.clone()))
+        .with_visibility(std::sync::Arc::new(switches));
+    let (app, _) = app(state);
+    let http = Http {
+        app,
+        token: idp.token(&idp.claims("test:write")),
+        idp: idp.clone(),
+    };
+    let (ws, elsewhere) = (
+        crate::tenancy::WorkspaceId::new(),
+        crate::tenancy::WorkspaceId::new(),
+    );
+    let claimed = json!({ "workspace_id": elsewhere.to_string(), "reason": "done" });
+    for (uri, key) in [
+        (format!("/api/v1/w/{ws}/boxes/b1/edit"), "k-box"),
+        (format!("/api/v1/w/{elsewhere}/boxes/b2/edit"), "k-other"),
+        (ARCHIVE.to_owned(), "k-note"),
+    ] {
+        let (status, _, body) = http
+            .send("POST", &uri, Some(key), Some(claimed.clone()))
+            .await;
+        assert!(status.is_success(), "{uri}: {status} {body}");
+    }
+    assert_eq!(
+        workspace_keys(&db).await,
+        [
+            ("k-box".to_owned(), Some(ws.to_string())),
+            ("k-note".to_owned(), None),
+            ("k-other".to_owned(), Some(elsewhere.to_string())),
+        ]
+    );
+
+    // Refused unless the transaction works in that workspace.
+    let pool = testing::app_role_pool(&db).await;
+    let purge = "SELECT kernel.purge_workspace_idempotency($1, 100)";
+    for mut tx in [
+        pool.begin().await.unwrap(),
+        pool.begin_for(elsewhere).await.unwrap(),
+    ] {
+        let refused = sqlx::query_scalar::<_, i64>(purge)
+            .bind(ws.to_string())
+            .fetch_one(&mut *tx)
+            .await
+            .unwrap_err();
+        assert!(
+            refused
+                .to_string()
+                .contains("in a transaction working in that workspace"),
+            "{refused}"
+        );
+    }
+    assert_eq!(workspace_keys(&db).await.len(), 3, "nothing was deleted");
+
+    // In the workspace: its key goes, expired or not; the others stay, and
+    // the transaction still sees no key at all.
+    let mut tx = pool.begin_for(ws).await.unwrap();
+    assert_eq!(
+        crate::idempotency::purge_workspace(&mut tx, &ws.to_string())
+            .await
+            .unwrap(),
+        1
+    );
+    let seen: i64 = sqlx::query_scalar("SELECT count(*) FROM kernel.idempotency")
+        .fetch_one(&mut *tx)
+        .await
+        .unwrap();
+    assert_eq!(seen, 0);
+    tx.commit().await.unwrap();
+    assert_eq!(
+        workspace_keys(&db).await,
+        [
+            ("k-note".to_owned(), None),
+            ("k-other".to_owned(), Some(elsewhere.to_string())),
+        ]
+    );
+}
