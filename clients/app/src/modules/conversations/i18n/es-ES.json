@@ -71,7 +71,17 @@
     "imagesHidden_other": "{{count}} imágenes remotas ocultas, para que el remitente no sepa cuándo lees esto.",
     "imagesShown": "Imágenes remotas visibles.",
     "trustImages": "Mostrar siempre las imágenes de {{name}}",
-    "imagesTrusted": "Imágenes visibles: confías en {{name}}. Los píxeles de seguimiento siguen eliminados."
+    "imagesTrusted": "Imágenes visibles: confías en {{name}}. Los píxeles de seguimiento siguen eliminados.",
+    "imagesTrustedInbox": "Imágenes visibles: este buzón confía en {{name}}. Los píxeles de seguimiento siguen eliminados.",
+    "imagesHeld": {
+      "under_review": "Las imágenes siguen retenidas: este correo está en revisión.",
+      "checks_fail": "Las imágenes siguen retenidas: este correo no pasa las comprobaciones del remitente.",
+      "unverified": "Las imágenes siguen retenidas: el proveedor de correo no comprobó nada que confirme a este remitente.",
+      "cannot_authenticate": "Las imágenes siguen retenidas: este proveedor de correo no comparte las comprobaciones del remitente, así que aquí no se puede confiar en ningún remitente.",
+      "not_checked": "Las imágenes esperan a que Scout revise este correo. Mientras Scout esté desactivado o haya superado su límite diario, siguen retenidas.",
+      "rule_paused": "Las imágenes siguen retenidas: la regla inteligente que confía en este remitente está en pausa o esperando un sí.",
+      "rule_too_broad": "Las imágenes siguen retenidas: la regla inteligente para todo el dominio de este remitente confiaría en desconocidos (cualquiera puede enviar desde él), así que no actúa. Aún puedes confiar en esta dirección."
+    }
   },
   "toast": {
     "done": "Hecho · {{subject}}",
@@ -610,7 +620,8 @@
     "imagesMatches_one": "Ya hay {{n}} conversación de este remitente. Sus imágenes se muestran siempre que su correo pasa las comprobaciones.",
     "imagesMatches_other": "Ya hay {{n}} conversaciones de este remitente. Sus imágenes se muestran siempre que su correo pasa las comprobaciones.",
     "imagesNew": "Sus imágenes se mostrarán en el correo nuevo de este remitente que pase las comprobaciones.",
-    "imagesHow": "Solo para el correo que pasa las comprobaciones del remitente, nunca para el que se hace pasar por él. Los píxeles de seguimiento siguen eliminados."
+    "imagesHow": "Solo para el correo que pasa las comprobaciones del remitente y en el que Scout no ha encontrado nada sospechoso; por eso, mientras Scout esté desactivado o haya superado su límite diario, siguen retenidas. Nunca para el que se hace pasar por él. Los píxeles de seguimiento siguen eliminados.",
+    "imagesAlready": "Ya hay una regla inteligente para las imágenes de este remitente, aunque esté en pausa o esperando un sí. La encontrarás en la memoria de Scout."
   },
   "ahead": {
     "reportTitle": "¿No volver a ver correos como este?",

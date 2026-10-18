@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
+import { problemCode } from "~/lib/api";
 import { useShortcut } from "~/lib/shortcuts";
 import {
   Banner,
@@ -118,6 +119,9 @@ function Confirm({
   const preview = useRulePreview(workspaceId, draft.inboxId, rule);
   const [existing, setExisting] = useState(true);
   const [failed, setFailed] = useState(false);
+  // A rule already trusts this sender's images (paused or waiting too): the
+  // server refuses a second one, and saving again would change nothing.
+  const [already, setAlready] = useState(false);
   const [saved, setSaved] = useState(false);
   const sentence = ruleSentence(t, locale, rule);
   const count = preview.data?.would_change ?? 0;
@@ -151,7 +155,7 @@ function Confirm({
   }
 
   const save = () => {
-    if (create.isPending || saved) {
+    if (create.isPending || saved || already) {
       return;
     }
     setFailed(false);
@@ -199,12 +203,16 @@ function Confirm({
             },
           });
         },
-        () => {
-          setFailed(true);
+        (error: unknown) => {
+          if (problemCode(error) === "images_already_trusted") {
+            setAlready(true);
+          } else {
+            setFailed(true);
+          }
         },
       );
   };
-  useShortcut("inbox.rule.save", save, { enabled: !saved });
+  useShortcut("inbox.rule.save", save, { enabled: !saved && !already });
 
   return (
     <Dialog
@@ -221,7 +229,7 @@ function Confirm({
           <Button
             variant="primary"
             shortcut="inbox.rule.save"
-            disabled={create.isPending}
+            disabled={create.isPending || already}
             onClick={save}
           >
             {failed ? t("smartRule.retry") : t("smartRule.save")}
@@ -276,6 +284,7 @@ function Confirm({
           />
         ) : null}
         {failed ? <Banner tone="danger" role="alert" title={t("smartRule.failed")} /> : null}
+        {already ? <Banner role="status" title={t("smartRule.imagesAlready")} /> : null}
       </div>
     </Dialog>
   );

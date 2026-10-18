@@ -2,7 +2,6 @@ import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { errorStatus } from "~/lib/api";
-import { isFreeMailDomain } from "~/lib/mail/free-mail";
 import { useShortcut } from "~/lib/shortcuts";
 import {
   ActionBar,
@@ -205,15 +204,14 @@ export function ConversationReader({
   };
   /**
    * Trust `message`'s sender with its images: a smart rule for the address,
-   * or anyone at its domain (never a free mail provider's), confirmed first.
+   * or anyone at `domain` when the server offers one (an owned domain, never
+   * a free mail provider's), confirmed first.
    */
-  const trustImages = (message: MessageView) => {
+  const trustImages = (message: MessageView, domain: string | undefined) => {
     if (conversation === undefined || inbox === undefined) {
       return;
     }
     const address = message.from.address.trim().toLowerCase();
-    const at = address.lastIndexOf("@");
-    const domain = at === -1 ? "" : address.slice(at + 1);
     const byAddress = {
       id: "address",
       heading: t("smartRule.imagesTitle", { sender: address }),
@@ -221,13 +219,16 @@ export function ConversationReader({
       description: t("smartRule.imagesAddressDetail"),
       conditions: [{ field: "sender_address" as const, value: address }],
     };
-    const byDomain = {
-      id: "domain",
-      heading: t("smartRule.imagesTitle", { sender: domain }),
-      title: t("smartRule.imagesDomain", { domain }),
-      description: t("smartRule.imagesDomainDetail", { domain }),
-      conditions: [{ field: "sender_domain" as const, value: domain }],
-    };
+    const byDomain =
+      domain === undefined
+        ? undefined
+        : {
+            id: "domain",
+            heading: t("smartRule.imagesTitle", { sender: domain }),
+            title: t("smartRule.imagesDomain", { domain }),
+            description: t("smartRule.imagesDomainDetail", { domain }),
+            conditions: [{ field: "sender_domain" as const, value: domain }],
+          };
     setTrusting({
       inboxId: inbox.id,
       conditions: byAddress.conditions,
@@ -235,7 +236,7 @@ export function ConversationReader({
       title: t("smartRule.imagesTitle", { sender: address }),
       fromConversation: conversation.id,
       sharedInbox: inbox.shared ? inbox.address : undefined,
-      choices: domain === "" || isFreeMailDomain(domain) ? [byAddress] : [byAddress, byDomain],
+      choices: byDomain === undefined ? [byAddress] : [byAddress, byDomain],
     });
   };
   // Never offered on mail that may be phishing: trust is not the question.
@@ -279,15 +280,6 @@ export function ConversationReader({
   );
   const viewing = conversation !== undefined;
   useShortcut("inbox.show_images", showAllImages, { enabled: viewing });
-  useShortcut(
-    "inbox.trust_images",
-    () => {
-      if (newestInbound !== undefined) {
-        trustImages(newestInbound);
-      }
-    },
-    { enabled: active && trustable && newestInbound !== undefined && trusting === null },
-  );
   useShortcut(
     "inbox.next_attachment",
     () => {
@@ -728,11 +720,13 @@ export function ConversationReader({
             }}
             onTrustImages={
               trustable && message.direction === "inbound"
-                ? () => {
-                    trustImages(message);
+                ? (domain) => {
+                    trustImages(message, domain);
                   }
                 : undefined
             }
+            trustKey={active && trusting === null && message.id === newestInbound?.id}
+            sharedInbox={inbox?.shared === true}
             kind={message.direction === "outbound" ? "person" : kind}
             inertLinks={conversation.need?.question === "suspicious"}
             now={now}
