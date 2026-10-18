@@ -30,7 +30,7 @@ use crate::{
 };
 
 mod purge_again;
-pub use purge_again::{PurgeAgain, purge_again};
+pub use purge_again::{LIVE_PURGE_NOTICE, PurgeAgain, PurgeAgainOptions, purge_again};
 
 /// How long a deleted workspace's records are kept before they are purged.
 pub const GRACE_PERIOD: TimeDelta = TimeDelta::days(30);
@@ -213,7 +213,7 @@ fn log_purged(id: WorkspaceId, purged_at: DateTime<Utc>) {
 #[cfg(test)]
 mod tests {
     use axum::http::StatusCode;
-    use campbooks_kernel::jobs::Worker;
+    use campbooks_kernel::{jobs::Worker, tenancy::WorkspaceId};
     use sqlx::PgPool;
 
     use crate::testkit::Kit;
@@ -344,7 +344,7 @@ mod tests {
     }
 
     /// The workspace's purges still queued, as the database owner.
-    async fn queued_purges(kit: &Kit, ws: campbooks_kernel::tenancy::WorkspaceId) -> i64 {
+    async fn queued_purges(kit: &Kit, ws: WorkspaceId) -> i64 {
         sqlx::query_scalar(
             "SELECT count(*) FROM kernel.jobs
               WHERE kind = 'workspaces.purge_workspace' AND workspace_id = $1
@@ -356,28 +356,72 @@ mod tests {
         .unwrap()
     }
 
-    /// After a restore of a backup taken before the deletion, the operator's
-    /// `purge-again` deletes the workspace now, publishes its deletion (every
-    /// module purges too) and purges it at once; a second run enqueues no
-    /// second purge; once purged, the id is a no-op that says so.
+    /// What `purge-again` is told: nothing, or that the workspace was
+    /// deleted after the backup (and when to purge it).
+    fn told(
+        not_deleted_in_backup: bool,
+        purge_after: Option<chrono::DateTime<chrono::Utc>>,
+    ) -> super::PurgeAgainOptions {
+        super::PurgeAgainOptions {
+            not_deleted_in_backup,
+            purge_after,
+        }
+    }
+
+    /// Whether the workspace is still live and nothing was published or
+    /// queued for it.
+    async fn untouched(kit: &Kit, ana: &crate::testkit::Caller, ws: WorkspaceId) {
+        assert_eq!(
+            kit.get(ana, &format!("/api/v1/w/{ws}")).await.status,
+            StatusCode::OK
+        );
+        assert!(
+            !kit.events_of(&ws.to_string())
+                .await
+                .contains(&"workspaces.workspace_deleting".to_owned())
+        );
+        assert_eq!(queued_purges(kit, ws).await, 0);
+    }
+
+    /// A workspace live in the restored database is left alone unless the
+    /// operator says it was deleted after the backup: the command answers
+    /// the facts only (members, creation date). Told so, it deletes it at
+    /// once (deletion published, the first owner standing in for the
+    /// operator) and queues its purge an hour later; a second run enqueues
+    /// no second purge and reports when the queued one runs; once purged,
+    /// the id is a no-op that says so.
     #[sqlx::test(migrations = "../../../migrations")]
-    async fn purge_again_deletes_and_purges_a_restored_workspace_once(db: PgPool) {
+    async fn purge_again_deletes_a_live_workspace_only_when_told(db: PgPool) {
         let kit = Kit::new(db).await;
         let ana = kit.user("ana");
         let ws = kit.create_workspace(&ana, "Shop").await;
         kit.join(&ana, ws, "bea", "member").await;
 
-        let first = super::purge_again(&kit.state, ws).await.unwrap();
-        assert_eq!(
-            first,
-            super::PurgeAgain::Scheduled {
-                newly_deleted: true
-            }
+        let refused = super::purge_again(&kit.state, ws, told(false, None))
+            .await
+            .unwrap();
+        assert!(
+            matches!(refused, super::PurgeAgain::NotDeleted { members: 2, .. }),
+            "{refused:?}"
         );
+        untouched(&kit, &ana, ws).await;
+
+        let before = chrono::Utc::now();
+        let deleted = super::purge_again(&kit.state, ws, told(true, None))
+            .await
+            .unwrap();
+        let super::PurgeAgain::Deleted { purge_after } = deleted else {
+            panic!("{deleted:?}");
+        };
+        assert!(
+            purge_after >= before + super::LIVE_PURGE_NOTICE,
+            "{purge_after}"
+        );
+        assert!(purge_after < chrono::Utc::now() + super::LIVE_PURGE_NOTICE * 2);
         assert_eq!(
             kit.get(&ana, &format!("/api/v1/w/{ws}")).await.status,
             StatusCode::NOT_FOUND,
-            "gone for its members at once"
+            "hidden from its members at once"
         );
         assert!(
             kit.events_of(&ws.to_string())
@@ -388,30 +432,110 @@ mod tests {
         assert_eq!(
             deleted_by,
             serde_json::json!(kit.user_id("ana").await),
-            "the owner, who alone deletes"
+            "the first owner, standing in for the operator"
         );
 
-        let second = super::purge_again(&kit.state, ws).await.unwrap();
-        assert_eq!(
-            second,
-            super::PurgeAgain::AlreadyQueued {
-                newly_deleted: false
-            }
+        let again = super::purge_again(&kit.state, ws, told(true, None))
+            .await
+            .unwrap();
+        let super::PurgeAgain::AlreadyQueued { run_at } = again else {
+            panic!("{again:?}");
+        };
+        assert!(
+            (run_at - purge_after).num_seconds().abs() < 1,
+            "{run_at} {purge_after}"
         );
         assert_eq!(queued_purges(&kit, ws).await, 1, "no second purge");
 
+        // An hour later, the worker purges it.
+        sqlx::query(
+            "UPDATE workspaces.workspaces SET purge_after = now() - interval '1 second'
+              WHERE id = $1",
+        )
+        .bind(ws.as_uuid())
+        .execute(&kit.db)
+        .await
+        .unwrap();
+        sqlx::query(
+            "UPDATE kernel.jobs SET run_at = now() WHERE kind = 'workspaces.purge_workspace'",
+        )
+        .execute(&kit.db)
+        .await
+        .unwrap();
         let stats = Worker::new(kit.state.clone()).run_until_idle().await;
         assert_eq!(stats.failed, 0, "{stats:?}");
         assert_eq!(kit.rows_of(ws).await, (0, 0, 0));
         assert_eq!(
-            super::purge_again(&kit.state, ws).await.unwrap(),
+            super::purge_again(&kit.state, ws, told(true, None))
+                .await
+                .unwrap(),
             super::PurgeAgain::NoSuchWorkspace
         );
         assert_eq!(queued_purges(&kit, ws).await, 0);
     }
 
-    /// A workspace deleted in its grace period keeps its one queued purge:
-    /// `purge-again` marks it due now and enqueues nothing more.
+    /// The purge time of a live workspace deleted again may be given (its
+    /// original `purge_after`), but never less than an hour away.
+    #[sqlx::test(migrations = "../../../migrations")]
+    async fn purge_again_takes_a_purge_time_an_hour_away_at_least(db: PgPool) {
+        let kit = Kit::new(db).await;
+        let ana = kit.user("ana");
+        let ws = kit.create_workspace(&ana, "Shop").await;
+
+        let soon = chrono::Utc::now() + chrono::TimeDelta::minutes(30);
+        let refused = super::purge_again(&kit.state, ws, told(true, Some(soon)))
+            .await
+            .unwrap();
+        assert!(
+            matches!(refused, super::PurgeAgain::TooSoon { .. }),
+            "{refused:?}"
+        );
+        untouched(&kit, &ana, ws).await;
+
+        let later = chrono::Utc::now() + chrono::TimeDelta::days(12);
+        let deleted = super::purge_again(&kit.state, ws, told(true, Some(later)))
+            .await
+            .unwrap();
+        let super::PurgeAgain::Deleted { purge_after } = deleted else {
+            panic!("{deleted:?}");
+        };
+        assert!(
+            (purge_after - later).num_milliseconds().abs() < 1,
+            "{purge_after}"
+        );
+    }
+
+    /// A live workspace with no owner to name is refused, even when told.
+    #[sqlx::test(migrations = "../../../migrations")]
+    async fn purge_again_refuses_a_live_workspace_with_no_owner(db: PgPool) {
+        let kit = Kit::new(db).await;
+        let ana = kit.user("ana");
+        let ws = kit.create_workspace(&ana, "Shop").await;
+        sqlx::query("UPDATE workspaces.members SET role = 'admin' WHERE workspace_id = $1")
+            .bind(ws.as_uuid())
+            .execute(&kit.db)
+            .await
+            .unwrap();
+        assert_eq!(
+            super::purge_again(&kit.state, ws, told(true, None))
+                .await
+                .unwrap(),
+            super::PurgeAgain::NoOwner
+        );
+        let deleted: bool = sqlx::query_scalar(
+            "SELECT deleted_at IS NOT NULL FROM workspaces.workspaces WHERE id = $1",
+        )
+        .bind(ws.as_uuid())
+        .fetch_one(&kit.db)
+        .await
+        .unwrap();
+        assert!(!deleted);
+        assert_eq!(queued_purges(&kit, ws).await, 0);
+    }
+
+    /// A workspace deleted in its grace period keeps its one queued purge
+    /// and its purge time: `purge-again` changes nothing and says when the
+    /// purge runs.
     #[sqlx::test(migrations = "../../../migrations")]
     async fn purge_again_keeps_the_queued_purge_of_a_deleted_workspace(db: PgPool) {
         let kit = Kit::new(db).await;
@@ -421,26 +545,57 @@ mod tests {
         assert_eq!(response.status, StatusCode::ACCEPTED);
         let deletions = kit.events_of(&ws.to_string()).await.len();
 
-        assert_eq!(
-            super::purge_again(&kit.state, ws).await.unwrap(),
-            super::PurgeAgain::AlreadyQueued {
-                newly_deleted: false
-            }
-        );
+        let outcome = super::purge_again(&kit.state, ws, told(false, None))
+            .await
+            .unwrap();
+        let super::PurgeAgain::AlreadyQueued { run_at } = outcome else {
+            panic!("{outcome:?}");
+        };
+        assert!(run_at > chrono::Utc::now() + chrono::TimeDelta::days(29));
         assert_eq!(queued_purges(&kit, ws).await, 1);
         assert_eq!(
             kit.events_of(&ws.to_string()).await.len(),
             deletions,
             "its deletion is not published twice"
         );
-        let due: bool = sqlx::query_scalar(
-            "SELECT purge_after <= now() FROM workspaces.workspaces WHERE id = $1",
+        let later: bool = sqlx::query_scalar(
+            "SELECT purge_after > now() + interval '29 days' FROM workspaces.workspaces
+              WHERE id = $1",
         )
         .bind(ws.as_uuid())
         .fetch_one(&kit.db)
         .await
         .unwrap();
-        assert!(due);
+        assert!(later, "its purge time is untouched");
+    }
+
+    /// A deleted workspace with no purge queued (the purge job gave up) is
+    /// marked for purge now and its purge queued to run now.
+    #[sqlx::test(migrations = "../../../migrations")]
+    async fn purge_again_requeues_the_purge_of_a_deleted_workspace(db: PgPool) {
+        let kit = Kit::new(db).await;
+        let ana = kit.user("ana");
+        let ws = kit.create_workspace(&ana, "Shop").await;
+        let response = kit.delete(&ana, &format!("/api/v1/w/{ws}")).await;
+        assert_eq!(response.status, StatusCode::ACCEPTED);
+        sqlx::query(
+            "UPDATE kernel.jobs SET state = 'failed', finished_at = now()
+              WHERE kind = 'workspaces.purge_workspace'",
+        )
+        .execute(&kit.db)
+        .await
+        .unwrap();
+
+        assert_eq!(
+            super::purge_again(&kit.state, ws, told(false, None))
+                .await
+                .unwrap(),
+            super::PurgeAgain::Scheduled
+        );
+        assert_eq!(queued_purges(&kit, ws).await, 1);
+        let stats = Worker::new(kit.state.clone()).run_until_idle().await;
+        assert_eq!(stats.failed, 0, "{stats:?}");
+        assert_eq!(kit.rows_of(ws).await, (0, 0, 0));
     }
 
     /// The `workspace purged` line carries the workspace's id and the time,

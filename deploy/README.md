@@ -254,29 +254,55 @@ docker run --rm -v campbooks_blobs-data:/data -v "$PWD":/backup busybox:1.37.0-m
 
 ### After restoring a backup: purge deleted workspaces again
 
-A restore brings back every workspace as it was when the backup was taken, including
-the ones deleted and purged since: their members, their mail and their files are back.
-Purge each of them again before anyone signs in.
+A restore brings every workspace back as it was when the backup was taken. That
+includes the ones deleted since, whether already purged or still in their 30-day grace
+period, with their members, their mail and their files. Delete each of them again before
+anyone signs in. Keep server logs at least as long as your oldest backup, since the logs
+are how you find them.
 
-1. List the workspaces purged after the backup's time. Each purge logs one line,
-   `workspace purged`, with the workspace's id and the time (nothing else), so search
-   your logs from the backup's time onwards for that message. Keep server logs at least
-   as long as your oldest backup.
-2. With the restored database running, purge each again (the id twice, as confirmation):
+1. **List them.** Search your logs from the backup's time onwards for two messages:
+   - `workspace purged`: the workspace was purged after the backup. The line holds the
+     workspace's id and the time, nothing else.
+   - `workspace deleted`: the workspace was deleted after the backup and may not have
+     been purged yet. Its line also holds the `purge_after` it was given.
+2. **Purge each again** from the restored database, giving the id twice as
+   confirmation:
 
    ```sh
    docker compose exec server campbooks-server workspaces purge-again <id> --confirm <id>
    ```
 
-   It deletes the workspace now if the backup predates its deletion (every part of the
-   app then purges its data too), sets its purge for now, and queues the purge, which a
-   worker runs. Running it twice queues one purge; an id with no workspace changes
-   nothing and says so. It logs one line with the workspace's id only.
+   - **If it was already deleted in the backup,** its purge is queued again, or, if a
+     purge is queued already, the command changes nothing and says when that purge runs.
+   - **If it was still live in the backup** (deleted after the backup was taken), the
+     command refuses at first. It prints only that the workspace is live, how many
+     members it has and when it was created, so a mistyped id costs nothing. Check those,
+     then run it again with `--not-deleted-in-backup`:
 
-The server records each purge in the database too (a tombstone, so data that arrives for
-a purged workspace later is deleted by the hourly sweep), but those records are restored
-to the backup's moment with everything else: the log lines are what tells you which
-workspaces went after it. There is no API for this; only the command does it.
+     ```sh
+     docker compose exec server campbooks-server workspaces purge-again <id> --confirm <id> \
+       --not-deleted-in-backup [--purge-after <purge_after from its "workspace deleted" line>]
+     ```
+
+     The workspace is hidden at once, and every part of the app purges its data at its
+     purge time: an hour from now, or the `--purge-after` you give, which cannot be
+     sooner. Until then, a workspace deleted by mistake can still be brought back by
+     restoring again.
+   - **If the command says the workspace has no owner,** it changes nothing. Every
+     workspace keeps an owner, so this means the restored data is not what you expect:
+     do not edit the database by hand. Check that you restored the right backup, and if
+     it persists, open an issue with the command's output (it holds only ids, counts and
+     dates).
+   - **An id with no workspace** is reported as such and changes nothing.
+
+   Running the command twice queues a single purge. It logs one line, with the
+   workspace's id only, when it changes something.
+
+The server also records each purge in the database: a tombstone, so data that arrives
+for a purged workspace later is deleted by the hourly sweep. Those records are restored
+to the backup's moment along with everything else, which is why the log lines, not the
+database, tell you which workspaces went after it. There is no API for any of this; only
+the command does it.
 
 ## Monitoring
 

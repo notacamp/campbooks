@@ -299,12 +299,14 @@ All notable changes to Campbooks Next are documented here. The format follows
   by an hourly sweep, rather than waiting up to 90 days for normal retention. A delivery
   still waiting to run is kept until it has run. The server remembers which workspaces
   were purged by id and time only, and forgets that too 30 days after nothing of the
-  workspace is left. After restoring a database backup, operators can purge again the
-  workspaces deleted after the backup was taken:
-  `campbooks-server workspaces purge-again <id> --confirm <id>`. The ids come from the
-  `workspace purged` log line, which holds only the id and the time; the self-hosting
-  guide's Backups section has the steps. Only that command can make a purge run
-  immediately: there is no API for it.
+  workspace is left. A workspace that turns out to be live again is never swept. After
+  restoring a database backup, operators can delete again the workspaces deleted after
+  the backup was taken: `campbooks-server workspaces purge-again <id> --confirm <id>`. The
+  ids come from the `workspace deleted` and `workspace purged` log lines. A workspace that
+  is live in the backup is only described (member count, creation date) until the operator
+  adds `--not-deleted-in-backup`; it is then hidden at once and purged an hour later at
+  the earliest. The self-hosting guide's Backups section has the steps. Only that command
+  can shorten a workspace's grace period: there is no API for it.
 
 ### Added
 

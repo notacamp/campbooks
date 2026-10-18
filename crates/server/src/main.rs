@@ -23,7 +23,7 @@ use campbooks_kernel::{
     jobs::Worker,
 };
 use campbooks_server::{bff, telemetry::Telemetry};
-use campbooks_workspaces::operator::PurgeAgain;
+use campbooks_workspaces::operator::{PurgeAgain, PurgeAgainOptions};
 use clap::{Parser, Subcommand};
 use secrecy::ExposeSecret;
 use sqlx::{Connection as _, PgConnection, PgPool};
@@ -147,19 +147,31 @@ enum TelemetryCommand {
 #[derive(Debug, Subcommand)]
 enum WorkspacesCommand {
     /// Purge a workspace again after restoring a database backup brought it
-    /// back (it was deleted and purged after the backup was taken): marks it
-    /// deleted, its purge due now, and enqueues the purge, which a worker
-    /// runs. A workspace that was not deleted yet in the backup is deleted
-    /// now and every module purges its data too. A purge already queued is
-    /// not enqueued twice; an id with no workspace changes nothing. Operator
+    /// back (it was deleted after the backup was taken). A workspace deleted
+    /// in the backup has its purge queued to run now (unless one is queued
+    /// already: then nothing changes and the command says when it runs). A
+    /// workspace live in the backup is left alone, and the command prints
+    /// its member count and creation date, unless `--not-deleted-in-backup`
+    /// says it was deleted after the backup: then it is deleted now (every
+    /// part of the app purges its data too) and purged an hour later, or at
+    /// `--purge-after`. An id with no workspace changes nothing. Operator
     /// only: no API route does this.
     PurgeAgain {
-        /// The workspace's id (a UUID), as the `workspace purged` log line
-        /// gives it.
+        /// The workspace's id (a UUID), as the `workspace deleted` or
+        /// `workspace purged` log line gives it.
         workspace: String,
         /// The same id again: purging cannot be undone.
         #[arg(long)]
         confirm: Option<String>,
+        /// The workspace is live in the restored database but was deleted
+        /// after the backup was taken: delete it again.
+        #[arg(long)]
+        not_deleted_in_backup: bool,
+        /// With `--not-deleted-in-backup`: when to purge it (RFC 3339, e.g.
+        /// the `purge_after` of its `workspace deleted` line), at least an
+        /// hour from now. Default: an hour from now.
+        #[arg(long, requires = "not_deleted_in_backup", value_parser = parse_instant)]
+        purge_after: Option<chrono::DateTime<chrono::Utc>>,
     },
 }
 
@@ -218,8 +230,21 @@ fn main() -> ExitCode {
         Command::Admin { command } => admin_cli::run(command),
         Command::Labelling { command } => labelling_cli::run(command),
         Command::Workspaces {
-            command: WorkspacesCommand::PurgeAgain { workspace, confirm },
-        } => purge_again(&workspace, confirm.as_deref()),
+            command:
+                WorkspacesCommand::PurgeAgain {
+                    workspace,
+                    confirm,
+                    not_deleted_in_backup,
+                    purge_after,
+                },
+        } => purge_again(
+            &workspace,
+            confirm.as_deref(),
+            PurgeAgainOptions {
+                not_deleted_in_backup,
+                purge_after,
+            },
+        ),
         Command::Search {
             command: SearchCommand::Reindex { workspace },
         } => reindex(&workspace),
@@ -826,7 +851,7 @@ fn reindex(workspace: &str) -> ExitCode {
 }
 
 /// `workspaces purge-again <id> --confirm <id>` (campbooks-cloud#65).
-fn purge_again(workspace: &str, confirm: Option<&str>) -> ExitCode {
+fn purge_again(workspace: &str, confirm: Option<&str>, options: PurgeAgainOptions) -> ExitCode {
     if let Err(e) = confirmed(workspace, confirm) {
         return fail(&e);
     }
@@ -854,7 +879,7 @@ fn purge_again(workspace: &str, confirm: Option<&str>) -> ExitCode {
         let db = connect(&config).await?;
         let state =
             campbooks_server::with_ports(AppState::new(db.clone(), config).with_registry(registry));
-        let outcome = campbooks_workspaces::operator::purge_again(&state, id)
+        let outcome = campbooks_workspaces::operator::purge_again(&state, id, options)
             .await
             .map_err(|e| e.to_string());
         db.close().await;
@@ -862,28 +887,58 @@ fn purge_again(workspace: &str, confirm: Option<&str>) -> ExitCode {
     });
     drop(runtime);
     telemetry.shutdown();
+    match outcome {
+        Ok(outcome) => purged_again(id, outcome),
+        Err(e) => fail(&e),
+    }
+}
+
+/// What `purge-again` says it did: facts only (ids, counts, dates).
+fn purged_again(id: campbooks_kernel::tenancy::WorkspaceId, outcome: PurgeAgain) -> ExitCode {
     let said = |message: String| {
         let _ = writeln!(std::io::stdout(), "{message}");
         ExitCode::SUCCESS
     };
     match outcome {
-        Ok(PurgeAgain::NoSuchWorkspace) => said(format!(
+        PurgeAgain::NoSuchWorkspace => said(format!(
             "no workspace {id}: nothing to purge (purged already, or never here); nothing was done"
         )),
-        Ok(PurgeAgain::NoOwner) => fail(&format!(
-            "workspace {id} is not deleted and has no owner to name; nothing was done"
+        PurgeAgain::NotDeleted {
+            members,
+            created_at,
+        } => fail(&format!(
+            "workspace {id} is live (not deleted) in this database: {members} member(s), created \
+             {}; nothing was done (if it was deleted after the backup was taken, run again with \
+             --not-deleted-in-backup)",
+            created_at.to_rfc3339()
         )),
-        Ok(PurgeAgain::Scheduled { newly_deleted }) => said(format!(
-            "workspace {id} {}marked for purge now; a worker purges it",
-            if newly_deleted { "deleted and " } else { "" }
+        PurgeAgain::TooSoon { earliest } => fail(&format!(
+            "--purge-after must be at least an hour from now (after {}); nothing was done",
+            earliest.to_rfc3339()
         )),
-        Ok(PurgeAgain::AlreadyQueued { newly_deleted }) => said(format!(
-            "workspace {id} {}marked for purge now; its purge was queued already and runs \
-             when due",
-            if newly_deleted { "deleted and " } else { "" }
+        PurgeAgain::NoOwner => fail(&format!(
+            "workspace {id} is live and has no owner to name in its deletion; nothing was done \
+             (see Backups in the self-hosting guide)"
         )),
-        Err(e) => fail(&e),
+        PurgeAgain::Deleted { purge_after } => said(format!(
+            "workspace {id} deleted; a worker purges it after {}",
+            purge_after.to_rfc3339()
+        )),
+        PurgeAgain::Scheduled => said(format!(
+            "workspace {id} marked for purge now; a worker purges it"
+        )),
+        PurgeAgain::AlreadyQueued { run_at } => said(format!(
+            "workspace {id} is deleted and its purge is queued already for {}; nothing was changed",
+            run_at.to_rfc3339()
+        )),
     }
+}
+
+/// `--purge-after`: an RFC 3339 instant.
+fn parse_instant(value: &str) -> Result<chrono::DateTime<chrono::Utc>, String> {
+    chrono::DateTime::parse_from_rfc3339(value)
+        .map(|at| at.to_utc())
+        .map_err(|_| format!("{value}: expected an RFC 3339 time, e.g. 2026-11-01T09:00:00Z"))
 }
 
 /// `--confirm` must repeat the workspace id exactly.
@@ -1156,8 +1211,9 @@ mod tests {
         assert!(confirmed(id, Some("0192f7a0-0000-7000-8000-000000000002")).is_err());
         assert!(confirmed(id, Some(&id.to_uppercase())).is_err());
         let failure = format!("{:?}", ExitCode::FAILURE);
-        assert_eq!(format!("{:?}", purge_again(id, None)), failure);
-        assert_eq!(format!("{:?}", purge_again(id, Some(""))), failure);
+        let options = PurgeAgainOptions::default();
+        assert_eq!(format!("{:?}", purge_again(id, None, options)), failure);
+        assert_eq!(format!("{:?}", purge_again(id, Some(""), options)), failure);
         let cli = Cli::try_parse_from([
             "campbooks-server",
             "workspaces",
@@ -1170,9 +1226,43 @@ mod tests {
         assert!(matches!(
             cli.command,
             Some(Command::Workspaces {
-                command: WorkspacesCommand::PurgeAgain { .. }
+                command: WorkspacesCommand::PurgeAgain {
+                    not_deleted_in_backup: false,
+                    purge_after: None,
+                    ..
+                }
             })
         ));
+        // `--purge-after` only with `--not-deleted-in-backup`.
+        let at = "2026-11-01T09:00:00Z";
+        let alone = [
+            "campbooks-server",
+            "workspaces",
+            "purge-again",
+            id,
+            "--confirm",
+            id,
+        ];
+        assert!(Cli::try_parse_from(alone.iter().chain(&["--purge-after", at])).is_err());
+        let told = Cli::try_parse_from(alone.iter().chain(&[
+            "--not-deleted-in-backup",
+            "--purge-after",
+            at,
+        ]))
+        .unwrap();
+        let Some(Command::Workspaces {
+            command:
+                WorkspacesCommand::PurgeAgain {
+                    not_deleted_in_backup: true,
+                    purge_after: Some(purge_after),
+                    ..
+                },
+        }) = told.command
+        else {
+            panic!("--not-deleted-in-backup --purge-after not parsed as given");
+        };
+        assert_eq!(purge_after.to_rfc3339(), "2026-11-01T09:00:00+00:00");
+        assert!(parse_instant("tomorrow").is_err());
     }
 
     /// The worker's probe answers 200 while it beats, 503 otherwise, and

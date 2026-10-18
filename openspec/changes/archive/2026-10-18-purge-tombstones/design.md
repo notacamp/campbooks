@@ -43,23 +43,53 @@ They cannot tell which workspaces were purged after the backup.
 **What they fix:** rows written after a purge, and, for a backup taken
 after a purge, rows that reach the purged workspace afterwards.
 
-**What fixes a restore:** the operator's runbook. The `workspace purged` log
-line (its fields pinned by a test to the id and the time) lists the
-workspaces purged after the backup's time. `campbooks-server workspaces
-purge-again <id> --confirm <id>` purges each again:
+**What fixes a restore:** the operator's runbook. Two log lines list the
+workspaces to act on after the backup's time. A test pins the fields of
+`workspace purged` to the id and the time. `workspace deleted` carries the
+original `purge_after`, so it covers workspaces deleted after the backup but
+not yet purged. `campbooks-server workspaces purge-again <id> --confirm <id>`
+then handles each one:
 
-- **It re-marks the workspace.** A workspace still live in the backup is
-  deleted now, and its deletion is published with its first owner as the
-  one who deleted it, so every module purges its data. In every case its
-  `purge_after` is set to now. Only this command sets `purge_after` to now;
-  the app always waits out the grace period.
-- **It enqueues the purge** under the purge's unique key, so a purge
-  already queued means no second one. A workspace deleted in the backup
-  keeps its queued purge, which runs when due; for a restore, that time has
-  usually passed.
-- **It stays with the operator.** It is a subcommand of the server binary
+- **A workspace deleted in the backup.** Its queued purge stays as it is;
+  the command changes nothing and reports when the purge runs. If no purge
+  is queued (it gave up), the command sets the purge time to now and queues
+  a purge.
+- **A workspace live in the backup.** By default the command refuses and
+  prints only facts: that the workspace is live, its member count and its
+  creation date. A mistyped id then costs nothing. With
+  `--not-deleted-in-backup`:
+  - the workspace is hidden at once and its deletion is published, so every
+    module purges its data;
+  - the event names its first owner, a stand-in for the operator, since
+    `deleted_by` must be a member;
+  - the purge comes an hour later, or at `--purge-after` (never sooner than
+    an hour), which leaves time to undo a mistyped id through the restore.
+- **A live workspace with no owner** is refused. Every workspace keeps an
+  owner, so this needs a person to look at it, not a guess.
+- **The purge is queued** under its unique key, so a purge already queued
+  means no second one.
+- **It stays with the operator.** It is a subcommand of the server binary,
   with no route or admin endpoint. It refuses unless `--confirm` repeats the
-  id exactly, and it logs one line with the id only.
+  id exactly, and it logs one line with the id only. Only this command sets
+  a purge time sooner than the grace period.
+
+### The sweep leaves a live workspace alone
+
+A tombstone and a live row of the same workspace mean something went wrong:
+a partial restore, or an id reused by hand. The sweep checks the membership
+port's `workspace_live` before each purge. It skips a live workspace with
+one warning naming its id, and keeps the tombstone. It also logs and skips
+a workspace whose check or purge fails, and moves on to the next.
+
+### The purge's log line is written before the commit
+
+The worker commits the job's transaction together with marking the job
+succeeded, after `run` returns. `JobContext` has no after-commit hook, and
+adding one for a log line would change every job's contract. So
+`workspace purged` is logged at the end of `run`, before that commit. If
+the commit fails, the line names a workspace that is still there and still
+deleted. `purge-again` on it then reports the queued purge and changes
+nothing, so the runbook stays safe.
 
 ### Rejected: a purge ledger outside the database
 

@@ -17,7 +17,7 @@
 use serde::{Deserialize, Serialize};
 use sqlx::{PgPool, Postgres, Transaction};
 
-use crate::{Job, JobContext, JobError};
+use crate::{Job, JobContext, JobError, tenancy::WorkspaceId};
 
 #[cfg(test)]
 mod tests;
@@ -86,8 +86,10 @@ pub async fn tombstone(
 /// Delete what reached the kernel's tables of a purged workspace after its
 /// purge, for every tombstone ([`purge_workspace`]: changes, finished jobs,
 /// events no pending or running delivery reads), then drop the tombstones
-/// older than 30 days whose workspace has nothing left. Scheduled hourly by
-/// the kernel.
+/// older than 30 days whose workspace has nothing left. A workspace that is
+/// live again is skipped with a warning, its tombstone kept; a workspace
+/// whose purge fails is logged and tried again by the next sweep, and the
+/// others go on. Scheduled hourly by the kernel.
 #[derive(Debug, Clone, Copy, Default, Serialize, Deserialize)]
 pub struct SweepPurgedWorkspaces;
 
@@ -108,17 +110,33 @@ impl Job for SweepPurgedWorkspaces {
         .await?;
         tx.commit().await?;
         let mut swept = Purged::default();
+        // Tombstones left as they are this time: a live workspace, or one
+        // whose purge failed (the next sweep tries again).
+        let mut kept: Vec<String> = Vec::new();
         for workspace in &tombstones {
-            let purged = purge_workspace(&pool, workspace).await?;
-            swept.jobs += purged.jobs;
-            swept.events += purged.events;
-            swept.changes += purged.changes;
+            match Self::sweep_one(ctx, &pool, workspace).await {
+                Ok(Some(purged)) => {
+                    swept.jobs += purged.jobs;
+                    swept.events += purged.events;
+                    swept.changes += purged.changes;
+                }
+                Ok(None) => kept.push(workspace.clone()),
+                Err(error) => {
+                    tracing::warn!(
+                        workspace = %workspace,
+                        %error,
+                        "could not sweep a purged workspace; the next sweep tries again"
+                    );
+                    kept.push(workspace.clone());
+                }
+            }
         }
         let mut tx = crate::db::begin_kernel(&pool).await?;
         let dropped = sqlx::query!(
             r#"
             DELETE FROM kernel.purged_workspaces p
              WHERE p.purged_at < now() - make_interval(days => $1)
+               AND p.workspace_id <> ALL($2)
                AND NOT EXISTS (SELECT 1 FROM kernel.jobs j WHERE j.workspace_id = p.workspace_id)
                AND NOT EXISTS (SELECT 1 FROM kernel.events e WHERE e.workspace_id = p.workspace_id)
                AND NOT EXISTS (SELECT 1 FROM kernel.changes c WHERE c.workspace_id = p.workspace_id)
@@ -126,6 +144,7 @@ impl Job for SweepPurgedWorkspaces {
                    SELECT 1 FROM kernel.change_heads h WHERE h.workspace_id = p.workspace_id)
             "#,
             TOMBSTONE_KEPT_DAYS,
+            &kept as &[String],
         )
         .execute(&mut *tx)
         .await?
@@ -136,9 +155,34 @@ impl Job for SweepPurgedWorkspaces {
             jobs = swept.jobs,
             events = swept.events,
             changes = swept.changes,
+            kept = kept.len(),
             dropped,
             "swept what was left of purged workspaces"
         );
         Ok(())
+    }
+}
+
+impl SweepPurgedWorkspaces {
+    /// Purge what is left of tombstoned `workspace`, unless the workspace is
+    /// live again (its row is back and not deleted: a restore, or a mistake):
+    /// then nothing is deleted, its tombstone stays, and one warning names
+    /// it (`None`). An id that is not a workspace id cannot be live.
+    async fn sweep_one(
+        ctx: &JobContext,
+        pool: &PgPool,
+        workspace: &str,
+    ) -> Result<Option<Purged>, crate::Error> {
+        if let Ok(id) = workspace.parse::<WorkspaceId>() {
+            let state = ctx.state();
+            if state.membership.workspace_live(pool, id).await? {
+                tracing::warn!(
+                    workspace = %workspace,
+                    "a tombstoned workspace is live; its rows are not swept"
+                );
+                return Ok(None);
+            }
+        }
+        Ok(Some(purge_workspace(pool, workspace).await?))
     }
 }

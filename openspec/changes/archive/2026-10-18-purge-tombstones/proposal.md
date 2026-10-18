@@ -32,12 +32,23 @@ Purging a deleted workspace left pieces of it behind (campbooks-cloud#65):
   survive. A tombstone is dropped once nothing of its workspace is left and
   it is older than 30 days.
 - **Purge again after a restore.** `campbooks-server workspaces purge-again
-  <id> --confirm <id>` marks a restored workspace deleted with its purge due
-  now and enqueues the purge. If the backup predates the deletion, it also
-  publishes the deletion so every module purges its data. A purge already
-  queued means no second one, and an id with no workspace is a no-op that
-  says so. It runs from the server binary only: there is no route and no
-  admin endpoint.
+  <id> --confirm <id>` handles each workspace a restore brought back:
+  - **deleted in the backup:** a purge already queued changes nothing (the
+    command reports when it runs); otherwise the purge is queued to run
+    now;
+  - **live in the backup:** the command refuses with facts only (live, its
+    member count, its creation date) unless `--not-deleted-in-backup` is
+    given. With it, the workspace is hidden at once, its deletion is
+    published, and it is purged an hour later or at `--purge-after` (never
+    sooner);
+  - **an id with no workspace:** a no-op that says so.
+
+  It runs from the server binary only: there is no route and no admin
+  endpoint.
+- **The sweep skips a live workspace.** It logs a warning with the id and
+  keeps the tombstone. A failure on one workspace no longer stops the sweep.
+- **An index on finished jobs by workspace**, built concurrently, so the
+  batches don't scan the queue.
 - **The purge's log line** carries only the workspace's id and the time, so
   it can serve as the list of workspaces to purge again after a restore.
 - **Self-hosting:** the guide's "Backups" section gains the runbook.
@@ -52,5 +63,5 @@ Purging a deleted workspace left pieces of it behind (campbooks-cloud#65):
   - the registry's schedule;
   - the workspaces module's `PurgeWorkspace` and `purge_again`;
   - the server's `workspaces purge-again` command.
-- Migration `20261022050000_kernel__purged_workspaces`.
+- Migrations `20261022050000_kernel__purged_workspaces` and `20261022050200_kernel__jobs_finished_workspace_index` (concurrent).
 - Prod's restore runbook: campbooks-cloud#261.

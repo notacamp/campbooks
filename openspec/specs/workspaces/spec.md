@@ -341,24 +341,57 @@ account with no user, or a user in no workspace, SHALL publish nothing.
 
 ### Requirement: Purging a workspace again after a restore
 `campbooks-server workspaces purge-again <id> --confirm <id>` SHALL purge a
-workspace a restored backup brought back. It SHALL refuse, changing
-nothing, unless `--confirm` repeats the id exactly. It SHALL set the
-workspace's purge time to now. A workspace that is not deleted SHALL also be
-deleted now, with `WorkspaceDeleting` published (its first owner as who
-deleted it). It SHALL enqueue the purge under the purge's unique key, so a
-purge already queued means no second one. An id with no workspace SHALL be a
-no-op that says so. It SHALL log one line with the workspace's id only.
-Setting the purge time to now SHALL be possible through this command only:
-no API route or admin endpoint SHALL do it.
+workspace a restored backup brought back. It SHALL refuse, reading and
+changing nothing, unless `--confirm` repeats the id exactly. An id with no
+workspace SHALL be a no-op that says so.
 
-#### Scenario: A workspace restored from before its deletion
-- **WHEN** the operator runs `purge-again` twice for a live workspace, then a worker runs
-- **THEN** the first run deletes it and publishes its deletion, the second enqueues no second purge, and the worker purges it
-- **AND** a third run says there is no such workspace and enqueues nothing
+For a workspace deleted in the restored database:
+- if its purge is queued, the command SHALL change nothing and SHALL report
+  when the purge runs;
+- otherwise it SHALL set the purge time to now and SHALL queue the purge.
+
+For a live workspace:
+- without `--not-deleted-in-backup`, the command SHALL refuse, changing
+  nothing, and SHALL print only facts: that it is live, its member count and
+  its creation date;
+- with `--not-deleted-in-backup`, it SHALL delete the workspace at once
+  (hidden from its members), set its purge time to an hour from now, or to
+  `--purge-after` (refused when less than an hour away), publish
+  `WorkspaceDeleting`, and queue the purge for that time. The event SHALL
+  name the workspace's first owner as who deleted it, a stand-in for the
+  operator. A live workspace with no owner SHALL be refused, changing
+  nothing.
+
+The purge SHALL be queued under its unique key, so a purge already queued
+means no second one. The command SHALL log one line with the workspace's id
+only when it changes something. Setting a purge time sooner than the app's
+grace period SHALL be possible through this command only: no API route or
+admin endpoint SHALL do it.
+
+#### Scenario: A workspace live in the restored database
+- **WHEN** the operator runs `purge-again` for a live workspace without `--not-deleted-in-backup`
+- **THEN** the command fails, saying it is live with its member count and creation date, and nothing is published, queued or changed
+
+#### Scenario: A workspace deleted after the backup was taken
+- **WHEN** the operator runs `purge-again --not-deleted-in-backup` twice for a live workspace, and a worker runs once its purge time has passed
+- **THEN** the first run hides it, publishes its deletion naming its first owner, and queues its purge an hour later; the second reports the queued purge's time and enqueues none; the worker purges it
+- **AND** a later run says there is no such workspace and enqueues nothing
+
+#### Scenario: A purge time given
+- **WHEN** the operator gives `--purge-after` half an hour away, then twelve days away
+- **THEN** the first is refused and nothing changes, and the second is the workspace's purge time
+
+#### Scenario: No owner
+- **WHEN** the operator runs `purge-again --not-deleted-in-backup` for a live workspace with no owner
+- **THEN** the command fails and nothing changes
 
 #### Scenario: A workspace in its grace period
 - **WHEN** the operator runs `purge-again` for a workspace deleted through the app
-- **THEN** its purge time is now, its one queued purge stays, and its deletion is not published again
+- **THEN** its purge time and its one queued purge stay, the command reports when the purge runs, and its deletion is not published again
+
+#### Scenario: A deleted workspace whose purge gave up
+- **WHEN** the operator runs `purge-again` for a deleted workspace with no purge queued
+- **THEN** its purge time becomes now, a purge is queued, and a worker purges it
 
 #### Scenario: No confirmation
 - **WHEN** the operator runs `purge-again <id>` without `--confirm`, or with another id

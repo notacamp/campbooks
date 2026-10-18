@@ -11,7 +11,9 @@ use campbooks_kernel::{
 use sqlx::PgConnection;
 use uuid::Uuid;
 
-pub use crate::features::delete_workspace::{PurgeAgain, purge_again};
+pub use crate::features::delete_workspace::{
+    LIVE_PURGE_NOTICE, PurgeAgain, PurgeAgainOptions, purge_again,
+};
 
 /// The members of `workspace` that `who` names, with their role: a member's
 /// id, or the verified address on their profile (case ignored). As the API

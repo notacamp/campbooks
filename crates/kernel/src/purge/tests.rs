@@ -7,6 +7,7 @@ use super::*;
 use crate::{
     AppState,
     jobs::{EnqueueOptions, Registry, Worker, enqueue},
+    tenancy::{LiveFuture, Membership, MembershipFuture, WorkspaceId},
     testing,
 };
 
@@ -273,11 +274,110 @@ async fn a_tombstone_holds_the_id_and_the_time_only(db: PgPool) {
         count(&db, "SELECT count(*) FROM kernel.purged_workspaces").await,
         1
     );
-    // Another workspace's transaction sees no tombstone but its own.
+    // Another workspace's transaction sees no tombstone but its own, and
+    // cannot write one for another workspace, even as raw SQL.
     let mut tx = crate::db::begin_in(&state.db, "elsewhere").await.unwrap();
     let seen: i64 = sqlx::query_scalar("SELECT count(*) FROM kernel.purged_workspaces")
         .fetch_one(&mut *tx)
         .await
         .unwrap();
     assert_eq!(seen, 0);
+    let forged =
+        sqlx::query("INSERT INTO kernel.purged_workspaces (workspace_id) VALUES ('gone2')")
+            .execute(&mut *tx)
+            .await
+            .unwrap_err();
+    assert!(
+        forged.to_string().contains("row-level security"),
+        "{forged}"
+    );
+    drop(tx);
+    assert_eq!(
+        count(&db, "SELECT count(*) FROM kernel.purged_workspaces").await,
+        1
+    );
+}
+
+/// Which workspaces are live, and whose check fails.
+#[derive(Debug, Default)]
+struct Ports {
+    live: Vec<WorkspaceId>,
+    broken: Vec<WorkspaceId>,
+}
+
+impl Membership for Ports {
+    fn resolve<'a>(
+        &'a self,
+        _db: &'a PgPool,
+        _principal: &'a crate::auth::Principal,
+        _workspace: WorkspaceId,
+    ) -> MembershipFuture<'a> {
+        Box::pin(async { Ok(None) })
+    }
+
+    fn workspace_live<'a>(&'a self, _db: &'a PgPool, workspace: WorkspaceId) -> LiveFuture<'a> {
+        let live = self.live.contains(&workspace);
+        let broken = self.broken.contains(&workspace);
+        Box::pin(async move {
+            if broken {
+                Err(crate::Error::NotFound)
+            } else {
+                Ok(live)
+            }
+        })
+    }
+}
+
+/// Every row of `workspace` in the queue, the log and the feed.
+async fn rows_of(db: &PgPool, workspace: &str) -> i64 {
+    sqlx::query_scalar(
+        "SELECT (SELECT count(*) FROM kernel.jobs WHERE workspace_id = $1)
+              + (SELECT count(*) FROM kernel.events WHERE workspace_id = $1)
+              + (SELECT count(*) FROM kernel.changes WHERE workspace_id = $1)
+              + (SELECT count(*) FROM kernel.change_heads WHERE workspace_id = $1)",
+    )
+    .bind(workspace)
+    .fetch_one(db)
+    .await
+    .unwrap()
+}
+
+/// A tombstoned workspace that is live again (its row came back) is left
+/// alone: nothing of it is deleted and its tombstone stays, even with
+/// nothing left. One whose check fails is skipped too, and the sweep goes on
+/// to the others.
+#[sqlx::test(migrations = "../../migrations")]
+async fn the_sweep_leaves_a_live_workspace_alone(db: PgPool) {
+    let [live, live_empty, broken, gone] = std::array::from_fn(|_| WorkspaceId::new());
+    let state = runtime(&db)
+        .await
+        .with_membership(std::sync::Arc::new(Ports {
+            live: vec![live, live_empty],
+            broken: vec![broken],
+        }));
+    for workspace in [live, live_empty, broken, gone] {
+        tombstoned(&db, &workspace.to_string(), 31).await;
+    }
+    for workspace in [live, broken, gone] {
+        delivered_events(&db, &workspace.to_string(), 2).await;
+        change(&db, &workspace.to_string()).await;
+    }
+
+    sweep(&state).await;
+
+    assert_eq!(rows_of(&db, &live.to_string()).await, 2 + 2 + 1 + 1);
+    assert_eq!(rows_of(&db, &broken.to_string()).await, 2 + 2 + 1 + 1);
+    assert_eq!(rows_of(&db, &gone.to_string()).await, 0, "the others go on");
+    let mut left: Vec<String> =
+        sqlx::query_scalar("SELECT workspace_id FROM kernel.purged_workspaces")
+            .fetch_all(&db)
+            .await
+            .unwrap();
+    left.sort();
+    let mut kept = vec![live.to_string(), live_empty.to_string(), broken.to_string()];
+    kept.sort();
+    assert_eq!(
+        left, kept,
+        "the gone workspace's old, empty tombstone is dropped"
+    );
 }
