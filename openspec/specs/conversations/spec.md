@@ -1557,8 +1557,10 @@ list and automation headers, attachment names and media types, the start of
 the text body; items alternating `dev` and `test`) and `labels.csv` (id,
 date, sender, subject, attachments and an empty `money` column). It SHALL run
 inside the workspace with row-level security, refuse a folder that exists,
-refuse to run without `--member` (there is no whole-workspace export), mark
-the folder as its own (`.campbooks-labelling`), and print its absolute path,
+refuse to run without `--member` (there is no whole-workspace export), say before reading any
+mail the member id, role and inbox ids it resolved, mark the folder as its own
+(`.campbooks-labelling`, recording that workspace, member, role, inboxes and
+set), and print its absolute path,
 that it holds real mail to keep off the repository, and to delete it from the
 server once copied; a member who is suspended, of a workspace being deleted,
 or who reads no inbox is refused. `campbooks-server labelling purge --out
@@ -1596,6 +1598,10 @@ write its report into the folder.
 #### Scenario: Purging
 - **WHEN** the operator purges a folder without the marker
 - **THEN** nothing is removed; a folder the export wrote is removed
+
+#### Scenario: Saying whom it is for
+- **WHEN** the operator exports for sam@example.com
+- **THEN** before any mail is read it prints Sam's member id, role and inbox ids, and the marker records them
 
 ### Requirement: Scout proposes replies
 `POST …/conversations/{conversation_id}/reply/suggestions`
