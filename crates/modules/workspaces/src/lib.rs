@@ -33,6 +33,7 @@ mod tests {
         assert_eq!(super::MESSAGES.check(), Vec::<String>::new());
     }
 }
+pub mod operator;
 pub mod scopes;
 #[cfg(test)]
 mod testkit;
