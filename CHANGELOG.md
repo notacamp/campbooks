@@ -270,6 +270,10 @@ All notable changes to Campbooks Next are documented here. The format follows
   token is refused and a fresh one can be had, a change you just made (a send, a move, a
   rule) is now sent again with the fresh token, instead of asking you to sign in again. If
   the sign-in service is briefly down, you stay signed in and the next try goes through.
+- **Rotating the instance secret key keeps pending mailbox changes too.** A change you
+  asked for that is still waiting to be made at your mail provider (its mailbox paused, or
+  the provider down) is now signed again with the new key during a rotation, so it is
+  still made once the old key is removed. The logs say when none are left.
 - **A retried request is never done twice after a crash.** If the server stopped after it
   made a change but before it answered, retrying that request with the same
   `Idempotency-Key` used to run it again after two minutes. It is now never run again:

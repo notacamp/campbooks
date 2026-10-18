@@ -448,11 +448,13 @@ one for a while as `CAMPBOOKS_SECRET_KEY_PREVIOUS_FILE` (or `CAMPBOOKS_SECRET_KE
     connected accounts within the hour, web sessions (all their tokens) at their next
     token refresh (minutes of use);
   - what it signed is signed again with the new key in the background: taught rules,
-    what each rule changed (so it can still be put back), rule runs, change requests and
-    scheduled sends. Every 15 minutes, in every workspace, a job re-tags what still
-    verifies only under the old key. Each run logs, per workspace, either
+    what each rule changed (so it can still be put back), rule runs, change requests,
+    scheduled sends, and changes still waiting to be made at a mail provider (outbound
+    changes). At start-up and every 15 minutes, in every workspace, two jobs re-tag what
+    still verifies only under the old key. Each run logs, per workspace, either
     `binding re-tag: nothing in this workspace is bound under the previous key any more`
-    or a warning with how many rows are `left` for the next run.
+    and `binding re-tag: no outbound change in this workspace is bound under the previous
+    key any more`, or a warning with how many rows are `left` for the next run.
 - **What it does not cover:** the rate-limit counters are keyed by the current key only,
   so they start afresh, which is harmless.
 - **Errors:** the server refuses to start when the previous key is set without a current
@@ -470,8 +472,9 @@ docker compose run --rm server-init sh /server/init.sh rotate
 #            CAMPBOOKS_SECRET_KEY_PREVIOUS_FILE: /run/campbooks/secret-key-previous
 docker compose up -d && docker compose restart server
 # 3. Before forgetting the old key: the background re-tag has finished. Every workspace
-#    has logged "nothing ... bound under the previous key any more" since the restart,
-#    and no "binding re-tag" warning came after it:
+#    has logged both "... bound under the previous key any more" lines (taught rules and
+#    sends; outbound changes) since the restart, and no "binding re-tag" warning came
+#    after them:
 docker compose logs server | grep 'binding re-tag'
 # 4. After 30 days (the longest web session; held sign-up grants last 7), remove the
 #    variable, then delete the old key:
@@ -484,7 +487,9 @@ Without compose, set `CAMPBOOKS_SECRET_KEY` to the new key (`openssl rand -base6
 remove the previous key after 30 days, once the logs show the re-tag finished (step 3).
 
 - **Before removing the previous key:** wait for step 3. A rule still signed with the old
-  key would need confirming again, and its changes could not be put back. A web session
+  key would need confirming again, and its changes could not be put back. An outbound
+  change still waiting under the old key (its mailbox paused, or the provider down
+  throughout) would be skipped, and its message read again from the provider. A web session
   unused since the rotation (and so not refreshed) ends at its next use, and its member
   signs in again. A connection whose credentials were not used since needs connecting
   again. With mail syncing, connections are used every few minutes.
