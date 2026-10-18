@@ -13,7 +13,8 @@
     "all": "Todas",
     "unread": "Não lidas",
     "more": "Mostrar mais",
-    "loadingMore": "A carregar mais conversas"
+    "loadingMore": "A carregar mais conversas",
+    "youPrefix": "Eu: {{snippet}}"
   },
   "empty": {
     "streamTitle": "Nada em {{stream}}",
@@ -55,7 +56,15 @@
     "kept": {
       "title": "Mantida como histórico",
       "lead": "{{address}} foi desligada e o correio dela ficou aqui, só de leitura: nada de novo chega, e nada pode ser enviado nem alterado a partir dela."
-    }
+    },
+    "you": "Eu",
+    "toName": "→ {{name}}",
+    "toNameOthers_one": "→ {{name}} e mais {{count}} pessoa",
+    "toNameOthers_other": "→ {{name}} e mais {{count}} pessoas",
+    "more_one": "Mais {{count}} mensagem",
+    "more_other": "Mais {{count}} mensagens",
+    "showQuoted": "Mostrar texto citado",
+    "hideQuoted": "Ocultar texto citado"
   },
   "actions": {
     "star": "Fixar",

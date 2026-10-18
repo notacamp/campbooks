@@ -8,6 +8,14 @@ All notable changes to Campbooks Next are documented here. The format follows
 
 ### Added
 
+- **Threads read as a back and forth.** Your own messages in a thread read "You → Marta
+  Silva" and sit in from the left, while theirs stay flush left. A long thread keeps its
+  newest two messages, its first and anything unread, and folds the middle into "N more
+  messages", which opens in place. A reply's quoted history folds behind "Show quoted
+  text", found from how the mail is built, never from its words. The reply box stays pinned
+  at the bottom of the reader while the thread scrolls under it (phones keep the Reply and
+  Done bar). In the list, a conversation where you wrote last starts its snippet with
+  "You:".
 - **Always show images from a sender you trust.** In the reader, beside Show images, "Always
   show images from <sender>" (⇧A) saves a smart rule, after the usual confirmation, for that
   address or anyone at its domain. Their images then show on their own, but only when the

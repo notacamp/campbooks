@@ -1,12 +1,21 @@
-import { Fragment, type ReactNode } from "react";
+import { Fragment, useId, useState, type ReactNode } from "react";
 
 import { Avatar, type AvatarProps } from "../Avatar/Avatar";
 import { Icon } from "../Icon/Icon";
 
 import styles from "./Message.module.css";
 
+/**
+ * Whose message it is in the thread: theirs sit flush left, yours (sent from
+ * the inbox) are set in from the left on the sunken surface.
+ */
+export type MessageSide = "theirs" | "yours";
+
 export interface MessageCardProps {
   from: string;
+  /** After the sender, for a message of yours: "→ Marta Silva". */
+  addressee?: string | undefined;
+  side?: MessageSide | undefined;
   avatar?: Pick<AvatarProps, "kind" | "initials"> | undefined;
   /** "Fri 17:42". */
   time: string;
@@ -28,11 +37,15 @@ export interface MessageCardProps {
   actions?: ReactNode | undefined;
   /** Its files with their actions (an `AttachmentList`), last. */
   files?: ReactNode | undefined;
+  /** Quoted history folded under the text (a {@link QuotedText}). */
+  quoted?: ReactNode | undefined;
 }
 
 /** One message of a conversation. */
 export function MessageCard({
   from,
+  addressee,
+  side = "theirs",
   avatar,
   time,
   dateTime,
@@ -43,14 +56,20 @@ export function MessageCard({
   attachments = [],
   actions,
   files: fileList,
+  quoted,
 }: MessageCardProps) {
   const files = attachment === undefined ? attachments : [attachment, ...attachments];
   return (
-    <article className={styles["message"]}>
+    <article className={styles["message"]} data-side={side}>
       <Avatar name={from} {...avatar} />
       <div className={styles["body"]}>
         <div className={styles["head"]}>
-          <b className={styles["from"]}>{from}</b>
+          <b className={styles["from"]}>
+            {from}
+            {addressee === undefined || addressee === "" ? null : (
+              <span className={styles["addressee"]}> {addressee}</span>
+            )}
+          </b>
           <time className={styles["time"]} dateTime={dateTime}>
             {time}
           </time>
@@ -61,6 +80,7 @@ export function MessageCard({
         ) : (
           <p className={styles["text"]}>{children}</p>
         )}
+        {quoted}
         {actions === undefined ? null : <div className={styles["actions"]}>{actions}</div>}
         {files.length === 0 ? null : (
           <div className={styles["files"]}>
@@ -77,6 +97,9 @@ export function MessageCard({
 
 export interface FoldedMessageProps {
   from: string;
+  /** After the sender, for a message of yours: "→ Marta Silva". */
+  addressee?: string | undefined;
+  side?: MessageSide | undefined;
   avatar?: Pick<AvatarProps, "kind" | "initials"> | undefined;
   time: string;
   dateTime?: string | undefined;
@@ -89,6 +112,8 @@ export interface FoldedMessageProps {
 /** An older message of a thread, folded to one line until opened. */
 export function FoldedMessage({
   from,
+  addressee,
+  side = "theirs",
   avatar,
   time,
   dateTime,
@@ -96,14 +121,74 @@ export function FoldedMessage({
   onOpen,
 }: FoldedMessageProps) {
   return (
-    <button type="button" className={styles["folded"]} onClick={onOpen} aria-expanded={false}>
+    <button
+      type="button"
+      className={styles["folded"]}
+      data-side={side}
+      onClick={onOpen}
+      aria-expanded={false}
+    >
       <Avatar name={from} size="sm" {...avatar} />
-      <b className={styles["from"]}>{from}</b>
+      <b className={styles["from"]}>
+        {from}
+        {addressee === undefined || addressee === "" ? null : (
+          <span className={styles["addressee"]}> {addressee}</span>
+        )}
+      </b>
       <span className={styles["foldedSnippet"]}>{snippet}</span>
       <time className={styles["time"]} dateTime={dateTime}>
         {time}
       </time>
     </button>
+  );
+}
+
+export interface MoreMessagesProps {
+  /** "4 more messages". */
+  label: string;
+  /** Show them, folded, in its place. */
+  onOpen: () => void;
+}
+
+/** The middle of a long thread, folded into one line until shown. */
+export function MoreMessages({ label, onOpen }: MoreMessagesProps) {
+  return (
+    <button type="button" className={styles["more"]} onClick={onOpen} aria-expanded={false}>
+      {label}
+    </button>
+  );
+}
+
+export interface QuotedTextProps {
+  /** "Show quoted text". */
+  showLabel: string;
+  /** "Hide quoted text". */
+  hideLabel: string;
+  /** The quoted lines, as plain text. */
+  children: string;
+}
+
+/** A plain-text message's quoted history, folded behind a toggle. */
+export function QuotedText({ showLabel, hideLabel, children }: QuotedTextProps) {
+  const [open, setOpen] = useState(false);
+  const id = useId();
+  return (
+    <div className={styles["quoted"]}>
+      <button
+        type="button"
+        className={styles["quotedToggle"]}
+        aria-expanded={open}
+        aria-controls={id}
+        onClick={() => {
+          setOpen((current) => !current);
+        }}
+      >
+        {open ? hideLabel : showLabel}
+      </button>
+      <p id={id} className={styles["quotedText"]} hidden={!open}>
+        {children}
+      </p>
+    </div>
   );
 }
 

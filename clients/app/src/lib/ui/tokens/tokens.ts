@@ -84,6 +84,9 @@ export const COMPONENT_TOKENS = [
   "row-text-min",
   "scrollbar-size",
   "scrollbar-gap",
+  "message-yours-indent",
+  "message-yours-bg",
+  "reader-footer-max",
 ] as const;
 
 export type SemanticToken = (typeof SEMANTIC_TOKENS)[keyof typeof SEMANTIC_TOKENS][number];

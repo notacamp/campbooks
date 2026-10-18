@@ -13,7 +13,8 @@
     "all": "Todas",
     "unread": "No leídas",
     "more": "Mostrar más",
-    "loadingMore": "Cargando más conversaciones"
+    "loadingMore": "Cargando más conversaciones",
+    "youPrefix": "Yo: {{snippet}}"
   },
   "empty": {
     "streamTitle": "Nada en {{stream}}",
@@ -55,7 +56,15 @@
     "kept": {
       "title": "Conservado como historial",
       "lead": "{{address}} se desconectó y su correo se conserva aquí, solo lectura: no llega nada nuevo y no se puede enviar ni cambiar nada desde él."
-    }
+    },
+    "you": "Yo",
+    "toName": "→ {{name}}",
+    "toNameOthers_one": "→ {{name}} y {{count}} persona más",
+    "toNameOthers_other": "→ {{name}} y {{count}} personas más",
+    "more_one": "{{count}} mensaje más",
+    "more_other": "{{count}} mensajes más",
+    "showQuoted": "Mostrar texto citado",
+    "hideQuoted": "Ocultar texto citado"
   },
   "actions": {
     "star": "Fijar",

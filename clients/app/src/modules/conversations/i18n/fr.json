@@ -13,7 +13,8 @@
     "all": "Toutes",
     "unread": "Non lues",
     "more": "Afficher plus",
-    "loadingMore": "Chargement d’autres conversations"
+    "loadingMore": "Chargement d’autres conversations",
+    "youPrefix": "Moi : {{snippet}}"
   },
   "empty": {
     "streamTitle": "Rien dans {{stream}}",
@@ -55,7 +56,15 @@
     "kept": {
       "title": "Gardée comme historique",
       "lead": "{{address}} a été déconnectée et ses e-mails sont gardés ici, en lecture seule : rien de nouveau n’arrive, et rien ne peut être envoyé ni modifié depuis cette boîte."
-    }
+    },
+    "you": "Moi",
+    "toName": "→ {{name}}",
+    "toNameOthers_one": "→ {{name}} et {{count}} autre personne",
+    "toNameOthers_other": "→ {{name}} et {{count}} autres personnes",
+    "more_one": "{{count}} autre message",
+    "more_other": "{{count}} autres messages",
+    "showQuoted": "Afficher le texte cité",
+    "hideQuoted": "Masquer le texte cité"
   },
   "actions": {
     "star": "Épingler",

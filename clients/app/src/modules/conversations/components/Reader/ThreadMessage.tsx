@@ -6,7 +6,9 @@ import {
   Button,
   FoldedMessage,
   ImagePreview,
+  initialsOf,
   MessageCard,
+  QuotedText,
   SafeHtml,
   Skeleton,
   Text,
@@ -15,11 +17,13 @@ import {
 import { downloadAttachment, imageUrl, openPdf, type AttachmentRef } from "../../api/attachments";
 import { useMessageBody, type MessageView } from "../../api/queries";
 import {
+  addresseeLine,
   attachmentKind,
   cleanFileName,
   displayName,
   messageTime,
   recipientsLine,
+  splitQuoted,
   type Translate,
 } from "../../model";
 
@@ -49,7 +53,9 @@ export interface ThreadMessageProps {
 /**
  * One message of the thread: its plain text, or its HTML body (sanitised by
  * the server) in the sandboxed frame, with "Show images" when remote images
- * were held back, and its attachments.
+ * were held back, and its attachments. Its quoted history is folded behind
+ * "Show quoted text"; a message the inbox sent reads "You → <recipient>",
+ * set in from the left.
  */
 export function ThreadMessage({
   workspaceId,
@@ -74,7 +80,12 @@ export function ThreadMessage({
     showImages,
     open && message.has_html,
   );
-  const from = displayName(message.from);
+  const sender = displayName(message.from);
+  const yours = message.direction === "outbound";
+  const from = yours ? t("reader.you") : sender;
+  const side = yours ? "yours" : "theirs";
+  const addressee = yours ? addresseeLine(t, message) : undefined;
+  const avatar = yours ? { kind, initials: initialsOf(sender) } : { kind };
   const time = messageTime(message.sent_at, i18n.language, now);
   const text = message.text?.content ?? "";
   const files = useAttachments(workspaceId, conversationId, message, t, shortcuts);
@@ -83,7 +94,9 @@ export function ThreadMessage({
     return (
       <FoldedMessage
         from={from}
-        avatar={{ kind }}
+        addressee={addressee}
+        side={side}
+        avatar={avatar}
         time={time}
         dateTime={message.sent_at}
         snippet={text.replaceAll(/\s+/gu, " ").trim()}
@@ -95,9 +108,13 @@ export function ThreadMessage({
   const remote = body.data?.remote_images ?? 0;
   const html = body.data?.html;
 
+  const plain = splitQuoted(text);
   let content;
+  // A plain-text body's quoted history, folded under its own words.
+  let quoted: string | undefined;
   if (!message.has_html) {
-    content = text;
+    content = plain.own;
+    quoted = plain.quoted;
   } else if (body.isPending) {
     content = (
       <span className="flex flex-col gap-2" aria-busy="true">
@@ -107,15 +124,22 @@ export function ThreadMessage({
       </span>
     );
   } else if (html === undefined || html === null) {
-    content = body.isError ? <Text tone="tertiary">{t("error.body")}</Text> : text;
+    if (body.isError) {
+      content = <Text tone="tertiary">{t("error.body")}</Text>;
+    } else {
+      content = plain.own;
+      quoted = plain.quoted;
+    }
   } else {
     content = (
       <SafeHtml
         html={html}
-        title={t("reader.frameTitle", { name: from })}
+        title={t("reader.frameTitle", { name: sender })}
         remoteImages={body.data?.images_shown ?? false}
         css={body.data?.css}
         inertLinks={inertLinks}
+        showQuoted={t("reader.showQuoted")}
+        hideQuoted={t("reader.hideQuoted")}
       />
     );
   }
@@ -124,12 +148,21 @@ export function ThreadMessage({
   return (
     <MessageCard
       from={from}
-      avatar={{ kind }}
+      addressee={addressee}
+      side={side}
+      avatar={avatar}
       time={time}
       dateTime={message.sent_at}
       recipients={recipientsLine(t, message, i18n.language)}
       rich={message.has_html}
       files={files}
+      quoted={
+        quoted === undefined ? undefined : (
+          <QuotedText showLabel={t("reader.showQuoted")} hideLabel={t("reader.hideQuoted")}>
+            {quoted}
+          </QuotedText>
+        )
+      }
       actions={
         remote > 0 || truncated ? (
           <>
@@ -157,14 +190,14 @@ export function ThreadMessage({
                     shortcut={shortcuts ? "inbox.trust_images" : undefined}
                     onClick={onTrustImages}
                   >
-                    {t("actions.trustImages", { name: from })}
+                    {t("actions.trustImages", { name: sender })}
                   </Button>
                 )}
               </>
             ) : null}
             {remote > 0 && body.data?.images_trusted === true ? (
               <Text tone="tertiary" size="sm">
-                {t("actions.imagesTrusted", { name: from })}
+                {t("actions.imagesTrusted", { name: sender })}
               </Text>
             ) : null}
           </>
