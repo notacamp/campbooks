@@ -353,6 +353,23 @@ pub async fn sender_seen(
     if seen { Ok(()) } else { Err(invalid()) }
 }
 
+/// Whether a stored `rule` may act again (confirmed, confirmed again, or
+/// brought back): what [`validate`] and [`not_trusted_yet`] would accept of
+/// it now, as if it were taught today. Lists grow (a domain may have become
+/// a free mail provider's or a shared platform's since, campbooks-cloud#235),
+/// and another rule may trust its sender by now.
+pub async fn may_keep_again(conn: &mut PgConnection, rule: &Stored) -> Result<()> {
+    validate(&rule.conditions, &rule.actions)?;
+    not_trusted_yet(
+        conn,
+        rule.inbox,
+        &rule.conditions,
+        &rule.actions,
+        Some(rule.id),
+    )
+    .await
+}
+
 /// 409 `images_already_trusted` when a rule of `inbox` (not removed, other
 /// than `this`) already shows the images of the sender a new image rule
 /// names: the same address, or a domain that covers it (campbooks-cloud#235).
@@ -370,7 +387,13 @@ pub async fn not_trusted_yet(
     let existing: Vec<Stored> = of_inboxes(conn, &[inbox])
         .await?
         .into_iter()
-        .filter(|r| Some(r.id) != this && r.actions.contains(&RuleAction::ShowImages))
+        // A rule for a domain too broad to act covers nobody: the member may
+        // still trust one address there.
+        .filter(|r| {
+            Some(r.id) != this
+                && r.actions.contains(&RuleAction::ShowImages)
+                && !r.domain_too_broad()
+        })
         .collect();
     let covers = |rule: &Stored| match conditions {
         [RuleCondition::SenderAddress(address)] => rule.engine().matches(&taught::Facts {
@@ -504,13 +527,20 @@ impl Stored {
         kept.paused_reason()
     }
 
-    /// Whether a sender-domain condition names a public suffix: a rule
-    /// stored before the Public Suffix List was complete may. The engine
-    /// never matches it; only removing the rule clears this.
-    fn domain_too_broad(&self) -> bool {
-        self.conditions
-            .iter()
-            .any(|c| matches!(c, RuleCondition::SenderDomain(d) if !taught::is_owned_domain(d)))
+    /// Whether a sender-domain condition names a public suffix (a rule
+    /// stored before the Public Suffix List was complete may), or, for a rule
+    /// that shows images, a domain anyone may send from: a free mail or
+    /// internet provider's, or a shared platform's (a rule stored before the
+    /// domain joined those lists may, campbooks-cloud#235). The engine never
+    /// acts on it; only removing the rule clears this.
+    pub(crate) fn domain_too_broad(&self) -> bool {
+        let images = self.actions.contains(&RuleAction::ShowImages);
+        self.conditions.iter().any(|c| match c {
+            RuleCondition::SenderDomain(d) => {
+                !taught::is_owned_domain(d) || (images && taught::images_domain_too_broad(d))
+            }
+            _ => false,
+        })
     }
 
     /// The rule as the engine reads it.
@@ -966,6 +996,27 @@ mod stored_tests {
             generation: 0,
             mac: None,
         }
+    }
+
+    #[test]
+    fn an_old_image_rule_for_a_domain_anyone_sends_from_never_acts() {
+        for domain in [
+            "gmail.com",
+            "mail.yahoo.fr",
+            "substack.com",
+            "acme.zendesk.com",
+        ] {
+            let mut rule = stored(domain, RuleState::Active);
+            rule.actions = vec![RuleAction::ShowImages];
+            assert_eq!(rule.effective_state(), RuleState::Paused, "{domain}");
+            assert_eq!(rule.paused_reason(), Some(PausedReason::DomainTooBroad));
+        }
+        // Sorting a shared platform's mail by domain still acts.
+        let sorting = stored("substack.com", RuleState::Active);
+        assert_eq!(sorting.effective_state(), RuleState::Active);
+        let mut owned = stored("brightloop.example", RuleState::Active);
+        owned.actions = vec![RuleAction::ShowImages];
+        assert_eq!(owned.effective_state(), RuleState::Active);
     }
 
     #[test]

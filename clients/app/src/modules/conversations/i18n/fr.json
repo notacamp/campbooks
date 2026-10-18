@@ -76,10 +76,11 @@
     "imagesHeld": {
       "under_review": "Les images restent retenues : cet e-mail est en cours d’examen.",
       "checks_fail": "Les images restent retenues : cet e-mail ne réussit pas les vérifications de l’expéditeur.",
-      "unverified": "Les images restent bloquées : le fournisseur de messagerie n’a rien vérifié qui confirme cet expéditeur.",
+      "unverified": "Les images restent retenues : le fournisseur de messagerie n’a rien vérifié qui confirme cet expéditeur.",
       "cannot_authenticate": "Les images restent retenues : ce fournisseur de messagerie ne partage pas les vérifications de l’expéditeur, donc aucun expéditeur ne peut être approuvé ici.",
       "not_checked": "Les images attendent que Scout vérifie cet e-mail. Tant que Scout est désactivé ou a atteint sa limite quotidienne, elles restent retenues.",
-      "rule_paused": "Les images restent bloquées : la règle intelligente qui fait confiance à cet expéditeur est en pause ou attend un oui."
+      "rule_paused": "Les images restent retenues : la règle intelligente qui fait confiance à cet expéditeur est en pause ou attend un oui.",
+      "rule_too_broad": "Les images restent retenues : la règle intelligente pour tout le domaine de cet expéditeur ferait confiance à des inconnus (n’importe qui peut envoyer depuis ce domaine), elle n’agit donc pas. Vous pouvez toujours faire confiance à cette adresse."
     }
   },
   "toast": {

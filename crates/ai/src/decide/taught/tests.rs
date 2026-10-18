@@ -695,7 +695,18 @@ fn a_free_mail_domain_is_refused_by_its_registrable_domain() {
 
 #[test]
 fn a_whole_platform_anyone_sends_from_is_never_trusted_with_images() {
-    for domain in ["substack.com", "mail.beehiiv.com", "googlegroups.com"] {
+    for domain in [
+        "substack.com",
+        "mail.beehiiv.com",
+        "googlegroups.com",
+        // Help desks: every customer sends from a subdomain of theirs.
+        "zendesk.com",
+        "acme.zendesk.com",
+        // Address relays, and the domain above one.
+        "privaterelay.appleid.com",
+        "appleid.com",
+        "simplelogin.com",
+    ] {
         assert_eq!(
             TaughtRule::validate(
                 &[Condition::SenderDomain(domain.into())],
@@ -722,4 +733,30 @@ fn a_whole_platform_anyone_sends_from_is_never_trusted_with_images() {
         ),
         Ok(())
     );
+}
+
+#[test]
+fn an_image_rule_kept_from_before_a_domain_was_listed_never_shows_images() {
+    // Stored before the lists grew: the engine still never acts on it.
+    let rules = [
+        rule(
+            "free",
+            vec![Condition::SenderDomain("yahoo.fr".into())],
+            vec![Action::ShowImages],
+            1,
+        ),
+        rule(
+            "platform",
+            vec![Condition::SenderDomain("substack.com".into())],
+            vec![Action::ShowImages],
+            2,
+        ),
+    ];
+    let mail = |sender| facts(sender, "This week", None);
+    assert_eq!(shows_images(&rules, &mail("sam@mail.yahoo.fr"), true), None);
+    assert_eq!(
+        shows_images(&rules, &mail("ledger@substack.com"), true),
+        None
+    );
+    assert!(rules.iter().all(TaughtRule::images_too_broad));
 }

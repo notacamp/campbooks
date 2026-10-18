@@ -709,4 +709,82 @@ mod tests {
         assert_eq!(review["images_shown"], false);
         assert_eq!(review["images_held"], "under_review");
     }
+
+    #[sqlx::test(migrations = "../../../migrations")]
+    async fn an_image_rule_kept_from_before_for_a_shared_platform_never_trusts(db: PgPool) {
+        use campbooks_kernel::db::BeginFor as _;
+
+        let kit = Kit::new(db.clone()).await;
+        let (workspace, inbox, sam) = kit.sams_inbox().await;
+        // A newsletter on a platform anyone sends from, authenticated by it.
+        let mut message = newsletter(
+            "platform-1",
+            "Brightloop weekly",
+            Some(
+                "mx.google.com; dkim=pass header.i=@substack.com header.s=s1; \
+                 dmarc=pass (p=REJECT sp=REJECT dis=NONE) header.from=substack.com",
+            ),
+        );
+        message["message"]["from"] =
+            json!({"name": "Brightloop", "address": "brightloop@substack.com"});
+        let batch = dev::record(&kit.state, workspace, inbox, &json!({"changes": [message]}))
+            .await
+            .unwrap();
+        dev::submit(&kit.state, workspace, &batch).await.unwrap();
+        kit.run_jobs().await;
+        judged_not_suspicious(&db).await;
+        // An active, signed rule trusting anyone at the platform, stored as
+        // if from before the platform was listed (the API refuses it now).
+        let rule = sqlx::types::Uuid::now_v7();
+        let mut tx = kit.state.db.begin_for(workspace).await.unwrap();
+        sqlx::query(
+            "INSERT INTO conversations.rules
+                 (id, workspace_id, inbox_id, teaching_id, conditions, actions, specificity,
+                  origin, state, confirmed_at)
+             VALUES ($1, $2, $3, $4,
+                     '[{\"field\": \"sender_domain\", \"value\": \"substack.com\"}]'::jsonb,
+                     '[{\"action\": \"show_images\"}]'::jsonb, 1, 'action', 'active', now())",
+        )
+        .bind(rule)
+        .bind(workspace.as_uuid())
+        .bind(inbox.as_uuid())
+        .bind(sqlx::types::Uuid::now_v7())
+        .execute(&mut *tx)
+        .await
+        .unwrap();
+        crate::domain::rules::binding::sign(
+            &mut tx,
+            &kit.state.binding,
+            crate::model::RuleId::from_uuid(rule),
+        )
+        .await
+        .unwrap();
+        tx.commit().await.unwrap();
+
+        let body = body_of(&kit, &sam, workspace, "platform-1").await;
+        assert_eq!(body["images_trusted"], false, "{body}");
+        assert_eq!(body["images_shown"], false);
+        assert_eq!(body["images_held"], "rule_too_broad");
+        // The address alone may still be trusted.
+        assert_eq!(body["images_offer"], true);
+        assert!(body["images_domain"].is_null());
+        // Removed, it does not come back.
+        let removed = kit
+            .delete(&sam, &format!("/api/v1/w/{workspace}/rules/{rule}"))
+            .await;
+        assert!(removed.status.is_success(), "{}", removed.json);
+        let restored = kit
+            .post(
+                &sam,
+                &format!("/api/v1/w/{workspace}/rules/{rule}/restore"),
+                Some(json!({})),
+            )
+            .await;
+        assert_eq!(
+            restored.status,
+            StatusCode::BAD_REQUEST,
+            "{}",
+            restored.json
+        );
+    }
 }

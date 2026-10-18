@@ -79,7 +79,8 @@
       "unverified": "Las imágenes siguen retenidas: el proveedor de correo no comprobó nada que confirme a este remitente.",
       "cannot_authenticate": "Las imágenes siguen retenidas: este proveedor de correo no comparte las comprobaciones del remitente, así que aquí no se puede confiar en ningún remitente.",
       "not_checked": "Las imágenes esperan a que Scout revise este correo. Mientras Scout esté desactivado o haya superado su límite diario, siguen retenidas.",
-      "rule_paused": "Las imágenes siguen retenidas: la regla inteligente que confía en este remitente está en pausa o esperando un sí."
+      "rule_paused": "Las imágenes siguen retenidas: la regla inteligente que confía en este remitente está en pausa o esperando un sí.",
+      "rule_too_broad": "Las imágenes siguen retenidas: la regla inteligente para todo el dominio de este remitente confiaría en desconocidos (cualquiera puede enviar desde él), así que no actúa. Aún puedes confiar en esta dirección."
     }
   },
   "toast": {

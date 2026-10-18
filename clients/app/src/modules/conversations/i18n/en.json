@@ -79,7 +79,8 @@
       "unverified": "Images stay held back: the mail provider checked nothing that confirms this sender.",
       "cannot_authenticate": "Images stay held back: this mail provider doesn’t share sender checks, so no sender can be trusted here.",
       "not_checked": "Images wait for Scout to check this email. While Scout is off or past its daily limit, they stay held back.",
-      "rule_paused": "Images stay held back: the smart rule that trusts this sender is paused or waiting for a yes."
+      "rule_paused": "Images stay held back: the smart rule that trusts this sender is paused or waiting for a yes.",
+      "rule_too_broad": "Images stay held back: the smart rule for this sender’s whole domain would trust strangers (anyone can send from it), so it doesn’t act. You can still trust this address."
     }
   },
   "toast": {

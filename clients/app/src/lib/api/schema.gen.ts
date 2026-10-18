@@ -2976,7 +2976,7 @@ export interface components {
          *     could be, trusted (campbooks-cloud#235).
          * @enum {string}
          */
-        ImagesHeld: "under_review" | "checks_fail" | "unverified" | "cannot_authenticate" | "not_checked" | "rule_paused";
+        ImagesHeld: "under_review" | "checks_fail" | "unverified" | "cannot_authenticate" | "not_checked" | "rule_paused" | "rule_too_broad";
         /**
          * Format: uuid
          * @description InboxId (UUIDv7)

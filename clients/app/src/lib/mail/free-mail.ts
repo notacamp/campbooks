@@ -1,8 +1,8 @@
 // Free mail providers, and the mail of internet providers, by registrable
 // domain: a rule for a whole domain of theirs would match strangers. A copy of
 // the server's list (`FREE_MAIL` in `crates/ai/src/decide/taught.rs`), which
-// has the last word (`invalid_rule`); `free-mail.test.ts` fails when they
-// drift (campbooks-cloud#235).
+// has the last word (`invalid_rule`); `test/architecture/free-mail-drift.test.ts`
+// fails when they drift (campbooks-cloud#235).
 
 /** Free mail providers, as the server lists them. */
 export const FREE_MAIL: ReadonlySet<string> = new Set([
@@ -85,6 +85,7 @@ export const FREE_MAIL: ReadonlySet<string> = new Set([
   "gmx.fr",
   "gmx.it",
   "gmx.net",
+  "gmx.pt",
   "googlemail.com",
   "guerrillamail.com",
   "hanmail.net",
@@ -156,6 +157,7 @@ export const FREE_MAIL: ReadonlySet<string> = new Set([
   "mac.com",
   "mail.bg",
   "mail.com",
+  "mail.de",
   "mail.ee",
   "mail.ru",
   "mailbox.org",
@@ -164,6 +166,7 @@ export const FREE_MAIL: ReadonlySet<string> = new Set([
   "me.com",
   "meta.ua",
   "mindspring.com",
+  "movistar.es",
   "msn.com",
   "mweb.co.za",
   "nate.com",
@@ -267,6 +270,7 @@ export const FREE_MAIL: ReadonlySet<string> = new Set([
   "terra.com.br",
   "terra.es",
   "tin.it",
+  "tiscali.co.uk",
   "tiscali.it",
   "tlen.pl",
   "tpg.com.au",
@@ -286,6 +290,7 @@ export const FREE_MAIL: ReadonlySet<string> = new Set([
   "vodamail.co.za",
   "volny.cz",
   "voo.be",
+  "walla.co.il",
   "wanadoo.fr",
   "web.de",
   "webmail.co.za",
@@ -337,6 +342,7 @@ export const FREE_MAIL: ReadonlySet<string> = new Set([
   "yahoo.se",
   "yandex.by",
   "yandex.com",
+  "yandex.com.tr",
   "yandex.kz",
   "yandex.ru",
   "yandex.ua",

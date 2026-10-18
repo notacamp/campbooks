@@ -370,6 +370,7 @@ pub const FREE_MAIL: &[&str] = &[
     "gmx.fr",
     "gmx.it",
     "gmx.net",
+    "gmx.pt",
     "googlemail.com",
     "guerrillamail.com",
     "hanmail.net",
@@ -441,6 +442,7 @@ pub const FREE_MAIL: &[&str] = &[
     "mac.com",
     "mail.bg",
     "mail.com",
+    "mail.de",
     "mail.ee",
     "mail.ru",
     "mailbox.org",
@@ -449,6 +451,7 @@ pub const FREE_MAIL: &[&str] = &[
     "me.com",
     "meta.ua",
     "mindspring.com",
+    "movistar.es",
     "msn.com",
     "mweb.co.za",
     "nate.com",
@@ -552,6 +555,7 @@ pub const FREE_MAIL: &[&str] = &[
     "terra.com.br",
     "terra.es",
     "tin.it",
+    "tiscali.co.uk",
     "tiscali.it",
     "tlen.pl",
     "tpg.com.au",
@@ -571,6 +575,7 @@ pub const FREE_MAIL: &[&str] = &[
     "vodamail.co.za",
     "volny.cz",
     "voo.be",
+    "walla.co.il",
     "wanadoo.fr",
     "web.de",
     "webmail.co.za",
@@ -622,6 +627,7 @@ pub const FREE_MAIL: &[&str] = &[
     "yahoo.se",
     "yandex.by",
     "yandex.com",
+    "yandex.com.tr",
     "yandex.kz",
     "yandex.ru",
     "yandex.ua",
@@ -643,23 +649,31 @@ pub fn is_owned_domain(domain: &str) -> bool {
 }
 
 /// Platforms anyone can send from and still pass the domain's checks:
-/// mailing lists, newsletter and mass mail services, by registrable domain.
-/// A rule may still sort their mail by domain, but never trust a whole one
-/// with images: each sender there is someone else (campbooks-cloud#235).
+/// mailing lists, newsletter and mass mail services, help desks whose
+/// customers send from their subdomains, and address relays (each relayed
+/// sender is someone else). A rule may still sort their mail by domain, but
+/// never trust a whole one with images (campbooks-cloud#235).
 pub const SHARED_SENDERS: &[&str] = &[
+    "addy.io",
     "amazonses.com",
+    "anonaddy.com",
+    "anonaddy.me",
     "beehiiv.com",
     "brevo.com",
     "buttondown.com",
     "buttondown.email",
     "campaign-archive.com",
+    "ccsend.com",
     "constantcontact.com",
     "convertkit.com",
+    "createsend.com",
     "freelists.org",
+    "freshdesk.com",
     "ghost.io",
     "googlegroups.com",
     "groups.io",
     "hubspotemail.net",
+    "intercom-mail.com",
     "kit.com",
     "list-manage.com",
     "mailchimp.com",
@@ -667,23 +681,43 @@ pub const SHARED_SENDERS: &[&str] = &[
     "mailerlite.com",
     "mailgun.org",
     "mandrillapp.com",
+    "mcdlv.net",
     "mcsv.net",
     "medium.com",
+    "mozmail.com",
     "patreon.com",
+    "privaterelay.appleid.com",
+    "rsgsv.net",
     "sendgrid.net",
     "sendinblue.com",
+    "simplelogin.com",
     "sourceforge.net",
     "sparkpostmail.com",
     "substack.com",
     "yahoogroups.com",
+    "zendesk.com",
 ];
 
-/// Whether `domain` (or the registrable domain it is under) is a platform
-/// anyone can send from ([`SHARED_SENDERS`]).
+/// Whether trusting anyone at `domain` with images would trust strangers: a
+/// free mail or internet provider's domain, a platform anyone can send from,
+/// or a public suffix. Checked when an image rule is written and again
+/// whenever one is read, so a rule stored before a domain joined a list
+/// never acts (campbooks-cloud#235).
+pub fn images_domain_too_broad(domain: &str) -> bool {
+    !is_owned_domain(domain) || is_free_mail(domain) || is_shared_sender(domain)
+}
+
+/// Whether `domain` reaches a platform anyone can send from
+/// ([`SHARED_SENDERS`]): it is one, is under one, or is above one (a rule for
+/// anyone at `appleid.com` reaches `privaterelay.appleid.com`).
 pub fn is_shared_sender(domain: &str) -> bool {
     let domain = domain.trim().trim_matches('.').to_ascii_lowercase();
-    SHARED_SENDERS.contains(&domain.as_str())
-        || SHARED_SENDERS.contains(&registrable_domain(&domain).as_str())
+    !domain.is_empty()
+        && SHARED_SENDERS.iter().any(|shared| {
+            domain == *shared
+                || domain.ends_with(&format!(".{shared}"))
+                || shared.ends_with(&format!(".{domain}"))
+        })
 }
 
 /// Whether `domain` (or the registrable domain it is under) belongs to a
@@ -806,7 +840,7 @@ impl TaughtRule {
         if actions.contains(&Action::ShowImages)
             && conditions
                 .iter()
-                .any(|c| matches!(c, Condition::SenderDomain(d) if is_shared_sender(d)))
+                .any(|c| matches!(c, Condition::SenderDomain(d) if images_domain_too_broad(d)))
         {
             return Err(Invalid::SharedSenderDomain);
         }
@@ -816,6 +850,16 @@ impl TaughtRule {
     /// Whether every condition holds for `facts`.
     pub fn matches(&self, facts: &Facts<'_>) -> bool {
         !self.conditions.is_empty() && self.conditions.iter().all(|c| c.holds(facts))
+    }
+
+    /// Whether this rule shows images for anyone at a domain that would
+    /// trust strangers ([`images_domain_too_broad`]): it never acts.
+    pub fn images_too_broad(&self) -> bool {
+        self.actions.contains(&Action::ShowImages)
+            && self
+                .conditions
+                .iter()
+                .any(|c| matches!(c, Condition::SenderDomain(d) if images_domain_too_broad(d)))
     }
 
     /// Precedence: more specific first, then later confirmed, then smaller id.
@@ -1025,8 +1069,9 @@ pub fn evaluate(rules: &[TaughtRule], facts: &Facts<'_>) -> Outcome {
 /// whose sender matches, the most specific first. Only when the receiving
 /// provider's results `authenticated` the From domain (a DMARC pass for it,
 /// or an aligned DKIM pass; no results at all is not a pass), so a spoofed
-/// sender never gets its images shown; and never for mail that looks
-/// suspicious or failed its checks.
+/// sender never gets its images shown; never for mail that looks
+/// suspicious or failed its checks; and never by a rule for anyone at a
+/// domain that would trust strangers, however old ([`TaughtRule::images_too_broad`]).
 pub fn shows_images<'r>(
     rules: &'r [TaughtRule],
     facts: &Facts<'_>,
@@ -1037,7 +1082,9 @@ pub fn shows_images<'r>(
     }
     let mut matching: Vec<&TaughtRule> = rules
         .iter()
-        .filter(|r| r.actions.contains(&Action::ShowImages) && r.matches(facts))
+        .filter(|r| {
+            r.actions.contains(&Action::ShowImages) && !r.images_too_broad() && r.matches(facts)
+        })
         .collect();
     matching.sort_by(|a, b| a.precedes(b));
     matching.first().map(|r| r.id.as_str())

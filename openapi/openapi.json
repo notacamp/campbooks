@@ -14240,7 +14240,8 @@
           "unverified",
           "cannot_authenticate",
           "not_checked",
-          "rule_paused"
+          "rule_paused",
+          "rule_too_broad"
         ]
       },
       "InboxId": {
