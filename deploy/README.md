@@ -29,8 +29,9 @@
    worker separately, add a second service with the same image and env and
    `command: ["worker"]`, and give the first one `command: ["api"]`. The
    image's health check probes the API, which a worker does not serve, so
-   give the worker its own: `healthcheck: { test: ["CMD", "campbooks-server",
-   "healthcheck", "--worker"] }`. A worker answers `GET /healthz` on
+   give the worker its own: `healthcheck: { test: ["CMD", "/app/campbooks-server",
+   "healthcheck", "--worker"] }` (the image has no shell, and `/app` is not on
+   `PATH`). A worker answers `GET /healthz` on
    `CAMPBOOKS_JOBS__HEALTH_ADDR` (default `127.0.0.1:8081`, inside the
    container only): 200 while its job loop runs and reaches the database
    (checked every 10 s), 503 after a minute without. Worker settings are the

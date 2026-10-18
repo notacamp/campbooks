@@ -3947,8 +3947,8 @@ async fn the_job_key_indexes_are_rebuilt_when_missing_or_invalid(db: PgPool) {
     assert_eq!(indexes, healthy);
 }
 
-/// A running worker beats once its loop has reached the database, and a
-/// stopped one stops beating (campbooks-cloud#185).
+/// A running worker beats once its loop has reached the database
+/// (campbooks-cloud#185).
 #[sqlx::test(migrations = "../../migrations")]
 async fn a_running_worker_is_alive(db: PgPool) {
     let state = state_with(db, |_| {}).await;

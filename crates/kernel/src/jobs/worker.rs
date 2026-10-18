@@ -114,32 +114,29 @@ pub const ALIVE_FOR: Duration = Duration::from_mins(1);
 /// Cheap to clone.
 #[derive(Debug, Clone, Default)]
 pub struct Liveness {
-    /// Milliseconds since the Unix epoch of the last beat; 0 before the
-    /// first.
-    last: Arc<AtomicU64>,
+    /// When it last beat (a monotonic clock, unaffected by changes to the
+    /// wall clock); `None` before the first beat.
+    last: Arc<std::sync::Mutex<Option<std::time::Instant>>>,
 }
 
 impl Liveness {
     /// Mark the worker alive now.
     pub fn beat(&self) {
-        self.last.store(unix_millis(), Ordering::Relaxed);
+        self.set(Some(std::time::Instant::now()));
     }
 
     /// Whether the last beat is within `within` of now.
     pub fn alive(&self, within: Duration) -> bool {
-        let last = self.last.load(Ordering::Relaxed);
-        last > 0
-            && unix_millis().saturating_sub(last)
-                <= u64::try_from(within.as_millis()).unwrap_or(u64::MAX)
+        self.last
+            .lock()
+            .is_ok_and(|last| last.is_some_and(|at| at.elapsed() <= within))
     }
-}
 
-fn unix_millis() -> u64 {
-    std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .map_or(0, |since| {
-            u64::try_from(since.as_millis()).unwrap_or(u64::MAX)
-        })
+    fn set(&self, at: Option<std::time::Instant>) {
+        if let Ok(mut last) = self.last.lock() {
+            *last = at;
+        }
+    }
 }
 
 /// Claims jobs from every queue in the registry and runs them.
@@ -1198,10 +1195,10 @@ mod liveness_tests {
         liveness.beat();
         assert!(liveness.alive(ALIVE_FOR));
         // Its last beat two minutes ago: no longer.
-        liveness
-            .last
-            .store(unix_millis() - 120_000, Ordering::Relaxed);
-        assert!(!liveness.alive(ALIVE_FOR));
-        assert!(liveness.alive(Duration::from_mins(3)));
+        if let Some(earlier) = std::time::Instant::now().checked_sub(Duration::from_mins(2)) {
+            liveness.set(Some(earlier));
+            assert!(!liveness.alive(ALIVE_FOR));
+            assert!(liveness.alive(Duration::from_mins(3)));
+        }
     }
 }
