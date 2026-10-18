@@ -460,16 +460,7 @@ async fn run(
         );
     }
     if role.worker() {
-        let health_addr = state.config.jobs.health_addr;
-        let worker = Worker::new(state);
-        if !role.api() {
-            serve_worker_health(&mut parts, worker.liveness(), health_addr, &stop).await?;
-        }
-        let stopped = stopped(&stop);
-        parts.spawn(async move {
-            worker.run(stopped).await;
-            Ok(())
-        });
+        spawn_worker(&mut parts, state, !role.api(), &stop).await?;
     }
 
     let signal = Arc::clone(&stop);
@@ -932,6 +923,27 @@ async fn shutdown_signal() {
         () = terminate => {},
     }
     tracing::info!("shutdown signal received, draining connections and jobs");
+}
+
+/// Run the job worker until `stop`; a worker-only process (`alone`) also
+/// serves its health probe.
+async fn spawn_worker(
+    parts: &mut JoinSet<Result<(), String>>,
+    state: AppState,
+    alone: bool,
+    stop: &watch::Sender<bool>,
+) -> Result<(), String> {
+    let health_addr = state.config.jobs.health_addr;
+    let worker = Worker::new(state);
+    if alone {
+        serve_worker_health(parts, worker.liveness(), health_addr, stop).await?;
+    }
+    let stopped = stopped(stop);
+    parts.spawn(async move {
+        worker.run(stopped).await;
+        Ok(())
+    });
+    Ok(())
 }
 
 /// A worker-only process's health probe (campbooks-cloud#185): `GET
