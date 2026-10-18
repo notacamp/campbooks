@@ -3977,3 +3977,13 @@ async fn a_running_worker_is_alive(db: PgPool) {
     stop.send(()).unwrap();
     running.await.unwrap();
 }
+
+/// An over-limit payload cannot fit by retrying: a job failing with it fails
+/// now, like a bad request (campbooks-cloud#265).
+#[test]
+fn an_over_limit_payload_fails_a_job_for_good() {
+    let too_large = crate::Error::from(crate::blobs::BlobError::TooLarge { limit: 10 });
+    assert!(matches!(JobError::from(too_large), JobError::Fatal(_)));
+    let busy = crate::Error::Unavailable(crate::i18n::MESSAGES.reason("database_unavailable"));
+    assert!(matches!(JobError::from(busy), JobError::Retry { .. }));
+}

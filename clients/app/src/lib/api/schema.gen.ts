@@ -10957,7 +10957,7 @@ export interface operations {
                     "application/json": components["schemas"]["SignedInWith"];
                 };
             };
-            /** @description `invalid_body` (not a credential). A body over 16 KiB is 413 `body_too_large`. */
+            /** @description `invalid_body` (not a credential). */
             400: {
                 headers: {
                     [name: string]: unknown;
@@ -10984,6 +10984,15 @@ export interface operations {
             };
             /** @description `passkey_expired`: no ceremony waits for this browser (it took more than five minutes, or was used). */
             409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `body_too_large`: the body is over 16 KiB. */
+            413: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -11028,7 +11037,7 @@ export interface operations {
                     "application/json": components["schemas"]["RequestOptions"];
                 };
             };
-            /** @description `invalid_return_to`, or `invalid_body` (not JSON). A body over 16 KiB is 413 `body_too_large`. */
+            /** @description `invalid_return_to`, or `invalid_body` (not JSON). */
             400: {
                 headers: {
                     [name: string]: unknown;
@@ -11052,6 +11061,15 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description `body_too_large`: the body is over 16 KiB. */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
             };
             /** @description `rate_limited`: too many ceremonies, or ten challenges waiting, for this address. */
             429: {
@@ -11091,7 +11109,7 @@ export interface operations {
                     "application/json": components["schemas"]["SignedInWith"];
                 };
             };
-            /** @description `invalid_body` (not a credential). A body over 16 KiB is 413 `body_too_large`. */
+            /** @description `invalid_body` (not a credential). */
             400: {
                 headers: {
                     [name: string]: unknown;
@@ -11118,6 +11136,15 @@ export interface operations {
             };
             /** @description `passkey_expired`, or `passkey_already_registered`. */
             409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `body_too_large`: the body is over 16 KiB. */
+            413: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -11162,7 +11189,7 @@ export interface operations {
                     "application/json": components["schemas"]["CreationOptions"];
                 };
             };
-            /** @description `display_name_required`, `invalid_return_to`, or `invalid_body` (not JSON). A body over 16 KiB is 413 `body_too_large`. */
+            /** @description `display_name_required`, `invalid_return_to`, or `invalid_body` (not JSON). */
             400: {
                 headers: {
                     [name: string]: unknown;
@@ -11186,6 +11213,15 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description `body_too_large`: the body is over 16 KiB. */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
             };
             /** @description `rate_limited`: too many ceremonies, or ten challenges waiting, for this address. */
             429: {

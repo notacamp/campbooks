@@ -281,7 +281,7 @@ All notable changes to Campbooks Next are documented here. The format follows
   still made once the old key is removed. The logs say when none are left.
 - **A file or request that is too large now says so with 413.** An upload over the
   instance's size limit, or a request body over its limit, is answered 413 (instead of
-  400), and the message names the limit in your language.
+  400). For a file, the message names the limit in your language.
 - **A retried request is never done twice after a crash.** If a request with an
   `Idempotency-Key` ended without its answer being kept (the server stopped, the request
   hit the 30-second limit, or the client hung up), retrying it with the same key used to
@@ -289,6 +289,9 @@ All notable changes to Campbooks Next are documented here. The format follows
   `idempotency_outcome_unknown`, so the caller checks whether it took effect and then
   retries with a new key. A request past the time limit now answers 503
   `request_timed_out`, which says the same.
+- **The 30-second request limit is a hard cap.** Telling a stopped request why, in your
+  language, no longer waits on a slow lookup of your saved language: after two seconds it
+  uses your browser's.
 - **A request body that cannot be read is explained in your language.** The web app's
   error for a body that arrived incomplete was English only; it is now in all four
   languages.

@@ -291,6 +291,16 @@ secret (`secret`, `token`, `ticket`, `password`, `*url`). The
 kernel's `kernel.prune_idempotency` schedule deletes expired keys hourly,
 in the kernel scope.
 
+**Irreversible effects need a domain guard.** Idempotency runs an operation at
+most once per key when its answer is lost, but a 5xx answered after a commit
+releases the key (campbooks-cloud#266, parked). So an operation with an
+irreversible external effect (a send, a change at a mail provider, a payment)
+has its own guard, a state machine or a unique key on the effect, and never
+relies on the `Idempotency-Key` alone. Mail's guard is the draft's send state.
+A keyed request body is at most 10 MiB (the layer holds it to hash it): a
+larger upload is stored in its own unkeyed step (blobs are content addressed)
+and attached by reference in a small keyed operation.
+
 **Record references.** A module that points at another module's record
 stores a `kernel::RecordRef { type, id }`, with `type` =
 `<module>.<record>`, never a foreign key.
