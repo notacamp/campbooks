@@ -284,10 +284,11 @@ are how you find them.
        --not-deleted-in-backup [--purge-after <purge_after from its "workspace deleted" line>]
      ```
 
-     The workspace is hidden at once, and every part of the app purges its data at its
-     purge time: an hour from now, or the `--purge-after` you give, which cannot be
-     sooner. Until then, a workspace deleted by mistake can still be brought back by
-     restoring again.
+     The workspace is hidden at once, and its mailbox connections and app clients are
+     revoked at once. Everything else is purged at its purge time: an hour from now, or
+     the `--purge-after` you give, which cannot be sooner. Until then, a workspace deleted
+     by mistake can still be brought back by restoring again, though its mailboxes then
+     need reconnecting.
    - **If the command says the workspace has no owner,** it changes nothing. Every
      workspace keeps an owner, so this means the restored data is not what you expect:
      do not edit the database by hand. Check that you restored the right backup, and if
