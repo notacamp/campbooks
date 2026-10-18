@@ -22,7 +22,8 @@
 // fake-gmail.ts), and each fake Zoho login a demo Zoho Mail mailbox (scripts/
 // fake-zoho-mail.ts), that the connectors module syncs, writes members'
 // changes back to and sends through: `POST /fake/deliver` drops one more
-// message into every mailbox, to show mail arriving live, and
+// message into every mailbox, to show mail arriving live (`?reply=q4`: an
+// answer in the Q4 thread instead), and
 // `GET /fake/mailbox` lists what each holds (subjects and state), to show
 // write-backs landing. `POST /fake/expire` withdraws every grant so far, to
 // show a mailbox that needs reconnecting. `--html-mail` adds the sanitiser's
@@ -422,7 +423,8 @@ const server = createServer((request, response) => {
         return;
       }
       if (url.pathname === "/fake/deliver" && request.method === "POST") {
-        const delivered = [...mailboxes.values()].map((mailbox) => deliverDemo(mailbox).id);
+        const reply = url.searchParams.get("reply") ?? undefined;
+        const delivered = [...mailboxes.values()].map((mailbox) => deliverDemo(mailbox, reply).id);
         json(response, 200, { delivered });
         return;
       }

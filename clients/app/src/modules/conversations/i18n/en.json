@@ -597,7 +597,9 @@
     "readingQuote": "Reading the email to quote it…",
     "quoteUnread": "Couldn’t read the email you’re replying to, so its quote can’t be shown. Nothing can be sent until it is.",
     "quoteCut": "This email is long: your reply quotes its first part.",
-    "quoteShortened": "Shown in part: your reply quotes all of it."
+    "quoteShortened": "Shown in part: your reply quotes all of it.",
+    "newer": "A newer message from {{name}} arrived. Your reply still answers the one quoted below.",
+    "answerNewer": "Answer the newer one"
   },
   "smartRule": {
     "tag": "Smart rule",

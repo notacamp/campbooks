@@ -21,6 +21,23 @@ const FRESH = {
   content_token: "demo-token-fresh",
 };
 
+const LAST = Q4_DETAIL.messages.at(-1);
+if (LAST === undefined) {
+  throw new Error("the fixture has no message");
+}
+/** A message from Leo that arrives while the member reviews a draft. */
+const NEWER = {
+  ...LAST,
+  id: "0192f1a0-0000-7000-8000-0000000000e9",
+  from: { name: "Leo Brandt", address: "leo@northwind-studio.example" },
+  reply_to: [],
+  sent_at: "2026-10-13T13:00:00Z",
+  text: { content: "Could we do Friday instead?", truncated: false },
+  has_html: false,
+  attachments: [],
+};
+const WITH_NEWER = { ...Q4_DETAIL, messages: [...Q4_DETAIL.messages, NEWER] };
+
 function routes(extra: Parameters<typeof mockApi>[0] = {}) {
   return mockApi({
     [`GET ${C}`]: { body: Q4_DETAIL },
@@ -260,6 +277,119 @@ describe("ReplyDialog", () => {
     dialog();
     expect(await screen.findByText("Shown in part: your reply quotes all of it.")).toBeVisible();
     expect(screen.getByText(/two weeks\.[^…]*…$/u)).toBeVisible();
+  });
+
+  it("keeps answering the message its draft was written for when a newer one arrives", async () => {
+    // campbooks-cloud#220: Send answers the pinned message, never mail that
+    // arrived while the member reviewed the draft.
+    let arrived = false;
+    const api = routes({
+      [`GET ${C}`]: () => ({ body: arrived ? WITH_NEWER : Q4_DETAIL }),
+    });
+    const handlers = {
+      onClose: vi.fn(),
+      onWriteOwn: vi.fn(),
+      onOpenDraft: vi.fn(),
+      onSent: vi.fn(),
+      onUndone: vi.fn(),
+    };
+    const { queryClient } = renderWithProviders(
+      <ReplyDialog workspaceId={DUARTE.id} conversationId={Q4.id} {...handlers} />,
+    );
+    fireEvent.keyDown(await screen.findByRole("button", { name: /Say Thursday works/u }), {
+      key: "1",
+    });
+    await screen.findByRole("textbox", { name: "Your reply" });
+    arrived = true;
+    await queryClient.refetchQueries();
+    expect(
+      await screen.findByText(
+        "A newer message from Leo Brandt arrived. Your reply still answers the one quoted below.",
+      ),
+    ).toBeVisible();
+    fireEvent.click(screen.getByRole("button", { name: /^Send/u }));
+    await waitFor(() => {
+      expect(handlers.onSent).toHaveBeenCalled();
+    });
+    const created = api.calls.find((c) => c.route === `POST ${D}`)?.body as {
+      message_id: string;
+      quoted: string;
+    };
+    expect(created.message_id).toBe(NEWEST);
+    expect(created.quoted).not.toContain("Friday instead");
+  });
+
+  it("answers the newer message on request, writing the draft again for it", async () => {
+    let arrived = false;
+    const api = routes({
+      [`GET ${C}`]: () => ({ body: arrived ? WITH_NEWER : Q4_DETAIL }),
+      [`POST ${C}/reply/draft`]: (_request, body) => ({
+        body: {
+          message_id: (body as { message_id: string }).message_id,
+          text:
+            (body as { message_id: string }).message_id === NEWER.id
+              ? "Hi Leo, Friday works too."
+              : DRAFT,
+        },
+      }),
+    });
+    const handlers = {
+      onClose: vi.fn(),
+      onWriteOwn: vi.fn(),
+      onOpenDraft: vi.fn(),
+      onSent: vi.fn(),
+      onUndone: vi.fn(),
+    };
+    const { queryClient } = renderWithProviders(
+      <ReplyDialog workspaceId={DUARTE.id} conversationId={Q4.id} {...handlers} />,
+    );
+    fireEvent.keyDown(await screen.findByRole("button", { name: /Say Thursday works/u }), {
+      key: "1",
+    });
+    await screen.findByRole("textbox", { name: "Your reply" });
+    arrived = true;
+    await queryClient.refetchQueries();
+    fireEvent.click(await screen.findByRole("button", { name: "Answer the newer one" }));
+    await waitFor(() => {
+      expect(screen.getByRole("textbox", { name: "Your reply" })).toHaveValue(
+        "Hi Leo, Friday works too.",
+      );
+    });
+    expect(api.calls.findLast((c) => c.route === `POST ${C}/reply/draft`)?.body).toEqual({
+      message_id: NEWER.id,
+      intent: "Say Thursday works",
+    });
+    expect(screen.queryByText(/A newer message from/u)).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: /^Send/u }));
+    await waitFor(() => {
+      expect(handlers.onSent).toHaveBeenCalled();
+    });
+    const created = api.calls.find((c) => c.route === `POST ${D}`)?.body as {
+      message_id: string;
+      quoted: string;
+    };
+    expect(created.message_id).toBe(NEWER.id);
+    expect(created.quoted).toContain("Friday instead");
+  });
+
+  it("offers no Undo when the send has no window to take it back in", async () => {
+    routes({
+      [`POST ${D}/${REPLY.id}/send`]: {
+        status: 202,
+        body: { ...REPLY, state: "scheduled", send_at: null },
+      },
+    });
+    const handlers = dialog();
+    fireEvent.keyDown(await screen.findByRole("button", { name: /Say Thursday works/u }), {
+      key: "1",
+    });
+    await screen.findByRole("textbox", { name: "Your reply" });
+    fireEvent.click(screen.getByRole("button", { name: /^Send/u }));
+    await waitFor(() => {
+      expect(handlers.onSent).toHaveBeenCalled();
+    });
+    expect((await screen.findAllByText("Sending to Maya Okafor")).length).toBeGreaterThan(0);
+    expect(screen.queryByRole("button", { name: /^Undo/u })).toBeNull();
   });
 
   it("says who the reply goes to, and warns when Reply-To is elsewhere", async () => {

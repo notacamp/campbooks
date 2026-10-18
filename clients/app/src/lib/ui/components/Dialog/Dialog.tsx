@@ -48,7 +48,8 @@ export interface DialogProps {
  * A modal dialog for one decision: focus stays inside, Esc or a click on
  * the scrim closes it with nothing changed, number keys pick a choice and
  * the arrows move between choices. Below 48rem it is a bottom sheet. Page
- * shortcuts never fire behind it (plain keys stop at the dialog; ⌘/Ctrl
+ * shortcuts never fire behind it: the focus stays in it, even when the
+ * focused control goes away, and plain keys stop at the dialog (⌘/Ctrl
  * combinations still reach the registry). Rendered into <body>.
  */
 export function Dialog({
@@ -126,27 +127,32 @@ export function Dialog({
         event.stopPropagation();
       }
     };
-    // The focused control went away (a step replaced it): the focus is on
-    // the page, not in the dialog. Keys still belong to the dialog, never
-    // to the page behind it.
-    const onStrayKeyDown = (event: KeyboardEvent) => {
-      const target = event.target;
-      if (target !== document.body && target !== document.documentElement) {
-        return;
-      }
-      dialogElement.focus();
-      onKeyDown(event);
-      if (!event.metaKey && !event.ctrlKey && !event.altKey) {
-        event.stopPropagation();
+    // The focused control went away (a step replaced it), or the focus
+    // left for nowhere: it comes back to the dialog, so its keys (Esc, the
+    // numbers, the arrows) stay its own and plain keys still stop at it. Only
+    // the dialog is watched, never the whole document: a key the page itself
+    // receives is the page's (campbooks-cloud#220).
+    const reclaim = () => {
+      const active = document.activeElement;
+      if (active === null || active === document.body || active === document.documentElement) {
+        dialogElement.focus();
       }
     };
+    const onFocusOut = (event: FocusEvent) => {
+      if (event.relatedTarget === null) {
+        queueMicrotask(reclaim);
+      }
+    };
+    const replaced = new MutationObserver(reclaim);
+    replaced.observe(dialogElement, { childList: true, subtree: true });
     scrimElement.addEventListener("mousedown", onScrimDown);
     dialogElement.addEventListener("keydown", onKeyDown);
-    document.addEventListener("keydown", onStrayKeyDown, true);
+    dialogElement.addEventListener("focusout", onFocusOut);
     return () => {
+      replaced.disconnect();
       scrimElement.removeEventListener("mousedown", onScrimDown);
       dialogElement.removeEventListener("keydown", onKeyDown);
-      document.removeEventListener("keydown", onStrayKeyDown, true);
+      dialogElement.removeEventListener("focusout", onFocusOut);
     };
   }, [open]);
 
