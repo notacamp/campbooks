@@ -70,7 +70,12 @@ const CHUNK: usize = 1024;
 /// `br` and at the end of each block, and no `<blockquote>`s when `quotes`
 /// is [`Quotes::Drop`].
 pub fn text_of(html: &str, quotes: Quotes) -> String {
-    let deadline = Instant::now() + MAX_TEXT_TIME;
+    text_of_within(html, quotes, Instant::now() + MAX_TEXT_TIME).0
+}
+
+/// [`text_of`], stopped at `deadline` instead, and whether it read all of
+/// `html` in time.
+pub fn text_of_within(html: &str, quotes: Quotes, deadline: Instant) -> (String, bool) {
     let tokenizer = Tokenizer::new(Reader::new(quotes), TokenizerOpts::default());
     let queue = BufferQueue::default();
     let mut rest = html;
@@ -84,8 +89,9 @@ pub fn text_of(html: &str, quotes: Quotes) -> String {
         let _ = tokenizer.feed(&queue);
         rest = tail;
     }
+    let complete = rest.is_empty();
     tokenizer.end();
-    tokenizer.sink.text.take()
+    (tokenizer.sink.text.take(), complete)
 }
 
 /// The elements that may stand in `<head>` (the tree builder's "in head"

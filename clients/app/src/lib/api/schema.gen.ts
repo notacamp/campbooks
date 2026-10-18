@@ -3315,6 +3315,12 @@ export interface components {
             /** @description The subject. */
             subject: string;
             text?: components["schemas"]["MessageText"] | null;
+            /**
+             * @description Its words were to be read from its HTML and this answer ran out of
+             *     time first: `text` is absent, and the HTML is still whole
+             *     (`conversations.get_message_body`).
+             */
+            text_unread?: boolean;
             /** @description Recipients. */
             to: components["schemas"]["Address"][];
         };

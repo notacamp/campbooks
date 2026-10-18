@@ -818,7 +818,12 @@ for a message with an HTML part, the version of how HTML becomes text. The
 same reading SHALL give every other reader of a message its words: its
 snippet and Scout's read at ingest, the decide pass, the labelling export,
 reply context, need summaries, and the text `conversations.get` returns for
-each message, which replies and forwards quote. A conversation that no longer exists SHALL be reported as gone.
+each message, which replies and forwards quote. HTML SHALL be read as text
+off the async workers; `conversations.get` SHALL read it within one second
+for all its messages together, reading at most 256 KiB of each message's
+HTML, and a message past that SHALL come without `text`, marked
+`text_unread` (the HTML is still whole). Words read from HTML SHALL never
+mark a text `truncated`. A conversation that no longer exists SHALL be reported as gone.
 Drafts SHALL NOT be returned.
 
 #### Scenario: HTML-only message
@@ -848,6 +853,10 @@ Drafts SHALL NOT be returned.
 #### Scenario: Forwarding HTML-only mail
 - **WHEN** a member forwards or replies to a message that is HTML alone, or one whose text part is blanks
 - **THEN** the message's text in `conversations.get` holds the words of its HTML, so the quote carries them
+
+#### Scenario: Crafted HTML threaded into one conversation
+- **WHEN** a sender threads a dozen HTML-only messages, each slow to tokenize, into one conversation and a member opens it
+- **THEN** the answer comes within a few seconds, each message with its words or marked `text_unread`, none marked `truncated`
 
 ### Requirement: Visible inboxes as a list
 The module's container-visibility port SHALL also list the inboxes a caller

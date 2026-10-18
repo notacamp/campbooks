@@ -3,7 +3,9 @@
 use campbooks_kernel::blobs::{BlobError, BlobRef, BlobStore};
 use futures_util::StreamExt as _;
 
-use super::plain_text::{self, Quotes};
+use std::time::Instant;
+
+use super::plain_text::{self, MAX_TEXT_TIME, Quotes};
 
 /// How much of each part [`words`] reads, in bytes.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -22,23 +24,71 @@ pub struct Budget {
 pub async fn words(
     blobs: &BlobStore,
     workspace: &str,
-    (text, html): (Option<&BlobRef>, Option<&BlobRef>),
+    parts: (Option<&BlobRef>, Option<&BlobRef>),
     budget: Budget,
     quotes: Quotes,
 ) -> Result<(String, bool), BlobError> {
+    let read = words_until(blobs, workspace, parts, budget, quotes, None).await?;
+    Ok((read.text, read.cut))
+}
+
+/// What [`words_until`] read.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct Words {
+    /// The words.
+    pub text: String,
+    /// Whether the text part was cut at its budget. Never set for words
+    /// read from HTML: the HTML itself is whole, whatever was read of it.
+    pub cut: bool,
+    /// Whether they were to come from the HTML and `deadline` passed first
+    /// (no words), or came in part.
+    pub late: bool,
+}
+
+/// [`words`], with the HTML read as text off the async workers (it is CPU
+/// work, at most [`MAX_TEXT_TIME`]) and stopped at `deadline` when given:
+/// several messages answered together share one. Past it, no HTML is read.
+pub async fn words_until(
+    blobs: &BlobStore,
+    workspace: &str,
+    (text, html): (Option<&BlobRef>, Option<&BlobRef>),
+    budget: Budget,
+    quotes: Quotes,
+    deadline: Option<Instant>,
+) -> Result<Words, BlobError> {
     if let Some(text) = text {
         let (read, cut) = read_text(blobs, workspace, text, budget.text).await?;
         if !read.trim().is_empty() || html.is_none() {
-            return Ok((read, cut));
+            return Ok(Words {
+                text: read,
+                cut,
+                late: false,
+            });
         }
     }
-    match html {
-        Some(html) => {
-            let (read, cut) = read_text(blobs, workspace, html, budget.html).await?;
-            Ok((plain_text::text_of(&read, quotes), cut))
-        }
-        None => Ok((String::new(), false)),
+    let Some(html) = html else {
+        return Ok(Words::default());
+    };
+    if deadline.is_some_and(|deadline| Instant::now() >= deadline) {
+        return Ok(Words {
+            late: true,
+            ..Words::default()
+        });
     }
+    let (read, _) = read_text(blobs, workspace, html, budget.html).await?;
+    let until = deadline.map_or_else(
+        || Instant::now() + MAX_TEXT_TIME,
+        |deadline| deadline.min(Instant::now() + MAX_TEXT_TIME),
+    );
+    let (words, complete) =
+        tokio::task::spawn_blocking(move || plain_text::text_of_within(&read, quotes, until))
+            .await
+            .unwrap_or_default();
+    Ok(Words {
+        text: words,
+        cut: false,
+        late: !complete && deadline.is_some(),
+    })
 }
 
 /// `text` cut to at most `max` bytes, at a character boundary.
@@ -154,6 +204,32 @@ mod tests {
         assert_eq!(read((None, None), Quotes::Keep).await.unwrap().0, "");
         // A cut at a character boundary.
         assert_eq!(cut("éé".to_owned(), 3), "é");
+        // Past a shared deadline, no HTML is read: late, no words. A text
+        // part with words still answers.
+        let past = Some(Instant::now());
+        let late = words_until(blobs, ws, (None, Some(&html)), budget, Quotes::Keep, past)
+            .await
+            .unwrap();
+        assert!(late.late && late.text.is_empty() && !late.cut, "{late:?}");
+        let plain = words_until(
+            blobs,
+            ws,
+            (Some(&text), Some(&html)),
+            budget,
+            Quotes::Keep,
+            past,
+        )
+        .await
+        .unwrap();
+        assert_eq!((plain.text.as_str(), plain.late), ("Plain words", false));
+        let soon = Some(Instant::now() + std::time::Duration::from_secs(5));
+        let read = words_until(blobs, ws, (None, Some(&html)), budget, Quotes::Keep, soon)
+            .await
+            .unwrap();
+        assert!(
+            !read.late && read.text.contains("Hi") && !read.cut,
+            "{read:?}"
+        );
     }
 
     #[test]
