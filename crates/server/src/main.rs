@@ -32,6 +32,9 @@ use tokio::{sync::watch, task::JoinSet};
 const DEFAULT_PORT: u16 = 8080;
 /// How long the database pool waits for a connection.
 const DB_ACQUIRE_TIMEOUT: Duration = Duration::from_secs(5);
+/// What `healthcheck` probes on a process serving the API.
+const API_HEALTH_PATH: &str = "/api/v1/system/health";
+
 /// How long `healthcheck` waits for the server.
 const HEALTHCHECK_TIMEOUT: Duration = Duration::from_secs(5);
 
@@ -96,9 +99,14 @@ enum Command {
     /// health checks (the runtime image has no shell or curl).
     Healthcheck {
         /// Port to probe on 127.0.0.1. Defaults to the port of
-        /// `CAMPBOOKS_BIND_ADDR`, else 8080.
+        /// `CAMPBOOKS_BIND_ADDR`, else 8080; with `--worker`, of
+        /// `CAMPBOOKS_JOBS__HEALTH_ADDR`, else 8081.
         #[arg(long)]
         port: Option<u16>,
+        /// Probe a worker-only process (`campbooks-server worker`): its job
+        /// loop runs and reaches the database.
+        #[arg(long)]
+        worker: bool,
     },
 }
 
@@ -192,7 +200,14 @@ fn main() -> ExitCode {
         } => test_error(),
         Command::Openapi => print_json(&campbooks_server::openapi(), "OpenAPI document"),
         Command::Scopes => print_json(&campbooks_server::scope_catalogue(), "scope catalogue"),
-        Command::Healthcheck { port } => healthcheck(port.unwrap_or_else(port_from_env)),
+        Command::Healthcheck {
+            port,
+            worker: false,
+        } => healthcheck(port.unwrap_or_else(port_from_env), API_HEALTH_PATH),
+        Command::Healthcheck { port, worker: true } => healthcheck(
+            port.unwrap_or_else(worker_port_from_env),
+            WORKER_HEALTH_PATH,
+        ),
     }
 }
 
@@ -445,7 +460,11 @@ async fn run(
         );
     }
     if role.worker() {
+        let health_addr = state.config.jobs.health_addr;
         let worker = Worker::new(state);
+        if !role.api() {
+            serve_worker_health(&mut parts, worker.liveness(), health_addr, &stop).await?;
+        }
         let stopped = stopped(&stop);
         parts.spawn(async move {
             worker.run(stopped).await;
@@ -915,6 +934,50 @@ async fn shutdown_signal() {
     tracing::info!("shutdown signal received, draining connections and jobs");
 }
 
+/// A worker-only process's health probe (campbooks-cloud#185): `GET
+/// /healthz` on `addr` answers 200 while the worker's loop runs and the
+/// database answers it, 503 otherwise. `campbooks-server healthcheck
+/// --worker` probes it.
+async fn serve_worker_health(
+    parts: &mut JoinSet<Result<(), String>>,
+    liveness: campbooks_kernel::jobs::Liveness,
+    addr: SocketAddr,
+    stop: &watch::Sender<bool>,
+) -> Result<(), String> {
+    let router = axum::Router::new().route(
+        WORKER_HEALTH_PATH,
+        axum::routing::get(move || {
+            let liveness = liveness.clone();
+            async move { worker_health(&liveness) }
+        }),
+    );
+    let listener = tokio::net::TcpListener::bind(addr)
+        .await
+        .map_err(|e| format!("could not bind CAMPBOOKS_JOBS__HEALTH_ADDR={addr}: {e}"))?;
+    tracing::info!(%addr, "serving the worker's health probe at {WORKER_HEALTH_PATH}");
+    let stopped = stopped(stop);
+    parts.spawn(async move {
+        axum::serve(listener, router)
+            .with_graceful_shutdown(stopped)
+            .await
+            .map_err(|e| format!("worker health listener failed: {e}"))
+    });
+    Ok(())
+}
+
+/// Where a worker-only process answers its health probe.
+const WORKER_HEALTH_PATH: &str = "/healthz";
+
+/// The worker's health: 200 while it beat within
+/// [`ALIVE_FOR`](campbooks_kernel::jobs::ALIVE_FOR), else 503.
+fn worker_health(liveness: &campbooks_kernel::jobs::Liveness) -> axum::http::StatusCode {
+    if liveness.alive(campbooks_kernel::jobs::ALIVE_FOR) {
+        axum::http::StatusCode::OK
+    } else {
+        axum::http::StatusCode::SERVICE_UNAVAILABLE
+    }
+}
+
 fn port_from_env() -> u16 {
     std::env::var("CAMPBOOKS_BIND_ADDR")
         .ok()
@@ -922,23 +985,35 @@ fn port_from_env() -> u16 {
         .map_or(DEFAULT_PORT, |addr| addr.port())
 }
 
-/// A dependency-free HTTP/1.1 probe of the health endpoint.
-fn healthcheck(port: u16) -> ExitCode {
-    match probe(port) {
+/// The port of `CAMPBOOKS_JOBS__HEALTH_ADDR`, else the default.
+fn worker_port_from_env() -> u16 {
+    std::env::var("CAMPBOOKS_JOBS__HEALTH_ADDR")
+        .ok()
+        .and_then(|addr| addr.parse::<SocketAddr>().ok())
+        .map_or(
+            campbooks_kernel::config::DEFAULT_WORKER_HEALTH_PORT,
+            |addr| addr.port(),
+        )
+}
+
+/// A dependency-free HTTP/1.1 probe of a health endpoint: the API's, or a
+/// worker-only process's.
+fn healthcheck(port: u16, path: &str) -> ExitCode {
+    match probe(port, path) {
         Ok(true) => ExitCode::SUCCESS,
         Ok(false) => fail("unhealthy"),
         Err(e) => fail(&format!("healthcheck failed: {e}")),
     }
 }
 
-fn probe(port: u16) -> std::io::Result<bool> {
+fn probe(port: u16, path: &str) -> std::io::Result<bool> {
     let addr = SocketAddr::from(([127, 0, 0, 1], port));
     let mut stream = TcpStream::connect_timeout(&addr, HEALTHCHECK_TIMEOUT)?;
     stream.set_read_timeout(Some(HEALTHCHECK_TIMEOUT))?;
     stream.set_write_timeout(Some(HEALTHCHECK_TIMEOUT))?;
     write!(
         stream,
-        "GET /api/v1/system/health HTTP/1.1\r\nHost: 127.0.0.1:{port}\r\nConnection: close\r\n\r\n"
+        "GET {path} HTTP/1.1\r\nHost: 127.0.0.1:{port}\r\nConnection: close\r\n\r\n"
     )?;
     let mut head = [0_u8; 32];
     let read = stream.read(&mut head)?;
@@ -955,6 +1030,49 @@ fn fail(message: &str) -> ExitCode {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// The worker's probe answers 200 while it beats, 503 otherwise, and
+    /// `healthcheck --worker` reads it (campbooks-cloud#185).
+    #[tokio::test(flavor = "multi_thread")]
+    async fn the_worker_health_probe_follows_its_liveness() {
+        let liveness = campbooks_kernel::jobs::Liveness::default();
+        assert_eq!(
+            worker_health(&liveness),
+            axum::http::StatusCode::SERVICE_UNAVAILABLE
+        );
+        let mut parts: JoinSet<Result<(), String>> = JoinSet::new();
+        let stop = watch::channel(false).0;
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let addr = listener.local_addr().unwrap();
+        drop(listener);
+        serve_worker_health(&mut parts, liveness.clone(), addr, &stop)
+            .await
+            .unwrap();
+        let port = addr.port();
+        let probe_now = || async move {
+            tokio::task::spawn_blocking(move || probe(port, WORKER_HEALTH_PATH))
+                .await
+                .unwrap()
+                .unwrap()
+        };
+        assert!(!probe_now().await, "never beat: unhealthy");
+        liveness.beat();
+        assert_eq!(worker_health(&liveness), axum::http::StatusCode::OK);
+        assert!(probe_now().await, "beating: healthy");
+        stop.send_replace(true);
+        while let Some(part) = parts.join_next().await {
+            part.unwrap().unwrap();
+        }
+    }
+
+    #[test]
+    fn the_worker_probe_port_defaults_to_8081() {
+        assert_eq!(
+            campbooks_kernel::config::DEFAULT_WORKER_HEALTH_PORT,
+            8081,
+            "deploy/README.md and the compose healthcheck name it"
+        );
+    }
 
     #[test]
     fn since_accepts_an_event_id_or_a_time() {

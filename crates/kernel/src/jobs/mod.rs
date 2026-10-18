@@ -41,7 +41,7 @@ pub use maintenance::{PruneEvents, PruneJobs, purge_workspace};
 pub(crate) use registry::is_dotted;
 pub use registry::{Background, ConsumerInfo, InstanceRows, Registry, RegistryError};
 pub use rekey::{DispatchRekeys, REKEY_EVERY};
-pub use worker::{Worker, WorkerStats};
+pub use worker::{ALIVE_FOR, Liveness, Worker, WorkerStats};
 
 crate::define_id!(
     /// A job in `kernel.jobs`.

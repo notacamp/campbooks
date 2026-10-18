@@ -85,6 +85,11 @@ All notable changes to Campbooks Next are documented here. The format follows
   background. The logs say when nothing is left under the old key, which is when to remove
   it. With compose, `server-init` gains `rotate` and `forget-previous`; the self-hosting
   guide has the steps. Never keep a leaked key as the previous one.
+- **A separate worker container can have a health check.** A process started as
+  `campbooks-server worker` answers `GET /healthz` on `CAMPBOOKS_JOBS__HEALTH_ADDR` (default
+  `127.0.0.1:8081`): 200 while its job loop runs and reaches the database, 503 after a
+  minute without. Use `campbooks-server healthcheck --worker` as the container's health
+  check; the self-hosting guide shows how.
 
 ### Fixed
 

@@ -3946,3 +3946,26 @@ async fn the_job_key_indexes_are_rebuilt_when_missing_or_invalid(db: PgPool) {
     let indexes: Vec<(String, bool)> = sqlx::query_as(VALID).fetch_all(&db).await.unwrap();
     assert_eq!(indexes, healthy);
 }
+
+/// A running worker beats once its loop has reached the database, and a
+/// stopped one stops beating (campbooks-cloud#185).
+#[sqlx::test(migrations = "../../migrations")]
+async fn a_running_worker_is_alive(db: PgPool) {
+    let state = state_with(db, |_| {}).await;
+    let worker = Worker::new(state);
+    let liveness = worker.liveness();
+    assert!(!liveness.alive(crate::jobs::ALIVE_FOR), "not started yet");
+    let (stop, stopped) = tokio::sync::oneshot::channel::<()>();
+    let running = tokio::spawn(worker.run(async {
+        let _ = stopped.await;
+    }));
+    for _ in 0..100 {
+        if liveness.alive(crate::jobs::ALIVE_FOR) {
+            break;
+        }
+        tokio::time::sleep(Duration::from_millis(20)).await;
+    }
+    assert!(liveness.alive(crate::jobs::ALIVE_FOR), "beats once running");
+    stop.send(()).unwrap();
+    running.await.unwrap();
+}

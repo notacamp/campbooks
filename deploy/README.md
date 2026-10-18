@@ -27,10 +27,14 @@
    runs inside the same container: the image runs `campbooks-server all`, the
    API plus the job worker. Jobs live in Postgres, so nothing is lost on restart. To run the
    worker separately, add a second service with the same image and env and
-   `command: ["worker"]` (and `healthcheck: { disable: true }`: the health
-   check probes the API, which a worker does not serve), and give the first
-   one `command: ["api"]`. Worker settings are the `CAMPBOOKS_JOBS__*` block
-   of `.env.example`.
+   `command: ["worker"]`, and give the first one `command: ["api"]`. The
+   image's health check probes the API, which a worker does not serve, so
+   give the worker its own: `healthcheck: { test: ["CMD", "campbooks-server",
+   "healthcheck", "--worker"] }`. A worker answers `GET /healthz` on
+   `CAMPBOOKS_JOBS__HEALTH_ADDR` (default `127.0.0.1:8081`, inside the
+   container only): 200 while its job loop runs and reaches the database
+   (checked every 10 s), 503 after a minute without. Worker settings are the
+   `CAMPBOOKS_JOBS__*` block of `.env.example`.
 
 8. Files (message bodies, attachments, documents) are stored outside Postgres,
    in the `blobs-data` volume by default. See "Blob storage" below to use an
