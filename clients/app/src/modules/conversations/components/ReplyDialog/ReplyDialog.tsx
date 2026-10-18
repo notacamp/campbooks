@@ -138,8 +138,14 @@ export function ReplyDialog({
   const base = pinned === undefined ? newest : messages.find((m) => m.id === pinned);
   // A newer message than the one the draft answers: said, with a way to
   // answer it instead.
+  // Your own mail sent meanwhile is not something to answer.
   const newer =
-    pinned !== undefined && newest !== undefined && newest.id !== pinned ? newest : undefined;
+    pinned !== undefined &&
+    newest !== undefined &&
+    newest.id !== pinned &&
+    newest.direction === "inbound"
+      ? newest
+      : undefined;
   // Its words, asked for on their own when the conversation came without
   // them (`text_unread`).
   const unread = useMessageWords(workspaceId, conversationId, base);
@@ -266,6 +272,13 @@ export function ReplyDialog({
     setProblem(undefined);
     setStage("choose");
     setPinned(undefined);
+    // A draft already saved (a send that failed) is never reused for the
+    // next pick, which may answer another message: the next save is a fresh
+    // draft, and that one goes (campbooks-cloud#257).
+    if (saved !== undefined) {
+      replaced.current = saved;
+      setSaved(undefined);
+    }
   };
 
   /**
@@ -430,8 +443,8 @@ export function ReplyDialog({
       if (draft === undefined) {
         throw new Error("nothing to answer yet");
       }
-      // The composer finds it at once (it reopens the reply draft of the
-      // newest message).
+      // The composer finds it at once: it reopens the reply draft of the
+      // message the draft answers (`onOpenDraft` names it).
       queryClient.setQueryData<Draft[]>(
         draftKeys.forConversation(workspaceId, conversationId),
         (list) => [draft, ...(list ?? []).filter((d) => d.id !== draft.id)],

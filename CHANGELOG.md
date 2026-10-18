@@ -228,6 +228,10 @@ All notable changes to Campbooks Next are documented here. The format follows
   which writes the draft again for it. A send that can't be taken back no longer offers an
   Undo that could only say "too late", and keyboard shortcuts on the page are no longer
   swallowed by an open dialog that lost its focus.
+- **The reply dialog leaves no stray drafts behind.** Going back to Scout's choices after
+  a send failed, then sending another reply, now discards the failed draft instead of
+  leaving it in your drafts, and your own sent mail arriving in the conversation no longer
+  shows as "a newer message" to answer.
 
 ### Added
 

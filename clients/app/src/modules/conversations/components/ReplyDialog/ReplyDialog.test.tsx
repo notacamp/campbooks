@@ -372,6 +372,153 @@ describe("ReplyDialog", () => {
     expect(created.quoted).toContain("Friday instead");
   });
 
+  it("discards the draft saved for the older message once the newer one is answered and sent", async () => {
+    // campbooks-cloud#257: a failed send leaves a draft for Maya's message;
+    // answering Leo's instead writes a fresh one, and Maya's goes.
+    let arrived = false;
+    let created = 0;
+    const api = routes({
+      [`GET ${C}`]: () => ({ body: arrived ? WITH_NEWER : Q4_DETAIL }),
+      [`POST ${C}/reply/draft`]: (_request, body) => ({
+        body: { message_id: (body as { message_id: string }).message_id, text: DRAFT },
+      }),
+      [`POST ${D}`]: (_request, body) => {
+        created += 1;
+        const fields = body as { body: string; message_id: string };
+        return created === 1
+          ? { status: 201, body: { ...REPLY, message_id: NEWEST, body: fields.body } }
+          : { status: 201, body: { ...FRESH, message_id: fields.message_id, body: fields.body } };
+      },
+      [`POST ${D}/${REPLY.id}/send`]: problem(503, "unavailable"),
+      [`POST ${D}/${FRESH.id}/send`]: {
+        status: 202,
+        body: { ...FRESH, state: "scheduled", send_at: "2026-10-13T15:00:10Z" },
+      },
+      [`DELETE ${D}/${REPLY.id}`]: { status: 204 },
+    });
+    const handlers = {
+      onClose: vi.fn(),
+      onWriteOwn: vi.fn(),
+      onOpenDraft: vi.fn(),
+      onSent: vi.fn(),
+      onUndone: vi.fn(),
+    };
+    const { queryClient } = renderWithProviders(
+      <ReplyDialog workspaceId={DUARTE.id} conversationId={Q4.id} {...handlers} />,
+    );
+    fireEvent.keyDown(await screen.findByRole("button", { name: /Say Thursday works/u }), {
+      key: "1",
+    });
+    await screen.findByRole("textbox", { name: "Your reply" });
+    fireEvent.click(screen.getByRole("button", { name: /^Send/u }));
+    await waitFor(() => {
+      expect(api.calls.map((c) => c.route)).toContain(`POST ${D}/${REPLY.id}/send`);
+    });
+    await screen.findByRole("textbox", { name: "Your reply" });
+    arrived = true;
+    await queryClient.refetchQueries();
+    fireEvent.click(await screen.findByRole("button", { name: "Answer the newer one" }));
+    await waitFor(() => {
+      expect(api.calls.findLast((c) => c.route === `POST ${C}/reply/draft`)?.body).toMatchObject({
+        message_id: NEWER.id,
+      });
+    });
+    const send = await screen.findByRole("button", { name: /^Send/u });
+    await waitFor(() => {
+      expect(send).toBeEnabled();
+    });
+    fireEvent.click(send);
+    await waitFor(() => {
+      expect(handlers.onSent).toHaveBeenCalled();
+    });
+    expect(api.calls.filter((c) => c.route === `POST ${D}`).map((c) => c.body)).toMatchObject([
+      { message_id: NEWEST },
+      { message_id: NEWER.id },
+    ]);
+    // Maya's draft is never saved again, and goes.
+    expect(api.calls.some((c) => c.route === `PATCH ${D}/${REPLY.id}`)).toBe(false);
+    await waitFor(() => {
+      expect(api.calls.map((c) => c.route)).toContain(`DELETE ${D}/${REPLY.id}`);
+    });
+  });
+
+  it("discards the draft of a failed send when Back leads to another pick", async () => {
+    let created = 0;
+    const api = routes({
+      [`POST ${D}`]: (_request, body) => {
+        created += 1;
+        const fields = body as { body: string };
+        return created === 1
+          ? { status: 201, body: { ...REPLY, message_id: NEWEST, body: fields.body } }
+          : { status: 201, body: { ...FRESH, body: fields.body } };
+      },
+      [`POST ${D}/${REPLY.id}/send`]: problem(503, "unavailable"),
+      [`POST ${D}/${FRESH.id}/send`]: {
+        status: 202,
+        body: { ...FRESH, state: "scheduled", send_at: "2026-10-13T15:00:10Z" },
+      },
+      [`DELETE ${D}/${REPLY.id}`]: { status: 204 },
+    });
+    const handlers = dialog();
+    fireEvent.keyDown(await screen.findByRole("button", { name: /Say Thursday works/u }), {
+      key: "1",
+    });
+    await screen.findByRole("textbox", { name: "Your reply" });
+    fireEvent.click(screen.getByRole("button", { name: /^Send/u }));
+    await waitFor(() => {
+      expect(api.calls.map((c) => c.route)).toContain(`POST ${D}/${REPLY.id}/send`);
+    });
+    fireEvent.click(await screen.findByRole("button", { name: "Back to the choices" }));
+    fireEvent.click(await screen.findByRole("button", { name: /Ask for more time/u }));
+    await screen.findByRole("textbox", { name: "Your reply" });
+    const send = screen.getByRole("button", { name: /^Send/u });
+    await waitFor(() => {
+      expect(send).toBeEnabled();
+    });
+    fireEvent.click(send);
+    await waitFor(() => {
+      expect(handlers.onSent).toHaveBeenCalled();
+    });
+    expect(api.calls.filter((c) => c.route === `POST ${D}`)).toHaveLength(2);
+    expect(api.calls.some((c) => c.route === `PATCH ${D}/${REPLY.id}`)).toBe(false);
+    await waitFor(() => {
+      expect(api.calls.map((c) => c.route)).toContain(`DELETE ${D}/${REPLY.id}`);
+    });
+  });
+
+  it("says nothing of a newer message that is the member's own mail", async () => {
+    let arrived = false;
+    const own = {
+      ...NEWER,
+      direction: "outbound" as const,
+      from: { name: "Sam Rivera", address: "sam@example.com" },
+      to: [LAST.from],
+    };
+    routes({
+      [`GET ${C}`]: () => ({
+        body: arrived ? { ...Q4_DETAIL, messages: [...Q4_DETAIL.messages, own] } : Q4_DETAIL,
+      }),
+    });
+    const { queryClient } = renderWithProviders(
+      <ReplyDialog
+        workspaceId={DUARTE.id}
+        conversationId={Q4.id}
+        onClose={vi.fn()}
+        onWriteOwn={vi.fn()}
+        onOpenDraft={vi.fn()}
+      />,
+    );
+    fireEvent.keyDown(await screen.findByRole("button", { name: /Say Thursday works/u }), {
+      key: "1",
+    });
+    await screen.findByRole("textbox", { name: "Your reply" });
+    arrived = true;
+    await queryClient.refetchQueries();
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(screen.queryByText(/A newer message from/u)).toBeNull();
+    expect(screen.queryByRole("button", { name: "Answer the newer one" })).toBeNull();
+  });
+
   it("offers no Undo when the send has no window to take it back in", async () => {
     routes({
       [`POST ${D}/${REPLY.id}/send`]: {
