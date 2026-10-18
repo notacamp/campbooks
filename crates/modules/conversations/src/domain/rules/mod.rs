@@ -375,12 +375,11 @@ pub async fn not_trusted_yet(
             sender_address: address,
             ..taught::Facts::default()
         }),
-        [RuleCondition::SenderDomain(domain)] => rule.conditions.iter().any(|c| match c {
-            RuleCondition::SenderDomain(theirs) => {
-                let (domain, theirs) = (domain.to_lowercase(), theirs.to_lowercase());
-                domain == theirs || domain.ends_with(&format!(".{theirs}"))
-            }
-            _ => false,
+        // Anyone at the domain: the engine decides whether an existing rule
+        // already reaches them, the same way it would on a real message.
+        [RuleCondition::SenderDomain(domain)] => rule.engine().matches(&taught::Facts {
+            sender_address: &format!("anyone@{domain}"),
+            ..taught::Facts::default()
         }),
         _ => false,
     };

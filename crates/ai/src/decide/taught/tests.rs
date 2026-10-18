@@ -692,3 +692,34 @@ fn a_free_mail_domain_is_refused_by_its_registrable_domain() {
         assert!(!is_free_mail(domain), "{domain}");
     }
 }
+
+#[test]
+fn a_whole_platform_anyone_sends_from_is_never_trusted_with_images() {
+    for domain in ["substack.com", "mail.beehiiv.com", "googlegroups.com"] {
+        assert_eq!(
+            TaughtRule::validate(
+                &[Condition::SenderDomain(domain.into())],
+                &[Action::ShowImages]
+            ),
+            Err(Invalid::SharedSenderDomain),
+            "{domain}"
+        );
+        // Sorting its mail by domain is still fine.
+        assert_eq!(
+            TaughtRule::validate(
+                &[Condition::SenderDomain(domain.into())],
+                &[to_stream("newsletters")]
+            ),
+            Ok(()),
+            "{domain}"
+        );
+    }
+    // One newsletter's address on it may be trusted.
+    assert_eq!(
+        TaughtRule::validate(
+            &[Condition::SenderAddress("ledger@substack.com".into())],
+            &[Action::ShowImages]
+        ),
+        Ok(())
+    );
+}

@@ -7,13 +7,20 @@ were held back, whether trusting its sender can take effect
 sender yet, the email is not under review, its provider shares sender checks
 and they pass), the sender's registrable domain that may be offered instead
 of the address (`images_domain`: owned, never a free mail or internet
-provider's), and why the images stay held back although the sender is, or
-could be, trusted (`images_held`: `under_review`, `checks_fail`,
-`cannot_authenticate`, or `not_checked` while Scout has not checked the
-email). A message with no remote images SHALL offer and explain nothing.
+provider's, nor a platform anyone can send from), and why the images stay held
+back although the sender is, or could be, trusted (`images_held`:
+`under_review`, `checks_fail`, `unverified` when the provider checked nothing,
+`cannot_authenticate`, `not_checked` while Scout has not checked the email
+under an acting rule, or `rule_paused` when the rule covering the sender is
+paused or waiting for a yes). A message with no remote images SHALL offer and
+explain nothing. The body SHALL read the inbox's rules only when one of them
+shows images.
 Creating or changing an image rule for a sender a rule already covers (the
 same address, or a domain that covers it) SHALL be refused with 409
-`images_already_trusted`. The free mail list SHALL be one list, compared by
+`images_already_trusted`, with the engine deciding whether an existing rule
+covers it. An image rule for anyone at a platform anyone can send from
+(Substack, Mailchimp, Google Groups and the like) SHALL be refused as invalid.
+The free mail list SHALL be one list, compared by
 registrable domain (`mail.yahoo.fr` is Yahoo's), covering the major global and
 regional providers and internet providers' mail; the web client's copy SHALL
 be checked against it.
@@ -33,3 +40,7 @@ be checked against it.
 #### Scenario: Under review
 - **WHEN** a trusted sender's email has a stored `suspicious` answer of `true`
 - **THEN** its images stay held back and `images_held` is `under_review`
+
+#### Scenario: A platform anyone sends from
+- **WHEN** a member asks to show images from anyone at `substack.com`
+- **THEN** the rule is refused, and the reader offers only the address

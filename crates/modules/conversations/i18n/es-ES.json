@@ -30,6 +30,6 @@
     "rule_not_active": "Esta regla está esperando un sí. Mantenla primero y luego podrás pausarla.",
     "rule_not_restorable": "Esta regla ya no se puede recuperar. Vuelve a enseñarla.",
     "invalid_senders_query": "Busca con 2 a 100 caracteres y pide entre 1 y {{max}} remitentes.",
-    "images_already_trusted": "Las imágenes de este remitente ya se muestran: una regla inteligente confía en él. La encontrarás en la memoria de Scout."
+    "images_already_trusted": "Ya hay una regla inteligente para las imágenes de este remitente, aunque esté en pausa o esperando un sí. La encontrarás en la memoria de Scout."
   }
 }

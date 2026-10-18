@@ -9,7 +9,7 @@ use campbooks_ai::decide::{
     signals::facts::{
         dmarc_refused, registrable_domain, sender_authenticated, sender_checks_failed,
     },
-    taught::{self, Action, Facts, TaughtRule, is_free_mail, is_owned_domain},
+    taught::{self, Action, Facts, TaughtRule, is_free_mail, is_owned_domain, is_shared_sender},
 };
 use campbooks_kernel::Result;
 use serde::{Deserialize, Serialize};
@@ -29,14 +29,19 @@ use crate::{
 pub enum ImagesHeld {
     /// The email or its conversation is under review.
     UnderReview,
-    /// The email does not pass its sender's checks, or pretends to be them.
+    /// The email fails its sender's checks, or pretends to be them.
     ChecksFail,
+    /// The provider checked nothing that could confirm the sender (its
+    /// results say `none`).
+    Unverified,
     /// The provider that received it shares no sender checks, so no sender
     /// can be trusted here.
     CannotAuthenticate,
     /// Scout has not checked the email yet: images wait for it, and stay held
     /// back while Scout is off or past its daily limit.
     NotChecked,
+    /// The rule that trusts the sender is paused or waiting for a yes.
+    RulePaused,
 }
 
 /// What a message's sender is trusted with, and what the reader may offer.
@@ -70,7 +75,7 @@ pub async fn images(
     inboxes: &[InboxId],
     message: MessageId,
 ) -> Result<Images> {
-    let row: Option<(InboxId, String, serde_json::Value, bool, bool)> = sqlx::query_as(
+    let row: Option<(InboxId, String, serde_json::Value, bool, bool, bool)> = sqlx::query_as(
         "SELECT m.inbox_id, m.sender_address, m.headers,
                 EXISTS (SELECT 1 FROM conversations.decisions d
                          WHERE d.message_id = m.id AND d.question = 'suspicious'
@@ -80,7 +85,11 @@ pub async fn images(
                             AND d.question = 'suspicious' AND d.value = 'true'::jsonb)
                  OR EXISTS (SELECT 1 FROM conversations.needs n
                              WHERE n.conversation_id = m.conversation_id
-                               AND n.state = 'open' AND n.reason = 'review'))
+                               AND n.state = 'open' AND n.reason = 'review')),
+                -- The inbox's rules are read only when one shows images.
+                EXISTS (SELECT 1 FROM conversations.rules r
+                         WHERE r.inbox_id = m.inbox_id AND r.state <> 'removed'
+                           AND r.actions @> '[{\"action\": \"show_images\"}]'::jsonb)
            FROM conversations.messages m
           WHERE m.id = $1 AND m.inbox_id = ANY($2) AND m.direction = 'inbound'",
     )
@@ -88,13 +97,18 @@ pub async fn images(
     .bind(inboxes)
     .fetch_optional(&mut *conn)
     .await?;
-    let Some((inbox, sender, headers, judged, suspicious)) = row else {
+    let Some((inbox, sender, headers, judged, suspicious, image_rules)) = row else {
         return Ok(Images::default());
     };
     // The inbox's rules that show images: acting ones trust, and any not
     // removed (paused or waiting for a yes too) means it is taught already.
     let (mut acting, mut taught_already) = (Vec::new(), Vec::new());
-    for rule in of_inboxes(conn, &[inbox]).await? {
+    let stored = if image_rules {
+        of_inboxes(conn, &[inbox]).await?
+    } else {
+        Vec::new()
+    };
+    for rule in stored {
         let engine = rule.engine();
         if !engine.actions.contains(&Action::ShowImages) {
             continue;
@@ -138,27 +152,33 @@ fn assess(f: &Seen<'_>) -> Images {
         ..Facts::default()
     };
     let trusted = f.judged && taught::shows_images(f.acting, &facts, authenticated).is_some();
-    let covered = f.taught_already.iter().any(|r| r.matches(&facts));
+    let acting = f.acting.iter().any(|r| r.matches(&facts));
+    let covered = acting || f.taught_already.iter().any(|r| r.matches(&facts));
     // What would keep images back whatever a rule says.
     let blocked = if f.suspicious {
         Some(ImagesHeld::UnderReview)
     } else if f.results.is_none() {
         Some(ImagesHeld::CannotAuthenticate)
-    } else if auth_failed || impersonated || !authenticated {
+    } else if auth_failed || impersonated {
         Some(ImagesHeld::ChecksFail)
+    } else if !authenticated {
+        Some(ImagesHeld::Unverified)
     } else {
         None
     };
     let offer = !covered && blocked.is_none();
     let held = if trusted {
         None
-    } else if covered {
+    } else if acting {
         blocked.or((!f.judged).then_some(ImagesHeld::NotChecked))
+    } else if covered {
+        blocked.or(Some(ImagesHeld::RulePaused))
     } else {
         blocked
     };
-    let domain = Some(registrable_domain(f.sender))
-        .filter(|d| offer && !d.is_empty() && is_owned_domain(d) && !is_free_mail(d));
+    let domain = Some(registrable_domain(f.sender)).filter(|d| {
+        offer && !d.is_empty() && is_owned_domain(d) && !is_free_mail(d) && !is_shared_sender(d)
+    });
     Images {
         trusted,
         offer,
@@ -221,12 +241,13 @@ mod tests {
         });
         assert!(!waiting.trusted && !waiting.offer);
         assert_eq!(waiting.held, Some(ImagesHeld::NotChecked));
-        // A paused rule still counts as taught: no second offer.
+        // A paused rule still counts as taught: no second offer, and why.
         let paused = assess(&Seen {
             acting: &[],
             ..facts(Some(PASS), &rules)
         });
         assert!(!paused.trusted && !paused.offer);
+        assert_eq!(paused.held, Some(ImagesHeld::RulePaused));
     }
 
     #[test]
@@ -234,6 +255,9 @@ mod tests {
         let failing = assess(&facts(Some(FAIL), &[]));
         assert!(!failing.offer);
         assert_eq!(failing.held, Some(ImagesHeld::ChecksFail));
+        let unsigned = assess(&facts(Some("mx.google.com; none"), &[]));
+        assert!(!unsigned.offer);
+        assert_eq!(unsigned.held, Some(ImagesHeld::Unverified));
         let unchecked = assess(&facts(None, &[]));
         assert!(!unchecked.offer);
         assert_eq!(unchecked.held, Some(ImagesHeld::CannotAuthenticate));
@@ -265,6 +289,20 @@ mod tests {
             results: Some(
                 "mx.google.com; dkim=pass header.i=@yahoo.fr header.s=s1; \
                  dmarc=pass (p=REJECT sp=REJECT dis=NONE) header.from=mail.yahoo.fr",
+            ),
+            ..facts(None, &[])
+        });
+        assert!(got.offer);
+        assert_eq!(got.domain, None);
+    }
+
+    #[test]
+    fn a_platform_anyone_sends_from_is_offered_its_address_only() {
+        let got = assess(&Seen {
+            sender: "ledger@mail.beehiiv.com",
+            results: Some(
+                "mx.google.com; dkim=pass header.i=@beehiiv.com header.s=s1; \
+                 dmarc=pass (p=REJECT sp=REJECT dis=NONE) header.from=mail.beehiiv.com",
             ),
             ..facts(None, &[])
         });

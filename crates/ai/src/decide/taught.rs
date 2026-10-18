@@ -280,6 +280,10 @@ pub enum Invalid {
     /// one domain, and nothing else.
     #[error("showing images needs one sender, and nothing else")]
     ImagesNeedSender,
+    /// Trusting a whole domain anyone can send from (a mailing list or a
+    /// newsletter platform) with images.
+    #[error("anyone can send from this domain: trust an address instead")]
+    SharedSenderDomain,
 }
 
 /// Free mail providers, and the mail of internet providers, by registrable
@@ -638,6 +642,50 @@ pub fn is_owned_domain(domain: &str) -> bool {
     domain.split('.').filter(|l| !l.is_empty()).count() >= 2 && !is_public_suffix(&domain)
 }
 
+/// Platforms anyone can send from and still pass the domain's checks:
+/// mailing lists, newsletter and mass mail services, by registrable domain.
+/// A rule may still sort their mail by domain, but never trust a whole one
+/// with images: each sender there is someone else (campbooks-cloud#235).
+pub const SHARED_SENDERS: &[&str] = &[
+    "amazonses.com",
+    "beehiiv.com",
+    "brevo.com",
+    "buttondown.com",
+    "buttondown.email",
+    "campaign-archive.com",
+    "constantcontact.com",
+    "convertkit.com",
+    "freelists.org",
+    "ghost.io",
+    "googlegroups.com",
+    "groups.io",
+    "hubspotemail.net",
+    "kit.com",
+    "list-manage.com",
+    "mailchimp.com",
+    "mailchimpapp.com",
+    "mailerlite.com",
+    "mailgun.org",
+    "mandrillapp.com",
+    "mcsv.net",
+    "medium.com",
+    "patreon.com",
+    "sendgrid.net",
+    "sendinblue.com",
+    "sourceforge.net",
+    "sparkpostmail.com",
+    "substack.com",
+    "yahoogroups.com",
+];
+
+/// Whether `domain` (or the registrable domain it is under) is a platform
+/// anyone can send from ([`SHARED_SENDERS`]).
+pub fn is_shared_sender(domain: &str) -> bool {
+    let domain = domain.trim().trim_matches('.').to_ascii_lowercase();
+    SHARED_SENDERS.contains(&domain.as_str())
+        || SHARED_SENDERS.contains(&registrable_domain(&domain).as_str())
+}
+
 /// Whether `domain` (or the registrable domain it is under) belongs to a
 /// free mail provider.
 pub fn is_free_mail(domain: &str) -> bool {
@@ -754,6 +802,13 @@ impl TaughtRule {
                 ))
         {
             return Err(Invalid::ImagesNeedSender);
+        }
+        if actions.contains(&Action::ShowImages)
+            && conditions
+                .iter()
+                .any(|c| matches!(c, Condition::SenderDomain(d) if is_shared_sender(d)))
+        {
+            return Err(Invalid::SharedSenderDomain);
         }
         Ok(())
     }

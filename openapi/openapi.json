@@ -14165,8 +14165,10 @@
         "enum": [
           "under_review",
           "checks_fail",
+          "unverified",
           "cannot_authenticate",
-          "not_checked"
+          "not_checked",
+          "rule_paused"
         ]
       },
       "InboxId": {

@@ -19,8 +19,12 @@ All notable changes to Campbooks Next are documented here. The format follows
   The offer only appears where it can take effect (not for a sender already trusted, mail
   failing its checks, mail under review, or a provider that shares no sender checks), and
   otherwise the reader says in one line why images stay held back. "Anyone at" is never
-  offered for a free mail or internet provider's domain (over 300 of them, subdomains
-  included), and in a shared inbox the note says the inbox trusts the sender.
+  included), nor for a platform anyone can send from (Substack, Mailchimp, Google Groups
+  and the like), and the server refuses such a rule however it is made; the wider list
+  also refuses domain-only rules of any kind for those providers' domains (trust an
+  address instead). A second rule for a sender already covered, even by a paused one, is
+  refused with a pointer to Scout's memory. In a shared inbox the note says the inbox
+  trusts the sender.
 - **Home offers each email's own actions, picked by Scout (with the catalogue on).** When
   the action catalogue is switched on, the selected item's buttons are the ones the model
   ranked for that email, likelier first on 1, 2 and 3, with the visor saying Scout picked
