@@ -51,12 +51,12 @@ string, fragment, title or address.
 ### Requirement: Matomo learns the screen, not the person
 Each tracking request SHALL carry exactly `idsite`, `rec=1`, `apiv=1`,
 `url` (the instance's public URL followed by the route), `action_name` (the
-route), `_id`, `send_image=0`, and, when the request has them, `ua` (its
+route), `cid`, `send_image=0`, and, when the request has them, `ua` (its
 `User-Agent`, capped) and `lang` (its `Accept-Language` reduced to a shipped
-locale). `_id` SHALL be the first 16 hex characters of HMAC-SHA256 under the
-visitor key of the account id, `:` and the UTC date (`YYYY-MM-DD`). No IP
-(`cip`), `token_auth`, user id (`uid`, `cid`), workspace or custom dimension
-SHALL be sent. The visitor key SHALL never be logged and SHALL be redacted
+locale). `cid`, the forced visitor id, SHALL be the first 16 hex characters
+of HMAC-SHA256 under the visitor key of the account id, `:` and the UTC date
+(`YYYY-MM-DD`). No IP (`cip`), `token_auth`, user id (`uid`), `_id`,
+workspace or custom dimension SHALL be sent. The visitor key SHALL never be logged and SHALL be redacted
 wherever the configuration is printed.
 
 #### Scenario: The same person, two days

@@ -22,6 +22,6 @@
 
 ## 4. Docs
 
-- [x] 4.1 `deploy/README.md` and `deploy/.env.example`: settings, Matomo's `trust_visitors_cookies`, metric
+- [x] 4.1 `deploy/README.md` and `deploy/.env.example`: settings, metric
 - [x] 4.2 CHANGELOG
 - [x] 4.3 Gates green in CI

@@ -65,7 +65,7 @@ user agent) and the request never waits on any of it.
 ## What Matomo receives
 
 `GET <MATOMO_URL>/matomo.php` with exactly `idsite`, `rec=1`, `apiv=1`,
-`url=<CAMPBOOKS_PUBLIC_URL><route>`, `action_name=<route>`, `_id`,
+`url=<CAMPBOOKS_PUBLIC_URL><route>`, `action_name=<route>`, `cid`,
 `send_image=0`, `ua` (the request's `User-Agent`, at most 256 characters,
 when sent) and `lang` (the request's `Accept-Language` reduced to a locale
 we ship, when there is one).
@@ -78,10 +78,16 @@ we ship, when there is one).
   another account another id; without the key it cannot be turned back into
   an account or linked across days. That gives daily unique users per screen
   and nothing more; retention and active users come from the warehouse.
-  Because every visit comes from one address, Matomo should be set to
-  `trust_visitors_cookies = 1`, so visits are told apart by this id rather
-  than by a fingerprint they all share.
-- **Nothing else.** No `uid`, no `cid`, no custom dimensions or variables,
+- **Sent as `cid`, not `_id`.** Every visit comes from the server's one
+  address, so the people behind it share a fingerprint (`config_id`). With
+  `_id`, Matomo's default recognition can still match on that fingerprint
+  and merge different people; `cid` is a forced visitor id, which Matomo
+  accepts without `token_auth` when it is 16 hex characters, and when it is
+  set Matomo recognises visits by the visitor id alone
+  (`VisitorRecognizer::shouldLookupOneVisitorFieldOnly`). No instance-wide
+  Matomo setting is needed, so the sites tracked with cookieless scripts
+  keep their recognition.
+- **Nothing else.** No `uid`, no `_id`, no custom dimensions or variables,
   no workspace id, no title.
 
 ## Configuration

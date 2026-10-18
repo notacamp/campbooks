@@ -159,7 +159,7 @@ fn the_tracking_request_holds_the_route_and_nothing_identifying() {
         ("apiv", "1"),
         ("url", "https://app.example.com/w/:workspaceId/inbox"),
         ("action_name", "/w/:workspaceId/inbox"),
-        ("_id", "0123456789abcdef"),
+        ("cid", "0123456789abcdef"),
         ("ua", "Mozilla/5.0 (Macintosh) Chrome/141.0"),
         ("lang", "pt-PT"),
         ("send_image", "0"),
@@ -172,7 +172,7 @@ fn the_tracking_request_holds_the_route_and_nothing_identifying() {
         "cip",
         "uid",
         "token_auth",
-        "cid",
+        "_id",
         "_cvar",
         "cvar",
         "dimension1",
@@ -315,10 +315,10 @@ mod handler {
         let days = [before, Utc::now().date_naive()];
         assert!(
             days.iter()
-                .any(|day| params["_id"] == super::visitor_id(KEY.as_bytes(), "test-user", *day)),
+                .any(|day| params["cid"] == super::visitor_id(KEY.as_bytes(), "test-user", *day)),
             "{params:?}"
         );
-        for never in ["cip", "uid", "token_auth", "cid"] {
+        for never in ["cip", "uid", "token_auth", "_id"] {
             assert!(!params.contains_key(never), "{never}");
         }
         let url = received[0].url.as_str();

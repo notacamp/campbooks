@@ -16,9 +16,12 @@
 //! retried and never an error for the person. Matomo gets the route
 //! template, the request's `User-Agent`, its language when we ship it and a
 //! visitor id that changes every UTC day (the first 16 hex characters of an
-//! HMAC of the account and the day under the visitor key): never an IP
-//! (`cip`), a user id (`uid`), a workspace or custom dimensions, and no
-//! `token_auth`. Without the three settings the operation does nothing.
+//! HMAC of the account and the day under the visitor key), sent as `cid`:
+//! Matomo takes a forced visitor id without `token_auth` and then recognises
+//! visits by it alone, never by a fingerprint, so people behind the server's
+//! one address are not merged. Never an IP (`cip`), a user id (`uid`), a
+//! workspace or custom dimensions, and no `token_auth`. Without the three
+//! settings the operation does nothing.
 
 use std::{
     sync::{Arc, OnceLock},
@@ -219,7 +222,8 @@ pub(crate) struct Hit<'a> {
 
 /// The tracking request for `hit`: `<matomo>/matomo.php` with `idsite`,
 /// `rec`, `apiv`, `url` (`app` and the route), `action_name` (the route),
-/// `_id`, `ua`, `lang` and `send_image=0`, and nothing else.
+/// `cid` (the forced visitor id), `ua`, `lang` and `send_image=0`, and
+/// nothing else.
 pub(crate) fn tracking_url(matomo: &Matomo<'_>, app: &str, hit: &Hit<'_>) -> Option<Url> {
     let mut url = Url::parse(&format!("{}/matomo.php", matomo.url)).ok()?;
     url.set_query(None);
@@ -235,7 +239,7 @@ pub(crate) fn tracking_url(matomo: &Matomo<'_>, app: &str, hit: &Hit<'_>) -> Opt
                 &format!("{}{}", app.trim_end_matches('/'), hit.route),
             )
             .append_pair("action_name", hit.route)
-            .append_pair("_id", hit.visitor)
+            .append_pair("cid", hit.visitor)
             .append_pair("send_image", "0");
         if let Some(user_agent) = hit.user_agent {
             query.append_pair("ua", user_agent);

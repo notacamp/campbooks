@@ -317,10 +317,10 @@ Track or Global Privacy Control. The server checks the template and sends it to 
 tracking API in the background, with the browser's user agent, the language when
 Campbooks ships it and a visitor id that is an HMAC of the account and the UTC day under
 the visitor key: daily unique visitors per screen, with no way to follow a person across
-days. No IP, user id, workspace or custom dimension is sent, and no `token_auth` is
-needed, so Matomo sees every visit coming from the server's address: set
-`trust_visitors_cookies = 1` in its `[Tracker]` section so visitors are told apart by
-that id. A slow or unreachable Matomo costs dropped views
+days. The id goes as Matomo's forced visitor id (`cid`), which needs no `token_auth`
+and makes Matomo tell visits apart by that id alone, although they all come from the
+server's address; no Matomo setting has to change. No IP, user id, workspace or custom
+dimension is sent. A slow or unreachable Matomo costs dropped views
 (`campbooks_screen_views_total{outcome="failed"}`), never a slower app.
 
 **What you get.**
