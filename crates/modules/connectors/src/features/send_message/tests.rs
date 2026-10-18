@@ -785,11 +785,14 @@ async fn a_send_during_a_slow_token_refresh_waits_for_it_and_uses_one_attempt(db
     assert_eq!(done.len(), 1);
     assert_eq!(done[0]["outcome"], "sent");
     assert_eq!(done[0]["send_id"], send_id.to_string());
-    let attempts: Vec<i32> = sqlx::query_scalar(
-        "SELECT attempts FROM kernel.jobs WHERE kind = 'connectors.send_message'",
+    // The send that ran took one attempt (the check queued behind it has
+    // not run yet).
+    let ran: Vec<(String, i32)> = sqlx::query_as(
+        "SELECT state, attempts FROM kernel.jobs
+          WHERE kind = 'connectors.send_message' AND attempts > 0",
     )
     .fetch_all(&kit.db)
     .await
     .unwrap();
-    assert_eq!(attempts, [1]);
+    assert_eq!(ran, [("succeeded".to_owned(), 1)]);
 }
