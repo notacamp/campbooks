@@ -89,6 +89,11 @@ All notable changes to Campbooks Next are documented here. The format follows
   `?`) is left out, and so is a subject hiding a line break or an invisible character,
   or a body hiding a control character other than line breaks and tabs, which could
   start another header such as Bcc. Internationalised addresses still open.
+- **Gmail write-back stays within its quota budget.** Before writing your changes back to
+  Gmail, a sync now reserves the most those writes can cost, not just what it plans: enough
+  for Gmail to refuse a large batch (each message is then changed on its own) or for a
+  change made meanwhile in Gmail to split a batch into smaller writes. Before, such pushes
+  could spend far more than they took from the shared budget and run into Gmail's rate limit.
 - **Mail whose HTML has no body tag gets its words.** Mail written as a head followed
   straight by its text, with no `<body>` (some mailers send it), was stored with a blank
   text in place of its words, so search found nothing in it, its preview and Scout's read
