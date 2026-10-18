@@ -1,0 +1,31 @@
+## Why
+
+The re-review of #566 (campbooks-cloud#243) found that a desktop mail link's
+address part, before `?`, reached the mail app as written:
+`mailto:a@b.example%0D%0Abcc:evil@x` could carry a header to a mail app that
+decodes the whole link before splitting it (campbooks-cloud#247). The same
+app would read a field hidden in a value: `body=x%26attach%3D…` decodes to
+`&attach=…`, and `to`, `cc` and `bcc` could carry a header too.
+
+## What Changes
+
+- A mail link opens only when its address part is nothing but addresses:
+  none, or comma-separated `local@domain`s, decoded, with no control
+  character, blank, or delimiter a mail app could read as another field or
+  header (CR, LF, `&`, `;`, `?`, `#`, `<`, `>`, `"`, `\`, a leftover `%`),
+  valid UTF-8 with no Unicode control (C0, C1) or format character (bidi
+  overrides, zero-width characters); other Unicode is kept for
+  internationalised addresses. A link with an authority
+  (`mailto://user:password@host`) is refused too, and so is an address part
+  starting with `/`. The `to`, `cc` and `bcc` fields are held to the same
+  rule. A subject or body holding `&` or `?` once decoded is dropped, and so
+  is a subject with a control character (CR, LF), U+2028/2029 or an invisible
+  character, or a body with a control character other than CR, LF and tab,
+  or either one not valid UTF-8 (a header hidden behind a line break).
+  Unicode blanks (`char::is_whitespace`) and other default-ignorable
+  characters are refused too. Anything else opens nowhere.
+
+## Impact
+
+- Spec: inbox-ui (HTML mail on the desktop app).
+- Code: `src-tauri/src/links.rs`. Nothing changes on screen.

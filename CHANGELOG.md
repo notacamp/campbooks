@@ -80,6 +80,15 @@ All notable changes to Campbooks Next are documented here. The format follows
 
 ### Fixed
 
+- **Desktop app: a mail link opens only when its addresses are plain addresses.** A link
+  whose address part hides a line break, another field or header (`&`, `;`, `?`), even
+  encoded, an invisible character (a bidi override, a zero-width space) or bytes that are
+  not text, or that carries a `mailto://` authority, now opens nowhere instead of
+  reaching the mail app as written; the same holds for addresses in its `to`, `cc` and
+  `bcc` fields. A subject or body that could be read as another field (it holds `&` or
+  `?`) is left out, and so is a subject hiding a line break or an invisible character,
+  or a body hiding a control character other than line breaks and tabs, which could
+  start another header such as Bcc. Internationalised addresses still open.
 - **Gmail write-back stays within its quota budget.** Before writing your changes back to
   Gmail, a sync now reserves the most those writes can cost, not just what it plans: enough
   for Gmail to refuse a large batch (each message is then changed on its own) or for a
