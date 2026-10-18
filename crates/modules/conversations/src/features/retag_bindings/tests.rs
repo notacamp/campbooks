@@ -30,15 +30,7 @@ fn new() -> SecretKey {
 
 /// How many of the workspace's applications verify under `binding`.
 async fn bound_applications(kit: &crate::testkit::Kit, binding: &Binding) -> usize {
-    let rows: Vec<(
-        Uuid,
-        Uuid,
-        Uuid,
-        Uuid,
-        Option<Uuid>,
-        serde_json::Value,
-        Option<Vec<u8>>,
-    )> = sqlx::query_as(
+    let rows: Vec<super::ApplicationRow> = sqlx::query_as(
         "SELECT a.workspace_id, a.rule_id, r.inbox_id, a.conversation_id, a.run_id, a.before,
                     a.mac
                FROM conversations.rule_applications a
@@ -59,7 +51,7 @@ async fn bound_applications(kit: &crate::testkit::Kit, binding: &Binding) -> usi
                 ),
                 crate::model::ConversationId::from_uuid(*conversation),
                 *run,
-                (&before, mac.as_deref()),
+                (&before, Some(mac.as_slice())),
             )
         })
         .count()

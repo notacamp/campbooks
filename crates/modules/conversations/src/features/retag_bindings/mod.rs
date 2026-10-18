@@ -201,6 +201,9 @@ async fn retag_applications(
     Ok(())
 }
 
+/// A run: its id, rule, kind, requester and MAC.
+type RunRow = (Uuid, Uuid, String, Option<Uuid>, Vec<u8>);
+
 /// Running rule runs, at their rule's generation now.
 async fn retag_runs(
     conn: &mut PgConnection,
@@ -208,7 +211,7 @@ async fn retag_runs(
     workspace: WorkspaceId,
     tally: &mut Tally,
 ) -> campbooks_kernel::Result<()> {
-    let rows: Vec<(Uuid, Uuid, String, Option<Uuid>, Vec<u8>)> = sqlx::query_as(
+    let rows: Vec<RunRow> = sqlx::query_as(
         "SELECT id, rule_id, kind, requested_by, mac FROM conversations.rule_runs
           WHERE state = 'running' AND mac IS NOT NULL ORDER BY id",
     )
@@ -336,6 +339,9 @@ async fn retag_scheduled_sends(
     Ok(())
 }
 
+/// A stored send: its draft, send, inbox, author, document and MAC.
+type SendRow = (Uuid, Uuid, Uuid, Option<Uuid>, Value, Vec<u8>);
+
 /// Released sends not handed over yet.
 async fn retag_stored_sends(
     conn: &mut PgConnection,
@@ -343,7 +349,7 @@ async fn retag_stored_sends(
     workspace: WorkspaceId,
     tally: &mut Tally,
 ) -> campbooks_kernel::Result<()> {
-    let rows: Vec<(Uuid, Uuid, Uuid, Option<Uuid>, Value, Vec<u8>)> = sqlx::query_as(
+    let rows: Vec<SendRow> = sqlx::query_as(
         "SELECT id, send_id, inbox_id, author, send_document, send_mac FROM conversations.drafts
           WHERE send_mac IS NOT NULL AND send_id IS NOT NULL AND send_document IS NOT NULL
           ORDER BY id",

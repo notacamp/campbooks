@@ -1513,6 +1513,7 @@ fn registry_collects_kernel_and_module_work() {
     assert_eq!(
         registry.kind_names(),
         [
+            "kernel.dispatch_rekeys",
             "kernel.prune_changes",
             "kernel.prune_events",
             "kernel.prune_idempotency",
@@ -1535,7 +1536,8 @@ fn registry_collects_kernel_and_module_work() {
             "kernel.sweep_blobs",
             "kernel.prune_idempotency",
             "kernel.prune_rate_limits",
-            "kernel.prune_changes"
+            "kernel.prune_changes",
+            "kernel.dispatch_rekeys"
         ]
     );
     assert_eq!(
@@ -1652,6 +1654,7 @@ fn registry_marks_the_instance_only_kinds() {
     assert_eq!(
         registry.instance_only_kinds(),
         [
+            "kernel.dispatch_rekeys",
             "kernel.prune_changes",
             "kernel.prune_events",
             "kernel.prune_idempotency",
