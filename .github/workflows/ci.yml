@@ -290,7 +290,7 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with: { workspaces: clients/app/src-tauri, key: shell }
       - name: tauri-driver
-        run: cargo install tauri-driver --locked
+        run: cargo install tauri-driver --version 2.1.0 --locked
       - uses: pnpm/action-setup@v6
         with: { package_json_file: clients/package.json }
       - uses: actions/setup-node@v7
