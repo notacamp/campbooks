@@ -381,6 +381,51 @@ async fn many_messages_go_in_one_batch(db: PgPool) {
 }
 
 #[sqlx::test(migrations = "../../../migrations")]
+async fn a_push_counts_the_units_its_calls_spent(db: PgPool) {
+    // campbooks-cloud#252: the run settles its reservation with this.
+    let kit = Kit::new(db).await;
+    let twelve: Vec<&[&str]> = vec![&["INBOX", "UNREAD"]; 12];
+    let m = mailbox(&kit, &twelve).await;
+    let backlog = |ids: &[String]| crate::domain::outbound::Backlog {
+        pending: ids
+            .iter()
+            .map(|id| crate::domain::outbound::Pending {
+                id: uuid::Uuid::now_v7(),
+                provider_message_id: id.clone(),
+                add: Vec::new(),
+                remove: vec!["INBOX".to_owned()],
+                stamp: None,
+                attempts: 0,
+                created_at: kit.clock.now(),
+            })
+            .collect(),
+        labels: ids
+            .iter()
+            .map(|id| (id.clone(), vec!["INBOX".to_owned(), "UNREAD".to_owned()]))
+            .collect(),
+        ..Default::default()
+    };
+    let google = kit.deps.google.clone().unwrap();
+    let (access, _) = kit.google.grant();
+
+    // As planned: the profile, one batch, the profile after.
+    let planned = backlog(&m.ids);
+    assert_eq!(
+        crate::gmail::write::units(&planned),
+        2 + 4 * 2 + 50,
+        "reserved: both profiles, the history pages it may read, the batch"
+    );
+    let pushed = crate::gmail::write::push(&google.gmail(&access), &planned).await;
+    assert_eq!(pushed.spent, 1 + 50 + 1);
+
+    // A batch Gmail refuses: the batch, then each message on its own.
+    kit.google.refuse_changes(&m.ids[3]);
+    let refused = backlog(&m.ids);
+    let pushed = crate::gmail::write::push(&google.gmail(&access), &refused).await;
+    assert_eq!(pushed.spent, 1 + 50 + 12 * 5 + 1);
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
 async fn a_message_that_refuses_changes_fails_alone(db: PgPool) {
     let kit = Kit::new(db).await;
     let m = mailbox(&kit, &[&["INBOX"], &["INBOX"], &["INBOX"]]).await;

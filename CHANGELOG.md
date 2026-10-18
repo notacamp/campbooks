@@ -217,6 +217,12 @@ All notable changes to Campbooks Next are documented here. The format follows
   second encoding.** A subject or body holding `;` once decoded, or still holding an escape
   such as `%0D` (it was encoded twice), is left out of what reaches your mail app; a
   percent sign that is text, as in "50% off", stays.
+- **Big Gmail write-backs no longer hold back other syncs.** Writing your changes back to
+  Gmail now takes from the shared Google budget what it plans to spend, then settles what
+  its calls really cost: unused units go straight back, and any extra (Gmail refusing a
+  batch, say) is paid back before more is spent. A large archive no longer holds thousands
+  of units it never uses, or waits behind smaller syncs, and every unit stays counted
+  whatever rate is configured.
 
 ### Added
 
