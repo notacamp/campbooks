@@ -356,16 +356,17 @@ debug build only. A web link opens in the system's browser, a mail link in
 the mail app with only its address, copies, subject and body and no
 fragment, each value decoded and encoded again with everything but
 unreserved characters as `%XX` (a space as `%20`, never `+`; a plus as `%2B`;
-a line break, `;`, `?`, `=`, `/`, `&` or `#` encoded too, so no field hides in
+a line break in a body, `=`, `/` or `#` encoded too, so no field hides in
 a value), and only when it has no authority (`mailto://…`) and its address
 part and its `to`, `cc` and `bcc` fields are nothing but addresses (none, or
 comma-separated `local@domain`s, valid UTF-8, not starting with `/`, with no
 control character, Unicode blank, invisible character such as a bidi
 override, a zero-width space or a variation selector, or delimiter such as
 CR, LF, `&`, `;`, `?` or `\`, even encoded; other Unicode, as in an
-internationalised address, is kept); a subject or body holding `&` or `?`
-once decoded SHALL be dropped, since a mail app that decodes before it splits
-would read another field there, and so SHALL a subject that is not valid
+internationalised address, is kept); a subject or body holding `&`, `;` or `?`
+once decoded, or still holding a `%XX` escape (encoded twice), SHALL be
+dropped, since a mail app that decodes before it splits (on `;` too, as some
+older parsers do), or decodes again, would read another field there, and so SHALL a subject that is not valid
 UTF-8 or holds a control character (CR and LF included), a line or paragraph
 separator (U+2028, U+2029) or an invisible character, and a body that is not
 valid UTF-8 or holds a control character other than CR, LF and tab, since a
@@ -396,7 +397,7 @@ and a control proving the check would see a script run.
 
 #### Scenario: A field hidden in a value or the fragment
 - **WHEN** the member clicks `mailto:rita@example.com?subject=hi#&attach=/etc/passwd` or `mailto:rita@example.com?subject=x;attach=/etc/passwd`
-- **THEN** the mail app gets `mailto:rita@example.com?subject=hi`, or `mailto:rita@example.com?subject=x%3Battach%3D%2Fetc%2Fpasswd`
+- **THEN** the mail app gets `mailto:rita@example.com?subject=hi`, or `mailto:rita@example.com` (that subject left out)
 
 #### Scenario: A header hidden in the address
 - **WHEN** the member clicks `mailto:rita@example.com%0D%0Abcc:evil@example.org` or `mailto:rita@example.com%26attach=/etc/passwd`
@@ -413,6 +414,10 @@ and a control proving the check would see a script run.
 #### Scenario: A header hidden in the subject
 - **WHEN** a mail link reads `mailto:rita@x.example?subject=Hi%0D%0ABcc:%20evil@x.example&body=Thanks`, or its body holds a NUL
 - **THEN** the subject (or the body) is left out and the rest opens; a body over several lines, with tabs, is kept as written
+
+#### Scenario: A field behind a semicolon or a second encoding
+- **WHEN** a mail link reads `mailto:x@x.example?subject=x;attach=/etc/passwd`, or its subject is `Hi%250D%250ABcc:%20evil@x.example`
+- **THEN** the subject is left out and the rest opens, while a subject of `50%25%20off` is kept as "50% off"
 
 ### Requirement: Only offers that take effect
 The reader SHALL offer "Always show images from <sender>" and its ⇧A only
