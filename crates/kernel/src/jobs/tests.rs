@@ -3858,10 +3858,18 @@ async fn a_jobs_transaction_allows_its_statements_five_minutes(db: PgPool) {
     .await;
     Worker::new(state.clone()).run_until_idle().await;
     assert_eq!(notes(&db, "test.probe").await, ["statement_timeout=5min"]);
-    // Only for that transaction: the connection it ran on is back to its own.
-    let after: String = sqlx::query_scalar("SELECT current_setting('statement_timeout')")
-        .fetch_one(&state.db)
-        .await
-        .unwrap();
-    assert_ne!(after, "5min");
+    // Only for that transaction: every connection of the pool, the one the
+    // job ran on among them, is back to its own limit (campbooks-cloud#256).
+    let size = state.db.options().get_max_connections();
+    let mut connections = Vec::new();
+    for _ in 0..size {
+        connections.push(state.db.acquire().await.unwrap());
+    }
+    for connection in &mut connections {
+        let after: String = sqlx::query_scalar("SELECT current_setting('statement_timeout')")
+            .fetch_one(&mut **connection)
+            .await
+            .unwrap();
+        assert_ne!(after, "5min");
+    }
 }
