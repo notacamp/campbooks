@@ -31,6 +31,12 @@ const ALL_SCOPES: &str = "workspaces:read workspaces:write workspaces:admin";
 
 /// How long a test waits for a frame it expects.
 const WAIT: Duration = Duration::from_secs(10);
+/// Longest any one request or sequencer run may take: a stall fails at once,
+/// naming the step, instead of surfacing later as an expired token.
+const STEP: Duration = Duration::from_mins(1);
+/// The lifetime of the tokens the tests use: far beyond any test, so a token
+/// expires only when a test means it to (campbooks-cloud#249).
+const TOKEN_LIFETIME: u64 = 24 * 3600;
 
 /// Registered clients: each acts for a person, until removed.
 #[derive(Debug, Default)]
@@ -188,12 +194,11 @@ impl Replica {
             }
             None => Body::empty(),
         };
-        let response = self
-            .app
-            .clone()
-            .oneshot(request.body(body).unwrap())
-            .await
-            .unwrap();
+        let response =
+            tokio::time::timeout(STEP, self.app.clone().oneshot(request.body(body).unwrap()))
+                .await
+                .unwrap_or_else(|_| panic!("{method} {uri} did not answer within {STEP:?}"))
+                .unwrap();
         let status = response.status();
         let bytes = response.into_body().collect().await.unwrap().to_bytes();
         (
@@ -231,12 +236,15 @@ impl Replica {
         if let Some(id) = last_event_id {
             request = request.header("last-event-id", id);
         }
-        let response = self
-            .app
-            .clone()
-            .oneshot(request.body(Body::empty()).unwrap())
-            .await
-            .unwrap();
+        let response = tokio::time::timeout(
+            STEP,
+            self.app
+                .clone()
+                .oneshot(request.body(Body::empty()).unwrap()),
+        )
+        .await
+        .unwrap_or_else(|_| panic!("opening {uri} did not answer within {STEP:?}"))
+        .unwrap();
         if response.status() != StatusCode::OK {
             let status = response.status();
             let bytes = response.into_body().collect().await.unwrap().to_bytes();
@@ -260,7 +268,9 @@ impl Replica {
 
     /// Run the sequencer (and anything else queued).
     async fn sequence(&self) {
-        Worker::new(self.state.clone()).run_until_idle().await;
+        tokio::time::timeout(STEP, Worker::new(self.state.clone()).run_until_idle())
+            .await
+            .unwrap_or_else(|_| panic!("the sequencer did not finish within {STEP:?}"));
     }
 }
 
@@ -405,6 +415,7 @@ impl World {
 
     fn token(&self, sub: &str, scopes: &str) -> String {
         let mut claims = self.idp.claims(scopes);
+        claims["exp"] = (jsonwebtoken_now() + TOKEN_LIFETIME).into();
         claims["sub"] = sub.into();
         claims["email"] = format!("{sub}@example.com").into();
         claims["email_verified"] = true.into();
@@ -415,6 +426,7 @@ impl World {
     /// A token of client `id`, bound to `workspace`.
     fn client(&self, id: &str, workspace: &str) -> String {
         let mut claims = self.idp.claims(ALL_SCOPES);
+        claims["exp"] = (jsonwebtoken_now() + TOKEN_LIFETIME).into();
         let object = claims.as_object_mut().unwrap();
         object.remove("sub");
         object.insert("azp".into(), id.into());
@@ -2103,6 +2115,7 @@ impl World {
     /// A client token of `id` for `workspace` with `scopes`.
     fn client_with(&self, id: &str, workspace: &str, scopes: &str) -> String {
         let mut claims = self.idp.claims(scopes);
+        claims["exp"] = (jsonwebtoken_now() + TOKEN_LIFETIME).into();
         let object = claims.as_object_mut().unwrap();
         object.remove("sub");
         object.insert("azp".into(), id.into());
