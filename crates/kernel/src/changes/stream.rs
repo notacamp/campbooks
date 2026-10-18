@@ -566,6 +566,16 @@ fn opens_limit(config: &crate::config::ChangesConfig) -> Option<Limit> {
     })
 }
 
+/// Count an open against `principal`'s limit of opens per window.
+async fn count_open(state: &AppState, principal: &Principal) -> Result<(), Error> {
+    if let Some(limit) = opens_limit(&state.config.changes) {
+        // Counted per caller, whatever happens in the workspace.
+        let key = RateKey::text(&caller(principal));
+        state.rate_limits.check(&state.db, &limit, &key).await?;
+    }
+    Ok(())
+}
+
 /// `subscription`'s caller's access in its workspace now, asked once the
 /// open has read its head: the request resolved it before, and a removal
 /// numbered in between falls in no range the stream reads (it reads
@@ -611,11 +621,7 @@ pub async fn open(
     let config = &state.config.changes;
     let workspace = subscription.workspace.to_string();
     let binding = binding(&workspace, &subscription.principal);
-    if let Some(limit) = opens_limit(config) {
-        // Counted per caller, whatever happens in the workspace.
-        let key = RateKey::text(&caller(&subscription.principal));
-        state.rate_limits.check(&state.db, &limit, &key).await?;
-    }
+    count_open(state, &subscription.principal).await?;
     let slot = state
         .changes
         .admit(&subscription.principal.subject)
