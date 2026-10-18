@@ -80,6 +80,11 @@ All notable changes to Campbooks Next are documented here. The format follows
 
 ### Fixed
 
+- **Desktop app: links stay where they belong.** On macOS and Linux the main window no
+  longer treats `tauri.localhost` as the app (there it is the computer itself, where any
+  local program could answer), only on Windows and Android, where the app is served from
+  it. Mail links keep their spaces as `%20` instead of turning them into `+`, which mail
+  apps showed as plus signs; files (`attach=`) are still never handed to the mail app.
 - **Home's Forward never offers a sender under review or a no-reply address.** The picker
   lists only people it is safe to write to: the server leaves out no-reply addresses,
   senders whose newest mail fails their sender checks or pretends to be them, and

@@ -19,7 +19,12 @@ import { fileURLToPath } from "node:url";
 import { webkit, type Browser, type Page } from "playwright";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import { frameDocument, framePolicy, SANDBOX } from "../../src/lib/ui/safe-html/frame.ts";
+import {
+  frameDocument,
+  framePolicy,
+  REFERRER_POLICY,
+  SANDBOX,
+} from "../../src/lib/ui/safe-html/frame.ts";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const read = (file: string) => readFileSync(path.join(here, file), "utf8");
@@ -70,12 +75,24 @@ const HOSTILE = `
 <meta http-equiv="refresh" content="0;url=https://evil.example/refresh">
 `;
 
+/** How a test frames the mail: as the app does, unless a control says otherwise. */
+interface Framing {
+  /** The frame's sandbox (the app's, `SANDBOX`). */
+  sandbox: string;
+  /** Whether the frame's document carries its own policy (it does in the app). */
+  framePolicy: boolean;
+}
+
+const AS_THE_APP: Framing = { sandbox: SANDBOX, framePolicy: true };
+
 /** The page a test opens: the frame, as the app renders it, and nothing else. */
-function harness(html: string, remoteImages: boolean): string {
-  const srcdoc = frameDocument(html, remoteImages)
-    .replaceAll("&", "&amp;")
-    .replaceAll('"', "&quot;");
-  return `<!doctype html><html><head><meta charset="utf-8"><title>Mail frame</title></head><body style="margin: 0"><iframe id="mail" title="Message" sandbox="${SANDBOX}" referrerpolicy="no-referrer" style="width: 720px; height: 1600px; border: 0" srcdoc="${srcdoc}"></iframe></body></html>`;
+function harness(html: string, remoteImages: boolean, framing: Framing): string {
+  const document = frameDocument(html, remoteImages);
+  const shown = framing.framePolicy
+    ? document
+    : document.replace(/<meta http-equiv="Content-Security-Policy"[^>]*>/u, "");
+  const srcdoc = shown.replaceAll("&", "&amp;").replaceAll('"', "&quot;");
+  return `<!doctype html><html><head><meta charset="utf-8"><title>Mail frame</title></head><body style="margin: 0"><iframe id="mail" title="Message" sandbox="${framing.sandbox}" referrerpolicy="${REFERRER_POLICY}" style="width: 720px; height: 1600px; border: 0" srcdoc="${srcdoc}"></iframe></body></html>`;
 }
 
 let browser: Browser;
@@ -92,10 +109,11 @@ beforeAll(async () => {
       response.writeHead(404).end();
       return;
     }
+    // No policy at all for a control that asks for none ("").
     response
       .writeHead(200, {
         "content-type": "text/html; charset=utf-8",
-        "content-security-policy": served.csp,
+        ...(served.csp === "" ? {} : { "content-security-policy": served.csp }),
       })
       .end(served.html);
   });
@@ -121,10 +139,15 @@ interface Opened {
 let opened = 0;
 
 /** Open `html` in the frame under `csp`, remote images allowed or not. */
-async function open(csp: string, html: string, remoteImages: boolean): Promise<Opened> {
+async function open(
+  csp: string,
+  html: string,
+  remoteImages: boolean,
+  framing: Framing = AS_THE_APP,
+): Promise<Opened> {
   opened += 1;
   const at = `/mail-${String(opened)}`;
-  pages.set(at, { html: harness(html, remoteImages), csp });
+  pages.set(at, { html: harness(html, remoteImages, framing), csp });
   const context = await browser.newContext();
   const requested: string[] = [];
   const popups: Page[] = [];
@@ -174,6 +197,20 @@ describe("the frame's own layers", () => {
     expect(flags).not.toContain("allow-scripts");
     expect(flags).not.toContain("allow-forms");
     expect(flags.filter((flag) => flag.startsWith("allow-top-navigation"))).toEqual([]);
+  });
+
+  it("would see a script run: the probe works (a control, never the app's frame)", async () => {
+    // The same harness and mail with `allow-scripts`, no page policy and no
+    // frame policy: the hostile markup's scripts run and set the flag the
+    // "runs no script" tests look for, so their silence means something.
+    const { page } = await open("", HOSTILE, true, {
+      sandbox: `${SANDBOX} allow-scripts`,
+      framePolicy: false,
+    });
+    await page.frameLocator("#mail").locator("#script-link").click();
+    await page.waitForTimeout(800);
+    expect(await page.evaluate("window.pwned")).toEqual(expect.any(String));
+    await page.context().close();
   });
 
   it("allows nothing but data: images until Show images", () => {

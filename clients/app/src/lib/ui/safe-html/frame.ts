@@ -28,6 +28,9 @@ export function framePolicy(remoteImages: boolean): string {
  */
 export const SANDBOX = "allow-same-origin allow-popups allow-popups-to-escape-sandbox";
 
+/** The frame's referrer policy: a link or image never tells where it was seen. */
+export const REFERRER_POLICY = "no-referrer";
+
 /**
  * The sandbox for mail that may be phishing: no popups either, so a link
  * cannot open anything at all (there is no other way out of the frame).

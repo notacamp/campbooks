@@ -16,36 +16,73 @@ const MAILTO_FIELDS: [&str; 5] = ["to", "cc", "bcc", "subject", "body"];
 
 /// What a link may open outside the app: a web link as it is, a mail link
 /// with only [`MAILTO_FIELDS`], else nothing.
+///
+/// A mail link's fields are kept as written, still percent-encoded (the
+/// parser has encoded anything a query may not hold, a space as `%20`, a
+/// line break as `%0D%0A`), never decoded and encoded again: form encoding
+/// would write a space as `+`, which a mail app shows as a plus (RFC 6068
+/// reads `+` literally).
 pub fn outside(url: &Url) -> Option<String> {
     match url.scheme() {
         "https" | "http" => Some(url.as_str().to_owned()),
         "mailto" => {
-            let kept: Vec<(String, String)> = url
-                .query_pairs()
-                .filter(|(key, _)| MAILTO_FIELDS.contains(&key.to_ascii_lowercase().as_str()))
-                .map(|(key, value)| (key.into_owned(), value.into_owned()))
+            let kept: Vec<&str> = url
+                .query()
+                .unwrap_or_default()
+                .split('&')
+                .filter(|field| {
+                    let key = field.split_once('=').map_or(*field, |(key, _)| key);
+                    MAILTO_FIELDS.contains(&key.to_ascii_lowercase().as_str())
+                })
                 .collect();
             let mut clean = url.clone();
-            clean.set_query(None);
-            if !kept.is_empty() {
-                clean.query_pairs_mut().extend_pairs(kept);
-            }
+            clean.set_query((!kept.is_empty()).then(|| kept.join("&")).as_deref());
             Some(clean.into())
         }
         _ => None,
     }
 }
 
-/// Whether the main webview may load `url` itself: the app's own pages
-/// (`tauri://localhost`, or `http(s)://tauri.localhost` on Windows), the mail
-/// frame's `about:srcdoc` (some engines ask about frames too), and in a
-/// debug build the dev server (`dev`).
+/// What the build may treat as the app's own pages besides
+/// `tauri://localhost`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Build {
+    /// `http(s)://tauri.localhost` is the app: on Windows and Android, where
+    /// the webview serves the app from it. Elsewhere `*.localhost` is the
+    /// machine itself, where any local process could answer and pass for
+    /// the app (campbooks-cloud#243).
+    pub localhost_app: bool,
+    /// A debug build, which may load the dev server.
+    pub debug: bool,
+}
+
+impl Build {
+    /// This build.
+    pub const CURRENT: Self = Self {
+        localhost_app: cfg!(any(windows, target_os = "android")),
+        debug: cfg!(debug_assertions),
+    };
+}
+
+/// Whether the main webview may load `url` itself ([`inside_for`] this
+/// build).
 pub fn inside(url: &Url, dev: Option<&Url>) -> bool {
+    inside_for(url, dev, Build::CURRENT)
+}
+
+/// Whether the main webview of `build` may load `url` itself: the app's own
+/// pages (`tauri://localhost`, and `http(s)://tauri.localhost` where the
+/// build serves the app from it), the mail frame's `about:srcdoc` (some
+/// engines ask about frames too), and in a debug build only the dev server
+/// (`dev`).
+pub fn inside_for(url: &Url, dev: Option<&Url>, build: Build) -> bool {
     match url.scheme() {
         "tauri" => url.host_str() == Some("localhost"),
-        "http" | "https" if url.host_str() == Some("tauri.localhost") => true,
+        "http" | "https" if build.localhost_app && url.host_str() == Some("tauri.localhost") => {
+            true
+        }
         "about" => matches!(url.path(), "srcdoc" | "blank"),
-        _ => dev.is_some_and(|dev| dev.origin() == url.origin()),
+        _ => build.debug && dev.is_some_and(|dev| dev.origin() == url.origin()),
     }
 }
 
@@ -80,6 +117,32 @@ mod tests {
     }
 
     #[test]
+    fn a_mail_link_keeps_its_spaces_and_line_breaks_encoded() {
+        // A space stays `%20` (RFC 6068 reads `+` as a plus), a literal plus
+        // stays a plus, a line break stays `%0D%0A`; `attach=` still goes.
+        let link = outside(&parse(
+            "mailto:hello@weekly-ledger.example?Subject=Tax%20dates%2Bfees\
+             &body=Hi%20Rita,%0D%0AThanks&attach=/etc/passwd&x-mailer=a+b",
+        ));
+        assert_eq!(
+            link.as_deref(),
+            Some(
+                "mailto:hello@weekly-ledger.example?Subject=Tax%20dates%2Bfees\
+                 &body=Hi%20Rita,%0D%0AThanks"
+            )
+        );
+        let spaced = outside(&parse(
+            "mailto:hello@weekly-ledger.example?subject=Tax dates",
+        ));
+        assert_eq!(
+            spaced.as_deref(),
+            Some("mailto:hello@weekly-ledger.example?subject=Tax%20dates")
+        );
+        let link = link.unwrap_or_default();
+        assert!(!link.contains('+') && !link.contains('\r') && !link.contains('\n'));
+    }
+
+    #[test]
     fn a_mail_link_keeps_only_its_mail_fields() {
         let link = outside(&parse(
             "mailto:hello@weekly-ledger.example?subject=Hi&attach=/etc/passwd&body=Thanks",
@@ -94,9 +157,63 @@ mod tests {
         assert_eq!(bare.as_deref(), Some("mailto:hello@weekly-ledger.example"));
     }
 
+    /// Windows and Android (the app on `tauri.localhost`), the other
+    /// platforms, each as a debug and a release build.
+    const WINDOWS: Build = Build {
+        localhost_app: true,
+        debug: false,
+    };
+    const MAC_OR_LINUX: Build = Build {
+        localhost_app: false,
+        debug: false,
+    };
+
+    #[test]
+    fn tauri_localhost_is_the_app_only_where_the_app_is_served_from_it() {
+        for url in [
+            "http://tauri.localhost/inbox",
+            "https://tauri.localhost/inbox",
+        ] {
+            assert!(inside_for(&parse(url), None, WINDOWS), "{url}");
+            // On macOS and Linux it is the machine: a local process could
+            // answer it.
+            assert!(!inside_for(&parse(url), None, MAC_OR_LINUX), "{url}");
+        }
+        for build in [WINDOWS, MAC_OR_LINUX] {
+            assert!(inside_for(
+                &parse("tauri://localhost/index.html"),
+                None,
+                build
+            ));
+        }
+        assert_eq!(
+            Build::CURRENT.localhost_app,
+            cfg!(any(windows, target_os = "android"))
+        );
+    }
+
+    #[test]
+    fn only_a_debug_build_loads_the_dev_server() {
+        let dev = parse("http://localhost:5173/");
+        let page = parse("http://localhost:5173/inbox");
+        for build in [WINDOWS, MAC_OR_LINUX] {
+            assert!(!inside_for(&page, Some(&dev), build), "{build:?}");
+            let debug = Build {
+                debug: true,
+                ..build
+            };
+            assert!(inside_for(&page, Some(&dev), debug), "{debug:?}");
+            assert!(!inside_for(
+                &parse("http://localhost:5174/"),
+                Some(&dev),
+                debug
+            ));
+        }
+        assert_eq!(Build::CURRENT.debug, cfg!(debug_assertions));
+    }
+
     #[test]
     fn the_main_webview_stays_on_the_app() {
-        let dev = parse("http://localhost:5173/");
         for url in [
             "tauri://localhost/index.html",
             "http://tauri.localhost/inbox",
@@ -104,9 +221,8 @@ mod tests {
             "about:srcdoc",
             "about:blank",
         ] {
-            assert!(inside(&parse(url), None), "{url}");
+            assert!(inside_for(&parse(url), None, WINDOWS), "{url}");
         }
-        assert!(inside(&parse("http://localhost:5173/inbox"), Some(&dev)));
         for url in [
             "https://weekly-ledger.example/",
             "http://localhost:5173/inbox",
@@ -116,7 +232,9 @@ mod tests {
             "data:text/html,hi",
             "file:///etc/passwd",
         ] {
-            assert!(!inside(&parse(url), None), "{url}");
+            for build in [WINDOWS, MAC_OR_LINUX] {
+                assert!(!inside_for(&parse(url), None, build), "{url}");
+            }
         }
     }
 

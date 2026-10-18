@@ -47,13 +47,8 @@ fn main_window(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
     else {
         return Err("tauri.conf.json has no main window".into());
     };
-    // The dev server, in a debug build only.
-    let dev = app
-        .config()
-        .build
-        .dev_url
-        .clone()
-        .filter(|_| cfg!(debug_assertions));
+    // The dev server: [`links::inside`] lets only a debug build load it.
+    let dev = app.config().build.dev_url.clone();
     tauri::WebviewWindowBuilder::from_config(app.handle(), &config)?
         .on_new_window(|url, _features| {
             links::open_outside(&url);
