@@ -274,7 +274,9 @@ builds that router with `kernel::operations::compose`.
 per-operation opt-out): the first request's response is stored in
 `kernel.idempotency` for 24 hours and replayed for an identical retry
 (`Idempotency-Replayed: true`); a different request with the same key is
-422, one still running is 409. Keys belong to the authenticated caller (a
+422, one still running is 409, and one whose process stopped without an answer
+is never run again (409 `idempotency_outcome_unknown` once abandoned). Keys
+belong to the authenticated caller (a
 person through one app: the web app and each app acting for them keep
 separate keys): row-level security admits a key only to a transaction
 naming its caller, which only the layer opens. Server errors and auth
