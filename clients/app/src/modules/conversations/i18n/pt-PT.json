@@ -80,7 +80,7 @@
       "cannot_authenticate": "As imagens continuam retidas: este fornecedor de email não partilha as verificações do remetente, por isso aqui não se pode confiar em nenhum remetente.",
       "not_checked": "As imagens esperam que o Scout verifique este email. Enquanto o Scout estiver desligado ou acima do limite diário, continuam retidas.",
       "rule_paused": "As imagens continuam retidas: a regra inteligente que confia neste remetente está em pausa ou à espera de um sim.",
-      "rule_too_broad": "As imagens continuam retidas: a regra inteligente para todo o domínio deste remetente confiaria em desconhecidos (qualquer pessoa pode enviar a partir dele), por isso não atua. Ainda podes confiar neste endereço."
+      "rule_too_broad": "As imagens continuam retidas: a regra inteligente para todo o domínio deste remetente confiaria em desconhecidos (qualquer pessoa pode enviar a partir dele), por isso não atua. Ainda pode confiar neste endereço."
     }
   },
   "toast": {
