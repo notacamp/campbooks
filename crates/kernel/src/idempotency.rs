@@ -585,26 +585,25 @@ const PURGE_BATCH: i32 = 5_000;
 
 /// Delete every key first used on a route of `workspace` (its
 /// `{workspace_id}` segment), expired or not, when the workspace is purged
-/// (campbooks-cloud#65). Runs in `tx`, which must work in `workspace`: keys
-/// stay their callers' (no workspace transaction reads or writes them), so
-/// the deletion goes through `kernel.purge_workspace_idempotency`, a
-/// definer function that refuses any other transaction and reads nothing
-/// back. Returns how many keys were deleted.
+/// (campbooks-cloud#65): [`PURGE_BATCH`] keys at a time, each batch in a
+/// short transaction of its own working in `workspace`. Keys stay their
+/// callers' (no workspace transaction reads or writes them), so the deletion
+/// goes through `kernel.purge_workspace_idempotency`, a definer function that
+/// refuses any other transaction and reads nothing back. Returns how many
+/// keys were deleted. Called by [`crate::purge::purge_workspace`].
 ///
 /// # Errors
-/// When the database fails, or refuses a transaction that does not work in
-/// `workspace`.
-pub async fn purge_workspace(
-    tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
-    workspace: &str,
-) -> Result<u64, sqlx::Error> {
+/// When the database fails.
+pub async fn purge_workspace(pool: &PgPool, workspace: &str) -> Result<u64, sqlx::Error> {
     let mut purged = 0_u64;
     loop {
+        let mut tx = crate::db::begin_in(pool, workspace).await?;
         let deleted: i64 = sqlx::query_scalar("SELECT kernel.purge_workspace_idempotency($1, $2)")
             .bind(workspace)
             .bind(PURGE_BATCH)
-            .fetch_one(&mut **tx)
+            .fetch_one(&mut *tx)
             .await?;
+        tx.commit().await?;
         purged += deleted.unsigned_abs();
         if deleted < i64::from(PURGE_BATCH) {
             return Ok(purged);

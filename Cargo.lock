@@ -695,6 +695,7 @@ dependencies = [
  "sqlx",
  "tokio",
  "tracing",
+ "tracing-subscriber",
  "utoipa",
  "utoipa-axum",
  "uuid",

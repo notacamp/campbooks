@@ -1385,18 +1385,25 @@ async fn a_workspace_routes_keys_name_it_and_go_with_its_purge(db: PgPool) {
     // In the workspace: its key goes, expired or not; the others stay, and
     // the transaction still sees no key at all.
     let mut tx = pool.begin_for(ws).await.unwrap();
-    assert_eq!(
-        crate::idempotency::purge_workspace(&mut tx, &ws.to_string())
-            .await
-            .unwrap(),
-        1
-    );
+    let deleted: i64 = sqlx::query_scalar(purge)
+        .bind(ws.to_string())
+        .fetch_one(&mut *tx)
+        .await
+        .unwrap();
+    assert_eq!(deleted, 1);
     let seen: i64 = sqlx::query_scalar("SELECT count(*) FROM kernel.idempotency")
         .fetch_one(&mut *tx)
         .await
         .unwrap();
     assert_eq!(seen, 0);
     tx.commit().await.unwrap();
+    assert_eq!(
+        crate::idempotency::purge_workspace(&pool, &ws.to_string())
+            .await
+            .unwrap(),
+        0,
+        "nothing left; the purge's own short transactions"
+    );
     assert_eq!(
         workspace_keys(&db).await,
         [

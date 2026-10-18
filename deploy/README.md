@@ -252,6 +252,59 @@ docker run --rm -v campbooks_blobs-data:/data -v "$PWD":/backup busybox:1.37.0-m
   tar czf /backup/blobs-data.tgz -C /data .
 ```
 
+### After restoring a backup: purge deleted workspaces again
+
+A restore brings every workspace back as it was when the backup was taken. That
+includes the ones deleted since, whether already purged or still in their 30-day grace
+period, with their members, their mail and their files. Delete each of them again before
+anyone signs in. Keep server logs at least as long as your oldest backup, since the logs
+are how you find them.
+
+1. **List them.** Search your logs from the backup's time onwards for two messages:
+   - `workspace purged`: the workspace was purged after the backup. The line holds the
+     workspace's id and the time, nothing else.
+   - `workspace deleted`: the workspace was deleted after the backup and may not have
+     been purged yet. Its line also holds the `purge_after` it was given.
+2. **Purge each again** from the restored database, giving the id twice as
+   confirmation:
+
+   ```sh
+   docker compose exec server campbooks-server workspaces purge-again <id> --confirm <id>
+   ```
+
+   - **If it was already deleted in the backup,** its purge is queued again, or, if a
+     purge is queued already, the command changes nothing and says when that purge runs.
+   - **If it was still live in the backup** (deleted after the backup was taken), the
+     command refuses at first. It prints only that the workspace is live, how many
+     members it has and when it was created, so a mistyped id costs nothing. Check those,
+     then run it again with `--not-deleted-in-backup`:
+
+     ```sh
+     docker compose exec server campbooks-server workspaces purge-again <id> --confirm <id> \
+       --not-deleted-in-backup [--purge-after <purge_after from its "workspace deleted" line>]
+     ```
+
+     The workspace is hidden at once, and its mailbox connections and app clients are
+     revoked at once. Everything else is purged at its purge time: an hour from now, or
+     the `--purge-after` you give, which cannot be sooner. Until then, a workspace deleted
+     by mistake can still be brought back by restoring again, though its mailboxes then
+     need reconnecting.
+   - **If the command says the workspace has no owner,** it changes nothing. Every
+     workspace keeps an owner, so this means the restored data is not what you expect:
+     do not edit the database by hand. Check that you restored the right backup, and if
+     it persists, open an issue with the command's output (it holds only ids, counts and
+     dates).
+   - **An id with no workspace** is reported as such and changes nothing.
+
+   Running the command twice queues a single purge. It logs one line, with the
+   workspace's id only, when it changes something.
+
+The server also records each purge in the database: a tombstone, so data that arrives
+for a purged workspace later is deleted by the hourly sweep. Those records are restored
+to the backup's moment along with everything else, which is why the log lines, not the
+database, tell you which workspaces went after it. There is no API for any of this; only
+the command does it.
+
 ## Monitoring
 
 Out of the box Campbooks exports nothing and opens no extra port. It writes JSON logs to

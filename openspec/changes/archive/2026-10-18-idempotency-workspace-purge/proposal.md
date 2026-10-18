@@ -14,8 +14,11 @@ unexpired: after a database restore, with the operator's `purge-again`
   when a key is taken, from the `{workspace_id}` segment of the matched
   route alone (the same segment a replay's access check reads), never from
   the request's body or query. Routes outside a workspace record none.
-- **The purge deletes them.** `workspaces.purge_workspace` deletes the
-  workspace's keys, expired or not, in its own transaction, through
+- **The purge deletes them.** The batched purge of a workspace's kernel
+  rows (`kernel::purge::purge_workspace`, run by `workspaces.purge_workspace`
+  and by the hourly sweep of tombstones) deletes the workspace's keys,
+  expired or not, in short transactions of their own working in the
+  workspace, through
   `kernel.purge_workspace_idempotency(workspace, batch)`. This is a
   `SECURITY DEFINER` function owned by `campbooks_definer`, like the
   rate-limit and rule-resign functions. It refuses any transaction that
@@ -27,7 +30,9 @@ unexpired: after a database restore, with the operator's `purge-again`
 
 ## Impact
 
-- Spec: access (Idempotency keys belong to their caller).
+- Specs: access (Idempotency keys belong to their caller), events-and-jobs
+  (Sweeping purged workspaces: the sweep deletes a tombstoned workspace's
+  keys too).
 - Code:
   - kernel `idempotency` (the claim records the workspace;
     `purge_workspace`);
