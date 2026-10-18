@@ -277,6 +277,22 @@ function demoMessages(me: string, images: string): DemoMessage[] {
       html: `<head><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>Quay Office</title><style>p{font-family:Georgia,serif}</style><p>Hello Sam,</p><p>Your berth at the harbourlight pontoon is kept for next season. Nothing to do until March.</p><p>Quay Office</p>`,
     },
     {
+      // HTML alone and long (over 256 KiB): read in time, but a reply or
+      // forward quotes only its first part, and says so
+      // (campbooks-cloud#255; the quote-long-html recording). Its words never say
+      // "harbourlight": search-head-html finds the berth email by that word alone.
+      from: "Quay Office <office@quay-moorings.example>",
+      to: me,
+      subject: "Tide tables for the season",
+      hoursAgo: 23,
+      labels: ["INBOX", "CATEGORY_UPDATES"],
+      html: `<div style="font-family:Georgia,serif"><p>Hello Sam,</p><p>Here are the tide tables at the quay for the whole season.</p><table>${Array.from(
+        { length: 3000 },
+        (_, day) =>
+          `<tr><td>Day ${String(day + 1)}</td><td>High water 06:12 and 18:40</td><td>Low water 00:05 and 12:27</td></tr>`,
+      ).join("")}</table><p>Quay Office</p></div>`,
+    },
+    {
       from: "Accounts <no-reply@accounts.example>",
       to: me,
       subject: "New sign-in to your account from Linux",

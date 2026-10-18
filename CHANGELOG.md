@@ -223,6 +223,11 @@ All notable changes to Campbooks Next are documented here. The format follows
   batch, say) is paid back before more is spent. A large archive no longer holds thousands
   of units it never uses, or waits behind smaller syncs, and every unit stays counted
   whatever rate is configured.
+- **A long email's quote says it holds only the first part.** Replying to or forwarding an
+  email that came as long HTML (over 256 KiB) quoted only its beginning without a word;
+  the composer now says "This email is long: the quote holds its first part.", and the
+  reply dialog says so too. When the dialog's preview shows only the start of a quote, it
+  says the reply quotes all of it.
 
 ### Added
 

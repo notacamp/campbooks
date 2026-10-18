@@ -595,7 +595,9 @@
     "to": "À {{recipient}}",
     "replyToElsewhere": "Les réponses vont à {{recipient}}, pas à l’expéditeur {{sender}}. Vérifiez avant d’envoyer.",
     "readingQuote": "Lecture de l’e-mail pour le citer…",
-    "quoteUnread": "Impossible de lire l’e-mail auquel vous répondez : la citation ne peut pas s’afficher. Rien ne peut être envoyé tant qu’elle n’est pas affichée."
+    "quoteUnread": "Impossible de lire l’e-mail auquel vous répondez : la citation ne peut pas s’afficher. Rien ne peut être envoyé tant qu’elle n’est pas affichée.",
+    "quoteCut": "Cet e-mail est long : votre réponse en cite le début.",
+    "quoteShortened": "Affiché en partie : votre réponse le cite en entier."
   },
   "smartRule": {
     "tag": "Règle intelligente",
