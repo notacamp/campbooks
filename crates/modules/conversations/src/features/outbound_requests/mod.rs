@@ -8,6 +8,11 @@
 //!   outgoing document `release_send` recorded, and its author may still
 //!   send it (a member, allowed to send from the inbox). The connector sends
 //!   that document, never one an event names.
+//! - Both are bound (campbooks-cloud#227): the stored send by the MAC
+//!   `release_send` wrote with it, a recorded change request by the MAC
+//!   `conversation::request` wrote with it, under a key the database never
+//!   holds. One that does not verify (planted or edited by SQL, or written
+//!   by an older version) does not stand.
 //! - A requested change stands only when this module recorded it, under
 //!   the id of the event that carried it, for that conversation and inbox
 //!   (`conversation::request` records every request it publishes). A member's
@@ -25,6 +30,7 @@ use serde::Deserialize as _;
 use sqlx::{PgConnection, types::Uuid};
 
 use crate::{
+    domain::binding,
     events::RequestedItem,
     features::release_send::author_may_send,
     model::{ConversationId, DraftId, DraftState, InboxId, SendId},
@@ -71,6 +77,28 @@ impl OutboundRequests for StoredRequests {
             else {
                 return Ok(None);
             };
+            // Bound by the release that wrote it (campbooks-cloud#227): a
+            // send planted or edited by SQL does not verify.
+            let mac: Option<Vec<u8>> =
+                sqlx::query_scalar("SELECT send_mac FROM conversations.drafts WHERE id = $1")
+                    .bind(draft.id)
+                    .fetch_one(&mut *conn)
+                    .await?;
+            let stored = binding::StoredSend {
+                workspace,
+                send: SendId::from(send),
+                inbox: draft.inbox,
+                author: draft.author,
+                document: &message,
+            };
+            if !stored.holds(&state.binding, mac.as_deref()) {
+                tracing::warn!(
+                    %workspace,
+                    %send,
+                    "a stored send is not bound to the release that wrote it; it is not sent"
+                );
+                return Ok(None);
+            }
             if !author_may_send(state, conn, workspace, draft.author, draft.id).await? {
                 return Ok(None);
             }
@@ -83,8 +111,9 @@ impl OutboundRequests for StoredRequests {
 
     fn changes_standing<'a>(
         &'a self,
+        state: &'a AppState,
         conn: &'a mut PgConnection,
-        _workspace: WorkspaceId,
+        workspace: WorkspaceId,
         request: Uuid,
         inbox: Uuid,
         conversation: Uuid,
@@ -100,9 +129,35 @@ impl OutboundRequests for StoredRequests {
             )
             .fetch_optional(&mut *conn)
             .await?;
-            let recorded: Vec<RequestedItem> = recorded
-                .and_then(|items| Vec::<RequestedItem>::deserialize(&items).ok())
-                .unwrap_or_default();
+            let Some(recorded) = recorded else {
+                return Ok(vec![false; items.len()]);
+            };
+            let recorded: Vec<RequestedItem> =
+                Vec::<RequestedItem>::deserialize(&recorded).unwrap_or_default();
+            // Bound where it was recorded (campbooks-cloud#227): a request
+            // planted or edited by SQL does not verify, and none of it
+            // stands.
+            let mac: Option<Vec<u8>> =
+                sqlx::query_scalar("SELECT mac FROM conversations.change_requests WHERE id = $1")
+                    .bind(request)
+                    .fetch_one(&mut *conn)
+                    .await?;
+            let bound = binding::ChangeRequest {
+                workspace,
+                request,
+                inbox: InboxId::from(inbox),
+                conversation: ConversationId::from(conversation),
+                items: &recorded,
+            };
+            if !bound.holds(&state.binding, mac.as_deref())? {
+                tracing::warn!(
+                    %workspace,
+                    %request,
+                    "a recorded change request is not bound to the request that made it; \
+                     its changes are not made"
+                );
+                return Ok(vec![false; items.len()]);
+            }
             Ok(items
                 .iter()
                 .map(|item| {

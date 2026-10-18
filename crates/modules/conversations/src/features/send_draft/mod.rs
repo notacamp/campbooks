@@ -21,6 +21,7 @@ use utoipa::ToSchema;
 
 use crate::{
     domain::{
+        binding,
         drafts::{self, DraftView, MAX_ATTACHMENT_BYTES, attachment_bytes, valid_address},
         paths::DraftPath,
     },
@@ -137,6 +138,7 @@ pub async fn send(
     )
     .fetch_one(&mut *tx)
     .await?;
+    bind_request(&state, &mut tx, access, &row, generation).await?;
     campbooks_kernel::jobs::enqueue_to::<ReleaseSend>(
         &mut tx,
         &ReleaseSendPayload {
@@ -153,6 +155,43 @@ pub async fn send(
         .view()?;
     tx.commit().await?;
     Ok((StatusCode::ACCEPTED, Json(draft)))
+}
+
+/// Bind the author's request to send `row` at `generation` (scheduled in
+/// `tx`) with a MAC the database cannot forge (campbooks-cloud#227):
+/// `release_send` releases only a draft whose content, recipients, inbox,
+/// author and generation are still the ones signed here. Without the
+/// instance secret there is no key, and nothing is scheduled.
+async fn bind_request(
+    state: &AppState,
+    tx: &mut sqlx::PgConnection,
+    access: &campbooks_kernel::tenancy::Access,
+    row: &drafts::DraftRow,
+    generation: i32,
+) -> Result<()> {
+    let content = binding::content_hash(row)?;
+    let request = binding::SendRequest {
+        workspace: access.workspace,
+        draft: row.id,
+        generation,
+        author: access.user,
+        inbox: row.inbox_id,
+        content: &content,
+    };
+    let Some(mac) = request.sign(&state.binding) else {
+        tracing::warn!(
+            workspace = %access.workspace,
+            draft = %row.id,
+            "a send was refused: there is no key to bind it with (CAMPBOOKS_SECRET_KEY is unset)"
+        );
+        return Err(Error::internal("sends are not bound: no instance secret"));
+    };
+    sqlx::query("UPDATE conversations.drafts SET request_mac = $2 WHERE id = $1")
+        .bind(row.id)
+        .bind(mac)
+        .execute(&mut *tx)
+        .await?;
+    Ok(())
 }
 
 /// Take a send back within its undo window.
@@ -201,6 +240,11 @@ pub async fn cancel(
             )
             .execute(&mut *tx)
             .await?;
+            // The request it was sent with no longer stands.
+            sqlx::query("UPDATE conversations.drafts SET request_mac = NULL WHERE id = $1")
+                .bind(id)
+                .execute(&mut *tx)
+                .await?;
         }
         DraftState::Sending => return Err(Error::Conflict(crate::MESSAGES.reason("too_late"))),
         // Not sending: nothing to take back.

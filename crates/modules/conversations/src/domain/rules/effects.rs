@@ -3,7 +3,7 @@
 //! `conversation_changed`, and a `changes_requested` per kind of change so
 //! the provider makes it too.
 
-use campbooks_kernel::{EventBus, Result};
+use campbooks_kernel::{EventBus, Result, binding::Binding};
 use serde_json::json;
 use sqlx::{PgConnection, Postgres, Transaction, types::Uuid};
 
@@ -41,6 +41,7 @@ impl Effects {
     pub async fn publish(
         self,
         tx: &mut Transaction<'_, Postgres>,
+        binding: &Binding,
         events: &EventBus,
         at: (&str, InboxId, ConversationId),
         announce: bool,
@@ -59,7 +60,7 @@ impl Effects {
         };
         for (messages, change) in self.requests {
             changed.provider_message_ids = messages;
-            request(events, tx, &changed, &change).await?;
+            request(binding, events, tx, &changed, &change).await?;
         }
         if announce {
             changed.provider_message_ids = provider_message_ids(tx, conversation).await?;

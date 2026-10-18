@@ -129,7 +129,14 @@ impl JobHandler for SyncStream {
         // late after a long pause.
         let retention = TimeDelta::days(i64::from(self.deps.config.batch_retention_days));
         outbound::expire(ctx.pool(), workspace, target.stream, now - retention, now).await?;
-        let backlog = outbound::backlog(ctx.pool(), workspace, target.stream, now).await?;
+        let backlog = outbound::backlog(
+            ctx.pool(),
+            &ctx.state().binding,
+            workspace,
+            target.stream,
+            now,
+        )
+        .await?;
         let read = match target.provider {
             Provider::Google => {
                 self.run_gmail(ctx, workspace, &target, &token, &backlog, now)

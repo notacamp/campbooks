@@ -131,6 +131,7 @@ async fn standing(
     let mut tx = kit.state.db.begin_for(workspace).await.unwrap();
     let standing = outbound_requests()
         .changes_standing(
+            &kit.state,
             &mut tx,
             workspace,
             request.parse().unwrap(),
@@ -378,4 +379,179 @@ async fn trash_spam_and_flags_stand_as_requested(db: PgPool) {
             );
         }
     }
+}
+
+/// Run `sql` binding `send` as the runtime role in `workspace`: what an
+/// attacker with SQL in the workspace can do.
+async fn as_runtime(kit: &Kit, workspace: WorkspaceId, sql: &'static str, send: &str) {
+    let mut tx = kit.state.db.begin_for(workspace).await.unwrap();
+    sqlx::query(sql)
+        .bind(send.parse::<Uuid>().unwrap())
+        .execute(&mut *tx)
+        .await
+        .unwrap();
+    tx.commit().await.unwrap();
+}
+
+/// campbooks-cloud#227: a stored send stands only with the binding
+/// `release_send` wrote for it, over its send id, inbox, author and
+/// document. SQL can edit the row, or plant one, but not make it verify.
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_stored_send_stands_only_while_its_binding_holds(db: PgPool) {
+    let kit = Kit::new(db).await;
+    let (workspace, inbox, sam) = kit.sams_inbox().await;
+    let event = released(&kit, workspace, &sam).await;
+    let send = event["send_id"].as_str().unwrap().to_owned();
+    assert!(stored(&kit, workspace, &send).await.is_some());
+    let mac: Vec<u8> =
+        sqlx::query_scalar("SELECT send_mac FROM conversations.drafts WHERE send_id = $1::uuid")
+            .bind(&send)
+            .fetch_one(&kit.db)
+            .await
+            .unwrap();
+
+    // No binding, or a made-up one.
+    for tamper in [
+        "UPDATE conversations.drafts SET send_mac = NULL WHERE send_id = $1",
+        "UPDATE conversations.drafts SET send_mac = '\\x01'::bytea || sha256('x') WHERE send_id = $1",
+    ] {
+        as_runtime(&kit, workspace, tamper, &send).await;
+        assert_eq!(stored(&kit, workspace, &send).await, None, "{tamper}");
+        let mut tx = kit.state.db.begin_for(workspace).await.unwrap();
+        sqlx::query("UPDATE conversations.drafts SET send_mac = $2 WHERE send_id = $1::uuid")
+            .bind(&send)
+            .bind(&mac)
+            .execute(&mut *tx)
+            .await
+            .unwrap();
+        tx.commit().await.unwrap();
+        assert!(stored(&kit, workspace, &send).await.is_some());
+    }
+
+    // Another document (any blob the workspace holds), another author or
+    // another inbox, with the binding kept: none verifies.
+    let other = kit
+        .state
+        .blobs
+        .put(
+            &workspace.to_string(),
+            b"{\"to\":[]}".to_vec(),
+            "application/json",
+        )
+        .await
+        .unwrap();
+    let mut tx = kit.state.db.begin_for(workspace).await.unwrap();
+    sqlx::query("UPDATE conversations.drafts SET send_document = $2 WHERE send_id = $1::uuid")
+        .bind(&send)
+        .bind(serde_json::to_value(&other).unwrap())
+        .execute(&mut *tx)
+        .await
+        .unwrap();
+    tx.commit().await.unwrap();
+    assert_eq!(stored(&kit, workspace, &send).await, None);
+    let mut tx = kit.state.db.begin_for(workspace).await.unwrap();
+    sqlx::query("UPDATE conversations.drafts SET send_document = $2 WHERE send_id = $1::uuid")
+        .bind(&send)
+        .bind(event["message"].clone())
+        .execute(&mut *tx)
+        .await
+        .unwrap();
+    tx.commit().await.unwrap();
+    assert!(stored(&kit, workspace, &send).await.is_some());
+
+    let (_, leo) = kit.member("leo", workspace);
+    kit.add_to_inbox(inbox, leo, crate::model::InboxRole::Manager)
+        .await;
+    let mut tx = kit.state.db.begin_for(workspace).await.unwrap();
+    sqlx::query("UPDATE conversations.drafts SET author = $2 WHERE send_id = $1::uuid")
+        .bind(&send)
+        .bind(leo)
+        .execute(&mut *tx)
+        .await
+        .unwrap();
+    tx.commit().await.unwrap();
+    assert_eq!(stored(&kit, workspace, &send).await, None);
+
+    // A send planted from scratch, copying the real one's document and
+    // binding under a send id of its own.
+    let planted = Uuid::now_v7().to_string();
+    let mut tx = kit.state.db.begin_for(workspace).await.unwrap();
+    sqlx::query(
+        "INSERT INTO conversations.drafts
+             (id, workspace_id, inbox_id, author, kind, state, send_id, send_document, send_mac)
+         SELECT $1, workspace_id, inbox_id, author, 'new', 'sending', $2::uuid, send_document,
+                send_mac
+           FROM conversations.drafts WHERE send_id = $3::uuid",
+    )
+    .bind(Uuid::now_v7())
+    .bind(&planted)
+    .bind(&send)
+    .execute(&mut *tx)
+    .await
+    .unwrap();
+    tx.commit().await.unwrap();
+    assert_eq!(stored(&kit, workspace, &planted).await, None);
+}
+
+/// campbooks-cloud#227: a recorded change request stands only with the
+/// binding `conversation::request` wrote for it. Edited items, a planted
+/// row (even with a real request's binding) or no binding: nothing stands.
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_planted_or_edited_change_request_stands_for_nothing(db: PgPool) {
+    let kit = Kit::new(db).await;
+    let (workspace, inbox, sam) = kit.sams_inbox().await;
+    let conversation = kit.conversation_of("en-1").await;
+    let base = format!("/api/v1/w/{workspace}/conversations/{conversation}");
+    let read = kit.post(&sam, &format!("{base}/read"), None).await;
+    assert_eq!(read.status, StatusCode::OK, "{:?}", read.json);
+    let (request, items) = last_request(&kit).await;
+    assert!(every(
+        &standing(&kit, workspace, &request, inbox, &conversation, &items).await
+    ));
+
+    // The row's items turned into an archive, asked for as such.
+    let archive: Vec<Value> = items
+        .iter()
+        .map(|item| json!({"provider_message_id": item["provider_message_id"], "change": {"kind": "archive"}}))
+        .collect();
+    let mut tx = kit.state.db.begin_for(workspace).await.unwrap();
+    sqlx::query("UPDATE conversations.change_requests SET items = $2 WHERE id = $1::uuid")
+        .bind(&request)
+        .bind(Value::from(archive.clone()))
+        .execute(&mut *tx)
+        .await
+        .unwrap();
+    tx.commit().await.unwrap();
+    assert!(none(
+        &standing(&kit, workspace, &request, inbox, &conversation, &archive).await
+    ));
+
+    // A row planted under a request id of its own, with the real one's
+    // binding, and with none.
+    let planted = Uuid::now_v7().to_string();
+    let mut tx = kit.state.db.begin_for(workspace).await.unwrap();
+    sqlx::query(
+        "INSERT INTO conversations.change_requests
+             (id, workspace_id, inbox_id, conversation_id, items, mac)
+         SELECT $1::uuid, workspace_id, inbox_id, conversation_id, $2, mac
+           FROM conversations.change_requests WHERE id = $3::uuid",
+    )
+    .bind(&planted)
+    .bind(Value::from(archive.clone()))
+    .bind(&request)
+    .execute(&mut *tx)
+    .await
+    .unwrap();
+    sqlx::query("UPDATE conversations.change_requests SET mac = NULL WHERE id = $1::uuid")
+        .bind(&request)
+        .execute(&mut *tx)
+        .await
+        .unwrap();
+    tx.commit().await.unwrap();
+    assert!(none(
+        &standing(&kit, workspace, &planted, inbox, &conversation, &archive).await
+    ));
+    assert!(none(
+        &standing(&kit, workspace, &request, inbox, &conversation, &archive).await
+    ));
 }

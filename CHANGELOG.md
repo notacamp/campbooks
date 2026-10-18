@@ -215,6 +215,21 @@ All notable changes to Campbooks Next are documented here. The format follows
 
 ### Security
 
+- **SQL alone can't make a mailbox send (campbooks-cloud#227).** Sending a
+  draft now signs the author's request, under a key derived from the instance secret that
+  never goes in the database, over the draft, its send, the author, the inbox and
+  everything that goes out: recipients, subject, body, reply headers and attachments. A
+  draft is released only while that signature still holds, so a draft planted or edited
+  with SQL (other recipients, another body, another author) is never sent and is left as
+  it is, with a warning in the log and no content. The released send is signed in turn
+  and checked before every call to Gmail or Zoho, and so are change requests and each
+  change the connector records, before it is made at the provider; one that doesn't hold
+  is skipped and the provider's state comes back. Changes made by taught rules are
+  still signed by the server, so a rule planted with SQL can still change mail; that is
+  campbooks-cloud#242. Without `CAMPBOOKS_SECRET_KEY` nothing
+  is sent (it was already needed to connect a mailbox). Two migrations add the signatures;
+  drafts waiting in their undo window during the upgrade go back to drafts, to be sent
+  again, and a change pending during the upgrade isn't made.
 - **An event alone can't make a mailbox send or change mail (campbooks-cloud#226).**
   The connector no longer takes a send or change request event as proof. Before it records
   a send, and again before every call to Gmail or Zoho for it, it asks the conversations

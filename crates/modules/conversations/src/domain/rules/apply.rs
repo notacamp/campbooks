@@ -6,7 +6,7 @@ use campbooks_ai::decide::{
     signals::email::triage,
     taught::{self, Bin, Outcome, Surface, TaughtRule},
 };
-use campbooks_kernel::{EventBus, Result};
+use campbooks_kernel::{EventBus, Result, binding::Binding};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use sqlx::{PgConnection, Postgres, Transaction};
@@ -75,6 +75,8 @@ pub struct Before {
 
 /// Where a rule acts: the inbox, the workspace's event key and the events.
 pub struct Context<'a> {
+    /// What binds the changes asked of the provider (campbooks-cloud#227).
+    pub binding: &'a Binding,
     /// The event bus.
     pub events: &'a EventBus,
     /// The workspace, as events key it.
@@ -138,6 +140,7 @@ pub async fn apply(
     effects
         .publish(
             tx,
+            ctx.binding,
             ctx.events,
             (ctx.workspace, ctx.inbox, candidate.id),
             true,
@@ -437,7 +440,13 @@ pub async fn revert(
     .execute(&mut **tx)
     .await?;
     effects
-        .publish(tx, ctx.events, (ctx.workspace, ctx.inbox, id), true)
+        .publish(
+            tx,
+            ctx.binding,
+            ctx.events,
+            (ctx.workspace, ctx.inbox, id),
+            true,
+        )
         .await?;
     needs::refresh(tx, ctx.events, ctx.workspace, id, ctx.needs).await?;
     Ok(true)
