@@ -57,7 +57,7 @@ export function stripLinks(doc: Document): void {
 }
 
 /** The attribute the server wraps a reply's trailing quoted history in. */
-export const QUOTED_MARK = "data-cb-quoted";
+const QUOTED_MARK = "data-cb-quoted";
 
 /** How the fold's summary looks: a small dashed pill on the mail's white page. */
 const SUMMARY_STYLE = [
@@ -88,20 +88,20 @@ const FRAME_RULES = [
  * behind a `<details>`, which opens and closes with no script. The mail
  * cannot write the mark: the server lets no `data-` attribute through.
  */
-export function foldQuoted(doc: Document, show: string, hide: string): void {
-  const block = doc.querySelector(`div[${QUOTED_MARK}]`);
+function foldQuoted(doc: Document, show: string, hide: string): void {
+  const block = doc.querySelector("div[data-cb-quoted]");
   if (block === null) {
     return;
   }
   const details = doc.createElement("details");
-  details.setAttribute(QUOTED_MARK, "");
+  details.dataset["cbQuoted"] = "";
   const summary = doc.createElement("summary");
   summary.setAttribute("style", SUMMARY_STYLE);
   const showLabel = doc.createElement("span");
-  showLabel.setAttribute("data-cb-show", "");
+  showLabel.dataset["cbShow"] = "";
   showLabel.textContent = show;
   const hideLabel = doc.createElement("span");
-  hideLabel.setAttribute("data-cb-hide", "");
+  hideLabel.dataset["cbHide"] = "";
   hideLabel.setAttribute("style", "display: none");
   hideLabel.textContent = hide;
   summary.append(showLabel, hideLabel);

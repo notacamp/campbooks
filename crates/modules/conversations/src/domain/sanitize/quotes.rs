@@ -29,6 +29,8 @@
 //! The mark itself is never allowed through ammonia, so a sender cannot write
 //! one: the only `data-cb-quoted` in the output is the one added here.
 
+use std::fmt::Write as _;
+
 /// The attribute the reader folds. Never allowed through ammonia.
 pub const MARK: &str = "data-cb-quoted";
 
@@ -126,7 +128,7 @@ pub fn mark(html: &str) -> String {
         Some((start, end)) => {
             let mut marked = String::with_capacity(html.len() + 40);
             marked.push_str(&html[..start]);
-            marked.push_str(r#"<div data-cb-quoted="1">"#);
+            let _ = write!(marked, r#"<div {MARK}="1">"#);
             marked.push_str(&html[start..end]);
             marked.push_str("</div>");
             marked.push_str(&html[end..]);

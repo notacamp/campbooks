@@ -67,7 +67,10 @@ export function MessageCard({
           <b className={styles["from"]}>
             {from}
             {addressee === undefined || addressee === "" ? null : (
-              <span className={styles["addressee"]}> {addressee}</span>
+              <>
+                {" "}
+                <span className={styles["addressee"]}>{addressee}</span>
+              </>
             )}
           </b>
           <time className={styles["time"]} dateTime={dateTime}>
@@ -132,7 +135,10 @@ export function FoldedMessage({
       <b className={styles["from"]}>
         {from}
         {addressee === undefined || addressee === "" ? null : (
-          <span className={styles["addressee"]}> {addressee}</span>
+          <>
+            {" "}
+            <span className={styles["addressee"]}>{addressee}</span>
+          </>
         )}
       </b>
       <span className={styles["foldedSnippet"]}>{snippet}</span>

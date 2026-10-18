@@ -248,6 +248,7 @@ export const ReaderWithComposer: Story = {
         <ReaderFooter
           slot={
             <section aria-label="Reply to Marta Silva" className="flex flex-col gap-2 p-3">
+              <textarea aria-label="Your reply" rows={4} defaultValue="Monday works." />
               {Array.from({ length: 30 }, (_, index) => (
                 <p key={index}>Monday works. I will bring the brackets.</p>
               ))}
