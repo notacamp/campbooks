@@ -95,6 +95,7 @@ pub fn module(deps: Deps) -> Module {
             .handler(features::send_message::SendMessage::new(deps.clone()))
             .consumer(features::queue_send::QueueSend)
             .schedule::<features::dispatch_due::DispatchDue>(features::dispatch_due::EVERY)
+            .rekey::<features::retag_bindings::RetagBindings>()
             .consumer(features::member_left::RevokeDepartedGrants::new(
                 deps.clone(),
             ))

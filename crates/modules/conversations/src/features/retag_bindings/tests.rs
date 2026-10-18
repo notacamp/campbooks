@@ -144,3 +144,47 @@ async fn a_rotated_key_retags_rules_and_their_changes_which_keep_working_without
         }
     }
 }
+
+/// A rule run started under the old key, still running at the rotation, is
+/// re-tagged with its rule and works through its mail under the new key
+/// alone (campbooks-cloud#262).
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_running_run_retagged_after_a_rotation_finishes_under_the_new_key(db: PgPool) {
+    let kit = kit(db).await;
+    let (workspace, inbox, sam, _) = sams_notifications(&kit, 5).await;
+    let created = kit
+        .post(
+            &sam,
+            &format!("/api/v1/w/{workspace}/inboxes/{inbox}/rules"),
+            Some(move_github()),
+        )
+        .await;
+    assert_eq!(created.status, StatusCode::CREATED, "{:?}", created.json);
+    assert_eq!(
+        created.json["run"]["state"], "running",
+        "{:?}",
+        created.json
+    );
+    // No job ran: the run is still to do.
+    let rotated = Binding::new(&new().with_previous(&old()));
+    let kit = kit.with_binding(rotated.clone());
+    let mut tx = kit.state.db.begin_for(workspace).await.unwrap();
+    let tally = retag(&mut tx, &rotated, workspace).await.unwrap();
+    tx.commit().await.unwrap();
+    assert_eq!(
+        tally,
+        Tally {
+            retagged: 2,
+            left: 0
+        },
+        "the rule and its run"
+    );
+
+    let kit = kit.with_binding(Binding::new(&new()));
+    kit.run_jobs().await;
+    for (id, stream, _) in streams(&kit).await {
+        if id.starts_with("gh-") {
+            assert_eq!(stream, "updates", "{id} is moved by the run");
+        }
+    }
+}
