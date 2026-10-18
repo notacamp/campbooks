@@ -354,13 +354,56 @@ impl Kit {
         &self,
         sub: &str,
         workspace: WorkspaceId,
+        call: (&str, Value),
+        confirmed: bool,
+    ) -> Result<operations::Output, operations::InvokeError> {
+        self.invoke_as_assistant(sub, workspace, call, confirmed, false)
+            .await
+    }
+
+    /// [`as_assistant`](Self::as_assistant), as if the catalogue opted the
+    /// assistant in to `operation` (`x-campbooks.assistant` true): what a
+    /// flag flipped back by mistake would let reach the handler, which must
+    /// still refuse on its own (campbooks-cloud#242).
+    pub async fn as_assistant_listed(
+        &self,
+        sub: &str,
+        workspace: WorkspaceId,
+        call: (&str, Value),
+        confirmed: bool,
+    ) -> Result<operations::Output, operations::InvokeError> {
+        self.invoke_as_assistant(sub, workspace, call, confirmed, true)
+            .await
+    }
+
+    async fn invoke_as_assistant(
+        &self,
+        sub: &str,
+        workspace: WorkspaceId,
         (operation, input): (&str, Value),
         confirmed: bool,
+        listed: bool,
     ) -> Result<operations::Output, operations::InvokeError> {
         let module = crate::module(self.deps.clone());
         let resources = campbooks_kernel::authz::Catalogue::new([&module.resources]).unwrap();
-        let state =
-            operations::compose(module.router, self.state.clone().with_resources(resources)).state;
+        let composed =
+            operations::compose(module.router, self.state.clone().with_resources(resources));
+        let state = if listed {
+            let mut spec = serde_json::to_value(&composed.spec).unwrap();
+            for item in spec["paths"].as_object_mut().unwrap().values_mut() {
+                for op in item.as_object_mut().unwrap().values_mut() {
+                    if op.get("operationId").and_then(Value::as_str) == Some(operation) {
+                        op["x-campbooks"]["assistant"] = Value::Bool(true);
+                    }
+                }
+            }
+            let catalogue = Arc::new(operations::Catalogue::from_json(&spec));
+            composed
+                .state
+                .with_operations(operations::Operations::new(composed.routes, catalogue))
+        } else {
+            composed.state
+        };
         let principal = Principal {
             subject: sub.to_owned(),
             kind: PrincipalKind::User,

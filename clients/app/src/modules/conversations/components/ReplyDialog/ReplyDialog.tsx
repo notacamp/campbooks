@@ -283,9 +283,10 @@ export function ReplyDialog({
     setSaved(fresh);
     const old = replaced.current;
     replaced.current = undefined;
-    // Only a draft still being written: a send on its way is taken back by
-    // its Undo alone, never discarded here (campbooks-cloud#242).
-    if (old?.state === "draft") {
+    // Only one that is still editable, a draft or a send that failed: a
+    // send on its way is taken back by its Undo alone, never discarded here
+    // (campbooks-cloud#242).
+    if (old?.state === "draft" || old?.state === "failed") {
       // Best effort: left behind, it is only a draft the composer shows whole.
       void deleteDraft(workspaceId, old.id).catch(() => {
         // Nothing to say: the reply itself is saved.
