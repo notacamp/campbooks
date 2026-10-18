@@ -264,29 +264,7 @@ pub async fn handler(
             .map_err(|e| Error::internal(crate::domain::redact::json(&e)))?;
         let bodies: Bodies = serde_json::from_value(row.bodies)
             .map_err(|e| Error::internal(crate::domain::redact::json(&e)))?;
-        // Its text part, else its HTML read as text: also when the text
-        // part is blanks only (campbooks-cloud#218). Quotes and forwards are
-        // built from it.
-        let text = if bodies.text.is_some() || bodies.html.is_some() {
-            let (content, cut_short) = words(
-                &state.blobs,
-                &ws,
-                (bodies.text.as_ref(), bodies.html.as_ref()),
-                Budget {
-                    text: MAX_TEXT_BYTES,
-                    html: MAX_HTML_BYTES,
-                },
-                Quotes::Keep,
-            )
-            .await?;
-            let truncated = cut_short || content.len() > MAX_TEXT_BYTES;
-            Some(MessageText {
-                content: cut(content, MAX_TEXT_BYTES),
-                truncated,
-            })
-        } else {
-            None
-        };
+        let text = text_of(&state, &ws, &bodies).await?;
         messages.push(MessageView {
             id: row.id,
             direction: row.direction.parse()?,
@@ -345,6 +323,31 @@ async fn attachments_of(
             });
     }
     Ok(attachments)
+}
+
+/// A message's text: its text part, else its HTML read as text, also when
+/// the text part is blanks only (campbooks-cloud#218); replies and forwards
+/// quote it. `None` for a message with neither part.
+async fn text_of(state: &AppState, ws: &str, bodies: &Bodies) -> Result<Option<MessageText>> {
+    if bodies.text.is_none() && bodies.html.is_none() {
+        return Ok(None);
+    }
+    let (content, cut_short) = words(
+        &state.blobs,
+        ws,
+        (bodies.text.as_ref(), bodies.html.as_ref()),
+        Budget {
+            text: MAX_TEXT_BYTES,
+            html: MAX_HTML_BYTES,
+        },
+        Quotes::Keep,
+    )
+    .await?;
+    let truncated = cut_short || content.len() > MAX_TEXT_BYTES;
+    Ok(Some(MessageText {
+        content: cut(content, MAX_TEXT_BYTES),
+        truncated,
+    }))
 }
 
 #[cfg(test)]
