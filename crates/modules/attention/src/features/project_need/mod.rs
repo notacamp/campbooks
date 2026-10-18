@@ -80,19 +80,24 @@ impl EventHandler for ProjectConversationNeed {
             .execute(&mut **tx)
             .await?;
         }
-        let announce = if let Some(facts) = &need.need {
+        let written = if let Some(facts) = &need.need {
             open(tx, workspace, id, &need, facts, &latest).await?
         } else {
-            // Nobody saw a tombstone; announce only a real item.
-            clear(tx, workspace, id, &need, &latest).await? && current.is_some()
+            // Nobody saw a tombstone: announce a clear only over a row that
+            // was there, seen before (`current`) or written by a delivery
+            // racing this one (`updated`).
+            clear(tx, workspace, id, &need, &latest)
+                .await?
+                .filter(|written| current.is_some() || written.updated)
         };
-        if announce {
+        // The row's own id: in a race for a new item, the other delivery's.
+        if let Some(written) = written {
             events
                 .publish(
                     tx,
                     &ItemChanged {
                         workspace: need.workspace.clone(),
-                        item: id,
+                        item: written.id,
                         container: RecordRef::new(INBOX, &need.inbox),
                     },
                 )
@@ -102,7 +107,17 @@ impl EventHandler for ProjectConversationNeed {
     }
 }
 
-/// Open (or update) item `id` with `facts`: whether it was written (an item
+/// An item row an upsert wrote.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, sqlx::FromRow)]
+struct Written {
+    /// Its id (another delivery's when it inserted the row first).
+    id: ItemId,
+    /// Whether it updated a row that was already there rather than
+    /// inserting one.
+    updated: bool,
+}
+
+/// Open (or update) item `id` with `facts`: the row written, if any (an item
 /// a newer revision reached first, in a race, is left as it is).
 async fn open(
     tx: &mut Transaction<'static, Postgres>,
@@ -111,8 +126,8 @@ async fn open(
     need: &ConversationNeedChanged,
     facts: &NeedFacts,
     latest: &str,
-) -> Result<bool, JobError> {
-    let written = sqlx::query(
+) -> Result<Option<Written>, JobError> {
+    let written = sqlx::query_as::<_, Written>(
         r"
         INSERT INTO attention.items
             (id, workspace_id, record_type, record_id, container_type, container_id,
@@ -129,6 +144,7 @@ async fn open(
                cleared_because = NULL, cleared_by = NULL, cleared_at = NULL,
                producer_revision = EXCLUDED.producer_revision, updated_at = now()
          WHERE attention.items.producer_revision < EXCLUDED.producer_revision
+        RETURNING id, (xmax <> 0) AS updated
         ",
     )
     .bind(id)
@@ -146,13 +162,13 @@ async fn open(
     .bind(facts.urgent)
     .bind(need.sent_at)
     .bind(need.revision)
-    .execute(&mut **tx)
+    .fetch_optional(&mut **tx)
     .await?;
-    Ok(written.rows_affected() > 0)
+    Ok(written)
 }
 
 /// Clear item `id`; without one yet, leave a tombstone at this revision.
-/// Whether it was written (an item a newer revision reached first, in a
+/// The row written, if any (an item a newer revision reached first, in a
 /// race, is left as it is).
 async fn clear(
     tx: &mut Transaction<'static, Postgres>,
@@ -160,8 +176,8 @@ async fn clear(
     id: ItemId,
     need: &ConversationNeedChanged,
     latest: &str,
-) -> Result<bool, JobError> {
-    let written = sqlx::query(
+) -> Result<Option<Written>, JobError> {
+    let written = sqlx::query_as::<_, Written>(
         r"
         INSERT INTO attention.items
             (id, workspace_id, record_type, record_id, container_type, container_id,
@@ -174,6 +190,7 @@ async fn clear(
                latest_id = EXCLUDED.latest_id,
                producer_revision = EXCLUDED.producer_revision, updated_at = now()
          WHERE attention.items.producer_revision < EXCLUDED.producer_revision
+        RETURNING id, (xmax <> 0) AS updated
         ",
     )
     .bind(id)
@@ -189,9 +206,9 @@ async fn clear(
     .bind(&need.cleared_because)
     .bind(need.cleared_by.map(|u| *u.as_uuid()))
     .bind(need.revision)
-    .execute(&mut **tx)
+    .fetch_optional(&mut **tx)
     .await?;
-    Ok(written.rows_affected() > 0)
+    Ok(written)
 }
 
 #[cfg(test)]
