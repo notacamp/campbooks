@@ -60,7 +60,7 @@
 //! (none for a route outside a workspace). The workspace's purge deletes
 //! those keys, expired or not, through [`purge_workspace`].
 
-use std::time::Duration;
+use std::{borrow::Cow, time::Duration};
 
 use aws_lc_rs::digest;
 use axum::{
@@ -70,6 +70,7 @@ use axum::{
     middleware::Next,
     response::{IntoResponse, Response},
 };
+use percent_encoding::percent_decode_str;
 use serde::{Deserialize, Serialize};
 use sqlx::{PgConnection, PgPool};
 use std::sync::Arc;
@@ -352,8 +353,10 @@ fn secret_shown_once() -> Response {
     response
 }
 
-/// The `{workspace_id}` segment of `path`, a request to `operation`'s route.
-fn workspace_of<'a>(operation: &OperationInfo, path: &'a str) -> Option<&'a str> {
+/// The `{workspace_id}` segment of `path`, a request to `operation`'s route,
+/// percent-decoded as the router decodes it for the handler (a segment that
+/// does not decode to UTF-8 is kept as it is, and parses as no workspace).
+fn workspace_of<'a>(operation: &OperationInfo, path: &'a str) -> Option<Cow<'a, str>> {
     // Templates and paths line up segment by segment, from `/api/` on (a
     // router nested under `/bff` prefixes the path).
     let template: Vec<&str> = operation.path.split('/').collect();
@@ -366,7 +369,12 @@ fn workspace_of<'a>(operation: &OperationInfo, path: &'a str) -> Option<&'a str>
     template
         .iter()
         .zip(segments)
-        .find_map(|(t, s)| (*t == wanted).then_some(s))
+        .find(|(t, _)| **t == wanted)
+        .map(|(_, s)| {
+            percent_decode_str(s)
+                .decode_utf8()
+                .unwrap_or(Cow::Borrowed(s))
+        })
 }
 
 fn valid_key(value: &HeaderValue) -> Result<String, LocalizableProblem> {

@@ -128,10 +128,11 @@ pub async fn execute(state: &AppState, access: &Access) -> Result<WorkspaceDelet
 
 /// Hard-delete a deleted workspace's records once its grace period is over:
 /// its blobs (`BlobStore::purge_workspace`), then the workspace row, and with
-/// it (foreign keys cascade) its members, invitations and security events,
-/// and the kernel's change feed, event log, finished jobs and idempotency
-/// keys of the workspace. Runs in the workspace, so row-level security applies; a
-/// workspace that is gone already is a no-op.
+/// it (foreign keys cascade) its members, invitations and security events.
+/// The kernel's change feed, event log, finished jobs and idempotency keys of
+/// the workspace are deleted explicitly, in the same transaction (no foreign
+/// key reaches them). Runs in the workspace, so row-level security applies;
+/// a workspace that is gone already is a no-op.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct PurgeWorkspace {
     /// The workspace.

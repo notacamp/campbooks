@@ -1405,3 +1405,75 @@ async fn a_workspace_routes_keys_name_it_and_go_with_its_purge(db: PgPool) {
         ]
     );
 }
+
+/// The app over `db` with membership and visibility switched on, and a
+/// writer's client.
+async fn workspace_http(db: &PgPool) -> Http {
+    let idp = TestIdp::start().await;
+    let switches = SwitchPorts(std::sync::Arc::default());
+    let state = idp
+        .state(db.clone())
+        .with_membership(std::sync::Arc::new(switches.clone()))
+        .with_visibility(std::sync::Arc::new(switches));
+    let (app, _) = app(state);
+    Http {
+        app,
+        token: idp.token(&idp.claims("test:write")),
+        idp: idp.clone(),
+    }
+}
+
+/// A percent-encoded workspace segment records the workspace the router
+/// decodes for the handler, not the raw text.
+#[sqlx::test(migrations = "../../migrations")]
+async fn a_percent_encoded_workspace_segment_records_the_decoded_workspace(db: PgPool) {
+    let http = workspace_http(&db).await;
+    let ws = crate::tenancy::WorkspaceId::new();
+    let id = ws.to_string();
+    let encoded = format!("%{:02X}{}", id.as_bytes()[0], &id[1..]);
+    let uri = format!("/api/v1/w/{encoded}/boxes/b1/edit");
+    let (status, _, body) = http.send("POST", &uri, Some("k-enc"), None).await;
+    assert!(status.is_success(), "{uri}: {status} {body}");
+    assert_eq!(workspace_keys(&db).await, [("k-enc".to_owned(), Some(id))]);
+}
+
+/// A key taken again once expired records its new route's workspace, not
+/// the old one's.
+#[sqlx::test(migrations = "../../migrations")]
+async fn an_expired_key_taken_again_records_its_new_workspace(db: PgPool) {
+    let http = workspace_http(&db).await;
+    let (first, second) = (
+        crate::tenancy::WorkspaceId::new(),
+        crate::tenancy::WorkspaceId::new(),
+    );
+    let (status, ..) = http
+        .send(
+            "POST",
+            &format!("/api/v1/w/{first}/boxes/b1/edit"),
+            Some("k"),
+            None,
+        )
+        .await;
+    assert!(status.is_success());
+    sqlx::query("UPDATE kernel.idempotency SET expires_at = now() - interval '1 second'")
+        .execute(&db)
+        .await
+        .unwrap();
+    let (status, headers, _) = http
+        .send(
+            "POST",
+            &format!("/api/v1/w/{second}/boxes/b1/edit"),
+            Some("k"),
+            None,
+        )
+        .await;
+    assert!(status.is_success());
+    assert!(
+        !headers.contains_key(idempotency::REPLAYED_HEADER),
+        "ran again"
+    );
+    assert_eq!(
+        workspace_keys(&db).await,
+        [("k".to_owned(), Some(second.to_string()))]
+    );
+}

@@ -18,8 +18,10 @@ app's alone: the web app and every app acting for the same person keep
 separate keys.
 
 A key SHALL record the workspace of the route it was first used on: the
-`{workspace_id}` segment of the matched route, never a value from the
-request's body or query, and none for a route outside a workspace. A
+`{workspace_id}` segment of the matched route, percent-decoded as the
+router decodes it for the handler, never a value from the request's body
+or query, and none for a route outside a workspace. A key taken again once
+expired SHALL record its new route's workspace. A
 workspace's purge SHALL delete its keys, expired or not, only through
 `kernel.purge_workspace_idempotency(workspace, batch)`. That function SHALL
 be a `SECURITY DEFINER` function owned by `campbooks_definer`, with a pinned
@@ -45,6 +47,14 @@ workspace, and SHALL answer only how many keys it deleted.
 #### Scenario: A key's workspace comes from the route
 - **WHEN** keyed requests go to a route of workspace A and to one of workspace B, both with a body naming workspace B, and to a route outside any workspace
 - **THEN** the keys record A, B and none
+
+#### Scenario: A percent-encoded workspace segment
+- **WHEN** a keyed request goes to a workspace route whose `{workspace_id}` segment is percent-encoded
+- **THEN** the key records the decoded workspace
+
+#### Scenario: An expired key taken again
+- **WHEN** a key used on workspace A's route has expired and is used on workspace B's
+- **THEN** the request runs again and the key records B
 
 #### Scenario: A workspace's purge
 - **WHEN** the purge function runs for workspace A in a transaction that set nothing, in one working in workspace B, and in one working in A

@@ -15,3 +15,4 @@
 - [x] 3.2 The function refuses an unset transaction and another workspace's; in the workspace it deletes only that workspace's keys, and the transaction still sees none
 - [x] 3.3 The workspace purge deletes its unexpired keys and leaves another workspace's and instance-wide ones
 - [x] 3.4 The definer role's grants list includes `kernel.idempotency` (DELETE, SELECT)
+- [x] 3.5 A percent-encoded workspace segment records the decoded workspace; an expired key taken again records its new workspace
