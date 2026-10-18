@@ -80,6 +80,11 @@ All notable changes to Campbooks Next are documented here. The format follows
 
 ### Fixed
 
+- **The live feed resyncs whenever it finds an inbox nothing announced.** If an inbox ever
+  became visible to someone without the change that should announce it, only the
+  heartbeat's check noticed; a check triggered by a change to some other inbox let it in
+  silently, and mail read past in the meantime was never sent. Every check now resyncs
+  the client in that case, while an announced grant still needs none.
 - **Desktop app: links stay where they belong.** On macOS and Linux the main window no
   longer treats `tauri.localhost` as the app (there it is the computer itself, where any
   local program could answer), only on Windows and Android, where the app is served from
