@@ -33,7 +33,7 @@ const ALL_SCOPES: &str = "workspaces:read workspaces:write workspaces:admin";
 const WAIT: Duration = Duration::from_secs(10);
 /// Longest any one request or sequencer run may take: a stall fails at once,
 /// naming the step, instead of surfacing later as an expired token.
-const STEP: Duration = Duration::from_secs(60);
+const STEP: Duration = Duration::from_mins(1);
 /// The lifetime of the tokens the tests use: far beyond any test, so a token
 /// expires only when a test means it to (campbooks-cloud#249).
 const TOKEN_LIFETIME: u64 = 24 * 3600;
