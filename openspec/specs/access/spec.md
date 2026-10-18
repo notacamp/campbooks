@@ -294,11 +294,23 @@ which only the kernel's idempotency layer opens
 answer and the release. The kernel scope SHALL read and delete expired
 keys only (the hourly prune), and SHALL NOT read a live key nor write any.
 A transaction working in a workspace, or one that set nothing, SHALL see no
-key and SHALL NOT add, change or delete one. Request bodies SHALL never be
-stored, only a hash of the request, and no stored answer SHALL hold a
-secret (see `operation-catalogue`). A person's keys through one app SHALL be
-that app's alone: the web app and every app acting for the same person keep
+key and SHALL NOT add or change one, nor delete one other than through the
+workspace purge's function. Request bodies SHALL never be stored, only a
+hash of the request, and no stored answer SHALL hold a secret (see
+`operation-catalogue`). A person's keys through one app SHALL be that
+app's alone: the web app and every app acting for the same person keep
 separate keys.
+
+A key SHALL record the workspace of the route it was first used on: the
+`{workspace_id}` segment of the matched route, percent-decoded as the
+router decodes it for the handler, never a value from the request's body
+or query, and none for a route outside a workspace. A key taken again once
+expired SHALL record its new route's workspace. A
+workspace's purge SHALL delete its keys, expired or not, only through
+`kernel.purge_workspace_idempotency(workspace, batch)`. That function SHALL
+be a `SECURITY DEFINER` function owned by `campbooks_definer`, with a pinned
+`search_path`. It SHALL refuse a transaction that does not work in that
+workspace, and SHALL answer only how many keys it deleted.
 
 #### Scenario: A workspace transaction and the keys
 - **WHEN** a key is stored for a caller, and a transaction of the runtime role working in a workspace counts, updates, deletes and inserts idempotency keys
@@ -315,6 +327,22 @@ separate keys.
 #### Scenario: One person through two apps
 - **WHEN** a person's web app and an app acting for them each send a request with `Idempotency-Key: k-1`
 - **THEN** each runs once and replays only to its own app, and neither gets 422 for the other's request
+
+#### Scenario: A key's workspace comes from the route
+- **WHEN** keyed requests go to a route of workspace A and to one of workspace B, both with a body naming workspace B, and to a route outside any workspace
+- **THEN** the keys record A, B and none
+
+#### Scenario: A percent-encoded workspace segment
+- **WHEN** a keyed request goes to a workspace route whose `{workspace_id}` segment is percent-encoded
+- **THEN** the key records the decoded workspace
+
+#### Scenario: An expired key taken again
+- **WHEN** a key used on workspace A's route has expired and is used on workspace B's
+- **THEN** the request runs again and the key records B
+
+#### Scenario: A workspace's purge
+- **WHEN** the purge function runs for workspace A in a transaction that set nothing, in one working in workspace B, and in one working in A
+- **THEN** the first two are refused and delete nothing, and the third deletes A's keys only while still seeing no key
 
 ### Requirement: Rate-limit counters are reached only through the kernel's functions
 The runtime role SHALL hold no privilege on `kernel.rate_limits`, which

@@ -1582,6 +1582,8 @@ mod tests {
             // `conversations.take_rule_resign` (campbooks-cloud#242).
             ("conversations.rule_resigns", "DELETE, SELECT"),
             ("conversations.rules", "SELECT"),
+            // `kernel.purge_workspace_idempotency` (campbooks-cloud#65).
+            ("kernel.idempotency", "DELETE, SELECT"),
             ("kernel.rate_limits", "DELETE, INSERT, SELECT, UPDATE"),
         ]
         .map(|(table, privileges)| (table.to_owned(), privileges.to_owned()));

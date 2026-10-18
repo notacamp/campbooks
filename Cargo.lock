@@ -574,6 +574,7 @@ dependencies = [
  "object_store",
  "opentelemetry",
  "opentelemetry_sdk",
+ "percent-encoding",
  "reqwest",
  "secrecy",
  "serde",

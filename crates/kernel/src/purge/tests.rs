@@ -123,6 +123,7 @@ async fn a_large_workspace_is_purged_in_batches(db: PgPool) {
             jobs: 12_000,
             events: 12_000,
             changes: 1,
+            keys: 0,
             batches: 3,
         }
     );
@@ -380,4 +381,36 @@ async fn the_sweep_leaves_a_live_workspace_alone(db: PgPool) {
         left, kept,
         "the gone workspace's old, empty tombstone is dropped"
     );
+}
+
+/// The purge deletes the workspace's idempotency keys too, expired or not,
+/// and leaves another workspace's and the instance-wide ones.
+#[sqlx::test(migrations = "../../migrations")]
+async fn the_purge_deletes_the_workspaces_idempotency_keys(db: PgPool) {
+    let state = runtime(&db).await;
+    for (key, workspace, expires) in [
+        ("k-1", Some("gone"), "1 day"),
+        ("k-2", Some("gone"), "-1 day"),
+        ("k-3", Some("other"), "1 day"),
+        ("k-4", None, "1 day"),
+    ] {
+        sqlx::query(
+            "INSERT INTO kernel.idempotency
+                 (principal, key, operation_id, request_hash, expires_at, workspace_id)
+             VALUES ('client:app', $1, 'test.op', '\\x00', now() + $3::interval, $2)",
+        )
+        .bind(key)
+        .bind(workspace)
+        .bind(expires)
+        .execute(&db)
+        .await
+        .unwrap();
+    }
+    let purged = purge_workspace(&state.db, "gone").await.unwrap();
+    assert_eq!(purged.keys, 2);
+    let left: Vec<String> = sqlx::query_scalar("SELECT key FROM kernel.idempotency ORDER BY key")
+        .fetch_all(&db)
+        .await
+        .unwrap();
+    assert_eq!(left, ["k-3", "k-4"]);
 }

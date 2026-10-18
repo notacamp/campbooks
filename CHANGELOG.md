@@ -310,6 +310,12 @@ All notable changes to Campbooks Next are documented here. The format follows
   adds `--not-deleted-in-backup`; it is then hidden at once and purged an hour later at
   the earliest. The self-hosting guide's Backups section has the steps. Only that command
   can shorten a workspace's grace period: there is no API for it.
+- **Purging a workspace also deletes its saved retry answers.** When a request is sent with
+  an idempotency key, the server keeps its answer for a day so a retry gets the same
+  answer, and that answer can include what you wrote. Each saved answer now records the
+  workspace in the request's address (never one named in the request itself), and purging
+  the workspace deletes them at once, even ones less than a day old. Saved answers stay
+  readable only by the person and app that made the request.
 
 ### Added
 

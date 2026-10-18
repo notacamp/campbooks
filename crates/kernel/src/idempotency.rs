@@ -53,8 +53,14 @@
 //! whose row-level security admits that caller's keys only; a workspace
 //! transaction sees and writes none. The prune reads and deletes expired
 //! keys in the kernel scope, and nothing else.
+//!
+//! **A workspace's keys go with it** (campbooks-cloud#65). A key records the
+//! workspace of the route it was first used on: the matched route's
+//! `{workspace_id}` segment, never a value from the body or the query
+//! (none for a route outside a workspace). The workspace's purge deletes
+//! those keys, expired or not, through [`purge_workspace`].
 
-use std::time::Duration;
+use std::{borrow::Cow, time::Duration};
 
 use aws_lc_rs::digest;
 use axum::{
@@ -64,6 +70,7 @@ use axum::{
     middleware::Next,
     response::{IntoResponse, Response},
 };
+use percent_encoding::percent_decode_str;
 use serde::{Deserialize, Serialize};
 use sqlx::{PgConnection, PgPool};
 use std::sync::Arc;
@@ -268,8 +275,23 @@ pub async fn middleware(State(idem): State<Idempotency>, request: Request, next:
         .insert(AuthenticatedPrincipal(principal.clone()));
     let owner = owner(&principal);
     let hash = request_hash(&parts, &body);
+    // The workspace the key belongs to, for its purge: the matched route's
+    // `{workspace_id}` segment alone, never anything the body or the query
+    // says (campbooks-cloud#65).
+    let workspace = workspace_of(&operation, parts.uri.path())
+        .and_then(|workspace| workspace.parse::<WorkspaceId>().ok())
+        .map(|workspace| workspace.to_string());
 
-    match claim(&idem.db, &owner, &key, &operation_id, &hash).await {
+    match claim(
+        &idem.db,
+        &owner,
+        &key,
+        &operation_id,
+        &hash,
+        workspace.as_deref(),
+    )
+    .await
+    {
         Err(error) => {
             tracing::warn!(%error, "idempotency: cannot claim the key");
             return problem(StatusCode::SERVICE_UNAVAILABLE, "database_unavailable");
@@ -331,8 +353,10 @@ fn secret_shown_once() -> Response {
     response
 }
 
-/// The `{workspace_id}` segment of `path`, a request to `operation`'s route.
-fn workspace_of<'a>(operation: &OperationInfo, path: &'a str) -> Option<&'a str> {
+/// The `{workspace_id}` segment of `path`, a request to `operation`'s route,
+/// percent-decoded as the router decodes it for the handler (a segment that
+/// does not decode to UTF-8 is kept as it is, and parses as no workspace).
+fn workspace_of<'a>(operation: &OperationInfo, path: &'a str) -> Option<Cow<'a, str>> {
     // Templates and paths line up segment by segment, from `/api/` on (a
     // router nested under `/bff` prefixes the path).
     let template: Vec<&str> = operation.path.split('/').collect();
@@ -345,7 +369,12 @@ fn workspace_of<'a>(operation: &OperationInfo, path: &'a str) -> Option<&'a str>
     template
         .iter()
         .zip(segments)
-        .find_map(|(t, s)| (*t == wanted).then_some(s))
+        .find(|(t, _)| **t == wanted)
+        .map(|(_, s)| {
+            percent_decode_str(s)
+                .decode_utf8()
+                .unwrap_or(Cow::Borrowed(s))
+        })
 }
 
 fn valid_key(value: &HeaderValue) -> Result<String, LocalizableProblem> {
@@ -445,14 +474,16 @@ async fn claim(
     key: &str,
     operation_id: &str,
     hash: &[u8],
+    workspace: Option<&str>,
 ) -> Result<Claim, sqlx::Error> {
     let mut tx = crate::db::begin_as_idempotency_caller(db, owner).await?;
-    let claim = claim_in(&mut tx, owner, key, operation_id, hash).await?;
+    let claim = claim_in(&mut tx, owner, key, operation_id, hash, workspace).await?;
     tx.commit().await?;
     Ok(claim)
 }
 
-/// [`claim`] in the caller's transaction.
+/// [`claim`] in the caller's transaction. A key taken records `workspace`,
+/// the matched route's workspace (for its purge, [`purge_workspace`]).
 ///
 /// A key is taken only when it is new or expired. A pending key is never
 /// taken over (campbooks-cloud#63): its request may have committed its
@@ -466,6 +497,7 @@ async fn claim_in(
     key: &str,
     operation_id: &str,
     hash: &[u8],
+    workspace: Option<&str>,
 ) -> Result<Claim, sqlx::Error> {
     let retention = seconds(RETENTION);
     let abandoned = seconds(ABANDONED_AFTER);
@@ -475,11 +507,12 @@ async fn claim_in(
         let acquired = sqlx::query_scalar!(
             r#"
             INSERT INTO kernel.idempotency
-                (principal, key, operation_id, request_hash, expires_at)
-            VALUES ($1, $2, $3, $4, now() + make_interval(secs => $5))
+                (principal, key, operation_id, request_hash, expires_at, workspace_id)
+            VALUES ($1, $2, $3, $4, now() + make_interval(secs => $5), $6)
             ON CONFLICT (principal, key) DO UPDATE
                SET operation_id = EXCLUDED.operation_id,
                    request_hash = EXCLUDED.request_hash,
+                   workspace_id = EXCLUDED.workspace_id,
                    state = 'pending',
                    response_status = NULL,
                    response_content_type = NULL,
@@ -495,6 +528,7 @@ async fn claim_in(
             operation_id,
             hash,
             retention,
+            workspace,
         )
         .fetch_optional(&mut *conn)
         .await?;
@@ -544,6 +578,37 @@ async fn claim_in(
         );
     }
     Ok(Claim::InFlight)
+}
+
+/// Keys deleted per call of `kernel.purge_workspace_idempotency`.
+const PURGE_BATCH: i32 = 5_000;
+
+/// Delete every key first used on a route of `workspace` (its
+/// `{workspace_id}` segment), expired or not, when the workspace is purged
+/// (campbooks-cloud#65): [`PURGE_BATCH`] keys at a time, each batch in a
+/// short transaction of its own working in `workspace`. Keys stay their
+/// callers' (no workspace transaction reads or writes them), so the deletion
+/// goes through `kernel.purge_workspace_idempotency`, a definer function that
+/// refuses any other transaction and reads nothing back. Returns how many
+/// keys were deleted. Called by [`crate::purge::purge_workspace`].
+///
+/// # Errors
+/// When the database fails.
+pub async fn purge_workspace(pool: &PgPool, workspace: &str) -> Result<u64, sqlx::Error> {
+    let mut purged = 0_u64;
+    loop {
+        let mut tx = crate::db::begin_in(pool, workspace).await?;
+        let deleted: i64 = sqlx::query_scalar("SELECT kernel.purge_workspace_idempotency($1, $2)")
+            .bind(workspace)
+            .bind(PURGE_BATCH)
+            .fetch_one(&mut *tx)
+            .await?;
+        tx.commit().await?;
+        purged += deleted.unsigned_abs();
+        if deleted < i64::from(PURGE_BATCH) {
+            return Ok(purged);
+        }
+    }
 }
 
 /// Whether a response with `status` is the operation's settled outcome.
