@@ -14,7 +14,7 @@ import {
 } from "~/lib/ui";
 
 import { downloadAttachment, imageUrl, openPdf, type AttachmentRef } from "../../api/attachments";
-import { useMessageBody, type MessageView } from "../../api/queries";
+import { useMessageBody, useMessageWords, type MessageView } from "../../api/queries";
 import {
   attachmentKind,
   cleanFileName,
@@ -85,7 +85,10 @@ export function ThreadMessage({
   );
   const from = displayName(message.from);
   const time = messageTime(message.sent_at, i18n.language, now);
-  const text = message.text?.content ?? "";
+  // Its words for the folded snippet, asked for on their own when the
+  // conversation came without them (`text_unread`); open, it shows its HTML.
+  const unread = useMessageWords(workspaceId, conversationId, open ? undefined : message);
+  const text = message.text?.content ?? unread.data?.content ?? "";
   const files = useAttachments(workspaceId, conversationId, message, t, shortcuts);
   // Trusting the sender, only where the server says it can take effect.
   const domain = body.data?.images_domain ?? undefined;
@@ -110,7 +113,13 @@ export function ThreadMessage({
         avatar={{ kind }}
         time={time}
         dateTime={message.sent_at}
-        snippet={text.replaceAll(/\s+/gu, " ").trim()}
+        snippet={
+          message.text_unread !== true || unread.data !== undefined
+            ? text.replaceAll(/\s+/gu, " ").trim()
+            : unread.isError
+              ? t("reader.textFailed")
+              : t("reader.readingText")
+        }
         onOpen={onOpen}
       />
     );

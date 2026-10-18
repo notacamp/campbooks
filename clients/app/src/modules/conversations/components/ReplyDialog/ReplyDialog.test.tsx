@@ -124,6 +124,106 @@ describe("ReplyDialog", () => {
     });
   });
 
+  it("quotes the words of a newest message that came without them", async () => {
+    const api = routes({
+      [`GET ${C}`]: {
+        body: {
+          ...Q4_DETAIL,
+          messages: Q4_DETAIL.messages.map((message) =>
+            message.id === NEWEST ? { ...message, text: null, text_unread: true } : message,
+          ),
+        },
+      },
+      [`GET ${C}/messages/${NEWEST}/body`]: {
+        body: {
+          text: "The harbourlight pontoon can move by two weeks.",
+          html: null,
+          truncated: false,
+          remote_images: 0,
+          images_shown: false,
+          images_trusted: false,
+          images_offer: false,
+          images_domain: null,
+        },
+      },
+    });
+    const handlers = dialog();
+    fireEvent.keyDown(await screen.findByRole("button", { name: /Say Thursday works/u }), {
+      key: "1",
+    });
+    await screen.findByRole("textbox", { name: "Your reply" });
+    fireEvent.click(screen.getByRole("button", { name: /^Send/u }));
+    await waitFor(() => {
+      expect(handlers.onSent).toHaveBeenCalled();
+    });
+    const created = api.calls.find((c) => c.route === `POST ${D}`)?.body as { quoted: string };
+    expect(created.quoted).toMatch(/Maya Okafor wrote:\n> The harbourlight pontoon can move/u);
+  });
+
+  it("sends nothing until the quote it could not read is read again and shown", async () => {
+    let readable = false;
+    const api = routes({
+      [`GET ${C}`]: {
+        body: {
+          ...Q4_DETAIL,
+          messages: Q4_DETAIL.messages.map((message) =>
+            message.id === NEWEST ? { ...message, text: null, text_unread: true } : message,
+          ),
+        },
+      },
+      [`GET ${C}/messages/${NEWEST}/body`]: () =>
+        readable
+          ? {
+              body: {
+                text: "The harbourlight pontoon can move by two weeks.",
+                html: null,
+                truncated: false,
+                remote_images: 0,
+                images_shown: false,
+                images_trusted: false,
+                images_offer: false,
+                images_domain: null,
+              },
+            }
+          : problem(503, "unavailable"),
+    });
+    const handlers = dialog();
+    expect(
+      await screen.findByText(
+        "Couldn’t read the email you’re replying to, so its quote can’t be shown. Nothing can be sent until it is.",
+      ),
+    ).toBeVisible();
+    fireEvent.keyDown(await screen.findByRole("button", { name: /Say Thursday works/u }), {
+      key: "1",
+    });
+    await screen.findByRole("textbox", { name: "Your reply" });
+    // Neither Send nor its shortcut, nor Open in composer, while the quote is unread.
+    expect(screen.getByRole("button", { name: /^Send/u })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Open in composer" })).toBeDisabled();
+    fireEvent.keyDown(screen.getByRole("textbox", { name: "Your reply" }), {
+      key: "Enter",
+      ctrlKey: true,
+    });
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(api.calls.some((c) => c.route === `POST ${D}`)).toBe(false);
+    // Try again reads it, shows it, and only then may it go.
+    readable = true;
+    fireEvent.click(screen.getByRole("button", { name: "Try again" }));
+    expect(
+      await screen.findByText(/The harbourlight pontoon can move by two weeks\./u),
+    ).toBeVisible();
+    const send = screen.getByRole("button", { name: /^Send/u });
+    await waitFor(() => {
+      expect(send).toBeEnabled();
+    });
+    fireEvent.click(send);
+    await waitFor(() => {
+      expect(handlers.onSent).toHaveBeenCalled();
+    });
+    const created = api.calls.find((c) => c.route === `POST ${D}`)?.body as { quoted: string };
+    expect(created.quoted).toMatch(/> The harbourlight pontoon can move by two weeks\./u);
+  });
+
   it("says who the reply goes to, and warns when Reply-To is elsewhere", async () => {
     const newest = Q4_DETAIL.messages.at(-1);
     if (newest === undefined) {

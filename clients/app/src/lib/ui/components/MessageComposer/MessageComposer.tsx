@@ -39,6 +39,8 @@ export interface MessageComposerProps {
   /** The quoted history, folded away under the text; omit for none. */
   quoted?: string | undefined;
   onQuotedChange?: ((quoted: string) => void) | undefined;
+  /** Said beside the quoted history, e.g. that it holds only the start of a long message. */
+  quotedNote?: ReactNode | undefined;
   attachments?: readonly ComposerAttachment[] | undefined;
   onRemoveAttachment?: ((id: string) => void) | undefined;
   /** "Saved", "Saving…": said politely next to Send. */
@@ -83,6 +85,7 @@ export function MessageComposer({
   onBodyChange,
   quoted,
   onQuotedChange,
+  quotedNote,
   attachments = [],
   onRemoveAttachment,
   status,
@@ -284,6 +287,7 @@ export function MessageComposer({
           >
             {showQuoted ? t("composer.hideQuoted") : t("composer.showQuoted")}
           </Button>
+          {quotedNote === undefined ? null : <p className={styles["quotedNote"]}>{quotedNote}</p>}
           {showQuoted ? (
             <>
               <label className={styles["hidden"]} htmlFor={`${id}-quoted`}>

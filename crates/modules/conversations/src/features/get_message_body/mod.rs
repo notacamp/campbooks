@@ -32,7 +32,8 @@ use crate::{
     domain::{
         access::visible_inboxes,
         attachments::{is_raster, sniff},
-        blobs::{read_bytes, read_text},
+        blobs::{Budget, read_bytes, read_text, words_until},
+        plain_text::Quotes,
         rules::{ImagesHeld, images},
         sanitize::{InlineImages, sanitize},
     },
@@ -58,7 +59,19 @@ pub struct BodyQuery {
     /// tracking pixels are removed either way.
     #[serde(default)]
     pub show_images: bool,
+    /// `true` for the message's words only, as `text`: its text part when it
+    /// has any, else its HTML read as text (at most half a second). `html`
+    /// is then absent. What a reply or forward quotes when
+    /// `conversations.get` marked the message `text_unread`.
+    #[serde(default)]
+    pub words: bool,
 }
+
+/// Bytes read of each part for [`BodyQuery::words`].
+const WORDS_BUDGET: Budget = Budget {
+    text: 256 * 1024,
+    html: 256 * 1024,
+};
 
 /// A message's bodies.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
@@ -151,6 +164,10 @@ pub async fn handler(
     .fetch_optional(&mut *tx)
     .await?
     .ok_or(Error::NotFound)?;
+    if query.words {
+        tx.commit().await?;
+        return words_of(&state, &access.workspace.to_string(), bodies).await;
+    }
     // Parts `cid:` images may name (read only if the HTML names any).
     let parts: Vec<InlinePart> = sqlx::query_as!(
         InlinePart,
@@ -203,6 +220,45 @@ pub async fn handler(
         css: sanitized.as_ref().and_then(|s| s.css.clone()),
         html: sanitized.map(|s| s.html),
         truncated,
+    }))
+}
+
+/// The message's words only ([`BodyQuery::words`]), read off the async
+/// workers within the per-message reading time.
+async fn words_of(
+    state: &AppState,
+    ws: &str,
+    bodies: serde_json::Value,
+) -> Result<Json<MessageBody>> {
+    let bodies: Bodies = serde_json::from_value(bodies)
+        .map_err(|e| Error::internal(crate::domain::redact::json(&e)))?;
+    // Cut at the text budget, or only some of the HTML's words: either way
+    // a quote of them says it is not whole.
+    let text = if bodies.text.is_some() || bodies.html.is_some() {
+        let read = words_until(
+            &state.blobs,
+            ws,
+            (bodies.text.as_ref(), bodies.html.as_ref()),
+            WORDS_BUDGET,
+            Quotes::Keep,
+            None,
+        )
+        .await?;
+        Some((read.text, read.cut || read.partial))
+    } else {
+        None
+    };
+    Ok(Json(MessageBody {
+        truncated: text.as_ref().is_some_and(|(_, cut)| *cut),
+        text: text.map(|(words, _)| words),
+        html: None,
+        remote_images: 0,
+        images_shown: false,
+        images_trusted: false,
+        images_offer: false,
+        images_domain: None,
+        images_held: None,
+        css: None,
     }))
 }
 
@@ -786,5 +842,118 @@ mod tests {
             "{}",
             restored.json
         );
+    }
+
+    #[sqlx::test(migrations = "../../../migrations")]
+    async fn words_alone_are_the_text_or_the_html_read_as_text(db: PgPool) {
+        // campbooks-cloud#250: what a reply or forward quotes when
+        // `conversations.get` could not read a message's HTML in time.
+        let kit = Kit::new(db).await;
+        let (workspace, inbox, sam) = kit.sams_inbox().await;
+        kit.ingest_value(
+            workspace,
+            inbox,
+            &json!({"changes": [{"op": "upsert", "message": {
+                "provider_message_id": "html-only-1",
+                "from": {"name": "Quay Office", "address": "office@quay-moorings.example"},
+                "to": [{"address": "sam@example.com"}],
+                "subject": "Your berth for next season",
+                "sent_at": "2026-10-13T06:30:00Z",
+                "direction": "inbound",
+                "html": "<head><meta charset=utf-8><title>Quay Office</title>\
+                         <p>Your berth at the harbourlight pontoon is kept.</p>",
+                "mailbox": {"in_inbox": true},
+                "read": false, "starred": false
+            }}]}),
+        )
+        .await;
+        let words = |id: &'static str| {
+            let kit = &kit;
+            let sam = &sam;
+            async move {
+                let (conversation, message): (String, String) = sqlx::query_as(
+                    "SELECT conversation_id::text, id::text FROM conversations.messages
+                      WHERE provider_message_id = $1",
+                )
+                .bind(id)
+                .fetch_one(&kit.db)
+                .await
+                .unwrap();
+                kit.get(
+                    sam,
+                    &format!(
+                        "/api/v1/w/{workspace}/conversations/{conversation}/messages/{message}/body?words=true"
+                    ),
+                )
+                .await
+            }
+        };
+        let html_only = words("html-only-1").await;
+        assert_eq!(html_only.status, StatusCode::OK, "{}", html_only.json);
+        let text = html_only.json["text"].as_str().unwrap_or_default();
+        assert!(
+            text.contains("harbourlight pontoon") && !text.contains("Quay Office"),
+            "{text:?}"
+        );
+        assert!(html_only.json["html"].is_null());
+        assert_eq!(html_only.json["truncated"], false);
+        // HTML past the 256 KiB read: its words come, marked cut, so a quote
+        // of them says it is not whole.
+        let long = "<p>The harbourlight pontoon schedule, week by week.</p>".repeat(6_000);
+        kit.ingest_value(
+            workspace,
+            inbox,
+            &json!({"changes": [{"op": "upsert", "message": {
+                "provider_message_id": "html-long-1",
+                "from": {"name": "Quay Office", "address": "office@quay-moorings.example"},
+                "to": [{"address": "sam@example.com"}],
+                "subject": "The season's schedule",
+                "sent_at": "2026-10-13T07:30:00Z",
+                "direction": "inbound",
+                "html": long,
+                "mailbox": {"in_inbox": true},
+                "read": false, "starred": false
+            }}]}),
+        )
+        .await;
+        let cut = words("html-long-1").await;
+        assert_eq!(cut.status, StatusCode::OK, "{}", cut.json);
+        assert!(
+            cut.json["text"]
+                .as_str()
+                .unwrap_or_default()
+                .starts_with("The harbourlight pontoon schedule"),
+            "{}",
+            cut.json["text"]
+        );
+        assert_eq!(cut.json["truncated"], true);
+        // A message with a text part answers with it.
+        let plain = words("en-1").await;
+        assert!(
+            plain.json["text"]
+                .as_str()
+                .unwrap_or_default()
+                .contains("by Friday 10 October"),
+            "{}",
+            plain.json
+        );
+        // Who may not read it gets nothing.
+        let (other, _) = kit.member("leo", workspace);
+        let (conversation, message): (String, String) = sqlx::query_as(
+            "SELECT conversation_id::text, id::text FROM conversations.messages
+              WHERE provider_message_id = 'html-only-1'",
+        )
+        .fetch_one(&kit.db)
+        .await
+        .unwrap();
+        let hidden = kit
+            .get(
+                &other,
+                &format!(
+                    "/api/v1/w/{workspace}/conversations/{conversation}/messages/{message}/body?words=true"
+                ),
+            )
+            .await;
+        assert_eq!(hidden.status, StatusCode::NOT_FOUND, "{}", hidden.json);
     }
 }

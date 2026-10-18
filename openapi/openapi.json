@@ -3694,6 +3694,15 @@
             "schema": {
               "type": "boolean"
             }
+          },
+          {
+            "name": "words",
+            "in": "query",
+            "description": "`true` for the message's words only, as `text`: its text part when it\nhas any, else its HTML read as text (at most half a second). `html`\nis then absent. What a reply or forward quotes when\n`conversations.get` marked the message `text_unread`.",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
           }
         ],
         "responses": {
