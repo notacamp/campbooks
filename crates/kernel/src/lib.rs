@@ -28,6 +28,7 @@ pub mod module;
 pub mod operations;
 pub mod outbound;
 pub mod preferences;
+pub mod purge;
 pub mod rate_limit;
 pub mod records;
 pub mod redact;

@@ -1348,7 +1348,7 @@ async fn a_purged_workspace_loses_its_finished_jobs_and_events(db: PgPool) {
     .await;
 
     let mut tx = crate::db::begin_in(&db, "gone").await.unwrap();
-    let (jobs, events) = purge_workspace(&mut tx, "gone").await.unwrap();
+    let (jobs, events) = purge_workspace(&mut tx, "gone", 10).await.unwrap();
     tx.commit().await.unwrap();
     assert_eq!((jobs, events), (1, 1));
     let left: Vec<(String, String)> = sqlx::query_as(
@@ -1436,9 +1436,9 @@ async fn enqueue_notifications_wake_an_idle_worker(db: PgPool) {
     );
     wait_for_kernel_schedules(&db).await;
     stop.send(()).unwrap();
-    // The probe, and the kernel's prunes, blob sweep and rekey dispatch
-    // scheduled at start-up.
-    assert_eq!(worker.await.unwrap().succeeded, 8);
+    // The probe, and the kernel's prunes, blob sweep, purged-workspace
+    // sweep and rekey dispatch scheduled at start-up.
+    assert_eq!(worker.await.unwrap().succeeded, 9);
 }
 
 #[sqlx::test(migrations = "../../migrations")]
@@ -1448,8 +1448,8 @@ async fn shutdown_finishes_quick_jobs_and_releases_slow_ones(db: PgPool) {
         jobs.poll_interval_ms = 50;
         // Room for both probes and every start-up schedule at once (all
         // instance-wide, so one fairness bucket).
-        jobs.concurrency = 9;
-        jobs.per_workspace = 9;
+        jobs.concurrency = 10;
+        jobs.per_workspace = 10;
     })
     .await;
     let quick = created(
@@ -1484,9 +1484,9 @@ async fn shutdown_finishes_quick_jobs_and_releases_slow_ones(db: PgPool) {
 
     stop.send(()).unwrap();
     let stats = worker.await.unwrap();
-    // The quick probe and the kernel's prunes, blob sweep and rekey
-    // dispatch scheduled at start-up.
-    assert_eq!((stats.succeeded, stats.released), (8, 1));
+    // The quick probe and the kernel's prunes, blob sweep, purged-workspace
+    // sweep and rekey dispatch scheduled at start-up.
+    assert_eq!((stats.succeeded, stats.released), (9, 1));
     assert_eq!(job(&db, quick).await.state, "succeeded");
     let slow = job(&db, slow).await;
     assert_eq!((slow.state.as_str(), slow.attempts), ("pending", 0));
@@ -1522,6 +1522,7 @@ fn registry_collects_kernel_and_module_work() {
             "kernel.prune_rate_limits",
             "kernel.sequence_changes",
             "kernel.sweep_blobs",
+            "kernel.sweep_purged_workspaces",
             "test.count_a",
             "test.count_b",
             "test.forget_fails",
@@ -1538,6 +1539,7 @@ fn registry_collects_kernel_and_module_work() {
             "kernel.prune_idempotency",
             "kernel.prune_rate_limits",
             "kernel.prune_changes",
+            "kernel.sweep_purged_workspaces",
             "kernel.dispatch_rekeys"
         ]
     );
@@ -1662,6 +1664,7 @@ fn registry_marks_the_instance_only_kinds() {
             "kernel.prune_jobs",
             "kernel.prune_rate_limits",
             "kernel.sweep_blobs",
+            "kernel.sweep_purged_workspaces",
             "test.forget_fails",
         ]
     );
@@ -2500,12 +2503,16 @@ mod kernel_scope {
             assert!(blob_refused(&detached), "{what}: {detached:?}");
             drop(step);
             let mut step = db::savepoint(&mut tx).await.unwrap();
-            let purged = purge_workspace(&mut step, &ws).await;
+            let purged = purge_workspace(&mut step, &ws, 10).await;
             assert!(refused(&purged), "{what}: {purged:?}");
             drop(step);
             let mut step = db::savepoint(&mut tx).await.unwrap();
-            let purged = crate::changes::purge_workspace(&mut step, &ws).await;
+            let purged = crate::changes::purge_workspace(&mut step, &ws, 10).await;
             assert!(refused(&purged), "{what}: {purged:?}");
+            drop(step);
+            let mut step = db::savepoint(&mut tx).await.unwrap();
+            let tombstoned = crate::purge::tombstone(&mut step, &ws).await;
+            assert!(refused(&tombstoned), "{what}: {tombstoned:?}");
             drop(step);
             tx.commit().await.unwrap();
         }
@@ -2513,7 +2520,8 @@ mod kernel_scope {
             owner_count(
                 &db,
                 "SELECT (SELECT count(*) FROM kernel.jobs) + (SELECT count(*) FROM kernel.events)
-                      + (SELECT count(*) FROM kernel.changes) + (SELECT count(*) FROM kernel.blob_refs)"
+                      + (SELECT count(*) FROM kernel.changes) + (SELECT count(*) FROM kernel.blob_refs)
+                      + (SELECT count(*) FROM kernel.purged_workspaces)"
             )
             .await,
             0,

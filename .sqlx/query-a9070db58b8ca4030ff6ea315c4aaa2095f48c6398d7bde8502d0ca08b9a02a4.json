@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        DELETE FROM kernel.changes\n         WHERE id IN (SELECT id FROM kernel.changes WHERE workspace_id = $1 LIMIT $2)\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Int8"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "a9070db58b8ca4030ff6ea315c4aaa2095f48c6398d7bde8502d0ca08b9a02a4"
+}
