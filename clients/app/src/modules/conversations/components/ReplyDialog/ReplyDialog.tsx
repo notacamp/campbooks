@@ -316,7 +316,8 @@ export function ReplyDialog({
       cc: [],
       bcc: [],
     };
-    if (saved !== undefined && saved.message_id === answered.id) {
+    // Only a draft of the message answered is saved again.
+    if (saved?.message_id === answered.id) {
       const again = await saveDraft(workspaceId, saved.id, {
         version: saved.version,
         content_token: saved.content_token ?? null,

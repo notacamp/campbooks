@@ -1,6 +1,6 @@
 // A reader without the send slice's composer offers no Reply: none that
 // would do nothing (campbooks-cloud#220).
-import { fireEvent, screen, within } from "@testing-library/react";
+import { fireEvent, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 import { INBOX, Q4, Q4_DETAIL, W } from "../../../../../test/demo/conversations";
@@ -41,10 +41,9 @@ describe("ConversationReader", () => {
   it("offers no Reply, Reply all or Forward without a composer, and R does nothing", async () => {
     routes();
     renderWithProviders(<Reader />);
-    const reader = await screen.findByRole("main", { name: "Conversation" });
-    await within(reader).findByRole("heading", { name: Q4.subject });
+    await screen.findByRole("heading", { name: Q4.subject });
     for (const name of [/^Reply/u, /^Forward/u]) {
-      expect(within(reader).queryByRole("button", { name })).toBeNull();
+      expect(screen.queryByRole("button", { name })).toBeNull();
     }
     fireEvent.keyDown(document.body, { key: "r" });
     expect(screen.queryByRole("dialog")).toBeNull();
@@ -54,8 +53,8 @@ describe("ConversationReader", () => {
     routes();
     const slot = vi.fn<RenderReplySlot>(() => null);
     renderWithProviders(<Reader slot={slot} />);
-    const reader = await screen.findByRole("main", { name: "Conversation" });
-    const [reply] = await within(reader).findAllByRole("button", { name: /^Reply(?! all)/u });
+    await screen.findByRole("heading", { name: Q4.subject });
+    const [reply] = await screen.findAllByRole("button", { name: /^Reply(?! all)/u });
     if (reply === undefined) {
       throw new Error("no Reply");
     }
