@@ -115,11 +115,19 @@ and caller while the key is retained (24 hours): an identical retry SHALL
 receive the stored response with `Idempotency-Replayed: true`; a different
 request (operation, method, path, query or body) with the same key SHALL
 receive 422; a retry while the first request is running SHALL receive 409.
-A key whose first request stopped without an answer (its process died,
-perhaps after committing its effects) SHALL never run the operation again:
-once the key has been pending for two minutes, longer than any request
-runs, a retry SHALL receive 409 `idempotency_outcome_unknown` in the
-caller's language, until the key expires.
+A key whose first request ended without a stored answer SHALL never run
+the operation again. That happens when its process died, when the request
+was stopped at its time limit, or when the client or a proxy hung up, each
+perhaps after committing its effects. Once the key has been pending for two
+minutes, longer than any request runs, a retry SHALL receive 409
+`idempotency_outcome_unknown` in the caller's language, until the key
+expires. A request still running after the server's time limit (30 seconds)
+SHALL be answered 503 `request_timed_out`, which does not release its key:
+the caller checks the result, then retries with a new key. A server error
+the operation itself answers still releases the key, so a retry runs it
+again. If the operation committed before that error (or before an
+acknowledgement was lost), only the operation's own guard (a draft's send
+state, for mail) keeps the work from running twice.
 Server errors and authentication or rate-limit failures SHALL release the
 key. GET and HEAD requests SHALL ignore the header, and no operation SHALL be
 able to opt out. Expired keys SHALL be deleted by an hourly job. For an
@@ -163,7 +171,11 @@ running the operation again or showing the secret.
 
 #### Scenario: Two requests with one key at once
 - **WHEN** two identical requests with the same key arrive while the first is still running
-- **THEN** one runs, the other receives 409 `idempotency_key_in_flight`, and a retry afterwards replays the one answer
+- **THEN** exactly one runs and the other receives 409 `idempotency_key_in_flight`, and a retry afterwards replays the one answer
+
+#### Scenario: A request past its time limit
+- **WHEN** a request is still running after the server's time limit
+- **THEN** it is answered 503 `request_timed_out` in the caller's language, and a retry with the same key is not run again
 
 ### Requirement: Record references
 The kernel SHALL provide a record reference `{ type, id }` whose `type` is

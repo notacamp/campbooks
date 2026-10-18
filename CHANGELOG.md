@@ -274,11 +274,13 @@ All notable changes to Campbooks Next are documented here. The format follows
   asked for that is still waiting to be made at your mail provider (its mailbox paused, or
   the provider down) is now signed again with the new key during a rotation, so it is
   still made once the old key is removed. The logs say when none are left.
-- **A retried request is never done twice after a crash.** If the server stopped after it
-  made a change but before it answered, retrying that request with the same
-  `Idempotency-Key` used to run it again after two minutes. It is now never run again:
-  the retry answers 409 `idempotency_outcome_unknown`, so the caller checks whether it took
-  effect before trying with a new key.
+- **A retried request is never done twice after a crash.** If a request with an
+  `Idempotency-Key` ended without its answer being kept (the server stopped, the request
+  hit the 30-second limit, or the client hung up), retrying it with the same key used to
+  run it again after two minutes. It is now never run again: the retry answers 409
+  `idempotency_outcome_unknown`, so the caller checks whether it took effect and then
+  retries with a new key. A request past the time limit now answers 503
+  `request_timed_out`, which says the same.
 
 ### Added
 

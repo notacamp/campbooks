@@ -815,15 +815,22 @@ async fn concurrent_requests_with_one_key_run_once(db: PgPool) {
                 .await
         },
     );
-    assert_eq!(first.0, StatusCode::CREATED, "{}", first.2);
-    assert_eq!(second.0, StatusCode::CONFLICT, "{}", second.2);
-    assert_eq!(second.2["code"], "idempotency_key_in_flight");
+    // Exactly one ran, whichever it was; the other heard it was in flight.
+    let (ran, refused) = match (first.0, second.0) {
+        (StatusCode::CREATED, StatusCode::CONFLICT) => (first, second),
+        (StatusCode::CONFLICT, StatusCode::CREATED) => (second, first),
+        other => panic!(
+            "one 201 and one 409, not {other:?}: {} / {}",
+            first.2, second.2
+        ),
+    };
+    assert_eq!(refused.2["code"], "idempotency_key_in_flight");
     let (status, headers, again) = http
         .send("POST", "/api/v1/test/slow", Some("together"), None)
         .await;
     assert_eq!(status, StatusCode::CREATED);
     assert_eq!(headers[idempotency::REPLAYED_HEADER], "true");
-    assert_eq!(again["run"], first.2["run"], "it ran once");
+    assert_eq!(again["run"], ran.2["run"], "it ran once");
 }
 
 #[sqlx::test(migrations = "../../migrations")]

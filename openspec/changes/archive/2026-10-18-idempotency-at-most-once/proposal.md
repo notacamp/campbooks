@@ -30,11 +30,25 @@ twice.
   rate-limit failures release the key; and row-level security keeps keys to
   their caller.
 
+- **Time limit and disconnects.** A request stopped at the server's 30-second
+  limit, or one whose client or proxy hung up, also ends without a stored
+  answer, so its key gives "outcome unknown" too. The time limit now answers
+  503 `request_timed_out`, its own problem code, in the caller's language,
+  saying to check and then retry with a new key. Before, it was a bare 503
+  that read like a server error, which suggested the key had been released;
+  it never was. Only API clients send keys today; the web app does not.
+- **What stays as before.** A 5xx the operation itself answers releases the
+  key. An operation that committed before such an error, or before a lost
+  acknowledgement, can run again on retry unless it has its own guard (mail
+  has the draft's send state). The spec states this, and it is filed as a
+  follow-up.
+
 ## Impact
 
 - Spec: operation-catalogue (Idempotent mutating operations).
 - Code: kernel `idempotency` (`claim_in`: no takeover, `Claim::Unknown`),
-  four kernel locale files.
+  server `time_limit` (503 `request_timed_out`, replacing tower's
+  `TimeoutLayer`), four kernel locale files.
 - No migration: the schema is unchanged.
 - Behaviour: a request whose process died now needs a new key (after
   checking whether it took effect) instead of being re-run.

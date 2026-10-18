@@ -7,3 +7,4 @@
 
 - [x] 2.1 A crash between the commit and the stored answer (simulated) never runs twice
 - [x] 2.2 Two requests with one key at once run once; the retry replays
+- [x] 2.3 A request past the time limit answers 503 `request_timed_out` and keeps its key

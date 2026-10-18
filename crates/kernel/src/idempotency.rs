@@ -10,10 +10,12 @@
 //! - answers **422** when the key is reused for another operation or another
 //!   request (method, path, query or body differ);
 //! - answers **409** while the first request with the key is still running.
-//! - never runs it again when the first request stopped without an answer
-//!   (its process died after it may have committed): once that key has
-//!   been pending for longer than any request runs, a retry gets **409**
-//!   `idempotency_outcome_unknown` until the key expires (campbooks-cloud#63).
+//! - never runs it again when the first request ended without a stored
+//!   answer (its process died, it was stopped at the server's time limit,
+//!   or its client hung up, each maybe after it committed): once that key
+//!   has been pending for longer than any request runs, a retry gets
+//!   **409** `idempotency_outcome_unknown` until the key expires
+//!   (campbooks-cloud#63).
 //!
 //! Keys belong to the authenticated caller; requests without a valid token
 //! are passed through untouched (the handler answers them as usual). GET and
@@ -394,8 +396,9 @@ enum Claim {
     Withheld(Vec<RecordRef>),
     Mismatch,
     InFlight,
-    /// The first request with the key stopped without an answer (its
-    /// process died): it may have run, and it is never run again.
+    /// The first request with the key ended without a stored answer (its
+    /// process died, it timed out, its client hung up): it may have run,
+    /// and it is never run again.
     Unknown,
 }
 
@@ -442,21 +445,6 @@ async fn claim(
     Ok(claim)
 }
 
-/// What [`claim_in`] reads back of a key it could not take.
-#[derive(sqlx::FromRow)]
-struct Existing {
-    operation_id: String,
-    request_hash: Vec<u8>,
-    state: String,
-    response_status: Option<i16>,
-    response_content_type: Option<String>,
-    response_location: Option<String>,
-    response_body: Option<Vec<u8>>,
-    containers: serde_json::Value,
-    /// Pending for longer than any request runs: its process stopped.
-    abandoned: bool,
-}
-
 /// [`claim`] in the caller's transaction.
 ///
 /// A key is taken only when it is new or expired. A pending key is never
@@ -477,44 +465,48 @@ async fn claim_in(
     // Two rounds: the row seen as a conflict may expire or be released before
     // it is read back.
     for _ in 0..2 {
-        let acquired: Option<bool> = sqlx::query_scalar(
-            "INSERT INTO kernel.idempotency
-                 (principal, key, operation_id, request_hash, expires_at)
-             VALUES ($1, $2, $3, $4, now() + make_interval(secs => $5))
-             ON CONFLICT (principal, key) DO UPDATE
-                SET operation_id = EXCLUDED.operation_id,
-                    request_hash = EXCLUDED.request_hash,
-                    state = 'pending',
-                    response_status = NULL,
-                    response_content_type = NULL,
-                    response_location = NULL,
-                    response_body = NULL,
-                    created_at = now(),
-                    expires_at = EXCLUDED.expires_at
-              WHERE kernel.idempotency.expires_at <= now()
-             RETURNING true",
+        let acquired = sqlx::query_scalar!(
+            r#"
+            INSERT INTO kernel.idempotency
+                (principal, key, operation_id, request_hash, expires_at)
+            VALUES ($1, $2, $3, $4, now() + make_interval(secs => $5))
+            ON CONFLICT (principal, key) DO UPDATE
+               SET operation_id = EXCLUDED.operation_id,
+                   request_hash = EXCLUDED.request_hash,
+                   state = 'pending',
+                   response_status = NULL,
+                   response_content_type = NULL,
+                   response_location = NULL,
+                   response_body = NULL,
+                   created_at = now(),
+                   expires_at = EXCLUDED.expires_at
+             WHERE kernel.idempotency.expires_at <= now()
+            RETURNING true AS "acquired!"
+            "#,
+            owner,
+            key,
+            operation_id,
+            hash,
+            retention,
         )
-        .bind(owner)
-        .bind(key)
-        .bind(operation_id)
-        .bind(hash)
-        .bind(retention)
         .fetch_optional(&mut *conn)
         .await?;
         if acquired.is_some() {
             return Ok(Claim::Acquired);
         }
 
-        let existing: Option<Existing> = sqlx::query_as(
-            "SELECT operation_id, request_hash, state, response_status, response_content_type,
-                    response_location, response_body, containers,
-                    created_at < now() - make_interval(secs => $3) AS abandoned
-               FROM kernel.idempotency
-              WHERE principal = $1 AND key = $2 AND expires_at > now()",
+        let existing = sqlx::query!(
+            r#"
+            SELECT operation_id, request_hash, state, response_status,
+                   response_content_type, response_location, response_body, containers,
+                   created_at < now() - make_interval(secs => $3) AS "abandoned!"
+              FROM kernel.idempotency
+             WHERE principal = $1 AND key = $2 AND expires_at > now()
+            "#,
+            owner,
+            key,
+            abandoned,
         )
-        .bind(owner)
-        .bind(key)
-        .bind(abandoned)
         .fetch_optional(&mut *conn)
         .await?;
         let Some(row) = existing else {

@@ -55,7 +55,6 @@ use tower_http::{
     compression::CompressionLayer,
     request_id::{MakeRequestUuid, PropagateRequestIdLayer, SetRequestIdLayer},
     set_header::SetResponseHeaderLayer,
-    timeout::TimeoutLayer,
 };
 use utoipa::{
     OpenApi as _,
@@ -677,13 +676,30 @@ fn compose(
             .layer(SetRequestIdLayer::new(request_id.clone(), MakeRequestUuid))
             .layer(middleware::from_fn_with_state(metrics, telemetry::observe))
             .layer(PropagateRequestIdLayer::new(request_id))
-            .layer(TimeoutLayer::with_status_code(
-                StatusCode::SERVICE_UNAVAILABLE,
-                REQUEST_TIMEOUT,
-            ))
             .layer(CompressionLayer::new())
-            .layer(localize),
+            .layer(localize)
+            // Inside `localize`, so its problem is in the caller's language.
+            .layer(middleware::from_fn_with_state(REQUEST_TIMEOUT, time_limit)),
     )
+}
+
+/// Stop a request still running after `limit` and answer 503 problem+json
+/// `request_timed_out`. A mutating request with an `Idempotency-Key` keeps
+/// its key: the request may have committed before it was stopped, so the
+/// key is not released, and retrying with it answers 409 (in flight, then
+/// `idempotency_outcome_unknown`); check the result, then retry with a new
+/// key (campbooks-cloud#63).
+async fn time_limit(
+    axum::extract::State(limit): axum::extract::State<Duration>,
+    request: AxumRequest,
+    next: middleware::Next,
+) -> axum::response::Response {
+    match tokio::time::timeout(limit, next.run(request)).await {
+        Ok(response) => response,
+        Err(_) => axum::response::IntoResponse::into_response(Error::Unavailable(
+            i18n::MESSAGES.reason("request_timed_out"),
+        )),
+    }
 }
 
 #[cfg(test)]
@@ -696,6 +712,45 @@ mod tests {
 
     fn app() -> Router {
         router(testing::state(testing::unreachable_pool()), None)
+    }
+
+    /// A request still running past its limit is a 503 problem
+    /// `request_timed_out`, in the caller's language (campbooks-cloud#63).
+    #[tokio::test]
+    async fn a_request_past_its_time_limit_is_a_503_problem() {
+        let state = testing::state(testing::unreachable_pool());
+        let localize = middleware::from_fn_with_state(state.clone(), i18n::localize);
+        let app =
+            Router::new()
+                .route(
+                    "/slow",
+                    get(|| async {
+                        tokio::time::sleep(Duration::from_secs(5)).await;
+                        "done"
+                    }),
+                )
+                .layer(ServiceBuilder::new().layer(localize).layer(
+                    middleware::from_fn_with_state(Duration::from_millis(50), time_limit),
+                ));
+        let request = Request::get("/slow")
+            .header(header::ACCEPT_LANGUAGE, "pt-PT")
+            .body(Body::empty())
+            .unwrap();
+        let response = testing::send(&app, request).await;
+        assert_eq!(response.status, StatusCode::SERVICE_UNAVAILABLE);
+        assert_eq!(
+            response.content_type.as_deref(),
+            Some("application/problem+json")
+        );
+        assert_eq!(response.json["code"], "request_timed_out");
+        assert!(
+            response.json["detail"]
+                .as_str()
+                .unwrap()
+                .contains("Idempotency-Key"),
+            "{}",
+            response.json
+        );
     }
 
     #[test]
