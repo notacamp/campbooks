@@ -81,6 +81,10 @@ pub struct MessageText {
 
 /// A message, with its plain-text body.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[allow(
+    clippy::struct_excessive_bools,
+    reason = "the wire shape: independent facts about one message"
+)]
 pub struct MessageView {
     /// The message.
     pub id: MessageId,
