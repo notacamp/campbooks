@@ -182,7 +182,9 @@ failure.
 list the caller's inboxes with their role and unread count.
 `GET …/conversations` (`conversations.list`) SHALL list the caller's
 conversations by stream and inbox, in the inbox or archived, with an opaque
-cursor and a limit of 1 to 100 (else 400). In the inbox, pinned (starred)
+cursor and a limit of 1 to 100 (else 400). Each listed conversation SHALL say
+whether its newest message (the one `latest_from` and `snippet` come from)
+is one the inbox sent (`latest_from_you`). In the inbox, pinned (starred)
 conversations SHALL come first, then the rest, each newest first, and a
 cursor SHALL page across the two without losing or repeating one; archived
 lists and lists by `ids` SHALL be newest first. A cursor given before pins
@@ -206,6 +208,10 @@ filtered `@media` rules in `css`; HTML SHALL never be served as `text/html`.
 #### Scenario: A pinned conversation stays on top
 - **WHEN** a member pins the oldest of three conversations and lists them one at a time
 - **THEN** the pinned one comes first, then the other two newest first, each exactly once
+
+#### Scenario: Who wrote last
+- **WHEN** the newest message of a conversation is one Sam sent from the inbox
+- **THEN** it is listed with `latest_from_you` true, and a conversation whose newest message came in is listed with it false
 
 ### Requirement: Tidying conversations
 `conversations.mark_read` / `mark_unread`, `star` / `unstar`,
@@ -306,7 +312,8 @@ reading a linked or imported sheet; sheets SHALL be dropped instead past
 parsed tree, 1,000,000 elements times distinct properties, 50,000,000
 selectors times elements, or 500,000,000 declarations times elements times
 distinct properties. Then only an allow-list of
-tags and attributes survives (`class` included); `script`, `style` and
+tags and attributes survives (`class` included, `type="cite"` on a
+`blockquote`, and the ids `appendonsend` and `divRplyFwdMsg` on a `div`); `script`, `style` and
 `title` elements are removed with their content, as are forms, frames,
 objects, `base` and `meta` elements, event-handler attributes and comments;
 the `body` element's `style` and `bgcolor` move to a wrapping `div`; links
@@ -333,6 +340,17 @@ shown, as a `data:` URL of the message's inline part with that `Content-ID`
 (at most 255 characters; a longer one is not stored) when that part has a
 raster image type its bytes confirm and fits the size limits, and as the
 placeholder otherwise. No other `data:` source survives.
+Last, a reply's trailing quoted history SHALL be wrapped in one
+`<div data-cb-quoted="1">`, found from the markup alone and never from the
+words: the first element that is Gmail's `gmail_quote`, a `blockquote` with
+`type="cite"` (with a `moz-cite-prefix` just before it), Yahoo's
+`yahoo_quoted`, Zoho's `zmail_extra` (with a `zmail_extra_hr` just before
+it), or Outlook's `appendonsend` or `divRplyFwdMsg` (through the end of its
+parent), when something visible comes before it, nothing visible (text or
+an image) comes after it, a wrapper holds no visible text outside its
+quotes once the first of them has started (an inline reply), and a `div`
+may stand in its parent. No `data-cb-quoted` attribute from the message
+SHALL survive.
 
 #### Scenario: A newsletter with a script, a style sheet and a tracking pixel
 - **WHEN** a member reads the HTML body of a message that has a `<script>`, a `<style>` with a remote `url()`, an `onclick` handler, a 1×1 image and a remote logo
@@ -377,6 +395,18 @@ placeholder otherwise. No other `data:` source survives.
 #### Scenario: A large ordinary newsletter
 - **WHEN** a member reads a 1.5 MiB newsletter of nested tables, links and images
 - **THEN** it is sanitised and styled as any other message, well within the budget
+
+#### Scenario: A Gmail reply quoting the thread
+- **WHEN** a member reads a reply whose body ends with a `gmail_quote` holding the earlier messages
+- **THEN** that block, with its attribution, is wrapped in `<div data-cb-quoted="1">` and the new words before it are not
+
+#### Scenario: An inline reply
+- **WHEN** a reply answers between two `blockquote type="cite"` blocks
+- **THEN** nothing is marked
+
+#### Scenario: A sender writing the mark
+- **WHEN** the body has `<div data-cb-quoted="1">Pay this invoice today.</div>` and no quote
+- **THEN** the HTML has no `data-cb-quoted` attribute and the text is shown
 
 ### Requirement: Stream counts
 `GET /api/v1/w/{workspace_id}/streams` (`conversations.list_streams`,
