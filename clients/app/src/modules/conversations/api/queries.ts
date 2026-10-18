@@ -210,10 +210,14 @@ function wordsQuery(workspaceId: string, conversationId: string, messageId: stri
  * The words of a message `conversations.get` marked `text_unread` (its HTML
  * was not read in time), asked for on their own; disabled otherwise.
  */
-export function useMessageWords(workspaceId: string, conversationId: string, message: MessageView) {
+export function useMessageWords(
+  workspaceId: string,
+  conversationId: string,
+  message: MessageView | undefined,
+) {
   return useQuery({
-    ...wordsQuery(workspaceId, conversationId, message.id),
-    enabled: message.text_unread === true,
+    ...wordsQuery(workspaceId, conversationId, message?.id ?? ""),
+    enabled: message?.text_unread === true,
   });
 }
 

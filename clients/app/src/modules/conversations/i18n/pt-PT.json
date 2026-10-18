@@ -55,7 +55,8 @@
     "kept": {
       "title": "Mantida como histórico",
       "lead": "{{address}} foi desligada e o correio dela ficou aqui, só de leitura: nada de novo chega, e nada pode ser enviado nem alterado a partir dela."
-    }
+    },
+    "readingText": "A ler…"
   },
   "actions": {
     "star": "Fixar",
@@ -228,12 +229,14 @@
       "unknown": "Algo correu mal. Tente de novo.",
       "not_saved": "Não foi possível guardar as últimas alterações, por isso nada foi enviado. Tente de novo.",
       "draft_changed": "Este rascunho foi alterado noutro sítio. Feche-o e abra-o de novo para ver a versão mais recente.",
-      "content_changed": "Isto mudou desde que o abriu. Verifique-o e envie de novo."
+      "content_changed": "Isto mudou desde que o abriu. Verifique-o e envie de novo.",
+      "quote": "Não foi possível ler o email para o citar. Nada foi iniciado. Tente novamente."
     },
     "shortcuts": {
       "newMessage": "Nova mensagem"
     },
-    "tooLate": "Já não é possível anular: a mensagem foi enviada."
+    "tooLate": "Já não é possível anular: a mensagem foi enviada.",
+    "readingQuote": "A ler o email para o citar…"
   },
   "needs": {
     "line": {
@@ -588,7 +591,9 @@
       "changed": "Esta resposta mudou desde que foi guardada. Verifique-a e envie de novo."
     },
     "to": "Para {{recipient}}",
-    "replyToElsewhere": "As respostas vão para {{recipient}}, não para o remetente {{sender}}. Confirme antes de enviar."
+    "replyToElsewhere": "As respostas vão para {{recipient}}, não para o remetente {{sender}}. Confirme antes de enviar.",
+    "readingQuote": "A ler o email para o citar…",
+    "quoteUnread": "Não foi possível ler o email para o citar. Feche e tente novamente."
   },
   "smartRule": {
     "tag": "Regra inteligente",
@@ -667,6 +672,7 @@
     "failed": "Não foi possível preparar o reencaminhamento: nada foi enviado. Tente de novo.",
     "none": "Ninguém com esse nome lhe escreveu.",
     "searchFailed": "Não foi possível procurar agora. Tente de novo.",
-    "nobody": "Ainda ninguém lhe escreveu."
+    "nobody": "Ainda ninguém lhe escreveu.",
+    "quoteFailed": "Não foi possível ler o email para o citar: nada foi enviado. Tente novamente."
   }
 }

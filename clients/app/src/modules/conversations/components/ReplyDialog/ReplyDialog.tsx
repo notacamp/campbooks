@@ -26,7 +26,7 @@ import {
   sendDraft,
   type Draft,
 } from "../../api/drafts";
-import { useConversation, type MessageView } from "../../api/queries";
+import { useConversation, useMessageWords, withWords, type MessageView } from "../../api/queries";
 import { useReplySuggestions, writeReply } from "../../api/replies";
 import { displayName, replyQuote, type QuoteWords } from "../../compose/quote";
 import type { Translate } from "../../model";
@@ -130,7 +130,14 @@ export function ReplyDialog({
   const detail = useConversation(workspaceId, conversationId);
   const messages = detail.data?.messages ?? [];
   // The newest message, as the reader's Reply answers it.
-  const answered = messages.at(-1);
+  const newest = messages.at(-1);
+  // Its words, asked for on their own when the conversation came without
+  // them (`text_unread`).
+  const unread = useMessageWords(workspaceId, conversationId, newest);
+  const answered =
+    newest?.text_unread === true && unread.data !== undefined
+      ? { ...newest, text: { content: unread.data, truncated: false }, text_unread: false }
+      : newest;
   // Who it really goes to, never only the sender's display name: a Reply-To
   // elsewhere is said out loud.
   const recipient = answered === undefined ? undefined : recipientOf(answered);
@@ -257,10 +264,12 @@ export function ReplyDialog({
     if (answered === undefined) {
       return undefined;
     }
+    // Its words, when they are still being read: never an empty quote.
+    const quoting = await withWords(queryClient, workspaceId, conversationId, answered);
     // The recipients shown, and no copies: what is saved is what is seen.
     const content = {
       body: text,
-      quoted: replyQuote(answered, i18n.language, words),
+      quoted: replyQuote(quoting, i18n.language, words),
       to: recipients,
       cc: [],
       bcc: [],
@@ -398,6 +407,10 @@ export function ReplyDialog({
 
   const intents = suggestions.data?.intents ?? [];
   // The message answered, the one the draft replies to.
+  // Still reading its words, or they could not be read: said, never an
+  // empty quote shown as if there were nothing.
+  const quoteUnread = newest?.text_unread === true && unread.isError;
+  const quoteReading = newest?.text_unread === true && unread.isPending;
   const quote =
     answered?.text?.content === undefined || answered.text.content.trim() === "" ? undefined : (
       <ReplyQuote
@@ -502,7 +515,19 @@ export function ReplyDialog({
       }
     >
       {to}
-      {quote}
+      {quoteUnread ? (
+        <Text tone="danger" size="sm">
+          {t("reply.quoteUnread")}
+        </Text>
+      ) : null}
+      {quoteReading ? (
+        <div role="status">
+          <Text tone="secondary" size="sm">
+            {t("reply.readingQuote")}
+          </Text>
+        </div>
+      ) : null}
+      {quoteUnread || quoteReading ? null : quote}
       {stage === "choose" ? (
         <>
           {problemLine}
