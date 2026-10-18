@@ -34,6 +34,8 @@
     "rule_needs_your_yes": "Vous seul pouvez dire oui à cette règle. Scout peut la proposer : vérifiez-la dans la mémoire de Scout et gardez-la là.",
     "undo_unavailable": "Une partie de ce que cette règle a modifié ne peut pas être rétablie. Supprimez-la en gardant ses modifications.",
     "invalid_senders_query": "Recherchez avec 2 à 100 caractères et demandez entre 1 et {{max}} expéditeurs.",
-    "images_already_trusted": "Une règle intelligente couvre déjà les images de cet expéditeur, même si elle est en pause ou attend un oui. Vous la trouverez dans la mémoire de Scout."
+    "images_already_trusted": "Une règle intelligente couvre déjà les images de cet expéditeur, même si elle est en pause ou attend un oui. Vous la trouverez dans la mémoire de Scout.",
+    "send_needs_you": "Vous seul pouvez envoyer un message ou annuler un envoi. Scout peut écrire un brouillon : vérifiez-le et envoyez-le vous-même.",
+    "images_need_you": "Vous seul pouvez choisir d’afficher toujours les images d’un expéditeur. Ouvrez l’un de ses messages et choisissez-le là."
   }
 }

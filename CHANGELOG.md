@@ -287,6 +287,19 @@ All notable changes to Campbooks Next are documented here. The format follows
 
 ### Security
 
+- **Scout can write a draft for you but never send it (campbooks-cloud#242).** When the
+  assistant (or an automation) calls the API on your behalf, the server now refuses to
+  send a draft (`send_needs_you`) or to take back a send you made, even with the token it
+  read for you and even if the call was marked as confirmed: nothing is scheduled, nothing
+  is signed and nothing reaches your mail provider. It may still write, change and discard
+  drafts; you send them with your own Send. Before, sending was gated only by a "confirmed"
+  flag that the calling code sets itself. The build now refuses any high-risk operation
+  that the assistant or an automation could call. The assistant can also no longer save,
+  reshape or bring back a rule that shows a sender's images (`images_need_you`), so a
+  suggestion of its own can't stand in the way of your "Always show images" for that
+  sender. No Scout feature calls any of these on its own today: this closes the door
+  before one does. The Scout reply dialog now also discards the draft it replaces when
+  that draft's send had failed, not only while it was a draft.
 - **Scout can propose rules but never keep them for you (campbooks-cloud#242).** When the
   assistant (or an automation) calls the API on your behalf, the server now refuses (`rule_needs_your_yes`) to
   say yes to a rule, to adopt one, to let a paused one act again, to change what a kept

@@ -187,20 +187,7 @@ impl Server {
     /// Run `operation` as `caller` for person `sub`; the HTTP status it
     /// ended with.
     async fn invoke(&self, caller: Caller, sub: &str, operation: &str, input: Value) -> StatusCode {
-        let principal = Principal {
-            subject: sub.to_owned(),
-            kind: PrincipalKind::User,
-            client_id: None,
-            scopes: SCOPES.split(' ').map(Scope::new).collect(),
-            workspace: None,
-            email: None,
-            email_verified: false,
-            name: None,
-            expires_at: None,
-            issued_at: None,
-            auth_time: None,
-        };
-        let invocation = Invocation::new(caller, principal, operation, input)
+        let invocation = Invocation::new(caller, person(sub), operation, input)
             .in_workspace(WORKSPACE)
             .idempotency_key(uuid::Uuid::new_v4().to_string())
             .confirmed();
@@ -209,6 +196,24 @@ impl Server {
             Err(InvokeError::Failed { status, .. }) => status,
             Err(other) => panic!("{other}"),
         }
+    }
+}
+
+/// Person `sub` with every scope of these tests, as automation or the
+/// assistant acts for them.
+fn person(sub: &str) -> Principal {
+    Principal {
+        subject: sub.to_owned(),
+        kind: PrincipalKind::User,
+        client_id: None,
+        scopes: SCOPES.split(' ').map(Scope::new).collect(),
+        workspace: None,
+        email: None,
+        email_verified: false,
+        name: None,
+        expires_at: None,
+        issued_at: None,
+        auth_time: None,
     }
 }
 
@@ -308,7 +313,7 @@ async fn writes_and_sends_stop_at_their_own_lower_limits(db: PgPool) {
 }
 
 #[sqlx::test(migrations = "../../migrations")]
-async fn automation_and_the_assistant_have_their_own_budget_and_share_sends(db: PgPool) {
+async fn automation_and_the_assistant_have_their_own_budget_and_never_send(db: PgPool) {
     let server = Server::new(&db, &low()).await;
     let ana = server.token("ana", "campbooks-web");
     for _ in 0..3 {
@@ -361,18 +366,31 @@ async fn automation_and_the_assistant_have_their_own_budget_and_share_sends(db: 
     // The person's reads were never touched.
     assert!(!server.read(&ana).await.limited());
 
-    // Sends are the person's, whoever sends: two through the web app use
-    // the assistant's too.
-    for _ in 0..2 {
-        server.send(&ana).await;
-    }
+    // Sends are the person's own (campbooks-cloud#242): neither the
+    // assistant nor automation may send, so they never reach the send
+    // budget, confirmed or not.
     let send = json!({ "draft_id": DRAFT, "version": 1 });
-    assert_eq!(
-        server
-            .invoke(Caller::Assistant, "ana", "conversations.send_draft", send)
-            .await,
-        StatusCode::TOO_MANY_REQUESTS
-    );
+    for caller in [Caller::Assistant, Caller::Automation] {
+        let invocation = Invocation::new(
+            caller,
+            person("ana"),
+            "conversations.send_draft",
+            send.clone(),
+        )
+        .in_workspace(WORKSPACE)
+        .idempotency_key(uuid::Uuid::new_v4().to_string())
+        .confirmed();
+        let refused = operations::invoke(&server.state, invocation).await;
+        assert!(
+            matches!(refused, Err(InvokeError::NotAllowed { .. })),
+            "{refused:?}"
+        );
+    }
+    // Ana's own two sends are all hers.
+    for _ in 0..2 {
+        assert!(!server.send(&ana).await.limited());
+    }
+    assert!(server.send(&ana).await.limited());
 }
 
 #[sqlx::test(migrations = "../../migrations")]

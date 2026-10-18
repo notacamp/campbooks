@@ -685,14 +685,6 @@ fn check_meta(
             ));
         }
     }
-    if meta
-        .get("risk")
-        .is_some_and(|risk| !matches!(risk.as_str(), Some("low" | "high")))
-    {
-        violations.push(format!(
-            "OpenAPI operation `{name}`: `x-campbooks.risk` must be \"low\" or \"high\""
-        ));
-    }
     match meta.get("records") {
         None => {}
         Some(serde_json::Value::Array(records)) => {
@@ -734,6 +726,7 @@ fn check_meta(
     };
     check_method(name, method, meta, violations);
     check_rate_limit(name, meta, violations);
+    check_risk(name, meta, violations);
     if meta.get("secret_once").is_some()
         && meta.get("mutates").and_then(serde_json::Value::as_bool) != Some(true)
     {
@@ -774,6 +767,37 @@ fn check_method(
             violations.push(format!(
                 "OpenAPI operation `{name}` does not mutate, so it must be GET or HEAD (or a POST \
                  marked `Operation::body_query()` when its inputs must stay out of URLs)"
+            ));
+        }
+    }
+}
+
+/// `risk` is `low` or `high`, and a high-risk operation (it sends mail in
+/// the person's name, deletes, or changes who may do what) is never
+/// automation's nor the assistant's: a person runs it with their own
+/// request (campbooks-cloud#242). Whether a call was "confirmed" is said by
+/// the code making it, so it proves no click.
+fn check_risk(
+    name: &str,
+    meta: &serde_json::Map<String, serde_json::Value>,
+    violations: &mut Vec<String>,
+) {
+    if meta
+        .get("risk")
+        .is_some_and(|risk| !matches!(risk.as_str(), Some("low" | "high")))
+    {
+        violations.push(format!(
+            "OpenAPI operation `{name}`: `x-campbooks.risk` must be \"low\" or \"high\""
+        ));
+    }
+    if meta.get("risk").and_then(serde_json::Value::as_str) != Some("high") {
+        return;
+    }
+    for caller in ["automation", "assistant"] {
+        if meta.get(caller).and_then(serde_json::Value::as_bool) == Some(true) {
+            violations.push(format!(
+                "OpenAPI operation `{name}` is high-risk and opts `x-campbooks.{caller}` in: \
+                 a high-risk operation is the person's own request only"
             ));
         }
     }
@@ -1758,6 +1782,40 @@ mod tests {
             v.iter()
                 .any(|m| m.contains("`GET /f` is not served by any module"))
         );
+    }
+
+    #[test]
+    fn a_high_risk_operation_is_no_callers_but_the_persons() {
+        let mut send = meta(true);
+        send["risk"] = serde_json::json!("high");
+        send["automation"] = serde_json::json!(false);
+        let (mut spec, mut owners) = healthy_catalogue();
+        spec["paths"]["/api/v1/mail/drafts/{id}/send"] =
+            serde_json::json!({ "post": { "operationId": "mail.send", "x-campbooks": send } });
+        owners.insert(
+            (
+                "POST".to_owned(),
+                "/api/v1/mail/drafts/{id}/send".to_owned(),
+            ),
+            "mail".to_owned(),
+        );
+        assert!(
+            check_operations(&spec, &owners).is_empty(),
+            "{:#?}",
+            check_operations(&spec, &owners)
+        );
+        for caller in ["automation", "assistant"] {
+            let mut opted = spec.clone();
+            opted["paths"]["/api/v1/mail/drafts/{id}/send"]["post"]["x-campbooks"][caller] =
+                serde_json::json!(true);
+            let v = check_operations(&opted, &owners);
+            assert_eq!(v.len(), 1, "{v:#?}");
+            assert!(
+                v[0].contains("`POST /api/v1/mail/drafts/{id}/send` is high-risk")
+                    && v[0].contains(&format!("`x-campbooks.{caller}`")),
+                "{v:#?}"
+            );
+        }
     }
 
     #[test]

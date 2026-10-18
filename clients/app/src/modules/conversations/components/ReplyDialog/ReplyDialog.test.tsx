@@ -219,6 +219,30 @@ describe("ReplyDialog", () => {
     });
   });
 
+  it("discards a replaced draft whose send failed: it is editable, so it goes too", async () => {
+    const api = routes({
+      [`POST ${D}`]: (_request, body) => ({
+        status: 201,
+        body: { ...FRESH, body: (body as { body: string }).body },
+      }),
+      [`DELETE ${D}/${REPLY.id}`]: { status: 204 },
+    });
+    const resume: ReplyResume = {
+      draft: { ...REPLY, message_id: NEWEST, body: DRAFT, state: "failed" },
+      intent: "Say Thursday works",
+    };
+    const handlers = dialog({ resume });
+    await screen.findByText("To Maya Okafor <maya@northwind-studio.example>");
+    fireEvent.click(screen.getByRole("button", { name: "Open in composer" }));
+    await waitFor(() => {
+      expect(handlers.onOpenDraft).toHaveBeenCalled();
+    });
+    expect(api.calls.some((c) => c.route === `POST ${D}`)).toBe(true);
+    await waitFor(() => {
+      expect(api.calls.map((c) => c.route)).toContain(`DELETE ${D}/${REPLY.id}`);
+    });
+  });
+
   it("never discards a draft that is on its way: only its Undo takes a send back", async () => {
     const api = routes({
       [`POST ${D}`]: (_request, body) => ({

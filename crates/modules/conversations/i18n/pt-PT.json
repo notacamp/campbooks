@@ -34,6 +34,8 @@
     "rule_needs_your_yes": "Só você pode dizer sim a esta regra. O Scout pode propô-la: verifique-a na memória do Scout e mantenha-a aí.",
     "undo_unavailable": "Parte do que esta regra alterou já não pode ser reposta. Remova-a mantendo as alterações.",
     "invalid_senders_query": "Pesquise com 2 a 100 caracteres e peça entre 1 e {{max}} remetentes.",
-    "images_already_trusted": "Já existe uma regra inteligente para as imagens deste remetente, mesmo que esteja em pausa ou à espera de um sim. Encontra-a na memória do Scout."
+    "images_already_trusted": "Já existe uma regra inteligente para as imagens deste remetente, mesmo que esteja em pausa ou à espera de um sim. Encontra-a na memória do Scout.",
+    "send_needs_you": "Só você pode enviar mensagens ou anular um envio. O Scout pode escrever um rascunho: verifique-o e envie-o você mesmo.",
+    "images_need_you": "Só você pode escolher mostrar sempre as imagens de um remetente. Abra uma das mensagens dele e escolha-o aí."
   }
 }

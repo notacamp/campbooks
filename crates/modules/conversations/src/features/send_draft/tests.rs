@@ -1,5 +1,10 @@
 use axum::http::StatusCode;
-use campbooks_kernel::{blobs::BlobRef, db::BeginFor as _, tenancy::WorkspaceId};
+use campbooks_kernel::{
+    blobs::BlobRef,
+    db::BeginFor as _,
+    operations::{InvokeError, Output},
+    tenancy::WorkspaceId,
+};
 use serde_json::{Value, json};
 use sqlx::PgPool;
 
@@ -712,4 +717,125 @@ async fn an_autosave_takes_the_token_of_the_last_save(db: PgPool) {
         .await;
     assert_eq!(fresh.status, StatusCode::OK, "{:?}", fresh.json);
     assert_eq!(fresh.json["body"], "Thursday works");
+}
+
+/// The kernel refused the assistant's call before the handler ran: the
+/// operation does not opt the assistant in.
+fn not_the_assistants(result: &Result<Output, InvokeError>) {
+    assert!(
+        matches!(result, Err(InvokeError::NotAllowed { .. })),
+        "{result:?}"
+    );
+}
+
+/// The handler refused it on its own: 403 `send_needs_you`.
+fn needs_the_member(result: &Result<Output, InvokeError>) {
+    match result {
+        Err(InvokeError::Failed {
+            status, problem, ..
+        }) => {
+            assert_eq!(*status, StatusCode::FORBIDDEN, "{problem}");
+            assert_eq!(problem["code"], "send_needs_you", "{problem}");
+        }
+        other => panic!("not refused: {other:?}"),
+    }
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn the_assistant_writes_a_draft_but_only_the_member_sends_it(db: PgPool) {
+    let kit = Kit::new(db).await;
+    let (workspace, _, sam) = kit.sams_inbox().await;
+    // Scout writes Sam's reply and reads it back: the token it gets is Sam's.
+    let message = kit.message_of("en-1").await;
+    let written = kit
+        .as_assistant(
+            "sam",
+            workspace,
+            (
+                "conversations.create_draft",
+                json!({"kind": "reply", "message_id": message, "body": "Thursday works."}),
+            ),
+            false,
+        )
+        .await
+        .unwrap();
+    let id = written.body["id"].as_str().unwrap().to_owned();
+    let uri = format!("/api/v1/w/{workspace}/drafts/{id}");
+    let read = kit
+        .as_assistant(
+            "sam",
+            workspace,
+            ("conversations.get_draft", json!({"draft_id": id})),
+            false,
+        )
+        .await
+        .unwrap();
+    assert!(read.body["content_token"].is_string(), "{}", read.body);
+    let input = json!({"draft_id": id, "version": read.body["version"],
+        "content_token": read.body["content_token"]});
+    // Sending it with Sam's token, as a call the user confirmed or not: the
+    // kernel refuses it before the handler runs.
+    for confirmed in [false, true] {
+        not_the_assistants(
+            &kit.as_assistant(
+                "sam",
+                workspace,
+                ("conversations.send_draft", input.clone()),
+                confirmed,
+            )
+            .await,
+        );
+    }
+    // Listed for the assistant by mistake, the kernel still wants a
+    // confirmation, and a confirmed call is refused by the handler itself.
+    let unconfirmed = kit
+        .as_assistant_listed(
+            "sam",
+            workspace,
+            ("conversations.send_draft", input.clone()),
+            false,
+        )
+        .await;
+    assert!(
+        matches!(unconfirmed, Err(InvokeError::ConfirmationRequired(_))),
+        "{unconfirmed:?}"
+    );
+    needs_the_member(
+        &kit.as_assistant_listed("sam", workspace, ("conversations.send_draft", input), true)
+            .await,
+    );
+    // Nothing was scheduled, bound or asked of the connector.
+    nothing_scheduled(&kit, &uri).await;
+
+    // Sam's own Send, with the token his screen got: it leaves, once.
+    let sent = send(&kit, &sam, &uri).await;
+    assert_eq!(sent.status, StatusCode::ACCEPTED, "{:?}", sent.json);
+    window_ends(&kit).await;
+    assert_eq!(kit.events("conversations.send_requested").await.len(), 1);
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn the_assistant_never_takes_back_a_send_the_member_made(db: PgPool) {
+    let kit = Kit::new(db).await;
+    let (workspace, _, sam) = kit.sams_inbox().await;
+    let uri = reply(&kit, workspace, &sam).await;
+    let sent = send(&kit, &sam, &uri).await;
+    assert_eq!(sent.status, StatusCode::ACCEPTED, "{:?}", sent.json);
+    let id = uri.rsplit('/').next().unwrap().to_owned();
+    let cancel = ("conversations.cancel_send", json!({"draft_id": id}));
+    for confirmed in [false, true] {
+        not_the_assistants(
+            &kit.as_assistant("sam", workspace, cancel.clone(), confirmed)
+                .await,
+        );
+        needs_the_member(
+            &kit.as_assistant_listed("sam", workspace, cancel.clone(), confirmed)
+                .await,
+        );
+    }
+    // Still on its way, as Sam sent it: it leaves when the window ends.
+    let shown = kit.get(&sam, &uri).await;
+    assert_eq!(shown.json["state"], "scheduled", "{:?}", shown.json);
+    window_ends(&kit).await;
+    assert_eq!(kit.events("conversations.send_requested").await.len(), 1);
 }
