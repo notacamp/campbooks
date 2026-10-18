@@ -17,15 +17,38 @@
 //!
 //! The folder holds real mail: it is the owner's, it is never committed,
 //! and `cargo xtask eval decide --set-dir <folder>` reads it where it is.
+//!
+//! Every export is bounded by one member's visibility (campbooks-cloud#219):
+//! `--member` names them (their id, or their verified address), and only
+//! the inboxes they can read are exported, as the API decides it; `--inbox`
+//! narrows it to one of those. There is no "whole workspace". The folder
+//! carries a marker ([`MARKER`]), and `campbooks-server labelling purge
+//! --out <folder>` removes a folder only when it has one.
 
-use std::{fs, io::Write as _, path::Path, process::ExitCode};
+use std::{
+    fs,
+    io::Write as _,
+    path::{Path, PathBuf},
+    process::ExitCode,
+};
 
 use campbooks_ai::decide::signals::actions::ActionId;
 use campbooks_conversations::labelling::{
     LabellingItem, LabellingSet, MAX_ITEMS, export_set, manifest_for,
 };
-use campbooks_kernel::{AppState, Config, tenancy::WorkspaceId};
+use campbooks_kernel::{
+    AppState, Config, Error,
+    db::BeginFor as _,
+    tenancy::{Access, WorkspaceId},
+};
 use clap::Subcommand;
+
+/// The file every export folder carries, so `purge` removes only a folder
+/// this tool wrote. Its first line is [`MARKER_HEADER`].
+pub const MARKER: &str = ".campbooks-labelling";
+
+/// The first line of [`MARKER`].
+const MARKER_HEADER: &str = "campbooks-server labelling export";
 
 /// What `campbooks-server labelling` does.
 #[derive(Debug, Subcommand)]
@@ -37,6 +60,14 @@ pub enum LabellingCommand {
         /// The workspace's id.
         #[arg(long)]
         workspace: String,
+        /// The member whose visibility bounds the export: their member id,
+        /// or their verified address. Only the inboxes they can read are
+        /// exported (never a teammate's private inbox).
+        #[arg(long)]
+        member: String,
+        /// Only this inbox (its id), which the member must be able to read.
+        #[arg(long)]
+        inbox: Option<String>,
         /// How many days back.
         #[arg(long, default_value_t = 90)]
         days: u32,
@@ -47,6 +78,13 @@ pub enum LabellingCommand {
         /// catalogue: mail that had a need, one column per action).
         #[arg(long, value_enum, default_value_t = Set::Money)]
         set: Set,
+    },
+    /// Remove a folder `export` wrote (it carries a `.campbooks-labelling`
+    /// marker); refuses any other folder.
+    Purge {
+        /// The folder to remove.
+        #[arg(long)]
+        out: PathBuf,
     },
 }
 
@@ -67,6 +105,14 @@ impl Set {
         }
     }
 
+    /// Its name on the command line.
+    const fn name(self) -> &'static str {
+        match self {
+            Self::Money => "money",
+            Self::Actions => "actions",
+        }
+    }
+
     /// The columns the owner fills in.
     fn columns(self) -> Vec<&'static str> {
         match self {
@@ -78,15 +124,52 @@ impl Set {
 
 /// Run `command`.
 pub fn run(command: LabellingCommand) -> ExitCode {
-    let LabellingCommand::Export {
-        workspace,
-        days,
-        out,
-        set,
-    } = command;
-    let Ok(workspace) = workspace.parse::<WorkspaceId>() else {
+    match command {
+        LabellingCommand::Export {
+            workspace,
+            member,
+            inbox,
+            days,
+            out,
+            set,
+        } => export(&Export {
+            workspace,
+            member,
+            inbox,
+            days,
+            out,
+            set,
+        }),
+        LabellingCommand::Purge { out } => match purge(&out) {
+            Ok(removed) => {
+                let _ = writeln!(std::io::stdout(), "removed {}", removed.display());
+                ExitCode::SUCCESS
+            }
+            Err(e) => super::fail(&e),
+        },
+    }
+}
+
+/// What `export` was asked.
+struct Export {
+    workspace: String,
+    member: String,
+    inbox: Option<String>,
+    days: u32,
+    out: PathBuf,
+    set: Set,
+}
+
+fn export(args: &Export) -> ExitCode {
+    let Ok(workspace) = args.workspace.parse::<WorkspaceId>() else {
         return super::fail("--workspace must be a workspace id (a UUID)");
     };
+    let inbox = match args.inbox.as_deref().map(str::parse) {
+        None => None,
+        Some(Ok(inbox)) => Some(inbox),
+        Some(Err(_)) => return super::fail("--inbox must be an inbox id (a UUID)"),
+    };
+    let out = &args.out;
     if out.exists() {
         return super::fail(&format!(
             "{} exists already: name a new folder, so no labels are overwritten",
@@ -101,13 +184,12 @@ pub fn run(command: LabellingCommand) -> ExitCode {
         Ok(runtime) => runtime,
         Err(e) => return super::fail(&e),
     };
+    let set = args.set;
     let exported = runtime.block_on(async {
         let db = super::connect(&config).await?;
         let blobs = campbooks_kernel::blobs::BlobStore::from_config(&config.blobs, db.clone())?;
         let state = AppState::new(db.clone(), config).with_blobs(blobs);
-        let items = export_set(&state, workspace, days, set.labelling())
-            .await
-            .map_err(|e| e.to_string());
+        let items = bounded_export(&state, workspace, &args.member, inbox, args.days, set).await;
         db.close().await;
         items
     });
@@ -121,36 +203,128 @@ pub fn run(command: LabellingCommand) -> ExitCode {
             "only the newest {MAX_ITEMS} messages: use fewer --days for an older window"
         );
     }
-    if let Err(e) = write(&out, &items, set) {
+    if let Err(e) = write(out, &items, set, workspace) {
         return super::fail(&format!("could not write {}: {e}", out.display()));
     }
+    let at = fs::canonicalize(out).unwrap_or_else(|_| out.clone());
     let next = match set {
         Set::Money => format!(
             "Fill the `money` column of labels.csv with owed, paid or neither, then run\n  \
              cargo xtask eval decide --set-dir {} --question money --strategy jev",
-            out.display()
+            at.display()
         ),
         Set::Actions => format!(
             "For each email, write yes under every action you would take (leave the others\n\
              blank; a row left all blank is skipped), then run\n  \
              cargo xtask eval actions --set-dir {} --floor 0.6 --floor 0.7 --floor 0.8",
-            out.display()
+            at.display()
         ),
     };
     let _ = writeln!(
         std::io::stdout(),
         "wrote {} message(s) to {}\n{next}\n\
-         This folder holds real mail: keep it on your own machine and never commit it.",
+         This folder holds real mail: keep it on your own machine and never commit it.\n\
+         Delete it from this server once copied: campbooks-server labelling purge --out {}",
         items.len(),
-        out.display(),
+        at.display(),
+        at.display(),
     );
     ExitCode::SUCCESS
 }
 
-fn write(out: &Path, items: &[LabellingItem], set: Set) -> std::io::Result<()> {
+/// The export of `set`, bounded by the member `who` names (and `inbox`).
+async fn bounded_export(
+    state: &AppState,
+    workspace: WorkspaceId,
+    who: &str,
+    inbox: Option<campbooks_conversations::model::InboxId>,
+    days: u32,
+    set: Set,
+) -> Result<Vec<LabellingItem>, String> {
+    let mut tx = state
+        .db
+        .begin_for(workspace)
+        .await
+        .map_err(|e| e.to_string())?;
+    let named = campbooks_workspaces::operator::members_named(&mut tx, workspace, who)
+        .await
+        .map_err(|e| e.to_string())?;
+    tx.commit().await.map_err(|e| e.to_string())?;
+    let (user, role) = match named.as_slice() {
+        [one] => *one,
+        [] => {
+            return Err(format!(
+                "nobody in workspace {workspace} is {who}: name a member by their member id \
+                 or their verified address"
+            ));
+        }
+        several => {
+            let ids: Vec<String> = several.iter().map(|(user, _)| user.to_string()).collect();
+            return Err(format!(
+                "{} members have the address {who}: choose one with --member <id>: {}",
+                several.len(),
+                ids.join(", ")
+            ));
+        }
+    };
+    let access = Access {
+        workspace,
+        user: Some(user),
+        role: Some(role),
+    };
+    export_set(state, &access, inbox, days, set.labelling())
+        .await
+        .map_err(|e| match (e, inbox) {
+            (Error::NotFound, Some(inbox)) => format!(
+                "{who} cannot read inbox {inbox}: name one of their inboxes, or leave --inbox out"
+            ),
+            (e, _) => e.to_string(),
+        })
+}
+
+/// Remove `out`, a folder `export` wrote: a real folder (not a link) whose
+/// [`MARKER`] starts with [`MARKER_HEADER`]. Anything else is refused, and
+/// nothing is removed.
+fn purge(out: &Path) -> Result<PathBuf, String> {
+    let meta = fs::symlink_metadata(out).map_err(|e| format!("{}: {e}", out.display()))?;
+    if !meta.is_dir() {
+        return Err(format!(
+            "{} is not a folder: nothing removed",
+            out.display()
+        ));
+    }
+    let marker = out.join(MARKER);
+    let written = fs::symlink_metadata(&marker).is_ok_and(|m| m.is_file())
+        && fs::read_to_string(&marker).is_ok_and(|text| text.lines().next() == Some(MARKER_HEADER));
+    if !written {
+        return Err(format!(
+            "{} was not written by `campbooks-server labelling export` (no {MARKER} marker): \
+             nothing removed",
+            out.display()
+        ));
+    }
+    let at = fs::canonicalize(out).map_err(|e| format!("{}: {e}", out.display()))?;
+    fs::remove_dir_all(&at).map_err(|e| format!("could not remove {}: {e}", at.display()))?;
+    Ok(at)
+}
+
+fn write(
+    out: &Path,
+    items: &[LabellingItem],
+    set: Set,
+    workspace: WorkspaceId,
+) -> std::io::Result<()> {
     // Real mail: readable by the operator only, and never into a folder
     // that exists (no labels overwritten, no race with the check above).
     private_dir(out)?;
+    // First, so `purge` can always remove what was started.
+    private_file(
+        &out.join(MARKER),
+        &format!(
+            "{MARKER_HEADER}\nworkspace {workspace}\nset {}\n",
+            set.name()
+        ),
+    )?;
     private_dir(&out.join("items"))?;
     let manifest = serde_json::to_string_pretty(&manifest_for(set.labelling()))
         .map_err(std::io::Error::other)?;
@@ -215,7 +389,110 @@ fn csv_cell(text: &str) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::{Set, csv_cell};
+    use clap::Parser;
+
+    use super::{LabellingCommand, MARKER, Set, csv_cell, purge};
+
+    /// The `labelling` subcommands, as the server parses them.
+    #[derive(Parser)]
+    struct Cli {
+        #[command(subcommand)]
+        command: LabellingCommand,
+    }
+
+    /// A new, empty folder of this test's own.
+    fn scratch(name: &str) -> std::path::PathBuf {
+        let dir = std::env::temp_dir().join(format!(
+            "campbooks-labelling-{name}-{}-{}",
+            std::process::id(),
+            uuid::Uuid::now_v7()
+        ));
+        std::fs::create_dir(&dir).expect("scratch folder");
+        dir
+    }
+
+    #[test]
+    fn an_export_names_the_member_whose_visibility_bounds_it() {
+        let workspace = "0192f1a0-0000-7000-8000-000000000001";
+        let without = Cli::try_parse_from([
+            "labelling",
+            "export",
+            "--workspace",
+            workspace,
+            "--out",
+            "/tmp/owner-money",
+        ]);
+        let err = without.err().expect("refused without --member");
+        assert!(err.to_string().contains("--member"), "{err}");
+        let with = Cli::try_parse_from([
+            "labelling",
+            "export",
+            "--workspace",
+            workspace,
+            "--member",
+            "sam@example.com",
+            "--inbox",
+            "0192f1a0-0000-7000-8000-000000000002",
+            "--set",
+            "actions",
+            "--out",
+            "/tmp/owner-actions",
+        ]);
+        assert!(with.is_ok());
+    }
+
+    #[test]
+    fn purge_removes_only_a_folder_export_wrote() {
+        // No marker: refused, nothing removed.
+        let other = scratch("other");
+        std::fs::write(other.join("notes.txt"), "keep me").expect("a file");
+        let refused = purge(&other).expect_err("no marker");
+        assert!(refused.contains(MARKER), "{refused}");
+        assert!(other.join("notes.txt").exists());
+        // A marker that is not ours: refused too.
+        std::fs::write(other.join(MARKER), "something else\n").expect("a marker");
+        assert!(purge(&other).is_err());
+        assert!(other.join("notes.txt").exists());
+        std::fs::remove_dir_all(&other).expect("cleaned up");
+
+        // A file, not a folder: refused.
+        let file =
+            std::env::temp_dir().join(format!("campbooks-labelling-file-{}", uuid::Uuid::now_v7()));
+        std::fs::write(&file, "x").expect("a file");
+        assert!(purge(&file).is_err());
+        std::fs::remove_file(&file).expect("cleaned up");
+
+        // An export's folder: removed, with what it holds.
+        let ours = scratch("ours");
+        std::fs::write(
+            ours.join(MARKER),
+            "campbooks-server labelling export\nworkspace w\nset money\n",
+        )
+        .expect("a marker");
+        std::fs::create_dir(ours.join("items")).expect("items");
+        std::fs::write(ours.join("items").join("owner.jsonl"), "{}\n").expect("items");
+        let removed = purge(&ours).expect("purged");
+        assert!(!removed.exists());
+        assert!(!ours.exists());
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn purge_never_follows_a_link() {
+        let ours = scratch("linked");
+        std::fs::write(
+            ours.join(MARKER),
+            "campbooks-server labelling export\nworkspace w\nset money\n",
+        )
+        .expect("a marker");
+        let link =
+            std::env::temp_dir().join(format!("campbooks-labelling-link-{}", uuid::Uuid::now_v7()));
+        std::os::unix::fs::symlink(&ours, &link).expect("a link");
+        assert!(purge(&link).is_err());
+        assert!(ours.join(MARKER).exists());
+        std::fs::remove_file(&link).expect("cleaned up");
+        std::fs::remove_dir_all(&ours).expect("cleaned up");
+    }
 
     #[test]
     fn each_set_has_its_own_columns() {

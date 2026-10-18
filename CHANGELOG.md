@@ -55,6 +55,12 @@ All notable changes to Campbooks Next are documented here. The format follows
 
 ### Fixed
 
+- **The labelling export stays within one member's inboxes.** `campbooks-server labelling export`
+  now requires `--member` (a member id or verified address) and exports only from the inboxes
+  that member can read, never a teammate's private inbox; `--inbox` narrows it to one of them.
+  The command prints where the folder is and how to delete it, and `campbooks-server labelling
+  purge --out <folder>` removes a folder only if the export wrote it. A committed eval set can
+  no longer claim `private` to skip its reserved-domain checks.
 - **HTML mail looks right in the desktop app.** The desktop app now shows HTML mail as the web
   app does: styled, with its pictures, and remote images still held back until Show images or
   a trusted sender. Its page policy allows only inline style attributes and `https:`, `data:`

@@ -5,7 +5,7 @@
 use std::{
     collections::{BTreeMap, HashSet},
     fs,
-    path::Path,
+    path::{Path, PathBuf},
 };
 
 use anyhow::{Context as _, Result, bail};
@@ -147,6 +147,7 @@ impl Dataset {
             &fs::read_to_string(dir.join("manifest.json")).context("reading manifest.json")?,
         )
         .context("parsing manifest.json")?;
+        refuse_committed_private(dir, manifest.private)?;
         let mut items = Vec::new();
         for locale in &manifest.locales {
             let path = dir.join("items").join(format!("{locale}.jsonl"));
@@ -412,6 +413,32 @@ fn link_hosts(text: &str) -> Vec<String> {
         .collect()
 }
 
+/// The folder the committed eval sets live in.
+fn committed_sets() -> PathBuf {
+    Path::new(env!("CARGO_MANIFEST_DIR")).join("../crates/ai/evals")
+}
+
+/// A committed set (anywhere under `crates/ai/evals/`) is fictional, so it
+/// never claims `private`, which skips the reserved-domain and labelling
+/// checks meant for an owner's own export (campbooks-cloud#219).
+fn refuse_committed_private(dir: &Path, private: bool) -> Result<()> {
+    if !private {
+        return Ok(());
+    }
+    let committed = match (fs::canonicalize(dir), fs::canonicalize(committed_sets())) {
+        (Ok(dir), Ok(sets)) => dir.starts_with(sets),
+        _ => false,
+    };
+    if committed {
+        bail!(
+            "{} is a committed eval set: it cannot be `private` (that skips the \
+             reserved-domain checks; only an owner's own export is private)",
+            dir.display()
+        );
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -423,6 +450,19 @@ mod tests {
             Ok(set) => set,
             Err(e) => panic!("{e:#}"),
         }
+    }
+
+    #[test]
+    fn a_committed_set_is_never_private() {
+        let committed = committed_sets().join("decide/mail-triage");
+        let err = refuse_committed_private(&committed, true)
+            .err()
+            .map(|e| e.to_string())
+            .unwrap_or_default();
+        assert!(err.contains("committed eval set"), "{err}");
+        assert!(refuse_committed_private(&committed, false).is_ok());
+        // An owner's export, anywhere else, may be.
+        assert!(refuse_committed_private(&std::env::temp_dir(), true).is_ok());
     }
 
     #[test]
