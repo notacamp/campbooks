@@ -80,6 +80,11 @@ All notable changes to Campbooks Next are documented here. The format follows
 
 ### Fixed
 
+- **Home no longer keeps an older need when two changes race.** When a conversation's
+  need changed twice in quick succession before it had an item on Home, two workers could
+  both create the item and the older change could land last, leaving Home on the older
+  need until the next change. The item now only ever moves to a newer revision. This was
+  also why a replay test failed now and then in CI.
 - **The labelling export says whom it is for.** Before reading any mail, `campbooks-server
   labelling export` prints the member it resolved (id and role) and the inboxes it will
   read, and records them in the folder's `.campbooks-labelling` marker.

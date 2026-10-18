@@ -5,7 +5,10 @@
 //! its revision is newer than the item's, so a replayed or late delivery
 //! changes nothing. A clear that arrives before its open leaves a tombstone
 //! (a cleared row with no reason) holding its revision, so the late open
-//! cannot reopen it. Rebuilding is replaying this handler from the log;
+//! cannot reopen it. Two deliveries racing for a conversation with no item
+//! yet (parallel workers, a replay) find no row to lock: the write itself
+//! only ever moves the revision forward, so the older one, landing second,
+//! changes nothing. Rebuilding is replaying this handler from the log;
 //! snoozes are the members' own and survive it, until the sender writes
 //! again.
 
@@ -78,12 +81,10 @@ impl EventHandler for ProjectConversationNeed {
             .await?;
         }
         let announce = if let Some(facts) = &need.need {
-            open(tx, workspace, id, &need, facts, &latest).await?;
-            true
+            open(tx, workspace, id, &need, facts, &latest).await?
         } else {
-            clear(tx, workspace, id, &need, &latest).await?;
             // Nobody saw a tombstone; announce only a real item.
-            current.is_some()
+            clear(tx, workspace, id, &need, &latest).await? && current.is_some()
         };
         if announce {
             events
@@ -101,7 +102,8 @@ impl EventHandler for ProjectConversationNeed {
     }
 }
 
-/// Open (or update) item `id` with `facts`.
+/// Open (or update) item `id` with `facts`: whether it was written (an item
+/// a newer revision reached first, in a race, is left as it is).
 async fn open(
     tx: &mut Transaction<'static, Postgres>,
     workspace: WorkspaceId,
@@ -109,9 +111,9 @@ async fn open(
     need: &ConversationNeedChanged,
     facts: &NeedFacts,
     latest: &str,
-) -> Result<(), JobError> {
-    sqlx::query!(
-        r#"
+) -> Result<bool, JobError> {
+    let written = sqlx::query(
+        r"
         INSERT INTO attention.items
             (id, workspace_id, record_type, record_id, container_type, container_id,
              cause_type, cause_id, latest_id, reason, trust, due_on, urgent, since,
@@ -126,38 +128,41 @@ async fn open(
                urgent = EXCLUDED.urgent, since = EXCLUDED.since, state = 'open',
                cleared_because = NULL, cleared_by = NULL, cleared_at = NULL,
                producer_revision = EXCLUDED.producer_revision, updated_at = now()
-        "#,
-        id as ItemId,
-        workspace.as_uuid(),
-        CONVERSATION,
-        need.conversation,
-        INBOX,
-        need.inbox,
-        MESSAGE,
-        need.message,
-        latest,
-        facts.reason.as_str(),
-        facts.trust.as_str(),
-        facts.due_on,
-        facts.urgent,
-        need.sent_at,
-        need.revision,
+         WHERE attention.items.producer_revision < EXCLUDED.producer_revision
+        ",
     )
+    .bind(id)
+    .bind(workspace.as_uuid())
+    .bind(CONVERSATION)
+    .bind(&need.conversation)
+    .bind(INBOX)
+    .bind(&need.inbox)
+    .bind(MESSAGE)
+    .bind(&need.message)
+    .bind(latest)
+    .bind(facts.reason.as_str())
+    .bind(facts.trust.as_str())
+    .bind(facts.due_on)
+    .bind(facts.urgent)
+    .bind(need.sent_at)
+    .bind(need.revision)
     .execute(&mut **tx)
     .await?;
-    Ok(())
+    Ok(written.rows_affected() > 0)
 }
 
 /// Clear item `id`; without one yet, leave a tombstone at this revision.
+/// Whether it was written (an item a newer revision reached first, in a
+/// race, is left as it is).
 async fn clear(
     tx: &mut Transaction<'static, Postgres>,
     workspace: WorkspaceId,
     id: ItemId,
     need: &ConversationNeedChanged,
     latest: &str,
-) -> Result<(), JobError> {
-    sqlx::query!(
-        r#"
+) -> Result<bool, JobError> {
+    let written = sqlx::query(
+        r"
         INSERT INTO attention.items
             (id, workspace_id, record_type, record_id, container_type, container_id,
              cause_type, cause_id, latest_id, since, state, cleared_because,
@@ -168,24 +173,25 @@ async fn clear(
                cleared_by = EXCLUDED.cleared_by, cleared_at = now(),
                latest_id = EXCLUDED.latest_id,
                producer_revision = EXCLUDED.producer_revision, updated_at = now()
-        "#,
-        id as ItemId,
-        workspace.as_uuid(),
-        CONVERSATION,
-        need.conversation,
-        INBOX,
-        need.inbox,
-        MESSAGE,
-        need.message,
-        latest,
-        need.sent_at,
-        need.cleared_because,
-        need.cleared_by.map(|u| *u.as_uuid()),
-        need.revision,
+         WHERE attention.items.producer_revision < EXCLUDED.producer_revision
+        ",
     )
+    .bind(id)
+    .bind(workspace.as_uuid())
+    .bind(CONVERSATION)
+    .bind(&need.conversation)
+    .bind(INBOX)
+    .bind(&need.inbox)
+    .bind(MESSAGE)
+    .bind(&need.message)
+    .bind(latest)
+    .bind(need.sent_at)
+    .bind(&need.cleared_because)
+    .bind(need.cleared_by.map(|u| *u.as_uuid()))
+    .bind(need.revision)
     .execute(&mut **tx)
     .await?;
-    Ok(())
+    Ok(written.rows_affected() > 0)
 }
 
 #[cfg(test)]

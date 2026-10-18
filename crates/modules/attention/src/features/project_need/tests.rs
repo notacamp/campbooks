@@ -4,8 +4,11 @@ use campbooks_kernel::tenancy::WorkspaceId;
 use chrono::{TimeDelta, Utc};
 use sqlx::PgPool;
 
+use campbooks_kernel::db::BeginFor;
+
 use crate::{
-    domain::Reason,
+    domain::{ItemId, Reason, Trust},
+    events::{ConversationNeedChanged, NeedFacts},
     testkit::{Kit, Need},
 };
 
@@ -84,6 +87,72 @@ async fn replaying_rebuilds_the_items(db: PgPool) {
     }
     kit.run_jobs().await;
     assert_eq!(items(&db).await, before);
+}
+
+/// `need` as `conversations.need_changed` carries it, open with `reason` or
+/// cleared.
+fn changed(workspace: WorkspaceId, need: &Need, open: bool) -> ConversationNeedChanged {
+    ConversationNeedChanged {
+        workspace: workspace.to_string(),
+        inbox: need.inbox.clone(),
+        conversation: need.conversation.clone(),
+        message: need.message.clone(),
+        revision: need.revision,
+        sent_at: need.sent_at,
+        need: open.then_some(NeedFacts {
+            reason: need.reason,
+            trust: Trust::Sure,
+            due_on: None,
+            urgent: false,
+        }),
+        cleared_because: (!open).then(|| "done".to_owned()),
+        cleared_by: None,
+        latest_message: None,
+    }
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn an_older_delivery_losing_a_race_for_a_new_item_changes_nothing(db: PgPool) {
+    // Two deliveries for a conversation with no item yet, run by two
+    // workers at once: neither finds a row to lock, so both insert. The
+    // newer one landed first; the older one, landing second, must not undo
+    // it (campbooks-cloud#135).
+    let kit = Kit::new(db.clone()).await;
+    let workspace = WorkspaceId::new();
+    let newer = changed(workspace, &need(2, Reason::Do), true);
+    let facts = newer.need.clone().unwrap();
+    let mut tx = BeginFor::begin_for(&kit.state.db, workspace).await.unwrap();
+    let message = newer.message.clone();
+    assert!(
+        super::open(&mut tx, workspace, ItemId::new(), &newer, &facts, &message)
+            .await
+            .unwrap()
+    );
+    tx.commit().await.unwrap();
+    // The older open, and an older clear, each with the id it made up.
+    let older = changed(workspace, &need(1, Reason::Reply), true);
+    let older_facts = older.need.clone().unwrap();
+    let mut tx = BeginFor::begin_for(&kit.state.db, workspace).await.unwrap();
+    assert!(
+        !super::open(
+            &mut tx,
+            workspace,
+            ItemId::new(),
+            &older,
+            &older_facts,
+            &message
+        )
+        .await
+        .unwrap()
+    );
+    let cleared = changed(workspace, &need(1, Reason::Reply), false);
+    assert!(
+        !super::clear(&mut tx, workspace, ItemId::new(), &cleared, &message)
+            .await
+            .unwrap()
+    );
+    tx.commit().await.unwrap();
+    assert_eq!(items(&db).await, [("do".into(), "open".into(), 2)]);
 }
 
 #[sqlx::test(migrations = "../../../migrations")]
