@@ -420,8 +420,19 @@ export function ReplyDialog({
   // empty quote shown as if there were nothing.
   const quoteUnread = newest?.text_unread === true && unread.isError && !unread.isFetching;
   const quoteReading = newest?.text_unread === true && unread.data === undefined && !quoteUnread;
+  // What the preview leaves out is said (campbooks-cloud#255): a long
+  // email's reply quotes only its first part; a long quote is shown in
+  // part, and quoted whole.
+  const said = answered?.text?.content.trim() ?? "";
+  const shortened = said.length > QUOTE_CHARS;
+  let quoteNote: string | undefined;
+  if (answered?.quote_cut === true || answered?.text?.truncated === true) {
+    quoteNote = t("reply.quoteCut");
+  } else if (shortened) {
+    quoteNote = t("reply.quoteShortened");
+  }
   const quote =
-    answered?.text?.content === undefined || answered.text.content.trim() === "" ? undefined : (
+    answered?.text?.content === undefined || said === "" ? undefined : (
       <ReplyQuote
         from={t("reply.quoteFrom", {
           name: displayName(answered.from),
@@ -431,7 +442,8 @@ export function ReplyDialog({
             month: "short",
           }).format(new Date(answered.sent_at)),
         })}
-        text={answered.text.content.trim().slice(0, QUOTE_CHARS)}
+        text={shortened ? `${said.slice(0, QUOTE_CHARS)}…` : said}
+        note={quoteNote}
       />
     );
   const to =

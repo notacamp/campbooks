@@ -375,6 +375,17 @@ describe("ReplyComposer", () => {
     ).toBeVisible();
   });
 
+  it("says the quote holds only the first part of a long email read in time", async () => {
+    const long = Q4_DETAIL.messages.map((message) =>
+      message.id === FIRST ? { ...message, quote_cut: true } : message,
+    );
+    mockApi({ [`GET ${D}`]: { body: { drafts: [REPLY] } } });
+    renderWithProviders(slot(null, vi.fn(), long));
+    expect(
+      await screen.findByText("This email is long: the quote holds its first part."),
+    ).toBeVisible();
+  });
+
   it("starts nothing when the words cannot be read, and says why", async () => {
     const api = mockApi({
       [`GET ${D}`]: { body: { drafts: [] } },

@@ -224,6 +224,44 @@ describe("ReplyDialog", () => {
     expect(created.quoted).toMatch(/> The harbourlight pontoon can move by two weeks\./u);
   });
 
+  it("says when the quote shown is only part of what is quoted, or all that is", async () => {
+    const newest = (change: object) => ({
+      [`GET ${C}`]: {
+        body: {
+          ...Q4_DETAIL,
+          messages: Q4_DETAIL.messages.map((message) =>
+            message.id === NEWEST ? { ...message, ...change } : message,
+          ),
+        },
+      },
+    });
+    // A long email read in time: its reply quotes only its first part.
+    routes(newest({ quote_cut: true }));
+    dialog();
+    expect(
+      await screen.findByText("This email is long: your reply quotes its first part."),
+    ).toBeVisible();
+  });
+
+  it("says when the preview shows a long quote in part", async () => {
+    const words = "The timeline can move by two weeks. ".repeat(20);
+    routes({
+      [`GET ${C}`]: {
+        body: {
+          ...Q4_DETAIL,
+          messages: Q4_DETAIL.messages.map((message) =>
+            message.id === NEWEST
+              ? { ...message, text: { content: words, truncated: false } }
+              : message,
+          ),
+        },
+      },
+    });
+    dialog();
+    expect(await screen.findByText("Shown in part: your reply quotes all of it.")).toBeVisible();
+    expect(screen.getByText(/two weeks\.[^…]*…$/u)).toBeVisible();
+  });
+
   it("says who the reply goes to, and warns when Reply-To is elsewhere", async () => {
     const newest = Q4_DETAIL.messages.at(-1);
     if (newest === undefined) {

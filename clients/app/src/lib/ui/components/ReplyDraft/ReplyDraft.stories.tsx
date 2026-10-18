@@ -53,6 +53,17 @@ export const Quote: StoryObj = {
   ),
 };
 
+/** A long email: what is shown is the start, and the note says what the reply quotes. */
+export const QuoteWithNote: StoryObj = {
+  render: () => (
+    <ReplyQuote
+      from="Quay Office, Tue 13 Oct"
+      text="The harbourlight pontoon schedule, week by week…"
+      note="This email is long: your reply quotes its first part."
+    />
+  ),
+};
+
 /** Ask in your own words: the button carries the visor and stays off while the field is empty. */
 export const Ask: StoryObj = {
   render: () => (

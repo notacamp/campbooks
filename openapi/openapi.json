@@ -14896,6 +14896,10 @@
             "$ref": "#/components/schemas/MessageId",
             "description": "The message."
           },
+          "quote_cut": {
+            "type": "boolean",
+            "description": "`text` holds only the first part of its words (its HTML was cut at\n256 KiB, or the words at their limit): a reply or forward quoting it\nsays so. The reader's own `truncated` stays about the text part\n(campbooks-cloud#255)."
+          },
           "read": {
             "type": "boolean",
             "description": "Read."

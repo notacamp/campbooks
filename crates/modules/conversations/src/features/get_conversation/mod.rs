@@ -113,6 +113,12 @@ pub struct MessageView {
     /// (`conversations.get_message_body`).
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub text_unread: bool,
+    /// `text` holds only the first part of its words (its HTML was cut at
+    /// 256 KiB, or the words at their limit): a reply or forward quoting it
+    /// says so. The reader's own `truncated` stays about the text part
+    /// (campbooks-cloud#255).
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub quote_cut: bool,
     /// Whether it has an HTML body (`conversations.get_message_body`).
     pub has_html: bool,
     /// Its attachments, in order.
@@ -280,7 +286,7 @@ pub async fn handler(
             .map_err(|e| Error::internal(crate::domain::redact::json(&e)))?;
         let bodies: Bodies = serde_json::from_value(row.bodies)
             .map_err(|e| Error::internal(crate::domain::redact::json(&e)))?;
-        let (text, text_unread) = text_of(&state, &ws, &bodies, deadline).await?;
+        let (text, text_unread, quote_cut) = text_of(&state, &ws, &bodies, deadline).await?;
         messages.push(MessageView {
             id: row.id,
             direction: row.direction.parse()?,
@@ -295,6 +301,7 @@ pub async fn handler(
             starred: row.starred,
             text,
             text_unread,
+            quote_cut,
             has_html: bodies.html.is_some(),
             attachments: attachments.remove(&row.id).unwrap_or_default(),
         });
@@ -359,16 +366,17 @@ fn text_deadline() -> std::time::Duration {
 
 /// A message's text: its text part, else its HTML read as text, also when
 /// the text part is blanks only (campbooks-cloud#218); replies and forwards
-/// quote it. `None` for a message with neither part; `(None, true)` when its
-/// HTML was not read by `deadline`.
+/// quote it. `None` for a message with neither part; `(None, true, _)` when
+/// its HTML was not read by `deadline`. The last is whether the text holds
+/// only the first part of its words.
 async fn text_of(
     state: &AppState,
     ws: &str,
     bodies: &Bodies,
     deadline: Instant,
-) -> Result<(Option<MessageText>, bool)> {
+) -> Result<(Option<MessageText>, bool, bool)> {
     if bodies.text.is_none() && bodies.html.is_none() {
-        return Ok((None, false));
+        return Ok((None, false, false));
     }
     let read = words_until(
         &state.blobs,
@@ -383,16 +391,19 @@ async fn text_of(
     )
     .await?;
     if read.late {
-        return Ok((None, true));
+        return Ok((None, true, false));
     }
+    let long = read.text.len() > MAX_TEXT_BYTES;
     // Cut short only when the text part was: words read from HTML are
-    // capped too, but the HTML the reader shows is whole.
+    // capped too, but the HTML the reader shows is whole. A quote of them
+    // says it holds the first part.
     Ok((
         Some(MessageText {
             content: cut(read.text, MAX_TEXT_BYTES),
             truncated: read.cut,
         }),
         false,
+        read.cut || read.partial || long,
     ))
 }
 
@@ -487,6 +498,65 @@ mod tests {
                 assert!(!content.contains(never), "{id}: {never} in {content:?}");
             }
         }
+    }
+
+    #[sqlx::test(migrations = "../../../migrations")]
+    async fn long_html_read_in_time_says_its_quote_holds_the_first_part(db: PgPool) {
+        // campbooks-cloud#255: HTML past 256 KiB read within the deadline is
+        // neither `text_unread` nor `truncated` (the reader shows the HTML
+        // whole), but its quote holds only the first part.
+        let kit = Kit::new(db).await;
+        let (workspace, inbox, sam) = kit.sams_inbox().await;
+        let long = "<p>The harbourlight pontoon schedule, week by week.</p>".repeat(6_000);
+        let short = "<p>Your berth at the harbourlight pontoon is kept.</p>";
+        for (id, html) in [("html-long-1", long.as_str()), ("html-short-1", short)] {
+            kit.ingest_value(
+                workspace,
+                inbox,
+                &serde_json::json!({"changes": [{"op": "upsert", "message": {
+                    "provider_message_id": id,
+                    "from": {"name": "Quay Office", "address": "office@quay-moorings.example"},
+                    "to": [{"address": "sam@example.com"}],
+                    "subject": format!("Schedule {id}"),
+                    "sent_at": "2026-10-13T06:30:00Z",
+                    "direction": "inbound",
+                    "html": html,
+                    "mailbox": {"in_inbox": true},
+                    "read": false, "starred": false
+                }}]}),
+            )
+            .await;
+        }
+        let read = |id: &'static str| {
+            let kit = &kit;
+            let sam = &sam;
+            async move {
+                let conversation = kit.conversation_of(id).await;
+                let response = kit
+                    .get(
+                        sam,
+                        &format!("/api/v1/w/{workspace}/conversations/{conversation}"),
+                    )
+                    .await;
+                assert_eq!(response.status, StatusCode::OK, "{:?}", response.json);
+                response.json["messages"][0].clone()
+            }
+        };
+        let long = read("html-long-1").await;
+        assert!(
+            long["text"]["content"]
+                .as_str()
+                .unwrap_or_default()
+                .starts_with("The harbourlight pontoon schedule"),
+            "{}",
+            long["text"]
+        );
+        assert_eq!(long["text"]["truncated"], false);
+        assert!(long.get("text_unread").is_none(), "{}", long["text_unread"]);
+        assert_eq!(long["quote_cut"], true);
+        // Whole words: nothing said.
+        let short = read("html-short-1").await;
+        assert!(short.get("quote_cut").is_none(), "{}", short["quote_cut"]);
     }
 
     #[sqlx::test(migrations = "../../../migrations")]

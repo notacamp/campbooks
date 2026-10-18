@@ -595,7 +595,9 @@
     "to": "Para {{recipient}}",
     "replyToElsewhere": "Las respuestas van a {{recipient}}, no al remitente {{sender}}. Compruébalo antes de enviar.",
     "readingQuote": "Leyendo el correo para citarlo…",
-    "quoteUnread": "No se pudo leer el correo al que respondes, así que no se puede mostrar la cita. No se puede enviar nada hasta que se muestre."
+    "quoteUnread": "No se pudo leer el correo al que respondes, así que no se puede mostrar la cita. No se puede enviar nada hasta que se muestre.",
+    "quoteCut": "Este correo es largo: tu respuesta cita la primera parte.",
+    "quoteShortened": "Se muestra en parte: tu respuesta lo cita entero."
   },
   "smartRule": {
     "tag": "Regla inteligente",
