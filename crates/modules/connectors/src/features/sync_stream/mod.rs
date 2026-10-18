@@ -256,9 +256,20 @@ impl SyncStream {
             // The read keeps the units it reserved; the writes pay what
             // they spent.
             let spent = gmail::UNITS_PER_RUN.saturating_add(pushed.spent);
-            schedule::settle_budget(ctx.pool(), target.provider, cost, spent, rate).await?;
-            if let Some(err) = Self::record_push(ctx, workspace, target.stream, pushed, now).await?
+            // What Gmail now holds is recorded first; settling the budget
+            // after is best effort (a miss only leaves the budget as taken).
+            let trouble = Self::record_push(ctx, workspace, target.stream, pushed, now).await?;
+            if let Err(err) =
+                schedule::settle_budget(ctx.pool(), target.provider, cost, spent, rate).await
             {
+                tracing::warn!(
+                    %workspace,
+                    stream = %target.stream,
+                    error = %campbooks_kernel::redact::error(&err),
+                    "could not settle the Gmail budget after a push"
+                );
+            }
+            if let Some(err) = trouble {
                 self.trouble(ctx, workspace, target, &err, now).await?;
                 return Ok(None);
             }

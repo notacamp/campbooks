@@ -301,13 +301,13 @@ pub async fn settle(pool: &PgPool, key: &str, reserved: u32, spent: u32, rate: R
     if back.abs() < 0.5 {
         return Ok(());
     }
-    sqlx::query(
+    sqlx::query!(
         "UPDATE connectors.provider_budgets SET tokens = least($2, tokens + $3)
           WHERE provider = $1",
+        key,
+        burst,
+        back,
     )
-    .bind(key)
-    .bind(burst)
-    .bind(back)
     .execute(pool)
     .await?;
     Ok(())

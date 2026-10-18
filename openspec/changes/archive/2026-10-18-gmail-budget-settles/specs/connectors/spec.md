@@ -26,7 +26,7 @@ message Gmail no longer has SHALL be recorded `skipped` (`message_gone`).
 - **WHEN** Gmail refuses the change for one message of a conversation
 - **THEN** the other messages are changed, that one is recorded `failed` (`refused`), and conversations is told its Gmail state
 
-#### Scenario: A large batch reserves its fallback
+#### Scenario: A refused batch is owed
 - **WHEN** a push plans one `batchModify` of 12 archives and Gmail refuses the batch
 - **THEN** it takes 60 units before writing (both profiles, four history pages, the batch) and, once each message is archived on its own, settles the 112 it spent (one profile read before, the batch, twelve modifies, one after): 52 more are owed
 
