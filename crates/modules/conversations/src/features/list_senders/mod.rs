@@ -11,9 +11,10 @@
 //! With `reachable`, only the senders it is safe to write to, such as
 //! Forward's picker (campbooks-cloud#233): never a no-reply address, nor
 //! a sender whose newest mail fails its sender's checks or pretends to be
-//! them, nor one with mail under review. Facts only (ADR 0018): addresses,
-//! the provider's authentication results and open review needs, never what
-//! the mail says.
+//! them, nor one with mail reported (in spam), under review or found
+//! suspicious and not said safe. Facts only (ADR 0018): addresses, the
+//! provider's authentication results, stored answers, needs and member
+//! corrections, never what the mail says.
 
 use axum::{Json, extract::State};
 use campbooks_kernel::{
@@ -60,7 +61,8 @@ pub struct SendersQuery {
     pub limit: Option<u32>,
     /// Only senders it is safe to write to (Forward's picker): never a
     /// no-reply address, nor a sender whose newest mail fails their checks
-    /// or pretends to be them, nor one with mail under review. Default false.
+    /// or pretends to be them, nor one with mail reported (in spam), under
+    /// review or found suspicious. Default false.
     pub reachable: Option<bool>,
 }
 
@@ -93,9 +95,9 @@ type Row = (String, Option<String>, i32, i32, Option<String>);
 
 /// The newest inbound mail only (`messages_inbound_recent_idx`); then one
 /// "was it answered" per thread, not per message, and only for the senders
-/// `q` keeps. With `reachable` ($6), a sender with mail under an open review
-/// is left out here, and the facts of their newest mail are read for the
-/// checks in Rust ([`may_write_to`]).
+/// `q` keeps. With `reachable` ($6), a sender Campbooks or the member
+/// flagged is left out here (`flagged`), and the facts of their newest mail
+/// are read for the checks in Rust ([`may_write_to`]).
 const SENDERS: &str = r"
     WITH recent AS (
         SELECT m.sender_address AS address,
@@ -123,14 +125,28 @@ const SENDERS: &str = r"
                   WHERE public.unaccent(lower(address || ' ' || coalesce(string_agg(name, ' '), '')))
                         NOT LIKE '%' || public.unaccent(lower(w.word)) || '%' ESCAPE '\')
     ),
-    reviewed AS (
-        SELECT DISTINCT r.address
-          FROM recent r
-          JOIN senders s USING (address)
+    -- Any of the sender's own mail in the window, spam included: reported
+    -- (Report and delete moves it to spam), under review (open, or cleared
+    -- because a later message replaced it), or found suspicious and not
+    -- said safe by a member. Judged by the flagged message's own sender,
+    -- so the real people in a hijacked thread stay.
+    flagged AS (
+        SELECT DISTINCT m.sender_address AS address
+          FROM conversations.messages m
          WHERE $6
-           AND EXISTS (SELECT 1 FROM conversations.needs n
-                        WHERE n.conversation_id = r.conversation_id
-                          AND n.state = 'open' AND n.reason = 'review')
+           AND m.inbox_id = ANY($1) AND m.direction = 'inbound'
+           AND m.sent_at > now() - make_interval(days => $4)
+           AND m.sender_address IN (SELECT address FROM senders)
+           AND (m.in_spam
+                OR EXISTS (SELECT 1 FROM conversations.needs n
+                            WHERE n.message_id = m.id AND n.reason = 'review'
+                              AND (n.state = 'open' OR n.cleared_because = 'superseded'))
+                OR (EXISTS (SELECT 1 FROM conversations.decisions d
+                             WHERE d.message_id = m.id AND d.question = 'suspicious'
+                               AND d.value = 'true'::jsonb)
+                    AND NOT EXISTS (SELECT 1 FROM conversations.corrections c
+                                     WHERE c.message_id = m.id AND c.question = 'suspicious'
+                                       AND c.to_value = 'false' AND c.withdrawn_at IS NULL)))
     ),
     threads AS (
         SELECT r.address, r.conversation_id, min(r.sent_at) AS first_at
@@ -154,7 +170,7 @@ const SENDERS: &str = r"
            s.newest_results
       FROM senders s
       LEFT JOIN replied r USING (address)
-     WHERE s.address NOT IN (SELECT address FROM reviewed)
+     WHERE s.address NOT IN (SELECT address FROM flagged)
      ORDER BY 4 DESC, 3 DESC, 1
      LIMIT $3
     ";
@@ -355,6 +371,199 @@ mod tests {
         for address in left_out {
             assert!(!listed.contains(&address.to_owned()), "{address}");
         }
+    }
+
+    /// One inbound message from `from`, in thread `thread`, with the
+    /// provider's authentication `results` when given.
+    fn mail(
+        id: &str,
+        thread: &str,
+        from: &str,
+        sent_at: &str,
+        results: Option<&str>,
+    ) -> serde_json::Value {
+        let mut message = json!({
+            "provider_message_id": id,
+            "thread_key": thread,
+            "from": {"name": "Lumen Billing", "address": from},
+            "to": [{"address": "sam@example.com"}],
+            "subject": format!("Invoice {id}"),
+            "sent_at": sent_at,
+            "direction": "inbound",
+            "text": "Your invoice is attached.",
+            "mailbox": {"in_inbox": true},
+            "read": false, "starred": false
+        });
+        if let Some(results) = results {
+            message["headers"] = json!({"authentication_results": results});
+        }
+        json!({"op": "upsert", "message": message})
+    }
+
+    /// The addresses `list_senders` answers for `q`, with `reachable` or not.
+    async fn found(
+        kit: &Kit,
+        sam: &str,
+        workspace: WorkspaceId,
+        q: &str,
+        reachable: bool,
+    ) -> Vec<String> {
+        let reachable = if reachable { "&reachable=true" } else { "" };
+        let response = kit
+            .get(
+                sam,
+                &format!("/api/v1/w/{workspace}/senders?q={q}{reachable}"),
+            )
+            .await;
+        assert_eq!(response.status, StatusCode::OK, "{}", response.json);
+        response.json["senders"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|s| s["address"].as_str().unwrap().to_owned())
+            .collect()
+    }
+
+    #[sqlx::test(migrations = "../../../migrations")]
+    async fn a_reported_sender_stays_out_whatever_else_they_send(db: PgPool) {
+        let kit = Kit::new(db).await;
+        let (workspace, inbox, sam) = kit.sams_inbox().await;
+        let from = "billing@lumen-pay.example";
+        kit.ingest_value(
+            workspace,
+            inbox,
+            &json!({"changes": [
+                mail("lumen-1", "thr-lumen-1", from, "2026-10-15T09:00:00Z", None),
+                mail("lumen-2", "thr-lumen-2", from, "2026-10-16T09:00:00Z", None),
+            ]}),
+        )
+        .await;
+        assert_eq!(found(&kit, &sam, workspace, "lumen", true).await, [from]);
+        // Reported: Report and delete moves that conversation to spam.
+        let reported = kit.conversation_of("lumen-1").await;
+        let spam = kit
+            .post(
+                &sam,
+                &format!("/api/v1/w/{workspace}/conversations/{reported}/spam"),
+                None,
+            )
+            .await;
+        assert_eq!(spam.status, StatusCode::OK);
+        // Their other, unflagged conversation doesn't bring them back.
+        assert!(found(&kit, &sam, workspace, "lumen", true).await.is_empty());
+        assert_eq!(found(&kit, &sam, workspace, "lumen", false).await, [from]);
+    }
+
+    #[sqlx::test(migrations = "../../../migrations")]
+    async fn a_review_replaced_by_a_later_message_still_keeps_them_out(db: PgPool) {
+        let kit = Kit::new(db.clone()).await;
+        let (workspace, inbox, sam) = kit.sams_inbox().await;
+        kit.ingest(workspace, inbox, "needs").await;
+        let phish = "it-support@at3lier-sol.example";
+        assert!(
+            !found(&kit, &sam, workspace, "support", true)
+                .await
+                .contains(&phish.to_owned())
+        );
+        let flagged =
+            "(SELECT id FROM conversations.messages WHERE provider_message_id = 'needs-4')";
+        // A follow-up replaced the review: it is cleared as superseded.
+        sqlx::query(&format!(
+            "UPDATE conversations.needs
+                SET state = 'cleared', cleared_because = 'superseded', cleared_at = now()
+              WHERE message_id = {flagged}"
+        ))
+        .execute(&db)
+        .await
+        .unwrap();
+        assert!(
+            !found(&kit, &sam, workspace, "support", true)
+                .await
+                .contains(&phish.to_owned())
+        );
+        // Rebuilt for a later message, the review leaves no trace in the
+        // needs: the stored answer that it is suspicious still does.
+        sqlx::query(&format!(
+            "DELETE FROM conversations.needs WHERE message_id = {flagged}"
+        ))
+        .execute(&db)
+        .await
+        .unwrap();
+        assert!(
+            !found(&kit, &sam, workspace, "support", true)
+                .await
+                .contains(&phish.to_owned())
+        );
+        // A member said it is safe: they may be written to again.
+        sqlx::query(&format!(
+            "INSERT INTO conversations.corrections
+                 (id, workspace_id, conversation_id, message_id, question, from_value,
+                  to_value, overridden_source)
+             SELECT gen_random_uuid(), workspace_id, conversation_id, id, 'suspicious',
+                    'true', 'false', 'model'
+               FROM conversations.messages WHERE id = {flagged}"
+        ))
+        .execute(&db)
+        .await
+        .unwrap();
+        assert!(
+            found(&kit, &sam, workspace, "support", true)
+                .await
+                .contains(&phish.to_owned())
+        );
+    }
+
+    /// Only the headers speak: whatever else was concluded about `from`'s
+    /// messages (a suspicious answer, a review) is set aside.
+    async fn headers_only(db: &PgPool, from: &str) {
+        for sql in [
+            "DELETE FROM conversations.needs WHERE message_id IN
+                 (SELECT id FROM conversations.messages WHERE sender_address = $1)",
+            "DELETE FROM conversations.decisions WHERE question = 'suspicious'
+                AND message_id IN
+                 (SELECT id FROM conversations.messages WHERE sender_address = $1)",
+        ] {
+            sqlx::query(sql).bind(from).execute(db).await.unwrap();
+        }
+    }
+
+    #[sqlx::test(migrations = "../../../migrations")]
+    async fn a_sender_whose_newest_mail_fails_its_checks_is_left_out(db: PgPool) {
+        let kit = Kit::new(db.clone()).await;
+        let (workspace, inbox, sam) = kit.sams_inbox().await;
+        let from = "billing@lumen-pay.example";
+        let pass = "mx.google.com; dkim=pass header.i=@lumen-pay.example header.s=s1; \
+                    dmarc=pass (p=REJECT sp=REJECT dis=NONE) header.from=lumen-pay.example";
+        let refused = "mx.google.com; spf=pass smtp.mailfrom=bounce@spoofer.example; \
+                       dmarc=fail (p=REJECT sp=REJECT dis=REJECT) header.from=lumen-pay.example";
+        let batch = |id: &str, sent_at: &str, results: &str| json!({"changes": [mail(id, id, from, sent_at, Some(results))]});
+        kit.ingest_value(
+            workspace,
+            inbox,
+            &batch("lumen-1", "2026-10-15T09:00:00Z", pass),
+        )
+        .await;
+        headers_only(&db, from).await;
+        assert_eq!(found(&kit, &sam, workspace, "lumen", true).await, [from]);
+        // Newest, pretending to be them: left out.
+        kit.ingest_value(
+            workspace,
+            inbox,
+            &batch("lumen-2", "2026-10-16T09:00:00Z", refused),
+        )
+        .await;
+        headers_only(&db, from).await;
+        assert!(found(&kit, &sam, workspace, "lumen", true).await.is_empty());
+        assert_eq!(found(&kit, &sam, workspace, "lumen", false).await, [from]);
+        // Their genuine mail again, newest: back.
+        kit.ingest_value(
+            workspace,
+            inbox,
+            &batch("lumen-3", "2026-10-17T09:00:00Z", pass),
+        )
+        .await;
+        headers_only(&db, from).await;
+        assert_eq!(found(&kit, &sam, workspace, "lumen", true).await, [from]);
     }
 
     #[sqlx::test(migrations = "../../../migrations")]

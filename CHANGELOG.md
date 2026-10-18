@@ -83,7 +83,10 @@ All notable changes to Campbooks Next are documented here. The format follows
 - **Home's Forward never offers a sender under review or a no-reply address.** The picker
   lists only people it is safe to write to: the server leaves out no-reply addresses,
   senders whose newest mail fails their sender checks or pretends to be them, and
-  senders with mail under review, from facts alone, never what the mail says. A name typed
+  senders with any mail reported as spam, under review (even once a later email
+  replaced the review) or found suspicious and not marked safe, from facts alone, never
+  what the mail says. Only the flagged email's own sender is left out, so the real
+  people in a hijacked thread stay. A name typed
   for one of them finds nobody. Closing Forward while it starts, then forwarding again,
   addresses the same draft rather than making a second one; a forward that fails while it
   starts no longer opens the composer after saying so; and Open attachment with no file

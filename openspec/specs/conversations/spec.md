@@ -1425,11 +1425,16 @@ most 5,000 messages (through a partial index on received mail), so the
 counts are within that window and its cost doesn't grow with an inbox's
 history. Within one compile, the assistant SHALL ask it at most once per
 `q`. With `reachable=true` it SHALL list only senders it is safe to write
-to: never a no-reply address, a sender whose newest mail in that window
-fails their sender checks or is refused by their DMARC policy, nor a sender
-with mail under an open review; facts only (addresses, the provider's
-authentication results and review needs), never what the mail says. Without
-it, the answer SHALL be as before.
+to: never a no-reply address, nor a sender whose newest mail in that
+window fails their sender checks or is refused by their DMARC policy, nor a
+sender any of whose own mail in that window, in the caller's inboxes and
+spam included, was reported (is in spam), is under review (open, or cleared
+because a later message replaced it), or holds a stored `suspicious` answer
+of `true` that no member corrected to safe. A flagged message SHALL exclude
+only its own sender, so the other people in its thread stay. Facts only
+(addresses, the provider's authentication results, stored answers, needs and
+member corrections), never what the mail says. Without it, the answer SHALL
+be as before.
 
 #### Scenario: Suggestions for "always reach you"
 - **WHEN** a member lists senders without `q`
@@ -1446,6 +1451,18 @@ it, the answer SHALL be as before.
 #### Scenario: Safe to write to
 - **WHEN** a member lists senders with `reachable=true`, with or without `q` ("support", "accounts")
 - **THEN** neither it-support@at3lier-sol.example (under review) nor no-reply@accounts.example is listed, while both are found without it
+
+#### Scenario: Reported once
+- **WHEN** a member reported one of a sender's conversations and the sender's other conversation is unflagged
+- **THEN** that sender is still not listed with `reachable=true`
+
+#### Scenario: A review replaced
+- **WHEN** a later message replaced a sender's review, or the review's need is gone, and no member said the flagged email is safe
+- **THEN** that sender is still not listed with `reachable=true`; once a member says it is safe, they are
+
+#### Scenario: Failing checks, newest
+- **WHEN** a sender's newest mail is refused by their DMARC policy
+- **THEN** they are not listed with `reachable=true` until newer mail of theirs passes
 
 ### Requirement: The caller's labels
 `GET /api/v1/w/{workspace_id}/labels` (`conversations.list_labels`,

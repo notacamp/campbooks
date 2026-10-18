@@ -460,7 +460,8 @@ export function useConversationAction(workspaceId: string) {
  * those matching `q` by name or address (from two characters). With
  * `reachable`, only those it is safe to write to (Forward's picker): the
  * server leaves out no-reply addresses, senders whose mail fails their
- * checks or pretends to be them, and senders under review.
+ * checks or pretends to be them, and senders reported, under review or found
+ * suspicious.
  */
 export function useSenders(
   workspaceId: string,
