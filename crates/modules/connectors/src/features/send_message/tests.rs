@@ -754,8 +754,11 @@ async fn an_unclear_send_that_stops_standing_is_looked_up_not_lost(db: PgPool) {
 #[sqlx::test(migrations = "../../../migrations")]
 async fn a_send_during_a_slow_token_refresh_waits_for_it_and_uses_one_attempt(db: PgPool) {
     // campbooks-cloud#254: the refresh lock is tried, never waited on (a
-    // lock wait is cut at `lock_timeout`, 10 s), so a send arriving while
-    // a sync refreshes the token takes that token once it is stored.
+    // lock wait is cut at `lock_timeout`), so a send arriving while a sync
+    // refreshes the token takes that token once it is stored. The send runs
+    // on connections whose `lock_timeout` is 200 ms, far shorter than the
+    // refresh: waiting on the lock, as before #578, would fail its attempt
+    // with 55P03 (campbooks-cloud#256).
     let kit = Kit::new(db).await;
     let (ws, inbox, thread) = connected(&kit).await;
     let connection: crate::domain::model::ConnectionId =
@@ -774,7 +777,26 @@ async fn a_send_during_a_slow_token_refresh_waits_for_it_and_uses_one_attempt(db
     // The refresh is under way (holding the lock) when the send runs.
     tokio::time::sleep(std::time::Duration::from_millis(300)).await;
     let send_id = request(&kit, ws, inbox, Some(&thread)).await;
-    kit.run_jobs().await;
+    let impatient = campbooks_kernel::db::with_runtime_role(
+        sqlx::postgres::PgPoolOptions::new().max_connections(5),
+        Some(campbooks_kernel::db::DEFAULT_RUNTIME_ROLE),
+    )
+    .connect_with(
+        campbooks_kernel::db::with_session_limits((*kit.db.connect_options()).clone())
+            .options([("lock_timeout", "200ms")]),
+    )
+    .await
+    .unwrap();
+    let lock_timeout: String = sqlx::query_scalar("SELECT current_setting('lock_timeout')")
+        .fetch_one(&impatient)
+        .await
+        .unwrap();
+    assert_eq!(lock_timeout, "200ms");
+    let mut state = kit.state.clone();
+    state.db = impatient;
+    campbooks_kernel::jobs::Worker::new(state)
+        .run_until_idle()
+        .await;
     let refreshed = refreshing.await.unwrap();
     assert!(refreshed.is_ok(), "{refreshed:?}");
 
