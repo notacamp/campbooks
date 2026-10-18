@@ -750,3 +750,46 @@ async fn an_unclear_send_that_stops_standing_is_looked_up_not_lost(db: PgPool) {
     assert_eq!(done.len(), 1);
     assert_eq!(done[0]["outcome"], "sent");
 }
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_send_during_a_slow_token_refresh_waits_for_it_and_uses_one_attempt(db: PgPool) {
+    // campbooks-cloud#254: the refresh lock is tried, never waited on (a
+    // lock wait is cut at `lock_timeout`, 10 s), so a send arriving while
+    // a sync refreshes the token takes that token once it is stored.
+    let kit = Kit::new(db).await;
+    let (ws, inbox, thread) = connected(&kit).await;
+    let connection: crate::domain::model::ConnectionId =
+        serde_json::from_value(kit.stream().await["connection_id"].clone()).unwrap();
+    // The stored token has expired; Google takes a while to refresh it.
+    kit.clock.advance(TimeDelta::hours(2));
+    kit.google
+        .slow_refresh(std::time::Duration::from_millis(1_500));
+    let before = kit.google.token_calls();
+    let refreshing = {
+        let (pool, deps) = (kit.state.db.clone(), kit.deps.clone());
+        tokio::spawn(async move {
+            crate::domain::credentials::access_token(&pool, &deps, ws, connection).await
+        })
+    };
+    // The refresh is under way (holding the lock) when the send runs.
+    tokio::time::sleep(std::time::Duration::from_millis(300)).await;
+    let send_id = request(&kit, ws, inbox, Some(&thread)).await;
+    kit.run_jobs().await;
+    let refreshed = refreshing.await.unwrap();
+    assert!(refreshed.is_ok(), "{refreshed:?}");
+
+    // Sent on the first attempt, with the one refreshed token.
+    assert_eq!(kit.google.send_calls(), 1);
+    assert_eq!(kit.google.token_calls() - before, 1);
+    let done = completed(&kit, ws).await;
+    assert_eq!(done.len(), 1);
+    assert_eq!(done[0]["outcome"], "sent");
+    assert_eq!(done[0]["send_id"], send_id.to_string());
+    let attempts: Vec<i32> = sqlx::query_scalar(
+        "SELECT attempts FROM kernel.jobs WHERE kind = 'connectors.send_message'",
+    )
+    .fetch_all(&kit.db)
+    .await
+    .unwrap();
+    assert_eq!(attempts, [1]);
+}
