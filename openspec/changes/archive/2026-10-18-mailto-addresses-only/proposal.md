@@ -12,8 +12,12 @@ defence in depth.
 - A mail link opens only when its address part is nothing but addresses:
   none, or comma-separated `local@domain`s, decoded, with no control
   character, blank, or delimiter a mail app could read as another field or
-  header (CR, LF, `&`, `;`, `?`, `#`, `<`, `>`, `"`, `\`, a leftover `%`).
-  Anything else opens nowhere.
+  header (CR, LF, `&`, `;`, `?`, `#`, `<`, `>`, `"`, `\`, a leftover `%`),
+  valid UTF-8 with no Unicode control (C0, C1) or format character (bidi
+  overrides, zero-width characters); other Unicode is kept for
+  internationalised addresses. A link with an authority
+  (`mailto://user:password@host`) is refused too. Anything else opens
+  nowhere.
 
 ## Impact
 

@@ -30,9 +30,16 @@ pub fn outside(url: &Url) -> Option<String> {
     match url.scheme() {
         "https" | "http" => Some(url.as_str().to_owned()),
         "mailto" => {
-            // Its addresses, before `?`: plain addresses only, or it opens
+            // `mailto:` then its addresses, before `?`: never an authority
+            // (`mailto://user:password@host`, whose parts would reach the
+            // mail app unchecked), and plain addresses only, or it opens
             // nowhere (campbooks-cloud#247).
-            if !addresses_only(url.path()) {
+            if url.path().starts_with('/')
+                || url.has_host()
+                || !url.username().is_empty()
+                || url.password().is_some()
+                || !addresses_only(url.path())
+            {
                 return None;
             }
             let kept: Vec<String> = url
@@ -77,6 +84,16 @@ fn addresses_only(path: &str) -> bool {
     if decoded.iter().any(refused) {
         return false;
     }
+    // Other characters may be any Unicode (an internationalised address or
+    // domain), but valid UTF-8, and never a control or an invisible format
+    // character (a bidi override, a zero-width space) that could make an
+    // address read as another.
+    let Ok(text) = std::str::from_utf8(&decoded) else {
+        return false;
+    };
+    if text.chars().any(|c| c.is_control() || is_format(c)) {
+        return false;
+    }
     decoded.split(|b| *b == b',').all(|address| {
         let mut parts = address.split(|b| *b == b'@');
         matches!(
@@ -84,6 +101,35 @@ fn addresses_only(path: &str) -> bool {
             (Some(local), Some(domain), None) if !local.is_empty() && !domain.is_empty()
         )
     })
+}
+
+/// Whether `c` is a Unicode format character (general category Cf):
+/// invisible, it changes how the text around it shows.
+fn is_format(c: char) -> bool {
+    matches!(
+        u32::from(c),
+        0x00AD
+            | 0x0600..=0x0605
+            | 0x061C
+            | 0x06DD
+            | 0x070F
+            | 0x0890..=0x0891
+            | 0x08E2
+            | 0x180E
+            | 0x200B..=0x200F
+            | 0x202A..=0x202E
+            | 0x2060..=0x2064
+            | 0x2066..=0x206F
+            | 0xFEFF
+            | 0xFFF9..=0xFFFB
+            | 0x110BD
+            | 0x110CD
+            | 0x13430..=0x1343F
+            | 0x1BCA0..=0x1BCA3
+            | 0x1D173..=0x1D17A
+            | 0xE0001
+            | 0xE0020..=0xE007F
+    )
 }
 
 /// `text` with its `%XX` escapes decoded, as bytes; a `%` not followed by
@@ -271,6 +317,19 @@ mod tests {
             "mailto:a@b@c.example",
             "mailto:a@b.example,,c@d.example",
             "mailto:%3Cevil@x.example%3E",
+            // An authority: its user, password and host would pass unchecked.
+            "mailto://x%0D%0Abcc:evil@b.example",
+            "mailto://x:y%0D%0Abcc%3Aevil@host.example?subject=a",
+            "mailto://rita@silva-contas.example",
+            "mailto:///rita@silva-contas.example",
+            // Invisible or control characters, and bytes that are not UTF-8.
+            "mailto:rita@silva%E2%80%AEcontas.example",
+            "mailto:rita%E2%80%8B@silva-contas.example",
+            "mailto:rita@silva-contas.example%C2%85bcc",
+            "mailto:rita@silva-contas%FF.example",
+            "mailto:rita@silva-contas.example%E2%80",
+            // A truncated escape.
+            "mailto:rita@silva-contas.example%2",
         ] {
             assert_eq!(outside(&parse(link)), None, "{link}");
         }
@@ -279,6 +338,9 @@ mod tests {
             "mailto:a@x.example,b@y.example",
             "mailto:?subject=Hi",
             "mailto:rita.gomes+tax@silva-contas.example",
+            // Internationalised: any other Unicode still opens.
+            "mailto:ana@ex%C3%A4mple.example",
+            "mailto:ana@exämple.example",
         ] {
             assert!(outside(&parse(link)).is_some(), "{link}");
         }

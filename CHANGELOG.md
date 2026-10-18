@@ -82,7 +82,9 @@ All notable changes to Campbooks Next are documented here. The format follows
 
 - **Desktop app: a mail link opens only when its addresses are plain addresses.** A link
   whose address part hides a line break, another field or header (`&`, `;`, `?`), even
-  encoded, now opens nowhere instead of reaching the mail app as written.
+  encoded, an invisible character (a bidi override, a zero-width space) or bytes that are
+  not text, or that carries a `mailto://` authority, now opens nowhere instead of
+  reaching the mail app as written. Internationalised addresses still open.
 - **Mail whose HTML has no body tag gets its words.** Mail written as a head followed
   straight by its text, with no `<body>` (some mailers send it), was stored with a blank
   text in place of its words, so search found nothing in it, its preview and Scout's read
