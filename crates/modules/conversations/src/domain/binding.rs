@@ -152,6 +152,12 @@ impl SendRequest<'_> {
     pub fn holds(&self, binding: &Binding, tag: Option<&[u8]>) -> bool {
         binding.verify(&self.fields(), tag)
     }
+
+    /// The tag under the current key, when `tag` is this request's under
+    /// the previous key only (campbooks-cloud#191).
+    pub fn retag(&self, binding: &Binding, tag: Option<&[u8]>) -> Option<Vec<u8>> {
+        binding.retag(&self.fields(), tag)
+    }
 }
 
 /// A released send as stored: `send` from `inbox`, asked for by `author`,
@@ -189,6 +195,12 @@ impl StoredSend<'_> {
     /// Whether `tag` is this send's.
     pub fn holds(&self, binding: &Binding, tag: Option<&[u8]>) -> bool {
         binding.verify(&self.fields(), tag)
+    }
+
+    /// The tag under the current key, when `tag` is this send's under the
+    /// previous key only (campbooks-cloud#191).
+    pub fn retag(&self, binding: &Binding, tag: Option<&[u8]>) -> Option<Vec<u8>> {
+        binding.retag(&self.fields(), tag)
     }
 }
 
@@ -234,6 +246,12 @@ impl ChangeRequest<'_> {
     /// Whether `tag` is this request's.
     pub fn holds(&self, binding: &Binding, tag: Option<&[u8]>) -> Result<bool> {
         Ok(binding.verify(&self.fields()?, tag))
+    }
+
+    /// The tag under the current key, when `tag` is this request's under
+    /// the previous key only (campbooks-cloud#191).
+    pub fn retag(&self, binding: &Binding, tag: Option<&[u8]>) -> Result<Option<Vec<u8>>> {
+        Ok(binding.retag(&self.fields()?, tag))
     }
 }
 

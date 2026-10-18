@@ -120,6 +120,17 @@ impl Fields {
     }
 }
 
+/// Which key a tag verified under ([`Binding::verify_checked`]).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Verified {
+    /// Neither: not this binding's tag.
+    No,
+    /// The current key.
+    Current,
+    /// The previous key, during a rotation: re-tag it ([`Binding::retag`]).
+    Previous,
+}
+
 /// Signs and verifies bound requests under the key derived from the
 /// instance secret. Cheap to clone. [`Binding::disabled`] (the default,
 /// until the server installs one) signs nothing and verifies nothing.
@@ -178,22 +189,53 @@ impl Binding {
         Some(tag)
     }
 
-    /// Whether `tag` is the tag of `fields` under this key (the HMAC
-    /// compared in constant time). `false` without a key, without a tag,
-    /// or for a tag of another version.
+    /// Whether `tag` is the tag of `fields` under this key, or under the
+    /// previous one during a rotation (the HMAC compared in constant time).
+    /// `false` without a key, without a tag, or for a tag of another
+    /// version.
     pub fn verify(&self, fields: &Fields, tag: Option<&[u8]>) -> bool {
+        self.verify_checked(fields, tag) != Verified::No
+    }
+
+    /// [`verify`](Self::verify), saying which key the tag is under.
+    pub fn verify_checked(&self, fields: &Fields, tag: Option<&[u8]>) -> Verified {
         let (Some(key), Some(tag)) = (self.key.as_ref(), tag) else {
-            return false;
+            return Verified::No;
         };
         let Some((&version, mac)) = tag.split_first() else {
-            return false;
+            return Verified::No;
         };
-        version == TAG_VERSION
-            && (hmac::verify(key, &fields.bytes, mac).is_ok()
-                || self
-                    .previous
-                    .as_ref()
-                    .is_some_and(|previous| hmac::verify(previous, &fields.bytes, mac).is_ok()))
+        if version != TAG_VERSION {
+            return Verified::No;
+        }
+        if hmac::verify(key, &fields.bytes, mac).is_ok() {
+            return Verified::Current;
+        }
+        match &self.previous {
+            Some(previous) if hmac::verify(previous, &fields.bytes, mac).is_ok() => {
+                Verified::Previous
+            }
+            _ => Verified::No,
+        }
+    }
+
+    /// The tag of `fields` under the current key, when `tag` verifies under
+    /// the previous key only (campbooks-cloud#191); `None` otherwise (it
+    /// verifies under the current key already, or not at all). Re-tagging
+    /// adds no trust: what was bound stays bound, under the key that will
+    /// remain.
+    pub fn retag(&self, fields: &Fields, tag: Option<&[u8]>) -> Option<Vec<u8>> {
+        if self.verify_checked(fields, tag) == Verified::Previous {
+            self.tag(fields)
+        } else {
+            None
+        }
+    }
+
+    /// Whether a previous key is set: a rotation is under way, and what it
+    /// bound should be re-tagged ([`retag`](Self::retag)).
+    pub fn has_previous(&self) -> bool {
+        self.previous.is_some()
     }
 }
 
@@ -294,6 +336,26 @@ mod tests {
                 .with_previous(&SecretKey::from_bytes([7; SECRET_KEY_LEN])),
         );
         assert!(rotated.verify(&fields, Some(&old)));
+        assert!(rotated.has_previous() && !binding(8).has_previous());
+        assert_eq!(
+            rotated.verify_checked(&fields, Some(&old)),
+            Verified::Previous
+        );
+        // Re-tagged: only what verified under the previous key, and it then
+        // verifies under the new key alone.
+        let retagged = rotated.retag(&fields, Some(&old)).unwrap();
+        assert!(binding(8).verify(&fields, Some(&retagged)));
+        assert_eq!(
+            rotated.verify_checked(&fields, Some(&retagged)),
+            Verified::Current
+        );
+        assert!(rotated.retag(&fields, Some(&retagged)).is_none());
+        assert!(
+            rotated
+                .retag(&fields, Some(&binding(9).tag(&fields).unwrap()))
+                .is_none()
+        );
+        assert!(rotated.retag(&fields, None).is_none());
         let fresh = rotated.tag(&fields).unwrap();
         assert_eq!(
             fresh,

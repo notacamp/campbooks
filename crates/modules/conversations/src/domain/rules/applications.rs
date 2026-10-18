@@ -104,6 +104,21 @@ pub fn verifies(
     fields(owner, conversation, run, before).is_some_and(|f| binding.verify(&f, mac))
 }
 
+/// The MAC of the row of `owner`'s application to `conversation` (made in
+/// `run`) under the current key, when its stored one verifies under the
+/// previous key only (campbooks-cloud#191); `None` otherwise. The effect
+/// path needs none: it writes every row it touches with the current key.
+pub fn retag(
+    binding: &Binding,
+    owner: Owner,
+    conversation: ConversationId,
+    run: Option<Uuid>,
+    stored: (&Before, Option<&[u8]>),
+) -> Option<Vec<u8>> {
+    let (before, mac) = stored;
+    fields(owner, conversation, run, before).and_then(|f| binding.retag(&f, mac))
+}
+
 /// What `stored` (the row of `owner`'s application to `conversation`)
 /// recorded, when it is bound to the rule; `None` when it does not decode
 /// or verify.

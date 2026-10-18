@@ -104,6 +104,20 @@ impl Stored {
                 .is_ok_and(|fields| binding.verify(&fields, self.mac.as_deref()))
     }
 
+    /// The rule's MAC under the current key, when its stored one verifies
+    /// under the previous key only (a rotation of the instance secret key,
+    /// campbooks-cloud#191): at the same generation, so the content tokens
+    /// members hold stay valid. `None` for a proposal, a rule bound under
+    /// the current key already, or one that does not verify.
+    pub fn retag(&self, binding: &Binding) -> Option<Vec<u8>> {
+        if self.state == RuleState::Proposed {
+            return None;
+        }
+        self.bound_fields(self.generation)
+            .ok()
+            .and_then(|fields| binding.retag(&fields, self.mac.as_deref()))
+    }
+
     /// Whether a member must confirm the rule again before it acts: it is
     /// kept (active or paused) but not [`bound`](Self::bound).
     pub fn needs_confirmation(&self, binding: &Binding) -> bool {

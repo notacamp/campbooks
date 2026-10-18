@@ -268,11 +268,16 @@ async fn stored_access(
         // Sealed with the previous instance secret: sealed again with the
         // current one (campbooks-cloud#191). The refresh token follows at
         // the next refresh.
-        sqlx::query("UPDATE connectors.credentials SET access_token = $2 WHERE connection_id = $1")
-            .bind(*id.as_uuid())
-            .bind(cipher.seal(&opened.value, &context("access_token", id)))
-            .execute(&mut *conn)
-            .await?;
+        // Compare-and-set: a refresh that stored a new token meanwhile wins.
+        sqlx::query(
+            "UPDATE connectors.credentials SET access_token = $2
+              WHERE connection_id = $1 AND access_token = $3",
+        )
+        .bind(*id.as_uuid())
+        .bind(cipher.seal(&opened.value, &context("access_token", id)))
+        .bind(&sealed)
+        .execute(&mut *conn)
+        .await?;
     }
     Ok(Some(opened.value))
 }

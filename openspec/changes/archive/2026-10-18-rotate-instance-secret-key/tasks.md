@@ -7,7 +7,9 @@
 
 - [x] 2.1 Identity signing keys sealed again when loaded
 - [x] 2.2 Connection access tokens sealed again on use, refresh tokens at refresh
-- [x] 2.3 Web session refresh tokens sealed again at refresh
+- [x] 2.3 Web session refresh and ID tokens sealed again at refresh
+- [x] 2.4 `Binding::verify_checked` and `retag`; `Background::rekey` and `kernel.dispatch_rekeys`
+- [x] 2.5 `conversations.retag_bindings`: rules, applications, runs, change requests, sends (compare-and-set, logged)
 
 ## 3. Operations
 
@@ -17,3 +19,4 @@
 
 - [x] 4.1 Kernel: open with the previous key, sealed again, the previous removed, wrong keys, env reading
 - [x] 4.2 Identity signing keys and connection credentials across a rotation
+- [x] 4.3 Rules re-tagged keep acting and putting back after the previous key is removed; the BFF re-seals at refresh

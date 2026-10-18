@@ -16,7 +16,18 @@ is used:
 - the signing keys when they are loaded;
 - a connection's access token when it is used, and its refresh token at its
   next refresh;
-- a web session's refresh token at its next refresh.
+- a web session's refresh and ID tokens at its next refresh.
+
+What the previous key signed SHALL be signed again with the current key in
+the background. While a previous key is set, a job SHALL run in every
+workspace with a change feed, at most every 15 minutes. It SHALL re-tag
+every taught rule (at its generation), rule application, running rule run,
+change request and scheduled or stored send whose MAC verifies under the
+previous key only. Each update SHALL be a compare-and-set on the old MAC, so
+a row signed again meanwhile is left as it is, and a row that verifies under
+neither key SHALL NOT be re-tagged. Each run SHALL log, per workspace,
+either that nothing is bound under the previous key any more or how many
+rows are left for the next run.
 
 The server SHALL refuse to start, naming the variable, when a previous key is
 set without a current one, is the same key, or is not 32 bytes of base64. No
@@ -30,6 +41,10 @@ key, what only it sealed SHALL fail closed, as for any wrong key.
 #### Scenario: The previous key removed
 - **WHEN** the previous key is removed after everything was sealed again
 - **THEN** the new key alone opens everything, and the old key alone opens nothing
+
+#### Scenario: Rules and their changes signed again
+- **WHEN** a rule moved mail under the old key, the key is rotated, the re-tag runs and the previous key is removed
+- **THEN** the rule still acts on new mail, its changes are still put back, and a second re-tag finds nothing to do
 
 #### Scenario: A wrong key
 - **WHEN** neither the current nor the previous key sealed a value

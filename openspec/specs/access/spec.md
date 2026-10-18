@@ -392,7 +392,8 @@ deadlines out of order, and a landing the handler would refuse: longer than
 visible ASCII, a backslash, `"`, `'`, `<`, `>` or a backtick, or naming the
 BFF's own paths. `touch_session` SHALL refuse a missing time or idle
 deadline, or a deadline not after the use, and `store_session_tokens` a
-missing or empty sealed access or refresh token or a missing deadline.
+missing or empty sealed access or refresh token, an empty ID token or a
+missing deadline; a missing ID token keeps the stored one.
 
 #### Scenario: Direct access as the runtime role
 - **WHEN** a transaction of the runtime role selects, updates, deletes, inserts, truncates or locks any of the three tables while a session, a sign-in and a retired token exist

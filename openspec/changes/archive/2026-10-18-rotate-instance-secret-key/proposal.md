@@ -23,7 +23,21 @@ practice (campbooks-cloud#191, from the web BFF change's task 6.4).
   - Connectors seal a connection's access token again when they use it, and
     its refresh token at the next refresh, even when the provider sends none
     back.
-  - The BFF does the same for a session's refresh token at refresh.
+  - The BFF does the same for a session's refresh token at refresh, and
+    for its ID token too. A new migration makes `bff.lock_session_tokens`
+    return the ID token and `bff.store_session_tokens` take one.
+- **Signing again in the background.**
+  - `Binding::verify_checked` says which key verified a tag.
+  - `Binding::retag` gives the current key's tag only for one that
+    verifies under the previous key alone.
+  - A module registers a per-workspace job with `Background::rekey`. The
+    kernel's `kernel.dispatch_rekeys`, every 15 minutes while a previous key
+    is set, enqueues it in every workspace with a change feed.
+  - The conversations module's `conversations.retag_bindings` re-tags
+    rules (same generation), applications, running runs, change requests
+    and scheduled and stored sends, each with a compare-and-set. It logs
+    what is left; the runbook waits for nothing left before
+    `forget-previous`.
   - Short-lived values open and expire: sign-ins, pending sign-ups, grants
     held for up to 7 days, and cursors.
 - **Operations.**
@@ -36,13 +50,18 @@ practice (campbooks-cloud#191, from the web BFF change's task 6.4).
 
 ## Impact
 
-- Spec: web-bff (new requirement: the instance secret key can be rotated).
+- Spec: web-bff (new requirement: the instance secret key can be rotated); access (the BFF's `store_session_tokens` takes an ID token).
 - Code:
   - kernel `crypto` (`SecretKey`, `Cipher::open_checked`, `Opened`,
     `Signer`) and `binding`;
-  - connectors `domain::credentials`;
+  - kernel `jobs` (`Background::rekey`, `DispatchRekeys`);
+  - conversations `features::retag_bindings` and the domain `retag`
+    helpers;
+  - connectors `domain::credentials` (the access token's re-seal is a
+    compare-and-set);
   - identity `domain::keys`;
   - server `bff` and `main`.
 - Deploy: `server/init.sh`, `.env.example`, README.
-- No migration. Nothing changes until a previous key is set.
+- Migration `20261022040000_bff__session_id_token_on_refresh`. Nothing else
+  changes until a previous key is set.
 - Keys are not zeroized: the code never did, and this change keeps it so.
