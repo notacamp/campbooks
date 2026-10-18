@@ -65,6 +65,9 @@ All notable changes to Campbooks Next are documented here. The format follows
 
 ### Fixed
 
+- **The labelling export says whom it is for.** Before reading any mail, `campbooks-server
+  labelling export` prints the member it resolved (id and role) and the inboxes it will
+  read, and records them in the folder's `.campbooks-labelling` marker.
 - **The labelling export stays within one member's inboxes.** `campbooks-server labelling export`
   now requires `--member` (a member id or verified address) and exports only from the inboxes
   that member can read, never a teammate's private inbox; `--inbox` narrows it to one of them.
