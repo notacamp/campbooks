@@ -2,11 +2,11 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useEffectEvent, useLayoutEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
-import { problemCode } from "~/lib/api";
 import { useDebounced } from "~/lib/hooks/use-debounced";
 import { Banner, Dialog, DialogChoices, SearchField, Text } from "~/lib/ui";
 
 import {
+  changedElsewhere,
   createDraft,
   draftKeys,
   saveDraft,
@@ -161,9 +161,10 @@ export function ForwardDialog({
         quoted: forwardQuote(message, i18n.language, words),
         to,
       });
-    // Saved with the token that came with it; one that changed since
-    // (campbooks-cloud#242) is left alone and a new forward starts. Either
-    // way it opens in the composer, which shows all of it before Send.
+    // Saved with the version and token that came with it; one that changed
+    // since (`draft_changed` or `content_changed`, campbooks-cloud#242) is
+    // left alone and a new forward starts. Either way it opens in the
+    // composer, which shows all of it before Send.
     const saved =
       existing === undefined
         ? fresh()
@@ -172,7 +173,7 @@ export function ForwardDialog({
             version: existing.version,
             content_token: existing.content_token ?? null,
           }).catch(async (thrown: unknown) => {
-            if (problemCode(thrown) !== "content_changed") {
+            if (!changedElsewhere(thrown)) {
               throw thrown;
             }
             return fresh();

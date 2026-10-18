@@ -80,6 +80,14 @@ All notable changes to Campbooks Next are documented here. The format follows
 
 ### Fixed
 
+- **Send no longer gets stuck when the draft was saved somewhere else.** With a draft open
+  and nothing unsaved, a change to it from another tab, another device or later the
+  assistant made every Send fail until the composer was closed and opened again. Send now
+  reads the draft again, shows it as it is now with "This changed since you opened it.
+  Check it and send again.", and the next Send goes; nothing is ever sent on its own, and
+  anything typed meanwhile stays. The reply dialog does the same (the next Send goes in a
+  fresh reply draft), and Forward starts a fresh forward instead of failing
+  (campbooks-cloud#242).
 - **The live feed resyncs whenever it finds an inbox nothing announced.** If an inbox ever
   became visible to someone without the change that should announce it, only the
   heartbeat's check noticed; a check triggered by a change to some other inbox let it in

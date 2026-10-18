@@ -227,7 +227,6 @@
       "unknown_outcome": "Campbooks no ha podido confirmar que este mensaje se haya enviado. Revisa la carpeta Enviados antes de enviarlo de nuevo.",
       "unknown": "Algo ha salido mal. Inténtalo de nuevo.",
       "not_saved": "No se han podido guardar los últimos cambios, así que no se ha enviado nada. Inténtalo de nuevo.",
-      "draft_changed": "Este borrador ha cambiado en otro sitio. Ciérralo y vuelve a abrirlo para ver la última versión.",
       "content_changed": "Esto ha cambiado desde que lo abriste. Revísalo y vuelve a enviarlo."
     },
     "shortcuts": {

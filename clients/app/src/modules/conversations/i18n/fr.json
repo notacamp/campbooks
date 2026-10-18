@@ -227,7 +227,6 @@
       "unknown_outcome": "Campbooks n’a pas pu confirmer l’envoi de ce message. Vérifiez votre dossier Envoyés avant de le renvoyer.",
       "unknown": "Un problème est survenu. Réessayez.",
       "not_saved": "Vos dernières modifications n’ont pas pu être enregistrées, rien n’a donc été envoyé. Réessayez.",
-      "draft_changed": "Ce brouillon a été modifié ailleurs. Fermez-le et rouvrez-le pour voir la dernière version.",
       "content_changed": "Ceci a changé depuis que vous l’avez ouvert. Vérifiez-le et renvoyez-le."
     },
     "shortcuts": {
