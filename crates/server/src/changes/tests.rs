@@ -1744,6 +1744,110 @@ async fn an_inbox_gained_unannounced_makes_the_stream_resync_at_its_heartbeat(db
 }
 
 #[sqlx::test(migrations = "../../migrations")]
+async fn an_inbox_gained_unannounced_resyncs_at_the_next_relist_whatever_causes_it(db: PgPool) {
+    use campbooks_conversations::{dev, events::InboxChanged, model::InboxRole};
+
+    // No heartbeat falls within the test: the relist comes from a change
+    // about another inbox (campbooks-cloud#232).
+    let world = World::with(db, |c| c.heartbeat_seconds = 600).await;
+    let ana = world.user("ana");
+    let ws = world.create_workspace(&ana, "Shop").await;
+    let ana_id = world.user_id("ana").await;
+    let (_, bea_id) = world.add_member(&ws, "bea", "member").await;
+    world.server.sequence().await;
+    let mut feed = world
+        .server
+        .subscribe(Some(&world.token("bea", READ_ALL)), &ws, None)
+        .await
+        .unwrap();
+    assert!(feed.next_event().await.is("ready"));
+    // Her containers are listed at the read this frame comes from.
+    world.rename(&ana, &ws, "Shop 1").await;
+    world.server.sequence().await;
+    assert_eq!(
+        record_of(&feed.next_event().await).0,
+        "workspaces.workspace"
+    );
+
+    // An inbox made for her with no change announcing it (only a bug would
+    // do that): its first mail is read past under her old list, before the
+    // rename numbered after it reaches her.
+    let own = dev::create_inbox(
+        &world.server.state,
+        ws.parse().unwrap(),
+        "bea@example.com",
+        &[(bea_id, InboxRole::Manager)],
+    )
+    .await
+    .unwrap();
+    world.ingest(&ws, own, EN).await;
+    world.rename(&ana, &ws, "Shop 2").await;
+    world.server.sequence().await;
+    assert_eq!(
+        record_of(&feed.next_event().await).0,
+        "workspaces.workspace"
+    );
+    let read_past = message_ids(&world.db, own, "en-").await;
+    assert!(!read_past.is_empty());
+    assert!(read_past.iter().all(|id| !feed.raw.contains(id)));
+
+    // A change about an inbox she cannot see makes the stream list again:
+    // that listing finds hers, which nothing announced, and resyncs.
+    let others = dev::create_inbox(
+        &world.server.state,
+        ws.parse().unwrap(),
+        "ana@example.com",
+        &[(ana_id, InboxRole::Manager)],
+    )
+    .await
+    .unwrap();
+    world
+        .publish(&InboxChanged {
+            workspace: ws.clone(),
+            inbox: others,
+        })
+        .await;
+    let reset = tokio::time::timeout(Duration::from_secs(5), feed.next_event())
+        .await
+        .unwrap_or_else(|_| panic!("no reset: {}", feed.raw));
+    assert!(reset.is("reset"), "{reset:?}");
+    assert_eq!(reset.json()["reason"], "access_changed");
+
+    // An inbox gained and announced (as a grant does) needs no resync: its
+    // mail simply arrives.
+    let granted = dev::create_inbox(
+        &world.server.state,
+        ws.parse().unwrap(),
+        "bea.two@example.com",
+        &[(bea_id, InboxRole::Manager)],
+    )
+    .await
+    .unwrap();
+    world
+        .publish(&InboxChanged {
+            workspace: ws.clone(),
+            inbox: granted,
+        })
+        .await;
+    world.ingest(&ws, granted, FR).await;
+    let arrived = message_ids(&world.db, granted, "fr-").await;
+    assert!(!arrived.is_empty());
+    tokio::time::timeout(Duration::from_secs(5), async {
+        while !arrived.iter().all(|id| feed.raw.contains(id)) {
+            feed.next_event().await;
+        }
+    })
+    .await
+    .unwrap_or_else(|_| panic!("the granted inbox's mail did not arrive: {}", feed.raw));
+    assert_eq!(
+        feed.raw.matches("event: reset").count(),
+        1,
+        "an announced gain resyncs nothing: {}",
+        feed.raw
+    );
+}
+
+#[sqlx::test(migrations = "../../migrations")]
 async fn a_removal_numbered_after_a_full_page_stops_that_page(db: PgPool) {
     let world = World::with(db, |c| c.heartbeat_seconds = 600).await;
     let busy = world.space("Busy").await;
@@ -2357,12 +2461,16 @@ impl DomainEvent for Filed {
 
 #[sqlx::test(migrations = "../../migrations")]
 async fn catching_up_past_more_hidden_changes_than_a_page_looks_the_same(db: PgPool) {
-    const TICK: Duration = Duration::from_millis(250);
-    // A frame is recorded a moment after it left.
-    const SLACK: Duration = Duration::from_millis(20);
+    const TICK_MS: u64 = 250;
+    const TICK: Duration = Duration::from_millis(TICK_MS);
+    // A frame is recorded a moment after it left: frames go out through a
+    // one-slot channel on this single-threaded runtime, so under load the
+    // recorder can stamp one late (campbooks-cloud#232). A missing pacer
+    // still shows: its pages come about a whole tick early.
+    const SLACK: Duration = Duration::from_millis(TICK_MS / 5);
     let world = World::with(db, |c| {
         c.heartbeat_seconds = MATRIX_BEAT.as_secs();
-        c.catch_up_tick_ms = u64::try_from(TICK.as_millis()).unwrap();
+        c.catch_up_tick_ms = TICK_MS;
     })
     .await;
     let busy = world.space("Busy").await;
@@ -2436,10 +2544,10 @@ async fn catching_up_past_more_hidden_changes_than_a_page_looks_the_same(db: PgP
         );
         assert_tokens_fresh_and_beats_on_time(frames, "catch-up");
         // One page per tick, each a tick after its read began, in the busy
-        // workspace as in the quiet one. A read begins once the client took
-        // what came before it (`ready`, then the previous page), so each
-        // page is timed from there: timing from the request that opened
-        // the stream would count how long opening took under load.
+        // workspace as in the quiet one. A read begins once what came before
+        // it (`ready`, then the previous page) is buffered for the client,
+        // so each page is timed from there: timing from the request that
+        // opened the stream would count how long opening took under load.
         let left: Vec<Duration> = frames
             .iter()
             .filter(|(_, f)| f.is("change"))
