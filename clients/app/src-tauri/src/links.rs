@@ -22,8 +22,9 @@ const MAILTO_FIELDS: [&str; 5] = ["to", "cc", "bcc", "subject", "body"];
 /// A mail link's kept values are decoded and encoded again with everything
 /// but RFC 3986's unreserved characters as `%XX` ([`strict`]): a space goes
 /// out as `%20` (never `+`, which RFC 6068 reads as a plus), a plus as
-/// `%2B`, a line break as `%0D%0A`, and a `;`, `=`, `/` or `#` inside a
-/// value as itself encoded (campbooks-cloud#243). The fragment goes: some
+/// `%2B`, a line break in a body as `%0D%0A`, and an `=`, `/` or `#` inside
+/// a value as itself encoded (campbooks-cloud#243); a value holding `&`, `;`
+/// or `?` once decoded is dropped, below. The fragment goes: some
 /// mail apps split on `&` without minding `#` (CVE-2020-11880). The address
 /// part and `to`, `cc` and `bcc` must be plain addresses, or nothing opens;
 /// a subject or body that is not plain text once decoded is dropped

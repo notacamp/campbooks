@@ -19,7 +19,7 @@ debug build only. A web link opens in the system's browser, a mail link in
 the mail app with only its address, copies, subject and body and no
 fragment, each value decoded and encoded again with everything but
 unreserved characters as `%XX` (a space as `%20`, never `+`; a plus as `%2B`;
-a line break, `;`, `?`, `=`, `/`, `&` or `#` encoded too, so no field hides in
+a line break in a body, `=`, `/` or `#` encoded too, so no field hides in
 a value), and only when it has no authority (`mailto://…`) and its address
 part and its `to`, `cc` and `bcc` fields are nothing but addresses (none, or
 comma-separated `local@domain`s, valid UTF-8, not starting with `/`, with no
@@ -60,7 +60,7 @@ and a control proving the check would see a script run.
 
 #### Scenario: A field hidden in a value or the fragment
 - **WHEN** the member clicks `mailto:rita@example.com?subject=hi#&attach=/etc/passwd` or `mailto:rita@example.com?subject=x;attach=/etc/passwd`
-- **THEN** the mail app gets `mailto:rita@example.com?subject=hi`, or `mailto:rita@example.com?subject=x%3Battach%3D%2Fetc%2Fpasswd`
+- **THEN** the mail app gets `mailto:rita@example.com?subject=hi`, or `mailto:rita@example.com` (that subject left out)
 
 #### Scenario: A header hidden in the address
 - **WHEN** the member clicks `mailto:rita@example.com%0D%0Abcc:evil@example.org` or `mailto:rita@example.com%26attach=/etc/passwd`
