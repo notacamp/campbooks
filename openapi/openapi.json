@@ -8224,6 +8224,16 @@
                 }
               }
             }
+          },
+          "409": {
+            "description": "Some of what it changed can't be put back: remove it keeping its changes.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
           }
         },
         "security": [

@@ -30,6 +30,7 @@
     "rule_not_active": "This rule is waiting for a yes. Keep it first, then you can pause it.",
     "rule_not_restorable": "This rule can't be brought back any more. Teach it again instead.",
     "rule_needs_confirmation": "This rule needs a yes again before it acts. Confirm it first, then you can change it.",
+    "undo_unavailable": "Some of what this rule changed can't be put back. Remove it keeping its changes instead.",
     "invalid_senders_query": "Search with 2 to 100 characters, and ask for 1 to {{max}} senders.",
     "images_already_trusted": "A smart rule already covers this sender's images, even if it is paused or waiting for a yes. Find it in Scout's memory."
   }

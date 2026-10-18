@@ -249,6 +249,18 @@ All notable changes to Campbooks Next are documented here. The format follows
 
 ### Security
 
+- **A planted rule run or undo changes nothing (campbooks-cloud#242).** Applying a rule to
+  the mail already in your inbox, and removing a rule while putting back what it changed,
+  now sign the run for the member who asked, under the key of campbooks-cloud#227, and each
+  change a rule records about a conversation is signed where the rule makes it, over what it
+  was before and what the rule did. A run written with SQL, or one copied from another run,
+  stops before its first change (a warning in the log with ids only), and putting a rule's
+  changes back skips any record that was written or edited with SQL, so it can no longer take
+  mail out of spam or the trash at Gmail or Zoho; the rest is still put back. A run of a rule
+  that has been changed, or paused and resumed, since it started stops too. Runs going
+  during the upgrade stop: apply the rule again if you need to. What a rule changed before the
+  upgrade can't be put back automatically: removing such a rule while putting its changes
+  back answers `undo_unavailable`, and removing it keeping its changes still works.
 - **A taught rule planted or changed with SQL changes nothing (campbooks-cloud#242).**
   Saving, confirming, changing, pausing, removing or bringing back a rule now signs it for
   the member who did it, under the key of campbooks-cloud#227, over its conditions,
