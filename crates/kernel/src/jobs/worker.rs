@@ -106,7 +106,7 @@ const BEAT_EVERY: Duration = Duration::from_secs(10);
 /// How long a worker counts as alive after its last beat
 /// ([`Liveness::alive`]): several beats, and longer than a poll interval or
 /// a statement's time limit, so one slow round does not mark it dead.
-pub const ALIVE_FOR: Duration = Duration::from_secs(60);
+pub const ALIVE_FOR: Duration = Duration::from_mins(1);
 
 /// Whether a running worker's loop goes round and the database answers it
 /// (campbooks-cloud#185): the loop beats every [`BEAT_EVERY`] after a
@@ -1202,6 +1202,6 @@ mod liveness_tests {
             .last
             .store(unix_millis() - 120_000, Ordering::Relaxed);
         assert!(!liveness.alive(ALIVE_FOR));
-        assert!(liveness.alive(Duration::from_secs(180)));
+        assert!(liveness.alive(Duration::from_mins(3)));
     }
 }
