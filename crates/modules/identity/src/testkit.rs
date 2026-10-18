@@ -822,6 +822,7 @@ impl Kit {
             grant: &grant,
             profile: &profile,
             amr: &[],
+            family: None,
             now: chrono::Utc::now(),
         }
         .access_token()

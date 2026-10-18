@@ -238,6 +238,10 @@ All notable changes to Campbooks Next are documented here. The format follows
   a send failed, then sending another reply, now discards the failed draft instead of
   leaving it in your drafts, and your own sent mail arriving in the conversation no longer
   shows as "a newer message" to answer.
+- **Signing out of one place stops access there at once.** Signing out of one browser,
+  revoking an app, removing a way in, or revoking a refresh token now stops that sign-in's
+  access tokens on the very next request, instead of letting them run out their ten
+  minutes; your other sign-ins keep working.
 
 ### Added
 

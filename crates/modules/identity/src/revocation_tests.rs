@@ -10,7 +10,7 @@ use sqlx::PgPool;
 use uuid::Uuid;
 
 use crate::{
-    domain::{accounts, suspension, tokens},
+    domain::{accounts, clients::WEB_CLIENT_ID, suspension, tokens},
     testkit::{Kit, ORIGIN},
 };
 
@@ -49,6 +49,7 @@ async fn mint(kit: &Kit, access: &str, auth_time: DateTime<Utc>, now: DateTime<U
         grant: &grant,
         profile: &profile,
         amr: &[],
+        family: None,
         now,
     }
     .access_token()
@@ -287,5 +288,94 @@ async fn a_workspace_clients_tokens_are_not_the_persons(db: PgPool) {
     assert_eq!(
         principal.kind,
         campbooks_kernel::auth::PrincipalKind::Client
+    );
+}
+
+/// Two sign-ins of one person, each in its own browser (its own issuer
+/// session and refresh family): the token responses.
+async fn two_sign_ins(kit: &Kit) -> (serde_json::Value, serde_json::Value) {
+    let (code, verifier) = kit.sign_up().await;
+    let first = kit.redeem(&code, &verifier).await;
+    assert_eq!(first.status, StatusCode::OK, "{first:?}");
+    kit.new_browser();
+    let second = sign_in_again(kit).await;
+    assert_eq!(second.status, StatusCode::OK, "{second:?}");
+    let (_, one) = Kit::decode(first.json["access_token"].as_str().unwrap());
+    let (_, two) = Kit::decode(second.json["access_token"].as_str().unwrap());
+    // Each token names its own sign-in.
+    assert_ne!(one["sid"], two["sid"], "two sessions");
+    assert_ne!(one["fam"], two["fam"], "two refresh families");
+    assert!(one["fam"].is_string(), "{one}");
+    (first.json, second.json)
+}
+
+fn text(tokens: &serde_json::Value, name: &str) -> String {
+    tokens[name].as_str().unwrap().to_owned()
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn signing_out_one_session_stops_its_tokens_and_no_others(db: PgPool) {
+    // campbooks-cloud#143: at once, not when its ten minutes run out.
+    let kit = Kit::new(db).await;
+    let (first, second) = two_sign_ins(&kit).await;
+    let (one, two) = (text(&first, "access_token"), text(&second, "access_token"));
+    assert_eq!(
+        kit.api(Method::GET, WAYS_IN, &one).await.status,
+        StatusCode::OK
+    );
+
+    let hint = text(&first, "id_token");
+    let out = kit
+        .get(&format!(
+            "/oauth2/end_session?id_token_hint={hint}&client_id={WEB_CLIENT_ID}&post_logout_redirect_uri={ORIGIN}/"
+        ))
+        .await;
+    assert_eq!(out.location(), format!("{ORIGIN}/"), "{out:?}");
+
+    assert_refused(&kit.api(Method::GET, WAYS_IN, &one).await);
+    // The other browser's sign-in goes on.
+    assert_eq!(
+        kit.api(Method::GET, WAYS_IN, &two).await.status,
+        StatusCode::OK
+    );
+    assert_eq!(
+        kit.refresh(&text(&second, "refresh_token")).await.status,
+        StatusCode::OK
+    );
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn revoking_one_refresh_token_stops_its_sign_ins_tokens_and_no_others(db: PgPool) {
+    let kit = Kit::new(db).await;
+    let (first, second) = two_sign_ins(&kit).await;
+    let (one, two) = (text(&first, "access_token"), text(&second, "access_token"));
+
+    let secret = Kit::web_secret();
+    let revoked = kit
+        .post_form(
+            "/oauth2/revoke",
+            &[
+                ("token", &text(&first, "refresh_token")),
+                ("client_id", WEB_CLIENT_ID),
+                ("client_secret", &secret),
+            ],
+        )
+        .await;
+    assert_eq!(revoked.status, StatusCode::OK, "{revoked:?}");
+
+    assert_refused(&kit.api(Method::GET, WAYS_IN, &one).await);
+    assert_eq!(
+        kit.api(Method::GET, WAYS_IN, &two).await.status,
+        StatusCode::OK
+    );
+    // A token refreshed from the other sign-in names its family, and stands.
+    let refreshed = kit.refresh(&text(&second, "refresh_token")).await;
+    let three = text(&refreshed.json, "access_token");
+    let (_, claims) = Kit::decode(&three);
+    let (_, before) = Kit::decode(&two);
+    assert_eq!(claims["fam"], before["fam"], "rotation keeps the family");
+    assert_eq!(
+        kit.api(Method::GET, WAYS_IN, &three).await.status,
+        StatusCode::OK
     );
 }

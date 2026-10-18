@@ -189,6 +189,7 @@ pub trait Membership: std::fmt::Debug + Send + Sync + 'static {
                 expires_at: None,
                 issued_at: None,
                 auth_time: None,
+                sign_in: None,
             };
             Ok(self.resolve(db, &client, workspace).await?.is_some())
         })
@@ -492,6 +493,7 @@ mod tests {
             expires_at: None,
             issued_at: None,
             auth_time: None,
+            sign_in: None,
         }
     }
 

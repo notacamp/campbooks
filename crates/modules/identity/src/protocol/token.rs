@@ -197,7 +197,7 @@ pub async fn token(
         return client_credentials(&ctx, issuer, &client, form.scope.as_deref(), now).await;
     }
     let mut tx = ctx.state.db.begin().await?;
-    let (grant, refresh_token, nonce) = match form.grant_type.as_deref() {
+    let (grant, refresh_token, nonce, family) = match form.grant_type.as_deref() {
         Some("authorization_code") => {
             let (Some(code), Some(redirect_uri), Some(verifier)) =
                 (&form.code, &form.redirect_uri, &form.code_verifier)
@@ -222,11 +222,12 @@ pub async fn token(
                         let (family, token) =
                             tokens::create_family(&mut tx, &redeemed.grant, &client, now).await?;
                         tokens::attach_family(&mut tx, code, family).await?;
-                        Some(token)
+                        Some((family, token))
                     } else {
                         None
                     };
-                    (redeemed.grant, refresh, redeemed.nonce)
+                    let (family, refresh) = refresh.unzip();
+                    (redeemed.grant, refresh, redeemed.nonce, family)
                 }
                 Err(refusal) => return refused(&ctx, tx, &client, refusal).await,
             }
@@ -236,7 +237,7 @@ pub async fn token(
                 return Ok(oauth_error(StatusCode::BAD_REQUEST, "invalid_request"));
             };
             match tokens::rotate(&mut tx, token, &client, &issuer.resource, now).await? {
-                Ok((grant, next)) => (grant, Some(next), None),
+                Ok((grant, next, family)) => (grant, Some(next), None, Some(family)),
                 Err(refusal) => return refused(&ctx, tx, &client, refusal).await,
             }
         }
@@ -252,6 +253,7 @@ pub async fn token(
         grant,
         refresh_token,
         nonce,
+        family,
     };
     respond(&ctx, issuer, &client, tx, exchanged, now).await
 }
@@ -261,6 +263,8 @@ struct Issued {
     grant: Grant,
     refresh_token: Option<String>,
     nonce: Option<String>,
+    /// The refresh family the sign-in holds, stamped on the access token.
+    family: Option<uuid::Uuid>,
 }
 
 /// Commit `tx` and answer the tokens `exchanged` stands for, with an ID token
@@ -277,6 +281,7 @@ async fn respond(
         grant,
         refresh_token,
         nonce,
+        family,
     } = exchanged;
     // A code or refresh token of an app that needs consent stands on that
     // consent: revoked, replaced by one for another workspace, or narrower,
@@ -325,6 +330,7 @@ async fn respond(
     let amr = sessions::amr(&ctx.state.db, grant.session_id).await?;
     let mint = Mint {
         amr: &amr,
+        family,
         issuer: &issuer.url,
         signer: &signer,
         grant: &grant,

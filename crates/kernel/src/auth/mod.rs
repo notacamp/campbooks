@@ -177,6 +177,21 @@ pub struct Principal {
     /// ([`Admin`](crate::admin::Admin)). Always `None` for clients and
     /// in-process principals.
     pub auth_time: Option<chrono::DateTime<chrono::Utc>>,
+    /// The sign-in a person's token was issued in, as the in-process issuer
+    /// names it; `None` for clients, other issuers and in-process
+    /// principals. Ending that session, revoking that refresh family or the
+    /// app's consent stops the token at once ([`TokenRevocation`]).
+    pub sign_in: Option<SignIn>,
+}
+
+/// A person's sign-in, as the in-process issuer stamps it on their access
+/// token (campbooks-cloud#143).
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct SignIn {
+    /// The issuer session it was made in (`sid`).
+    pub session: Option<String>,
+    /// The refresh family it holds (`fam`), when it holds a refresh token.
+    pub family: Option<String>,
 }
 
 impl Principal {

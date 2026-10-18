@@ -345,6 +345,15 @@ async fn revoking_a_consent_ends_its_tokens_and_asks_again(db: PgPool) {
         .as_str()
         .unwrap_or_else(|| panic!("{tokens:?}"))
         .to_owned();
+    let app_access = tokens.json["access_token"]
+        .as_str()
+        .unwrap_or_else(|| panic!("{tokens:?}"))
+        .to_owned();
+    // A route the app's scope does not reach: refused for its scope, not
+    // as an invalid token, while the token stands.
+    let probe = "/api/v1/identity/ways-in";
+    let before = kit.api(Method::GET, probe, &app_access).await;
+    assert_ne!(before.status, StatusCode::UNAUTHORIZED, "{before:?}");
 
     let apps = kit
         .api(Method::GET, "/api/v1/identity/consents", &web)
@@ -369,6 +378,18 @@ async fn revoking_a_consent_ends_its_tokens_and_asks_again(db: PgPool) {
         )
         .await;
     assert_eq!(again.status, StatusCode::NOT_FOUND);
+
+    // The app's access token stops at once (campbooks-cloud#143); the
+    // person's own sign-in goes on.
+    let stopped = kit.api(Method::GET, probe, &app_access).await;
+    assert_eq!(stopped.status, StatusCode::UNAUTHORIZED, "{stopped:?}");
+    assert_eq!(stopped.json["code"], "invalid_token");
+    assert_eq!(
+        kit.api(Method::GET, "/api/v1/identity/consents", &web)
+            .await
+            .status,
+        StatusCode::OK
+    );
 
     let refreshed = kit
         .post_form(
