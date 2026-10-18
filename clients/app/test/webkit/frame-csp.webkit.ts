@@ -195,8 +195,11 @@ describe.each(POLICIES)("the mail frame under the %s policy", (_name, csp) => {
     await page.frameLocator("#mail").locator("#script-link").click();
     await page.waitForTimeout(800);
     expect(await page.evaluate("window.pwned")).toBeUndefined();
+    // A popup the link may have opened ran nothing either (one already gone
+    // ran nothing that stayed).
     for (const popup of popups) {
-      expect(await popup.evaluate("window.pwned").catch(() => undefined)).toBeUndefined();
+      const pwned: unknown = await popup.evaluate("window.pwned").catch(() => null);
+      expect([undefined, null]).toContain(pwned);
     }
     await page.context().close();
   });
