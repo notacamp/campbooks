@@ -2,16 +2,17 @@
 //! stands. Its account: suspended or not, the instant of its last
 //! revocation. Its own sign-in (campbooks-cloud#143): its issuer session
 //! (`sid`) signed out or ended with the way in it used, its refresh family
-//! (`fam`) revoked, or the consent of its app revoked since it was issued.
-//! Registered by the server for the in-process issuer's verifier, which
-//! asks on every verification of a person's token.
+//! (`fam`) revoked, or the consent its app was granted under (`cns`)
+//! revoked. Registered by the server for the in-process issuer's verifier,
+//! which asks on every verification of a person's token.
 //!
 //! One statement per verification, uncached, as before: a primary-key read
-//! of `identity.accounts` with three indexed lookups beside it (a session
-//! and a family by primary key, the app's consents by account and client).
-//! No cache, so no staleness to bound: a revocation takes effect on the next
-//! request in every process, for the same single round trip a request
-//! already paid for the account's standing.
+//! of `identity.accounts` with three primary-key lookups beside it (a
+//! session, a family, a consent). No cache, so no staleness to bound: a
+//! revocation takes effect on the next request in every process, for the
+//! same single round trip a request already paid for the account's standing.
+//! A token minted before these claims existed carries none of them and is
+//! judged by its account alone, for the rest of its ten minutes.
 
 use std::sync::Arc;
 
@@ -30,21 +31,18 @@ pub fn token_revocation() -> TokenRevocationPort {
 #[derive(Debug, Clone, Copy)]
 struct Accounts;
 
-/// The token's account and whether its own sign-in ended since `$5` (its
-/// `iat`): its session ended (signed out, or its way in removed), its refresh
-/// family revoked, or a consent of its app (`$4`) live when it was issued
-/// revoked since. Ended sessions and revoked families are kept a day and
-/// revoked consents thirty, far longer than an access token lives.
+/// The token's account and whether its own sign-in ended: its session ended
+/// (signed out, or its way in removed), its refresh family revoked, or the
+/// consent it was minted under revoked. Ended sessions and revoked families
+/// are kept a day and revoked consents thirty, far longer than an access
+/// token lives.
 const STANDING: &str = "SELECT a.disabled_at IS NOT NULL, a.tokens_not_before,
         EXISTS (SELECT 1 FROM identity.sessions s
                  WHERE s.id = $2 AND s.ended_at IS NOT NULL)
         OR EXISTS (SELECT 1 FROM identity.refresh_families f
                     WHERE f.id = $3 AND f.revoked_at IS NOT NULL)
         OR EXISTS (SELECT 1 FROM identity.consents c
-                    WHERE c.account_id = a.id AND c.client_id = $4
-                      AND c.revoked_at IS NOT NULL
-                      AND c.granted_at < $5 + interval '1 second'
-                      AND c.revoked_at >= $5 - interval '1 second')
+                    WHERE c.id = $4 AND c.revoked_at IS NOT NULL)
    FROM identity.accounts a WHERE a.id = $1";
 
 impl TokenRevocation for Accounts {
@@ -60,7 +58,11 @@ impl TokenRevocation for Accounts {
             let parse = |id: Option<String>| -> Result<Option<Uuid>, ()> {
                 id.map(|id| id.parse::<Uuid>().map_err(|_| ())).transpose()
             };
-            let (Ok(session), Ok(family)) = (parse(sign_in.session), parse(sign_in.family)) else {
+            let (Ok(session), Ok(family), Ok(consent)) = (
+                parse(sign_in.session),
+                parse(sign_in.family),
+                parse(sign_in.consent),
+            ) else {
                 return Ok(Some(TokenStanding {
                     sign_in_ended: true,
                     ..TokenStanding::default()
@@ -70,8 +72,7 @@ impl TokenRevocation for Accounts {
                 .bind(id)
                 .bind(session)
                 .bind(family)
-                .bind(principal.client_id.as_deref())
-                .bind(principal.issued_at)
+                .bind(consent)
                 .fetch_optional(db)
                 .await?;
             Ok(row.map(
@@ -90,7 +91,7 @@ mod tests {
     use std::collections::BTreeSet;
 
     use campbooks_kernel::auth::{Principal, PrincipalKind, SignIn, TokenStanding};
-    use chrono::{DateTime, TimeDelta, Utc};
+    use chrono::{DateTime, Utc};
     use sqlx::PgPool;
     use uuid::Uuid;
 
@@ -170,7 +171,7 @@ mod tests {
     #[sqlx::test(migrations = "../../../migrations")]
     async fn a_tokens_own_sign_in_ends_it_and_no_other(db: PgPool) {
         // campbooks-cloud#143: its session ended, its refresh family revoked,
-        // or its app's consent revoked since it was issued.
+        // or the consent it was minted under revoked; nothing else.
         let pool = campbooks_kernel::testing::app_role_pool(&db).await;
         let account = Uuid::now_v7();
         let now = Utc::now();
@@ -215,43 +216,29 @@ mod tests {
             .await
             .unwrap();
         }
-        // An app whose consent was revoked after the token, and one whose
-        // earlier consent was revoked before it was granted again.
-        let consent =
-            |client: &'static str, granted: DateTime<Utc>, revoked: Option<DateTime<Utc>>| {
-                let db = db.clone();
-                async move {
-                    sqlx::query(
-                        "INSERT INTO identity.consents
-                         (id, account_id, client_id, scopes, remembered, redirect_uri, granted_at,
-                          revoked_at)
-                     VALUES ($1, $2, $3, '{}', false, 'http://localhost:1/cb', $4, $5)",
-                    )
-                    .bind(Uuid::now_v7())
-                    .bind(account)
-                    .bind(client)
-                    .bind(granted)
-                    .bind(revoked)
-                    .execute(&db)
-                    .await
-                    .unwrap();
-                }
-            };
-        let hour = TimeDelta::hours(1);
-        consent(
-            "revoked-app",
-            now - hour,
-            Some(now + TimeDelta::seconds(30)),
-        )
-        .await;
-        consent("regranted-app", now - hour * 3, Some(now - hour * 2)).await;
-        consent("regranted-app", now - hour, None).await;
+        // An app's consent revoked, and the one granted after it.
+        let (withdrawn, granted) = (Uuid::now_v7(), Uuid::now_v7());
+        for (consent, revoked_at) in [(withdrawn, Some(now)), (granted, None)] {
+            sqlx::query(
+                "INSERT INTO identity.consents
+                     (id, account_id, client_id, scopes, remembered, redirect_uri, granted_at,
+                      revoked_at)
+                 VALUES ($1, $2, 'an-app', '{}', false, 'http://localhost:1/cb', $3, $4)",
+            )
+            .bind(consent)
+            .bind(account)
+            .bind(now)
+            .bind(revoked_at)
+            .execute(&db)
+            .await
+            .unwrap();
+        }
 
         let port = super::token_revocation();
-        let ended_for = |client: &'static str, sign_in: SignIn| {
+        let ended_for = |sign_in: SignIn| {
             let port = port.clone();
             let pool = pool.clone();
-            let principal = token(&account.to_string(), Some(client), iat, Some(sign_in));
+            let principal = token(&account.to_string(), Some("an-app"), iat, Some(sign_in));
             async move {
                 port.standing(&pool, &principal)
                     .await
@@ -260,34 +247,29 @@ mod tests {
                     .sign_in_ended
             }
         };
-        let sign_in = |session: Uuid, family: Option<Uuid>| SignIn {
+        let sign_in = |session: Uuid, family: Option<Uuid>, consent: Option<Uuid>| SignIn {
             session: Some(session.to_string()),
             family: family.map(|f| f.to_string()),
+            consent: consent.map(|c| c.to_string()),
         };
 
-        // Untouched: a live session, a live family, a first-party client.
-        assert!(!ended_for("campbooks-web", sign_in(live, Some(kept))).await);
+        // Untouched: a live session, a live family, the live consent.
+        assert!(!ended_for(sign_in(live, Some(kept), Some(granted))).await);
+        assert!(!ended_for(sign_in(live, None, None)).await);
+        assert!(ended_for(sign_in(ended, None, None)).await, "session ended");
         assert!(
-            ended_for("campbooks-web", sign_in(ended, None)).await,
-            "session ended"
-        );
-        assert!(
-            ended_for("campbooks-web", sign_in(live, Some(revoked))).await,
+            ended_for(sign_in(live, Some(revoked), None)).await,
             "family revoked"
         );
         assert!(
-            ended_for("revoked-app", sign_in(live, None)).await,
+            ended_for(sign_in(live, None, Some(withdrawn))).await,
             "consent revoked"
-        );
-        assert!(
-            !ended_for("regranted-app", sign_in(live, None)).await,
-            "a consent revoked before it, then granted again"
         );
         // A sign-in named with something that is no id stands for nothing.
         let bogus = SignIn {
             session: Some("not-an-id".to_owned()),
-            family: None,
+            ..SignIn::default()
         };
-        assert!(ended_for("campbooks-web", bogus).await);
+        assert!(ended_for(bogus).await);
     }
 }

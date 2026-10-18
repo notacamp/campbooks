@@ -43,6 +43,7 @@ async fn mint(
         profile: &profile,
         amr: &[],
         family: None,
+        consent: None,
         now: Utc::now(),
     }
     .access_token()

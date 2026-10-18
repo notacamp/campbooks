@@ -285,9 +285,10 @@ async fn respond(
     } = exchanged;
     // A code or refresh token of an app that needs consent stands on that
     // consent: revoked, replaced by one for another workspace, or narrower,
-    // and nothing more is minted (the transaction rolls back).
-    if client.needs_consent()
-        && !consents::covers(
+    // and nothing more is minted (the transaction rolls back). Its id goes on
+    // the access token, so revoking it stops the token at once.
+    let consent = if client.needs_consent() {
+        let Some(consent) = consents::covering(
             &ctx.state.db,
             grant.account_id,
             &client.id,
@@ -295,9 +296,13 @@ async fn respond(
             &grant.scope,
         )
         .await?
-    {
-        return Ok(oauth_error(StatusCode::BAD_REQUEST, "invalid_grant"));
-    }
+        else {
+            return Ok(oauth_error(StatusCode::BAD_REQUEST, "invalid_grant"));
+        };
+        Some(consent)
+    } else {
+        None
+    };
     // The allow-list is judged again at every exchange, so tightening it cuts
     // access at the next refresh (the transaction rolls back, nothing more
     // is minted).
@@ -331,6 +336,7 @@ async fn respond(
     let mint = Mint {
         amr: &amr,
         family,
+        consent,
         issuer: &issuer.url,
         signer: &signer,
         grant: &grant,

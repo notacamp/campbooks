@@ -14,9 +14,10 @@ still let that sign-in's access tokens run out their ten minutes
 
 - **The sign-in on the token:** a person's access token from the in-process
   issuer already carries `sid` (its issuer session). It now also carries
-  `fam`, the refresh family its sign-in holds when there is one. A token
-  minted when a code is redeemed names the family that redemption creates,
-  and rotation keeps it.
+  `fam`, the refresh family its sign-in holds when there is one, and `cns`,
+  the consent an app that needs one was minted under. A token minted when a
+  code is redeemed names the family that redemption creates, and rotation
+  keeps it.
 - **The check:** the kernel's `TokenRevocation` port now receives the whole
   principal, which gains its `sign_in` (`sid`, `fam`), and
   `TokenStanding` gains `sign_in_ended`. The identity adapter answers in one
@@ -24,13 +25,20 @@ still let that sign-in's access tokens run out their ten minutes
   - The session ended. This covers sign-out and the sessions ended when the
     way in they used is removed.
   - The family was revoked (revoke, reuse, sign-out).
-  - A consent of the token's app that was live when the token was issued has
-    been revoked since.
+  - The consent it was minted under (`cns`) has been revoked.
+  - Each lookup is by primary key. The first version matched any consent of
+    the app revoked around the token's `iat`. That refused a token redeemed
+    right after a re-consent, because a re-consent revoked the previous row.
+- **Re-consent keeps an equal consent:** an app asked again for exactly what
+  its live consent holds (the same workspace, member and scopes) keeps that
+  consent. Native and agent apps are asked on every sign-in, so its tokens
+  on the person's other devices go on. A different grant still replaces the
+  consent.
 - **No cache, so no staleness:** a revocation takes effect on the next
   request in every process. The cost is the one round trip each request
-  already paid for the account check. A new index,
-  `consents (account_id, client_id)`, keeps the consent lookup cheap,
-  because the live-consent unique index skips revoked rows.
+  already paid for the account check. Every lookup is by primary key, so no
+  new index is needed. A token minted before these claims existed is judged
+  by its account alone, for the rest of its ten minutes.
 - Every other sign-in of the person keeps working.
 
 ## Impact
@@ -43,4 +51,4 @@ still let that sign-in's access tokens run out their ten minutes
   - identity `token_revocation`, `domain::tokens` (`fam`, `rotate` returns
     the family) and `protocol::token`.
 - Every `Principal` literal gains `sign_in: None`.
-- Migration: an index on `identity.consents`, built concurrently.
+- No migration.

@@ -314,6 +314,7 @@ struct Claims {
     preferred_username: Option<String>,
     sid: Option<String>,
     fam: Option<String>,
+    cns: Option<String>,
 }
 
 /// Per-client claims an IdP may nest under `custom` instead of the root.
@@ -367,10 +368,14 @@ impl Claims {
         };
         // The sign-in only the in-process issuer names, on a person's token.
         let sign_in = match kind {
-            PrincipalKind::User if own_issuer && (self.sid.is_some() || self.fam.is_some()) => {
+            PrincipalKind::User
+                if own_issuer
+                    && (self.sid.is_some() || self.fam.is_some() || self.cns.is_some()) =>
+            {
                 Some(super::SignIn {
                     session: self.sid,
                     family: self.fam,
+                    consent: self.cns,
                 })
             }
             _ => None,

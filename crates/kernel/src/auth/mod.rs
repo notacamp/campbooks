@@ -179,8 +179,8 @@ pub struct Principal {
     pub auth_time: Option<chrono::DateTime<chrono::Utc>>,
     /// The sign-in a person's token was issued in, as the in-process issuer
     /// names it; `None` for clients, other issuers and in-process
-    /// principals. Ending that session, revoking that refresh family or the
-    /// app's consent stops the token at once ([`TokenRevocation`]).
+    /// principals. Ending that session, or revoking that refresh family or
+    /// that consent, stops the token at once ([`TokenRevocation`]).
     pub sign_in: Option<SignIn>,
 }
 
@@ -192,6 +192,8 @@ pub struct SignIn {
     pub session: Option<String>,
     /// The refresh family it holds (`fam`), when it holds a refresh token.
     pub family: Option<String>,
+    /// The consent it was granted under (`cns`), for an app that needs one.
+    pub consent: Option<String>,
 }
 
 impl Principal {

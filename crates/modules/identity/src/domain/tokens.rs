@@ -397,6 +397,10 @@ struct AccessClaims<'a> {
     /// token at once (campbooks-cloud#143).
     #[serde(skip_serializing_if = "Option::is_none")]
     fam: Option<String>,
+    /// The consent an app's token was minted under: revoking it stops the
+    /// token at once.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    cns: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     workspace_id: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -459,6 +463,8 @@ pub struct Mint<'a> {
     pub amr: &'a [String],
     /// The refresh family the sign-in holds, when it holds one (`fam`).
     pub family: Option<Uuid>,
+    /// The consent an app that needs one was granted under (`cns`).
+    pub consent: Option<Uuid>,
     /// The time.
     pub now: DateTime<Utc>,
 }
@@ -532,6 +538,7 @@ impl Mint<'_> {
                 auth_time: self.grant.auth_time.timestamp(),
                 sid: self.grant.session_id.map(|id| id.to_string()),
                 fam: self.family.map(|id| id.to_string()),
+                cns: self.consent.map(|id| id.to_string()),
                 workspace_id: self.grant.workspace.map(|id| id.to_string()),
                 email: wants("email")
                     .then_some(self.profile.primary_email.as_deref())

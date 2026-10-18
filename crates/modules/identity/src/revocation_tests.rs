@@ -50,6 +50,7 @@ async fn mint(kit: &Kit, access: &str, auth_time: DateTime<Utc>, now: DateTime<U
         profile: &profile,
         amr: &[],
         family: None,
+        consent: None,
         now,
     }
     .access_token()
