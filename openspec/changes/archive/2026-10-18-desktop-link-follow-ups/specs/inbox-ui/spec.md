@@ -16,9 +16,11 @@ never leave the app's own pages: `tauri://localhost`, and
 `http(s)://tauri.localhost` only on Windows and Android, where the app is
 served from it (elsewhere it is the machine itself), plus the dev server in a
 debug build only. A web link opens in the system's browser, a mail link in
-the mail app with only its address, copies, subject and body, kept as
-written and still percent-encoded (a space stays `%20`, never `+`; a line
-break stays encoded), anything else nowhere; no remote URL SHALL be granted
+the mail app with only its address, copies, subject and body and no
+fragment, each value decoded and encoded again with everything but
+unreserved characters as `%XX` (a space as `%20`, never `+`; a plus as `%2B`;
+a line break, `;`, `?`, `=`, `/`, `&` or `#` encoded too, so no field hides in
+a value), anything else nowhere; no remote URL SHALL be granted
 IPC. CI SHALL check the frame in WebKit under the desktop and web policies
 read from their definitions, with the app's own sandbox and referrer policy,
 and a control proving the check would see a script run.
@@ -42,3 +44,7 @@ and a control proving the check would see a script run.
 #### Scenario: A mail link with spaces
 - **WHEN** the member clicks `mailto:rita@example.com?subject=Tax%20dates&attach=/etc/passwd`
 - **THEN** the mail app gets `mailto:rita@example.com?subject=Tax%20dates`
+
+#### Scenario: A field hidden in a value or the fragment
+- **WHEN** the member clicks `mailto:rita@example.com?subject=hi#&attach=/etc/passwd` or `mailto:rita@example.com?subject=x;attach=/etc/passwd`
+- **THEN** the mail app gets `mailto:rita@example.com?subject=hi`, or `mailto:rita@example.com?subject=x%3Battach%3D%2Fetc%2Fpasswd`

@@ -15,32 +15,75 @@ use url::Url;
 const MAILTO_FIELDS: [&str; 5] = ["to", "cc", "bcc", "subject", "body"];
 
 /// What a link may open outside the app: a web link as it is, a mail link
-/// with only [`MAILTO_FIELDS`], else nothing.
+/// with only [`MAILTO_FIELDS`] and no fragment, else nothing.
 ///
-/// A mail link's fields are kept as written, still percent-encoded (the
-/// parser has encoded anything a query may not hold, a space as `%20`, a
-/// line break as `%0D%0A`), never decoded and encoded again: form encoding
-/// would write a space as `+`, which a mail app shows as a plus (RFC 6068
-/// reads `+` literally).
+/// A mail link's kept values are decoded and encoded again with everything
+/// but RFC 3986's unreserved characters as `%XX` ([`strict`]): a space goes
+/// out as `%20` (never `+`, which RFC 6068 reads as a plus), a plus as
+/// `%2B`, a line break as `%0D%0A`, and a `;`, `?`, `=`, `/`, `&` or `#`
+/// inside a value as itself encoded, so no mail app can read a field of its
+/// own out of a value (campbooks-cloud#243). The fragment goes: some mail
+/// apps split on `&` without minding `#` (CVE-2020-11880).
 pub fn outside(url: &Url) -> Option<String> {
     match url.scheme() {
         "https" | "http" => Some(url.as_str().to_owned()),
         "mailto" => {
-            let kept: Vec<&str> = url
+            let kept: Vec<String> = url
                 .query()
                 .unwrap_or_default()
                 .split('&')
-                .filter(|field| {
-                    let key = field.split_once('=').map_or(*field, |(key, _)| key);
-                    MAILTO_FIELDS.contains(&key.to_ascii_lowercase().as_str())
+                .filter_map(|field| {
+                    let (key, value) = field.split_once('=').unwrap_or((field, ""));
+                    MAILTO_FIELDS
+                        .contains(&key.to_ascii_lowercase().as_str())
+                        .then(|| format!("{}={}", strict(&decode(key)), strict(&decode(value))))
                 })
                 .collect();
             let mut clean = url.clone();
             clean.set_query((!kept.is_empty()).then(|| kept.join("&")).as_deref());
+            clean.set_fragment(None);
             Some(clean.into())
         }
         _ => None,
     }
+}
+
+/// `text` with its `%XX` escapes decoded, as bytes; a `%` not followed by
+/// two hex digits stays as it is.
+fn decode(text: &str) -> Vec<u8> {
+    let bytes = text.as_bytes();
+    let mut out = Vec::with_capacity(bytes.len());
+    let mut i = 0;
+    while i < bytes.len() {
+        let hex = |b: u8| char::from(b).to_digit(16);
+        if bytes[i] == b'%'
+            && let (Some(high), Some(low)) = (
+                bytes.get(i + 1).copied().and_then(hex),
+                bytes.get(i + 2).copied().and_then(hex),
+            )
+        {
+            out.push(u8::try_from(high * 16 + low).unwrap_or_default());
+            i += 3;
+        } else {
+            out.push(bytes[i]);
+            i += 1;
+        }
+    }
+    out
+}
+
+/// `bytes` with everything but RFC 3986's unreserved characters (letters,
+/// digits, `-`, `.`, `_`, `~`) written as `%XX`.
+fn strict(bytes: &[u8]) -> String {
+    let mut out = String::with_capacity(bytes.len() * 3);
+    for &b in bytes {
+        if b.is_ascii_alphanumeric() || matches!(b, b'-' | b'.' | b'_' | b'~') {
+            out.push(char::from(b));
+        } else {
+            out.push_str(&format!("%{b:02X}"));
+        }
+    }
+    out
 }
 
 /// What the build may treat as the app's own pages besides
@@ -118,8 +161,8 @@ mod tests {
 
     #[test]
     fn a_mail_link_keeps_its_spaces_and_line_breaks_encoded() {
-        // A space stays `%20` (RFC 6068 reads `+` as a plus), a literal plus
-        // stays a plus, a line break stays `%0D%0A`; `attach=` still goes.
+        // A space stays `%20` (RFC 6068 reads `+` as a plus), a plus is
+        // `%2B`, a line break `%0D%0A`, a comma `%2C`; `attach=` still goes.
         let link = outside(&parse(
             "mailto:hello@weekly-ledger.example?Subject=Tax%20dates%2Bfees\
              &body=Hi%20Rita,%0D%0AThanks&attach=/etc/passwd&x-mailer=a+b",
@@ -128,8 +171,13 @@ mod tests {
             link.as_deref(),
             Some(
                 "mailto:hello@weekly-ledger.example?Subject=Tax%20dates%2Bfees\
-                 &body=Hi%20Rita,%0D%0AThanks"
+                 &body=Hi%20Rita%2C%0D%0AThanks"
             )
+        );
+        let plus = outside(&parse("mailto:hello@weekly-ledger.example?subject=a+b"));
+        assert_eq!(
+            plus.as_deref(),
+            Some("mailto:hello@weekly-ledger.example?subject=a%2Bb")
         );
         let spaced = outside(&parse(
             "mailto:hello@weekly-ledger.example?subject=Tax dates",
@@ -140,6 +188,33 @@ mod tests {
         );
         let link = link.unwrap_or_default();
         assert!(!link.contains('+') && !link.contains('\r') && !link.contains('\n'));
+    }
+
+    #[test]
+    fn no_field_hides_in_a_value_or_the_fragment() {
+        for (link, kept) in [
+            // A fragment some mail apps split on `&` anyway (CVE-2020-11880).
+            (
+                "mailto:x@weekly-ledger.example?subject=hi#&attach=/home/u/.ssh/id_rsa",
+                "mailto:x@weekly-ledger.example?subject=hi",
+            ),
+            // Another separator inside a value.
+            (
+                "mailto:x@weekly-ledger.example?subject=x;attach=/etc/passwd",
+                "mailto:x@weekly-ledger.example?subject=x%3Battach%3D%2Fetc%2Fpasswd",
+            ),
+            (
+                "mailto:x@weekly-ledger.example?subject=x?attach=/etc/passwd",
+                "mailto:x@weekly-ledger.example?subject=x%3Fattach%3D%2Fetc%2Fpasswd",
+            ),
+            // An encoded `&` stays inside its value.
+            (
+                "mailto:x@weekly-ledger.example?body=a%26attach%3D%2Fetc%2Fpasswd",
+                "mailto:x@weekly-ledger.example?body=a%26attach%3D%2Fetc%2Fpasswd",
+            ),
+        ] {
+            assert_eq!(outside(&parse(link)).as_deref(), Some(kept), "{link}");
+        }
     }
 
     #[test]
