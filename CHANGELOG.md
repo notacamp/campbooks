@@ -292,6 +292,19 @@ All notable changes to Campbooks Next are documented here. The format follows
 - **A request body that cannot be read is explained in your language.** The web app's
   error for a body that arrived incomplete was English only; it is now in all four
   languages.
+- **A deleted workspace leaves nothing behind once purged.** When a workspace's grace
+  period ends, its purge now deletes its history in small batches, so even a very large
+  workspace is purged without long locks. Whatever reaches that workspace afterwards (an
+  event published by another part of the app's own clean-up, or a finished job) is deleted
+  by an hourly sweep, rather than waiting up to 90 days for normal retention. A delivery
+  still waiting to run is kept until it has run. The server remembers which workspaces
+  were purged by id and time only, and forgets that too 30 days after nothing of the
+  workspace is left. After restoring a database backup, operators can purge again the
+  workspaces deleted after the backup was taken:
+  `campbooks-server workspaces purge-again <id> --confirm <id>`. The ids come from the
+  `workspace purged` log line, which holds only the id and the time; the self-hosting
+  guide's Backups section has the steps. Only that command can make a purge run
+  immediately: there is no API for it.
 
 ### Added
 

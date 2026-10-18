@@ -29,6 +29,9 @@ use crate::{
     scopes::WorkspacesAdmin,
 };
 
+mod purge_again;
+pub use purge_again::{PurgeAgain, purge_again};
+
 /// How long a deleted workspace's records are kept before they are purged.
 pub const GRACE_PERIOD: TimeDelta = TimeDelta::days(30);
 
@@ -127,11 +130,15 @@ pub async fn execute(state: &AppState, access: &Access) -> Result<WorkspaceDelet
 }
 
 /// Hard-delete a deleted workspace's records once its grace period is over:
-/// its blobs (`BlobStore::purge_workspace`), then the workspace row, and with
-/// it (foreign keys cascade) its members, invitations and security events,
-/// and the kernel's change feed, event log and finished jobs of the
-/// workspace. Runs in the workspace, so row-level security applies; a
-/// workspace that is gone already is a no-op.
+/// its blobs (`BlobStore::purge_workspace`), the kernel's change feed, event
+/// log and finished jobs of the workspace (in short batches,
+/// `campbooks_kernel::purge::purge_workspace`), then the workspace row, and
+/// with it (foreign keys cascade) its members, invitations and security
+/// events, together with the workspace's tombstone
+/// (`campbooks_kernel::purge::tombstone`) in the same transaction. What
+/// reaches the kernel's tables of the workspace afterwards is deleted by
+/// the kernel's hourly sweep of tombstones. Runs in the workspace, so
+/// row-level security applies; a workspace that is gone already is a no-op.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct PurgeWorkspace {
     /// The workspace.
@@ -179,6 +186,10 @@ impl Job for PurgeWorkspace {
                 .await
                 .map_err(|e| JobError::retry(format!("purging the workspace's blobs: {e}")))?;
         }
+        // The kernel's rows of the workspace, batch by batch in short
+        // transactions of their own (jobs still queued, such as other
+        // modules' purges, stay to run; what they leave is swept later).
+        campbooks_kernel::purge::purge_workspace(ctx.pool(), &workspace).await?;
         let tx = ctx.tx().await?;
         sqlx::query!(
             "DELETE FROM workspaces.workspaces WHERE id = $1",
@@ -186,13 +197,17 @@ impl Job for PurgeWorkspace {
         )
         .execute(&mut **tx)
         .await?;
-        // Its change feed, event log and finished jobs go with it (jobs
-        // still queued, such as other modules' purges, stay to run).
-        campbooks_kernel::changes::purge_workspace(tx, &workspace).await?;
-        let (jobs, events) = campbooks_kernel::jobs::purge_workspace(tx, &workspace).await?;
-        tracing::info!(workspace = %id, jobs, events, "workspace purged");
+        campbooks_kernel::purge::tombstone(tx, &workspace).await?;
+        log_purged(id, Utc::now());
         Ok(())
     }
+}
+
+/// The one line a purge logs: the workspace's id and when, nothing else (no
+/// name, no member, no count), so the log is safe to keep as the list of
+/// what was purged (the restore runbook in `deploy/README.md`, "Backups" reads it).
+fn log_purged(id: WorkspaceId, purged_at: DateTime<Utc>) {
+    tracing::info!(workspace = %id, purged_at = %purged_at.to_rfc3339(), "workspace purged");
 }
 
 #[cfg(test)]
@@ -295,6 +310,180 @@ mod tests {
         .await
         .unwrap();
         assert_eq!(history, (0, 0), "its events and finished jobs went with it");
+        let tombstones: i64 = sqlx::query_scalar(
+            "SELECT count(*) FROM kernel.purged_workspaces WHERE workspace_id = $1",
+        )
+        .bind(ws.to_string())
+        .fetch_one(&kit.db)
+        .await
+        .unwrap();
+        assert_eq!(
+            tombstones, 1,
+            "its tombstone, written with the row's delete"
+        );
+
+        // What finished after the purge (the purge job itself) goes with the
+        // kernel's next sweep of tombstones.
+        let mut tx = kit.db.begin().await.unwrap();
+        campbooks_kernel::jobs::enqueue(
+            &mut tx,
+            &campbooks_kernel::purge::SweepPurgedWorkspaces,
+            campbooks_kernel::jobs::EnqueueOptions::default(),
+        )
+        .await
+        .unwrap();
+        tx.commit().await.unwrap();
+        worker.run_until_idle().await;
+        let left: i64 =
+            sqlx::query_scalar("SELECT count(*) FROM kernel.jobs WHERE workspace_id = $1")
+                .bind(ws.to_string())
+                .fetch_one(&kit.db)
+                .await
+                .unwrap();
+        assert_eq!(left, 0, "nothing of the workspace is left in the queue");
+    }
+
+    /// The workspace's purges still queued, as the database owner.
+    async fn queued_purges(kit: &Kit, ws: campbooks_kernel::tenancy::WorkspaceId) -> i64 {
+        sqlx::query_scalar(
+            "SELECT count(*) FROM kernel.jobs
+              WHERE kind = 'workspaces.purge_workspace' AND workspace_id = $1
+                AND state IN ('pending', 'running')",
+        )
+        .bind(ws.to_string())
+        .fetch_one(&kit.db)
+        .await
+        .unwrap()
+    }
+
+    /// After a restore of a backup taken before the deletion, the operator's
+    /// `purge-again` deletes the workspace now, publishes its deletion (every
+    /// module purges too) and purges it at once; a second run enqueues no
+    /// second purge; once purged, the id is a no-op that says so.
+    #[sqlx::test(migrations = "../../../migrations")]
+    async fn purge_again_deletes_and_purges_a_restored_workspace_once(db: PgPool) {
+        let kit = Kit::new(db).await;
+        let ana = kit.user("ana");
+        let ws = kit.create_workspace(&ana, "Shop").await;
+        kit.join(&ana, ws, "bea", "member").await;
+
+        let first = super::purge_again(&kit.state, ws).await.unwrap();
+        assert_eq!(
+            first,
+            super::PurgeAgain::Scheduled {
+                newly_deleted: true
+            }
+        );
+        assert_eq!(
+            kit.get(&ana, &format!("/api/v1/w/{ws}")).await.status,
+            StatusCode::NOT_FOUND,
+            "gone for its members at once"
+        );
+        assert!(
+            kit.events_of(&ws.to_string())
+                .await
+                .contains(&"workspaces.workspace_deleting".to_owned())
+        );
+        let deleted_by = kit.last_event_payload(&ws.to_string()).await["deleted_by"].clone();
+        assert_eq!(
+            deleted_by,
+            serde_json::json!(kit.user_id("ana").await),
+            "the owner, who alone deletes"
+        );
+
+        let second = super::purge_again(&kit.state, ws).await.unwrap();
+        assert_eq!(
+            second,
+            super::PurgeAgain::AlreadyQueued {
+                newly_deleted: false
+            }
+        );
+        assert_eq!(queued_purges(&kit, ws).await, 1, "no second purge");
+
+        let stats = Worker::new(kit.state.clone()).run_until_idle().await;
+        assert_eq!(stats.failed, 0, "{stats:?}");
+        assert_eq!(kit.rows_of(ws).await, (0, 0, 0));
+        assert_eq!(
+            super::purge_again(&kit.state, ws).await.unwrap(),
+            super::PurgeAgain::NoSuchWorkspace
+        );
+        assert_eq!(queued_purges(&kit, ws).await, 0);
+    }
+
+    /// A workspace deleted in its grace period keeps its one queued purge:
+    /// `purge-again` marks it due now and enqueues nothing more.
+    #[sqlx::test(migrations = "../../../migrations")]
+    async fn purge_again_keeps_the_queued_purge_of_a_deleted_workspace(db: PgPool) {
+        let kit = Kit::new(db).await;
+        let ana = kit.user("ana");
+        let ws = kit.create_workspace(&ana, "Shop").await;
+        let response = kit.delete(&ana, &format!("/api/v1/w/{ws}")).await;
+        assert_eq!(response.status, StatusCode::ACCEPTED);
+        let deletions = kit.events_of(&ws.to_string()).await.len();
+
+        assert_eq!(
+            super::purge_again(&kit.state, ws).await.unwrap(),
+            super::PurgeAgain::AlreadyQueued {
+                newly_deleted: false
+            }
+        );
+        assert_eq!(queued_purges(&kit, ws).await, 1);
+        assert_eq!(
+            kit.events_of(&ws.to_string()).await.len(),
+            deletions,
+            "its deletion is not published twice"
+        );
+        let due: bool = sqlx::query_scalar(
+            "SELECT purge_after <= now() FROM workspaces.workspaces WHERE id = $1",
+        )
+        .bind(ws.as_uuid())
+        .fetch_one(&kit.db)
+        .await
+        .unwrap();
+        assert!(due);
+    }
+
+    /// The `workspace purged` line carries the workspace's id and the time,
+    /// and nothing else: the restore runbook relies on it being safe to keep.
+    #[test]
+    fn the_purge_line_carries_the_id_and_the_time_only() {
+        use std::sync::{Arc, Mutex};
+        use tracing_subscriber::layer::SubscriberExt as _;
+
+        type Seen = Arc<Mutex<Vec<(String, String)>>>;
+        struct Fields(Seen);
+        struct Visit<'a>(&'a mut Vec<(String, String)>);
+        impl tracing::field::Visit for Visit<'_> {
+            fn record_debug(&mut self, field: &tracing::field::Field, value: &dyn std::fmt::Debug) {
+                self.0.push((field.name().to_owned(), format!("{value:?}")));
+            }
+        }
+        impl<S: tracing::Subscriber> tracing_subscriber::Layer<S> for Fields {
+            fn on_event(
+                &self,
+                event: &tracing::Event<'_>,
+                _: tracing_subscriber::layer::Context<'_, S>,
+            ) {
+                event.record(&mut Visit(&mut self.0.lock().unwrap()));
+            }
+        }
+
+        let seen = Seen::default();
+        let subscriber = tracing_subscriber::registry().with(Fields(Arc::clone(&seen)));
+        let id = campbooks_kernel::tenancy::WorkspaceId::new();
+        let at = chrono::Utc::now();
+        tracing::subscriber::with_default(subscriber, || super::log_purged(id, at));
+
+        let mut fields = seen.lock().unwrap().clone();
+        fields.sort();
+        assert_eq!(
+            fields,
+            [
+                ("message".to_owned(), "workspace purged".to_owned()),
+                ("purged_at".to_owned(), at.to_rfc3339()),
+                ("workspace".to_owned(), id.to_string()),
+            ]
+        );
     }
 
     #[sqlx::test(migrations = "../../../migrations")]

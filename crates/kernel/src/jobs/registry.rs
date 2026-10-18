@@ -483,6 +483,7 @@ impl Registry {
             .schedule::<PruneRateLimits>(PRUNE_EVERY)
             .job::<SequenceChanges>()
             .schedule::<PruneChanges>(PRUNE_EVERY)
+            .schedule::<crate::purge::SweepPurgedWorkspaces>(PRUNE_EVERY)
             .schedule::<DispatchRekeys>(REKEY_EVERY);
         let owners = std::iter::once((KERNEL_OWNER, &kernel))
             .chain(modules.iter().map(|m| (m.name, &m.background)))

@@ -1,6 +1,8 @@
 //! What the server's operator commands read about a workspace's members
 //! (campbooks-cloud#219): `campbooks-server labelling export --member` bounds
-//! an export by one member's visibility, so it first finds who that is.
+//! an export by one member's visibility, so it first finds who that is. And
+//! `campbooks-server workspaces purge-again`, which purges a workspace a
+//! restored backup brought back ([`purge_again`], campbooks-cloud#65).
 
 use campbooks_kernel::{
     Result,
@@ -8,6 +10,8 @@ use campbooks_kernel::{
 };
 use sqlx::PgConnection;
 use uuid::Uuid;
+
+pub use crate::features::delete_workspace::{PurgeAgain, purge_again};
 
 /// The members of `workspace` that `who` names, with their role: a member's
 /// id, or the verified address on their profile (case ignored). As the API

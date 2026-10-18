@@ -252,6 +252,32 @@ docker run --rm -v campbooks_blobs-data:/data -v "$PWD":/backup busybox:1.37.0-m
   tar czf /backup/blobs-data.tgz -C /data .
 ```
 
+### After restoring a backup: purge deleted workspaces again
+
+A restore brings back every workspace as it was when the backup was taken, including
+the ones deleted and purged since: their members, their mail and their files are back.
+Purge each of them again before anyone signs in.
+
+1. List the workspaces purged after the backup's time. Each purge logs one line,
+   `workspace purged`, with the workspace's id and the time (nothing else), so search
+   your logs from the backup's time onwards for that message. Keep server logs at least
+   as long as your oldest backup.
+2. With the restored database running, purge each again (the id twice, as confirmation):
+
+   ```sh
+   docker compose exec server campbooks-server workspaces purge-again <id> --confirm <id>
+   ```
+
+   It deletes the workspace now if the backup predates its deletion (every part of the
+   app then purges its data too), sets its purge for now, and queues the purge, which a
+   worker runs. Running it twice queues one purge; an id with no workspace changes
+   nothing and says so. It logs one line with the workspace's id only.
+
+The server records each purge in the database too (a tombstone, so data that arrives for
+a purged workspace later is deleted by the hourly sweep), but those records are restored
+to the backup's moment with everything else: the log lines are what tells you which
+workspaces went after it. There is no API for this; only the command does it.
+
 ## Monitoring
 
 Out of the box Campbooks exports nothing and opens no extra port. It writes JSON logs to

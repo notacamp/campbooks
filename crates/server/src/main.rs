@@ -23,6 +23,7 @@ use campbooks_kernel::{
     jobs::Worker,
 };
 use campbooks_server::{bff, telemetry::Telemetry};
+use campbooks_workspaces::operator::PurgeAgain;
 use clap::{Parser, Subcommand};
 use secrecy::ExposeSecret;
 use sqlx::{Connection as _, PgConnection, PgPool};
@@ -79,6 +80,11 @@ enum Command {
     Labelling {
         #[command(subcommand)]
         command: labelling_cli::LabellingCommand,
+    },
+    /// Operator work on workspaces (`purge-again`).
+    Workspaces {
+        #[command(subcommand)]
+        command: WorkspacesCommand,
     },
     /// Work with the search index.
     Search {
@@ -139,6 +145,25 @@ enum TelemetryCommand {
 }
 
 #[derive(Debug, Subcommand)]
+enum WorkspacesCommand {
+    /// Purge a workspace again after restoring a database backup brought it
+    /// back (it was deleted and purged after the backup was taken): marks it
+    /// deleted, its purge due now, and enqueues the purge, which a worker
+    /// runs. A workspace that was not deleted yet in the backup is deleted
+    /// now and every module purges its data too. A purge already queued is
+    /// not enqueued twice; an id with no workspace changes nothing. Operator
+    /// only: no API route does this.
+    PurgeAgain {
+        /// The workspace's id (a UUID), as the `workspace purged` log line
+        /// gives it.
+        workspace: String,
+        /// The same id again: purging cannot be undone.
+        #[arg(long)]
+        confirm: Option<String>,
+    },
+}
+
+#[derive(Debug, Subcommand)]
 enum SearchCommand {
     /// Rebuild a workspace's search index from its sources, in the
     /// background (a worker runs it). Search keeps answering meanwhile.
@@ -192,6 +217,9 @@ fn main() -> ExitCode {
         },
         Command::Admin { command } => admin_cli::run(command),
         Command::Labelling { command } => labelling_cli::run(command),
+        Command::Workspaces {
+            command: WorkspacesCommand::PurgeAgain { workspace, confirm },
+        } => purge_again(&workspace, confirm.as_deref()),
         Command::Search {
             command: SearchCommand::Reindex { workspace },
         } => reindex(&workspace),
@@ -797,6 +825,80 @@ fn reindex(workspace: &str) -> ExitCode {
     }
 }
 
+/// `workspaces purge-again <id> --confirm <id>` (campbooks-cloud#65).
+fn purge_again(workspace: &str, confirm: Option<&str>) -> ExitCode {
+    if let Err(e) = confirmed(workspace, confirm) {
+        return fail(&e);
+    }
+    let Ok(id) = workspace.parse::<campbooks_kernel::tenancy::WorkspaceId>() else {
+        return fail("the workspace must be a workspace id (a UUID); nothing was done");
+    };
+    let config = match Config::from_env() {
+        Ok(config) => config,
+        Err(e) => return fail(&e.to_string()),
+    };
+    let telemetry = match Telemetry::new(&config.telemetry, "cli") {
+        Ok(telemetry) => telemetry,
+        Err(e) => return fail(&e),
+    };
+    telemetry.install_subscriber(config.log_format);
+    let registry = match campbooks_server::registry() {
+        Ok(registry) => registry,
+        Err(e) => return fail(&e.to_string()),
+    };
+    let runtime = match runtime() {
+        Ok(runtime) => runtime,
+        Err(e) => return fail(&e),
+    };
+    let outcome = runtime.block_on(async {
+        let db = connect(&config).await?;
+        let state =
+            campbooks_server::with_ports(AppState::new(db.clone(), config).with_registry(registry));
+        let outcome = campbooks_workspaces::operator::purge_again(&state, id)
+            .await
+            .map_err(|e| e.to_string());
+        db.close().await;
+        outcome
+    });
+    drop(runtime);
+    telemetry.shutdown();
+    let said = |message: String| {
+        let _ = writeln!(std::io::stdout(), "{message}");
+        ExitCode::SUCCESS
+    };
+    match outcome {
+        Ok(PurgeAgain::NoSuchWorkspace) => said(format!(
+            "no workspace {id}: nothing to purge (purged already, or never here); nothing was done"
+        )),
+        Ok(PurgeAgain::NoOwner) => fail(&format!(
+            "workspace {id} is not deleted and has no owner to name; nothing was done"
+        )),
+        Ok(PurgeAgain::Scheduled { newly_deleted }) => said(format!(
+            "workspace {id} {}marked for purge now; a worker purges it",
+            if newly_deleted { "deleted and " } else { "" }
+        )),
+        Ok(PurgeAgain::AlreadyQueued { newly_deleted }) => said(format!(
+            "workspace {id} {}marked for purge now; its purge was queued already and runs \
+             when due",
+            if newly_deleted { "deleted and " } else { "" }
+        )),
+        Err(e) => fail(&e),
+    }
+}
+
+/// `--confirm` must repeat the workspace id exactly.
+fn confirmed(workspace: &str, confirm: Option<&str>) -> Result<(), String> {
+    match confirm {
+        Some(again) if again == workspace => Ok(()),
+        Some(_) => Err("--confirm must repeat the workspace id exactly; nothing was done".into()),
+        None => Err(
+            "purging cannot be undone: repeat the workspace id with --confirm <id>; nothing \
+             was done"
+                .into(),
+        ),
+    }
+}
+
 /// `--since`: an event id or an RFC 3339 instant.
 fn parse_since(since: Option<&str>) -> Result<ReplayFrom, String> {
     let Some(since) = since else {
@@ -1042,6 +1144,36 @@ fn fail(message: &str) -> ExitCode {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// `workspaces purge-again` refuses unless `--confirm` repeats the id
+    /// exactly, before reading any setting or touching the database
+    /// (campbooks-cloud#65).
+    #[test]
+    fn purging_again_needs_the_id_confirmed() {
+        let id = "0192f7a0-0000-7000-8000-000000000001";
+        assert!(confirmed(id, Some(id)).is_ok());
+        assert!(confirmed(id, None).unwrap_err().contains("--confirm"));
+        assert!(confirmed(id, Some("0192f7a0-0000-7000-8000-000000000002")).is_err());
+        assert!(confirmed(id, Some(&id.to_uppercase())).is_err());
+        let failure = format!("{:?}", ExitCode::FAILURE);
+        assert_eq!(format!("{:?}", purge_again(id, None)), failure);
+        assert_eq!(format!("{:?}", purge_again(id, Some(""))), failure);
+        let cli = Cli::try_parse_from([
+            "campbooks-server",
+            "workspaces",
+            "purge-again",
+            id,
+            "--confirm",
+            id,
+        ])
+        .unwrap();
+        assert!(matches!(
+            cli.command,
+            Some(Command::Workspaces {
+                command: WorkspacesCommand::PurgeAgain { .. }
+            })
+        ));
+    }
 
     /// The worker's probe answers 200 while it beats, 503 otherwise, and
     /// `healthcheck --worker` reads it (campbooks-cloud#185).
