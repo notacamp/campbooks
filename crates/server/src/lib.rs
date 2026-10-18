@@ -1362,7 +1362,7 @@ mod tests {
         let after = |statements: &'static [&'static str]| {
             let db = db.clone();
             async move {
-                for statement in statements {
+                for &statement in statements {
                     sqlx::query(statement).execute(&db).await.unwrap();
                 }
                 let tables: Vec<(String, bool)> = sqlx::query_as(KERNEL_TABLES_PROTECTED)
