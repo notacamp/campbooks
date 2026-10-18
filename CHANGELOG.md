@@ -274,6 +274,9 @@ All notable changes to Campbooks Next are documented here. The format follows
   asked for that is still waiting to be made at your mail provider (its mailbox paused, or
   the provider down) is now signed again with the new key during a rotation, so it is
   still made once the old key is removed. The logs say when none are left.
+- **A file or request that is too large now says so with 413.** An upload over the
+  instance's size limit, or a request body over its limit, is answered 413 (instead of
+  400), and the message names the limit in your language.
 
 ### Added
 

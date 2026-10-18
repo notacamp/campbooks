@@ -33,6 +33,7 @@
     "idempotency_body_too_large": "The request body is too large to be used with an Idempotency-Key.",
     "database_unavailable": "The database is unavailable right now. Try again in a moment.",
     "file_too_large": "The file is larger than the limit of {{limit}} bytes.",
+    "body_too_large": "The request body is larger than this operation accepts.",
     "upload_mismatch": "The uploaded file does not match what was expected. Upload it again.",
     "upload_failed": "Reading the upload failed. Try again.",
     "too_many_streams": "You have too many live update connections open. Close some tabs or windows and try again.",

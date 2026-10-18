@@ -33,6 +33,7 @@
     "idempotency_body_too_large": "Le corps de la requête est trop volumineux pour être utilisé avec une Idempotency-Key.",
     "database_unavailable": "La base de données est indisponible pour le moment. Réessayez dans un instant.",
     "file_too_large": "Le fichier dépasse la limite de {{limit}} octets.",
+    "body_too_large": "Le corps de la requête est plus volumineux que ce que cette opération accepte.",
     "upload_mismatch": "Le fichier envoyé ne correspond pas à ce qui était attendu. Envoyez-le à nouveau.",
     "upload_failed": "La lecture de l’envoi a échoué. Réessayez.",
     "too_many_streams": "Vous avez trop de connexions de mise à jour en direct ouvertes. Fermez quelques onglets ou fenêtres et réessayez.",
