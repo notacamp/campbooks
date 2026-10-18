@@ -25,6 +25,7 @@
     "missing_json_content_type": "The request body must be JSON (Content-Type: application/json).",
     "invalid_json": "The request body is not valid JSON: {{reason}}",
     "invalid_body": "The request body is not what this operation expects: {{reason}}",
+    "body_unreadable": "The request body could not be read in full.",
     "invalid_query": "The query string is not what this operation expects: {{reason}}",
     "idempotency_key_invalid": "The Idempotency-Key must be 1 to {{max}} visible ASCII characters.",
     "idempotency_key_reused": "This Idempotency-Key was already used for a different request.",

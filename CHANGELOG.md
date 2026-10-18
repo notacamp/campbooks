@@ -289,6 +289,9 @@ All notable changes to Campbooks Next are documented here. The format follows
   `idempotency_outcome_unknown`, so the caller checks whether it took effect and then
   retries with a new key. A request past the time limit now answers 503
   `request_timed_out`, which says the same.
+- **A request body that cannot be read is explained in your language.** The web app's
+  error for a body that arrived incomplete was English only; it is now in all four
+  languages.
 
 ### Added
 
