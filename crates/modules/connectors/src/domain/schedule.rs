@@ -269,6 +269,50 @@ pub async fn take(pool: &PgPool, key: &str, cost: u32, rate: Rate) -> Result<Res
     }
 }
 
+/// Settle a take of `reserved` units of `provider`'s budget with what was
+/// really `spent`: the difference is given back, or owed. A refund never
+/// fills the bucket past its two seconds' worth; a debt takes it below zero,
+/// so later takes wait until the rate has paid it back. A take larger than
+/// the bucket only ever takes the bucket ([`take`]); its settlement charges
+/// the rest, so the budget counts every unit spent whatever the rate.
+pub async fn settle_budget(
+    pool: &PgPool,
+    provider: Provider,
+    reserved: u32,
+    spent: u32,
+    rate: u32,
+) -> Result<()> {
+    settle(
+        pool,
+        provider.as_str(),
+        reserved,
+        spent,
+        Rate::per_second(rate),
+    )
+    .await
+}
+
+/// [`settle_budget`] for the budget `key`.
+pub async fn settle(pool: &PgPool, key: &str, reserved: u32, spent: u32, rate: Rate) -> Result<()> {
+    let burst = rate.per_second * rate.burst_seconds;
+    // What `take` took of `reserved`: never more than the bucket.
+    let taken = f64::from(reserved).min(burst);
+    let back = taken - f64::from(spent);
+    if back.abs() < 0.5 {
+        return Ok(());
+    }
+    sqlx::query!(
+        "UPDATE connectors.provider_budgets SET tokens = least($2, tokens + $3)
+          WHERE provider = $1",
+        key,
+        burst,
+        back,
+    )
+    .execute(pool)
+    .await?;
+    Ok(())
+}
+
 /// Drop the budget `key` (its connection is gone).
 pub async fn forget_budget(conn: &mut PgConnection, key: &str) -> Result<()> {
     sqlx::query!(
@@ -283,6 +327,65 @@ pub async fn forget_budget(conn: &mut PgConnection, key: &str) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// The test budget's stored tokens.
+    async fn tokens(db: &PgPool) -> f64 {
+        sqlx::query_scalar("SELECT tokens FROM connectors.provider_budgets WHERE provider = 'test'")
+            .fetch_one(db)
+            .await
+            .unwrap()
+    }
+
+    #[sqlx::test(migrations = "../../../migrations")]
+    async fn a_settled_take_gives_back_or_owes_the_difference(db: PgPool) {
+        // campbooks-cloud#252. A slow bucket (one unit a second, 100 at
+        // most), so the test's own time barely refills it.
+        let rate = Rate {
+            per_second: 1.0,
+            burst_seconds: 100.0,
+        };
+        assert!(take(&db, "test", 60, rate).await.unwrap().is_ok());
+        // Spent 10 of the 60: 50 back.
+        settle(&db, "test", 60, 10, rate).await.unwrap();
+        assert!(
+            (tokens(&db).await - 90.0).abs() < 1.0,
+            "{}",
+            tokens(&db).await
+        );
+        // Spent 185 of 85: owes 100, below zero, and the next take waits it out.
+        assert!(take(&db, "test", 85, rate).await.unwrap().is_ok());
+        settle(&db, "test", 85, 185, rate).await.unwrap();
+        assert!(tokens(&db).await < -90.0, "{}", tokens(&db).await);
+        let wait = take(&db, "test", 10, rate).await.unwrap().unwrap_err();
+        assert!(wait >= Duration::from_secs(90), "{wait:?}");
+        // A refund never fills the bucket past its size.
+        settle(&db, "test", 1_000, 0, rate).await.unwrap();
+        settle(&db, "test", 1_000, 0, rate).await.unwrap();
+        assert!(
+            (tokens(&db).await - 100.0).abs() < 0.5,
+            "{}",
+            tokens(&db).await
+        );
+    }
+
+    #[sqlx::test(migrations = "../../../migrations")]
+    async fn a_take_larger_than_the_bucket_is_charged_in_full_when_settled(db: PgPool) {
+        // The bucket holds 100: a reservation of 300 takes 100, and settling
+        // it with the 300 spent owes the other 200.
+        let rate = Rate {
+            per_second: 1.0,
+            burst_seconds: 100.0,
+        };
+        assert!(take(&db, "test", 300, rate).await.unwrap().is_ok());
+        settle(&db, "test", 300, 300, rate).await.unwrap();
+        let tokens: f64 = sqlx::query_scalar(
+            "SELECT tokens FROM connectors.provider_budgets WHERE provider = 'test'",
+        )
+        .fetch_one(&db)
+        .await
+        .unwrap();
+        assert!(tokens < -190.0, "{tokens}");
+    }
 
     #[test]
     fn intervals_back_off_and_reset() {
