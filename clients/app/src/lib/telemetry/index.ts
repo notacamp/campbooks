@@ -5,6 +5,8 @@ import { isTauri } from "~/lib/platform";
 
 import { createReporter, type ClientReport, type Reporter } from "./reporter";
 
+export { startScreenViews } from "./screen-views";
+
 /**
  * The app's own telemetry (`openspec/specs/observability`): errors it did
  * not handle and its web vitals, sent in batches to the server

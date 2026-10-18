@@ -872,6 +872,7 @@ fn body(world: &World, id: &str) -> Option<Value> {
         "identity.rename_passkey" => json!({"name": "Laptop"}),
         "identity.register_client" => json!({"name": "Matrix agent", "scopes": []}),
         "system.report_client_telemetry" => json!({"session_id": "matrix"}),
+        "system.report_screen_view" => json!({"route": "/inbox"}),
         "attention.snooze" => json!({"until": chrono::Utc::now() + chrono::TimeDelta::days(1)}),
         "conversations.resolve_need" => {
             json!({"outcome": "done", "message_id": world.instances["conversations.message"]})

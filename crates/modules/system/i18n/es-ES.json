@@ -1,6 +1,7 @@
 {
   "errors": {
     "database_unreachable": "No se puede contactar con la base de datos. La instancia no está lista para atender solicitudes.",
-    "database_timeout": "La base de datos no ha respondido a tiempo. La instancia no está lista para atender solicitudes."
+    "database_timeout": "La base de datos no ha respondido a tiempo. La instancia no está lista para atender solicitudes.",
+    "invalid_route": "Solo se puede comunicar una plantilla de ruta: palabras en minúsculas y parámetros como :workspaceId, sin identificadores, números, consulta ni fragmento."
   }
 }
