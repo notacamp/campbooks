@@ -192,7 +192,7 @@ impl Writes {
     /// [`PUSH_LIMIT`](crate::domain::outbound::PUSH_LIMIT) changes, so this
     /// stays under about 7,300 units.
     fn most(&self) -> u32 {
-        let batched: usize = self.batches.iter().map(|(_, chunk)| chunk.len()).sum();
+        let in_batches: usize = self.batches.iter().map(|(_, chunk)| chunk.len()).sum();
         let labelled = self
             .singles
             .iter()
@@ -202,11 +202,11 @@ impl Writes {
             .singles
             .iter()
             .map(Single::calls)
-            .fold(count(batched), u32::saturating_add);
-        let batches = count(batched.saturating_add(labelled) / BATCH_FROM);
+            .fold(count(in_batches), u32::saturating_add);
+        let batch_calls = count(in_batches.saturating_add(labelled) / BATCH_FROM);
         calls
             .saturating_mul(CALL_UNITS)
-            .saturating_add(batches.saturating_mul(BATCH_UNITS))
+            .saturating_add(batch_calls.saturating_mul(BATCH_UNITS))
     }
 
     /// `messages` all getting (`add`, `remove`): nothing, one by one, or in
