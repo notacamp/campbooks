@@ -321,8 +321,9 @@ valid one alone.
 ### Requirement: Sweeping purged workspaces
 The kernel SHALL schedule `kernel.sweep_purged_workspaces` hourly. For every
 tombstone of a purged workspace it SHALL delete, whatever their age, the
-workspace's changes and cursor head, finished jobs, and events no pending or
-running delivery reads. It SHALL work 5,000 rows per table per transaction,
+workspace's changes and cursor head, finished jobs, events no pending or
+running delivery reads, and idempotency keys (through
+`kernel.purge_workspace_idempotency`, in short transactions of their own). It SHALL work 5,000 rows per table per transaction,
 in a transaction working in that workspace. A pending or running delivery,
 and the event it reads, SHALL survive.
 

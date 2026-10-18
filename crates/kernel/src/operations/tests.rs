@@ -1305,3 +1305,182 @@ async fn a_replay_needs_the_access_the_first_run_had(db: PgPool) {
     let (status, _, last) = http.send("POST", &uri, Some("k-box"), None).await;
     assert_eq!((status, last), (StatusCode::OK, first));
 }
+
+// --- a workspace's keys go with it (campbooks-cloud#65) ---------------------
+
+/// Every key with the workspace it records, as the database owner.
+async fn workspace_keys(db: &PgPool) -> Vec<(String, Option<String>)> {
+    sqlx::query_as("SELECT key, workspace_id FROM kernel.idempotency ORDER BY key")
+        .fetch_all(db)
+        .await
+        .unwrap()
+}
+
+/// A key of a `{workspace_id}` route records that workspace, taken from the
+/// matched route alone: a `workspace_id` in the body changes nothing, and a
+/// route outside a workspace records none. The workspace's purge deletes its
+/// keys through `kernel.purge_workspace_idempotency`, only in a transaction
+/// working in that workspace, and leaves every other key.
+#[sqlx::test(migrations = "../../migrations")]
+async fn a_workspace_routes_keys_name_it_and_go_with_its_purge(db: PgPool) {
+    use crate::db::BeginFor as _;
+
+    let idp = TestIdp::start().await;
+    let switches = SwitchPorts(std::sync::Arc::default());
+    let state = idp
+        .state(db.clone())
+        .with_membership(std::sync::Arc::new(switches.clone()))
+        .with_visibility(std::sync::Arc::new(switches));
+    let (app, _) = app(state);
+    let http = Http {
+        app,
+        token: idp.token(&idp.claims("test:write")),
+        idp: idp.clone(),
+    };
+    let (ws, elsewhere) = (
+        crate::tenancy::WorkspaceId::new(),
+        crate::tenancy::WorkspaceId::new(),
+    );
+    let claimed = json!({ "workspace_id": elsewhere.to_string(), "reason": "done" });
+    for (uri, key) in [
+        (format!("/api/v1/w/{ws}/boxes/b1/edit"), "k-box"),
+        (format!("/api/v1/w/{elsewhere}/boxes/b2/edit"), "k-other"),
+        (ARCHIVE.to_owned(), "k-note"),
+    ] {
+        let (status, _, body) = http
+            .send("POST", &uri, Some(key), Some(claimed.clone()))
+            .await;
+        assert!(status.is_success(), "{uri}: {status} {body}");
+    }
+    assert_eq!(
+        workspace_keys(&db).await,
+        [
+            ("k-box".to_owned(), Some(ws.to_string())),
+            ("k-note".to_owned(), None),
+            ("k-other".to_owned(), Some(elsewhere.to_string())),
+        ]
+    );
+
+    // Refused unless the transaction works in that workspace.
+    let pool = testing::app_role_pool(&db).await;
+    let purge = "SELECT kernel.purge_workspace_idempotency($1, 100)";
+    for mut tx in [
+        pool.begin().await.unwrap(),
+        pool.begin_for(elsewhere).await.unwrap(),
+    ] {
+        let refused = sqlx::query_scalar::<_, i64>(purge)
+            .bind(ws.to_string())
+            .fetch_one(&mut *tx)
+            .await
+            .unwrap_err();
+        assert!(
+            refused
+                .to_string()
+                .contains("in a transaction working in that workspace"),
+            "{refused}"
+        );
+    }
+    assert_eq!(workspace_keys(&db).await.len(), 3, "nothing was deleted");
+
+    // In the workspace: its key goes, expired or not; the others stay, and
+    // the transaction still sees no key at all.
+    let mut tx = pool.begin_for(ws).await.unwrap();
+    let deleted: i64 = sqlx::query_scalar(purge)
+        .bind(ws.to_string())
+        .fetch_one(&mut *tx)
+        .await
+        .unwrap();
+    assert_eq!(deleted, 1);
+    let seen: i64 = sqlx::query_scalar("SELECT count(*) FROM kernel.idempotency")
+        .fetch_one(&mut *tx)
+        .await
+        .unwrap();
+    assert_eq!(seen, 0);
+    tx.commit().await.unwrap();
+    assert_eq!(
+        crate::idempotency::purge_workspace(&pool, &ws.to_string())
+            .await
+            .unwrap(),
+        0,
+        "nothing left; the purge's own short transactions"
+    );
+    assert_eq!(
+        workspace_keys(&db).await,
+        [
+            ("k-note".to_owned(), None),
+            ("k-other".to_owned(), Some(elsewhere.to_string())),
+        ]
+    );
+}
+
+/// The app over `db` with membership and visibility switched on, and a
+/// writer's client.
+async fn workspace_http(db: &PgPool) -> Http {
+    let idp = TestIdp::start().await;
+    let switches = SwitchPorts(std::sync::Arc::default());
+    let state = idp
+        .state(db.clone())
+        .with_membership(std::sync::Arc::new(switches.clone()))
+        .with_visibility(std::sync::Arc::new(switches));
+    let (app, _) = app(state);
+    Http {
+        app,
+        token: idp.token(&idp.claims("test:write")),
+        idp: idp.clone(),
+    }
+}
+
+/// A percent-encoded workspace segment records the workspace the router
+/// decodes for the handler, not the raw text.
+#[sqlx::test(migrations = "../../migrations")]
+async fn a_percent_encoded_workspace_segment_records_the_decoded_workspace(db: PgPool) {
+    let http = workspace_http(&db).await;
+    let ws = crate::tenancy::WorkspaceId::new();
+    let id = ws.to_string();
+    let encoded = format!("%{:02X}{}", id.as_bytes()[0], &id[1..]);
+    let uri = format!("/api/v1/w/{encoded}/boxes/b1/edit");
+    let (status, _, body) = http.send("POST", &uri, Some("k-enc"), None).await;
+    assert!(status.is_success(), "{uri}: {status} {body}");
+    assert_eq!(workspace_keys(&db).await, [("k-enc".to_owned(), Some(id))]);
+}
+
+/// A key taken again once expired records its new route's workspace, not
+/// the old one's.
+#[sqlx::test(migrations = "../../migrations")]
+async fn an_expired_key_taken_again_records_its_new_workspace(db: PgPool) {
+    let http = workspace_http(&db).await;
+    let (first, second) = (
+        crate::tenancy::WorkspaceId::new(),
+        crate::tenancy::WorkspaceId::new(),
+    );
+    let (status, ..) = http
+        .send(
+            "POST",
+            &format!("/api/v1/w/{first}/boxes/b1/edit"),
+            Some("k"),
+            None,
+        )
+        .await;
+    assert!(status.is_success());
+    sqlx::query("UPDATE kernel.idempotency SET expires_at = now() - interval '1 second'")
+        .execute(&db)
+        .await
+        .unwrap();
+    let (status, headers, _) = http
+        .send(
+            "POST",
+            &format!("/api/v1/w/{second}/boxes/b1/edit"),
+            Some("k"),
+            None,
+        )
+        .await;
+    assert!(status.is_success());
+    assert!(
+        !headers.contains_key(idempotency::REPLAYED_HEADER),
+        "ran again"
+    );
+    assert_eq!(
+        workspace_keys(&db).await,
+        [("k".to_owned(), Some(second.to_string()))]
+    );
+}

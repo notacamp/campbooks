@@ -38,15 +38,21 @@ pub struct Purged {
     pub events: u64,
     /// Changes of the change feed.
     pub changes: u64,
-    /// Transactions it took, [`PURGE_BATCH`] rows per table each.
+    /// Idempotency keys first used on the workspace's routes, expired or not.
+    pub keys: u64,
+    /// Transactions it took for the change feed, the jobs and the events,
+    /// [`PURGE_BATCH`] rows per table each (the keys take their own).
     pub batches: u32,
 }
 
 /// Delete `workspace`'s change feed, finished jobs and events no pending or
 /// running delivery reads, [`PURGE_BATCH`] rows per table at a time, each
 /// batch in a short transaction of its own working in `workspace` (row-level
-/// security applies). Unfinished jobs stay: another module's purge may
-/// still be queued. Idempotent: a second run deletes what appeared since.
+/// security applies), then its idempotency keys, expired or not, in short
+/// transactions of their own there too
+/// ([`crate::idempotency::purge_workspace`]). Unfinished jobs stay: another
+/// module's purge may still be queued. Idempotent: a second run deletes what
+/// appeared since.
 pub async fn purge_workspace(pool: &PgPool, workspace: &str) -> Result<Purged, sqlx::Error> {
     let mut purged = Purged::default();
     loop {
@@ -60,9 +66,11 @@ pub async fn purge_workspace(pool: &PgPool, workspace: &str) -> Result<Purged, s
         purged.events += events;
         let full = PURGE_BATCH.unsigned_abs();
         if changes < full && jobs < full && events < full {
-            return Ok(purged);
+            break;
         }
     }
+    purged.keys = crate::idempotency::purge_workspace(pool, workspace).await?;
+    Ok(purged)
 }
 
 /// Record that `workspace` was purged, in `tx`: the transaction that deletes
@@ -119,6 +127,7 @@ impl Job for SweepPurgedWorkspaces {
                     swept.jobs += purged.jobs;
                     swept.events += purged.events;
                     swept.changes += purged.changes;
+                    swept.keys += purged.keys;
                 }
                 Ok(None) => kept.push(workspace.clone()),
                 Err(error) => {
@@ -155,6 +164,7 @@ impl Job for SweepPurgedWorkspaces {
             jobs = swept.jobs,
             events = swept.events,
             changes = swept.changes,
+            keys = swept.keys,
             kept = kept.len(),
             dropped,
             "swept what was left of purged workspaces"
