@@ -634,7 +634,7 @@ pub fn check_operations(spec: &serde_json::Value, owners: &Owners) -> Vec<String
 
 /// A field name in an answer that looks like it may carry a secret: a
 /// secret, token, ticket or password, or a URL (a link may carry a ticket).
-static SECRET_LOOKING_FIELD: LazyLock<Regex> = LazyLock::new(|| {
+static GUARDED_FIELD_NAME: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(r"(?:^|_)(?:secret|token|ticket|password)s?(?:$|_)|(?:^|_)url$")
         .unwrap_or_else(|e| unreachable!("static regex compiles: {e}"))
 });
@@ -642,7 +642,7 @@ static SECRET_LOOKING_FIELD: LazyLock<Regex> = LazyLock::new(|| {
 /// Secret-looking fields in the answers of mutating operations that show no
 /// secret, each with the reason: `(operationId, field, reason)`. Every other
 /// such field needs its operation to declare `x-campbooks.secret_once`.
-pub const SECRET_LOOKING_ALLOWED: &[(&str, &str, &str)] = &[
+pub const ANSWER_FIELDS_ALLOWED: &[(&str, &str, &str)] = &[
     (
         "bff.logout",
         "logout_url",
@@ -675,7 +675,7 @@ const CONTENT_TOKEN: &str =
 /// `additionalProperties`): a secret-looking name needs `secret_once` or an
 /// entry in `allowed` with its reason. An entry naming a field no longer
 /// answered is stale and reported too.
-pub fn check_secret_answers(
+pub fn check_answer_field_names(
     spec: &serde_json::Value,
     allowed: &[(&str, &str, &str)],
 ) -> Vec<String> {
@@ -720,14 +720,14 @@ pub fn check_secret_answers(
                     }
                 }
             }
-            for field in fields.iter().filter(|f| SECRET_LOOKING_FIELD.is_match(f)) {
+            for field in fields.iter().filter(|f| GUARDED_FIELD_NAME.is_match(f)) {
                 if allowed.iter().any(|(op, f, _)| *op == id && f == field) {
                     used.insert((id.to_owned(), field.clone()));
                 } else {
                     violations.push(format!(
                         "operation `{id}` answers `{field}`, which looks like a secret: \
                          declare `x-campbooks.secret_once` (the idempotency layer then keeps \
-                         no copy), or list it in `SECRET_LOOKING_ALLOWED` with the reason it \
+                         no copy), or list it in `ANSWER_FIELDS_ALLOWED` with the reason it \
                          is none"
                     ));
                 }
@@ -737,7 +737,7 @@ pub fn check_secret_answers(
     for (op, field, _) in allowed {
         if !used.contains(&((*op).to_owned(), (*field).to_owned())) {
             violations.push(format!(
-                "`SECRET_LOOKING_ALLOWED` lists `{field}` of `{op}`, which no mutating \
+                "`ANSWER_FIELDS_ALLOWED` lists `{field}` of `{op}`, which no mutating \
                  operation without `secret_once` answers any more: remove the entry"
             ));
         }
@@ -2126,7 +2126,7 @@ mod tests {
     }
 
     #[test]
-    fn a_secret_looking_answer_needs_secret_once_or_a_reason() {
+    fn a_guarded_answer_field_needs_secret_once_or_a_reason() {
         let mut issues = meta(true);
         issues["secret_once"] = serde_json::json!(true);
         let spec = serde_json::json!({
@@ -2173,7 +2173,7 @@ mod tests {
             ("mail.tagged", "content_token", "a version tag"),
             ("mail.gone", "content_token", "stale"),
         ];
-        let v = check_secret_answers(&spec, &allowed);
+        let v = check_answer_field_names(&spec, &allowed);
         assert_eq!(v.len(), 5, "{v:#?}");
         for field in ["client_secret", "tokens", "refresh_token", "accept_url"] {
             assert!(

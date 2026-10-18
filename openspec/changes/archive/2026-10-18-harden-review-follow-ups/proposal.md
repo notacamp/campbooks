@@ -71,7 +71,7 @@ the rest that is code or documentation:
   - server `main` (startup checks, migration lock timeout) and `bff`
     (`touch_until`);
   - identity `protocol::token`;
-  - xtask `arch` (`check_secret_answers`).
+  - xtask `arch` (`check_answer_field_names`).
 - Migrations: `20261022030000_kernel__definer_membership_checks`,
   `20261022030100_kernel__job_key_indexes_valid`.
 - Not done: the CHANGELOG line of #527 stays as released; the docs now
