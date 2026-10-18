@@ -146,6 +146,14 @@ pub fn pkce_challenge(verifier: &str) -> String {
     URL_SAFE_NO_PAD.encode(digest::digest(&digest::SHA256, verifier.as_bytes()))
 }
 
+/// HMAC-SHA256 of `message` under `key`: a pseudonym only the key's holder
+/// can link back to `message` (the usage analytics' daily visitor id).
+pub fn hmac_sha256(key: &[u8], message: &[u8]) -> Vec<u8> {
+    hmac::sign(&hmac::Key::new(hmac::HMAC_SHA256, key), message)
+        .as_ref()
+        .to_vec()
+}
+
 /// Seals and opens secrets kept at rest, for one purpose.
 pub struct Cipher {
     key: LessSafeKey,
@@ -446,6 +454,20 @@ mod tests {
         assert_eq!(hash(&a).len(), 32);
         assert!(same_hash(&hash(&a), &hash(&a)));
         assert!(!same_hash(&hash(&a), &hash("other")));
+    }
+
+    #[test]
+    fn hmac_sha256_matches_rfc_4231_test_case_2() {
+        let tag = hmac_sha256(b"Jefe", b"what do ya want for nothing?");
+        let hex = tag.iter().fold(String::new(), |mut hex, byte| {
+            use std::fmt::Write as _;
+            let _ = write!(hex, "{byte:02x}");
+            hex
+        });
+        assert_eq!(
+            hex,
+            "5bdcc146bf60754e6a042426089575c75a003f089d2739839dec58b964ec3843"
+        );
     }
 
     #[test]

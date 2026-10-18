@@ -315,6 +315,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/system/screen-views": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Report the screen the app shows. */
+        post: operations["system.report_screen_view"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/system/version": {
         parameters: {
             query?: never;
@@ -4280,6 +4297,16 @@ export interface components {
              */
             total: number;
         };
+        /** @description A screen the app shows. */
+        ScreenView: {
+            /**
+             * @description The screen's route template, never its address: `/`, or segments of
+             *     lowercase letters, `-` and `_` and parameters `:name`, with no digit,
+             *     query or fragment.
+             * @example /w/:workspaceId/inbox
+             */
+            route: string;
+        };
         /** @description A page of results. */
         SearchResults: {
             /** @description The results, in the order asked for. */
@@ -5808,6 +5835,55 @@ export interface operations {
             };
             /** @description The database is unreachable. */
             503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "system.report_screen_view": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ScreenView"];
+            };
+        };
+        responses: {
+            /** @description Taken: relayed in the background when the instance records usage analytics, otherwise dropped. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description `invalid_route`: not a route template. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No valid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description The token lacks `system:read`. */
+            403: {
                 headers: {
                     [name: string]: unknown;
                 };
