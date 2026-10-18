@@ -412,9 +412,82 @@ async fn an_unsigned_application_never_fails_ingest_and_is_not_undone(db: PgPool
     .await
     .unwrap();
     assert!(signed);
-    assert_eq!(labels, None);
+    assert_eq!(labels, Some(json!([])));
     // Removed keeping its changes: still possible.
     let removed = kit.delete(&sam, &one).await;
     assert_eq!(removed.status, StatusCode::OK, "{:?}", removed.json);
     assert_eq!(removed.json["state"], "removed");
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn an_application_planted_while_a_rule_records_is_never_signed(db: PgPool) {
+    let kit = kit(db).await;
+    let (workspace, inbox, sam, _) = sams_notifications(&kit, 2).await;
+    let rule = spam_github(&kit, &sam, workspace, inbox, false).await;
+    // gh-0 is a phishing mail the provider put in spam.
+    sqlx::query(
+        "UPDATE conversations.messages SET in_spam = true, in_inbox = false
+          WHERE provider_message_id = 'gh-0'",
+    )
+    .execute(&kit.db)
+    .await
+    .unwrap();
+    let thread = conversation(&kit, "gh-0").await;
+    // The attacker inserts, without committing yet, the rule's application
+    // to gh-0's conversation saying the rule binned gh-0, while a follow-up
+    // arrives there and the rule records what it does.
+    let mut planted = kit.state.db.begin_for(workspace).await.unwrap();
+    sqlx::query(
+        "INSERT INTO conversations.rule_applications
+             (rule_id, conversation_id, workspace_id, before)
+         VALUES ($1, $2, $3, $4)",
+    )
+    .bind(rule)
+    .bind(thread)
+    .bind(workspace.as_uuid())
+    .bind(json!({"binned": "spam", "binned_messages": ["gh-0"], "archived": true}))
+    .execute(&mut *planted)
+    .await
+    .unwrap();
+    let mut follow_up = notifications("gh-0-reply", 1, GITHUB, None);
+    follow_up["changes"][0]["message"]["thread_key"] = json!("thr-gh-0");
+    let arrives = kit.ingest_value(workspace, inbox, &follow_up);
+    let commits = async {
+        tokio::time::sleep(std::time::Duration::from_millis(500)).await;
+        planted.commit().await.unwrap();
+    };
+    let (_stats, ()) = tokio::join!(arrives, commits);
+    assert_eq!(spam(&kit, "gh-0-reply-0").await, (true, false));
+    // What is stored and signed is only what the rule did.
+    let (before, signed): (Value, bool) = sqlx::query_as(
+        "SELECT before, mac IS NOT NULL FROM conversations.rule_applications
+          WHERE rule_id = $1 AND conversation_id = $2",
+    )
+    .bind(rule)
+    .bind(thread)
+    .fetch_one(&kit.db)
+    .await
+    .unwrap();
+    assert!(signed);
+    assert_eq!(
+        before["binned_messages"],
+        json!(["gh-0-reply-0"]),
+        "{before}"
+    );
+    assert_eq!(before["archived"], false, "{before}");
+    // Sam's undo takes out of spam only what the rule put there.
+    let removed = kit
+        .delete(
+            &sam,
+            &format!("/api/v1/w/{workspace}/rules/{rule}?restore=true"),
+        )
+        .await;
+    assert_eq!(removed.status, StatusCode::OK, "{:?}", removed.json);
+    kit.run_jobs().await;
+    assert_eq!(spam(&kit, "gh-0-reply-0").await, (false, true));
+    assert_eq!(
+        spam(&kit, "gh-0").await,
+        (true, false),
+        "gh-0 taken out of spam"
+    );
 }

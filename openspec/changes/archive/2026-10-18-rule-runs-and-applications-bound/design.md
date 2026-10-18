@@ -65,7 +65,7 @@ record their progress. There is no scheduled re-apply.
 | MAC | Inputs | Written by | Stored in | Verified by, before |
 |---|---|---|---|---|
 | A run | workspace, run id, rule id, the rule's `binding_generation`, kind (`apply`/`revert`), the rule's inbox, the requesting member (or none) | `rule_runs::start`, in the member's request | `rule_runs.mac`, `rule_runs.requested_by` | `apply_rule`, every batch, before counting or changing anything |
-| An application | workspace, rule id, the rule's inbox, conversation id, run id (or none, for mail arriving), `before` | `effects::record` (`applications::seal`), in the effect path | `rule_applications.mac` | `apply::revert`, under the row lock, before it changes anything |
+| An application | workspace, rule id, the rule's inbox, conversation id, run id (or none, for mail arriving), `before` | `effects::record` (`applications::write`), in the effect path, after claiming and locking the row | `rule_applications.mac` | `apply::revert`, under the row lock, before it changes anything |
 
 Labels: `campbooks/conversations.rule-run/v1` and
 `campbooks/conversations.rule-application/v1`, one per purpose, under the
@@ -121,12 +121,25 @@ rule as stored when it runs.
 
 **Applications.** `effects::record` runs only where a rule's effects are
 carried out, right after the rule verified (`rules::acting` on arrival and
-in an apply run, which also verified its run). It signs the row from what
-that path did (the `before` it computed, the run it is in, the verified
-rule's inbox) merged with what the row already held, only when that row
-verifies: an existing row that does not (planted, edited, or written before
-this change) is dropped first (`before = '{}'`, no run, no MAC; a WARN with
-ids), so the MAC never covers what SQL wrote.
+in an apply run, which also verified its run). In this order:
+
+1. **Claim and lock** the row (`applications::claim`): `INSERT … before =
+   '{}' ON CONFLICT DO NOTHING RETURNING`; a row returned is ours. Otherwise
+   `SELECT … FOR UPDATE`, which waits for a transaction still inserting the
+   row and returns it as it committed. A bare `SELECT … FOR UPDATE` would
+   lock nothing while the row does not exist yet: an attacker's uncommitted
+   INSERT with a forged `before` would be invisible to it, and the upsert's
+   `ON CONFLICT DO UPDATE` would then merge into it once it committed
+   (the race the review of this PR found).
+2. **Verify** what the locked row recorded. A row that does not verify
+   (planted, edited, or written before this change) is dropped (a WARN with
+   ids): nothing of it is kept.
+3. **Merge in Rust** (`applications::merge`) the verified `Before` (or none)
+   with what this path did: the first stream and bin, the last place it
+   moved it, everything it did either time.
+4. **Write `before`, run and MAC in one statement** (`applications::write`),
+   overwriting the row whole: the value signed is the one computed in Rust,
+   never one SQL produced.
 
 **No signing oracle.** No job signs a run, and no job creates one. The
 only job that signs an application is `apply_rule`'s apply batch, and only
@@ -144,9 +157,9 @@ is no re-sign of rows kept at the deploy (§6).
   it; it is not put back` (workspace, rule, conversation). The row is left
   as it is and the batch goes on with the others; the run's `done` counts
   it, `changed` does not.
-- `effects::record`: `WARN an application of a taught rule is not bound to
-  it; what it recorded is dropped` (workspace, rule, conversation); ingest
-  and the batch go on.
+- `effects::record` (`claim`): `WARN an application of a taught rule is not
+  bound to it; what it recorded is dropped` (workspace, rule, conversation);
+  ingest and the batch go on.
 
 No WARN carries a `before`, an address, a provider id or the tag. A row
 that does not decode is never an error ingest or a job fails on.
@@ -174,6 +187,16 @@ Re-signing old rows would sign whatever SQL wrote (§4), so none are:
 
 Planted rows with no MAC also make `restore=true` answer 409: SQL can
 refuse a member's undo (they still remove the rule), never act through it.
+
+**Other upsert-then-sign paths.** Looked for in this change and in the
+rule binding of #556: `rules::binding::sign` signs a rule its caller holds
+locked (the request's own `INSERT` of a new id, or `FOR UPDATE` taken
+before reading it), never through an upsert; `resign_rules` locks with
+`FOR UPDATE SKIP LOCKED` and the definer function compares SQL with SQL; a
+run is signed after a plain `INSERT` of an id the request made (a planted
+row with that id would make the insert fail, never merge). The only
+upsert-then-sign was `effects::record`, fixed as above. The other upserts
+of the module (`store_decision`, `link_label`) sign nothing.
 
 ## 7. What is still open
 

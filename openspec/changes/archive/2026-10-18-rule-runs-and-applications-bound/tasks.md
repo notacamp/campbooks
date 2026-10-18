@@ -7,7 +7,7 @@
 
 ## 2. Applications
 
-- [x] 2.1 `rules::applications`: the MAC (`campbooks/conversations.rule-application/v1`: workspace, rule, inbox, conversation, run, `before`), `drop_unbound` before the merge and `seal` after it, both inside `effects::record`
+- [x] 2.1 `rules::applications`: the MAC (`campbooks/conversations.rule-application/v1`: workspace, rule, inbox, conversation, run, `before`), inside `effects::record`: `claim` (insert-or-lock, so a row being inserted concurrently is waited for), the verified row merged in Rust (`merge`), and `before` with its MAC written in one statement (`write`)
 - [x] 2.2 `rules::revert` verifies the row under its lock and leaves one that does not verify (WARN with ids); the run goes on
 
 ## 3. The deploy
@@ -21,4 +21,5 @@
 - [x] 4.2 A planted revert run and forged application take nothing out of spam and request nothing; the member's own undo still skips the forged row
 - [x] 4.3 Planted apply runs of a signed rule (unsigned, made up, copied from another run) are cancelled; a run of a rule signed again since stops
 - [x] 4.4 An application changed with SQL, or carrying another row's MAC, is left while the rest go back, and the job does not fail
+- [x] 4.6 An application planted uncommitted while arrival records is waited for and dropped: the stored row is only what the rule did, signed, and undo leaves the phishing mail in spam
 - [x] 4.5 An unsigned or undecodable application never fails ingest; it is dropped when the rule changes the conversation again, and undo answers `undo_unavailable` while any is held

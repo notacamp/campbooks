@@ -24,7 +24,10 @@ it (if any) and a canonical encoding of what it records. Only the path that
 carries out a verified rule's effects (in a run or on arriving mail) SHALL
 sign it, over what that path did and, when the conversation already held
 changes of the rule, what the existing row recorded only if that row
-verifies; an existing row that does not SHALL be dropped first. Putting a
+verifies; an existing row that does not SHALL be dropped. The row SHALL be
+claimed and locked before it is read (a row another transaction is
+inserting SHALL be waited for), and its record and MAC SHALL be written
+together from a value computed by the server, never one SQL produced. Putting a
 rule's changes back SHALL verify each application under its row lock and
 SHALL leave one that does not verify, or does not decode, as it is, with a
 WARN line carrying ids only, and go on with the others. A row that does not
@@ -45,6 +48,10 @@ verify or decode SHALL never fail ingest or a job.
 #### Scenario: One application changed with SQL
 - **WHEN** a rule reported three conversations as spam and SQL rewrites one application's record and copies another's, MAC included, onto the third, then Sam removes the rule with `restore=true`
 - **THEN** only the untouched conversation is taken out of spam, the run ends done with one changed, and no job fails
+
+#### Scenario: An application planted while the rule records
+- **WHEN** the runtime role inserts, without committing yet, an application of a member's rule to a conversation saying the rule binned a phishing mail, while new mail the rule matches arrives in that conversation, then commits
+- **THEN** the stored application records only what the rule did, signed, and the member's undo leaves the phishing mail in spam
 
 #### Scenario: A bad row on arriving mail
 - **WHEN** a rule's application to a conversation has no MAC or does not decode, and new mail the rule matches arrives in that conversation

@@ -23,19 +23,23 @@
 //! after the rule verified (`rules::acting` on arrival and in a run), from
 //! what that path did and, when the conversation already held changes of
 //! the rule, what the existing row recorded, only when that row verifies
-//! too. A row that does not is dropped first, so no MAC ever covers what
-//! SQL wrote. Putting back (`apply::revert`) verifies each row under its
+//! too. The row is claimed and locked before it is read ([`claim`]), the
+//! two are merged in Rust ([`merge`]) and written with the MAC in one
+//! statement ([`write`]), so no MAC ever covers what SQL wrote. Putting back (`apply::revert`) verifies each row under its
 //! lock and leaves one that does not verify as it is.
 
 use campbooks_kernel::{
-    Result,
+    Error, Result,
     binding::{Binding, Fields},
 };
 use serde_json::Value;
 use sqlx::{PgConnection, types::Uuid};
 
 use super::Before;
-use crate::model::{ConversationId, InboxId, RuleId, RuleRunId};
+use crate::{
+    domain::redact,
+    model::{ConversationId, InboxId, RuleId},
+};
 
 /// What a rule changed on one conversation, as its owner recorded it.
 const APPLICATION: &str = "campbooks/conversations.rule-application/v1";
@@ -126,64 +130,135 @@ pub async fn bound(
         .and_then(|(_, run, mac)| checked(binding, owner, conversation, (before, run, mac))))
 }
 
-/// Before the effect path merges what it did into an existing row of
-/// `owner`'s application to `conversation`: drop what that row recorded
-/// (its `before` and run) unless it is bound, so the MAC [`seal`] writes
-/// never covers what SQL wrote.
-pub async fn drop_unbound(
+/// What the effect path found in `owner`'s application to a conversation,
+/// with the row claimed and locked ([`claim`]).
+pub struct Held {
+    /// Whether the rule holds the conversation changed: a row it has not
+    /// put back.
+    pub holds: bool,
+    /// What the row recorded and the run that made it, only when the row is
+    /// bound to the rule.
+    pub bound: Option<(Before, Option<Uuid>)>,
+}
+
+/// Claim and lock the row of `owner`'s application to `conversation` before
+/// the effect path reads it: insert an empty one if there is none (so it is
+/// ours), else lock the existing one. A row another transaction is
+/// inserting is waited for, then read as it committed. What it recorded is
+/// kept only if it is bound to the rule; a row that is not (planted, edited
+/// or written before applications were bound) is dropped with a WARN, so no
+/// MAC ever covers what SQL wrote.
+pub async fn claim(
     conn: &mut PgConnection,
     binding: &Binding,
     owner: Owner,
     conversation: ConversationId,
-) -> Result<()> {
-    let Some(stored) = row(conn, owner, conversation).await? else {
-        return Ok(());
-    };
-    if checked(binding, owner, conversation, stored).is_some() {
-        return Ok(());
-    }
+) -> Result<Held> {
     let (workspace, _, rule) = owner;
-    tracing::warn!(
-        %workspace,
-        %rule,
-        %conversation,
-        "an application of a taught rule is not bound to it; what it recorded is dropped"
-    );
-    sqlx::query(
-        "UPDATE conversations.rule_applications SET before = '{}'::jsonb, run_id = NULL, mac = NULL
-          WHERE rule_id = $1 AND conversation_id = $2",
+    let claimed: Option<Uuid> = sqlx::query_scalar(
+        "INSERT INTO conversations.rule_applications (rule_id, conversation_id, workspace_id, before)
+         VALUES ($1, $2, $3, '{}'::jsonb)
+         ON CONFLICT (rule_id, conversation_id) DO NOTHING
+         RETURNING rule_id",
     )
     .bind(rule.as_uuid())
     .bind(conversation.as_uuid())
-    .execute(conn)
+    .bind(workspace)
+    .fetch_optional(&mut *conn)
     .await?;
-    Ok(())
+    let empty = Held {
+        holds: false,
+        bound: None,
+    };
+    if claimed.is_some() {
+        return Ok(empty);
+    }
+    let row: Option<(Value, Option<Uuid>, Option<Vec<u8>>, bool)> = sqlx::query_as(
+        "SELECT before, run_id, mac, reverted_at IS NULL FROM conversations.rule_applications
+          WHERE rule_id = $1 AND conversation_id = $2 FOR UPDATE",
+    )
+    .bind(rule.as_uuid())
+    .bind(conversation.as_uuid())
+    .fetch_optional(conn)
+    .await?;
+    let Some((before, run, mac, holds)) = row else {
+        return Ok(empty);
+    };
+    let bound = checked(binding, owner, conversation, (before, run, mac));
+    if bound.is_none() {
+        tracing::warn!(
+            %workspace,
+            %rule,
+            %conversation,
+            "an application of a taught rule is not bound to it; what it recorded is dropped"
+        );
+    }
+    Ok(Held {
+        holds,
+        bound: bound.map(|before| (before, run)),
+    })
 }
 
-/// Sign `owner`'s application to `conversation` as the effect path just
-/// stored it. Only there, right after the rule verified, and only over what
-/// that path did and what [`drop_unbound`] kept. Without a key (no instance
-/// secret; no rule acts then) or a `before` that does not decode, it stays
-/// unsigned, and nothing puts it back. Never an error ingest would fail on.
-pub async fn seal(
+/// `old`, what a bound application recorded, with what the rule did now:
+/// what the conversation was the first time (its stream, where it binned
+/// it), where the rule moved it last, and everything it did either time.
+pub fn merge(old: Before, now: &Before) -> Before {
+    let union = |mut first: Vec<String>, second: &[String]| {
+        for item in second {
+            if !first.contains(item) {
+                first.push(item.clone());
+            }
+        }
+        first
+    };
+    let mut labels = old.labels;
+    for label in &now.labels {
+        if !labels.contains(label) {
+            labels.push(*label);
+        }
+    }
+    Before {
+        stream: old.stream.or_else(|| now.stream.clone()),
+        moved_to: now.moved_to.or(old.moved_to),
+        archived: old.archived || now.archived,
+        read: old.read || now.read,
+        labels,
+        answered: union(old.answered, &now.answered),
+        binned: old.binned.or(now.binned),
+        binned_messages: union(old.binned_messages, &now.binned_messages),
+        binned_archived: old.binned_archived || now.binned_archived,
+    }
+}
+
+/// Write `before` (made in `run`) as `owner`'s application to
+/// `conversation`, with its MAC, in one statement: the row [`claim`] locked
+/// is overwritten whole, so the value signed is the one computed here.
+/// Without a key (no instance secret; no rule acts then) it is stored
+/// unsigned, and nothing puts it back.
+pub async fn write(
     conn: &mut PgConnection,
     binding: &Binding,
     owner: Owner,
-    conversation: ConversationId,
+    at: (ConversationId, Option<Uuid>),
+    before: &Before,
 ) -> Result<()> {
-    let Some((before, run, _)) = row(conn, owner, conversation).await? else {
-        return Ok(());
-    };
-    let mac = serde_json::from_value::<Before>(before)
-        .ok()
-        .and_then(|before| fields(owner, conversation, run, &before))
-        .and_then(|fields| binding.tag(&fields));
+    let (workspace, _, rule) = owner;
+    let (conversation, run) = at;
+    let mac = fields(owner, conversation, run, before).and_then(|fields| binding.tag(&fields));
+    let json = serde_json::to_value(before).map_err(|e| Error::internal(redact::json(&e)))?;
     sqlx::query(
-        "UPDATE conversations.rule_applications SET mac = $3
-          WHERE rule_id = $1 AND conversation_id = $2",
+        "INSERT INTO conversations.rule_applications
+             (rule_id, conversation_id, workspace_id, run_id, before, mac)
+         VALUES ($1, $2, $3, $4, $5, $6)
+         ON CONFLICT (rule_id, conversation_id) DO UPDATE
+            SET run_id = EXCLUDED.run_id, before = EXCLUDED.before, mac = EXCLUDED.mac,
+                applied_at = now(), reverted_at = NULL",
     )
-    .bind(owner.2.as_uuid())
+    .bind(rule.as_uuid())
     .bind(conversation.as_uuid())
+    .bind(workspace)
+    .bind(run)
+    .bind(json)
     .bind(mac)
     .execute(conn)
     .await?;
@@ -289,6 +364,38 @@ mod tests {
         flipped[7] ^= 1;
         assert!(!check(&binding(), Some(flipped.as_slice())));
         assert!(!check(&Binding::disabled(), signed));
+    }
+
+    #[test]
+    fn a_change_again_keeps_the_first_before_and_adds_what_the_rule_did() {
+        let label = LabelId::new();
+        let old = Before {
+            stream: Some((Stream::Primary, "default".into())),
+            moved_to: Some(Stream::Updates),
+            labels: vec![label],
+            binned: Some(campbooks_ai::decide::taught::Bin::Spam),
+            binned_messages: vec!["m-1".into()],
+            ..Before::default()
+        };
+        let other = LabelId::new();
+        let now = Before {
+            stream: Some((Stream::Updates, "taught".into())),
+            moved_to: Some(Stream::Newsletters),
+            read: true,
+            labels: vec![label, other],
+            answered: vec!["needs_reply".into()],
+            binned: Some(campbooks_ai::decide::taught::Bin::Trash),
+            binned_messages: vec!["m-1".into(), "m-2".into()],
+            ..Before::default()
+        };
+        let merged = merge(old, &now);
+        assert_eq!(merged.stream, Some((Stream::Primary, "default".into())));
+        assert_eq!(merged.moved_to, Some(Stream::Newsletters));
+        assert!(merged.read && !merged.archived);
+        assert_eq!(merged.labels, [label, other]);
+        assert_eq!(merged.answered, ["needs_reply"]);
+        assert_eq!(merged.binned, Some(campbooks_ai::decide::taught::Bin::Spam));
+        assert_eq!(merged.binned_messages, ["m-1", "m-2"]);
     }
 
     #[test]
