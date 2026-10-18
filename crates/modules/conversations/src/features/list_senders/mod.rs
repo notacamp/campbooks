@@ -7,6 +7,14 @@
 //! newest inbound mail ([`WINDOW_DAYS`], at most [`MAX_SCANNED`] messages,
 //! through `messages_inbound_recent_idx`), so its cost doesn't grow with an
 //! inbox's history.
+//!
+//! With `reachable`, only the senders it is safe to write to, such as
+//! Forward's picker (campbooks-cloud#233): never a no-reply address, nor
+//! a sender whose newest mail fails its sender's checks or pretends to be
+//! them, nor one with mail reported (in spam), under review or found
+//! suspicious and not said safe. Facts only (ADR 0018): addresses, the
+//! provider's authentication results, stored answers, needs and member
+//! corrections, never what the mail says.
 
 use axum::{Json, extract::State};
 use campbooks_kernel::{
@@ -18,12 +26,12 @@ use campbooks_kernel::{
 use serde::{Deserialize, Serialize};
 use utoipa::{IntoParams, ToSchema};
 
+use campbooks_ai::decide::signals::facts::{Facts, dmarc_refused, sender_checks_failed};
 use campbooks_kernel::authz::Action;
 
 use crate::{
     domain::{access::visible_inboxes, resources},
     events::INBOX_RECORD,
-    model::InboxId,
     scopes::ConversationsRead,
 };
 
@@ -37,6 +45,9 @@ pub const MAX_SCANNED: i64 = 5_000;
 const Q_CHARS: std::ops::RangeInclusive<usize> = 2..=100;
 /// Most words of `q` matched.
 const MAX_WORDS: usize = 5;
+/// Senders read beyond `limit` with `reachable`, so those it leaves out
+/// rarely shorten the answer.
+const REACHABLE_SLACK: i64 = 40;
 
 /// Which senders.
 #[derive(Debug, Clone, Default, Deserialize, IntoParams)]
@@ -48,6 +59,11 @@ pub struct SendersQuery {
     pub q: Option<String>,
     /// How many, 1 to 10 (default 10).
     pub limit: Option<u32>,
+    /// Only senders it is safe to write to (Forward's picker): never a
+    /// no-reply address, nor a sender whose newest mail fails their checks
+    /// or pretends to be them, nor one with mail reported (in spam), under
+    /// review or found suspicious. Default false.
+    pub reachable: Option<bool>,
 }
 
 /// Someone who writes to the caller's inboxes.
@@ -72,6 +88,92 @@ pub struct SenderList {
     /// Replied to most first, then written most, then by address.
     pub senders: Vec<SenderView>,
 }
+
+/// One sender as the query reads them: address, name, received, replied,
+/// and their newest mail's authentication results.
+type Row = (String, Option<String>, i32, i32, Option<String>);
+
+/// The newest inbound mail only (`messages_inbound_recent_idx`); then one
+/// "was it answered" per thread, not per message, and only for the senders
+/// `q` keeps. With `reachable` ($6), a sender Campbooks or the member
+/// flagged is left out here (`flagged`), and the facts of their newest mail
+/// are read for the checks in Rust ([`may_write_to`]).
+const SENDERS: &str = r"
+    WITH recent AS (
+        SELECT m.sender_address AS address,
+               nullif(m.sender->>'name', '') AS name,
+               m.headers->>'authentication_results' AS results,
+               m.sent_at,
+               m.conversation_id
+          FROM conversations.messages m
+         WHERE m.inbox_id = ANY($1) AND m.direction = 'inbound'
+           AND NOT m.in_spam AND NOT m.in_trash
+           AND m.sent_at > now() - make_interval(days => $4)
+         ORDER BY m.sent_at DESC
+         LIMIT $5
+    ),
+    senders AS (
+        SELECT address,
+               (array_agg(name ORDER BY sent_at DESC) FILTER (WHERE name IS NOT NULL))[1]
+                 AS name,
+               (array_agg(results ORDER BY sent_at DESC))[1] AS newest_results,
+               count(*)::int AS received
+          FROM recent
+         GROUP BY address
+        HAVING $2::text[] IS NULL OR NOT EXISTS (
+                 SELECT 1 FROM unnest($2::text[]) AS w(word)
+                  WHERE public.unaccent(lower(address || ' ' || coalesce(string_agg(name, ' '), '')))
+                        NOT LIKE '%' || public.unaccent(lower(w.word)) || '%' ESCAPE '\')
+    ),
+    -- Any of the sender's own mail in the window, spam included: reported
+    -- (Report and delete moves it to spam), under review (open, or cleared
+    -- because a later message replaced it), or found suspicious and not
+    -- said safe by a member. Judged by the flagged message's own sender,
+    -- so the real people in a hijacked thread stay.
+    flagged AS (
+        SELECT DISTINCT m.sender_address AS address
+          FROM conversations.messages m
+         WHERE $6
+           AND m.inbox_id = ANY($1) AND m.direction = 'inbound'
+           AND m.sent_at > now() - make_interval(days => $4)
+           AND m.sender_address IN (SELECT address FROM senders)
+           AND (m.in_spam
+                OR EXISTS (SELECT 1 FROM conversations.needs n
+                            WHERE n.message_id = m.id AND n.reason = 'review'
+                              AND (n.state = 'open' OR n.cleared_because = 'superseded'))
+                OR (EXISTS (SELECT 1 FROM conversations.decisions d
+                             WHERE d.message_id = m.id AND d.question = 'suspicious'
+                               AND d.value = 'true'::jsonb)
+                    AND NOT EXISTS (SELECT 1 FROM conversations.corrections c
+                                     WHERE c.message_id = m.id AND c.question = 'suspicious'
+                                       AND c.to_value = 'false' AND c.withdrawn_at IS NULL)))
+    ),
+    threads AS (
+        SELECT r.address, r.conversation_id, min(r.sent_at) AS first_at
+          FROM recent r
+          JOIN senders s USING (address)
+         GROUP BY r.address, r.conversation_id
+    ),
+    replied AS (
+        SELECT t.address, count(*)::int AS replied
+          FROM threads t
+         WHERE EXISTS (SELECT 1 FROM conversations.messages o
+                        WHERE o.conversation_id = t.conversation_id
+                          AND o.inbox_id = ANY($1)
+                          AND o.direction = 'outbound' AND o.sent_at > t.first_at)
+         GROUP BY t.address
+    )
+    SELECT s.address,
+           s.name,
+           s.received,
+           coalesce(r.replied, 0),
+           s.newest_results
+      FROM senders s
+      LEFT JOIN replied r USING (address)
+     WHERE s.address NOT IN (SELECT address FROM flagged)
+     ORDER BY 4 DESC, 3 DESC, 1
+     LIMIT $3
+    ";
 
 /// List who writes to the inboxes you can read.
 #[utoipa::path(
@@ -112,78 +214,42 @@ pub async fn handler(
     let access = &workspace.access;
     let mut tx = state.db.begin_for(access.workspace).await?;
     let inboxes = visible_inboxes(&mut tx, access).await?;
-    // The newest inbound mail only (`messages_inbound_recent_idx`); then one
-    // "was it answered" per thread, not per message, and only for the
-    // senders `q` keeps.
-    let rows = sqlx::query!(
-        r#"
-        WITH recent AS (
-            SELECT m.sender_address AS address,
-                   nullif(m.sender->>'name', '') AS name,
-                   m.sent_at,
-                   m.conversation_id
-              FROM conversations.messages m
-             WHERE m.inbox_id = ANY($1) AND m.direction = 'inbound'
-               AND NOT m.in_spam AND NOT m.in_trash
-               AND m.sent_at > now() - make_interval(days => $4)
-             ORDER BY m.sent_at DESC
-             LIMIT $5
-        ),
-        senders AS (
-            SELECT address,
-                   (array_agg(name ORDER BY sent_at DESC) FILTER (WHERE name IS NOT NULL))[1]
-                     AS name,
-                   count(*)::int AS received
-              FROM recent
-             GROUP BY address
-            HAVING $2::text[] IS NULL OR NOT EXISTS (
-                     SELECT 1 FROM unnest($2::text[]) AS w(word)
-                      WHERE public.unaccent(lower(address || ' ' || coalesce(string_agg(name, ' '), '')))
-                            NOT LIKE '%' || public.unaccent(lower(w.word)) || '%' ESCAPE '\')
-        ),
-        threads AS (
-            SELECT r.address, r.conversation_id, min(r.sent_at) AS first_at
-              FROM recent r
-              JOIN senders s USING (address)
-             GROUP BY r.address, r.conversation_id
-        ),
-        replied AS (
-            SELECT t.address, count(*)::int AS replied
-              FROM threads t
-             WHERE EXISTS (SELECT 1 FROM conversations.messages o
-                            WHERE o.conversation_id = t.conversation_id
-                              AND o.inbox_id = ANY($1)
-                              AND o.direction = 'outbound' AND o.sent_at > t.first_at)
-             GROUP BY t.address
-        )
-        SELECT s.address AS "address!",
-               s.name,
-               s.received AS "received!",
-               coalesce(r.replied, 0) AS "replied!"
-          FROM senders s
-          LEFT JOIN replied r USING (address)
-         ORDER BY 4 DESC, 3 DESC, 1
-         LIMIT $3
-        "#,
-        &inboxes as &[InboxId],
-        words.as_deref() as Option<&[String]>,
-        i64::from(limit),
-        WINDOW_DAYS,
-        MAX_SCANNED,
-    )
-    .fetch_all(&mut *tx)
-    .await?;
+    let reachable = query.reachable.unwrap_or(false);
+    let rows: Vec<Row> = sqlx::query_as(SENDERS)
+        .bind(&inboxes)
+        .bind(words.as_deref())
+        .bind(i64::from(limit) + if reachable { REACHABLE_SLACK } else { 0 })
+        .bind(WINDOW_DAYS)
+        .bind(MAX_SCANNED)
+        .bind(reachable)
+        .fetch_all(&mut *tx)
+        .await?;
     tx.commit().await?;
     let senders = rows
         .into_iter()
-        .map(|row| SenderView {
-            address: row.address,
-            name: row.name,
-            received: u32::try_from(row.received).unwrap_or_default(),
-            replied: u32::try_from(row.replied).unwrap_or_default(),
+        .filter(|(address, .., results)| !reachable || may_write_to(address, results.as_deref()))
+        .take(usize::try_from(limit).unwrap_or(usize::MAX))
+        .map(|(address, name, received, replied, _)| SenderView {
+            address,
+            name,
+            received: u32::try_from(received).unwrap_or_default(),
+            replied: u32::try_from(replied).unwrap_or_default(),
         })
         .collect();
     Ok(Json(SenderList { senders }))
+}
+
+/// Whether `address` is safe to write to, from facts alone: not a no-reply
+/// address, and its newest mail (`results`, the provider's authentication
+/// results) neither fails its sender's checks nor pretends to be them.
+/// Absent results say nothing.
+fn may_write_to(address: &str, results: Option<&str>) -> bool {
+    let no_reply = Facts {
+        from: address.to_lowercase(),
+        ..Facts::default()
+    }
+    .no_reply_sender();
+    !no_reply && !sender_checks_failed(address, results) && !dmarc_refused(results)
 }
 
 fn invalid() -> Error {
@@ -217,12 +283,292 @@ mod tests {
     use campbooks_kernel::tenancy::WorkspaceId;
     use sqlx::PgPool;
 
-    use super::words;
+    use serde_json::json;
+
+    use super::{may_write_to, words};
     use crate::{model::InboxRole, testkit::Kit};
 
     #[test]
     fn wildcards_are_escaped() {
         assert_eq!(words("50%_off a\\b"), vec!["50\\%\\_off", "a\\\\b"]);
+    }
+
+    #[test]
+    fn who_may_be_written_to_is_read_from_facts() {
+        let pass = "mx.google.com; dkim=pass header.i=@silva-contas.example header.s=s1; \
+                    dmarc=pass (p=REJECT sp=REJECT dis=NONE) header.from=silva-contas.example";
+        let refused = "mx.google.com; spf=pass smtp.mailfrom=bounce@spoofer.example; \
+                       dmarc=fail (p=REJECT sp=REJECT dis=REJECT) header.from=silva-contas.example";
+        assert!(may_write_to("rita@silva-contas.example", Some(pass)));
+        // No results say nothing (Zoho, IMAP).
+        assert!(may_write_to("rita@silva-contas.example", None));
+        assert!(!may_write_to("rita@silva-contas.example", Some(refused)));
+        for address in [
+            "no-reply@accounts.example",
+            "noreply@shop.example",
+            "do-not-reply@bank.example",
+            "mailer-daemon@example.com",
+        ] {
+            assert!(!may_write_to(address, Some(pass)), "{address}");
+        }
+    }
+
+    #[sqlx::test(migrations = "../../../migrations")]
+    async fn reachable_leaves_out_who_one_should_not_write_to(db: PgPool) {
+        let kit = Kit::new(db).await;
+        let (workspace, inbox, sam) = kit.sams_inbox().await;
+        // The phishing sender under review, and a no-reply address.
+        kit.ingest(workspace, inbox, "needs").await;
+        kit.ingest_value(
+            workspace,
+            inbox,
+            &json!({"changes": [{"op": "upsert", "message": {
+                "provider_message_id": "accounts-1",
+                "from": {"name": "Accounts", "address": "no-reply@accounts.example"},
+                "to": [{"address": "sam@example.com"}],
+                "subject": "Your sign-in code",
+                "sent_at": "2026-10-14T09:00:00Z",
+                "direction": "inbound",
+                "text": "Your code is 000000.",
+                "mailbox": {"in_inbox": true},
+                "read": false, "starred": false
+            }}]}),
+        )
+        .await;
+        let uri = format!("/api/v1/w/{workspace}/senders");
+        let addresses = |json: &serde_json::Value| -> Vec<String> {
+            json["senders"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(|s| s["address"].as_str().unwrap().to_owned())
+                .collect()
+        };
+        let left_out = [
+            "it-support@at3lier-sol.example",
+            "no-reply@accounts.example",
+            "no-reply@accounts.cloudvault.example",
+        ];
+        // Without it, as before: anyone found by name.
+        for (q, address) in [("support", left_out[0]), ("accounts", left_out[1])] {
+            let all = kit.get(&sam, &format!("{uri}?q={q}")).await;
+            assert!(addresses(&all.json).contains(&address.to_owned()), "{q}");
+        }
+        // With it: never, whether typed or not.
+        let top = kit.get(&sam, &format!("{uri}?reachable=true")).await;
+        assert_eq!(top.status, StatusCode::OK);
+        let listed = addresses(&top.json);
+        assert!(!listed.is_empty());
+        assert!(listed.contains(&"maya@northwind-studio.example".to_owned()));
+        for q in ["support", "at3lier", "accounts", "no-reply"] {
+            let found = kit.get(&sam, &format!("{uri}?q={q}&reachable=true")).await;
+            let found = addresses(&found.json);
+            assert!(
+                left_out.iter().all(|a| !found.contains(&(*a).to_owned())),
+                "{q}: {found:?}"
+            );
+        }
+        for address in left_out {
+            assert!(!listed.contains(&address.to_owned()), "{address}");
+        }
+    }
+
+    /// One inbound message from `from`, in thread `thread`, with the
+    /// provider's authentication `results` when given.
+    fn mail(
+        id: &str,
+        thread: &str,
+        from: &str,
+        sent_at: &str,
+        results: Option<&str>,
+    ) -> serde_json::Value {
+        let mut message = json!({
+            "provider_message_id": id,
+            "thread_key": thread,
+            "from": {"name": "Lumen Billing", "address": from},
+            "to": [{"address": "sam@example.com"}],
+            "subject": format!("Invoice {id}"),
+            "sent_at": sent_at,
+            "direction": "inbound",
+            "text": "Your invoice is attached.",
+            "mailbox": {"in_inbox": true},
+            "read": false, "starred": false
+        });
+        if let Some(results) = results {
+            message["headers"] = json!({"authentication_results": results});
+        }
+        json!({"op": "upsert", "message": message})
+    }
+
+    /// The addresses `list_senders` answers for `q`, with `reachable` or not.
+    async fn found(
+        kit: &Kit,
+        sam: &str,
+        workspace: WorkspaceId,
+        q: &str,
+        reachable: bool,
+    ) -> Vec<String> {
+        let reachable = if reachable { "&reachable=true" } else { "" };
+        let response = kit
+            .get(
+                sam,
+                &format!("/api/v1/w/{workspace}/senders?q={q}{reachable}"),
+            )
+            .await;
+        assert_eq!(response.status, StatusCode::OK, "{}", response.json);
+        response.json["senders"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|s| s["address"].as_str().unwrap().to_owned())
+            .collect()
+    }
+
+    #[sqlx::test(migrations = "../../../migrations")]
+    async fn a_reported_sender_stays_out_whatever_else_they_send(db: PgPool) {
+        let kit = Kit::new(db).await;
+        let (workspace, inbox, sam) = kit.sams_inbox().await;
+        let from = "billing@lumen-pay.example";
+        kit.ingest_value(
+            workspace,
+            inbox,
+            &json!({"changes": [
+                mail("lumen-1", "thr-lumen-1", from, "2026-10-15T09:00:00Z", None),
+                mail("lumen-2", "thr-lumen-2", from, "2026-10-16T09:00:00Z", None),
+            ]}),
+        )
+        .await;
+        assert_eq!(found(&kit, &sam, workspace, "lumen", true).await, [from]);
+        // Reported: Report and delete moves that conversation to spam.
+        let reported = kit.conversation_of("lumen-1").await;
+        let spam = kit
+            .post(
+                &sam,
+                &format!("/api/v1/w/{workspace}/conversations/{reported}/spam"),
+                None,
+            )
+            .await;
+        assert_eq!(spam.status, StatusCode::OK);
+        // Their other, unflagged conversation doesn't bring them back.
+        assert!(found(&kit, &sam, workspace, "lumen", true).await.is_empty());
+        assert_eq!(found(&kit, &sam, workspace, "lumen", false).await, [from]);
+    }
+
+    #[sqlx::test(migrations = "../../../migrations")]
+    async fn a_review_replaced_by_a_later_message_still_keeps_them_out(db: PgPool) {
+        let kit = Kit::new(db.clone()).await;
+        let (workspace, inbox, sam) = kit.sams_inbox().await;
+        kit.ingest(workspace, inbox, "needs").await;
+        let phish = "it-support@at3lier-sol.example";
+        assert!(
+            !found(&kit, &sam, workspace, "support", true)
+                .await
+                .contains(&phish.to_owned())
+        );
+        // The flagged message, `$1`.
+        let flagged = "needs-4";
+        // A follow-up replaced the review: it is cleared as superseded.
+        sqlx::query(
+            "UPDATE conversations.needs
+                SET state = 'cleared', cleared_because = 'superseded', cleared_at = now()
+              WHERE message_id =
+                    (SELECT id FROM conversations.messages WHERE provider_message_id = $1)",
+        )
+        .bind(flagged)
+        .execute(&db)
+        .await
+        .unwrap();
+        assert!(
+            !found(&kit, &sam, workspace, "support", true)
+                .await
+                .contains(&phish.to_owned())
+        );
+        // Rebuilt for a later message, the review leaves no trace in the
+        // needs: the stored answer that it is suspicious still does.
+        sqlx::query(
+            "DELETE FROM conversations.needs WHERE message_id =
+                 (SELECT id FROM conversations.messages WHERE provider_message_id = $1)",
+        )
+        .bind(flagged)
+        .execute(&db)
+        .await
+        .unwrap();
+        assert!(
+            !found(&kit, &sam, workspace, "support", true)
+                .await
+                .contains(&phish.to_owned())
+        );
+        // A member said it is safe: they may be written to again.
+        sqlx::query(
+            "INSERT INTO conversations.corrections
+                 (id, workspace_id, conversation_id, message_id, question, from_value,
+                  to_value, overridden_source)
+             SELECT gen_random_uuid(), workspace_id, conversation_id, id, 'suspicious',
+                    'true', 'false', 'model'
+               FROM conversations.messages WHERE provider_message_id = $1",
+        )
+        .bind(flagged)
+        .execute(&db)
+        .await
+        .unwrap();
+        assert!(
+            found(&kit, &sam, workspace, "support", true)
+                .await
+                .contains(&phish.to_owned())
+        );
+    }
+
+    /// Only the headers speak: whatever else was concluded about `from`'s
+    /// messages (a suspicious answer, a review) is set aside.
+    async fn headers_only(db: &PgPool, from: &str) {
+        for sql in [
+            "DELETE FROM conversations.needs WHERE message_id IN
+                 (SELECT id FROM conversations.messages WHERE sender_address = $1)",
+            "DELETE FROM conversations.decisions WHERE question = 'suspicious'
+                AND message_id IN
+                 (SELECT id FROM conversations.messages WHERE sender_address = $1)",
+        ] {
+            sqlx::query(sql).bind(from).execute(db).await.unwrap();
+        }
+    }
+
+    #[sqlx::test(migrations = "../../../migrations")]
+    async fn a_sender_whose_newest_mail_fails_its_checks_is_left_out(db: PgPool) {
+        let kit = Kit::new(db.clone()).await;
+        let (workspace, inbox, sam) = kit.sams_inbox().await;
+        let from = "billing@lumen-pay.example";
+        let pass = "mx.google.com; dkim=pass header.i=@lumen-pay.example header.s=s1; \
+                    dmarc=pass (p=REJECT sp=REJECT dis=NONE) header.from=lumen-pay.example";
+        let refused = "mx.google.com; spf=pass smtp.mailfrom=bounce@spoofer.example; \
+                       dmarc=fail (p=REJECT sp=REJECT dis=REJECT) header.from=lumen-pay.example";
+        let batch = |id: &str, sent_at: &str, results: &str| json!({"changes": [mail(id, id, from, sent_at, Some(results))]});
+        kit.ingest_value(
+            workspace,
+            inbox,
+            &batch("lumen-1", "2026-10-15T09:00:00Z", pass),
+        )
+        .await;
+        headers_only(&db, from).await;
+        assert_eq!(found(&kit, &sam, workspace, "lumen", true).await, [from]);
+        // Newest, pretending to be them: left out.
+        kit.ingest_value(
+            workspace,
+            inbox,
+            &batch("lumen-2", "2026-10-16T09:00:00Z", refused),
+        )
+        .await;
+        headers_only(&db, from).await;
+        assert!(found(&kit, &sam, workspace, "lumen", true).await.is_empty());
+        assert_eq!(found(&kit, &sam, workspace, "lumen", false).await, [from]);
+        // Their genuine mail again, newest: back.
+        kit.ingest_value(
+            workspace,
+            inbox,
+            &batch("lumen-3", "2026-10-17T09:00:00Z", pass),
+        )
+        .await;
+        headers_only(&db, from).await;
+        assert_eq!(found(&kit, &sam, workspace, "lumen", true).await, [from]);
     }
 
     #[sqlx::test(migrations = "../../../migrations")]

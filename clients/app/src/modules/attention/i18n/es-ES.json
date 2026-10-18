@@ -47,7 +47,7 @@
     "forward": "Reenviar…",
     "combo": "{{first}} y después {{second}}",
     "picked": "Scout ha elegido estas para este correo",
-    "noAttachment": "Este correo no tiene ningún archivo que abrir: solo imágenes en el texto."
+    "noAttachment": "Este correo no tiene ningún archivo que abrir."
   },
   "confirm": {
     "done": "Hecho · {{name}}",

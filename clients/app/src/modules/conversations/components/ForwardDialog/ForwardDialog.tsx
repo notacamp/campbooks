@@ -1,5 +1,5 @@
 import { useQueryClient } from "@tanstack/react-query";
-import { useEffect, useEffectEvent, useRef, useState } from "react";
+import { useEffect, useEffectEvent, useLayoutEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { useDebounced } from "~/lib/hooks/use-debounced";
@@ -102,8 +102,11 @@ export function ForwardDialog({
   const text = typed.trim();
   const settled = useDebounced(text, DEBOUNCE_MS);
   const searching = settled.length >= MIN_CHARS;
-  const top = useSenders(workspaceId);
-  const found = useSenders(workspaceId, settled, { enabled: searching });
+  // Only people it is safe to write to: the server leaves out no-reply
+  // addresses, senders failing their checks and senders under review, and
+  // a name typed for one of them finds nobody.
+  const top = useSenders(workspaceId, "", { reachable: true });
+  const found = useSenders(workspaceId, settled, { enabled: searching, reachable: true });
 
   // What the server found for the settled text, or, until it answers, the
   // people already here, filtered as it would.
@@ -128,6 +131,9 @@ export function ForwardDialog({
 
   // The pick a forward was started for (a failed one can be picked again).
   const started = useRef<Sender | null>(null);
+  // Which start is current: one given up on (it failed in the meantime)
+  // hands nothing to the composer when its draft arrives.
+  const attempt = useRef(0);
   // Closed (Esc, Close) while the forward was being started: nothing more.
   const closed = useRef(false);
   useEffect(() => {
@@ -156,16 +162,20 @@ export function ForwardDialog({
             to,
           })
         : saveDraft(workspaceId, existing.id, { to, version: existing.version });
+    attempt.current += 1;
+    const mine = attempt.current;
     void saved
       .then(async (draft) => {
-        if (closed.current) {
-          return;
-        }
+        // Known at once, so a reopen addresses it again rather than
+        // starting a second one, even when closed or given up on meanwhile.
         queryClient.setQueryData<Draft[]>(
           draftKeys.forConversation(workspaceId, conversationId),
           (list) => [draft, ...(list ?? []).filter((each) => each.id !== draft.id)],
         );
-        onForwarded(draft);
+        // Closed, or failed while it started: nothing opens.
+        if (!closed.current && attempt.current === mine) {
+          onForwarded(draft);
+        }
         await queryClient.invalidateQueries({ queryKey: draftKeys.all(workspaceId) });
       })
       .catch(() => {
@@ -186,6 +196,14 @@ export function ForwardDialog({
     setBusy(false);
     setFailed(true);
   }
+  // Said failed: a start still running is given up on, before its draft can
+  // arrive (layout effects run with the commit that shows the failure).
+  useLayoutEffect(() => {
+    if (failed) {
+      attempt.current += 1;
+      started.current = null;
+    }
+  }, [failed]);
   useEffect(() => {
     if (
       chosen !== undefined &&
