@@ -37,7 +37,7 @@ pub use exceptions::{RuleException, RuleMark, Undone, attach, except, recent_exc
 pub use facts::{
     Candidate, TEMPLATE_PAGE, candidate, corresponds, fill_templates, scan, templates_missing,
 };
-pub use images::{Images, ImagesHeld, images};
+pub use images::{ImagesHeld, images};
 
 use crate::model::{
     ConversationId, InboxId, InboxRole, LabelId, PausedReason, RuleId, RuleOrigin, RuleState,

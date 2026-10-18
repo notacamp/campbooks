@@ -62,6 +62,10 @@ pub struct BodyQuery {
 
 /// A message's bodies.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[allow(
+    clippy::struct_excessive_bools,
+    reason = "the wire shape: independent facts about one message's images"
+)]
 pub struct MessageBody {
     /// The plain-text part.
     pub text: Option<String>,
