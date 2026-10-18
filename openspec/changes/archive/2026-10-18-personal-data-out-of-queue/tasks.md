@@ -26,3 +26,9 @@
 - [x] 4.4 A job whose name or payload cannot be read, an ambiguous payload struct, and a name constant with several values are reported
 - [x] 4.5 Every free-text event field is listed by its full path (`*` for a path in every event)
 - [x] 4.6 Gmail's raw message decode error uses `provider::unreadable`
+
+## 5. Review round 2
+
+- [x] 5.1 A shorthand `message` field counts as the value `message`; capitalised constructors (`Fatal`, `Retry`, and `Self::` in `From` impls) are scanned, and passing one as a function fails
+- [x] 5.2 `*` covers `workspace` only; `reason`, `client`, `provider` and `method` are listed event by event
+- [x] 5.3 A constructor is skipped as a pattern only inside a `matches!(…)`'s parentheses; duplicate audit entries and open maps (`additionalProperties: true`) are reported; a lower count fails too

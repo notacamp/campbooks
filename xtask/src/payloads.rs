@@ -35,32 +35,14 @@ use crate::access::{is_test_file, without_comments, without_tests};
 /// Event payload fields that can hold free text, by their full path
 /// (`items[].change.provider_key`; `[]` for a list's items, `{}` for a map's
 /// values), each with the reason it holds no personal data:
-/// `(event, path, reason)`. An event of `*` covers that path in every event.
+/// `(event, path, reason)`. An event of `*` covers that path in every event:
+/// only for `workspace`, the routing field `check_workspace` checks on every
+/// publish; any other free-text field is reviewed event by event.
 pub const EVENT_FIELDS_ALLOWED: &[(&str, &str, &str)] = &[
     (
         "*",
         "workspace",
         "a workspace's event routing field: the workspace's id as text (`DomainEvent::workspace`)",
-    ),
-    (
-        "*",
-        "client",
-        "an OAuth client's id: generated for the app, never a person's name or address",
-    ),
-    (
-        "*",
-        "provider",
-        "a mail or sign-in provider's name, from the code (`google`, `zoho`, `microsoft`)",
-    ),
-    (
-        "*",
-        "method",
-        "how someone signs in, from the code (`provider`, `passkey`)",
-    ),
-    (
-        "*",
-        "reason",
-        "a reason code, from the code (`grant_revoked`, `member_left`, `too_large`)",
     ),
     (
         "attention.item_changed",
@@ -146,7 +128,45 @@ pub const EVENT_FIELDS_ALLOWED: &[(&str, &str, &str)] = &[
         "the names of the settings that changed (`name`, `accent`), from the code; never their \
          values",
     ),
+    (
+        "connectors.connection_needs_reauth",
+        "reason",
+        "why the connection needs signing in again, a code from the code (`grant_revoked`, `credentials_unreadable`)",
+    ),
+    (
+        "connectors.send_completed",
+        "reason",
+        "why a send failed, a code from the code (`not_connected`, `needs_reauth`, `rejected`, `too_large`, `unavailable`)",
+    ),
+    (
+        "conversations.send_failed",
+        "reason",
+        "why a send failed, a code from the code (`not_connected`, `rejected`, `unknown_outcome`)",
+    ),
+    (
+        "identity.consent_revoked",
+        "reason",
+        "why the consent ended, a code from the code (`revoked`, `member_left`, `workspace_deleting`, `client_removed`)",
+    ),
+    ("identity.client_registered", "client", CLIENT_ID),
+    ("identity.client_removed", "client", CLIENT_ID),
+    ("identity.consent_granted", "client", CLIENT_ID),
+    ("identity.consent_revoked", "client", CLIENT_ID),
+    ("identity.refresh_reuse_detected", "client", CLIENT_ID),
+    ("identity.account_created", "provider", PROVIDER_NAME),
+    ("identity.signed_in", "provider", PROVIDER_NAME),
+    ("identity.way_in_added", "provider", PROVIDER_NAME),
+    ("identity.way_in_removed", "provider", PROVIDER_NAME),
+    ("identity.signed_in", "method", METHOD_NAME),
+    ("identity.way_in_added", "method", METHOD_NAME),
+    ("identity.way_in_removed", "method", METHOD_NAME),
 ];
+
+const CLIENT_ID: &str = "an app's OAuth client id: an app identifier (a first-party id, a \
+     generated id, or the app's own HTTPS metadata-document URL), not personal data";
+const PROVIDER_NAME: &str =
+    "a mail or sign-in provider's name, from the code (`google`, `zoho`, `microsoft`)";
+const METHOD_NAME: &str = "how someone signs in, from the code (`provider`, `passkey`)";
 
 const PROVIDER_MESSAGE_ID: &str = "the provider's id of a message (Gmail's hex id, Zoho's \
      number): opaque, never its content or its sender";
@@ -550,7 +570,12 @@ pub fn check_event_payloads(
     events: &serde_json::Value,
     allowed: &[(&str, &str, &str)],
 ) -> Vec<String> {
-    let mut violations = Vec::new();
+    let mut violations = duplicates(
+        "EVENT_FIELDS_ALLOWED",
+        allowed
+            .iter()
+            .map(|(event, path, _)| format!("`{path}` of `{event}`")),
+    );
     let mut used = BTreeSet::new();
     let schemas = events.pointer("/components/schemas");
     let list = events
@@ -568,6 +593,14 @@ pub fn check_event_payloads(
         };
         let mut fields = BTreeSet::new();
         free_text_fields(payload, schemas, "", &mut BTreeSet::new(), &mut fields);
+        for open in fields.iter().filter(|path| path.ends_with(OPEN_MAP)) {
+            let path = open.trim_end_matches(OPEN_MAP);
+            violations.push(format!(
+                "event `{name}` carries an open map at `{path}` (`additionalProperties: true`): \
+                 its values cannot be checked; give them a schema"
+            ));
+        }
+        fields.retain(|path| !path.ends_with(OPEN_MAP));
         for path in &fields {
             let entry = allowed
                 .iter()
@@ -588,6 +621,12 @@ pub fn check_event_payloads(
         if reason.trim().is_empty() {
             violations.push(format!(
                 "`EVENT_FIELDS_ALLOWED` lists `{path}` of `{event}` without a reason"
+            ));
+        }
+        if *event == "*" && *path != WILDCARD_PATH {
+            violations.push(format!(
+                "`EVENT_FIELDS_ALLOWED` lists `{path}` for every event (`*`): only `{WILDCARD_PATH}` \
+                 may be, list it event by event"
             ));
         }
         if !used.contains(&((*event).to_owned(), (*path).to_owned())) {
@@ -660,13 +699,38 @@ fn free_text_fields(
             free_text_fields(items, schemas, &format!("{path}[]"), seen, out);
         }
     }
-    if let Some(values) = object.get("additionalProperties").filter(|v| v.is_object()) {
-        container = true;
-        free_text_fields(values, schemas, &format!("{path}{{}}"), seen, out);
+    match object.get("additionalProperties") {
+        Some(values @ serde_json::Value::Object(_)) => {
+            container = true;
+            free_text_fields(values, schemas, &format!("{path}{{}}"), seen, out);
+        }
+        Some(serde_json::Value::Bool(true)) => {
+            container = true;
+            out.insert(format!("{path}{OPEN_MAP}"));
+        }
+        _ => {}
     }
     if !container && !opaque_leaf(schema) {
         out.insert(path.to_owned());
     }
+}
+
+/// The one path an `*` entry may cover: a workspace's event routing field,
+/// which `check_workspace` checks on every publish.
+const WILDCARD_PATH: &str = "workspace";
+
+/// Marks the path of an object whose values are open
+/// (`additionalProperties: true`): reported, since nothing can be checked.
+const OPEN_MAP: &str = "{open}";
+
+/// Every entry of `list` that appears more than once (each `entries` item
+/// names one), as violations.
+fn duplicates(list: &str, entries: impl Iterator<Item = String>) -> Vec<String> {
+    let mut seen = BTreeSet::new();
+    entries
+        .filter(|entry| !seen.insert(entry.clone()))
+        .map(|entry| format!("`{list}` lists {entry} twice: keep one entry"))
+        .collect()
 }
 
 /// The schemas of a stored blob's reference, under the names the events
@@ -1010,6 +1074,12 @@ fn split_top_level(text: &str, angles: bool) -> Vec<String> {
 /// payload has any more is stale.
 pub fn check_job_payloads(scan: &JobScan, audit: &[(&str, &str, &str)]) -> Vec<String> {
     let mut violations = scan.problems.clone();
+    violations.extend(duplicates(
+        "JOB_PAYLOAD_FIELDS",
+        audit
+            .iter()
+            .map(|(kind, field, _)| format!("`{field}` of `{kind}`")),
+    ));
     let mut used = BTreeSet::new();
     for payload in &scan.payloads {
         for field in &payload.fields {
@@ -1052,8 +1122,8 @@ static FROM_IMPL: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(r"\bimpl\s+From<[^{]*>\s+for\s+(?:[\w:]+::)?JobError\s*\{")
         .unwrap_or_else(|e| unreachable!("static regex compiles: {e}"))
 });
-static SELF_CALL: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r"\bSelf::(?:fatal|retry|retry_after)\s*\(")
+static SELF_NAME: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r"\bSelf::(fatal|retry|retry_after|Fatal|Retry)\b")
         .unwrap_or_else(|e| unreachable!("static regex compiles: {e}"))
 });
 
@@ -1069,12 +1139,12 @@ pub struct JobErrorScan {
 
 /// Where a job's error message is built from values, outside tests and
 /// comments: every value a `JobError::fatal`, `retry` or `retry_after`
-/// message interpolates (or is, when it is not a string literal), the same
-/// for `Self::fatal` … in any `impl From<…> for JobError`, and for a
-/// `JobError::Fatal(…)` or `JobError::Retry { message, … }` written out
-/// (a pattern, in a `match` arm, `if let` or `matches!`, is not one).
-/// `JobError::retry` passed as a function (`.map_err(JobError::retry)`)
-/// hides what the message is built from: a problem.
+/// message interpolates (or is, when it is not a string literal), and the
+/// message of a `JobError::Fatal(…)` or `JobError::Retry { message, … }`
+/// written out (a pattern, in a `match` arm, `if let` or inside `matches!`,
+/// is not one); the same for `Self::…` in any `impl From<…> for JobError`.
+/// A constructor passed as a function (`.map_err(JobError::retry)`,
+/// `JobError::Fatal`) hides what the message is built from: a problem.
 pub fn job_error_values(sources: &[(String, String)]) -> JobErrorScan {
     let mut scan = JobErrorScan::default();
     for (path, text) in sources {
@@ -1083,72 +1153,81 @@ pub fn job_error_values(sources: &[(String, String)]) -> JobErrorScan {
         }
         let code = without_comments(without_tests(text));
         for found in ERROR_NAME.captures_iter(&code) {
-            let Some(whole) = found.get(0) else {
-                continue;
-            };
-            let after = code[whole.end()..].trim_start();
-            let message = match (&found[1], after.chars().next()) {
-                ("fatal" | "retry" | "retry_after", Some('(')) => {
-                    let rest = &after[1..];
-                    closing(rest, '(', ')')
-                        .and_then(|end| split_top_level(&rest[..end], false).into_iter().next())
-                }
-                ("fatal" | "retry" | "retry_after", _) => {
-                    scan.problems.push(format!(
-                        "{path}: `{}` is passed as a function, so what its message is built \
-                         from cannot be read: call it with the message (`|e| JobError::{}(…)`)",
-                        whole.as_str(),
-                        &found[1]
-                    ));
-                    None
-                }
-                ("Fatal", Some('(')) => {
-                    let rest = &after[1..];
-                    closing(rest, '(', ')').and_then(|end| {
-                        written_out(&code, whole.start(), &rest[end + 1..])
-                            .then(|| rest[..end].to_owned())
-                    })
-                }
-                ("Retry", Some('{')) => {
-                    let rest = &after[1..];
-                    closing(rest, '{', '}').and_then(|end| {
-                        if !written_out(&code, whole.start(), &rest[end + 1..]) {
-                            return None;
-                        }
-                        split_top_level(&rest[..end], false)
-                            .into_iter()
-                            .find_map(|field| {
-                                let (name, value) = field.split_once(':')?;
-                                (name.trim() == "message").then(|| value.trim().to_owned())
-                            })
-                    })
-                }
-                _ => None,
-            };
-            for value in message.iter().flat_map(|m| message_values(m)) {
-                scan.values.push((path.clone(), value));
-            }
+            constructor_values(path, &code, &found, &mut scan);
         }
         for block in FROM_IMPL.find_iter(&code) {
             let Some(body) = block_after(&code, block.end() - 1) else {
                 continue;
             };
-            for call in SELF_CALL.find_iter(body) {
-                let rest = &body[call.end()..];
-                let message = closing(rest, '(', ')')
-                    .and_then(|end| split_top_level(&rest[..end], false).into_iter().next());
-                for value in message.iter().flat_map(|m| message_values(m)) {
-                    scan.values.push((path.clone(), value));
-                }
+            for found in SELF_NAME.captures_iter(body) {
+                constructor_values(path, body, &found, &mut scan);
             }
         }
     }
     scan
 }
 
+/// The values the `JobError` constructor `found` in `code` builds its
+/// message from, into `scan` (or a problem when they cannot be read).
+fn constructor_values(
+    path: &str,
+    code: &str,
+    found: &regex::Captures<'_>,
+    scan: &mut JobErrorScan,
+) {
+    let Some(whole) = found.get(0) else {
+        return;
+    };
+    let after = code[whole.end()..].trim_start();
+    let next = after.chars().next();
+    let message = match (&found[1], next) {
+        ("fatal" | "retry" | "retry_after", Some('(')) => {
+            let rest = &after[1..];
+            closing(rest, '(', ')')
+                .and_then(|end| split_top_level(&rest[..end], false).into_iter().next())
+        }
+        ("Fatal", Some('(')) => {
+            let rest = &after[1..];
+            closing(rest, '(', ')').and_then(|end| {
+                written_out(code, whole.start(), &rest[end + 1..]).then(|| rest[..end].to_owned())
+            })
+        }
+        ("Retry", Some('{')) => {
+            let rest = &after[1..];
+            closing(rest, '{', '}').and_then(|end| {
+                if !written_out(code, whole.start(), &rest[end + 1..]) {
+                    return None;
+                }
+                split_top_level(&rest[..end], false)
+                    .into_iter()
+                    .find_map(|field| match field.split_once(':') {
+                        Some((name, value)) => {
+                            (name.trim() == "message").then(|| value.trim().to_owned())
+                        }
+                        // Shorthand: the value is a variable named `message`.
+                        None => (field.trim() == "message").then(|| "message".to_owned()),
+                    })
+            })
+        }
+        ("fatal" | "retry" | "retry_after" | "Fatal", _) => {
+            scan.problems.push(format!(
+                "{path}: `{}` is passed as a function, so what its message is built from \
+                 cannot be read: call it with the message (`|e| JobError::{}(…)`)",
+                whole.as_str(),
+                &found[1]
+            ));
+            None
+        }
+        _ => None,
+    };
+    for value in message.iter().flat_map(|m| message_values(m)) {
+        scan.values.push((path.to_owned(), value));
+    }
+}
+
 /// Whether a `JobError` variant at `start` of `code`, followed by `rest`, is
 /// built (an expression) rather than matched (a pattern: followed by `=>`,
-/// `|` or `=`, or inside `matches!`).
+/// `|` or `=`, or inside the parentheses of a `matches!`).
 fn written_out(code: &str, start: usize, rest: &str) -> bool {
     let next = rest.trim_start();
     if next.starts_with("=>")
@@ -1157,8 +1236,12 @@ fn written_out(code: &str, start: usize, rest: &str) -> bool {
     {
         return false;
     }
-    let line_start = code[..start].rfind('\n').map_or(0, |at| at + 1);
-    !code[line_start..start].contains("matches!(")
+    !code[..start]
+        .match_indices("matches!(")
+        .any(|(at, opener)| {
+            let inside = at + opener.len();
+            closing(&code[inside..], '(', ')').is_none_or(|end| inside + end > start)
+        })
 }
 
 /// The values `message` (a message argument) is built from: none for a
@@ -1261,6 +1344,12 @@ fn collapse(text: &str) -> String {
 /// uses any more is stale.
 pub fn check_job_errors(scan: &JobErrorScan, audit: &[(&str, &str, usize, &str)]) -> Vec<String> {
     let mut violations = scan.problems.clone();
+    violations.extend(duplicates(
+        "JOB_ERROR_VALUES",
+        audit
+            .iter()
+            .map(|(path, value, _, _)| format!("`{value}` in {path}")),
+    ));
     let mut counts: BTreeMap<(&str, &str), usize> = BTreeMap::new();
     for (path, value) in &scan.values {
         *counts.entry((path.as_str(), value.as_str())).or_default() += 1;
@@ -1365,11 +1454,56 @@ mod tests {
             ("*", "gone", "no longer carried"),
         ];
         let violations = check_event_payloads(&catalogue(&free), &allowed);
-        assert_eq!(violations.len(), 2, "{violations:?}");
-        assert!(
-            violations.iter().all(|v| v.contains("no event carries")),
+        assert_eq!(violations.len(), 3, "{violations:?}");
+        assert_eq!(
+            violations
+                .iter()
+                .filter(|v| v.contains("no event carries"))
+                .count(),
+            2,
             "{violations:?}"
         );
+        assert!(
+            violations
+                .iter()
+                .any(|v| v.contains("only `workspace` may be")),
+            "{violations:?}"
+        );
+    }
+
+    #[test]
+    fn a_duplicate_entry_and_an_open_map_are_reported() {
+        let open = serde_json::json!({ "type": "object", "properties": {
+            "extra": { "type": "object", "additionalProperties": true }
+        } });
+        let violations = check_event_payloads(&catalogue(&open), &[]);
+        assert_eq!(violations.len(), 1, "{violations:?}");
+        assert!(
+            violations[0].contains("open map at `extra`"),
+            "{violations:?}"
+        );
+
+        let free = serde_json::json!({ "type": "object", "properties": {
+            "subject": { "type": "string" } } });
+        let twice = [
+            ("test.happened", "subject", "an id"),
+            ("test.happened", "subject", "an id again"),
+        ];
+        let violations = check_event_payloads(&catalogue(&free), &twice);
+        assert_eq!(violations.len(), 1, "{violations:?}");
+        assert!(violations[0].contains("twice"), "{violations:?}");
+
+        let scan = JobErrorScan {
+            values: vec![("crates/x/src/a.rs".to_owned(), "id".to_owned())],
+            problems: Vec::new(),
+        };
+        let twice = [
+            ("crates/x/src/a.rs", "id", 1, "an id"),
+            ("crates/x/src/a.rs", "id", 1, "an id again"),
+        ];
+        let violations = check_job_errors(&scan, &twice);
+        assert_eq!(violations.len(), 1, "{violations:?}");
+        assert!(violations[0].contains("twice"), "{violations:?}");
     }
 
     fn sources(files: &[(&str, &str)]) -> Vec<(String, String)> {
@@ -1543,6 +1677,8 @@ fn run() -> Result<(), JobError> {
     let e = Self::retry(other.to_string());
     let f = JobError::Fatal(built.to_string());
     let g = JobError::Retry { message: format!("{kind}"), after: None };
+    let h = JobError::Retry { message, after };
+    let i = if matches!(err, Some(_)) { JobError::Fatal(m) } else { JobError::fatal("x") };
     match err {
         JobError::Fatal(_) => {}
         JobError::Retry { after, .. } => {}
@@ -1554,6 +1690,16 @@ fn run() -> Result<(), JobError> {
 impl From<Problem> for crate::JobError {
     fn from(err: Problem) -> Self {
         Self::fatal(err.code())
+    }
+}
+
+impl From<Other> for JobError {
+    fn from(err: Other) -> Self {
+        match err {
+            Other::Gone(why) => Self::Fatal(why),
+            Other::Busy => Self::Retry { message: err.kind(), after: None },
+            Other::Mapped(e) => e.map(Self::Fatal),
+        }
     }
 }
 
@@ -1570,7 +1716,7 @@ mod tests {
             ("crates/x/src/run_tests.rs", ERRORS),
             (
                 "crates/x/src/free.rs",
-                "fn f() { x.map_err(JobError::retry)?; }",
+                "fn f() { x.map_err(JobError::retry)?; y.map_err(JobError::Fatal)?; }",
             ),
         ]));
         let mut values = scan.values.clone();
@@ -1584,15 +1730,28 @@ mod tests {
             at("built.to_string()"),
             at("kind"),
             at("err.code()"),
+            at("message"),
+            at("m"),
+            at("why"),
+            at("err.kind()"),
         ];
         expected.sort();
         assert_eq!(
             values, expected,
-            "`Self::` counts only in a `From<…> for JobError`; patterns, tests and comments \
-             are skipped"
+            "`Self::` counts only in a `From<…> for JobError`; a shorthand `message` is the \
+             value `message`; a constructor after a closed `matches!` is built; patterns, \
+             tests and comments are skipped"
         );
-        assert_eq!(scan.problems.len(), 1, "{:?}", scan.problems);
-        assert!(scan.problems[0].contains("passed as a function"));
+        assert_eq!(scan.problems.len(), 3, "{:?}", scan.problems);
+        for name in ["JobError::retry", "JobError::Fatal", "Self::Fatal"] {
+            assert!(
+                scan.problems
+                    .iter()
+                    .any(|p| p.contains(&format!("`{name}` is passed as a function"))),
+                "{name}: {:?}",
+                scan.problems
+            );
+        }
 
         let audit = [
             ("crates/x/src/run.rs", "stream", 1, "an id"),
@@ -1600,10 +1759,13 @@ mod tests {
             ("crates/x/src/run.rs", "built.to_string()", 1, "a code"),
             ("crates/x/src/run.rs", "kind", 1, "a name"),
             ("crates/x/src/run.rs", "err.code()", 1, "a code"),
+            ("crates/x/src/run.rs", "message", 1, "a code"),
+            ("crates/x/src/run.rs", "m", 1, "a code"),
+            ("crates/x/src/run.rs", "err.kind()", 1, "a code"),
             ("crates/x/src/other.rs", "why", 1, "elsewhere"),
         ];
         let violations = check_job_errors(&scan, &audit);
-        assert_eq!(violations.len(), 4, "{violations:?}");
+        assert_eq!(violations.len(), 6, "{violations:?}");
         assert!(
             violations[0].contains("passed as a function"),
             "{violations:?}"
@@ -1620,6 +1782,20 @@ mod tests {
         );
         assert!(
             violations.iter().any(|v| v.contains("no job error there")),
+            "{violations:?}"
+        );
+    }
+
+    #[test]
+    fn a_count_that_went_down_fails_too() {
+        let scan = JobErrorScan {
+            values: vec![("crates/x/src/a.rs".to_owned(), "id".to_owned())],
+            problems: Vec::new(),
+        };
+        let violations = check_job_errors(&scan, &[("crates/x/src/a.rs", "id", 2, "an id")]);
+        assert_eq!(violations.len(), 1, "{violations:?}");
+        assert!(
+            violations[0].contains("`id` 1 time(s)") && violations[0].contains("lists 2"),
             "{violations:?}"
         );
     }

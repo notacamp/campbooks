@@ -364,7 +364,9 @@ any of its three lists that no longer matches anything:
 - every field of every event payload in the catalogue, at any depth, that
   can hold free text (a string that is not an id, a date or one of a closed
   set, outside a blob reference) SHALL be listed by its full path in
-  `EVENT_FIELDS_ALLOWED` with its reason;
+  `EVENT_FIELDS_ALLOWED` with its reason, for that event (for every event
+  only the routing field `workspace`), and an open map
+  (`additionalProperties: true`) SHALL be reported;
 - every field of every job kind's payload SHALL be listed in
   `JOB_PAYLOAD_FIELDS` with its reason, and a job whose name or payload
   cannot be read SHALL be reported;
