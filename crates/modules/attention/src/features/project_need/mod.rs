@@ -5,7 +5,10 @@
 //! its revision is newer than the item's, so a replayed or late delivery
 //! changes nothing. A clear that arrives before its open leaves a tombstone
 //! (a cleared row with no reason) holding its revision, so the late open
-//! cannot reopen it. Rebuilding is replaying this handler from the log;
+//! cannot reopen it. Two deliveries racing for a conversation with no item
+//! yet (parallel workers, a replay) find no row to lock: the write itself
+//! only ever moves the revision forward, so the older one, landing second,
+//! changes nothing. Rebuilding is replaying this handler from the log;
 //! snoozes are the members' own and survive it, until the sender writes
 //! again.
 
@@ -77,21 +80,24 @@ impl EventHandler for ProjectConversationNeed {
             .execute(&mut **tx)
             .await?;
         }
-        let announce = if let Some(facts) = &need.need {
-            open(tx, workspace, id, &need, facts, &latest).await?;
-            true
+        let written = if let Some(facts) = &need.need {
+            open(tx, workspace, id, &need, facts, &latest).await?
         } else {
-            clear(tx, workspace, id, &need, &latest).await?;
-            // Nobody saw a tombstone; announce only a real item.
-            current.is_some()
+            // Nobody saw a tombstone: announce a clear only over a row that
+            // was there, seen before (`current`) or written by a delivery
+            // racing this one (`updated`).
+            clear(tx, workspace, id, &need, &latest)
+                .await?
+                .filter(|written| current.is_some() || written.updated)
         };
-        if announce {
+        // The row's own id: in a race for a new item, the other delivery's.
+        if let Some(written) = written {
             events
                 .publish(
                     tx,
                     &ItemChanged {
                         workspace: need.workspace.clone(),
-                        item: id,
+                        item: written.id,
                         container: RecordRef::new(INBOX, &need.inbox),
                     },
                 )
@@ -101,7 +107,18 @@ impl EventHandler for ProjectConversationNeed {
     }
 }
 
-/// Open (or update) item `id` with `facts`.
+/// An item row an upsert wrote.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, sqlx::FromRow)]
+struct Written {
+    /// Its id (another delivery's when it inserted the row first).
+    id: ItemId,
+    /// Whether it updated a row that was already there rather than
+    /// inserting one.
+    updated: bool,
+}
+
+/// Open (or update) item `id` with `facts`: the row written, if any (an item
+/// a newer revision reached first, in a race, is left as it is).
 async fn open(
     tx: &mut Transaction<'static, Postgres>,
     workspace: WorkspaceId,
@@ -109,9 +126,9 @@ async fn open(
     need: &ConversationNeedChanged,
     facts: &NeedFacts,
     latest: &str,
-) -> Result<(), JobError> {
-    sqlx::query!(
-        r#"
+) -> Result<Option<Written>, JobError> {
+    let written = sqlx::query_as::<_, Written>(
+        r"
         INSERT INTO attention.items
             (id, workspace_id, record_type, record_id, container_type, container_id,
              cause_type, cause_id, latest_id, reason, trust, due_on, urgent, since,
@@ -126,38 +143,42 @@ async fn open(
                urgent = EXCLUDED.urgent, since = EXCLUDED.since, state = 'open',
                cleared_because = NULL, cleared_by = NULL, cleared_at = NULL,
                producer_revision = EXCLUDED.producer_revision, updated_at = now()
-        "#,
-        id as ItemId,
-        workspace.as_uuid(),
-        CONVERSATION,
-        need.conversation,
-        INBOX,
-        need.inbox,
-        MESSAGE,
-        need.message,
-        latest,
-        facts.reason.as_str(),
-        facts.trust.as_str(),
-        facts.due_on,
-        facts.urgent,
-        need.sent_at,
-        need.revision,
+         WHERE attention.items.producer_revision < EXCLUDED.producer_revision
+        RETURNING id, (xmax <> 0) AS updated
+        ",
     )
-    .execute(&mut **tx)
+    .bind(id)
+    .bind(workspace.as_uuid())
+    .bind(CONVERSATION)
+    .bind(&need.conversation)
+    .bind(INBOX)
+    .bind(&need.inbox)
+    .bind(MESSAGE)
+    .bind(&need.message)
+    .bind(latest)
+    .bind(facts.reason.as_str())
+    .bind(facts.trust.as_str())
+    .bind(facts.due_on)
+    .bind(facts.urgent)
+    .bind(need.sent_at)
+    .bind(need.revision)
+    .fetch_optional(&mut **tx)
     .await?;
-    Ok(())
+    Ok(written)
 }
 
 /// Clear item `id`; without one yet, leave a tombstone at this revision.
+/// The row written, if any (an item a newer revision reached first, in a
+/// race, is left as it is).
 async fn clear(
     tx: &mut Transaction<'static, Postgres>,
     workspace: WorkspaceId,
     id: ItemId,
     need: &ConversationNeedChanged,
     latest: &str,
-) -> Result<(), JobError> {
-    sqlx::query!(
-        r#"
+) -> Result<Option<Written>, JobError> {
+    let written = sqlx::query_as::<_, Written>(
+        r"
         INSERT INTO attention.items
             (id, workspace_id, record_type, record_id, container_type, container_id,
              cause_type, cause_id, latest_id, since, state, cleared_because,
@@ -168,24 +189,26 @@ async fn clear(
                cleared_by = EXCLUDED.cleared_by, cleared_at = now(),
                latest_id = EXCLUDED.latest_id,
                producer_revision = EXCLUDED.producer_revision, updated_at = now()
-        "#,
-        id as ItemId,
-        workspace.as_uuid(),
-        CONVERSATION,
-        need.conversation,
-        INBOX,
-        need.inbox,
-        MESSAGE,
-        need.message,
-        latest,
-        need.sent_at,
-        need.cleared_because,
-        need.cleared_by.map(|u| *u.as_uuid()),
-        need.revision,
+         WHERE attention.items.producer_revision < EXCLUDED.producer_revision
+        RETURNING id, (xmax <> 0) AS updated
+        ",
     )
-    .execute(&mut **tx)
+    .bind(id)
+    .bind(workspace.as_uuid())
+    .bind(CONVERSATION)
+    .bind(&need.conversation)
+    .bind(INBOX)
+    .bind(&need.inbox)
+    .bind(MESSAGE)
+    .bind(&need.message)
+    .bind(latest)
+    .bind(need.sent_at)
+    .bind(&need.cleared_because)
+    .bind(need.cleared_by.map(|u| *u.as_uuid()))
+    .bind(need.revision)
+    .fetch_optional(&mut **tx)
     .await?;
-    Ok(())
+    Ok(written)
 }
 
 #[cfg(test)]

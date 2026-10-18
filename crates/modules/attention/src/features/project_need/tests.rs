@@ -4,8 +4,11 @@ use campbooks_kernel::tenancy::WorkspaceId;
 use chrono::{TimeDelta, Utc};
 use sqlx::PgPool;
 
+use campbooks_kernel::db::BeginFor;
+
 use crate::{
-    domain::Reason,
+    domain::{ItemId, Reason, Trust},
+    events::{ConversationNeedChanged, NeedFacts},
     testkit::{Kit, Need},
 };
 
@@ -84,6 +87,137 @@ async fn replaying_rebuilds_the_items(db: PgPool) {
     }
     kit.run_jobs().await;
     assert_eq!(items(&db).await, before);
+}
+
+/// `need` as `conversations.need_changed` carries it, open with `reason` or
+/// cleared.
+fn changed(workspace: WorkspaceId, need: &Need, open: bool) -> ConversationNeedChanged {
+    ConversationNeedChanged {
+        workspace: workspace.to_string(),
+        inbox: need.inbox.clone(),
+        conversation: need.conversation.clone(),
+        message: need.message.clone(),
+        revision: need.revision,
+        sent_at: need.sent_at,
+        need: open.then_some(NeedFacts {
+            reason: need.reason,
+            trust: Trust::Sure,
+            due_on: None,
+            urgent: false,
+        }),
+        cleared_because: (!open).then(|| "done".to_owned()),
+        cleared_by: None,
+        latest_message: None,
+    }
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn an_older_delivery_losing_a_race_for_a_new_item_changes_nothing(db: PgPool) {
+    // Two deliveries for a conversation with no item yet, run by two
+    // workers at once: neither finds a row to lock, so both insert. The
+    // newer one landed first; the older one, landing second, must not undo
+    // it (campbooks-cloud#135).
+    let kit = Kit::new(db.clone()).await;
+    let workspace = WorkspaceId::new();
+    let newer = changed(workspace, &need(2, Reason::Do), true);
+    let facts = newer.need.clone().unwrap();
+    let mut tx = BeginFor::begin_for(&kit.state.db, workspace).await.unwrap();
+    let message = newer.message.clone();
+    assert!(
+        super::open(&mut tx, workspace, ItemId::new(), &newer, &facts, &message)
+            .await
+            .unwrap()
+            .is_some()
+    );
+    tx.commit().await.unwrap();
+    // The older open, and an older clear, each with the id it made up.
+    let older = changed(workspace, &need(1, Reason::Reply), true);
+    let older_facts = older.need.clone().unwrap();
+    let mut tx = BeginFor::begin_for(&kit.state.db, workspace).await.unwrap();
+    assert!(
+        super::open(
+            &mut tx,
+            workspace,
+            ItemId::new(),
+            &older,
+            &older_facts,
+            &message
+        )
+        .await
+        .unwrap()
+        .is_none()
+    );
+    let cleared = changed(workspace, &need(1, Reason::Reply), false);
+    assert!(
+        super::clear(&mut tx, workspace, ItemId::new(), &cleared, &message)
+            .await
+            .unwrap()
+            .is_none()
+    );
+    tx.commit().await.unwrap();
+    assert_eq!(items(&db).await, [("do".into(), "open".into(), 2)]);
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_newer_clear_landing_on_a_racing_open_is_announced(db: PgPool) {
+    // The open (revision 1) and the clear (revision 2) of a conversation with
+    // no item are handled at once: the clear finds no row to lock, the open
+    // inserts first, and the clear then updates that row. Home must hear
+    // of it, with the row's own id (campbooks-cloud#135).
+    let kit = Kit::new(db.clone()).await;
+    let workspace = WorkspaceId::new();
+    let opened = changed(workspace, &need(1, Reason::Reply), true);
+    let facts = opened.need.clone().unwrap();
+    let row = ItemId::new();
+    let mut racing = BeginFor::begin_for(&kit.state.db, workspace).await.unwrap();
+    let written = super::open(
+        &mut racing,
+        workspace,
+        row,
+        &opened,
+        &facts,
+        &opened.message,
+    )
+    .await
+    .unwrap();
+    assert_eq!(written.map(|w| (w.id, w.updated)), Some((row, false)));
+    // The clear's handler runs while the open is uncommitted; the open
+    // commits once the clear waits on its row.
+    let commit_when_blocked = async {
+        let deadline = tokio::time::Instant::now() + std::time::Duration::from_secs(30);
+        loop {
+            let waiting: i64 = sqlx::query_scalar(
+                "SELECT count(*) FROM pg_stat_activity
+                  WHERE datname = current_database() AND wait_event_type = 'Lock'",
+            )
+            .fetch_one(&db)
+            .await
+            .unwrap();
+            assert!(
+                tokio::time::Instant::now() < deadline,
+                "the clear never waited on the open's row"
+            );
+            if waiting > 0 {
+                break;
+            }
+            tokio::task::yield_now().await;
+        }
+        racing.commit().await.unwrap();
+    };
+    let cleared = async {
+        kit.cleared(workspace, &need(2, Reason::Reply), "replied", None)
+            .await
+    };
+    tokio::join!(cleared, commit_when_blocked);
+    let (state, revision): (String, i64) =
+        sqlx::query_as("SELECT state, producer_revision FROM attention.items")
+            .fetch_one(&db)
+            .await
+            .unwrap();
+    assert_eq!((state.as_str(), revision), ("cleared", 2));
+    let changed = kit.events("attention.item_changed").await;
+    assert_eq!(changed.len(), 1, "{changed:?}");
+    assert_eq!(changed[0]["item"], row.to_string());
 }
 
 #[sqlx::test(migrations = "../../../migrations")]

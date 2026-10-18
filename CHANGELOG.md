@@ -85,6 +85,15 @@ All notable changes to Campbooks Next are documented here. The format follows
   local program could answer), only on Windows and Android, where the app is served from
   it. Mail links keep their spaces as `%20` instead of turning them into `+`, which mail
   apps showed as plus signs; files (`attach=`) are still never handed to the mail app.
+- **Forward's picker stays fast on a big inbox.** Checking that no one it offers was
+  reported or found suspicious now looks only at the senders it is about to show, through
+  a new index, instead of reading a year of the inbox's mail on every keystroke (three
+  indexes, built without blocking writes).
+- **Home no longer keeps an older need when two changes race.** When a conversation's
+  need changed twice in quick succession before it had an item on Home, two workers could
+  both create the item and the older change could land last, leaving Home on the older
+  need until the next change. The item now only ever moves to a newer revision. This was
+  also why a replay test failed now and then in CI.
 - **Home's Forward never offers a sender under review or a no-reply address.** The picker
   lists only people it is safe to write to: the server leaves out no-reply addresses,
   senders whose newest mail fails their sender checks or pretends to be them, and

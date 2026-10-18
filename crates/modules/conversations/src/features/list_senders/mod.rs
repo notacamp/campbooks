@@ -96,8 +96,9 @@ type Row = (String, Option<String>, i32, i32, Option<String>);
 /// The newest inbound mail only (`messages_inbound_recent_idx`); then one
 /// "was it answered" per thread, not per message, and only for the senders
 /// `q` keeps. With `reachable` ($6), a sender Campbooks or the member
-/// flagged is left out here (`flagged`), and the facts of their newest mail
-/// are read for the checks in Rust ([`may_write_to`]).
+/// flagged is left out here, checked best first and only until `$3` pass,
+/// and the facts of their newest mail are read for the checks in Rust
+/// ([`may_write_to`]).
 const SENDERS: &str = r"
     WITH recent AS (
         SELECT m.sender_address AS address,
@@ -125,29 +126,6 @@ const SENDERS: &str = r"
                   WHERE public.unaccent(lower(address || ' ' || coalesce(string_agg(name, ' '), '')))
                         NOT LIKE '%' || public.unaccent(lower(w.word)) || '%' ESCAPE '\')
     ),
-    -- Any of the sender's own mail in the window, spam included: reported
-    -- (Report and delete moves it to spam), under review (open, or cleared
-    -- because a later message replaced it), or found suspicious and not
-    -- said safe by a member. Judged by the flagged message's own sender,
-    -- so the real people in a hijacked thread stay.
-    flagged AS (
-        SELECT DISTINCT m.sender_address AS address
-          FROM conversations.messages m
-         WHERE $6
-           AND m.inbox_id = ANY($1) AND m.direction = 'inbound'
-           AND m.sent_at > now() - make_interval(days => $4)
-           AND m.sender_address IN (SELECT address FROM senders)
-           AND (m.in_spam
-                OR EXISTS (SELECT 1 FROM conversations.needs n
-                            WHERE n.message_id = m.id AND n.reason = 'review'
-                              AND (n.state = 'open' OR n.cleared_because = 'superseded'))
-                OR (EXISTS (SELECT 1 FROM conversations.decisions d
-                             WHERE d.message_id = m.id AND d.question = 'suspicious'
-                               AND d.value = 'true'::jsonb)
-                    AND NOT EXISTS (SELECT 1 FROM conversations.corrections c
-                                     WHERE c.message_id = m.id AND c.question = 'suspicious'
-                                       AND c.to_value = 'false' AND c.withdrawn_at IS NULL)))
-    ),
     threads AS (
         SELECT r.address, r.conversation_id, min(r.sent_at) AS first_at
           FROM recent r
@@ -162,16 +140,43 @@ const SENDERS: &str = r"
                           AND o.inbox_id = ANY($1)
                           AND o.direction = 'outbound' AND o.sent_at > t.first_at)
          GROUP BY t.address
+    ),
+    -- Ranked first (`OFFSET 0` keeps the check below out of the sort), so
+    -- the flag check runs sender by sender, best first, only until `$3`
+    -- pass, each through `messages_inbound_sender_idx`, never over the
+    -- inbox's history (campbooks-cloud#246).
+    ranked AS (
+        SELECT s.address, s.name, s.received, coalesce(r.replied, 0) AS replied,
+               s.newest_results
+          FROM senders s
+          LEFT JOIN replied r USING (address)
+         ORDER BY 4 DESC, 3 DESC, 1
+        OFFSET 0
     )
-    SELECT s.address,
-           s.name,
-           s.received,
-           coalesce(r.replied, 0),
-           s.newest_results
-      FROM senders s
-      LEFT JOIN replied r USING (address)
-     WHERE s.address NOT IN (SELECT address FROM flagged)
-     ORDER BY 4 DESC, 3 DESC, 1
+    SELECT address, name, received, replied, newest_results
+      FROM ranked k
+     -- With `reachable`: none of the sender's own mail in the window, spam
+     -- included, was reported (Report and delete moves it to spam), is
+     -- under review (open, or cleared because a later message replaced
+     -- it), or was found suspicious and not said safe by a member. Judged
+     -- by the flagged message's own sender, so the real people in a
+     -- hijacked thread stay.
+     WHERE NOT ($6 AND EXISTS (
+           SELECT 1 FROM conversations.messages m
+            WHERE m.inbox_id = ANY($1) AND m.direction = 'inbound'
+              AND m.sender_address = k.address
+              AND m.sent_at > now() - make_interval(days => $4)
+              AND (m.in_spam
+                   OR EXISTS (SELECT 1 FROM conversations.needs n
+                               WHERE n.message_id = m.id AND n.reason = 'review'
+                                 AND (n.state = 'open' OR n.cleared_because = 'superseded'))
+                   OR (EXISTS (SELECT 1 FROM conversations.decisions d
+                                WHERE d.message_id = m.id AND d.question = 'suspicious'
+                                  AND d.value = 'true'::jsonb)
+                       AND NOT EXISTS (SELECT 1 FROM conversations.corrections c
+                                        WHERE c.message_id = m.id AND c.question = 'suspicious'
+                                          AND c.to_value = 'false' AND c.withdrawn_at IS NULL)))))
+     ORDER BY replied DESC, received DESC, address
      LIMIT $3
     ";
 
@@ -513,6 +518,22 @@ mod tests {
         .unwrap();
         assert!(
             found(&kit, &sam, workspace, "support", true)
+                .await
+                .contains(&phish.to_owned())
+        );
+        // The member took "It's safe" back (Undo): out again
+        // (campbooks-cloud#246).
+        sqlx::query(
+            "UPDATE conversations.corrections SET withdrawn_at = now()
+              WHERE question = 'suspicious' AND message_id =
+                    (SELECT id FROM conversations.messages WHERE provider_message_id = $1)",
+        )
+        .bind(flagged)
+        .execute(&db)
+        .await
+        .unwrap();
+        assert!(
+            !found(&kit, &sam, workspace, "support", true)
                 .await
                 .contains(&phish.to_owned())
         );
