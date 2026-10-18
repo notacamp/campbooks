@@ -50,7 +50,11 @@ const keys = {
       conversation_id: conversationId,
     }),
   senders: (workspaceId: string, q: string, reachable: boolean) =>
-    operationKey("conversations.list_senders", { workspace_id: workspaceId, q, reachable }),
+    operationKey("conversations.list_senders", {
+      workspace_id: workspaceId,
+      q,
+      ...(reachable ? { reachable: "true" } : {}),
+    }),
   body: (workspaceId: string, conversationId: string, messageId: string, showImages: boolean) =>
     operationKey("conversations.get_message_body", {
       workspace_id: workspaceId,
