@@ -287,7 +287,7 @@ function demoMessages(me: string, images: string): DemoMessage[] {
       hoursAgo: 23,
       labels: ["INBOX", "CATEGORY_UPDATES"],
       html: `<div style="font-family:Georgia,serif"><p>Hello Sam,</p><p>Here are the tide tables at the quay for the whole season.</p><table>${Array.from(
-        { length: 3_000 },
+        { length: 3000 },
         (_, day) =>
           `<tr><td>Day ${String(day + 1)}</td><td>High water 06:12 and 18:40</td><td>Low water 00:05 and 12:27</td></tr>`,
       ).join("")}</table><p>Quay Office</p></div>`,
