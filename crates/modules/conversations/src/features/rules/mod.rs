@@ -760,7 +760,7 @@ pub async fn create_in(
         && body.apply_to_existing
         && !rules::only_shows_images(&body.actions)
     {
-        rule_runs::start(tx, &state.events, &ws, &rule, RunKind::Apply).await?;
+        rule_runs::start(tx, state, access, &rule, RunKind::Apply).await?;
     } else {
         rule_runs::announce(
             tx,
@@ -953,7 +953,7 @@ pub async fn confirm(
         .ok_or(Error::NotFound)?;
     let ws = access.workspace.to_string();
     if body.apply_to_existing && !rules::only_shows_images(&rule.actions) {
-        rule_runs::start(&mut tx, &state.events, &ws, &rule, RunKind::Apply).await?;
+        rule_runs::start(&mut tx, &state, access, &rule, RunKind::Apply).await?;
     } else {
         rule_runs::announce(
             &mut tx,
@@ -1003,7 +1003,7 @@ async fn confirm_again(
         && rule.effective_state() == RuleState::Active
         && !rules::only_shows_images(&rule.actions)
     {
-        rule_runs::start(&mut tx, &state.events, &ws, &rule, RunKind::Apply).await?;
+        rule_runs::start(&mut tx, state, access, &rule, RunKind::Apply).await?;
     } else {
         rule_runs::announce(
             &mut tx,
@@ -1269,6 +1269,8 @@ pub struct RemoveQuery {
             content_type = "application/problem+json"),
         (status = NOT_FOUND, description = "No such rule, or you cannot see it.",
             body = Problem, content_type = "application/problem+json"),
+        (status = CONFLICT, description = "Some of what it changed can't be put back: remove it keeping its changes.",
+            body = Problem, content_type = "application/problem+json"),
     )
 )]
 pub async fn remove(
@@ -1300,6 +1302,15 @@ pub async fn remove(
     ) {
         return Err(Error::NotFound);
     }
+    // Nothing is put back in an inbox kept read-only.
+    // A rule that only showed images changed no mail: nothing to put back.
+    let put_back =
+        query.restore && !rule.inbox_detached && !rules::only_shows_images(&rule.actions);
+    // What it changed before applications were bound (campbooks-cloud#242)
+    // cannot be put back: refused before anything changes.
+    if put_back && rules::unsigned_held(&mut tx, rule.id).await? > 0 {
+        return Err(Error::Conflict(crate::MESSAGES.reason("undo_unavailable")));
+    }
     // Bound as it is (under the lock), it stays bound once removed, so Undo
     // brings it back acting (campbooks-cloud#242).
     let bound = rules::find_any(&mut tx, rule.id)
@@ -1323,10 +1334,8 @@ pub async fn remove(
         rule_notices::reopen(&mut tx, rule.id, RESTORE_MINUTES).await?;
     }
     let ws = access.workspace.to_string();
-    // Nothing is put back in an inbox kept read-only.
-    // A rule that only showed images changed no mail: nothing to put back.
-    if query.restore && !rule.inbox_detached && !rules::only_shows_images(&rule.actions) {
-        rule_runs::start(&mut tx, &state.events, &ws, &removed, RunKind::Revert).await?;
+    if put_back {
+        rule_runs::start(&mut tx, &state, access, &removed, RunKind::Revert).await?;
     } else {
         sqlx::query!(
             r#"UPDATE conversations.rule_runs SET state = 'cancelled', finished_at = now()
@@ -1488,7 +1497,7 @@ pub async fn restore(
         && body.apply_to_existing
         && !rules::only_shows_images(&rule.actions)
     {
-        rule_runs::start(&mut tx, &state.events, &ws, &rule, RunKind::Apply).await?;
+        rule_runs::start(&mut tx, &state, access, &rule, RunKind::Apply).await?;
     } else {
         rule_runs::announce(
             &mut tx,

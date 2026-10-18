@@ -7,6 +7,7 @@ use campbooks_kernel::{EventBus, Result, binding::Binding};
 use serde_json::json;
 use sqlx::{PgConnection, Postgres, Transaction, types::Uuid};
 
+use super::applications;
 use crate::{
     domain::{
         conversation::{Changed, provider_message_ids, request},
@@ -267,17 +268,22 @@ pub async fn store_decision(
     Ok(())
 }
 
-/// Record that `rule` changed conversation `id` (in `run`, or as mail
-/// arrived), and count it unless it already held it changed. A
-/// conversation it changed again keeps what it was before the first time,
-/// adds what the rule did since and where it last moved it.
+/// Record that `rule` (of `inbox`, in `workspace`) changed conversation
+/// `id` (in `run`, or as mail arrived), and count it unless it already held
+/// it changed. A conversation it changed again keeps what it was before the
+/// first time, adds what the rule did since and where it last moved it.
+///
+/// Only right after the rule verified (`rules::acting`, on arrival and in a
+/// run): the row is signed here (campbooks-cloud#242), over what this call
+/// did and what the row already held only when that row is bound too.
 pub async fn record(
     conn: &mut PgConnection,
-    workspace: Uuid,
-    rule: RuleId,
+    binding: &Binding,
+    owner: applications::Owner,
     at: (ConversationId, Option<RuleRunId>),
     before: &super::Before,
 ) -> Result<()> {
+    let (workspace, _, rule) = owner;
     let (id, run) = at;
     // Counted once per conversation it holds changed: not again when it
     // changes one it already holds (a new message in it), again after a
@@ -291,6 +297,8 @@ pub async fn record(
     .fetch_optional(&mut *conn)
     .await?
     .unwrap_or(false);
+    // What it held is merged in below only when it is bound to the rule.
+    applications::drop_unbound(conn, binding, owner, id).await?;
     sqlx::query!(
         r#"
         INSERT INTO conversations.rule_applications
@@ -347,6 +355,7 @@ pub async fn record(
     )
     .execute(&mut *conn)
     .await?;
+    applications::seal(conn, binding, owner, id).await?;
     sqlx::query!(
         r#"UPDATE conversations.rules
               SET applied_count = applied_count + CASE WHEN $2 THEN 0 ELSE 1 END,
