@@ -49,64 +49,55 @@ impl Job for Prune {
         let ended = now - KEEP_ENDED;
         let db = ctx.pool();
         let mut deleted = 0;
+        let unused = now - UNUSED_CLIENT;
+        // Each in batches of short statements (campbooks-cloud#254).
         for (sql, at) in [
             (
-                "DELETE FROM identity.authorize_requests WHERE expires_at <= $1",
+                "DELETE FROM identity.authorize_requests WHERE ctid = ANY(ARRAY(SELECT ctid FROM identity.authorize_requests WHERE expires_at <= $1 LIMIT $2))",
                 now,
             ),
             (
-                "DELETE FROM identity.upstream_flows WHERE expires_at <= $1",
+                "DELETE FROM identity.upstream_flows WHERE ctid = ANY(ARRAY(SELECT ctid FROM identity.upstream_flows WHERE expires_at <= $1 LIMIT $2))",
                 now,
             ),
             (
-                "DELETE FROM identity.link_tickets WHERE expires_at <= $1",
+                "DELETE FROM identity.link_tickets WHERE ctid = ANY(ARRAY(SELECT ctid FROM identity.link_tickets WHERE expires_at <= $1 LIMIT $2))",
                 now,
             ),
             (
-                "DELETE FROM identity.pending_sign_ups WHERE expires_at <= $1",
+                "DELETE FROM identity.pending_sign_ups WHERE ctid = ANY(ARRAY(SELECT ctid FROM identity.pending_sign_ups WHERE expires_at <= $1 LIMIT $2))",
                 now,
             ),
             (
-                "DELETE FROM identity.webauthn_challenges WHERE expires_at <= $1",
+                "DELETE FROM identity.webauthn_challenges WHERE ctid = ANY(ARRAY(SELECT ctid FROM identity.webauthn_challenges WHERE expires_at <= $1 LIMIT $2))",
                 now,
             ),
             (
-                "DELETE FROM identity.held_grants WHERE expires_at <= $1",
+                "DELETE FROM identity.held_grants WHERE ctid = ANY(ARRAY(SELECT ctid FROM identity.held_grants WHERE expires_at <= $1 LIMIT $2))",
                 now,
             ),
             (
-                "DELETE FROM identity.authorization_codes WHERE expires_at <= $1",
+                "DELETE FROM identity.authorization_codes WHERE ctid = ANY(ARRAY(SELECT ctid FROM identity.authorization_codes WHERE expires_at <= $1 LIMIT $2))",
                 ended,
             ),
             (
-                "DELETE FROM identity.refresh_families
-                  WHERE expires_at <= $1 OR revoked_at <= $1",
+                "DELETE FROM identity.refresh_families WHERE ctid = ANY(ARRAY(SELECT ctid FROM identity.refresh_families WHERE expires_at <= $1 OR revoked_at <= $1 LIMIT $2))",
                 ended,
             ),
             (
-                "DELETE FROM identity.sessions
-                  WHERE ended_at <= $1 OR least(idle_expires_at, expires_at) <= $1",
+                "DELETE FROM identity.sessions WHERE ctid = ANY(ARRAY(SELECT ctid FROM identity.sessions WHERE ended_at <= $1 OR least(idle_expires_at, expires_at) <= $1 LIMIT $2))",
                 ended,
+            ),
+            (
+                "DELETE FROM identity.consents WHERE ctid = ANY(ARRAY(SELECT ctid FROM identity.consents WHERE revoked_at <= $1 LIMIT $2))",
+                unused,
+            ),
+            (
+                "DELETE FROM identity.notices WHERE ctid = ANY(ARRAY(SELECT ctid FROM identity.notices WHERE sent_at <= $1 LIMIT $2))",
+                unused,
             ),
         ] {
-            deleted += sqlx::query(sql)
-                .bind(at)
-                .execute(db)
-                .await
-                .map_err(|e| JobError::retry(format!("pruning identity state: {e}")))?
-                .rows_affected();
-        }
-        let unused = now - UNUSED_CLIENT;
-        for sql in [
-            "DELETE FROM identity.consents WHERE revoked_at <= $1",
-            "DELETE FROM identity.notices WHERE sent_at <= $1",
-        ] {
-            deleted += sqlx::query(sql)
-                .bind(unused)
-                .execute(db)
-                .await
-                .map_err(|e| JobError::retry(format!("pruning identity state: {e}")))?
-                .rows_affected();
+            deleted += delete_in_batches(db, sql, at, PRUNE_BATCH).await?;
         }
         let mut tx = crate::domain::clients::begin_as_server(db)
             .await
@@ -131,6 +122,34 @@ impl Job for Prune {
             .map_err(|e| JobError::retry(format!("pruning mailbox records: {e}")))?;
         tracing::info!(deleted, ways_in, "pruned expired sign-in state");
         Ok(())
+    }
+}
+
+/// Rows one prune statement deletes at most.
+const PRUNE_BATCH: i64 = 5_000;
+
+/// Run `sql` (a `DELETE` of at most `$2` rows due by `$1`) with `size`
+/// until it deletes fewer: each statement stays short, well within the
+/// runtime pool's `statement_timeout`. How many rows went.
+async fn delete_in_batches(
+    db: &sqlx::PgPool,
+    sql: &'static str,
+    at: chrono::DateTime<Utc>,
+    size: i64,
+) -> Result<u64, JobError> {
+    let mut deleted = 0;
+    loop {
+        let batch = sqlx::query(sql)
+            .bind(at)
+            .bind(size)
+            .execute(db)
+            .await
+            .map_err(|e| JobError::retry(format!("pruning identity state: {e}")))?
+            .rows_affected();
+        deleted += batch;
+        if batch < u64::try_from(size).unwrap_or(u64::MAX) {
+            return Ok(deleted);
+        }
     }
 }
 
@@ -182,4 +201,41 @@ pub async fn sweep_unnamed_mailboxes(
         gone += removed.len();
     }
     Ok(gone)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[sqlx::test(migrations = "../../../migrations")]
+    async fn expired_rows_go_in_batches_and_live_ones_stay(db: sqlx::PgPool) {
+        let now = Utc::now();
+        for (n, expires) in [-5, -4, -3, -2, -1, 10].into_iter().enumerate() {
+            sqlx::query(
+                "INSERT INTO identity.webauthn_challenges
+                     (challenge_hash, purpose, browser_hash, return_to, created_at, expires_at)
+                 VALUES ($1, 'sign_in', '\\x00', '/', $2, $3)",
+            )
+            .bind(vec![u8::try_from(n).unwrap()])
+            .bind(now - TimeDelta::minutes(10))
+            .bind(now + TimeDelta::minutes(expires))
+            .execute(&db)
+            .await
+            .unwrap();
+        }
+        let deleted = delete_in_batches(
+            &db,
+            "DELETE FROM identity.webauthn_challenges WHERE ctid = ANY(ARRAY(SELECT ctid FROM identity.webauthn_challenges WHERE expires_at <= $1 LIMIT $2))",
+            now,
+            2,
+        )
+        .await
+        .unwrap();
+        assert_eq!(deleted, 5);
+        let left: i64 = sqlx::query_scalar("SELECT count(*) FROM identity.webauthn_challenges")
+            .fetch_one(&db)
+            .await
+            .unwrap();
+        assert_eq!(left, 1);
+    }
 }

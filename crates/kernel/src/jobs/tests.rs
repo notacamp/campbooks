@@ -24,6 +24,10 @@ use crate::{
 /// run in `job_log` through the job transaction, so a failed attempt leaves
 /// no row behind.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[allow(
+    clippy::struct_excessive_bools,
+    reason = "a test fixture scripted by its payload: each flag is one behaviour"
+)]
 struct Probe {
     note: String,
     /// Fail (retryably) while the attempt number is at most this.
@@ -41,6 +45,9 @@ struct Probe {
     /// Work in the kernel scope (`kernel_tx`), recording whether it was on.
     #[serde(default)]
     kernel: bool,
+    /// Record the statement timeout of the job's transaction.
+    #[serde(default)]
+    limits: bool,
 }
 
 impl Probe {
@@ -70,6 +77,14 @@ impl Job for Probe {
         }
         if let Some(reply) = &self.echo {
             return Err(JobError::fatal(format!("provider answered 400: {reply}")));
+        }
+        if self.limits {
+            let tx = ctx.tx().await?;
+            let limit: String = sqlx::query_scalar("SELECT current_setting('statement_timeout')")
+                .fetch_one(&mut **tx)
+                .await?;
+            log(ctx, Self::NAME, &format!("statement_timeout={limit}"), 1).await?;
+            return Ok(());
         }
         if self.kernel {
             let tx = ctx.kernel_tx().await?;
@@ -401,10 +416,18 @@ async fn replay_reenqueues_one_consumer(db: PgPool) {
             .unwrap(),
         3
     );
-    // Already pending: a second replay adds nothing.
+    // Already pending: a second replay adds nothing, read in batches of
+    // two or not (campbooks-cloud#254).
     assert_eq!(
         events
             .replay(&db, "test.count_a", ReplayFrom::Beginning)
+            .await
+            .unwrap(),
+        0
+    );
+    assert_eq!(
+        events
+            .replay_in_batches(&db, "test.count_a", ReplayFrom::Beginning, 2)
             .await
             .unwrap(),
         0
@@ -426,6 +449,20 @@ async fn replay_reenqueues_one_consumer(db: PgPool) {
             .await
             .unwrap(),
         1
+    );
+    worker.run_until_idle().await;
+    // Every event, a batch of two and then one, each enqueued once.
+    assert_eq!(
+        events
+            .replay_in_batches(&db, "test.count_b", ReplayFrom::Beginning, 2)
+            .await
+            .unwrap(),
+        3
+    );
+    worker.run_until_idle().await;
+    assert_eq!(
+        sorted_notes(&db, "test.count_b").await,
+        ["1", "1", "2", "2", "3", "3", "3"]
     );
     let future = Utc::now() + TimeDelta::hours(1);
     assert_eq!(
@@ -3802,4 +3839,29 @@ mod kernel_scope {
             "no handler ran"
         );
     }
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn a_jobs_transaction_allows_its_statements_five_minutes(db: PgPool) {
+    // campbooks-cloud#254: requests' statements are cut at 30 s
+    // (`db::STATEMENT_TIMEOUT`); a job's own transaction allows five
+    // minutes, until it ends.
+    let state = state(db.clone()).await;
+    enqueue_probe(
+        &state,
+        &Probe {
+            limits: true,
+            ..Probe::note("limits")
+        },
+        EnqueueOptions::default(),
+    )
+    .await;
+    Worker::new(state.clone()).run_until_idle().await;
+    assert_eq!(notes(&db, "test.probe").await, ["statement_timeout=5min"]);
+    // Only for that transaction: the connection it ran on is back to its own.
+    let after: String = sqlx::query_scalar("SELECT current_setting('statement_timeout')")
+        .fetch_one(&state.db)
+        .await
+        .unwrap();
+    assert_ne!(after, "5min");
 }
