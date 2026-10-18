@@ -80,6 +80,10 @@ All notable changes to Campbooks Next are documented here. The format follows
 
 ### Fixed
 
+- **Forward's picker stays fast on a big inbox.** Checking that no one it offers was
+  reported or found suspicious now looks only at the senders it is about to show, through
+  a new index, instead of reading a year of the inbox's mail on every keystroke (three
+  indexes, built without blocking writes).
 - **Home's Forward never offers a sender under review or a no-reply address.** The picker
   lists only people it is safe to write to: the server leaves out no-reply addresses,
   senders whose newest mail fails their sender checks or pretends to be them, and

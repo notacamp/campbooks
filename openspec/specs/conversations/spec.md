@@ -1433,8 +1433,10 @@ because a later message replaced it), or holds a stored `suspicious` answer
 of `true` that no member corrected to safe. A flagged message SHALL exclude
 only its own sender, so the other people in its thread stay. Facts only
 (addresses, the provider's authentication results, stored answers, needs and
-member corrections), never what the mail says. Without it, the answer SHALL
-be as before.
+member corrections), never what the mail says. That check SHALL run sender
+by sender in ranking order, only until the answer is full, each through an
+index on an inbox's received mail by sender, so its cost doesn't grow with an
+inbox's history either. Without it, the answer SHALL be as before.
 
 #### Scenario: Suggestions for "always reach you"
 - **WHEN** a member lists senders without `q`
@@ -1458,7 +1460,7 @@ be as before.
 
 #### Scenario: A review replaced
 - **WHEN** a later message replaced a sender's review, or the review's need is gone, and no member said the flagged email is safe
-- **THEN** that sender is still not listed with `reachable=true`; once a member says it is safe, they are
+- **THEN** that sender is still not listed with `reachable=true`; once a member says it is safe, they are, and once that is undone, they are not again
 
 #### Scenario: Failing checks, newest
 - **WHEN** a sender's newest mail is refused by their DMARC policy
