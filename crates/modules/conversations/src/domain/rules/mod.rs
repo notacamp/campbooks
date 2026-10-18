@@ -12,8 +12,11 @@
 //! suspended (`member_suspensions`, campbooks-cloud#147); a member who
 //! changed back what a rule did makes that conversation an **exception** the
 //! rule leaves alone ([`exceptions`]). A rule acts only while its MAC binds
-//! it to the member who taught it ([`binding`], campbooks-cloud#242).
+//! it to the member who taught it ([`binding`], campbooks-cloud#242), and
+//! what it changed is put back only where the application's own MAC binds it
+//! to the rule (`applications`).
 
+mod applications;
 mod apply;
 mod arrival;
 pub mod binding;
@@ -33,6 +36,7 @@ use serde_json::json;
 use sqlx::PgConnection;
 use utoipa::ToSchema;
 
+pub use applications::unsigned_held;
 pub use apply::{Applied, Before, Context, acting_on, apply, revert};
 pub use arrival::{Arrival, on_arrival};
 pub use exceptions::{RuleException, RuleMark, Undone, attach, except, recent_exceptions_of};

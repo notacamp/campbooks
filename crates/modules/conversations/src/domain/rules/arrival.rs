@@ -178,8 +178,8 @@ pub async fn on_arrival(
         };
         effects::record(
             tx,
-            arrival.workspace,
-            rule,
+            binding,
+            (arrival.workspace, arrival.inbox, rule),
             (arrival.conversation, None),
             &before,
         )

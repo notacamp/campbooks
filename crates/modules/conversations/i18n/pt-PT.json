@@ -30,6 +30,7 @@
     "rule_not_active": "Esta regra está à espera de um sim. Mantenha-a primeiro e depois pode pô-la em pausa.",
     "rule_not_restorable": "Esta regra já não pode ser reposta. Volte a ensiná-la.",
     "rule_needs_confirmation": "Esta regra precisa de um novo sim antes de voltar a agir. Confirme-a primeiro e depois pode alterá-la.",
+    "undo_unavailable": "Parte do que esta regra alterou já não pode ser reposta. Remova-a mantendo as alterações.",
     "invalid_senders_query": "Pesquise com 2 a 100 caracteres e peça entre 1 e {{max}} remetentes."
   }
 }
