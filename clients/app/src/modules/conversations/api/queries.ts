@@ -239,7 +239,7 @@ export async function withWords(
   if (message.text_unread !== true) {
     return message;
   }
-  const text = await queryClient.fetchQuery(wordsQuery(workspaceId, conversationId, message.id));
+  const text = await queryClient.query(wordsQuery(workspaceId, conversationId, message.id));
   return { ...message, text, text_unread: false };
 }
 
