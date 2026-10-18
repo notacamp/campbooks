@@ -50,7 +50,8 @@ pub enum Quotes {
 }
 
 /// The text of an HTML body, without quoted `<blockquote>`s: see
-/// [`text_of`].
+/// [`text_of`] (readers go through `blobs::words`).
+#[cfg(test)]
 pub fn from_html(html: &str) -> String {
     text_of(html, Quotes::Drop)
 }

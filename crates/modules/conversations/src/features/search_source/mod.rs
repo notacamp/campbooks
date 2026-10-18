@@ -39,7 +39,7 @@ const MAX_PARTICIPANTS_BYTES: usize = 64 * 1024;
 const MAX_TEXT_BYTES: usize = 128 * 1024;
 /// The most of an HTML part read, in bytes.
 const MAX_HTML_BYTES: usize = 512 * 1024;
-/// How HTML becomes text ([`plain_text::from_html`]): part of the stamp of
+/// How HTML becomes text ([`plain_text::text_of`]): part of the stamp of
 /// an entry with an HTML part. 2: words after `<head>` with no `<body>` tag
 /// are read, and a text part of blanks only falls back to the HTML
 /// (campbooks-cloud#218).
