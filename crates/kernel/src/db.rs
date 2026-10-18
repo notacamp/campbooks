@@ -469,6 +469,9 @@ pub fn with_runtime_role(options: PgPoolOptions, role: Option<&str>) -> PgPoolOp
 }
 
 /// What the database says about the role a pool's connections run as.
+// Each flag is one independent finding of the database, judged together by
+// `verdict`: not a state machine.
+#[allow(clippy::struct_excessive_bools)]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RoleReport {
     /// `current_user`: the role queries run as (after any `SET ROLE`).
@@ -485,6 +488,11 @@ pub struct RoleReport {
     /// member of one): a query that can run `RESET ROLE` or `SET ROLE` then
     /// escapes row-level security.
     pub login_can_bypass: bool,
+    /// `user` is a member of `campbooks_definer`, the owner of the
+    /// `SECURITY DEFINER` functions: it could reach the tables only those
+    /// functions should (the web sessions' sealed tokens, the rate-limit
+    /// counters) directly (campbooks-cloud#213, item 8).
+    pub holds_definer_rights: bool,
 }
 
 /// Inspect the role `pool`'s connections run as.
@@ -501,7 +509,10 @@ pub async fn inspect_role(pool: &PgPool) -> Result<RoleReport, sqlx::Error> {
                              AND pg_has_role(current_user, c.relowner, 'MEMBER')) AS "owns_policy_tables!",
                   EXISTS (SELECT 1 FROM pg_roles r
                            WHERE (r.rolsuper OR r.rolbypassrls)
-                             AND pg_has_role(session_user, r.oid, 'MEMBER')) AS "login_can_bypass!""#
+                             AND pg_has_role(session_user, r.oid, 'MEMBER')) AS "login_can_bypass!",
+                  EXISTS (SELECT 1 FROM pg_roles r
+                           WHERE r.rolname = 'campbooks_definer'
+                             AND pg_has_role(current_user, r.oid, 'MEMBER')) AS "holds_definer_rights!""#
     )
     .fetch_one(pool)
     .await
@@ -537,6 +548,14 @@ impl RoleReport {
             return RoleVerdict::Unsafe(format!(
                 "the database role `{}` owns tables that carry row-level security \
                  policies, and owners can change their own policies",
+                self.user
+            ));
+        }
+        if self.holds_definer_rights {
+            return RoleVerdict::Unsafe(format!(
+                "the database role `{}` is a member of `campbooks_definer`, the owner of the \
+                 SECURITY DEFINER functions, so it can read the web sign-in's tables (sealed \
+                 tokens) and the rate-limit counters directly; revoke that membership",
                 self.user
             ));
         }
@@ -621,9 +640,53 @@ pub async fn login_can_bypass(conn: &mut PgConnection) -> Result<bool, sqlx::Err
     .await
 }
 
+/// The oldest PostgreSQL Campbooks runs on, as `server_version_num`: 15,
+/// for `NULLS NOT DISTINCT` (the job queue's unique keys). Campbooks is
+/// built and tested on 17, the bundled image (campbooks-cloud#213, item 15).
+pub const MIN_SERVER_VERSION_NUM: i32 = 150_000;
+
+/// The connected server's `server_version_num` (e.g. `170002`).
+pub async fn server_version_num<'c>(conn: impl sqlx::PgExecutor<'c>) -> Result<i32, sqlx::Error> {
+    sqlx::query_scalar("SELECT current_setting('server_version_num')::int")
+        .fetch_one(conn)
+        .await
+}
+
+/// Refuse a server older than [`MIN_SERVER_VERSION_NUM`], naming both.
+///
+/// # Errors
+/// When `version_num` is older.
+pub fn check_server_version(version_num: i32) -> Result<(), String> {
+    if version_num >= MIN_SERVER_VERSION_NUM {
+        return Ok(());
+    }
+    Err(format!(
+        "PostgreSQL {}.{} is too old: Campbooks needs PostgreSQL {} or later (17 \
+         recommended, the version it is built and tested on)",
+        version_num / 10_000,
+        version_num % 10_000,
+        MIN_SERVER_VERSION_NUM / 10_000
+    ))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn postgres_15_or_later() {
+        assert!(check_server_version(170_002).is_ok());
+        assert!(check_server_version(150_000).is_ok());
+        let old = check_server_version(140_011).unwrap_err();
+        assert!(old.contains("PostgreSQL 14.11 is too old"), "{old}");
+        assert!(old.contains("PostgreSQL 15 or later"), "{old}");
+    }
+
+    #[sqlx::test(migrations = "../../migrations")]
+    async fn the_test_server_is_new_enough(db: PgPool) {
+        let version = server_version_num(&db).await.unwrap();
+        assert!(check_server_version(version).is_ok(), "{version}");
+    }
 
     fn report() -> RoleReport {
         RoleReport {
@@ -632,6 +695,7 @@ mod tests {
             bypasses_row_security: false,
             owns_policy_tables: false,
             login_can_bypass: false,
+            holds_definer_rights: false,
         }
     }
 
@@ -768,6 +832,11 @@ mod tests {
                 ..report()
             };
             assert!(matches!(owner.verdict(split), RoleVerdict::Unsafe(_)));
+            let definer = RoleReport {
+                holds_definer_rights: true,
+                ..report()
+            };
+            assert!(matches!(definer.verdict(split), RoleVerdict::Unsafe(_)));
         }
     }
 

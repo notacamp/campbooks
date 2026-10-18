@@ -26,8 +26,13 @@ mutating operation and SHALL only appear on a mutating operation. A
 mutating operation. An operation with `risk: high` SHALL NOT opt
 automation or the assistant in (`automation` and `assistant` false): a
 high-risk operation is the person's own request only, since whether an
-invocation is "confirmed" is said by the code making it. The architecture
-check SHALL fail on any violation.
+invocation is "confirmed" is said by the code making it. A mutating operation
+whose answer below 400 has a field that looks like a secret (a name holding
+`secret`, `token`, `ticket` or `password` as a word, or ending in `url`), at
+any depth of its schema, SHALL declare `secret_once`, or the field SHALL be
+listed in the architecture check with the reason it is none; a listed field
+no longer answered SHALL be reported. The architecture check SHALL fail on
+any violation.
 
 #### Scenario: Health and version are catalogued
 - **WHEN** the OpenAPI document is generated
@@ -52,6 +57,10 @@ check SHALL fail on any violation.
 #### Scenario: A high-risk operation opted in for an invoker
 - **WHEN** an operation declares `x-campbooks.risk: high` with `assistant: true` or `automation: true`
 - **THEN** `cargo xtask arch` fails naming the operation and the caller kind
+
+#### Scenario: A secret-looking answer
+- **WHEN** a mutating operation without `secret_once` answers 201 with a nested `refresh_token`, or 303 with an `accept_url`
+- **THEN** `cargo xtask arch` fails naming the operation and the field, unless the field is listed with its reason
 
 ### Requirement: Events catalogue
 Modules SHALL declare the domain events they publish. The server SHALL
@@ -105,9 +114,10 @@ key. GET and HEAD requests SHALL ignore the header, and no operation SHALL be
 able to opt out. Expired keys SHALL be deleted by an hourly job. For an
 operation declaring `x-campbooks.secret_once` (`identity.register_client`,
 `identity.rotate_client_secret`, `workspaces.invite_member`,
-`identity.start_link`, `connectors.start_connection`), a successful answer
-SHALL NOT be stored: the key SHALL be kept as used (`withheld`: its status
-and `Location`, no body), and a replay SHALL answer 409 problem+json
+`identity.start_link`, `connectors.start_connection`, `identity.token`), an
+answer below 400 SHALL NOT be stored: the key SHALL be kept as used
+(`withheld`: its status, and a success's `Location`, never a redirect's, no
+body), and a replay SHALL answer 409 problem+json
 `idempotency_secret_shown_once` with `Idempotency-Replayed: true`, in the
 caller's language, after the same authorization as any replay, without
 running the operation again or showing the secret.
@@ -131,6 +141,10 @@ running the operation again or showing the secret.
 #### Scenario: The key of a secret reused
 - **WHEN** the key of a withheld answer is reused for another request
 - **THEN** the answer is 422, as for any reused key
+
+#### Scenario: The token endpoint and a key
+- **WHEN** a client calling `/oauth2/token` also sends a valid bearer token and an `Idempotency-Key`, then sends the same request again
+- **THEN** the issued tokens are not stored, and the second request answers 409 `idempotency_secret_shown_once`
 
 ### Requirement: Record references
 The kernel SHALL provide a record reference `{ type, id }` whose `type` is

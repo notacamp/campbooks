@@ -246,6 +246,18 @@ All notable changes to Campbooks Next are documented here. The format follows
   access tokens on the very next request, instead of letting them run out their ten
   minutes, and the web app there asks you to sign in again right away; your other sign-ins
   keep working.
+- **Database and retry hardening (campbooks-cloud#213).**
+  - The web app and each app acting for you now keep separate `Idempotency-Key`s. A retry
+    that spans the upgrade runs again.
+  - The token endpoint's answers, and any redirect from a request that shows a secret, are
+    never kept for replay.
+  - The server refuses to start on PostgreSQL older than 15, or when its database login
+    holds the role that owns the database functions.
+  - Migrations stop after a minute behind a long-running transaction and run again at the
+    next start, instead of hanging.
+  - A queue index left broken by a hand-run migration is rebuilt.
+  - A database clock behind the server's no longer fails web requests near a session's end.
+  - The self-hosting guide says what the database separation protects, and when.
 
 ### Added
 

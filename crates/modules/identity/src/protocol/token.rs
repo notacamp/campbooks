@@ -154,7 +154,7 @@ async fn authenticate(
     path = "/oauth2/token",
     tag = "identity",
     operation_id = "identity.token",
-    extensions(("x-campbooks" = json!(Operation::command(Risk::Low).records(["identity.authorization_code", "identity.refresh_token"]).access("identity.token", campbooks_kernel::authz::Action::Write)))),
+    extensions(("x-campbooks" = json!(Operation::command(Risk::Low).secret_once().records(["identity.authorization_code", "identity.refresh_token"]).access("identity.token", campbooks_kernel::authz::Action::Write)))),
     request_body(content = TokenForm, content_type = "application/x-www-form-urlencoded"),
     security(()),
     responses(

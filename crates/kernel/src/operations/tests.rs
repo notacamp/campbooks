@@ -148,6 +148,28 @@ async fn issue_secret(_: Scoped<TestWrite>) -> (StatusCode, Json<Value>) {
     )
 }
 
+/// Send the caller on to a secret link: a redirect whose `Location` is the
+/// secret.
+#[utoipa::path(
+    post,
+    path = "/api/v1/test/links",
+    operation_id = "test.issue_link",
+    security(("bearer" = ["test:write"])),
+    extensions(("x-campbooks" = json!(Operation::command(Risk::High)
+        .secret_once()
+        .records(["test.secret"])))),
+    responses((status = SEE_OTHER)),
+)]
+async fn issue_link(_: Scoped<TestWrite>) -> (StatusCode, [(header::HeaderName, String); 1]) {
+    (
+        StatusCode::SEE_OTHER,
+        [(
+            header::LOCATION,
+            format!("https://app.example.com/accept/{}", uuid::Uuid::now_v7()),
+        )],
+    )
+}
+
 /// Reasons of the test operations.
 static TEST_MESSAGES: crate::i18n::Catalogue =
     crate::i18n::Catalogue::new("test", [r#"{"errors": {"flaky": "Busy ({{run}})"}}"#; 4]);
@@ -207,6 +229,7 @@ fn api() -> OpenApiRouter<AppState> {
         .routes(routes!(delete_note))
         .routes(routes!(flaky))
         .routes(routes!(issue_secret))
+        .routes(routes!(issue_link))
 }
 
 /// The test API over `state`: the HTTP router and the state that invokes
@@ -246,7 +269,7 @@ fn status(error: &InvokeError) -> Option<StatusCode> {
 fn catalogue_reads_ids_metadata_and_routes() {
     let (_, spec) = api().split_for_parts();
     let catalogue = Catalogue::from_openapi(&spec);
-    assert_eq!(catalogue.len(), 7);
+    assert_eq!(catalogue.len(), 8);
     assert!(catalogue.get("test.issue_secret").unwrap().secret_once());
     assert!(!catalogue.get("test.archive").unwrap().secret_once());
 
@@ -531,6 +554,17 @@ impl Http {
         }
     }
 
+    /// The same app, called by the same person through app `client`.
+    fn through_app(&self, client: &str) -> Self {
+        let mut claims = self.idp.claims("test:write");
+        claims["azp"] = json!(client);
+        Self {
+            app: self.app.clone(),
+            token: self.idp.token(&claims),
+            idp: self.idp.clone(),
+        }
+    }
+
     async fn send(
         &self,
         method: &str,
@@ -732,6 +766,48 @@ async fn keys_belong_to_their_caller(db: PgPool) {
     assert_eq!(theirs["by"], "someone-else");
 }
 
+/// One person's keys through two apps are separate (campbooks-cloud#213,
+/// item 3): the same key with another body is no 422 across apps, and each
+/// app's replay is its own.
+#[sqlx::test(migrations = "../../migrations")]
+async fn a_persons_keys_are_per_app(db: PgPool) {
+    let http = http(db).await;
+    let helper = http.through_app("mail-helper");
+    let (status, _, web) = http
+        .send(
+            "POST",
+            ARCHIVE,
+            Some("k-1"),
+            Some(json!({ "reason": "done" })),
+        )
+        .await;
+    assert_eq!(status, StatusCode::CREATED);
+    let (status, headers, app) = helper
+        .send(
+            "POST",
+            ARCHIVE,
+            Some("k-1"),
+            Some(json!({ "reason": "later" })),
+        )
+        .await;
+    assert_eq!(status, StatusCode::CREATED, "{app}");
+    assert!(!headers.contains_key(idempotency::REPLAYED_HEADER));
+    assert_ne!(web["run"], app["run"]);
+    assert_eq!(app["by"], web["by"], "the same person");
+
+    let (status, headers, again) = helper
+        .send(
+            "POST",
+            ARCHIVE,
+            Some("k-1"),
+            Some(json!({ "reason": "later" })),
+        )
+        .await;
+    assert_eq!(status, StatusCode::CREATED);
+    assert_eq!(headers[idempotency::REPLAYED_HEADER], "true");
+    assert_eq!(again, app, "the app's own answer");
+}
+
 #[sqlx::test(migrations = "../../migrations")]
 async fn anonymous_requests_pass_through(db: PgPool) {
     let http = http(db.clone()).await;
@@ -818,6 +894,31 @@ async fn stored(db: &PgPool) -> Vec<Kept> {
     .fetch_all(db)
     .await
     .unwrap()
+}
+
+/// A redirect from an operation showing a secret is withheld too, its
+/// `Location` (the secret) not kept (campbooks-cloud#213, item 4).
+#[sqlx::test(migrations = "../../migrations")]
+async fn a_secret_redirect_is_withheld_without_its_location(db: PgPool) {
+    let http = http(testing::app_role_pool(&db).await).await;
+    let (status, headers, _) = http
+        .send("POST", "/api/v1/test/links", Some("l-1"), None)
+        .await;
+    assert_eq!(status, StatusCode::SEE_OTHER);
+    let link = headers[header::LOCATION].to_str().unwrap().to_owned();
+    let kept: (String, Option<i16>, Option<String>) =
+        sqlx::query_as("SELECT state, response_status, response_location FROM kernel.idempotency")
+            .fetch_one(&db)
+            .await
+            .unwrap();
+    assert_eq!(kept, ("withheld".to_owned(), Some(303), None), "{link}");
+    let (status, headers, problem) = http
+        .send("POST", "/api/v1/test/links", Some("l-1"), None)
+        .await;
+    assert_eq!(status, StatusCode::CONFLICT);
+    assert_eq!(headers[idempotency::REPLAYED_HEADER], "true");
+    assert_eq!(problem["code"], "idempotency_secret_shown_once");
+    assert!(!headers.contains_key(header::LOCATION));
 }
 
 #[sqlx::test(migrations = "../../migrations")]

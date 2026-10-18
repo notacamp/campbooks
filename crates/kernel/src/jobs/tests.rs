@@ -3873,3 +3873,72 @@ async fn a_jobs_transaction_allows_its_statements_five_minutes(db: PgPool) {
         assert_ne!(after, "5min");
     }
 }
+
+/// The queue's per-workspace key indexes left missing or invalid by a
+/// migration run that does not drop invalid indexes first (`cargo sqlx
+/// migrate run`) are built again by `20261022030100`, and a valid one is
+/// left alone (campbooks-cloud#213, item 14).
+#[sqlx::test(migrations = "../../migrations")]
+async fn the_job_key_indexes_are_rebuilt_when_missing_or_invalid(db: PgPool) {
+    const VALID: &str = "SELECT c.relname::text, i.indisvalid
+                           FROM pg_index i
+                           JOIN pg_class c ON c.oid = i.indexrelid
+                          WHERE c.relname IN ('jobs_unique_key_per_workspace_idx',
+                                              'jobs_ordering_per_workspace_idx')
+                          ORDER BY 1";
+    let migration = std::fs::read_to_string(format!(
+        "{}/../../migrations/20261022030100_kernel__job_key_indexes_valid.sql",
+        env!("CARGO_MANIFEST_DIR")
+    ))
+    .unwrap();
+    let healthy = vec![
+        ("jobs_ordering_per_workspace_idx".to_owned(), true),
+        ("jobs_unique_key_per_workspace_idx".to_owned(), true),
+    ];
+    let indexes: Vec<(String, bool)> = sqlx::query_as(VALID).fetch_all(&db).await.unwrap();
+    assert_eq!(indexes, healthy);
+    let oid_before: i64 = sqlx::query_scalar(
+        "SELECT 'kernel.jobs_ordering_per_workspace_idx'::regclass::oid::bigint",
+    )
+    .fetch_one(&db)
+    .await
+    .unwrap();
+
+    // What a failed concurrent build leaves: an invalid index, or none.
+    sqlx::query(
+        "UPDATE pg_index SET indisvalid = false
+          WHERE indexrelid = 'kernel.jobs_unique_key_per_workspace_idx'::regclass",
+    )
+    .execute(&db)
+    .await
+    .unwrap();
+    let indexes: Vec<(String, bool)> = sqlx::query_as(VALID).fetch_all(&db).await.unwrap();
+    assert_eq!(
+        indexes[1],
+        ("jobs_unique_key_per_workspace_idx".to_owned(), false)
+    );
+    sqlx::raw_sql(sqlx::AssertSqlSafe(migration.clone()))
+        .execute(&db)
+        .await
+        .unwrap();
+    let indexes: Vec<(String, bool)> = sqlx::query_as(VALID).fetch_all(&db).await.unwrap();
+    assert_eq!(indexes, healthy);
+    let oid_after: i64 = sqlx::query_scalar(
+        "SELECT 'kernel.jobs_ordering_per_workspace_idx'::regclass::oid::bigint",
+    )
+    .fetch_one(&db)
+    .await
+    .unwrap();
+    assert_eq!(oid_before, oid_after, "a valid index is left alone");
+
+    sqlx::query("DROP INDEX kernel.jobs_ordering_per_workspace_idx")
+        .execute(&db)
+        .await
+        .unwrap();
+    sqlx::raw_sql(sqlx::AssertSqlSafe(migration))
+        .execute(&db)
+        .await
+        .unwrap();
+    let indexes: Vec<(String, bool)> = sqlx::query_as(VALID).fetch_all(&db).await.unwrap();
+    assert_eq!(indexes, healthy);
+}

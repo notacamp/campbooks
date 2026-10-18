@@ -33,13 +33,16 @@
 //! **A secret is never stored.** An operation declared
 //! `Operation::secret_once` (a new app's client secret, an invitation's
 //! link, a single-use ticket) shows its secret in its successful answer and
-//! nowhere else, ever: the layer keeps only that the key was used
-//! (`withheld`: the status and `Location`, no body), and a replay answers
+//! nowhere else, ever: for any answer below 400 the layer keeps only that
+//! the key was used (`withheld`: the status, a success's `Location`, no
+//! body), and a replay answers
 //! **409** `idempotency_secret_shown_once` instead of running the operation
 //! again or showing the secret twice.
 //!
-//! **Keys are their caller's** (campbooks-cloud#210). Every statement on
-//! `kernel.idempotency` runs in a transaction naming its caller
+//! **Keys are their caller's** (campbooks-cloud#210), and a person's keys
+//! through one app are that app's alone (campbooks-cloud#213). Every
+//! statement on `kernel.idempotency` runs in a transaction naming its
+//! caller
 //! ([`begin_as_idempotency_caller`](crate::db::begin_as_idempotency_caller)),
 //! whose row-level security admits that caller's keys only; a workspace
 //! transaction sees and writes none. The prune reads and deletes expired
@@ -346,10 +349,19 @@ fn problem(status: StatusCode, code: &'static str) -> Response {
     LocalizableProblem::new(status, MESSAGES.reason(code)).into_response()
 }
 
-/// Keys are per caller: users by subject, clients by client id.
+/// Keys are per caller: a person through one app (subject and the token's
+/// client), so the web app and every app acting for the same person keep
+/// separate keys (campbooks-cloud#213, item 3); clients by client id. The
+/// subject is length-prefixed, so no subject and client pair can spell
+/// another's.
 fn owner(principal: &Principal) -> String {
     match principal.kind {
-        PrincipalKind::User => format!("user:{}", principal.subject),
+        PrincipalKind::User => format!(
+            "user:{}:{}|azp:{}",
+            principal.subject.len(),
+            principal.subject,
+            principal.client_id.as_deref().unwrap_or_default()
+        ),
         PrincipalKind::Client => format!("client:{}", principal.subject),
     }
 }
@@ -527,8 +539,9 @@ fn storable(status: StatusCode) -> bool {
 enum Keep {
     /// The whole response, for replay.
     Body,
-    /// For a successful answer, only that the key was used (it showed a
-    /// secret: `Operation::secret_once`); any other answer whole.
+    /// For an answer below 400 (a success, or a redirect whose `Location`
+    /// may carry the secret), only that the key was used (it showed a
+    /// secret: `Operation::secret_once`); an error answer whole.
     WithheldOnSuccess,
 }
 
@@ -567,8 +580,10 @@ async fn finish(
             .and_then(|v: &HeaderValue| v.to_str().ok())
             .map(ToOwned::to_owned)
     };
-    let stored = if keep == Keep::WithheldOnSuccess && status.is_success() {
-        withhold(db, owner, key, status, header(header::LOCATION), containers).await
+    let stored = if keep == Keep::WithheldOnSuccess && status.as_u16() < 400 {
+        // A redirect's `Location` may be the secret itself: not kept.
+        let location = header(header::LOCATION).filter(|_| status.is_success());
+        withhold(db, owner, key, status, location, containers).await
     } else {
         store(db, owner, key, status, &parts, &body, containers).await
     };
@@ -707,5 +722,57 @@ impl Job for PruneIdempotency {
         }
         tracing::info!(pruned, "pruned expired idempotency keys");
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod owner_tests {
+    use super::{Principal, PrincipalKind, owner};
+
+    fn principal(subject: &str, kind: PrincipalKind, client: Option<&str>) -> Principal {
+        Principal {
+            subject: subject.to_owned(),
+            kind,
+            client_id: client.map(ToOwned::to_owned),
+            scopes: std::collections::BTreeSet::new(),
+            workspace: None,
+            email: None,
+            email_verified: false,
+            name: None,
+            expires_at: None,
+            issued_at: None,
+            auth_time: None,
+            sign_in: None,
+        }
+    }
+
+    /// One person through two apps has two key spaces (campbooks-cloud#213,
+    /// item 3), and no subject and client pair spells another's.
+    #[test]
+    fn a_persons_keys_are_per_app() {
+        let web = owner(&principal(
+            "ana",
+            PrincipalKind::User,
+            Some("campbooks-web"),
+        ));
+        let app = owner(&principal("ana", PrincipalKind::User, Some("mail-helper")));
+        assert_ne!(web, app);
+        assert_eq!(web, "user:3:ana|azp:campbooks-web");
+        assert_eq!(
+            owner(&principal("ana", PrincipalKind::User, None)),
+            "user:3:ana|azp:"
+        );
+        assert_ne!(
+            owner(&principal("a|azp:b", PrincipalKind::User, None)),
+            owner(&principal("a", PrincipalKind::User, Some("b")))
+        );
+        assert_eq!(
+            owner(&principal(
+                "ana-agent",
+                PrincipalKind::Client,
+                Some("ana-agent")
+            )),
+            "client:ana-agent"
+        );
     }
 }
