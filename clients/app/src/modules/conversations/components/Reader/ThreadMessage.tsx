@@ -153,7 +153,12 @@ export function ThreadMessage({
       avatar={avatar}
       time={time}
       dateTime={message.sent_at}
-      recipients={recipientsLine(t, message, i18n.language)}
+      // "You → Clara" already names a lone recipient.
+      recipients={
+        yours && message.to.length + message.cc.length === 1
+          ? undefined
+          : recipientsLine(t, message, i18n.language)
+      }
       rich={message.has_html}
       files={files}
       quoted={
