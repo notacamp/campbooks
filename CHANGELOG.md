@@ -282,6 +282,13 @@ All notable changes to Campbooks Next are documented here. The format follows
 - **A file or request that is too large now says so with 413.** An upload over the
   instance's size limit, or a request body over its limit, is answered 413 (instead of
   400), and the message names the limit in your language.
+- **A retried request is never done twice after a crash.** If a request with an
+  `Idempotency-Key` ended without its answer being kept (the server stopped, the request
+  hit the 30-second limit, or the client hung up), retrying it with the same key used to
+  run it again after two minutes. It is now never run again: the retry answers 409
+  `idempotency_outcome_unknown`, so the caller checks whether it took effect and then
+  retries with a new key. A request past the time limit now answers 503
+  `request_timed_out`, which says the same.
 
 ### Added
 

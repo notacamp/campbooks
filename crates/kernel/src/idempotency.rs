@@ -10,6 +10,12 @@
 //! - answers **422** when the key is reused for another operation or another
 //!   request (method, path, query or body differ);
 //! - answers **409** while the first request with the key is still running.
+//! - never runs it again when the first request ended without a stored
+//!   answer (its process died, it was stopped at the server's time limit,
+//!   or its client hung up, each maybe after it committed): once that key
+//!   has been pending for longer than any request runs, a retry gets
+//!   **409** `idempotency_outcome_unknown` until the key expires
+//!   (campbooks-cloud#63).
 //!
 //! Keys belong to the authenticated caller; requests without a valid token
 //! are passed through untouched (the handler answers them as usual). GET and
@@ -112,7 +118,8 @@ pub const MAX_REQUEST_BYTES: usize = 10 * 1024 * 1024;
 pub const MAX_STORED_RESPONSE_BYTES: usize = 1024 * 1024;
 
 /// A pending key older than this belongs to a request that died with its
-/// process (requests time out well before); the same request may take it over.
+/// process (requests time out well before). It is never taken over: a retry
+/// learns that its outcome is unknown (campbooks-cloud#63).
 const ABANDONED_AFTER: Duration = Duration::from_mins(2);
 
 /// What the middleware needs: the database, the token verifier and the
@@ -284,6 +291,9 @@ pub async fn middleware(State(idem): State<Idempotency>, request: Request, next:
         Ok(Claim::InFlight) => {
             return problem(StatusCode::CONFLICT, "idempotency_key_in_flight");
         }
+        Ok(Claim::Unknown) => {
+            return problem(StatusCode::CONFLICT, "idempotency_outcome_unknown");
+        }
         Ok(Claim::Acquired) => {}
     }
 
@@ -386,6 +396,10 @@ enum Claim {
     Withheld(Vec<RecordRef>),
     Mismatch,
     InFlight,
+    /// The first request with the key ended without a stored answer (its
+    /// process died, it timed out, its client hung up): it may have run,
+    /// and it is never run again.
+    Unknown,
 }
 
 struct Stored {
@@ -432,6 +446,13 @@ async fn claim(
 }
 
 /// [`claim`] in the caller's transaction.
+///
+/// A key is taken only when it is new or expired. A pending key is never
+/// taken over (campbooks-cloud#63): its request may have committed its
+/// effects before its process stopped and before its answer was stored, so
+/// running it again could do them twice. Once it has been pending for
+/// longer than any request runs ([`ABANDONED_AFTER`]) a retry learns that
+/// its outcome is unknown ([`Claim::Unknown`]) until the key expires.
 async fn claim_in(
     conn: &mut PgConnection,
     owner: &str,
@@ -460,10 +481,6 @@ async fn claim_in(
                    created_at = now(),
                    expires_at = EXCLUDED.expires_at
              WHERE kernel.idempotency.expires_at <= now()
-                OR (kernel.idempotency.state = 'pending'
-                    AND kernel.idempotency.created_at < now() - make_interval(secs => $6)
-                    AND kernel.idempotency.operation_id = EXCLUDED.operation_id
-                    AND kernel.idempotency.request_hash = EXCLUDED.request_hash)
             RETURNING true AS "acquired!"
             "#,
             owner,
@@ -471,7 +488,6 @@ async fn claim_in(
             operation_id,
             hash,
             retention,
-            abandoned,
         )
         .fetch_optional(&mut *conn)
         .await?;
@@ -482,12 +498,14 @@ async fn claim_in(
         let existing = sqlx::query!(
             r#"
             SELECT operation_id, request_hash, state, response_status,
-                   response_content_type, response_location, response_body, containers
+                   response_content_type, response_location, response_body, containers,
+                   created_at < now() - make_interval(secs => $3) AS "abandoned!"
               FROM kernel.idempotency
              WHERE principal = $1 AND key = $2 AND expires_at > now()
             "#,
             owner,
             key,
+            abandoned,
         )
         .fetch_optional(&mut *conn)
         .await?;
@@ -513,6 +531,7 @@ async fn claim_in(
                     containers: containers(),
                 }),
                 ("withheld", ..) => Claim::Withheld(containers()),
+                ("pending", ..) if row.abandoned => Claim::Unknown,
                 _ => Claim::InFlight,
             },
         );

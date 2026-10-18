@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n            SELECT operation_id, request_hash, state, response_status,\n                   response_content_type, response_location, response_body, containers\n              FROM kernel.idempotency\n             WHERE principal = $1 AND key = $2 AND expires_at > now()\n            ",
+  "query": "\n            SELECT operation_id, request_hash, state, response_status,\n                   response_content_type, response_location, response_body, containers,\n                   created_at < now() - make_interval(secs => $3) AS \"abandoned!\"\n              FROM kernel.idempotency\n             WHERE principal = $1 AND key = $2 AND expires_at > now()\n            ",
   "describe": {
     "columns": [
       {
@@ -90,12 +90,19 @@
             "name": "containers"
           }
         }
+      },
+      {
+        "ordinal": 8,
+        "name": "abandoned!",
+        "type_info": "Bool",
+        "origin": "Expression"
       }
     ],
     "parameters": {
       "Left": [
         "Text",
-        "Text"
+        "Text",
+        "Float8"
       ]
     },
     "nullable": [
@@ -106,8 +113,9 @@
       true,
       true,
       true,
-      false
+      false,
+      null
     ]
   },
-  "hash": "9c4e68b9674da582d5fe4823dba3dc851c660fb6a08c4132b52709f1b1c3c2a5"
+  "hash": "118a9bbe35dcb07490fff949422e2332661798ba86d3c2fd0686c308fd560c65"
 }
