@@ -15,7 +15,14 @@
    "Built-in sign-in" below. Upgrading from a release that shipped Rauthy: see "Upgrading
    from the Rauthy sign-in".
 6. Upgrades: `docker compose pull && docker compose up -d`; migrations run on startup
-   (the server's).
+   (the server's). Campbooks needs PostgreSQL 15 or later and is built and tested on 17,
+   the bundled image; the server refuses to start on an older one. A migration waits a
+   few seconds for each lock it needs (a minute at most where it sets no limit of its
+   own). Behind a long-running transaction, such as a web session's token refresh holding
+   its row for up to ten seconds while a migration changes the sign-in tables, the
+   migration fails, the server says so and exits, and it migrates again at its next start
+   (compose restarts it). Nothing is half-applied: each migration is one transaction, and
+   an index build it leaves unfinished is dropped and built again.
 7. Background work (maintenance today; mail sync and the AI pass as they land)
    runs inside the same container: the image runs `campbooks-server all`, the
    API plus the job worker. Jobs live in Postgres, so nothing is lost on restart. To run the
@@ -84,9 +91,12 @@ GRANT campbooks_definer TO <migration user>;
 `campbooks_definer` owns the database functions that run with their owner's
 rights (`SECURITY DEFINER`), so they never run as the migration login. It
 cannot log in, holds only the few table privileges those functions need, and
-must not be granted to the runtime login. The migrations create it when the
-migration user may create roles; otherwise they stop, naming the statements
-above, until an administrator has run them.
+must not be granted to the runtime login or to `campbooks_app`: the server
+refuses to start when the role it queries as holds it, and the migrations
+refuse a `campbooks_app` that does. The migration user must hold it with
+`INHERIT` (the default) so later migrations can replace those functions. The
+migrations create it when the migration user may create roles; otherwise they
+stop, naming the statements above, until an administrator has run them.
 
 Then set `CAMPBOOKS_DATABASE_URL=postgres://campbooks_runtime:<password>@host/db`
 (or omit the password and point `CAMPBOOKS_DATABASE_PASSWORD_FILE` at a file
@@ -95,13 +105,22 @@ managed services the "owner" is the user that created the database; do not
 reuse it as the runtime login.
 
 **Startup checks.** The server refuses to start (and says why) when the role
-it queries as is a superuser, has `BYPASSRLS`, is a member of such a role, or
-owns tables with row-level security; and, when a migration login is
-configured, when the runtime login could still switch to a privileged role.
-Only the old single-URL setup (a privileged login that `SET ROLE campbooks_app`)
-keeps working, with a warning to split the logins. If you cannot yet, set
-`CAMPBOOKS_DATABASE_ALLOW_RLS_BYPASS=true` to start anyway; workspace
-isolation then rests on the queries alone.
+it queries as is a superuser, has `BYPASSRLS`, is a member of such a role,
+owns tables with row-level security, or is a member of `campbooks_definer`;
+and, when a migration login is configured, when the runtime login could still
+switch to a privileged role. Only the old single-URL setup (a privileged login
+that `SET ROLE campbooks_app`) keeps working, with a warning to split the
+logins. If you cannot yet, set `CAMPBOOKS_DATABASE_ALLOW_RLS_BYPASS=true` to
+start anyway; workspace isolation then rests on the queries alone.
+
+**What the separation protects, and when.** With a dedicated runtime login
+(the bundled setup, and the one above), no request or job can read, reset or
+rewrite the rate-limit counters, the idempotency keys of another caller, or
+the web sign-in's tables (sessions and their sealed tokens): it reaches them
+only through the database functions. That holds against SQL running as the
+runtime role, injected or mistaken. In the single-URL setup, or when the
+server runs as the owner login, a query able to `RESET ROLE` gets the owner's
+rights back, and with them every table, as it escapes row-level security.
 
 ## Local AI
 

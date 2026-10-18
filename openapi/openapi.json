@@ -12041,7 +12041,8 @@
             "identity.authorization_code",
             "identity.refresh_token"
           ],
-          "risk": "low"
+          "risk": "low",
+          "secret_once": true
         }
       }
     }

@@ -98,7 +98,10 @@ and 8 784 hours (366 days); the server SHALL refuse to start otherwise,
 naming the setting. Its
 cookie value SHALL be replaced periodically, the previous value staying valid
 for a short grace period. Ended sessions SHALL be deleted by a scheduled job.
-A session whose tokens can no longer be decrypted SHALL end.
+A session whose tokens can no longer be decrypted SHALL end. A use SHALL be
+recorded only with an idle deadline after it: when the server's clock has
+passed the session's absolute end while the database's (behind it) still
+finds the session, the use is not recorded and the request goes on.
 
 #### Scenario: Idle session
 - **WHEN** a session has not been used for longer than the idle timeout
@@ -119,6 +122,10 @@ A session whose tokens can no longer be decrypted SHALL end.
 #### Scenario: An absolute timeout out of bounds
 - **WHEN** the server starts with `CAMPBOOKS_BFF__ABSOLUTE_TIMEOUT_HOURS` of 0 or 8 785
 - **THEN** it refuses to start, naming the setting, and starts with 8 784
+
+#### Scenario: The server's clock ahead of the database's
+- **WHEN** a session is found by the database's clock but its absolute end has passed by the server's
+- **THEN** the request is answered as usual, not as a server error, and the session ends by either clock soon after
 
 ### Requirement: Current session
 `GET /bff/session` SHALL answer 200 with `authenticated`, and when

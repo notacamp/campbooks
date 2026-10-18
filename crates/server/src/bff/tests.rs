@@ -779,6 +779,33 @@ async fn a_sign_in_keeps_the_scopes_it_started_with(db: PgPool) {
     );
 }
 
+/// A use is recorded at most every minute, never past the session's end,
+/// and not at all when this server's clock has passed the end the database
+/// still finds the session before (campbooks-cloud#213, item 9).
+#[test]
+fn a_use_is_recorded_only_with_a_later_deadline() {
+    use super::touch_until;
+    use chrono::{TimeDelta, Utc};
+
+    let now = Utc::now();
+    let idle = TimeDelta::hours(8);
+    let long = now + TimeDelta::days(30);
+    let earlier = now - TimeDelta::minutes(5);
+    assert_eq!(touch_until(now, earlier, idle, long), Some(now + idle));
+    assert_eq!(
+        touch_until(now, now - TimeDelta::seconds(10), idle, long),
+        None,
+        "not due yet"
+    );
+    let soon = now + TimeDelta::minutes(30);
+    assert_eq!(touch_until(now, earlier, idle, soon), Some(soon));
+    // Clock skew: the database's clock is behind, this server's has passed
+    // the end (or reached it exactly).
+    for end in [now - TimeDelta::seconds(2), now] {
+        assert_eq!(touch_until(now, earlier, idle, end), None);
+    }
+}
+
 #[test]
 fn asked_for_all_compares_sets() {
     use super::asked_for_all;

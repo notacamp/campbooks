@@ -274,12 +274,16 @@ builds that router with `kernel::operations::compose`.
 per-operation opt-out): the first request's response is stored in
 `kernel.idempotency` for 24 hours and replayed for an identical retry
 (`Idempotency-Replayed: true`); a different request with the same key is
-422, one still running is 409. Keys belong to the authenticated caller:
-row-level security admits a key only to a transaction naming its caller,
-which only the layer opens. Server errors and auth failures release the
-key. GET and HEAD ignore the header. An operation declaring
-`x-campbooks.secret_once` (its answer shows a secret once) has no answer
-stored: a replay of its key is 409 `idempotency_secret_shown_once`. The
+422, one still running is 409. Keys belong to the authenticated caller (a
+person through one app: the web app and each app acting for them keep
+separate keys): row-level security admits a key only to a transaction
+naming its caller, which only the layer opens. Server errors and auth
+failures release the key. GET and HEAD ignore the header. An operation
+declaring `x-campbooks.secret_once` (its answer shows a secret once) has no
+answer below 400 stored: a replay of its key is 409
+`idempotency_secret_shown_once`. `cargo xtask arch` requires the flag, or a
+listed reason, on any mutating operation answering a field named like a
+secret (`secret`, `token`, `ticket`, `password`, `*url`). The
 kernel's `kernel.prune_idempotency` schedule deletes expired keys hourly,
 in the kernel scope.
 

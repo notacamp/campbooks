@@ -1264,22 +1264,88 @@ mod tests {
         }
     }
 
-    /// Whether each table of the kernel's and the BFF's schemas is protected
-    /// from the runtime role (`$1`): row-level security enabled and forced
-    /// with a policy, or no privilege of any kind on the table or on any of
-    /// its columns (`has_table_privilege` does not see a column's grant).
+    /// Whether each table, view and materialized view of the kernel's and
+    /// the BFF's schemas is protected from the runtime role (`$1`): a table
+    /// with row-level security enabled and forced, a policy, and no
+    /// permissive policy for that role (or everyone) that admits every row
+    /// (`USING (true)`, `WITH CHECK (true)` or none); or no privilege of any
+    /// kind on the relation or on any of its columns (`has_table_privilege`
+    /// does not see a column's grant). Row-level security does not apply
+    /// through a view, so a view is protected by having no grant
+    /// (campbooks-cloud#213, item 7).
     const KERNEL_TABLES_PROTECTED: &str = "
         SELECT n.nspname || '.' || c.relname,
-               (c.relrowsecurity AND c.relforcerowsecurity
-                   AND EXISTS (SELECT 1 FROM pg_policy p WHERE p.polrelid = c.oid))
+               (c.relkind IN ('r', 'p') AND c.relrowsecurity AND c.relforcerowsecurity
+                   AND EXISTS (SELECT 1 FROM pg_policy p WHERE p.polrelid = c.oid)
+                   AND NOT EXISTS (
+                       SELECT 1 FROM pg_policy p
+                        WHERE p.polrelid = c.oid AND p.polpermissive
+                          AND (0 = ANY (p.polroles)
+                               OR EXISTS (SELECT 1 FROM unnest(p.polroles) AS r(oid)
+                                           WHERE r.oid <> 0
+                                             AND pg_has_role($1, r.oid, 'MEMBER')))
+                          AND coalesce(pg_get_expr(p.polqual, p.polrelid), 'true') = 'true'
+                          AND coalesce(pg_get_expr(p.polwithcheck, p.polrelid), 'true')
+                              = 'true'))
                OR NOT (has_table_privilege($1, c.oid,
                            'SELECT, INSERT, UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER')
                        OR has_any_column_privilege($1, c.oid,
                            'SELECT, INSERT, UPDATE, REFERENCES'))
           FROM pg_class c
           JOIN pg_namespace n ON n.oid = c.relnamespace
-         WHERE n.nspname IN ('kernel', 'bff') AND c.relkind IN ('r', 'p')
+         WHERE n.nspname IN ('kernel', 'bff') AND c.relkind IN ('r', 'p', 'v', 'm')
          ORDER BY 1";
+
+    /// A view the runtime role may read, and a policy admitting the runtime
+    /// role to every row, leave the kernel open; a policy for another role
+    /// or a restrictive one does not (campbooks-cloud#213, item 7).
+    #[sqlx::test(migrations = "../../migrations")]
+    async fn an_open_view_or_policy_leaves_the_kernel_open(db: sqlx::PgPool) {
+        let role = campbooks_kernel::db::DEFAULT_RUNTIME_ROLE;
+        let protected = |tables: &[(String, bool)], name: &str| {
+            tables
+                .iter()
+                .find(|(t, _)| t == name)
+                .map(|(_, protected)| *protected)
+        };
+        for statement in [
+            "CREATE VIEW kernel.peek AS SELECT principal FROM kernel.idempotency",
+            "CREATE MATERIALIZED VIEW kernel.peek_later AS SELECT 1 AS one",
+            "GRANT SELECT ON kernel.peek_later TO campbooks_app",
+            "CREATE POLICY only_for_the_definer ON kernel.idempotency TO campbooks_definer
+                 USING (true)",
+            "CREATE POLICY never_more ON kernel.idempotency AS RESTRICTIVE TO campbooks_app
+                 USING (true)",
+        ] {
+            sqlx::query(statement).execute(&db).await.unwrap();
+        }
+        let tables: Vec<(String, bool)> = sqlx::query_as(KERNEL_TABLES_PROTECTED)
+            .bind(role)
+            .fetch_all(&db)
+            .await
+            .unwrap();
+        assert_eq!(
+            protected(&tables, "kernel.peek"),
+            Some(true),
+            "no grant yet"
+        );
+        assert_eq!(protected(&tables, "kernel.peek_later"), Some(false));
+        assert_eq!(protected(&tables, "kernel.idempotency"), Some(true));
+
+        for statement in [
+            "GRANT SELECT ON kernel.peek TO campbooks_app",
+            "CREATE POLICY everyone ON kernel.idempotency FOR SELECT USING (true)",
+        ] {
+            sqlx::query(statement).execute(&db).await.unwrap();
+        }
+        let tables: Vec<(String, bool)> = sqlx::query_as(KERNEL_TABLES_PROTECTED)
+            .bind(role)
+            .fetch_all(&db)
+            .await
+            .unwrap();
+        assert_eq!(protected(&tables, "kernel.peek"), Some(false));
+        assert_eq!(protected(&tables, "kernel.idempotency"), Some(false));
+    }
 
     /// A grant on one column of a BFF table is a privilege the coverage
     /// test sees (campbooks-cloud#214, item 6).

@@ -365,6 +365,11 @@ async fn run(
         migrate(&config).await?;
     }
     let db = connect(&config).await?;
+    if !config.run_migrations {
+        let mut conn = db.acquire().await?;
+        check_server_version(&mut *conn).await?;
+        drop(conn);
+    }
     check_row_security(&db, &config).await?;
     telemetry.observe_pool(&db, config.database_max_connections);
 
@@ -516,12 +521,16 @@ async fn migrate(config: &Config) -> Result<(), String> {
     let mut conn = PgConnection::connect_with(&options)
         .await
         .map_err(|e| format!("could not connect to the database to migrate: {e}"))?;
+    check_server_version(&mut conn).await?;
     sqlx::query("SELECT pg_advisory_lock($1)")
         .bind(MIGRATION_LOCK)
         .execute(&mut conn)
         .await
         .map_err(|e| format!("could not take the migration lock: {e}"))?;
-    let migrated = migrate_locked(&mut conn).await;
+    let migrated = match limit_migration_waits(&mut conn).await {
+        Ok(()) => migrate_locked(&mut conn).await,
+        Err(e) => Err(e),
+    };
     // Closing the connection releases the lock too; unlock first anyway.
     let _ = sqlx::query("SELECT pg_advisory_unlock($1)")
         .bind(MIGRATION_LOCK)
@@ -531,6 +540,37 @@ async fn migrate(config: &Config) -> Result<(), String> {
     migrated?;
     tracing::info!("migrations applied");
     Ok(())
+}
+
+/// How long a migration statement waits for a lock (or, building an index
+/// concurrently, for older transactions to end) when the migration sets no
+/// limit of its own (campbooks-cloud#213, item 16). Behind a long-running
+/// transaction the migration then fails, saying so, and the server migrates
+/// again at its next start (a concurrent build left invalid is dropped
+/// first), instead of hanging at startup with every later statement queued
+/// behind it. Statements themselves have no time limit: an index build on a
+/// large table may take long.
+const MIGRATION_LOCK_TIMEOUT: &str = "60s";
+
+/// Set [`MIGRATION_LOCK_TIMEOUT`] on the migration connection, after the
+/// migration lock is taken (another process's long migration holds it, and
+/// waiting for that is right).
+async fn limit_migration_waits(conn: &mut PgConnection) -> Result<(), String> {
+    sqlx::query("SELECT set_config('lock_timeout', $1, false)")
+        .bind(MIGRATION_LOCK_TIMEOUT)
+        .execute(&mut *conn)
+        .await
+        .map(drop)
+        .map_err(|e| format!("could not limit the migrations' lock waits: {e}"))
+}
+
+/// Refuse a PostgreSQL older than Campbooks needs, before anything runs on
+/// it (campbooks-cloud#213, item 15).
+async fn check_server_version(conn: &mut PgConnection) -> Result<(), String> {
+    let version = db::server_version_num(conn)
+        .await
+        .map_err(|e| format!("could not read the PostgreSQL version: {e}"))?;
+    db::check_server_version(version).map_err(|why| format!("refusing to start: {why}"))
 }
 
 /// The session advisory lock every Campbooks process holds while it
@@ -985,6 +1025,24 @@ mod tests {
         migrate_locked(&mut conn).await.unwrap();
     }
 
+    /// The migration connection waits at most a minute for a lock where a
+    /// migration sets no limit, and the server is new enough
+    /// (campbooks-cloud#213, items 15 and 16).
+    #[sqlx::test(migrations = "../../migrations")]
+    async fn migrations_wait_for_locks_a_minute_at_most(db: PgPool) {
+        let mut conn = PgConnection::connect_with(&db.connect_options())
+            .await
+            .unwrap();
+        check_server_version(&mut conn).await.unwrap();
+        limit_migration_waits(&mut conn).await.unwrap();
+        let timeout: String = sqlx::query_scalar("SELECT current_setting('lock_timeout')")
+            .fetch_one(&mut conn)
+            .await
+            .unwrap();
+        assert_eq!(timeout, "1min");
+        migrate_locked(&mut conn).await.unwrap();
+    }
+
     #[test]
     fn every_migration_belongs_to_a_swept_schema() {
         for migration in sqlx::migrate!("../../migrations").iter() {
@@ -1032,6 +1090,40 @@ mod tests {
             .unwrap();
         login.close().await;
         testing::drop_runtime_login(&db).await;
+    }
+
+    /// A login that is a member of `campbooks_definer` could read the web
+    /// sign-in's sealed tokens directly: startup refuses it, split or not
+    /// (campbooks-cloud#213, item 8).
+    #[sqlx::test(migrations = "../../migrations")]
+    async fn startup_refuses_a_login_holding_the_definer_role(db: PgPool) {
+        use campbooks_kernel::testing;
+
+        // Not a member of the runtime role: a migration elsewhere in the
+        // cluster refusing a runtime login that holds the definer role never
+        // sees this one.
+        let name = testing::create_login(&db).await;
+        sqlx::query(sqlx::AssertSqlSafe(format!(
+            "GRANT campbooks_definer TO {name}"
+        )))
+        .execute(&db)
+        .await
+        .unwrap();
+        let login = testing::login_pool(&db, &name).await;
+        let report = db::inspect_role(&login).await.unwrap();
+        assert!(report.holds_definer_rights, "{report:?}");
+        for split in [true, false] {
+            let err = check_row_security(&login, &config(split, false))
+                .await
+                .unwrap_err();
+            assert!(err.contains("campbooks_definer"), "{err}");
+        }
+        login.close().await;
+        testing::drop_runtime_login(&db).await;
+
+        // The runtime role is no member of it.
+        let app = testing::app_role_pool(&db).await;
+        assert!(!db::inspect_role(&app).await.unwrap().holds_definer_rights);
     }
 
     #[sqlx::test(migrations = "../../migrations")]

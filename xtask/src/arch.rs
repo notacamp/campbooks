@@ -632,6 +632,161 @@ pub fn check_operations(spec: &serde_json::Value, owners: &Owners) -> Vec<String
     violations
 }
 
+/// A field name in an answer that looks like it may carry a secret: a
+/// secret, token, ticket or password, or a URL (a link may carry a ticket).
+static SECRET_LOOKING_FIELD: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r"(?:^|_)(?:secret|token|ticket|password)s?(?:$|_)|(?:^|_)url$")
+        .unwrap_or_else(|e| unreachable!("static regex compiles: {e}"))
+});
+
+/// Secret-looking fields in the answers of mutating operations that show no
+/// secret, each with the reason: `(operationId, field, reason)`. Every other
+/// such field needs its operation to declare `x-campbooks.secret_once`.
+pub const SECRET_LOOKING_ALLOWED: &[(&str, &str, &str)] = &[
+    (
+        "bff.logout",
+        "logout_url",
+        "the identity provider's end-session URL, which carries no credential",
+    ),
+    (
+        "identity.register",
+        "token_endpoint_auth_method",
+        "names how the app signs in to the token endpoint (`none`); no secret",
+    ),
+    ("conversations.create_draft", "content_token", CONTENT_TOKEN),
+    ("conversations.update_draft", "content_token", CONTENT_TOKEN),
+    ("conversations.cancel_send", "content_token", CONTENT_TOKEN),
+    ("conversations.send_draft", "content_token", CONTENT_TOKEN),
+    ("conversations.create_rule", "content_token", CONTENT_TOKEN),
+    ("conversations.update_rule", "content_token", CONTENT_TOKEN),
+    ("conversations.remove_rule", "content_token", CONTENT_TOKEN),
+    ("conversations.confirm_rule", "content_token", CONTENT_TOKEN),
+    ("conversations.decline_rule", "content_token", CONTENT_TOKEN),
+    ("conversations.restore_rule", "content_token", CONTENT_TOKEN),
+];
+
+const CONTENT_TOKEN: &str =
+    "a version tag of the content on screen, for conflict checks; not a credential";
+
+/// The idempotency layer stores the answers of mutating operations, unless
+/// they declare `x-campbooks.secret_once` (campbooks-cloud#213, item 4).
+/// Every field of a schema a mutating operation answers below 400 with is
+/// read (through `$ref`, `allOf`, `oneOf`, `anyOf`, `items` and
+/// `additionalProperties`): a secret-looking name needs `secret_once` or an
+/// entry in `allowed` with its reason. An entry naming a field no longer
+/// answered is stale and reported too.
+pub fn check_secret_answers(
+    spec: &serde_json::Value,
+    allowed: &[(&str, &str, &str)],
+) -> Vec<String> {
+    let mut violations = Vec::new();
+    let mut used = BTreeSet::new();
+    let schemas = spec.pointer("/components/schemas");
+    let Some(paths) = spec.get("paths").and_then(serde_json::Value::as_object) else {
+        return violations;
+    };
+    for item in paths.values() {
+        for method in OPERATION_METHODS {
+            let Some(operation) = item.get(method) else {
+                continue;
+            };
+            let meta = operation.get("x-campbooks");
+            let flag = |key| {
+                meta.and_then(|m| m.get(key))
+                    .and_then(serde_json::Value::as_bool)
+                    == Some(true)
+            };
+            if !flag("mutates") || flag("secret_once") {
+                continue;
+            }
+            let id = operation
+                .get("operationId")
+                .and_then(serde_json::Value::as_str)
+                .unwrap_or_default();
+            let mut fields = BTreeSet::new();
+            let responses = operation
+                .get("responses")
+                .and_then(serde_json::Value::as_object);
+            for (status, response) in responses.into_iter().flatten() {
+                if !status.starts_with(['1', '2', '3']) {
+                    continue;
+                }
+                let contents = response
+                    .get("content")
+                    .and_then(serde_json::Value::as_object);
+                for media in contents.into_iter().flatten().map(|(_, media)| media) {
+                    if let Some(schema) = media.get("schema") {
+                        field_names(schema, schemas, &mut BTreeSet::new(), &mut fields);
+                    }
+                }
+            }
+            for field in fields.iter().filter(|f| SECRET_LOOKING_FIELD.is_match(f)) {
+                if allowed.iter().any(|(op, f, _)| *op == id && f == field) {
+                    used.insert((id.to_owned(), field.clone()));
+                } else {
+                    violations.push(format!(
+                        "operation `{id}` answers `{field}`, which looks like a secret: \
+                         declare `x-campbooks.secret_once` (the idempotency layer then keeps \
+                         no copy), or list it in `SECRET_LOOKING_ALLOWED` with the reason it \
+                         is none"
+                    ));
+                }
+            }
+        }
+    }
+    for (op, field, _) in allowed {
+        if !used.contains(&((*op).to_owned(), (*field).to_owned())) {
+            violations.push(format!(
+                "`SECRET_LOOKING_ALLOWED` lists `{field}` of `{op}`, which no mutating \
+                 operation without `secret_once` answers any more: remove the entry"
+            ));
+        }
+    }
+    violations
+}
+
+/// The property names `schema` holds, at any depth.
+fn field_names(
+    schema: &serde_json::Value,
+    schemas: Option<&serde_json::Value>,
+    seen: &mut BTreeSet<String>,
+    names: &mut BTreeSet<String>,
+) {
+    if let Some(reference) = schema.get("$ref").and_then(serde_json::Value::as_str) {
+        let name = reference.rsplit('/').next().unwrap_or_default();
+        if seen.insert(name.to_owned())
+            && let Some(target) = schemas.and_then(|s| s.get(name))
+        {
+            field_names(target, schemas, seen, names);
+        }
+        return;
+    }
+    for key in ["allOf", "oneOf", "anyOf"] {
+        for part in schema
+            .get(key)
+            .and_then(serde_json::Value::as_array)
+            .into_iter()
+            .flatten()
+        {
+            field_names(part, schemas, seen, names);
+        }
+    }
+    if let Some(properties) = schema
+        .get("properties")
+        .and_then(serde_json::Value::as_object)
+    {
+        for (name, property) in properties {
+            names.insert(name.clone());
+            field_names(property, schemas, seen, names);
+        }
+    }
+    for key in ["items", "additionalProperties"] {
+        if let Some(inner) = schema.get(key).filter(|inner| inner.is_object()) {
+            field_names(inner, schemas, seen, names);
+        }
+    }
+}
+
 /// The parts of `x-campbooks` the cross-operation checks need.
 struct Meta {
     mutates: bool,
@@ -1968,6 +2123,81 @@ mod tests {
             v.iter()
                 .any(|m| m.contains("`POST /f`: `x-campbooks.secret_once` must be a boolean"))
         );
+    }
+
+    #[test]
+    fn a_secret_looking_answer_needs_secret_once_or_a_reason() {
+        let mut issues = meta(true);
+        issues["secret_once"] = serde_json::json!(true);
+        let spec = serde_json::json!({
+            "paths": {
+                "/leak": { "post": {
+                    "operationId": "mail.leak", "x-campbooks": meta(true),
+                    "responses": {
+                        "201": { "content": { "application/json": {
+                            "schema": { "$ref": "#/components/schemas/Leak" } } } },
+                        "303": { "content": { "application/json": { "schema": {
+                            "type": "object",
+                            "properties": { "accept_url": { "type": "string" } } } } } },
+                        "400": { "content": { "application/json": { "schema": {
+                            "type": "object",
+                            "properties": { "password": { "type": "string" } } } } } }
+                    } } },
+                "/issue": { "post": {
+                    "operationId": "mail.issue", "x-campbooks": issues,
+                    "responses": { "201": { "content": { "application/json": {
+                        "schema": { "$ref": "#/components/schemas/Leak" } } } } } } },
+                "/read": { "get": {
+                    "operationId": "mail.read", "x-campbooks": meta(false),
+                    "responses": { "200": { "content": { "application/json": {
+                        "schema": { "$ref": "#/components/schemas/Leak" } } } } } } },
+                "/tagged": { "post": {
+                    "operationId": "mail.tagged", "x-campbooks": meta(true),
+                    "responses": { "200": { "content": { "application/json": { "schema": {
+                        "type": "object",
+                        "properties": { "content_token": { "type": "string" } } } } } } } } }
+            },
+            "components": { "schemas": {
+                "Leak": { "allOf": [ { "$ref": "#/components/schemas/Inner" },
+                    { "type": "object", "properties": {
+                        "tokens": { "type": "array", "items": { "type": "object",
+                            "properties": { "refresh_token": { "type": "string" } } } } } } ] },
+                "Inner": { "type": "object", "properties": {
+                    "client_secret": { "type": "string" },
+                    "secretary": { "type": "string" },
+                    "tokenizer": { "type": "string" },
+                    "next": { "$ref": "#/components/schemas/Leak" } } }
+            } }
+        });
+        let allowed = [
+            ("mail.tagged", "content_token", "a version tag"),
+            ("mail.gone", "content_token", "stale"),
+        ];
+        let v = check_secret_answers(&spec, &allowed);
+        assert_eq!(v.len(), 5, "{v:#?}");
+        for field in ["client_secret", "tokens", "refresh_token", "accept_url"] {
+            assert!(
+                v.iter()
+                    .any(|m| m.contains(&format!("`mail.leak` answers `{field}`"))),
+                "{field}: {v:#?}"
+            );
+        }
+        assert!(
+            v.iter()
+                .any(|m| m.contains("lists `content_token` of `mail.gone`"))
+        );
+        // An error answer, a read, `secret_once`, a listed field and names
+        // that only start like a secret are not reported.
+        for quiet in [
+            "password",
+            "mail.issue",
+            "mail.read",
+            "mail.tagged",
+            "secretary",
+            "tokenizer",
+        ] {
+            assert!(!v.iter().any(|m| m.contains(quiet)), "{quiet}: {v:#?}");
+        }
     }
 
     #[test]

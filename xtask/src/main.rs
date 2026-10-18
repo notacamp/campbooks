@@ -268,6 +268,10 @@ fn run_arch(root: &Path) -> Result<String> {
     violations.extend(arch::check_operation_security(&spec, schemes, &catalogue));
     let owners = operation_owners()?;
     violations.extend(arch::check_operations(&spec, &owners));
+    violations.extend(arch::check_secret_answers(
+        &spec,
+        arch::SECRET_LOOKING_ALLOWED,
+    ));
     violations.extend(check_admin(root, &spec, &owners)?);
     violations.extend(check_access(root, &spec, &arch_file, &migration_sql)?);
 

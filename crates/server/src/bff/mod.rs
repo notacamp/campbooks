@@ -460,8 +460,12 @@ impl Inner {
             self.retire(&token_hash).await?;
             return Ok(None);
         }
-        if now - session.last_seen_at >= TOUCH_EVERY {
-            let idle_until = (now + self.timeouts.idle).min(session.expires_at);
+        if let Some(idle_until) = touch_until(
+            now,
+            session.last_seen_at,
+            self.timeouts.idle,
+            session.expires_at,
+        ) {
             store::touch(&self.db, &token_hash, now, idle_until).await?;
         }
         if session.current && now - session.rotated_at >= self.timeouts.rotate {
@@ -668,6 +672,23 @@ impl Inner {
 /// default when it gives none.
 fn expires_in(seconds: Option<u64>) -> TimeDelta {
     TimeDelta::seconds(seconds.and_then(|s| i64::try_from(s).ok()).unwrap_or(300))
+}
+
+/// The idle deadline to record a use at `now` with, when one is due: at
+/// most every [`TOUCH_EVERY`], `idle` after the use and never past the
+/// session's absolute end. `None` too when that end is not after `now`: the
+/// database (by its own clock) still found the session, but this server's
+/// clock is ahead of it, and `bff.touch_session` refuses a deadline that is
+/// not after the use (campbooks-cloud#213, item 9). The session ends on
+/// either clock soon enough; the request goes on.
+fn touch_until(
+    now: DateTime<Utc>,
+    last_seen_at: DateTime<Utc>,
+    idle: TimeDelta,
+    expires_at: DateTime<Utc>,
+) -> Option<DateTime<Utc>> {
+    let idle_until = (now + idle).min(expires_at);
+    (now - last_seen_at >= TOUCH_EVERY && now < idle_until).then_some(idle_until)
 }
 
 /// Whether a session that asked for `had` at sign-in asked for every scope in
