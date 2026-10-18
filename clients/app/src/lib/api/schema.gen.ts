@@ -3301,6 +3301,13 @@ export interface components {
             has_html: boolean;
             /** @description The message. */
             id: components["schemas"]["MessageId"];
+            /**
+             * @description `text` holds only the first part of its words (its HTML was cut at
+             *     256 KiB, or the words at their limit): a reply or forward quoting it
+             *     says so. The reader's own `truncated` stays about the text part
+             *     (campbooks-cloud#255).
+             */
+            quote_cut?: boolean;
             /** @description Read. */
             read: boolean;
             /** @description Where replies go, when not to the sender. */

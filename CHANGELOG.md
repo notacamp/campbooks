@@ -217,6 +217,11 @@ All notable changes to Campbooks Next are documented here. The format follows
   second encoding.** A subject or body holding `;` once decoded, or still holding an escape
   such as `%0D` (it was encoded twice), is left out of what reaches your mail app; a
   percent sign that is text, as in "50% off", stays.
+- **A long email's quote says it holds only the first part.** Replying to or forwarding an
+  email that came as long HTML (over 256 KiB) quoted only its beginning without a word;
+  the composer now says "This email is long: the quote holds its first part.", and the
+  reply dialog says so too. When the dialog's preview shows only the start of a quote, it
+  says the reply quotes all of it.
 
 ### Added
 

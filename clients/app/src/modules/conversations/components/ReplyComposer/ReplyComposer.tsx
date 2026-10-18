@@ -115,7 +115,10 @@ export function ReplyComposer({
   // the composer says the quote holds its first part.
   const quotedMessage = messages.find((m) => m.id === draft?.message_id);
   const quotedWords = useMessageWords(workspaceId, conversation.id, quotedMessage);
-  const quoteCut = quotedMessage?.text?.truncated === true || quotedWords.data?.truncated === true;
+  const quoteCut =
+    quotedMessage?.quote_cut === true ||
+    quotedMessage?.text?.truncated === true ||
+    quotedWords.data?.truncated === true;
 
   if (failed !== false) {
     return (
