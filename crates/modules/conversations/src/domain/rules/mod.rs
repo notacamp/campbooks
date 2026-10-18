@@ -37,7 +37,7 @@ pub use exceptions::{RuleException, RuleMark, Undone, attach, except, recent_exc
 pub use facts::{
     Candidate, TEMPLATE_PAGE, candidate, corresponds, fill_templates, scan, templates_missing,
 };
-pub use images::images_trusted;
+pub use images::{Images, ImagesHeld, images};
 
 use crate::model::{
     ConversationId, InboxId, InboxRole, LabelId, PausedReason, RuleId, RuleOrigin, RuleState,
@@ -349,6 +349,47 @@ pub async fn sender_seen(
     .fetch_one(conn)
     .await?;
     if seen { Ok(()) } else { Err(invalid()) }
+}
+
+/// 409 `images_already_trusted` when a rule of `inbox` (not removed, other
+/// than `this`) already shows the images of the sender a new image rule
+/// names: the same address, or a domain that covers it (campbooks-cloud#235).
+/// Any other rule passes.
+pub async fn not_trusted_yet(
+    conn: &mut PgConnection,
+    inbox: InboxId,
+    conditions: &[RuleCondition],
+    actions: &[RuleAction],
+    this: Option<RuleId>,
+) -> Result<()> {
+    if !actions.contains(&RuleAction::ShowImages) {
+        return Ok(());
+    }
+    let existing: Vec<Stored> = of_inboxes(conn, &[inbox])
+        .await?
+        .into_iter()
+        .filter(|r| Some(r.id) != this && r.actions.contains(&RuleAction::ShowImages))
+        .collect();
+    let covers = |rule: &Stored| match conditions {
+        [RuleCondition::SenderAddress(address)] => rule.engine().matches(&taught::Facts {
+            sender_address: address,
+            ..taught::Facts::default()
+        }),
+        [RuleCondition::SenderDomain(domain)] => rule.conditions.iter().any(|c| match c {
+            RuleCondition::SenderDomain(theirs) => {
+                let (domain, theirs) = (domain.to_lowercase(), theirs.to_lowercase());
+                domain == theirs || domain.ends_with(&format!(".{theirs}"))
+            }
+            _ => false,
+        }),
+        _ => false,
+    };
+    if existing.iter().any(covers) {
+        return Err(Error::Conflict(
+            crate::MESSAGES.reason("images_already_trusted"),
+        ));
+    }
+    Ok(())
 }
 
 /// The sum of the conditions' weights.

@@ -678,6 +678,7 @@ pub async fn create_in(
 ) -> Result<CreatedRule> {
     rules::labels_of_inbox(tx, inbox, &body.conditions, &body.actions).await?;
     rules::sender_seen(tx, inbox, &body.conditions, &body.actions).await?;
+    rules::not_trusted_yet(tx, inbox, &body.conditions, &body.actions, None).await?;
     if let Some(notice) = body.notice_id {
         rule_notices::check_open(tx, notice, inbox).await?;
     }
@@ -1074,6 +1075,7 @@ pub async fn update(
     // Pausing or resuming changes no sender: only a new shape is checked.
     if reshaped {
         rules::sender_seen(&mut tx, rule.inbox, &conditions, &actions).await?;
+        rules::not_trusted_yet(&mut tx, rule.inbox, &conditions, &actions, Some(rule.id)).await?;
     }
     let next_state = match body.paused {
         Some(true) => RuleState::Paused,

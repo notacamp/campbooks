@@ -627,3 +627,68 @@ fn images_show_only_for_an_authenticated_trusted_sender() {
     // It changes nothing on arrival.
     assert!(evaluate(&rules[..2], &mail("news@brightloop.example")).is_empty());
 }
+
+#[test]
+fn a_lookalike_or_suffix_domain_is_never_trusted() {
+    let rules = [rule(
+        "domain",
+        vec![Condition::SenderDomain("paperkite.example".into())],
+        vec![Action::ShowImages],
+        1,
+    )];
+    for sender in [
+        "news@paperkite.example.evil",
+        "news@evilpaperkite.example",
+        "news@paperkite-example.com",
+        "news@paperkite.examples",
+    ] {
+        assert_eq!(
+            shows_images(&rules, &facts(sender, "This week", None), true),
+            None,
+            "{sender}"
+        );
+    }
+    assert_eq!(
+        shows_images(
+            &rules,
+            &facts("news@mail.paperkite.example", "This week", None),
+            true
+        ),
+        Some("domain")
+    );
+}
+
+#[test]
+fn a_free_mail_domain_is_refused_by_its_registrable_domain() {
+    for domain in [
+        "mail.yahoo.fr",
+        "qq.com",
+        "163.com",
+        "naver.com",
+        "yahoo.co.jp",
+        "outlook.de",
+        "hotmail.com.br",
+        "libero.it",
+        "wp.pl",
+        "seznam.cz",
+        "skynet.be",
+        "telenet.be",
+        "btinternet.com",
+        "comcast.net",
+        "iol.pt",
+    ] {
+        assert!(is_free_mail(domain), "{domain}");
+        assert_eq!(
+            TaughtRule::validate(
+                &[Condition::SenderDomain(domain.into())],
+                &[Action::ShowImages]
+            ),
+            Err(Invalid::FreeMailDomain),
+            "{domain}"
+        );
+    }
+    // A provider's name inside another domain is not the provider.
+    for domain in ["notqq.com", "qq.com.example", "brightloop.example"] {
+        assert!(!is_free_mail(domain), "{domain}");
+    }
+}
