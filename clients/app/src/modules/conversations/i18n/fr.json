@@ -785,5 +785,44 @@
     "searchFailed": "Impossible de chercher pour le moment. Réessayez.",
     "nobody": "Personne ne vous a encore écrit.",
     "quoteFailed": "Impossible de lire l’e-mail pour le citer : rien n’a été envoyé. Réessayez."
+  },
+  "personNotes": {
+    "line": {
+      "tell": "Parler de {{name}} à Scout",
+      "knows": "Scout sait : {{note}}",
+      "edit": "Modifier",
+      "editLabel": "Modifier ce que Scout sait de {{name}}",
+      "rewrite": "Réécrire avec ceci",
+      "saved": "Enregistré. Désormais, Scout écrit ainsi à {{name}}."
+    },
+    "form": {
+      "label": "À propos de {{name}}, et comment lui écrire",
+      "placeholder": "p. ex. Mon propriétaire. Formel, en portugais.",
+      "left_one": "Encore {{n}} caractère",
+      "left_other": "Encore {{n}} caractères",
+      "save": "Enregistrer",
+      "cancel": "Annuler",
+      "forget": "Oublier ceci",
+      "failed": "Scout n’a pas pu garder cette note. Réessayez.",
+      "full": "Vous avez déjà 500 notes sur des personnes. Retirez-en une dans la mémoire de Scout d’abord.",
+      "invalid": "Écrivez entre 1 et 500 caractères sur cette personne."
+    },
+    "toast": {
+      "saved": "Scout sait maintenant qui est {{name}}",
+      "forgotten": "Scout a oublié ce que vous avez dit de {{name}}",
+      "failed": "Campbooks n’a pas pu modifier cette note. Rien n’a changé."
+    },
+    "list": {
+      "label": "Les personnes dont vous avez parlé à Scout",
+      "emptyTitle": "Personne pour l’instant",
+      "empty": "Quand vous répondez à quelqu’un, vous pouvez dire à Scout qui est cette personne et comment lui écrire.",
+      "failed": "Impossible de charger ce que vous avez dit à Scout sur des personnes",
+      "retry": "Réessayer",
+      "edit": "Modifier",
+      "editLabel": "Modifier ce que Scout sait de {{name}}",
+      "remove": "Retirer",
+      "removeLabel": "Retirer ce que Scout sait de {{name}}",
+      "saved": "Enregistré"
+    }
   }
 }

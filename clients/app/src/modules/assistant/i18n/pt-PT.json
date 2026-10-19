@@ -243,7 +243,9 @@
       "proactivity": "Quando o Scout tem a certeza"
     },
     "rules": "As suas regras",
-    "rulesDescription": "Tudo o que o Scout faz sozinho. Se remover uma regra, ela deixa de atuar; é você que escolhe se os emails que ela moveu voltam ao sítio."
+    "rulesDescription": "Tudo o que o Scout faz sozinho. Se remover uma regra, ela deixa de atuar; é você que escolhe se os emails que ela moveu voltam ao sítio.",
+    "people": "Pessoas de quem falou ao Scout",
+    "peopleDescription": "Quem são e como o Scout lhes escreve, por palavras suas. Só você vê estas notas, e só as suas respostas as usam."
   },
   "shortcuts": {
     "skip": "Saltar esta pergunta",

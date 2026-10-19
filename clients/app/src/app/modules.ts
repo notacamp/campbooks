@@ -14,6 +14,7 @@ import {
   buildConversationsRoutes,
   COMPOSE_SHORTCUTS,
   CONVERSATIONS_SHORTCUTS,
+  PersonNotesList,
   RulesList,
 } from "~/modules/conversations";
 import {
@@ -62,8 +63,14 @@ export function buildModuleRoutes<
   // After a workspace is created, `identity` offers the mailbox held since sign-up.
   const workspaces = buildWorkspacesRoutes({ root, workspace, afterCreate: MailboxStep });
   const identity = buildIdentityRoutes({ public: parents.public, workspace });
-  // Scout's questions and memory, whose rules list is the conversations module's.
-  const assistant = buildAssistantRoutes({ root, workspace, rules: RulesList });
+  // Scout's questions and memory, whose rules list and notes about people
+  // are the conversations module's.
+  const assistant = buildAssistantRoutes({
+    root,
+    workspace,
+    rules: RulesList,
+    people: PersonNotesList,
+  });
   return {
     // Signed in or not: signing in, creating an account.
     public: [...identity.public],
