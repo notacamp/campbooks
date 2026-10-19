@@ -76,7 +76,9 @@ CONTRIBUTING.md → Screen recordings).
 
 ## 6. Pull request
 
-- `CHANGELOG.md` → `[Unreleased]` for anything users or self-hosters notice.
+- A changelog entry file for anything users or self-hosters notice:
+  `.github/scripts/changelog.sh new <kind> <issue>-<slug>` (`changelog/README.md`).
+  Never edit `CHANGELOG.md` (only a release writes it).
 - Signed commits; if `next` moved, `git merge origin/next` (never rebase or
   force-push, `docs/parallel-work.md`).
 - Push, then open the PR into `next` with a Conventional Commit title. Body:
