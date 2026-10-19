@@ -801,6 +801,37 @@ export function staleAskDemos(me: string): DemoMessage[] {
   ];
 }
 
+/**
+ * Waits and nudges (campbooks-cloud#293), for `--waits`: João Matos asks
+ * Ana Costa, copying the mailbox, to send the revised floor plan, eight days
+ * before the mailbox is made (so Scout's clock has already turned the wait
+ * into a nudge); and Rui Matos promises the signed contract by Friday (a
+ * wait Scout checks then). `POST /fake/deliver?reply=ana` is Ana writing
+ * back.
+ */
+export function waitDemos(me: string): DemoMessage[] {
+  return [
+    {
+      from: "João Matos <joao@obras-matos.example>",
+      to: "Ana Costa <ana@costa-arquitetos.example>",
+      cc: me,
+      subject: "Revised floor plan",
+      hoursAgo: 8 * 24,
+      labels: ["INBOX", "CATEGORY_PERSONAL"],
+      thread: "ana",
+      text: "Ana,\n\nCould you send Sam the revised floor plan directly, with the kitchen on the north wall? Sam would like it before Thursday’s visit.\n\nThanks,\nJoão",
+    },
+    {
+      from: "Rui Matos <rui@matos-carpintaria.example>",
+      to: me,
+      subject: "Signed contract for the kitchen units",
+      hoursAgo: 20,
+      labels: ["INBOX", "CATEGORY_PERSONAL"],
+      text: "Hi Sam,\n\nThanks for confirming the measurements. I’ll send the signed contract by Friday, and we can book the fitting after that.\n\nRui",
+    },
+  ];
+}
+
 /** A new demo mailbox for `address`, with `more` messages on top of the demo. */
 export function createMailbox(
   address: string,
@@ -857,6 +888,25 @@ export function createMailbox(
  */
 export function deliverDemo(mailbox: Mailbox, reply?: string): StoredMessage {
   const date = new Date();
+  // Ana writes back (`--waits`), in a thread of her own: any email from the
+  // person Scout waits on ends the wait.
+  if (reply === "ana") {
+    const raw = rfc822(
+      {
+        from: "Ana Costa <ana@costa-arquitetos.example>",
+        to: mailbox.address,
+        subject: "Floor plan, kitchen on the north wall",
+        hoursAgo: 0,
+        labels: [],
+        text: "Hi Sam,\n\nHere is the revised floor plan, with the kitchen on the north wall. See you on Thursday.\n\nAna",
+      },
+      date,
+      `<${hex(6)}@demo.example>`,
+    );
+    return appendMessage(mailbox, raw, ["INBOX", "UNREAD", "CATEGORY_PERSONAL"], {
+      internalDate: date.getTime(),
+    });
+  }
   const thread = reply === undefined ? undefined : mailbox.threads?.get(reply);
   if (thread !== undefined) {
     const raw = rfc822(
