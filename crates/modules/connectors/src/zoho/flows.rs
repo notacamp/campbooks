@@ -1331,3 +1331,120 @@ async fn mail_from_before_the_first_sync_is_never_new_mail(db: PgPool) {
             .all(|b| b.get("backfill").is_none())
     );
 }
+
+/// The labels (keys) of the newest upsert of `id` since the `from`th change,
+/// if there is one.
+async fn labels_since(kit: &Kit, ws: WorkspaceId, from: usize, id: &str) -> Option<Value> {
+    upsert_of(&changes(kit, ws).await[from..], id)
+        .last()
+        .map(|c| c["message"]["labels"].clone())
+}
+
+/// A message carrying `Clients` (indexed with it), and the label's id.
+async fn labelled_mailbox(kit: &Kit, count: usize) -> (Connected, Vec<String>, String) {
+    let clients = kit.zoho.add_label("Clients");
+    let ids: Vec<String> = (0..count)
+        .map(|n| {
+            let id = kit.zoho.deliver(
+                &synthetic(n),
+                INBOX,
+                true,
+                kit.clock.now() - TimeDelta::hours(i64::try_from(n).unwrap() + 1),
+            );
+            kit.zoho.change(&id, |m| m.labels.push(clients.clone()));
+            id
+        })
+        .collect();
+    let mailbox = connected(kit).await;
+    let all = changes(kit, mailbox.ws).await;
+    for id in &ids {
+        assert_eq!(
+            upsert_of(&all, id).last().unwrap()["message"]["labels"],
+            json!([{"key": clients.clone(), "name": "Clients"}])
+        );
+    }
+    (mailbox, ids, clients)
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_label_listing_zoho_fails_takes_nothing_off(db: PgPool) {
+    let kit = Kit::new(db).await;
+    let (mailbox, ids, clients) = labelled_mailbox(&kit, 1).await;
+    // The label is still listed, but its messages answer 404.
+    kit.zoho.fail_label_listing(&clients);
+    let from = changes(&kit, mailbox.ws).await.len();
+    sweep(&kit).await;
+    assert_eq!(labels_since(&kit, mailbox.ws, from, &ids[0]).await, None);
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_label_deleted_in_zoho_comes_off(db: PgPool) {
+    let kit = Kit::new(db).await;
+    let (mailbox, ids, clients) = labelled_mailbox(&kit, 1).await;
+    kit.zoho.delete_label(&clients);
+    let from = changes(&kit, mailbox.ws).await.len();
+    sweep(&kit).await;
+    assert_eq!(
+        labels_since(&kit, mailbox.ws, from, &ids[0]).await,
+        Some(json!([]))
+    );
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_listing_that_would_strip_too_many_takes_nothing_off(db: PgPool) {
+    let kit = Kit::new(db).await;
+    let (mailbox, ids, _) = labelled_mailbox(&kit, 6).await;
+    // Every one loses the label at once: more than a fifth, five or more.
+    for id in &ids {
+        kit.zoho.change(id, |m| m.labels.clear());
+    }
+    let from = changes(&kit, mailbox.ws).await.len();
+    sweep(&kit).await;
+    for id in &ids {
+        assert_eq!(labels_since(&kit, mailbox.ws, from, id).await, None, "{id}");
+    }
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn one_message_losing_a_label_is_believed(db: PgPool) {
+    let kit = Kit::new(db).await;
+    let (mailbox, ids, _) = labelled_mailbox(&kit, 6).await;
+    kit.zoho.change(&ids[0], |m| m.labels.clear());
+    let from = changes(&kit, mailbox.ws).await.len();
+    sweep(&kit).await;
+    assert_eq!(
+        labels_since(&kit, mailbox.ws, from, &ids[0]).await,
+        Some(json!([]))
+    );
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_mark_just_written_is_not_taken_off_by_the_sweep(db: PgPool) {
+    let kit = Kit::new(db).await;
+    let message = kit.zoho.deliver(
+        &synthetic(1),
+        INBOX,
+        true,
+        kit.clock.now() - TimeDelta::hours(1),
+    );
+    let mailbox = connected(&kit).await;
+    mailbox
+        .request(
+            &kit,
+            &[(
+                message.as_str(),
+                json!({"kind": "move_to_stream", "stream": "receipts"}),
+            )],
+        )
+        .await;
+    // Zoho's label listing has not caught up with the write.
+    kit.zoho.hide_from_label_listings(&message);
+    let from = changes(&kit, mailbox.ws).await.len();
+    sweep(&kit).await;
+    assert!(
+        streams_of(&kit, mailbox.ws, from, &message)
+            .await
+            .is_empty(),
+        "the mark stays as written"
+    );
+}

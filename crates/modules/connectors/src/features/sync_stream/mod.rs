@@ -361,11 +361,16 @@ impl SyncStream {
         };
         if !reported.is_empty() {
             let names = gmail_names(ctx, workspace, target.stream).await?;
+            let reporting = Reporting {
+                ids: &reported,
+                marks: MarkIds::from_labels(names.iter().map(|(id, n)| (id.as_str(), n.as_str()))),
+                label: str::to_owned,
+            };
             report(
                 ctx,
                 workspace,
                 target.stream,
-                &reported,
+                &reporting,
                 &mut page.changes,
                 |labels| gmail::normalize::flags(labels, &names),
             )
@@ -431,8 +436,10 @@ impl SyncStream {
         } else {
             Vec::new()
         };
+        // Label reads are reserved as expected and settled as made.
+        let label_calls = zoho::read::label_requests(target.labels_granted, target.phase, &rows);
         let cost = zoho::read::requests_per_run(cursor.folders.len())
-            + zoho::read::label_requests(target.labels_granted, target.phase, &rows)
+            + label_calls
             + zoho::write::requests(Self::messages(backlog));
         let key = schedule::connection_budget(target.connection);
         let rate = Rate::per_minute(config.requests_per_minute);
@@ -492,13 +499,29 @@ impl SyncStream {
             }
             Err(other) => return Err(JobError::retry(other.to_string())),
         };
+        if let Some(cache) = labels.as_ref()
+            && let Err(err) =
+                schedule::settle(ctx.pool(), &key, label_calls, cache.calls(), rate).await
+        {
+            tracing::warn!(
+                %workspace,
+                stream = %target.stream,
+                error = %campbooks_kernel::redact::error(&err),
+                "could not settle the Zoho budget for label reads"
+            );
+        }
         if let Some(cache) = labels.as_ref().filter(|_| !reported.is_empty()) {
             let names = cache.names();
+            let reporting = Reporting {
+                ids: &reported,
+                marks: MarkIds::from_labels(names.iter().map(|(id, n)| (id.as_str(), n.as_str()))),
+                label: zoho::state::label_token,
+            };
             report(
                 ctx,
                 workspace,
                 target.stream,
-                &reported,
+                &reporting,
                 &mut page.changes,
                 |tokens| zoho::state::flags_with(tokens, &names),
             )
@@ -1009,16 +1032,29 @@ fn stream_changed(
         .collect()
 }
 
-/// Report once, from the index, where the messages `ids` are now that a
-/// write changed their provider stream (no download, no provider call), so
-/// the conversations module stores it; a message the page carries already
-/// is not repeated. `flags` reads a message's state from its index labels.
-/// A message whose stored document cannot be read is left out (logged).
+/// The messages a run reports ([`report`]), and how the provider names
+/// the stream marks of their pending changes.
+struct Reporting<'a> {
+    /// The messages.
+    ids: &'a [String],
+    /// The stream marks the provider has.
+    marks: MarkIds,
+    /// A label's token from its id.
+    label: fn(&str) -> String,
+}
+
+/// Report once, from the index, where the messages of `reporting` are now
+/// that a write changed their provider stream (no download, no provider
+/// call), so the conversations module stores it; a message the page carries
+/// already is not repeated. A member's change still waiting to be made
+/// shows as they left it, as in every emission. `flags` reads a message's
+/// state from its labels. A message whose stored document cannot be read
+/// is left out (logged).
 async fn report(
     ctx: &JobContext,
     workspace: WorkspaceId,
     stream: StreamId,
-    ids: &[String],
+    reporting: &Reporting<'_>,
     changes: &mut Vec<MessageChange>,
     flags: impl Fn(&[String]) -> crate::mail::Flags,
 ) -> Result<(), JobError> {
@@ -1029,7 +1065,8 @@ async fn report(
             MessageChange::Remove { .. } => None,
         })
         .collect();
-    let ids: Vec<&str> = ids
+    let ids: Vec<&str> = reporting
+        .ids
         .iter()
         .map(String::as_str)
         .filter(|id| !carried.contains(id))
@@ -1049,9 +1086,22 @@ async fn report(
     .fetch_all(&mut *tx)
     .await?;
     tx.commit().await?;
+    let pending: Vec<String> = rows.iter().map(|(id, ..)| id.clone()).collect();
+    let overlay = outbound::overlay(ctx.pool(), workspace, stream, &pending).await?;
     let key = workspace.to_string();
     let blobs = &ctx.state().blobs;
-    for (_, labels, hash, size) in rows {
+    for (id, labels, hash, size) in rows {
+        let labels = overlay.get(&id).map_or_else(
+            || labels.clone(),
+            |changes| {
+                let changes = crate::domain::marks::resolve_changes(
+                    changes,
+                    &reporting.marks,
+                    reporting.label,
+                );
+                outbound::apply_labels(&labels, &changes)
+            },
+        );
         let document = match crate::mail::document_ref(&hash, size) {
             Ok(blob) => crate::mail::document(blobs, &key, &blob).await,
             Err(err) => Err(err),

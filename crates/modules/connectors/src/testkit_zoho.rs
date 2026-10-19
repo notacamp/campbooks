@@ -90,6 +90,10 @@ struct State {
     failing: Vec<String>,
     /// The labels API refuses the grant (no labels scope).
     labels_refused: bool,
+    /// Labels whose `labelid` listing answers 404.
+    unlisted_labels: Vec<String>,
+    /// Messages `labelid` listings leave out (a listing that lags behind).
+    hidden_from_labels: Vec<String>,
 }
 
 /// Folder ids of every fake account: Inbox, Drafts, Sent, Spam, Trash,
@@ -137,6 +141,8 @@ impl FakeZoho {
             trash_hidden: false,
             failing: Vec::new(),
             labels_refused: false,
+            unlisted_labels: Vec::new(),
+            hidden_from_labels: Vec::new(),
         }));
         Mock::given(any())
             .respond_with(Responder(state.clone()))
@@ -328,6 +334,29 @@ impl FakeZoho {
         state.failing.retain(|f| f != id);
         if failing {
             state.failing.push(id.to_owned());
+        }
+    }
+
+    /// Listing label `id`'s messages answers 404, while the label is still
+    /// listed.
+    pub fn fail_label_listing(&self, id: &str) {
+        self.lock().unlisted_labels.push(id.to_owned());
+    }
+
+    /// `labelid` listings leave message `id` out.
+    pub fn hide_from_label_listings(&self, id: &str) {
+        self.lock().hidden_from_labels.push(id.to_owned());
+    }
+
+    /// The member deletes label `id` in Zoho: gone from the labels and
+    /// from every message.
+    pub fn delete_label(&self, id: &str) {
+        let mut state = self.lock();
+        for account in &mut state.accounts {
+            account.labels.retain(|(label, _)| label != id);
+            for message in account.messages.values_mut() {
+                message.labels.retain(|label| label != id);
+            }
         }
     }
 
@@ -633,6 +662,13 @@ fn mail(
         // listed with `labelid`, in every folder.
         ("GET", ["messages", "view"]) if query.contains_key("labelid") => {
             let label = query.get("labelid").cloned().unwrap_or_default();
+            let known = state.accounts[index]
+                .labels
+                .iter()
+                .any(|(id, _)| *id == label);
+            if !known || state.unlisted_labels.contains(&label) {
+                return error(404, "LABEL_NOT_FOUND");
+            }
             let start: usize = query.get("start").and_then(|s| s.parse().ok()).unwrap_or(1);
             let limit: usize = query
                 .get("limit")
@@ -643,6 +679,7 @@ fn mail(
                 .messages
                 .values()
                 .filter(|m| m.labels.contains(&label) && (archived || !m.archived))
+                .filter(|m| !state.hidden_from_labels.contains(&m.id))
                 .collect();
             messages.sort_by(|a, b| b.received.cmp(&a.received).then(b.id.cmp(&a.id)));
             let page: Vec<_> = messages

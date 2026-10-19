@@ -219,8 +219,15 @@ pub struct LabelCache(Mutex<Labels>);
 #[derive(Debug, Default)]
 struct Labels {
     names: HashMap<String, String>,
+    /// Whether Zoho listed the labels this run.
+    listed: bool,
     fresh: Option<Vec<ZohoLabel>>,
     read: HashMap<String, Membership>,
+    /// (message, label) pairs a push of ours changed since the last pass
+    /// ended: never taken off by a listing.
+    written: HashSet<(String, String)>,
+    /// Label requests made this run.
+    calls: u32,
 }
 
 /// The messages a label was read on this run; `whole` when its whole
@@ -238,6 +245,34 @@ impl LabelCache {
             names,
             ..Labels::default()
         }))
+    }
+
+    /// Label requests made this run.
+    pub fn calls(&self) -> u32 {
+        self.lock().calls
+    }
+
+    fn called(&self) {
+        let mut labels = self.lock();
+        labels.calls = labels.calls.saturating_add(1);
+    }
+
+    /// Of the labels `held` (on indexed messages), those Zoho's listing this
+    /// run does not have (deleted): on no message. None when Zoho did not
+    /// list the labels this run.
+    fn deleted(&self, held: Vec<String>) -> Vec<String> {
+        let labels = self.lock();
+        if !labels.listed {
+            return Vec::new();
+        }
+        held.into_iter()
+            .filter(|id| !labels.names.contains_key(id))
+            .collect()
+    }
+
+    /// Never take labels off the (message, label) pairs of `written`.
+    fn protect(&self, written: HashSet<(String, String)>) {
+        self.lock().written = written;
     }
 
     fn lock(&self) -> MutexGuard<'_, Labels> {
@@ -265,6 +300,7 @@ impl LabelCache {
     /// Zoho's listing of the labels, kept as fresh when it changed them.
     fn replace(&self, listed: Vec<ZohoLabel>) {
         let mut labels = self.lock();
+        labels.listed = true;
         let names: HashMap<String, String> = listed
             .iter()
             .map(|l| (l.label_id.clone(), l.name()))
@@ -312,18 +348,24 @@ impl LabelCache {
     /// `tokens` of message `message` with what this run read of its
     /// labels: a label read on it is put on, one read whole without it is
     /// taken off. Mail in the trash or spam keeps the labels it had (a
-    /// listing may leave those folders out). Sorted.
+    /// listing may leave those folders out), and so does a label a push of
+    /// ours changed on it since the last pass ended. Sorted.
     fn relabel(&self, message: &str, tokens: &[String]) -> Vec<String> {
         let binned = tokens.iter().any(|t| t == "TRASH" || t == "SPAM");
         let mut out = tokens.to_vec();
-        for (label, read) in &self.lock().read {
+        let labels = self.lock();
+        for (label, read) in &labels.read {
             let token = state::label_token(label);
+            let written = labels
+                .written
+                .contains(&(message.to_owned(), label.clone()));
             if read.messages.contains(message) {
                 out.push(token);
-            } else if read.whole && !binned {
+            } else if read.whole && !binned && !written {
                 out.retain(|t| *t != token);
             }
         }
+        drop(labels);
         out.sort();
         out.dedup();
         out
@@ -429,6 +471,7 @@ impl Reader<'_> {
         let Some(cache) = self.labels else {
             return Ok(());
         };
+        cache.called();
         match self.mail.labels().await {
             Ok(listed) => {
                 cache.replace(listed);
@@ -448,8 +491,9 @@ impl Reader<'_> {
 
     /// Read which messages carry label `label` (`labelid`), up to `pages`
     /// pages, into the cache: its whole listing when `whole` and it ends
-    /// within them. A label Zoho no longer has is on none. A failure other
-    /// than one that stops the run leaves the label unread (logged).
+    /// within them. A label Zoho answers 404 for, while it still lists the
+    /// label, is left unread (so nothing is taken off). A failure other
+    /// than one that stops the run leaves the label unread too (logged).
     async fn read_label(&self, label: &str, pages: u32, whole: bool) -> Result<(), ReadError> {
         let Some(cache) = self.labels else {
             return Ok(());
@@ -458,6 +502,7 @@ impl Reader<'_> {
         let mut ended = false;
         let mut start = 1;
         for _ in 0..pages {
+            cache.called();
             match self.mail.labelled(label, start, LABEL_PAGE).await {
                 Ok(page) => {
                     let full = u32::try_from(page.len()).unwrap_or(u32::MAX) >= LABEL_PAGE;
@@ -468,10 +513,6 @@ impl Reader<'_> {
                     }
                     start += LABEL_PAGE;
                 }
-                Err(ProviderError::NotFound) => {
-                    ended = true;
-                    break;
-                }
                 Err(err) if is_run_trouble(&err) && err != ProviderError::Unauthorized => {
                     return Err(err.into());
                 }
@@ -481,20 +522,99 @@ impl Reader<'_> {
                 }
             }
         }
-        cache.record(label, messages, whole && ended);
+        let whole = whole && ended && self.plausible(label, &messages).await?;
+        cache.record(label, messages, whole);
         Ok(())
     }
 
-    /// Every label's messages, whole (the end of a pass).
+    /// Whether a whole listing of `label` (on `messages`) may take it off
+    /// the indexed messages it leaves out: not when that would be more than
+    /// a fifth of those carrying it, and five or more (a listing that may
+    /// miss folders or lag behind; the next pass tries again).
+    ///
+    /// TODO(campbooks-cloud#292): check against a recorded Zoho answer
+    /// which folders a `labelid` listing covers (archived, spam, trash,
+    /// the member's own), and how soon it shows a change.
+    async fn plausible(&self, label: &str, messages: &HashSet<String>) -> Result<bool, ReadError> {
+        let mut tx = self.pool.begin_for(self.workspace).await?;
+        let carrying: Vec<String> = sqlx::query_scalar(
+            "SELECT provider_message_id FROM connectors.messages
+              WHERE stream_id = $1 AND $2 = ANY(label_ids)",
+        )
+        .bind(self.stream)
+        .bind(state::label_token(label))
+        .fetch_all(&mut *tx)
+        .await?;
+        tx.commit().await?;
+        let losing = carrying.iter().filter(|id| !messages.contains(*id)).count();
+        if losing >= 5 && losing * 5 > carrying.len() {
+            tracing::warn!(
+                stream = %self.stream,
+                label,
+                carrying = carrying.len(),
+                losing,
+                "a Zoho label's listing would take it off too many messages; nothing taken off this pass"
+            );
+            return Ok(false);
+        }
+        Ok(true)
+    }
+
+    /// Every label's messages, whole (the end of a pass): a label Zoho no
+    /// longer lists is on none. Labels a push of ours changed since the
+    /// last pass ended stay as written.
     async fn read_all_labels(&self) -> Result<(), ReadError> {
-        for label in self
-            .labels
-            .map(|cache| cache.ids(false))
-            .unwrap_or_default()
-        {
+        let Some(cache) = self.labels else {
+            return Ok(());
+        };
+        cache.protect(self.written().await?);
+        for label in cache.ids(false) {
             self.read_label(&label, LABEL_PAGES, true).await?;
         }
+        let mut tx = self.pool.begin_for(self.workspace).await?;
+        let held: Vec<String> = sqlx::query_scalar(
+            "SELECT DISTINCT substr(token, 7) FROM connectors.messages, unnest(label_ids) AS token
+              WHERE stream_id = $1 AND token LIKE 'label:%'",
+        )
+        .bind(self.stream)
+        .fetch_all(&mut *tx)
+        .await?;
+        tx.commit().await?;
+        for label in cache.deleted(held) {
+            cache.record(&label, HashSet::new(), true);
+        }
         Ok(())
+    }
+
+    /// The (message, label id) pairs our applied changes put on or took off
+    /// since the last pass ended (all those still kept when none did).
+    async fn written(&self) -> Result<HashSet<(String, String)>, ReadError> {
+        let since = self.cursor.swept_at.unwrap_or(DateTime::UNIX_EPOCH);
+        let mut tx = self.pool.begin_for(self.workspace).await?;
+        let rows: Vec<(String, Vec<String>, Vec<String>)> = sqlx::query_as(
+            "SELECT provider_message_id, add_labels, remove_labels
+               FROM connectors.outbound_changes
+              WHERE stream_id = $1 AND state = 'applied' AND done_at >= $2",
+        )
+        .bind(self.stream)
+        .bind(since)
+        .fetch_all(&mut *tx)
+        .await?;
+        tx.commit().await?;
+        let names = self.labels.map_or_else(HashMap::new, LabelCache::names);
+        let ids = MarkIds::from_labels(names.iter().map(|(id, n)| (id.as_str(), n.as_str())));
+        let mut written = HashSet::new();
+        for (message, add, remove) in rows {
+            for token in add.iter().chain(&remove) {
+                let label = state::label_of(token).map(ToOwned::to_owned).or_else(|| {
+                    marks::of_token(token).and_then(|stream| ids.get(stream).map(ToOwned::to_owned))
+                });
+                if let Some(label) = label {
+                    written.insert((message.clone(), label));
+                }
+            }
+        }
+        Ok(written)
     }
 
     /// Indexed messages `page` does not carry whose labels this run's reads
