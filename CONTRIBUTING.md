@@ -23,9 +23,10 @@ The rules are in [`AGENTS.md`](AGENTS.md); this is the walkthrough.
    pnpm --dir clients lint typecheck test deps:check deadcode format:check api:check i18n:check
    ```
 6. **Changelog:** for anything user-visible, add an entry *file* with
-   `.github/scripts/changelog.sh new <kind> <issue>-<slug>` (`feat/` and `fix/`
-   branches are checked). Never edit `CHANGELOG.md` itself; see
-   [`changelog/README.md`](changelog/README.md).
+   `.github/scripts/changelog.sh new <kind> <issue>-<slug>` (required when the
+   branch, `feat/` or `fix/`, or the title, `feat:` or `fix:`, says so). Never
+   edit `CHANGELOG.md` itself, and never delete an entry: only a release does;
+   see [`changelog/README.md`](changelog/README.md).
 7. **Open a PR into `next`.** Title = Conventional Commit (it becomes the
    squash commit). Commits must be **signed** (SSH or GPG).
 8. **UI changes:** verify at 375px and desktop, and **attach a screen recording**
@@ -133,14 +134,15 @@ then `changelog.sh release X.Y.Z`.
 The Policy check fails the PR if the changelog section is missing, the tag
 already exists or the branch's own entries are left behind, and fails any
 other PR that edits `CHANGELOG.md` or deletes an entry (a maintainer fixing an
-entry by hand applies the `changelog-edit` label). Merge it; when CI is green on the merge commit,
-`release-next.yml` builds the image, tags it `next-vX.Y.Z` and `next-vX.Y`,
-fails on fixable HIGH/CRITICAL Trivy findings, attests build provenance and an
-SPDX SBOM, and only then creates the tag and the prerelease (the changelog
-section is the release notes). Nothing is committed back to `next`: its branch
-ruleset requires checks on every commit, so the changelog is rolled in the PR.
-If the workflow fails after the merge, fix the cause and re-run it from the
-Actions tab (`Release next`, branch `next`); it is idempotent until the tag exists.
+entry by hand applies the `changelog-edit` label). Merge the release PR; when
+CI is green on the merge commit, `release-next.yml` builds the image, tags it
+`next-vX.Y.Z` and `next-vX.Y`, fails on fixable HIGH/CRITICAL Trivy findings,
+attests build provenance and an SPDX SBOM, and only then creates the tag and
+the prerelease (the changelog section is the release notes). Nothing is
+committed back to `next`: its branch ruleset requires checks on every commit,
+so the changelog is rolled in the PR. If the workflow fails after the merge,
+fix the cause and re-run it from the Actions tab (`Release next`, branch
+`next`); it is idempotent until the tag exists.
 Verify an image with `gh attestation verify oci://ghcr.io/notacamp/campbooks:next-vX.Y.Z --repo notacamp/campbooks`.
 
 Releases deploy nothing: production already runs every green merge. GitHub

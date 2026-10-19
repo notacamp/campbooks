@@ -71,7 +71,7 @@ jobs:
           if [ -z "$needed" ]; then
             echo "Not a feat or fix PR — no changelog entry required."; exit 0
           fi
-          added=$(git diff --name-only --no-renames --diff-filter=AM "$PR_RANGE" -- changelog/unreleased \
+          added=$(git diff --name-only --find-renames --diff-filter=AM "$PR_RANGE" -- changelog/unreleased \
                     | grep -v '/\.gitkeep$' || true)
           if [ -z "$added" ]; then
             echo "::error::feat and fix PRs add a changelog entry: .github/scripts/changelog.sh new <added|changed|fixed|...> <issue>-<slug>, then write it (changelog/README.md)."

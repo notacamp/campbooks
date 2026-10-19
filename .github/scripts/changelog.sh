@@ -156,7 +156,7 @@ release() {
   ' "$root/Cargo.lock" > "$tmp"
   mv "$tmp" "$root/Cargo.lock"
 
-  entries | while read -r f; do git -C "$root" rm -q --cached --ignore-unmatch -- "$f" >/dev/null; rm -f "$f"; done
+  entries | while IFS= read -r f; do git -C "$root" rm -q --cached --ignore-unmatch -- "$f" >/dev/null; rm -f "$f"; done
   find "$dir" -mindepth 1 -type d -empty -delete
 
   echo "changelog: released $tag ($current → $version). Review the diff, then open"
