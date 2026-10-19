@@ -111,8 +111,9 @@ and not spam keep `conversations:write`. No endpoint is added.
 ## Risks
 
 - Not spam puts received mail back in the inbox even if it was archived
-  before it was reported, so Undo of Report spam on an archived conversation
-  brings it to the inbox. That is the provider's own "Not spam" semantics,
-  kept as specified.
+  before it was reported (the provider's own "Not spam", kept on the
+  server). So the client's Undo of Report spam on an archived conversation
+  is Not spam then archive, one Undo entry with one toast, and puts it back
+  in the archive; the plain Not spam still means "back to the inbox".
 - A message deleted at the provider before this migration but still synced
   in the trash keeps its conversation in Trash until the provider empties it.

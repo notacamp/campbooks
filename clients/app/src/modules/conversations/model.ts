@@ -129,6 +129,28 @@ export function sentToLine(t: Translate, summary: ConversationSummary): string {
  */
 export type Move = "archive" | "unarchive" | "trash" | "untrash" | "spam" | "not_spam";
 
+/** Each move's inverse. */
+const INVERSE: Record<Move, Move> = {
+  archive: "unarchive",
+  unarchive: "archive",
+  trash: "untrash",
+  untrash: "trash",
+  spam: "not_spam",
+  not_spam: "spam",
+};
+
+/**
+ * What Undo runs after `move` on `summary`, in order, to put it back exactly
+ * where it was. Not spam always puts received mail in the inbox, so undoing
+ * Report spam on an archived conversation archives it again.
+ */
+export function undoMoves(summary: ConversationSummary, move: Move): Move[] {
+  if (move === "spam" && summary.archived && !summary.trashed) {
+    return ["not_spam", "archive"];
+  }
+  return [INVERSE[move]];
+}
+
 /** E: Done while in the inbox, Move to Inbox once archived; nothing in spam or the trash. */
 export function archiveMove(summary: ConversationSummary): Move | undefined {
   if (summary.trashed) {

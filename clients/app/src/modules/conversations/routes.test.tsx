@@ -163,6 +163,32 @@ describe("the inbox", () => {
     });
   });
 
+  it("undoes Report spam on an archived conversation back into the archive, in one Undo", async () => {
+    const archived = { ...Q4, archived: true, unread_count: 0 };
+    const api = inbox({
+      [`GET ${W}/conversations/${Q4.id}`]: { body: { ...Q4_DETAIL, conversation: archived } },
+    });
+    renderAt(`/w/${DUARTE.id}/inbox/archive/${Q4.id}`);
+    await screen.findByRole("heading", { name: Q4.subject });
+
+    fireEvent.keyDown(document, { key: "!" });
+    expect(await screen.findByText(`Reported as spam · ${Q4.subject}`)).toBeVisible();
+    fireEvent.keyDown(document, { key: "z" });
+    await waitFor(() => {
+      expect(api.calls.map((call) => call.route)).toContain(
+        `POST ${W}/conversations/${Q4.id}/archive`,
+      );
+    });
+    const moves = api.calls
+      .map((call) => call.route)
+      .filter((route) => /\/(spam|not-spam|archive)$/u.test(route));
+    expect(moves).toEqual([
+      `POST ${W}/conversations/${Q4.id}/spam`,
+      `POST ${W}/conversations/${Q4.id}/not-spam`,
+      `POST ${W}/conversations/${Q4.id}/archive`,
+    ]);
+  });
+
   it("opens a conversation: newest message open, older folded, read on open", async () => {
     const api = inbox();
     renderAt(`/w/${DUARTE.id}/inbox/primary/${Q4.id}`);

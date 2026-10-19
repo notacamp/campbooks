@@ -39,7 +39,10 @@ stream and a view at once. Any other place in the address SHALL open Primary.
 Delete (#) SHALL move the open conversation, or the one under the list's
 cursor, to the trash, and Report spam (!) SHALL report it as spam, each shown
 at once, with a toast ("Deleted · <subject>", "Reported as spam · <subject>")
-and an entry that Undo (Z, or the toast) takes back. When it leaves the list
+and an entry that Undo (Z, or the toast) takes back, putting the conversation
+back exactly where it was: Report spam on an archived conversation is undone
+by Not spam and archiving it again, as one entry with one toast, while Not
+spam on its own still brings received mail to the inbox. When it leaves the list
 on screen, the next conversation opens (the list, on phones), as after Done.
 The shortcuts SHALL be keyed by their operations (`conversations.trash`,
 `conversations.report_spam`) and shown wherever their buttons are. Both SHALL
@@ -52,6 +55,10 @@ be icon buttons beside Pin and Mark read: one button style per toolbar.
 #### Scenario: Report spam
 - **WHEN** the user presses ! on a conversation in Primary
 - **THEN** it leaves Primary for Spam, with Undo
+
+#### Scenario: Undo Report spam from the archive
+- **WHEN** the user presses ! on an archived conversation, then Z
+- **THEN** it is out of Spam and back in Archive, not the inbox, in one Undo
 
 ### Requirement: The way back from each view
 The reader's main action SHALL follow where the conversation is. In the inbox

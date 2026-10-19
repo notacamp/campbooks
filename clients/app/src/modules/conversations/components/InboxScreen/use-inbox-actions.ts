@@ -9,17 +9,17 @@ import {
   type Stream,
 } from "../../api/queries";
 import type { TaughtAction } from "../../api/rules";
-import { streamName, type Move, type Translate } from "../../model";
+import { streamName, undoMoves, type Move, type Translate } from "../../model";
 import { useTeachOnce } from "../TeachOnce/TeachOnce";
 
-/** Each move's inverse (its Undo) and its toast. */
-const MOVES: Record<Move, { inverse: Move; toast: string }> = {
-  archive: { inverse: "unarchive", toast: "toast.done" },
-  unarchive: { inverse: "archive", toast: "toast.toInbox" },
-  trash: { inverse: "untrash", toast: "toast.deleted" },
-  untrash: { inverse: "trash", toast: "toast.restored" },
-  spam: { inverse: "not_spam", toast: "toast.spam" },
-  not_spam: { inverse: "spam", toast: "toast.notSpam" },
+/** Each move's toast. */
+const TOASTS: Record<Move, string> = {
+  archive: "toast.done",
+  unarchive: "toast.toInbox",
+  trash: "toast.deleted",
+  untrash: "toast.restored",
+  spam: "toast.spam",
+  not_spam: "toast.notSpam",
 };
 
 /**
@@ -56,6 +56,22 @@ export function useInboxActions(workspaceId: string) {
       },
     );
   };
+  /** Run `moves` one after the other, each on the summary the last one returned. */
+  const runInOrder = (conversation: ConversationSummary, moves: readonly Move[]) => {
+    const [first, ...rest] = moves;
+    if (first === undefined) {
+      return;
+    }
+    mutation.mutate(
+      { conversation, action: first },
+      {
+        onSuccess: (summary) => {
+          teach?.exception(summary.rule_exception);
+          runInOrder(summary, rest);
+        },
+      },
+    );
+  };
   const subjectOf = (conversation: ConversationSummary) =>
     conversation.subject === "" ? t("reader.noSubject") : conversation.subject;
 
@@ -87,14 +103,19 @@ export function useInboxActions(workspaceId: string) {
     },
     /** Move it to another place; Done (archive) offers to teach archiving. */
     moveTo: (conversation: ConversationSummary, move: Move) => {
-      const { inverse, toast } = MOVES[move];
-      undoable(
-        conversation,
-        move,
-        inverse,
-        t(toast, { subject: subjectOf(conversation) }),
-        move === "archive" ? { kind: "archive" } : undefined,
-      );
+      // One toast and one Undo entry, which puts it back exactly where it
+      // was, in as many steps as that takes.
+      const back = undoMoves(conversation, move);
+      run(conversation, move, move === "archive" ? { kind: "archive" } : undefined);
+      undo.push({
+        label: t(TOASTS[move], { subject: subjectOf(conversation) }),
+        undo: () => {
+          runInOrder(conversation, back);
+        },
+        redo: () => {
+          run(conversation, move);
+        },
+      });
     },
     toggleStar: (conversation: ConversationSummary) => {
       const starring = !conversation.starred;

@@ -38,6 +38,7 @@ import {
   splitQuoted,
   threadLayout,
   trashMove,
+  undoMoves,
   type ThreadEntry,
   type Translate,
 } from "./model";
@@ -260,5 +261,19 @@ describe("attachments", () => {
       "untrash",
       undefined,
     ]);
+  });
+
+  it("undoes Report spam back where it was: archived again when it was archived", () => {
+    expect(undoMoves(FIGURES, "spam")).toEqual(["not_spam", "archive"]);
+    expect(undoMoves(Q4, "spam")).toEqual(["not_spam"]);
+    // The plain Not spam stays one step, back to the inbox.
+    expect(undoMoves(SPAMMED, "not_spam")).toEqual(["spam"]);
+    expect(undoMoves(Q4, "trash")).toEqual(["untrash"]);
+    expect(undoMoves(FIGURES, "unarchive")).toEqual(["archive"]);
+    let undone = applied(FIGURES, "spam");
+    for (const move of undoMoves(FIGURES, "spam")) {
+      undone = applied(undone, move);
+    }
+    expect([undone.archived, undone.trashed, undone.spam]).toEqual([true, false, false]);
   });
 });
