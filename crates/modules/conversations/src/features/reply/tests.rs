@@ -1041,3 +1041,57 @@ async fn trashed_and_year_old_mail_is_not_past_mail(db: PgPool) {
     // An old message still shows they were written to.
     assert_eq!(input["them"]["i_wrote_to_them_before"], true);
 }
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_suspicious_or_reviewed_conversation_gets_no_person_context(db: PgPool) {
+    let server = MockServer::start().await;
+    answer_with(&server, &json!({"reply": "Hi"})).await;
+    let kit = kit_with_model(db, &server).await;
+    let (workspace, inbox, sam, _) = demo(&kit).await;
+    marta_is_written_to(&kit, workspace, inbox).await;
+    for id in ["sus-1", "review-1"] {
+        store(
+            &kit,
+            workspace,
+            inbox,
+            "sam@example.com",
+            received(id, &format!("thr-{id}"), MARTA, 1, "Hello"),
+        )
+        .await;
+    }
+    // The model said "suspicious".
+    sqlx::query(
+        "INSERT INTO conversations.decisions
+             (id, workspace_id, message_id, conversation_id, question, source, strategy,
+              value, confidence, model, acted, state_version)
+         SELECT gen_random_uuid(), m.workspace_id, m.id, m.conversation_id, 'suspicious',
+                'model', 'model', 'true'::jsonb, 0.97, 'scripted', true, 3
+           FROM conversations.messages m WHERE m.provider_message_id = 'sus-1'",
+    )
+    .execute(&kit.db)
+    .await
+    .unwrap();
+    // An open Review need.
+    sqlx::query(
+        "INSERT INTO conversations.needs
+             (conversation_id, workspace_id, message_id, reason, trust, basis, question,
+              state, latest_inbound_id)
+         SELECT m.conversation_id, m.workspace_id, m.id, 'review', 'check', 'model',
+                'asks_action', 'open', m.id
+           FROM conversations.messages m WHERE m.provider_message_id = 'review-1'",
+    )
+    .execute(&kit.db)
+    .await
+    .unwrap();
+    for provider_id in ["sus-1", "review-1"] {
+        let id = kit.conversation_of(provider_id).await;
+        write_reply(&kit, &sam, workspace, &id, None).await;
+    }
+    let asked = asked(&server).await;
+    assert_eq!(asked.len(), 2);
+    for (_, input) in asked {
+        assert!(input.get("them").is_none(), "{input}");
+        assert!(!input.to_string().contains("Private words"));
+        assert_eq!(input["conversation"]["total_messages"], 1);
+    }
+}

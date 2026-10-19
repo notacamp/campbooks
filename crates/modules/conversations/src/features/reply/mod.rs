@@ -87,6 +87,35 @@ const PAST_BYTES: usize = 4 * 1024;
 /// Each mail count sent to the model stops here.
 const COUNT_CAP: i64 = 100;
 /// Messages counted in a conversation, at most.
+const TOTAL_CAP: i64 = 1000;
+
+/// The conversation's inbox, if the caller can see it.
+const INBOX: &str = "SELECT i.id, i.display_name FROM conversations.conversations c \
+     JOIN conversations.inboxes i ON i.id = c.inbox_id \
+     WHERE c.id = $1 AND c.inbox_id = ANY($2)";
+/// The message answered: the one asked for, or the newest; with whether it
+/// is in spam, its headers, and whether its conversation is flagged
+/// suspicious or has an open Review need (as the sender checks of the
+/// trusted-images rule read them).
+const ANSWERED: &str = "SELECT m.id, m.sent_at, m.direction, m.sender_address, m.recipients, \
+            m.in_spam, m.headers, \
+            (EXISTS (SELECT 1 FROM conversations.decisions d \
+                      WHERE d.conversation_id = m.conversation_id \
+                        AND d.workspace_id = m.workspace_id \
+                        AND d.question = 'suspicious' AND d.value = 'true'::jsonb) \
+             OR EXISTS (SELECT 1 FROM conversations.needs n \
+                         WHERE n.conversation_id = m.conversation_id \
+                           AND n.workspace_id = m.workspace_id \
+                           AND n.state = 'open' AND n.reason = 'review')) \
+     FROM conversations.messages m \
+     WHERE m.conversation_id = $1 AND ($2::uuid IS NULL OR m.id = $2) \
+     ORDER BY m.sent_at DESC, m.id DESC LIMIT 1";
+/// The messages up to the one answered, newest first.
+const THREAD: &str = "SELECT id, direction, sender, subject, sent_at, bodies \
+     FROM conversations.messages \
+     WHERE conversation_id = $1 AND (sent_at, id) <= ($2, $3) \
+     ORDER BY sent_at DESC, id DESC LIMIT $4";
+/// How many messages the conversation has, capped.
 const TOTAL: &str = "SELECT count(*) FROM ( \
          SELECT 1 FROM conversations.messages WHERE conversation_id = $1 LIMIT $2) counted";
 /// Their mail to the inbox in the last year, capped at `$3`. Served by
