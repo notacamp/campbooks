@@ -103,24 +103,6 @@ const THREAD: &str = "SELECT id, direction, sender, subject, sent_at, bodies \
 /// How many messages the conversation has, capped.
 const TOTAL: &str = "SELECT LEAST(count(*), $2) FROM conversations.messages \
      WHERE conversation_id = $1";
-/// The inbox's newest sent messages (`$3` of them) that went to or copied
-/// `$2`, a lower-cased address. The address is matched as a whole JSON
-/// string, as `rules::facts::corresponds` does.
-const SENT_TO_THEM: &str = "WITH sent AS ( \
-         SELECT id, conversation_id, sent_at, in_spam, in_trash, bodies, \
-                position(('\"' || $2::text || '\"') IN lower( \
-                    coalesce(recipients->'to', '[]'::jsonb)::text || \
-                    coalesce(recipients->'cc', '[]'::jsonb)::text)) > 0 AS to_them \
-         FROM conversations.messages \
-         WHERE inbox_id = $1 AND direction = 'outbound' \
-         ORDER BY sent_at DESC, id DESC LIMIT $3)";
-/// Whether the inbox ever wrote to them in that scan, and how many such
-/// messages went in the last year (capped at `$4`).
-const WROTE_TO_THEM: &str = " \
-     SELECT coalesce(bool_or(to_them), false), \
-            LEAST(count(*) FILTER (WHERE to_them AND NOT in_spam AND NOT in_trash \
-                AND sent_at > now() - interval '365 days'), $4) \
-     FROM sent";
 /// Their mail to the inbox in the last year, capped at `$3`. Served by
 /// `messages_inbound_sender_idx`.
 const FROM_THEM: &str = "SELECT count(*) FROM ( \
@@ -128,13 +110,41 @@ const FROM_THEM: &str = "SELECT count(*) FROM ( \
          WHERE inbox_id = $1 AND direction = 'inbound' AND sender_address = $2 \
            AND NOT in_spam AND NOT in_trash AND sent_at > now() - interval '365 days' \
          LIMIT $3) recent";
+/// The inbox's newest sent messages (`$3` of them), each marked when it went to
+/// or copied `$2`, followed by `$rest`: a literal, so the SQL stays static.
+macro_rules! sent_to_them {
+    ($rest:literal) => {
+        concat!(
+            "WITH sent AS ( \
+                 SELECT id, conversation_id, sent_at, in_spam, in_trash, bodies, \
+                        position(('\"' || $2::text || '\"') IN lower( \
+                            coalesce(recipients->'to', '[]'::jsonb)::text || \
+                            coalesce(recipients->'cc', '[]'::jsonb)::text)) > 0 AS to_them \
+                 FROM conversations.messages \
+                 WHERE inbox_id = $1 AND direction = 'outbound' \
+                 ORDER BY sent_at DESC, id DESC LIMIT $3) ",
+            $rest
+        )
+    };
+}
+/// Whether the inbox ever wrote to `$2` (a lower-cased address) in its
+/// newest `$3` sent messages, and how many such messages went in the last
+/// year (capped at `$4`). The address is matched as a whole JSON string, as
+/// `rules::facts::corresponds` does.
+const WROTE_TO_THEM: &str = sent_to_them!(
+    "SELECT coalesce(bool_or(to_them), false), \
+            LEAST(count(*) FILTER (WHERE to_them AND NOT in_spam AND NOT in_trash \
+                AND sent_at > now() - interval '365 days'), $4) \
+     FROM sent"
+);
 /// The newest of those sent messages from other conversations (`$4`),
 /// within the last year, not in the trash; `$5` at most.
-const PAST: &str = " \
-     SELECT sent_at, bodies FROM sent \
+const PAST: &str = sent_to_them!(
+    "SELECT sent_at, bodies FROM sent \
      WHERE to_them AND conversation_id <> $4 AND NOT in_trash \
        AND sent_at > now() - interval '365 days' \
-     ORDER BY sent_at DESC, id DESC LIMIT $5";
+     ORDER BY sent_at DESC, id DESC LIMIT $5"
+);
 
 /// A row of [`THREAD`].
 type MessageRow = (MessageId, String, Value, String, DateTime<Utc>, Value);
@@ -608,14 +618,13 @@ async fn known_person(
         });
     };
     let address = correspondent.address.trim().to_lowercase();
-    let (wrote_before, from_me): (bool, i64) =
-        sqlx::query_as(&format!("{SENT_TO_THEM}{WROTE_TO_THEM}"))
-            .bind(inbox)
-            .bind(&address)
-            .bind(SENT_SCAN)
-            .bind(COUNT_CAP)
-            .fetch_one(&mut *tx)
-            .await?;
+    let (wrote_before, from_me): (bool, i64) = sqlx::query_as(WROTE_TO_THEM)
+        .bind(inbox)
+        .bind(&address)
+        .bind(SENT_SCAN)
+        .bind(COUNT_CAP)
+        .fetch_one(&mut *tx)
+        .await?;
     let from_them: i64 = sqlx::query_scalar(FROM_THEM)
         .bind(inbox)
         .bind(&address)
@@ -623,7 +632,7 @@ async fn known_person(
         .fetch_one(&mut *tx)
         .await?;
     // A few more than are kept: some have no words of their own.
-    let rows: Vec<(DateTime<Utc>, Value)> = sqlx::query_as(&format!("{SENT_TO_THEM}{PAST}"))
+    let rows: Vec<(DateTime<Utc>, Value)> = sqlx::query_as(PAST)
         .bind(inbox)
         .bind(&address)
         .bind(SENT_SCAN)
