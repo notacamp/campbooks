@@ -3,7 +3,7 @@
 ### Requirement: What needs you
 When the user can see at least one inbox, Home SHALL show their open
 attention items (`attention.list`) in groups, in the order Review, Reply,
-Decide, Do, Pay, Nudge, leaving out empty groups, each item in the list's order. The
+Decide, Do, Pay, Nudge, Worth a look, leaving out empty groups, each item in the list's order. The
 hero SHALL say how many things need the user, with the Visor `alert` when
 Review has an item. The selected item SHALL be shown by the selected background and a full focus
 ring, never by a coloured stripe on one edge. Each item SHALL show who it is from, its sentence (from a
@@ -29,9 +29,9 @@ the owning module's batch read (`conversations.list` with `ids`), not from
 - **WHEN** Marta's question arrived at 10:00 today, Pedro's on Monday and the bill on 2 October, and it is Friday 15:00
 - **THEN** Marta's row says "5 hours ago", Pedro's "4 days ago" and the bill's "2 Oct" above "Due 30 Oct", each with its full date on hover
 
-#### Scenario: A nudge at the end
-- **WHEN** the user has a reply and a nudge
-- **THEN** Home says "2 things need you", Reply comes first and Nudge last
+#### Scenario: A nudge after the bills
+- **WHEN** the user has a reply, a bill and a nudge
+- **THEN** Home says "3 things need you" and lists Reply, Pay, then Nudge
 
 ## ADDED Requirements
 

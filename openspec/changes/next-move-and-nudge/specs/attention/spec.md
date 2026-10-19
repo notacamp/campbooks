@@ -3,12 +3,11 @@
 ### Requirement: Items are references
 An attention item SHALL hold the record it is about, the container that
 decides who may see it, the record that caused it, a reason (`review`,
-`reply`, `decide`, `do`, `pay`, `waiting` or `nudge`), a trust (`sure` or
-`check`), an optional due date, an optional lapse time (when what it asks
-stops being possible), whether it is urgent, and when its cause arrived. It
-SHALL hold no names, addresses, subjects or message text. Every table of the
-`attention` schema SHALL be isolated per workspace by forced row-level
-security.
+`reply`, `decide`, `do`, `pay`, `worth_a_look`, `waiting` or `nudge`), a trust (`sure` or `check`), an optional due
+date, an optional lapse time (when what it asks stops being possible),
+whether it is urgent, and when its cause arrived. It SHALL hold no
+names, addresses, subjects or message text. Every table of the `attention`
+schema SHALL be isolated per workspace by forced row-level security.
 
 #### Scenario: A reply need from Marta
 - **WHEN** an item is projected for a conversation in which Marta Ferreira asks for a reply
@@ -26,19 +25,19 @@ security.
 `GET /api/v1/w/{workspace_id}/attention` (`attention.list`, `attention:read`)
 SHALL return the caller's open items, leaving out items in containers the
 caller cannot see (the kernel's `Visibility` port), items the caller snoozed
-until a later time, items whose lapse time has passed, `waiting` items, and
-items other than `pay` and `nudge` more than 7 days past their due date (a
-bill or a nudge stays until a member answers it). Items SHALL be ordered by
-reason (`review`, `reply`, `decide`, `do`, `pay`, `nudge`), then overdue
-first, then by due date, then urgent first, then oldest cause first, and the
-response SHALL carry the count per reason. The caller's day (for what is
-overdue and for Done today) SHALL follow `utc_offset`, the caller's offset
+until a later time, items whose lapse time has passed, `waiting` items, and items other than
+`pay` and `nudge` more than 7 days past their due date (a bill or a nudge
+stays until a member answers it). Items
+SHALL be ordered by reason (`review`, `reply`, `decide`, `do`, `pay`, `nudge`, `worth_a_look`), then
+overdue first, then by due date, then urgent first, then oldest cause first,
+and the response SHALL carry the count per reason. The caller's day (for what
+is overdue and for Done today) SHALL follow `utc_offset`, the caller's offset
 from UTC in minutes (default 0; beyond 14 hours, 400 `invalid_offset`). With
 `state=cleared` it SHALL return the items cleared since the start of the
 caller's day, newest first, with what cleared them and who, leaving out those
-cleared as `superseded`, `rule` or `lapsed`. With `state=waiting`
-it SHALL return the caller's open `waiting` items, soonest due date first,
-with the same visibility and snoozes.
+cleared as `superseded`, `rule` or `lapsed`. With `state=waiting` it SHALL
+return the caller's open `waiting` items, soonest due date first, with the
+same visibility and snoozes.
 
 #### Scenario: Someone else's inbox
 - **WHEN** a member who is not in Sam's inbox lists their attention items
@@ -62,7 +61,7 @@ with the same visibility and snoozes.
 
 #### Scenario: Still waiting
 - **WHEN** a member has a `waiting` item due Thursday and a `nudge` item due 10 days ago
-- **THEN** the queue lists the nudge last, after Pay, and not the waiting item; `state=waiting` lists the waiting item
+- **THEN** the queue lists the nudge after Pay and before Worth a look, and not the waiting item; `state=waiting` lists the waiting item
 
 ## ADDED Requirements
 

@@ -72,7 +72,7 @@ the `waiting` need is `sure`.
 ## Precedence
 
 One need per conversation. From the newest inbound message, in order:
-`review`, `pay`, `reply`/`do` (sure, then check), then `waiting`. A wait is
+`review`, `pay`, `reply`/`do` (sure, then check), `worth_a_look` (a rule the member taught), then `waiting`. A wait is
 only raised when the message asks nothing else of the member, and only for
 mail the facts do not mark as list, automatic or no-reply, whose accepted
 stream is `primary` or which has no accepted stream answer.

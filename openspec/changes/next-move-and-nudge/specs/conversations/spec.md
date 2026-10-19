@@ -80,7 +80,8 @@ the facts' and taught rules' answers SHALL still raise theirs. Until then
 - **THEN** the `reply` need is raised as before
 
 ### Requirement: Waiting on someone
-When the newest inbound message raises no other need, its accepted `stream`
+When the newest inbound message raises no other need (`worth_a_look`, a rule
+the member taught, included), its accepted `stream`
 answer is `primary` or no `stream` answer is accepted, and no fact marks it as
 list, automatic or no-reply mail, the conversation SHALL get a `waiting`
 need on one person: the sender, when the policy accepts `next_move` `sender`
