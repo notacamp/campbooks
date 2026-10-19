@@ -41,6 +41,7 @@ use campbooks_ai::{
         signals::{
             actions::{action_questions, likelihoods},
             email::{Attachment, Envelope, Recipient, triage_questions},
+            moves::move_questions,
         },
         strategy::Strategy,
     },
@@ -156,14 +157,27 @@ struct Pass {
 
 impl Pass {
     /// The questions asked about `envelope`: the triage questions, then,
-    /// with the catalogue on, its own (each in a slot of its own). With it
-    /// off, exactly the triage questions.
+    /// with the catalogue on, whose move it is ([`Self::moves`]) and the
+    /// catalogue's own (each in a slot of its own). With it off, exactly the
+    /// triage questions.
     fn asked(&self, triage: &[Question], envelope: &Envelope) -> Vec<Question> {
         let mut asked = triage.to_vec();
         if self.actions.enabled {
+            asked.extend(move_questions(envelope));
             asked.extend(action_questions(envelope));
         }
         asked
+    }
+
+    /// The questions about whose move it is that `asked` adds to triage: the
+    /// ones recorded with the triage answers (same switch as the catalogue,
+    /// campbooks-cloud#293). None with it off.
+    fn moves(&self, envelope: &Envelope) -> Vec<Question> {
+        if self.actions.enabled {
+            move_questions(envelope)
+        } else {
+            Vec::new()
+        }
     }
 
     /// The envelope the catalogue's facts read: its attachments are the
@@ -260,16 +274,20 @@ impl Pass {
             }
             Err(error) => return Err(redact::ai(&error)),
         };
-        // The catalogue's answers are rated, never stored as decisions:
-        // the triage answers are recorded exactly as without it.
+        // The catalogue's answers are rated, never stored as decisions: the
+        // triage answers are recorded exactly as without it. The move
+        // answers (asked right after them) are recorded with them, and only
+        // recorded: the policy has no switch for them, so none acts.
         let rated = self.rate(&facts, &answers);
-        answers.truncate(questions.len());
+        let moves = self.moves(&facts);
+        let recorded_questions: Vec<Question> = questions.iter().chain(&moves).cloned().collect();
+        answers.truncate(recorded_questions.len());
         let recorded = Recorded {
             message,
             conversation: loaded.conversation,
             source: Source::Model,
             strategy: model.strategy.name(),
-            questions: &questions,
+            questions: &recorded_questions,
             answers: &answers,
             policy: &self.policy,
         };

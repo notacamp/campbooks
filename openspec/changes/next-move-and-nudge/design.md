@@ -46,6 +46,10 @@ bumped (its rule). Both questions are catalogue-like for the call's strict
 checks: an answer missing or outside its options records nothing and fails
 nothing. Check the provider's limit on questions per call before adding
 them (nine with `awaited`, plus the catalogue's).
+Checked: neither provider adapter (`laya.rs`, `openai.rs`) limits questions per call;
+the only limits are the crate's own, `MAX_QUESTIONS` (64) and `MAX_OPTIONS` (20). With
+`awaited` the call has nine triage and move questions plus the catalogue's four, and
+`awaited` has at most seven options.
 
 ## Policy and trust
 

@@ -141,7 +141,7 @@ pub fn preamble(envelope: &Envelope) -> String {
 
 /// One line of at most [`QUOTED_CHARS`] characters, without control
 /// characters: a value that cannot break out of its line.
-fn quoted(value: &str) -> String {
+pub(super) fn quoted(value: &str) -> String {
     let line: String = value
         .chars()
         .map(|c| if c.is_control() { ' ' } else { c })

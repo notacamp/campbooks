@@ -27,7 +27,7 @@ use regex::Regex;
 
 use super::{
     auth_results,
-    email::{Envelope, triage},
+    email::{Envelope, Party, triage},
 };
 use crate::{
     Error,
@@ -107,6 +107,50 @@ pub fn is_machine_sender(envelope: &Envelope) -> bool {
         || facts.automatic().is_some()
         || facts.no_reply_sender()
         || facts.service_sender()
+}
+
+/// The most people [`awaitable`] returns: the `awaited` question's options.
+pub const MAX_AWAITABLE: usize = 6;
+
+/// Who on `envelope` may be awaited (the `awaited` question's options): the
+/// people in `To`, then in `Cc`, in order, without the inbox's own addresses,
+/// the sender, any address a machine owns (a no-reply or service address),
+/// and duplicates (compared without regard to case), at most
+/// [`MAX_AWAITABLE`]. When the sender is itself a machine (list or automatic
+/// mail, a no-reply or service address) nobody is awaited. Like every fact
+/// it only removes: it never decides who is expected to act, and reads no
+/// text (ADR 0018).
+pub fn awaitable(envelope: &Envelope) -> Vec<Party> {
+    if is_machine_sender(envelope) {
+        return Vec::new();
+    }
+    let sender = envelope.from.address.trim().to_lowercase();
+    let mut seen: Vec<String> = vec![sender];
+    let mut out: Vec<Party> = Vec::new();
+    for party in envelope.to.iter().chain(&envelope.cc) {
+        let address = party.address.trim().to_lowercase();
+        if address.is_empty() || seen.contains(&address) {
+            continue;
+        }
+        seen.push(address.clone());
+        let inbox = envelope.recipient.as_ref().is_some_and(|r| {
+            r.addresses
+                .iter()
+                .any(|a| a.trim().eq_ignore_ascii_case(&address))
+        });
+        let machine = Facts {
+            from: address,
+            ..Facts::default()
+        };
+        if inbox || machine.no_reply_sender() || machine.service_sender() {
+            continue;
+        }
+        out.push(party.clone());
+        if out.len() == MAX_AWAITABLE {
+            break;
+        }
+    }
+    out
 }
 
 /// Whether the receiving provider's `authentication_results` say mail from
@@ -1135,5 +1179,119 @@ mod tests {
         assert!(sender_checks_failed("hi@shop.example", Some(unsigned)));
         assert!(!dmarc_refused(Some(unsigned)));
         assert!(!dmarc_refused(None));
+    }
+
+    fn named(name: &str, address: &str) -> Party {
+        Party {
+            name: name.into(),
+            address: address.into(),
+        }
+    }
+
+    fn addresses(people: &[Party]) -> Vec<&str> {
+        people.iter().map(|p| p.address.as_str()).collect()
+    }
+
+    #[test]
+    fn a_colleague_and_a_no_reply_address() {
+        let mut env = with_recipient(&["ana.costa@studio.example"], &[], &["inbox@example.com"]);
+        env.from = named("Joao", "joao@studio.example");
+        env.cc = vec![
+            named("", "inbox@example.com"),
+            named("", "no-reply@tickets.example.com"),
+        ];
+        let awaitable = awaitable(&env);
+        assert_eq!(addresses(&awaitable), ["ana.costa@studio.example"]);
+        // The facts answer neither move question.
+        let questions = super::super::moves::move_questions(&env);
+        assert_eq!(questions.len(), 2);
+        let decided = EmailFacts::answer(&env, &questions);
+        assert!(decided.answers.iter().all(Option::is_none));
+    }
+
+    #[test]
+    fn nobody_to_pick_when_the_mail_is_only_to_the_inbox() {
+        let mut env = with_recipient(&["inbox@example.com"], &[], &["inbox@example.com"]);
+        env.from = named("Marta", "marta@studio.example");
+        assert!(awaitable(&env).is_empty());
+    }
+
+    #[test]
+    fn the_awaitable_keep_their_order_and_lose_case_duplicates_and_the_sender() {
+        let mut env = with_recipient(
+            &["Rui@Studio.example", "ana@studio.example"],
+            &[
+                "rui@studio.example ",
+                "MARTA@studio.example",
+                "sender@studio.example",
+            ],
+            &["inbox@example.com"],
+        );
+        env.from = named("Sender", "Sender@studio.example");
+        let awaitable = awaitable(&env);
+        assert_eq!(
+            addresses(&awaitable),
+            [
+                "Rui@Studio.example",
+                "ana@studio.example",
+                "MARTA@studio.example"
+            ]
+        );
+    }
+
+    #[test]
+    fn the_inbox_is_removed_without_regard_to_case_and_a_missing_inbox_removes_nobody() {
+        let env = with_recipient(
+            &["Inbox@Example.com", "ana@studio.example"],
+            &[],
+            &["inbox@example.com"],
+        );
+        assert_eq!(addresses(&awaitable(&env)), ["ana@studio.example"]);
+        let mut unknown = env.clone();
+        unknown.recipient = None;
+        assert_eq!(
+            addresses(&awaitable(&unknown)),
+            ["Inbox@Example.com", "ana@studio.example"]
+        );
+    }
+
+    #[test]
+    fn at_most_six_are_awaitable() {
+        let to: Vec<String> = (0..9).map(|n| format!("p{n}@studio.example")).collect();
+        let to: Vec<&str> = to.iter().map(String::as_str).collect();
+        let env = with_recipient(&to, &[], &[]);
+        let awaitable = awaitable(&env);
+        assert_eq!(awaitable.len(), MAX_AWAITABLE);
+        assert_eq!(awaitable[0].address, "p0@studio.example");
+        assert_eq!(awaitable[5].address, "p5@studio.example");
+    }
+
+    #[test]
+    fn machine_addresses_are_never_awaited() {
+        let env = with_recipient(
+            &[
+                "billing@shop.example",
+                "noreply@shop.example",
+                "ana@studio.example",
+            ],
+            &["Notifications@shop.example"],
+            &[],
+        );
+        assert_eq!(addresses(&awaitable(&env)), ["ana@studio.example"]);
+    }
+
+    #[test]
+    fn nobody_is_awaited_on_mail_from_a_machine() {
+        let people = ["ana@studio.example"];
+        let mut no_reply = with_recipient(&people, &[], &[]);
+        no_reply.from = named("", "no-reply@shop.example");
+        assert!(awaitable(&no_reply).is_empty());
+        let mut service = with_recipient(&people, &[], &[]);
+        service.from = named("", "billing@shop.example");
+        assert!(awaitable(&service).is_empty());
+        let mut list = with_recipient(&people, &[], &[]);
+        list.headers
+            .insert("List-Id".into(), "<news.shop.example>".into());
+        assert!(awaitable(&list).is_empty());
     }
 }

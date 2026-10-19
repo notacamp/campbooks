@@ -7,9 +7,9 @@
 
 ## 1. Decide (`campbooks-ai`)
 
-- [ ] 1.1 `triage::NEXT_MOVE` and its four options; `triage::AWAITED` built from the awaitable people (`p1`…`p6`, `none`)
-- [ ] 1.2 Facts: `awaitable(envelope)` (removes the inbox, the sender, machine addresses, duplicates; at most six), unit tests; the facts answer neither question
-- [ ] 1.3 Both questions tolerant like the catalogue's (missing or off-options answer records nothing); confirm the provider's per-call question limit
+- [x] 1.1 `moves::question::NEXT_MOVE` and its four options; `moves::question::AWAITED` built from the awaitable people (`p1`…`p6`, `none`) (`crates/ai/src/decide/signals/moves.rs`)
+- [x] 1.2 Facts: `awaitable(envelope)` (removes the inbox, the sender, machine addresses, duplicates; at most six), unit tests; the facts answer neither question
+- [x] 1.3 Both questions tolerant like the catalogue's (missing or off-options answer records nothing); confirm the provider's per-call question limit
 - [ ] 1.4 Labelling guide rulings for `next_move` and `awaited`; eval items gain the two fields **unlabelled**, for the owner to label (never agent labels); `cargo xtask eval decide` reports them once labelled
 
 ## 2. Conversations: the wait

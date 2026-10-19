@@ -100,6 +100,32 @@ pressure. A genuine alert from the real sender's domain is **not**
 suspicious, however alarming. A suspicious message is labelled with the
 `stream` it pretends to be, and never `needs_reply`.
 
+### `next_move` (recipient, sender, someone_else, nobody)
+
+Who is expected to **act next** after this message, from the recipient's
+point of view. One value per message; the owner labels it, an agent never
+does. Not in the committed `items/` yet: see the rulings below.
+
+- **`recipient`**: the recipient is asked to reply, decide, do or pay
+  something. Questions put to the recipient, requests of them, a bill they
+  owe.
+- **`sender`**: the sender says they will send or do something next
+  ("I'll send the contract on Friday", "I'll come back to you once I have
+  the figures"), or the matter waits on the sender's side.
+- **`someone_else`**: another person on the message is asked to do
+  something for the recipient or to get in touch with them.
+- **`nobody`**: it informs, thanks or settles the matter, and nobody owes a
+  next step: thanks, FYI, confirmations, receipts, newsletters.
+
+### `awaited` (one of the message's people, or none)
+
+Asked only when the message names someone who may be awaited (an address in
+`to` or `cc` that is not the inbox, the sender or a no-reply, service or list
+address; at most six, `p1`, `p2`, ... in the order `to` then `cc`). The label
+is the person expected to act next when that is neither the sender nor the
+recipient, or `none`. It follows `next_move`: `someone_else` has a person;
+`recipient`, `sender` and `nobody` are `none`.
+
 ## Hard-case tags
 
 | Tag | What makes it hard |
@@ -164,6 +190,21 @@ suspicious, however alarming. A suspicious message is labelled with the
   name or by role ("Daniel, can you confirm the figures?"), that ask is
   theirs and the labels follow it as for any other message. A question put to
   the people in `to` is not theirs.
+- Copied-only mail where the sender asks someone in `to` to contact the
+  recipient ("Ana, please send the floor plan to Sam"): `next_move` is
+  `someone_else` and `awaited` is that person. The recipient is only kept
+  informed, so `needs_reply` is false.
+- "I'll send it on Friday" or "I'll get back to you": `next_move` is
+  `sender`, `awaited` is `none`. Naming a date does not change who has the
+  move.
+- A question put to the recipient, by name or because they are the only
+  person in `to`: `next_move` is `recipient`.
+- Thanks, FYI, a settled matter, an automatic notice: `nobody`.
+- When the sender asks the recipient and someone else both to act, the
+  recipient's own ask wins: `recipient`. `someone_else` is for when the
+  recipient owes nothing.
+- A person who is only copied for information, not asked anything, is never
+  `awaited`.
 
 ## Agreement (v1)
 

@@ -62,6 +62,12 @@ impl Policy {
     /// | `urgency` | 85% | never answers | 0.73, 81% (does not hold) | record |
     /// | `suspicious` | 98% | never answers | 0.54, 100% | act ≥ 0.54 |
     /// | `money` | 90% | never answers | not measured | record |
+    /// | `next_move` | not set | never answers | not measured | record |
+    /// | `awaited` | not set | never answers | not measured | record |
+    ///
+    /// `next_move` and `awaited` (campbooks-cloud#293) only record until the
+    /// owner's labels give them an operating point, so no answer to either
+    /// ever acts.
     ///
     /// `money` (campbooks-cloud#167) is not in the fictional set: its
     /// operating point comes from mail the owner labels
@@ -157,6 +163,27 @@ mod tests {
             model: "rules".into(),
             model_version: None,
             latency: Duration::ZERO,
+        }
+    }
+
+    #[test]
+    fn the_baseline_never_accepts_whose_move_it_is() {
+        use campbooks_ai::decide::signals::moves::question;
+        let policy = Policy::baseline();
+        for id in question::ALL {
+            for source in [Source::Model, Source::Rules] {
+                assert_eq!(policy.switch(id, source), Switch::Record, "{id}");
+                let confident = Answer {
+                    question_id: id.into(),
+                    value: AnswerValue::Choice("someone_else".into()),
+                    probabilities: Some(vec![0.0, 0.0, 1.0, 0.0]),
+                    confidence: Some(1.0),
+                    model: "jev".into(),
+                    model_version: None,
+                    latency: Duration::ZERO,
+                };
+                assert!(!policy.switch(id, source).accepts(&confident), "{id}");
+            }
         }
     }
 
