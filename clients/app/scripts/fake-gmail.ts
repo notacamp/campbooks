@@ -1,8 +1,8 @@
 // The Gmail API of the fake Google (scripts/fake-google.ts): a demo mailbox
 // per fake Google account, served as the connectors module's Gmail adapter
 // reads it (users.me only: profile, labels, messages list/get, history) and
-// writes to it (messages modify, batchModify, trash and untrash, recorded in
-// history).
+// writes to it (labels create; messages modify, batchModify, trash and
+// untrash, recorded in history).
 // Development and recordings only. Every person, company and address here is
 // fictional; domains are `.example`.
 import { randomBytes } from "node:crypto";
@@ -44,6 +44,8 @@ export interface Mailbox {
   historyId: number;
   /** Each demo thread's Gmail thread id and Message-IDs, to answer in it later. */
   threads?: Map<string, { threadId: string; messageIds: string[] }>;
+  /** User labels made since (`labels.create`, or by the member in Gmail). */
+  userLabels?: { id: string; name: string }[];
 }
 
 const LABELS = [
@@ -57,8 +59,33 @@ const LABELS = [
   { id: "CATEGORY_PERSONAL", name: "CATEGORY_PERSONAL", type: "system" },
   { id: "CATEGORY_UPDATES", name: "CATEGORY_UPDATES", type: "system" },
   { id: "CATEGORY_PROMOTIONS", name: "CATEGORY_PROMOTIONS", type: "system" },
+  { id: "CATEGORY_SOCIAL", name: "CATEGORY_SOCIAL", type: "system" },
+  { id: "CATEGORY_FORUMS", name: "CATEGORY_FORUMS", type: "system" },
   { id: "Label_1", name: "Clients", type: "user" },
 ];
+
+/** Every label `mailbox` has: Gmail's own, then the user labels. */
+function labelsOf(mailbox: Mailbox): { id: string; name: string; type: string }[] {
+  return [
+    ...LABELS,
+    ...(mailbox.userLabels ?? []).map((label) => ({ ...label, type: "user" })),
+  ];
+}
+
+/**
+ * The user label named `name` (any case), made when `mailbox` has none, as
+ * `labels.create` or the member in Gmail makes one.
+ */
+function labelNamed(mailbox: Mailbox, name: string): { id: string; name: string } {
+  const found = labelsOf(mailbox).find((label) => label.name.toLowerCase() === name.toLowerCase());
+  if (found !== undefined) {
+    return { id: found.id, name: found.name };
+  }
+  const made = { id: `Label_${String(100 + (mailbox.userLabels?.length ?? 0))}`, name };
+  mailbox.userLabels = [...(mailbox.userLabels ?? []), made];
+  console.log(`fake Gmail: label ${made.id} "${name}" made`);
+  return made;
+}
 
 const hex = (bytes: number) => randomBytes(bytes).toString("hex");
 
@@ -951,6 +978,17 @@ export async function writeGmail(
   let text = "";
   for await (const chunk of request) text += String(chunk);
   const body = (text === "" ? {} : JSON.parse(text)) as Record<string, unknown>;
+  if (path === "labels") {
+    // `labels.create`: a name Gmail has already is refused, as Gmail does.
+    const name = typeof body["name"] === "string" ? body["name"] : "";
+    const taken = labelsOf(mailbox).some((label) => label.name.toLowerCase() === name.toLowerCase());
+    if (name === "" || taken) {
+      json(response, 409, { error: { code: 409, message: "Label name exists or conflicts" } });
+      return true;
+    }
+    json(response, 200, { ...labelNamed(mailbox, name), type: "user" });
+    return true;
+  }
   const add = strings(body["addLabelIds"]);
   const remove = strings(body["removeLabelIds"]);
   if (path === "messages/batchModify") {
@@ -984,14 +1022,52 @@ export async function writeGmail(
   return true;
 }
 
-/** What `mailbox` holds, newest first: each message's subject and labels. */
+/** The subject of a stored message. */
+const subjectOf = (message: StoredMessage) =>
+  /^Subject: (.*)$/mu.exec(message.raw)?.[1]?.trim() ?? "";
+
+/**
+ * What `mailbox` holds, newest first: each message's subject and labels, user
+ * labels by name (`Campbooks/Receipts`), Gmail's own by id (`INBOX`).
+ */
 export function describeMailbox(mailbox: Mailbox): { subject: string; labels: string[] }[] {
+  const names = new Map(labelsOf(mailbox).map((label) => [label.id, label.name]));
   return mailbox.messages
     .toSorted((a, b) => b.internalDate - a.internalDate)
     .map((message) => ({
-      subject: /^Subject: (.*)$/mu.exec(message.raw)?.[1]?.trim() ?? "",
-      labels: message.labelIds.toSorted(),
+      subject: subjectOf(message),
+      labels: message.labelIds.map((id) => names.get(id) ?? id).toSorted(),
     }));
+}
+
+/**
+ * The member changes the labels of the newest message with `subject` in
+ * Gmail's own screens (`POST /fake/relabel`): `add` and `remove` name labels
+ * (`CATEGORY_PROMOTIONS`, `Campbooks/Receipts`); a user label Gmail does not
+ * have yet is made. Recorded in history, so the next sync reads it. Returns
+ * the message's labels afterwards, or undefined when there is no such message.
+ */
+export function relabelDemo(
+  mailbox: Mailbox,
+  subject: string,
+  add: string[],
+  remove: string[],
+): string[] | undefined {
+  const message = mailbox.messages
+    .filter((candidate) => subjectOf(candidate) === subject)
+    .toSorted((a, b) => b.internalDate - a.internalDate)[0];
+  if (message === undefined) {
+    return undefined;
+  }
+  const known = (name: string) =>
+    labelsOf(mailbox).find((label) => label.name.toLowerCase() === name.toLowerCase())?.id;
+  modifyLabels(
+    mailbox,
+    message,
+    add.map((name) => known(name) ?? labelNamed(mailbox, name).id),
+    remove.map((name) => known(name)).filter((id): id is string => id !== undefined),
+  );
+  return describeMailbox({ ...mailbox, messages: [message] })[0]?.labels;
 }
 
 /**
@@ -1017,7 +1093,7 @@ export function handleGmail(
     return true;
   }
   if (path === "labels") {
-    json(response, 200, { labels: LABELS });
+    json(response, 200, { labels: labelsOf(mailbox) });
     return true;
   }
   if (path === "messages") {
