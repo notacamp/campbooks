@@ -293,8 +293,8 @@ fn router() -> OpenApiRouter<AppState> {
     use features::{
         archive, create_draft, get_attachment, get_conversation, get_message_body, labels,
         list_conversations, list_drafts, list_inboxes, list_labels, list_senders, list_streams,
-        mark_read, move_to_stream, needs, reply, rule_notices, rules, send_draft, spam, star,
-        suggest_rules, trash, update_draft,
+        mark_read, move_to_stream, needs, person_notes, reply, rule_notices, rules, send_draft,
+        spam, star, suggest_rules, trash, update_draft,
     };
     OpenApiRouter::new()
         .routes(routes!(list_inboxes::handler))
@@ -343,6 +343,8 @@ fn router() -> OpenApiRouter<AppState> {
         .routes(routes!(reply::suggest))
         .routes(routes!(reply::write))
         .routes(routes!(reply::stream))
+        .routes(routes!(person_notes::list, person_notes::set))
+        .routes(routes!(person_notes::delete))
 }
 
 #[cfg(test)]

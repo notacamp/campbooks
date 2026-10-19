@@ -995,3 +995,156 @@ describe("ReplyDialog", () => {
     });
   });
 });
+
+const P = `${W}/person-notes`;
+const MAYA_NOTE = {
+  id: "0192f1a0-0000-7000-8000-0000000002a1",
+  address: "maya@northwind-studio.example",
+  name: "Maya Okafor",
+  note: "A client. Warm, first names, in English.",
+  updated_at: "2026-10-12T09:00:00Z",
+};
+
+/** The member's notes, kept as the server would: by address, theirs alone. */
+function notesApi(start: (typeof MAYA_NOTE)[] = []) {
+  let notes = [...start];
+  return {
+    [`GET ${P}`]: () => ({ body: { notes } }),
+    [`PUT ${P}`]: (_request: Request, body: unknown) => {
+      const { address, note } = body as { address: string; note: string };
+      const kept = {
+        ...(notes.find((item) => item.address === address) ?? { ...MAYA_NOTE, address }),
+        note,
+      };
+      notes = [kept, ...notes.filter((item) => item.address !== address)];
+      return { body: kept };
+    },
+    [`DELETE ${P}/${MAYA_NOTE.id}`]: () => {
+      notes = notes.filter((item) => item.id !== MAYA_NOTE.id);
+      return { status: 204 };
+    },
+  };
+}
+
+describe("ReplyDialog: telling Scout about the person", () => {
+  it("keeps a note about the person answered and offers to rewrite with it", async () => {
+    const api = routes(notesApi());
+    dialog();
+    fireEvent.click(await screen.findByRole("button", { name: /Say Thursday works/u }));
+    await screen.findByRole("textbox", { name: "Your reply" });
+
+    fireEvent.click(await screen.findByRole("button", { name: /Tell Scout about Maya/u }));
+    const field = screen.getByRole("textbox", { name: "About Maya, and how to write to them" });
+    expect(field).toHaveFocus();
+    expect(field).toHaveAttribute("placeholder", "e.g. My landlord. Formal, in Portuguese.");
+    fireEvent.change(field, { target: { value: "  A client. Warm, first names.  " } });
+    fireEvent.click(screen.getByRole("button", { name: /^Save/u }));
+
+    expect(await screen.findByText("Scout knows: A client. Warm, first names.")).toBeVisible();
+    // The address travels in the body, never in the URL.
+    const put = api.calls.find((c) => c.route === `PUT ${P}`);
+    expect(put?.body).toEqual({
+      address: "maya@northwind-studio.example",
+      note: "A client. Warm, first names.",
+    });
+    expect(api.calls.every((c) => !c.route.includes("maya@"))).toBe(true);
+    // The focus is back on the line, and Saved is announced.
+    await waitFor(() => {
+      expect(
+        screen.getByRole("button", { name: "Edit what Scout knows about Maya" }),
+      ).toHaveFocus();
+    });
+    expect(screen.getAllByRole("status").some((s) => s.textContent.includes("Saved."))).toBe(true);
+    expect(await screen.findByRole("button", { name: /^Undo/u })).toBeInTheDocument();
+
+    // Nothing is written again on its own: only on Rewrite with this.
+    const writes = () => api.calls.filter((c) => c.route === WRITE).length;
+    expect(writes()).toBe(1);
+    fireEvent.click(screen.getByRole("button", { name: /Rewrite with this/u }));
+    await waitFor(() => {
+      expect(writes()).toBe(2);
+    });
+    expect(api.calls.findLast((c) => c.route === WRITE)?.body).toEqual({
+      message_id: NEWEST,
+      intent: "Say Thursday works",
+      suggestions: INTENTS,
+    });
+  });
+
+  it("leaves the field with Esc and keeps the note with ⌘↵, never sending", async () => {
+    const api = routes(notesApi());
+    const handlers = dialog();
+    fireEvent.click(await screen.findByRole("button", { name: /Say Thursday works/u }));
+    await screen.findByRole("textbox", { name: "Your reply" });
+
+    fireEvent.click(await screen.findByRole("button", { name: /Tell Scout about Maya/u }));
+    let field = screen.getByRole("textbox", { name: "About Maya, and how to write to them" });
+    fireEvent.change(field, { target: { value: "Not this" } });
+    fireEvent.keyDown(field, { key: "Escape" });
+    expect(screen.queryByRole("textbox", { name: /About Maya/u })).toBeNull();
+    // The dialog stays, and the focus is back on the line.
+    expect(handlers.onClose).not.toHaveBeenCalled();
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: /Tell Scout about Maya/u })).toHaveFocus();
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: /Tell Scout about Maya/u }));
+    field = screen.getByRole("textbox", { name: "About Maya, and how to write to them" });
+    expect(field).toHaveValue("");
+    fireEvent.change(field, { target: { value: "A client." } });
+    fireEvent.keyDown(field, { key: "Enter", metaKey: true });
+    expect(await screen.findByText("Scout knows: A client.")).toBeVisible();
+    expect(api.calls.some((c) => c.route === `POST ${D}`)).toBe(false);
+    expect(handlers.onSent).not.toHaveBeenCalled();
+  });
+
+  it("shows what Scout knows, and forgets it with Undo", async () => {
+    const api = routes(notesApi([MAYA_NOTE]));
+    dialog();
+    expect(
+      await screen.findByText("Scout knows: A client. Warm, first names, in English."),
+    ).toBeVisible();
+    fireEvent.click(screen.getByRole("button", { name: "Edit what Scout knows about Maya" }));
+    expect(
+      screen.getByRole("textbox", { name: "About Maya, and how to write to them" }),
+    ).toHaveValue(MAYA_NOTE.note);
+    fireEvent.click(screen.getByRole("button", { name: "Forget this" }));
+    expect(await screen.findByRole("button", { name: /Tell Scout about Maya/u })).toBeVisible();
+    expect(api.calls.map((c) => c.route)).toContain(`DELETE ${P}/${MAYA_NOTE.id}`);
+
+    fireEvent.click(await screen.findByRole("button", { name: /^Undo/u }));
+    await waitFor(() => {
+      expect(api.calls.findLast((c) => c.route === `PUT ${P}`)?.body).toEqual({
+        address: MAYA_NOTE.address,
+        note: MAYA_NOTE.note,
+      });
+    });
+  });
+
+  it("says why a note can't be kept", async () => {
+    routes({
+      ...notesApi(),
+      [`PUT ${P}`]: problem(409, "person_notes_full"),
+    });
+    dialog();
+    fireEvent.click(await screen.findByRole("button", { name: /Tell Scout about Maya/u }));
+    fireEvent.change(screen.getByRole("textbox", { name: /About Maya/u }), {
+      target: { value: "A client." },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /^Save/u }));
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "You keep 500 notes about people already.",
+    );
+    expect(screen.getByRole("textbox", { name: /About Maya/u })).toHaveValue("A client.");
+  });
+
+  it("offers nothing to tell when Scout can't write replies here", async () => {
+    routes({
+      ...notesApi(),
+      [`POST ${C}/reply/suggestions`]: problem(409, "reply_unavailable"),
+    });
+    dialog();
+    await screen.findByText("Scout can't write replies on this server, so you write this one.");
+    expect(screen.queryByRole("button", { name: /Tell Scout about/u })).toBeNull();
+  });
+});
