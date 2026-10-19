@@ -163,8 +163,8 @@ describe("What needs you", () => {
     api();
     renderHome();
     await screen.findByText("This may be phishing. Don’t use its links.");
+    // Stepping onto it opens it, as a click does.
     fireEvent.keyDown(document, { key: "j" });
-    fireEvent.keyDown(document, { key: "Enter" });
     expect(await screen.findByText(/Hope the move went well/u)).toBeVisible();
     expect(screen.getByRole("button", { name: "Show the whole email" })).toBeVisible();
   });
@@ -174,7 +174,6 @@ describe("What needs you", () => {
     renderHome();
     await screen.findByText("This may be phishing. Don’t use its links.");
     fireEvent.keyDown(document, { key: "j" });
-    fireEvent.keyDown(document, { key: "Enter" });
     const summary = await screen.findByRole("region", { name: "Scout’s summary" });
     expect(summary).toHaveTextContent(
       "Marta is arranging Thursday’s walkthrough with the builders and needs your yes by Wednesday.",
@@ -195,22 +194,64 @@ describe("What needs you", () => {
     expect(screen.queryByRole("region", { name: "Scout’s summary" })).not.toBeInTheDocument();
   });
 
-  it("moves with the arrow keys, even with an item open", async () => {
+  it("moves with the arrow keys, opening each item it steps onto, as a click does", async () => {
     api();
     renderHome();
     await screen.findByText("This may be phishing. Don’t use its links.");
+    /** Whether the row holding `text` is open. */
+    const isOpen = (text: string) =>
+      screen.getByText(text).closest("button")?.getAttribute("aria-expanded") === "true";
+    // Nothing is open on arrival.
+    expect(isOpen("This may be phishing. Don’t use its links.")).toBe(false);
     fireEvent.keyDown(document, { key: "ArrowDown" });
     expect(isSelected("Marta Ferreira is waiting for your reply")).toBe(true);
+    expect(isOpen("Marta Ferreira is waiting for your reply")).toBe(true);
     fireEvent.keyDown(document, { key: "ArrowUp" });
     expect(isSelected("This may be phishing. Don’t use its links.")).toBe(true);
+    expect(isOpen("This may be phishing. Don’t use its links.")).toBe(true);
+    expect(isOpen("Marta Ferreira is waiting for your reply")).toBe(false);
+    expect(await screen.findByText("How Campbooks decided")).toBeVisible();
+    // Enter closes the open item, Esc too; J and K step and open the same way.
     fireEvent.keyDown(document, { key: "Enter" });
-    await screen.findByText("How Campbooks decided");
-    // Open: ↓ still steps (and closes it), as do J and K.
-    fireEvent.keyDown(document, { key: "ArrowDown" });
-    expect(isSelected("Marta Ferreira is waiting for your reply")).toBe(true);
-    expect(screen.queryByText("How Campbooks decided")).toBeNull();
+    expect(isOpen("This may be phishing. Don’t use its links.")).toBe(false);
+    fireEvent.keyDown(document, { key: "j" });
     fireEvent.keyDown(document, { key: "j" });
     expect(isSelected("Jonas Weber asked you a question")).toBe(true);
+    expect(isOpen("Jonas Weber asked you a question")).toBe(true);
+    fireEvent.keyDown(document, { key: "Escape" });
+    expect(isOpen("Jonas Weber asked you a question")).toBe(false);
+  });
+
+  it("opens the next item when the open one is done", async () => {
+    api();
+    renderHome();
+    await screen.findByText("This may be phishing. Don’t use its links.");
+    fireEvent.keyDown(document, { key: "j" });
+    fireEvent.keyDown(document, { key: "e" });
+    expect((await screen.findAllByText("Done · Marta Ferreira")).length).toBeGreaterThan(0);
+    expect(isSelected("Jonas Weber asked you a question")).toBe(true);
+    expect(
+      screen
+        .getByText("Jonas Weber asked you a question")
+        .closest("button")
+        ?.getAttribute("aria-expanded"),
+    ).toBe("true");
+  });
+
+  it("says how long each item has waited, with the full date on hover", async () => {
+    api();
+    renderHome();
+    const row = (await screen.findByText("Marta Ferreira is waiting for your reply")).closest(
+      "button",
+    );
+    const age = row?.querySelector("time");
+    expect(age).not.toBeNull();
+    expect(age?.getAttribute("dateTime")).toBe(new Date(MARTA.last_message_at).toISOString());
+    expect(age?.getAttribute("title")).toMatch(/2026/u);
+    // Every row says it, not only the dated ones.
+    const rows = [...document.querySelectorAll("button[id^='attention-']")];
+    expect(rows).toHaveLength(NEEDS.length);
+    expect(rows.every((r) => r.querySelector("time") !== null)).toBe(true);
   });
 
   it("shows the selected item's actions in words with keys, and only its", async () => {

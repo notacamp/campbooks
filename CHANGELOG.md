@@ -8,6 +8,10 @@ All notable changes to Campbooks Next are documented here. The format follows
 
 ### Added
 
+- **Home says how long each thing has waited.** Every row on Home now shows its age at the
+  end of the line, above its due date: "12 minutes ago", "5 hours ago", "Yesterday", "4
+  days ago", then the date once it is a week old ("2 Oct"). Hover it for the full date and
+  time.
 - **Threads read as a back and forth.** Your own messages in a thread read "You → Marta
   Silva" and sit in from the left, while theirs stay flush left. A long thread keeps its
   newest two messages, its first and anything unread, and folds the middle into "N more
@@ -116,6 +120,10 @@ All notable changes to Campbooks Next are documented here. The format follows
   was valid after it was sent. Open asks are settled on upgrade, and summaries written
   before are read once more for their dates, within the daily AI limit.
 
+- **The arrow keys open Home's items, as a click does.** Moving with ↑/↓ or J/K on Home now
+  opens the item you land on (Scout's summary and the email), instead of only selecting it.
+  Enter or Esc closes it. When you finish the open item, the next one opens in its place,
+  so you can read and clear Home one item at a time.
 - **An email you are only copied on no longer reads as "needs a reply".** Scout is now told
   who was addressed and who was copied, and that someone copied on an email is usually being
   kept informed: it asks for a reply from them only when the email asks them something
