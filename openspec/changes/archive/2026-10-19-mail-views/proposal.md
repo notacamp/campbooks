@@ -47,7 +47,7 @@ mail and no button calls them. The owner: the app is missing basic folders
 - Specs: conversations (Reading conversations, Trash and spam, ADDED the
   inbox's latest message and spam images), inbox-ui (Streams, not people,
   ADDED views' actions, Sent rows and the Spam reader).
-- Migration `20261023020000_conversations__mail_views` and four concurrent
+- Migration `20261023040000_conversations__mail_views` and four concurrent
   index migrations.
 - API: `conversations.list` gains `view`; `ConversationSummary` gains five
   fields; `ImagesHeld` gains `spam`.
