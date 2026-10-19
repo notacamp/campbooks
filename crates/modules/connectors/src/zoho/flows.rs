@@ -1173,8 +1173,10 @@ async fn stream_moves_and_labels_reach_zoho_and_never_echo(db: PgPool) {
 #[sqlx::test(migrations = "../../../migrations")]
 async fn a_revert_in_zoho_after_a_stream_write_comes_back(db: PgPool) {
     // Scout's sort is written (a Receipts mark), then the member takes the
-    // mark off in Zoho: the batches say `receipts`, then (at the sweep)
-    // `primary`, and nothing is written back.
+    // mark off in Zoho: the batches say `receipts`, then `primary`, and
+    // nothing is written back. A mark our push changed since the last pass
+    // ended is never taken off by a listing, so the sweep after the next
+    // one sees the member's change.
     let kit = Kit::new(db).await;
     let message = kit.zoho.deliver(
         &synthetic(1),
@@ -1196,6 +1198,11 @@ async fn a_revert_in_zoho_after_a_stream_write_comes_back(db: PgPool) {
     let mark = kit.zoho.label_named("Campbooks/Receipts").unwrap();
     kit.zoho
         .change(&message, |m| m.labels.retain(|l| *l != mark));
+    sweep(&kit).await;
+    assert_eq!(
+        streams_of(&kit, mailbox.ws, before, &message).await,
+        [json!("receipts")]
+    );
     sweep(&kit).await;
     assert_eq!(
         streams_of(&kit, mailbox.ws, before, &message).await,

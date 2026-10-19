@@ -66,10 +66,7 @@ const LABELS = [
 
 /** Every label `mailbox` has: Gmail's own, then the user labels. */
 function labelsOf(mailbox: Mailbox): { id: string; name: string; type: string }[] {
-  return [
-    ...LABELS,
-    ...(mailbox.userLabels ?? []).map((label) => ({ ...label, type: "user" })),
-  ];
+  return [...LABELS, ...(mailbox.userLabels ?? []).map((label) => ({ ...label, type: "user" }))];
 }
 
 /**
@@ -981,7 +978,9 @@ export async function writeGmail(
   if (path === "labels") {
     // `labels.create`: a name Gmail has already is refused, as Gmail does.
     const name = typeof body["name"] === "string" ? body["name"] : "";
-    const taken = labelsOf(mailbox).some((label) => label.name.toLowerCase() === name.toLowerCase());
+    const taken = labelsOf(mailbox).some(
+      (label) => label.name.toLowerCase() === name.toLowerCase(),
+    );
     if (name === "" || taken) {
       json(response, 409, { error: { code: 409, message: "Label name exists or conflicts" } });
       return true;
