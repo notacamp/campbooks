@@ -3763,7 +3763,8 @@
           "automation": false,
           "mutates": false,
           "records": [
-            "conversations.message"
+            "conversations.message",
+            "conversations.rule"
           ],
           "risk": "low"
         }

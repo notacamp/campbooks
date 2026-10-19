@@ -156,7 +156,8 @@ export function useMessageBody(
   return useQuery({
     queryKey: keys.body(workspaceId, conversationId, messageId, showImages),
     enabled,
-    // A body never changes once stored.
+    // A body never changes once stored; whether its images show does, with
+    // the rules: a live rule change re-reads it (`conversations.rule`).
     staleTime: Number.POSITIVE_INFINITY,
     // "Show images" refetches it: keep the blocked version up meanwhile.
     placeholderData: keepPreviousData,

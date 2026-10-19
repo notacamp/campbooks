@@ -134,6 +134,23 @@ describe("the change feed", () => {
       expect(stale(detail)).toBe("gone");
     });
 
+    it("re-reads the message bodies it holds when a rule changes or goes", async () => {
+      // A rule that trusts a sender shows or hides its images: removed on
+      // another device or by another member, the bodies here follow at once
+      // (campbooks-cloud#236), and stay cached until then.
+      const { client, stale } = seededClient();
+      const body = operationKey("conversations.get_message_body", {
+        workspace_id: WS,
+        conversation_id: "c1",
+        message_id: "m1",
+        show_images: "false",
+      });
+      client.setQueryData(body, { cached: true });
+      createCacheBinding(client, WS).change({ type: "conversations.rule", id: "r1" }, "delete");
+      await vi.advanceTimersByTimeAsync(50);
+      expect(stale(body)).toBe(true);
+    });
+
     it("ignores record types no read operation returns", async () => {
       const { client, keys, stale } = seededClient();
       createCacheBinding(client, WS).change({ type: "nowhere.thing", id: "x" }, "upsert");
