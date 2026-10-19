@@ -423,6 +423,9 @@ mod http_tests {
         let q4 = &all.json["conversations"][2];
         assert_eq!(q4["message_count"], 2);
         assert_eq!(q4["latest_from"]["address"], "sam@example.com");
+        // Sam wrote last; the newsletter's newest message is theirs.
+        assert_eq!(q4["latest_from_you"], true);
+        assert_eq!(all.json["conversations"][1]["latest_from_you"], false);
         assert_eq!(q4["labels"][0]["name"], "Clients");
         assert!(all.json["next_cursor"].is_null());
 

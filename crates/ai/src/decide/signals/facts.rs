@@ -12,6 +12,9 @@
 //! - [`EmailFacts`] answers `needs_reply` false, and only that, for list
 //!   mail, mail sent automatically and mail from a no-reply address. It
 //!   abstains on every other question, and never answers true.
+//!   It also notes whether the inbox's owner is only copied (`Cc`, not `To`).
+//!   That is a hint for the model, never a "no": being asked something by
+//!   name while copied is for the model to read.
 //! - [`Facts::hints`] is what a `decide` model is told about the same facts
 //!   ([`super::inbox::preamble`]): hints, not decisions.
 //!
@@ -187,6 +190,9 @@ pub struct Facts {
     pub from: String,
     /// The recipients' and copied recipients' addresses, lower-cased.
     pub recipients: Vec<String>,
+    /// Whether the inbox's owner is copied (`Cc`) and not addressed (`To`):
+    /// one of the inbox's addresses is in `Cc` and none is in `To`.
+    pub copied_only: bool,
     /// `List-Id`.
     pub list_id: Option<String>,
     /// `List-Unsubscribe`.
@@ -216,6 +222,7 @@ impl Facts {
                 .chain(&envelope.cc)
                 .map(|party| party.address.to_lowercase())
                 .collect(),
+            copied_only: copied_only(envelope),
             list_id: header("list-id"),
             list_unsubscribe: header("list-unsubscribe"),
             precedence: header("precedence"),
@@ -380,8 +387,25 @@ impl Facts {
             service_sender: self.service_sender(),
             reply_elsewhere: self.reply_elsewhere(),
             authentication_failed: self.authentication_failed(),
+            copied_only: self.copied_only,
         }
     }
+}
+
+/// Whether one of the inbox's addresses is in `Cc` and none is in `To`
+/// (addresses compared without regard to case). `false` when the inbox is
+/// unknown.
+fn copied_only(envelope: &Envelope) -> bool {
+    let Some(recipient) = &envelope.recipient else {
+        return false;
+    };
+    let mine = |party: &super::email::Party| {
+        recipient
+            .addresses
+            .iter()
+            .any(|a| a.trim().eq_ignore_ascii_case(party.address.trim()))
+    };
+    envelope.cc.iter().any(mine) && !envelope.to.iter().any(mine)
 }
 
 /// What the facts say about an email, for a model's context.
@@ -403,6 +427,9 @@ pub struct Hints {
     pub reply_elsewhere: bool,
     /// The receiving provider's authentication of the sender failed.
     pub authentication_failed: bool,
+    /// The recipient is in `Cc` and not in `To`: copied, not addressed. A
+    /// hint, never a decision: a copied person is sometimes asked something.
+    pub copied_only: bool,
 }
 
 /// The facts as a [`Strategy`]: `needs_reply` false for list mail,
@@ -636,6 +663,57 @@ mod tests {
         assert_eq!(needs_reply(&bulk).unwrap().reasons[0].rule, LIST_MAIL);
         let other = mail("a@example.com", "x", "x", &[("Precedence", "first-class")]);
         assert!(needs_reply(&other).is_none());
+    }
+
+    fn with_recipient(to: &[&str], cc: &[&str], inbox: &[&str]) -> Envelope {
+        let party = |a: &&str| Party {
+            name: String::new(),
+            address: (*a).into(),
+        };
+        let mut env = mail("ana@studio.example", "x", "x", &[]);
+        env.to = to.iter().map(party).collect();
+        env.cc = cc.iter().map(party).collect();
+        env.recipient = Some(crate::decide::signals::inbox::Recipient {
+            name: String::new(),
+            addresses: inbox.iter().map(|a| (*a).to_owned()).collect(),
+            shared: false,
+        });
+        env
+    }
+
+    #[test]
+    fn copied_only_means_in_cc_and_not_in_to() {
+        let hint = |env: &Envelope| Facts::of(env).hints().copied_only;
+        let sam = ["sam@example.com"];
+        assert!(!hint(&with_recipient(&["sam@example.com"], &[], &sam)));
+        assert!(hint(&with_recipient(
+            &["ana@studio.example"],
+            &["Sam@Example.com"],
+            &sam
+        )));
+        assert!(!hint(&with_recipient(
+            &["sam@example.com"],
+            &["sam@example.com"],
+            &sam
+        )));
+        // A shared inbox with several addresses: any of them in To is addressed.
+        let shared = ["studio@example.com", "team@example.com"];
+        assert!(hint(&with_recipient(
+            &["ana@studio.example"],
+            &["studio@example.com"],
+            &shared
+        )));
+        assert!(!hint(&with_recipient(
+            &["team@example.com"],
+            &["studio@example.com"],
+            &shared
+        )));
+        // Unknown inbox: no hint. And the hint never makes the facts say no.
+        let mut unknown = with_recipient(&[], &["sam@example.com"], &[]);
+        unknown.recipient = None;
+        assert!(!hint(&unknown));
+        let copied = with_recipient(&["ana@studio.example"], &["sam@example.com"], &sam);
+        assert!(needs_reply(&copied).is_none());
     }
 
     #[test]

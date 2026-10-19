@@ -21,7 +21,9 @@ the archive as `view=archive` does, and with any other `view` the response
 SHALL be 400 `invalid_view`. Lists by `ids` SHALL ignore the view and the
 stream. A cursor given before pins existed SHALL read as one among the
 unpinned conversations. Pinning SHALL stay the provider's star (Gmail's
-STARRED), synced as before. A summary SHALL say whether the conversation is
+STARRED), synced as before. Each listed conversation SHALL say whether its
+newest message (the one `latest_from` and `snippet` come from) is one the
+inbox sent (`latest_from_you`). A summary SHALL say whether the conversation is
 `archived`, `trashed` and binned as `spam`, when the inbox last wrote in it
 (`last_sent_at`), whom that message went to (`sent_to`: to, then cc) and
 whether someone wrote back since (`replied_since_sent`).
@@ -59,6 +61,10 @@ filtered `@media` rules in `css`; HTML SHALL never be served as `text/html`.
 #### Scenario: Other inboxes
 - **WHEN** a member of the workspace who is not in an inbox lists any view
 - **THEN** none of that inbox's conversations is listed
+
+#### Scenario: Who wrote last
+- **WHEN** the newest message of a conversation is one Sam sent from the inbox
+- **THEN** it is listed with `latest_from_you` true, and a conversation whose newest message came in is listed with it false
 
 ### Requirement: Trash and spam
 `POST …/conversations/{conversation_id}/trash` (`conversations.trash`) and

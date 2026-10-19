@@ -13291,6 +13291,7 @@
           "spam",
           "sent_to",
           "replied_since_sent",
+          "latest_from_you",
           "snippet",
           "labels"
         ],
@@ -13337,6 +13338,10 @@
                 "type": "null"
               }
             ]
+          },
+          "latest_from_you": {
+            "type": "boolean",
+            "description": "Whether the newest message is one the inbox sent (outbound)."
           },
           "message_count": {
             "type": "integer",

@@ -126,7 +126,11 @@ export function ConversationList({
             time={listTime(at, i18n.language, now)}
             dateTime={at}
             subject={conversation.subject === "" ? t("reader.noSubject") : conversation.subject}
-            snippet={conversation.snippet}
+            snippet={
+              conversation.latest_from_you
+                ? t("list.youPrefix", { snippet: conversation.snippet })
+                : conversation.snippet
+            }
             unread={conversation.unread_count > 0}
             starred={conversation.starred}
             count={conversation.message_count}

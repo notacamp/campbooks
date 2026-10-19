@@ -24,6 +24,7 @@ const base: Pick<
   | "stream"
   | "stream_source"
   | "starred"
+  | "latest_from_you"
 > = {
   inbox_id: INBOX.id,
   archived: false,
@@ -37,6 +38,7 @@ const base: Pick<
   stream: "primary",
   stream_source: "default",
   starred: false,
+  latest_from_you: false,
 };
 
 interface Spec {
@@ -176,6 +178,7 @@ export const SOFIA: Summary = {
   message_count: 2,
   unread_count: 0,
   latest_from: { name: "Sam Rivera", address: "sam.rivera@example.com" },
+  latest_from_you: true,
   snippet: "Perfect, thank you!",
   need: null,
 };

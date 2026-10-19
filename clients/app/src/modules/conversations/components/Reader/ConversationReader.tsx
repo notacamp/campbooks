@@ -13,9 +13,11 @@ import {
   HowDecided,
   IconButton,
   MetaLine,
+  MoreMessages,
   Note,
   PaneHeader,
   ReaderBody,
+  ReaderFooter,
   SkeletonList,
   Spacer,
 } from "~/lib/ui";
@@ -35,8 +37,10 @@ import {
   openByDefault,
   placeName,
   placementLine,
+  replyName,
   spamMove,
   streamName,
+  threadLayout,
   trashMove,
   type Move,
   type Translate,
@@ -90,8 +94,9 @@ export interface ConversationReaderProps {
 
 /**
  * A conversation: its actions (with their shortcuts), the assistant's note
- * (suggestions with their reasons), the thread newest last with older
- * messages folded, and the reply slot.
+ * (suggestions with their reasons), the thread newest first with older
+ * messages folded (the middle of a long one into "N more messages"), and
+ * the reply slot pinned at the bottom.
  */
 export function ConversationReader({
   workspaceId,
@@ -159,6 +164,8 @@ export function ConversationReader({
   const toPay = need !== undefined && billKind(need) === "toPay";
 
   const [opened, setOpened] = useState<Set<string>>(new Set());
+  // Messages "N more messages" showed (folded) in its place.
+  const [revealed, setRevealed] = useState<Set<string>>(new Set());
   const [images, setImages] = useState<Set<string>>(new Set());
   const [moving, setMoving] = useState(false);
   const [reply, setReply] = useState<ReplyRequest | null>(null);
@@ -184,6 +191,7 @@ export function ConversationReader({
 
   const messages = detail?.messages ?? [];
   const open = new Set([...openByDefault(messages), ...opened]);
+  const thread = threadLayout(messages, new Set([...opened, ...revealed]));
   const newest = messages.at(-1);
   const suggestion = writable && !binned ? (conversation?.suggestion ?? undefined) : undefined;
   const active = conversation !== undefined && writable;
@@ -429,17 +437,8 @@ export function ConversationReader({
   const unread = conversation.unread_count > 0;
   const replyButtons =
     renderReplySlot === undefined ? null : (
+      // Reply is the pinned footer's (the floating bar's on phones).
       <span className="flex flex-wrap gap-1 max-md:hidden">
-        <Button
-          variant="ghost"
-          icon="reply"
-          shortcut="item.reply"
-          onClick={() => {
-            openReply();
-          }}
-        >
-          {tShortcuts("item.reply")}
-        </Button>
         <Button
           variant="ghost"
           icon="reply-all"
@@ -766,63 +765,93 @@ export function ConversationReader({
             {needSentence(t, need, needSender(need, conversation))}
           </Note>
         )}
-        {messages.toReversed().map((message) => (
-          <ThreadMessage
-            key={message.id}
-            workspaceId={workspaceId}
-            conversationId={conversationId}
-            message={message}
-            open={open.has(message.id)}
-            onOpen={() => {
-              setOpened((current) => new Set([...current, message.id]));
-            }}
-            showImages={!inSpam && images.has(message.id)}
-            onShowImages={() => {
-              setImages((current) => new Set([...current, message.id]));
-            }}
-            onTrustImages={
-              trustable && message.direction === "inbound"
-                ? (domain) => {
-                    trustImages(message, domain);
-                  }
-                : undefined
-            }
-            trustKey={active && trusting === null && message.id === newestInbound?.id}
-            sharedInbox={inbox?.shared === true}
-            kind={message.direction === "outbound" ? "person" : kind}
-            inertLinks={inSpam || conversation.need?.question === "suspicious"}
-            now={now}
-          />
-        ))}
-        {renderReplySlot?.(replyContext)}
+        {thread.map((entry) =>
+          entry.kind === "more" ? (
+            <MoreMessages
+              key={entry.ids.join(",")}
+              label={t("reader.more", { count: entry.ids.length })}
+              onOpen={() => {
+                setRevealed((current) => new Set([...current, ...entry.ids]));
+              }}
+            />
+          ) : (
+            <ThreadMessage
+              key={entry.message.id}
+              workspaceId={workspaceId}
+              conversationId={conversationId}
+              message={entry.message}
+              open={open.has(entry.message.id)}
+              onOpen={() => {
+                setOpened((current) => new Set([...current, entry.message.id]));
+              }}
+              showImages={!inSpam && images.has(entry.message.id)}
+              onShowImages={() => {
+                setImages((current) => new Set([...current, entry.message.id]));
+              }}
+              onTrustImages={
+                trustable && entry.message.direction === "inbound"
+                  ? (domain) => {
+                      trustImages(entry.message, domain);
+                    }
+                  : undefined
+              }
+              trustKey={active && trusting === null && entry.message.id === newestInbound?.id}
+              sharedInbox={inbox?.shared === true}
+              kind={entry.message.direction === "outbound" ? "person" : kind}
+              inertLinks={inSpam || conversation.need?.question === "suspicious"}
+              now={now}
+            />
+          ),
+        )}
       </ReaderBody>
-      {/* While the composer is open it owns the bottom of the screen; in
-          spam or the trash the banner holds the way back. */}
-      {reply === null && writable && archiveTo !== undefined ? (
-        <ActionBar label={t("reader.actions")} phoneOnly aboveTabBar>
-          {renderReplySlot === undefined ? null : (
+      <ReaderFooter
+        slot={renderReplySlot?.(replyContext)}
+        prompt={
+          renderReplySlot === undefined || newest === undefined ? undefined : (
             <Button
-              variant="primary"
-              size="lg"
               icon="reply"
+              shortcut="item.reply"
               grow
               onClick={() => {
                 openReply();
               }}
             >
-              {tShortcuts("item.reply")}
+              {replyName(newest) === ""
+                ? tShortcuts("item.reply")
+                : t("compose.title.reply", { name: replyName(newest) })}
             </Button>
-          )}
-          <Button
-            size="lg"
-            icon={archiveTo === "archive" ? "archive" : "inbox"}
-            grow
-            onClick={moveBy(archiveTo)}
-          >
-            {archiveTo === "archive" ? tShortcuts("item.done") : t("actions.toInbox")}
-          </Button>
-        </ActionBar>
-      ) : null}
+          )
+        }
+        // While the composer is open it owns the bottom of the screen; in
+        // spam or the trash the banner holds the way back.
+        phoneBar={
+          reply === null && writable && archiveTo !== undefined ? (
+            <ActionBar label={t("reader.actions")} phoneOnly aboveTabBar>
+              {renderReplySlot === undefined ? null : (
+                <Button
+                  variant="primary"
+                  size="lg"
+                  icon="reply"
+                  grow
+                  onClick={() => {
+                    openReply();
+                  }}
+                >
+                  {tShortcuts("item.reply")}
+                </Button>
+              )}
+              <Button
+                size="lg"
+                icon={archiveTo === "archive" ? "archive" : "inbox"}
+                grow
+                onClick={moveBy(archiveTo)}
+              >
+                {archiveTo === "archive" ? tShortcuts("item.done") : t("actions.toInbox")}
+              </Button>
+            </ActionBar>
+          ) : undefined
+        }
+      />
       {replying === undefined || renderReplySlot === undefined ? null : (
         <ReplyDialog
           key={replying.opened}

@@ -2581,6 +2581,8 @@ export interface components {
              */
             last_sent_at?: string | null;
             latest_from?: components["schemas"]["Address"] | null;
+            /** @description Whether the newest message is one the inbox sent (outbound). */
+            latest_from_you: boolean;
             /**
              * Format: int32
              * @description Messages in it.

@@ -31,6 +31,7 @@ const base: Pick<
   | "replied_since_sent"
   | "labels"
   | "suggestion"
+  | "latest_from_you"
 > = {
   inbox_id: INBOX.id,
   archived: false,
@@ -41,6 +42,7 @@ const base: Pick<
   replied_since_sent: false,
   labels: [],
   suggestion: null,
+  latest_from_you: false,
 };
 
 export const Q4: Summary = {
@@ -147,6 +149,7 @@ export const FIGURES: Summary = {
   starred: false,
   archived: true,
   latest_from: { name: "Sam Rivera", address: "sam.rivera@example.com" },
+  latest_from_you: true,
   snippet: "Here are the figures for Thursday, with last year’s for comparison.",
   last_sent_at: "2026-10-12T17:30:00Z",
   sent_to: [

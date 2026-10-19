@@ -77,6 +77,8 @@ pub struct ConversationSummary {
     pub replied_since_sent: bool,
     /// The sender of the newest message.
     pub latest_from: Option<Address>,
+    /// Whether the newest message is one the inbox sent (outbound).
+    pub latest_from_you: bool,
     /// The start of the newest message's text.
     pub snippet: String,
     /// Its labels, by name.
@@ -109,7 +111,7 @@ pub const SUMMARY_SELECT: &str = r"
                 WHERE r.conversation_id = c.id AND r.direction = 'inbound'
                   AND NOT r.in_spam AND NOT r.in_trash AND r.sent_at > c.last_sent_at
            ) AS replied_since_sent,
-           m.sender, m.snippet,
+           m.sender, m.snippet, coalesce(m.direction = 'outbound', false) AS latest_from_you,
            coalesce((SELECT jsonb_agg(jsonb_build_object('id', l.id, 'name', l.name)
                                       ORDER BY l.name)
                        FROM conversations.conversation_labels cl
@@ -117,7 +119,7 @@ pub const SUMMARY_SELECT: &str = r"
                       WHERE cl.conversation_id = c.id), '[]') AS labels
       FROM conversations.conversations c
       LEFT JOIN LATERAL (
-          SELECT sender, snippet FROM conversations.messages
+          SELECT sender, snippet, direction FROM conversations.messages
            WHERE conversation_id = c.id ORDER BY sent_at DESC, id DESC LIMIT 1
       ) m ON true
       LEFT JOIN LATERAL (
@@ -151,6 +153,7 @@ pub struct SummaryRow {
     pub replied_since_sent: bool,
     pub sender: Option<serde_json::Value>,
     pub snippet: Option<String>,
+    pub latest_from_you: bool,
     pub labels: serde_json::Value,
 }
 
@@ -180,6 +183,7 @@ impl TryFrom<SummaryRow> for ConversationSummary {
                 .map(serde_json::from_value)
                 .transpose()
                 .map_err(json)?,
+            latest_from_you: row.latest_from_you,
             snippet: row.snippet.unwrap_or_default(),
             labels: serde_json::from_value(row.labels).map_err(json)?,
             suggestion: None,

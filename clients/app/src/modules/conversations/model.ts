@@ -74,6 +74,31 @@ export function recipientsLine(t: Translate, message: MessageView, locale: strin
   return parts.join(", ");
 }
 
+/**
+ * Who a message of yours went to: "→ Marta Silva", or "→ Marta Silva and 2
+ * others" (To first, then cc).
+ */
+export function addresseeLine(t: Translate, message: MessageView): string {
+  const everyone = [...message.to, ...message.cc];
+  const first = everyone[0];
+  if (first === undefined) {
+    return "";
+  }
+  const name = displayName(first);
+  const others = everyone.length - 1;
+  return others === 0
+    ? t("reader.toName", { name })
+    : t("reader.toNameOthers", { name, count: others });
+}
+
+/** Who Reply answers: the sender, or for a message of yours, its first recipient. */
+export function replyName(message: MessageView): string {
+  if (message.direction === "outbound") {
+    return displayName(message.to[0] ?? message.cc[0]);
+  }
+  return displayName(message.from);
+}
+
 export function streamName(t: Translate, stream: Stream): string {
   return t(`streams.${stream}`);
 }
@@ -218,6 +243,70 @@ export function openByDefault(messages: readonly MessageView[]): Set<string> {
     }
   }
   return open;
+}
+
+/** One entry of the thread as the reader shows it: a message, or several folded into one line. */
+export type ThreadEntry =
+  { kind: "message"; message: MessageView } | { kind: "more"; ids: string[] };
+
+/**
+ * The thread newest first with its middle folded. The newest two, the first,
+ * every unread one and every one in `shown` (opened, or revealed) stay;
+ * two or more of the rest in a row become one "N more messages" entry, and a
+ * single one stays as itself. Threads of four or fewer never fold.
+ */
+export function threadLayout(
+  messages: readonly MessageView[],
+  shown: ReadonlySet<string>,
+): ThreadEntry[] {
+  const oldest = messages.length - 1;
+  const entries: ThreadEntry[] = [];
+  let hidden: MessageView[] = [];
+  const flush = () => {
+    if (hidden.length >= 2) {
+      entries.push({ kind: "more", ids: hidden.map((message) => message.id) });
+    } else {
+      entries.push(...hidden.map((message) => ({ kind: "message" as const, message })));
+    }
+    hidden = [];
+  };
+  for (const [position, message] of messages.toReversed().entries()) {
+    const kept = position < 2 || position === oldest || !message.read || shown.has(message.id);
+    if (kept) {
+      flush();
+      entries.push({ kind: "message", message });
+    } else {
+      hidden.push(message);
+    }
+  }
+  flush();
+  return entries;
+}
+
+/**
+ * A plain-text body split before its trailing quote: the run of lines
+ * starting with `>` at its end (with the blank lines among and before them),
+ * when something of its own comes first. Read from the lines' shape only,
+ * never their words: no attribution line is looked for.
+ */
+export function splitQuoted(text: string): { own: string; quoted: string | undefined } {
+  const lines = text.split("\n");
+  let start = lines.length;
+  let quotedLines = 0;
+  while (start > 0) {
+    const line = (lines[start - 1] ?? "").trim();
+    if (line.startsWith(">")) {
+      quotedLines += 1;
+    } else if (line !== "") {
+      break;
+    }
+    start -= 1;
+  }
+  const own = lines.slice(0, start).join("\n").trimEnd();
+  if (quotedLines === 0 || own.trim() === "") {
+    return { own: text, quoted: undefined };
+  }
+  return { own, quoted: lines.slice(start).join("\n").trim() };
 }
 
 /** Raster images: decoded by an `<img>` and nothing else (the server's list). */
