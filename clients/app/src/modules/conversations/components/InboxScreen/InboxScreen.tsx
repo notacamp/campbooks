@@ -58,6 +58,9 @@ const LEAVING: Record<Move, { key: string; icon: RowLeaving["icon"]; tone: RowLe
   not_spam: { key: "leaving.notSpam", icon: "check", tone: "done" },
 };
 
+/** How long a row takes to leave (`--duration-confirm`, as `ConversationRow`'s fold). */
+const LEAVE_MS = 900;
+
 /** A row leaving the list, and what it says while it folds away. */
 interface Farewell extends LeavingRow {
   said: RowLeaving;
@@ -127,8 +130,12 @@ export function InboxScreen({
       : loaded;
   const ids = conversations?.map((conversation) => conversation.id) ?? [];
   // The rows leaving the list stay in place while they say what happened,
-  // out of the keyboard's reach.
-  const shown = conversations === undefined ? undefined : withLeaving(conversations, leaving);
+  // out of the keyboard's reach; one back on the list (Undo while it
+  // folded) is a plain row again.
+  const folding = leaving.filter(
+    (row) => !(conversations ?? []).some((conversation) => conversation.id === row.conversation.id),
+  );
+  const shown = conversations === undefined ? undefined : withLeaving(conversations, folding);
 
   /** It is leaving the list on screen: it says what happened, then folds away. */
   const farewell = (conversation: ConversationSummary, said: RowLeaving) => {
@@ -137,10 +144,15 @@ export function InboxScreen({
       return;
     }
     const before = shown[at + 1]?.id;
+    const row: Farewell = { conversation, before, at, said };
     setLeaving((rows) => [
-      ...rows.filter((row) => row.conversation.id !== conversation.id),
-      { conversation, before, at, said },
+      ...rows.filter((other) => other.conversation.id !== conversation.id),
+      row,
     ]);
+    // Gone once it has folded, whether or not it was still drawn by then.
+    setTimeout(() => {
+      setLeaving((rows) => rows.filter((other) => other !== row));
+    }, LEAVE_MS);
   };
 
   const open = (id: string) => {
@@ -337,10 +349,7 @@ export function InboxScreen({
             onOpen={(conversation) => {
               open(conversation.id);
             }}
-            leaving={new Map(leaving.map((row) => [row.conversation.id, row.said]))}
-            onLeft={(id) => {
-              setLeaving((rows) => rows.filter((row) => row.conversation.id !== id));
-            }}
+            leaving={new Map(folding.map((row) => [row.conversation.id, row.said]))}
             now={now}
           />
         )}
