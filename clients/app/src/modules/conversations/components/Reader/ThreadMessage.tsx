@@ -52,6 +52,8 @@ export interface ThreadMessageProps {
   kind: "person" | "service";
   /** The conversation may be phishing: the body's links lead nowhere. */
   inertLinks?: boolean | undefined;
+  /** Its conversation is in spam: remote images never load. */
+  spam?: boolean | undefined;
   /** Show the reader's keys (⇧I, V) on its buttons; off where they are not bound. */
   shortcuts?: boolean | undefined;
   now?: Date | undefined;
@@ -77,6 +79,7 @@ export function ThreadMessage({
   sharedInbox = false,
   kind,
   inertLinks = false,
+  spam = false,
   shortcuts = true,
   now,
 }: ThreadMessageProps) {
@@ -88,6 +91,7 @@ export function ThreadMessage({
     message.id,
     showImages,
     open && message.has_html,
+    spam,
   );
   const sender = displayName(message.from);
   const yours = message.direction === "outbound";

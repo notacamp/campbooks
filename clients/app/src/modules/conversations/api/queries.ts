@@ -98,12 +98,20 @@ const keys = {
       q,
       ...(reachable ? { reachable: "true" } : {}),
     }),
-  body: (workspaceId: string, conversationId: string, messageId: string, showImages: boolean) =>
+  body: (
+    workspaceId: string,
+    conversationId: string,
+    messageId: string,
+    showImages: boolean,
+    spam: boolean,
+  ) =>
     operationKey("conversations.get_message_body", {
       workspace_id: workspaceId,
       conversation_id: conversationId,
       message_id: messageId,
       show_images: String(showImages),
+      // In spam the server holds images back: a body read before is not that one.
+      ...(spam ? { spam: "true" } : {}),
     }),
   words: (workspaceId: string, conversationId: string, messageId: string) =>
     operationKey("conversations.get_message_body", {
@@ -188,21 +196,26 @@ export function useConversation(workspaceId: string, conversationId: string | un
   });
 }
 
-/** `conversations.get_message_body`: sanitised HTML (and text), remote images on request. */
+/**
+ * `conversations.get_message_body`: sanitised HTML (and text), remote images
+ * on request; `spam` while its conversation is in spam (asked for again then).
+ */
 export function useMessageBody(
   workspaceId: string,
   conversationId: string,
   messageId: string,
   showImages: boolean,
   enabled: boolean,
+  spam = false,
 ) {
   return useQuery({
-    queryKey: keys.body(workspaceId, conversationId, messageId, showImages),
+    queryKey: keys.body(workspaceId, conversationId, messageId, showImages, spam),
     enabled,
     // A body never changes once stored.
     staleTime: Number.POSITIVE_INFINITY,
-    // "Show images" refetches it: keep the blocked version up meanwhile.
-    placeholderData: keepPreviousData,
+    // "Show images" refetches it: keep the blocked version up meanwhile. Never
+    // in spam: the version before may have had its images.
+    ...(spam ? {} : { placeholderData: keepPreviousData }),
     queryFn: async ({ signal }) =>
       unwrap(
         await api.GET(

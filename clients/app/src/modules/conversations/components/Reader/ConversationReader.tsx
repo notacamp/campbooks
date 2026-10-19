@@ -799,6 +799,7 @@ export function ConversationReader({
               sharedInbox={inbox?.shared === true}
               kind={entry.message.direction === "outbound" ? "person" : kind}
               inertLinks={inSpam || conversation.need?.question === "suspicious"}
+              spam={inSpam}
               now={now}
             />
           ),
