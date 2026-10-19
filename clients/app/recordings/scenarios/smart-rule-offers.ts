@@ -106,4 +106,18 @@ export default async function smartRuleOffers({ page }: ScenarioContext): Promis
   await page.getByRole("button", { name: /^Undo/u }).first().click();
   await pause(1500);
   await caption(page, "Back again", 1500);
+
+  // Correct Scout: these are worth reading, so highlight them instead.
+  await noticed.getByRole("button", { name: /^Something else/u }).click();
+  const highlight = page.getByRole("dialog", { name: /A rule for mail from/u });
+  await highlight.waitFor();
+  await highlight.getByRole("radio", { name: /^Highlight them/u }).check({ force: true });
+  await caption(page, "Not what I want: I like these. Highlight them", 2400);
+  await highlight.getByRole("button", { name: /^Save smart rule/u }).click();
+  await page.getByText("Smart rule saved").first().waitFor();
+  await caption(page, "Saved: the suggestion is answered and won't come back", 2200);
+  await homeShows(page, workspace, "Worth a look");
+  const group = page.getByText("Worth a look").first();
+  await group.scrollIntoViewIfNeeded();
+  await caption(page, "Each one waits on Home under Worth a look, nothing pinned", 2800);
 }
