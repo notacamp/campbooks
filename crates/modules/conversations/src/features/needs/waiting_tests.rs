@@ -1,7 +1,10 @@
 //! Waiting on someone and Nudge (campbooks-cloud#293), end to end: Joao asks
 //! Ana Costa to send Sam the floor plan, copying Sam's inbox.
 
+use std::sync::Arc;
+
 use axum::http::StatusCode;
+use campbooks_ai::decide::{AnswerValue, signals::moves::question::NEXT_MOVE};
 use campbooks_kernel::{
     jobs::{self, EnqueueOptions},
     tenancy::WorkspaceId,
@@ -11,10 +14,29 @@ use serde_json::{Value, json};
 use sqlx::PgPool;
 
 use crate::{
-    domain::needs::after_working_days,
+    domain::needs::{NeedSettings, after_working_days},
     features::wake_needs::DispatchNeedClocks,
-    testkit::{ANA, JOAO, Kit, SAM, contract, joao_asks_ana, mail, waiting_deps},
+    testkit::{
+        ANA, JOAO, Kit, SAM, Scripted, contract, joao_asks_ana, mail, script, someone_else_moves,
+        waiting_deps,
+    },
 };
+
+/// Results a receiving provider gives mail whose From is forged.
+const FORGED: &str =
+    "mx.example; dkim=fail header.i=@studio.example; dmarc=fail header.from=studio.example";
+
+/// [`mail`] with another `subject` and, when given, the receiving
+/// provider's `results`.
+fn mail_with(base: Value, subject: &str, results: Option<&str>) -> Value {
+    let mut value = base;
+    let message = &mut value["changes"][0]["message"];
+    message["subject"] = json!(subject);
+    if let Some(results) = results {
+        message["headers"] = json!({"authentication_results": results});
+    }
+    value
+}
 
 async fn summary(kit: &Kit, token: &str, workspace: WorkspaceId) -> Value {
     let id = kit.conversation_of("joao-1").await;
@@ -309,4 +331,170 @@ async fn heard_from_them_and_not_waiting(db: PgPool) {
         (question.as_str(), from.as_str(), to.as_str()),
         ("next_move", "someone_else", "not_waiting")
     );
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_newer_message_that_waits_on_nobody_ends_the_wait_as_superseded(db: PgPool) {
+    // Joao's "never mind, I sent it myself": nobody has the next move.
+    let mut nobody = script("primary", false, false, false, 0.0, false);
+    nobody.push((NEXT_MOVE, AnswerValue::Choice("nobody".to_owned()), 0.91));
+    let model = Scripted::model([(JOAO.1, someone_else_moves())]).followup(
+        JOAO.1,
+        "Re: Floor plan",
+        nobody,
+    );
+    let kit = Kit::with_deps(db, waiting_deps().with_model(Arc::new(model))).await;
+    let (workspace, inbox, _) = joao_asks_ana(&kit).await;
+    assert_eq!(need(&kit).await.0, "waiting");
+
+    kit.ingest_value(
+        workspace,
+        inbox,
+        &mail_with(
+            mail("joao-2", "thr-floor-plan", JOAO, &[ANA], &[SAM], 0),
+            "Re: Floor plan",
+            None,
+        ),
+    )
+    .await;
+    let (_, _, state, cleared, _) = need(&kit).await;
+    assert_eq!(
+        (state.as_str(), cleared.as_deref()),
+        ("cleared", Some("superseded"))
+    );
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn mail_from_ana_that_fails_its_sender_checks_is_not_hearing_back(db: PgPool) {
+    let kit = Kit::with_deps(db, waiting_deps()).await;
+    let (workspace, inbox, _) = joao_asks_ana(&kit).await;
+    kit.ingest_value(
+        workspace,
+        inbox,
+        &mail_with(
+            mail("ana-forged", "thr-forged", ANA, &[SAM], &[], 0),
+            "Floor plan",
+            Some(FORGED),
+        ),
+    )
+    .await;
+    assert_eq!(need(&kit).await.2, "open");
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_message_to_ana_long_after_does_not_arm_the_wait_again(db: PgPool) {
+    let kit = Kit::with_deps(db, waiting_deps()).await;
+    let (workspace, inbox, _) = joao_asks_ana(&kit).await;
+    // Joao asked 90 days ago: a nudge since.
+    days_later(&kit, 90).await;
+    assert_eq!(need(&kit).await.0, "nudge");
+    // Sam writes to Ana now, past the 60 days the scan reads: not a nudge.
+    kit.ingest_value(
+        workspace,
+        inbox,
+        &mail("sam-late", "thr-floor-plan", SAM, &[ANA], &[JOAO], 0),
+    )
+    .await;
+    let (reason, _, _, _, nudges) = need(&kit).await;
+    assert_eq!((reason.as_str(), nudges), ("nudge", 0));
+}
+
+/// Joao's conversation's open wait, made one on `address`.
+async fn waiting_on(kit: &Kit, address: &str) {
+    let conversation = kit.conversation_of("joao-1").await;
+    sqlx::query(
+        "UPDATE conversations.needs SET awaited_address = $2, awaited_name = 'Sam'
+          WHERE conversation_id = $1::uuid",
+    )
+    .bind(&conversation)
+    .bind(address)
+    .execute(&kit.db)
+    .await
+    .unwrap();
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_wait_on_the_inbox_itself_is_never_nudged(db: PgPool) {
+    let kit = Kit::with_deps(db, waiting_deps()).await;
+    let (workspace, _, sam) = joao_asks_ana(&kit).await;
+    let id = kit.conversation_of("joao-1").await;
+    let message = kit.message_of("joao-1").await;
+    // A wait stored on the inbox's own address, however it got there.
+    waiting_on(&kit, &SAM.1.to_uppercase()).await;
+    let draft = kit
+        .post(
+            &sam,
+            &format!("/api/v1/w/{workspace}/drafts"),
+            Some(json!({"kind": "nudge", "message_id": message})),
+        )
+        .await;
+    assert_eq!(draft.status, StatusCode::CONFLICT, "{:?}", draft.json);
+    assert_eq!(draft.json["code"], "not_waiting");
+    let written = kit
+        .post(
+            &sam,
+            &format!("/api/v1/w/{workspace}/conversations/{id}/nudge/draft"),
+            Some(json!({})),
+        )
+        .await;
+    assert_eq!(written.status, StatusCode::CONFLICT, "{:?}", written.json);
+    assert_eq!(written.json["code"], "not_waiting");
+    let drafts: i64 = sqlx::query_scalar("SELECT count(*) FROM conversations.drafts")
+        .fetch_one(&kit.db)
+        .await
+        .unwrap();
+    assert_eq!(drafts, 0);
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_nudge_goes_where_the_server_addresses_it(db: PgPool) {
+    let kit = Kit::with_deps(db, waiting_deps()).await;
+    let (workspace, _, sam) = joao_asks_ana(&kit).await;
+    let message = kit.message_of("joao-1").await;
+    let draft = kit
+        .post(
+            &sam,
+            &format!("/api/v1/w/{workspace}/drafts"),
+            Some(json!({
+                "kind": "nudge",
+                "message_id": message,
+                "to": [{"name": "Eve", "address": "eve@elsewhere.example"}],
+                "cc": [{"name": "Mallory", "address": "mallory@elsewhere.example"}],
+                "body": "Hi Ana",
+            })),
+        )
+        .await;
+    assert_eq!(draft.status, StatusCode::CREATED, "{:?}", draft.json);
+    let addresses = |field: &str| -> Vec<String> {
+        draft.json[field]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|a| a["address"].as_str().unwrap().to_owned())
+            .collect()
+    };
+    assert_eq!(addresses("to"), [ANA.1]);
+    assert_eq!(addresses("cc"), [JOAO.1]);
+    assert_eq!(draft.json["body"], "Hi Ana");
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn with_waits_switched_off_an_open_wait_keeps_its_course(db: PgPool) {
+    let kit = Kit::with_deps(db, waiting_deps()).await;
+    let (workspace, _, _) = joao_asks_ana(&kit).await;
+    assert_eq!(need(&kit).await.2, "open");
+    let conversation = kit.conversation_of("joao-1").await;
+    let mut tx = kit.state.db.begin_for(workspace).await.unwrap();
+    crate::domain::needs::refresh(
+        &mut tx,
+        &kit.state.events,
+        &workspace.to_string(),
+        conversation.parse().unwrap(),
+        &NeedSettings::new(36_500, &waiting_deps().policy).with_waits(false),
+    )
+    .await
+    .unwrap();
+    tx.commit().await.unwrap();
+    let (reason, _, state, _, _) = need(&kit).await;
+    assert_eq!((reason.as_str(), state.as_str()), ("waiting", "open"));
 }

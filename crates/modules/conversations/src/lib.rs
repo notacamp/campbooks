@@ -181,7 +181,8 @@ pub fn module(deps: ConversationsDeps) -> Module {
     };
     let needs = domain::needs::NeedSettings::new(deps.config.needs_window_days, &deps.policy)
         .with_summaries(summaries.is_some())
-        .with_wait_days(deps.config.wait.working_days);
+        .with_wait_days(deps.config.wait.working_days)
+        .with_waits(deps.config.actions.enabled);
     Module {
         name: NAME,
         scopes: scopes::ALL,

@@ -132,11 +132,15 @@ pub async fn handler(
     )
     .await?;
 
-    let [to, cc, bcc] = tidy([
-        body.to.unwrap_or(filled.to),
-        body.cc.unwrap_or(filled.cc),
-        body.bcc.unwrap_or_default(),
-    ]);
+    // A nudge goes where the server addresses it, whatever the client sent:
+    // the member changes recipients in the composer afterwards, as with any
+    // draft.
+    let (to, cc) = if body.kind == DraftKind::Nudge {
+        (filled.to, filled.cc)
+    } else {
+        (body.to.unwrap_or(filled.to), body.cc.unwrap_or(filled.cc))
+    };
+    let [to, cc, bcc] = tidy([to, cc, body.bcc.unwrap_or_default()]);
     let subject = body.subject.unwrap_or(filled.subject);
     let text = body.body.unwrap_or_default();
     let quoted = body.quoted.unwrap_or_default();
@@ -330,6 +334,16 @@ async fn nudge(
     } else {
         fill(conn, access, DraftKind::ReplyAll, waited).await?
     };
+    // Never a nudge to the inbox itself (mail it sent itself, filed as
+    // received): nothing to wait for.
+    let inbox: String =
+        sqlx::query_scalar("SELECT address FROM conversations.inboxes WHERE id = $1")
+            .bind(filled.inbox)
+            .fetch_one(&mut *conn)
+            .await?;
+    if address.trim().eq_ignore_ascii_case(inbox.trim()) {
+        return Err(Error::Conflict(crate::MESSAGES.reason("not_waiting")));
+    }
     let awaited = Address {
         name: name.filter(|n| !n.trim().is_empty()),
         address,

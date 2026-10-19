@@ -168,9 +168,18 @@ pub fn awaited_party(envelope: &Envelope, label: &str) -> Option<Party> {
 /// Whether an `awaited` option's `description`, as it was asked, still names
 /// `person`'s address: the check that a stored `pN`, mapped back through
 /// today's headers ([`awaited_party`]), is the person the model was shown.
+/// Only the address [`describe`] put last counts, whole: a display name
+/// that holds an address (`Bob <ana@studio.example>`) names nobody.
 pub fn describes(description: &str, person: &Party) -> bool {
     let address = quoted(&person.address);
-    !address.is_empty() && description.contains(&format!("<{address}>"))
+    if address.is_empty() {
+        return false;
+    }
+    ["To", "Cc"].into_iter().any(|field| {
+        description
+            .strip_suffix(&format!("<{address}> ({field})"))
+            .is_some_and(|name| name.is_empty() || name.ends_with(' '))
+    })
 }
 
 fn option_label(index: usize) -> String {
@@ -327,5 +336,19 @@ mod tests {
         assert!(question::is_move("next_move") && question::is_move("awaited"));
         assert!(!question::is_move("needs_reply"));
         assert!(!question::is_move("action_remind"));
+    }
+
+    #[test]
+    fn only_the_address_shown_last_is_described() {
+        let ana = party("Ana Costa", "ana@studio.example");
+        assert!(describes("Ana Costa <ana@studio.example> (To)", &ana));
+        assert!(describes("<ana@studio.example> (Cc)", &ana));
+        // A display name holding Ana's address names Bob, not Ana.
+        let posing = "Bob <ana@studio.example> <bob@studio.example> (To)";
+        assert!(!describes(posing, &ana));
+        assert!(describes(posing, &party("Bob", "bob@studio.example")));
+        // Part of an address is not the address.
+        assert!(!describes("<xana@studio.example> (To)", &ana));
+        assert!(!describes("Ana Costa <ana@studio.example> (Bcc)", &ana));
     }
 }

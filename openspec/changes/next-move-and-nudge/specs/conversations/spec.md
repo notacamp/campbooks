@@ -97,7 +97,11 @@ server refuses to start) working days, working days being Monday to Friday by
 UTC date, at the time of day the message was sent. Its due date SHALL be the
 nudge time's date. The need clock SHALL wake it at the nudge time and turn it
 into a `nudge` need, with a new revision. Only model answers whose
-`model_version` starts with `checked:` SHALL count.
+`model_version` starts with `checked:` SHALL count. No wait SHALL be on one
+of the inbox's own addresses (mail the inbox sent itself, which Gmail and
+Zoho file as received). While the action catalogue is switched off
+(`CAMPBOOKS_CONVERSATIONS__ACTIONS__ENABLED`), no new wait SHALL be raised;
+a wait already open SHALL keep its course.
 
 #### Scenario: Ana was asked to write
 - **WHEN** João's message of Wednesday 14 October 10:00 asks Ana Costa to send the floor plan, raises no other need, and the model answers `next_move` `someone_else` at 0.91 and `awaited` Ana Costa
@@ -127,12 +131,15 @@ into a `nudge` need, with a new revision. Only model answers whose
 An open `waiting` or `nudge` need SHALL be cleared as `heard_back` when an
 inbound message from its awaited address (without regard to case), sent after
 the need's message, reaches the same inbox, in this conversation or in any
-other. A message sent from the inbox with the awaited address in `To` or
-`Cc`, after the need's message, SHALL set it back to `waiting` with a new
-nudge time worked out from that message's sent time, counting the nudges.
-Archiving a conversation SHALL NOT clear a wait; trash, spam and a member
-resolving it SHALL, as for any need, and a newer inbound message from anyone
-else in the conversation SHALL derive the need again from it.
+other, unless the receiving provider marks it as failing its sender's checks
+(a forged From hears nothing). A message sent from the inbox with the awaited
+address in `To` or `Cc`, within 60 days after the need's message, SHALL set
+it back to `waiting` with a new nudge time worked out from that message's
+sent time, counting the nudges. Archiving a conversation SHALL NOT clear a
+wait; trash, spam and a member resolving it SHALL, as for any need, and a
+newer inbound message from anyone else in the conversation SHALL derive the
+need again from it: when it was asked whose move it is and raises nothing,
+the wait SHALL be cleared as `superseded`.
 
 #### Scenario: Ana writes in a new thread
 - **WHEN** Ana Costa writes to the inbox in a new conversation, "Floor plan attached"
@@ -141,6 +148,14 @@ else in the conversation SHALL derive the need again from it.
 #### Scenario: The member nudged Ana
 - **WHEN** Sam sends Ana a nudge on Monday 19 October 11:00
 - **THEN** the need is `waiting` again, nudges 1, with the nudge time Thursday 22 October 11:00
+
+#### Scenario: Never mind
+- **WHEN** João writes again "never mind, I sent it myself" and the model answers `next_move` `nobody`
+- **THEN** the wait on Ana is cleared as `superseded`
+
+#### Scenario: A forged From
+- **WHEN** mail claiming to be from Ana Costa reaches the inbox and the provider's results say it failed its sender's checks
+- **THEN** the wait on Ana goes on
 
 #### Scenario: Archived while waiting
 - **WHEN** Sam archives João's conversation
@@ -162,8 +177,9 @@ conversation's open need is `waiting` or `nudge` (else 409 `not_waiting`) and
 SHALL fill on the server, as a reply all of the need's message: the awaited
 person in `To`, everyone else reply all would address in `Cc`, the inbox's
 own address in neither, no duplicates, with the subject, `In-Reply-To`,
-`References` and thread key of a reply. Every other rule of drafts SHALL
-apply.
+`References` and thread key of a reply, whatever `To` and `Cc` the client
+sent; 409 `not_waiting` as well when the awaited address is the inbox's
+own. Every other rule of drafts SHALL apply.
 
 #### Scenario: Nudging Ana
 - **WHEN** Sam starts a nudge on João's message to Ana Costa that copied Sam
@@ -186,7 +202,7 @@ the thread), the daily AI limit as interactive and the per-member hourly
 allowance (429 `rate_limited`), 503 `reply_failed` logged by kind only, mail
 as data, and nothing changed: no draft, no stored text, no event. It SHALL
 answer 409 `not_waiting` when the conversation's need is neither `waiting`
-nor `nudge`. The instruction SHALL forbid inventing facts, dates or
+nor `nudge`, or waits on the inbox's own address. The instruction SHALL forbid inventing facts, dates or
 pressure.
 
 #### Scenario: A nudge for Ana

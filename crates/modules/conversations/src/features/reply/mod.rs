@@ -127,7 +127,7 @@ const WAIT: &str = "SELECT message_id, awaited_name, awaited_address FROM conver
         AND awaited_address IS NOT NULL";
 
 /// The conversation's inbox, if the caller can see it.
-const INBOX: &str = "SELECT i.id, i.display_name FROM conversations.conversations c \
+const INBOX: &str = "SELECT i.id, i.display_name, i.address FROM conversations.conversations c \
      JOIN conversations.inboxes i ON i.id = c.inbox_id \
      WHERE c.id = $1 AND c.inbox_id = ANY($2)";
 /// The message answered: the one asked for, or the newest; with whether it
@@ -843,12 +843,12 @@ async fn prepare<'a>(
         )
         .await?;
         let inboxes = visible_inboxes(&mut tx, access).await?;
-        let found: Option<(InboxId, Option<String>)> = sqlx::query_as(INBOX)
+        let found: Option<(InboxId, Option<String>, String)> = sqlx::query_as(INBOX)
             .bind(conversation)
             .bind(inboxes.as_slice())
             .fetch_optional(&mut *tx)
             .await?;
-        let (inbox, name) = found.ok_or(Error::NotFound)?;
+        let (inbox, name, own_address) = found.ok_or(Error::NotFound)?;
         // A reader, or an inbox kept read-only: 403 `inbox_read_only`.
         resources::authorize(
             state,
@@ -867,8 +867,13 @@ async fn prepare<'a>(
                     .bind(conversation)
                     .fetch_optional(&mut *tx)
                     .await?;
-                let (message, name, address) =
-                    wait.ok_or_else(|| Error::Conflict(crate::MESSAGES.reason("not_waiting")))?;
+                let (message, name, address) = wait
+                    // Never a nudge to the inbox itself (mail it sent
+                    // itself, filed as received).
+                    .filter(|(_, _, address)| {
+                        !address.trim().eq_ignore_ascii_case(own_address.trim())
+                    })
+                    .ok_or_else(|| Error::Conflict(crate::MESSAGES.reason("not_waiting")))?;
                 let shown = name
                     .map(|n| n.trim().to_owned())
                     .filter(|n| !n.is_empty())

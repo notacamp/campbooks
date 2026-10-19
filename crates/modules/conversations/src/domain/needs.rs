@@ -104,6 +104,10 @@ pub struct NeedSettings {
     /// Working days a wait lasts before Scout nudges, when its email gives
     /// no date (`CAMPBOOKS_CONVERSATIONS__WAIT__WORKING_DAYS`).
     pub wait_days: u32,
+    /// Whether a new wait may be raised: only while the action catalogue is
+    /// switched on (`CAMPBOOKS_CONVERSATIONS__ACTIONS__ENABLED`). Off, an
+    /// open wait keeps its course; none opens.
+    pub waits: bool,
 }
 
 impl NeedSettings {
@@ -114,7 +118,15 @@ impl NeedSettings {
             policy: policy.clone(),
             summaries: false,
             wait_days: crate::config::DEFAULT_WAIT_WORKING_DAYS,
+            waits: true,
         }
+    }
+
+    /// The same settings, raising new waits only when `on`.
+    #[must_use]
+    pub const fn with_waits(mut self, on: bool) -> Self {
+        self.waits = on;
+        self
     }
 
     /// The same settings, a wait lasting `days` working days.
@@ -606,7 +618,11 @@ pub fn raise_with(
     // rule the member taught keeps in front of them, then a wait.
     raised
         .or_else(|| highlighted(message, answers))
-        .or_else(|| people.and_then(|people| waiting(message, answers, people, settings)))
+        .or_else(|| {
+            people
+                .filter(|_| settings.waits)
+                .and_then(|people| waiting(message, answers, people, settings))
+        })
 }
 
 /// The wait the answers about `message` raise when nothing else is raised
@@ -662,7 +678,15 @@ fn waiting(
     };
     let Party { name, address } = person;
     let address = address.trim().to_owned();
-    if address.is_empty() {
+    // Never a wait on the inbox itself: Gmail and Zoho file mail the inbox
+    // sent itself as received, so its sender can be the inbox.
+    let ours = people.recipient.as_ref().is_some_and(|inbox| {
+        inbox
+            .addresses
+            .iter()
+            .any(|own| own.trim().eq_ignore_ascii_case(&address))
+    });
+    if address.is_empty() || ours {
         return None;
     }
     Some(Need {
@@ -1208,17 +1232,19 @@ async fn candidate(
     let mut reread = false;
     let mut recent = false;
     let mut money_asked = true;
+    // Whether the newest message was asked whose move it is.
+    let mut move_asked = false;
     if let Some(newest) = &newest {
         recent = newest.sent_at >= Utc::now() - settings.window;
         reread = row.is_some_and(|r| r.message_id == newest.id);
         if recent || reread {
             let answers = answers(tx, newest.id).await?;
             money_asked = answers.iter().any(|a| a.question == triage::MONEY);
-            // Its people only matter to a wait, which needs a move answer.
-            let people = if answers
+            move_asked = answers
                 .iter()
-                .any(|a| a.question == moves::question::NEXT_MOVE)
-            {
+                .any(|a| a.question == moves::question::NEXT_MOVE);
+            // Its people only matter to a wait, which needs a move answer.
+            let people = if move_asked {
                 people(tx, newest.id).await?
             } else {
                 None
@@ -1241,10 +1267,23 @@ async fn candidate(
         {
             false
         }
+        // Waits switched off: an open wait keeps its course, though its own
+        // message no longer raises it.
+        Some(row) if reread && raised.is_none() && !settings.waits && row.need()?.is_wait() => {
+            false
+        }
         Some(row) if reread && raised.is_none() => !matches!(
             row.verdict_on(row.message_id)?,
             Some(NeedVerdict::Confirmed | NeedVerdict::StillToPay)
         ),
+        // A newer message in the conversation was read again for whose move
+        // it is and waits on nobody ("never mind, I sent it myself"): the
+        // wait it followed is over, replaced by what that message says. A
+        // newer message from the person waited on ends it as heard back
+        // first (`settle`), and one that raises its own need replaces it.
+        Some(row) if !reread && recent && move_asked && raised.is_none() => {
+            row.need()?.is_wait()
+        }
         _ => false,
     };
     let need = match (raised, open) {
@@ -1326,9 +1365,20 @@ async fn since(
     ))
 }
 
+/// Most messages from the person waited on read for one that passes its
+/// sender's checks: past these, the wait is not taken for heard back.
+const HEARD_SCAN: i64 = 50;
+
+/// How long after a wait's message the inbox's own messages are read for a
+/// nudge to the person: what bounds the scan (`messages_outbound_idx`). A
+/// message to them sent later than this does not arm the wait again.
+const SENDS_SCAN_DAYS: i32 = 60;
+
 /// Whether mail from `address` (lower-cased) reached `inbox` after `after`
-/// (spam aside), in any conversation; and the inbox's messages to it, in To
-/// or Cc, since then.
+/// (spam aside), in any conversation, that the receiving provider did not
+/// mark as failing its sender's checks (a forged From hears nothing); and
+/// the inbox's messages to it, in To or Cc, in the [`SENDS_SCAN_DAYS`]
+/// after.
 async fn heard_from(
     tx: &mut Transaction<'_, Postgres>,
     inbox: InboxId,
@@ -1336,20 +1386,27 @@ async fn heard_from(
     after: DateTime<Utc>,
 ) -> Result<(bool, Option<Sends>)> {
     // Served by `messages_inbound_sender_idx`; `sender_address` is stored
-    // lower-cased.
-    let heard: bool = sqlx::query_scalar(
-        "SELECT EXISTS (SELECT 1 FROM conversations.messages
-                         WHERE inbox_id = $1 AND direction = 'inbound' AND sender_address = $2
-                           AND sent_at > $3 AND NOT in_spam)",
+    // lower-cased. Oldest first, at most [`HEARD_SCAN`].
+    let from_them: Vec<serde_json::Value> = sqlx::query_scalar(
+        "SELECT headers FROM conversations.messages
+          WHERE inbox_id = $1 AND direction = 'inbound' AND sender_address = $2
+            AND sent_at > $3 AND NOT in_spam
+          ORDER BY sent_at, id LIMIT $4",
     )
     .bind(inbox)
     .bind(address)
     .bind(after)
-    .fetch_one(&mut **tx)
+    .bind(HEARD_SCAN)
+    .fetch_all(&mut **tx)
     .await?;
+    let heard = from_them
+        .iter()
+        .any(|headers| !super::person::distrusted("inbound", address, false, headers, false));
+    // Served by `messages_outbound_idx` (inbox, sent_at): a bounded range.
     let (last, count): (Option<DateTime<Utc>>, i64) = sqlx::query_as(
         "SELECT max(m.sent_at), count(*) FROM conversations.messages m
           WHERE m.inbox_id = $1 AND m.direction = 'outbound' AND m.sent_at > $3
+            AND m.sent_at <= $3 + make_interval(days => $4)
             AND EXISTS (SELECT 1 FROM jsonb_array_elements(
                     CASE WHEN jsonb_typeof(m.recipients->'to') = 'array'
                          THEN m.recipients->'to' ELSE '[]'::jsonb END ||
@@ -1360,6 +1417,7 @@ async fn heard_from(
     .bind(inbox)
     .bind(address)
     .bind(after)
+    .bind(SENDS_SCAN_DAYS)
     .fetch_one(&mut **tx)
     .await?;
     let sends = last.map(|last| Sends {
@@ -3125,6 +3183,31 @@ mod tests {
         let mut machine = joao_to_ana();
         machine.from = party("Tickets", "no-reply@tickets.example.com");
         assert_eq!(waits(&answers, &machine), None);
+    }
+
+    #[test]
+    fn never_a_wait_on_the_inbox_itself() {
+        // Mail the inbox sent itself, filed as received: its sender is the
+        // inbox, whatever the case or spaces.
+        let mut own = joao_to_ana();
+        own.from = party("Sam", " SAM@example.com ");
+        let mut answers = quiet();
+        answers.push(next_move("sender", 0.95, true));
+        assert_eq!(waits(&answers, &own), None);
+    }
+
+    #[test]
+    fn no_new_wait_while_waits_are_switched_off() {
+        let people = joao_to_ana();
+        let mut answers = quiet();
+        answers.push(next_move("someone_else", 0.91, false));
+        answers.push(awaited(&people, "p1"));
+        assert!(waits(&answers, &people).is_some());
+        let off = settings().with_waits(false);
+        assert_eq!(
+            raise_with(MessageId::new(), &answers, Some(&people), &off),
+            None
+        );
     }
 
     #[test]

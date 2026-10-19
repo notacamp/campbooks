@@ -583,6 +583,18 @@ pub const SAM: (&str, &str) = ("Sam Rivers", "sam@example.com");
 /// Costa in [`mail`]s Joao sends to Ana. Anyone else's mail is abstained
 /// on.
 pub fn waiting_deps() -> ConversationsDeps {
+    let mut deps = sorting_deps().with_model(Arc::new(Scripted::model([(
+        JOAO.1,
+        someone_else_moves(),
+    )])));
+    deps.config.actions.enabled = true;
+    deps
+}
+
+/// What [`waiting_deps`]' model answers about Joao's mail: it asks nothing
+/// of the recipient, and someone else on it, the first person it may name
+/// (`p1`), has the next move.
+pub fn someone_else_moves() -> Script {
     let mut joao = script("primary", false, false, false, 0.0, false);
     joao.push((
         campbooks_ai::decide::signals::moves::question::NEXT_MOVE,
@@ -594,9 +606,7 @@ pub fn waiting_deps() -> ConversationsDeps {
         AnswerValue::Choice("p1".to_owned()),
         0.9,
     ));
-    let mut deps = sorting_deps().with_model(Arc::new(Scripted::model([(JOAO.1, joao)])));
-    deps.config.actions.enabled = true;
-    deps
+    joao
 }
 
 /// One message as a recorded batch (the fixtures' format): `from` to `to`,
