@@ -185,35 +185,22 @@ pub fn check_authorize_calls(
             }
             continue;
         }
-        let declaration = format!("operation_id = \"{id}\"");
-        // Only code declares: a comment quoting a declaration (the kernel's
-        // operations docs show one), line, doc or block, is not one. A
-        // `#[utoipa::path]` declaration outranks a macro's literal, and among
-        // equals the first path wins: the order the files were read in never
-        // decides the check.
-        let declaring = sources
-            .iter()
-            .filter(|(path, text)| {
-                !is_test_file(path) && (text.contains(&declaration) || declares_by_macro(text, id))
-            })
-            .filter_map(|(path, text)| {
-                let code = without_comments(text);
-                let rank = if code.contains(&declaration) {
-                    0
-                } else if declares_by_macro(&code, id) {
-                    1
-                } else {
-                    return None;
-                };
-                Some(((rank, path.as_str()), (path, text)))
-            })
-            .min_by_key(|(key, _)| *key)
-            .map(|(_, found)| found);
-        let Some((path, text)) = declaring else {
-            violations.push(format!(
-                "operation `{name}` (`{id}`): no source file declares it"
-            ));
-            continue;
+        let (path, text) = match declaring_file(sources, id) {
+            Declaring::One(path, text) => (path, text),
+            Declaring::None => {
+                violations.push(format!(
+                    "operation `{name}` (`{id}`): no source file declares it"
+                ));
+                continue;
+            }
+            Declaring::Many(paths) => {
+                violations.push(format!(
+                    "operation `{name}` (`{id}`) is declared in more than one file ({}): \
+                     declare it once, so the check knows which handler to read (ADR 0017)",
+                    paths.join(", ")
+                ));
+                continue;
+            }
         };
         // The operation's own declaration names its resource: only the code
         // around it counts, and no comment (line, trailing or block) does.
@@ -254,6 +241,51 @@ pub fn check_authorize_calls(
     violations
 }
 
+/// Which file declares an operation, as `declaring_file` finds it.
+enum Declaring<'a> {
+    /// No file does.
+    None,
+    /// This one: `(path, text)`.
+    One(&'a str, &'a str),
+    /// Several hold a real `operation_id = "<id>"`: their paths, sorted.
+    Many(Vec<&'a str>),
+}
+
+/// The non-test file declaring operation `id`, read on its code only: a
+/// comment quoting a declaration (the kernel's operations docs show one),
+/// line, doc or block, is not one, nor is code under `#[cfg(test)]`. A real
+/// `operation_id = "<id>"` outranks a macro's `"<id>",` literal (rate-limit
+/// tables and catalogues hold those too); two real ones are ambiguous; among
+/// literals the first path wins. The order the files were read in never
+/// decides.
+fn declaring_file<'a>(sources: &'a [(String, String)], id: &str) -> Declaring<'a> {
+    let declaration = format!("operation_id = \"{id}\"");
+    let (mut real, mut listed) = (Vec::new(), Vec::new());
+    for (path, text) in sources {
+        if is_test_file(path) || !(text.contains(&declaration) || declares_by_macro(text, id)) {
+            continue;
+        }
+        let code = without_comments(without_tests(text));
+        if code.contains(&declaration) {
+            real.push((path.as_str(), text.as_str()));
+        } else if declares_by_macro(&code, id) {
+            listed.push((path.as_str(), text.as_str()));
+        }
+    }
+    match *real.as_slice() {
+        [(path, text)] => Declaring::One(path, text),
+        [] => listed
+            .into_iter()
+            .min_by_key(|&(path, _)| path)
+            .map_or(Declaring::None, |(path, text)| Declaring::One(path, text)),
+        _ => {
+            let mut paths: Vec<&str> = real.iter().map(|&(path, _)| path).collect();
+            paths.sort_unstable();
+            Declaring::Many(paths)
+        }
+    }
+}
+
 /// `CONST: &str = "<module>.<record>"` declarations, by name.
 fn resource_constants(sources: &[(String, String)]) -> Vec<(String, String)> {
     static CONSTANT: LazyLock<Regex> = LazyLock::new(|| {
@@ -289,8 +321,9 @@ static AUTHORIZE_CALL: LazyLock<Regex> = LazyLock::new(|| {
     .unwrap_or_else(|e| unreachable!("static regex compiles: {e}"))
 });
 
-/// `code` without its `#[utoipa::path(…)]` attributes and comments, which
-/// name the declared resource whether or not the handler asks about it.
+/// `code` (its comments already removed) without its `#[utoipa::path(…)]`
+/// attributes, which name the declared resource whether or not the handler
+/// asks about it.
 fn without_declarations(code: &str) -> String {
     const ATTRIBUTE: &str = "#[utoipa::path(";
     let mut out = String::with_capacity(code.len());
@@ -326,10 +359,7 @@ fn without_declarations(code: &str) -> String {
         rest = &rest[end..];
     }
     out.push_str(rest);
-    out.lines()
-        .filter(|line| !line.trim_start().starts_with("//"))
-        .collect::<Vec<_>>()
-        .join("\n")
+    out
 }
 
 /// The BFF documents its proxies with a macro taking the id as a literal.
@@ -1135,56 +1165,80 @@ mod tests {
         let c = catalogue();
         let s = spec(Some(json!({"resource": "mail.thread", "action": "read"})));
         let declared = "#[utoipa::path(operation_id = \"mail.list\")]\nfn handler() {}\n";
+        let asks = "fn h() { authz::require_type(\"mail.thread\"); }\n";
         let file = AccessFile::default();
-        let src = |text: &str| {
-            vec![(
-                "crates/modules/mail/src/list.rs".to_owned(),
-                text.to_owned(),
-            )]
-        };
-        let asking = format!("{declared}fn h() {{ authz::require_type(\"mail.thread\"); }}\n");
+        let check = |sources: &[(String, String)]| check_authorize_calls(&s, &c, sources, &file);
+        let at = |path: &str, text: &str| (path.to_owned(), text.to_owned());
+        let real_path = "crates/modules/mail/src/list.rs";
+        let real = at(real_path, &format!("{declared}{asks}"));
+        let silent = at(real_path, declared);
         // A file whose docs quote the declaration is not its handler,
-        // whichever is read first.
-        let quoted = (
-            "crates/kernel/src/operations.rs".to_owned(),
-            "//! ```\n//!     operation_id = \"mail.list\",\n//! ```\n".to_owned(),
+        // whichever is read first; nor is one quoting it in a block comment.
+        let quoted = at(
+            "crates/kernel/src/operations.rs",
+            "//! ```\n//!     operation_id = \"mail.list\",\n//! ```\n",
         );
-        let real = ("crates/modules/mail/src/list.rs".to_owned(), asking.clone());
-        assert!(check_authorize_calls(&s, &c, &[quoted.clone(), real.clone()], &file).is_empty());
-        assert!(check_authorize_calls(&s, &c, &[real.clone(), quoted], &file).is_empty());
-        // Nor is one quoting it in a block comment, or holding the id as a
-        // macro's literal (`"mail.list",`) next to a real declaration: the
-        // real one is the handler, whichever is read first.
-        let block = (
-            "crates/kernel/src/block.rs".to_owned(),
-            "/* operation_id = \"mail.list\",\n */\nfn f() {}\n".to_owned(),
+        let block = at(
+            "crates/kernel/src/block.rs",
+            "/* operation_id = \"mail.list\",\n */\nfn f() {}\n",
         );
-        let listed = (
-            "crates/server/src/a_list.rs".to_owned(),
-            "const IDS: &[&str] = &[\n    \"mail.list\",\n];\n".to_owned(),
+        // A file listing the id as a literal (`"mail.list",`), sorting
+        // before the real handler and asking the check itself: path order
+        // alone would pick it and pass; only the rank (a real declaration
+        // beats a literal) reads the real handler.
+        let listed = at(
+            "crates/a/src/ids.rs",
+            &format!("const IDS: &[&str] = &[\n    \"mail.list\",\n];\n{asks}"),
         );
         for order in [
-            vec![block.clone(), listed.clone(), real.clone()],
-            vec![real.clone(), listed.clone(), block.clone()],
-            vec![listed.clone(), real.clone(), block.clone()],
+            vec![quoted.clone(), block.clone(), listed.clone(), real.clone()],
+            vec![real.clone(), listed.clone(), block.clone(), quoted.clone()],
+            vec![listed.clone(), real.clone(), quoted.clone(), block.clone()],
         ] {
-            assert!(check_authorize_calls(&s, &c, &order, &file).is_empty());
+            assert!(check(&order[..]).is_empty(), "{order:?}");
         }
-        // And a handler that never asks still fails, whatever else quotes it.
-        let silent = (
-            "crates/modules/mail/src/list.rs".to_owned(),
-            declared.to_owned(),
+        // A real handler that never asks fails, named, whatever is read first
+        // and whatever else quotes or lists it.
+        for order in [
+            vec![
+                listed.clone(),
+                silent.clone(),
+                quoted.clone(),
+                block.clone(),
+            ],
+            vec![
+                silent.clone(),
+                block.clone(),
+                quoted.clone(),
+                listed.clone(),
+            ],
+        ] {
+            let violations = check(&order[..]);
+            assert_eq!(violations.len(), 1, "{violations:?}");
+            assert!(violations[0].starts_with(real_path), "{violations:?}");
+        }
+        // Two real declarations are ambiguous, not settled by path; one
+        // under `#[cfg(test)]` is not a declaration.
+        let twin = at("crates/a/src/list.rs", &format!("{declared}{asks}"));
+        let violations = check(&[twin, real.clone()][..]);
+        assert_eq!(violations.len(), 1, "{violations:?}");
+        assert!(
+            violations[0].contains("more than one file"),
+            "{violations:?}"
         );
-        assert_eq!(
-            check_authorize_calls(&s, &c, &[block, listed, silent], &file).len(),
-            1
+        assert!(violations[0].contains("crates/a/src/list.rs, crates/modules/mail/src/list.rs"));
+        let in_tests = at(
+            "crates/a/src/list.rs",
+            &format!("fn f() {{}}\n#[cfg(test)]\nmod tests {{\n{declared}}}\n"),
         );
+        assert!(check(&[in_tests.clone(), real][..]).is_empty());
+        assert_eq!(check(&[in_tests, silent][..]).len(), 1);
         // A commented-out call is not a call: trailing or block comment.
         for hidden in [
             format!("{declared}fn h() {{ /* authz::require_type(\"mail.thread\"); */ }}\n"),
             format!("{declared}fn h() {{ let _ = 1; // authz::require_type(\"mail.thread\")\n}}\n"),
         ] {
-            assert_eq!(check_authorize_calls(&s, &c, &src(&hidden), &file).len(), 1);
+            assert_eq!(check(&[at(real_path, &hidden)][..]).len(), 1);
         }
     }
 
