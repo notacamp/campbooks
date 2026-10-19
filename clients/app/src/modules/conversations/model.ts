@@ -198,9 +198,9 @@ export interface LeavingRow {
  * sat above (placed first when that one is leaving too), else where it was.
  * One back on the list (Undo while it folded) is itself again.
  */
-export function withLeaving<Row extends LeavingRow>(
+export function withLeaving(
   listed: readonly ConversationSummary[],
-  leaving: readonly Row[],
+  leaving: readonly LeavingRow[],
 ): ConversationSummary[] {
   const shown = [...listed];
   const has = (id: string | undefined) => shown.some((conversation) => conversation.id === id);
