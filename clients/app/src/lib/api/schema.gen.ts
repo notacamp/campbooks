@@ -3235,12 +3235,6 @@ export interface components {
              */
             logout_url?: string | null;
         };
-        /**
-         * @description Which of the inbox's places a list shows. The streams are the inbox;
-         *     the other views sit beside them and are not streams.
-         * @enum {string}
-         */
-        MailView: "inbox" | "sent" | "archive" | "spam" | "trash";
         /** @description The members, in the order they joined. */
         MemberList: {
             /** @description The members. */
@@ -6941,7 +6935,7 @@ export interface operations {
                 /** @description Only this inbox; every inbox you can read when absent. */
                 inbox?: components["schemas"]["InboxId"];
                 /** @description Which place: the inbox (default), Sent, Archive, Spam or Trash. */
-                view?: components["schemas"]["MailView"];
+                view?: "inbox" | "sent" | "archive" | "spam" | "trash";
                 /**
                  * @description Deprecated: use `view=archive`. `true` lists the archive, as
                  *     `view=archive` does; with another `view` it is a bad request.

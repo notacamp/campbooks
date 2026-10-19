@@ -10,7 +10,7 @@ import {
   type QueryClient,
 } from "@tanstack/react-query";
 
-import { api, operationKey, unwrap, type Schema } from "~/lib/api";
+import { api, operationKey, unwrap, type OperationQuery, type Schema } from "~/lib/api";
 
 export type Stream = Schema<"Stream">;
 export type ConversationSummary = Schema<"ConversationSummary">;
@@ -34,7 +34,7 @@ export function isStream(value: string): value is Stream {
 }
 
 /** A view beside the streams (`conversations.list` with `view`): never a stream. */
-export type View = Exclude<Schema<"MailView">, "inbox">;
+export type View = Exclude<NonNullable<OperationQuery<"conversations.list">["view"]>, "inbox">;
 
 /** The views, in display order, after the streams. */
 export const VIEWS: readonly View[] = ["sent", "archive", "spam", "trash"];

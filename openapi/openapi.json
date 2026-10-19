@@ -3032,7 +3032,15 @@
             "description": "Which place: the inbox (default), Sent, Archive, Spam or Trash.",
             "required": false,
             "schema": {
-              "$ref": "#/components/schemas/MailView"
+              "type": "string",
+              "description": "Which of the inbox's places a list shows. The streams are the inbox;\nthe other views sit beside them and are not streams.",
+              "enum": [
+                "inbox",
+                "sent",
+                "archive",
+                "spam",
+                "trash"
+              ]
             }
           },
           {
@@ -14778,17 +14786,6 @@
             "description": "The identity provider's end-session URL (RP-initiated logout), which\ncomes back to the app's root; `null` when it has none."
           }
         }
-      },
-      "MailView": {
-        "type": "string",
-        "description": "Which of the inbox's places a list shows. The streams are the inbox;\nthe other views sit beside them and are not streams.",
-        "enum": [
-          "inbox",
-          "sent",
-          "archive",
-          "spam",
-          "trash"
-        ]
       },
       "MemberList": {
         "type": "object",

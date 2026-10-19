@@ -105,6 +105,7 @@ pub struct ListQuery {
     /// Only this inbox; every inbox you can read when absent.
     pub inbox: Option<InboxId>,
     /// Which place: the inbox (default), Sent, Archive, Spam or Trash.
+    #[param(inline)]
     pub view: Option<MailView>,
     /// Deprecated: use `view=archive`. `true` lists the archive, as
     /// `view=archive` does; with another `view` it is a bad request.
@@ -548,7 +549,7 @@ mod http_tests {
 
     /// A recorded message Sam sent in `thread` at `at` (RFC 3339) to Marta
     /// Ferreira, copying two others, with its `mailbox` flags.
-    fn sent(id: &str, thread: &str, subject: &str, at: &str, mailbox: Value) -> Value {
+    fn sent(id: &str, thread: &str, subject: &str, at: &str, mailbox: &Value) -> Value {
         json!({"op": "upsert", "message": {
             "provider_message_id": id, "thread_key": thread,
             "from": {"name": "Sam Rivers", "address": "sam@example.com"},
@@ -583,7 +584,7 @@ mod http_tests {
             "thr-mine-1",
             "Figures for the board",
             "2026-10-07T09:00:00Z",
-            json!({"in_inbox": false}),
+            &json!({"in_inbox": false}),
         );
         kit.ingest_value(workspace, inbox, &json!({"changes": [started]}))
             .await;
@@ -848,7 +849,7 @@ mod http_tests {
                 "thr-en-q4",
                 "Re: Q4 plan: can you review by Friday?",
                 "2026-10-06T12:00:00Z",
-                mailbox,
+                &mailbox,
             )
         };
         kit.ingest_value(
@@ -878,7 +879,7 @@ mod http_tests {
             "thr-en-q4",
             "Re: Q4 plan: can you review by Friday?",
             "2026-10-05T10:02:00Z",
-            json!({"in_inbox": false, "in_spam": true}),
+            &json!({"in_inbox": false, "in_spam": true}),
         );
         reply["message"]["to"] =
             json!([{"name": "Maya Okafor", "address": "maya@northwind-studio.example"}]);
@@ -936,7 +937,7 @@ mod http_tests {
             "thr-mine-2",
             "Studio keys",
             "2026-10-06T18:00:00Z",
-            json!({"in_inbox": false}),
+            &json!({"in_inbox": false}),
         );
         kit.ingest_value(workspace, inbox, &json!({"changes": [other]}))
             .await;
