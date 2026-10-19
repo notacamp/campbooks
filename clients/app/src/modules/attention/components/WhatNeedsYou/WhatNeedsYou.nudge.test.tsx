@@ -277,8 +277,8 @@ describe("What needs you: Waiting on others", () => {
       `POST ${W}/conversations/${RUI.id}/nudge/draft`,
     );
     // Rui wrote the email, so the nudge copies nobody.
-    const rui = await screen.findByText("Rui Matos <rui@matos-carpintaria.example>");
-    expect(rui.closest("p")).toHaveTextContent("To Rui Matos <rui@matos-carpintaria.example>");
+    const to = await screen.findByText("Rui Matos <rui@matos-carpintaria.example>");
+    expect(to.closest("p")).toHaveTextContent("To Rui Matos <rui@matos-carpintaria.example>");
     expect(screen.getByRole("dialog")).not.toHaveTextContent("Copying");
   });
 

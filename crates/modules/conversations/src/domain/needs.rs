@@ -1281,9 +1281,7 @@ async fn candidate(
         // wait it followed is over, replaced by what that message says. A
         // newer message from the person waited on ends it as heard back
         // first (`settle`), and one that raises its own need replaces it.
-        Some(row) if !reread && recent && move_asked && raised.is_none() => {
-            row.need()?.is_wait()
-        }
+        Some(row) if !reread && recent && move_asked && raised.is_none() => row.need()?.is_wait(),
         _ => false,
     };
     let need = match (raised, open) {

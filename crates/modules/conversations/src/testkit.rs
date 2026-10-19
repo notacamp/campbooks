@@ -583,10 +583,8 @@ pub const SAM: (&str, &str) = ("Sam Rivers", "sam@example.com");
 /// Costa in [`mail`]s Joao sends to Ana. Anyone else's mail is abstained
 /// on.
 pub fn waiting_deps() -> ConversationsDeps {
-    let mut deps = sorting_deps().with_model(Arc::new(Scripted::model([(
-        JOAO.1,
-        someone_else_moves(),
-    )])));
+    let mut deps =
+        sorting_deps().with_model(Arc::new(Scripted::model([(JOAO.1, someone_else_moves())])));
     deps.config.actions.enabled = true;
     deps
 }
