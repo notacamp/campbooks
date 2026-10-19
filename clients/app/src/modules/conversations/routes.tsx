@@ -57,7 +57,16 @@ function InboxPage() {
   );
   if (stream === DRAFTS) {
     return (
-      <DraftsScreen key={workspaceId} workspaceId={workspaceId} composeAction={composeAction} />
+      <TeachOnceProvider workspaceId={workspaceId}>
+        <DraftsScreen
+          key={workspaceId}
+          workspaceId={workspaceId}
+          conversationId={params.conversationId}
+          draftId={search.draft}
+          renderReplySlot={renderReplyComposer}
+          composeAction={composeAction}
+        />
+      </TeachOnceProvider>
     );
   }
   return (
