@@ -27,6 +27,8 @@ export default async function deleteDraft({ page }: ScenarioContext): Promise<vo
   await (phone
     ? page.getByRole("button", { name: "Reply", exact: true }).last().click()
     : page.keyboard.press("r"));
+  // Reply opens Scout's reply dialog first; this one is written by hand.
+  await page.getByRole("button", { name: "Write my own" }).click();
 
   const composer = page.getByRole("region", { name: /^Reply to/u });
   const body = composer.getByRole("textbox", { name: "Message" });
