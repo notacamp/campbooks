@@ -183,14 +183,15 @@ export function needChip(t: Translate, need: NeedView): string {
 
 /** The signal colour of a need's chip. */
 export function needSignal(need: NeedView): "reply" | "do" | "pay" | "review" | "look" | "nudge" {
+  const reason = need.reason;
   // A wait is never a question to the member, whatever its trust.
-  if (isWait(need)) {
+  if (reason === "waiting" || reason === "nudge") {
     return "nudge";
   }
   if (need.trust === "check" && billKind(need) === undefined) {
     return "review";
   }
-  return need.reason === "worth_a_look" ? "look" : need.reason;
+  return reason === "worth_a_look" ? "look" : reason;
 }
 
 /** Days from `today` to `isoDate` (a calendar date), negative when past. */
