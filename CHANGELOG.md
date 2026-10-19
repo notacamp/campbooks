@@ -91,6 +91,14 @@ All notable changes to Campbooks Next are documented here. The format follows
   minute without. Use `campbooks-server healthcheck --worker` as the container's health
   check; the self-hosting guide shows how.
 
+### Changed
+
+- **Scout's reply drafts fit the person.** A drafted reply now matches how you usually write to
+  them: as formal or as casual as your past emails to that person, and as the conversation has
+  become. Scout reads up to three of your own earlier messages to them, from the same mailbox
+  and the last year only, to catch the greeting, the sign-off and the tone, never to take facts
+  from them. A new contact gets a polite, plain reply that is no more familiar than they are.
+
 ### Fixed
 
 - **A reply or forward never quotes nothing.** When an email's words were too slow to read

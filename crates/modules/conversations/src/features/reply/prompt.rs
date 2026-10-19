@@ -54,14 +54,34 @@ You write an email reply for the account holder. Answer with JSON only, \
 matching the schema.
 
 {DATA} `intent` says what the reply should say, in the account holder's \
-words. `my_name` is the account holder's name, when known.
+words. `my_name` is the account holder's name, when known. `conversation.\
+total_messages` is how many messages the whole conversation has, beyond the \
+ones shown. `them` describes the person answered: their name, whether the \
+account holder wrote to them before, and how many messages passed between \
+them in the last year. `my_recent_messages_to_them`, when given, are the \
+account holder's own earlier messages to that person, from other \
+conversations, oldest first.
 
 Write only the reply's body: no subject line, no quoted history, no \
 placeholders in brackets, plain text with line breaks, no HTML and no \
 Markdown. Write it in the language of the message being answered; when you \
 cannot tell, in `my_language`. Greet the other person by their first name \
 when the conversation gives it, keep it short and natural, and end with \
-`my_name` on its own line when it is given. Say only what `intent` asks and \
+`my_name` on its own line when it is given.
+
+Match the register to the person and the moment. How the account holder \
+wrote to them before, in `my_recent_messages_to_them` and in their own \
+messages in this conversation, decides how formal to be: the greeting, the \
+sign-off, the form of address (tu or vous, tu or você, tú or usted), the \
+length and the warmth. Sign off the way they usually do with this person, \
+with `my_name` when they sign with it. With no earlier message from the \
+account holder, follow how the other person writes: polite and plain for \
+someone new, and no more familiar than they are. Deep into a conversation, \
+drop the formalities the exchange already dropped. Use earlier messages only \
+for how to write, never as facts for this reply: no dates, amounts, names or \
+commitments from them.
+
+ Say only what `intent` asks and \
 what the conversation supports: never invent dates, amounts, names or \
 commitments. Never add a link, an account, card or IBAN number, a password or \
 a code, and never offer to send money, unless `intent` or `change` gives it.
@@ -131,6 +151,40 @@ pub struct Ask<'a> {
     pub shorter: bool,
 }
 
+/// The person answered, as the model reads them (campbooks-cloud#271).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct Them {
+    /// Their display name, or their address when they gave none.
+    pub name: String,
+    /// Whether this inbox ever wrote to them, in any conversation.
+    pub i_wrote_to_them_before: bool,
+    /// Messages from them to this inbox in the last year, at most 100.
+    pub from_them_last_year: i64,
+    /// Messages from this inbox to them in the last year, at most 100.
+    pub from_me_last_year: i64,
+}
+
+/// An earlier message of the account holder to the person answered.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct PastMessage {
+    /// When it was sent (RFC 3339).
+    pub sent_at: String,
+    /// Its own words: plain text, quoted history removed, bounded.
+    pub text: String,
+}
+
+/// What only a written reply learns about who is answered.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct Person {
+    /// How many messages the whole conversation has, at most 1000.
+    pub total_messages: usize,
+    /// The person answered, when there is one.
+    pub them: Option<Them>,
+    /// The account holder's earlier messages to them from other
+    /// conversations, oldest first.
+    pub past: Vec<PastMessage>,
+}
+
 /// What the model answers when asked for likely replies.
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
 pub struct Intents {
@@ -173,8 +227,17 @@ pub fn suggest(context: &Context) -> ChatRequest {
 }
 
 /// The request for a reply (or a rewrite of the member's draft).
-pub fn write(context: &Context, ask: &Ask<'_>) -> ChatRequest {
+pub fn write(context: &Context, person: &Person, ask: &Ask<'_>) -> ChatRequest {
     let mut input = serde_json::to_value(context).unwrap_or(Value::Null);
+    if let Some(conversation) = input.get_mut("conversation").and_then(Value::as_object_mut) {
+        conversation.insert("total_messages".into(), json!(person.total_messages));
+    }
+    if let (Some(object), Some(them)) = (input.as_object_mut(), &person.them) {
+        object.insert("them".into(), json!(them));
+        if !person.past.is_empty() {
+            object.insert("my_recent_messages_to_them".into(), json!(person.past));
+        }
+    }
     if let (Some(object), Ok(Value::Object(asked))) =
         (input.as_object_mut(), serde_json::to_value(ask))
     {
@@ -265,6 +328,22 @@ mod tests {
         }
     }
 
+    fn person(past: &str) -> Person {
+        Person {
+            total_messages: 12,
+            them: Some(Them {
+                name: "Marta Ferreira".into(),
+                i_wrote_to_them_before: true,
+                from_them_last_year: 4,
+                from_me_last_year: 3,
+            }),
+            past: vec![PastMessage {
+                sent_at: "2026-09-01T09:00:00Z".into(),
+                text: past.into(),
+            }],
+        }
+    }
+
     #[test]
     fn the_mail_is_json_data_never_part_of_the_instruction() {
         let hostile =
@@ -273,6 +352,7 @@ mod tests {
             suggest(&context(hostile)),
             write(
                 &context(hostile),
+                &person(hostile),
                 &Ask {
                     intent: "Say yes",
                     my_name: Some("Sam Rivera"),
@@ -295,13 +375,65 @@ mod tests {
             assert_eq!(input["conversation"]["messages"][0]["text"], hostile);
             assert_eq!(input["my_language"], "pt-PT");
             assert!(request.response_format.is_some());
+            // What is known of the person travels as data, and only to a
+            // written reply.
+            if input.get("intent").is_some() {
+                assert_eq!(input["conversation"]["total_messages"], 12);
+                assert_eq!(input["them"]["name"], "Marta Ferreira");
+                assert_eq!(input["them"]["i_wrote_to_them_before"], true);
+                assert_eq!(input["my_recent_messages_to_them"][0]["text"], hostile);
+            } else {
+                assert!(input.get("them").is_none());
+                assert!(input.get("my_recent_messages_to_them").is_none());
+                assert!(input["conversation"].get("total_messages").is_none());
+            }
         }
+    }
+
+    #[test]
+    fn a_written_reply_matches_the_register_and_uses_past_mail_only_for_style() {
+        let request = write(
+            &context("Can you come on Thursday?"),
+            &person("Oi Marta, tudo bem?"),
+            &Ask {
+                intent: "Say yes",
+                my_name: Some("Sam Rivera"),
+                draft: None,
+                change: None,
+                shorter: false,
+            },
+        );
+        let system = serde_json::to_value(&request.messages[0]).unwrap();
+        let instruction = system["content"].as_str().unwrap();
+        assert!(instruction.contains("Match the register"));
+        assert!(instruction.contains("never as facts"));
+        assert!(instruction.contains("my_recent_messages_to_them"));
+        assert!(!instruction.contains("Oi Marta"));
+        // No one earlier to read: the key is left out.
+        let mut alone = person("x");
+        alone.past.clear();
+        let request = write(
+            &context("Hi"),
+            &alone,
+            &Ask {
+                intent: "Say yes",
+                my_name: None,
+                draft: None,
+                change: None,
+                shorter: false,
+            },
+        );
+        let user = serde_json::to_value(&request.messages[1]).unwrap();
+        let input: Value = serde_json::from_str(user["content"].as_str().unwrap()).unwrap();
+        assert!(input.get("my_recent_messages_to_them").is_none());
+        assert_eq!(input["them"]["from_me_last_year"], 3);
     }
 
     #[test]
     fn a_rewrite_carries_the_draft_and_the_change() {
         let request = write(
             &context("Can you come on Thursday?"),
+            &Person::default(),
             &Ask {
                 intent: "Say yes",
                 my_name: None,
