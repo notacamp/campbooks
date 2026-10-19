@@ -834,3 +834,107 @@ async fn the_dispatcher_leaves_no_workspace_set(db: PgPool) {
     assert_eq!(workspace, None);
     tx.rollback().await.unwrap();
 }
+
+/// A strategy that remembers which questions it was asked, answering as
+/// `inner` does.
+struct Recording {
+    inner: Scripted,
+    asked: std::sync::Mutex<Vec<Vec<String>>>,
+}
+
+impl Strategy for Recording {
+    fn name(&self) -> &str {
+        self.inner.name()
+    }
+
+    fn decide<'a>(
+        &'a self,
+        envelope: &'a Envelope,
+        questions: &'a [Question],
+    ) -> BoxFuture<'a, Result<Decisions, campbooks_ai::Error>> {
+        self.asked
+            .lock()
+            .unwrap()
+            .push(questions.iter().map(|q| q.id.clone()).collect());
+        self.inner.decide(envelope, questions)
+    }
+}
+
+/// campbooks-cloud#293: mail stored before whose move it is was asked, with
+/// no open need, is asked only the move questions once on upgrade, and may
+/// then wait on someone; running it again asks nothing more.
+#[sqlx::test(migrations = "../../../migrations")]
+async fn the_upgrade_asks_recent_mail_whose_move_it_is_once(db: PgPool) {
+    use crate::testkit::{joao_asks_ana, waiting_deps};
+
+    // Before the upgrade: the catalogue was off, so only triage was asked.
+    let mut before = waiting_deps();
+    before.config.actions.enabled = false;
+    let old = Kit::with_deps(db.clone(), before).await;
+    let (workspace, _, _) = joao_asks_ana(&old).await;
+    assert!(needs_of(&db, workspace).await.is_empty());
+    let moves: i64 = sqlx::query_scalar(
+        "SELECT count(*) FROM conversations.decisions WHERE question = 'next_move'",
+    )
+    .fetch_one(&db)
+    .await
+    .unwrap();
+    assert_eq!(moves, 0);
+
+    // The upgraded server, the catalogue on: the migration's seed, a tick.
+    let mut joao = script("primary", false, false, false, 0.0, false);
+    joao.push((
+        "next_move",
+        AnswerValue::Choice("someone_else".to_owned()),
+        0.91,
+    ));
+    joao.push(("awaited", AnswerValue::Choice("p1".to_owned()), 0.9));
+    let recording = Arc::new(Recording {
+        inner: Scripted::model([(crate::testkit::JOAO.1, joao)]),
+        asked: std::sync::Mutex::new(Vec::new()),
+    });
+    let upgraded = Kit::with_deps(db.clone(), waiting_deps().with_model(recording.clone())).await;
+    let migration = std::fs::read_to_string(format!(
+        "{}/../../../migrations/20261023090000_conversations__needs_waiting.sql",
+        env!("CARGO_MANIFEST_DIR")
+    ))
+    .unwrap();
+    let start = migration.find("-- seed begin").unwrap();
+    let end = migration.find("-- seed end").unwrap();
+    // The migration's own text, from the repository.
+    sqlx::raw_sql(sqlx::AssertSqlSafe(migration[start..end].to_owned()))
+        .execute(&db)
+        .await
+        .unwrap();
+    tick(&upgraded).await;
+
+    // Asked once, the move questions only.
+    let asked = recording.asked.lock().unwrap().clone();
+    assert_eq!(asked, [vec!["next_move".to_owned(), "awaited".to_owned()]]);
+    assert_eq!(
+        needs_of(&db, workspace).await,
+        [(
+            "joao-1".to_owned(),
+            "waiting".to_owned(),
+            "open".to_owned(),
+            String::new()
+        )]
+    );
+    // The triage answers stay as they were: one model answer each.
+    let replies: i64 = sqlx::query_scalar(
+        "SELECT count(*) FROM conversations.decisions
+          WHERE question = 'needs_reply' AND source = 'model'",
+    )
+    .fetch_one(&db)
+    .await
+    .unwrap();
+    assert_eq!(replies, 1);
+
+    // Again: nothing more is asked.
+    sqlx::raw_sql(sqlx::AssertSqlSafe(migration[start..end].to_owned()))
+        .execute(&db)
+        .await
+        .unwrap();
+    tick(&upgraded).await;
+    assert_eq!(recording.asked.lock().unwrap().len(), 1);
+}

@@ -48,6 +48,8 @@ use crate::{
 
 #[cfg(test)]
 mod tests;
+#[cfg(test)]
+mod waiting_tests;
 
 /// What a correction of a Pay need's money answer says when the member
 /// marks it Not needed: no payment is owed (paid already, or no bill).

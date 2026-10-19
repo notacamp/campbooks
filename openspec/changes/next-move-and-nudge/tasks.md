@@ -14,26 +14,26 @@
 
 ## 2. Conversations: the wait
 
-- [ ] 2.1 Migration: `needs.awaited_name`, `awaited_address`, `nudge_at`, `nudges`; reasons `waiting`/`nudge`, cause `heard_back` (checks widened, validated in a second migration); the hearing-back index
-- [ ] 2.2 Need derivation: `waiting` after every other need, the 0.8 / accepted rules, the awaited person from the stored `awaited` options, trust `sure`/`check`; `next_move` takes away a model `reply`/`do` only when accepted
-- [ ] 2.3 Nudge time: working days by UTC date at the message's time of day, `due_on` from Scout's read when given; `CAMPBOOKS_CONVERSATIONS__WAIT__WORKING_DAYS` (1 to 15, refused at start otherwise)
-- [ ] 2.4 Need clock: a `waiting` need's clock row is its `nudge_at`; `wake_needs` turns it into `nudge` with a new revision
-- [ ] 2.5 Hearing back on inbound store (same inbox, any conversation, after the need's message); re-arming on a send to the awaited address; archiving leaves the wait
-- [ ] 2.6 `need_changed` v1 contract: the two reasons and the cause (additive); `cargo xtask events --check`
-- [ ] 2.7 `ConversationSummary.need.waiting_on` and `nudges`; waits left out of "needs you" counts
-- [ ] 2.8 Upgrade: queue every inbox once to ask the two questions for recent mail with no open need, in the daily AI limit
+- [x] 2.1 Migration: `needs.awaited_name`, `awaited_address`, `nudge_at`, `nudges`; reasons `waiting`/`nudge`, cause `heard_back` (checks widened, validated in a second migration); the hearing-back index
+- [x] 2.2 Need derivation: `waiting` after every other need, the 0.8 / accepted rules, the awaited person from the stored `awaited` options, trust `sure`/`check`; `next_move` takes away a model `reply`/`do` only when accepted
+- [x] 2.3 Nudge time: working days by UTC date at the message's time of day, `due_on` from Scout's read when given; `CAMPBOOKS_CONVERSATIONS__WAIT__WORKING_DAYS` (1 to 15, refused at start otherwise)
+- [x] 2.4 Need clock: a `waiting` need's clock row is its `nudge_at`; `wake_needs` turns it into `nudge` with a new revision
+- [x] 2.5 Hearing back on inbound store (same inbox, any conversation, after the need's message); re-arming on a send to the awaited address; archiving leaves the wait
+- [x] 2.6 `need_changed` v1 contract: the two reasons and the cause (additive); `cargo xtask events --check`
+- [x] 2.7 `ConversationSummary.need.waiting_on` and `nudges`; waits left out of "needs you" counts
+- [x] 2.8 Upgrade: queue every inbox once to ask the two questions for recent mail with no open need, in the daily AI limit
 
 ## 3. Conversations: the nudge
 
-- [ ] 3.1 Draft kind `nudge` (reply all, awaited in To, the rest in Cc, never the inbox), 409 `not_waiting`
-- [ ] 3.2 `conversations.write_nudge` on the `write_reply` machinery: scope, access, role and opt-in, limits, fixed instruction, mail as data
+- [x] 3.1 Draft kind `nudge` (reply all, awaited in To, the rest in Cc, never the inbox), 409 `not_waiting`
+- [x] 3.2 `conversations.write_nudge` on the `write_reply` machinery: scope, access, role and opt-in, limits, fixed instruction, mail as data
 - [ ] 3.3 HTTP tests: addressing, read-only inbox, someone else's inbox (404), no model (409), rate limit, nothing stored
 
 ## 4. Attention
 
-- [ ] 4.1 Reasons `waiting`/`nudge`; projection of `heard_back` and of a nudge going back to waiting
-- [ ] 4.2 `attention.list`: waiting left out of the queue, Nudge ordered last, never dropped by age; `state=waiting`, soonest first
-- [ ] 4.3 Replay and out-of-order tests for the new transitions
+- [x] 4.1 Reasons `waiting`/`nudge`; projection of `heard_back` and of a nudge going back to waiting
+- [x] 4.2 `attention.list`: waiting left out of the queue, Nudge ordered last, never dropped by age; `state=waiting`, soonest first
+- [x] 4.3 Replay and out-of-order tests for the new transitions
 
 ## 5. Home
 
