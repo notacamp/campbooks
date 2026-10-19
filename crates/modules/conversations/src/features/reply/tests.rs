@@ -1250,6 +1250,8 @@ async fn without_a_model_that_may_read_mail_no_nudge_is_written(db: PgPool) {
         .await;
     assert_eq!(response.status, StatusCode::CONFLICT);
     assert_eq!(response.json["code"], "reply_unavailable");
+}
+
 /// `token` tells Scout `note` about `address` (`conversations.set_person_note`).
 async fn tell_scout(kit: &Kit, token: &str, workspace: WorkspaceId, address: &str, note: &str) {
     let response = kit
