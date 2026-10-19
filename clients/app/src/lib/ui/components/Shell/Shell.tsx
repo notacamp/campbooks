@@ -172,6 +172,34 @@ export function ReaderBody({ children }: { children: ReactNode }) {
   return <div className={styles["readerBody"]}>{children}</div>;
 }
 
+export interface ReaderFooterProps {
+  /** The reply composer while it is open; nothing (or `null`) otherwise. */
+  slot?: ReactNode | undefined;
+  /** From 48rem, shown while the slot is empty: the way to start a reply. */
+  prompt?: ReactNode | undefined;
+  /** Below 48rem, shown while the slot is empty: the floating action bar. */
+  phoneBar?: ReactNode | undefined;
+}
+
+/**
+ * The bottom of a reader, pinned while its thread scrolls under it, after
+ * the {@link ReaderBody}: never between or after messages in the flow. An
+ * open composer takes it and grows upward, scrolling past
+ * `--reader-footer-max`; otherwise it shows `prompt` (from 48rem) or
+ * `phoneBar` (below, above the tab bar).
+ */
+export function ReaderFooter({ slot, prompt, phoneBar }: ReaderFooterProps) {
+  return (
+    <div className={styles["readerFooter"]}>
+      <div className={styles["readerFooterColumn"]}>
+        <div className={styles["readerSlot"]}>{slot}</div>
+        {prompt === undefined ? null : <div className={styles["readerPrompt"]}>{prompt}</div>}
+        {phoneBar === undefined ? null : <div className={styles["readerPhoneBar"]}>{phoneBar}</div>}
+      </div>
+    </div>
+  );
+}
+
 /** A pane's top bar: a title or actions on one line. */
 export function PaneHeader({ children }: { children: ReactNode }) {
   return <div className={styles["paneHeader"]}>{children}</div>;

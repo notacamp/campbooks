@@ -122,8 +122,40 @@ export const Responsive: Story = {
   play: async ({ canvasElement }) => {
     await fitsItsContent(canvasElement);
     const { frame, doc } = loadedFrame(canvasElement);
-    await expect(doc.adoptedStyleSheets).toHaveLength(1);
+    // The frame's own rules, then the message's.
+    await expect(doc.adoptedStyleSheets).toHaveLength(2);
     await expect(doc.body.style.zoom).toBe("");
     await expect(doc.documentElement.scrollWidth).toBeLessThanOrEqual(frame.clientWidth);
+  },
+};
+
+/**
+ * A reply whose quoted history the server marked: folded behind "Show quoted
+ * text", which opens and closes with no script, and the frame grows to fit.
+ */
+export const QuotedHistory: Story = {
+  args: {
+    html: `<div dir="ltr">Perfect, approved. When can you start?</div><div data-cb-quoted="1"><div class="gmail_quote"><div class="gmail_attr">On Thu, Sam Rivera wrote:</div><blockquote class="gmail_quote" style="margin: 0 0 0 0.8ex; border-left: 1px solid #cccccc; padding-left: 1ex">${"Revised quote attached: €2,340 incl. VAT, two extra brackets included. ".repeat(12)}</blockquote></div></div>`,
+    showQuoted: "Show quoted text",
+    hideQuoted: "Hide quoted text",
+  },
+  play: async ({ canvasElement }) => {
+    await fitsItsContent(canvasElement);
+    const { frame, doc } = loadedFrame(canvasElement);
+    const details = doc.querySelector("details");
+    const summary = doc.querySelector("summary");
+    if (details === null || summary === null) {
+      throw new Error("not folded");
+    }
+    await expect(details.open).toBe(false);
+    const folded = frame.getBoundingClientRect().height;
+    summary.click();
+    await expect(details.open).toBe(true);
+    await waitFor(() => {
+      if (frame.getBoundingClientRect().height <= folded) {
+        throw new Error("the frame has not grown yet");
+      }
+    });
+    await fitsItsContent(canvasElement);
   },
 };

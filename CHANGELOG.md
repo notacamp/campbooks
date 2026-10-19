@@ -8,6 +8,14 @@ All notable changes to Campbooks Next are documented here. The format follows
 
 ### Added
 
+- **Threads read as a back and forth.** Your own messages in a thread read "You → Marta
+  Silva" and sit in from the left, while theirs stay flush left. A long thread keeps its
+  newest two messages, its first and anything unread, and folds the middle into "N more
+  messages", which opens in place. A reply's quoted history folds behind "Show quoted
+  text", found from how the mail is built, never from its words. The reply box stays pinned
+  at the bottom of the reader while the thread scrolls under it (phones keep the Reply and
+  Done bar). In the list, a conversation where you wrote last starts its snippet with
+  "You:".
 - **Usage analytics, without a tracking script (off by default).** An instance can count
   which screens people use in its own Matomo (`CAMPBOOKS_ANALYTICS__MATOMO_URL`,
   `__MATOMO_SITE_ID` and `__MATOMO_VISITOR_KEY`, all three or nothing). The app loads no
