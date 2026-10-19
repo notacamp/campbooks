@@ -1242,16 +1242,16 @@ mod tests {
     #[test]
     fn the_inbox_is_removed_without_regard_to_case_and_a_missing_inbox_removes_nobody() {
         let env = with_recipient(
-            &["Inbox@Example.com", "ana@studio.example"],
+            &["Inbox@Example.com", "lia@studio.example"],
             &[],
             &["inbox@example.com"],
         );
-        assert_eq!(addresses(&awaitable(&env)), ["ana@studio.example"]);
+        assert_eq!(addresses(&awaitable(&env)), ["lia@studio.example"]);
         let mut unknown = env.clone();
         unknown.recipient = None;
         assert_eq!(
             addresses(&awaitable(&unknown)),
-            ["Inbox@Example.com", "ana@studio.example"]
+            ["Inbox@Example.com", "lia@studio.example"]
         );
     }
 
@@ -1272,12 +1272,12 @@ mod tests {
             &[
                 "billing@shop.example",
                 "noreply@shop.example",
-                "ana@studio.example",
+                "lia@studio.example",
             ],
             &["Notifications@shop.example"],
             &[],
         );
-        assert_eq!(addresses(&awaitable(&env)), ["ana@studio.example"]);
+        assert_eq!(addresses(&awaitable(&env)), ["lia@studio.example"]);
     }
 
     #[test]
