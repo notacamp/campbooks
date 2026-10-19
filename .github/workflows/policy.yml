@@ -1,7 +1,7 @@
 name: Policy
 
 # Gates on the PR's process and the repo's hygiene rather than its runtime
-# behaviour: PR title, changelog, UI recording, specs, secrets. Each step runs `if: always()`
+# behaviour: PR title, changelog entries, UI recording, specs, secrets. Each step runs `if: always()`
 # so one failure never hides another.
 
 on:
@@ -18,7 +18,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with: { fetch-depth: 0 }
 
       - name: The PR's own changes
@@ -37,6 +37,12 @@ jobs:
             range="origin/${BASE_REF}...HEAD"
           fi
           echo "PR_RANGE=$range" >> "$GITHUB_ENV"
+          # The PR's own tree (parent 2 of the merge ref), for what it leaves behind.
+          if git rev-parse -q --verify 'HEAD^2' >/dev/null; then
+            echo "PR_HEAD=HEAD^2" >> "$GITHUB_ENV"
+          else
+            echo "PR_HEAD=HEAD" >> "$GITHUB_ENV"
+          fi
           echo "The PR's own changes ($range):"
           git diff --name-only "$range" | sed 's/^/  /'
 
@@ -51,19 +57,66 @@ jobs:
             exit 1
           fi
 
-      - name: Changelog entry on feat/ and fix/ branches
+      - name: Changelog entry on feat and fix PRs
+        # One file per entry under changelog/unreleased/<kind>/, so parallel
+        # PRs never touch the same lines (changelog/README.md). Required when
+        # the branch (feat/, fix/) or the title (feat:, fix:) says so.
         if: always() && github.event_name == 'pull_request'
         env:
           HEAD_REF: ${{ github.head_ref }}
+          TITLE: ${{ github.event.pull_request.title }}
         run: |
-          case "$HEAD_REF" in
-            feat/*|fix/*)
-              if ! git diff --name-only "$PR_RANGE" | grep -qx CHANGELOG.md; then
-                echo "::error::feat/ and fix/ PRs must add a line under [Unreleased] in CHANGELOG.md"
-                exit 1
-              fi ;;
-            *) echo "Not a feat/ or fix/ branch — no changelog entry required." ;;
-          esac
+          case "$HEAD_REF" in feat/*|fix/*) needed=1 ;; *) needed= ;; esac
+          if [[ "$TITLE" =~ ^(feat|fix)(\([a-z0-9-]+\))?!?: ]]; then needed=1; fi
+          if [ -z "$needed" ]; then
+            echo "Not a feat or fix PR — no changelog entry required."; exit 0
+          fi
+          added=$(git diff --name-only --find-renames --diff-filter=AM "$PR_RANGE" -- changelog/unreleased \
+                    | grep -v '/\.gitkeep$' || true)
+          if [ -z "$added" ]; then
+            echo "::error::feat and fix PRs add a changelog entry: .github/scripts/changelog.sh new <added|changed|fixed|...> <issue>-<slug>, then write it (changelog/README.md)."
+            exit 1
+          fi
+          echo "Changelog entries:"; echo "$added" | sed 's/^/  /'
+
+      - name: Changelog entries are well-formed
+        if: always()
+        run: .github/scripts/changelog.sh check
+
+      - name: CHANGELOG.md is written only by a release
+        # Entries go in changelog/unreleased/; CHANGELOG.md changes only in the
+        # PR that cuts a release (`changelog.sh release`), which must take
+        # every entry its branch had with it; entries merged into next while
+        # it was open stay for the following release. Only a release deletes
+        # entries. A maintainer fixing a released or unreleased entry by hand
+        # applies the `changelog-edit` label.
+        if: >-
+          always() && github.event_name == 'pull_request' &&
+          !contains(github.event.pull_request.labels.*.name, 'changelog-edit')
+        run: |
+          if git diff --quiet "$PR_RANGE" -- CHANGELOG.md; then
+            deleted=$(git diff --name-only --no-renames --diff-filter=D "$PR_RANGE" -- changelog/unreleased \
+                        | grep -v '/\.gitkeep$' || true)
+            if [ -n "$deleted" ]; then
+              echo "::error::This PR deletes (or moves) changelog entries it did not add; only a release removes them. Restore them with git checkout origin/next -- <path>:"
+              echo "$deleted" | sed 's/^/  /'
+              exit 1
+            fi
+            echo "CHANGELOG.md unchanged."; exit 0
+          fi
+          version=$(tr -d '[:space:]' < VERSION)
+          if git ls-remote --exit-code --tags origin "refs/tags/next-v${version}" >/dev/null 2>&1 ||
+             ! .github/scripts/release-notes.sh "$version" >/dev/null 2>&1; then
+            echo "::error::Don't edit CHANGELOG.md: add your entry as a file with .github/scripts/changelog.sh new <kind> <slug> (changelog/README.md). CHANGELOG.md is written only when a release is cut (CONTRIBUTING.md → Releases)."
+            exit 1
+          fi
+          left=$(git ls-tree -r --name-only "$PR_HEAD" -- changelog/unreleased | grep -v '/\.gitkeep$' || true)
+          if [ -n "$left" ]; then
+            echo "::error::This PR cuts next-v${version} but leaves entries behind; run .github/scripts/changelog.sh release on the branch again so they are released and removed:"
+            echo "$left" | sed 's/^/  /'
+            exit 1
+          fi
+          echo "This PR cuts next-v${version}."
 
       - name: UI PRs include a screen recording
         # A PR that changes the client UI must show it working: a `## Recording`
@@ -102,7 +155,7 @@ jobs:
             exit 1
           fi
           if ! .github/scripts/release-notes.sh "$version" >/dev/null; then
-            echo "::error::VERSION is now ${version}: roll CHANGELOG.md [Unreleased] into a '## [next-v${version}] - YYYY-MM-DD' section (CONTRIBUTING.md → Releases)."
+            echo "::error::VERSION is now ${version} but CHANGELOG.md has no '## [next-v${version}]' section: cut releases with .github/scripts/changelog.sh release (CONTRIBUTING.md → Releases)."
             exit 1
           fi
           echo "Release next-v${version} is ready to be cut on merge."

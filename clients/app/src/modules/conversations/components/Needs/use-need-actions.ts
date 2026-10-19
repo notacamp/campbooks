@@ -9,7 +9,7 @@ import {
   type NeedVerdict,
 } from "../../api/queries";
 import type { Translate } from "../../model";
-import { needSender } from "../../needs";
+import { isStillNeeded, needSender } from "../../needs";
 import { useTeachOnce } from "../TeachOnce/TeachOnce";
 
 const TOASTS: Record<Exclude<NeedVerdict, "reopen">, string> = {
@@ -74,7 +74,15 @@ export function useNeedActions(
       .then(
         () => {
           // Not needed on a need (not a warning) can teach: "these never need me".
-          if (verdict === "not_needed" && conversation.need?.question !== "suspicious") {
+          // Not on "Still needed?": the mail did need something, time passed.
+          const need = conversation.need;
+          if (
+            verdict === "not_needed" &&
+            need !== null &&
+            need !== undefined &&
+            need.question !== "suspicious" &&
+            !isStillNeeded(need)
+          ) {
             teach?.after(conversation, { kind: "not_needed" });
           }
           if (verdict === "already_paid" && undone?.current !== true) {
@@ -129,9 +137,16 @@ export function useNeedActions(
     }
     const name = needSender(need, conversation);
     const safe = verdict === "not_needed" && need.question === "suspicious";
+    // "Still needed?" answered No: nothing is learned from it, so say only that.
+    const stale = verdict === "not_needed" && isStillNeeded(need);
+    const label = safe
+      ? "needs.toast.safe"
+      : stale
+        ? "needs.toast.noLongerNeeded"
+        : TOASTS[verdict];
     const undone = { current: false };
     const entry = undo.push({
-      label: t(safe ? "needs.toast.safe" : TOASTS[verdict], { name }),
+      label: t(label, { name }),
       undo: () => {
         undone.current = true;
         onUndo?.(conversation);

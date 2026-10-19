@@ -2,17 +2,27 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useEffectEvent, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
-import { Banner, Button, Text } from "~/lib/ui";
+import { Banner, Button, Text, useUndoToast } from "~/lib/ui";
 
 import { createDraft, draftKeys, useConversationDrafts, type Draft } from "../../api/drafts";
 import { useMessageWords, withWords } from "../../api/queries";
 import { displayName, forwardQuote, replyQuote, type QuoteWords } from "../../compose/quote";
+import { useDeleteDraft } from "../../compose/use-delete-draft";
+import type { Translate } from "../../model";
 import { DraftComposer } from "../DraftComposer/DraftComposer";
 import type { ReplyRequest, ReplySlotContext } from "../Reader/ReplySlot";
 
 /** A draft the member can still change. */
 function editable(draft: Draft): boolean {
   return draft.state === "draft" || draft.state === "failed";
+}
+
+/** What a draft is, as its title says it: "Reply to Maya Okafor", "Forward". */
+function titleOf(draft: Draft, t: Translate) {
+  const first = draft.to[0];
+  return draft.kind === "reply"
+    ? t("compose.title.reply", { name: first === undefined ? "" : displayName(first) })
+    : t(`compose.title.${draft.kind}`);
 }
 
 /** The reader's reply slot: one argument, so it can be passed as `renderReplySlot`. */
@@ -42,6 +52,9 @@ export function ReplyComposer({
   const [failed, setFailed] = useState<"quote" | "draft" | false>(false);
   // Reading the message's words for the quote (it came `text_unread`).
   const [reading, setReading] = useState(false);
+  const deleteDraft = useDeleteDraft(workspaceId);
+  const toast = useUndoToast();
+  const tr = t as unknown as Translate;
   const started = useRef<number | null>(null);
 
   const words: QuoteWords = {
@@ -136,29 +149,45 @@ export function ReplyComposer({
       </div>
     );
   }
+  if (closed) {
+    // Every draft left on this conversation, each named and each deletable.
+    return open.length === 0 ? null : (
+      <ul className="m-0 flex list-none flex-col gap-1 p-0">
+        {open.map((chip) => {
+          const name = titleOf(chip, tr);
+          return (
+            <li key={chip.id} className="flex flex-wrap items-center gap-1">
+              <Button
+                variant="ghost"
+                icon="reply"
+                onClick={() => {
+                  setDraftId(chip.id);
+                  setClosed(false);
+                }}
+              >
+                {t("compose.draftChip", { title: name })}
+              </Button>
+              <Button
+                variant="ghost"
+                aria-label={t("compose.deleteDraftNamed", { title: name })}
+                onClick={() => {
+                  void deleteDraft(chip).catch(() => {
+                    toast.notify(t("compose.errors.unknown"));
+                  });
+                }}
+              >
+                {t("compose.deleteDraft")}
+              </Button>
+            </li>
+          );
+        })}
+      </ul>
+    );
+  }
   if (draft === undefined) {
     return null;
   }
-  if (closed) {
-    return (
-      <div className="flex">
-        <Button
-          variant="ghost"
-          icon="reply"
-          onClick={() => {
-            setClosed(false);
-          }}
-        >
-          {t("compose.draftSaved")}
-        </Button>
-      </div>
-    );
-  }
-  const first = draft.to[0];
-  const title =
-    draft.kind === "reply"
-      ? t("compose.title.reply", { name: first === undefined ? "" : displayName(first) })
-      : t(`compose.title.${draft.kind}`);
+  const title = titleOf(draft, tr);
   return (
     <DraftComposer
       key={draft.id}
@@ -173,7 +202,9 @@ export function ReplyComposer({
         onClose();
       }}
       onDone={() => {
+        // Sent or deleted: any other draft left here shows as a chip.
         setDraftId(undefined);
+        setClosed(true);
         onClose();
       }}
       onUndone={() => {

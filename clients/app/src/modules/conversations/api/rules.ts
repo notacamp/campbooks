@@ -55,9 +55,11 @@ export function useRulePreview(
   workspaceId: string,
   inboxId: string,
   rule: { conditions: RuleCondition[]; actions: RuleAction[] },
+  { enabled = true }: { enabled?: boolean } = {},
 ) {
   return useQuery({
     queryKey: keys.preview(workspaceId, inboxId, rule),
+    enabled,
     queryFn: async ({ signal }) =>
       unwrap(
         await api.POST("/api/v1/w/{workspace_id}/inboxes/{inbox_id}/rules/preview", {
@@ -84,6 +86,24 @@ export function useRuleNotices(workspaceId: string) {
           signal,
         }),
       ).notices,
+  });
+}
+
+/**
+ * `assistant.compile_instruction`: the member's words about a sender's mail,
+ * read by Scout into what a rule would do. Saves nothing; the confirmation
+ * does. (Called here and not through the assistant module, which imports this
+ * one.)
+ */
+export function useCompileGoal(workspaceId: string) {
+  return useMutation({
+    mutationFn: async (text: string) =>
+      unwrap(
+        await api.POST("/api/v1/w/{workspace_id}/assistant/compile", {
+          params: { path: { workspace_id: workspaceId } },
+          body: { text },
+        }),
+      ),
   });
 }
 

@@ -988,3 +988,94 @@ async fn a_member_s_done_does_not_wait_on_a_batch_updating_the_message(db: PgPoo
         Value::Null
     );
 }
+
+async fn corrections(db: &PgPool) -> i64 {
+    sqlx::query_scalar("SELECT count(*) FROM conversations.corrections")
+        .fetch_one(db)
+        .await
+        .unwrap()
+}
+
+/// campbooks-cloud#275: an undated ask from three weeks ago is asked again,
+/// "Still to do?". Yes keeps it as the member's own; Not needed clears it;
+/// neither is a correction of the model, which read the mail right.
+#[sqlx::test(migrations = "../../../migrations")]
+async fn still_needed_answers_store_no_correction(db: PgPool) {
+    // Raised under the testkit's wide window, then settled under the
+    // shipped one, by a member of the same inbox.
+    let kit = Kit::new(db.clone()).await;
+    let (workspace, inbox, _) = sams_needs(&kit).await;
+    let mut deps = sorting_deps();
+    deps.config.needs_window_days = 14;
+    let shipped = Kit::with_deps(db.clone(), deps).await;
+    let (sam, sam_id) = shipped.member("sam-14", workspace);
+    shipped
+        .add_to_inbox(inbox, sam_id, InboxRole::Manager)
+        .await;
+    sqlx::query(
+        "UPDATE conversations.messages SET sent_at = now() - interval '21 days'
+          WHERE provider_message_id = 'needs-2'",
+    )
+    .execute(&db)
+    .await
+    .unwrap();
+    let id = shipped.conversation_of("needs-2").await;
+    // The clock is due: the scheduler's tick wakes it.
+    sqlx::query(
+        "UPDATE conversations.need_clocks SET wake_at = now() - interval '1 minute'
+          WHERE conversation_id = $1::uuid",
+    )
+    .bind(&id)
+    .execute(&db)
+    .await
+    .unwrap();
+    let mut tx = shipped.state.db.begin().await.unwrap();
+    campbooks_kernel::jobs::enqueue(
+        &mut tx,
+        &crate::features::wake_needs::DispatchNeedClocks,
+        campbooks_kernel::jobs::EnqueueOptions::default(),
+    )
+    .await
+    .unwrap();
+    tx.commit().await.unwrap();
+    shipped.run_jobs().await;
+
+    let pedro = summary(&shipped, &sam, workspace, "needs-2").await;
+    assert_eq!(pedro["need"]["reason"], "review");
+    assert_eq!(pedro["need"]["trust"], "check");
+    assert_eq!(pedro["need"]["question"], "still_to_do");
+    let seen = shipped.message_of("needs-2").await;
+    let base = format!("/api/v1/w/{workspace}/conversations/{id}/need");
+    // Yes: still to do, the member's own.
+    let yes = shipped
+        .post(
+            &sam,
+            &format!("{base}/confirm"),
+            Some(json!({"message_id": seen})),
+        )
+        .await;
+    assert_eq!(yes.status, StatusCode::OK, "{:?}", yes.json);
+    assert_eq!(yes.json["need"]["reason"], "do");
+    assert_eq!(yes.json["need"]["trust"], "sure");
+    assert_eq!(yes.json["need"]["basis"], "member");
+    assert_eq!(corrections(&db).await, 0);
+
+    // Undo: the question again.
+    let back = shipped.post(&sam, &format!("{base}/reopen"), None).await;
+    assert_eq!(back.status, StatusCode::OK, "{:?}", back.json);
+    assert_eq!(back.json["need"]["question"], "still_to_do");
+
+    // No longer needed: cleared, and nothing learned from it.
+    let no = shipped
+        .post(
+            &sam,
+            &format!("{base}/resolve"),
+            Some(json!({"outcome": "not_needed", "message_id": seen})),
+        )
+        .await;
+    assert_eq!(no.status, StatusCode::OK, "{:?}", no.json);
+    assert_eq!(no.json["need"], Value::Null);
+    assert_eq!(corrections(&db).await, 0);
+    let last = shipped.events("conversations.need_changed").await;
+    assert_eq!(last.last().unwrap()["cleared_because"], "not_needed");
+}

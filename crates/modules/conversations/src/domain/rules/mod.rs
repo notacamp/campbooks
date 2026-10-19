@@ -161,6 +161,11 @@ pub enum RuleAction {
     /// mail whose sender passes authentication; tracking pixels stay
     /// removed. Read when a message is opened, so it changes no mail.
     ShowImages,
+    /// Make sure the member sees each new message: it waits on Home under
+    /// "Worth a look" until it has been opened once ("Highlight them",
+    /// campbooks-cloud#274). Not pinned: it hides nothing, and the mail can
+    /// still be archived like any other.
+    WorthALook,
 }
 
 impl From<&RuleCondition> for taught::Condition {
@@ -210,6 +215,7 @@ impl From<&RuleAction> for taught::Action {
             RuleAction::Spam => Self::Spam,
             RuleAction::MarkPaid => Self::MarkPaid,
             RuleAction::ShowImages => Self::ShowImages,
+            RuleAction::WorthALook => Self::WorthALook,
         }
     }
 }
@@ -958,7 +964,7 @@ pub fn hides(actions: &[RuleAction]) -> bool {
         RuleAction::MoveToStream { stream } => *stream != Stream::Primary,
         RuleAction::NeedsReply { value } | RuleAction::AsksAction { value } => !value,
         RuleAction::Surface { value } => *value == SurfaceWhen::Never,
-        RuleAction::AddLabel { .. } | RuleAction::ShowImages => false,
+        RuleAction::AddLabel { .. } | RuleAction::ShowImages | RuleAction::WorthALook => false,
     })
 }
 

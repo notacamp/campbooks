@@ -22,8 +22,11 @@ The rules are in [`AGENTS.md`](AGENTS.md); this is the walkthrough.
    cargo deny check && cargo machete
    pnpm --dir clients lint typecheck test deps:check deadcode format:check api:check i18n:check
    ```
-6. **Changelog:** add a line under `[Unreleased]` in `CHANGELOG.md` for
-   anything user-visible (`feat/` and `fix/` branches are checked).
+6. **Changelog:** for anything user-visible, add an entry *file* with
+   `.github/scripts/changelog.sh new <kind> <issue>-<slug>` (required when the
+   branch, `feat/` or `fix/`, or the title, `feat:` or `fix:`, says so). Never
+   edit `CHANGELOG.md` itself, and never delete an entry: only a release does;
+   see [`changelog/README.md`](changelog/README.md).
 7. **Open a PR into `next`.** Title = Conventional Commit (it becomes the
    squash commit). Commits must be **signed** (SSH or GPG).
 8. **UI changes:** verify at 375px and desktop, and **attach a screen recording**
@@ -99,30 +102,52 @@ Rails `v0.x.y` tags and releases that `main` owns: tags `next-vX.Y.Z`, images
 
 Every push to `next` builds, scans and attests the image in CI as
 `:ci-<sha>`; once CI is green, `publish-next.yml` tags that same image
-`:next` and `:next-<sha12>` and deploys staging and production. A *release*
-is the same recipe under a version, plus a tag and a GitHub **prerelease**.
+`:next` and `:next-<sha12>` and deploys staging and production. So every
+merged change is live within minutes; a *release* only puts a version on
+what is already deployed: the same image under a version, plus a tag and a
+GitHub **prerelease** whose notes are the changelog section.
 
-**To cut a release**, open one PR into `next` (title `chore: release next-vX.Y.Z`)
-that:
+Until a release, each change's notes are a file under `changelog/unreleased/`
+(one per entry, [`changelog/README.md`](changelog/README.md)), so parallel PRs
+never conflict over `CHANGELOG.md`. Only a release writes that file.
 
-1. sets `VERSION` to `X.Y.Z` and `[workspace.package] version` in `Cargo.toml`
-   to match (`cargo xtask arch` checks this; refresh `Cargo.lock`);
-2. renames `## [Unreleased]` in `CHANGELOG.md` to `## [next-vX.Y.Z] - YYYY-MM-DD`
-   and adds a fresh empty `## [Unreleased]` above it.
+**To cut a release**, on a branch off `next` (e.g. `chore/release-next-vX.Y.Z`):
 
-The Policy check fails the PR if the changelog section is missing or the tag
-already exists. Merge it; when CI is green on the merge commit,
-`release-next.yml` builds the image, tags it `next-vX.Y.Z` and `next-vX.Y`,
-fails on fixable HIGH/CRITICAL Trivy findings, attests build provenance and an
-SPDX SBOM, and only then creates the tag and the prerelease (the changelog
-section is the release notes). Nothing is committed back to `next`: its branch
-ruleset requires checks on every commit, so the changelog is rolled in the PR.
-If the workflow fails after the merge, fix the cause and re-run it from the
-Actions tab (`Release next`, branch `next`); it is idempotent until the tag exists.
+```sh
+.github/scripts/changelog.sh preview    # read what will ship
+.github/scripts/changelog.sh release    # or: release X.Y.Z
+```
+
+`release` gathers every entry into `## [next-vX.Y.Z] - <today>` at the top of
+`CHANGELOG.md` (Added, Changed, Deprecated, Removed, Fixed, Security; newest
+first), deletes the entry files and sets `VERSION`, `[workspace.package]
+version` in `Cargo.toml` and the workspace crates in `Cargo.lock` to the new
+version (`cargo xtask arch` checks they match). Without a version it bumps the
+minor when anything was added, changed, deprecated or removed, and the patch
+otherwise; pass `X.Y.Z` for anything else. Open the PR as
+`chore: release next-vX.Y.Z`. Entries merged into `next` while the release PR
+is open are not in it: they stay in `changelog/unreleased/` and go into the
+following release. To include them anyway, start over from `next`'s files:
+`git merge origin/next`, `git checkout origin/next -- CHANGELOG.md VERSION Cargo.toml Cargo.lock changelog/`,
+then `changelog.sh release X.Y.Z`.
+
+The Policy check fails the PR if the changelog section is missing, the tag
+already exists or the branch's own entries are left behind, and fails any
+other PR that edits `CHANGELOG.md` or deletes an entry (a maintainer fixing an
+entry by hand applies the `changelog-edit` label). Merge the release PR; when
+CI is green on the merge commit, `release-next.yml` builds the image, tags it
+`next-vX.Y.Z` and `next-vX.Y`, fails on fixable HIGH/CRITICAL Trivy findings,
+attests build provenance and an SPDX SBOM, and only then creates the tag and
+the prerelease (the changelog section is the release notes). Nothing is
+committed back to `next`: its branch ruleset requires checks on every commit,
+so the changelog is rolled in the PR. If the workflow fails after the merge,
+fix the cause and re-run it from the Actions tab (`Release next`, branch
+`next`); it is idempotent until the tag exists.
 Verify an image with `gh attestation verify oci://ghcr.io/notacamp/campbooks:next-vX.Y.Z --repo notacamp/campbooks`.
 
-Releases do not deploy anything yet (staging follows `:next`); the workflow
-documents where a production deploy dispatch will hook in.
+Releases deploy nothing: production already runs every green merge. GitHub
+caps release notes at 125,000 characters, so a longer section is cut at a
+whole entry and links to the full one in `CHANGELOG.md`.
 
 ## Working with AI agents
 

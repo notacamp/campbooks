@@ -243,7 +243,9 @@ add a token or theme a workspace: `docs/design-system.md`.
   `pnpm typecheck` (strict + `noUncheckedIndexedAccess`), `pnpm test`,
   `pnpm deps:check`, `pnpm deadcode` (knip), `pnpm audit --prod`.
 - Repo: gitleaks, Trivy on the built image, Conventional Commit PR title,
-  changelog entry on `feat/` and `fix/` branches.
+  a changelog entry file on feat and fix PRs (by branch or title),
+  `CHANGELOG.md` untouched and entries kept outside a release (only a release
+  deletes them).
 
 ## Workflow
 
@@ -258,7 +260,11 @@ add a token or theme a workspace: `docs/design-system.md`.
 - Scaffold modules and slices with `cargo xtask new-module` /
   `cargo xtask new-feature` rather than copying by hand. *(CI:
   `cargo xtask scaffold-check` keeps their output passing the gates.)*
-- Update `CHANGELOG.md` `[Unreleased]` for user-visible changes.
+- User-visible changes get a changelog entry *file*:
+  `.github/scripts/changelog.sh new <kind> <issue>-<slug>`, then write it
+  (`changelog/README.md`). Never edit `CHANGELOG.md`: only a release writes it,
+  and the Policy check fails any other PR that does. *(CI: Policy → changelog
+  checks.)*
 - UI work: get a visual prototype approved before implementing it, then verify
   at **375px and desktop** before calling it done.
 - **UI PRs carry a screen recording** (375px + desktop) of the change working,

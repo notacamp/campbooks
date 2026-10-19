@@ -87,6 +87,7 @@ export { CopyField, type CopyFieldProps } from "./components/CopyField/CopyField
 export {
   ConversationRow,
   type ConversationRowProps,
+  type RowLeaving,
 } from "./components/ConversationRow/ConversationRow";
 export { Disclosure, type DisclosureProps } from "./components/Disclosure/Disclosure";
 export {

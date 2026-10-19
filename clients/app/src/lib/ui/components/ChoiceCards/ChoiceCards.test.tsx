@@ -30,4 +30,27 @@ describe("ChoiceCards", () => {
 
     expect(onChange).toHaveBeenCalledWith("personal");
   });
+
+  it("describes a card by its tag and its sentence, and names it by its title alone", () => {
+    renderUi(
+      <ChoiceCards
+        label="What should happen?"
+        value={null}
+        onChange={vi.fn()}
+        options={[
+          {
+            value: "guess",
+            title: "Archive them",
+            tag: "Scout’s guess",
+            description: "Out of the way.",
+          },
+          { value: "plain", title: "Mark them read" },
+        ]}
+      />,
+    );
+
+    const guess = screen.getByRole("radio", { name: "Archive them" });
+    expect(guess).toHaveAccessibleDescription("Scout’s guess Out of the way.");
+    expect(screen.getByRole("radio", { name: "Mark them read" })).not.toHaveAccessibleDescription();
+  });
 });
