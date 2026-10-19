@@ -149,8 +149,13 @@ export {
   FoldedMessage,
   MessageCard,
   MetaLine,
+  MoreMessages,
+  QuotedText,
   type FoldedMessageProps,
   type MessageCardProps,
+  type MessageSide,
+  type MoreMessagesProps,
+  type QuotedTextProps,
 } from "./components/Message/Message";
 export {
   MessageComposer,
@@ -208,6 +213,7 @@ export {
   PhoneHeader,
   PhoneSubnav,
   ReaderBody,
+  ReaderFooter,
   ReaderPane,
   SearchButton,
   Shell,
@@ -218,6 +224,7 @@ export {
   WorkspaceMark,
   WorkspaceSwitcher,
   type AccountButtonProps,
+  type ReaderFooterProps,
   type WorkspaceSwitcherProps,
 } from "./components/Shell/Shell";
 export {

@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 
+import { MAIL_PAGE } from "../tokens/tokens";
+
 import { frameDocument, REFERRER_POLICY, SANDBOX, SANDBOX_INERT_LINKS } from "./frame";
 import styles from "./SafeHtml.module.css";
 
@@ -25,6 +27,82 @@ export function stripLinks(doc: Document): void {
     link.dataset["href"] = link.getAttribute("href") ?? "";
     link.removeAttribute("href");
   }
+}
+
+/** The attribute the server wraps a reply's trailing quoted history in. */
+const QUOTED_MARK = "data-cb-quoted";
+
+/** How the fold's summary looks: a small dashed pill on the mail's white page. */
+const SUMMARY_STYLE = [
+  "display: inline-block",
+  "margin: 8px 0",
+  "padding: 1px 10px",
+  `border: 1px dashed ${MAIL_PAGE.foldBorder}`,
+  "border-radius: 999px",
+  `color: ${MAIL_PAGE.foldText}`,
+  "font-size: 12px",
+  "line-height: 1.6",
+  "cursor: pointer",
+  "list-style: none",
+].join("; ");
+
+/**
+ * The frame's own rules (a constructed sheet: the page's policy blocks
+ * `<style>`): the fold's summary says Hide once it is open.
+ */
+const FRAME_RULES = [
+  `details[${QUOTED_MARK}] > summary::-webkit-details-marker { display: none; }`,
+  `details[${QUOTED_MARK}][open] > summary > [data-cb-show] { display: none !important; }`,
+  `details[${QUOTED_MARK}][open] > summary > [data-cb-hide] { display: inline !important; }`,
+].join("\n");
+
+/**
+ * Fold the quoted history the server marked (one `div[data-cb-quoted]`)
+ * behind a `<details>`, which opens and closes with no script. The mail
+ * cannot write the mark: the server lets no `data-` attribute through.
+ */
+function foldQuoted(doc: Document, show: string, hide: string): void {
+  const block = doc.querySelector("div[data-cb-quoted]");
+  if (block === null) {
+    return;
+  }
+  const details = doc.createElement("details");
+  details.dataset["cbQuoted"] = "";
+  const summary = doc.createElement("summary");
+  summary.setAttribute("style", SUMMARY_STYLE);
+  const showLabel = doc.createElement("span");
+  showLabel.dataset["cbShow"] = "";
+  showLabel.textContent = show;
+  const hideLabel = doc.createElement("span");
+  hideLabel.dataset["cbHide"] = "";
+  hideLabel.setAttribute("style", "display: none");
+  hideLabel.textContent = hide;
+  summary.append(showLabel, hideLabel);
+  block.replaceWith(details);
+  details.append(summary, block);
+}
+
+/**
+ * `html` as the frame shows it, parsed inertly (a `DOMParser` document
+ * loads and runs nothing): its links taken out ({@link stripLinks}) when
+ * `inertLinks`, its quoted history folded ({@link foldQuoted}) when labels
+ * are given.
+ */
+export function prepareHtml(
+  html: string,
+  { inertLinks, quoted }: { inertLinks: boolean; quoted?: { show: string; hide: string } },
+): string {
+  if (!inertLinks && quoted === undefined) {
+    return html;
+  }
+  const doc = new DOMParser().parseFromString(html, "text/html");
+  if (inertLinks) {
+    stripLinks(doc);
+  }
+  if (quoted !== undefined) {
+    foldQuoted(doc, quoted.show, quoted.hide);
+  }
+  return doc.body.innerHTML;
 }
 
 /** Smallest and largest estimated heights, in px. */
@@ -82,13 +160,15 @@ function adoptStyles(doc: Document, css: string | undefined): void {
   if (view === null) {
     return;
   }
+  const own = new view.CSSStyleSheet();
+  own.replaceSync(FRAME_RULES);
   if (css === undefined || css === "") {
-    doc.adoptedStyleSheets = [];
+    doc.adoptedStyleSheets = [own];
     return;
   }
   const sheet = new view.CSSStyleSheet();
   sheet.replaceSync(css);
-  doc.adoptedStyleSheets = [sheet];
+  doc.adoptedStyleSheets = [own, sheet];
 }
 
 /**
@@ -122,6 +202,13 @@ export interface SafeHtmlProps {
   css?: string | null | undefined;
   /** Mail that may be phishing: its links lead nowhere. */
   inertLinks?: boolean | undefined;
+  /**
+   * "Show quoted text": fold the quoted history the server marked behind
+   * this label (with {@link SafeHtmlProps.hideQuoted} once open).
+   */
+  showQuoted?: string | undefined;
+  /** "Hide quoted text". */
+  hideQuoted?: string | undefined;
 }
 
 /**
@@ -136,14 +223,25 @@ export function SafeHtml({
   remoteImages = false,
   css,
   inertLinks = false,
+  showQuoted,
+  hideQuoted,
 }: SafeHtmlProps) {
   const frame = useRef<HTMLIFrameElement>(null);
   const [measured, setMeasured] = useState<number | undefined>();
   // Inert links are taken out before the frame ever parses the mail (an
   // inert DOMParser document loads and runs nothing), and again on load.
   const srcDoc = useMemo(
-    () => frameDocument(inertLinks ? withoutLinks(html) : html, remoteImages),
-    [html, remoteImages, inertLinks],
+    () =>
+      frameDocument(
+        prepareHtml(html, {
+          inertLinks,
+          ...(showQuoted === undefined
+            ? {}
+            : { quoted: { show: showQuoted, hide: hideQuoted ?? showQuoted } }),
+        }),
+        remoteImages,
+      ),
+    [html, remoteImages, inertLinks, showQuoted, hideQuoted],
   );
   const rules = css ?? undefined;
 
