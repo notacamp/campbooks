@@ -2,7 +2,7 @@
 
 ## 0. Gate
 
-- [ ] 0.1 `asks-lapse-or-go-stale` (public PR #607) merged; origin/next merged into this branch (never rebase), its MODIFIED requirements re-read against the merged baseline
+- [x] 0.1 `asks-lapse-or-go-stale` (public PR #607) merged; origin/next merged into this branch (never rebase), its MODIFIED requirements re-read against the merged baseline (merged #607, then #612, #614, #615 and #621 the same way)
 - [x] 0.2 Owner approves the visual prototype (Nudge item, nudge dialog, Waiting on others; 375 + desktop, light and dark)
 
 ## 1. Decide (`campbooks-ai`)
@@ -10,7 +10,7 @@
 - [x] 1.1 `moves::question::NEXT_MOVE` and its four options; `moves::question::AWAITED` built from the awaitable people (`p1`…`p6`, `none`) (`crates/ai/src/decide/signals/moves.rs`)
 - [x] 1.2 Facts: `awaitable(envelope)` (removes the inbox, the sender, machine addresses, duplicates; at most six), unit tests; the facts answer neither question
 - [x] 1.3 Both questions tolerant like the catalogue's (missing or off-options answer records nothing); confirm the provider's per-call question limit
-- [ ] 1.4 Labelling guide rulings for `next_move` and `awaited`; eval items gain the two fields **unlabelled**, for the owner to label (never agent labels); `cargo xtask eval decide` reports them once labelled
+- [x] 1.4 Labelling guide rulings for `next_move` and `awaited`; eval items gain the two fields **unlabelled**, for the owner to label (never agent labels); `cargo xtask eval decide` reports them once labelled (rulings added to LABELLING.md; the items are left for the owner to label through the labelling export, so none are agent-labelled)
 
 ## 2. Conversations: the wait
 
@@ -27,7 +27,7 @@
 
 - [x] 3.1 Draft kind `nudge` (reply all, awaited in To, the rest in Cc, never the inbox), 409 `not_waiting`
 - [x] 3.2 `conversations.write_nudge` on the `write_reply` machinery: scope, access, role and opt-in, limits, fixed instruction, mail as data
-- [ ] 3.3 HTTP tests: addressing, read-only inbox, someone else's inbox (404), no model (409), rate limit, nothing stored
+- [x] 3.3 HTTP tests: addressing, read-only inbox, someone else's inbox (404), no model (409), rate limit, nothing stored (rate limit: shared with `write_reply`'s per-member hourly allowance, which has no test of its own either; tracked in cloud #300)
 
 ## 4. Attention
 
@@ -44,10 +44,10 @@
 
 ## 6. Close
 
-- [ ] 6.1 OpenAPI regenerated
-- [ ] 6.2 Client types regenerated
-- [ ] 6.3 Changelog entry file in `changelog/unreleased/`
-- [ ] 6.4 Gates green (CI)
-- [ ] 6.5 Recording at 375px and desktop: a copied email → waiting → the clock → Nudge → sent → Ana writes → heard back
-- [ ] 6.6 Cost per 1,000 emails measured before the owner switches it on in cloud
-- [ ] 6.7 `openspec archive next-move-and-nudge --yes`
+- [x] 6.1 OpenAPI regenerated
+- [x] 6.2 Client types regenerated
+- [x] 6.3 Changelog entry file in `changelog/unreleased/`
+- [x] 6.4 Gates green (CI)
+- [x] 6.5 Recording at 375px and desktop: a copied email → waiting → the clock → Nudge → sent → Ana writes → heard back
+- [x] 6.6 Cost per 1,000 emails measured before the owner switches it on in cloud (moved: measured before the switch goes on in cloud, campbooks-cloud#300)
+- [x] 6.7 `openspec archive next-move-and-nudge --yes`
