@@ -1,6 +1,6 @@
 import type { Page } from "playwright";
 
-import { pause, type ScenarioContext } from "../context.ts";
+import type { ScenarioContext } from "../context.ts";
 
 import { caption, signedIn } from "./inbox.ts";
 
@@ -25,17 +25,27 @@ import { caption, signedIn } from "./inbox.ts";
 
 const STILL = "Pedro Alves asked 2 weeks ago. Still to do?";
 
-/** Reload Home until `text` shows, for at most `tries` seconds. */
-async function homeShows(page: Page, workspace: string, text: string, tries = 420): Promise<void> {
-  for (let attempt = 0; attempt < tries; attempt += 1) {
-    await page.goto(`/w/${workspace}`);
-    await page.getByRole("heading", { level: 1 }).waitFor();
-    if ((await page.getByText(text).count()) > 0) {
-      return;
-    }
-    await pause(1000);
+/**
+ * Open Home and wait for `text`, for at most `seconds`: Home follows the
+ * change feed, so a need that changes (the clock waking it) arrives without
+ * a reload. One reload at the end covers a feed that dropped.
+ */
+async function homeShows(page: Page, workspace: string, text: string, seconds = 420): Promise<void> {
+  const home = `/w/${workspace}`;
+  if (!page.url().endsWith(home)) {
+    await page.goto(home);
   }
-  throw new Error(`Home never showed “${text}”`);
+  await page.getByRole("heading", { level: 1 }).waitFor();
+  try {
+    await page.getByText(text).first().waitFor({ timeout: seconds * 1000 });
+  } catch {
+    await page.goto(home);
+    await page.getByRole("heading", { level: 1 }).waitFor();
+    if ((await page.getByText(text).count()) === 0) {
+      const shown = await page.locator("main").innerText();
+      throw new Error(`Home never showed “${text}”. It showed:\n${shown}`);
+    }
+  }
 }
 
 export default async function staleAsks({ page }: ScenarioContext): Promise<void> {
@@ -60,6 +70,6 @@ export default async function staleAsks({ page }: ScenarioContext): Promise<void
   await link.waitFor();
   await caption(page, "In the inbox it says Expired, with nothing to act on", 2400);
   await link.click();
-  await page.getByText("Expired").first().waitFor();
+  await page.getByText("Expired").filter({ visible: true }).first().waitFor();
   await caption(page, "Scout's summary says how long it was valid, never “expires soon”", 2400);
 }
