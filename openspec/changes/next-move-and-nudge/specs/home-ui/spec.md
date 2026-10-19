@@ -95,4 +95,4 @@ when Scout waits on nobody, and SHALL refetch with the rest of Home.
 
 #### Scenario: Nudge early
 - **WHEN** the user chooses Nudge now on Rui's row
-- **THEN** the nudge dialog opens for Rui, and after the send his row says when Scout checks again
+- **THEN** the nudge dialog opens for Rui, and after the send Rui's row says when Scout checks again

@@ -135,9 +135,9 @@ else in the conversation SHALL derive the need again from it.
 
 #### Scenario: Ana writes in a new thread
 - **WHEN** Ana Costa writes to the inbox in a new conversation, "Floor plan attached"
-- **THEN** the wait on her in João's conversation is cleared as `heard_back`
+- **THEN** the wait on Ana in João's conversation is cleared as `heard_back`
 
-#### Scenario: The member nudged her
+#### Scenario: The member nudged Ana
 - **WHEN** Sam sends Ana a nudge on Monday 19 October 11:00
 - **THEN** the need is `waiting` again, nudges 1, with the nudge time Thursday 22 October 11:00
 
@@ -153,7 +153,7 @@ sent. A `waiting` need SHALL never be counted in a stream's or an inbox's
 
 #### Scenario: Home asks for its rows
 - **WHEN** the client lists João's conversation, whose need is `nudge`
-- **THEN** its summary's need carries `waiting_on` Ana Costa and her address, and nudges 0
+- **THEN** its summary's need carries `waiting_on` Ana Costa and Ana's address, and nudges 0
 
 ### Requirement: Nudge drafts
 Creating a draft of kind `nudge` for a message SHALL be allowed only when the
@@ -190,7 +190,7 @@ pressure.
 
 #### Scenario: A nudge for Ana
 - **WHEN** Sam asks for the nudge on João's conversation
-- **THEN** the response is a few lines to Ana asking whether she had a chance to send the floor plan, signed Sam, and no draft exists
+- **THEN** the response is a few lines to Ana asking whether Ana had a chance to send the floor plan, signed Sam, and no draft exists
 
 #### Scenario: No model may read mail
 - **WHEN** the `complete` role is not configured

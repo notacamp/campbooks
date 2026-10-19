@@ -20,7 +20,7 @@ security.
 
 #### Scenario: Waiting on Ana
 - **WHEN** `need_changed` carries a `waiting` need due on Thursday
-- **THEN** the item holds the reason `waiting` and Thursday, and neither Ana's name nor her address
+- **THEN** the item holds the reason `waiting` and Thursday, and neither Ana's name nor Ana's address
 
 ### Requirement: Listing what needs the caller
 `GET /api/v1/w/{workspace_id}/attention` (`attention.list`, `attention:read`)
