@@ -333,6 +333,9 @@ describe("Scout noticed", () => {
       actions: [{ action: "archive" }],
       notice_id: NOTICE.id,
     });
+    // The sender's display name (their own text) never reaches Scout's prompt.
+    const asked = api.calls.find((call) => call.route === `POST ${W}/assistant/compile`);
+    expect(asked?.body).toEqual({ text: "builds@ci.example.com: just archive them" });
   });
 
   it("says plainly when Scout cannot turn the words into a rule", async () => {

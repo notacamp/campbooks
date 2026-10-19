@@ -57,6 +57,11 @@ export interface SmartRuleDraft {
         kind: RuleNotice["kind"];
         /** Who the mail is from, as the question says it. */
         sender: string;
+        /**
+         * The sender's address alone: what the member's own words are about
+         * when Scout reads them (never the name, which the sender chooses).
+         */
+        address: string;
         start: "guess" | "none";
       }
     | undefined;
@@ -460,7 +465,9 @@ function Goal({
       return;
     }
     setUnclear(false);
-    compile.mutate(`${draft.goal?.sender ?? ""}: ${sentence}`, {
+    // Only the address goes with the member's words: a display name is the
+    // sender's text, and must never read as the member's own instruction.
+    compile.mutate(`${draft.goal?.address ?? ""}: ${sentence}`, {
       onSuccess: (result) => {
         const found = result.proposals[0];
         if (result.outcome !== "rules" || found === undefined || found.actions.length === 0) {

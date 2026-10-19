@@ -146,7 +146,7 @@ export function ScoutNoticed({ workspaceId }: ScoutNoticedProps) {
       origin: "suggestion",
       noticeId: notice.id,
       sharedInbox,
-      goal: { kind: notice.kind, sender: nameOf(notice), start },
+      goal: { kind: notice.kind, sender: nameOf(notice), address: notice.sender, start },
     });
   };
   const verb =
