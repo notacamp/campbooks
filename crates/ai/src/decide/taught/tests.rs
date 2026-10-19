@@ -769,11 +769,54 @@ fn worth_a_look_is_its_own_slot_and_hides_nothing() {
         vec![Action::WorthALook],
         1,
     )];
-    let out = evaluate(&rules, &facts("digest@shop.example", "Weekly picks", None));
+    let genuine = Facts {
+        authenticated: true,
+        ..facts("digest@shop.example", "Weekly picks", None)
+    };
+    let out = evaluate(&rules, &genuine);
     assert_eq!(out.highlight.as_deref(), Some("look"));
     assert!(out.archive.is_none() && out.read.is_none() && out.surface.is_none());
     assert!(out.rules().contains("look"));
     assert!(evaluate(&rules, &facts("someone@example.com", "Hi", None)).is_empty());
+}
+
+#[test]
+fn worth_a_look_is_never_raised_for_a_sender_that_is_not_authenticated() {
+    let rules = [rule(
+        "look",
+        vec![Condition::SenderAddress("digest@shop.example".into())],
+        vec![Action::WorthALook],
+        1,
+    )];
+    let from = || facts("digest@shop.example", "Weekly picks", None);
+    // Authenticated, and nothing against it: raised.
+    let genuine = Facts {
+        authenticated: true,
+        ..from()
+    };
+    assert_eq!(
+        evaluate(&rules, &genuine).highlight.as_deref(),
+        Some("look")
+    );
+    // A spoofed From: the provider's results do not authenticate it.
+    assert!(evaluate(&rules, &from()).highlight.is_none());
+    // Authenticated, yet failing its checks, impersonated or suspicious.
+    for facts in [
+        Facts {
+            auth_failed: true,
+            ..genuine
+        },
+        Facts {
+            impersonated: true,
+            ..genuine
+        },
+        Facts {
+            suspicious: true,
+            ..genuine
+        },
+    ] {
+        assert!(evaluate(&rules, &facts).highlight.is_none(), "{facts:?}");
+    }
 }
 
 #[test]

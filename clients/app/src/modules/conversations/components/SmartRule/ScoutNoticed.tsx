@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
+import { useShortcut } from "~/lib/shortcuts";
 import { Button, Note, Text, useUndoToast } from "~/lib/ui";
 
 import { useInboxes } from "../../api/queries";
@@ -124,20 +125,13 @@ export function ScoutNoticed({ workspaceId }: ScoutNoticedProps) {
       }}
     />
   );
-  // The confirmation stays where it is when the suggestion it answers goes
-  // (saved): its result shows to the end.
-  if (notice === undefined) {
-    return (
-      <>
-        {null}
-        {confirm}
-      </>
-    );
-  }
-  const inbox = inboxes.data?.find((item) => item.id === notice.inbox_id);
-  const sharedInbox = notice.shared && inbox !== undefined ? inbox.address : undefined;
+  const inbox = inboxes.data?.find((item) => item.id === notice?.inbox_id);
+  const sharedInbox = notice?.shared === true && inbox !== undefined ? inbox.address : undefined;
   // The verb button starts on Scout's guess; Something else… on nothing.
   const setUp = (start: "guess" | "none") => {
+    if (notice === undefined) {
+      return;
+    }
     setDraft({
       inboxId: notice.inbox_id,
       conditions: notice.conditions,
@@ -149,6 +143,51 @@ export function ScoutNoticed({ workspaceId }: ScoutNoticedProps) {
       goal: { kind: notice.kind, sender: nameOf(notice), address: notice.sender, start },
     });
   };
+  // Shift + F, O, L and D press the four buttons, while no confirmation is
+  // open (campbooks-cloud#282).
+  const live = notice !== undefined && draft === null;
+  useShortcut(
+    "inbox.noticed.apply",
+    () => {
+      setUp("guess");
+    },
+    { enabled: live },
+  );
+  useShortcut(
+    "inbox.noticed.other",
+    () => {
+      setUp("none");
+    },
+    { enabled: live },
+  );
+  useShortcut(
+    "inbox.noticed.not_now",
+    () => {
+      if (notice !== undefined) {
+        respond(notice, "not_now");
+      }
+    },
+    { enabled: live },
+  );
+  useShortcut(
+    "inbox.noticed.never",
+    () => {
+      if (notice !== undefined) {
+        respond(notice, "never");
+      }
+    },
+    { enabled: live },
+  );
+  // The confirmation stays where it is when the suggestion it answers goes
+  // (saved): its result shows to the end.
+  if (notice === undefined) {
+    return (
+      <>
+        {null}
+        {confirm}
+      </>
+    );
+  }
   const verb =
     notice.kind === "archive_on_arrival"
       ? t("noticed.verbArchive")
@@ -162,6 +201,7 @@ export function ScoutNoticed({ workspaceId }: ScoutNoticedProps) {
           <>
             <Button
               variant="secondary"
+              shortcut="inbox.noticed.apply"
               onClick={() => {
                 setUp("guess");
               }}
@@ -170,6 +210,7 @@ export function ScoutNoticed({ workspaceId }: ScoutNoticedProps) {
             </Button>
             <Button
               variant="secondary"
+              shortcut="inbox.noticed.other"
               ai
               onClick={() => {
                 setUp("none");
@@ -179,6 +220,7 @@ export function ScoutNoticed({ workspaceId }: ScoutNoticedProps) {
             </Button>
             <Button
               variant="secondary"
+              shortcut="inbox.noticed.not_now"
               onClick={() => {
                 respond(notice, "not_now");
               }}
@@ -187,6 +229,7 @@ export function ScoutNoticed({ workspaceId }: ScoutNoticedProps) {
             </Button>
             <Button
               variant="secondary"
+              shortcut="inbox.noticed.never"
               onClick={() => {
                 respond(notice, "never");
               }}

@@ -34,10 +34,14 @@ export function useAttention(workspaceId: string, state: ListState = "open") {
   });
 }
 
-/** How many things need the caller (the Home badge); `undefined` until known. */
+/**
+ * How many things need the caller (the Home badge); `undefined` until known.
+ * "Worth a look" asks nothing of them, so it is not counted
+ * (campbooks-cloud#282).
+ */
 export function useAttentionCount(workspaceId: string): number | undefined {
   const query = useAttention(workspaceId);
-  return query.data?.items.length;
+  return query.data?.items.filter((item) => item.reason !== "worth_a_look").length;
 }
 
 /** Refetch every attention list of the workspace. */

@@ -5,7 +5,9 @@
     "count_other": "{{count}} coisas precisam de si",
     "subline": "O Campbooks lê o seu correio e guarda aqui o que lhe pede algo.",
     "clear": "Nada precisa de si",
-    "clearSubline": "Neste momento nada no seu correio lhe pede algo. O Campbooks continua a ler."
+    "clearSubline": "Neste momento nada no seu correio lhe pede algo. O Campbooks continua a ler.",
+    "lookSubline_one": "Nada lhe pede nada. {{count}} email abaixo merece uma vista de olhos.",
+    "lookSubline_other": "Nada lhe pede nada. {{count}} emails abaixo merecem uma vista de olhos."
   },
   "groups": {
     "review": "Rever",

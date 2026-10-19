@@ -27,7 +27,7 @@ use campbooks_ai::decide::{
     AnswerValue, Question,
     signals::{
         email::{subject_template, triage, triage_questions},
-        facts::{dmarc_refused, sender_checks_failed},
+        facts::{dmarc_refused, sender_authenticated, sender_checks_failed},
     },
     strategy::{Decided, Strategy},
     taught::{Facts, Outcome, TaughtRule, evaluate},
@@ -715,6 +715,7 @@ impl Apply<'_> {
             auth_failed: sender_checks_failed(&sender, results),
             impersonated,
             correspondent,
+            authenticated: sender_authenticated(&sender, results),
         };
         Ok(evaluate(&acting, &facts))
     }

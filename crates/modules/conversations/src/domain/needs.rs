@@ -693,13 +693,16 @@ async fn since(
     need: &Need,
 ) -> Result<(Since, Option<DateTime<Utc>>)> {
     // A message in spam or the trash needs nothing, as one that is gone.
-    let sent = sqlx::query_scalar!(
-        "SELECT sent_at FROM conversations.messages
+    // The same row says whether it was opened ("Worth a look" clears then).
+    let message: Option<(DateTime<Utc>, bool)> = sqlx::query_as(
+        "SELECT sent_at, read FROM conversations.messages
           WHERE id = $1 AND NOT in_spam AND NOT in_trash",
-        need.message as MessageId,
     )
+    .bind(need.message)
     .fetch_optional(&mut **tx)
     .await?;
+    let sent = message.map(|(sent, _)| sent);
+    let opened = message.is_some_and(|(_, read)| read);
     let replied = match sent {
         Some(sent) => {
             sqlx::query_scalar!(
@@ -717,11 +720,6 @@ async fn since(
         Some(row) => row.verdict_on(need.message)?,
         None => None,
     };
-    let opened: bool = sqlx::query_scalar("SELECT read FROM conversations.messages WHERE id = $1")
-        .bind(need.message)
-        .fetch_optional(&mut **tx)
-        .await?
-        .unwrap_or(false);
     let rule = if rule_clears(&answers(tx, need.message).await?, need.question) {
         RuleSays::NotNeeded
     } else {

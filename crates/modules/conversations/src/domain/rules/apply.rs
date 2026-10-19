@@ -114,8 +114,11 @@ pub async fn apply(
         _ => {}
     }
     let acting = acting_on(tx, rules, candidate.id).await?;
-    let outcome = taught::evaluate(&acting, &candidate.facts());
+    let mut outcome = taught::evaluate(&acting, &candidate.facts());
     let id = rule.to_string();
+    if !raise_highlight && outcome.highlight.as_deref() == Some(id.as_str()) {
+        outcome.highlight = None;
+    }
     let mine = Mine::of(&outcome, &id);
     if mine.is_empty() {
         let wanted = acting

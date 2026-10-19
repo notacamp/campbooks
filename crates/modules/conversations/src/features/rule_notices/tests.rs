@@ -158,12 +158,65 @@ async fn mail_never_opened_is_noticed_and_offered_as_a_rule(db: PgPool) {
     assert_eq!(twice.status, StatusCode::BAD_REQUEST, "{:?}", twice.json);
 }
 
+/// What the receiving provider says of mail really from `BUILDS`'s domain.
+const PASSES: &str = "mx.google.com; dkim=pass header.i=@ci.example.com header.s=s1; \
+                      dmarc=pass (p=REJECT sp=REJECT dis=NONE) header.from=ci.example.com";
+/// And of mail pretending to be from it: authenticated for another domain.
+const SPOOFED: &str = "mx.google.com; dkim=pass header.i=@spoofer.example header.s=s1; \
+                       spf=pass smtp.mailfrom=bounce@spoofer.example";
+
+/// `recorded`'s messages, with the receiving provider's `results`.
+fn received_with(mut recorded: Value, results: &str) -> Value {
+    for change in recorded["changes"].as_array_mut().unwrap() {
+        change["message"]["headers"]["authentication_results"] = json!(results);
+    }
+    recorded
+}
+
+/// Conversation of `provider_id`, as Sam's list shows it.
+async fn listed(
+    kit: &Kit,
+    sam: &str,
+    workspace: WorkspaceId,
+    provider_id: &str,
+) -> (String, Value) {
+    let id = kit.conversation_of(provider_id).await;
+    let list = kit
+        .get(
+            sam,
+            &format!("/api/v1/w/{workspace}/conversations?ids={id}"),
+        )
+        .await;
+    assert_eq!(list.status, StatusCode::OK, "{:?}", list.json);
+    (id, list.json["conversations"][0].clone())
+}
+
+/// A "Worth a look" rule on `BUILDS`, taught by Sam.
+async fn highlight_rule(kit: &Kit, sam: &str, workspace: WorkspaceId, inbox: InboxId) {
+    let created = kit
+        .post(
+            sam,
+            &format!("/api/v1/w/{workspace}/inboxes/{inbox}/rules"),
+            Some(json!({
+                "conditions": [{"field": "sender_address", "value": BUILDS}],
+                "actions": [{"action": "worth_a_look"}],
+            })),
+        )
+        .await;
+    assert_eq!(created.status, StatusCode::CREATED, "{:?}", created.json);
+    kit.run_jobs().await;
+}
+
 #[sqlx::test(migrations = "../../../migrations")]
 async fn a_suggestion_can_be_answered_with_another_goal_worth_a_look(db: PgPool) {
     let kit = Kit::with_deps(db, ConversationsDeps::offline()).await;
     let (workspace, inbox, sam) = sams_inbox(&kit).await;
-    kit.ingest_value(workspace, inbox, &daily("ci", BUILDS, 12))
-        .await;
+    kit.ingest_value(
+        workspace,
+        inbox,
+        &received_with(daily("ci", BUILDS, 12), PASSES),
+    )
+    .await;
     let notices = noticed(&kit, &sam, workspace).await;
     let notice = &notices[0];
 
@@ -186,28 +239,18 @@ async fn a_suggestion_can_be_answered_with_another_goal_worth_a_look(db: PgPool)
     assert!(noticed(&kit, &sam, workspace).await.is_empty());
     kit.run_jobs().await;
 
-    // Each unread one waits on Home as Worth a look, not pinned.
-    let summary = |provider_id: &'static str| {
-        let kit = &kit;
-        let sam = &sam;
-        async move {
-            let id = kit.conversation_of(provider_id).await;
-            let list = kit
-                .get(
-                    sam,
-                    &format!("/api/v1/w/{workspace}/conversations?ids={id}"),
-                )
-                .await;
-            assert_eq!(list.status, StatusCode::OK, "{:?}", list.json);
-            (id, list.json["conversations"][0].clone())
-        }
-    };
-    let (id, before) = summary("ci-3").await;
+    // Applied to the mail already here, only the newest unread one waits on
+    // Home as Worth a look, not pinned: never a backlog of the other eleven.
+    let (id, before) = listed(&kit, &sam, workspace, "ci-11").await;
     assert_eq!(before["need"]["reason"], "worth_a_look", "{before}");
     assert_eq!(before["need"]["trust"], "sure");
     assert_eq!(before["need"]["question"], "worth_a_look");
+    for older in ["ci-0", "ci-3", "ci-10"] {
+        let (_, other) = listed(&kit, &sam, workspace, older).await;
+        assert!(other["need"].is_null(), "{older}: {other}");
+    }
 
-    // Opening it once clears it, and only that one.
+    // Opening it once clears it.
     let read = kit
         .post(
             &sam,
@@ -216,10 +259,10 @@ async fn a_suggestion_can_be_answered_with_another_goal_worth_a_look(db: PgPool)
         )
         .await;
     assert_eq!(read.status, StatusCode::OK, "{:?}", read.json);
-    let (_, after) = summary("ci-3").await;
+    let (_, after) = listed(&kit, &sam, workspace, "ci-11").await;
     assert!(after["need"].is_null(), "{after}");
-    let (_, other) = summary("ci-4").await;
-    assert_eq!(other["need"]["reason"], "worth_a_look");
+    let (_, still) = listed(&kit, &sam, workspace, "ci-10").await;
+    assert!(still["need"].is_null(), "{still}");
 
     // The Home item clears as "opened".
     let cleared: i64 = sqlx::query_scalar(
@@ -230,6 +273,70 @@ async fn a_suggestion_can_be_answered_with_another_goal_worth_a_look(db: PgPool)
     .await
     .unwrap();
     assert_eq!(cleared, 1);
+
+    // New mail still raises one item per message.
+    kit.ingest_value(
+        workspace,
+        inbox,
+        &received_with(daily("later", BUILDS, 2), PASSES),
+    )
+    .await;
+    for arrived in ["later-0", "later-1"] {
+        let (_, raised) = listed(&kit, &sam, workspace, arrived).await;
+        assert_eq!(
+            raised["need"]["reason"], "worth_a_look",
+            "{arrived}: {raised}"
+        );
+    }
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn worth_a_look_is_never_raised_for_a_sender_that_is_not_authenticated(db: PgPool) {
+    let kit = Kit::with_deps(db, ConversationsDeps::offline()).await;
+    let (workspace, inbox, sam) = sams_inbox(&kit).await;
+    // Already here: two real ones, then a spoofed one and one with no
+    // results at all, both newer than the real ones.
+    let mut recorded = received_with(daily("real", BUILDS, 2), PASSES);
+    let fake = received_with(daily("fake", BUILDS, 1), SPOOFED);
+    let bare = daily("bare", BUILDS, 1);
+    for extra in [fake, bare] {
+        recorded["changes"]
+            .as_array_mut()
+            .unwrap()
+            .extend(extra["changes"].as_array().unwrap().clone());
+    }
+    // Make the unauthenticated ones the newest.
+    recorded["changes"][2]["message"]["sent_at"] = json!(Utc::now().to_rfc3339());
+    recorded["changes"][3]["message"]["sent_at"] = json!(Utc::now().to_rfc3339());
+    kit.ingest_value(workspace, inbox, &recorded).await;
+    highlight_rule(&kit, &sam, workspace, inbox).await;
+
+    // The newest *authenticated* one is the one to look at.
+    let (_, real) = listed(&kit, &sam, workspace, "real-1").await;
+    assert_eq!(real["need"]["reason"], "worth_a_look", "{real}");
+    for unsafe_one in ["fake-0", "bare-0"] {
+        let (_, none) = listed(&kit, &sam, workspace, unsafe_one).await;
+        assert!(none["need"].is_null(), "{unsafe_one}: {none}");
+    }
+
+    // Mail arriving later is no different: a spoofed one raises nothing, an
+    // authenticated one does.
+    kit.ingest_value(
+        workspace,
+        inbox,
+        &received_with(daily("spoof", BUILDS, 1), SPOOFED),
+    )
+    .await;
+    kit.ingest_value(
+        workspace,
+        inbox,
+        &received_with(daily("good", BUILDS, 1), PASSES),
+    )
+    .await;
+    let (_, spoofed) = listed(&kit, &sam, workspace, "spoof-0").await;
+    assert!(spoofed["need"].is_null(), "{spoofed}");
+    let (_, good) = listed(&kit, &sam, workspace, "good-0").await;
+    assert_eq!(good["need"]["reason"], "worth_a_look", "{good}");
 }
 
 #[sqlx::test(migrations = "../../../migrations")]

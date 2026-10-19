@@ -122,5 +122,5 @@ export default async function smartRuleOffers({ page }: ScenarioContext): Promis
     .getByRole("heading", { level: 2, name: /^Worth a look/u })
     .evaluate("(el) => el.scrollIntoView({ block: 'start', behavior: 'smooth' })");
   await pause(1200);
-  await caption(page, "Each one waits on Home under Worth a look, nothing pinned", 3200);
+  await caption(page, "Only the latest one already here waits on Home under Worth a look, nothing pinned", 3200);
 }

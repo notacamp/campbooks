@@ -481,7 +481,11 @@ function demoMessages(me: string, images: string): DemoMessage[] {
       subject: "This week: calmer dashboards",
       hoursAgo: 10,
       labels: ["INBOX", "UNREAD", "CATEGORY_PROMOTIONS"],
-      headers: { "List-Unsubscribe": "<mailto:leave@design-notes.example>", Precedence: "list" },
+      headers: {
+        "List-Unsubscribe": "<mailto:leave@design-notes.example>",
+        Precedence: "list",
+        "Authentication-Results": DESIGN_NOTES_RESULTS,
+      },
       text: "Three essays on calmer dashboards, and a webinar on 20 October.",
       html: `<div style="font-family:system-ui,sans-serif;max-width:520px"><img src="${images}/notes-cover.svg" alt="Design Notes" width="520" height="160" style="width:100%;height:auto;border-radius:8px"><h2>Calmer dashboards</h2><p>Three essays on calmer dashboards, and a <a href="https://design-notes.example/webinar">webinar on 20 October</a>.</p></div>`,
     },
@@ -715,6 +719,14 @@ function appendMessage(
 }
 
 /**
+ * What Gmail says of Design Notes mail: signed and DMARC-passing, so a rule
+ * that highlights it can raise Worth a look (campbooks-cloud#282).
+ */
+const DESIGN_NOTES_RESULTS =
+  "mx.google.com; dkim=pass header.i=@design-notes.example header.s=s1; " +
+  "dmarc=pass (p=REJECT sp=REJECT dis=NONE) header.from=design-notes.example";
+
+/**
  * `count` more issues of the Design Notes digest, a few hours apart (so
  * hundreds fit in the window a first sync reads): mail that looks the same,
  * for teaching once (`--lookalikes` of the fake provider).
@@ -728,7 +740,11 @@ function lookalikes(me: string, count: number): DemoMessage[] {
     hoursAgo: 34 + index * 3,
     // Unread, as a digest nobody opens: what Scout notices.
     labels: ["INBOX", "UNREAD", "CATEGORY_PROMOTIONS"],
-    headers: { "List-Unsubscribe": "<mailto:leave@design-notes.example>", Precedence: "list" },
+    headers: {
+      "List-Unsubscribe": "<mailto:leave@design-notes.example>",
+      Precedence: "list",
+      "Authentication-Results": DESIGN_NOTES_RESULTS,
+    },
     text: "Three short essays, and what we read this week.",
   }));
 }

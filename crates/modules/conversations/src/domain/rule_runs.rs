@@ -193,6 +193,7 @@ pub async fn start(
         run: id,
         after: None,
         counting: kind == RunKind::Apply,
+        newest: None,
     };
     campbooks_kernel::jobs::enqueue_to::<crate::features::apply_rule::ApplyRules>(
         tx,
@@ -360,6 +361,20 @@ pub struct RunBatch {
     /// Counting the conversations the rule matches, before changing them.
     #[serde(default)]
     pub counting: bool,
+    /// The newest unread conversation the rule matches that "Worth a look"
+    /// may be raised for, found while counting: an apply run raises that one
+    /// only (campbooks-cloud#282).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub newest: Option<Newest>,
+}
+
+/// The conversation an apply run raises "Worth a look" for.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Newest {
+    /// The conversation.
+    pub id: crate::model::ConversationId,
+    /// When its newest inbound message was sent.
+    pub sent_at: DateTime<Utc>,
 }
 
 impl RunBatch {

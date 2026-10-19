@@ -938,6 +938,11 @@ pub struct Facts<'a> {
     /// The inbox writes to the sender: "fails its sender checks" never
     /// matches their mail.
     pub correspondent: bool,
+    /// The receiving provider's results `authenticated` the sender's domain
+    /// (`signals::facts::sender_authenticated`: a DMARC pass for it, or an
+    /// aligned DKIM pass; no results at all is not a pass). "Worth a look"
+    /// is raised only for such mail (campbooks-cloud#282).
+    pub authenticated: bool,
 }
 
 /// One slot's answer and the rule that gave it.
@@ -1091,6 +1096,13 @@ pub fn evaluate(rules: &[TaughtRule], facts: &Facts<'_>) -> Outcome {
     if facts.auth_failed {
         out.paid = None;
     }
+    // "Worth a look" puts mail in front of the member as something to see:
+    // never for mail whose sender is not authenticated, looks suspicious or
+    // is impersonated, whoever the rule names (the gate `shows_images`
+    // holds too; campbooks-cloud#282).
+    if !facts.authenticated || facts.suspicious || facts.auth_failed || facts.impersonated {
+        out.highlight = None;
+    }
     out
 }
 
@@ -1185,6 +1197,7 @@ impl Strategy for TaughtRules {
                 auth_failed: false,
                 impersonated: false,
                 correspondent: false,
+                authenticated: false,
             };
             let outcome = evaluate(&self.rules, &facts);
             let answers = questions
