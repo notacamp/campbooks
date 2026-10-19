@@ -42,8 +42,8 @@ export interface Mailbox {
   /** The history id before the first record still kept. */
   baseHistoryId: number;
   historyId: number;
-  /** Each demo thread's Gmail thread id and first Message-ID, to answer in it later. */
-  threads?: Map<string, { threadId: string; messageId: string }>;
+  /** Each demo thread's Gmail thread id and Message-IDs, to answer in it later. */
+  threads?: Map<string, { threadId: string; messageIds: string[] }>;
 }
 
 const LABELS = [
@@ -843,7 +843,8 @@ export function deliverDemo(mailbox: Mailbox, reply?: string): StoredMessage {
       },
       date,
       `<${hex(6)}@demo.example>`,
-      thread.messageId,
+      thread.messageIds.at(-1),
+      thread.messageIds.join(" "),
     );
     return appendMessage(mailbox, raw, ["INBOX", "UNREAD", "Label_1", "CATEGORY_PERSONAL"], {
       threadId: thread.threadId,
