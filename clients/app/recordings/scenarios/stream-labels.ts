@@ -101,21 +101,25 @@ export default async function streamLabels({ page }: ScenarioContext): Promise<v
   const workspace = await signedIn(page);
   const phone = (page.viewportSize()?.width ?? 1440) < 768;
 
-  // a. The invoice, in Primary or Updates, and what Gmail holds.
+  // a. The invoice, in Primary or Updates, and what Gmail holds. (The page
+  // opens first: the API is called from it, through the BFF.)
+  await page.goto(`/w/${workspace}/inbox/primary`);
   const start = (await invoice(page, workspace))?.stream ?? "primary";
-  await page.goto(`/w/${workspace}/inbox/${start}`);
+  if (start !== "primary") {
+    await page.goto(`/w/${workspace}/inbox/${start}`);
+  }
   await page.getByText(subject).first().click();
   await page.getByRole("heading", { name: subject }).waitFor();
   await showGmail(page, await gmailLabels(page));
   await caption(page, "An invoice, in Gmail's Updates tab", 2400);
 
   // b. Move it to Receipts.
-  await caption(page, phone ? "Move it to Receipts" : "M, then 3: move it to Receipts", 1400);
-  await (phone
-    ? page.getByRole("button", { name: "Move" }).first().click()
-    : page.keyboard.press("m"));
+  // The keys at both widths: at 375 the Move menu opens off-screen from an
+  // open conversation (campbooks-cloud#301).
+  await caption(page, "M, then 3: move it to Receipts", 1400);
+  await page.keyboard.press("m");
   await pause(700);
-  await page.getByRole("button", { name: /^Receipts/u }).click();
+  await page.keyboard.press("3");
   // The connector writes it back on the stream's next run.
   const written = await gmailUntil(page, (labels) => labels.includes(MARK));
   await showGmail(page, written);
