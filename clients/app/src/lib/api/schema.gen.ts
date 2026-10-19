@@ -3398,12 +3398,12 @@ export interface components {
          * @description The question whose answer raised a need.
          * @enum {string}
          */
-        NeedQuestion: "needs_reply" | "asks_action" | "suspicious" | "money" | "still_to_do" | "still_needs_reply";
+        NeedQuestion: "needs_reply" | "asks_action" | "suspicious" | "money" | "worth_a_look" | "still_to_do" | "still_needs_reply";
         /**
          * @description Why a conversation needs its inbox's members (attention).
          * @enum {string}
          */
-        NeedReason: "reply" | "do" | "pay" | "review";
+        NeedReason: "reply" | "do" | "pay" | "review" | "worth_a_look";
         /**
          * @description How much Campbooks stands behind a need.
          * @enum {string}
@@ -3806,7 +3806,7 @@ export interface components {
          * @description Why an item needs someone, in the order Home shows the groups.
          * @enum {string}
          */
-        Reason: "review" | "reply" | "decide" | "do" | "pay";
+        Reason: "review" | "reply" | "decide" | "do" | "pay" | "worth_a_look";
         /** @description How many open items there are for one reason. */
         ReasonCount: {
             /**
@@ -4089,6 +4089,9 @@ export interface components {
         } | {
             /** @enum {string} */
             action: "show_images";
+        } | {
+            /** @enum {string} */
+            action: "worth_a_look";
         };
         /** @description One test on a message; all of a rule's conditions must hold. */
         RuleCondition: {

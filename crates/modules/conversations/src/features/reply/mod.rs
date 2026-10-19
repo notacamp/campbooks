@@ -9,6 +9,11 @@
 //! proposes text in a strict schema with no tools; nothing is stored, and
 //! nothing is sent until the member sends a draft through
 //! `conversations.create_draft` and `conversations.send_draft`.
+//!
+//! A written reply also learns who is answered and how the member writes to
+//! them (campbooks-cloud#271): the conversation's length, the person's
+//! name, how much mail passed between them, and a few of the same inbox's
+//! earlier messages to them, for the register only.
 
 mod prompt;
 mod types;
@@ -16,7 +21,11 @@ mod types;
 use std::time::{Duration, Instant};
 
 use axum::{Extension, Json, extract::State};
-use campbooks_ai::{Gateway, Role, usage::Scope};
+use campbooks_ai::{
+    Gateway, Role,
+    decide::signals::facts::{dmarc_refused, sender_checks_failed},
+    usage::Scope,
+};
 use campbooks_kernel::{
     AppState, Error, Operation, Problem, RecordRef, Result, Risk,
     authz::Action,
@@ -30,7 +39,7 @@ use chrono::{DateTime, SecondsFormat, Utc};
 use serde::de::DeserializeOwned;
 use serde_json::Value;
 
-use self::prompt::{Ask, Author, Context, Thread, ThreadMessage};
+use self::prompt::{Ask, Author, Context, PastMessage, Person, Them, Thread, ThreadMessage};
 use self::types::{ReplySuggestions, ReplyText, SuggestReplies, WriteReply};
 use crate::{
     domain::{
@@ -66,23 +75,110 @@ const RAW_HTML_BYTES: usize = 256 * 1024;
 const MAX_ASK_CHARS: usize = 300;
 /// Longest draft the member may ask to rewrite, in characters.
 const MAX_DRAFT_CHARS: usize = 20_000;
+/// The inbox's newest sent messages looked through for mail to the person
+/// answered. Served by `messages_outbound_idx`.
+const SENT_SCAN: i64 = 500;
+/// Earlier messages to the person answered handed on, at most.
+const PAST_MESSAGES: usize = 3;
+/// Most of one earlier message handed on, in bytes.
+const PAST_MESSAGE_BYTES: usize = 1536;
+/// Most of all the earlier messages handed on, in bytes.
+const PAST_BYTES: usize = 4 * 1024;
+/// Each mail count sent to the model stops here.
+const COUNT_CAP: i64 = 100;
+/// Messages counted in a conversation, at most.
+const TOTAL_CAP: i64 = 1000;
 
 /// The conversation's inbox, if the caller can see it.
 const INBOX: &str = "SELECT i.id, i.display_name FROM conversations.conversations c \
      JOIN conversations.inboxes i ON i.id = c.inbox_id \
      WHERE c.id = $1 AND c.inbox_id = ANY($2)";
-/// The message answered: the one asked for, or the newest.
-const ANSWERED: &str = "SELECT id, sent_at FROM conversations.messages \
-     WHERE conversation_id = $1 AND ($2::uuid IS NULL OR id = $2) \
-     ORDER BY sent_at DESC, id DESC LIMIT 1";
+/// The message answered: the one asked for, or the newest; with whether it
+/// is in spam, its headers, and whether its conversation is flagged
+/// suspicious or has an open Review need (as the sender checks of the
+/// trusted-images rule read them).
+const ANSWERED: &str = "SELECT m.id, m.sent_at, m.direction, m.sender_address, m.recipients, \
+            m.in_spam, m.headers, \
+            (EXISTS (SELECT 1 FROM conversations.decisions d \
+                      WHERE d.conversation_id = m.conversation_id \
+                        AND d.workspace_id = m.workspace_id \
+                        AND d.question = 'suspicious' AND d.value = 'true'::jsonb) \
+             OR EXISTS (SELECT 1 FROM conversations.needs n \
+                         WHERE n.conversation_id = m.conversation_id \
+                           AND n.workspace_id = m.workspace_id \
+                           AND n.state = 'open' AND n.reason = 'review')) \
+     FROM conversations.messages m \
+     WHERE m.conversation_id = $1 AND ($2::uuid IS NULL OR m.id = $2) \
+     ORDER BY m.sent_at DESC, m.id DESC LIMIT 1";
 /// The messages up to the one answered, newest first.
 const THREAD: &str = "SELECT id, direction, sender, subject, sent_at, bodies \
      FROM conversations.messages \
      WHERE conversation_id = $1 AND (sent_at, id) <= ($2, $3) \
      ORDER BY sent_at DESC, id DESC LIMIT $4";
+/// How many messages the conversation has, capped.
+const TOTAL: &str = "SELECT count(*) FROM ( \
+         SELECT 1 FROM conversations.messages WHERE conversation_id = $1 LIMIT $2) counted";
+/// Their mail to the inbox in the last year, capped at `$3`. Served by
+/// `messages_inbound_sender_idx`.
+const FROM_THEM: &str = "SELECT count(*) FROM ( \
+         SELECT 1 FROM conversations.messages \
+         WHERE inbox_id = $1 AND direction = 'inbound' AND sender_address = $2 \
+           AND NOT in_spam AND NOT in_trash AND sent_at > now() - interval '365 days' \
+         LIMIT $3) recent";
+/// The inbox's newest sent messages (`$3` of them), each marked when it went to
+/// or copied `$2`, followed by `$rest`: a literal, so the SQL stays static.
+macro_rules! sent_to_them {
+    ($rest:literal) => {
+        concat!(
+            "WITH sent AS ( \
+                 SELECT id, conversation_id, sent_at, in_spam, in_trash, bodies, \
+                        EXISTS (SELECT 1 FROM jsonb_array_elements( \
+                            CASE WHEN jsonb_typeof(recipients->'to') = 'array' \
+                                 THEN recipients->'to' ELSE '[]'::jsonb END || \
+                            CASE WHEN jsonb_typeof(recipients->'cc') = 'array' \
+                                 THEN recipients->'cc' ELSE '[]'::jsonb END) r \
+                            WHERE lower(r->>'address') = $2::text) AS to_them \
+                 FROM conversations.messages \
+                 WHERE inbox_id = $1 AND direction = 'outbound' \
+                 ORDER BY sent_at DESC, id DESC LIMIT $3) ",
+            $rest
+        )
+    };
+}
+/// Whether the inbox ever wrote to `$2` (a lower-cased address) in its
+/// newest `$3` sent messages, and how many such messages went in the last
+/// year (capped at `$4`). The address must equal the `address` of a To or
+/// Cc recipient, never a name or any other text of the row.
+const WROTE_TO_THEM: &str = sent_to_them!(
+    "SELECT coalesce(bool_or(to_them), false), \
+            LEAST(count(*) FILTER (WHERE to_them AND NOT in_spam AND NOT in_trash \
+                AND sent_at > now() - interval '365 days'), $4) \
+     FROM sent"
+);
+/// The newest of those sent messages from other conversations (`$4`),
+/// within the last year, not in the trash; `$5` at most.
+const PAST: &str = sent_to_them!(
+    "SELECT sent_at, bodies FROM sent \
+     WHERE to_them AND conversation_id <> $4 AND NOT in_trash \
+       AND sent_at > now() - interval '365 days' \
+     ORDER BY sent_at DESC, id DESC LIMIT $5"
+);
 
 /// A row of [`THREAD`].
 type MessageRow = (MessageId, String, Value, String, DateTime<Utc>, Value);
+/// Sent messages read for their words: when, and their bodies.
+type PastRows = Vec<(DateTime<Utc>, Value)>;
+/// A row of [`ANSWERED`].
+type AnsweredRow = (
+    MessageId,
+    DateTime<Utc>,
+    String,
+    String,
+    Value,
+    bool,
+    Value,
+    bool,
+);
 
 /// The AI gateway, when one is composed.
 #[derive(Debug, Clone)]
@@ -159,6 +255,7 @@ pub async fn suggest(
         &workspace,
         path.conversation_id,
         body.message_id,
+        false,
     )
     .await?;
     let context = read.context(locale);
@@ -250,6 +347,7 @@ pub async fn write(
         &workspace,
         path.conversation_id,
         body.message_id,
+        true,
     )
     .await?;
     let context = read.context(locale);
@@ -273,7 +371,7 @@ pub async fn write(
         read.gateway,
         workspace.id,
         "conversations.write_reply",
-        prompt::write(&context, &asked),
+        prompt::write(&context, &read.person, &asked),
     )
     .await?;
     let text = prompt::reply(&answer.reply)
@@ -299,6 +397,9 @@ struct Read<'a> {
     /// carries none.
     inbox_name: Option<String>,
     thread: Thread,
+    /// Who is answered and how the member writes to them; empty for
+    /// suggestions.
+    person: Person,
 }
 
 impl Read<'_> {
@@ -313,16 +414,18 @@ impl Read<'_> {
 
 /// Check the caller may read the conversation and send from its inbox,
 /// that a model may read mail here and the member has allowance left, then
-/// read the conversation up to the message answered.
+/// read the conversation up to the message answered, and, for a written
+/// reply (`with_person`), who is answered.
 async fn prepare<'a>(
     state: &AppState,
     writer: &'a ReplyWriter,
     workspace: &Workspace<ConversationsSend>,
     conversation: ConversationId,
     requested: Option<MessageId>,
+    with_person: bool,
 ) -> Result<Read<'a>> {
     let access = &workspace.access;
-    let inbox_name = {
+    let (inbox_id, inbox_name) = {
         let mut tx = state.db.begin_for(access.workspace).await?;
         resources::authorize(
             state,
@@ -349,7 +452,7 @@ async fn prepare<'a>(
         )
         .await?;
         tx.commit().await?;
-        name
+        (inbox, name)
     };
     let gateway = writer.gateway()?;
     let who = access.user.map_or_else(
@@ -366,12 +469,19 @@ async fn prepare<'a>(
         .await?;
 
     let mut tx = state.db.begin_for(access.workspace).await?;
-    let answered: Option<(MessageId, DateTime<Utc>)> = sqlx::query_as(ANSWERED)
+    let answered: Option<AnsweredRow> = sqlx::query_as(ANSWERED)
         .bind(conversation)
         .bind(requested)
         .fetch_optional(&mut *tx)
         .await?;
-    let (message, sent_at) = answered.ok_or(Error::NotFound)?;
+    let (message, sent_at, direction, sender_address, recipients, in_spam, headers, suspicious) =
+        answered.ok_or(Error::NotFound)?;
+    let answered = Answered {
+        distrusted: distrusted(&direction, &sender_address, in_spam, &headers, suspicious),
+        direction,
+        sender_address,
+        recipients,
+    };
     let rows: Vec<MessageRow> = sqlx::query_as(THREAD)
         .bind(conversation)
         .bind(sent_at)
@@ -379,10 +489,31 @@ async fn prepare<'a>(
         .bind(THREAD_MESSAGES)
         .fetch_all(&mut *tx)
         .await?;
+    let known = if with_person {
+        Some(known_person(&mut tx, inbox_id, conversation, &answered).await?)
+    } else {
+        None
+    };
     tx.commit().await?;
 
-    // Newest first, within the budget; then oldest first for the model.
     let ws = access.workspace.to_string();
+    let thread = read_thread(state, &ws, rows).await?;
+    let person = match known {
+        Some(known) => known.read(state, &ws).await?,
+        None => Person::default(),
+    };
+    Ok(Read {
+        gateway,
+        message,
+        inbox_name,
+        thread,
+        person,
+    })
+}
+
+/// The thread as the model reads it: newest first within the budget, then
+/// oldest first.
+async fn read_thread(state: &AppState, ws: &str, rows: Vec<MessageRow>) -> Result<Thread> {
     let subject = rows
         .first()
         .map(|row| cut_bytes(&row.3, NAME_BYTES))
@@ -398,7 +529,7 @@ async fn prepare<'a>(
         let sender: Address = serde_json::from_value(sender)
             .map_err(|e| Error::internal(crate::domain::redact::json(&e)))?;
         let text = cut_bytes(
-            &own_words(state, &ws, &bodies).await?,
+            &own_words(state, ws, &bodies).await?,
             MESSAGE_BYTES.min(budget),
         );
         budget = budget.saturating_sub(text.len());
@@ -414,11 +545,191 @@ async fn prepare<'a>(
         });
     }
     messages.reverse();
-    Ok(Read {
-        gateway,
-        message,
-        inbox_name,
-        thread: Thread { subject, messages },
+    Ok(Thread { subject, messages })
+}
+
+/// What is read about the person answered, before the bodies are.
+struct Known {
+    total_messages: usize,
+    them: Option<(Them, PastRows)>,
+}
+
+impl Known {
+    /// The person as the model reads them: the earlier messages reduced to
+    /// their own words, within [`PAST_MESSAGE_BYTES`] each and [`PAST_BYTES`]
+    /// in all, newest kept first and handed on oldest first.
+    async fn read(self, state: &AppState, workspace: &str) -> Result<Person> {
+        let Some((them, rows)) = self.them else {
+            return Ok(Person {
+                total_messages: self.total_messages,
+                ..Person::default()
+            });
+        };
+        let mut past = Vec::with_capacity(PAST_MESSAGES);
+        let mut budget = PAST_BYTES;
+        for (sent, bodies) in rows {
+            if past.len() == PAST_MESSAGES || budget == 0 {
+                break;
+            }
+            let bodies: Bodies = serde_json::from_value(bodies)
+                .map_err(|e| Error::internal(crate::domain::redact::json(&e)))?;
+            let text = cut_bytes(
+                &own_words(state, workspace, &bodies).await?,
+                PAST_MESSAGE_BYTES.min(budget),
+            );
+            if text.trim().is_empty() {
+                continue;
+            }
+            budget = budget.saturating_sub(text.len());
+            past.push(PastMessage {
+                sent_at: sent.to_rfc3339_opts(SecondsFormat::Secs, true),
+                text,
+            });
+        }
+        past.reverse();
+        Ok(Person {
+            total_messages: self.total_messages,
+            them: Some(them),
+            past,
+        })
+    }
+}
+
+/// The message answered, as far as the person is concerned.
+struct Answered {
+    direction: String,
+    sender_address: String,
+    recipients: Value,
+    /// In spam, flagged suspicious, or failing its sender's checks: it is
+    /// no reason to open the member's earlier mail to that address.
+    distrusted: bool,
+}
+
+/// Whether the message answered earns no person context. Facts only, as
+/// everywhere else (ADR 0018): spam, a `suspicious` answer or open Review
+/// need, and, for mail received, the receiving provider's results saying the
+/// sender failed its checks or is impersonated.
+fn distrusted(
+    direction: &str,
+    sender: &str,
+    in_spam: bool,
+    headers: &Value,
+    suspicious: bool,
+) -> bool {
+    if in_spam || suspicious {
+        return true;
+    }
+    let results = headers
+        .get("authentication_results")
+        .and_then(Value::as_str);
+    direction == "inbound" && (sender_checks_failed(sender, results) || dmarc_refused(results))
+}
+
+/// Whether `address` is plain enough to look up: one `@` with something on
+/// both sides, and no quote, backslash, whitespace or control character.
+fn plain_address(address: &str) -> bool {
+    let mut parts = address.split('@');
+    let (Some(local), Some(domain), None) = (parts.next(), parts.next(), parts.next()) else {
+        return false;
+    };
+    !local.is_empty()
+        && !domain.is_empty()
+        && !address
+            .chars()
+            .any(|c| c == '"' || c == '\\' || c.is_whitespace() || c.is_control())
+}
+
+/// The conversation's length and what the inbox knows of the person
+/// answered: the other side of the message answered (the sender of an
+/// inbound one, the first recipient of one the member sent). Nothing of the
+/// person when the message is distrusted or their address is not plain.
+///
+/// Only the conversation's own inbox is read, never another one the member
+/// can see: it is the inbox the reply is sent from, which the caller was
+/// just authorized to read and send from.
+async fn known_person(
+    tx: &mut sqlx::PgConnection,
+    inbox: InboxId,
+    conversation: ConversationId,
+    answered: &Answered,
+) -> Result<Known> {
+    let Answered {
+        direction,
+        sender_address,
+        recipients,
+        distrusted,
+    } = answered;
+    let total: i64 = sqlx::query_scalar(TOTAL)
+        .bind(conversation)
+        .bind(TOTAL_CAP)
+        .fetch_one(&mut *tx)
+        .await?;
+    let total_messages = usize::try_from(total).unwrap_or_default();
+    let first_to = recipients
+        .pointer("/to/0")
+        .and_then(|to| serde_json::from_value::<Address>(to.clone()).ok());
+    let correspondent = if direction == "outbound" {
+        first_to
+    } else {
+        // Their name, from the newest message they sent in this
+        // conversation; the address alone when none gave one.
+        let sender: Option<Value> = sqlx::query_scalar(
+            "SELECT sender FROM conversations.messages \
+             WHERE conversation_id = $1 AND direction = 'inbound' AND sender_address = $2 \
+             ORDER BY sent_at DESC, id DESC LIMIT 1",
+        )
+        .bind(conversation)
+        .bind(sender_address)
+        .fetch_optional(&mut *tx)
+        .await?;
+        sender
+            .and_then(|sender| serde_json::from_value::<Address>(sender).ok())
+            .or_else(|| {
+                Some(Address {
+                    name: None,
+                    address: sender_address.to_owned(),
+                })
+            })
+    };
+    let correspondent = correspondent.filter(|c| !distrusted && plain_address(c.address.trim()));
+    let Some(correspondent) = correspondent else {
+        return Ok(Known {
+            total_messages,
+            them: None,
+        });
+    };
+    let address = correspondent.address.trim().to_lowercase();
+    let (wrote_before, from_me): (bool, i64) = sqlx::query_as(WROTE_TO_THEM)
+        .bind(inbox)
+        .bind(&address)
+        .bind(SENT_SCAN)
+        .bind(COUNT_CAP)
+        .fetch_one(&mut *tx)
+        .await?;
+    let from_them: i64 = sqlx::query_scalar(FROM_THEM)
+        .bind(inbox)
+        .bind(&address)
+        .bind(COUNT_CAP)
+        .fetch_one(&mut *tx)
+        .await?;
+    // A few more than are kept: some have no words of their own.
+    let rows: PastRows = sqlx::query_as(PAST)
+        .bind(inbox)
+        .bind(&address)
+        .bind(SENT_SCAN)
+        .bind(conversation)
+        .bind(i64::try_from(PAST_MESSAGES * 2).unwrap_or(6))
+        .fetch_all(&mut *tx)
+        .await?;
+    let them = Them {
+        name: shown_name(correspondent),
+        i_wrote_to_them_before: wrote_before,
+        from_them_last_year: from_them,
+        from_me_last_year: from_me,
+    };
+    Ok(Known {
+        total_messages,
+        them: Some((them, rows)),
     })
 }
 
@@ -440,7 +751,6 @@ async fn own_words(state: &AppState, workspace: &str, bodies: &Bodies) -> Result
     Ok(plain_text::own_words(&raw))
 }
 
-/// `text` cut to at most `max` bytes, at a character boundary.
 /// A sender as the model reads them: their name, else their address, capped.
 fn shown_name(sender: Address) -> String {
     let name = sender
@@ -450,6 +760,7 @@ fn shown_name(sender: Address) -> String {
     cut_bytes(&name, NAME_BYTES)
 }
 
+/// `text` cut to at most `max` bytes, at a character boundary.
 fn cut_bytes(text: &str, max: usize) -> String {
     if text.len() <= max {
         return text.to_owned();

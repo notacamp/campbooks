@@ -6,7 +6,15 @@ import type { Schema } from "~/lib/api";
 import type { ItemView, Reason } from "./api/queries";
 
 /** The groups, in the order Home shows them. */
-const REASONS: readonly Reason[] = ["review", "reply", "decide", "do", "pay"];
+const REASONS: readonly Reason[] = ["review", "reply", "decide", "do", "pay", "worth_a_look"];
+
+/**
+ * The signal colour of a group: its reason's, except "Worth a look", which
+ * has a hue of its own (`look`).
+ */
+export function signalOf(reason: Reason): Exclude<Reason, "worth_a_look"> | "look" {
+  return reason === "worth_a_look" ? "look" : reason;
+}
 
 /** Items by reason, in display order, keeping the server's order inside each group. */
 export function groupByReason(items: readonly ItemView[]): { reason: Reason; items: ItemView[] }[] {
@@ -71,9 +79,10 @@ export type UniversalActionId = "done" | "snooze" | "not_needed";
 
 /**
  * What a row is: a question, a warning, a bill Campbooks asks about ("Is it
- * paid?"), a bill the member said is still to pay, or any other need.
+ * paid?"), a bill the member said is still to pay, mail a rule they taught
+ * keeps in front of them until opened ("Worth a look"), or any other need.
  */
-export type RowKind = "question" | "warning" | "need" | "bill" | "toPay";
+export type RowKind = "question" | "warning" | "need" | "bill" | "toPay" | "highlight";
 
 /**
  * The actions Home offers for a need today. A question (`check`) is
@@ -106,6 +115,12 @@ export function rowActionIds(kind: RowKind): {
     }
     case "need": {
       return { own: ["reply"], universal: ["done", "snooze", "not_needed"] };
+    }
+    // Nothing is asked of the member: it clears itself once opened. Seen
+    // (Done) and Later are the only buttons; there is nothing to say "not
+    // needed" about, the rule that raised it is theirs.
+    case "highlight": {
+      return { own: [], universal: ["done", "snooze"] };
     }
   }
 }
@@ -234,7 +249,7 @@ export function rowChoices(
     picked: false,
   };
   // Only a missing key means "not rated": `null` never comes from the server.
-  if (ranked === undefined || kind === "question") {
+  if (ranked === undefined || kind === "question" || kind === "highlight") {
     return fallback;
   }
   const own: OwnChoice[] = [];

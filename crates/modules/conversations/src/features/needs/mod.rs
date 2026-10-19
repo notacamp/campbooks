@@ -295,6 +295,7 @@ async fn withdraw(tx: &mut Transaction<'_, Postgres>, correction: CorrectionId) 
 }
 
 /// Record `verdict` on conversation `id`'s open need.
+#[allow(clippy::too_many_lines)]
 async fn judge(
     state: &AppState,
     settings: &NeedSettings,
@@ -355,7 +356,11 @@ async fn judge(
     } else {
         ("true", "false")
     };
+    // "Worth a look" is the member's own rule at work, not an answer to
+    // correct: whatever the verdict, it files nothing (Seen is its Done).
+    let taught_highlight = need.question == NeedQuestion::WorthALook.as_str();
     let to = match verdict {
+        _ if taught_highlight => None,
         NeedVerdict::Done | NeedVerdict::AlreadyPaid => None,
         NeedVerdict::NotNeeded => Some(no),
         NeedVerdict::Confirmed | NeedVerdict::StillToPay => Some(yes),

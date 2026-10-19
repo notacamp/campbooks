@@ -85,7 +85,7 @@ caller cannot see (the kernel's `Visibility` port), items the caller snoozed
 until a later time, items whose lapse time has passed, and items other than
 `pay` more than 7 days past their due date (a bill stays until a member
 answers it). Items
-SHALL be ordered by reason (`review`, `reply`, `decide`, `do`, `pay`), then
+SHALL be ordered by reason (`review`, `reply`, `decide`, `do`, `pay`, `worth_a_look`), then
 overdue first, then by due date, then urgent first, then oldest cause first,
 and the response SHALL carry the count per reason. The caller's day (for what
 is overdue and for Done today) SHALL follow `utc_offset`, the caller's offset
@@ -172,4 +172,14 @@ listing it among what left the member's list today.
 
 #### Scenario: A sign-in link
 - **WHEN** `need_changed` clears a Do need with cause `lapsed`
+- **THEN** the item leaves every member's list and is not shown in Done today
+
+### Requirement: Needs cleared by being opened
+The attention projection SHALL accept a need cleared with cause `opened` and
+treat it as cleared for every member who can see the container, without
+listing it among what left the member's list today. A `worth_a_look` item
+SHALL be a reason of its own, listed after Pay.
+
+#### Scenario: Opened
+- **WHEN** `need_changed` clears a `worth_a_look` need with cause `opened`
 - **THEN** the item leaves every member's list and is not shown in Done today

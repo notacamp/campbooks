@@ -63,13 +63,14 @@ const OPEN: &str = "SELECT i.id, i.record_type, i.record_id, i.container_type, i
         AND NOT EXISTS (SELECT 1 FROM attention.snoozes s \
                          WHERE s.item_id = i.id AND s.user_id = $4 AND s.until > $5) \
       ORDER BY CASE i.reason WHEN 'review' THEN 0 WHEN 'reply' THEN 1 \
-                             WHEN 'decide' THEN 2 WHEN 'do' THEN 3 ELSE 4 END, \
+                             WHEN 'decide' THEN 2 WHEN 'do' THEN 3 WHEN 'pay' THEN 4 \
+                             ELSE 5 END, \
                (i.due_on IS NOT NULL AND i.due_on < $6) DESC, \
                i.due_on ASC NULLS LAST, i.urgent DESC, i.since ASC, i.id";
 
 /// What left the caller's list since `$5` (the start of their day): cleared,
-/// but not replaced, cleared by a rule or lapsed (none of which a member
-/// did), or snoozed by the caller (`$3`) and still snoozed at `$4`; newest
+/// but not replaced, cleared by a rule, opened ("Worth a look") or lapsed
+/// (none of which a member marked), or snoozed by the caller (`$3`) and still snoozed at `$4`; newest
 /// first.
 const CLEARED: &str = "SELECT i.id, i.record_type, i.record_id, i.container_type, \
             i.container_id, i.cause_type, i.cause_id, i.reason, i.trust, i.due_on, i.urgent, \
@@ -81,7 +82,8 @@ const CLEARED: &str = "SELECT i.id, i.record_type, i.record_id, i.container_type
         AND i.container_type || ':' || i.container_id = ANY($2) \
         AND i.reason IS NOT NULL \
         AND ((i.state = 'cleared' AND i.cleared_at >= $5 \
-              AND coalesce(i.cleared_because, '') NOT IN ('superseded', 'rule', 'lapsed')) \
+              AND coalesce(i.cleared_because, '') \
+                  NOT IN ('superseded', 'rule', 'opened', 'lapsed')) \
              OR (i.state = 'open' AND s.created_at >= $5)) \
       ORDER BY greatest(i.cleared_at, s.created_at) DESC, i.id";
 

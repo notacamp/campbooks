@@ -8,6 +8,7 @@ import {
   remindTime,
   rowActionIds,
   rowChoices,
+  signalOf,
   snoozeOptions,
 } from "./model";
 
@@ -35,6 +36,17 @@ describe("attention model", () => {
     const groups = groupByReason([item("a", "pay"), item("b", "reply"), item("c", "pay")]);
     expect(groups.map((g) => g.reason)).toEqual(["reply", "pay"]);
     expect(groups[1]?.items.map((i) => i.id)).toEqual(["a", "c"]);
+  });
+
+  it("puts Worth a look after Pay, in a colour of its own", () => {
+    const groups = groupByReason([
+      item("a", "worth_a_look"),
+      item("b", "pay"),
+      item("c", "review"),
+    ]);
+    expect(groups.map((g) => g.reason)).toEqual(["review", "pay", "worth_a_look"]);
+    expect(signalOf("worth_a_look")).toBe("look");
+    expect(signalOf("pay")).toBe("pay");
   });
 
   it("offers later today only while it is worth it, and next week", () => {
@@ -79,6 +91,10 @@ describe("attention model", () => {
       own: ["report", "safe"],
       universal: ["done", "snooze"],
     });
+    // Worth a look asks nothing: Seen (Done) and Snooze, never Not needed.
+    expect(rowActionIds("highlight")).toEqual({ own: [], universal: ["done", "snooze"] });
+    // Whatever the server ranked, it offers no reply.
+    expect(rowChoices("highlight", [{ actions: ["reply"], likelihood: 90 }]).own).toEqual([]);
   });
 
   it("offers the fixed actions when the server sent no ranking", () => {

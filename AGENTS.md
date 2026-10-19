@@ -243,8 +243,9 @@ add a token or theme a workspace: `docs/design-system.md`.
   `pnpm typecheck` (strict + `noUncheckedIndexedAccess`), `pnpm test`,
   `pnpm deps:check`, `pnpm deadcode` (knip), `pnpm audit --prod`.
 - Repo: gitleaks, Trivy on the built image, Conventional Commit PR title,
-  a changelog entry file on `feat/` and `fix/` branches, `CHANGELOG.md`
-  untouched outside a release.
+  a changelog entry file on feat and fix PRs (by branch or title),
+  `CHANGELOG.md` untouched and entries kept outside a release (only a release
+  deletes them).
 
 ## Workflow
 

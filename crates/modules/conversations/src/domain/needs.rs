@@ -51,6 +51,10 @@ use crate::{
 
 /// The question a taught rule's `surface` answer is stored under.
 pub const SURFACE: &str = "surface";
+/// The question a taught rule's "Worth a look" answer is stored under
+/// (campbooks-cloud#274): the member asked to see each message from a sender
+/// until they have opened it once.
+pub const WORTH_A_LOOK: &str = "worth_a_look";
 /// The `urgency` level meaning "today".
 const TODAY_LEVEL: f64 = 2.0;
 /// The stream of automated money mail: only a payment still owed needs
@@ -185,12 +189,14 @@ pub struct Dates {
 
 impl Need {
     /// Whether it can lapse: anything but a bill (it stays until a member
-    /// answers it) and a warning (it keeps its own rules).
+    /// answers it), a warning (it keeps its own rules) and "Worth a look"
+    /// (a rule the member taught keeps it until it is opened: nothing the
+    /// mail says undoes that).
     pub fn can_lapse(&self) -> bool {
-        self.reason != NeedReason::Pay
+        !matches!(self.reason, NeedReason::Pay | NeedReason::WorthALook)
             && !matches!(
                 self.question,
-                NeedQuestion::Money | NeedQuestion::Suspicious
+                NeedQuestion::Money | NeedQuestion::Suspicious | NeedQuestion::WorthALook
             )
     }
 
@@ -422,12 +428,33 @@ pub fn raise(message: MessageId, answers: &[Answer], settings: &NeedSettings) ->
                 })
         })
     };
-    raised.map(|mut need| {
+    let raised = raised.map(|mut need| {
         need.urgent = answers.iter().any(|a| {
             a.question == triage::URGENCY && a.acted && a.level().is_some_and(|l| l >= TODAY_LEVEL)
         });
         need
-    })
+    });
+    // Anything that asks something of the member comes first.
+    raised.or_else(|| highlighted(message, answers))
+}
+
+/// "Worth a look": what a rule the member taught keeps in front of them
+/// until they have opened it, when nothing asks more of them. It is never
+/// urgent and never a question: they asked for it.
+fn highlighted(message: MessageId, answers: &[Answer]) -> Option<Need> {
+    answers
+        .iter()
+        .find(|a| a.basis == NeedBasis::Taught && a.question == WORTH_A_LOOK && a.is_true())
+        .map(|a| Need {
+            message,
+            reason: NeedReason::WorthALook,
+            trust: NeedTrust::Sure,
+            basis: a.basis,
+            question: NeedQuestion::WorthALook,
+            decision: Some(a.id),
+            due_on: None,
+            urgent: false,
+        })
 }
 
 /// The answers with a taught rule's speaking for the member: its answer to
@@ -458,16 +485,26 @@ fn surfaces_never(answers: &[Answer]) -> bool {
     })
 }
 
+/// The question an ask was raised by: a "Still needed?" question stands for
+/// the ask it was raised as; every other question is its own.
+fn asked(question: NeedQuestion) -> NeedQuestion {
+    match question {
+        NeedQuestion::StillToDo => NeedQuestion::AsksAction,
+        NeedQuestion::StillNeedsReply => NeedQuestion::NeedsReply,
+        NeedQuestion::NeedsReply
+        | NeedQuestion::AsksAction
+        | NeedQuestion::Suspicious
+        | NeedQuestion::Money
+        | NeedQuestion::WorthALook => question,
+    }
+}
+
 /// Whether a taught rule now says the need raised by `question` is not
 /// needed: "never", or a false answer to that question. A warning about
 /// suspicious mail is never cleared this way.
 fn rule_clears(answers: &[Answer], question: NeedQuestion) -> bool {
     // A "Still needed?" question stands for the ask it was raised as.
-    let question = match question {
-        NeedQuestion::StillToDo => NeedQuestion::AsksAction,
-        NeedQuestion::StillNeedsReply => NeedQuestion::NeedsReply,
-        other => other,
-    };
+    let question = asked(question);
     if question == NeedQuestion::Suspicious {
         return false;
     }
@@ -480,6 +517,7 @@ fn rule_clears(answers: &[Answer], question: NeedQuestion) -> bool {
 
 /// What happened in the conversation since the need's message.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+#[allow(clippy::struct_excessive_bools)]
 pub struct Since {
     /// A message was sent from the inbox after it.
     pub replied: bool,
@@ -494,6 +532,8 @@ pub struct Since {
     pub rule: RuleSays,
     /// When the need's message was sent (`None` once it is gone).
     pub sent_at: Option<DateTime<Utc>>,
+    /// The message was opened (read) by someone, here or at the provider.
+    pub opened: bool,
 }
 
 /// What a taught rule says about a need.
@@ -533,12 +573,9 @@ pub fn settle(mut need: Need, since: Since, clock: Clock) -> Settled {
                     NeedQuestion::NeedsReply
                     | NeedQuestion::Suspicious
                     | NeedQuestion::StillNeedsReply => NeedReason::Reply,
+                    NeedQuestion::WorthALook => NeedReason::WorthALook,
                 };
-                need.question = match need.question {
-                    NeedQuestion::StillToDo => NeedQuestion::AsksAction,
-                    NeedQuestion::StillNeedsReply => NeedQuestion::NeedsReply,
-                    other => other,
-                };
+                need.question = asked(need.question);
             }
             need.trust = NeedTrust::Sure;
             need.basis = NeedBasis::Member;
@@ -553,6 +590,10 @@ pub fn settle(mut need: Need, since: Since, clock: Clock) -> Settled {
     }
     if since.trashed {
         return Settled::Cleared(need, ClearCause::Trashed);
+    }
+    // "Worth a look" asks only that the member opens it once.
+    if since.opened && need.reason == NeedReason::WorthALook {
+        return Settled::Cleared(need, ClearCause::Opened);
     }
     if since.replied && matches!(need.reason, NeedReason::Reply | NeedReason::Do) {
         return Settled::Cleared(need, ClearCause::Replied);
@@ -861,6 +902,11 @@ async fn since(
         Some(row) => row.verdict_on(need.message)?,
         None => None,
     };
+    let opened: bool = sqlx::query_scalar("SELECT read FROM conversations.messages WHERE id = $1")
+        .bind(need.message)
+        .fetch_optional(&mut **tx)
+        .await?
+        .unwrap_or(false);
     let rule = if rule_clears(&answers(tx, need.message).await?, need.question) {
         RuleSays::NotNeeded
     } else {
@@ -874,6 +920,7 @@ async fn since(
             verdict,
             rule,
             sent_at: sent,
+            opened,
         },
         sent,
     ))
@@ -1631,6 +1678,59 @@ mod tests {
     }
 
     #[test]
+    fn a_highlight_rule_raises_worth_a_look_only_when_nothing_asks_more() {
+        let look = answer(WORTH_A_LOOK, NeedBasis::Taught, json!(true), true);
+        let need = raised(std::slice::from_ref(&look)).unwrap();
+        assert_eq!(
+            (need.reason, need.trust, need.basis, need.question),
+            (
+                NeedReason::WorthALook,
+                NeedTrust::Sure,
+                NeedBasis::Taught,
+                NeedQuestion::WorthALook
+            )
+        );
+        assert!(!need.urgent);
+        // A reply someone is waiting for outranks it: one need per conversation.
+        let reply = raised(&[
+            answer(triage::NEEDS_REPLY, NeedBasis::Taught, json!(true), true),
+            look.clone(),
+        ])
+        .unwrap();
+        assert_eq!(reply.reason, NeedReason::Reply);
+        // "Never needs anyone" is the opposite of a highlight.
+        let never = answer(SURFACE, NeedBasis::Taught, json!("never"), true);
+        assert_eq!(raised(&[look, never]), None);
+    }
+
+    #[test]
+    fn worth_a_look_clears_itself_once_opened() {
+        let opened = Since {
+            opened: true,
+            ..Since::default()
+        };
+        assert_eq!(
+            cause(&settle(need(NeedReason::WorthALook), opened)),
+            Some(ClearCause::Opened)
+        );
+        // Opening settles nothing else: a bill stays until answered.
+        assert_eq!(cause(&settle(need(NeedReason::Pay), opened)), None);
+        assert_eq!(
+            cause(&settle(need(NeedReason::WorthALook), Since::default())),
+            None
+        );
+        // Seen (Done) clears it too.
+        let seen = Since {
+            verdict: Some(NeedVerdict::Done),
+            ..Since::default()
+        };
+        assert_eq!(
+            cause(&settle(need(NeedReason::WorthALook), seen)),
+            Some(ClearCause::Done)
+        );
+    }
+
+    #[test]
     fn a_rule_clears_what_it_says_is_not_needed() {
         let by_rule = Since {
             rule: RuleSays::NotNeeded,
@@ -2179,6 +2279,44 @@ mod tests {
                     lapses_at: Some(Utc::now()),
                 })
                 .lapses_at,
+            None
+        );
+    }
+
+    /// A taught "Worth a look" rule keeps its need until the message is
+    /// opened: no lapse time read from the mail undoes it.
+    #[test]
+    fn worth_a_look_never_lapses() {
+        let mut look = lapsing(model(NeedReason::WorthALook, NeedQuestion::WorthALook), -60);
+        look.basis = NeedBasis::Taught;
+        assert!(!look.can_lapse());
+        match settle(look.clone(), sent(30), clock()) {
+            Settled::Open(need) => assert_eq!(
+                (need.reason, need.trust, need.question),
+                (
+                    NeedReason::WorthALook,
+                    NeedTrust::Sure,
+                    NeedQuestion::WorthALook
+                )
+            ),
+            Settled::Cleared(_, cause) => panic!("worth a look stays until opened, not {cause:?}"),
+        }
+        // Its dates carry no lapse time, and the clock never wakes it.
+        assert_eq!(
+            look.clone()
+                .dated(Dates {
+                    due_on: None,
+                    lapses_at: Some(Utc::now() + TimeDelta::minutes(5)),
+                })
+                .lapses_at,
+            None
+        );
+        assert_eq!(
+            next_wake(
+                &Settled::Open(look),
+                Some(Utc::now() - TimeDelta::days(30)),
+                clock()
+            ),
             None
         );
     }

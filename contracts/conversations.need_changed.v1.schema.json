@@ -22,7 +22,7 @@
           "required": ["reason", "trust", "urgent"],
           "additionalProperties": false,
           "properties": {
-            "reason": { "enum": ["reply", "do", "pay", "review"] },
+            "reason": { "enum": ["reply", "do", "pay", "review", "worth_a_look"] },
             "trust": { "enum": ["sure", "check"] },
             "due_on": { "type": "string", "format": "date" },
             "lapses_at": {
@@ -36,7 +36,17 @@
       ]
     },
     "cleared_because": {
-      "enum": ["replied", "archived", "trashed", "done", "not_needed", "superseded", "rule", "lapsed"]
+      "enum": [
+        "replied",
+        "archived",
+        "trashed",
+        "done",
+        "not_needed",
+        "superseded",
+        "rule",
+        "opened",
+        "lapsed"
+      ]
     },
     "cleared_by": { "$ref": "#/$defs/uuid" },
     "latest_message": {
