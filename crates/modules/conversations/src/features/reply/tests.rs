@@ -30,12 +30,16 @@ fn gateway(base_url: &str) -> Gateway {
     .unwrap()
 }
 
-/// A chat completion whose content is `answer`.
+/// A chat completion whose content is `answer`: a string as it is (a
+/// written reply is plain text), anything else as JSON (likely replies).
 fn completion(answer: &Value) -> Value {
+    let content = answer
+        .as_str()
+        .map_or_else(|| answer.to_string(), ToOwned::to_owned);
     json!({
         "model": "test-model",
         "choices": [{
-            "message": { "role": "assistant", "content": answer.to_string() },
+            "message": { "role": "assistant", "content": content },
             "finish_reason": "stop",
         }],
     })
@@ -64,11 +68,14 @@ async fn asked(server: &MockServer) -> Vec<(String, Value)> {
         .iter()
         .filter_map(|request| {
             let body: Value = serde_json::from_slice(&request.body).ok()?;
-            let schema = body["response_format"]["json_schema"]["name"].as_str()?;
-            if !schema.starts_with("reply_") {
+            // Likely replies and written replies, known by their instruction
+            // (a written reply has no schema).
+            let system = body["messages"][0]["content"].as_str()?.to_owned();
+            if !(system.starts_with("You help the account holder answer an email")
+                || system.starts_with("You write an email reply"))
+            {
                 return None;
             }
-            let system = body["messages"][0]["content"].as_str()?.to_owned();
             let input = serde_json::from_str(body["messages"][1]["content"].as_str()?).ok()?;
             Some((system, input))
         })
@@ -81,6 +88,10 @@ fn suggestions(workspace: WorkspaceId, conversation: &str) -> String {
 
 fn draft(workspace: WorkspaceId, conversation: &str) -> String {
     format!("/api/v1/w/{workspace}/conversations/{conversation}/reply/draft")
+}
+
+fn stream_uri(workspace: WorkspaceId, conversation: &str) -> String {
+    format!("/api/v1/w/{workspace}/conversations/{conversation}/reply/draft/stream")
 }
 
 #[sqlx::test(migrations = "../../../migrations")]
@@ -151,7 +162,7 @@ async fn a_reply_for_an_intent_is_signed_with_the_members_name(db: PgPool) {
     let server = MockServer::start().await;
     answer_with(
         &server,
-        &json!({"reply": "\r\nHi Maya,\r\n\r\nFriday works.\r\n\r\nSam Rivers\r\n"}),
+        &json!("\r\nHi Maya,\r\n\r\nFriday works.\r\n\r\nSam Rivers\r\n"),
     )
     .await;
     let kit = kit_with_model(db, &server).await;
@@ -188,7 +199,7 @@ async fn a_reply_for_an_intent_is_signed_with_the_members_name(db: PgPool) {
 #[sqlx::test(migrations = "../../../migrations")]
 async fn a_draft_is_rewritten_as_asked(db: PgPool) {
     let server = MockServer::start().await;
-    answer_with(&server, &json!({"reply": "Hi Maya, Friday works. Sam"})).await;
+    answer_with(&server, &json!("Hi Maya, Friday works. Sam")).await;
     let kit = kit_with_model(db, &server).await;
     let (workspace, _, sam) = kit.sams_inbox().await;
     let id = kit.conversation_of("en-1").await;
@@ -320,9 +331,9 @@ async fn a_failing_model_is_reply_failed_without_its_words(db: PgPool) {
 }
 
 #[sqlx::test(migrations = "../../../migrations")]
-async fn an_answer_outside_the_schema_is_reply_failed(db: PgPool) {
+async fn an_empty_reply_or_likely_replies_outside_the_schema_are_reply_failed(db: PgPool) {
     let server = MockServer::start().await;
-    answer_with(&server, &json!({"text": "Hi"})).await;
+    answer_with(&server, &json!("  \n ")).await;
     let kit = kit_with_model(db, &server).await;
     let (workspace, _, sam) = kit.sams_inbox().await;
     let id = kit.conversation_of("en-1").await;
@@ -335,6 +346,106 @@ async fn an_answer_outside_the_schema_is_reply_failed(db: PgPool) {
         .await;
     assert_eq!(response.status, StatusCode::SERVICE_UNAVAILABLE);
     assert_eq!(response.json["code"], "reply_failed");
+    // Not JSON where likely replies are asked for.
+    let response = kit
+        .post(&sam, &suggestions(workspace, &id), Some(json!({})))
+        .await;
+    assert_eq!(response.status, StatusCode::SERVICE_UNAVAILABLE);
+    assert_eq!(response.json["code"], "reply_failed");
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_reply_cut_short_is_reply_failed(db: PgPool) {
+    let server = MockServer::start().await;
+    Mock::given(method("POST"))
+        .and(path("/v1/chat/completions"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+            "model": "test-model",
+            "choices": [{
+                "message": { "role": "assistant", "content": "Hi Maya, Fri" },
+                "finish_reason": "length",
+            }],
+        })))
+        .mount(&server)
+        .await;
+    let kit = kit_with_model(db, &server).await;
+    let (workspace, _, sam) = kit.sams_inbox().await;
+    let id = kit.conversation_of("en-1").await;
+    let response = kit
+        .post(
+            &sam,
+            &draft(workspace, &id),
+            Some(json!({"intent": "Say yes"})),
+        )
+        .await;
+    assert_eq!(response.status, StatusCode::SERVICE_UNAVAILABLE);
+    assert_eq!(response.json["code"], "reply_failed");
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn the_suggestions_shown_reach_the_model_numbered(db: PgPool) {
+    let server = MockServer::start().await;
+    answer_with(
+        &server,
+        &json!("Hi Maya, Friday works and I will send the notes."),
+    )
+    .await;
+    let kit = kit_with_model(db, &server).await;
+    let (workspace, _, sam) = kit.sams_inbox().await;
+    let id = kit.conversation_of("en-1").await;
+    let response = kit
+        .post(
+            &sam,
+            &draft(workspace, &id),
+            Some(json!({
+                "intent": "1 and 3, warmer",
+                "suggestions": [
+                    "Say Friday works",
+                    " Ask for\nmore time ",
+                    "Say you'll send the notes\u{202E}",
+                ],
+            })),
+        )
+        .await;
+    assert_eq!(response.status, StatusCode::OK, "{:?}", response.json);
+    let input = the_input(&server).await;
+    assert_eq!(input["intent"], "1 and 3, warmer");
+    assert_eq!(
+        input["suggestions"],
+        json!([
+            {"number": 1, "says": "Say Friday works"},
+            {"number": 2, "says": "Ask for more time"},
+            {"number": 3, "says": "Say you'll send the notes"},
+        ])
+    );
+}
+
+/// A model that answers after `delay`, asked with `timeout`: the JSON
+/// routes' failure when it takes too long.
+#[tokio::test]
+async fn a_slow_model_is_reply_timed_out() {
+    let server = MockServer::start().await;
+    Mock::given(method("POST"))
+        .respond_with(
+            ResponseTemplate::new(200)
+                .set_body_json(completion(&json!("Hi")))
+                .set_delay(std::time::Duration::from_secs(5)),
+        )
+        .mount(&server)
+        .await;
+    let state = campbooks_kernel::testing::state(campbooks_kernel::testing::unreachable_pool());
+    let gateway = gateway(&server.uri());
+    let error = super::ask(
+        &state,
+        &gateway,
+        WorkspaceId::new(),
+        "conversations.write_reply",
+        campbooks_ai::ChatRequest::new(vec![campbooks_ai::Message::user("Hi")]),
+        std::time::Duration::from_millis(200),
+    )
+    .await
+    .unwrap_err();
+    assert_eq!(error.code(), "reply_timed_out");
 }
 
 #[sqlx::test(migrations = "../../../migrations")]
@@ -373,16 +484,23 @@ async fn only_someone_who_may_send_may_ask(db: PgPool) {
     assert_eq!(response.status, StatusCode::NOT_FOUND);
     assert!(asked(&server).await.is_empty());
 
-    // An empty or overlong ask: 400 before anything is read.
+    // An empty or overlong ask, or too many or too long suggestions: 400
+    // before anything is read, on both routes.
     for body in [
         json!({"intent": "  "}),
         json!({"intent": "x".repeat(301)}),
         json!({"intent": "Say yes", "change": "y".repeat(301)}),
+        json!({"intent": "1", "suggestions": ["a", "b", "c", "d"]}),
+        json!({"intent": "1", "suggestions": ["z".repeat(81)]}),
+        json!({"intent": "1", "suggestions": [" "]}),
     ] {
-        let response = kit.post(&sam, &draft(workspace, &id), Some(body)).await;
-        assert_eq!(response.status, StatusCode::BAD_REQUEST);
-        assert_eq!(response.json["code"], "reply_ask_invalid");
+        for uri in [draft(workspace, &id), stream_uri(workspace, &id)] {
+            let response = kit.post(&sam, &uri, Some(body.clone())).await;
+            assert_eq!(response.status, StatusCode::BAD_REQUEST, "{body}");
+            assert_eq!(response.json["code"], "reply_ask_invalid");
+        }
     }
+    assert!(asked(&server).await.is_empty());
 }
 
 const MARTA: (&str, &str) = ("Marta Ferreira", "marta@clientes.example");
@@ -501,7 +619,7 @@ async fn write_reply(
 #[sqlx::test(migrations = "../../../migrations")]
 async fn a_reply_reads_how_i_wrote_to_them_before(db: PgPool) {
     let server = MockServer::start().await;
-    answer_with(&server, &json!({"reply": "Oi Marta"})).await;
+    answer_with(&server, &json!("Oi Marta")).await;
     let kit = kit_with_model(db, &server).await;
     let (workspace, inbox, sam, _) = demo(&kit).await;
     for (n, days) in [(1, 40), (2, 30), (3, 20), (4, 10)] {
@@ -565,7 +683,7 @@ async fn a_reply_reads_how_i_wrote_to_them_before(db: PgPool) {
 #[sqlx::test(migrations = "../../../migrations")]
 async fn past_mail_stays_in_its_inbox(db: PgPool) {
     let server = MockServer::start().await;
-    answer_with(&server, &json!({"reply": "Oi Marta"})).await;
+    answer_with(&server, &json!("Oi Marta")).await;
     let kit = kit_with_model(db, &server).await;
     let (workspace, inbox, sam, user) = demo(&kit).await;
     // Another inbox of the workspace that the member can see too.
@@ -618,7 +736,7 @@ async fn past_mail_stays_in_its_inbox(db: PgPool) {
 #[sqlx::test(migrations = "../../../migrations")]
 async fn this_conversation_is_not_repeated_as_past_mail(db: PgPool) {
     let server = MockServer::start().await;
-    answer_with(&server, &json!({"reply": "Oi Marta"})).await;
+    answer_with(&server, &json!("Oi Marta")).await;
     let kit = kit_with_model(db, &server).await;
     let (workspace, inbox, sam, _) = demo(&kit).await;
     store(
@@ -669,7 +787,7 @@ async fn this_conversation_is_not_repeated_as_past_mail(db: PgPool) {
 #[sqlx::test(migrations = "../../../migrations")]
 async fn a_first_message_to_someone_new(db: PgPool) {
     let server = MockServer::start().await;
-    answer_with(&server, &json!({"reply": "Hello Noor"})).await;
+    answer_with(&server, &json!("Hello Noor")).await;
     let kit = kit_with_model(db, &server).await;
     let (workspace, inbox, sam, _) = demo(&kit).await;
     store(
@@ -709,7 +827,7 @@ async fn a_first_message_to_someone_new(db: PgPool) {
 #[sqlx::test(migrations = "../../../migrations")]
 async fn answering_my_own_message_reads_its_recipient(db: PgPool) {
     let server = MockServer::start().await;
-    answer_with(&server, &json!({"reply": "Oi Marta"})).await;
+    answer_with(&server, &json!("Oi Marta")).await;
     let kit = kit_with_model(db, &server).await;
     let (workspace, inbox, sam, _) = demo(&kit).await;
     store(
@@ -740,7 +858,7 @@ async fn answering_my_own_message_reads_its_recipient(db: PgPool) {
 #[sqlx::test(migrations = "../../../migrations")]
 async fn past_mail_is_bounded(db: PgPool) {
     let server = MockServer::start().await;
-    answer_with(&server, &json!({"reply": "Oi Marta"})).await;
+    answer_with(&server, &json!("Oi Marta")).await;
     let kit = kit_with_model(db, &server).await;
     let (workspace, inbox, sam, _) = demo(&kit).await;
     for (n, days) in [(1, 30), (2, 20), (3, 10)] {
@@ -821,7 +939,7 @@ async fn suggestions_get_no_past_mail(db: PgPool) {
 #[sqlx::test(migrations = "../../../migrations")]
 async fn the_length_of_a_long_conversation_is_counted(db: PgPool) {
     let server = MockServer::start().await;
-    answer_with(&server, &json!({"reply": "Oi Marta"})).await;
+    answer_with(&server, &json!("Oi Marta")).await;
     let kit = kit_with_model(db, &server).await;
     let (workspace, inbox, sam, _) = demo(&kit).await;
     for n in 0..10 {
@@ -863,7 +981,7 @@ async fn marta_is_written_to(kit: &Kit, workspace: WorkspaceId, inbox: InboxId) 
 #[sqlx::test(migrations = "../../../migrations")]
 async fn a_forged_sender_address_matches_nothing(db: PgPool) {
     let server = MockServer::start().await;
-    answer_with(&server, &json!({"reply": "Hi"})).await;
+    answer_with(&server, &json!("Hi")).await;
     let kit = kit_with_model(db, &server).await;
     let (workspace, inbox, sam, _) = demo(&kit).await;
     marta_is_written_to(&kit, workspace, inbox).await;
@@ -906,7 +1024,7 @@ async fn a_forged_sender_address_matches_nothing(db: PgPool) {
 #[sqlx::test(migrations = "../../../migrations")]
 async fn a_name_that_looks_like_the_address_is_not_the_address(db: PgPool) {
     let server = MockServer::start().await;
-    answer_with(&server, &json!({"reply": "Hi"})).await;
+    answer_with(&server, &json!("Hi")).await;
     let kit = kit_with_model(db, &server).await;
     let (workspace, inbox, sam, _) = demo(&kit).await;
     // Sent to someone else whose display name is Marta's address.
@@ -944,7 +1062,7 @@ async fn a_name_that_looks_like_the_address_is_not_the_address(db: PgPool) {
 #[sqlx::test(migrations = "../../../migrations")]
 async fn spam_and_failed_checks_get_no_person_context(db: PgPool) {
     let server = MockServer::start().await;
-    answer_with(&server, &json!({"reply": "Hi"})).await;
+    answer_with(&server, &json!("Hi")).await;
     let kit = kit_with_model(db, &server).await;
     let (workspace, inbox, sam, _) = demo(&kit).await;
     marta_is_written_to(&kit, workspace, inbox).await;
@@ -985,7 +1103,7 @@ async fn spam_and_failed_checks_get_no_person_context(db: PgPool) {
 #[sqlx::test(migrations = "../../../migrations")]
 async fn trashed_and_year_old_mail_is_not_past_mail(db: PgPool) {
     let server = MockServer::start().await;
-    answer_with(&server, &json!({"reply": "Hi"})).await;
+    answer_with(&server, &json!("Hi")).await;
     let kit = kit_with_model(db, &server).await;
     let (workspace, inbox, sam, _) = demo(&kit).await;
     store(
@@ -1045,7 +1163,7 @@ async fn trashed_and_year_old_mail_is_not_past_mail(db: PgPool) {
 #[sqlx::test(migrations = "../../../migrations")]
 async fn a_suspicious_or_reviewed_conversation_gets_no_person_context(db: PgPool) {
     let server = MockServer::start().await;
-    answer_with(&server, &json!({"reply": "Hi"})).await;
+    answer_with(&server, &json!("Hi")).await;
     let kit = kit_with_model(db, &server).await;
     let (workspace, inbox, sam, _) = demo(&kit).await;
     marta_is_written_to(&kit, workspace, inbox).await;
@@ -1094,4 +1212,245 @@ async fn a_suspicious_or_reviewed_conversation_gets_no_person_context(db: PgPool
         assert!(!input.to_string().contains("Private words"));
         assert_eq!(input["conversation"]["total_messages"], 1);
     }
+}
+
+// --- the streamed reply (campbooks-cloud#288) -------------------------------
+
+/// A model server streaming a reply: some thinking, the words, the usage.
+async fn stream_with(server: &MockServer, words: &[&str]) {
+    let mut body = String::from(
+        "data: {\"model\":\"test-model\",\"choices\":[{\"delta\":{\"reasoning\":\"Maya asks about Friday.\"}}]}\n\n",
+    );
+    for word in words {
+        let chunk = json!({"choices": [{"delta": {"content": word}}]});
+        body.push_str(&format!("data: {chunk}\n\n"));
+    }
+    body.push_str(
+        "data: {\"choices\":[{\"delta\":{},\"finish_reason\":\"stop\"}]}\n\n\
+         data: {\"choices\":[],\"usage\":{\"prompt_tokens\":90,\"completion_tokens\":12}}\n\n\
+         data: [DONE]\n\n",
+    );
+    Mock::given(method("POST"))
+        .and(path("/v1/chat/completions"))
+        .respond_with(ResponseTemplate::new(200).set_body_raw(body, "text/event-stream"))
+        .mount(server)
+        .await;
+}
+
+/// The events of an SSE body, as (event, data).
+fn frames(body: &[u8]) -> Vec<(String, Value)> {
+    String::from_utf8_lossy(body)
+        .split("\n\n")
+        .filter_map(|block| {
+            let mut name = None;
+            let mut data = String::new();
+            for line in block.lines() {
+                if let Some(value) = line.strip_prefix("event: ") {
+                    name = Some(value.to_owned());
+                } else if let Some(value) = line.strip_prefix("data: ") {
+                    data.push_str(value);
+                }
+            }
+            Some((name?, serde_json::from_str(&data).ok()?))
+        })
+        .collect()
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_reply_streams_its_thinking_and_its_words(db: PgPool) {
+    let server = MockServer::start().await;
+    stream_with(
+        &server,
+        &["Hi Maya,\n\n", "Friday works.", "\n\nSam Rivers"],
+    )
+    .await;
+    let kit = kit_with_model(db, &server).await;
+    let (workspace, _, _) = kit.sams_inbox().await;
+    let sam = kit.token_named("sam", "Sam Rivers");
+    let id = kit.conversation_of("en-1").await;
+    let maya = kit.message_of("en-1").await;
+
+    let (status, headers, body) = kit
+        .post_raw(
+            &sam,
+            &stream_uri(workspace, &id),
+            json!({"message_id": maya, "intent": "Say Friday works",
+                   "suggestions": ["Say Friday works", "Ask for more time"]}),
+        )
+        .await;
+    assert_eq!(status, StatusCode::OK, "{}", String::from_utf8_lossy(&body));
+    assert_eq!(headers["content-type"], "text/event-stream");
+    assert_eq!(headers["x-accel-buffering"], "no");
+    let frames = frames(&body);
+    let names: Vec<&str> = frames.iter().map(|(name, _)| name.as_str()).collect();
+    assert_eq!(names, ["thinking", "text", "text", "text", "done"]);
+    assert_eq!(frames[0].1["delta"], "Maya asks about Friday.");
+    assert_eq!(frames[1].1["delta"], "Hi Maya,\n\n");
+    assert_eq!(
+        frames[4].1["text"],
+        "Hi Maya,\n\nFriday works.\n\nSam Rivers"
+    );
+    assert_eq!(frames[4].1["message_id"], maya);
+
+    // The same request as a written reply, streamed, with the suggestions.
+    let requests = server.received_requests().await.unwrap();
+    let sent: Value = serde_json::from_slice(&requests[0].body).unwrap();
+    assert_eq!(sent["stream"], true);
+    assert!(sent.get("response_format").is_none());
+    let input = the_input(&server).await;
+    assert_eq!(input["intent"], "Say Friday works");
+    assert_eq!(input["suggestions"][1]["says"], "Ask for more time");
+    assert_eq!(input["my_name"], "Sam Rivers");
+    // Nothing is stored.
+    let drafts: i64 = sqlx::query_scalar("SELECT count(*) FROM conversations.drafts")
+        .fetch_one(&kit.db)
+        .await
+        .unwrap();
+    assert_eq!(drafts, 0);
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn the_stream_refuses_as_a_problem_before_it_opens(db: PgPool) {
+    let server = MockServer::start().await;
+    stream_with(&server, &["Hi"]).await;
+    let kit = kit_with_model(db.clone(), &server).await;
+    let (workspace, inbox, _) = kit.sams_inbox().await;
+    let id = kit.conversation_of("en-1").await;
+    let (ana, ana_id) = kit.member("ana", workspace);
+    kit.add_to_inbox(inbox, ana_id, InboxRole::Reader).await;
+    let response = kit
+        .post(
+            &ana,
+            &stream_uri(workspace, &id),
+            Some(json!({"intent": "Say yes"})),
+        )
+        .await;
+    assert_eq!(response.status, StatusCode::FORBIDDEN);
+    assert_eq!(response.json["code"], "inbox_read_only");
+    assert_eq!(
+        response.content_type.as_deref(),
+        Some("application/problem+json")
+    );
+    assert!(server.received_requests().await.unwrap().is_empty());
+
+    // No model that may read mail: 409, as for the JSON route.
+    let kit = Kit::new(db).await;
+    let (workspace, _, sam) = kit.sams_inbox().await;
+    let id = kit.conversation_of("en-1").await;
+    let response = kit
+        .post(
+            &sam,
+            &stream_uri(workspace, &id),
+            Some(json!({"intent": "Say yes"})),
+        )
+        .await;
+    assert_eq!(response.status, StatusCode::CONFLICT);
+    assert_eq!(response.json["code"], "reply_unavailable");
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_provider_that_refuses_is_a_problem_not_a_stream(db: PgPool) {
+    let server = MockServer::start().await;
+    Mock::given(method("POST"))
+        .and(path("/v1/chat/completions"))
+        .respond_with(ResponseTemplate::new(500).set_body_string("Subject: Q4 plan"))
+        .mount(&server)
+        .await;
+    let kit = kit_with_model(db, &server).await;
+    let (workspace, _, sam) = kit.sams_inbox().await;
+    let id = kit.conversation_of("en-1").await;
+    let response = kit
+        .post(
+            &sam,
+            &stream_uri(workspace, &id),
+            Some(json!({"intent": "Say yes"})),
+        )
+        .await;
+    assert_eq!(response.status, StatusCode::SERVICE_UNAVAILABLE);
+    assert_eq!(response.json["code"], "reply_failed");
+    assert!(!response.json.to_string().contains("Q4 plan"));
+}
+
+/// A meter that refuses every call: the workspace used its day.
+#[derive(Debug)]
+struct Spent;
+
+impl campbooks_ai::usage::Meter for Spent {
+    fn admit<'a>(
+        &'a self,
+        _db: &'a PgPool,
+        _call: campbooks_ai::usage::MeteredCall<'a>,
+    ) -> campbooks_ai::decide::strategy::BoxFuture<
+        'a,
+        Result<campbooks_ai::usage::Admission, campbooks_ai::usage::MeterError>,
+    > {
+        Box::pin(async { Ok(campbooks_ai::usage::Admission::Refused { cap: 5000 }) })
+    }
+
+    fn settle<'a>(
+        &'a self,
+        _db: &'a PgPool,
+        _call: campbooks_ai::usage::MeteredCall<'a>,
+        _day: chrono::NaiveDate,
+        _outcome: campbooks_ai::usage::Outcome,
+    ) -> campbooks_ai::decide::strategy::BoxFuture<'a, Result<(), campbooks_ai::usage::MeterError>>
+    {
+        Box::pin(async { Ok(()) })
+    }
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn past_the_daily_limit_the_stream_is_a_problem(db: PgPool) {
+    let server = MockServer::start().await;
+    stream_with(&server, &["Hi"]).await;
+    let mut deps = sorting_deps();
+    deps.ai = Some(gateway(&server.uri()).with_meter(std::sync::Arc::new(Spent)));
+    let kit = Kit::with_deps(db, deps).await;
+    let (workspace, _, sam) = kit.sams_inbox().await;
+    let id = kit.conversation_of("en-1").await;
+    let response = kit
+        .post(
+            &sam,
+            &stream_uri(workspace, &id),
+            Some(json!({"intent": "Say yes"})),
+        )
+        .await;
+    assert_eq!(response.status, StatusCode::SERVICE_UNAVAILABLE);
+    assert_eq!(response.json["code"], "ai_daily_limit_reached");
+    assert!(server.received_requests().await.unwrap().is_empty());
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_distrusted_message_gets_no_person_context_on_the_stream_either(db: PgPool) {
+    let server = MockServer::start().await;
+    stream_with(&server, &["Hi"]).await;
+    let kit = kit_with_model(db, &server).await;
+    let (workspace, inbox, sam, _) = demo(&kit).await;
+    marta_is_written_to(&kit, workspace, inbox).await;
+    store(
+        &kit,
+        workspace,
+        inbox,
+        "sam@example.com",
+        received("spam-1", "thr-spam", MARTA, 1, "Hello"),
+    )
+    .await;
+    sqlx::query(
+        "UPDATE conversations.messages SET in_spam = true WHERE provider_message_id = 'spam-1'",
+    )
+    .execute(&kit.db)
+    .await
+    .unwrap();
+    let id = kit.conversation_of("spam-1").await;
+    let (status, _, _) = kit
+        .post_raw(
+            &sam,
+            &stream_uri(workspace, &id),
+            json!({"intent": "Say yes"}),
+        )
+        .await;
+    assert_eq!(status, StatusCode::OK);
+    let input = the_input(&server).await;
+    assert!(input.get("them").is_none(), "{input}");
+    assert!(!input.to_string().contains("Private words"));
 }

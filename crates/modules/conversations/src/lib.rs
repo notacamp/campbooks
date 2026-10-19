@@ -337,6 +337,7 @@ fn router() -> OpenApiRouter<AppState> {
         .routes(routes!(rule_notices::answer, rule_notices::clear_answer))
         .routes(routes!(reply::suggest))
         .routes(routes!(reply::write))
+        .routes(routes!(reply::stream))
 }
 
 #[cfg(test)]

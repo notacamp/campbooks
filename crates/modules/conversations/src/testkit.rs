@@ -335,6 +335,25 @@ impl Kit {
         (parts.status, parts.headers, bytes.to_vec())
     }
 
+    /// `POST uri` with a JSON body, whole: status, headers and body bytes
+    /// (a streamed answer read to its end).
+    pub async fn post_raw(
+        &self,
+        token: &str,
+        uri: &str,
+        body: serde_json::Value,
+    ) -> (StatusCode, HeaderMap, Vec<u8>) {
+        let request = Request::post(uri)
+            .header(header::AUTHORIZATION, format!("Bearer {token}"))
+            .header(header::CONTENT_TYPE, "application/json")
+            .body(Body::from(body.to_string()))
+            .unwrap();
+        let response = self.app.clone().oneshot(request).await.unwrap();
+        let (parts, body) = response.into_parts();
+        let bytes = axum::body::to_bytes(body, 64 << 20).await.unwrap();
+        (parts.status, parts.headers, bytes.to_vec())
+    }
+
     /// `POST uri` with a JSON body (or none).
     pub async fn post(
         &self,
