@@ -73,7 +73,7 @@ const LIST_UNITS: u32 = 1;
 /// (campbooks-cloud#252).
 pub fn units(backlog: &Backlog, marks: &MarkIds) -> u32 {
     let missing = count(marks::missing(backlog, marks).len());
-    let backlog = marks::resolve(backlog, marks, ToOwned::to_owned);
+    let backlog = marks::resolve(backlog, marks, str::to_owned);
     let writes = Writes::plan(&Plan::merge(&backlog).groups(), &backlog.labels);
     let pages = count(HISTORY_PAGES);
     (2 * PROFILE_UNITS)
@@ -184,7 +184,7 @@ async fn pushed(
     let backlog = &marks::resolve(
         &without_marks(backlog, &unmade, &mut push.outcome),
         &marks,
-        ToOwned::to_owned,
+        str::to_owned,
     );
     let mut plan = Plan::merge(backlog);
     // Later writers at Gmail, and what Gmail changed since the index was
@@ -416,7 +416,7 @@ async fn overtaken(
     };
     // What happened since the index was read is known only when history
     // starts no later than that.
-    let mut changed = read_from.map(|_| HashSet::new());
+    let mut since_read = read_from.map(|_| HashSet::new());
     let start = from.to_string();
     let mut token: Option<String> = None;
     let mut latest = None;
@@ -461,11 +461,11 @@ async fn overtaken(
                         .get(message)
                         .is_some_and(|own| own.iter().any(|w| w.covers(label, at)));
                     let key = (message.clone(), label.clone());
-                    if let Some(changed) = changed.as_mut()
+                    if let Some(since_read) = since_read.as_mut()
                         && !ours
                         && read_from.is_some_and(|read| at > read)
                     {
-                        changed.insert(key.clone());
+                        since_read.insert(key.clone());
                     }
                     if later && !ours && fates[&key] == Fate::Write {
                         fates.insert(key, Fate::Overtaken);
@@ -475,7 +475,7 @@ async fn overtaken(
         }
         token = page.next_page_token;
         if token.is_none() {
-            return Ok((latest, changed));
+            return Ok((latest, since_read));
         }
     }
     // More history than we read: what was read stands, the rest is

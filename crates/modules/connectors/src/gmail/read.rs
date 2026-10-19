@@ -312,7 +312,7 @@ impl Reader<'_> {
                     || meta.label_ids.clone(),
                     |changes| {
                         let changes =
-                            marks::resolve_changes(changes, &names.marks(), ToOwned::to_owned);
+                            marks::resolve_changes(changes, &names.marks(), str::to_owned);
                         outbound::apply_labels(&meta.label_ids, &changes)
                     },
                 );
