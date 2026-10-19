@@ -1,16 +1,20 @@
 //! Planning a stream's push of pending outbound changes, whatever the
 //! provider: merge them (per message and label the latest recorded change
-//! wins; earlier ones end `superseded`, `replaced`), make each whole or not
-//! at all, group messages with the same change, and say how each change
-//! ended. The adapters (`gmail/write.rs`, `zoho/write.rs`) do the provider's
+//! wins; earlier ones end `superseded`, `replaced`), leave out a change the
+//! message already shows (`skipped`, `already_set`, no call), make each
+//! whole or not at all, group messages with the same change, and say how
+//! each change ended. The adapters (`gmail/write.rs`, `zoho/write.rs`) do the provider's
 //! calls and mark what a later writer at the provider overtook.
 
 use std::collections::{BTreeMap, HashMap, HashSet};
 
 use uuid::Uuid;
 
-use super::outbound::{Backlog, End, LabelChange, MAX_ATTEMPTS, Outcome, State};
-use crate::provider::ProviderError;
+use super::{
+    marks,
+    outbound::{Backlog, End, LabelChange, MAX_ATTEMPTS, Outcome, State},
+};
+use crate::{contract::ProviderStream, provider::ProviderError};
 
 /// What a push did, and the provider trouble that stopped it, if any.
 #[derive(Debug, Default)]
@@ -22,6 +26,9 @@ pub struct Push {
     /// The provider quota units its calls spent, where the provider counts
     /// them (Gmail); the run settles its reservation with it.
     pub spent: u32,
+    /// Stream marks it created at the provider (label id, name), for the
+    /// run to add to its cache of the provider's labels.
+    pub created: Vec<(String, String)>,
 }
 
 /// One label's wanted state on one message: the change that won it.
@@ -38,6 +45,8 @@ pub enum Fate {
     Write,
     Overtaken,
     Gone,
+    /// Already so at the provider: nothing to write.
+    InPlace,
 }
 
 /// Wanted label states, per message then label.
@@ -58,6 +67,11 @@ pub struct Plan {
     /// the inbox or a category without taking it out of the trash or spam
     /// (an untrash or "not spam" does): skipped.
     in_trash: HashSet<Uuid>,
+    /// Changes that took a (message, label) over from an earlier change.
+    replaced: HashSet<Uuid>,
+    /// Changes the message already shows ([`Plan::in_place`]): skipped
+    /// (`already_set`) without a call.
+    already: HashSet<Uuid>,
 }
 
 /// What the writes did, per message.
@@ -85,6 +99,8 @@ impl Plan {
     pub fn merge(backlog: &Backlog) -> Self {
         let mut wants = Wants::new();
         let mut in_trash = HashSet::new();
+        // Changes that took a (message, label) over from an earlier one.
+        let mut replaced = HashSet::new();
         for change in &backlog.pending {
             // In the trash or spam, and not taken out of every one of them
             // by this change (an untrash or a "not spam" is).
@@ -112,7 +128,9 @@ impl Plan {
                     row: change.id,
                     stamp: change.stamp,
                 };
-                labels.insert(label.clone(), want);
+                if labels.insert(label.clone(), want).is_some() {
+                    replaced.insert(change.id);
+                }
             }
         }
         let mut fates = Fates::new();
@@ -139,6 +157,40 @@ impl Plan {
             fates,
             won,
             in_trash,
+            replaced,
+            already: HashSet::new(),
+        }
+    }
+
+    /// Leave out each change the message already shows: every label it won
+    /// is in the index as wanted, it took nothing over from an earlier
+    /// change (an undo of a change not made yet still counts as made), and
+    /// the provider changed none of its labels since the index was read
+    /// (`fresh`: the (message, label) pairs it did change; `None` when that
+    /// is not known, and nothing is left out). Such a change ends `skipped`
+    /// (`already_set`) and is not written.
+    pub fn in_place(&mut self, backlog: &Backlog, fresh: Option<&HashSet<(String, String)>>) {
+        let Some(changed) = fresh else {
+            return;
+        };
+        for (row, pairs) in &self.won {
+            if self.replaced.contains(row) {
+                continue;
+            }
+            let in_place = pairs.iter().all(|pair| {
+                let (message, label) = pair;
+                self.fates[pair] == Fate::Write
+                    && !changed.contains(pair)
+                    && backlog.labels.get(message).is_some_and(|labels| {
+                        labels.contains(label) == self.wants[message][label].present
+                    })
+            });
+            if in_place {
+                self.already.insert(*row);
+                for pair in pairs {
+                    self.fates.insert(pair.clone(), Fate::InPlace);
+                }
+            }
         }
     }
 
@@ -214,6 +266,14 @@ impl Plan {
     pub fn ends(&self, backlog: &Backlog, done: &Results, outcome: &mut Outcome) {
         for change in &backlog.pending {
             let (id, message) = (change.id, &change.provider_message_id);
+            if self.already.contains(&id) {
+                outcome.ends.push(End {
+                    id,
+                    state: State::Skipped,
+                    reason: Some("already_set"),
+                });
+                continue;
+            }
             if self.in_trash.contains(&id) {
                 // Gmail has it in the trash or spam: Campbooks is told so.
                 outcome.reemit.push(message.clone());
@@ -257,6 +317,39 @@ impl Plan {
             outcome.ends.push(end);
         }
     }
+}
+
+/// `backlog` without the changes that put on a stream mark the provider
+/// could not make (`unmade`, with why): each ends `skipped` with that reason
+/// in `outcome`, and is not made.
+pub fn without_marks(
+    backlog: &Backlog,
+    unmade: &BTreeMap<ProviderStream, &'static str>,
+    outcome: &mut Outcome,
+) -> Backlog {
+    let mut kept = backlog.clone();
+    if unmade.is_empty() {
+        return kept;
+    }
+    kept.pending.retain(|change| {
+        let reason = change
+            .add
+            .iter()
+            .filter_map(|label| marks::of_token(label))
+            .find_map(|stream| unmade.get(&stream));
+        match reason {
+            Some(reason) => {
+                outcome.ends.push(End {
+                    id: change.id,
+                    state: State::Skipped,
+                    reason: Some(reason),
+                });
+                false
+            }
+            None => true,
+        }
+    });
+    kept
 }
 
 /// A change the push did not get to because of trouble: pending again, or

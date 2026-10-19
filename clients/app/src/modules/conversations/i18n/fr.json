@@ -9,9 +9,20 @@
   },
   "views": {
     "sent": "Envoyés",
+    "starred": "Épinglées",
+    "drafts": "Brouillons",
     "archive": "Archives",
     "spam": "Spam",
     "trash": "Corbeille"
+  },
+  "drafts": {
+    "tag": "Brouillon",
+    "label": "Brouillons",
+    "noRecipients": "Aucun destinataire",
+    "cap": "Vos {{count}} brouillons les plus récents.",
+    "readerTitle": "Choisissez un brouillon",
+    "readerBody": "Choisissez-en un dans la liste pour continuer à l’écrire.",
+    "errorTitle": "Impossible de charger les brouillons"
   },
   "list": {
     "label": "Conversations",
@@ -37,6 +48,8 @@
     "readerTitle": "Choisissez une conversation",
     "readerBody": "Choisissez-en une dans la liste, ou utilisez le clavier :",
     "sent": "Rien dans Envoyés.",
+    "starred": "Rien d’épinglé.",
+    "drafts": "Aucun brouillon.",
     "archive": "Rien dans Archives.",
     "spam": "Rien dans Spam.",
     "trash": "Rien dans la Corbeille."
@@ -240,6 +253,8 @@
     "saveRule": "Enregistrer la règle intelligente",
     "trustImages": "Toujours afficher les images de cet expéditeur",
     "sent": "Aller à Envoyés",
+    "starred": "Aller à Épinglées",
+    "drafts": "Aller à Brouillons",
     "archive": "Aller à Archives",
     "spam": "Aller à Spam",
     "trash": "Aller à Corbeille",

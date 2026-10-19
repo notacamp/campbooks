@@ -11,7 +11,9 @@ use futures_util::StreamExt as _;
 use uuid::Uuid;
 
 use crate::{
-    contract::{Attachment, Category, Direction, Label, Mailbox, NormalizedMessage},
+    contract::{
+        Attachment, Category, Direction, Label, Mailbox, NormalizedMessage, ProviderStream,
+    },
     provider::ProviderError,
 };
 
@@ -24,6 +26,15 @@ pub struct Flags {
     pub direction: Direction,
     pub categories: Vec<Category>,
     pub labels: Vec<Label>,
+    /// The stream it is in at the provider (`NormalizedMessage`), when the
+    /// adapter can tell.
+    #[allow(
+        clippy::option_option,
+        reason = "absent, null or a stream: the contract's three cases"
+    )]
+    pub provider_stream: Option<Option<ProviderStream>>,
+    /// Its stream mark is stale (`NormalizedMessage`).
+    pub stream_mark_stale: bool,
 }
 
 /// Why a page could not be read (or a message stored).
@@ -222,6 +233,8 @@ pub async fn store_message(
         categories: flags.categories,
         read: flags.read,
         starred: flags.starred,
+        provider_stream: flags.provider_stream,
+        stream_mark_stale: flags.stream_mark_stale,
     };
     let document_bytes = serde_json::to_vec(&message).map_err(|e| {
         ReadError::Corrupt(format!(
@@ -255,6 +268,8 @@ pub fn apply_flags(message: &mut NormalizedMessage, flags: &Flags) {
     message.direction = flags.direction;
     message.categories.clone_from(&flags.categories);
     message.labels.clone_from(&flags.labels);
+    message.provider_stream = flags.provider_stream;
+    message.stream_mark_stale = flags.stream_mark_stale;
 }
 
 /// A stored message document of `workspace`.

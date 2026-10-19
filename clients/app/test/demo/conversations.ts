@@ -87,7 +87,7 @@ export const LEDGER: Summary = {
   },
 };
 
-const NDA: Summary = {
+export const NDA: Summary = {
   ...base,
   id: "0192f1a0-0000-7000-8000-0000000000c3",
   subject: "NDA before Friday’s kickoff",

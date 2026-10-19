@@ -41,12 +41,13 @@ export function ReplyComposer({
   conversation,
   messages,
   request,
+  draftId: openDraftId,
   onClose,
 }: ReplySlotContext) {
   const { t, i18n } = useTranslation("conversations");
   const queryClient = useQueryClient();
   const drafts = useConversationDrafts(workspaceId, conversation.id);
-  const [draftId, setDraftId] = useState<string | undefined>();
+  const [draftId, setDraftId] = useState<string | undefined>(openDraftId);
   const [closed, setClosed] = useState(false);
   // Why starting the draft failed: its quote could not be read, or else.
   const [failed, setFailed] = useState<"quote" | "draft" | false>(false);

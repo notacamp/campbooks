@@ -11,7 +11,7 @@ import {
   type RowLeaving,
 } from "~/lib/ui";
 
-import { isView, type ConversationSummary, type Place } from "../../api/queries";
+import { isView, type ConversationPlace, type ConversationSummary } from "../../api/queries";
 import {
   avatarKind,
   displayName,
@@ -26,7 +26,7 @@ import { ExpiredChip, NeedChips } from "../Needs/NeedChips";
 
 export interface ConversationListProps {
   /** The stream or view listed: Sent rows say who they went to. */
-  place: Place;
+  place: ConversationPlace;
   /** `undefined` while the first page loads. */
   conversations: readonly ConversationSummary[] | undefined;
   /** Only the unread ones are asked for. */
