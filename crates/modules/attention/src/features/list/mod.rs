@@ -14,7 +14,7 @@ use serde::{Deserialize, Serialize};
 use utoipa::{IntoParams, ToSchema};
 
 use crate::{
-    domain::{ItemId, ItemRow, ItemView, OVERDUE_DAYS, Reason, visible_containers},
+    domain::{ItemRow, ItemView, OVERDUE_DAYS, Reason, visible_containers},
     scopes::AttentionRead,
 };
 
@@ -45,6 +45,47 @@ pub struct ListQuery {
 
 /// The widest offset from UTC a time zone has (UTC+14:00), in minutes.
 const MAX_OFFSET_MINUTES: i32 = 14 * 60;
+
+/// The caller's open items: in containers they may see (`$2`), not more
+/// than [`OVERDUE_DAYS`] past their due date (`$3`) unless a bill (it stays
+/// until a member answers it), not lapsed (what they ask is no longer
+/// possible, campbooks-cloud#275) and not snoozed by the caller (`$4`) at
+/// `$5`; by reason, then overdue (before `$6`, the caller's today), due
+/// date, urgent and age.
+const OPEN: &str = "SELECT i.id, i.record_type, i.record_id, i.container_type, i.container_id, \
+            i.cause_type, i.cause_id, i.reason, i.trust, i.due_on, i.urgent, i.since, i.state, \
+            i.cleared_because, i.cleared_by, i.cleared_at, NULL::timestamptz AS snoozed_until \
+       FROM attention.items i \
+      WHERE i.workspace_id = $1 AND i.state = 'open' \
+        AND i.container_type || ':' || i.container_id = ANY($2) \
+        AND (i.due_on IS NULL OR i.due_on >= $3 OR i.reason = 'pay') \
+        AND (i.lapses_at IS NULL OR i.lapses_at > $5) \
+        AND NOT EXISTS (SELECT 1 FROM attention.snoozes s \
+                         WHERE s.item_id = i.id AND s.user_id = $4 AND s.until > $5) \
+      ORDER BY CASE i.reason WHEN 'review' THEN 0 WHEN 'reply' THEN 1 \
+                             WHEN 'decide' THEN 2 WHEN 'do' THEN 3 WHEN 'pay' THEN 4 \
+                             ELSE 5 END, \
+               (i.due_on IS NOT NULL AND i.due_on < $6) DESC, \
+               i.due_on ASC NULLS LAST, i.urgent DESC, i.since ASC, i.id";
+
+/// What left the caller's list since `$5` (the start of their day): cleared,
+/// but not replaced, cleared by a rule, opened ("Worth a look") or lapsed
+/// (none of which a member marked), or snoozed by the caller (`$3`) and still snoozed at `$4`; newest
+/// first.
+const CLEARED: &str = "SELECT i.id, i.record_type, i.record_id, i.container_type, \
+            i.container_id, i.cause_type, i.cause_id, i.reason, i.trust, i.due_on, i.urgent, \
+            i.since, i.state, i.cleared_because, i.cleared_by, i.cleared_at, \
+            s.until AS snoozed_until \
+       FROM attention.items i \
+       LEFT JOIN attention.snoozes s ON s.item_id = i.id AND s.user_id = $3 AND s.until > $4 \
+      WHERE i.workspace_id = $1 \
+        AND i.container_type || ':' || i.container_id = ANY($2) \
+        AND i.reason IS NOT NULL \
+        AND ((i.state = 'cleared' AND i.cleared_at >= $5 \
+              AND coalesce(i.cleared_because, '') \
+                  NOT IN ('superseded', 'rule', 'opened', 'lapsed')) \
+             OR (i.state = 'open' AND s.created_at >= $5)) \
+      ORDER BY greatest(i.cleared_at, s.created_at) DESC, i.id";
 
 /// How many open items there are for one reason.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
@@ -110,67 +151,31 @@ pub async fn handler(
     let mut tx = state.db.begin_for(access.workspace).await?;
     let visible = visible_containers(&state, &mut tx, access).await?;
     let user = access.user.map(|u| *u.as_uuid());
-    let rows = match query.state {
+    // Runtime queries, so the column added since (`lapses_at`) needs no
+    // entry in the `.sqlx` offline cache.
+    let rows: Vec<ItemRow> = match query.state {
         ListState::Open => {
-            sqlx::query_as!(
-                ItemRow,
-                r#"
-                SELECT i.id AS "id: ItemId", i.record_type, i.record_id, i.container_type,
-                       i.container_id, i.cause_type, i.cause_id, i.reason AS "reason!", i.trust AS "trust!", i.due_on,
-                       i.urgent, i.since, i.state, i.cleared_because,
-                       i.cleared_by AS "cleared_by: _", i.cleared_at,
-                       NULL::timestamptz AS "snoozed_until?"
-                  FROM attention.items i
-                 WHERE i.workspace_id = $1 AND i.state = 'open'
-                   AND i.container_type || ':' || i.container_id = ANY($2)
-                   AND (i.due_on IS NULL OR i.due_on >= $3)
-                   AND NOT EXISTS (SELECT 1 FROM attention.snoozes s
-                                    WHERE s.item_id = i.id AND s.user_id = $4 AND s.until > $5)
-                 ORDER BY CASE i.reason WHEN 'review' THEN 0 WHEN 'reply' THEN 1
-                                        WHEN 'decide' THEN 2 WHEN 'do' THEN 3 ELSE 4 END,
-                          (i.due_on IS NOT NULL AND i.due_on < $6) DESC,
-                          i.due_on ASC NULLS LAST, i.urgent DESC, i.since ASC, i.id
-                "#,
-                access.workspace.as_uuid(),
-                &visible,
-                today - TimeDelta::days(OVERDUE_DAYS),
-                user,
-                now,
-                today,
-            )
-            .fetch_all(&mut *tx)
-            .await?
+            sqlx::query_as(OPEN)
+                .bind(access.workspace.as_uuid())
+                .bind(visible.as_slice())
+                .bind(today - TimeDelta::days(OVERDUE_DAYS))
+                .bind(user)
+                .bind(now)
+                .bind(today)
+                .fetch_all(&mut *tx)
+                .await?
         }
         ListState::Cleared => {
             // Midnight where the caller is, as an instant.
             let start = today.and_hms_opt(0, 0, 0).unwrap_or_default().and_utc() - offset;
-            sqlx::query_as!(
-                ItemRow,
-                r#"
-                SELECT i.id AS "id: ItemId", i.record_type, i.record_id, i.container_type,
-                       i.container_id, i.cause_type, i.cause_id, i.reason AS "reason!", i.trust AS "trust!", i.due_on,
-                       i.urgent, i.since, i.state, i.cleared_because,
-                       i.cleared_by AS "cleared_by: _", i.cleared_at,
-                       s.until AS "snoozed_until?"
-                  FROM attention.items i
-                  LEFT JOIN attention.snoozes s
-                         ON s.item_id = i.id AND s.user_id = $3 AND s.until > $4
-                 WHERE i.workspace_id = $1
-                   AND i.container_type || ':' || i.container_id = ANY($2)
-                   AND i.reason IS NOT NULL
-                   AND ((i.state = 'cleared' AND i.cleared_at >= $5
-                         AND coalesce(i.cleared_because, '') NOT IN ('superseded', 'rule'))
-                        OR (i.state = 'open' AND s.created_at >= $5))
-                 ORDER BY greatest(i.cleared_at, s.created_at) DESC, i.id
-                "#,
-                access.workspace.as_uuid(),
-                &visible,
-                user,
-                now,
-                start,
-            )
-            .fetch_all(&mut *tx)
-            .await?
+            sqlx::query_as(CLEARED)
+                .bind(access.workspace.as_uuid())
+                .bind(visible.as_slice())
+                .bind(user)
+                .bind(now)
+                .bind(start)
+                .fetch_all(&mut *tx)
+                .await?
         }
     };
     tx.commit().await?;

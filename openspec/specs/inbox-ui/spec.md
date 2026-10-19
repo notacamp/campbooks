@@ -371,15 +371,35 @@ from <sender>" (⇧A, the newest message from someone else). It SHALL open the
 smart-rule confirmation: the rule as a sentence with the Smart rule tag,
 that it runs on its own with no AI and lives in Scout's memory, a choice
 between the sender's address and anyone at its domain (no domain for a free
-mail provider), how many conversations it opens up, that it holds only for
+mail provider), the address choice saying plainly that it holds when the
+domain's checks pass and that those checks vouch for the domain, not for the
+one person (they authenticate the domain, never the part before the @), how
+many conversations it opens up, that it holds only for
 mail passing the sender's checks and that tracking pixels stay removed, and
 no offer to apply it to the mail already here. Saving SHALL show its result
 and offer Undo. A message whose images a rule trusts SHALL say so ("Images
 shown: you trust <sender>") instead of offering Show images. Removing the rule
 in Scout's memory SHALL say, as it asks to confirm, that the images are held
-back again; once removed, Show images is back. A member who only reads the inbox SHALL not be
-offered it, nor SHALL anyone on mail that may be phishing. No visor: no AI
-is involved.
+back again; once removed, Show images is back. A rule created, paused
+or removed anywhere (Scout's memory, the assistant, another device, another
+member of a shared inbox) SHALL show or hold back the images of the message
+bodies the client holds without a reload, and a body a rule trusted SHALL
+never load its remote images again from the copy the client kept before the
+change. On the web, every change of a rule (made here, its live change, or
+the change feed's reset) SHALL drop the kept bodies a rule trusted, so an
+open one is read again behind its skeleton and a folded message, or a
+conversation opened again, waits for a fresh read; it SHALL re-read in the
+background the other kept bodies whose images are held back or offered. On
+the desktop and mobile apps, until they follow the change feed live, a rule
+changed in the app SHALL do the same; for a change made elsewhere, a body a
+rule trusted SHALL be read again every time it is shown, every minute while
+it is open and when the window regains focus, and the reader SHALL show the
+kept body with its remote images held back (their sources taken out, and the
+frame's policy blocking them) until the read made as it opened answers; a
+body whose images are held back or offered SHALL be read again after a minute
+or when the window regains focus. A member who only reads the inbox SHALL
+not be offered it, nor SHALL anyone on mail that may be phishing. No visor:
+no AI is involved.
 
 #### Scenario: Trust the Ledger
 - **WHEN** the member opens the Weekly Ledger's newsletter, presses Always show images from The Weekly Ledger, picks anyone at weekly-ledger.example and saves
@@ -388,6 +408,26 @@ is involved.
 #### Scenario: Only reading
 - **WHEN** the member's role in the inbox is reader
 - **THEN** Show images is offered and Always show images is not
+
+#### Scenario: What trusting an address means
+- **WHEN** the member presses Always show images from ana@acme.example
+- **THEN** the address choice says the images show for mail from that address when its domain's checks pass, and that those checks vouch for the domain, not for Ana alone
+
+#### Scenario: Removed on another device
+- **WHEN** a rule trusting The Weekly Ledger's images is removed on another device, or by another member of the shared inbox, while its newsletter is open here on the web
+- **THEN** the open newsletter holds its images back again and offers Show images, without a reload
+
+#### Scenario: Opened again after the rule is removed
+- **WHEN** the member read the Weekly Ledger's newsletter on the web while a rule trusted its sender, folded it or left the conversation, and the rule is removed (here, on another device, or by another member)
+- **THEN** opening it again shows its skeleton until it is read again, never its kept copy, and it then holds its images back and offers Show images
+
+#### Scenario: Removed while the desktop app is open
+- **WHEN** the same rule is removed on another device while the newsletter is open in the desktop app
+- **THEN** within a minute, or as soon as the window regains focus, it holds its images back again and offers Show images
+
+#### Scenario: Opened again in the desktop app
+- **WHEN** the rule was removed on another device and the member opens the newsletter the desktop app kept
+- **THEN** the kept newsletter shows at once with its images held back and no remote image source, and once it is read again its images stay held back and Show images is offered; had the rule still held, they would show once the read answered
 
 ### Requirement: HTML mail on the desktop app
 The desktop app SHALL render HTML mail as the web app does: the same
@@ -693,6 +733,7 @@ are inert as in mail that may be phishing.
 #### Scenario: No reply in the trash
 - **WHEN** the user opens a conversation in Trash
 - **THEN** there is no reply box and no Reply, and Restore brings both back
+
 ### Requirement: Who wrote last
 A conversation row whose newest message the inbox sent SHALL start its
 snippet with "You:" ("Eu:", "Yo:", "Moi :" in pt-PT, es-ES and fr), read
@@ -701,6 +742,21 @@ from the list's `latest_from_you`.
 #### Scenario: Waiting on them
 - **WHEN** Sam's reply is the newest message of a conversation in Primary
 - **THEN** its row's snippet reads "You: Revised quote attached…"
+
+### Requirement: An expired ask
+A conversation row whose summary carries `lapsed_need` and no `need` SHALL
+show the chip "Expired" in a neutral tone, and the reader's note SHALL show
+the same chip, with no Done, Not needed, Yes or No for it. A still-needed
+question SHALL be asked in the reader as on Home ("Pedro Alves asked 3 weeks
+ago. Still to do?") with Yes (1) and No (2), under the "Check" chip.
+
+#### Scenario: A sign-in link
+- **WHEN** the user opens the inbox after a sign-in link's ten minutes have passed
+- **THEN** its row shows "Expired" instead of "To do", and its reader offers nothing to resolve
+
+#### Scenario: An old ask in the reader
+- **WHEN** the user opens Pedro Alves's three-week-old request
+- **THEN** the note asks "Pedro Alves asked 3 weeks ago. Still to do?" with Yes and No
 
 ### Requirement: Deleting a draft
 While the composer is closed, the reader SHALL list every draft the member
@@ -730,3 +786,34 @@ delete, nothing SHALL change and the toast SHALL say so.
 #### Scenario: Discard is undoable
 - **WHEN** the member types in a draft, then chooses Discard
 - **THEN** the draft is deleted, and Undo brings it back with the text that was typed
+
+### Requirement: Rows leaving the list say what happened
+When the member's own action takes a conversation out of the list on screen
+(Done, Move to Inbox, Delete, Restore, Report spam, Not spam, or a move to
+another stream), its row SHALL first say what happened, in place: an icon and
+"Done", "Moved to Inbox", "Deleted", "Restored", "Reported as spam", "Not
+spam" or "Moved to <stream>", followed by the subject, wiping in over the row.
+Report spam and Delete SHALL use the danger colour, the others the success
+colour. The row SHALL then fold away while the rows below close the gap, all
+within `--duration-confirm`. A leaving row SHALL NOT be a button, SHALL be
+skipped by the keyboard cursor, and SHALL be hidden from assistive tech (the
+toast says the same). Rows leaving one after another SHALL keep their order.
+Undo while a row folds SHALL put the conversation straight back. Under reduced
+motion the row SHALL go at once. Rows that leave for any other reason (another
+device, a sync) SHALL go at once.
+
+#### Scenario: Done from the list
+- **WHEN** the user presses E on the row under the cursor in Primary
+- **THEN** the row says "Done" with the subject, folds away under a second, the rows below move up, and the cursor is on the next row
+
+#### Scenario: Report spam in red
+- **WHEN** the user presses ! on a row in Primary
+- **THEN** the row says "Reported as spam" in the danger colour, then folds away
+
+#### Scenario: Moved to another stream
+- **WHEN** the user moves an open conversation from Primary to Newsletters
+- **THEN** its row in Primary says "Moved to Newsletters", then folds away
+
+#### Scenario: Undo while it folds
+- **WHEN** the user presses # on a row, then Z before the row has gone
+- **THEN** the conversation is back in the list as a normal row

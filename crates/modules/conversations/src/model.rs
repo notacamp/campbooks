@@ -65,6 +65,11 @@ define_id!(
     /// connector's idempotency key.
     SendId
 );
+define_id!(
+    /// What a member told Scout about a person: who they are and how to
+    /// write to them.
+    PersonNoteId
+);
 
 /// What a draft answers.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
@@ -430,6 +435,9 @@ vocabulary!(
         Pay => "pay",
         /// Look before acting: a warning, or a question to the member.
         Review => "review",
+        /// A rule the member taught keeps this in front of them until they
+        /// have opened it once (campbooks-cloud#274).
+        WorthALook => "worth_a_look",
     }
 );
 
@@ -470,6 +478,14 @@ vocabulary!(
         /// `money`: it asks for a payment still owed (a Pay need, always a
         /// question until a member answers it, campbooks-cloud#167).
         Money => "money",
+        /// `worth_a_look`: a rule the member taught asked to see it.
+        WorthALook => "worth_a_look",
+        /// A `do` need whose message left the needs window with no date:
+        /// "Still to do?" (campbooks-cloud#275).
+        StillToDo => "still_to_do",
+        /// A `reply` need whose message left the needs window with no date:
+        /// "Still needs a reply?" (campbooks-cloud#275).
+        StillNeedsReply => "still_needs_reply",
     }
 );
 
@@ -513,6 +529,11 @@ vocabulary!(
         Superseded => "superseded",
         /// A rule a member taught says this mail never needs anyone.
         Rule => "rule",
+        /// The member opened it: all "Worth a look" asks.
+        Opened => "opened",
+        /// What it asks stopped being possible (a link or a code expired,
+        /// an offer closed), as Scout read the email (campbooks-cloud#275).
+        Lapsed => "lapsed",
     }
 );
 

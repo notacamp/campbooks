@@ -40,6 +40,7 @@
   --signal-pay-h: 155;
   --signal-review-h: 25;
   --signal-sort-h: 70;
+  --signal-look-h: 345;
 
   /* avatar hues: identity only, deliberately low chroma */
   --avatar-c: 0.055;
@@ -259,6 +260,10 @@
     oklch(0.58 0.1 var(--signal-sort-h)),
     oklch(0.76 0.1 var(--signal-sort-h))
   );
+  --signal-look: light-dark(
+    oklch(0.56 0.15 var(--signal-look-h)),
+    oklch(0.74 0.13 var(--signal-look-h))
+  );
 
   /* the visor (assistant's face) */
   --visor-glass-top: light-dark(
@@ -410,6 +415,10 @@
 
 [data-signal="sort"] {
   --sig: var(--signal-sort);
+}
+
+[data-signal="look"] {
+  --sig: var(--signal-look);
 }
 
 [data-avatar-hue="1"] {

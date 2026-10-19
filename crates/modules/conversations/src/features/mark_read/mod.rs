@@ -1,7 +1,7 @@
 //! `POST …/conversations/{conversation_id}/read` and `/unread` — mark a
 //! conversation read (every message) or unread (its newest message).
 
-use axum::{Json, extract::State};
+use axum::{Extension, Json, extract::State};
 use campbooks_kernel::{
     AppState, Operation, Problem, Result, Risk, extract,
     tenancy::{Workspace, WorkspaceId},
@@ -12,6 +12,7 @@ use crate::{
     domain::{
         conversation::ConversationSummary,
         flags::{self, Flag},
+        needs::NeedSettings,
     },
     model::ConversationId,
     scopes::ConversationsWrite,
@@ -45,11 +46,12 @@ use crate::{
 )]
 pub async fn read(
     State(state): State<AppState>,
+    Extension(needs): Extension<NeedSettings>,
     workspace: Workspace<ConversationsWrite>,
     extract::Path(path): extract::Path<ConversationPath>,
 ) -> Result<Json<ConversationSummary>> {
     let id = path.conversation_id;
-    flags::apply(&state, &workspace.access, id, Flag::Read, None)
+    flags::apply(&state, &workspace.access, id, Flag::Read, Some(&needs))
         .await
         .map(Json)
 }
@@ -82,11 +84,12 @@ pub async fn read(
 )]
 pub async fn unread(
     State(state): State<AppState>,
+    Extension(needs): Extension<NeedSettings>,
     workspace: Workspace<ConversationsWrite>,
     extract::Path(path): extract::Path<ConversationPath>,
 ) -> Result<Json<ConversationSummary>> {
     let id = path.conversation_id;
-    flags::apply(&state, &workspace.access, id, Flag::Unread, None)
+    flags::apply(&state, &workspace.access, id, Flag::Unread, Some(&needs))
         .await
         .map(Json)
 }

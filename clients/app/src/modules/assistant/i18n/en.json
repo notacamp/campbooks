@@ -243,7 +243,9 @@
       "proactivity": "When Scout is sure"
     },
     "rules": "Your rules",
-    "rulesDescription": "Everything Scout does on its own. Remove a rule and it stops; you choose whether the mail it moved goes back."
+    "rulesDescription": "Everything Scout does on its own. Remove a rule and it stops; you choose whether the mail it moved goes back.",
+    "people": "People you told Scout about",
+    "peopleDescription": "Who they are and how Scout writes to them, in your words. Only you see these notes, and only your replies use them."
   },
   "shortcuts": {
     "skip": "Skip this question",

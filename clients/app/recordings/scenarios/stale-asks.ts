@@ -1,0 +1,83 @@
+import type { Page } from "playwright";
+
+import type { ScenarioContext } from "../context.ts";
+
+import { caption, signedIn } from "./inbox.ts";
+
+// Asks that lapse or go stale (campbooks-cloud#275) on the stack the
+// `reply-dialog` scenario describes (inbox.ts's settings, a `decide` model
+// and the fake `complete` model, which reads the sign-in link's lapse time),
+// with the fake Google's `--stale-asks` demo mail. Fictional person and mail
+// only.
+//
+//   pnpm --dir clients fake-google --port 9071 --stale-asks
+//   pnpm --dir clients fake-complete
+//   CAMPBOOKS_AI__COMPLETE__BASE_URL=http://127.0.0.1:9060/v1 \
+//   CAMPBOOKS_AI__COMPLETE__MODEL=fake-complete … cargo run -p campbooks-server -- all
+//   INBOX_BASE_URL=http://localhost:5181 pnpm --dir clients record stale-asks \
+//     --base-url http://localhost:5181
+//
+// Pedro's request is sent just inside the 14-day needs window: a few
+// minutes after the sync, the clock (`conversations.wake_needs`, every
+// minute) asks again whether it is still to do. The sign-in link was valid
+// for ten minutes two hours ago: it never reaches Home, and the inbox says
+// it expired.
+
+const STILL = "Pedro Alves asked 2 weeks ago. Still to do?";
+
+/**
+ * Open Home and wait for `text`, for at most `seconds`: Home follows the
+ * change feed, so a need that changes (the clock waking it) arrives without
+ * a reload. One reload at the end covers a feed that dropped.
+ */
+async function homeShows(
+  page: Page,
+  workspace: string,
+  text: string,
+  seconds = 420,
+): Promise<void> {
+  const home = `/w/${workspace}`;
+  if (!page.url().endsWith(home)) {
+    await page.goto(home);
+  }
+  await page.getByRole("heading", { level: 1 }).waitFor();
+  try {
+    await page
+      .getByText(text)
+      .first()
+      .waitFor({ timeout: seconds * 1000 });
+  } catch {
+    await page.goto(home);
+    await page.getByRole("heading", { level: 1 }).waitFor();
+    if ((await page.getByText(text).count()) === 0) {
+      const shown = (await page.locator("main").textContent()) ?? "";
+      throw new Error(`Home never showed “${text}”. It showed:\n${shown}`);
+    }
+  }
+}
+
+export default async function staleAsks({ page }: ScenarioContext): Promise<void> {
+  const workspace = await signedIn(page);
+  await homeShows(page, workspace, "Pedro Alves");
+  await caption(page, "Pedro asked for the studio keys two weeks ago, with no date", 2400);
+  await homeShows(page, workspace, STILL);
+  await caption(page, "Two weeks on, Home asks again: still to do?", 2400);
+  await page.getByText(STILL).click();
+  await caption(page, "Yes keeps it as yours for good; No says it is no longer needed", 2400);
+  await page.keyboard.press("1");
+  await page.getByText("Thanks · Pedro Alves stays on your list").waitFor();
+  await caption(page, "Yes: it stays, and Campbooks will not ask again", 2000);
+
+  await caption(
+    page,
+    "The sign-in link was valid for 10 minutes after it was sent: it never reached Home",
+    2400,
+  );
+  await page.goto(`/w/${workspace}/inbox/updates`);
+  const link = page.getByText("Your Brightloop sign-in link").first();
+  await link.waitFor();
+  await caption(page, "In the inbox it says Expired, with nothing to act on", 2400);
+  await link.click();
+  await page.getByText("Expired").filter({ visible: true }).first().waitFor();
+  await caption(page, "Scout's summary says how long it was valid, never “expires soon”", 2400);
+}

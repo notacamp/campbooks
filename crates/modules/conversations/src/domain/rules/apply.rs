@@ -266,7 +266,8 @@ impl Mine {
             answers: outcome.needs_reply.as_ref().is_some_and(|a| a.rule == id)
                 || outcome.asks_action.as_ref().is_some_and(|a| a.rule == id)
                 || outcome.surface.as_ref().is_some_and(|a| a.rule == id)
-                || outcome.paid.as_deref() == Some(id),
+                || outcome.paid.as_deref() == Some(id)
+                || outcome.highlight.as_deref() == Some(id),
             bin: outcome
                 .bin
                 .as_ref()
@@ -310,11 +311,19 @@ pub fn answers<'a>(outcome: &Outcome, rule: &'a str) -> Vec<TaughtAnswer<'a>> {
         .as_deref()
         .filter(|r| *r == rule)
         .map(|_| (json!(triage::PAID), json!(triage::MONEY_OPTIONS)));
+    // "Worth a look": the member asked to see each one, so it waits on Home
+    // until opened. Answered `true`; no model answers this question.
+    let highlight = outcome
+        .highlight
+        .as_deref()
+        .filter(|r| *r == rule)
+        .map(|_| (json!(true), json!(["false", "true"])));
     [
         (triage::NEEDS_REPLY, flag(&outcome.needs_reply)),
         (triage::ASKS_ACTION, flag(&outcome.asks_action)),
         (needs::SURFACE, surface),
         (triage::MONEY, paid),
+        (needs::WORTH_A_LOOK, highlight),
     ]
     .into_iter()
     .filter_map(|(question, answer)| {

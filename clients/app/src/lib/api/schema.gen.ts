@@ -1249,6 +1249,41 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/w/{workspace_id}/person-notes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List what you told Scout about people. */
+        get: operations["conversations.list_person_notes"];
+        /** Tell Scout about a person, or change what you told it. */
+        put: operations["conversations.set_person_note"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/w/{workspace_id}/person-notes/{note_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Forget what you told Scout about a person. */
+        delete: operations["conversations.delete_person_note"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/w/{workspace_id}/rule-notices": {
         parameters: {
             query?: never;
@@ -2569,6 +2604,7 @@ export interface components {
             inbox_id: components["schemas"]["InboxId"];
             /** @description Its labels, by name. */
             labels: components["schemas"]["LabelView"][];
+            lapsed_need?: components["schemas"]["LapsedNeed"] | null;
             /**
              * Format: date-time
              * @description When its newest message was sent.
@@ -3218,6 +3254,24 @@ export interface components {
             name: string;
         };
         /**
+         * @description A conversation's ask that lapsed (campbooks-cloud#275): what it was and
+         *     when it stopped being possible, while its message is still the newest.
+         *     Clients show it as "Expired".
+         */
+        LapsedNeed: {
+            /**
+             * Format: date-time
+             * @description When what it asked stopped being possible.
+             */
+            lapsed_at: string;
+            /** @description The message it came from. */
+            message_id: components["schemas"]["MessageId"];
+            /** @description The question that raised it. */
+            question: components["schemas"]["NeedQuestion"];
+            /** @description Why it was needed. */
+            reason: components["schemas"]["NeedReason"];
+        };
+        /**
          * @description How a suggestion picks the mail that looks the same.
          * @enum {string}
          */
@@ -3379,12 +3433,12 @@ export interface components {
          * @description The question whose answer raised a need.
          * @enum {string}
          */
-        NeedQuestion: "needs_reply" | "asks_action" | "suspicious" | "money";
+        NeedQuestion: "needs_reply" | "asks_action" | "suspicious" | "money" | "worth_a_look" | "still_to_do" | "still_needs_reply";
         /**
          * @description Why a conversation needs its inbox's members (attention).
          * @enum {string}
          */
-        NeedReason: "reply" | "do" | "pay" | "review";
+        NeedReason: "reply" | "do" | "pay" | "review" | "worth_a_look";
         /**
          * @description How much Campbooks stands behind a need.
          * @enum {string}
@@ -3404,10 +3458,16 @@ export interface components {
             basis: components["schemas"]["NeedBasis"];
             /**
              * Format: date
-             * @description When it is due: none until a due date is extracted from the mail
-             *     (needs raised before ADR 0018 may carry one).
+             * @description When it is due, as Scout read the email: none until it has, or when
+             *     the email names no date.
              */
             due_on?: string | null;
+            /**
+             * Format: date-time
+             * @description When what it asks stops being possible, as Scout read the email
+             *     (never for a bill or a warning).
+             */
+            lapses_at?: string | null;
             /** @description The message it comes from. */
             message_id: components["schemas"]["MessageId"];
             /** @description Whether the due date has passed. */
@@ -3423,6 +3483,11 @@ export interface components {
              * @example model.decide
              */
             rule?: string | null;
+            /**
+             * Format: date-time
+             * @description When that message was sent.
+             */
+            sent_at?: string | null;
             /** @description `sure`, or `check` for a question to the member. */
             trust: components["schemas"]["NeedTrust"];
             /** @description Whether it is for today. */
@@ -3567,6 +3632,32 @@ export interface components {
          * @enum {string}
          */
         PausedReason: "inbox_read_only" | "domain_too_broad" | "author_cannot_write" | "paused_by_member" | "author_unavailable";
+        /** @description What you told Scout about a person. */
+        PersonNote: {
+            /** @description The person's address, lower-cased. */
+            address: string;
+            /** @description The note. */
+            id: components["schemas"]["PersonNoteId"];
+            /** @description Their name as your mail gave it, else as their trusted mail did. */
+            name?: string | null;
+            /** @description Who they are and how to write to them, in your words. */
+            note: string;
+            /**
+             * Format: date-time
+             * @description When you last changed it.
+             */
+            updated_at: string;
+        };
+        /**
+         * Format: uuid
+         * @description PersonNoteId (UUIDv7)
+         */
+        PersonNoteId: string;
+        /** @description Your notes, the newest change first. */
+        PersonNoteList: {
+            /** @description At most 500. */
+            notes: components["schemas"]["PersonNote"][];
+        };
         /**
          * @description Where a stream is in its reading.
          * @enum {string}
@@ -3776,7 +3867,7 @@ export interface components {
          * @description Why an item needs someone, in the order Home shows the groups.
          * @enum {string}
          */
-        Reason: "review" | "reply" | "decide" | "do" | "pay";
+        Reason: "review" | "reply" | "decide" | "do" | "pay" | "worth_a_look";
         /** @description How many open items there are for one reason. */
         ReasonCount: {
             /**
@@ -4059,6 +4150,9 @@ export interface components {
         } | {
             /** @enum {string} */
             action: "show_images";
+        } | {
+            /** @enum {string} */
+            action: "worth_a_look";
         };
         /** @description One test on a message; all of a rule's conditions must hold. */
         RuleCondition: {
@@ -4513,6 +4607,19 @@ export interface components {
             name?: string | null;
             /** @description Stable user id at the identity provider. */
             sub: string;
+        };
+        /** @description The note to keep about a person. */
+        SetPersonNote: {
+            /**
+             * @description The person's address.
+             * @example marta@clientes.example
+             */
+            address: string;
+            /**
+             * @description Who they are and how to write to them (1 to 500 characters).
+             * @example My landlord. Formal, in Portuguese.
+             */
+            note: string;
         };
         /** @description What a sign-in ceremony continues. */
         SignInStart: {
@@ -9709,6 +9816,178 @@ export interface operations {
             };
             /** @description `last_owner`: you are its only owner. */
             409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "conversations.list_person_notes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The workspace. */
+                workspace_id: components["schemas"]["WorkspaceId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Your notes; nobody else's. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PersonNoteList"];
+                };
+            };
+            /** @description No valid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Missing scope, or not a member (`person_notes_need_member`). */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No such workspace, or you are not a member. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "conversations.set_person_note": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The workspace. */
+                workspace_id: components["schemas"]["WorkspaceId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SetPersonNote"];
+            };
+        };
+        responses: {
+            /** @description The note as kept. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PersonNote"];
+                };
+            };
+            /** @description Not a plain address, or a note that is empty or too long (`person_note_invalid`). */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No valid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Missing scope, or not a member (`person_notes_need_member`). */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No such workspace, or you are not a member. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description You keep 500 notes already (`person_notes_full`): remove one first. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "conversations.delete_person_note": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The workspace. */
+                workspace_id: components["schemas"]["WorkspaceId"];
+                /** @description The note. */
+                note_id: components["schemas"]["PersonNoteId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Forgotten. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description No valid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Missing scope. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No such note of yours. */
+            404: {
                 headers: {
                     [name: string]: unknown;
                 };

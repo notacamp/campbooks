@@ -79,6 +79,10 @@ pub struct NeedFacts {
     /// When it is due.
     #[serde(default)]
     pub due_on: Option<NaiveDate>,
+    /// When what it asks stops being possible (campbooks-cloud#275); absent
+    /// from events written before.
+    #[serde(default)]
+    pub lapses_at: Option<DateTime<Utc>>,
     /// Whether it is for today.
     pub urgent: bool,
 }

@@ -42,3 +42,15 @@ contract) and the connector calling `labels.create` (5 units), after which
 conversations links the two by name as it already does; (c) ask the member
 the first time. **Recommended:** (b), with a per-inbox switch defaulting to
 on, since members expect a label they add to show on their phone.
+
+## Bringing back an expired ask
+
+An ask whose lapse time has passed (a link or a code expired, an offer
+closed) is cleared as `lapsed` (campbooks-cloud#275). The lapse time comes
+from Scout's read of the email, so it can be wrong, and the member cannot
+put the ask back on Home today: the conversation only shows "Expired".
+Options: (a) leave it (the member still has the conversation and can reply
+or act); (b) offer "Still to do" next to the Expired chip, which makes it the
+member's own need, cleared only by a member; (c) also let a member correct
+the lapse time. **Recommended:** (b), with the member's need then never
+lapsing; it keeps "a member's verdict wins" and needs no new data.

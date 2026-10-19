@@ -243,7 +243,9 @@
       "proactivity": "Quand Scout est sûr"
     },
     "rules": "Vos règles",
-    "rulesDescription": "Tout ce que Scout fait de lui-même. Si vous retirez une règle, elle s’arrête ; vous choisissez si les e-mails qu’elle a déplacés reviennent."
+    "rulesDescription": "Tout ce que Scout fait de lui-même. Si vous retirez une règle, elle s’arrête ; vous choisissez si les e-mails qu’elle a déplacés reviennent.",
+    "people": "Les personnes dont vous avez parlé à Scout",
+    "peopleDescription": "Qui sont ces personnes et comment Scout leur écrit, avec vos mots. Ces notes ne sont visibles que par vous, et seules vos réponses s’en servent."
   },
   "shortcuts": {
     "skip": "Passer cette question",
