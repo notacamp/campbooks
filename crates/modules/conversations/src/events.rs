@@ -230,6 +230,10 @@ pub struct NeedFacts {
     /// When it is due, when the message names a date that resolves.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub due_on: Option<NaiveDate>,
+    /// When what it asks stops being possible, as Scout read the email
+    /// (campbooks-cloud#275). Absent from events written before.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub lapses_at: Option<DateTime<Utc>>,
     /// Whether it is for today.
     pub urgent: bool,
 }

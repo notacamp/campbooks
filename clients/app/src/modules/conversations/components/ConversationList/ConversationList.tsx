@@ -21,7 +21,7 @@ import {
   type Translate,
 } from "../../model";
 import { ruleLine } from "../../rules-text";
-import { NeedChips } from "../Needs/NeedChips";
+import { ExpiredChip, NeedChips } from "../Needs/NeedChips";
 
 export interface ConversationListProps {
   /** The stream or view listed: Sent rows say who they went to. */
@@ -139,7 +139,12 @@ export function ConversationList({
             chips={
               sent && conversation.replied_since_sent ? (
                 <Tag icon="reply">{t("list.replied")}</Tag>
-              ) : conversation.need === null || conversation.need === undefined ? undefined : (
+              ) : conversation.need === null || conversation.need === undefined ? (
+                conversation.lapsed_need === null ||
+                conversation.lapsed_need === undefined ? undefined : (
+                  <ExpiredChip />
+                )
+              ) : (
                 <NeedChips need={conversation.need} now={now} />
               )
             }
