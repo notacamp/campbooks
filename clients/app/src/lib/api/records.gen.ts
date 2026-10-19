@@ -12,6 +12,7 @@ export const recordReaders: Readonly<Record<string, readonly string[]>> = {
   "conversations.draft": ["conversations.get_draft", "conversations.list_drafts"],
   "conversations.inbox": ["conversations.list_inboxes", "conversations.list_labels", "conversations.list_senders"],
   "conversations.message": ["conversations.get", "conversations.get_attachment", "conversations.get_message_body"],
+  "conversations.person_note": ["conversations.list_person_notes"],
   "conversations.rule": ["conversations.get", "conversations.get_message_body", "conversations.get_rule", "conversations.list", "conversations.list_rule_notices", "conversations.list_rules", "conversations.preview_rule", "conversations.suggest_rules"],
   "identity.authorization_code": ["identity.authorize"],
   "identity.authorize_request": ["identity.authorize", "identity.get_consent_request", "identity.get_sign_in_request"],

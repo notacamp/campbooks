@@ -45,3 +45,9 @@ export { isStream, type Stream } from "./api/queries";
  * @public
  */
 export { RulesList } from "./components/Rules/RulesList";
+/**
+ * The people slot of Scout's memory: what the member told Scout about
+ * people (campbooks-cloud#272), filled by the assistant module's page.
+ * @public
+ */
+export { PersonNotesList } from "./components/PersonNotes/PersonNotesList";
