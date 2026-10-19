@@ -16,21 +16,32 @@
 //!   Stored as `change_requests.mac`; the port verifies it before it says
 //!   any item stands.
 //!
+//! - **What a member was shown** (campbooks-cloud#242). Every response that
+//!   shows a member a draft or a rule carries a [`ContentToken`]: a tag over
+//!   the workspace, the member, the object (kind, id, version or binding
+//!   generation) and the same content hash the signing step binds
+//!   ([`content_hash`] for a draft; for a rule the hash of its conditions
+//!   and actions with its inbox, stored state and author). Sending a draft
+//!   and saying yes to a rule take the token back, and the server signs only
+//!   when it still holds for the row as it is under its lock. The token is
+//!   never stored: the client holds it.
+//!
 //! SQL in the workspace can still edit or plant these rows; it cannot make
 //! the tags verify, so nothing it planted or changed is sent or made.
 
+use base64::{Engine as _, engine::general_purpose::URL_SAFE_NO_PAD};
 use campbooks_kernel::{
     Error, Result,
     binding::{Binding, Fields},
     blobs::BlobRef,
-    tenancy::{UserId, WorkspaceId},
+    tenancy::{Access, UserId, WorkspaceId},
 };
 use sqlx::types::Uuid;
 
 use crate::{
     domain::{drafts::DraftRow, redact},
-    events::RequestedItem,
-    model::{Address, ConversationId, DraftId, InboxId, MessageId, SendId},
+    events::{DRAFT_RECORD, RULE_RECORD, RequestedItem},
+    model::{Address, ConversationId, DraftId, InboxId, MessageId, RuleId, RuleState, SendId},
 };
 
 /// The encoding of a draft's outgoing content. A new field takes a new
@@ -42,6 +53,8 @@ const SEND_REQUEST: &str = "campbooks/conversations.send-request/v1";
 const STORED_SEND: &str = "campbooks/conversations.stored-send/v1";
 /// A change request, as recorded.
 const CHANGE_REQUEST: &str = "campbooks/conversations.change-request/v1";
+/// What a member was shown: a draft or a rule, as a response showed it.
+const CONTENT_TOKEN: &str = "campbooks/conversations.content-token/v1";
 
 /// SHA-256 of everything of `row` that goes out: the sender, the
 /// recipients (To, Cc, Bcc), subject, body and quoted history, the reply
@@ -139,6 +152,12 @@ impl SendRequest<'_> {
     pub fn holds(&self, binding: &Binding, tag: Option<&[u8]>) -> bool {
         binding.verify(&self.fields(), tag)
     }
+
+    /// The tag under the current key, when `tag` is this request's under
+    /// the previous key only (campbooks-cloud#191).
+    pub fn retag(&self, binding: &Binding, tag: Option<&[u8]>) -> Option<Vec<u8>> {
+        binding.retag(&self.fields(), tag)
+    }
 }
 
 /// A released send as stored: `send` from `inbox`, asked for by `author`,
@@ -176,6 +195,12 @@ impl StoredSend<'_> {
     /// Whether `tag` is this send's.
     pub fn holds(&self, binding: &Binding, tag: Option<&[u8]>) -> bool {
         binding.verify(&self.fields(), tag)
+    }
+
+    /// The tag under the current key, when `tag` is this send's under the
+    /// previous key only (campbooks-cloud#191).
+    pub fn retag(&self, binding: &Binding, tag: Option<&[u8]>) -> Option<Vec<u8>> {
+        binding.retag(&self.fields(), tag)
     }
 }
 
@@ -221,6 +246,139 @@ impl ChangeRequest<'_> {
     /// Whether `tag` is this request's.
     pub fn holds(&self, binding: &Binding, tag: Option<&[u8]>) -> Result<bool> {
         Ok(binding.verify(&self.fields()?, tag))
+    }
+
+    /// The tag under the current key, when `tag` is this request's under
+    /// the previous key only (campbooks-cloud#191).
+    pub fn retag(&self, binding: &Binding, tag: Option<&[u8]>) -> Result<Option<Vec<u8>>> {
+        Ok(binding.retag(&self.fields()?, tag))
+    }
+}
+
+/// What a response showed a member, as its [`ContentToken`] binds it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Shown {
+    /// A draft at `version`, with everything that goes out ([`content_hash`]).
+    Draft {
+        /// The draft.
+        id: DraftId,
+        /// The inbox it is sent from (the send request binds it too).
+        inbox: InboxId,
+        /// Its version (bumped by every save).
+        version: i32,
+        /// [`content_hash`] of the row.
+        content: [u8; 32],
+    },
+    /// A rule at its binding `generation`.
+    Rule {
+        /// The rule.
+        id: RuleId,
+        /// Its binding generation (one more at every signing).
+        generation: i64,
+        /// Its inbox.
+        inbox: InboxId,
+        /// Its stored state (a proposal is `proposed`).
+        state: RuleState,
+        /// Who it is taught by (whose rights it acts with).
+        taught_by: Option<UserId>,
+        /// The hash of its conditions and actions
+        /// (`domain::rules::binding::content_hash`).
+        content: [u8; 32],
+    },
+}
+
+/// A token the server hands a member's client with what it shows them, and
+/// takes back when the member sends a draft or says yes to a rule: `0x01`
+/// then an HMAC-SHA256 under the binding key, over the workspace, the
+/// member and [`Shown`], as URL-safe base64. Bound to the member: another
+/// member's token does not hold. Never stored.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ContentToken {
+    /// The workspace.
+    pub workspace: WorkspaceId,
+    /// Who was shown it (`None` for a client token: those share the drafts
+    /// client tokens write).
+    pub member: Option<UserId>,
+    /// What was shown.
+    pub shown: Shown,
+}
+
+impl ContentToken {
+    /// The token of `shown`, shown to the caller of `access`.
+    pub fn for_caller(access: &Access, shown: Shown) -> Self {
+        Self {
+            workspace: access.workspace,
+            member: access.user,
+            shown,
+        }
+    }
+
+    /// The token of draft `row` as it is now, shown to `access`.
+    pub fn of_draft(access: &Access, row: &DraftRow) -> Result<Self> {
+        Ok(Self::for_caller(
+            access,
+            Shown::Draft {
+                id: row.id,
+                inbox: row.inbox_id,
+                version: row.version,
+                content: content_hash(row)?,
+            },
+        ))
+    }
+
+    fn fields(&self) -> Fields {
+        let mut fields = Fields::new(CONTENT_TOKEN);
+        fields
+            .uuid(self.workspace.as_uuid())
+            .opt_uuid(self.member.as_ref().map(UserId::as_uuid));
+        match &self.shown {
+            Shown::Draft {
+                id,
+                inbox,
+                version,
+                content,
+            } => {
+                fields
+                    .str(DRAFT_RECORD)
+                    .uuid(id.as_uuid())
+                    .uuid(inbox.as_uuid())
+                    .int(i64::from(*version))
+                    .bytes(content);
+            }
+            Shown::Rule {
+                id,
+                generation,
+                inbox,
+                state,
+                taught_by,
+                content,
+            } => {
+                fields
+                    .str(RULE_RECORD)
+                    .uuid(id.as_uuid())
+                    .int(*generation)
+                    .bytes(content)
+                    .uuid(inbox.as_uuid())
+                    .str(state.as_str())
+                    .opt_uuid(taught_by.as_ref().map(UserId::as_uuid));
+            }
+        }
+        fields
+    }
+
+    /// The token to put in the response; `None` without a key.
+    pub fn issue(&self, binding: &Binding) -> Option<String> {
+        binding
+            .tag(&self.fields())
+            .map(|tag| URL_SAFE_NO_PAD.encode(tag))
+    }
+
+    /// Whether `token` (as the client sent it back) is this one: the HMAC
+    /// compared in constant time. `false` without a key or a token, or for
+    /// one that does not decode.
+    pub fn holds(&self, binding: &Binding, token: Option<&str>) -> bool {
+        let tag = token.and_then(|t| URL_SAFE_NO_PAD.decode(t).ok());
+        binding.verify(&self.fields(), tag.as_deref())
     }
 }
 
@@ -355,5 +513,166 @@ mod tests {
             .holds(&binding(), Some(&tag))
             .unwrap()
         );
+    }
+
+    #[test]
+    fn a_content_token_holds_only_for_what_was_shown_to_whom() {
+        let workspace = WorkspaceId::new();
+        let member = Some(UserId::new());
+        let (id, inbox) = (DraftId::new(), InboxId::new());
+        let draft = Shown::Draft {
+            id,
+            inbox,
+            version: 3,
+            content: [5_u8; 32],
+        };
+        let token = ContentToken {
+            workspace,
+            member,
+            shown: draft,
+        };
+        let issued = token.issue(&binding()).unwrap();
+        assert!(token.holds(&binding(), Some(&issued)));
+        // Base64 of the version byte and the HMAC: no padding, URL-safe.
+        assert_eq!(issued.len(), 44);
+        assert!(!issued.contains(['=', '+', '/']));
+        for other in [
+            ContentToken {
+                member: Some(UserId::new()),
+                ..token
+            },
+            ContentToken {
+                member: None,
+                ..token
+            },
+            ContentToken {
+                workspace: WorkspaceId::new(),
+                ..token
+            },
+            ContentToken {
+                shown: Shown::Draft {
+                    id,
+                    inbox,
+                    version: 4,
+                    content: [5_u8; 32],
+                },
+                ..token
+            },
+            ContentToken {
+                shown: Shown::Draft {
+                    id,
+                    inbox,
+                    version: 3,
+                    content: [6_u8; 32],
+                },
+                ..token
+            },
+            ContentToken {
+                shown: Shown::Draft {
+                    id: DraftId::new(),
+                    inbox,
+                    version: 3,
+                    content: [5_u8; 32],
+                },
+                ..token
+            },
+            ContentToken {
+                shown: Shown::Draft {
+                    id,
+                    inbox: InboxId::new(),
+                    version: 3,
+                    content: [5_u8; 32],
+                },
+                ..token
+            },
+        ] {
+            assert!(!other.holds(&binding(), Some(&issued)));
+        }
+        // No token, garbage, another key, no key.
+        assert!(!token.holds(&binding(), None));
+        assert!(!token.holds(&binding(), Some("")));
+        assert!(!token.holds(&binding(), Some("not base64!")));
+        assert!(!token.holds(&Binding::disabled(), Some(&issued)));
+        assert!(token.issue(&Binding::disabled()).is_none());
+        let other_key = Binding::new(&campbooks_kernel::crypto::SecretKey::from_bytes(
+            [9; campbooks_kernel::crypto::SECRET_KEY_LEN],
+        ));
+        assert!(!token.holds(&other_key, Some(&issued)));
+    }
+
+    #[test]
+    fn a_rule_token_binds_its_inbox_state_and_author() {
+        let (id, inbox, content) = (RuleId::new(), InboxId::new(), [7_u8; 32]);
+        let rule = Shown::Rule {
+            id,
+            generation: 0,
+            inbox,
+            state: RuleState::Proposed,
+            taught_by: None,
+            content,
+        };
+        let token = ContentToken {
+            workspace: WorkspaceId::new(),
+            member: Some(UserId::new()),
+            shown: rule,
+        };
+        let issued = token.issue(&binding()).unwrap();
+        assert!(token.holds(&binding(), Some(&issued)));
+        let changed = |shown| ContentToken { shown, ..token };
+        for other in [
+            Shown::Rule {
+                id,
+                generation: 1,
+                inbox,
+                state: RuleState::Proposed,
+                taught_by: None,
+                content,
+            },
+            Shown::Rule {
+                id,
+                generation: 0,
+                inbox: InboxId::new(),
+                state: RuleState::Proposed,
+                taught_by: None,
+                content,
+            },
+            Shown::Rule {
+                id,
+                generation: 0,
+                inbox,
+                state: RuleState::Active,
+                taught_by: None,
+                content,
+            },
+            Shown::Rule {
+                id,
+                generation: 0,
+                inbox,
+                state: RuleState::Proposed,
+                taught_by: Some(UserId::new()),
+                content,
+            },
+            Shown::Rule {
+                id,
+                generation: 0,
+                inbox,
+                state: RuleState::Proposed,
+                taught_by: None,
+                content: [8_u8; 32],
+            },
+        ] {
+            assert!(!changed(other).holds(&binding(), Some(&issued)));
+        }
+        // A draft's token is never a rule's, even with the same id bytes.
+        let draft = ContentToken {
+            shown: Shown::Draft {
+                id: DraftId::from_uuid(*id.as_uuid()),
+                inbox,
+                version: 0,
+                content,
+            },
+            ..token
+        };
+        assert!(!draft.holds(&binding(), Some(&issued)));
     }
 }

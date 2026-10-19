@@ -358,6 +358,18 @@ impl EventBus {
         consumer: &str,
         from: ReplayFrom,
     ) -> Result<u64, ReplayError> {
+        self.replay_in_batches(db, consumer, from, REPLAY_BATCH_SIZE)
+            .await
+    }
+
+    /// [`replay`](Self::replay), reading `batch` events at a time.
+    pub(crate) async fn replay_in_batches(
+        &self,
+        db: &PgPool,
+        consumer: &str,
+        from: ReplayFrom,
+        batch: i64,
+    ) -> Result<u64, ReplayError> {
         let info = self
             .registry
             .consumer(consumer)
@@ -367,38 +379,70 @@ impl EventBus {
             ReplayFrom::Time(at) => (Some(at), None),
             ReplayFrom::Event(id) => (None, Some(id)),
         };
-        // Across workspaces: every logged event of the type, whoever's.
-        let mut tx = crate::db::begin_kernel(db).await?;
-        let enqueued = sqlx::query!(
-            r#"
-            INSERT INTO kernel.jobs
-                (queue, kind, payload, workspace_id, event_id, unique_key, max_attempts)
-            SELECT $1, $2, '{}'::jsonb, e.workspace_id, e.id, e.id::text, $3
-              FROM kernel.events e
-             WHERE e.name = $4
-               AND ($5::timestamptz IS NULL OR e.occurred_at >= $5)
-               AND ($6::uuid IS NULL OR e.id >= $6)
-             ORDER BY e.id
-            ON CONFLICT (kind, unique_key, workspace_id)
-                WHERE unique_key IS NOT NULL AND state IN ('pending', 'running')
-                DO NOTHING
-            "#,
-            info.queue,
-            info.name,
-            jobs::attempts_to_db(info.max_attempts),
-            info.event,
-            since_time,
-            since_id as Option<EventId>,
-        )
-        .execute(&mut *tx)
-        .await?
-        .rows_affected();
-        jobs::notify(&mut tx, info.queue).await?;
-        tx.commit().await?;
+        // Across workspaces: every logged event of the type, whoever's, in
+        // batches of their own transaction, so no statement nears the
+        // runtime pool's `statement_timeout` (campbooks-cloud#254).
+        let mut after: Option<uuid::Uuid> = None;
+        let mut enqueued = 0_u64;
+        loop {
+            let mut tx = crate::db::begin_kernel(db).await?;
+            let (last, added): (Option<uuid::Uuid>, i64) = sqlx::query_as(REPLAY_BATCH)
+                .bind(info.queue)
+                .bind(info.name)
+                .bind(jobs::attempts_to_db(info.max_attempts))
+                .bind(info.event)
+                .bind(since_time)
+                .bind(since_id.map(uuid::Uuid::from))
+                .bind(after)
+                .bind(batch)
+                .fetch_one(&mut *tx)
+                .await?;
+            if added > 0 {
+                jobs::notify(&mut tx, info.queue).await?;
+            }
+            tx.commit().await?;
+            enqueued += u64::try_from(added).unwrap_or_default();
+            match last {
+                Some(last) => after = Some(last),
+                None => break,
+            }
+        }
         tracing::info!(consumer, enqueued, "events replayed");
         Ok(enqueued)
     }
 }
+
+/// Events one replay batch reads.
+const REPLAY_BATCH_SIZE: i64 = 5_000;
+
+/// One batch of [`EventBus::replay`]: the next [`REPLAY_BATCH_SIZE`] logged
+/// events of the type after `$7`, each given a delivery unless one is
+/// unfinished; the last event read (none when there were none) and how
+/// many deliveries were added.
+const REPLAY_BATCH: &str = r"
+WITH batch AS (
+    SELECT e.id, e.workspace_id
+      FROM kernel.events e
+     WHERE e.name = $4
+       AND ($5::timestamptz IS NULL OR e.occurred_at >= $5)
+       AND ($6::uuid IS NULL OR e.id >= $6)
+       AND ($7::uuid IS NULL OR e.id > $7)
+     ORDER BY e.id
+     LIMIT $8
+), added AS (
+    INSERT INTO kernel.jobs
+        (queue, kind, payload, workspace_id, event_id, unique_key, max_attempts)
+    SELECT $1, $2, '{}'::jsonb, b.workspace_id, b.id, b.id::text, $3
+      FROM batch b
+     ORDER BY b.id
+    ON CONFLICT (kind, unique_key, workspace_id)
+        WHERE unique_key IS NOT NULL AND state IN ('pending', 'running')
+        DO NOTHING
+    RETURNING 1
+)
+SELECT (SELECT id FROM batch ORDER BY id DESC LIMIT 1) AS last,
+       (SELECT count(*) FROM added) AS added
+";
 
 /// Append the instance-wide event `name` (no workspace) and one delivery
 /// per consumer (`kinds`, with their `queues` and `max_attempts`), under an

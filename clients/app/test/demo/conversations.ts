@@ -262,6 +262,8 @@ export const Q4_BODY = {
   remote_images: 0,
   images_shown: false,
   images_trusted: false,
+  images_offer: false,
+  images_domain: null,
 };
 
 /** The newsletter's body: two remote images held back until "Show images". */
@@ -277,6 +279,9 @@ export function ledgerBody(shown: boolean) {
     remote_images: 1,
     images_shown: shown,
     images_trusted: false,
+    // An authenticated newsletter no rule trusts yet: trusting it may be offered.
+    images_offer: !shown,
+    images_domain: shown ? null : "weekly-ledger.example",
   };
 }
 

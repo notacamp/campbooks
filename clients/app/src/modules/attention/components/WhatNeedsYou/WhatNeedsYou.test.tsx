@@ -467,10 +467,22 @@ describe("What needs you", () => {
     fireEvent.keyDown(first, { key: "1" });
     const text = await screen.findByRole("textbox", { name: "Your reply" });
     expect(text).toHaveValue(MARTA_REPLY);
-    fireEvent.keyDown(text, { key: "Enter", ctrlKey: true });
+    // ⌘↵ is bound in an effect that runs after the draft is on screen, and
+    // Testing Library hands the textbox back as soon as it renders: under
+    // load, a press in between finds nothing bound and is lost
+    // (campbooks-cloud#245). Press until the send has started, never again
+    // once it has (a press while it is under way is ignored anyway).
+    const started = () => calls.calls.some((c) => c.route === `POST ${W}/drafts`);
+    await waitFor(() => {
+      if (!started()) {
+        fireEvent.keyDown(text, { key: "Enter", ctrlKey: true });
+      }
+      expect(started()).toBe(true);
+    });
     await waitFor(() => {
       expect(calls.calls.map((c) => c.route)).toContain(`POST ${W}/drafts/${MARTA_DRAFT.id}/send`);
     });
+    expect(calls.calls.filter((c) => c.route === `POST ${W}/drafts`)).toHaveLength(1);
     expect(calls.calls.find((c) => c.route === `POST ${W}/drafts`)?.body).toMatchObject({
       kind: "reply",
       body: MARTA_REPLY,

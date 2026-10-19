@@ -26,10 +26,11 @@ use campbooks_ai::{
 };
 use campbooks_kernel::{
     AppState, Error,
-    auth::{Principal, PrincipalKind},
+    auth::{Principal, PrincipalKind, Scope},
     blobs::{BlobRef, BlobStore},
     config::BlobsConfig,
     jobs::{Registry, Worker, WorkerStats},
+    operations,
     tenancy::{Access, Membership, MembershipFuture, Role, UserId, WorkspaceId},
     testing::{self, TestIdp, TestResponse},
 };
@@ -159,6 +160,15 @@ impl Kit {
         self.state = self
             .state
             .with_binding(campbooks_kernel::binding::Binding::disabled());
+        self.app = testing::app(crate::module(self.deps.clone()), self.state.clone());
+        self
+    }
+
+    /// The same kit binding with `binding` (a rotated instance secret key,
+    /// campbooks-cloud#191).
+    #[must_use]
+    pub fn with_binding(mut self, binding: campbooks_kernel::binding::Binding) -> Self {
+        self.state = self.state.with_binding(binding);
         self.app = testing::app(crate::module(self.deps.clone()), self.state.clone());
         self
     }
@@ -343,6 +353,88 @@ impl Kit {
     /// `PATCH uri` with a JSON body.
     pub async fn patch(&self, token: &str, uri: &str, body: serde_json::Value) -> TestResponse {
         self.call(Method::PATCH, token, uri, Some(body)).await
+    }
+
+    /// Run `operation` by id as the assistant acting for member `sub` in
+    /// `workspace` ([`operations::invoke`]): the same routes, scope and
+    /// membership checks as their HTTP request, with an idempotency key, and
+    /// marked confirmed (the user said yes to the call) when `confirmed`.
+    pub async fn as_assistant(
+        &self,
+        sub: &str,
+        workspace: WorkspaceId,
+        call: (&str, Value),
+        confirmed: bool,
+    ) -> Result<operations::Output, operations::InvokeError> {
+        self.invoke_as_assistant(sub, workspace, call, confirmed, false)
+            .await
+    }
+
+    /// [`as_assistant`](Self::as_assistant), as if the catalogue opted the
+    /// assistant in to `operation` (`x-campbooks.assistant` true): what a
+    /// flag flipped back by mistake would let reach the handler, which must
+    /// still refuse on its own (campbooks-cloud#242).
+    pub async fn as_assistant_listed(
+        &self,
+        sub: &str,
+        workspace: WorkspaceId,
+        call: (&str, Value),
+        confirmed: bool,
+    ) -> Result<operations::Output, operations::InvokeError> {
+        self.invoke_as_assistant(sub, workspace, call, confirmed, true)
+            .await
+    }
+
+    async fn invoke_as_assistant(
+        &self,
+        sub: &str,
+        workspace: WorkspaceId,
+        (operation, input): (&str, Value),
+        confirmed: bool,
+        listed: bool,
+    ) -> Result<operations::Output, operations::InvokeError> {
+        let module = crate::module(self.deps.clone());
+        let resources = campbooks_kernel::authz::Catalogue::new([&module.resources]).unwrap();
+        let composed =
+            operations::compose(module.router, self.state.clone().with_resources(resources));
+        let state = if listed {
+            let mut spec = serde_json::to_value(&composed.spec).unwrap();
+            for item in spec["paths"].as_object_mut().unwrap().values_mut() {
+                for op in item.as_object_mut().unwrap().values_mut() {
+                    if op.get("operationId").and_then(Value::as_str) == Some(operation) {
+                        op["x-campbooks"]["assistant"] = Value::Bool(true);
+                    }
+                }
+            }
+            let catalogue = Arc::new(operations::Catalogue::from_json(&spec));
+            composed
+                .state
+                .with_operations(operations::Operations::new(composed.routes, catalogue))
+        } else {
+            composed.state
+        };
+        let principal = Principal {
+            subject: sub.to_owned(),
+            kind: PrincipalKind::User,
+            client_id: None,
+            scopes: ALL_SCOPES.split(' ').map(Scope::new).collect(),
+            workspace: None,
+            email: Some(format!("{sub}@example.com")),
+            email_verified: true,
+            name: None,
+            expires_at: None,
+            issued_at: None,
+            auth_time: None,
+            sign_in: None,
+        };
+        let mut invocation =
+            operations::Invocation::new(operations::Caller::Assistant, principal, operation, input)
+                .in_workspace(workspace.to_string())
+                .idempotency_key(sqlx::types::Uuid::now_v7().to_string());
+        if confirmed {
+            invocation = invocation.confirmed();
+        }
+        operations::invoke(&state, invocation).await
     }
 
     /// The id of message `provider_message_id`.

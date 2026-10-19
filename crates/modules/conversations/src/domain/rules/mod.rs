@@ -11,10 +11,15 @@
 //! rule acts only while its author still may change the inbox and is not
 //! suspended (`member_suspensions`, campbooks-cloud#147); a member who
 //! changed back what a rule did makes that conversation an **exception** the
-//! rule leaves alone ([`exceptions`]).
+//! rule leaves alone ([`exceptions`]). A rule acts only while its MAC binds
+//! it to the member who taught it ([`binding`], campbooks-cloud#242), and
+//! what it changed is put back only where the application's own MAC binds it
+//! to the rule ([`applications`]).
 
+pub mod applications;
 mod apply;
 mod arrival;
+pub mod binding;
 mod effects;
 mod exceptions;
 mod facts;
@@ -24,20 +29,21 @@ use campbooks_ai::decide::{
     signals::email::{TEMPLATE_MAX_CHARS, subject_words},
     taught::{self, Surface, TaughtRule},
 };
-use campbooks_kernel::{Error, Result, tenancy::UserId};
+use campbooks_kernel::{Error, Result, binding::Binding, tenancy::UserId};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use sqlx::PgConnection;
 use utoipa::ToSchema;
 
+pub use applications::unsigned_held;
 pub use apply::{Applied, Before, Context, acting_on, apply, revert};
 pub use arrival::{Arrival, on_arrival};
 pub use exceptions::{RuleException, RuleMark, Undone, attach, except, recent_exceptions_of};
 pub use facts::{
     Candidate, TEMPLATE_PAGE, candidate, corresponds, fill_templates, scan, templates_missing,
 };
-pub use images::images_trusted;
+pub use images::{ImagesHeld, images};
 
 use crate::model::{
     ConversationId, InboxId, InboxRole, LabelId, PausedReason, RuleId, RuleOrigin, RuleState,
@@ -351,6 +357,69 @@ pub async fn sender_seen(
     if seen { Ok(()) } else { Err(invalid()) }
 }
 
+/// Whether a stored `rule` may act again (confirmed, confirmed again, or
+/// brought back): what [`validate`] and [`not_trusted_yet`] would accept of
+/// it now, as if it were taught today. Lists grow (a domain may have become
+/// a free mail provider's or a shared platform's since, campbooks-cloud#235),
+/// and another rule may trust its sender by now.
+pub async fn may_keep_again(conn: &mut PgConnection, rule: &Stored) -> Result<()> {
+    validate(&rule.conditions, &rule.actions)?;
+    not_trusted_yet(
+        conn,
+        rule.inbox,
+        &rule.conditions,
+        &rule.actions,
+        Some(rule.id),
+    )
+    .await
+}
+
+/// 409 `images_already_trusted` when a rule of `inbox` (not removed, other
+/// than `this`) already shows the images of the sender a new image rule
+/// names: the same address, or a domain that covers it (campbooks-cloud#235).
+/// Any other rule passes.
+pub async fn not_trusted_yet(
+    conn: &mut PgConnection,
+    inbox: InboxId,
+    conditions: &[RuleCondition],
+    actions: &[RuleAction],
+    this: Option<RuleId>,
+) -> Result<()> {
+    if !actions.contains(&RuleAction::ShowImages) {
+        return Ok(());
+    }
+    let existing: Vec<Stored> = of_inboxes(conn, &[inbox])
+        .await?
+        .into_iter()
+        // A rule for a domain too broad to act covers nobody: the member may
+        // still trust one address there.
+        .filter(|r| {
+            Some(r.id) != this
+                && r.actions.contains(&RuleAction::ShowImages)
+                && !r.domain_too_broad()
+        })
+        .collect();
+    let covers = |rule: &Stored| match conditions {
+        [RuleCondition::SenderAddress(address)] => rule.engine().matches(&taught::Facts {
+            sender_address: address,
+            ..taught::Facts::default()
+        }),
+        // Anyone at the domain: the engine decides whether an existing rule
+        // already reaches them, the same way it would on a real message.
+        [RuleCondition::SenderDomain(domain)] => rule.engine().matches(&taught::Facts {
+            sender_address: &format!("anyone@{domain}"),
+            ..taught::Facts::default()
+        }),
+        _ => false,
+    };
+    if existing.iter().any(covers) {
+        return Err(Error::Conflict(
+            crate::MESSAGES.reason("images_already_trusted"),
+        ));
+    }
+    Ok(())
+}
+
 /// The sum of the conditions' weights.
 pub fn specificity(conditions: &[RuleCondition]) -> i32 {
     let sum: u32 = conditions
@@ -401,6 +470,12 @@ pub struct Stored {
     /// Whether its inbox is kept read-only (its connection was removed): no
     /// rule acts there any more.
     pub inbox_detached: bool,
+    /// Its workspace.
+    pub workspace: sqlx::types::Uuid,
+    /// Its binding generation: one more at every signing ([`binding`]).
+    pub generation: i64,
+    /// Its MAC ([`binding`]); `None` until a member's request signs it.
+    pub mac: Option<Vec<u8>>,
 }
 
 impl Stored {
@@ -441,28 +516,38 @@ impl Stored {
         })
     }
 
-    /// For a proposed rule, why it would be paused once a member says yes
-    /// (confirming keeps its author, campbooks-cloud#197): an author away
-    /// for now, one who can no longer change the inbox, an inbox kept
-    /// read-only. `None` for any other rule, or when it would act.
+    /// For a proposed rule, why it would be paused once a member says yes:
+    /// an inbox kept read-only, or a domain too broad. The member who says
+    /// yes becomes its author (campbooks-cloud#242), and may change the
+    /// inbox (confirming takes that), so its author's reasons never hold
+    /// once kept. `None` for any other rule, or when it would act.
     pub fn paused_once_kept(&self) -> Option<PausedReason> {
         if self.state != RuleState::Proposed {
             return None;
         }
         let kept = Self {
             state: RuleState::Active,
+            author_may_act: true,
+            author_suspended: false,
             ..self.clone()
         };
         kept.paused_reason()
     }
 
-    /// Whether a sender-domain condition names a public suffix: a rule
-    /// stored before the Public Suffix List was complete may. The engine
-    /// never matches it; only removing the rule clears this.
-    fn domain_too_broad(&self) -> bool {
-        self.conditions
-            .iter()
-            .any(|c| matches!(c, RuleCondition::SenderDomain(d) if !taught::is_owned_domain(d)))
+    /// Whether a sender-domain condition names a public suffix (a rule
+    /// stored before the Public Suffix List was complete may), or, for a rule
+    /// that shows images, a domain anyone may send from: a free mail or
+    /// internet provider's, or a shared platform's (a rule stored before the
+    /// domain joined those lists may, campbooks-cloud#235). The engine never
+    /// acts on it; only removing the rule clears this.
+    pub(crate) fn domain_too_broad(&self) -> bool {
+        let images = self.actions.contains(&RuleAction::ShowImages);
+        self.conditions.iter().any(|c| match c {
+            RuleCondition::SenderDomain(d) => {
+                !taught::is_owned_domain(d) || (images && taught::images_domain_too_broad(d))
+            }
+            _ => false,
+        })
     }
 
     /// The rule as the engine reads it.
@@ -523,6 +608,10 @@ impl TryFrom<RuleRow> for Stored {
             author_may_act: row.author_may_act,
             author_suspended: row.author_suspended,
             inbox_detached: row.inbox_detached,
+            // Read next to the row (`binding::attach`).
+            workspace: sqlx::types::Uuid::nil(),
+            generation: 0,
+            mac: None,
         })
     }
 }
@@ -548,7 +637,8 @@ pub async fn find(conn: &mut PgConnection, id: RuleId) -> Result<Option<Stored>>
         .filter(|r| r.state != RuleState::Removed))
 }
 
-/// Rule `id`, removed or not.
+/// Rule `id`, removed or not; `None` when there is none, or its row does
+/// not decode (a WARN with its id).
 pub async fn find_any(conn: &mut PgConnection, id: RuleId) -> Result<Option<Stored>> {
     let row = sqlx::query_as!(
         RuleRow,
@@ -578,9 +668,19 @@ pub async fn find_any(conn: &mut PgConnection, id: RuleId) -> Result<Option<Stor
         "#,
         id as RuleId,
     )
-    .fetch_optional(conn)
+    .fetch_optional(&mut *conn)
     .await?;
-    row.map(Stored::try_from).transpose()
+    let Some(row) = row else { return Ok(None) };
+    // A row that does not even decode was not written by Campbooks: it is
+    // treated as no rule (it could never act), never as an error a job
+    // would retry or a request answer 500 with.
+    let id = row.id;
+    let Ok(mut rule) = Stored::try_from(row) else {
+        tracing::warn!(rule = %id, "a taught rule does not decode; it is left out");
+        return Ok(None);
+    };
+    binding::attach(conn, std::slice::from_mut(&mut rule)).await?;
+    Ok(Some(rule))
 }
 
 /// The rules of `inboxes` (not removed), newest first.
@@ -614,17 +714,51 @@ pub async fn of_inboxes(conn: &mut PgConnection, inboxes: &[InboxId]) -> Result<
         "#,
         inboxes as &[InboxId],
     )
-    .fetch_all(conn)
+    .fetch_all(&mut *conn)
     .await?;
-    rows.into_iter().map(Stored::try_from).collect()
+    // A row that does not even decode was not written by Campbooks: it is
+    // left out (it could never act), so it fails neither a list nor the
+    // mail arriving in its inbox.
+    let mut rules: Vec<Stored> = rows
+        .into_iter()
+        .filter_map(|row| {
+            let id = row.id;
+            Stored::try_from(row)
+                .inspect_err(|_| {
+                    tracing::warn!(rule = %id, "a taught rule does not decode; it is left out");
+                })
+                .ok()
+        })
+        .collect();
+    binding::attach(conn, &mut rules).await?;
+    Ok(rules)
 }
 
-/// The rules acting in `inbox`, as the engine reads them.
-pub async fn acting(conn: &mut PgConnection, inbox: InboxId) -> Result<Vec<TaughtRule>> {
+/// The rules acting in `inbox`, as the engine reads them: active, and bound
+/// to the member who taught them (campbooks-cloud#242). An active rule
+/// whose MAC does not verify (planted or changed with SQL, or kept from
+/// before rules were bound and not signed again) is left out, with a WARN
+/// carrying ids only: it changes nothing, and the other rules still act.
+pub async fn acting(
+    conn: &mut PgConnection,
+    binding: &Binding,
+    inbox: InboxId,
+) -> Result<Vec<TaughtRule>> {
     Ok(of_inboxes(conn, &[inbox])
         .await?
         .iter()
         .filter(|r| r.effective_state() == RuleState::Active)
+        .filter(|r| {
+            let bound = r.bound(binding);
+            if !bound {
+                tracing::warn!(
+                    workspace = %r.workspace,
+                    rule = %r.id,
+                    "a taught rule is not bound to the member who taught it; it does not act"
+                );
+            }
+            bound
+        })
         .map(Stored::engine)
         .collect())
 }
@@ -865,7 +999,31 @@ mod stored_tests {
             author_may_act: true,
             author_suspended: false,
             inbox_detached: false,
+            workspace: sqlx::types::Uuid::nil(),
+            generation: 0,
+            mac: None,
         }
+    }
+
+    #[test]
+    fn an_old_image_rule_for_a_domain_anyone_sends_from_never_acts() {
+        for domain in [
+            "gmail.com",
+            "mail.yahoo.fr",
+            "substack.com",
+            "acme.zendesk.com",
+        ] {
+            let mut rule = stored(domain, RuleState::Active);
+            rule.actions = vec![RuleAction::ShowImages];
+            assert_eq!(rule.effective_state(), RuleState::Paused, "{domain}");
+            assert_eq!(rule.paused_reason(), Some(PausedReason::DomainTooBroad));
+        }
+        // Sorting a shared platform's mail by domain still acts.
+        let sorting = stored("substack.com", RuleState::Active);
+        assert_eq!(sorting.effective_state(), RuleState::Active);
+        let mut owned = stored("brightloop.example", RuleState::Active);
+        owned.actions = vec![RuleAction::ShowImages];
+        assert_eq!(owned.effective_state(), RuleState::Active);
     }
 
     #[test]
@@ -894,15 +1052,18 @@ mod stored_tests {
         assert_eq!(rule.effective_state(), RuleState::Proposed);
         assert_eq!(rule.paused_reason(), None);
         assert_eq!(rule.paused_once_kept(), None);
+        // Its stored author away or gone: whoever says yes becomes its
+        // author (campbooks-cloud#242), so it would act.
         rule.author_suspended = true;
-        assert_eq!(
-            rule.paused_once_kept(),
-            Some(PausedReason::AuthorUnavailable)
-        );
+        rule.author_may_act = false;
+        assert_eq!(rule.paused_once_kept(), None);
+        // Only what no yes clears is said.
+        rule.inbox_detached = true;
+        assert_eq!(rule.paused_once_kept(), Some(PausedReason::InboxReadOnly));
         // Only for a proposal: an active rule says so with `paused_reason`.
         rule.state = RuleState::Active;
         assert_eq!(rule.paused_once_kept(), None);
-        assert_eq!(rule.paused_reason(), Some(PausedReason::AuthorUnavailable));
+        assert_eq!(rule.paused_reason(), Some(PausedReason::InboxReadOnly));
     }
 
     #[test]

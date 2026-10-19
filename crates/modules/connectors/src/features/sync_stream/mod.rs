@@ -18,6 +18,7 @@ use campbooks_kernel::{
     blobs::BlobOwner,
     db::BeginFor as _,
     jobs::{EnqueueOptions, JobHandler},
+    redact,
     tenancy::{UserId, WorkspaceId},
 };
 use chrono::{DateTime, TimeDelta, Utc};
@@ -237,12 +238,14 @@ impl SyncStream {
         let Some(google) = self.deps.google.clone() else {
             return Ok(None);
         };
-        let cost = gmail::UNITS_PER_RUN
-            + if backlog.pending.is_empty() {
-                0
-            } else {
-                gmail::write::units(backlog)
-            };
+        // The push's planned units are taken now and settled with what it
+        // spent once it is done (campbooks-cloud#252).
+        let writes = if backlog.pending.is_empty() {
+            0
+        } else {
+            gmail::write::units(backlog)
+        };
+        let cost = gmail::UNITS_PER_RUN + writes;
         let rate = self.deps.config.google.units_per_second;
         if let Err(wait) = schedule::take_budget(ctx.pool(), target.provider, cost, rate).await? {
             metrics::sync_finished(target.provider, SyncOutcome::Throttled);
@@ -251,16 +254,32 @@ impl SyncStream {
         }
         if backlog.last().is_some() {
             let pushed = gmail::write::push(&google.gmail(token), backlog).await;
-            if let Some(err) = Self::record_push(ctx, workspace, target.stream, pushed, now).await?
+            // The read keeps the units it reserved; the writes pay what
+            // they spent.
+            let spent = gmail::UNITS_PER_RUN.saturating_add(pushed.spent);
+            // What Gmail now holds is recorded first; settling the budget
+            // after is best effort (a miss only leaves the budget as taken).
+            let trouble = Self::record_push(ctx, workspace, target.stream, pushed, now).await?;
+            if let Err(err) =
+                schedule::settle_budget(ctx.pool(), target.provider, cost, spent, rate).await
             {
+                tracing::warn!(
+                    %workspace,
+                    stream = %target.stream,
+                    error = %campbooks_kernel::redact::error(&err),
+                    "could not settle the Gmail budget after a push"
+                );
+            }
+            if let Some(err) = trouble {
                 self.trouble(ctx, workspace, target, &err, now).await?;
                 return Ok(None);
             }
         }
         let cursor: gmail::Cursor = serde_json::from_value(target.cursor.clone()).map_err(|e| {
             JobError::fatal(format!(
-                "stream {} has an unreadable cursor: {e}",
-                target.stream
+                "stream {} has an unreadable cursor: {}",
+                target.stream,
+                redact::json(&e)
             ))
         })?;
         let state = ctx.state().clone();
@@ -287,7 +306,7 @@ impl SyncStream {
         };
         Ok(Some(RunPage {
             cursor: serde_json::to_value(&page.cursor)
-                .map_err(|e| JobError::fatal(format!("encoding a cursor: {e}")))?,
+                .map_err(|e| JobError::fatal(format!("encoding a cursor: {}", redact::json(&e))))?,
             token: page.cursor.token(),
             read_up_to: page
                 .cursor
@@ -328,8 +347,9 @@ impl SyncStream {
         let cursor: zoho::read::Cursor =
             serde_json::from_value(target.cursor.clone()).map_err(|e| {
                 JobError::fatal(format!(
-                    "stream {} has an unreadable cursor: {e}",
-                    target.stream
+                    "stream {} has an unreadable cursor: {}",
+                    target.stream,
+                    redact::json(&e)
                 ))
             })?;
         let config = &self.deps.config.zoho;
@@ -380,7 +400,7 @@ impl SyncStream {
         };
         Ok(Some(RunPage {
             cursor: serde_json::to_value(&page.cursor)
-                .map_err(|e| JobError::fatal(format!("encoding a cursor: {e}")))?,
+                .map_err(|e| JobError::fatal(format!("encoding a cursor: {}", redact::json(&e))))?,
             token: page.cursor.token(),
             read_up_to: None,
             changes: page.changes,
@@ -441,7 +461,7 @@ impl SyncStream {
         let batch = if changed {
             let document = MessageChangeBatch::new(inbox, page.changes);
             let bytes = serde_json::to_vec(&document)
-                .map_err(|e| JobError::fatal(format!("encoding a batch: {e}")))?;
+                .map_err(|e| JobError::fatal(format!("encoding a batch: {}", redact::json(&e))))?;
             Some(state.blobs.put(&key, bytes, BATCH_CONTENT_TYPE).await?)
         } else {
             None

@@ -181,6 +181,66 @@ async fn the_native_app_is_asked_for_every_time_and_works_in_every_workspace(db:
     assert_eq!(replayed.status, StatusCode::NOT_FOUND);
 }
 
+/// Authorize the native app again (asked every time), allow, redeem: its
+/// access token.
+async fn native_sign_in(kit: &Kit, scope: &str) -> String {
+    let (url, verifier) = Kit::authorize_url(NATIVE_CLIENT_ID, LOOPBACK, scope);
+    let id = to_consent(kit, &url).await;
+    let code = allow(kit, &id, None).await;
+    let tokens = redeem_public(kit, NATIVE_CLIENT_ID, &code, LOOPBACK, &verifier).await;
+    assert_eq!(tokens.status, StatusCode::OK, "{tokens:?}");
+    tokens.json["access_token"]
+        .as_str()
+        .unwrap_or_default()
+        .to_owned()
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn an_app_asked_again_works_at_once_and_on_its_other_devices(db: PgPool) {
+    // campbooks-cloud#143: an app's tokens name the consent they were minted
+    // under (`cns`). Asked again for the same, the consent is kept: the new
+    // token works at once and the first device's goes on. Revoking it stops
+    // both; granted again, the next token works at once.
+    let kit = Kit::new(db).await;
+    let web = kit.signed_up().await;
+    let probe = "/api/v1/identity/held-grants";
+    let scope = "openid offline_access identity:read";
+    let first = native_sign_in(&kit, scope).await;
+    let second = native_sign_in(&kit, scope).await;
+    for token in [&first, &second] {
+        let reply = kit.api(Method::GET, probe, token).await;
+        assert_eq!(reply.status, StatusCode::OK, "{reply:?}");
+    }
+    let (_, one) = Kit::decode(&first);
+    let (_, two) = Kit::decode(&second);
+    assert!(one["cns"].is_string(), "{one}");
+    assert_eq!(one["cns"], two["cns"], "the same consent, kept");
+    assert_eq!(live(&kit, &web).await, 1);
+
+    // Revoked explicitly: both stop at once.
+    let consent = one["cns"].as_str().unwrap_or_default().to_owned();
+    let revoked = kit
+        .api(
+            Method::DELETE,
+            &format!("/api/v1/identity/consents/{consent}"),
+            &web,
+        )
+        .await;
+    assert_eq!(revoked.status, StatusCode::NO_CONTENT, "{revoked:?}");
+    for token in [&first, &second] {
+        let reply = kit.api(Method::GET, probe, token).await;
+        assert_eq!(reply.status, StatusCode::UNAUTHORIZED, "{reply:?}");
+        assert_eq!(reply.json["code"], "invalid_token");
+    }
+
+    // Granted again: a new consent, and its token works at once.
+    let third = native_sign_in(&kit, scope).await;
+    let (_, three) = Kit::decode(&third);
+    assert_ne!(three["cns"], one["cns"], "a new consent");
+    let reply = kit.api(Method::GET, probe, &third).await;
+    assert_eq!(reply.status, StatusCode::OK, "{reply:?}");
+}
+
 #[sqlx::test(migrations = "../../../migrations")]
 async fn the_consent_screen_follows_a_recent_sign_in(db: PgPool) {
     let kit = Kit::new(db).await;
@@ -345,6 +405,15 @@ async fn revoking_a_consent_ends_its_tokens_and_asks_again(db: PgPool) {
         .as_str()
         .unwrap_or_else(|| panic!("{tokens:?}"))
         .to_owned();
+    let app_access = tokens.json["access_token"]
+        .as_str()
+        .unwrap_or_else(|| panic!("{tokens:?}"))
+        .to_owned();
+    // A route the app's scope does not reach: refused for its scope, not
+    // as an invalid token, while the token stands.
+    let probe = "/api/v1/identity/ways-in";
+    let before = kit.api(Method::GET, probe, &app_access).await;
+    assert_ne!(before.status, StatusCode::UNAUTHORIZED, "{before:?}");
 
     let apps = kit
         .api(Method::GET, "/api/v1/identity/consents", &web)
@@ -369,6 +438,18 @@ async fn revoking_a_consent_ends_its_tokens_and_asks_again(db: PgPool) {
         )
         .await;
     assert_eq!(again.status, StatusCode::NOT_FOUND);
+
+    // The app's access token stops at once (campbooks-cloud#143); the
+    // person's own sign-in goes on.
+    let stopped = kit.api(Method::GET, probe, &app_access).await;
+    assert_eq!(stopped.status, StatusCode::UNAUTHORIZED, "{stopped:?}");
+    assert_eq!(stopped.json["code"], "invalid_token");
+    assert_eq!(
+        kit.api(Method::GET, "/api/v1/identity/consents", &web)
+            .await
+            .status,
+        StatusCode::OK
+    );
 
     let refreshed = kit
         .post_form(

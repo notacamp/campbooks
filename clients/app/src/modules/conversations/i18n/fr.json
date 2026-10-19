@@ -64,7 +64,9 @@
     "more_one": "{{count}} autre message",
     "more_other": "{{count}} autres messages",
     "showQuoted": "Afficher le texte cité",
-    "hideQuoted": "Masquer le texte cité"
+    "hideQuoted": "Masquer le texte cité",
+    "readingText": "Lecture…",
+    "textFailed": "Impossible de lire le texte de cet e-mail."
   },
   "actions": {
     "star": "Épingler",
@@ -80,7 +82,17 @@
     "imagesHidden_other": "{{count}} images distantes masquées, pour que l’expéditeur ne sache pas quand vous lisez ceci.",
     "imagesShown": "Images distantes affichées.",
     "trustImages": "Toujours afficher les images de {{name}}",
-    "imagesTrusted": "Images affichées : vous faites confiance à {{name}}. Les pixels de suivi restent supprimés."
+    "imagesTrusted": "Images affichées : vous faites confiance à {{name}}. Les pixels de suivi restent supprimés.",
+    "imagesTrustedInbox": "Images affichées : cette boîte fait confiance à {{name}}. Les pixels de suivi restent supprimés.",
+    "imagesHeld": {
+      "under_review": "Les images restent retenues : cet e-mail est en cours d’examen.",
+      "checks_fail": "Les images restent retenues : cet e-mail ne réussit pas les vérifications de l’expéditeur.",
+      "unverified": "Les images restent retenues : le fournisseur de messagerie n’a rien vérifié qui confirme cet expéditeur.",
+      "cannot_authenticate": "Les images restent retenues : ce fournisseur de messagerie ne partage pas les vérifications de l’expéditeur, donc aucun expéditeur ne peut être approuvé ici.",
+      "not_checked": "Les images attendent que Scout vérifie cet e-mail. Tant que Scout est désactivé ou a atteint sa limite quotidienne, elles restent retenues.",
+      "rule_paused": "Les images restent retenues : la règle intelligente qui fait confiance à cet expéditeur est en pause ou attend un oui.",
+      "rule_too_broad": "Les images restent retenues : la règle intelligente pour tout le domaine de cet expéditeur ferait confiance à des inconnus (n’importe qui peut envoyer depuis ce domaine), elle n’agit donc pas. Vous pouvez toujours faire confiance à cette adresse."
+    }
   },
   "toast": {
     "done": "Terminé · {{subject}}",
@@ -226,12 +238,16 @@
       "unknown_outcome": "Campbooks n’a pas pu confirmer l’envoi de ce message. Vérifiez votre dossier Envoyés avant de le renvoyer.",
       "unknown": "Un problème est survenu. Réessayez.",
       "not_saved": "Vos dernières modifications n’ont pas pu être enregistrées, rien n’a donc été envoyé. Réessayez.",
-      "draft_changed": "Ce brouillon a été modifié ailleurs. Fermez-le et rouvrez-le pour voir la dernière version."
+      "draft_changed": "Ce brouillon a été modifié ailleurs. Fermez-le et rouvrez-le pour voir la dernière version.",
+      "content_changed": "Ceci a changé depuis que vous l’avez ouvert. Vérifiez-le et renvoyez-le.",
+      "quote": "Impossible de lire l’e-mail pour le citer. Rien n’a été commencé. Réessayez."
     },
     "shortcuts": {
       "newMessage": "Nouveau message"
     },
-    "tooLate": "Trop tard pour annuler : il a été envoyé."
+    "tooLate": "Trop tard pour annuler : il a été envoyé.",
+    "readingQuote": "Lecture de l’e-mail pour le citer…",
+    "quoteCut": "Cet e-mail est long : la citation en contient le début."
   },
   "needs": {
     "line": {
@@ -454,7 +470,8 @@
       "kept": "Règle gardée · {{rule}}",
       "keptPaused": "Règle gardée, en pause pour l’instant · {{rule}}",
       "declined": "Règle refusée · {{rule}}",
-      "failed": "Campbooks n’a pas pu modifier cette règle. Rien n’a changé."
+      "failed": "Campbooks n’a pas pu modifier cette règle. Rien n’a changé.",
+      "changed": "Cette règle a changé depuis que vous l’avez ouverte. Vérifiez-la et gardez-la à nouveau."
     },
     "row": {
       "move": "Campbooks a déplacé celui-ci",
@@ -581,10 +598,17 @@
       "limit": "Scout a écrit beaucoup de réponses cette heure-ci. Réessayez plus tard ou écrivez-la vous-même.",
       "dailyLimit": "Cet espace de travail a utilisé son quota d’IA du jour. Écrivez celle-ci vous-même.",
       "send": "Impossible d’envoyer à {{name}}. Votre brouillon est conservé.",
-      "open": "Impossible d’ouvrir l’éditeur. Votre brouillon reste ici."
+      "open": "Impossible d’ouvrir l’éditeur. Votre brouillon reste ici.",
+      "changed": "Cette réponse a changé depuis son enregistrement. Vérifiez-la et renvoyez-la."
     },
     "to": "À {{recipient}}",
-    "replyToElsewhere": "Les réponses vont à {{recipient}}, pas à l’expéditeur {{sender}}. Vérifiez avant d’envoyer."
+    "replyToElsewhere": "Les réponses vont à {{recipient}}, pas à l’expéditeur {{sender}}. Vérifiez avant d’envoyer.",
+    "readingQuote": "Lecture de l’e-mail pour le citer…",
+    "quoteUnread": "Impossible de lire l’e-mail auquel vous répondez : la citation ne peut pas s’afficher. Rien ne peut être envoyé tant qu’elle n’est pas affichée.",
+    "quoteCut": "Cet e-mail est long : votre réponse en cite le début.",
+    "quoteShortened": "Affiché en partie : votre réponse le cite en entier.",
+    "newer": "Un message plus récent de {{name}} est arrivé. Votre réponse répond toujours à celui cité ci-dessous.",
+    "answerNewer": "Répondre au plus récent"
   },
   "smartRule": {
     "tag": "Règle intelligente",
@@ -619,7 +643,8 @@
     "imagesMatches_one": "{{n}} conversation de cet expéditeur est déjà ici. Ses images s’affichent chaque fois que son courrier réussit ses vérifications.",
     "imagesMatches_other": "{{n}} conversations de cet expéditeur sont déjà ici. Ses images s’affichent chaque fois que son courrier réussit ses vérifications.",
     "imagesNew": "Ses images s’afficheront dans le nouveau courrier de cet expéditeur qui réussit ses vérifications.",
-    "imagesHow": "Seulement pour le courrier qui réussit les vérifications de l’expéditeur, jamais pour celui qui se fait passer pour lui. Les pixels de suivi restent supprimés."
+    "imagesHow": "Seulement pour le courrier qui réussit les vérifications de l’expéditeur et dans lequel Scout n’a rien trouvé de suspect : tant que Scout est désactivé ou a atteint sa limite quotidienne, elles restent retenues. Jamais pour celui qui se fait passer pour lui. Les pixels de suivi restent supprimés.",
+    "imagesAlready": "Une règle intelligente couvre déjà les images de cet expéditeur, même si elle est en pause ou attend un oui. Vous la trouverez dans la mémoire de Scout."
   },
   "ahead": {
     "reportTitle": "Ne plus jamais voir d’e-mails comme celui-ci ?",
@@ -662,6 +687,7 @@
     "failed": "Impossible de préparer le transfert : rien n’a été envoyé. Réessayez.",
     "none": "Personne de ce nom ne vous a écrit.",
     "searchFailed": "Impossible de chercher pour le moment. Réessayez.",
-    "nobody": "Personne ne vous a encore écrit."
+    "nobody": "Personne ne vous a encore écrit.",
+    "quoteFailed": "Impossible de lire l’e-mail pour le citer : rien n’a été envoyé. Réessayez."
   }
 }

@@ -279,7 +279,7 @@ pub async fn rotate(
     client: &Client,
     default_resource: &str,
     now: DateTime<Utc>,
-) -> Result<Result<(Grant, String), Refusal>> {
+) -> Result<Result<(Grant, String, Uuid), Refusal>> {
     let row: Option<RefreshRow> = sqlx::query_as(
         "SELECT t.family_id, t.idle_expires_at, t.rotated_at,
                 f.client_id, f.account_id, f.session_id, f.scope, f.auth_time, f.expires_at,
@@ -332,6 +332,7 @@ pub async fn rotate(
             workspace: row.bound_workspace_id,
         },
         next,
+        row.family_id,
     )))
 }
 
@@ -392,6 +393,14 @@ struct AccessClaims<'a> {
     auth_time: i64,
     #[serde(skip_serializing_if = "Option::is_none")]
     sid: Option<String>,
+    /// The refresh family the token's sign-in holds: revoking it stops the
+    /// token at once (campbooks-cloud#143).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    fam: Option<String>,
+    /// The consent an app's token was minted under: revoking it stops the
+    /// token at once.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    cns: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     workspace_id: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -452,6 +461,10 @@ pub struct Mint<'a> {
     /// How the person authenticated (`amr`, RFC 8176): `fed` for a
     /// provider; `hwk` or `swk`, and `user`, for a passkey.
     pub amr: &'a [String],
+    /// The refresh family the sign-in holds, when it holds one (`fam`).
+    pub family: Option<Uuid>,
+    /// The consent an app that needs one was granted under (`cns`).
+    pub consent: Option<Uuid>,
     /// The time.
     pub now: DateTime<Utc>,
 }
@@ -524,6 +537,8 @@ impl Mint<'_> {
                 jti: random_token(),
                 auth_time: self.grant.auth_time.timestamp(),
                 sid: self.grant.session_id.map(|id| id.to_string()),
+                fam: self.family.map(|id| id.to_string()),
+                cns: self.consent.map(|id| id.to_string()),
                 workspace_id: self.grant.workspace.map(|id| id.to_string()),
                 email: wants("email")
                     .then_some(self.profile.primary_email.as_deref())

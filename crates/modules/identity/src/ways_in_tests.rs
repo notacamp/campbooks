@@ -907,6 +907,13 @@ async fn removing_a_way_in_signs_out_whoever_used_it(db: PgPool) {
         .redeem(&signed_in.location_query()["code"], &verifier)
         .await;
     let refresh = tokens.json["refresh_token"].as_str().unwrap().to_owned();
+    let zoho_access = tokens.json["access_token"].as_str().unwrap().to_owned();
+    assert_eq!(
+        kit.api(Method::GET, "/api/v1/identity/ways-in", &zoho_access)
+            .await
+            .status,
+        StatusCode::OK
+    );
 
     // The owner removes Zoho from the first sign-in (still recent).
     let removed = kit
@@ -918,6 +925,19 @@ async fn removing_a_way_in_signs_out_whoever_used_it(db: PgPool) {
         .await;
     assert_eq!(removed.status, StatusCode::NO_CONTENT, "{removed:?}");
 
+    // That browser's access token stops at once (campbooks-cloud#143),
+    // while the owner's own sign-in goes on.
+    let stopped = kit
+        .api(Method::GET, "/api/v1/identity/ways-in", &zoho_access)
+        .await;
+    assert_eq!(stopped.status, StatusCode::UNAUTHORIZED, "{stopped:?}");
+    assert_eq!(stopped.json["code"], "invalid_token");
+    assert_eq!(
+        kit.api(Method::GET, "/api/v1/identity/ways-in", &access)
+            .await
+            .status,
+        StatusCode::OK
+    );
     // That browser's session and refresh tokens are gone.
     let refreshed = kit.refresh(&refresh).await;
     assert_eq!(refreshed.status, StatusCode::BAD_REQUEST, "{refreshed:?}");

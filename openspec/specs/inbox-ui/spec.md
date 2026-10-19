@@ -384,10 +384,40 @@ trust rule. The desktop page's policy SHALL add only `style-src-attr
 `default-src 'self'`; plain `http:` images stay blocked on desktop. Nothing
 in the mail frame SHALL run, so Tauri's IPC is out of its reach. A link that
 asks for a new window SHALL never open a webview, and the main webview SHALL
-never leave the app's own pages: a web link opens in the system's browser, a
-mail link in the mail app with only its address, copies, subject and body,
-anything else nowhere; no remote URL SHALL be granted IPC. CI SHALL check the frame in WebKit under the desktop and web
-policies read from their definitions.
+never leave the app's own pages: `tauri://localhost`, and
+`http(s)://tauri.localhost` only on Windows and Android, where the app is
+served from it (elsewhere it is the machine itself), plus the dev server in a
+debug build only. A web link opens in the system's browser, a mail link in
+the mail app with only its address, copies, subject and body and no
+fragment, each value decoded and encoded again with everything but
+unreserved characters as `%XX` (a space as `%20`, never `+`; a plus as `%2B`;
+a line break in a body, `=`, `/` or `#` encoded too, so no field hides in
+a value), and only when it has no authority (`mailto://…`) and its address
+part and its `to`, `cc` and `bcc` fields are nothing but addresses (none, or
+comma-separated `local@domain`s, valid UTF-8, not starting with `/`, with no
+control character, Unicode blank, invisible character such as a bidi
+override, a zero-width space or a variation selector, or delimiter such as
+CR, LF, `&`, `;`, `?` or `\`, even encoded; other Unicode, as in an
+internationalised address, is kept); a subject or body holding `&`, `;` or `?`
+once decoded, or still holding a `%XX` escape (encoded twice), SHALL be
+dropped, since a mail app that decodes before it splits (on `;` too, as some
+older parsers do), or decodes again, would read another field there, and so SHALL a subject that is not valid
+UTF-8 or holds a control character (CR and LF included), a line or paragraph
+separator (U+2028, U+2029) or an invisible character, and a body that is not
+valid UTF-8 or holds a control character other than CR, LF and tab, since a
+mail app that decodes first would start another header there; anything else nowhere; no remote URL SHALL be granted
+IPC. CI SHALL check the frame in WebKit under the desktop and web policies
+read from their definitions, with the app's own sandbox and referrer policy,
+and a control proving the check would see a script run. A separate CI job
+SHALL drive a debug build of the real shell (tauri-driver, WebKitWebDriver,
+a virtual display) against a mock API serving hostile HTML mail, and SHALL
+check in the mail frame's realm that no Tauri IPC object exists (while the
+app's page has one), that none of the mail's scripts ran and no invoke
+reached the API, that inline styles apply and nothing remote loads, that a
+`target=_blank` link opens no webview but goes to the system opener alone,
+and that a meta refresh or a nested iframe never reaches the system opener.
+Only a debug build SHALL record the links it hands to the system opener
+(`CAMPBOOKS_DEV_OPEN_OUTSIDE_LOG`) instead of opening them.
 
 #### Scenario: A newsletter on desktop
 - **WHEN** the member opens the #160 newsletter on the desktop app
@@ -400,6 +430,159 @@ policies read from their definitions.
 #### Scenario: A link in a mail
 - **WHEN** the member clicks a web link in a mail on the desktop app
 - **THEN** it opens in the system browser, and no Campbooks window shows the remote page
+
+#### Scenario: A look-alike on the machine
+- **WHEN** a link to `http://tauri.localhost/` reaches the main window on macOS or Linux
+- **THEN** the window stays where it is and the link opens in the system browser
+
+#### Scenario: A mail link with spaces
+- **WHEN** the member clicks `mailto:rita@example.com?subject=Tax%20dates&attach=/etc/passwd`
+- **THEN** the mail app gets `mailto:rita@example.com?subject=Tax%20dates`
+
+#### Scenario: A field hidden in a value or the fragment
+- **WHEN** the member clicks `mailto:rita@example.com?subject=hi#&attach=/etc/passwd` or `mailto:rita@example.com?subject=x;attach=/etc/passwd`
+- **THEN** the mail app gets `mailto:rita@example.com?subject=hi`, or `mailto:rita@example.com` (that subject left out)
+
+#### Scenario: A header hidden in the address
+- **WHEN** the member clicks `mailto:rita@example.com%0D%0Abcc:evil@example.org` or `mailto:rita@example.com%26attach=/etc/passwd`
+- **THEN** nothing opens, while `mailto:rita@example.com,joao@example.com` opens in the mail app
+
+#### Scenario: More addresses, or a field hidden in the body
+- **WHEN** the member clicks `mailto:?to=rita@example.com%0D%0Abcc:evil@example.org`, or `mailto:rita@example.com?body=x%26attach%3D/etc/passwd`
+- **THEN** the first opens nowhere, and the second opens with no body
+
+#### Scenario: An authority or an invisible character
+- **WHEN** the member clicks `mailto://x%0D%0Abcc:evil@example.org`, or an address holding U+202E, U+200B, U+0085 or a byte that is not UTF-8
+- **THEN** nothing opens, while `mailto:ana@exämple.example` opens in the mail app
+
+#### Scenario: A header hidden in the subject
+- **WHEN** a mail link reads `mailto:rita@x.example?subject=Hi%0D%0ABcc:%20evil@x.example&body=Thanks`, or its body holds a NUL
+- **THEN** the subject (or the body) is left out and the rest opens; a body over several lines, with tabs, is kept as written
+
+#### Scenario: A field behind a semicolon or a second encoding
+- **WHEN** a mail link reads `mailto:x@x.example?subject=x;attach=/etc/passwd`, or its subject is `Hi%250D%250ABcc:%20evil@x.example`
+- **THEN** the subject is left out and the rest opens, while a subject of `50%25%20off` is kept as "50% off"
+
+#### Scenario: The real shell
+- **WHEN** CI's `tauri-shell` job opens the hostile mail in a debug build of the desktop app
+- **THEN** the mail frame has no `__TAURI_INTERNALS__` or `__TAURI__`, nothing of the mail ran, its `target=_blank` link reaches the system opener and no new webview, and its meta refresh and nested iframe reach nothing
+
+### Requirement: Only offers that take effect
+The reader SHALL offer "Always show images from <sender>" and its ⇧A only
+where the server says trusting the sender can take effect, with "Anyone at"
+only for the domain the server offers; elsewhere, when remote images stay
+held back, it SHALL say why in one line (under review, failing the sender's
+checks, a provider without sender checks, or waiting for Scout's check). In
+an inbox other members use, the note SHALL say the inbox trusts the sender.
+The confirmation SHALL say that images wait for Scout's check, so they stay
+held back while Scout is off or past its daily limit.
+
+#### Scenario: Failing checks
+- **WHEN** a message failing its sender's checks has its images held back
+- **THEN** the reader says so in one line and offers no trust, and ⇧A does nothing
+
+#### Scenario: A shared inbox
+- **WHEN** a rule of a shared inbox trusts the Weekly Ledger
+- **THEN** the note reads "this inbox trusts The Weekly Ledger"
+
+### Requirement: Sending only what the member was shown
+The composer SHALL send, with every save and with Send, the
+`content_token` of the content on screen: the one of the draft it opened
+with, then of each save's answer or re-read it applies, never one from a
+list or a read it does not show. When an autosave answers 409
+`content_changed` (or `draft_changed`), it SHALL keep what the member
+typed, read the draft again for its version, token and attachments, show
+the notice once, and save nothing on its own: the next edit or Send saves
+the typed text with the fresh token. When Send answers 409
+`content_changed` it SHALL read the draft again and show it as it is now
+(its recipients, Cc and Bcc included, its subject and text), with "This
+changed since you opened it. Check it and send again." in all four locales,
+and SHALL NOT send it again on its own. The message composer SHALL show Cc
+and Bcc whenever the draft has any, also ones that arrive after it opened.
+The reply dialog SHALL show every recipient the reply goes to and SHALL
+NOT reuse a draft it did not create (one from the drafts list, or the one
+an Undo handed back): it SHALL create a fresh reply draft with exactly those
+recipients, no Cc or Bcc, its own quoted text and no attachments, discard
+the draft it replaces while that one is editable (a `draft`, or a `failed`
+send) and never one that is `scheduled` or `sending`, which only its Undo
+takes back, and send with the token of that draft; it MAY save
+again only the draft it created, with its token. On 409 `content_changed`
+it SHALL say so and send nothing until the member sends again, in a fresh
+draft. The forward dialog SHALL save into an untouched forward draft with
+its token and start a fresh forward when that is refused.
+
+#### Scenario: The draft changed since it was opened
+- **WHEN** Sam presses Send and the server answers 409 `content_changed`
+- **THEN** the composer shows the draft as the server holds it, a Bcc Sam never added included, with the notice, and nothing is sent until Sam presses Send again
+
+#### Scenario: An autosave refused
+- **WHEN** the composer's autosave answers 409 `content_changed`
+- **THEN** the typed text stays, the notice shows once, nothing is saved again until Sam types or presses Send, and that save uses the token of the draft read again
+
+#### Scenario: A reply dialog after an Undo
+- **WHEN** the draft an Undo handed back holds a Bcc and an attachment the dialog does not show, and Sam sends from the dialog
+- **THEN** a fresh draft with only the recipients shown is created and sent, and the old one is discarded
+
+#### Scenario: Opened before the upgrade
+- **WHEN** Sam types or presses Send in a composer opened before the upgrade
+- **THEN** the notice shows once, Sam's text is still there, and the next save and Send work
+
+#### Scenario: Replacing a draft whose send failed
+- **WHEN** the draft an Undo or a failed send handed back is `failed`, and Sam opens Scout's text in the composer
+- **THEN** a fresh reply draft is created and the failed one is discarded
+
+#### Scenario: Replacing a draft on its way
+- **WHEN** the draft handed back is `scheduled` (sent again elsewhere since)
+- **THEN** a fresh reply draft is created and the scheduled one is left alone
+
+### Requirement: Quoting mail whose words came later
+When `conversations.get` marks a message `text_unread`, the client SHALL ask
+for its words alone (`words=true` on its body), once per message, before
+quoting it in a reply, reply all or forward (the composer, the reply dialog
+and Home's Forward picker), and for its folded line in the reader. While
+they are read, a neutral line SHALL say so. When they cannot be read,
+nothing SHALL be started or sent and the member SHALL be told why: a reply
+or forward SHALL never carry an empty quote silently, nor a quote the member
+was not shown. In the reply dialog, Send, its shortcut and "Open in composer"
+SHALL wait until the quote is shown, and "Try again" SHALL read the words
+again and show them. When the words came `truncated`, the composer SHALL say
+the quote holds the email's first part. A folded line whose words cannot be
+read SHALL say so rather than stay blank.
+
+#### Scenario: Forwarding a message whose words came later
+- **WHEN** a member forwards a message marked `text_unread`
+- **THEN** "Reading the email to quote it…" shows, and the forward's quote carries the message's words
+
+#### Scenario: Its words cannot be read
+- **WHEN** a member forwards a message marked `text_unread` and its words cannot be read
+- **THEN** no draft is started and "Couldn't read the email to quote it" says why
+
+#### Scenario: Replying after the quote could not be read
+- **WHEN** the reply dialog could not read the words of the message it answers
+- **THEN** Send is disabled and says why, and after "Try again" reads them the quote shows and Send may go
+
+#### Scenario: A long email quoted
+- **WHEN** a member forwards a message whose words came `truncated`
+- **THEN** the composer says "This email is long: the quote holds its first part."
+
+#### Scenario: A folded message whose words came later
+- **WHEN** the reader folds a message marked `text_unread`
+- **THEN** its line says "Reading…" until its words are read, then shows them
+
+### Requirement: Saying what a quote leaves out
+The composer SHALL say "the quote holds its first part" when the message it
+quotes is `quote_cut` or its text or words came `truncated`. The reply
+dialog's preview SHALL say when the reply quotes only the email's first part,
+and otherwise, when the preview shows only the start of what the reply
+quotes, that it is shown in part (the preview ending in "…").
+
+#### Scenario: Replying to a long email
+- **WHEN** a member opens Reply on a message marked `quote_cut`
+- **THEN** the dialog's quote says "This email is long: your reply quotes its first part.", and Forward's composer says "This email is long: the quote holds its first part."
+
+#### Scenario: A long quote in a short preview
+- **WHEN** the reply dialog answers a message whose words are longer than its preview
+- **THEN** the preview ends in "…" and says "Shown in part: your reply quotes all of it."
 
 ### Requirement: Who wrote last
 A conversation row whose newest message the inbox sent SHALL start its

@@ -274,6 +274,10 @@ workspace) SHALL see them.
 - **WHEN** a member archives a conversation
 - **THEN** the feed records an upsert of that conversation within its inbox
 
+#### Scenario: Words of very long HTML
+- **WHEN** a member asks for the words of an HTML-only message longer than 256 KiB
+- **THEN** `text` holds the words of its first 256 KiB and `truncated` is true
+
 #### Scenario: Someone outside the inbox
 - **WHEN** a member who is not in an inbox follows the feed
 - **THEN** changes within that inbox are not shown to them
@@ -507,7 +511,9 @@ draft and answer 202 with the time it will be released, after
 `CAMPBOOKS_CONVERSATIONS__UNDO_SEND_SECONDS` (default 10). Until then
 `conversations.cancel_send` SHALL put it back to an editable draft; after
 release it SHALL answer 409 `too_late`. A scheduled or sending draft SHALL
-not be edited, deleted or sent again (409 `draft_not_editable`).
+not be edited, deleted or sent again (409 `draft_not_editable`): a scheduled
+send is taken back only by `cancel_send`, the deliberate cancel, after which
+the draft may be discarded.
 
 #### Scenario: Undo within the window
 - **WHEN** Sam sends a reply and cancels it before the window ends
@@ -516,6 +522,10 @@ not be edited, deleted or sent again (409 `draft_not_editable`).
 #### Scenario: Sending again after an undo
 - **WHEN** Sam cancels a send, edits the draft and sends it again
 - **THEN** only the second send is released, once
+
+#### Scenario: Discarding a scheduled send
+- **WHEN** Sam's reply is scheduled and a request deletes its draft
+- **THEN** the answer is 409 `draft_not_editable` and it stays scheduled; after `cancel_send` the delete succeeds and nothing is ever sent
 
 ### Requirement: The outbound intent
 When the window ends, the job `conversations.release_send` SHALL write an
@@ -826,15 +836,28 @@ The module SHALL implement the kernel's `SearchSource` port for the group
 type `conversations.conversation`: a conversation's container (its inbox),
 time (its last message), subject, label names, facets (stream, unread,
 starred, archived, label ids) and, per message, its people (from, to, cc
-with names and addresses), plain text (the text part, or the HTML part
-reduced to text when there is none, quoted history removed, at most
+with names and addresses), plain text (the text part when it has words, or
+the HTML part reduced to text when there is none or it holds blanks only,
+quoted history removed, at most
 32 KiB; the HTML is reduced by html5ever's tokenizer alone, with no tree,
 fed 1 KiB at a time and stopped after 500 ms with the words read so far, keeping the characters outside scripts, styles, the head, the
-title, the markup a `noscript`, `iframe`, `noembed` or `noframes` holds, and
-`blockquote`s, with a line break at each `br` and at the end of
-each block), attachment names, mailbox (`inbox`, `archive`, `spam`, `trash`),
-direction and a content stamp made of the hashes of the blobs it is read
-from. A conversation that no longer exists SHALL be reported as gone.
+title, the markup a `noscript`, `iframe`, `noembed` or `noframes` holds,
+`template`s and `blockquote`s, with a line break at each `br` and at the end of
+each block; the head ends where the tree builder would end it, at `</head>`,
+`<body>`, any start tag that cannot stand in a head, or words outside its
+raw-text elements, so HTML with no `<body>` tag still gives its words),
+attachment names, mailbox (`inbox`, `archive`, `spam`, `trash`), direction
+and a content stamp made of the hashes of the blobs it is read from, plus,
+for a message with an HTML part, the version of how HTML becomes text. The
+same reading SHALL give every other reader of a message its words: its
+snippet and Scout's read at ingest, the decide pass, the labelling export,
+reply context, need summaries, and the text `conversations.get` returns for
+each message, which replies and forwards quote. HTML SHALL be read as text
+off the async workers; `conversations.get` SHALL read it within one second
+for all its messages together, reading at most 256 KiB of each message's
+HTML, and a message past that SHALL come without `text`, marked
+`text_unread` (the HTML is still whole). Words read from HTML SHALL never
+mark a text `truncated`. A conversation that no longer exists SHALL be reported as gone.
 Drafts SHALL NOT be returned.
 
 #### Scenario: HTML-only message
@@ -852,6 +875,22 @@ Drafts SHALL NOT be returned.
 #### Scenario: HTML built to be slow to parse
 - **WHEN** search asks for an HTML-only message whose HTML would take minutes to build as a tree
 - **THEN** it gets the message's text, or the words read within 500 ms
+
+#### Scenario: A head and no body tag
+- **WHEN** search asks for an HTML-only message `<head><meta charset=utf-8><title>T</title><p>Invoice due Friday`
+- **THEN** it gets "Invoice due Friday" and nothing of the title, styles or scripts, as for a doctype, a full document, a closed head with no body tag and Outlook's HTML
+
+#### Scenario: A text part of blanks only
+- **WHEN** a message stored earlier holds a text part of three line breaks beside its HTML
+- **THEN** search, its snippet and Scout read the words of its HTML, and its stamp names how HTML is read, so the backfill reads it again
+
+#### Scenario: Forwarding HTML-only mail
+- **WHEN** a member forwards or replies to a message that is HTML alone, or one whose text part is blanks
+- **THEN** the message's text in `conversations.get` holds the words of its HTML, so the quote carries them
+
+#### Scenario: Crafted HTML threaded into one conversation
+- **WHEN** a sender threads a dozen HTML-only messages, each slow to tokenize, into one conversation and a member opens it
+- **THEN** the answer comes within a few seconds, each message with its words or marked `text_unread`, none marked `truncated`
 
 ### Requirement: Visible inboxes as a list
 The module's container-visibility port SHALL also list the inboxes a caller
@@ -1066,8 +1105,9 @@ dismissing a suggestion, SHALL take the catalogue's `write` on the inbox (a
 in an inbox kept read-only, gets 403 `inbox_read_only`). A proposed rule does
 not act yet: confirming it and turning it down (`POST …/rules/{rule_id}/decline`,
 `conversations.decline_rule`) SHALL take the same `write` on the inbox, and
-confirming SHALL keep its author (the confirmer becomes it only when it had
-none). Updating, removing and restoring an active rule SHALL take its author
+confirming SHALL make the confirming member its author, as a yes again does
+(the stored author is SQL's to choose and is not shown, so the rule acts
+with the rights of the member whose yes signs it). Updating, removing and restoring an active rule SHALL take its author
 while a `sender`, or a `manager` of the inbox; other writers get 403
 `rule_not_yours`. Reading rules SHALL take any role on the inbox; a
 rule in an inbox the caller cannot see SHALL answer 404. A client token, even
@@ -1081,6 +1121,10 @@ rule SHALL be paused the same way (a running apply run is cancelled at its
 next batch, new mail is not changed by it, and previews and suggestions do
 not count it), and lifting the suspension SHALL make it act again with
 nothing to redo; a run it cancelled is not restarted.
+
+#### Scenario: A yes makes it theirs
+- **WHEN** Sam proposes a rule in info@ and Leo, a sender there, says yes to it
+- **THEN** it is active with Leo as its author, Leo may change it, and Ana, another sender, gets 403 `rule_not_yours` removing it
 
 #### Scenario: Leo's rule in a shared inbox
 - **WHEN** Leo taught a rule in info@ and Ana, a sender there, tries to remove it
@@ -1234,11 +1278,20 @@ as it was before, except those excepted or changed since (by a member, or
 moved on by another rule), with the same batching, progress and events as an
 apply run. Every path that locks a rule's runs and the rule SHALL take the
 runs first, as a run's batch does, so undoing never deadlocks against a
-batch.
+batch. Only a conversation whose application verifies SHALL be put back
+(see "Rule runs and the changes they record are bound"). A rule that still
+holds an application with no MAC (recorded before applications were bound)
+SHALL NOT be removed with `restore=true`: the request SHALL answer 409
+`undo_unavailable` before anything changes, and removing it without
+`restore` SHALL still work.
 
 #### Scenario: Undo all
 - **WHEN** Ana presses Z right after 998 conversations were moved
 - **THEN** the rule is removed and the 998 are back in Primary, except one Leo has since starred and moved himself
+
+#### Scenario: Changes from before the upgrade
+- **WHEN** a rule holds a change recorded before applications were bound and Sam removes it with `restore=true`
+- **THEN** the request answers 409 `undo_unavailable`, the rule stays active, and removing it without `restore` succeeds
 
 ### Requirement: Rules in summaries
 A conversation summary SHALL carry `rule` (its id, the action it took, how
@@ -1445,7 +1498,19 @@ appear. It SHALL read only the newest inbound mail: the last 365 days, at
 most 5,000 messages (through a partial index on received mail), so the
 counts are within that window and its cost doesn't grow with an inbox's
 history. Within one compile, the assistant SHALL ask it at most once per
-`q`.
+`q`. With `reachable=true` it SHALL list only senders it is safe to write
+to: never a no-reply address, nor a sender whose newest mail in that
+window fails their sender checks or is refused by their DMARC policy, nor a
+sender any of whose own mail in that window, in the caller's inboxes and
+spam included, was reported (is in spam), is under review (open, or cleared
+because a later message replaced it), or holds a stored `suspicious` answer
+of `true` that no member corrected to safe. A flagged message SHALL exclude
+only its own sender, so the other people in its thread stay. Facts only
+(addresses, the provider's authentication results, stored answers, needs and
+member corrections), never what the mail says. That check SHALL run sender
+by sender in ranking order, only until the answer is full, each through an
+index on an inbox's received mail by sender, so its cost doesn't grow with an
+inbox's history either. Without it, the answer SHALL be as before.
 
 #### Scenario: Suggestions for "always reach you"
 - **WHEN** a member lists senders without `q`
@@ -1458,6 +1523,22 @@ history. Within one compile, the assistant SHALL ask it at most once per
 #### Scenario: Old mail only
 - **WHEN** a sender's every message is more than a year old
 - **THEN** that sender is not listed
+
+#### Scenario: Safe to write to
+- **WHEN** a member lists senders with `reachable=true`, with or without `q` ("support", "accounts")
+- **THEN** neither it-support@at3lier-sol.example (under review) nor no-reply@accounts.example is listed, while both are found without it
+
+#### Scenario: Reported once
+- **WHEN** a member reported one of a sender's conversations and the sender's other conversation is unflagged
+- **THEN** that sender is still not listed with `reachable=true`
+
+#### Scenario: A review replaced
+- **WHEN** a later message replaced a sender's review, or the review's need is gone, and no member said the flagged email is safe
+- **THEN** that sender is still not listed with `reachable=true`; once a member says it is safe, they are, and once that is undone, they are not again
+
+#### Scenario: Failing checks, newest
+- **WHEN** a sender's newest mail is refused by their DMARC policy
+- **THEN** they are not listed with `reachable=true` until newer mail of theirs passes
 
 ### Requirement: The caller's labels
 `GET /api/v1/w/{workspace_id}/labels` (`conversations.list_labels`,
@@ -1511,7 +1592,9 @@ which SHALL be kept: joining again announces the newest change.
 `inbox_read_only`, else `domain_too_broad` (a `sender_domain` naming a public
 suffix), else `author_cannot_write`, else `paused_by_member`, else
 `author_unavailable`; and, for a proposed rule, `paused_once_kept`: the
-reason it would be paused once confirmed (confirming keeps its author). A
+reason it would be paused once confirmed, which is never its author's
+(confirming makes the confirming member its author): only an inbox kept
+read-only or a domain too broad. A
 suspension is an administrator's action and SHALL not be disclosed to other
 members, clients or the assistant: no rule reason, event or text readable in
 the workspace names it.
@@ -1542,7 +1625,7 @@ the workspace names it.
 
 #### Scenario: Keeping a proposal whose author is away
 - **WHEN** a member reads a proposed rule whose author is suspended, then confirms it
-- **THEN** the proposal carries `paused_once_kept` `author_unavailable` and no `paused_reason`, and once confirmed it is the same author's, `paused` with `author_unavailable`
+- **THEN** the proposal carries no `paused_reason` and no `paused_once_kept`, and once confirmed it is the confirming member's and active
 
 ### Requirement: Reading mail again for the money question
 On upgrade to the money question, the needs checks SHALL accept the
@@ -1587,8 +1670,10 @@ list and automation headers, attachment names and media types, the start of
 the text body; items alternating `dev` and `test`) and `labels.csv` (id,
 date, sender, subject, attachments and an empty `money` column). It SHALL run
 inside the workspace with row-level security, refuse a folder that exists,
-refuse to run without `--member` (there is no whole-workspace export), mark
-the folder as its own (`.campbooks-labelling`), and print its absolute path,
+refuse to run without `--member` (there is no whole-workspace export), say before reading any
+mail the member id, role and inbox ids it resolved, mark the folder as its own
+(`.campbooks-labelling`, recording that workspace, member, role, inboxes and
+set), and print its absolute path,
 that it holds real mail to keep off the repository, and to delete it from the
 server once copied; a member who is suspended, of a workspace being deleted,
 or who reads no inbox is refused. `campbooks-server labelling purge --out
@@ -1626,6 +1711,10 @@ write its report into the folder.
 #### Scenario: Purging
 - **WHEN** the operator purges a folder without the marker
 - **THEN** nothing is removed; a folder the export wrote is removed
+
+#### Scenario: Saying whom it is for
+- **WHEN** the operator exports for sam@example.com
+- **THEN** before any mail is read it prints Sam's member id, role and inbox ids, and the marker records them
 
 ### Requirement: Scout proposes replies
 `POST …/conversations/{conversation_id}/reply/suggestions`
@@ -2118,3 +2207,451 @@ items. Without an instance secret nothing SHALL be signed or verify:
 #### Scenario: Drafts scheduled before the binding existed
 - **WHEN** the migration that adds the binding runs while drafts are scheduled
 - **THEN** those drafts go back to drafts, and their authors send them again
+
+### Requirement: What the reader may offer about a sender's images
+`conversations.get_message_body` SHALL say, for a message whose remote images
+were held back, whether trusting its sender can take effect
+(`images_offer`: no rule of the inbox, paused or waiting included, covers the
+sender yet, the email is not under review, its provider shares sender checks
+and they pass), the domain that may be offered instead of the address
+(`images_domain`: the sender's own host, never a parent of it, owned, and
+never a free mail or internet provider's, a platform anyone can send from, a
+help desk whose customers send from its subdomains, or an address relay), and
+why the images stay held back although the sender is, or could be, trusted
+(`images_held`:
+`under_review`, `checks_fail`, `unverified` when the provider checked nothing,
+`cannot_authenticate`, `not_checked` while Scout has not checked the email
+under an acting rule, `rule_paused` when the rule covering the sender is
+paused or waiting for a yes, or `rule_too_broad` when the only rule reaching
+the sender names a whole domain anyone may send from, in which case the
+address alone is still offered). A message with no remote images SHALL offer
+and explain nothing. The body SHALL read the inbox's rules only when one of them
+shows images.
+Creating or changing an image rule for a sender a rule already covers (the
+same address, or a domain that covers it) SHALL be refused with 409
+`images_already_trusted`, with the engine deciding whether an existing rule
+covers it. An image rule for anyone at a platform anyone can send from
+(Substack, Mailchimp, Google Groups, help desks, address relays and the like),
+or at a domain above one, SHALL be refused as invalid. The same checks SHALL
+hold when a rule is read: an image rule stored earlier for such a domain, or a
+free mail provider's, SHALL never act and SHALL be listed paused as too broad,
+and confirming, confirming again or bringing back a rule SHALL apply the
+checks of creating one (validation and the duplicate check).
+The free mail list SHALL be one list, compared by
+registrable domain (`mail.yahoo.fr` is Yahoo's), covering the major global and
+regional providers and internet providers' mail; the web client's copy SHALL
+be checked against it.
+
+#### Scenario: Offered with its domain
+- **WHEN** an authenticated newsletter from news@brightloop.example has its images held back and no rule trusts the sender
+- **THEN** `images_offer` is true and `images_domain` is `brightloop.example`
+
+#### Scenario: Could not take effect
+- **WHEN** a copy fails DMARC, or carries no authentication results
+- **THEN** nothing is offered and `images_held` is `checks_fail`, or `cannot_authenticate`
+
+#### Scenario: Already trusted
+- **WHEN** a rule trusts news@brightloop.example and the member asks for it again
+- **THEN** it is refused with 409 `images_already_trusted`, and while Scout has not checked the email it says `not_checked`
+
+#### Scenario: Under review
+- **WHEN** a trusted sender's email has a stored `suspicious` answer of `true`
+- **THEN** its images stay held back and `images_held` is `under_review`
+
+#### Scenario: A platform anyone sends from
+- **WHEN** a member asks to show images from anyone at `substack.com`
+- **THEN** the rule is refused, and the reader offers only the address
+
+#### Scenario: A help desk customer
+- **WHEN** an authenticated email from billing@acme.zendesk.com has its images held back
+- **THEN** only the address is offered, never anyone at `zendesk.com` or `acme.zendesk.com`
+
+#### Scenario: A rule kept from before the lists grew
+- **WHEN** an active, signed rule stored earlier trusts anyone at `substack.com` with images
+- **THEN** it trusts nobody, `images_held` is `rule_too_broad`, the address is offered, and once removed it cannot be brought back
+
+### Requirement: Taught rules are bound to the member who taught them
+A taught rule SHALL carry a MAC under the binding key (the key derived from
+the instance secret, never stored in the database, logged or sent), with its
+own context label (`campbooks/conversations.rule/v1`), over the workspace,
+the rule, its binding generation (one more at every signing), its inbox, who
+taught it, its stored state, its precedence (`confirmed_at`, else
+`created_at`) and a canonical hash of its conditions and actions (each
+length-prefixed, in order). Only an authenticated member's request SHALL
+sign a rule: creating it active, confirming it, changing it, pausing or
+resuming it, adopting it, removing it and bringing it back; a proposal SHALL
+NOT be signed until a member confirms it. A request that keeps a bound field
+it does not set SHALL verify the rule under its row lock first and SHALL NOT
+sign a rule that does not verify: such a rule MAY be paused, and any other
+change SHALL answer 409 `rule_needs_confirmation`. No job, consumer or
+startup task SHALL sign a rule whose content SQL can set. Without an
+instance secret a rule SHALL NOT be saved active (500).
+
+Before a rule acts (on arriving mail, in a run over existing mail, or to
+show a sender's images) its MAC SHALL be verified against the rule as
+stored, in constant time. A rule that does not verify, or has no MAC, SHALL
+change nothing, at the provider or locally, and ask the provider for
+nothing, with a WARN line carrying ids only and no retry; an apply run of it
+SHALL end cancelled. The other rules SHALL still act, and a rule that does
+not verify or does not decode SHALL never fail ingest.
+
+A kept rule (active or paused) that does not verify SHALL be listed with
+`needs_confirmation: true`; `conversations.confirm_rule` SHALL confirm it
+again: anyone who may teach in its inbox, signing it as it is, in its state,
+with the confirming member as its author (its stored author is SQL's to
+choose). A rule that verifies SHALL NOT be confirmed again (409
+`rule_not_proposed`).
+
+#### Scenario: A rule planted with SQL
+- **WHEN** a transaction of the runtime role in a workspace inserts an active rule "trash everything from this sender", taught by a manager, with no MAC, a made-up one or another rule's, and plants an apply run for it
+- **THEN** new mail from that sender is stored and left as it is, the run is cancelled before it changes anything, no `conversations.changes_requested` is published for it, and the rule is listed as needing confirmation
+
+#### Scenario: A signed rule changed with SQL
+- **WHEN** a member's rule has its actions, conditions, inbox, author, precedence or generation changed with SQL, or a paused or removed state set back to active
+- **THEN** it no longer acts, and its other changes wait for a member to confirm it
+
+#### Scenario: A MAC copied elsewhere
+- **WHEN** a rule's MAC is copied onto another rule with the same content, in the same inbox, another inbox or another workspace
+- **THEN** none of them acts
+
+#### Scenario: What members teach still acts
+- **WHEN** Sam teaches a rule, changes it, pauses and resumes it, removes it and brings it back
+- **THEN** it acts on the next mail and its changes are requested from the provider
+
+#### Scenario: Confirming again
+- **WHEN** a rule changed with SQL (its author removed, say) is listed as needing confirmation and Leo confirms it
+- **THEN** it is bound as it is, in its state, with Leo as its author, and acts once active
+
+#### Scenario: No instance secret
+- **WHEN** the server has no `CAMPBOOKS_SECRET_KEY` and a member saves an active rule
+- **THEN** the request fails with 500 and no rule acts
+
+### Requirement: Rules kept from before rules were bound
+The migration that adds the binding SHALL record each kept rule's (active or
+paused) id, workspace and a SHA-256 of its bound fields, computed in SQL as
+text no session setting changes, in `conversations.rule_resigns`, which the
+runtime role MAY read and SHALL NOT insert, update or delete.
+`conversations.take_rule_resign` (`SECURITY DEFINER`, owned by
+`campbooks_definer`, `search_path = pg_catalog, pg_temp`) SHALL remove a
+rule's row in the transaction's workspace and answer whether the rule as
+stored is kept and hashes, with the same expression, to the recorded value.
+`conversations.dispatch_rule_resigns` (every minute, the maintenance scope)
+SHALL enqueue `conversations.resign_rules` in each workspace with rows; that
+job SHALL sign a recorded rule only when the function answers true, never
+wait on a rule a member's request holds, and take nothing without an
+instance secret. A rule changed since the migration, or not recorded by it,
+SHALL stay unsigned, with a WARN line carrying ids only.
+
+#### Scenario: The owner's rules at the upgrade
+- **WHEN** the migration runs over active and paused rules and the dispatcher runs
+- **THEN** each rule still as it was is signed once, acts on the next mail, and leaves the snapshot
+
+#### Scenario: Changed after the migration
+- **WHEN** a recorded rule's actions are changed with SQL before the job runs
+- **THEN** it is not signed, leaves the snapshot, and waits for a member to confirm it
+
+#### Scenario: Adding to the snapshot
+- **WHEN** the runtime role inserts, updates or deletes a row of `conversations.rule_resigns`, or plants `conversations.resign_rules`
+- **THEN** the write is refused, and the job signs only rules the migration recorded
+
+### Requirement: Rule runs and the changes they record are bound
+A run of a taught rule SHALL carry a MAC under the binding key (derived from
+the instance secret, never stored in the database, logged or sent), with its
+own context label (`campbooks/conversations.rule-run/v1`), over the
+workspace, the run, the rule, the rule's binding generation, the kind (apply
+or revert), the rule's inbox and the member who asked for it. Only the
+authenticated member's request that starts the run SHALL sign it, right
+after it signed or verified the rule; an apply run SHALL be signed only
+while its rule is bound. No job, consumer or startup task SHALL create or
+sign a run. Before each batch, `conversations.apply_rule` SHALL verify the
+run's MAC against the run and the rule as stored, at the rule's generation
+then, in constant time; a run that does not verify, has no MAC, or whose
+rule was signed again since it started SHALL change nothing and ask the
+provider for nothing, and SHALL end `cancelled` with a WARN line carrying
+ids only and no retry.
+
+What a rule changes on a conversation (its application, with what the
+conversation was before and what the rule did) SHALL carry a MAC with its
+own context label (`campbooks/conversations.rule-application/v1`) over the
+workspace, the rule, the rule's inbox, the conversation, the run that made
+it (if any) and a canonical encoding of what it records. Only the path that
+carries out a verified rule's effects (in a run or on arriving mail) SHALL
+sign it, over what that path did and, when the conversation already held
+changes of the rule, what the existing row recorded only if that row
+verifies; an existing row that does not SHALL be dropped. The row SHALL be
+claimed and locked before it is read (a row another transaction is
+inserting SHALL be waited for), and its record and MAC SHALL be written
+together from a value computed by the server, never one SQL produced. Putting a
+rule's changes back SHALL verify each application under its row lock and
+SHALL leave one that does not verify, or does not decode, as it is, with a
+WARN line carrying ids only, and go on with the others. A row that does not
+verify or decode SHALL never fail ingest or a job.
+
+#### Scenario: A planted undo
+- **WHEN** a transaction of the runtime role in a workspace inserts, for a member's signed rule, an application saying the rule reported a mail as spam (with no MAC or a made-up one), a revert run and its job
+- **THEN** the run is cancelled before it changes anything, the mail stays in spam, and no `conversations.changes_requested` is published
+
+#### Scenario: A planted apply run of a member's rule
+- **WHEN** Sam taught "report GitHub as spam" without applying it to existing mail, and the runtime role plants an apply run for it (with no MAC, a made-up one, or another run's MAC copied) and its job
+- **THEN** the runs are cancelled, the mail already there is left as it is, nothing is requested from the provider, and the rule still acts on new mail
+
+#### Scenario: A run of a rule signed again
+- **WHEN** Sam pauses and resumes a rule before its apply run's first batch
+- **THEN** the run ends cancelled and changes nothing
+
+#### Scenario: One application changed with SQL
+- **WHEN** a rule reported three conversations as spam and SQL rewrites one application's record and copies another's, MAC included, onto the third, then Sam removes the rule with `restore=true`
+- **THEN** only the untouched conversation is taken out of spam, the run ends done with one changed, and no job fails
+
+#### Scenario: An application planted while the rule records
+- **WHEN** the runtime role inserts, without committing yet, an application of a member's rule to a conversation saying the rule binned a phishing mail, while new mail the rule matches arrives in that conversation, then commits
+- **THEN** the stored application records only what the rule did, signed, and the member's undo leaves the phishing mail in spam
+
+#### Scenario: A bad row on arriving mail
+- **WHEN** a rule's application to a conversation has no MAC or does not decode, and new mail the rule matches arrives in that conversation
+- **THEN** ingest succeeds, the rule acts, and the application records only what the rule did now, signed
+
+### Requirement: Send and confirm sign only what the member was shown
+Every response that shows a member a draft (`get_draft`, `list_drafts`,
+`create_draft`, `update_draft`, `send_draft`, `cancel_send`) or a taught
+rule (`get_rule`, `list_rules`, `create_rule`, `confirm_rule`,
+`update_rule`, `remove_rule`, `restore_rule`, `decline_rule`) SHALL carry a
+`content_token`: a version byte and an HMAC-SHA256 under the binding key
+(derived from the instance secret, never stored in the database, logged or
+sent), with its own context label
+(`campbooks/conversations.content-token/v1`), over the workspace, the member
+the response is for, the object's kind and id, and for a draft its inbox
+id, its version and the same content hash `send_draft` binds into the send
+request, for a
+rule its binding generation, the same hash of its conditions and actions its
+MAC binds, its inbox, its stored state and its author. The token SHALL NOT
+be stored. Without an instance secret no token SHALL be issued.
+
+`conversations.send_draft`, `conversations.update_draft` (every save: a
+save keeps fields it cannot send, such as the inbox, the reply headers and
+the attachments' files), `conversations.confirm_rule` (a proposal's yes and
+a yes again) and `conversations.update_rule` with `adopt` (unless the
+request sets both the conditions and the actions) SHALL take the token
+back. After every access check and under the row lock, before anything
+changes, the server SHALL recompute the hash of the row as stored and verify
+the token against it in constant time. A missing token, one issued to
+another member, or one that does not hold for the row as it is now SHALL
+answer 409 `content_changed`, with no state change, nothing saved or
+signed, no job queued and nothing published, and a WARN line carrying ids
+only. A save that holds SHALL issue the next token over the draft as it
+left it. Without an instance secret saves SHALL NOT be checked (nothing can
+be signed) and `send_draft` SHALL refuse. Requests
+that send the whole content they sign (`create_rule`, an `update_rule` with
+both conditions and actions) and requests that keep content whose rule MAC
+verifies under the lock (pausing, resuming, removing, bringing back) SHALL
+NOT need a token.
+
+#### Scenario: A Bcc added with SQL after the draft was shown
+- **WHEN** Sam's composer read his draft, then a transaction of the runtime role adds a Bcc or changes the body without bumping its version, and Sam sends with the version and token he read
+- **THEN** the answer is 409 `content_changed`, the draft is still a draft with no send request bound, no release is queued and no `conversations.send_requested` is published
+
+#### Scenario: Read again, it is what the member saw
+- **WHEN** Sam's client reads that draft again (it shows the Bcc) and Sam sends with the new token
+- **THEN** it is scheduled
+
+#### Scenario: A stale token after a save
+- **WHEN** Sam saves the draft and sends with the token of before the save
+- **THEN** the answer is 409 `content_changed`; with the save's token it is scheduled
+
+#### Scenario: Hidden fields changed before an autosave
+- **WHEN** Sam's composer read his draft, then SQL changes an attachment's file name, the quoted text or the reply headers, and the composer autosaves with the token it read
+- **THEN** the save answers 409 `content_changed` and writes nothing, and a send with that token signs nothing
+
+#### Scenario: A stale token after an autosave
+- **WHEN** Sam's composer saves, then saves again with the token of before the first save
+- **THEN** the second save answers 409 `content_changed`; with the first save's token it is saved
+
+#### Scenario: Another draft's or rule's token
+- **WHEN** a save, a send or a yes carries the token of another draft or rule of the same member
+- **THEN** the answer is 409 `content_changed`
+
+#### Scenario: Another member's token
+- **WHEN** a send or a yes carries a token issued to another member for the same content
+- **THEN** the answer is 409 `content_changed`
+
+#### Scenario: A proposal changed with SQL after it was shown
+- **WHEN** Sam's client read a rule waiting for a yes, then SQL changes its actions, conditions or author, and Sam says yes with the token he read
+- **THEN** the answer is 409 `content_changed`, the rule is still proposed and unsigned, no run starts, and nothing is asked of the provider
+
+#### Scenario: Adopting what was shown
+- **WHEN** a manager adopts a rule with a missing token, or one of before the rule was signed again
+- **THEN** the answer is 409 `content_changed`; with the token of the rule as it is now, or with the whole rule in the request, it is adopted
+
+#### Scenario: A composer opened before the upgrade
+- **WHEN** a member sends from a composer that has no token
+- **THEN** the answer is 409 `content_changed`, nothing is sent, and the next send with the token of the draft read again is scheduled
+
+### Requirement: Only a member's own request says yes to a rule
+A rule SHALL act only through a member's own request: one that reached the
+API over HTTP with the person's token (their client, or an app they
+allowed). When the assistant, or an automation rule, runs a rule
+operation on a member's behalf (`kernel::operations::invoke`), the server
+SHALL let it propose a rule and never make one act or sign it as the
+member's:
+
+- `conversations.confirm_rule` SHALL NOT be callable by the assistant
+  (`x-campbooks.assistant` false), so the kernel refuses the call before
+  the handler runs, confirmed or not; and the handler SHALL refuse with 403
+  `rule_needs_your_yes` any invoked request that reaches it.
+- `conversations.create_rule` SHALL store what an invoked request saves as
+  `proposed` whatever state, origin or member preference it carries (it is
+  not signed and applies to nothing), and SHALL refuse one that answers a
+  suggestion (`notice_id`, which keeps a rule acting at once) with 403
+  `rule_needs_your_yes`.
+- `conversations.update_rule` SHALL refuse, with 403 `rule_needs_your_yes`,
+  an invoked request that adopts a rule, lets it act again (`paused:
+  false`) or changes the conditions or actions of a rule that is not a
+  proposal. Pausing a rule, and reshaping a proposal (which still waits for
+  a yes), SHALL stay allowed.
+- `conversations.restore_rule` SHALL refuse, with 403 `rule_needs_your_yes`,
+  an invoked request that would bring a rule back active or paused; a
+  proposal may come back, still waiting for its yes.
+- `conversations.decline_rule` and `conversations.remove_rule`, which make
+  a rule act less, SHALL stay allowed.
+
+Each refusal SHALL come after the access checks and before anything is
+changed or signed, with a WARN line carrying the workspace and rule ids and
+the caller kind only. Whether a request was invoked SHALL be the kernel's to
+say, from a request extension only `invoke` attaches; nothing a client sends
+SHALL set it or clear it. A member's own yes (the rules list's Keep, with
+the token of what their screen showed) SHALL keep working unchanged.
+
+#### Scenario: Scout says yes with the member's token
+- **WHEN** the assistant, acting for Sam, reads a proposed rule (its `content_token` is Sam's) and calls `conversations.confirm_rule` with that token, as a call Sam confirmed or not
+- **THEN** the call is refused before the handler runs, the rule is still proposed and unsigned, no run starts and nothing is asked of the provider
+
+#### Scenario: Sam keeps it himself
+- **WHEN** Sam then keeps the proposal from the rules list with the token his screen got
+- **THEN** it is active, signed, and Sam is its author
+
+#### Scenario: Scout saves a rule asking for it to act
+- **WHEN** the assistant, acting for a member who lets Campbooks act without asking, saves a rule active or from corrections
+- **THEN** it is stored proposed and unsigned, `acted_without_asking` is false, and nothing changes in the inbox until the member says yes
+
+#### Scenario: Scout answers a suggestion
+- **WHEN** the assistant saves a rule with a `notice_id`
+- **THEN** the answer is 403 `rule_needs_your_yes` and nothing is saved
+
+#### Scenario: Scout adopts, resumes or rewrites a kept rule
+- **WHEN** the assistant adopts Sam's active rule with Sam's token, changes its actions, sets its whole content, or resumes it once paused
+- **THEN** each answers 403 `rule_needs_your_yes` and the rule's binding generation, MAC and state are as before
+
+#### Scenario: Scout pauses, removes and reshapes
+- **WHEN** the assistant pauses Sam's rule, removes it, or changes the actions of a proposal
+- **THEN** each succeeds; bringing the removed rule back is refused (403 `rule_needs_your_yes`) until Sam's own Undo brings it back acting, and the reshaped proposal waits for Sam's yes to what it now does
+
+### Requirement: Only a member's own request sends mail
+Mail SHALL leave, and a send SHALL be taken back, only through a member's
+own request: one that reached the API over HTTP with the person's token.
+When the assistant, or an automation rule, runs an operation on a member's
+behalf (`kernel::operations::invoke`), the server SHALL let it write drafts
+and never send one or cancel a send:
+
+- `conversations.send_draft` and `conversations.cancel_send` SHALL NOT be
+  callable by the assistant or automation (`x-campbooks.assistant` and
+  `.automation` false), so the kernel refuses the call before the handler
+  runs, whether or not the call is marked confirmed.
+- Both handlers SHALL refuse any invoked request that reaches them with
+  403 `send_needs_you`, after the access checks (404 for a draft the caller
+  cannot see, 403 for an inbox they only read) and before any 409, with a
+  WARN line carrying the workspace and draft ids and the caller kind only.
+  Nothing SHALL be scheduled, bound or released, and a scheduled send SHALL
+  stay scheduled.
+- `conversations.create_draft`, `update_draft`, `get_draft`, `list_drafts`
+  and `delete_draft` SHALL stay callable by the assistant: what it writes
+  is sent only by the member's own Send, with the `content_token` of the
+  draft on their screen.
+
+Whether a request was invoked SHALL be the kernel's to say
+(`Workspace::invoked_by`); nothing a client sends SHALL set or clear it. A
+member's own Send and Undo SHALL keep working unchanged.
+
+#### Scenario: Scout sends with the member's token
+- **WHEN** the assistant, acting for Sam, writes a reply, reads it back (its `content_token` is Sam's) and calls `conversations.send_draft` with its version and that token, as a call Sam confirmed or not
+- **THEN** the call is refused before the handler runs; the draft is still a draft, with no send bound, no release queued and no send asked of the connector
+
+#### Scenario: The flag flipped back by mistake
+- **WHEN** `send_draft` or `cancel_send` were listed for the assistant again, and it calls one confirmed
+- **THEN** the handler answers 403 `send_needs_you` and changes nothing
+
+#### Scenario: Scout takes back Sam's send
+- **WHEN** Sam's reply is scheduled and the assistant calls `conversations.cancel_send` for it
+- **THEN** the call is refused, the send stays scheduled and leaves when the window ends
+
+#### Scenario: Sam sends what Scout wrote
+- **WHEN** Sam opens the draft Scout wrote and presses Send
+- **THEN** it is scheduled with Sam's request bound to it, and his Undo can still take it back
+
+### Requirement: Only a member's own request trusts a sender's images
+A rule that shows a sender's images (`show_images`) SHALL be saved,
+reshaped and brought back only through a member's own request. When the
+assistant, or an automation rule, runs a rule operation on a member's
+behalf, the server SHALL answer 403 `images_need_you`, after the access
+checks and before anything is saved, to:
+
+- `conversations.create_rule` whose actions show images, whatever state it
+  asks for (so no proposal of the assistant's can make the member's own
+  rule for that sender answer 409 `images_already_trusted`);
+- `conversations.update_rule` that changes the conditions or actions of a
+  rule that shows images, or changes a rule's actions to show them;
+- `conversations.restore_rule` of a rule that shows images.
+
+Pausing, declining and removing such a rule SHALL stay allowed. A member's
+own "Always show images" SHALL keep working unchanged.
+
+#### Scenario: Scout proposes trusting a sender
+- **WHEN** the assistant, acting for Sam, saves "always show images from notifications@github.com", proposed or active
+- **THEN** the answer is 403 `images_need_you` and no rule is saved
+
+#### Scenario: Sam trusts the sender himself
+- **WHEN** Sam then chooses "Always show images" for that sender
+- **THEN** the rule is saved, active and Sam's, with no `images_already_trusted`
+
+#### Scenario: Scout reshapes or restores one
+- **WHEN** the assistant changes a proposal's actions to show images, or brings back an image rule Sam removed
+- **THEN** each answers 403 `images_need_you` and nothing changes
+
+### Requirement: A message's words alone
+`conversations.get_message_body` with `words=true` SHALL return the
+message's words alone, as `text`, with no `html`: its text part when it has
+words, else its HTML read as text the way every reader reads it (at most
+500 ms, at most 256 KiB of the HTML), cut at 256 KiB, and marked
+`truncated` whenever they are not whole: the text cut, the HTML cut at its
+256 KiB, or its reading stopped at the 500 ms cap. It SHALL need exactly the access of the body. This is what a
+reply or forward quotes when `conversations.get` marked the message
+`text_unread`. In a debug build only, `CAMPBOOKS_DEV_TEXT_DEADLINE_MS`, when
+set, SHALL replace the one-second deadline `conversations.get` reads HTML
+within (0 marks every message read from HTML `text_unread`); release builds
+SHALL never read it.
+
+#### Scenario: Words of HTML-only mail
+- **WHEN** a member asks for the words of a message that is HTML alone
+- **THEN** `text` holds the HTML's words and `html` is absent
+
+#### Scenario: Words of a message with a text part
+- **WHEN** a member asks for the words of a message with a text part
+- **THEN** `text` is that text part
+
+#### Scenario: Someone outside the inbox
+- **WHEN** a member of the workspace who is not in the message's inbox asks for its words
+- **THEN** the message is not found
+
+#### Scenario: Forcing text_unread for a recording
+- **WHEN** a debug server runs with `CAMPBOOKS_DEV_TEXT_DEADLINE_MS=0` and a member opens a conversation of HTML-only mail
+- **THEN** each such message comes without `text`, marked `text_unread`
+
+### Requirement: A quote says when it is cut
+`conversations.get` SHALL mark a message `quote_cut` when the `text` it
+returns holds only the first part of the message's words: the text part was
+cut, the HTML was cut at the 256 KiB it is read from, or the words were cut
+at their limit. The message's `truncated` SHALL stay about its text part
+alone, so HTML the reader shows whole is never called truncated.
+
+#### Scenario: Long HTML read in time
+- **WHEN** a member opens a conversation whose HTML-only message is 280 KiB and its words are read within the deadline
+- **THEN** the message has its words, is not `text_unread` and not `truncated`, and is marked `quote_cut`; a short HTML-only message is not

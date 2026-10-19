@@ -324,7 +324,7 @@ fn declares_by_macro(text: &str, id: &str) -> bool {
 /// module inside another module or a `macro_rules!` body does not either;
 /// and only when nothing but whitespace (or comments) follows the module's
 /// closing brace (campbooks-cloud#207). Anything else is checked whole.
-fn without_tests(text: &str) -> &str {
+pub(crate) fn without_tests(text: &str) -> &str {
     test_module_start(&code_only(text)).map_or(text, |at| &text[..at])
 }
 
@@ -877,7 +877,7 @@ fn lex(code: &str) -> Vec<(Lexeme, std::ops::Range<usize>)> {
 
 /// `code` without its comments (line, trailing and block comments), string
 /// and character literals kept as they are.
-fn without_comments(code: &str) -> String {
+pub(crate) fn without_comments(code: &str) -> String {
     let mut out = String::with_capacity(code.len());
     for (kind, range) in lex(code) {
         match kind {
@@ -1007,7 +1007,7 @@ fn raw_string_at(chars: &[(usize, char)], i: usize) -> bool {
     at(j) == Some('"')
 }
 
-fn is_test_file(path: &str) -> bool {
+pub(crate) fn is_test_file(path: &str) -> bool {
     let name = path.rsplit('/').next().unwrap_or_default();
     name == "tests.rs"
         || name.ends_with("_tests.rs")

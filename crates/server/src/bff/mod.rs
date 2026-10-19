@@ -460,8 +460,12 @@ impl Inner {
             self.retire(&token_hash).await?;
             return Ok(None);
         }
-        if now - session.last_seen_at >= TOUCH_EVERY {
-            let idle_until = (now + self.timeouts.idle).min(session.expires_at);
+        if let Some(idle_until) = touch_until(
+            now,
+            session.last_seen_at,
+            self.timeouts.idle,
+            session.expires_at,
+        ) {
             store::touch(&self.db, &token_hash, now, idle_until).await?;
         }
         if session.current && now - session.rotated_at >= self.timeouts.rotate {
@@ -483,6 +487,20 @@ impl Inner {
         if Utc::now() + REFRESH_BEFORE_EXPIRY < session.access_expires_at {
             return self.open_access(session, &session.access_token).await;
         }
+        self.refresh(session, None).await
+    }
+
+    /// Refresh the session's access token: when it is about to expire, or,
+    /// given `refused` (the token the API just refused as invalid: its
+    /// sign-in ended, campbooks-cloud#143), now, unless another request
+    /// already replaced it. A refresh the identity provider refuses ends
+    /// the session, so the app signs in again instead of failing until the
+    /// refused token would have expired.
+    async fn refresh(
+        &self,
+        session: &Session,
+        refused: Option<&str>,
+    ) -> Result<String, AccessError> {
         let lock = &self.refresh_locks[lock_index(session.id)];
         let _guard = lock.lock().await;
         let mut tx = store::begin_refresh(&self.db).await?;
@@ -490,12 +508,34 @@ impl Inner {
             return Err(AccessError::SessionEnded);
         };
         let now = Utc::now();
-        if now + REFRESH_BEFORE_EXPIRY < tokens.access_expires_at {
+        let current = match refused {
+            // Replaced by another request while this one waited: use it.
+            Some(refused) => {
+                let Ok(held) = self.cipher.open(
+                    &tokens.access_token,
+                    &sealed_for(session.id, "access_token"),
+                ) else {
+                    // Ending the session deletes its row on another
+                    // connection: this transaction's lock on it goes first
+                    // (campbooks-cloud#259).
+                    drop(tx);
+                    return self.unreadable(&session.presented).await;
+                };
+                (held != refused).then_some(held)
+            }
+            None => None,
+        };
+        if let Some(held) = current {
+            tx.commit().await?;
+            return Ok(held);
+        }
+        if refused.is_none() && now + REFRESH_BEFORE_EXPIRY < tokens.access_expires_at {
             // Another request refreshed while this one waited.
             tx.commit().await?;
             return self.open_access(session, &tokens.access_token).await;
         }
-        let still_valid = now < tokens.access_expires_at;
+        // A refused token is no longer valid, whenever it would expire.
+        let still_valid = refused.is_none() && now < tokens.access_expires_at;
         let Some(sealed_refresh) = &tokens.refresh_token else {
             tx.commit().await?;
             return if still_valid {
@@ -506,27 +546,31 @@ impl Inner {
         };
         let Ok(refresh_token) = self
             .cipher
-            .open(sealed_refresh, &sealed_for(session.id, "refresh_token"))
+            .open_checked(sealed_refresh, &sealed_for(session.id, "refresh_token"))
         else {
             drop(tx);
             return self.unreadable(&session.presented).await;
         };
-        match self.oidc.refresh(&refresh_token).await {
+        match self.oidc.refresh(&refresh_token.value).await {
             Ok(fresh) => {
-                let expires_at = now + expires_in(fresh.expires_in);
-                let access = self
-                    .cipher
-                    .seal(&fresh.access_token, &sealed_for(session.id, "access_token"));
-                let refresh = fresh.refresh_token.as_deref().map(|token| {
-                    self.cipher
-                        .seal(token, &sealed_for(session.id, "refresh_token"))
-                });
+                let sealed = self.seal_refreshed(
+                    session.id,
+                    &fresh,
+                    &refresh_token,
+                    tokens.id_token.as_deref(),
+                );
                 store::update_tokens(
                     &mut tx,
                     &session.presented,
-                    &access,
-                    expires_at,
-                    refresh.as_deref().or(Some(sealed_refresh.as_slice())),
+                    &store::Refreshed {
+                        access_token: &sealed.access,
+                        access_expires_at: now + expires_in(fresh.expires_in),
+                        refresh_token: sealed
+                            .refresh
+                            .as_deref()
+                            .or(Some(sealed_refresh.as_slice())),
+                        id_token: sealed.id.as_deref(),
+                    },
                 )
                 .await?;
                 tx.commit().await?;
@@ -549,6 +593,37 @@ impl Inner {
                     )))
                 }
             }
+        }
+    }
+
+    /// What a refresh stores, sealed with the current key: the new access
+    /// token; the refresh token the identity provider sent back, or the one
+    /// used when the previous instance secret sealed it; and the stored ID
+    /// token, sealed again when the previous key sealed it
+    /// (campbooks-cloud#191). `None` keeps what is stored.
+    fn seal_refreshed(
+        &self,
+        id: Uuid,
+        fresh: &oidc::TokenResponse,
+        used: &campbooks_kernel::crypto::Opened,
+        stored_id: Option<&[u8]>,
+    ) -> SealedRefresh {
+        let refresh = fresh
+            .refresh_token
+            .as_deref()
+            .or_else(|| used.by_previous.then_some(used.value.as_str()))
+            .map(|token| self.cipher.seal(token, &sealed_for(id, "refresh_token")));
+        let context = sealed_for(id, "id_token");
+        let id_token = stored_id
+            .and_then(|sealed| self.cipher.open_checked(sealed, &context).ok())
+            .filter(|opened| opened.by_previous)
+            .map(|opened| self.cipher.seal(&opened.value, &context));
+        SealedRefresh {
+            access: self
+                .cipher
+                .seal(&fresh.access_token, &sealed_for(id, "access_token")),
+            refresh,
+            id: id_token,
         }
     }
 
@@ -637,10 +712,34 @@ impl Inner {
     }
 }
 
+/// The sealed tokens a refresh stores ([`Inner::seal_refreshed`]).
+struct SealedRefresh {
+    access: Vec<u8>,
+    refresh: Option<Vec<u8>>,
+    id: Option<Vec<u8>>,
+}
+
 /// Lifetime of a new access token: the IdP's `expires_in`, or a cautious
 /// default when it gives none.
 fn expires_in(seconds: Option<u64>) -> TimeDelta {
     TimeDelta::seconds(seconds.and_then(|s| i64::try_from(s).ok()).unwrap_or(300))
+}
+
+/// The idle deadline to record a use at `now` with, when one is due: at
+/// most every [`TOUCH_EVERY`], `idle` after the use and never past the
+/// session's absolute end. `None` too when that end is not after `now`: the
+/// database (by its own clock) still found the session, but this server's
+/// clock is ahead of it, and `bff.touch_session` refuses a deadline that is
+/// not after the use (campbooks-cloud#213, item 9). The session ends on
+/// either clock soon enough; the request goes on.
+fn touch_until(
+    now: DateTime<Utc>,
+    last_seen_at: DateTime<Utc>,
+    idle: TimeDelta,
+    expires_at: DateTime<Utc>,
+) -> Option<DateTime<Utc>> {
+    let idle_until = (now + idle).min(expires_at);
+    (now - last_seen_at >= TOUCH_EVERY && now < idle_until).then_some(idle_until)
 }
 
 /// Whether a session that asked for `had` at sign-in asked for every scope in

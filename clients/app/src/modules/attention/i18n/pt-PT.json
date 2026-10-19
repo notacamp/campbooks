@@ -47,7 +47,7 @@
     "forward": "Reencaminhar…",
     "combo": "{{first}} e depois {{second}}",
     "picked": "O Scout escolheu estas para este email",
-    "noAttachment": "Este email não tem nenhum ficheiro para abrir: só imagens no texto."
+    "noAttachment": "Este email não tem nenhum ficheiro para abrir."
   },
   "confirm": {
     "done": "Feito · {{name}}",

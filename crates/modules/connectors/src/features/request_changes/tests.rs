@@ -381,6 +381,130 @@ async fn many_messages_go_in_one_batch(db: PgPool) {
 }
 
 #[sqlx::test(migrations = "../../../migrations")]
+async fn a_push_counts_the_units_its_calls_spent(db: PgPool) {
+    // campbooks-cloud#252: the run settles its reservation with this.
+    let kit = Kit::new(db).await;
+    let twelve: Vec<&[&str]> = vec![&["INBOX", "UNREAD"]; 12];
+    let m = mailbox(&kit, &twelve).await;
+    let backlog = |ids: &[String]| crate::domain::outbound::Backlog {
+        pending: ids
+            .iter()
+            .map(|id| crate::domain::outbound::Pending {
+                id: uuid::Uuid::now_v7(),
+                provider_message_id: id.clone(),
+                add: Vec::new(),
+                remove: vec!["INBOX".to_owned()],
+                stamp: None,
+                attempts: 0,
+                created_at: kit.clock.now(),
+            })
+            .collect(),
+        labels: ids
+            .iter()
+            .map(|id| (id.clone(), vec!["INBOX".to_owned(), "UNREAD".to_owned()]))
+            .collect(),
+        ..Default::default()
+    };
+    let google = kit.deps.google.clone().unwrap();
+    let (access, _) = kit.google.grant();
+
+    // As planned: the profile, one batch, the profile after.
+    let planned = backlog(&m.ids);
+    assert_eq!(
+        crate::gmail::write::units(&planned),
+        2 + 4 * 2 + 50,
+        "reserved: both profiles, the history pages it may read, the batch"
+    );
+    let pushed = crate::gmail::write::push(&google.gmail(&access), &planned).await;
+    assert_eq!(pushed.spent, 1 + 50 + 1);
+
+    // A batch Gmail refuses: the batch, then each message on its own.
+    kit.google.refuse_changes(&m.ids[3]);
+    let refused = backlog(&m.ids);
+    let pushed = crate::gmail::write::push(&google.gmail(&access), &refused).await;
+    assert_eq!(pushed.spent, 1 + 50 + 12 * 5 + 1);
+}
+
+/// Watch the shared budget's settlements (an update that does not refill):
+/// log each one's change of tokens to `settled`, or refuse it when `refuse`.
+async fn watch_settlements(kit: &Kit, refuse: bool) {
+    let body = if refuse {
+        "RAISE EXCEPTION 'settlement refused for the test';"
+    } else {
+        "INSERT INTO public.settled VALUES (NEW.tokens - OLD.tokens);"
+    };
+    for sql in [
+        "CREATE TABLE public.settled (delta float8 NOT NULL)".to_owned(),
+        format!(
+            "CREATE FUNCTION public.watch_settlement() RETURNS trigger LANGUAGE plpgsql
+                 SECURITY DEFINER AS $$
+             BEGIN
+                 IF NEW.refilled_at = OLD.refilled_at THEN {body} END IF;
+                 RETURN NEW;
+             END $$"
+        ),
+        "CREATE TRIGGER watch_settlement BEFORE UPDATE ON connectors.provider_budgets
+             FOR EACH ROW EXECUTE FUNCTION public.watch_settlement()"
+            .to_owned(),
+    ] {
+        sqlx::query(sqlx::AssertSqlSafe(sql))
+            .execute(&kit.db)
+            .await
+            .unwrap();
+    }
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_run_gives_back_what_its_push_did_not_spend(db: PgPool) {
+    // campbooks-cloud#252: twelve archives, one batch Gmail takes. The run
+    // reserved the batch, both profiles and four history pages, and spent
+    // less: the difference goes back, once.
+    let kit = Kit::new(db).await;
+    let twelve: Vec<&[&str]> = vec![&["INBOX"]; 12];
+    let m = mailbox(&kit, &twelve).await;
+    watch_settlements(&kit, false).await;
+    let items: Vec<(&str, Value)> = m
+        .ids
+        .iter()
+        .map(|id| (id.as_str(), json!({"kind": "archive"})))
+        .collect();
+    m.request(&kit, &items).await;
+    let settled: Vec<f64> = sqlx::query_scalar("SELECT delta FROM public.settled")
+        .fetch_all(&kit.db)
+        .await
+        .unwrap();
+    assert_eq!(settled.len(), 1, "{settled:?}");
+    // Reserved 60 for its writes; spent the batch (50), a profile after it
+    // and at least a profile or a history page before it.
+    assert!(settled[0] > 0.0 && settled[0] <= 8.0, "{settled:?}");
+    assert!(ends(&kit).await.iter().all(|e| e.0 == "applied"));
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_push_is_recorded_even_when_its_budget_cannot_be_settled(db: PgPool) {
+    // What Gmail now holds is recorded before the budget is settled: a
+    // settlement that fails never makes the run push the same changes again.
+    let kit = Kit::new(db).await;
+    let m = mailbox(&kit, &[&["INBOX"], &["INBOX"]]).await;
+    watch_settlements(&kit, true).await;
+    kit.google.clear_calls();
+    let items: Vec<(&str, Value)> = m
+        .ids
+        .iter()
+        .map(|id| (id.as_str(), json!({"kind": "archive"})))
+        .collect();
+    m.request(&kit, &items).await;
+    assert_eq!(
+        ends(&kit).await,
+        [end("applied", None), end("applied", None)]
+    );
+    assert_eq!(kit.google.writes().len(), 2, "{:?}", kit.google.writes());
+    for id in &m.ids {
+        assert!(kit.google.labels_of(id).is_empty());
+    }
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
 async fn a_message_that_refuses_changes_fails_alone(db: PgPool) {
     let kit = Kit::new(db).await;
     let m = mailbox(&kit, &[&["INBOX"], &["INBOX"], &["INBOX"]]).await;
@@ -976,4 +1100,51 @@ async fn a_planted_or_edited_outbound_change_is_never_made(db: PgPool) {
         kit.google.labels_of(&m.ids[1]),
         labels(&["INBOX", "STARRED"])
     );
+}
+
+/// campbooks-cloud#262: a change recorded under the old instance secret
+/// key and still pending (its stream paused) is re-tagged while the old key
+/// is the previous one, and made once only the new key is left.
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_pending_change_retagged_after_a_rotation_is_made_without_the_old_key(db: PgPool) {
+    use campbooks_kernel::{
+        binding::Binding,
+        crypto::{SECRET_KEY_LEN, SecretKey},
+    };
+
+    let mut kit = Kit::new(db).await;
+    let m = mailbox(&kit, &[&["INBOX"]]).await;
+    m.pause(&kit, true).await;
+    m.request(&kit, &[(m.ids[0].as_str(), json!({"kind": "star"}))])
+        .await;
+    // The kit's key (`testing::binding`) is the old one.
+    let old = SecretKey::from_bytes([0x5a; SECRET_KEY_LEN]);
+    let new = SecretKey::from_bytes([0x6b; SECRET_KEY_LEN]);
+    let rotated = Binding::new(&new.clone().with_previous(&old));
+
+    let mut tx = kit.state.db.begin_for(m.ws).await.unwrap();
+    let (retagged, left) = crate::domain::outbound::retag(&mut tx, &rotated, m.ws)
+        .await
+        .unwrap();
+    tx.commit().await.unwrap();
+    assert_eq!((retagged, left), (1, 0));
+    let mut tx = kit.state.db.begin_for(m.ws).await.unwrap();
+    assert_eq!(
+        crate::domain::outbound::retag(&mut tx, &rotated, m.ws)
+            .await
+            .unwrap(),
+        (0, 0),
+        "nothing left"
+    );
+    tx.commit().await.unwrap();
+
+    // The previous key removed: the change verifies under the new key alone.
+    kit.state = kit.state.clone().with_binding(Binding::new(&new));
+    m.pause(&kit, false).await;
+    m.run(&kit).await;
+    assert_eq!(
+        kit.google.labels_of(&m.ids[0]),
+        labels(&["INBOX", "STARRED"])
+    );
+    assert!(ends(&kit).await.iter().all(|e| *e == end("applied", None)));
 }

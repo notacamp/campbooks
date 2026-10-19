@@ -24,6 +24,10 @@ use crate::{
 /// run in `job_log` through the job transaction, so a failed attempt leaves
 /// no row behind.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[allow(
+    clippy::struct_excessive_bools,
+    reason = "a test fixture scripted by its payload: each flag is one behaviour"
+)]
 struct Probe {
     note: String,
     /// Fail (retryably) while the attempt number is at most this.
@@ -41,6 +45,9 @@ struct Probe {
     /// Work in the kernel scope (`kernel_tx`), recording whether it was on.
     #[serde(default)]
     kernel: bool,
+    /// Record the statement timeout of the job's transaction.
+    #[serde(default)]
+    limits: bool,
 }
 
 impl Probe {
@@ -70,6 +77,14 @@ impl Job for Probe {
         }
         if let Some(reply) = &self.echo {
             return Err(JobError::fatal(format!("provider answered 400: {reply}")));
+        }
+        if self.limits {
+            let tx = ctx.tx().await?;
+            let limit: String = sqlx::query_scalar("SELECT current_setting('statement_timeout')")
+                .fetch_one(&mut **tx)
+                .await?;
+            log(ctx, Self::NAME, &format!("statement_timeout={limit}"), 1).await?;
+            return Ok(());
         }
         if self.kernel {
             let tx = ctx.kernel_tx().await?;
@@ -401,10 +416,18 @@ async fn replay_reenqueues_one_consumer(db: PgPool) {
             .unwrap(),
         3
     );
-    // Already pending: a second replay adds nothing.
+    // Already pending: a second replay adds nothing, read in batches of
+    // two or not (campbooks-cloud#254).
     assert_eq!(
         events
             .replay(&db, "test.count_a", ReplayFrom::Beginning)
+            .await
+            .unwrap(),
+        0
+    );
+    assert_eq!(
+        events
+            .replay_in_batches(&db, "test.count_a", ReplayFrom::Beginning, 2)
             .await
             .unwrap(),
         0
@@ -426,6 +449,20 @@ async fn replay_reenqueues_one_consumer(db: PgPool) {
             .await
             .unwrap(),
         1
+    );
+    worker.run_until_idle().await;
+    // Every event, a batch of two and then one, each enqueued once.
+    assert_eq!(
+        events
+            .replay_in_batches(&db, "test.count_b", ReplayFrom::Beginning, 2)
+            .await
+            .unwrap(),
+        3
+    );
+    worker.run_until_idle().await;
+    assert_eq!(
+        sorted_notes(&db, "test.count_b").await,
+        ["1", "1", "2", "2", "3", "3", "3"]
     );
     let future = Utc::now() + TimeDelta::hours(1);
     assert_eq!(
@@ -1311,7 +1348,7 @@ async fn a_purged_workspace_loses_its_finished_jobs_and_events(db: PgPool) {
     .await;
 
     let mut tx = crate::db::begin_in(&db, "gone").await.unwrap();
-    let (jobs, events) = purge_workspace(&mut tx, "gone").await.unwrap();
+    let (jobs, events) = purge_workspace(&mut tx, "gone", 10).await.unwrap();
     tx.commit().await.unwrap();
     assert_eq!((jobs, events), (1, 1));
     let left: Vec<(String, String)> = sqlx::query_as(
@@ -1399,8 +1436,9 @@ async fn enqueue_notifications_wake_an_idle_worker(db: PgPool) {
     );
     wait_for_kernel_schedules(&db).await;
     stop.send(()).unwrap();
-    // The probe, and the kernel's prunes and blob sweep scheduled at start-up.
-    assert_eq!(worker.await.unwrap().succeeded, 7);
+    // The probe, and the kernel's prunes, blob sweep, purged-workspace
+    // sweep and rekey dispatch scheduled at start-up.
+    assert_eq!(worker.await.unwrap().succeeded, 9);
 }
 
 #[sqlx::test(migrations = "../../migrations")]
@@ -1410,8 +1448,8 @@ async fn shutdown_finishes_quick_jobs_and_releases_slow_ones(db: PgPool) {
         jobs.poll_interval_ms = 50;
         // Room for both probes and every start-up schedule at once (all
         // instance-wide, so one fairness bucket).
-        jobs.concurrency = 8;
-        jobs.per_workspace = 8;
+        jobs.concurrency = 10;
+        jobs.per_workspace = 10;
     })
     .await;
     let quick = created(
@@ -1446,9 +1484,9 @@ async fn shutdown_finishes_quick_jobs_and_releases_slow_ones(db: PgPool) {
 
     stop.send(()).unwrap();
     let stats = worker.await.unwrap();
-    // The quick probe and the kernel's prunes and blob sweep scheduled at
-    // start-up.
-    assert_eq!((stats.succeeded, stats.released), (7, 1));
+    // The quick probe and the kernel's prunes, blob sweep, purged-workspace
+    // sweep and rekey dispatch scheduled at start-up.
+    assert_eq!((stats.succeeded, stats.released), (9, 1));
     assert_eq!(job(&db, quick).await.state, "succeeded");
     let slow = job(&db, slow).await;
     assert_eq!((slow.state.as_str(), slow.attempts), ("pending", 0));
@@ -1476,6 +1514,7 @@ fn registry_collects_kernel_and_module_work() {
     assert_eq!(
         registry.kind_names(),
         [
+            "kernel.dispatch_rekeys",
             "kernel.prune_changes",
             "kernel.prune_events",
             "kernel.prune_idempotency",
@@ -1483,6 +1522,7 @@ fn registry_collects_kernel_and_module_work() {
             "kernel.prune_rate_limits",
             "kernel.sequence_changes",
             "kernel.sweep_blobs",
+            "kernel.sweep_purged_workspaces",
             "test.count_a",
             "test.count_b",
             "test.forget_fails",
@@ -1498,7 +1538,9 @@ fn registry_collects_kernel_and_module_work() {
             "kernel.sweep_blobs",
             "kernel.prune_idempotency",
             "kernel.prune_rate_limits",
-            "kernel.prune_changes"
+            "kernel.prune_changes",
+            "kernel.sweep_purged_workspaces",
+            "kernel.dispatch_rekeys"
         ]
     );
     assert_eq!(
@@ -1615,12 +1657,14 @@ fn registry_marks_the_instance_only_kinds() {
     assert_eq!(
         registry.instance_only_kinds(),
         [
+            "kernel.dispatch_rekeys",
             "kernel.prune_changes",
             "kernel.prune_events",
             "kernel.prune_idempotency",
             "kernel.prune_jobs",
             "kernel.prune_rate_limits",
             "kernel.sweep_blobs",
+            "kernel.sweep_purged_workspaces",
             "test.forget_fails",
         ]
     );
@@ -2459,12 +2503,16 @@ mod kernel_scope {
             assert!(blob_refused(&detached), "{what}: {detached:?}");
             drop(step);
             let mut step = db::savepoint(&mut tx).await.unwrap();
-            let purged = purge_workspace(&mut step, &ws).await;
+            let purged = purge_workspace(&mut step, &ws, 10).await;
             assert!(refused(&purged), "{what}: {purged:?}");
             drop(step);
             let mut step = db::savepoint(&mut tx).await.unwrap();
-            let purged = crate::changes::purge_workspace(&mut step, &ws).await;
+            let purged = crate::changes::purge_workspace(&mut step, &ws, 10).await;
             assert!(refused(&purged), "{what}: {purged:?}");
+            drop(step);
+            let mut step = db::savepoint(&mut tx).await.unwrap();
+            let tombstoned = crate::purge::tombstone(&mut step, &ws).await;
+            assert!(refused(&tombstoned), "{what}: {tombstoned:?}");
             drop(step);
             tx.commit().await.unwrap();
         }
@@ -2472,7 +2520,8 @@ mod kernel_scope {
             owner_count(
                 &db,
                 "SELECT (SELECT count(*) FROM kernel.jobs) + (SELECT count(*) FROM kernel.events)
-                      + (SELECT count(*) FROM kernel.changes) + (SELECT count(*) FROM kernel.blob_refs)"
+                      + (SELECT count(*) FROM kernel.changes) + (SELECT count(*) FROM kernel.blob_refs)
+                      + (SELECT count(*) FROM kernel.purged_workspaces)"
             )
             .await,
             0,
@@ -3802,4 +3851,139 @@ mod kernel_scope {
             "no handler ran"
         );
     }
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn a_jobs_transaction_allows_its_statements_five_minutes(db: PgPool) {
+    // campbooks-cloud#254: requests' statements are cut at 30 s
+    // (`db::STATEMENT_TIMEOUT`); a job's own transaction allows five
+    // minutes, until it ends.
+    let state = state(db.clone()).await;
+    enqueue_probe(
+        &state,
+        &Probe {
+            limits: true,
+            ..Probe::note("limits")
+        },
+        EnqueueOptions::default(),
+    )
+    .await;
+    Worker::new(state.clone()).run_until_idle().await;
+    assert_eq!(notes(&db, "test.probe").await, ["statement_timeout=5min"]);
+    // Only for that transaction: every connection of the pool, the one the
+    // job ran on among them, is back to its own limit (campbooks-cloud#256).
+    let size = state.db.options().get_max_connections();
+    let mut connections = Vec::new();
+    for _ in 0..size {
+        connections.push(state.db.acquire().await.unwrap());
+    }
+    for connection in &mut connections {
+        let after: String = sqlx::query_scalar("SELECT current_setting('statement_timeout')")
+            .fetch_one(&mut **connection)
+            .await
+            .unwrap();
+        assert_ne!(after, "5min");
+    }
+}
+
+/// The queue's per-workspace key indexes left missing or invalid by a
+/// migration run that does not drop invalid indexes first (`cargo sqlx
+/// migrate run`) are built again by `20261022030100`, and a valid one is
+/// left alone (campbooks-cloud#213, item 14).
+#[sqlx::test(migrations = "../../migrations")]
+async fn the_job_key_indexes_are_rebuilt_when_missing_or_invalid(db: PgPool) {
+    const VALID: &str = "SELECT c.relname::text, i.indisvalid
+                           FROM pg_index i
+                           JOIN pg_class c ON c.oid = i.indexrelid
+                          WHERE c.relname IN ('jobs_unique_key_per_workspace_idx',
+                                              'jobs_ordering_per_workspace_idx')
+                          ORDER BY 1";
+    let migration = std::fs::read_to_string(format!(
+        "{}/../../migrations/20261022030100_kernel__job_key_indexes_valid.sql",
+        env!("CARGO_MANIFEST_DIR")
+    ))
+    .unwrap();
+    let healthy = vec![
+        ("jobs_ordering_per_workspace_idx".to_owned(), true),
+        ("jobs_unique_key_per_workspace_idx".to_owned(), true),
+    ];
+    let indexes: Vec<(String, bool)> = sqlx::query_as(VALID).fetch_all(&db).await.unwrap();
+    assert_eq!(indexes, healthy);
+    let oid_before: i64 = sqlx::query_scalar(
+        "SELECT 'kernel.jobs_ordering_per_workspace_idx'::regclass::oid::bigint",
+    )
+    .fetch_one(&db)
+    .await
+    .unwrap();
+
+    // What a failed concurrent build leaves: an invalid index, or none.
+    sqlx::query(
+        "UPDATE pg_index SET indisvalid = false
+          WHERE indexrelid = 'kernel.jobs_unique_key_per_workspace_idx'::regclass",
+    )
+    .execute(&db)
+    .await
+    .unwrap();
+    let indexes: Vec<(String, bool)> = sqlx::query_as(VALID).fetch_all(&db).await.unwrap();
+    assert_eq!(
+        indexes[1],
+        ("jobs_unique_key_per_workspace_idx".to_owned(), false)
+    );
+    sqlx::raw_sql(sqlx::AssertSqlSafe(migration.clone()))
+        .execute(&db)
+        .await
+        .unwrap();
+    let indexes: Vec<(String, bool)> = sqlx::query_as(VALID).fetch_all(&db).await.unwrap();
+    assert_eq!(indexes, healthy);
+    let oid_after: i64 = sqlx::query_scalar(
+        "SELECT 'kernel.jobs_ordering_per_workspace_idx'::regclass::oid::bigint",
+    )
+    .fetch_one(&db)
+    .await
+    .unwrap();
+    assert_eq!(oid_before, oid_after, "a valid index is left alone");
+
+    sqlx::query("DROP INDEX kernel.jobs_ordering_per_workspace_idx")
+        .execute(&db)
+        .await
+        .unwrap();
+    sqlx::raw_sql(sqlx::AssertSqlSafe(migration))
+        .execute(&db)
+        .await
+        .unwrap();
+    let indexes: Vec<(String, bool)> = sqlx::query_as(VALID).fetch_all(&db).await.unwrap();
+    assert_eq!(indexes, healthy);
+}
+
+/// A running worker beats once its loop has reached the database
+/// (campbooks-cloud#185).
+#[sqlx::test(migrations = "../../migrations")]
+async fn a_running_worker_is_alive(db: PgPool) {
+    let state = state_with(db, |_| {}).await;
+    let worker = Worker::new(state);
+    let liveness = worker.liveness();
+    assert!(!liveness.alive(crate::jobs::ALIVE_FOR), "not started yet");
+    let (stop, stopped) = tokio::sync::oneshot::channel::<()>();
+    let running = tokio::spawn(worker.run(async {
+        let _ = stopped.await;
+    }));
+    for _ in 0..100 {
+        if liveness.alive(crate::jobs::ALIVE_FOR) {
+            break;
+        }
+        tokio::time::sleep(Duration::from_millis(20)).await;
+    }
+    assert!(liveness.alive(crate::jobs::ALIVE_FOR), "beats once running");
+    stop.send(()).unwrap();
+    running.await.unwrap();
+}
+
+/// An over-limit payload cannot fit by retrying: a job failing with it fails
+/// now, like a bad request (campbooks-cloud#265).
+#[test]
+fn an_over_limit_payload_fails_a_job_for_good() {
+    let too_large = crate::Error::from(crate::blobs::BlobError::TooLarge { limit: 10 });
+    assert!(matches!(JobError::from(too_large), JobError::Fatal(_)));
+    let busy = crate::Error::Unavailable(crate::i18n::MESSAGES.reason("database_unavailable"));
+    assert!(matches!(JobError::from(busy), JobError::Retry { .. }));
 }

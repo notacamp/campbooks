@@ -997,7 +997,7 @@ export interface paths {
         get: operations["conversations.get_draft"];
         put?: never;
         post?: never;
-        /** Discard a draft (also a scheduled one, which then never leaves). */
+        /** Discard a draft (not one on its way: cancel its send first). */
         delete: operations["conversations.delete_draft"];
         options?: never;
         head?: never;
@@ -2358,6 +2358,12 @@ export interface components {
         ConfirmRule: {
             /** @description Apply it to the mail already in the inbox too (default true). */
             apply_to_existing?: boolean;
+            /**
+             * @description The `content_token` that came with the rule on screen. Missing,
+             *     another member's, or not the rule as it is now: 409
+             *     `content_changed`, and nothing is kept (campbooks-cloud#242).
+             */
+            content_token?: string | null;
         };
         /** @description An app the caller let in. */
         ConnectedApp: {
@@ -2774,6 +2780,15 @@ export interface components {
             body?: string | null;
             /** @description Copied recipients. */
             cc?: components["schemas"]["Address"][] | null;
+            /**
+             * @description The `content_token` that came with the draft on screen (its last
+             *     save's answer, or the draft as read). Every save keeps fields it
+             *     cannot set (the inbox, the reply headers, the attachments' files),
+             *     so every save names what it was shown: missing, another member's, or
+             *     not the draft as it is now answers 409 `content_changed` and nothing
+             *     is saved (campbooks-cloud#242).
+             */
+            content_token?: string | null;
             /** @description The quoted history. */
             quoted?: string | null;
             /** @description The subject. */
@@ -2816,6 +2831,13 @@ export interface components {
             body: string;
             /** @description Copied recipients. */
             cc: components["schemas"]["Address"][];
+            /**
+             * @description What you were shown, bound to you (campbooks-cloud#242): send it
+             *     back with `conversations.send_draft`. Keep the one that came with
+             *     the content on screen (a save's answer replaces it); absent when the
+             *     server has no instance secret.
+             */
+            content_token?: string | null;
             conversation_id?: components["schemas"]["ConversationId"] | null;
             /**
              * Format: date-time
@@ -2973,6 +2995,12 @@ export interface components {
             /** @description Their display name. */
             name?: string | null;
         };
+        /**
+         * @description Why a message's remote images stay held back although its sender is, or
+         *     could be, trusted (campbooks-cloud#235).
+         * @enum {string}
+         */
+        ImagesHeld: "under_review" | "checks_fail" | "unverified" | "cannot_authenticate" | "not_checked" | "rule_paused" | "rule_too_broad";
         /**
          * Format: uuid
          * @description InboxId (UUIDv7)
@@ -3218,6 +3246,18 @@ export interface components {
             css?: string | null;
             /** @description The HTML part, sanitised; still to be shown only in a sandboxed frame. */
             html?: string | null;
+            /**
+             * @description The sender's domain the member may trust instead of the address
+             *     (owned, not a free mail provider's), when it may be offered.
+             */
+            images_domain?: string | null;
+            images_held?: components["schemas"]["ImagesHeld"] | null;
+            /**
+             * @description Whether "Always show images from …" can take effect here: remote
+             *     images were held back, no rule trusts the sender yet, and nothing
+             *     about the email would keep its images back.
+             */
+            images_offer: boolean;
             /** @description Whether the remote images were kept. */
             images_shown: boolean;
             /**
@@ -3263,6 +3303,13 @@ export interface components {
             has_html: boolean;
             /** @description The message. */
             id: components["schemas"]["MessageId"];
+            /**
+             * @description `text` holds only the first part of its words (its HTML was cut at
+             *     256 KiB, or the words at their limit): a reply or forward quoting it
+             *     says so. The reader's own `truncated` stays about the text part
+             *     (campbooks-cloud#255).
+             */
+            quote_cut?: boolean;
             /** @description Read. */
             read: boolean;
             /** @description Where replies go, when not to the sender. */
@@ -3277,6 +3324,12 @@ export interface components {
             /** @description The subject. */
             subject: string;
             text?: components["schemas"]["MessageText"] | null;
+            /**
+             * @description Its words were to be read from its HTML and this answer ran out of
+             *     time first: `text` is absent, and the HTML is still whole
+             *     (`conversations.get_message_body`).
+             */
+            text_unread?: boolean;
             /** @description Recipients. */
             to: components["schemas"]["Address"][];
         };
@@ -4203,6 +4256,12 @@ export interface components {
              */
             confirmed_at?: string | null;
             /**
+             * @description What you were shown, bound to you (campbooks-cloud#242): send it
+             *     back to say yes to it (`conversations.confirm_rule`) or to adopt it.
+             *     Absent when the server has no instance secret.
+             */
+            content_token?: string | null;
+            /**
              * Format: date-time
              * @description When it was made.
              */
@@ -4219,6 +4278,8 @@ export interface components {
             last_applied_at?: string | null;
             /** @description Whether the caller may change or remove it. */
             may_change: boolean;
+            /** @description Whether it waits for a member to confirm it again before it acts. */
+            needs_confirmation?: boolean;
             /** @description Where it came from. */
             origin: components["schemas"]["RuleOrigin"];
             /** @description The member's own words, for an instruction. */
@@ -4364,6 +4425,13 @@ export interface components {
         };
         /** @description Which version of the draft to send: the one the member last saw saved. */
         SendDraft: {
+            /**
+             * @description The `content_token` that came with the draft on screen (its last
+             *     save's answer, or the draft as read). Missing, another member's, or
+             *     not the draft as it is now: 409 `content_changed`, and nothing is
+             *     sent (campbooks-cloud#242).
+             */
+            content_token?: string | null;
             /**
              * Format: int32
              * @description The draft's version as last saved by the caller; any other answers
@@ -4715,6 +4783,13 @@ export interface components {
             adopt?: boolean;
             /** @description New conditions. */
             conditions?: components["schemas"]["RuleCondition"][] | null;
+            /**
+             * @description With `adopt`, unless this change sets both the conditions and the
+             *     actions: the `content_token` that came with the rule on screen, so
+             *     you adopt only what you were shown (409 `content_changed`
+             *     otherwise).
+             */
+            content_token?: string | null;
             /** @description `true` to pause it, `false` to let it act again. */
             paused?: boolean | null;
         };
@@ -7194,6 +7269,13 @@ export interface operations {
                  *     tracking pixels are removed either way.
                  */
                 show_images?: boolean;
+                /**
+                 * @description `true` for the message's words only, as `text`: its text part when it
+                 *     has any, else its HTML read as text (at most half a second). `html`
+                 *     is then absent. What a reply or forward quotes when
+                 *     `conversations.get` marked the message `text_unread`.
+                 */
+                words?: boolean;
             };
             header?: never;
             path: {
@@ -8492,7 +8574,7 @@ export interface operations {
                     "application/problem+json": components["schemas"]["Problem"];
                 };
             };
-            /** @description On its way (`draft_not_editable`). */
+            /** @description Scheduled or on its way (`draft_not_editable`): cancel its send first. */
             409: {
                 headers: {
                     [name: string]: unknown;
@@ -8566,7 +8648,7 @@ export interface operations {
                     "application/problem+json": components["schemas"]["Problem"];
                 };
             };
-            /** @description Changed since that version (`draft_changed`), or on its way (`draft_not_editable`). */
+            /** @description Changed since that version (`draft_changed`), on its way (`draft_not_editable`), or not what you were shown (`content_changed`): read it again, then save. */
             409: {
                 headers: {
                     [name: string]: unknown;
@@ -8609,7 +8691,7 @@ export interface operations {
                     "application/problem+json": components["schemas"]["Problem"];
                 };
             };
-            /** @description Missing scope, or you only read its inbox. */
+            /** @description Missing scope, you only read its inbox, or not your own request (`send_needs_you`). */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -8683,7 +8765,7 @@ export interface operations {
                     "application/problem+json": components["schemas"]["Problem"];
                 };
             };
-            /** @description Missing scope, or you only read its inbox. */
+            /** @description Missing scope, you only read its inbox, or not your own request (`send_needs_you`): the assistant and automation never send. */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -8701,7 +8783,7 @@ export interface operations {
                     "application/problem+json": components["schemas"]["Problem"];
                 };
             };
-            /** @description Already on its way (`draft_not_editable`), or saved since that version (`draft_changed`). */
+            /** @description Already on its way (`draft_not_editable`), saved since that version (`draft_changed`), or not what you were shown (`content_changed`): read it again, check it, and send again. */
             409: {
                 headers: {
                     [name: string]: unknown;
@@ -9101,7 +9183,7 @@ export interface operations {
                     "application/problem+json": components["schemas"]["Problem"];
                 };
             };
-            /** @description Missing scope, or you may only read this inbox. */
+            /** @description Missing scope, you may only read this inbox, a suggestion saved by the assistant rather than by you (`rule_needs_your_yes`), or a rule showing a sender's images saved other than in your own request (`images_need_you`). */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -9911,6 +9993,15 @@ export interface operations {
                     "application/problem+json": components["schemas"]["Problem"];
                 };
             };
+            /** @description Some of what it changed can't be put back: remove it keeping its changes. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
         };
     };
     "conversations.update_rule": {
@@ -9958,7 +10049,7 @@ export interface operations {
                     "application/problem+json": components["schemas"]["Problem"];
                 };
             };
-            /** @description Missing scope, or not your rule. */
+            /** @description Missing scope, not your rule, adopting, resuming or reshaping a kept rule other than in your own request (`rule_needs_your_yes`), or reshaping a rule that shows a sender's images other than in your own request (`images_need_you`). */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -9969,6 +10060,15 @@ export interface operations {
             };
             /** @description No such rule, or you cannot see it. */
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description It needs a yes again first (`rule_needs_confirmation`), or you adopt one that is not what you were shown (`content_changed`). */
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -10023,7 +10123,7 @@ export interface operations {
                     "application/problem+json": components["schemas"]["Problem"];
                 };
             };
-            /** @description Missing scope, or you may only read this inbox. */
+            /** @description Missing scope, you may only read this inbox, or not your own request (`rule_needs_your_yes`): only you say yes to a rule. */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -10041,7 +10141,7 @@ export interface operations {
                     "application/problem+json": components["schemas"]["Problem"];
                 };
             };
-            /** @description It is not waiting for a yes. */
+            /** @description It is not waiting for a yes (`rule_not_proposed`), or it is not what you were shown (`content_changed`): read it again, check it, and say yes again. */
             409: {
                 headers: {
                     [name: string]: unknown;
@@ -10149,7 +10249,7 @@ export interface operations {
                     "application/problem+json": components["schemas"]["Problem"];
                 };
             };
-            /** @description Missing scope, or not your rule. */
+            /** @description Missing scope, not your rule, bringing a kept rule back other than in your own request (`rule_needs_your_yes`), or bringing back a rule that shows a sender's images other than in your own request (`images_need_you`). */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -10337,6 +10437,13 @@ export interface operations {
                 q?: string;
                 /** @description How many, 1 to 10 (default 10). */
                 limit?: number;
+                /**
+                 * @description Only senders it is safe to write to (Forward's picker): never a
+                 *     no-reply address, nor a sender whose newest mail fails their checks
+                 *     or pretends to be them, nor one with mail reported (in spam), under
+                 *     review or found suspicious. Default false.
+                 */
+                reachable?: boolean;
             };
             header?: never;
             path: {
@@ -10852,7 +10959,7 @@ export interface operations {
                     "application/json": components["schemas"]["SignedInWith"];
                 };
             };
-            /** @description `invalid_body` (not a credential, or over 16 KiB). */
+            /** @description `invalid_body` (not a credential). */
             400: {
                 headers: {
                     [name: string]: unknown;
@@ -10879,6 +10986,15 @@ export interface operations {
             };
             /** @description `passkey_expired`: no ceremony waits for this browser (it took more than five minutes, or was used). */
             409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `body_too_large`: the body is over 16 KiB. */
+            413: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -10923,7 +11039,7 @@ export interface operations {
                     "application/json": components["schemas"]["RequestOptions"];
                 };
             };
-            /** @description `invalid_return_to`, or `invalid_body` (not JSON, or over 16 KiB). */
+            /** @description `invalid_return_to`, or `invalid_body` (not JSON). */
             400: {
                 headers: {
                     [name: string]: unknown;
@@ -10947,6 +11063,15 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description `body_too_large`: the body is over 16 KiB. */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
             };
             /** @description `rate_limited`: too many ceremonies, or ten challenges waiting, for this address. */
             429: {
@@ -10986,7 +11111,7 @@ export interface operations {
                     "application/json": components["schemas"]["SignedInWith"];
                 };
             };
-            /** @description `invalid_body` (not a credential, or over 16 KiB). */
+            /** @description `invalid_body` (not a credential). */
             400: {
                 headers: {
                     [name: string]: unknown;
@@ -11013,6 +11138,15 @@ export interface operations {
             };
             /** @description `passkey_expired`, or `passkey_already_registered`. */
             409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `body_too_large`: the body is over 16 KiB. */
+            413: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -11057,7 +11191,7 @@ export interface operations {
                     "application/json": components["schemas"]["CreationOptions"];
                 };
             };
-            /** @description `display_name_required`, `invalid_return_to`, or `invalid_body` (not JSON, or over 16 KiB). */
+            /** @description `display_name_required`, `invalid_return_to`, or `invalid_body` (not JSON). */
             400: {
                 headers: {
                     [name: string]: unknown;
@@ -11081,6 +11215,15 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description `body_too_large`: the body is over 16 KiB. */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
             };
             /** @description `rate_limited`: too many ceremonies, or ten challenges waiting, for this address. */
             429: {

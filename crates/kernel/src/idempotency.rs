@@ -10,6 +10,12 @@
 //! - answers **422** when the key is reused for another operation or another
 //!   request (method, path, query or body differ);
 //! - answers **409** while the first request with the key is still running.
+//! - never runs it again when the first request ended without a stored
+//!   answer (its process died, it was stopped at the server's time limit,
+//!   or its client hung up, each maybe after it committed): once that key
+//!   has been pending for longer than any request runs, a retry gets
+//!   **409** `idempotency_outcome_unknown` until the key expires
+//!   (campbooks-cloud#63).
 //!
 //! Keys belong to the authenticated caller; requests without a valid token
 //! are passed through untouched (the handler answers them as usual). GET and
@@ -33,19 +39,28 @@
 //! **A secret is never stored.** An operation declared
 //! `Operation::secret_once` (a new app's client secret, an invitation's
 //! link, a single-use ticket) shows its secret in its successful answer and
-//! nowhere else, ever: the layer keeps only that the key was used
-//! (`withheld`: the status and `Location`, no body), and a replay answers
+//! nowhere else, ever: for any answer below 400 the layer keeps only that
+//! the key was used (`withheld`: the status, a success's `Location`, no
+//! body), and a replay answers
 //! **409** `idempotency_secret_shown_once` instead of running the operation
 //! again or showing the secret twice.
 //!
-//! **Keys are their caller's** (campbooks-cloud#210). Every statement on
-//! `kernel.idempotency` runs in a transaction naming its caller
+//! **Keys are their caller's** (campbooks-cloud#210), and a person's keys
+//! through one app are that app's alone (campbooks-cloud#213). Every
+//! statement on `kernel.idempotency` runs in a transaction naming its
+//! caller
 //! ([`begin_as_idempotency_caller`](crate::db::begin_as_idempotency_caller)),
 //! whose row-level security admits that caller's keys only; a workspace
 //! transaction sees and writes none. The prune reads and deletes expired
 //! keys in the kernel scope, and nothing else.
+//!
+//! **A workspace's keys go with it** (campbooks-cloud#65). A key records the
+//! workspace of the route it was first used on: the matched route's
+//! `{workspace_id}` segment, never a value from the body or the query
+//! (none for a route outside a workspace). The workspace's purge deletes
+//! those keys, expired or not, through [`purge_workspace`].
 
-use std::time::Duration;
+use std::{borrow::Cow, time::Duration};
 
 use aws_lc_rs::digest;
 use axum::{
@@ -55,6 +70,7 @@ use axum::{
     middleware::Next,
     response::{IntoResponse, Response},
 };
+use percent_encoding::percent_decode_str;
 use serde::{Deserialize, Serialize};
 use sqlx::{PgConnection, PgPool};
 use std::sync::Arc;
@@ -102,14 +118,22 @@ pub const RETENTION: Duration = Duration::from_hours(24);
 /// Longest key accepted, in bytes.
 pub const MAX_KEY_LEN: usize = 255;
 
-/// Largest request body hashed (and therefore accepted with a key).
+/// Largest request body hashed (and therefore accepted with a key): the
+/// layer holds a keyed body in memory to hash it. Blobs may be larger
+/// (`CAMPBOOKS_BLOBS__MAX_OBJECT_BYTES`, 50 MiB by default), so an upload
+/// route does not take a large file under a key (campbooks-cloud#265). It
+/// stores the file in its own step without a key: blobs are content
+/// addressed, so the same bytes sent again are the same blob, and a retry is
+/// idempotent by nature. A small keyed operation then attaches the blob by
+/// its reference. Raising this cap would hold that much memory per request.
 pub const MAX_REQUEST_BYTES: usize = 10 * 1024 * 1024;
 
 /// Largest response body stored for replay; larger responses release the key.
 pub const MAX_STORED_RESPONSE_BYTES: usize = 1024 * 1024;
 
 /// A pending key older than this belongs to a request that died with its
-/// process (requests time out well before); the same request may take it over.
+/// process (requests time out well before). It is never taken over: a retry
+/// learns that its outcome is unknown (campbooks-cloud#63).
 const ABANDONED_AFTER: Duration = Duration::from_mins(2);
 
 /// What the middleware needs: the database, the token verifier and the
@@ -251,8 +275,23 @@ pub async fn middleware(State(idem): State<Idempotency>, request: Request, next:
         .insert(AuthenticatedPrincipal(principal.clone()));
     let owner = owner(&principal);
     let hash = request_hash(&parts, &body);
+    // The workspace the key belongs to, for its purge: the matched route's
+    // `{workspace_id}` segment alone, never anything the body or the query
+    // says (campbooks-cloud#65).
+    let workspace = workspace_of(&operation, parts.uri.path())
+        .and_then(|workspace| workspace.parse::<WorkspaceId>().ok())
+        .map(|workspace| workspace.to_string());
 
-    match claim(&idem.db, &owner, &key, &operation_id, &hash).await {
+    match claim(
+        &idem.db,
+        &owner,
+        &key,
+        &operation_id,
+        &hash,
+        workspace.as_deref(),
+    )
+    .await
+    {
         Err(error) => {
             tracing::warn!(%error, "idempotency: cannot claim the key");
             return problem(StatusCode::SERVICE_UNAVAILABLE, "database_unavailable");
@@ -280,6 +319,9 @@ pub async fn middleware(State(idem): State<Idempotency>, request: Request, next:
         }
         Ok(Claim::InFlight) => {
             return problem(StatusCode::CONFLICT, "idempotency_key_in_flight");
+        }
+        Ok(Claim::Unknown) => {
+            return problem(StatusCode::CONFLICT, "idempotency_outcome_unknown");
         }
         Ok(Claim::Acquired) => {}
     }
@@ -311,8 +353,10 @@ fn secret_shown_once() -> Response {
     response
 }
 
-/// The `{workspace_id}` segment of `path`, a request to `operation`'s route.
-fn workspace_of<'a>(operation: &OperationInfo, path: &'a str) -> Option<&'a str> {
+/// The `{workspace_id}` segment of `path`, a request to `operation`'s route,
+/// percent-decoded as the router decodes it for the handler (a segment that
+/// does not decode to UTF-8 is kept as it is, and parses as no workspace).
+fn workspace_of<'a>(operation: &OperationInfo, path: &'a str) -> Option<Cow<'a, str>> {
     // Templates and paths line up segment by segment, from `/api/` on (a
     // router nested under `/bff` prefixes the path).
     let template: Vec<&str> = operation.path.split('/').collect();
@@ -325,7 +369,12 @@ fn workspace_of<'a>(operation: &OperationInfo, path: &'a str) -> Option<&'a str>
     template
         .iter()
         .zip(segments)
-        .find_map(|(t, s)| (*t == wanted).then_some(s))
+        .find(|(t, _)| **t == wanted)
+        .map(|(_, s)| {
+            percent_decode_str(s)
+                .decode_utf8()
+                .unwrap_or(Cow::Borrowed(s))
+        })
 }
 
 fn valid_key(value: &HeaderValue) -> Result<String, LocalizableProblem> {
@@ -346,10 +395,19 @@ fn problem(status: StatusCode, code: &'static str) -> Response {
     LocalizableProblem::new(status, MESSAGES.reason(code)).into_response()
 }
 
-/// Keys are per caller: users by subject, clients by client id.
+/// Keys are per caller: a person through one app (subject and the token's
+/// client), so the web app and every app acting for the same person keep
+/// separate keys (campbooks-cloud#213, item 3); clients by client id. The
+/// subject is length-prefixed, so no subject and client pair can spell
+/// another's.
 fn owner(principal: &Principal) -> String {
     match principal.kind {
-        PrincipalKind::User => format!("user:{}", principal.subject),
+        PrincipalKind::User => format!(
+            "user:{}:{}|azp:{}",
+            principal.subject.len(),
+            principal.subject,
+            principal.client_id.as_deref().unwrap_or_default()
+        ),
         PrincipalKind::Client => format!("client:{}", principal.subject),
     }
 }
@@ -374,6 +432,10 @@ enum Claim {
     Withheld(Vec<RecordRef>),
     Mismatch,
     InFlight,
+    /// The first request with the key ended without a stored answer (its
+    /// process died, it timed out, its client hung up): it may have run,
+    /// and it is never run again.
+    Unknown,
 }
 
 struct Stored {
@@ -412,20 +474,30 @@ async fn claim(
     key: &str,
     operation_id: &str,
     hash: &[u8],
+    workspace: Option<&str>,
 ) -> Result<Claim, sqlx::Error> {
     let mut tx = crate::db::begin_as_idempotency_caller(db, owner).await?;
-    let claim = claim_in(&mut tx, owner, key, operation_id, hash).await?;
+    let claim = claim_in(&mut tx, owner, key, operation_id, hash, workspace).await?;
     tx.commit().await?;
     Ok(claim)
 }
 
-/// [`claim`] in the caller's transaction.
+/// [`claim`] in the caller's transaction. A key taken records `workspace`,
+/// the matched route's workspace (for its purge, [`purge_workspace`]).
+///
+/// A key is taken only when it is new or expired. A pending key is never
+/// taken over (campbooks-cloud#63): its request may have committed its
+/// effects before its process stopped and before its answer was stored, so
+/// running it again could do them twice. Once it has been pending for
+/// longer than any request runs ([`ABANDONED_AFTER`]) a retry learns that
+/// its outcome is unknown ([`Claim::Unknown`]) until the key expires.
 async fn claim_in(
     conn: &mut PgConnection,
     owner: &str,
     key: &str,
     operation_id: &str,
     hash: &[u8],
+    workspace: Option<&str>,
 ) -> Result<Claim, sqlx::Error> {
     let retention = seconds(RETENTION);
     let abandoned = seconds(ABANDONED_AFTER);
@@ -435,11 +507,12 @@ async fn claim_in(
         let acquired = sqlx::query_scalar!(
             r#"
             INSERT INTO kernel.idempotency
-                (principal, key, operation_id, request_hash, expires_at)
-            VALUES ($1, $2, $3, $4, now() + make_interval(secs => $5))
+                (principal, key, operation_id, request_hash, expires_at, workspace_id)
+            VALUES ($1, $2, $3, $4, now() + make_interval(secs => $5), $6)
             ON CONFLICT (principal, key) DO UPDATE
                SET operation_id = EXCLUDED.operation_id,
                    request_hash = EXCLUDED.request_hash,
+                   workspace_id = EXCLUDED.workspace_id,
                    state = 'pending',
                    response_status = NULL,
                    response_content_type = NULL,
@@ -448,10 +521,6 @@ async fn claim_in(
                    created_at = now(),
                    expires_at = EXCLUDED.expires_at
              WHERE kernel.idempotency.expires_at <= now()
-                OR (kernel.idempotency.state = 'pending'
-                    AND kernel.idempotency.created_at < now() - make_interval(secs => $6)
-                    AND kernel.idempotency.operation_id = EXCLUDED.operation_id
-                    AND kernel.idempotency.request_hash = EXCLUDED.request_hash)
             RETURNING true AS "acquired!"
             "#,
             owner,
@@ -459,7 +528,7 @@ async fn claim_in(
             operation_id,
             hash,
             retention,
-            abandoned,
+            workspace,
         )
         .fetch_optional(&mut *conn)
         .await?;
@@ -470,12 +539,14 @@ async fn claim_in(
         let existing = sqlx::query!(
             r#"
             SELECT operation_id, request_hash, state, response_status,
-                   response_content_type, response_location, response_body, containers
+                   response_content_type, response_location, response_body, containers,
+                   created_at < now() - make_interval(secs => $3) AS "abandoned!"
               FROM kernel.idempotency
              WHERE principal = $1 AND key = $2 AND expires_at > now()
             "#,
             owner,
             key,
+            abandoned,
         )
         .fetch_optional(&mut *conn)
         .await?;
@@ -501,11 +572,43 @@ async fn claim_in(
                     containers: containers(),
                 }),
                 ("withheld", ..) => Claim::Withheld(containers()),
+                ("pending", ..) if row.abandoned => Claim::Unknown,
                 _ => Claim::InFlight,
             },
         );
     }
     Ok(Claim::InFlight)
+}
+
+/// Delete every key first used on a route of `workspace` (its
+/// `{workspace_id}` segment), expired or not, when the workspace is purged
+/// (campbooks-cloud#65): [`crate::purge::PURGE_BATCH`] keys at a time (the
+/// batch of the rest of a workspace's purge), each batch in a
+/// short transaction of its own working in `workspace`. Keys stay their
+/// callers' (no workspace transaction reads or writes them), so the deletion
+/// goes through `kernel.purge_workspace_idempotency`, a definer function that
+/// refuses any other transaction and reads nothing back. Returns how many
+/// keys were deleted. Called by [`crate::purge::purge_workspace`].
+///
+/// # Errors
+/// When the database fails.
+pub async fn purge_workspace(pool: &PgPool, workspace: &str) -> Result<u64, sqlx::Error> {
+    // The function takes an `integer`; the batch fits one.
+    let batch = i32::try_from(crate::purge::PURGE_BATCH).unwrap_or(i32::MAX);
+    let mut purged = 0_u64;
+    loop {
+        let mut tx = crate::db::begin_in(pool, workspace).await?;
+        let deleted: i64 = sqlx::query_scalar("SELECT kernel.purge_workspace_idempotency($1, $2)")
+            .bind(workspace)
+            .bind(batch)
+            .fetch_one(&mut *tx)
+            .await?;
+        tx.commit().await?;
+        purged += deleted.unsigned_abs();
+        if deleted < i64::from(batch) {
+            return Ok(purged);
+        }
+    }
 }
 
 /// Whether a response with `status` is the operation's settled outcome.
@@ -527,8 +630,9 @@ fn storable(status: StatusCode) -> bool {
 enum Keep {
     /// The whole response, for replay.
     Body,
-    /// For a successful answer, only that the key was used (it showed a
-    /// secret: `Operation::secret_once`); any other answer whole.
+    /// For an answer below 400 (a success, or a redirect whose `Location`
+    /// may carry the secret), only that the key was used (it showed a
+    /// secret: `Operation::secret_once`); an error answer whole.
     WithheldOnSuccess,
 }
 
@@ -567,8 +671,10 @@ async fn finish(
             .and_then(|v: &HeaderValue| v.to_str().ok())
             .map(ToOwned::to_owned)
     };
-    let stored = if keep == Keep::WithheldOnSuccess && status.is_success() {
-        withhold(db, owner, key, status, header(header::LOCATION), containers).await
+    let stored = if keep == Keep::WithheldOnSuccess && status.as_u16() < 400 {
+        // A redirect's `Location` may be the secret itself: not kept.
+        let location = header(header::LOCATION).filter(|_| status.is_success());
+        withhold(db, owner, key, status, location, containers).await
     } else {
         store(db, owner, key, status, &parts, &body, containers).await
     };
@@ -707,5 +813,57 @@ impl Job for PruneIdempotency {
         }
         tracing::info!(pruned, "pruned expired idempotency keys");
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod owner_tests {
+    use super::{Principal, PrincipalKind, owner};
+
+    fn principal(subject: &str, kind: PrincipalKind, client: Option<&str>) -> Principal {
+        Principal {
+            subject: subject.to_owned(),
+            kind,
+            client_id: client.map(ToOwned::to_owned),
+            scopes: std::collections::BTreeSet::new(),
+            workspace: None,
+            email: None,
+            email_verified: false,
+            name: None,
+            expires_at: None,
+            issued_at: None,
+            auth_time: None,
+            sign_in: None,
+        }
+    }
+
+    /// One person through two apps has two key spaces (campbooks-cloud#213,
+    /// item 3), and no subject and client pair spells another's.
+    #[test]
+    fn a_persons_keys_are_per_app() {
+        let web = owner(&principal(
+            "ana",
+            PrincipalKind::User,
+            Some("campbooks-web"),
+        ));
+        let app = owner(&principal("ana", PrincipalKind::User, Some("mail-helper")));
+        assert_ne!(web, app);
+        assert_eq!(web, "user:3:ana|azp:campbooks-web");
+        assert_eq!(
+            owner(&principal("ana", PrincipalKind::User, None)),
+            "user:3:ana|azp:"
+        );
+        assert_ne!(
+            owner(&principal("a|azp:b", PrincipalKind::User, None)),
+            owner(&principal("a", PrincipalKind::User, Some("b")))
+        );
+        assert_eq!(
+            owner(&principal(
+                "ana-agent",
+                PrincipalKind::Client,
+                Some("ana-agent")
+            )),
+            "client:ana-agent"
+        );
     }
 }

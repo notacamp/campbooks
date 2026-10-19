@@ -871,6 +871,9 @@ impl S3Config {
     }
 }
 
+/// The port a worker-only process answers its health probe on by default.
+pub const DEFAULT_WORKER_HEALTH_PORT: u16 = 8081;
+
 /// Background job worker settings (`CAMPBOOKS_JOBS__*`, ADR 0012).
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
 #[serde(default)]
@@ -907,6 +910,12 @@ pub struct JobsConfig {
     pub retry_base_ms: u64,
     /// Longest retry delay in seconds (`CAMPBOOKS_JOBS__RETRY_MAX_SECONDS`).
     pub retry_max_seconds: u64,
+    /// Where a worker-only process (`campbooks-server worker`) answers its
+    /// health probe, `GET /healthz` (`CAMPBOOKS_JOBS__HEALTH_ADDR`, default
+    /// `127.0.0.1:8081`, inside the container only); `campbooks-server
+    /// healthcheck --worker` probes it (campbooks-cloud#185). A process that
+    /// serves the API answers `/api/v1/system/health` instead.
+    pub health_addr: std::net::SocketAddr,
 }
 
 impl Default for JobsConfig {
@@ -921,6 +930,7 @@ impl Default for JobsConfig {
             shutdown_grace_seconds: 8,
             retry_base_ms: 1_000,
             retry_max_seconds: 3_600,
+            health_addr: std::net::SocketAddr::from(([127, 0, 0, 1], DEFAULT_WORKER_HEALTH_PORT)),
         }
     }
 }

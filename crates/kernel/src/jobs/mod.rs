@@ -24,6 +24,7 @@ pub mod admin;
 mod context;
 mod maintenance;
 mod registry;
+mod rekey;
 mod worker;
 
 #[cfg(test)]
@@ -39,7 +40,8 @@ pub use context::JobContext;
 pub use maintenance::{PruneEvents, PruneJobs, purge_workspace};
 pub(crate) use registry::is_dotted;
 pub use registry::{Background, ConsumerInfo, InstanceRows, Registry, RegistryError};
-pub use worker::{Worker, WorkerStats};
+pub use rekey::{DispatchRekeys, REKEY_EVERY};
+pub use worker::{ALIVE_FOR, Liveness, Worker, WorkerStats};
 
 crate::define_id!(
     /// A job in `kernel.jobs`.
@@ -193,13 +195,15 @@ impl From<sqlx::Error> for JobError {
     }
 }
 
-/// Kernel errors: missing records and bad requests are permanent, the rest
-/// is retried. Internal detail is not copied into the message.
+/// Kernel errors: missing records, bad requests and over-limit payloads are
+/// permanent, the rest is retried. Internal detail is not copied into the
+/// message.
 impl From<crate::Error> for JobError {
     fn from(err: crate::Error) -> Self {
         match err {
             crate::Error::NotFound
             | crate::Error::BadRequest(_)
+            | crate::Error::PayloadTooLarge(_)
             | crate::Error::Forbidden
             | crate::Error::Denied(_) => Self::fatal(err.to_string()),
             other => Self::retry(other.to_string()),
@@ -276,6 +280,31 @@ pub enum Enqueued {
     /// An unfinished job with the same kind and unique key exists already
     /// in the same workspace (or, instance-wide, in none).
     Duplicate,
+}
+
+/// When the unfinished (pending or running) job of kind `J` with
+/// `unique_key` in `workspace` is due to run, if there is one: what
+/// [`enqueue`] found when it answered [`Enqueued::Duplicate`]. Read in `tx`,
+/// which must work in `workspace`.
+///
+/// # Errors
+/// When the database fails, or `tx` cannot reach `workspace`'s rows.
+pub async fn unfinished_run_at<J: Job>(
+    tx: &mut Transaction<'_, Postgres>,
+    workspace: &str,
+    unique_key: &str,
+) -> Result<Option<DateTime<Utc>>, sqlx::Error> {
+    crate::db::require_scope(tx, workspace, "a workspace's queued job").await?;
+    sqlx::query_scalar(
+        "SELECT run_at FROM kernel.jobs
+          WHERE kind = $1 AND unique_key = $2 AND workspace_id = $3
+            AND state IN ('pending', 'running')",
+    )
+    .bind(J::NAME)
+    .bind(unique_key)
+    .bind(workspace)
+    .fetch_optional(&mut **tx)
+    .await
 }
 
 /// Enqueue `job` inside `tx`: it exists for workers once `tx` commits, and

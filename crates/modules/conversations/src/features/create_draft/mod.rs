@@ -168,7 +168,7 @@ pub async fn handler(
     }
     let draft = drafts::load(&state, &mut tx, access, id, false, Action::Read)
         .await?
-        .view()?;
+        .shown(&state.binding, access)?;
     tx.commit().await?;
     Ok((StatusCode::CREATED, Json(draft)))
 }

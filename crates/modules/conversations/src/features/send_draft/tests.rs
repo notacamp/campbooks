@@ -1,5 +1,10 @@
 use axum::http::StatusCode;
-use campbooks_kernel::{blobs::BlobRef, tenancy::WorkspaceId};
+use campbooks_kernel::{
+    blobs::BlobRef,
+    db::BeginFor as _,
+    operations::{InvokeError, Output},
+    tenancy::WorkspaceId,
+};
 use serde_json::{Value, json};
 use sqlx::PgPool;
 
@@ -28,15 +33,76 @@ async fn reply(kit: &Kit, workspace: WorkspaceId, sam: &str) -> String {
     format!("{uri}/{}", draft.json["id"].as_str().unwrap())
 }
 
-/// Send the draft at `uri`, naming the version it has now.
+/// Send the draft at `uri` as it reads now: its version and the content
+/// token that came with it.
 async fn send(kit: &Kit, token: &str, uri: &str) -> campbooks_kernel::testing::TestResponse {
-    let version = kit.get(token, uri).await.json["version"].clone();
+    let shown = kit.get(token, uri).await.json;
+    send_shown(kit, token, uri, &shown).await
+}
+
+/// Send the draft at `uri` as `shown` showed it (a read or a save's answer).
+async fn send_shown(
+    kit: &Kit,
+    token: &str,
+    uri: &str,
+    shown: &Value,
+) -> campbooks_kernel::testing::TestResponse {
     kit.post(
         token,
         &format!("{uri}/send"),
-        Some(json!({"version": version})),
+        Some(json!({"version": shown["version"], "content_token": shown["content_token"]})),
     )
     .await
+}
+
+/// Save `changes` to the draft at `uri` as it reads now: its version and
+/// the content token that came with it.
+async fn save(
+    kit: &Kit,
+    token: &str,
+    uri: &str,
+    mut changes: Value,
+) -> campbooks_kernel::testing::TestResponse {
+    let shown = kit.get(token, uri).await.json;
+    changes["version"] = shown["version"].clone();
+    changes["content_token"] = shown["content_token"].clone();
+    kit.patch(token, uri, changes).await
+}
+
+/// Run `sql` (binding the draft at `uri`) as the runtime role in
+/// `workspace`: what an attacker with SQL in the workspace can do.
+async fn as_runtime(kit: &Kit, workspace: WorkspaceId, uri: &str, sql: &'static str) {
+    let draft: sqlx::types::Uuid = uri.rsplit('/').next().unwrap().parse().unwrap();
+    let mut tx = kit.state.db.begin_for(workspace).await.unwrap();
+    sqlx::query(sql)
+        .bind(draft)
+        .execute(&mut *tx)
+        .await
+        .unwrap();
+    tx.commit().await.unwrap();
+}
+
+/// What a refused send must not have done: the draft is still a draft, with
+/// no request bound, no release queued and nothing requested.
+async fn nothing_scheduled(kit: &Kit, uri: &str) {
+    let draft: sqlx::types::Uuid = uri.rsplit('/').next().unwrap().parse().unwrap();
+    let (state, mac, generation): (String, Option<Vec<u8>>, i32) = sqlx::query_as(
+        "SELECT state, request_mac, send_generation FROM conversations.drafts WHERE id = $1",
+    )
+    .bind(draft)
+    .fetch_one(&kit.db)
+    .await
+    .unwrap();
+    assert_eq!((state.as_str(), mac, generation), ("draft", None, 0));
+    let queued: i64 = sqlx::query_scalar(
+        "SELECT count(*) FROM kernel.jobs WHERE kind = 'conversations.release_send'",
+    )
+    .fetch_one(&kit.db)
+    .await
+    .unwrap();
+    assert_eq!(queued, 0);
+    window_ends(kit).await;
+    assert!(kit.events("conversations.send_requested").await.is_empty());
 }
 
 /// Make every pending release due now and run the jobs.
@@ -165,6 +231,37 @@ async fn send_waits_out_the_window_then_requests_the_send_once(db: PgPool) {
 }
 
 #[sqlx::test(migrations = "../../../migrations")]
+async fn a_scheduled_send_is_never_discarded_only_cancelled(db: PgPool) {
+    let kit = Kit::new(db).await;
+    let (workspace, _, sam) = kit.sams_inbox().await;
+    let draft = reply(&kit, workspace, &sam).await;
+
+    let sent = send(&kit, &sam, &draft).await;
+    assert_eq!(sent.status, StatusCode::ACCEPTED, "{:?}", sent.json);
+    // A discard of a send on its way (a stale screen, the assistant): refused,
+    // and it stays scheduled (campbooks-cloud#242).
+    let discarded = kit.delete(&sam, &draft).await;
+    assert_eq!(
+        discarded.status,
+        StatusCode::CONFLICT,
+        "{:?}",
+        discarded.json
+    );
+    assert_eq!(discarded.json["code"], "draft_not_editable");
+    assert_eq!(kit.get(&sam, &draft).await.json["state"], "scheduled");
+    // Its Undo, the deliberate cancel, makes it a draft again: then it goes.
+    let undone = kit.post(&sam, &format!("{draft}/cancel_send"), None).await;
+    assert_eq!(undone.status, StatusCode::OK, "{:?}", undone.json);
+    assert_eq!(
+        kit.delete(&sam, &draft).await.status,
+        StatusCode::NO_CONTENT
+    );
+    assert_eq!(kit.get(&sam, &draft).await.status, StatusCode::NOT_FOUND);
+    window_ends(&kit).await;
+    assert!(kit.events("conversations.send_requested").await.is_empty());
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
 async fn undo_then_send_again_releases_only_the_second(db: PgPool) {
     let kit = Kit::new(db).await;
     let (workspace, _, sam) = kit.sams_inbox().await;
@@ -175,12 +272,13 @@ async fn undo_then_send_again_releases_only_the_second(db: PgPool) {
     assert_eq!(undone.status, StatusCode::OK, "{:?}", undone.json);
     assert_eq!(undone.json["state"], "draft");
     assert!(undone.json["send_at"].is_null());
-    let version = undone.json["version"].clone();
+    // The draft shown again after Undo carries its own token.
     let edited = kit
         .patch(
             &sam,
             &draft,
-            json!({"version": version, "body": "Second thoughts"}),
+            json!({"version": undone.json["version"], "body": "Second thoughts",
+                "content_token": undone.json["content_token"]}),
         )
         .await;
     assert_eq!(edited.status, StatusCode::OK, "{:?}", edited.json);
@@ -258,10 +356,11 @@ async fn a_send_needs_valid_recipients(db: PgPool) {
     let response = send(&kit, &sam, &one).await;
     assert_eq!(response.status, StatusCode::BAD_REQUEST);
     assert_eq!(response.json["code"], "no_recipients");
-    kit.patch(
+    save(
+        &kit,
         &sam,
         &one,
-        json!({"version": 1, "to": [{"address": "not an address"}]}),
+        json!({"to": [{"address": "not an address"}]}),
     )
     .await;
     let response = send(&kit, &sam, &one).await;
@@ -276,9 +375,7 @@ async fn a_send_names_the_version_it_sends(db: PgPool) {
     let draft = reply(&kit, workspace, &sam).await;
     // Saved elsewhere since the composer last saved: refuse rather than send
     // something the member did not see.
-    let saved = kit
-        .patch(&sam, &draft, json!({"version": 1, "body": "Changed"}))
-        .await;
+    let saved = save(&kit, &sam, &draft, json!({"body": "Changed"})).await;
     assert_eq!(saved.json["version"], 2);
     let stale = kit
         .post(&sam, &format!("{draft}/send"), Some(json!({"version": 1})))
@@ -321,4 +418,424 @@ async fn a_send_that_never_reports_back_stops_waiting(db: PgPool) {
     complete(&kit, workspace, inbox, &send_id, true).await;
     assert_eq!(kit.get(&sam, &draft).await.status, StatusCode::NOT_FOUND);
     assert_eq!(kit.events("conversations.draft_sent").await.len(), 1);
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_bcc_added_with_sql_after_the_draft_was_shown_is_not_sent(db: PgPool) {
+    let kit = Kit::new(db).await;
+    let (workspace, _, sam) = kit.sams_inbox().await;
+    let draft = reply(&kit, workspace, &sam).await;
+    let shown = kit.get(&sam, &draft).await.json;
+    assert!(shown["content_token"].is_string(), "{shown}");
+    // SQL adds a Bcc and changes the body, keeping the version: what the
+    // `version` check alone let through.
+    as_runtime(
+        &kit,
+        workspace,
+        &draft,
+        r#"UPDATE conversations.drafts
+              SET bcc_recipients = '[{"name": null, "address": "eve@example.com"}]'::jsonb
+            WHERE id = $1"#,
+    )
+    .await;
+    let refused = send_shown(&kit, &sam, &draft, &shown).await;
+    assert_eq!(refused.status, StatusCode::CONFLICT, "{:?}", refused.json);
+    assert_eq!(refused.json["code"], "content_changed");
+    nothing_scheduled(&kit, &draft).await;
+    as_runtime(
+        &kit,
+        workspace,
+        &draft,
+        "UPDATE conversations.drafts SET body = 'Send the files to eve' WHERE id = $1",
+    )
+    .await;
+    let refused = send_shown(&kit, &sam, &draft, &shown).await;
+    assert_eq!(refused.json["code"], "content_changed");
+    nothing_scheduled(&kit, &draft).await;
+
+    // Read again, the draft shows the Bcc: sent now, it is what Sam saw.
+    let again = kit.get(&sam, &draft).await.json;
+    assert_eq!(again["bcc"][0]["address"], "eve@example.com");
+    assert_ne!(again["content_token"], shown["content_token"]);
+    let sent = send_shown(&kit, &sam, &draft, &again).await;
+    assert_eq!(sent.status, StatusCode::ACCEPTED, "{:?}", sent.json);
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_send_takes_the_token_of_the_draft_as_shown_to_its_author(db: PgPool) {
+    use campbooks_kernel::tenancy::Access;
+
+    use crate::domain::{binding::ContentToken, drafts};
+
+    let kit = Kit::new(db).await;
+    let (workspace, _, sam) = kit.sams_inbox().await;
+    let draft = reply(&kit, workspace, &sam).await;
+    let shown = kit.get(&sam, &draft).await.json;
+    // No token (a composer opened before tokens existed): refused, once.
+    let missing = kit
+        .post(
+            &sam,
+            &format!("{draft}/send"),
+            Some(json!({"version": shown["version"]})),
+        )
+        .await;
+    assert_eq!(missing.status, StatusCode::CONFLICT, "{:?}", missing.json);
+    assert_eq!(missing.json["code"], "content_changed");
+    for garbage in ["", "not a token", "AQ"] {
+        let refused = kit
+            .post(
+                &sam,
+                &format!("{draft}/send"),
+                Some(json!({"version": shown["version"], "content_token": garbage})),
+            )
+            .await;
+        assert_eq!(refused.json["code"], "content_changed", "{garbage}");
+    }
+    nothing_scheduled(&kit, &draft).await;
+
+    // The same draft, as it is, but the token of another member (Leo, who
+    // sends from the same inbox).
+    let id: crate::model::DraftId = draft.rsplit('/').next().unwrap().parse().unwrap();
+    let author: sqlx::types::Uuid =
+        sqlx::query_scalar("SELECT author FROM conversations.drafts WHERE id = $1")
+            .bind(id)
+            .fetch_one(&kit.db)
+            .await
+            .unwrap();
+    let author = campbooks_kernel::tenancy::UserId::from_uuid(author);
+    let access = |user| Access {
+        workspace,
+        user: Some(user),
+        role: None,
+    };
+    let mut tx = kit.state.db.begin_for(workspace).await.unwrap();
+    let row = drafts::find(&mut tx, &access(author), id, false)
+        .await
+        .unwrap()
+        .unwrap();
+    tx.commit().await.unwrap();
+    let (_, leo) = kit.member("leo", workspace);
+    let another = ContentToken::of_draft(&access(leo), &row)
+        .unwrap()
+        .issue(&kit.state.binding);
+    let refused = kit
+        .post(
+            &sam,
+            &format!("{draft}/send"),
+            Some(json!({"version": shown["version"], "content_token": another})),
+        )
+        .await;
+    assert_eq!(refused.json["code"], "content_changed");
+    nothing_scheduled(&kit, &draft).await;
+    // Sam's own: sent.
+    assert_eq!(
+        send_shown(&kit, &sam, &draft, &shown).await.status,
+        StatusCode::ACCEPTED
+    );
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_save_answers_with_the_token_of_what_it_saved(db: PgPool) {
+    let kit = Kit::new(db).await;
+    let (workspace, _, sam) = kit.sams_inbox().await;
+    let draft = reply(&kit, workspace, &sam).await;
+    let first = kit.get(&sam, &draft).await.json;
+    let saved = kit
+        .patch(
+            &sam,
+            &draft,
+            json!({"version": first["version"], "body": "Done, see you Thursday",
+                "content_token": first["content_token"]}),
+        )
+        .await;
+    assert_eq!(saved.status, StatusCode::OK, "{:?}", saved.json);
+    // The token of before the save, at the new version: refused.
+    let stale = kit
+        .post(
+            &sam,
+            &format!("{draft}/send"),
+            Some(
+                json!({"version": saved.json["version"], "content_token": first["content_token"]}),
+            ),
+        )
+        .await;
+    assert_eq!(stale.status, StatusCode::CONFLICT);
+    assert_eq!(stale.json["code"], "content_changed");
+    nothing_scheduled(&kit, &draft).await;
+    // The save's own token: sent, with what was saved.
+    let sent = send_shown(&kit, &sam, &draft, &saved.json).await;
+    assert_eq!(sent.status, StatusCode::ACCEPTED, "{:?}", sent.json);
+    window_ends(&kit).await;
+    let requested = kit.events("conversations.send_requested").await;
+    assert_eq!(requested.len(), 1);
+    let blob: BlobRef = serde_json::from_value(requested[0]["message"].clone()).unwrap();
+    let document: Value = serde_json::from_str(&kit.read(workspace, &blob).await).unwrap();
+    assert!(
+        document["text"]
+            .as_str()
+            .unwrap()
+            .starts_with("Done, see you Thursday")
+    );
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_save_keeps_only_what_was_shown(db: PgPool) {
+    let kit = Kit::new(db).await;
+    let (workspace, _, sam) = kit.sams_inbox().await;
+    let message = kit.message_of("en-1").await;
+    let uri = format!("/api/v1/w/{workspace}/drafts");
+    let forward = kit
+        .post(
+            &sam,
+            &uri,
+            Some(json!({"kind": "forward", "message_id": message,
+                "to": [{"address": "leo@example.com"}]})),
+        )
+        .await;
+    assert_eq!(forward.status, StatusCode::CREATED, "{:?}", forward.json);
+    let draft = format!("{uri}/{}", forward.json["id"].as_str().unwrap());
+    let shown = forward.json;
+    let attachment = shown["attachments"][0]["id"].clone();
+    // Between the open and the next autosave, SQL changes what no save
+    // sends: an attachment's file, the quoted text, the reply headers.
+    for sql in [
+        r#"UPDATE conversations.drafts
+              SET attachments = jsonb_set(attachments, '{0,filename}', '"invoice.pdf.exe"')
+            WHERE id = $1"#,
+        "UPDATE conversations.drafts SET quoted = 'Pay the new account' WHERE id = $1",
+        "UPDATE conversations.drafts SET in_reply_to = 'planted@example.com' WHERE id = $1",
+    ] {
+        as_runtime(&kit, workspace, &draft, sql).await;
+        let autosave = kit
+            .patch(
+                &sam,
+                &draft,
+                json!({"version": shown["version"], "content_token": shown["content_token"],
+                    "to": [{"address": "leo@example.com"}], "subject": shown["subject"],
+                    "body": "Here it is", "attachments": [attachment]}),
+            )
+            .await;
+        assert_eq!(
+            autosave.status,
+            StatusCode::CONFLICT,
+            "{sql}: {:?}",
+            autosave.json
+        );
+        assert_eq!(autosave.json["code"], "content_changed");
+        // Nothing saved: no new version, no new token for what was planted.
+        let row: (i32, String) =
+            sqlx::query_as("SELECT version, body FROM conversations.drafts WHERE id = $1")
+                .bind(
+                    draft
+                        .rsplit('/')
+                        .next()
+                        .unwrap()
+                        .parse::<sqlx::types::Uuid>()
+                        .unwrap(),
+                )
+                .fetch_one(&kit.db)
+                .await
+                .unwrap();
+        assert_eq!(row, (1, String::new()));
+        // And a send with what Sam was shown signs nothing.
+        let sent = send_shown(&kit, &sam, &draft, &shown).await;
+        assert_eq!(sent.json["code"], "content_changed");
+        nothing_scheduled(&kit, &draft).await;
+    }
+    // Read again (the composer shows the attachment as it now is): saved.
+    let again = save(&kit, &sam, &draft, json!({"body": "Here it is"})).await;
+    assert_eq!(again.status, StatusCode::OK, "{:?}", again.json);
+    assert_eq!(again.json["attachments"][0]["filename"], "invoice.pdf.exe");
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn another_drafts_token_does_not_hold(db: PgPool) {
+    let kit = Kit::new(db).await;
+    let (workspace, _, sam) = kit.sams_inbox().await;
+    let one = reply(&kit, workspace, &sam).await;
+    let other = reply(&kit, workspace, &sam).await;
+    let theirs = kit.get(&sam, &other).await.json;
+    let mine = kit.get(&sam, &one).await.json;
+    assert_eq!(mine["version"], theirs["version"]);
+    // The other draft's token, same version, same author: not this draft's.
+    let saved = kit
+        .patch(
+            &sam,
+            &one,
+            json!({"version": mine["version"], "content_token": theirs["content_token"],
+                "body": "x"}),
+        )
+        .await;
+    assert_eq!(saved.status, StatusCode::CONFLICT, "{:?}", saved.json);
+    assert_eq!(saved.json["code"], "content_changed");
+    let sent = kit
+        .post(
+            &sam,
+            &format!("{one}/send"),
+            Some(json!({"version": mine["version"], "content_token": theirs["content_token"]})),
+        )
+        .await;
+    assert_eq!(sent.json["code"], "content_changed");
+    nothing_scheduled(&kit, &one).await;
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn an_autosave_takes_the_token_of_the_last_save(db: PgPool) {
+    let kit = Kit::new(db).await;
+    let (workspace, _, sam) = kit.sams_inbox().await;
+    let draft = reply(&kit, workspace, &sam).await;
+    let opened = kit.get(&sam, &draft).await.json;
+    let first = kit
+        .patch(
+            &sam,
+            &draft,
+            json!({"version": opened["version"], "content_token": opened["content_token"],
+                "body": "Thursday"}),
+        )
+        .await;
+    assert_eq!(first.status, StatusCode::OK, "{:?}", first.json);
+    // The next autosave with the token of the open: refused, nothing saved.
+    let stale = kit
+        .patch(
+            &sam,
+            &draft,
+            json!({"version": first.json["version"], "content_token": opened["content_token"],
+                "body": "Thursday works"}),
+        )
+        .await;
+    assert_eq!(stale.status, StatusCode::CONFLICT, "{:?}", stale.json);
+    assert_eq!(stale.json["code"], "content_changed");
+    assert_eq!(kit.get(&sam, &draft).await.json["body"], "Thursday");
+    // With the last save's: saved.
+    let fresh = kit
+        .patch(
+            &sam,
+            &draft,
+            json!({"version": first.json["version"], "content_token": first.json["content_token"],
+                "body": "Thursday works"}),
+        )
+        .await;
+    assert_eq!(fresh.status, StatusCode::OK, "{:?}", fresh.json);
+    assert_eq!(fresh.json["body"], "Thursday works");
+}
+
+/// The kernel refused the assistant's call before the handler ran: the
+/// operation does not opt the assistant in.
+fn not_the_assistants(result: &Result<Output, InvokeError>) {
+    assert!(
+        matches!(result, Err(InvokeError::NotAllowed { .. })),
+        "{result:?}"
+    );
+}
+
+/// The handler refused it on its own: 403 `send_needs_you`.
+fn needs_the_member(result: &Result<Output, InvokeError>) {
+    match result {
+        Err(InvokeError::Failed {
+            status, problem, ..
+        }) => {
+            assert_eq!(*status, StatusCode::FORBIDDEN, "{problem}");
+            assert_eq!(problem["code"], "send_needs_you", "{problem}");
+        }
+        other => panic!("not refused: {other:?}"),
+    }
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn the_assistant_writes_a_draft_but_only_the_member_sends_it(db: PgPool) {
+    let kit = Kit::new(db).await;
+    let (workspace, _, sam) = kit.sams_inbox().await;
+    // Scout writes Sam's reply and reads it back: the token it gets is Sam's.
+    let message = kit.message_of("en-1").await;
+    let written = kit
+        .as_assistant(
+            "sam",
+            workspace,
+            (
+                "conversations.create_draft",
+                json!({"kind": "reply", "message_id": message, "body": "Thursday works."}),
+            ),
+            false,
+        )
+        .await
+        .unwrap();
+    let id = written.body["id"].as_str().unwrap().to_owned();
+    let uri = format!("/api/v1/w/{workspace}/drafts/{id}");
+    let read = kit
+        .as_assistant(
+            "sam",
+            workspace,
+            ("conversations.get_draft", json!({"draft_id": id})),
+            false,
+        )
+        .await
+        .unwrap();
+    assert!(read.body["content_token"].is_string(), "{}", read.body);
+    let input = json!({"draft_id": id, "version": read.body["version"],
+        "content_token": read.body["content_token"]});
+    // Sending it with Sam's token, as a call the user confirmed or not: the
+    // kernel refuses it before the handler runs.
+    for confirmed in [false, true] {
+        not_the_assistants(
+            &kit.as_assistant(
+                "sam",
+                workspace,
+                ("conversations.send_draft", input.clone()),
+                confirmed,
+            )
+            .await,
+        );
+    }
+    // Listed for the assistant by mistake, the kernel still wants a
+    // confirmation, and a confirmed call is refused by the handler itself.
+    let unconfirmed = kit
+        .as_assistant_listed(
+            "sam",
+            workspace,
+            ("conversations.send_draft", input.clone()),
+            false,
+        )
+        .await;
+    assert!(
+        matches!(unconfirmed, Err(InvokeError::ConfirmationRequired(_))),
+        "{unconfirmed:?}"
+    );
+    needs_the_member(
+        &kit.as_assistant_listed("sam", workspace, ("conversations.send_draft", input), true)
+            .await,
+    );
+    // Nothing was scheduled, bound or asked of the connector.
+    nothing_scheduled(&kit, &uri).await;
+
+    // Sam's own Send, with the token his screen got: it leaves, once.
+    let sent = send(&kit, &sam, &uri).await;
+    assert_eq!(sent.status, StatusCode::ACCEPTED, "{:?}", sent.json);
+    window_ends(&kit).await;
+    assert_eq!(kit.events("conversations.send_requested").await.len(), 1);
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn the_assistant_never_takes_back_a_send_the_member_made(db: PgPool) {
+    let kit = Kit::new(db).await;
+    let (workspace, _, sam) = kit.sams_inbox().await;
+    let uri = reply(&kit, workspace, &sam).await;
+    let sent = send(&kit, &sam, &uri).await;
+    assert_eq!(sent.status, StatusCode::ACCEPTED, "{:?}", sent.json);
+    let id = uri.rsplit('/').next().unwrap().to_owned();
+    let cancel = ("conversations.cancel_send", json!({"draft_id": id}));
+    for confirmed in [false, true] {
+        not_the_assistants(
+            &kit.as_assistant("sam", workspace, cancel.clone(), confirmed)
+                .await,
+        );
+        needs_the_member(
+            &kit.as_assistant_listed("sam", workspace, cancel.clone(), confirmed)
+                .await,
+        );
+    }
+    // Still on its way, as Sam sent it: it leaves when the window ends.
+    let shown = kit.get(&sam, &uri).await;
+    assert_eq!(shown.json["state"], "scheduled", "{:?}", shown.json);
+    window_ends(&kit).await;
+    assert_eq!(kit.events("conversations.send_requested").await.len(), 1);
 }

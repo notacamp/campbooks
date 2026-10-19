@@ -1,7 +1,8 @@
 import { useQueryClient } from "@tanstack/react-query";
-import { useEffect, useEffectEvent, useRef, useState } from "react";
+import { useEffect, useEffectEvent, useLayoutEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
+import { problemCode } from "~/lib/api";
 import { useDebounced } from "~/lib/hooks/use-debounced";
 import { Banner, Dialog, DialogChoices, SearchField, Text } from "~/lib/ui";
 
@@ -15,6 +16,7 @@ import {
 import {
   useConversation,
   useSenders,
+  withWords,
   type MessageView,
   type NeedView,
   type Sender,
@@ -99,11 +101,16 @@ export function ForwardDialog({
   const [chosen, setChosen] = useState<Sender | undefined>();
   const [busy, setBusy] = useState(false);
   const [failed, setFailed] = useState(false);
+  // The failure was the quote: the email's words could not be read.
+  const [quoteFailed, setQuoteFailed] = useState(false);
   const text = typed.trim();
   const settled = useDebounced(text, DEBOUNCE_MS);
   const searching = settled.length >= MIN_CHARS;
-  const top = useSenders(workspaceId);
-  const found = useSenders(workspaceId, settled, { enabled: searching });
+  // Only people it is safe to write to: the server leaves out no-reply
+  // addresses, senders failing their checks and senders under review, and
+  // a name typed for one of them finds nobody.
+  const top = useSenders(workspaceId, "", { reachable: true });
+  const found = useSenders(workspaceId, settled, { enabled: searching, reachable: true });
 
   // What the server found for the settled text, or, until it answers, the
   // people already here, filtered as it would.
@@ -128,6 +135,9 @@ export function ForwardDialog({
 
   // The pick a forward was started for (a failed one can be picked again).
   const started = useRef<Sender | null>(null);
+  // Which start is current: one given up on (it failed in the meantime)
+  // hands nothing to the composer when its draft arrives.
+  const attempt = useRef(0);
   // Closed (Esc, Close) while the forward was being started: nothing more.
   const closed = useRef(false);
   useEffect(() => {
@@ -147,25 +157,52 @@ export function ForwardDialog({
     const existing = known.find(
       (draft) => draft.kind === "forward" && draft.message_id === message.id && pristine(draft),
     );
-    const saved =
-      existing === undefined
-        ? createDraft(workspaceId, {
+    // Its words first when the conversation came without them
+    // (`text_unread`): a forward never quotes nothing, silently.
+    const fresh = () =>
+      withWords(queryClient, workspaceId, conversationId, message)
+        .catch((thrown: unknown) => {
+          setQuoteFailed(true);
+          throw thrown;
+        })
+        .then((quoting) =>
+          createDraft(workspaceId, {
             kind: "forward",
             message_id: message.id,
-            quoted: forwardQuote(message, i18n.language, words),
+            quoted: forwardQuote(quoting, i18n.language, words),
             to,
-          })
-        : saveDraft(workspaceId, existing.id, { to, version: existing.version });
+          }),
+        );
+    // Saved with the token that came with it; one that changed since
+    // (campbooks-cloud#242) is left alone and a new forward starts. Either
+    // way it opens in the composer, which shows all of it before Send.
+    const saved =
+      existing === undefined
+        ? fresh()
+        : saveDraft(workspaceId, existing.id, {
+            to,
+            version: existing.version,
+            content_token: existing.content_token ?? null,
+          }).catch(async (thrown: unknown) => {
+            if (problemCode(thrown) !== "content_changed") {
+              throw thrown;
+            }
+            return fresh();
+          });
+    attempt.current += 1;
+    const mine = attempt.current;
     void saved
       .then(async (draft) => {
-        if (closed.current) {
-          return;
-        }
+        // Known at once, so a reopen addresses it again rather than
+        // starting a second one, even when closed or given up on meanwhile.
         queryClient.setQueryData<Draft[]>(
           draftKeys.forConversation(workspaceId, conversationId),
           (list) => [draft, ...(list ?? []).filter((each) => each.id !== draft.id)],
         );
-        onForwarded(draft);
+        // Closed, or failed while it started: nothing opens.
+        if (!closed.current && attempt.current === mine) {
+          onForwarded(draft);
+        }
         await queryClient.invalidateQueries({ queryKey: draftKeys.all(workspaceId) });
       })
       .catch(() => {
@@ -186,6 +223,14 @@ export function ForwardDialog({
     setBusy(false);
     setFailed(true);
   }
+  // Said failed: a start still running is given up on, before its draft can
+  // arrive (layout effects run with the commit that shows the failure).
+  useLayoutEffect(() => {
+    if (failed) {
+      attempt.current += 1;
+      started.current = null;
+    }
+  }, [failed]);
   useEffect(() => {
     if (
       chosen !== undefined &&
@@ -205,6 +250,7 @@ export function ForwardDialog({
     }
     setBusy(true);
     setFailed(false);
+    setQuoteFailed(false);
     setChosen(person);
   };
 
@@ -266,7 +312,10 @@ export function ForwardDialog({
         )}
         <div role="status">
           {failed ? (
-            <Banner tone="danger" title={t("forward.failed")} />
+            <Banner
+              tone="danger"
+              title={quoteFailed ? t("forward.quoteFailed") : t("forward.failed")}
+            />
           ) : busy ? (
             <Text tone="secondary">{t("forward.starting")}</Text>
           ) : text !== "" && listed.length === 0 && !looking ? (

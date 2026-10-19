@@ -13,6 +13,7 @@
     "invalid_subject": "A subject is one line of at most {{max}} characters.",
     "draft_too_long": "This message is too long to send.",
     "draft_changed": "This draft was changed somewhere else. Reload it to see the latest version.",
+    "content_changed": "This changed since you opened it. Check it and try again.",
     "draft_not_editable": "This message is on its way and can no longer be changed.",
     "no_recipients": "Add at least one recipient.",
     "invalid_address": "This address is not valid: {{address}}",
@@ -29,6 +30,12 @@
     "rule_needs_member": "Rules are taught by a member of the inbox, not by an app.",
     "rule_not_active": "This rule is waiting for a yes. Keep it first, then you can pause it.",
     "rule_not_restorable": "This rule can't be brought back any more. Teach it again instead.",
-    "invalid_senders_query": "Search with 2 to 100 characters, and ask for 1 to {{max}} senders."
+    "rule_needs_confirmation": "This rule needs a yes again before it acts. Confirm it first, then you can change it.",
+    "rule_needs_your_yes": "Only you can say yes to this rule. Scout can propose it: check it in Scout's memory and keep it there.",
+    "undo_unavailable": "Some of what this rule changed can't be put back. Remove it keeping its changes instead.",
+    "invalid_senders_query": "Search with 2 to 100 characters, and ask for 1 to {{max}} senders.",
+    "images_already_trusted": "A smart rule already covers this sender's images, even if it is paused or waiting for a yes. Find it in Scout's memory.",
+    "send_needs_you": "Only you can send mail or take a send back. Scout can write a draft: check it and send it yourself.",
+    "images_need_you": "Only you can choose to always show a sender's images. Open one of their messages and choose it there."
   }
 }

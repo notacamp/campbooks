@@ -102,7 +102,10 @@ Access tokens SHALL be JWTs with header `typ` = `at+jwt`, signed with an
 Ed25519 key published in `/oauth2/jwks`, carrying `iss`, `sub`, `aud` (the
 API's resource URI, `<public origin>/api`), `client_id`, `azp`, `scope`,
 `iat`, `nbf`, `exp` (ten minutes after `iat`), `jti`, `auth_time` for a
-person's token, `workspace_id` when the token is bound to a workspace, and
+person's token, `sid` (the issuer session) when it was issued in one, `fam`
+(the refresh family) when its sign-in holds a refresh token, kept across
+rotation, `cns` (the consent it was minted under) for an app that needs one,
+`workspace_id` when the token is bound to a workspace, and
 the person's address and name when `email` and `profile` were granted. ID
 tokens SHALL be signed the same way with `typ` = `JWT`, for the client,
 carrying the request's `nonce` and the session's authentication methods
@@ -530,3 +533,43 @@ outside identity provider's tokens SHALL be verified as before.
 #### Scenario: Not this issuer's people
 - **WHEN** the API validates a workspace client's `client_credentials` token, or runs with an outside identity provider
 - **THEN** no revocation is looked up and the token is accepted as before
+
+### Requirement: One sign-in's access tokens stop at once
+The API SHALL also refuse a person's access token of the in-process issuer,
+on every verification and through the same `TokenRevocation` port, once its
+own sign-in has ended: its issuer session (`sid`) ended (signed out, or
+ended because the way in it used was removed), its refresh family (`fam`)
+revoked (`/oauth2/revoke`, reuse, sign-out), or the consent it was minted
+under (`cns`) revoked, each looked up by its id. The token gets the answer
+of any invalid token. Every other sign-in of the same person SHALL keep
+working. An app asked again for exactly what its live consent holds (the
+same workspace, member and scopes) SHALL keep that consent, so its tokens on
+the person's other devices go on; a different grant replaces it. The check
+SHALL cost the single statement the account check already needs, with no
+cache, so a revocation takes effect on the next request in every process. A
+token from before these claims is judged by its account alone. A sign-in
+named with something that is no id SHALL stand for nothing.
+
+#### Scenario: One session signed out
+- **WHEN** a person signed in in two browsers signs out of the first
+- **THEN** the first browser's access token gets 401 `invalid_token` at once, and the second's still works and refreshes
+
+#### Scenario: One refresh token revoked
+- **WHEN** the first sign-in's refresh token is revoked at `/oauth2/revoke`
+- **THEN** that sign-in's access token gets 401 at once, and the other sign-in's tokens, refreshed ones included, still work
+
+#### Scenario: A way in removed
+- **WHEN** a person removes the way in another browser signed in with
+- **THEN** that browser's access token gets 401 at once, and the person's own sign-in still works
+
+#### Scenario: An app's consent revoked
+- **WHEN** a person revokes an app's consent
+- **THEN** the app's access token gets 401 `invalid_token` at once, and the person's own tokens still work
+
+#### Scenario: An app asked again
+- **WHEN** the desktop app, asked for consent on every sign-in, is allowed again for the same scopes and its code redeemed at once
+- **THEN** the new token works at once, and the token on the first device still works
+
+#### Scenario: Granted again after a revocation
+- **WHEN** an app's consent was revoked and the person allows it again
+- **THEN** the token minted under the new consent works at once

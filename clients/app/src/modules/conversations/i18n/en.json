@@ -64,7 +64,9 @@
     "more_one": "{{count}} more message",
     "more_other": "{{count}} more messages",
     "showQuoted": "Show quoted text",
-    "hideQuoted": "Hide quoted text"
+    "hideQuoted": "Hide quoted text",
+    "readingText": "Reading…",
+    "textFailed": "Couldn’t read this email’s text."
   },
   "actions": {
     "star": "Pin",
@@ -80,7 +82,17 @@
     "imagesHidden_other": "{{count}} remote images hidden, so the sender cannot see when you read this.",
     "imagesShown": "Remote images shown.",
     "trustImages": "Always show images from {{name}}",
-    "imagesTrusted": "Images shown: you trust {{name}}. Tracking pixels stay removed."
+    "imagesTrusted": "Images shown: you trust {{name}}. Tracking pixels stay removed.",
+    "imagesTrustedInbox": "Images shown: this inbox trusts {{name}}. Tracking pixels stay removed.",
+    "imagesHeld": {
+      "under_review": "Images stay held back: this email is under review.",
+      "checks_fail": "Images stay held back: this email doesn’t pass its sender’s checks.",
+      "unverified": "Images stay held back: the mail provider checked nothing that confirms this sender.",
+      "cannot_authenticate": "Images stay held back: this mail provider doesn’t share sender checks, so no sender can be trusted here.",
+      "not_checked": "Images wait for Scout to check this email. While Scout is off or past its daily limit, they stay held back.",
+      "rule_paused": "Images stay held back: the smart rule that trusts this sender is paused or waiting for a yes.",
+      "rule_too_broad": "Images stay held back: the smart rule for this sender’s whole domain would trust strangers (anyone can send from it), so it doesn’t act. You can still trust this address."
+    }
   },
   "toast": {
     "done": "Done · {{subject}}",
@@ -226,12 +238,16 @@
       "unknown_outcome": "Campbooks could not confirm that this message was sent. Check your Sent folder before sending it again.",
       "unknown": "Something went wrong. Try again.",
       "not_saved": "Your last changes could not be saved, so nothing was sent. Try again.",
-      "draft_changed": "This draft changed somewhere else. Close it and open it again to see the latest version."
+      "draft_changed": "This draft changed somewhere else. Close it and open it again to see the latest version.",
+      "content_changed": "This changed since you opened it. Check it and send again.",
+      "quote": "Couldn’t read the email to quote it. Nothing was started. Try again."
     },
     "shortcuts": {
       "newMessage": "New message"
     },
-    "tooLate": "Too late to undo: it was sent."
+    "tooLate": "Too late to undo: it was sent.",
+    "readingQuote": "Reading the email to quote it…",
+    "quoteCut": "This email is long: the quote holds its first part."
   },
   "needs": {
     "line": {
@@ -454,7 +470,8 @@
       "kept": "Rule kept · {{rule}}",
       "keptPaused": "Rule kept, paused for now · {{rule}}",
       "declined": "Rule declined · {{rule}}",
-      "failed": "Campbooks could not change that rule. Nothing changed."
+      "failed": "Campbooks could not change that rule. Nothing changed.",
+      "changed": "This rule changed since you opened it. Check it and keep it again."
     },
     "row": {
       "move": "Campbooks moved this",
@@ -581,10 +598,17 @@
       "limit": "Scout has written a lot of replies this hour. Try again later, or write it yourself.",
       "dailyLimit": "This workspace has used today's AI allowance. Write this one yourself.",
       "send": "Couldn't send to {{name}}. Your draft is kept.",
-      "open": "Couldn't open the composer. Your draft is kept here."
+      "open": "Couldn't open the composer. Your draft is kept here.",
+      "changed": "This reply changed since it was saved. Check it and send again."
     },
     "to": "To {{recipient}}",
-    "replyToElsewhere": "Replies go to {{recipient}}, not to the sender {{sender}}. Check before you send."
+    "replyToElsewhere": "Replies go to {{recipient}}, not to the sender {{sender}}. Check before you send.",
+    "readingQuote": "Reading the email to quote it…",
+    "quoteUnread": "Couldn’t read the email you’re replying to, so its quote can’t be shown. Nothing can be sent until it is.",
+    "quoteCut": "This email is long: your reply quotes its first part.",
+    "quoteShortened": "Shown in part: your reply quotes all of it.",
+    "newer": "A newer message from {{name}} arrived. Your reply still answers the one quoted below.",
+    "answerNewer": "Answer the newer one"
   },
   "smartRule": {
     "tag": "Smart rule",
@@ -619,7 +643,8 @@
     "imagesMatches_one": "{{n}} conversation from them is already here. Their images show whenever their mail passes its checks.",
     "imagesMatches_other": "{{n}} conversations from them are already here. Their images show whenever their mail passes its checks.",
     "imagesNew": "Their images will show in new mail from them that passes its sender checks.",
-    "imagesHow": "Only for mail that passes the sender’s checks, never for mail pretending to be them. Tracking pixels stay removed."
+    "imagesHow": "Only for mail that passes the sender’s checks and that Scout found nothing suspicious in, so while Scout is off or past its daily limit they stay held back. Never for mail pretending to be them. Tracking pixels stay removed.",
+    "imagesAlready": "A smart rule already covers this sender’s images, even if it’s paused or waiting for a yes. Find it in Scout’s memory."
   },
   "ahead": {
     "reportTitle": "Never see emails like this again?",
@@ -662,6 +687,7 @@
     "failed": "Couldn’t start the forward: nothing was sent. Try again.",
     "none": "No one by that name has written to you.",
     "searchFailed": "Couldn’t search just now. Try again.",
-    "nobody": "No one has written to you yet."
+    "nobody": "No one has written to you yet.",
+    "quoteFailed": "Couldn’t read the email to quote it: nothing was sent. Try again."
   }
 }

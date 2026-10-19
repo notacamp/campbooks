@@ -93,12 +93,16 @@ impl JobContext {
 
     /// The job's transaction, opened on first use with the workspace set
     /// ([`WORKSPACE_SETTING`](crate::db::WORKSPACE_SETTING), as
-    /// [`BeginFor::begin_for`](crate::db::BeginFor::begin_for) does).
+    /// [`BeginFor::begin_for`](crate::db::BeginFor::begin_for) does) and its
+    /// statements allowed [`JOB_STATEMENT_TIMEOUT`](crate::db::JOB_STATEMENT_TIMEOUT).
     pub async fn tx(&mut self) -> Result<&mut Transaction<'static, Postgres>, JobError> {
         if let Some(tx) = self.tx.take() {
             return Ok(self.tx.insert(tx));
         }
         let mut tx = self.state.db.begin().await?;
+        // A job's own transaction may run longer statements than a
+        // request's, still bounded.
+        crate::db::allow_statements_for(&mut tx, crate::db::JOB_STATEMENT_TIMEOUT).await?;
         if let Some(workspace) = &self.info.workspace {
             crate::db::set_workspace(&mut tx, workspace).await?;
         }

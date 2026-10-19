@@ -84,6 +84,10 @@ struct Shared {
     max_age: AtomicU64,
     /// Answer the JWKS with 503, as an IdP that is down.
     unavailable: AtomicBool,
+    /// Answer the token endpoint with 503, as an IdP that is down.
+    token_down: AtomicBool,
+    /// How long a `refresh_token` grant takes, in milliseconds.
+    refresh_delay_ms: AtomicU64,
     /// The `traceparent` of the last request, if it carried one.
     last_traceparent: Mutex<Option<String>>,
     /// Who [`TestIdp::authorize`] signs in.
@@ -187,6 +191,8 @@ impl TestIdp {
             discovery_fetches: AtomicUsize::new(0),
             max_age: AtomicU64::new(u64::MAX),
             unavailable: AtomicBool::new(false),
+            token_down: AtomicBool::new(false),
+            refresh_delay_ms: AtomicU64::new(0),
             last_traceparent: Mutex::new(None),
             user: Mutex::new(TestUser::default()),
             codes: Mutex::default(),
@@ -324,6 +330,20 @@ impl TestIdp {
     /// attempts are still counted.
     pub fn set_unavailable(&self, unavailable: bool) {
         self.shared.unavailable.store(unavailable, Ordering::SeqCst);
+    }
+
+    /// Make the token endpoint answer 503 (`true`) or work again (`false`).
+    /// Requests are still counted.
+    pub fn set_token_endpoint_down(&self, down: bool) {
+        self.shared.token_down.store(down, Ordering::SeqCst);
+    }
+
+    /// Make every `refresh_token` grant take `delay` before it answers.
+    pub fn delay_refreshes(&self, delay: std::time::Duration) {
+        self.shared.refresh_delay_ms.store(
+            u64::try_from(delay.as_millis()).unwrap_or(u64::MAX),
+            Ordering::SeqCst,
+        );
     }
 
     /// How many times the JWKS was fetched.
@@ -575,7 +595,14 @@ async fn token(
     Form(form): Form<HashMap<String, String>>,
 ) -> Response {
     shared.token_requests.fetch_add(1, Ordering::SeqCst);
+    if shared.token_down.load(Ordering::SeqCst) {
+        return oauth_error(StatusCode::SERVICE_UNAVAILABLE, "temporarily_unavailable");
+    }
     let field = |name: &str| form.get(name).map(String::as_str).unwrap_or_default();
+    let delay = shared.refresh_delay_ms.load(Ordering::SeqCst);
+    if field("grant_type") == "refresh_token" && delay > 0 {
+        tokio::time::sleep(std::time::Duration::from_millis(delay)).await;
+    }
     if field("client_id") != WEB_CLIENT_ID || field("client_secret") != WEB_CLIENT_SECRET {
         return oauth_error(StatusCode::UNAUTHORIZED, "invalid_client");
     }

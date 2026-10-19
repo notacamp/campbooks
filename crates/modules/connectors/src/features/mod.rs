@@ -8,6 +8,7 @@ pub mod list_connections;
 pub mod member_left;
 pub mod queue_send;
 pub mod request_changes;
+pub mod retag_bindings;
 pub mod send_message;
 pub mod start_connection;
 pub mod sync_now;

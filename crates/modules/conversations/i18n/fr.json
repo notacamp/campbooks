@@ -13,6 +13,7 @@
     "invalid_subject": "L’objet tient sur une seule ligne d’au plus {{max}} caractères.",
     "draft_too_long": "Ce message est trop long pour être envoyé.",
     "draft_changed": "Ce brouillon a été modifié ailleurs. Rechargez-le pour voir la dernière version.",
+    "content_changed": "Ceci a changé depuis que vous l’avez ouvert. Vérifiez-le et réessayez.",
     "draft_not_editable": "Ce message est en route et ne peut plus être modifié.",
     "no_recipients": "Ajoutez au moins un destinataire.",
     "invalid_address": "Cette adresse n’est pas valide : {{address}}",
@@ -29,6 +30,12 @@
     "rule_needs_member": "Les règles sont enseignées par un membre de la boîte de réception, pas par une application.",
     "rule_not_active": "Cette règle attend votre accord. Gardez-la d’abord, puis vous pourrez la mettre en pause.",
     "rule_not_restorable": "Cette règle ne peut plus être rétablie. Enseignez-la à nouveau.",
-    "invalid_senders_query": "Recherchez avec 2 à 100 caractères et demandez entre 1 et {{max}} expéditeurs."
+    "rule_needs_confirmation": "Cette règle doit être confirmée à nouveau avant d’agir. Confirmez-la d’abord, puis vous pourrez la modifier.",
+    "rule_needs_your_yes": "Vous seul pouvez dire oui à cette règle. Scout peut la proposer : vérifiez-la dans la mémoire de Scout et gardez-la là.",
+    "undo_unavailable": "Une partie de ce que cette règle a modifié ne peut pas être rétablie. Supprimez-la en gardant ses modifications.",
+    "invalid_senders_query": "Recherchez avec 2 à 100 caractères et demandez entre 1 et {{max}} expéditeurs.",
+    "images_already_trusted": "Une règle intelligente couvre déjà les images de cet expéditeur, même si elle est en pause ou attend un oui. Vous la trouverez dans la mémoire de Scout.",
+    "send_needs_you": "Vous seul pouvez envoyer un message ou annuler un envoi. Scout peut écrire un brouillon : vérifiez-le et envoyez-le vous-même.",
+    "images_need_you": "Vous seul pouvez choisir d’afficher toujours les images d’un expéditeur. Ouvrez l’un de ses messages et choisissez-le là."
   }
 }

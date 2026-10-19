@@ -188,6 +188,7 @@ async fn admin_operations_stay_out_of_the_catalogue(db: PgPool) {
                     expires_at: None,
                     issued_at: None,
                     auth_time: Some(Utc::now()),
+                    sign_in: None,
                 },
                 "system.admin_overview",
                 Value::Null,

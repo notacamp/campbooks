@@ -31,6 +31,12 @@ const ALL_SCOPES: &str = "workspaces:read workspaces:write workspaces:admin";
 
 /// How long a test waits for a frame it expects.
 const WAIT: Duration = Duration::from_secs(10);
+/// Longest any one request or sequencer run may take: a stall fails at once,
+/// naming the step, instead of surfacing later as an expired token.
+const STEP: Duration = Duration::from_mins(1);
+/// The lifetime of the tokens the tests use: far beyond any test, so a token
+/// expires only when a test means it to (campbooks-cloud#249).
+const TOKEN_LIFETIME: u64 = 24 * 3600;
 
 /// Registered clients: each acts for a person, until removed.
 #[derive(Debug, Default)]
@@ -188,12 +194,11 @@ impl Replica {
             }
             None => Body::empty(),
         };
-        let response = self
-            .app
-            .clone()
-            .oneshot(request.body(body).unwrap())
-            .await
-            .unwrap();
+        let response =
+            tokio::time::timeout(STEP, self.app.clone().oneshot(request.body(body).unwrap()))
+                .await
+                .unwrap_or_else(|_| panic!("{method} {uri} did not answer within {STEP:?}"))
+                .unwrap();
         let status = response.status();
         let bytes = response.into_body().collect().await.unwrap().to_bytes();
         (
@@ -231,12 +236,15 @@ impl Replica {
         if let Some(id) = last_event_id {
             request = request.header("last-event-id", id);
         }
-        let response = self
-            .app
-            .clone()
-            .oneshot(request.body(Body::empty()).unwrap())
-            .await
-            .unwrap();
+        let response = tokio::time::timeout(
+            STEP,
+            self.app
+                .clone()
+                .oneshot(request.body(Body::empty()).unwrap()),
+        )
+        .await
+        .unwrap_or_else(|_| panic!("opening {uri} did not answer within {STEP:?}"))
+        .unwrap();
         if response.status() != StatusCode::OK {
             let status = response.status();
             let bytes = response.into_body().collect().await.unwrap().to_bytes();
@@ -260,7 +268,9 @@ impl Replica {
 
     /// Run the sequencer (and anything else queued).
     async fn sequence(&self) {
-        Worker::new(self.state.clone()).run_until_idle().await;
+        tokio::time::timeout(STEP, Worker::new(self.state.clone()).run_until_idle())
+            .await
+            .unwrap_or_else(|_| panic!("the sequencer did not finish within {STEP:?}"));
     }
 }
 
@@ -405,6 +415,7 @@ impl World {
 
     fn token(&self, sub: &str, scopes: &str) -> String {
         let mut claims = self.idp.claims(scopes);
+        claims["exp"] = (jsonwebtoken_now() + TOKEN_LIFETIME).into();
         claims["sub"] = sub.into();
         claims["email"] = format!("{sub}@example.com").into();
         claims["email_verified"] = true.into();
@@ -415,6 +426,7 @@ impl World {
     /// A token of client `id`, bound to `workspace`.
     fn client(&self, id: &str, workspace: &str) -> String {
         let mut claims = self.idp.claims(ALL_SCOPES);
+        claims["exp"] = (jsonwebtoken_now() + TOKEN_LIFETIME).into();
         let object = claims.as_object_mut().unwrap();
         object.remove("sub");
         object.insert("azp".into(), id.into());
@@ -958,12 +970,16 @@ async fn changes_the_caller_may_not_see_are_skipped_and_a_heartbeat_resumes_past
 struct Standings(std::sync::Mutex<std::collections::HashMap<String, TokenStanding>>);
 
 impl TokenRevocation for Standings {
-    fn standing<'a>(&'a self, _db: &'a PgPool, account: &'a str) -> StandingFuture<'a> {
+    fn standing<'a>(
+        &'a self,
+        _db: &'a PgPool,
+        principal: &'a campbooks_kernel::auth::Principal,
+    ) -> StandingFuture<'a> {
         let standing = self
             .0
             .lock()
             .unwrap()
-            .get(account)
+            .get(&principal.subject)
             .copied()
             .unwrap_or_default();
         Box::pin(async move { Ok(Some(standing)) })
@@ -993,8 +1009,8 @@ async fn a_stream_ends_within_a_heartbeat_when_its_tokens_are_revoked(db: PgPool
     standings.0.lock().unwrap().insert(
         "ana".to_owned(),
         TokenStanding {
-            suspended: false,
             tokens_not_before: Some(chrono::Utc::now()),
+            ..TokenStanding::default()
         },
     );
     // Heartbeat comments keep coming until then: bound the wait.
@@ -1050,6 +1066,116 @@ async fn a_removed_member_is_revoked_and_then_refused(db: PgPool) {
         .err()
         .unwrap();
     assert_eq!(status, StatusCode::NOT_FOUND);
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn a_removal_numbered_just_before_the_open_is_seen_by_the_open(db: PgPool) {
+    // campbooks-cloud#216: the request resolved Bea's access before the
+    // stream read the head, and she was removed in between (numbered before
+    // that head, so in no range the stream reads). The open resolves her
+    // access again after reading the head: she gets nothing, not a stream
+    // until the next heartbeat.
+    let world = World::new(db).await;
+    let ana = world.user("ana");
+    let ws = world.create_workspace(&ana, "Shop").await;
+    let (bea_token, bea) = world.add_member(&ws, "bea", "member").await;
+    world.server.sequence().await;
+    let state = &world.server.state;
+    let principal = state.auth.verify(&bea_token).await.unwrap();
+    let workspace: campbooks_kernel::tenancy::WorkspaceId = ws.parse().unwrap();
+    // As the request's extractor resolved it: Bea, a member.
+    let access = campbooks_kernel::tenancy::resolve_access(
+        state.membership.as_ref(),
+        state.clients.as_ref(),
+        &state.db,
+        &principal,
+        workspace,
+    )
+    .await
+    .unwrap()
+    .unwrap();
+    let subscription = |principal| campbooks_kernel::changes::Subscription {
+        workspace,
+        access,
+        principal,
+        after: None,
+    };
+    // Still a member: the open goes ahead (the probe would see a stream).
+    assert!(
+        campbooks_kernel::changes::open(state, subscription(principal.clone()))
+            .await
+            .is_ok()
+    );
+
+    let (status, _) = world
+        .server
+        .call(
+            Some(&ana),
+            "DELETE",
+            &format!("/api/v1/w/{ws}/members/{bea}"),
+            None,
+        )
+        .await;
+    assert_eq!(status, StatusCode::NO_CONTENT);
+    world.server.sequence().await;
+
+    let opened = campbooks_kernel::changes::open(state, subscription(principal)).await;
+    assert!(
+        matches!(opened.err(), Some(campbooks_kernel::Error::NotFound)),
+        "a former member opens nothing"
+    );
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn a_token_revoked_just_before_the_open_opens_nothing(db: PgPool) {
+    // As a heartbeat asks: a suspension or sign out everywhere between the
+    // request's verification and the open refuses the open, without waiting
+    // for the stream's first heartbeat (campbooks-cloud#216).
+    let idp = TestIdp::start().await;
+    let standings = std::sync::Arc::new(Standings::default());
+    let server = Replica::revocable(&db, &idp, |_| {}, Some(standings.clone())).await;
+    let world = World { idp, db, server };
+    let ana = world.user("ana");
+    let ws = world.create_workspace(&ana, "Shop").await;
+    world.server.sequence().await;
+    let state = &world.server.state;
+    let principal = state.auth.verify(&ana).await.unwrap();
+    let workspace: campbooks_kernel::tenancy::WorkspaceId = ws.parse().unwrap();
+    let access = campbooks_kernel::tenancy::resolve_access(
+        state.membership.as_ref(),
+        state.clients.as_ref(),
+        &state.db,
+        &principal,
+        workspace,
+    )
+    .await
+    .unwrap()
+    .unwrap();
+    let subscription = |principal| campbooks_kernel::changes::Subscription {
+        workspace,
+        access,
+        principal,
+        after: None,
+    };
+    assert!(
+        campbooks_kernel::changes::open(state, subscription(principal.clone()))
+            .await
+            .is_ok(),
+        "standing, it opens"
+    );
+
+    standings.0.lock().unwrap().insert(
+        "ana".to_owned(),
+        TokenStanding {
+            suspended: true,
+            ..TokenStanding::default()
+        },
+    );
+    let opened = campbooks_kernel::changes::open(state, subscription(principal)).await;
+    assert!(
+        matches!(opened.err(), Some(campbooks_kernel::Error::NotFound)),
+        "a token that no longer stands opens nothing"
+    );
 }
 
 /// A change every member with `workspaces:admin` sees, and that changes
@@ -1744,6 +1870,110 @@ async fn an_inbox_gained_unannounced_makes_the_stream_resync_at_its_heartbeat(db
 }
 
 #[sqlx::test(migrations = "../../migrations")]
+async fn an_inbox_gained_unannounced_resyncs_at_the_next_relist_whatever_causes_it(db: PgPool) {
+    use campbooks_conversations::{dev, events::InboxChanged, model::InboxRole};
+
+    // No heartbeat falls within the test: the relist comes from a change
+    // about another inbox (campbooks-cloud#232).
+    let world = World::with(db, |c| c.heartbeat_seconds = 600).await;
+    let ana = world.user("ana");
+    let ws = world.create_workspace(&ana, "Shop").await;
+    let ana_id = world.user_id("ana").await;
+    let (_, bea_id) = world.add_member(&ws, "bea", "member").await;
+    world.server.sequence().await;
+    let mut feed = world
+        .server
+        .subscribe(Some(&world.token("bea", READ_ALL)), &ws, None)
+        .await
+        .unwrap();
+    assert!(feed.next_event().await.is("ready"));
+    // Her containers are listed at the read this frame comes from.
+    world.rename(&ana, &ws, "Shop 1").await;
+    world.server.sequence().await;
+    assert_eq!(
+        record_of(&feed.next_event().await).0,
+        "workspaces.workspace"
+    );
+
+    // An inbox made for her with no change announcing it (only a bug would
+    // do that): its first mail is read past under her old list, before the
+    // rename numbered after it reaches her.
+    let own = dev::create_inbox(
+        &world.server.state,
+        ws.parse().unwrap(),
+        "bea@example.com",
+        &[(bea_id, InboxRole::Manager)],
+    )
+    .await
+    .unwrap();
+    world.ingest(&ws, own, EN).await;
+    world.rename(&ana, &ws, "Shop 2").await;
+    world.server.sequence().await;
+    assert_eq!(
+        record_of(&feed.next_event().await).0,
+        "workspaces.workspace"
+    );
+    let read_past = message_ids(&world.db, own, "en-").await;
+    assert!(!read_past.is_empty());
+    assert!(read_past.iter().all(|id| !feed.raw.contains(id)));
+
+    // A change about an inbox she cannot see makes the stream list again:
+    // that listing finds hers, which nothing announced, and resyncs.
+    let others = dev::create_inbox(
+        &world.server.state,
+        ws.parse().unwrap(),
+        "ana@example.com",
+        &[(ana_id, InboxRole::Manager)],
+    )
+    .await
+    .unwrap();
+    world
+        .publish(&InboxChanged {
+            workspace: ws.clone(),
+            inbox: others,
+        })
+        .await;
+    let reset = tokio::time::timeout(Duration::from_secs(5), feed.next_event())
+        .await
+        .unwrap_or_else(|_| panic!("no reset: {}", feed.raw));
+    assert!(reset.is("reset"), "{reset:?}");
+    assert_eq!(reset.json()["reason"], "access_changed");
+
+    // An inbox gained and announced (as a grant does) needs no resync: its
+    // mail simply arrives.
+    let granted = dev::create_inbox(
+        &world.server.state,
+        ws.parse().unwrap(),
+        "bea.two@example.com",
+        &[(bea_id, InboxRole::Manager)],
+    )
+    .await
+    .unwrap();
+    world
+        .publish(&InboxChanged {
+            workspace: ws.clone(),
+            inbox: granted,
+        })
+        .await;
+    world.ingest(&ws, granted, FR).await;
+    let arrived = message_ids(&world.db, granted, "fr-").await;
+    assert!(!arrived.is_empty());
+    tokio::time::timeout(Duration::from_secs(5), async {
+        while !arrived.iter().all(|id| feed.raw.contains(id)) {
+            feed.next_event().await;
+        }
+    })
+    .await
+    .unwrap_or_else(|_| panic!("the granted inbox's mail did not arrive: {}", feed.raw));
+    assert_eq!(
+        feed.raw.matches("event: reset").count(),
+        1,
+        "an announced gain resyncs nothing: {}",
+        feed.raw
+    );
+}
+
+#[sqlx::test(migrations = "../../migrations")]
 async fn a_removal_numbered_after_a_full_page_stops_that_page(db: PgPool) {
     let world = World::with(db, |c| c.heartbeat_seconds = 600).await;
     let busy = world.space("Busy").await;
@@ -1999,6 +2229,7 @@ impl World {
     /// A client token of `id` for `workspace` with `scopes`.
     fn client_with(&self, id: &str, workspace: &str, scopes: &str) -> String {
         let mut claims = self.idp.claims(scopes);
+        claims["exp"] = (jsonwebtoken_now() + TOKEN_LIFETIME).into();
         let object = claims.as_object_mut().unwrap();
         object.remove("sub");
         object.insert("azp".into(), id.into());
@@ -2357,12 +2588,16 @@ impl DomainEvent for Filed {
 
 #[sqlx::test(migrations = "../../migrations")]
 async fn catching_up_past_more_hidden_changes_than_a_page_looks_the_same(db: PgPool) {
-    const TICK: Duration = Duration::from_millis(250);
-    // A frame is recorded a moment after it left.
-    const SLACK: Duration = Duration::from_millis(20);
+    const TICK_MS: u64 = 250;
+    const TICK: Duration = Duration::from_millis(TICK_MS);
+    // A frame is recorded a moment after it left: frames go out through a
+    // one-slot channel on this single-threaded runtime, so under load the
+    // recorder can stamp one late (campbooks-cloud#232). A missing pacer
+    // still shows: its pages come about a whole tick early.
+    const SLACK: Duration = Duration::from_millis(TICK_MS / 5);
     let world = World::with(db, |c| {
         c.heartbeat_seconds = MATRIX_BEAT.as_secs();
-        c.catch_up_tick_ms = u64::try_from(TICK.as_millis()).unwrap();
+        c.catch_up_tick_ms = TICK_MS;
     })
     .await;
     let busy = world.space("Busy").await;
@@ -2436,10 +2671,10 @@ async fn catching_up_past_more_hidden_changes_than_a_page_looks_the_same(db: PgP
         );
         assert_tokens_fresh_and_beats_on_time(frames, "catch-up");
         // One page per tick, each a tick after its read began, in the busy
-        // workspace as in the quiet one. A read begins once the client took
-        // what came before it (`ready`, then the previous page), so each
-        // page is timed from there: timing from the request that opened
-        // the stream would count how long opening took under load.
+        // workspace as in the quiet one. A read begins once what came before
+        // it (`ready`, then the previous page) is buffered for the client,
+        // so each page is timed from there: timing from the request that
+        // opened the stream would count how long opening took under load.
         let left: Vec<Duration> = frames
             .iter()
             .filter(|(_, f)| f.is("change"))

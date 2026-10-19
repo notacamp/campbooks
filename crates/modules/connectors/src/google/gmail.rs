@@ -332,8 +332,9 @@ impl<'a> Gmail<'a> {
             body.extend_from_slice(&chunk);
         }
         let fetched_bytes = u64::try_from(body.len()).unwrap_or(u64::MAX);
-        let message: Raw = serde_json::from_slice(&body)
-            .map_err(|e| ProviderError::Unexpected(format!("raw message answer: {e}")))?;
+        let message: Raw = serde_json::from_slice(&body).map_err(|e| {
+            ProviderError::Unexpected(crate::provider::unreadable("a raw message answer", &e))
+        })?;
         drop(body);
         // Gmail pads base64url; accept it with or without padding.
         let raw = URL_SAFE_NO_PAD

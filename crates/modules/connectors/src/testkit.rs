@@ -803,6 +803,8 @@ struct Mailbox {
     unavailable_next: u32,
     /// The next this many `getProfile` calls answer 503.
     profile_unavailable_next: u32,
+    /// How long the token endpoint takes to answer a refresh.
+    slow_refresh: Option<std::time::Duration>,
 }
 
 /// What goes wrong with a send.
@@ -1044,6 +1046,20 @@ impl FakeGoogle {
             .collect()
     }
 
+    /// Make the token endpoint take `delay` to answer.
+    pub fn slow_refresh(&self, delay: std::time::Duration) {
+        self.lock().slow_refresh = Some(delay);
+    }
+
+    /// Calls to the token endpoint (refreshes, here).
+    pub fn token_calls(&self) -> usize {
+        self.lock()
+            .calls
+            .iter()
+            .filter(|c| *c == "POST /token")
+            .count()
+    }
+
     /// How many `messages.send` calls were made.
     pub fn send_calls(&self) -> usize {
         self.lock()
@@ -1093,7 +1109,13 @@ impl Respond for Responder {
             .calls
             .push(format!("{} {path}{format}", request.method));
         match (request.method.as_str(), path.as_str()) {
-            ("POST", "/token") => token(&mut mailbox, &form(&request.body)),
+            ("POST", "/token") => {
+                let answer = token(&mut mailbox, &form(&request.body));
+                match mailbox.slow_refresh {
+                    Some(delay) => answer.set_delay(delay),
+                    None => answer,
+                }
+            }
             ("POST", "/revoke") => {
                 let token = form(&request.body).remove("token").unwrap_or_default();
                 mailbox.revoked.push(token);

@@ -34,8 +34,9 @@ use serde_json::{Value, json};
 use crate::{
     domain::{
         access::visible_inboxes,
-        blobs::read_text,
-        decide::{ENVELOPE_BODY_BYTES, MessageParts, envelope},
+        blobs::{cut, words},
+        decide::{ENVELOPE_BODY_BYTES, ENVELOPE_BUDGET, MessageParts, envelope},
+        plain_text::Quotes,
         redact,
     },
     ingest::Headers,
@@ -93,6 +94,8 @@ struct Recipients {
 struct Bodies {
     #[serde(default)]
     text: Option<campbooks_kernel::blobs::BlobRef>,
+    #[serde(default)]
+    html: Option<campbooks_kernel::blobs::BlobRef>,
 }
 
 /// Which eval set an export is for.
@@ -119,17 +122,7 @@ pub async fn export_set(
     let workspace = access.workspace;
     let since = Utc::now() - TimeDelta::days(i64::from(days));
     let mut tx = state.db.begin_for(workspace).await?;
-    // What the member can read, as the API decides it; one of those at most.
-    let mut inboxes = visible_inboxes(&mut tx, access).await?;
-    if inboxes.is_empty() {
-        return Err(Error::NotFound);
-    }
-    if let Some(inbox) = inbox {
-        if !inboxes.contains(&inbox) {
-            return Err(Error::NotFound);
-        }
-        inboxes = vec![inbox];
-    }
+    let inboxes = scope(&mut tx, access, inbox).await?;
     let rows: Vec<Row> = sqlx::query_as(
         r"
         SELECT * FROM (
@@ -181,6 +174,42 @@ pub async fn export_set(
     Ok(items)
 }
 
+/// The inboxes an export for `access`'s member reads: those they can read,
+/// as the API decides it, or only `inbox`. 404 when `inbox` is not one of
+/// them, or when they read no inbox at all. For the operator to see what an
+/// export covers before it runs (campbooks-cloud#219).
+pub async fn export_inboxes(
+    state: &AppState,
+    access: &Access,
+    inbox: Option<InboxId>,
+) -> Result<Vec<InboxId>> {
+    let mut tx = state.db.begin_for(access.workspace).await?;
+    let inboxes = scope(&mut tx, access, inbox).await?;
+    tx.commit().await?;
+    Ok(inboxes)
+}
+
+/// [`export_inboxes`], in `conn`.
+async fn scope(
+    conn: &mut sqlx::PgConnection,
+    access: &Access,
+    inbox: Option<InboxId>,
+) -> Result<Vec<InboxId>> {
+    // What the member can read, as the API decides it; one of those at most.
+    let mut inboxes = visible_inboxes(conn, access).await?;
+    if inboxes.is_empty() {
+        return Err(Error::NotFound);
+    }
+    if let Some(inbox) = inbox {
+        if !inboxes.contains(&inbox) {
+            return Err(Error::NotFound);
+        }
+        inboxes = vec![inbox];
+    }
+    inboxes.sort_unstable();
+    Ok(inboxes)
+}
+
 /// One stored message, as an item to label (`owner-<n + 1>`).
 async fn labelling_item(state: &AppState, ws: &str, n: usize, row: Row) -> Result<LabellingItem> {
     let decode = |e: serde_json::Error| Error::internal(redact::json(&e));
@@ -188,14 +217,18 @@ async fn labelling_item(state: &AppState, ws: &str, n: usize, row: Row) -> Resul
     let recipients: Recipients = serde_json::from_value(row.recipients).map_err(decode)?;
     let headers: Headers = serde_json::from_value(row.headers).map_err(decode)?;
     let bodies: Bodies = serde_json::from_value(row.bodies).map_err(decode)?;
-    let body = match &bodies.text {
-        // A body that cannot be read is left out, not the message.
-        Some(text) => read_text(&state.blobs, ws, text, ENVELOPE_BODY_BYTES)
-            .await
-            .map(|(body, _)| body)
-            .unwrap_or_default(),
-        None => String::new(),
-    };
+    // Its text part, else its HTML read as text (campbooks-cloud#218); a
+    // body that cannot be read is left out, not the message.
+    let body = words(
+        &state.blobs,
+        ws,
+        (bodies.text.as_ref(), bodies.html.as_ref()),
+        ENVELOPE_BUDGET,
+        Quotes::Keep,
+    )
+    .await
+    .map(|(body, _)| cut(body, ENVELOPE_BODY_BYTES))
+    .unwrap_or_default();
     let attachments: Vec<(String, String)> = row
         .filenames
         .iter()

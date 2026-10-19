@@ -51,6 +51,16 @@ pub(crate) async fn kit(db: PgPool) -> Kit {
     Kit::with_deps(db, ConversationsDeps::offline()).await
 }
 
+/// `body` with the content token of the rule at `one` (its URI) as `token`
+/// reads it now: what a member's Keep or adopt sends back
+/// (campbooks-cloud#242).
+pub(crate) async fn as_shown(kit: &Kit, token: &str, one: &str, mut body: Value) -> Value {
+    let shown = kit.get(token, one).await.json;
+    assert!(shown["content_token"].is_string(), "{shown}");
+    body["content_token"] = shown["content_token"].clone();
+    body
+}
+
 pub(crate) fn move_github() -> Value {
     json!({
         "conditions": [{"field": "sender_address", "value": GITHUB}],
@@ -449,7 +459,14 @@ async fn a_rule_pauses_when_its_author_loses_access(db: PgPool) {
         "primary"
     );
     // Sam, a manager, adopts it: it acts again with Sam's rights.
-    let adopted = kit.patch(&sam, &one, json!({"adopt": true})).await;
+    let adopted = kit
+        .patch(
+            &sam,
+            &one,
+            as_shown(&kit, &sam, &one, json!({"adopt": true})).await,
+        )
+        .await;
+    assert_eq!(adopted.status, StatusCode::OK, "{:?}", adopted.json);
     assert_eq!(adopted.json["state"], "active");
 }
 
@@ -479,8 +496,9 @@ async fn invalid_rules_are_refused(db: PgPool) {
     }
 }
 
+/// Members who let Campbooks act without asking.
 #[derive(Debug)]
-struct ActsWithoutAsking;
+pub(crate) struct ActsWithoutAsking;
 
 impl MemberPreferences for ActsWithoutAsking {
     fn acts_without_asking<'a>(
@@ -493,7 +511,7 @@ impl MemberPreferences for ActsWithoutAsking {
     }
 }
 
-fn from_corrections() -> Value {
+pub(crate) fn from_corrections() -> Value {
     json!({
         "conditions": [{"field": "sender_address", "value": GITHUB}],
         "actions": [{"action": "move_to_stream", "stream": "updates"}],
@@ -519,11 +537,12 @@ async fn rules_from_evidence_ask_first_by_default(db: PgPool) {
     assert!(streams(&kit).await.iter().all(|(_, s, _)| s == "primary"));
     // Saying yes applies it.
     let rule = created.json["rule"]["id"].as_str().unwrap();
+    let one = format!("/api/v1/w/{workspace}/rules/{rule}");
     let confirmed = kit
         .post(
             &sam,
-            &format!("/api/v1/w/{workspace}/rules/{rule}/confirm"),
-            Some(json!({})),
+            &format!("{one}/confirm"),
+            Some(as_shown(&kit, &sam, &one, json!({})).await),
         )
         .await;
     assert_eq!(confirmed.json["state"], "active");
@@ -1001,12 +1020,10 @@ async fn the_same_conditions_in_any_order_or_spelling_are_one_rule(db: PgPool) {
     let second = second.json["rule"]["id"].as_str().unwrap().to_owned();
     let listed = kit.get(&sam, &format!("/api/v1/w/{workspace}/rules")).await;
     assert_eq!(listed.json["rules"].as_array().unwrap().len(), 2);
-    kit.post(
-        &sam,
-        &format!("/api/v1/w/{workspace}/rules/{second}/confirm"),
-        Some(json!({"apply_to_existing": false})),
-    )
-    .await;
+    let one = format!("/api/v1/w/{workspace}/rules/{second}");
+    let body = as_shown(&kit, &sam, &one, json!({"apply_to_existing": false})).await;
+    let kept = kit.post(&sam, &format!("{one}/confirm"), Some(body)).await;
+    assert_eq!(kept.status, StatusCode::OK, "{:?}", kept.json);
     let listed = kit.get(&sam, &format!("/api/v1/w/{workspace}/rules")).await;
     let all = listed.json["rules"].as_array().unwrap();
     assert_eq!(all.len(), 1, "{all:?}");
@@ -1220,29 +1237,29 @@ async fn rows_say_who_may_stop_the_rule_that_moved_them(db: PgPool) {
 }
 
 #[sqlx::test(migrations = "../../../migrations")]
-async fn anyone_who_teaches_confirms_or_declines_a_proposal_its_author_keeps(db: PgPool) {
+async fn anyone_who_teaches_confirms_or_declines_a_proposal_and_a_yes_makes_it_theirs(db: PgPool) {
     let kit = kit(db).await;
-    let (workspace, inbox, sam, sam_id) = sams_notifications(&kit, 2).await;
+    let (workspace, inbox, sam, _) = sams_notifications(&kit, 2).await;
     let (leo, leo_id) = kit.member("leo", workspace);
     kit.add_to_inbox(inbox, leo_id, InboxRole::Sender).await;
+    let (ana, ana_id) = kit.member("ana", workspace);
+    kit.add_to_inbox(inbox, ana_id, InboxRole::Sender).await;
     let rules = format!("/api/v1/w/{workspace}/inboxes/{inbox}/rules");
     let propose = || {
         let mut proposed = move_github();
         proposed["state"] = json!("proposed");
         proposed
     };
-    // Sam proposes; Leo, another sender, says yes: Sam stays its author.
+    // Sam proposes; Leo, another sender, says yes: the rule is his now
+    // (campbooks-cloud#242), acting with the rights of whoever said yes.
     let first = kit.post(&sam, &rules, Some(propose())).await;
     let first = first.json["rule"]["id"].as_str().unwrap().to_owned();
-    let confirmed = kit
-        .post(
-            &leo,
-            &format!("/api/v1/w/{workspace}/rules/{first}/confirm"),
-            Some(json!({"apply_to_existing": false})),
-        )
-        .await;
+    let one = format!("/api/v1/w/{workspace}/rules/{first}");
+    let body = as_shown(&kit, &leo, &one, json!({"apply_to_existing": false})).await;
+    let confirmed = kit.post(&leo, &format!("{one}/confirm"), Some(body)).await;
     assert_eq!(confirmed.status, StatusCode::OK, "{:?}", confirmed.json);
-    assert_eq!(confirmed.json["taught_by"], sam_id.to_string());
+    assert_eq!(confirmed.json["taught_by"], leo_id.to_string());
+    assert_eq!(confirmed.json["may_change"], true);
     // Active now: only its author or a manager changes it.
     let refused = kit
         .post(
@@ -1253,7 +1270,7 @@ async fn anyone_who_teaches_confirms_or_declines_a_proposal_its_author_keeps(db:
         .await;
     assert_eq!(refused.status, StatusCode::CONFLICT);
     let refused = kit
-        .delete(&leo, &format!("/api/v1/w/{workspace}/rules/{first}"))
+        .delete(&ana, &format!("/api/v1/w/{workspace}/rules/{first}"))
         .await;
     assert_eq!(refused.json["code"], "rule_not_yours");
 
@@ -1377,13 +1394,9 @@ async fn a_proposal_whose_domain_became_a_public_suffix_is_not_kept(db: PgPool) 
     .execute(&kit.db)
     .await
     .unwrap();
-    let kept = kit
-        .post(
-            &sam,
-            &format!("/api/v1/w/{workspace}/rules/{rule}/confirm"),
-            Some(json!({"apply_to_existing": false})),
-        )
-        .await;
+    let one = format!("/api/v1/w/{workspace}/rules/{rule}");
+    let body = as_shown(&kit, &sam, &one, json!({"apply_to_existing": false})).await;
+    let kept = kit.post(&sam, &format!("{one}/confirm"), Some(body)).await;
     assert_eq!(kept.status, StatusCode::BAD_REQUEST, "{:?}", kept.json);
     assert_eq!(kept.json["code"], "invalid_rule");
 }

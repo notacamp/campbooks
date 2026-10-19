@@ -428,11 +428,26 @@ async fn the_last_way_in_stays_and_removing_a_passkey_signs_out_whoever_used_it(
     let gone = sign_in_with_passkey(&kit, &mut device, 0, &request).await;
     assert_eq!(gone.status, StatusCode::FORBIDDEN, "{gone:?}");
     assert_eq!(gone.json["code"], "passkey_not_accepted");
+    // The session that signed in with it is signed out, its token stopped
+    // at once (campbooks-cloud#143).
+    let stopped = kit
+        .api(Method::GET, "/api/v1/identity/passkeys", &access)
+        .await;
+    assert_eq!(stopped.status, StatusCode::UNAUTHORIZED, "{stopped:?}");
+    // Signed in with the second passkey, the first is gone.
+    let (request, verifier) = waiting_request(&kit).await;
+    let signed_in = sign_in_with_passkey(&kit, &mut device, 1, &request).await;
+    let fresh = redeem(
+        &kit,
+        signed_in.json["redirect"].as_str().unwrap(),
+        &verifier,
+    )
+    .await;
     let gone_again = kit
         .api(
             Method::DELETE,
             &format!("/api/v1/identity/passkeys/{first}"),
-            &access,
+            fresh["access_token"].as_str().unwrap(),
         )
         .await;
     assert_eq!(gone_again.status, StatusCode::NOT_FOUND);
@@ -868,8 +883,12 @@ async fn a_ceremony_names_only_a_waiting_request_and_reads_a_small_body(db: PgPo
             &json!({ "display_name": "Ana", "request": "a".repeat(20_000) }),
         )
         .await;
-        assert_eq!(huge.status, StatusCode::BAD_REQUEST, "{start}: {huge:?}");
-        assert_eq!(huge.json["code"], "invalid_body");
+        assert_eq!(
+            huge.status,
+            StatusCode::PAYLOAD_TOO_LARGE,
+            "{start}: {huge:?}"
+        );
+        assert_eq!(huge.json["code"], "body_too_large");
     }
     // Nothing of it was stored.
     assert_eq!(

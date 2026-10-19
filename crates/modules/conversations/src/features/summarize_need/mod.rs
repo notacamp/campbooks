@@ -39,7 +39,11 @@ use sqlx::{Postgres, Transaction};
 
 use self::prompt::{Answer, Email};
 use crate::{
-    domain::{blobs::read_text, plain_text, redact},
+    domain::{
+        blobs::{Budget, words},
+        plain_text::{self, Quotes},
+        redact,
+    },
     events::NeedSummarised,
     model::{Address, ConversationId, InboxId, MessageId},
 };
@@ -316,13 +320,18 @@ async fn load(
     let sender: Address = serde_json::from_value(row.sender).map_err(decode)?;
     let bodies: Bodies = serde_json::from_value(row.bodies).map_err(decode)?;
     let ws = workspace.to_string();
-    let raw = match (&bodies.text, &bodies.html) {
-        (Some(text), _) => read_text(&state.blobs, &ws, text, RAW_TEXT_BYTES).await,
-        (None, Some(html)) => read_text(&state.blobs, &ws, html, RAW_HTML_BYTES)
-            .await
-            .map(|(html, cut)| (plain_text::from_html(&html), cut)),
-        (None, None) => Ok((String::new(), false)),
-    };
+    // Its text part, else its HTML read as text (campbooks-cloud#218).
+    let raw = words(
+        &state.blobs,
+        &ws,
+        (bodies.text.as_ref(), bodies.html.as_ref()),
+        Budget {
+            text: RAW_TEXT_BYTES,
+            html: RAW_HTML_BYTES,
+        },
+        Quotes::Drop,
+    )
+    .await;
     let raw = match raw {
         Ok((text, _)) => text,
         // Its blob went with the message (its inbox removed): nothing to do.

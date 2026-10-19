@@ -375,6 +375,49 @@ async fn recorded(conn: &mut PgConnection, ids: &[Uuid]) -> Result<Vec<Recorded>
     .await?)
 }
 
+/// Re-tag, with the current key, every pending outbound change of
+/// `workspace` (the transaction's) whose MAC verifies under the previous key
+/// only (a rotation of the instance secret key, campbooks-cloud#262): the
+/// MAC was just verified, so what was bound stays bound and nothing new is
+/// trusted. Each update is a compare-and-set on the old MAC. Returns how
+/// many were re-tagged, and how many changed while this ran (left for the
+/// next run). Changes no longer pending are never verified again, so they
+/// are left as they are.
+pub async fn retag(
+    conn: &mut PgConnection,
+    binding: &Binding,
+    workspace: WorkspaceId,
+) -> Result<(u64, u64)> {
+    let rows: Vec<Recorded> = sqlx::query_as(
+        "SELECT id, stream_id, request_id, provider_message_id, kind, add_labels, remove_labels,
+                mac
+           FROM connectors.outbound_changes
+          WHERE state = 'pending' AND mac IS NOT NULL ORDER BY id",
+    )
+    .fetch_all(&mut *conn)
+    .await?;
+    let (mut retagged, mut left) = (0, 0);
+    for row in rows {
+        let Some(mac) = binding.retag(&row.fields(workspace), row.mac.as_deref()) else {
+            continue;
+        };
+        let done = sqlx::query(
+            "UPDATE connectors.outbound_changes SET mac = $2 WHERE id = $1 AND mac = $3",
+        )
+        .bind(row.id)
+        .bind(mac)
+        .bind(row.mac.as_deref())
+        .execute(&mut *conn)
+        .await?;
+        if done.rows_affected() == 0 {
+            left += 1;
+        } else {
+            retagged += 1;
+        }
+    }
+    Ok((retagged, left))
+}
+
 /// Bind the outbound changes `ids` of `workspace`, just recorded in `conn`
 /// (campbooks-cloud#227): a MAC over each row as written, under a key the
 /// database never holds, which a run verifies before it makes the change

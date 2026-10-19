@@ -99,6 +99,46 @@ struct Claimed {
     trace_context: Option<String>,
 }
 
+/// How often a running worker checks that the database answers, and marks
+/// itself alive when it does.
+const BEAT_EVERY: Duration = Duration::from_secs(10);
+
+/// How long a worker counts as alive after its last beat
+/// ([`Liveness::alive`]): several beats, and longer than a poll interval or
+/// a statement's time limit, so one slow round does not mark it dead.
+pub const ALIVE_FOR: Duration = Duration::from_mins(1);
+
+/// Whether a running worker's loop goes round and the database answers it
+/// (campbooks-cloud#185): the loop beats every [`BEAT_EVERY`] after a
+/// `SELECT 1` succeeds. A worker-only process serves it as its health probe.
+/// Cheap to clone.
+#[derive(Debug, Clone, Default)]
+pub struct Liveness {
+    /// When it last beat (a monotonic clock, unaffected by changes to the
+    /// wall clock); `None` before the first beat.
+    last: Arc<std::sync::Mutex<Option<std::time::Instant>>>,
+}
+
+impl Liveness {
+    /// Mark the worker alive now.
+    pub fn beat(&self) {
+        self.set(Some(std::time::Instant::now()));
+    }
+
+    /// Whether the last beat is within `within` of now.
+    pub fn alive(&self, within: Duration) -> bool {
+        self.last
+            .lock()
+            .is_ok_and(|last| last.is_some_and(|at| at.elapsed() <= within))
+    }
+
+    fn set(&self, at: Option<std::time::Instant>) {
+        if let Ok(mut last) = self.last.lock() {
+            *last = at;
+        }
+    }
+}
+
 /// Claims jobs from every queue in the registry and runs them.
 ///
 /// Any number of workers, in any number of processes, can share one
@@ -126,6 +166,7 @@ struct Shared {
     id: String,
     queues: Vec<&'static str>,
     counters: Counters,
+    liveness: Liveness,
 }
 
 impl Worker {
@@ -142,6 +183,7 @@ impl Worker {
                 config,
                 id: format!("{host}:{}", uuid::Uuid::now_v7()),
                 counters: Counters::default(),
+                liveness: Liveness::default(),
                 state,
             }),
         }
@@ -150,6 +192,12 @@ impl Worker {
     /// This worker's id, as stored in `kernel.jobs.locked_by`.
     pub fn id(&self) -> &str {
         &self.shared.id
+    }
+
+    /// Whether this worker's loop runs and reaches the database: the health
+    /// probe of a worker-only process (campbooks-cloud#185).
+    pub fn liveness(&self) -> Liveness {
+        self.shared.liveness.clone()
     }
 
     /// What this worker has done so far.
@@ -180,11 +228,22 @@ impl Worker {
         let mut next_upkeep = Instant::now();
         let mut next_stats = Instant::now() + STATS_EVERY;
         let mut next_sample = Instant::now();
+        let mut next_beat = Instant::now();
         let mut rotation = 0_usize;
         tokio::pin!(shutdown);
 
         loop {
             let now = Instant::now();
+            if now >= next_beat {
+                if sqlx::query("SELECT 1")
+                    .execute(&shared.state.db)
+                    .await
+                    .is_ok()
+                {
+                    shared.liveness.beat();
+                }
+                next_beat = now + BEAT_EVERY;
+            }
             if now >= next_upkeep {
                 shared.upkeep().await;
                 next_upkeep = now + upkeep_every;
@@ -200,7 +259,7 @@ impl Worker {
             shared.fill(&mut tasks, rotation).await;
             rotation = rotation.wrapping_add(1);
 
-            let wait_until = next_upkeep.min(now + poll);
+            let wait_until = next_upkeep.min(now + poll).min(next_beat);
             tokio::select! {
                 biased;
                 () = &mut shutdown => break,
@@ -1123,4 +1182,23 @@ fn log_stats(shared: &Shared, message: &'static str) {
         lost = s.lost,
         "{message}"
     );
+}
+
+#[cfg(test)]
+mod liveness_tests {
+    use super::*;
+
+    #[test]
+    fn a_worker_is_alive_only_shortly_after_a_beat() {
+        let liveness = Liveness::default();
+        assert!(!liveness.alive(ALIVE_FOR), "never beat");
+        liveness.beat();
+        assert!(liveness.alive(ALIVE_FOR));
+        // Its last beat two minutes ago: no longer.
+        if let Some(earlier) = std::time::Instant::now().checked_sub(Duration::from_mins(2)) {
+            liveness.set(Some(earlier));
+            assert!(!liveness.alive(ALIVE_FOR));
+            assert!(liveness.alive(Duration::from_mins(3)));
+        }
+    }
 }

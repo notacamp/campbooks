@@ -69,26 +69,28 @@ export default async function trustedImages({ page }: ScenarioContext): Promise<
     name: "Always show images from hello@weekly-ledger.example",
   });
   await dialog.waitFor();
-  await caption(page, "Trust the sender: a smart rule you check first, with no AI", 2600);
+  await caption(page, "Trust the sender: a smart rule you check first", 2400);
   await caption(
     page,
-    "Only when the mail passes its sender checks; tracking pixels stay removed",
-    2600,
+    "Only for mail that passes its sender checks and that Scout found nothing suspicious in",
+    2800,
   );
   await dialog.getByRole("button", { name: /Save smart rule/u }).click();
-  await reader.getByText(/Images shown: you trust The Weekly Ledger/u).waitFor();
+  await reader.getByText(/Images shown: (you|this inbox) trusts? The Weekly Ledger/u).waitFor();
   await caption(page, "Its images now show on their own; Undo takes the rule back", 2600);
+  await caption(page, "No second offer for a sender already trusted", 2000);
 
   reader = await read(page, workspace, SPOOF);
   await reader
-    .getByText(/remote image hidden/u)
+    .getByText(/Images stay held back:/u)
     .first()
     .waitFor();
   await caption(
     page,
-    "Mail pretending to be the Ledger fails DMARC: its images stay held back",
+    "Mail pretending to be the Ledger fails DMARC: its images stay held back, and it says why",
     2800,
   );
+  await caption(page, "Nothing to trust here: no Always show images offer", 2200);
 
   // Scout's memory → Smart rules: remove it, and "Show images" is back.
   await page.goto(`/w/${workspace}/settings/memory`);

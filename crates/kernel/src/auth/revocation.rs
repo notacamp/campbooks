@@ -1,8 +1,11 @@
 //! Access tokens that stop before they expire: a person's account can be
 //! suspended, or its owner can sign out everywhere, while clients still
-//! hold access tokens issued to it. The [`TokenRevocation`] port says where
-//! an account stands; [`TokenVerifier`](super::TokenVerifier) asks it on
-//! every verification of a person's token once the server attaches it
+//! hold access tokens issued to it; and one sign-in can end on its own (its
+//! session signed out, its refresh token revoked, the way in it used
+//! removed, or the app's consent revoked: campbooks-cloud#143). The
+//! [`TokenRevocation`] port says where a token's account and sign-in
+//! stand; [`TokenVerifier`](super::TokenVerifier) asks it on every
+//! verification of a person's token once the server attaches it
 //! ([`with_revocation`](super::TokenVerifier::with_revocation)).
 //!
 //! Only the in-process issuer's verifier gets one: its tokens' `sub` is an
@@ -26,6 +29,10 @@ pub struct TokenStanding {
     /// The instant of the account's last revocation (suspension, sign out
     /// everywhere), if any: only tokens issued in a later second stand.
     pub tokens_not_before: Option<DateTime<Utc>>,
+    /// The token's own sign-in ended since it was issued: its session was
+    /// signed out (or its way in removed), its refresh family revoked, or
+    /// the consent of its app revoked. None of its tokens stand.
+    pub sign_in_ended: bool,
 }
 
 impl TokenStanding {
@@ -38,7 +45,7 @@ impl TokenStanding {
     /// sign-in newer than the revocation, minted in that same second, with
     /// the next second.)
     pub fn admits(&self, issued_at: Option<DateTime<Utc>>) -> bool {
-        if self.suspended {
+        if self.suspended || self.sign_in_ended {
             return false;
         }
         let Some(issued_at) = issued_at else {
@@ -53,13 +60,15 @@ impl TokenStanding {
 pub type StandingFuture<'a> =
     Pin<Box<dyn Future<Output = Result<Option<TokenStanding>, Error>> + Send + 'a>>;
 
-/// Says where an account stands for its access tokens. Implemented by the
-/// `identity` module (which owns accounts) and registered by the server for
-/// the in-process issuer only.
+/// Says where a person's token stands: its account, and its own sign-in.
+/// Implemented by the `identity` module (which owns accounts, sessions,
+/// refresh families and consents) and registered by the server for the
+/// in-process issuer only.
 pub trait TokenRevocation: std::fmt::Debug + Send + Sync + 'static {
-    /// The standing of `account` (a token's `sub`), or `None` when there is
-    /// no such account (its tokens stand no more).
-    fn standing<'a>(&'a self, db: &'a PgPool, account: &'a str) -> StandingFuture<'a>;
+    /// The standing of the token `principal` was verified from (its `sub`,
+    /// sign-in, client and `iat`), or `None` when there is no such account
+    /// (its tokens stand no more).
+    fn standing<'a>(&'a self, db: &'a PgPool, principal: &'a Principal) -> StandingFuture<'a>;
 }
 
 /// A registered revocation port.
@@ -79,7 +88,7 @@ impl Revocation {
         if principal.kind != PrincipalKind::User {
             return Ok(true);
         }
-        let standing = self.port.standing(&self.db, &principal.subject).await?;
+        let standing = self.port.standing(&self.db, principal).await?;
         Ok(standing.is_some_and(|standing| standing.admits(principal.issued_at)))
     }
 }
@@ -102,8 +111,8 @@ mod tests {
     #[test]
     fn only_a_later_second_than_the_revocation_stands() {
         let standing = TokenStanding {
-            suspended: false,
             tokens_not_before: Some(at(1_700_000_000, 500)),
+            ..TokenStanding::default()
         };
         // Before, and earlier in the same second (`iat` is whole seconds).
         assert!(!standing.admits(Some(at(1_699_999_999, 0))));
@@ -117,8 +126,8 @@ mod tests {
     #[test]
     fn a_revocation_on_a_whole_second_refuses_that_second() {
         let standing = TokenStanding {
-            suspended: false,
             tokens_not_before: Some(at(1_700_000_000, 0)),
+            ..TokenStanding::default()
         };
         assert!(!standing.admits(Some(at(1_700_000_000, 0))));
         assert!(standing.admits(Some(at(1_700_000_001, 0))));
@@ -128,7 +137,16 @@ mod tests {
     fn a_suspended_account_admits_nothing() {
         let standing = TokenStanding {
             suspended: true,
-            tokens_not_before: None,
+            ..TokenStanding::default()
+        };
+        assert!(!standing.admits(Some(at(1_700_000_000, 0))));
+    }
+
+    #[test]
+    fn an_ended_sign_in_admits_nothing() {
+        let standing = TokenStanding {
+            sign_in_ended: true,
+            ..TokenStanding::default()
         };
         assert!(!standing.admits(Some(at(1_700_000_000, 0))));
     }

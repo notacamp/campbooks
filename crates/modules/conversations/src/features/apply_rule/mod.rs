@@ -7,7 +7,19 @@
 //! records its position and progress, publishes the changes and the run's
 //! `rule_changed`, and enqueues the next batch, so a run survives restarts
 //! and never changes a conversation twice.
+//!
+//! A run acts only when it is bound to the member who asked for it
+//! (`rule_runs::bound`, campbooks-cloud#242), at the rule's generation now;
+//! an apply run only for a rule bound to the member who taught it. A run
+//! planted with SQL, started before runs were bound, or of a rule signed
+//! again since, stops before its first change, with a WARN carrying ids
+//! only, and is not tried again. The rules an apply run competes with are
+//! the bound ones only (`rules::acting`). A revert run puts back only what
+//! the rule's own applications recorded, each one only when its MAC binds
+//! it to the rule (`rules::revert`), whatever the rule's binding.
 
+#[cfg(test)]
+mod binding_tests;
 #[cfg(test)]
 mod tests;
 
@@ -66,6 +78,8 @@ impl JobHandler for ApplyRules {
             return Ok(());
         }
         let kind: RunKind = run.kind.parse()?;
+        // Gone, or a row that does not decode (`find_any` WARNs with its id):
+        // the run ends, never retried.
         let Some(rule) = rules::find_any(tx, run.rule).await? else {
             return end(tx, batch.run, RunState::Cancelled).await;
         };
@@ -75,6 +89,10 @@ impl JobHandler for ApplyRules {
         if rule.inbox_detached
             || (kind == RunKind::Apply && rule.effective_state() != RuleState::Active)
         {
+            return end(tx, batch.run, RunState::Cancelled).await;
+        }
+        // Planted or changed with SQL: it changes nothing (campbooks-cloud#242).
+        if !bound(tx, &binding, workspace, (batch.run, kind), &rule).await? {
             return end(tx, batch.run, RunState::Cancelled).await;
         }
         let context = Context {
@@ -116,6 +134,40 @@ impl JobHandler for ApplyRules {
         rule_runs::announce(tx, &events, &ws, rule.inbox, rule.id, state, view.as_ref()).await?;
         Ok(())
     }
+}
+
+/// Whether `run`, a `kind` run of `rule`, may act (campbooks-cloud#242): the
+/// run is bound to the member who asked for it, at the rule's generation
+/// now, and an apply run's rule to the member who taught it. A WARN with ids
+/// only when not.
+async fn bound(
+    tx: &mut sqlx::Transaction<'static, sqlx::Postgres>,
+    binding: &campbooks_kernel::binding::Binding,
+    workspace: WorkspaceId,
+    run: (RuleRunId, RunKind),
+    rule: &rules::Stored,
+) -> Result<bool, JobError> {
+    let (run, kind) = run;
+    if !rule_runs::bound(tx, binding, workspace.as_uuid(), run, rule, kind).await? {
+        tracing::warn!(
+            %workspace,
+            rule = %rule.id,
+            %run,
+            "a rule run is not bound to the member who asked for it, or its rule \
+             changed since; it is stopped"
+        );
+        return Ok(false);
+    }
+    if kind == RunKind::Apply && !rule.bound(binding) {
+        tracing::warn!(
+            %workspace,
+            rule = %rule.id,
+            %run,
+            "a taught rule is not bound to the member who taught it; its run is stopped"
+        );
+        return Ok(false);
+    }
+    Ok(true)
 }
 
 /// Count the conversations `rule` matches in the next window. Returns the
@@ -160,7 +212,7 @@ async fn apply_batch(
     batch: &RunBatch,
     tally: &mut Tally,
 ) -> Result<Option<ConversationId>, JobError> {
-    let acting = rules::acting(tx, rule.inbox).await?;
+    let acting = rules::acting(tx, context.binding, rule.inbox).await?;
     let engine = rule.engine();
     // One window of the inbox at most, and at most [`BATCH`] changes.
     let window = rules::scan(tx, rule.inbox, &rule.conditions, batch.after, SCAN).await?;

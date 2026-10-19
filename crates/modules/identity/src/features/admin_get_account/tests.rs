@@ -8,7 +8,7 @@ use crate::admin_testkit::AdminKit;
 async fn administrators_see_how_a_person_gets_in_without_any_secret(db: PgPool) {
     let kit = AdminKit::new(db, &[]).await;
     let ana = kit.account("ana").await;
-    kit.account("bea").await;
+    let bea = kit.account("bea").await;
     let uri = format!("/admin/v1/identity/accounts/{ana}");
 
     for sub in ["root", "viewer"] {
@@ -28,9 +28,21 @@ async fn administrators_see_how_a_person_gets_in_without_any_secret(db: PgPool) 
         assert_eq!(ways[0]["provider"], "google");
         assert_eq!(ways[0]["email"], "ana@example.com");
         assert_eq!(ways[0]["linked_via"], "sign_up");
+        // No secret, and nothing of another account. Whole values, never
+        // a few letters: a random id may well contain "bea"
+        // (campbooks-cloud#230).
         let text = body.to_string();
-        for secret in ["session-secret", "public-key-bytes", "google-ana", "bea"] {
-            assert!(!text.contains(secret), "{secret} leaked: {text}");
+        let bea = bea.to_string();
+        for leaked in [
+            "session-secret",
+            "public-key-bytes",
+            "google-ana",
+            "google-bea",
+            "bea@example.com",
+            "\"bea\"",
+            bea.as_str(),
+        ] {
+            assert!(!text.contains(leaked), "{leaked} leaked: {text}");
         }
     }
     assert_eq!(

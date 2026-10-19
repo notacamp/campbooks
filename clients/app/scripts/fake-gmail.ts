@@ -42,6 +42,8 @@ export interface Mailbox {
   /** The history id before the first record still kept. */
   baseHistoryId: number;
   historyId: number;
+  /** Each demo thread's Gmail thread id and first Message-ID, to answer in it later. */
+  threads?: Map<string, { threadId: string; messageId: string }>;
 }
 
 const LABELS = [
@@ -81,7 +83,8 @@ export interface DemoMessage {
   subject: string;
   /** Hours before the mailbox was made. */
   hoursAgo: number;
-  text: string;
+  /** The text part; without one, the message is its HTML alone. */
+  text?: string;
   html?: string;
   labels: string[];
   /** Thread key shared by the messages of one demo conversation. */
@@ -429,6 +432,33 @@ function demoMessages(me: string, images: string): DemoMessage[] {
       files: [{ name: "CH-20418.pdf", type: "application/pdf", content: pdf("Invoice CH-20418") }],
     },
     {
+      // HTML alone, opening with a head and never saying <body> (some mailers
+      // send it): search finds it by a word only its text holds,
+      // "harbourlight" (campbooks-cloud#218; the search-head-html recording).
+      from: "Quay Office <office@quay-moorings.example>",
+      to: me,
+      subject: "Your berth for next season",
+      hoursAgo: 24,
+      labels: ["INBOX", "CATEGORY_UPDATES"],
+      html: `<head><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>Quay Office</title><style>p{font-family:Georgia,serif}</style><p>Hello Sam,</p><p>Your berth at the harbourlight pontoon is kept for next season. Nothing to do until March.</p><p>Quay Office</p>`,
+    },
+    {
+      // HTML alone and long (over 256 KiB): read in time, but a reply or
+      // forward quotes only its first part, and says so
+      // (campbooks-cloud#255; the quote-long-html recording). Its words never say
+      // "harbourlight": search-head-html finds the berth email by that word alone.
+      from: "Quay Office <office@quay-moorings.example>",
+      to: me,
+      subject: "Tide tables for the season",
+      hoursAgo: 23,
+      labels: ["INBOX", "CATEGORY_UPDATES"],
+      html: `<div style="font-family:Georgia,serif"><p>Hello Sam,</p><p>Here are the tide tables at the quay for the whole season.</p><table>${Array.from(
+        { length: 3000 },
+        (_, day) =>
+          `<tr><td>Day ${String(day + 1)}</td><td>High water 06:12 and 18:40</td><td>Low water 00:05 and 12:27</td></tr>`,
+      ).join("")}</table><p>Quay Office</p></div>`,
+    },
+    {
       from: "Accounts <no-reply@accounts.example>",
       to: me,
       subject: "New sign-in to your account from Linux",
@@ -579,7 +609,7 @@ export function rfc822(
     "Content-Type: text/plain; charset=utf-8",
     "Content-Transfer-Encoding: base64",
     "",
-    wrap64(message.text),
+    wrap64(message.text ?? ""),
   ].join(CRLF);
   const alt = `alt-${hex(6)}`;
   const alternative = [
@@ -613,10 +643,15 @@ export function rfc822(
   ].join(CRLF);
   let type: string;
   let body: string;
-  if (files.length === 0 && message.html === undefined) {
+  if (message.text === undefined && files.length === 0 && inline.length === 0) {
+    // HTML alone, as some mailers send it.
+    type = "text/html; charset=utf-8";
+    headers.push(["Content-Transfer-Encoding", "base64"]);
+    body = wrap64(message.html ?? "");
+  } else if (files.length === 0 && message.html === undefined) {
     type = "text/plain; charset=utf-8";
     headers.push(["Content-Transfer-Encoding", "base64"]);
-    body = wrap64(message.text);
+    body = wrap64(message.text ?? "");
   } else if (files.length === 0 && inline.length === 0) {
     type = `multipart/alternative; boundary="${alt}"`;
     body = alternative;
@@ -783,12 +818,38 @@ export function createMailbox(
   // The backfill reads the mailbox as it is; history starts after it.
   mailbox.history = [];
   mailbox.baseHistoryId = mailbox.historyId;
+  mailbox.threads = threads;
   return mailbox;
 }
 
-/** A message that arrives while the app is open (`POST /fake/deliver`). */
-export function deliverDemo(mailbox: Mailbox): StoredMessage {
+/**
+ * A message that arrives while the app is open (`POST /fake/deliver`), or
+ * with `?reply=q4` Leo's answer in the Q4 thread, for the reply dialog's
+ * "a newer message arrived" (campbooks-cloud#220).
+ */
+export function deliverDemo(mailbox: Mailbox, reply?: string): StoredMessage {
   const date = new Date();
+  const thread = reply === undefined ? undefined : mailbox.threads?.get(reply);
+  if (thread !== undefined) {
+    const raw = rfc822(
+      {
+        from: "Leo Brandt <leo@northwind-studio.example>",
+        to: mailbox.address,
+        cc: "Maya Okafor <maya@northwind-studio.example>",
+        subject: "Re: Q4 plan: can you review by Friday?",
+        hoursAgo: 0,
+        labels: [],
+        text: "Hi Sam,\n\nCould we look at it on Friday instead? I am away on Thursday.\n\nLeo",
+      },
+      date,
+      `<${hex(6)}@demo.example>`,
+      thread.messageId,
+    );
+    return appendMessage(mailbox, raw, ["INBOX", "UNREAD", "Label_1", "CATEGORY_PERSONAL"], {
+      threadId: thread.threadId,
+      internalDate: date.getTime(),
+    });
+  }
   const raw = rfc822(
     {
       from: "Rui Matos <rui@contabilidade-rm.example>",

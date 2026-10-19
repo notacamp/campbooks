@@ -100,6 +100,8 @@ async fn the_recorded_fixtures_are_normalised(db: PgPool) {
 
     let newsletter = upsert_of(&all, &ids[2]);
     assert_eq!(newsletter["subject"], "Novedades de otoño");
+    // HTML alone: no text part is made up for it (campbooks-cloud#218).
+    assert!(newsletter["html"].is_object() && newsletter["text"].is_null());
     assert_eq!(newsletter["categories"], serde_json::json!(["promotions"]));
     assert_eq!(newsletter["headers"]["precedence"], "bulk");
     assert_eq!(

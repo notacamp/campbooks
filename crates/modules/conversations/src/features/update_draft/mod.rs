@@ -21,7 +21,7 @@ use utoipa::ToSchema;
 
 use crate::{
     domain::{
-        drafts::{self, DraftView, check_limits, tidy},
+        drafts::{self, DraftView, check_limits, shown_to_author, tidy},
         paths::DraftPath,
     },
     events::DRAFT_RECORD,
@@ -35,6 +35,14 @@ use campbooks_kernel::authz::Action;
 pub struct DraftChanges {
     /// The version this change was made on (from the draft last read).
     pub version: u32,
+    /// The `content_token` that came with the draft on screen (its last
+    /// save's answer, or the draft as read). Every save keeps fields it
+    /// cannot set (the inbox, the reply headers, the attachments' files),
+    /// so every save names what it was shown: missing, another member's, or
+    /// not the draft as it is now answers 409 `content_changed` and nothing
+    /// is saved (campbooks-cloud#242).
+    #[serde(default)]
+    pub content_token: Option<String>,
     /// Recipients.
     #[serde(default)]
     pub to: Option<Vec<Address>>,
@@ -83,7 +91,7 @@ pub struct DraftChanges {
             body = Problem, content_type = "application/problem+json"),
         (status = NOT_FOUND, description = "No such draft, or it is not yours.",
             body = Problem, content_type = "application/problem+json"),
-        (status = CONFLICT, description = "Changed since that version (`draft_changed`), or on its way (`draft_not_editable`).",
+        (status = CONFLICT, description = "Changed since that version (`draft_changed`), on its way (`draft_not_editable`), or not what you were shown (`content_changed`): read it again, then save.",
             body = Problem, content_type = "application/problem+json"),
     )
 )]
@@ -105,6 +113,10 @@ pub async fn update(
     if i64::from(changes.version) != i64::from(row.version) {
         return Err(Error::Conflict(crate::MESSAGES.reason("draft_changed")));
     }
+    // What the save keeps is what the member was shown: the token is checked
+    // against the row before the write, and only then is a new one issued
+    // over what the save leaves (campbooks-cloud#242).
+    shown_to_author(&state, access, &row, changes.content_token.as_deref())?;
     let (to, cc, bcc) = row.recipients()?;
     let [to, cc, bcc] = tidy([
         changes.to.unwrap_or(to),
@@ -155,12 +167,12 @@ pub async fn update(
     .await?;
     let draft = drafts::load(&state, &mut tx, access, id, false, Action::Read)
         .await?
-        .view()?;
+        .shown(&state.binding, access)?;
     tx.commit().await?;
     Ok(Json(draft))
 }
 
-/// Discard a draft (also a scheduled one, which then never leaves).
+/// Discard a draft (not one on its way: cancel its send first).
 #[utoipa::path(
     delete,
     path = "/api/v1/w/{workspace_id}/drafts/{draft_id}",
@@ -182,7 +194,7 @@ pub async fn update(
             body = Problem, content_type = "application/problem+json"),
         (status = NOT_FOUND, description = "No such draft, or it is not yours.",
             body = Problem, content_type = "application/problem+json"),
-        (status = CONFLICT, description = "On its way (`draft_not_editable`).",
+        (status = CONFLICT, description = "Scheduled or on its way (`draft_not_editable`): cancel its send first.",
             body = Problem, content_type = "application/problem+json"),
     )
 )]
@@ -195,7 +207,10 @@ pub async fn delete(
     let id = path.draft_id;
     let mut tx = state.db.begin_for(access.workspace).await?;
     let row = drafts::load(&state, &mut tx, access, id, true, Action::Delete).await?;
-    if row.state()? == DraftState::Sending {
+    // A scheduled send is taken back only by a deliberate cancel
+    // (`conversations.cancel_send`, the Undo), never as a side effect of a
+    // discard (campbooks-cloud#242): then it is a draft again and may go.
+    if !row.state()?.editable() {
         return Err(Error::Conflict(
             crate::MESSAGES.reason("draft_not_editable"),
         ));

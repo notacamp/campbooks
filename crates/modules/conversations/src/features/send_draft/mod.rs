@@ -5,10 +5,16 @@
 //! runs when the window ends and hands it to the connector, unless it was
 //! cancelled, deleted or sent again meanwhile (each send has a generation,
 //! and a release acts only at its own).
+//!
+//! Both are the member's own request only (campbooks-cloud#242): neither is
+//! the assistant's or automation's (`x-campbooks` opts neither in), and a
+//! request run in-process for the member that reaches them anyway is
+//! refused. The assistant may write and save drafts; the member sends them.
 
 use axum::{Extension, Json, extract::State, http::StatusCode};
 use campbooks_kernel::{
     AppState, Error, Operation, Problem, Result, Risk,
+    auth::ScopeName,
     db::BeginFor as _,
     extract,
     jobs::EnqueueOptions,
@@ -32,11 +38,17 @@ use crate::{
 use campbooks_kernel::authz::Action;
 
 /// Which version of the draft to send: the one the member last saw saved.
-#[derive(Debug, Clone, Copy, Deserialize, ToSchema)]
+#[derive(Debug, Clone, Deserialize, ToSchema)]
 pub struct SendDraft {
     /// The draft's version as last saved by the caller; any other answers
     /// 409 `draft_changed`, so what is sent is what the member saw.
     pub version: u32,
+    /// The `content_token` that came with the draft on screen (its last
+    /// save's answer, or the draft as read). Missing, another member's, or
+    /// not the draft as it is now: 409 `content_changed`, and nothing is
+    /// sent (campbooks-cloud#242).
+    #[serde(default)]
+    pub content_token: Option<String>,
 }
 
 /// How sending behaves, from the module's settings.
@@ -54,9 +66,10 @@ pub struct SendSettings {
     tag = "conversations",
     security(("bearer" = ["conversations:send"])),
     // Mail leaves in the person's name: the send class of the rate limits.
+    // The member's own request only (campbooks-cloud#242): neither the
+    // assistant nor automation may send, whatever a call says it confirmed.
     extensions(("x-campbooks" = json!(Operation::command(Risk::High)
         .undo("conversations.cancel_send")
-        .assistant()
         .rate_limit(RateLimit::Send)
         .records(["conversations.draft"]).access("conversations.draft", campbooks_kernel::authz::Action::Send)))),
     params(
@@ -71,11 +84,11 @@ pub struct SendSettings {
             body = Problem, content_type = "application/problem+json"),
         (status = UNAUTHORIZED, description = "No valid access token.", body = Problem,
             content_type = "application/problem+json"),
-        (status = FORBIDDEN, description = "Missing scope, or you only read its inbox.",
+        (status = FORBIDDEN, description = "Missing scope, you only read its inbox, or not your own request (`send_needs_you`): the assistant and automation never send.",
             body = Problem, content_type = "application/problem+json"),
         (status = NOT_FOUND, description = "No such draft, or it is not yours.",
             body = Problem, content_type = "application/problem+json"),
-        (status = CONFLICT, description = "Already on its way (`draft_not_editable`), or saved since that version (`draft_changed`).",
+        (status = CONFLICT, description = "Already on its way (`draft_not_editable`), saved since that version (`draft_changed`), or not what you were shown (`content_changed`): read it again, check it, and send again.",
             body = Problem, content_type = "application/problem+json"),
         (status = TOO_MANY_REQUESTS, description = "`rate_limited`: you sent too much mail in a short time; `Retry-After` says when to try again.",
             body = Problem, content_type = "application/problem+json"),
@@ -92,6 +105,7 @@ pub async fn send(
     let id = path.draft_id;
     let mut tx = state.db.begin_for(access.workspace).await?;
     let row = drafts::load(&state, &mut tx, access, id, true, Action::Send).await?;
+    members_own_send(&workspace, id)?;
     if !row.state()?.editable() {
         return Err(Error::Conflict(
             crate::MESSAGES.reason("draft_not_editable"),
@@ -100,6 +114,15 @@ pub async fn send(
     if i64::from(body.version) != i64::from(row.version) {
         return Err(Error::Conflict(crate::MESSAGES.reason("draft_changed")));
     }
+    if !state.binding.is_enabled() {
+        tracing::warn!(
+            workspace = %access.workspace,
+            draft = %row.id,
+            "a send was refused: there is no key to bind it with (CAMPBOOKS_SECRET_KEY is unset)"
+        );
+        return Err(Error::internal("sends are not bound: no instance secret"));
+    }
+    let content = drafts::shown_to_author(&state, access, &row, body.content_token.as_deref())?;
     let (to, cc, bcc) = row.recipients()?;
     if to.len() + cc.len() + bcc.len() == 0 {
         return Err(Error::BadRequest(crate::MESSAGES.reason("no_recipients")));
@@ -138,7 +161,7 @@ pub async fn send(
     )
     .fetch_one(&mut *tx)
     .await?;
-    bind_request(&state, &mut tx, access, &row, generation).await?;
+    bind_request(&state, &mut tx, access, (&row, &content), generation).await?;
     campbooks_kernel::jobs::enqueue_to::<ReleaseSend>(
         &mut tx,
         &ReleaseSendPayload {
@@ -152,31 +175,55 @@ pub async fn send(
     .await?;
     let draft = drafts::load(&state, &mut tx, access, id, false, Action::Read)
         .await?
-        .view()?;
+        .shown(&state.binding, access)?;
     tx.commit().await?;
     Ok((StatusCode::ACCEPTED, Json(draft)))
 }
 
-/// Bind the author's request to send `row` at `generation` (scheduled in
-/// `tx`) with a MAC the database cannot forge (campbooks-cloud#227):
-/// `release_send` releases only a draft whose content, recipients, inbox,
-/// author and generation are still the ones signed here. Without the
-/// instance secret there is no key, and nothing is scheduled.
+/// 403 `send_needs_you` unless the request is the member's own
+/// (campbooks-cloud#242). Mail is untrusted input to the assistant, so a
+/// message could ask it to send something, or to take back a send the
+/// member made; and the assistant can read a draft's `content_token` like
+/// any client. A `confirmed` flag is set by the code making the call, so it
+/// proves nothing: only a request that arrived over HTTP with the member's
+/// token sends mail or cancels a send. Only the kernel says who invoked a
+/// request ([`Workspace::invoked_by`]), from a request extension no client
+/// can send. Checked after the access checks, before anything changes.
+fn members_own_send<S: ScopeName>(workspace: &Workspace<S>, draft: DraftId) -> Result<()> {
+    let Some(caller) = workspace.invoked_by else {
+        return Ok(());
+    };
+    tracing::warn!(
+        workspace = %workspace.id,
+        draft = %draft,
+        caller = %caller,
+        "a send was refused: only a member's own request sends mail or takes a send back"
+    );
+    Err(Error::Denied(crate::MESSAGES.reason("send_needs_you")))
+}
+
+/// Bind the author's request to send `row` (with `content`, its
+/// [`binding::content_hash`] as checked by [`drafts::shown_to_author`]) at
+/// `generation` (scheduled in `tx`) with a MAC the database cannot forge
+/// (campbooks-cloud#227): `release_send` releases only a draft whose
+/// content, recipients, inbox, author and generation are still the ones
+/// signed here. Without the instance secret there is no key, and nothing
+/// is scheduled.
 async fn bind_request(
     state: &AppState,
     tx: &mut sqlx::PgConnection,
     access: &campbooks_kernel::tenancy::Access,
-    row: &drafts::DraftRow,
+    draft: (&drafts::DraftRow, &[u8; 32]),
     generation: i32,
 ) -> Result<()> {
-    let content = binding::content_hash(row)?;
+    let (row, content) = draft;
     let request = binding::SendRequest {
         workspace: access.workspace,
         draft: row.id,
         generation,
         author: access.user,
         inbox: row.inbox_id,
-        content: &content,
+        content,
     };
     let Some(mac) = request.sign(&state.binding) else {
         tracing::warn!(
@@ -201,8 +248,9 @@ async fn bind_request(
     operation_id = "conversations.cancel_send",
     tag = "conversations",
     security(("bearer" = ["conversations:send"])),
+    // The member's own request only (campbooks-cloud#242): the assistant
+    // may not take back a send the member made.
     extensions(("x-campbooks" = json!(Operation::command(Risk::Low)
-        .assistant()
         .records(["conversations.draft"]).access("conversations.draft", campbooks_kernel::authz::Action::Write)))),
     params(
         ("workspace_id" = WorkspaceId, Path, description = "The workspace."),
@@ -212,7 +260,7 @@ async fn bind_request(
         (status = OK, description = "A draft again.", body = DraftView),
         (status = UNAUTHORIZED, description = "No valid access token.", body = Problem,
             content_type = "application/problem+json"),
-        (status = FORBIDDEN, description = "Missing scope, or you only read its inbox.",
+        (status = FORBIDDEN, description = "Missing scope, you only read its inbox, or not your own request (`send_needs_you`).",
             body = Problem, content_type = "application/problem+json"),
         (status = NOT_FOUND, description = "No such draft, or it is not yours (a sent draft is gone).",
             body = Problem, content_type = "application/problem+json"),
@@ -229,6 +277,7 @@ pub async fn cancel(
     let id = path.draft_id;
     let mut tx = state.db.begin_for(access.workspace).await?;
     let row = drafts::load(&state, &mut tx, access, id, true, Action::Write).await?;
+    members_own_send(&workspace, id)?;
     match row.state()? {
         DraftState::Scheduled => {
             sqlx::query!(
@@ -252,7 +301,7 @@ pub async fn cancel(
     }
     let draft = drafts::load(&state, &mut tx, access, id, false, Action::Read)
         .await?
-        .view()?;
+        .shown(&state.binding, access)?;
     tx.commit().await?;
     Ok(Json(draft))
 }

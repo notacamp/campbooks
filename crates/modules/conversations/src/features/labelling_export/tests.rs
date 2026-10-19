@@ -6,7 +6,7 @@ use campbooks_kernel::{
 };
 use sqlx::PgPool;
 
-use super::{LabellingSet, OWNER, export_set, manifest, manifest_for};
+use super::{LabellingSet, OWNER, export_inboxes, export_set, manifest, manifest_for};
 use crate::{model::InboxRole, testkit::Kit};
 
 /// Every fixture is recent enough.
@@ -296,5 +296,24 @@ async fn an_inbox_the_member_cannot_read_is_refused(db: PgPool) {
     );
     // Leo's private inbox: refused.
     let refused = export(Some(leos)).await;
+    assert!(matches!(refused, Err(Error::NotFound)), "{refused:?}");
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn an_export_says_which_inboxes_it_reads(db: PgPool) {
+    let kit = Kit::new(db).await;
+    let (workspace, (sam, sams), (_, leos)) = two_private_inboxes(&kit).await;
+    let access = member(workspace, sam);
+    assert_eq!(
+        export_inboxes(&kit.state, &access, None).await.unwrap(),
+        vec![sams]
+    );
+    assert_eq!(
+        export_inboxes(&kit.state, &access, Some(sams))
+            .await
+            .unwrap(),
+        vec![sams]
+    );
+    let refused = export_inboxes(&kit.state, &access, Some(leos)).await;
     assert!(matches!(refused, Err(Error::NotFound)), "{refused:?}");
 }

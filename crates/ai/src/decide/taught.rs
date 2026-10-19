@@ -280,62 +280,365 @@ pub enum Invalid {
     /// one domain, and nothing else.
     #[error("showing images needs one sender, and nothing else")]
     ImagesNeedSender,
+    /// Trusting a whole domain anyone can send from (a mailing list or a
+    /// newsletter platform) with images.
+    #[error("anyone can send from this domain: trust an address instead")]
+    SharedSenderDomain,
 }
 
-/// Free mail providers: a domain of theirs on its own would match people.
-const FREE_MAIL: [&str; 52] = [
-    "gmail.com",
-    "googlemail.com",
-    "outlook.com",
-    "outlook.pt",
-    "outlook.es",
-    "outlook.fr",
-    "hotmail.com",
-    "hotmail.co.uk",
-    "hotmail.fr",
-    "hotmail.es",
-    "hotmail.it",
-    "hotmail.de",
-    "live.com",
-    "live.co.uk",
-    "live.fr",
-    "msn.com",
-    "yahoo.com",
-    "yahoo.co.uk",
-    "yahoo.fr",
-    "yahoo.es",
-    "yahoo.de",
-    "ymail.com",
-    "rocketmail.com",
-    "icloud.com",
-    "me.com",
-    "mac.com",
-    "aol.com",
+/// Free mail providers, and the mail of internet providers, by registrable
+/// domain: a domain of theirs on its own would match people (anyone with an
+/// account there). The one list: the web client's copy is checked against it
+/// (`clients/app/src/lib/mail/free-mail.ts`, campbooks-cloud#235).
+pub const FREE_MAIL: &[&str] = &[
+    "10minutemail.com",
+    "126.com",
+    "139.com",
+    "163.com",
+    "189.cn",
+    "abv.bg",
+    "aim.com",
+    "alice.it",
+    "aliyun.com",
     "aol.co.uk",
-    "proton.me",
-    "protonmail.com",
-    "pm.me",
-    "gmx.com",
-    "gmx.net",
-    "gmx.de",
-    "gmx.fr",
-    "web.de",
-    "t-online.de",
-    "yandex.com",
-    "yandex.ru",
-    "mail.ru",
+    "aol.com",
+    "aol.de",
+    "aol.fr",
+    "aon.at",
+    "arcor.de",
+    "atlas.cz",
+    "att.net",
+    "azet.sk",
+    "bbox.fr",
+    "bell.net",
+    "bellsouth.net",
+    "biglobe.ne.jp",
+    "bigmir.net",
+    "bigpond.com",
+    "bigpond.net.au",
+    "bk.ru",
+    "bluewin.ch",
+    "blueyonder.co.uk",
+    "bol.com.br",
+    "bredband.net",
+    "btinternet.com",
+    "btopenworld.com",
+    "centrum.cz",
+    "centrum.sk",
+    "centurylink.net",
+    "charter.net",
+    "chello.at",
+    "chello.nl",
+    "citromail.hu",
+    "clix.pt",
+    "club-internet.fr",
+    "cogeco.ca",
+    "comcast.net",
+    "comhem.se",
+    "cox.net",
+    "daum.net",
+    "dir.bg",
+    "disroot.org",
+    "docomo.ne.jp",
+    "duck.com",
+    "earthlink.net",
+    "eircom.net",
+    "email.com",
+    "email.cz",
+    "email.it",
+    "embarqmail.com",
+    "excite.com",
+    "ezweb.ne.jp",
     "fastmail.com",
     "fastmail.fm",
+    "fastwebnet.it",
+    "foxmail.com",
+    "free.fr",
+    "freemail.hu",
+    "freenet.de",
+    "frontier.com",
+    "frontiernet.net",
+    "gazeta.pl",
+    "globo.com",
+    "gmail.com",
+    "gmx.at",
+    "gmx.ch",
+    "gmx.co.uk",
+    "gmx.com",
+    "gmx.de",
+    "gmx.es",
+    "gmx.fr",
+    "gmx.it",
+    "gmx.net",
+    "gmx.pt",
+    "googlemail.com",
+    "guerrillamail.com",
+    "hanmail.net",
+    "hetnet.nl",
+    "hey.com",
+    "hispeed.ch",
+    "home.nl",
+    "hotmail.be",
+    "hotmail.ca",
+    "hotmail.ch",
+    "hotmail.cl",
+    "hotmail.co.jp",
+    "hotmail.co.uk",
+    "hotmail.com",
+    "hotmail.com.ar",
+    "hotmail.com.au",
+    "hotmail.com.br",
+    "hotmail.com.mx",
+    "hotmail.com.tr",
+    "hotmail.de",
+    "hotmail.dk",
+    "hotmail.es",
+    "hotmail.fi",
+    "hotmail.fr",
+    "hotmail.gr",
+    "hotmail.it",
+    "hotmail.nl",
+    "hotmail.no",
+    "hotmail.se",
+    "hushmail.com",
+    "i.ua",
+    "icloud.com",
+    "ig.com.br",
+    "iinet.net.au",
+    "inbox.com",
+    "inbox.lt",
+    "inbox.lv",
+    "inbox.ru",
+    "interia.pl",
+    "iol.pt",
+    "juno.com",
+    "kakao.com",
+    "kpnmail.nl",
+    "laposte.net",
+    "libero.it",
+    "list.ru",
+    "live.be",
+    "live.ca",
+    "live.cl",
+    "live.co.uk",
+    "live.com",
+    "live.com.ar",
+    "live.com.au",
+    "live.com.mx",
+    "live.com.pt",
+    "live.de",
+    "live.dk",
+    "live.fr",
+    "live.ie",
+    "live.in",
+    "live.it",
+    "live.jp",
+    "live.nl",
+    "live.no",
+    "live.ru",
+    "live.se",
+    "luukku.com",
+    "lycos.com",
+    "mac.com",
+    "mail.bg",
+    "mail.com",
+    "mail.de",
+    "mail.ee",
+    "mail.ru",
+    "mailbox.org",
+    "mailfence.com",
+    "mailinator.com",
+    "me.com",
+    "meta.ua",
+    "mindspring.com",
+    "movistar.es",
+    "msn.com",
+    "mweb.co.za",
+    "nate.com",
+    "naver.com",
+    "netcabo.pt",
+    "netzero.net",
+    "neuf.fr",
+    "nifty.com",
+    "ntlworld.com",
+    "numericable.fr",
+    "o2.pl",
+    "ocn.ne.jp",
+    "onet.pl",
+    "online.de",
+    "online.no",
+    "op.pl",
+    "optonline.net",
+    "optusnet.com.au",
+    "orange.fr",
+    "orcon.net.nz",
+    "outlook.at",
+    "outlook.be",
+    "outlook.cl",
+    "outlook.co.id",
+    "outlook.co.il",
+    "outlook.co.nz",
+    "outlook.co.th",
+    "outlook.com",
+    "outlook.com.ar",
+    "outlook.com.au",
+    "outlook.com.br",
+    "outlook.com.gr",
+    "outlook.com.tr",
+    "outlook.com.vn",
+    "outlook.cz",
+    "outlook.de",
+    "outlook.dk",
+    "outlook.es",
+    "outlook.fr",
+    "outlook.hu",
+    "outlook.ie",
+    "outlook.in",
+    "outlook.it",
+    "outlook.jp",
+    "outlook.kr",
+    "outlook.lv",
+    "outlook.my",
+    "outlook.ph",
+    "outlook.pt",
+    "outlook.sa",
+    "outlook.sg",
+    "outlook.sk",
+    "passport.com",
+    "planet.nl",
+    "pm.me",
+    "post.cz",
+    "posteo.de",
+    "posteo.net",
+    "prodigy.net.mx",
+    "proton.me",
+    "protonmail.ch",
+    "protonmail.com",
+    "proximus.be",
+    "q.com",
+    "qq.com",
+    "rambler.ru",
+    "rediffmail.com",
+    "riseup.net",
+    "roadrunner.com",
+    "rocketmail.com",
+    "rogers.com",
+    "rr.com",
+    "runbox.com",
+    "sapo.pt",
+    "sbcglobal.net",
+    "scarlet.be",
+    "seznam.cz",
+    "sfr.fr",
+    "sharklasers.com",
+    "shaw.ca",
+    "sina.cn",
+    "sina.com",
+    "sky.com",
+    "skynet.be",
+    "so-net.ne.jp",
+    "softbank.ne.jp",
+    "sohu.com",
+    "spray.se",
+    "startmail.com",
+    "sunrise.ch",
+    "suomi24.fi",
+    "sympatico.ca",
+    "t-online.de",
+    "talktalk.net",
+    "telefonica.net",
+    "telenet.be",
+    "telia.com",
+    "telkomsa.net",
+    "telus.net",
+    "temp-mail.org",
+    "terra.com.br",
+    "terra.es",
+    "tin.it",
+    "tiscali.co.uk",
+    "tiscali.it",
+    "tlen.pl",
+    "tpg.com.au",
+    "trashmail.com",
+    "tuta.com",
+    "tuta.io",
+    "tutamail.com",
+    "tutanota.com",
+    "tutanota.de",
+    "ukr.net",
+    "uol.com.br",
+    "usa.com",
+    "verizon.net",
+    "videotron.ca",
+    "virgilio.it",
+    "virginmedia.com",
+    "vodamail.co.za",
+    "volny.cz",
+    "voo.be",
+    "walla.co.il",
+    "wanadoo.fr",
+    "web.de",
+    "webmail.co.za",
+    "windowslive.com",
+    "windstream.net",
+    "wp.pl",
+    "xfinity.com",
+    "xs4all.nl",
+    "xtra.co.nz",
+    "ya.ru",
+    "yahoo.at",
+    "yahoo.be",
+    "yahoo.ca",
+    "yahoo.ch",
+    "yahoo.cn",
+    "yahoo.co.id",
+    "yahoo.co.in",
+    "yahoo.co.jp",
+    "yahoo.co.kr",
+    "yahoo.co.nz",
+    "yahoo.co.th",
+    "yahoo.co.uk",
+    "yahoo.com",
+    "yahoo.com.ar",
+    "yahoo.com.au",
+    "yahoo.com.br",
+    "yahoo.com.hk",
+    "yahoo.com.mx",
+    "yahoo.com.my",
+    "yahoo.com.ph",
+    "yahoo.com.sg",
+    "yahoo.com.tr",
+    "yahoo.com.tw",
+    "yahoo.com.vn",
+    "yahoo.de",
+    "yahoo.dk",
+    "yahoo.es",
+    "yahoo.fi",
+    "yahoo.fr",
+    "yahoo.gr",
+    "yahoo.ie",
+    "yahoo.in",
+    "yahoo.it",
+    "yahoo.nl",
+    "yahoo.no",
+    "yahoo.pl",
+    "yahoo.pt",
+    "yahoo.ro",
+    "yahoo.se",
+    "yandex.by",
+    "yandex.com",
+    "yandex.com.tr",
+    "yandex.kz",
+    "yandex.ru",
+    "yandex.ua",
+    "yeah.net",
+    "ymail.com",
+    "yopmail.com",
+    "ziggo.nl",
     "zoho.com",
     "zohomail.com",
-    "tutanota.com",
-    "tuta.io",
-    "sapo.pt",
-    "orange.fr",
-    "free.fr",
-    "laposte.net",
-    "mail.com",
-    "hey.com",
+    "zohomail.eu",
+    "zoznam.sk",
 ];
 
 /// Whether `domain` is a domain someone owns: two labels or more, and not a
@@ -345,10 +648,85 @@ pub fn is_owned_domain(domain: &str) -> bool {
     domain.split('.').filter(|l| !l.is_empty()).count() >= 2 && !is_public_suffix(&domain)
 }
 
-/// Whether `domain` belongs to a free mail provider.
+/// Platforms anyone can send from and still pass the domain's checks:
+/// mailing lists, newsletter and mass mail services, help desks whose
+/// customers send from their subdomains, and address relays (each relayed
+/// sender is someone else). A rule may still sort their mail by domain, but
+/// never trust a whole one with images (campbooks-cloud#235).
+pub const SHARED_SENDERS: &[&str] = &[
+    "addy.io",
+    "amazonses.com",
+    "anonaddy.com",
+    "anonaddy.me",
+    "beehiiv.com",
+    "brevo.com",
+    "buttondown.com",
+    "buttondown.email",
+    "campaign-archive.com",
+    "ccsend.com",
+    "constantcontact.com",
+    "convertkit.com",
+    "createsend.com",
+    "freelists.org",
+    "freshdesk.com",
+    "ghost.io",
+    "googlegroups.com",
+    "groups.io",
+    "hubspotemail.net",
+    "intercom-mail.com",
+    "kit.com",
+    "list-manage.com",
+    "mailchimp.com",
+    "mailchimpapp.com",
+    "mailerlite.com",
+    "mailgun.org",
+    "mandrillapp.com",
+    "mcdlv.net",
+    "mcsv.net",
+    "medium.com",
+    "mozmail.com",
+    "patreon.com",
+    "privaterelay.appleid.com",
+    "rsgsv.net",
+    "sendgrid.net",
+    "sendinblue.com",
+    "simplelogin.com",
+    "sourceforge.net",
+    "sparkpostmail.com",
+    "substack.com",
+    "yahoogroups.com",
+    "zendesk.com",
+];
+
+/// Whether trusting anyone at `domain` with images would trust strangers: a
+/// free mail or internet provider's domain, a platform anyone can send from,
+/// or a public suffix. Checked when an image rule is written and again
+/// whenever one is read, so a rule stored before a domain joined a list
+/// never acts (campbooks-cloud#235).
+pub fn images_domain_too_broad(domain: &str) -> bool {
+    !is_owned_domain(domain) || is_free_mail(domain) || is_shared_sender(domain)
+}
+
+/// Whether `domain` reaches a platform anyone can send from
+/// ([`SHARED_SENDERS`]): it is one, is under one, or is above one (a rule for
+/// anyone at `appleid.com` reaches `privaterelay.appleid.com`).
+pub fn is_shared_sender(domain: &str) -> bool {
+    let domain = domain.trim().trim_matches('.').to_ascii_lowercase();
+    !domain.is_empty()
+        && SHARED_SENDERS.iter().any(|shared| {
+            domain == *shared
+                || domain.ends_with(&format!(".{shared}"))
+                || shared.ends_with(&format!(".{domain}"))
+        })
+}
+
+/// Whether `domain` (or the registrable domain it is under) belongs to a
+/// free mail provider.
 pub fn is_free_mail(domain: &str) -> bool {
-    let domain = domain.trim().to_ascii_lowercase();
+    let domain = domain.trim().trim_matches('.').to_ascii_lowercase();
+    // By registrable domain, so `mail.yahoo.fr` is Yahoo's too.
     FREE_MAIL.contains(&domain.as_str())
+        || FREE_MAIL.contains(&registrable_domain(&domain).as_str())
 }
 
 /// One taught rule, as the engine sees it.
@@ -459,12 +837,29 @@ impl TaughtRule {
         {
             return Err(Invalid::ImagesNeedSender);
         }
+        if actions.contains(&Action::ShowImages)
+            && conditions
+                .iter()
+                .any(|c| matches!(c, Condition::SenderDomain(d) if images_domain_too_broad(d)))
+        {
+            return Err(Invalid::SharedSenderDomain);
+        }
         Ok(())
     }
 
     /// Whether every condition holds for `facts`.
     pub fn matches(&self, facts: &Facts<'_>) -> bool {
         !self.conditions.is_empty() && self.conditions.iter().all(|c| c.holds(facts))
+    }
+
+    /// Whether this rule shows images for anyone at a domain that would
+    /// trust strangers ([`images_domain_too_broad`]): it never acts.
+    pub fn images_too_broad(&self) -> bool {
+        self.actions.contains(&Action::ShowImages)
+            && self
+                .conditions
+                .iter()
+                .any(|c| matches!(c, Condition::SenderDomain(d) if images_domain_too_broad(d)))
     }
 
     /// Precedence: more specific first, then later confirmed, then smaller id.
@@ -674,8 +1069,9 @@ pub fn evaluate(rules: &[TaughtRule], facts: &Facts<'_>) -> Outcome {
 /// whose sender matches, the most specific first. Only when the receiving
 /// provider's results `authenticated` the From domain (a DMARC pass for it,
 /// or an aligned DKIM pass; no results at all is not a pass), so a spoofed
-/// sender never gets its images shown; and never for mail that looks
-/// suspicious or failed its checks.
+/// sender never gets its images shown; never for mail that looks
+/// suspicious or failed its checks; and never by a rule for anyone at a
+/// domain that would trust strangers, however old ([`TaughtRule::images_too_broad`]).
 pub fn shows_images<'r>(
     rules: &'r [TaughtRule],
     facts: &Facts<'_>,
@@ -686,7 +1082,9 @@ pub fn shows_images<'r>(
     }
     let mut matching: Vec<&TaughtRule> = rules
         .iter()
-        .filter(|r| r.actions.contains(&Action::ShowImages) && r.matches(facts))
+        .filter(|r| {
+            r.actions.contains(&Action::ShowImages) && !r.images_too_broad() && r.matches(facts)
+        })
         .collect();
     matching.sort_by(|a, b| a.precedes(b));
     matching.first().map(|r| r.id.as_str())

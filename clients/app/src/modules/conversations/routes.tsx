@@ -18,12 +18,15 @@ import { NewMessage } from "./components/NewMessage/NewMessage";
 import { TeachOnceProvider } from "./components/TeachOnce/TeachOnce";
 import { renderReplyComposer } from "./components/ReplyComposer/ReplyComposer";
 
+/** A message id, as the API writes them. */
+const MESSAGE_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/u;
+
 /** `/w/$workspaceId/inbox…`: a stream, and the conversation open in it. */
 function InboxPage() {
   const params: { workspaceId?: string; stream?: string; conversationId?: string } = useParams({
     strict: false,
   });
-  const search: { reply?: boolean } = useSearch({ strict: false });
+  const search: { reply?: boolean; to?: string } = useSearch({ strict: false });
   const workspaceId = params.workspaceId ?? "";
   const stream = params.stream ?? "";
   const { t } = useTranslation("conversations");
@@ -50,6 +53,7 @@ function InboxPage() {
         conversationId={params.conversationId}
         renderReplySlot={renderReplyComposer}
         startReply={search.reply === true}
+        replyTo={search.to}
         composeAction={
           <Button variant="primary" icon="plus" shortcut="compose.new" onClick={compose}>
             {t("compose.newMessage")}
@@ -100,8 +104,16 @@ export function buildConversationsRoutes<TParent extends AnyRoute>(parent: TPare
     getParentRoute: () => parent,
     path: "/inbox/$stream/$conversationId",
     // `?reply=true` (Home's R) opens the reply composer.
-    validateSearch: (search: Record<string, unknown>): { reply?: boolean } =>
-      search["reply"] === true || search["reply"] === "true" ? { reply: true } : {},
+    // `reply`: open the composer on arrival; `to`: the message it answers
+    // (a draft written for it), else the newest.
+    validateSearch: (search: Record<string, unknown>): { reply?: boolean; to?: string } => {
+      const reply = search["reply"] === true || search["reply"] === "true";
+      const to = search["to"];
+      if (!reply) {
+        return {};
+      }
+      return typeof to === "string" && MESSAGE_ID.test(to) ? { reply, to } : { reply };
+    },
     component: InboxPage,
   });
   const compose = createRoute({

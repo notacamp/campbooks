@@ -2,14 +2,33 @@
 //! what it changed. A run is a row with a position; the job
 //! `conversations.apply_rule` works through it a batch at a time and
 //! announces its progress with `conversations.rule_changed`.
+//!
+//! A run row is no proof that a member asked for it: a transaction working
+//! in the workspace can insert one, and the job that works through it
+//! (campbooks-cloud#242). So a run carries a MAC under the kernel's
+//! [`Binding`] with its own context label, signed only in the member's
+//! request that starts it ([`start`]), right after that request signed or
+//! verified the rule. It covers the workspace, the run, the rule, the rule's
+//! binding generation then, the kind (apply or put back), the rule's inbox
+//! (what the run covers: an apply run the inbox's mail its rule matches at
+//! that generation, a revert run what the rule recorded there, each
+//! application verified on its own) and the requesting member. The job acts
+//! only on a run that verifies ([`bound`]), at the rule's generation now:
+//! a rule signed again since (changed, paused and resumed, adopted) stops
+//! its older runs.
 
-use campbooks_kernel::{EventBus, Result, jobs::EnqueueOptions};
+use campbooks_kernel::{
+    AppState, EventBus, Result,
+    binding::{Binding, Fields},
+    jobs::EnqueueOptions,
+    tenancy::{Access, UserId},
+};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
-use sqlx::{PgConnection, Postgres, Transaction};
+use sqlx::{PgConnection, Postgres, Transaction, types::Uuid};
 use utoipa::ToSchema;
 
-use super::rules::Stored;
+use super::rules::{self, Stored};
 use crate::{
     events::{RuleChanged, RunFacts},
     model::{InboxId, RuleId, RuleRunId, RuleState, RunKind, RunState},
@@ -119,15 +138,22 @@ pub async fn latest(conn: &mut PgConnection, rule: RuleId) -> Result<Option<RunV
     .transpose()
 }
 
-/// Start a `kind` run of `rule` (cancelling one still running), enqueue its
-/// first batch and announce it. Returns it.
+/// Start a `kind` run of `rule` (cancelling one still running) for the
+/// member of `access`, sign it, enqueue its first batch and announce it.
+/// Returns it.
+///
+/// Only inside that member's authenticated request, right after it signed
+/// or verified the rule (campbooks-cloud#242).
 pub async fn start(
     tx: &mut Transaction<'_, Postgres>,
-    events: &EventBus,
-    workspace: &str,
+    state: &AppState,
+    access: &Access,
     rule: &Stored,
     kind: RunKind,
 ) -> Result<RunView> {
+    let (events, binding) = (&state.events, &state.binding);
+    let ws = access.workspace.to_string();
+    let workspace = ws.as_str();
     sqlx::query!(
         r#"UPDATE conversations.rule_runs SET state = 'cancelled', finished_at = now()
             WHERE rule_id = $1 AND state = 'running'"#,
@@ -162,6 +188,7 @@ pub async fn start(
     )
     .execute(&mut **tx)
     .await?;
+    sign(tx, binding, access, id, rule.id, kind).await?;
     let batch = RunBatch {
         run: id,
         after: None,
@@ -186,6 +213,110 @@ pub async fn start(
     )
     .await?;
     run.ok_or(campbooks_kernel::Error::NotFound)
+}
+
+/// A run of a taught rule, as a member asked for it.
+const RUN: &str = "campbooks/conversations.rule-run/v1";
+
+/// The fields a run's MAC covers: `rule` as it is now (its generation and
+/// inbox) and who asked for it.
+fn run_fields(
+    workspace: &Uuid,
+    run: RuleRunId,
+    rule: &Stored,
+    kind: RunKind,
+    by: Option<&Uuid>,
+) -> Fields {
+    let mut fields = Fields::new(RUN);
+    fields
+        .uuid(workspace)
+        .uuid(run.as_uuid())
+        .uuid(rule.id.as_uuid())
+        .int(rule.generation)
+        .str(kind.as_str())
+        .uuid(rule.inbox.as_uuid())
+        .opt_uuid(by);
+    fields
+}
+
+/// Sign run `run` of rule `rule` for the member of `access`, from the rule
+/// as stored now in this request. An apply run is signed only while its rule
+/// is bound (it was just signed, or verified under its lock): an unbound
+/// rule's run stays unsigned and the job stops it. A revert run is signed
+/// whatever its rule's binding: the member asked to put back what it did,
+/// and each application it puts back is verified on its own. Without a key
+/// (no instance secret) the run stays unsigned, and stops.
+async fn sign(
+    conn: &mut PgConnection,
+    binding: &Binding,
+    access: &Access,
+    run: RuleRunId,
+    rule: RuleId,
+    kind: RunKind,
+) -> Result<()> {
+    let Some(rule) = rules::find_any(conn, rule).await? else {
+        return Ok(());
+    };
+    if kind == RunKind::Apply && !rule.bound(binding) {
+        return Ok(());
+    }
+    let by = access.user.as_ref().map(UserId::as_uuid);
+    let Some(mac) = binding.tag(&run_fields(
+        access.workspace.as_uuid(),
+        run,
+        &rule,
+        kind,
+        by,
+    )) else {
+        return Ok(());
+    };
+    sqlx::query("UPDATE conversations.rule_runs SET requested_by = $2, mac = $3 WHERE id = $1")
+        .bind(run.as_uuid())
+        .bind(by.copied())
+        .bind(mac)
+        .execute(conn)
+        .await?;
+    Ok(())
+}
+
+/// Whether run `run`, a `kind` run of `rule` (as stored now) in `workspace`,
+/// is bound to the member who asked for it: its MAC verifies over it, at
+/// the rule's generation now. A run with no MAC (planted with SQL, or
+/// started before runs were bound), another run's MAC, or a run of a rule
+/// signed again since, is not.
+pub async fn bound(
+    conn: &mut PgConnection,
+    binding: &Binding,
+    workspace: &Uuid,
+    run: RuleRunId,
+    rule: &Stored,
+    kind: RunKind,
+) -> Result<bool> {
+    let row: Option<(Option<Uuid>, Option<Vec<u8>>)> =
+        sqlx::query_as("SELECT requested_by, mac FROM conversations.rule_runs WHERE id = $1")
+            .bind(run.as_uuid())
+            .fetch_optional(conn)
+            .await?;
+    let Some((by, mac)) = row else {
+        return Ok(false);
+    };
+    let fields = run_fields(workspace, run, rule, kind, by.as_ref());
+    Ok(binding.verify(&fields, mac.as_deref()))
+}
+
+/// The MAC of run `run` (a `kind` run of `rule` as stored now, asked for by
+/// `by`) under the current key, when its stored `mac` verifies under the
+/// previous key only (campbooks-cloud#191); `None` otherwise.
+pub fn retag(
+    binding: &Binding,
+    workspace: &Uuid,
+    run: RuleRunId,
+    rule: &Stored,
+    kind: RunKind,
+    by: Option<&Uuid>,
+    mac: Option<&[u8]>,
+) -> Option<Vec<u8>> {
+    binding.retag(&run_fields(workspace, run, rule, kind, by), mac)
 }
 
 /// Publish `rule_changed` for `rule` in `state`, with `run`.
@@ -259,4 +390,117 @@ pub async fn lock_running(conn: &mut sqlx::PgConnection, rule: RuleId) -> Result
     .fetch_all(conn)
     .await?;
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{
+        domain::rules::{RuleAction, RuleCondition},
+        model::{RuleOrigin, TeachingId},
+    };
+
+    fn rule() -> Stored {
+        Stored {
+            id: RuleId::new(),
+            inbox: InboxId::new(),
+            teaching: TeachingId::new(),
+            conditions: vec![RuleCondition::SenderAddress("news@example.com".into())],
+            actions: vec![RuleAction::Trash],
+            origin: RuleOrigin::Action,
+            origin_text: None,
+            state: RuleState::Active,
+            taught_by: Some(UserId::new()),
+            from_conversation: None,
+            created_at: Utc::now(),
+            confirmed_at: Some(Utc::now()),
+            applied_count: 0,
+            last_applied_at: None,
+            author_may_act: true,
+            author_suspended: false,
+            inbox_detached: false,
+            workspace: Uuid::now_v7(),
+            generation: 3,
+            mac: None,
+        }
+    }
+
+    #[test]
+    fn a_run_is_bound_only_as_it_was_started() {
+        let binding = campbooks_kernel::testing::binding();
+        let rule = rule();
+        let workspace = Uuid::now_v7();
+        let run = RuleRunId::new();
+        let sam = Uuid::now_v7();
+        let mac = binding
+            .tag(&run_fields(
+                &workspace,
+                run,
+                &rule,
+                RunKind::Apply,
+                Some(&sam),
+            ))
+            .unwrap();
+        let holds = |fields: &Fields| binding.verify(fields, Some(mac.as_slice()));
+        assert!(holds(&run_fields(
+            &workspace,
+            run,
+            &rule,
+            RunKind::Apply,
+            Some(&sam)
+        )));
+        let mut resigned = rule.clone();
+        resigned.generation += 1;
+        let mut moved = rule.clone();
+        moved.inbox = InboxId::new();
+        let mut other_rule = rule.clone();
+        other_rule.id = RuleId::new();
+        let leo = Uuid::now_v7();
+        let elsewhere = Uuid::now_v7();
+        for (what, fields) in [
+            (
+                "another workspace",
+                run_fields(&elsewhere, run, &rule, RunKind::Apply, Some(&sam)),
+            ),
+            (
+                "another run",
+                run_fields(
+                    &workspace,
+                    RuleRunId::new(),
+                    &rule,
+                    RunKind::Apply,
+                    Some(&sam),
+                ),
+            ),
+            (
+                "another rule",
+                run_fields(&workspace, run, &other_rule, RunKind::Apply, Some(&sam)),
+            ),
+            (
+                "signed again since",
+                run_fields(&workspace, run, &resigned, RunKind::Apply, Some(&sam)),
+            ),
+            (
+                "another inbox",
+                run_fields(&workspace, run, &moved, RunKind::Apply, Some(&sam)),
+            ),
+            (
+                "a revert",
+                run_fields(&workspace, run, &rule, RunKind::Revert, Some(&sam)),
+            ),
+            (
+                "another member",
+                run_fields(&workspace, run, &rule, RunKind::Apply, Some(&leo)),
+            ),
+            (
+                "no member",
+                run_fields(&workspace, run, &rule, RunKind::Apply, None),
+            ),
+        ] {
+            assert!(!holds(&fields), "{what} still verifies");
+        }
+        let as_started = run_fields(&workspace, run, &rule, RunKind::Apply, Some(&sam));
+        assert!(!Binding::disabled().verify(&as_started, Some(mac.as_slice())));
+        assert!(!binding.verify(&as_started, None));
+    }
 }
