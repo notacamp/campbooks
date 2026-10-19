@@ -1559,7 +1559,8 @@
           "superseded",
           "rule",
           "opened",
-          "lapsed"
+          "lapsed",
+          "heard_back"
         ]
       },
       "ConnectionId": {
@@ -1767,7 +1768,9 @@
           "do",
           "pay",
           "review",
-          "worth_a_look"
+          "worth_a_look",
+          "waiting",
+          "nudge"
         ]
       },
       "NeedTrust": {

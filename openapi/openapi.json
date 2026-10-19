@@ -2097,14 +2097,15 @@
           {
             "name": "state",
             "in": "query",
-            "description": "`open` (default) or `cleared`.",
+            "description": "`open` (default), `cleared` or `waiting`.",
             "required": false,
             "schema": {
               "type": "string",
               "description": "Open items, or what left the list today.",
               "enum": [
                 "open",
-                "cleared"
+                "cleared",
+                "waiting"
               ]
             }
           },
@@ -2131,7 +2132,7 @@
             }
           },
           "400": {
-            "description": "Not a state, or an offset beyond 14 hours (`invalid_offset`).",
+            "description": "Not a state (`open`, `cleared`, `waiting`), or an offset beyond 14 hours (`invalid_offset`).",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -4226,6 +4227,147 @@
         }
       }
     },
+    "/api/v1/w/{workspace_id}/conversations/{conversation_id}/nudge/draft": {
+      "post": {
+        "tags": [
+          "conversations"
+        ],
+        "summary": "Scout's nudge to the person the conversation waits on, or your draft of it rewritten.",
+        "operationId": "conversations.write_nudge",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "description": "The workspace.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId"
+            }
+          },
+          {
+            "name": "conversation_id",
+            "in": "path",
+            "description": "The conversation.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ConversationId"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WriteNudge"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "The nudge as plain text, answering the message the wait comes from; nothing is saved or sent.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReplyText"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "A change or draft too long (`reply_ask_invalid`).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid access token.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing scope, or you may only read this inbox (`inbox_read_only`).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such conversation, or you cannot see it.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The conversation waits on nobody (`not_waiting`), or no language model may read mail here (`reply_unavailable`): write it yourself.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many replies asked for this hour.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "The language model failed (`reply_failed`), or the workspace used its whole daily AI limit (`ai_daily_limit_reached`).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [
+              "conversations:send"
+            ]
+          }
+        ],
+        "x-campbooks": {
+          "access": {
+            "action": "send",
+            "resource": "conversations.inbox"
+          },
+          "assistant": false,
+          "automation": false,
+          "mutates": true,
+          "records": [
+            "conversations.message"
+          ],
+          "risk": "low"
+        }
+      }
+    },
     "/api/v1/w/{workspace_id}/conversations/{conversation_id}/read": {
       "post": {
         "tags": [
@@ -5729,6 +5871,16 @@
           },
           "404": {
             "description": "No such inbox or message, or you cannot see it.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "A nudge for a conversation that waits on nobody (`not_waiting`).",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -12636,14 +12788,14 @@
             "items": {
               "$ref": "#/components/schemas/ReasonCount"
             },
-            "description": "Open items per reason, every reason listed (open lists only; empty\nfor cleared)."
+            "description": "Open items per reason, every reason of the queue listed (all but\n`waiting`); for `state=waiting`, the `waiting` count alone; empty for\ncleared."
           },
           "items": {
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/ItemView"
             },
-            "description": "Open: by reason (review, reply, decide, do, pay), then overdue, by\ndue date, urgent first, oldest first. Cleared: newest first."
+            "description": "Open: by reason (review, reply, decide, do, pay, nudge, worth a\nlook), then overdue, by due date, urgent first, oldest first.\nCleared: newest first. Waiting: soonest nudge first."
           }
         }
       },
@@ -14225,7 +14377,8 @@
           "new",
           "reply",
           "reply_all",
-          "forward"
+          "forward",
+          "nudge"
         ]
       },
       "DraftList": {
@@ -14926,7 +15079,7 @@
               "string",
               "null"
             ],
-            "description": "Why it was cleared (`replied`, `archived`, `trashed`, `done`,\n`not_needed`), as the producing module said."
+            "description": "Why it was cleared (`replied`, `archived`, `trashed`, `done`,\n`not_needed`, `heard_back`), as the producing module said."
           },
           "cleared_by": {
             "oneOf": [
@@ -15408,7 +15561,8 @@
           "money",
           "worth_a_look",
           "still_to_do",
-          "still_needs_reply"
+          "still_needs_reply",
+          "next_move"
         ]
       },
       "NeedReason": {
@@ -15419,7 +15573,9 @@
           "do",
           "pay",
           "review",
-          "worth_a_look"
+          "worth_a_look",
+          "waiting",
+          "nudge"
         ]
       },
       "NeedTrust": {
@@ -15477,6 +15633,15 @@
             "$ref": "#/components/schemas/MessageId",
             "description": "The message it comes from."
           },
+          "nudges": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32",
+            "description": "How many times the member wrote to them since (a `waiting` or\n`nudge` need only).",
+            "minimum": 0
+          },
           "overdue": {
             "type": "boolean",
             "description": "Whether the due date has passed."
@@ -15523,6 +15688,17 @@
           "urgent": {
             "type": "boolean",
             "description": "Whether it is for today."
+          },
+          "waiting_on": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Address",
+                "description": "Who a `waiting` or `nudge` need waits on: their name and address as\nthe email's headers gave them (campbooks-cloud#293). Absent for every\nother need."
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         }
       },
@@ -16452,7 +16628,9 @@
           "decide",
           "do",
           "pay",
-          "worth_a_look"
+          "nudge",
+          "worth_a_look",
+          "waiting"
         ]
       },
       "ReasonCount": {
@@ -19270,6 +19448,32 @@
             ]
           }
         }
+      },
+      "WriteNudge": {
+        "type": "object",
+        "description": "How to write the nudge to the person a conversation waits on\n(campbooks-cloud#293): Scout's own, or your draft rewritten.",
+        "properties": {
+          "change": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "How to change the draft, in plain words (at most 300 characters).",
+            "example": "warmer"
+          },
+          "draft": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The nudge as it stands, to rewrite with `change` or `shorter`."
+          },
+          "shorter": {
+            "type": "boolean",
+            "description": "Make the draft shorter."
+          }
+        },
+        "additionalProperties": false
       },
       "WriteReply": {
         "type": "object",
