@@ -250,7 +250,11 @@
     "from": "From",
     "sending": "Sending to {{name}}",
     "sendingNoName": "Sending",
-    "draftSaved": "Draft saved",
+    "draftChip": "Draft saved · {{title}}",
+    "draftDeleted": "Draft deleted",
+    "deleteDraft": "Delete draft",
+    "deleteDraftNamed": "Delete draft: {{title}}",
+    "draftNotRestored": "Couldn't bring the draft back.",
     "saveState": {
       "saved": "Saved",
       "saving": "Saving…",
@@ -638,6 +642,7 @@
       "dailyLimit": "This workspace has used today's AI allowance. Write this one yourself.",
       "send": "Couldn't send to {{name}}. Your draft is kept.",
       "open": "Couldn't open the composer. Your draft is kept here.",
+      "delete": "Couldn't delete the draft. It is still saved.",
       "changed": "This reply changed since it was saved. Check it and send again."
     },
     "to": "To {{recipient}}",

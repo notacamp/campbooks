@@ -6,7 +6,6 @@ import { problemCode } from "~/lib/api";
 import {
   cancelSend,
   changedElsewhere,
-  deleteDraft,
   draftKeys,
   fetchDraft,
   saveDraft,
@@ -14,6 +13,7 @@ import {
   type Draft,
   type DraftChanges,
 } from "../api/drafts";
+import { useDeleteDraft } from "./use-delete-draft";
 
 /** What the member edits. */
 export interface DraftFields {
@@ -68,6 +68,7 @@ function changesOf(
  */
 export function useDraftEditor(workspaceId: string, draft: Draft) {
   const queryClient = useQueryClient();
+  const deleteWithUndo = useDeleteDraft(workspaceId);
   const [fields, setFields] = useState<DraftFields>(() => fieldsOf(draft));
   const [saveState, setSaveState] = useState<SaveState>("saved");
   const [error, setError] = useState<string | undefined>(draft.failure_reason ?? undefined);
@@ -271,17 +272,35 @@ export function useDraftEditor(workspaceId: string, draft: Draft) {
     }
   }, [draft.id, refresh, replace, workspaceId]);
 
-  /** Throw the draft away. */
+  /**
+   * Throw the draft away, with Undo in a toast. Undo writes it back as it
+   * was on screen, unsaved edits included: a save in flight finishes first,
+   * a pending one is dropped.
+   */
   const discard = useCallback(async () => {
     if (timer.current !== null) {
       clearTimeout(timer.current);
       timer.current = null;
     }
+    if (inFlight.current !== null) {
+      await inFlight.current;
+    }
+    const seen = latest.current;
+    // Nothing may save into a draft that is going.
     latest.current = saved.current;
-    await deleteDraft(workspaceId, draft.id);
-    replace(null);
-    await refresh();
-  }, [draft.id, refresh, replace, workspaceId]);
+    try {
+      await deleteWithUndo({
+        ...draft,
+        ...seen,
+        attachments: draft.attachments.filter((a) => seen.attachments.includes(a.id)),
+      });
+    } catch (error) {
+      // Refused: the draft stays, and what was typed is still to be saved
+      // (the next save or Send writes it, never the last saved version).
+      latest.current = seen;
+      throw error;
+    }
+  }, [deleteWithUndo, draft]);
 
   return { fields, shown, update, saveState, error, sending, send, undo, discard, flush };
 }

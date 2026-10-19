@@ -250,7 +250,11 @@
     "from": "De",
     "sending": "Enviando a {{name}}",
     "sendingNoName": "Enviando",
-    "draftSaved": "Borrador guardado",
+    "draftChip": "Borrador guardado · {{title}}",
+    "draftDeleted": "Borrador eliminado",
+    "deleteDraft": "Eliminar borrador",
+    "deleteDraftNamed": "Eliminar borrador: {{title}}",
+    "draftNotRestored": "No se pudo recuperar el borrador.",
     "saveState": {
       "saved": "Guardado",
       "saving": "Guardando…",
@@ -638,6 +642,7 @@
       "dailyLimit": "Este espacio de trabajo ya ha usado la cuota de IA de hoy. Escribe esta tú mismo.",
       "send": "No se ha podido enviar a {{name}}. Tu borrador se ha guardado.",
       "open": "No se ha podido abrir el editor. Tu borrador sigue aquí.",
+      "delete": "No se pudo eliminar el borrador. Sigue guardado.",
       "changed": "Esta respuesta ha cambiado desde que se guardó. Revísala y vuelve a enviarla."
     },
     "to": "Para {{recipient}}",

@@ -8,6 +8,12 @@ All notable changes to Campbooks Next are documented here. The format follows
 
 ### Added
 
+- **Delete a draft from wherever it shows, with Undo.** Under a thread, every draft you left
+  open appears by name ("Draft saved · Reply to Maya", "Draft saved · Forward") with its own
+  Delete draft, so a second draft is no longer hidden. The Reply dialog offers Delete draft
+  once it holds a saved draft. Every delete, the composer's Discard included, says "Draft
+  deleted" and offers Undo, which writes the draft back as you saw it. A forward's
+  attachments you had removed come back with it.
 - **Home says how long each thing has waited.** Every row on Home now shows its age at the
   end of the line, above its due date: "12 minutes ago", "5 hours ago", "Yesterday", "4
   days ago", then the date once it is a week old ("2 Oct"). Hover it for the full date and
