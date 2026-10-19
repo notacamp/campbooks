@@ -119,3 +119,103 @@
 [data-density="compact"] .snippet {
   display: none;
 }
+
+/* A row leaving the list: what happened wipes in over it (a quarter of the
+   time), stays, then the row folds away and the rows below close the gap. */
+.leaving {
+  --leave-fg: var(--success);
+  --leave-bg: var(--success-soft);
+
+  display: grid;
+  grid-template-rows: 1fr;
+  animation: leave var(--duration-confirm) var(--ease-in-out) forwards;
+}
+
+.leaving[data-tone="danger"] {
+  --leave-fg: var(--danger);
+  --leave-bg: var(--danger-soft);
+}
+
+.leavingClip {
+  position: relative;
+  min-height: 0;
+  overflow: hidden;
+  border-radius: var(--row-radius);
+}
+
+.leaving [data-gone] {
+  cursor: default;
+  animation: gone var(--duration-confirm) var(--ease-out) forwards;
+}
+
+.confirmation {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+  padding: 0 var(--row-pad-x);
+  background: var(--leave-bg);
+  font-size: var(--text-md);
+  color: var(--leave-fg);
+  animation: wipe var(--duration-confirm) var(--ease-out) forwards;
+}
+
+.confirmationIcon {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: var(--size-avatar-sm);
+  height: var(--size-avatar-sm);
+  border-radius: var(--radius-full);
+  background: var(--leave-bg);
+}
+
+.confirmationLabel {
+  flex: none;
+  font-weight: var(--weight-medium);
+}
+
+.confirmationSubject {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-secondary);
+}
+
+@keyframes leave {
+  0%,
+  60% {
+    grid-template-rows: 1fr;
+    opacity: 1;
+  }
+
+  100% {
+    grid-template-rows: 0fr;
+    opacity: 0;
+  }
+}
+
+@keyframes gone {
+  0% {
+    opacity: 1;
+  }
+
+  25%,
+  100% {
+    opacity: 0;
+  }
+}
+
+@keyframes wipe {
+  0% {
+    clip-path: inset(0 100% 0 0);
+  }
+
+  25%,
+  100% {
+    clip-path: inset(0 0 0 0);
+  }
+}

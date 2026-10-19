@@ -12,6 +12,15 @@
 //! caller's locale; it is never written again, and opening an item never asks
 //! the model.
 //!
+//! The same call reads the email's dates (campbooks-cloud#275): when what it
+//! asks stops being possible and by when the recipient must act, vetoed in
+//! [`prompt::read_dates`] and stored with the summary (`dates_read_at` says
+//! they were read). Then the conversation's need is worked out again, so a
+//! lapse time or a due date reaches the need, its event and Home. A summary
+//! written before dates were read is read once more (queued by the needs
+//! backfill): a usable answer replaces its texts, no usable answer keeps
+//! them, and either way it is never asked again.
+//!
 //! Bounds on cost: one call per message that raises a need, so a burst of
 //! mail is bounded by the needs it raises, and each call is background work
 //! counted against the workspace's daily AI limit (over it, the job waits
@@ -26,7 +35,7 @@ use std::time::Duration;
 
 use campbooks_ai::{Gateway, Role, usage::Scope};
 use campbooks_kernel::{
-    JobContext, JobError, JobHandler,
+    EventBus, JobContext, JobError, JobHandler,
     blobs::BlobRef,
     db::BeginFor as _,
     jobs::{EnqueueOptions, Enqueued},
@@ -41,6 +50,7 @@ use self::prompt::{Answer, Email};
 use crate::{
     domain::{
         blobs::{Budget, words},
+        needs::{self, NeedSettings},
         plain_text::{self, Quotes},
         redact,
     },
@@ -67,7 +77,7 @@ const OVER_LIMIT_WAIT: Duration = Duration::from_hours(4);
 /// phishing warning: its sender,
 /// subject, parts, where it is, and what is stored for it.
 const LOAD: &str = "SELECT m.sender, m.subject, m.bodies, m.sent_at, m.conversation_id, \
-            m.inbox_id, s.state, s.attempts \
+            m.inbox_id, s.state, s.attempts, s.dates_read_at \
        FROM conversations.messages m \
        JOIN conversations.inboxes i ON i.id = m.inbox_id AND i.detached_at IS NULL \
        JOIN conversations.needs n ON n.conversation_id = m.conversation_id \
@@ -75,15 +85,27 @@ const LOAD: &str = "SELECT m.sender, m.subject, m.bodies, m.sent_at, m.conversat
        LEFT JOIN conversations.need_summaries s ON s.message_id = m.id \
       WHERE m.id = $1 AND m.direction = 'inbound' AND NOT m.in_spam AND NOT m.in_trash";
 
-/// A written summary, or a failure, of a message: nothing changes
-/// once it is written.
+/// A written summary, or a failure, of a message, with the dates read:
+/// nothing changes once it is written, but for a summary written before
+/// dates were read, which a usable answer replaces once.
 const STORE: &str = "INSERT INTO conversations.need_summaries \
-            (message_id, workspace_id, state, texts, attempts) \
-     VALUES ($1, $2, $3, $4, 1) \
+            (message_id, workspace_id, state, texts, attempts, lapses_at, due_on, \
+             dates_read_at) \
+     VALUES ($1, $2, $3, $4, 1, $5, $6, now()) \
      ON CONFLICT (message_id) DO UPDATE \
         SET state = EXCLUDED.state, texts = EXCLUDED.texts, \
-            attempts = need_summaries.attempts + 1, written_at = now() \
-      WHERE need_summaries.state = 'failed'";
+            attempts = need_summaries.attempts + 1, written_at = now(), \
+            lapses_at = EXCLUDED.lapses_at, due_on = EXCLUDED.due_on, \
+            dates_read_at = now() \
+      WHERE need_summaries.state = 'failed' \
+         OR (need_summaries.dates_read_at IS NULL AND EXCLUDED.state = 'written')";
+
+/// A summary written before dates were read, read again with no usable
+/// summary: it keeps its texts, takes whatever dates were read, and is
+/// marked read so it is never asked again.
+const MARK_READ: &str = "UPDATE conversations.need_summaries \
+        SET lapses_at = $2, due_on = $3, dates_read_at = now(), attempts = attempts + 1 \
+      WHERE message_id = $1 AND state = 'written' AND dates_read_at IS NULL";
 
 /// A row of [`LOAD`].
 #[derive(sqlx::FromRow)]
@@ -97,6 +119,8 @@ struct Loaded {
     /// `need_summaries.state`, when a row exists.
     state: Option<String>,
     attempts: Option<i16>,
+    /// When its dates were read, if they were.
+    dates_read_at: Option<DateTime<Utc>>,
 }
 
 /// The message to summarise.
@@ -109,13 +133,15 @@ pub struct SummarizeNeedPayload {
 /// Writes the summary of the email behind a need.
 pub struct SummarizeNeed {
     gateway: Option<Gateway>,
+    needs: NeedSettings,
 }
 
 impl SummarizeNeed {
     /// Summaries written through `gateway`'s `complete` role; `None` (the
     /// role is not configured, or may not receive mail here) does nothing.
-    pub fn new(gateway: Option<Gateway>) -> Self {
-        Self { gateway }
+    /// Needs are worked out again under `needs` once dates are read.
+    pub fn new(gateway: Option<Gateway>, needs: NeedSettings) -> Self {
+        Self { gateway, needs }
     }
 }
 
@@ -191,41 +217,98 @@ impl JobHandler for SummarizeNeed {
                 None
             }
         };
-        let texts = answer.map(prompt::kept).filter(|texts| !texts.is_empty());
-        if texts.is_none() {
-            tracing::warn!(feature = FEATURE, "no usable summary");
-        }
         let events = ctx.state().events.clone();
         let tx = ctx.tx().await?;
-        let (state, texts) = match texts {
-            Some(texts) => (
-                "written",
-                serde_json::to_value(texts).unwrap_or(Value::Null),
-            ),
-            None => ("failed", Value::Object(serde_json::Map::new())),
+        let target = Target {
+            workspace,
+            message,
+            conversation: loaded.conversation,
+            inbox: loaded.inbox,
+            sent_at: loaded.sent_at,
+            rereading: loaded.rereading,
         };
-        let stored = sqlx::query(STORE)
-            .bind(message)
-            .bind(workspace.as_uuid())
-            .bind(state)
-            .bind(texts)
-            .execute(&mut **tx)
-            .await?;
-        if state == "written" && stored.rows_affected() == 1 {
-            events
-                .publish(
-                    tx,
-                    &NeedSummarised {
-                        workspace: workspace.to_string(),
-                        inbox: loaded.inbox,
-                        conversation: loaded.conversation,
-                        message,
-                    },
-                )
-                .await?;
-        }
+        keep(tx, &events, &self.needs, &target, answer).await?;
         Ok(())
     }
+}
+
+/// Where a call's answer is kept.
+struct Target {
+    workspace: WorkspaceId,
+    message: MessageId,
+    conversation: ConversationId,
+    inbox: InboxId,
+    /// When the message was sent: the dates read must not come before it.
+    sent_at: DateTime<Utc>,
+    /// A summary is written but its dates were never read.
+    rereading: bool,
+}
+
+/// Keep what the call gave for `target` in `tx`: the summary or a failure,
+/// with the dates read; then work its need out again (the dates may change
+/// it) and, when a summary was written, say so.
+async fn keep(
+    tx: &mut Transaction<'_, Postgres>,
+    events: &EventBus,
+    settings: &NeedSettings,
+    target: &Target,
+    answer: Option<Answer>,
+) -> Result<(), JobError> {
+    let (lapses_at, due_on) = answer.as_ref().map_or((None, None), |answer| {
+        prompt::read_dates(answer, target.sent_at)
+    });
+    let texts = answer.map(prompt::kept).filter(|texts| !texts.is_empty());
+    if texts.is_none() {
+        tracing::warn!(feature = FEATURE, "no usable summary");
+    }
+    let (state, texts) = match texts {
+        Some(texts) => (
+            "written",
+            serde_json::to_value(texts).unwrap_or(Value::Null),
+        ),
+        None => ("failed", Value::Object(serde_json::Map::new())),
+    };
+    let stored = sqlx::query(STORE)
+        .bind(target.message)
+        .bind(target.workspace.as_uuid())
+        .bind(state)
+        .bind(texts)
+        .bind(lapses_at)
+        .bind(due_on)
+        .execute(&mut **tx)
+        .await?
+        .rows_affected();
+    // Read again with nothing usable: the old summary stays, read.
+    let marked = if state == "failed" && target.rereading {
+        sqlx::query(MARK_READ)
+            .bind(target.message)
+            .bind(lapses_at)
+            .bind(due_on)
+            .execute(&mut **tx)
+            .await?
+            .rows_affected()
+    } else {
+        0
+    };
+    let workspace = target.workspace.to_string();
+    // Its dates may change the need (a lapse time, a due date).
+    if stored + marked > 0 {
+        needs::refresh(tx, events, &workspace, target.conversation, settings).await?;
+    }
+    if state == "written" && stored == 1 {
+        events
+            .publish(
+                tx,
+                &NeedSummarised {
+                    workspace,
+                    inbox: target.inbox,
+                    conversation: target.conversation,
+                    message: target.message,
+                },
+            )
+            .await?;
+    }
+    Ok(())
 }
 
 /// The model's answer, or `None` with a warning saying why it did not
@@ -290,11 +373,15 @@ struct Read {
     email: Email,
     conversation: ConversationId,
     inbox: InboxId,
+    /// When the message was sent: the dates read must not come before it.
+    sent_at: DateTime<Utc>,
+    /// A summary is written but its dates were never read.
+    rereading: bool,
 }
 
 /// The message as the model reads it, when it is worth a call: its need is
 /// still open, nothing is stored for it (or one failure that may be tried
-/// once more), and it has words.
+/// once more, or a summary whose dates were never read), and it has words.
 async fn load(
     ctx: &JobContext,
     workspace: WorkspaceId,
@@ -310,11 +397,12 @@ async fn load(
     let Some(row) = row else {
         return Ok(None);
     };
-    match row.state.as_deref() {
-        Some("written") => return Ok(None),
+    let rereading = match row.state.as_deref() {
+        Some("written") if row.dates_read_at.is_some() => return Ok(None),
+        Some("written") => true,
         Some(_) if row.attempts.is_none_or(|n| n >= MAX_CALLS) => return Ok(None),
-        _ => {}
-    }
+        _ => false,
+    };
     let decode =
         |e: serde_json::Error| JobError::fatal(format!("stored message: {}", redact::json(&e)));
     let sender: Address = serde_json::from_value(row.sender).map_err(decode)?;
@@ -356,6 +444,8 @@ async fn load(
         },
         conversation: row.conversation_id,
         inbox: row.inbox_id,
+        sent_at: row.sent_at,
+        rereading,
     }))
 }
 

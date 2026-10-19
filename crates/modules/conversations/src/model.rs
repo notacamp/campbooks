@@ -475,6 +475,12 @@ vocabulary!(
         Money => "money",
         /// `worth_a_look`: a rule the member taught asked to see it.
         WorthALook => "worth_a_look",
+        /// A `do` need whose message left the needs window with no date:
+        /// "Still to do?" (campbooks-cloud#275).
+        StillToDo => "still_to_do",
+        /// A `reply` need whose message left the needs window with no date:
+        /// "Still needs a reply?" (campbooks-cloud#275).
+        StillNeedsReply => "still_needs_reply",
     }
 );
 
@@ -520,6 +526,9 @@ vocabulary!(
         Rule => "rule",
         /// The member opened it: all "Worth a look" asks.
         Opened => "opened",
+        /// What it asks stopped being possible (a link or a code expired,
+        /// an offer closed), as Scout read the email (campbooks-cloud#275).
+        Lapsed => "lapsed",
     }
 );
 

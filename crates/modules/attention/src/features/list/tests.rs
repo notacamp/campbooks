@@ -22,6 +22,7 @@ fn need(n: u32, reason: Reason, due_in: Option<i64>) -> Need {
         due_on: due_in.map(|days| Utc::now().date_naive() + TimeDelta::days(days)),
         sent_at: Utc::now() - TimeDelta::hours(i64::from(n)),
         latest: None,
+        lapses_at: None,
     }
 }
 
@@ -52,7 +53,9 @@ async fn items_come_by_reason_then_overdue_then_due_date(db: PgPool) {
         need(4, Reason::Reply, None),
         need(5, Reason::Review, None),
         // More than a week overdue: left out.
-        need(6, Reason::Pay, Some(-8)),
+        need(6, Reason::Do, Some(-8)),
+        // But a bill stays until a member answers it (campbooks-cloud#275).
+        need(7, Reason::Pay, Some(-9)),
     ] {
         kit.need(workspace, &need).await;
     }
@@ -66,6 +69,7 @@ async fn items_come_by_reason_then_overdue_then_due_date(db: PgPool) {
         [
             ("review".into(), None),
             ("reply".into(), None),
+            ("pay".into(), Some(today - TimeDelta::days(9))),
             ("pay".into(), Some(today - TimeDelta::days(2))),
             ("pay".into(), Some(today + TimeDelta::days(5))),
             ("pay".into(), None),
@@ -74,8 +78,61 @@ async fn items_come_by_reason_then_overdue_then_due_date(db: PgPool) {
     assert_eq!(list.json["items"][2]["overdue"], true);
     let counts = &list.json["counts"];
     assert_eq!(counts[4]["reason"], "pay");
-    assert_eq!(counts[4]["count"], 3);
+    assert_eq!(counts[4]["count"], 4);
+    assert_eq!(counts[3]["count"], 0);
     assert_eq!(counts[2]["count"], 0);
+}
+
+/// campbooks-cloud#275: a sign-in link valid for ten minutes leaves Home
+/// once they are over, before its producer has cleared it, and a need
+/// cleared as lapsed is not something the member did today.
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_lapsed_item_leaves_the_list_at_once(db: PgPool) {
+    let kit = Kit::new(db).await;
+    let workspace = WorkspaceId::new();
+    let (sam, sam_id) = kit.member("sam", workspace);
+    kit.let_see(INBOX, sam_id);
+    let mut link = need(1, Reason::Do, None);
+    link.lapses_at = Some(Utc::now() - TimeDelta::minutes(1));
+    let mut later = need(2, Reason::Do, None);
+    later.lapses_at = Some(Utc::now() + TimeDelta::minutes(9));
+    let mut old = need(3, Reason::Reply, None);
+    old.lapses_at = Some(Utc::now() - TimeDelta::minutes(30));
+    for need in [&link, &later, &old] {
+        kit.need(workspace, need).await;
+    }
+    let stored: Option<chrono::DateTime<Utc>> =
+        sqlx::query_scalar("SELECT lapses_at FROM attention.items WHERE record_id = $1")
+            .bind(&link.conversation)
+            .fetch_one(&kit.db)
+            .await
+            .unwrap();
+    assert!(stored.is_some(), "the item keeps its lapse time");
+    let list = kit
+        .get(&sam, &format!("/api/v1/w/{workspace}/attention"))
+        .await;
+    let ids: Vec<&str> = list.json["items"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|i| i["record"]["id"].as_str().unwrap())
+        .collect();
+    assert_eq!(ids, [later.conversation.as_str()]);
+
+    // The producer clears the old one as lapsed: not in Done today.
+    old.revision = 2;
+    kit.cleared(workspace, &old, "lapsed", None).await;
+    let done = kit
+        .get(
+            &sam,
+            &format!("/api/v1/w/{workspace}/attention?state=cleared"),
+        )
+        .await;
+    assert!(
+        done.json["items"].as_array().unwrap().is_empty(),
+        "{:?}",
+        done.json
+    );
 }
 
 #[sqlx::test(migrations = "../../../migrations")]

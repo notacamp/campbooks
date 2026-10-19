@@ -156,6 +156,7 @@ pub struct ItemView {
 }
 
 /// An item row (`attention.items` with the caller's snooze).
+#[derive(sqlx::FromRow)]
 pub struct ItemRow {
     pub id: ItemId,
     pub record_type: String,

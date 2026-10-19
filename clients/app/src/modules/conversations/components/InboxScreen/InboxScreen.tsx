@@ -15,6 +15,7 @@ import {
   ReaderPane,
   Segmented,
   Spacer,
+  type RowLeaving,
 } from "~/lib/ui";
 
 import {
@@ -24,12 +25,16 @@ import {
   useInboxes,
   type ConversationPlace,
   type ConversationSummary,
+  type Stream,
 } from "../../api/queries";
 import {
   archiveMove,
   placeName,
   spamMove,
+  streamName,
   trashMove,
+  withLeaving,
+  type LeavingRow,
   type Move,
   type Translate,
 } from "../../model";
@@ -42,6 +47,24 @@ import { useInboxActions } from "./use-inbox-actions";
 
 /** The keys the empty reader teaches. */
 const READER_HINTS = ["list.next", "list.previous", "list.open", "item.done"] as const;
+
+/** What a row leaving the list says, by move: spam and the trash in the danger colour. */
+const LEAVING: Record<Move, { key: string; icon: RowLeaving["icon"]; tone: RowLeaving["tone"] }> = {
+  archive: { key: "leaving.done", icon: "archive", tone: "done" },
+  unarchive: { key: "leaving.toInbox", icon: "inbox", tone: "done" },
+  trash: { key: "leaving.deleted", icon: "trash", tone: "danger" },
+  untrash: { key: "leaving.restored", icon: "check", tone: "done" },
+  spam: { key: "leaving.spam", icon: "warning", tone: "danger" },
+  not_spam: { key: "leaving.notSpam", icon: "check", tone: "done" },
+};
+
+/** How long a row takes to leave (`--duration-confirm`, as `ConversationRow`'s fold). */
+const LEAVE_MS = 900;
+
+/** A row leaving the list, and what it says while it folds away. */
+interface Farewell extends LeavingRow {
+  said: RowLeaving;
+}
 
 /** Where list and reader become separate screens (the shell's large breakpoint). */
 const NARROW = "(width < 64rem)";
@@ -96,6 +119,7 @@ export function InboxScreen({
   const actions = useInboxActions(workspaceId);
   const [show, setShow] = useState<"all" | "unread">("all");
   const [cursor, setCursor] = useState<string | undefined>();
+  const [leaving, setLeaving] = useState<readonly Farewell[]>([]);
 
   const loaded = list.data?.pages.flatMap((page) => page.conversations);
   const conversations =
@@ -105,6 +129,31 @@ export function InboxScreen({
         )
       : loaded;
   const ids = conversations?.map((conversation) => conversation.id) ?? [];
+  // The rows leaving the list stay in place while they say what happened,
+  // out of the keyboard's reach; one back on the list (Undo while it
+  // folded) is a plain row again.
+  const folding = leaving.filter(
+    (row) => !(conversations ?? []).some((conversation) => conversation.id === row.conversation.id),
+  );
+  const shown = conversations === undefined ? undefined : withLeaving(conversations, folding);
+
+  /** It is leaving the list on screen: it says what happened, then folds away. */
+  const farewell = (conversation: ConversationSummary, said: RowLeaving) => {
+    const at = shown?.findIndex((row) => row.id === conversation.id) ?? -1;
+    if (shown === undefined || at === -1) {
+      return;
+    }
+    const before = shown[at + 1]?.id;
+    const row: Farewell = { conversation, before, at, said };
+    setLeaving((rows) => [
+      ...rows.filter((other) => other.conversation.id !== conversation.id),
+      row,
+    ]);
+    // Gone once it has folded, whether or not it was still drawn by then.
+    setTimeout(() => {
+      setLeaving((rows) => rows.filter((other) => other !== row));
+    }, LEAVE_MS);
+  };
 
   const open = (id: string) => {
     setCursor(id);
@@ -150,6 +199,8 @@ export function InboxScreen({
     if (belongsIn(stream, applied(conversation, move))) {
       return;
     }
+    const said = LEAVING[move];
+    farewell(conversation, { label: t(said.key), icon: said.icon, tone: said.tone });
     const index = ids.indexOf(conversation.id);
     const following = ids[index + 1] ?? ids[index - 1];
     if (conversationId === conversation.id) {
@@ -224,6 +275,20 @@ export function InboxScreen({
     { enabled: listActive },
   );
 
+  /** Move it to another stream; out of this one, its row says where it went. */
+  const moveToStream = (conversation: ConversationSummary, target: Stream) => {
+    actions.move(conversation, target);
+    if (
+      target !== conversation.stream &&
+      !belongsIn(stream, applied(conversation, { stream: target }))
+    ) {
+      farewell(conversation, {
+        label: t("leaving.moved", { stream: streamName(t, target) }),
+        icon: "move",
+      });
+    }
+  };
+
   const name = placeName(t, stream);
   const noInbox = inboxes.data?.length === 0;
 
@@ -268,7 +333,7 @@ export function InboxScreen({
         ) : (
           <ConversationList
             place={stream}
-            conversations={conversations}
+            conversations={shown}
             unreadOnly={show === "unread"}
             failed={list.isError}
             onRetry={() => {
@@ -284,6 +349,7 @@ export function InboxScreen({
             onOpen={(conversation) => {
               open(conversation.id);
             }}
+            leaving={new Map(folding.map((row) => [row.conversation.id, row.said]))}
             now={now}
           />
         )}
@@ -312,7 +378,7 @@ export function InboxScreen({
             workspaceId={workspaceId}
             conversationId={conversationId}
             stream={stream}
-            actions={actions}
+            actions={{ ...actions, move: moveToStream }}
             onBack={toList}
             onPrevious={() => {
               step(-1);
