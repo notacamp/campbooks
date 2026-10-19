@@ -2,8 +2,8 @@
 
 ## 0. Gate
 
-- [ ] 0.1 `asks-lapse-or-go-stale` (public PR #607) merged; this branch rebased on it, its MODIFIED requirements re-read against the merged baseline
-- [ ] 0.2 Owner approves the visual prototype (Nudge item, nudge dialog, Waiting on others; 375 + desktop, light and dark)
+- [ ] 0.1 `asks-lapse-or-go-stale` (public PR #607) merged; origin/next merged into this branch (never rebase), its MODIFIED requirements re-read against the merged baseline
+- [x] 0.2 Owner approves the visual prototype (Nudge item, nudge dialog, Waiting on others; 375 + desktop, light and dark)
 
 ## 1. Decide (`campbooks-ai`)
 

@@ -180,3 +180,17 @@ measured per 1,000 emails before the flag is switched on, as #166 was.
 Behind the catalogue's switch (`CAMPBOOKS_CONVERSATIONS__ACTIONS__ENABLED`): off, no
 question is asked and no wait is raised. The owner switches it on in cloud
 after reviewing the recording.
+
+## Decisions (owner, 2026-10-19)
+
+Approved with the prototype's recommendations (relayed by the merge
+coordinator: "All their suggestions are approved"):
+
+1. Scout nudges 3 working days after the email, or the working day after a
+   date it gives; Later moves it.
+2. The nudge copies the original sender (reply all, the awaited person in To).
+3. "Waiting on others" sits in Home's aside on desktop (variant A), a fold
+   after the list below 48rem.
+4. Nudges stay listed until answered; they are never dropped by age.
+
+Prototype: https://claude.ai/artifact/JSVzGNSeRVNFbp1M6mYfbc
