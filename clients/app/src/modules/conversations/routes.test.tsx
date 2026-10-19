@@ -404,9 +404,7 @@ describe("the inbox", () => {
     const reader = await screen.findByRole("main", { name: "Conversation" });
     await within(reader).findByText(/1 remote image hidden/u);
 
-    fireEvent.click(
-      within(reader).getByRole("button", { name: /^Always show images from The Weekly Ledger/u }),
-    );
+    fireEvent.click(within(reader).getByRole("button", { name: /^Always from this sender/u }));
     const dialog = await screen.findByRole("dialog", {
       name: "Always show images from hello@weekly-ledger.example",
     });
@@ -495,7 +493,7 @@ describe("the inbox", () => {
     const reader = await screen.findByRole("main", { name: "Conversation" });
     fireEvent.click(
       await within(reader).findByRole("button", {
-        name: /^Always show images from The Weekly Ledger/u,
+        name: /^Always from this sender/u,
       }),
     );
     const dialog = await screen.findByRole("dialog", {

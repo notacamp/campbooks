@@ -24,7 +24,7 @@
   },
   "commandMenu": {
     "label": "Menu des commandes",
-    "placeholder": "Rechercher, demander ou lancer une commande",
+    "placeholder": "Chercher, demander ou agir",
     "empty": "Rien ne correspond à « {{query}} »",
     "results": "Commandes",
     "ask": "Demander à Campbooks : {{query}}",

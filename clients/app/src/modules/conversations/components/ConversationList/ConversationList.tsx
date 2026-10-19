@@ -126,10 +126,15 @@ export function ConversationList({
             time={listTime(at, i18n.language, now)}
             dateTime={at}
             subject={conversation.subject === "" ? t("reader.noSubject") : conversation.subject}
+            // "You:" is our copy and its own text, kept whole; only the mail's words truncate.
             snippet={
-              conversation.latest_from_you
-                ? t("list.youPrefix", { snippet: conversation.snippet })
-                : conversation.snippet
+              conversation.latest_from_you ? (
+                <>
+                  {t("list.youPrefix")} {conversation.snippet}
+                </>
+              ) : (
+                conversation.snippet
+              )
             }
             unread={conversation.unread_count > 0}
             starred={conversation.starred}

@@ -299,7 +299,7 @@
   --overlay-radius: var(--radius-lg);
   --visor-size: 22px;
   --visor-asleep-opacity: var(--opacity-muted);
-  --sidebar-width: 248px;
+  --sidebar-width: 256px;
   --aside-width: 300px;
   --list-width: 400px;
   --content-max: 1180px;

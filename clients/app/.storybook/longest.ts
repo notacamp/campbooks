@@ -10,8 +10,8 @@ export const FIT_MARK = "⁠";
 /** The toolbar's pseudo-locale: the longest translation of every string. */
 export const LONGEST = "longest";
 
-/** The translations a pseudo-locale string is picked from (English is the source, never the longest). */
-const TRANSLATED: readonly Locale[] = ["pt-PT", "es-ES", "fr"];
+/** Every shipped language: English is usually the shortest, not always. */
+const TRANSLATED: readonly Locale[] = ["en", "pt-PT", "es-ES", "fr"];
 
 const isMessages = (value: unknown): value is Messages =>
   typeof value === "object" && value !== null && !Array.isArray(value);
@@ -45,9 +45,9 @@ function marked(messages: Messages): Messages {
 }
 
 /**
- * One namespace in the pseudo-locale: for every key, the longest of the
- * Portuguese, Spanish and French strings, marked with FIT_MARK. Plural keys
- * are merged too (the three languages share one/many/other).
+ * One namespace in the pseudo-locale: for every key, the longest of its
+ * English, Portuguese, Spanish and French strings, marked with FIT_MARK.
+ * Plural keys are merged too (a key only English has, `_one`, still counts).
  */
 export function longestMessages(byLocale: Record<Locale, Messages>): Messages {
   return marked(TRANSLATED.map((locale) => byLocale[locale]).reduce(longer, {}));

@@ -52,7 +52,7 @@
       "lead": "Campbooks n’a pas répondu. Vérifiez votre connexion, puis réessayez."
     },
     "passkeyWaiting": "En attente de votre clé d’accès…",
-    "passkeySignUp": "Pas encore de compte ? Créez-en un avec une clé d’accès",
+    "passkeySignUp": "Nouveau ? Inscrivez-vous avec une clé d’accès",
     "passkeyField": {
       "label": "Clés d’accès enregistrées",
       "hint": "Votre navigateur propose ici les clés d’accès que vous avez enregistrées pour Campbooks.",

@@ -11,7 +11,7 @@ not that it fits.
 ## What changes
 
 - A "longest" pseudo-locale for stories: every string in its longest
-  translation (pt-PT, es-ES or fr), wrapped in an invisible marker so our
+  version (en, pt-PT, es-ES or fr), wrapped in an invisible marker so our
   copy can be told from demo content. It is in the Storybook locale toolbar.
 - A CI check, `pnpm test:fit`: every story rendered in that pseudo-locale
   at 375px and 1280px, without play functions. It fails when marked copy is

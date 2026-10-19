@@ -155,7 +155,7 @@
     "teach": {
       "title": "Teach Scout something",
       "label": "What should Scout do?",
-      "placeholder": "For example: anything from my accountant always matters",
+      "placeholder": "E.g. anything from my accountant matters",
       "privacy": "Only your sentence is sent, never your mail.",
       "submit": "Teach",
       "reading": "Reading your sentence",

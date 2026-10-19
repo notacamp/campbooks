@@ -20,7 +20,7 @@
     "unread": "Non lues",
     "more": "Afficher plus",
     "loadingMore": "Chargement d’autres conversations",
-    "youPrefix": "Moi : {{snippet}}",
+    "youPrefix": "Moi :",
     "to": "À {{name}}",
     "toOthers_one": "À {{name}} et {{count}} autre personne",
     "toOthers_other": "À {{name}} et {{count}} autres personnes",
@@ -104,7 +104,7 @@
     "imagesHidden_one": "{{count}} image distante masquée, pour que l’expéditeur ne sache pas quand vous lisez ceci.",
     "imagesHidden_other": "{{count}} images distantes masquées, pour que l’expéditeur ne sache pas quand vous lisez ceci.",
     "imagesShown": "Images distantes affichées.",
-    "trustImages": "Toujours afficher les images de {{name}}",
+    "trustImages": "Toujours pour cet expéditeur",
     "imagesTrusted": "Images affichées : vous faites confiance à {{name}}. Les pixels de suivi restent supprimés.",
     "imagesTrustedInbox": "Images affichées : cette boîte fait confiance à {{name}}. Les pixels de suivi restent supprimés.",
     "imagesHeld": {

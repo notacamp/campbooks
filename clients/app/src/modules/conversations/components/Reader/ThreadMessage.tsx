@@ -235,7 +235,7 @@ export function ThreadMessage({
                     shortcut={shortcuts && trustKey ? "inbox.trust_images" : undefined}
                     onClick={trust}
                   >
-                    {t("actions.trustImages", { name: sender })}
+                    {t("actions.trustImages")}
                   </Button>
                 )}
                 {body.data?.images_held === undefined || body.data.images_held === null ? null : (

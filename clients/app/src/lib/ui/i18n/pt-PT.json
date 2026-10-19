@@ -24,7 +24,7 @@
   },
   "commandMenu": {
     "label": "Menu de comandos",
-    "placeholder": "Pesquise, pergunte ou execute um comando",
+    "placeholder": "Pesquise, pergunte ou execute",
     "empty": "Nada corresponde a «{{query}}»",
     "results": "Comandos",
     "ask": "Perguntar ao Campbooks: {{query}}",

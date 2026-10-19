@@ -10,7 +10,7 @@
     "choice3": "Iniciar sessão com a terceira opção",
     "passkey": "Iniciar sessão com uma chave de acesso",
     "addWayIn": "Adicionar uma forma de iniciar sessão",
-    "addPasskey": "Adicionar uma chave de acesso",
+    "addPasskey": "Adicionar chave de acesso",
     "newApp": "Nova aplicação"
   },
   "signIn": {
@@ -52,7 +52,7 @@
       "lead": "O Campbooks não respondeu. Verifique a ligação e tente novamente."
     },
     "passkeyWaiting": "À espera da sua chave de acesso…",
-    "passkeySignUp": "Ainda não tem conta? Crie uma com uma chave de acesso",
+    "passkeySignUp": "Novo? Crie uma conta com chave de acesso",
     "passkeyField": {
       "label": "Chaves de acesso guardadas",
       "hint": "O seu navegador mostra aqui as chaves de acesso que guardou para o Campbooks.",
@@ -369,7 +369,7 @@
     "loadError": "Não foi possível carregar as suas chaves de acesso.",
     "retry": "Tentar novamente",
     "none": "Ainda não tem chaves de acesso.",
-    "add": "Adicionar uma chave de acesso",
+    "add": "Adicionar chave de acesso",
     "adding": "À espera da sua chave de acesso…",
     "added": "{{name}} foi adicionada. Já pode iniciar sessão com ela.",
     "nameOn": "Chave de acesso em {{device}}",

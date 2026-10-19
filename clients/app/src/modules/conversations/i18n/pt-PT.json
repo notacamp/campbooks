@@ -20,7 +20,7 @@
     "unread": "Não lidas",
     "more": "Mostrar mais",
     "loadingMore": "A carregar mais conversas",
-    "youPrefix": "Eu: {{snippet}}",
+    "youPrefix": "Eu:",
     "to": "Para {{name}}",
     "toOthers_one": "Para {{name}} e mais {{count}} pessoa",
     "toOthers_other": "Para {{name}} e mais {{count}} pessoas",
@@ -104,7 +104,7 @@
     "imagesHidden_one": "{{count}} imagem remota oculta, para que o remetente não saiba quando lê isto.",
     "imagesHidden_other": "{{count}} imagens remotas ocultas, para que o remetente não saiba quando lê isto.",
     "imagesShown": "Imagens remotas visíveis.",
-    "trustImages": "Mostrar sempre as imagens de {{name}}",
+    "trustImages": "Sempre deste remetente",
     "imagesTrusted": "Imagens visíveis: confia em {{name}}. Os píxeis de rastreio continuam removidos.",
     "imagesTrustedInbox": "Imagens visíveis: esta caixa confia em {{name}}. Os píxeis de rastreio continuam removidos.",
     "imagesHeld": {
