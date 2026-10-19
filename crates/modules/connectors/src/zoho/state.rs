@@ -311,7 +311,10 @@ mod tests {
         assert_eq!(flags(&listed(&["72"])).provider_stream, None);
         // A listing that names no labels keeps the index's.
         let known = listed(&["71"]);
-        assert_eq!(with_labels(inbox.clone(), None, Some(known.as_slice())), known);
+        assert_eq!(
+            with_labels(inbox.clone(), None, Some(known.as_slice())),
+            known
+        );
         assert!(writable("label:71") && writable("mark:receipts"));
         assert!(!writable("label:") && !writable("mark:someday"));
     }

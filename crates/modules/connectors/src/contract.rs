@@ -125,6 +125,10 @@ pub struct NormalizedMessage {
     /// mark, else its native place): absent when the adapter cannot tell
     /// (sent mail, a grant without labels), `Some(None)` (`null`) when it is
     /// in none of the four (Gmail's Social and Forums tabs, several marks).
+    #[allow(
+        clippy::option_option,
+        reason = "absent, null or a stream: the contract's three cases"
+    )]
     #[serde(
         default,
         deserialize_with = "present",
@@ -155,7 +159,12 @@ pub enum ProviderStream {
 
 impl ProviderStream {
     /// Every stream.
-    pub const ALL: [Self; 4] = [Self::Primary, Self::Updates, Self::Receipts, Self::Newsletters];
+    pub const ALL: [Self; 4] = [
+        Self::Primary,
+        Self::Updates,
+        Self::Receipts,
+        Self::Newsletters,
+    ];
 
     /// The wire name.
     pub const fn as_str(self) -> &'static str {

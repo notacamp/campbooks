@@ -52,6 +52,10 @@ fn categories_of(label_ids: &[String]) -> Vec<&str> {
 /// When a known message's category changed (labels `before`, now `now`)
 /// while it kept the same stream marks, at least one: the category's
 /// stream, which wins over the stale mark.
+#[allow(
+    clippy::option_option,
+    reason = "none for no change, or the stream it says (none of the four too)"
+)]
 pub fn category_won(
     before: &[String],
     now: &[String],

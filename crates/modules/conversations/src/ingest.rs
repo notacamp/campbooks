@@ -154,6 +154,10 @@ pub struct NormalizedMessage {
     /// mark, else its native place): `Some(None)` (`null`) when it is in
     /// none of the four, `None` (absent) when the connector cannot tell, which
     /// leaves the stored one as it is.
+    #[allow(
+        clippy::option_option,
+        reason = "absent, null or a stream: the contract's three cases"
+    )]
     #[serde(
         default,
         deserialize_with = "present",

@@ -668,30 +668,9 @@ impl Apply<'_> {
         let id = self
             .store(tx, message, prepared, conversation, template.as_deref())
             .await?;
-        // A received message joining a conversation already placed goes
-        // where it is at the provider too (a placement made now asks for
-        // itself: a taught rule's on arrival, the model pass's after it).
-        let mirrored = self.mirrors(message);
-        if mirrored && placement.conversation.is_some() && !sorted {
-            let placed: bool = sqlx::query_scalar(
-                "SELECT stream_source <> 'default' FROM conversations.conversations WHERE id = $1",
-            )
-            .bind(conversation)
-            .fetch_one(&mut **tx)
-            .await?;
-            if placed {
-                streams::mirror(
-                    &self.state.binding,
-                    self.events,
-                    tx,
-                    self.ws,
-                    conversation,
-                    None,
-                )
-                .await?;
-            }
+        if placement.conversation.is_some() && !sorted {
+            self.follow_joined(tx, message, conversation).await?;
         }
-
         if inbound {
             let recorded = Recorded {
                 message: id,
@@ -975,18 +954,64 @@ impl Apply<'_> {
         for label in &message.labels {
             link_provider_label(tx, self.workspace, self.inbox, conversation, label).await?;
         }
-        if let Some(stream) = message.provider_stream {
-            sqlx::query(
-                "UPDATE conversations.messages SET provider_stream = $2, mirrors_stream = $3
-                  WHERE id = $1",
+        self.store_provider_stream(tx, message, id).await?;
+        Ok(id)
+    }
+
+    /// Store where new message `id` is at the provider, and whether its
+    /// stream is mirrored, when its upsert says.
+    async fn store_provider_stream(
+        &self,
+        tx: &mut Transaction<'static, Postgres>,
+        message: &NormalizedMessage,
+        id: MessageId,
+    ) -> Result<(), JobError> {
+        let Some(stream) = message.provider_stream else {
+            return Ok(());
+        };
+        sqlx::query(
+            "UPDATE conversations.messages SET provider_stream = $2, mirrors_stream = $3
+              WHERE id = $1",
+        )
+        .bind(id)
+        .bind(stream.map_or(NO_STREAM, Stream::as_str))
+        .bind(self.mirrors(message))
+        .execute(&mut **tx)
+        .await?;
+        Ok(())
+    }
+
+    /// A received message that joined `conversation`, already placed by
+    /// someone, goes where it is at the provider too. (A placement made now
+    /// asks for itself: a taught rule's on arrival, the model pass's after
+    /// it.)
+    async fn follow_joined(
+        &self,
+        tx: &mut Transaction<'static, Postgres>,
+        message: &NormalizedMessage,
+        conversation: ConversationId,
+    ) -> Result<(), JobError> {
+        if !self.mirrors(message) {
+            return Ok(());
+        }
+        let placed: bool = sqlx::query_scalar(
+            "SELECT stream_source <> 'default' FROM conversations.conversations WHERE id = $1",
+        )
+        .bind(conversation)
+        .fetch_one(&mut **tx)
+        .await?;
+        if placed {
+            streams::mirror(
+                &self.state.binding,
+                self.events,
+                tx,
+                self.ws,
+                conversation,
+                None,
             )
-            .bind(id)
-            .bind(stream.map_or(NO_STREAM, Stream::as_str))
-            .bind(self.mirrors(message))
-            .execute(&mut **tx)
             .await?;
         }
-        Ok(id)
+        Ok(())
     }
 
     /// Whether `message`'s stream is mirrored to the provider: a received

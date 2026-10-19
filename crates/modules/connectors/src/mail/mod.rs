@@ -11,7 +11,9 @@ use futures_util::StreamExt as _;
 use uuid::Uuid;
 
 use crate::{
-    contract::{Attachment, Category, Direction, Label, Mailbox, NormalizedMessage, ProviderStream},
+    contract::{
+        Attachment, Category, Direction, Label, Mailbox, NormalizedMessage, ProviderStream,
+    },
     provider::ProviderError,
 };
 
@@ -26,6 +28,10 @@ pub struct Flags {
     pub labels: Vec<Label>,
     /// The stream it is in at the provider (`NormalizedMessage`), when the
     /// adapter can tell.
+    #[allow(
+        clippy::option_option,
+        reason = "absent, null or a stream: the contract's three cases"
+    )]
     pub provider_stream: Option<Option<ProviderStream>>,
     /// Its stream mark is stale (`NormalizedMessage`).
     pub stream_mark_stale: bool,

@@ -359,7 +359,7 @@ impl Reader<'_> {
     /// `changes` (pending, the overlay) with their stream marks' tokens as
     /// Zoho's labels.
     fn resolved(&self, changes: &[outbound::LabelChange]) -> Vec<outbound::LabelChange> {
-        let names = self.labels.map(LabelCache::names).unwrap_or_default();
+        let names = self.labels.map_or_else(HashMap::new, LabelCache::names);
         let ids = MarkIds::from_labels(names.iter().map(|(id, n)| (id.as_str(), n.as_str())));
         marks::resolve_changes(changes, &ids, state::label_token)
     }
