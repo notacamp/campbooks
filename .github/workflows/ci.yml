@@ -29,6 +29,8 @@ jobs:
   # in four shards); `rust`, the required check, is green only when all are.
   rust-checks:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     timeout-minutes: 30
     services:
       postgres:
@@ -67,11 +69,32 @@ jobs:
           git fetch --no-tags --depth=1 origin "+refs/heads/$BASE:refs/remotes/origin/$BASE"
           cargo xtask migrations --base "origin/$BASE"
       - name: OpenAPI drift
+        id: openapi
         if: always()
         run: cargo xtask openapi --check
       - name: Events catalogue drift
+        id: events
         if: always()
         run: cargo xtask events --check
+      # On drift, write the documents the server generates and upload them,
+      # so a change can commit them without compiling the server locally.
+      # The checks above still fail the job.
+      - name: Generate the stale API documents
+        if: always() && (steps.openapi.outcome == 'failure' || steps.events.outcome == 'failure')
+        run: |
+          cargo xtask openapi
+          cargo xtask events
+      - name: Upload the generated API documents
+        if: always() && (steps.openapi.outcome == 'failure' || steps.events.outcome == 'failure')
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: generated-openapi
+          path: |
+            openapi/openapi.json
+            openapi/admin.json
+            openapi/events.json
+          retention-days: 7
+          if-no-files-found: error
       - name: decide eval holds its baseline (offline strategies, no network)
         if: always()
         run: cargo xtask eval decide --offline --check
@@ -185,6 +208,8 @@ jobs:
 
   clients:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     timeout-minutes: 25
     defaults:
       run: { working-directory: clients }
@@ -214,8 +239,21 @@ jobs:
         if: always()
         run: pnpm deadcode
       - name: Generated API types are current
+        id: api-types
         if: always()
         run: pnpm api:check
+      # `api:check` regenerates the types from the committed OpenAPI
+      # documents before it diffs them: on drift, upload what it wrote. After
+      # a server change, commit `generated-openapi` first; the types follow
+      # from those documents on the next run.
+      - name: Upload the generated API types
+        if: always() && steps.api-types.outcome == 'failure'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: generated-api-types
+          path: clients/app/src/lib/api/*.gen.ts
+          retention-days: 7
+          if-no-files-found: error
       - name: Translations at parity (en, pt, es, fr)
         if: always()
         run: pnpm i18n:check
