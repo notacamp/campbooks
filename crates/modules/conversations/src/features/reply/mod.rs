@@ -545,6 +545,7 @@ impl Read<'_> {
 /// that a model may read mail here and the member has allowance left, then
 /// read the conversation up to the message answered, and, for a written
 /// reply (`with_person`), who is answered.
+#[allow(clippy::too_many_lines)]
 async fn prepare<'a>(
     state: &AppState,
     writer: &'a ReplyWriter,

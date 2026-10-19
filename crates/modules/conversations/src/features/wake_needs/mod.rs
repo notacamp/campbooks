@@ -1,7 +1,8 @@
 //! Needs that change with time alone (campbooks-cloud#275): an ask whose
 //! lapse time passed (a sign-in link valid for ten minutes) is cleared as
 //! lapsed, and an undated ask whose message left the needs window becomes
-//! "Still needed?".
+//! "Still needed?". A wait on someone (campbooks-cloud#293) becomes a
+//! Nudge at its nudge time.
 //!
 //! Every refresh writes, in `conversations.need_clocks`, when the
 //! conversation's open need next changes on its own (`needs::next_wake`), or

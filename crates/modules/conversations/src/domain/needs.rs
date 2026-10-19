@@ -3,7 +3,7 @@
 //!
 //! At most one need per conversation, kept in `conversations.needs`:
 //!
-//! - **Raised** ([`raise`], pure) from the decide pass's answers about the
+//! - **Raised** ([`raise_with`], pure) from the decide pass's answers about the
 //!   newest inbound message that is not in spam or the trash: `pay` when the
 //!   money answer says a payment is still owed, always as a question ("Is it
 //!   paid?", campbooks-cloud#167: Campbooks cannot see the bank); `reply` or
@@ -138,7 +138,7 @@ impl NeedSettings {
     }
 }
 
-/// One stored answer, as [`raise`] reads it.
+/// One stored answer, as [`raise_with`] reads it.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Answer {
     /// The stored decision.
@@ -462,6 +462,7 @@ fn taught_no_ask(answers: &[Answer]) -> bool {
 
 /// The need the answers about `message` raise, if any, under `settings`,
 /// without the email's people: never a wait (see [`raise_with`]).
+#[cfg(test)]
 pub fn raise(message: MessageId, answers: &[Answer], settings: &NeedSettings) -> Option<Need> {
     raise_with(message, answers, None, settings)
 }
