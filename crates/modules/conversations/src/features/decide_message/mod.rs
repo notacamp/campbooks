@@ -235,6 +235,7 @@ impl Pass {
     /// Ask the model about `message` and store its answers: sort the
     /// conversation when its stream answer is accepted and the message is
     /// its first inbound one, then refresh its need.
+    #[allow(clippy::too_many_lines)]
     async fn run(
         &self,
         ctx: &mut JobContext,

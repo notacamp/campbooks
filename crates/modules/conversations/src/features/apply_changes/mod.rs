@@ -642,6 +642,13 @@ impl Apply<'_> {
         self.announce(tx, message, prepared, conversation, id)
             .await?;
         self.new_in.insert(conversation);
+        self.note_correspondents(message, inbound);
+        Ok(())
+    }
+
+    /// Note who wrote to the inbox (`inbound`: the sender) or was written
+    /// to (its To and Cc), for hearing back.
+    fn note_correspondents(&mut self, message: &NormalizedMessage, inbound: bool) {
         let people: Vec<&Address> = if inbound {
             vec![&message.from]
         } else {
@@ -653,7 +660,6 @@ impl Apply<'_> {
                 .map(|a| a.address.trim().to_lowercase())
                 .filter(|a| !a.is_empty()),
         );
-        Ok(())
     }
 
     /// What the inbox's taught rules say about a new inbound message, in

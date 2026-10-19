@@ -160,6 +160,7 @@ impl ConversationsDeps {
 
 /// The `conversations` module, composed with `deps`, ready for the server
 /// to mount.
+#[allow(clippy::too_many_lines)]
 pub fn module(deps: ConversationsDeps) -> Module {
     // Scout's summary of a need's email: only while the `complete` role may
     // receive mail here.
