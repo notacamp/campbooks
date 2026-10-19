@@ -101,6 +101,11 @@ All notable changes to Campbooks Next are documented here. The format follows
 
 ### Fixed
 
+- **An email you are only copied on no longer reads as "needs a reply".** Scout is now told
+  who was addressed and who was copied, and that someone copied on an email is usually being
+  kept informed: it asks for a reply from them only when the email asks them something
+  directly. Mail you are only copied on that was already flagged is looked at again after
+  the upgrade (recent mail only), and the need goes away at once; nothing is deleted.
 - **A reply or forward never quotes nothing.** When an email's words were too slow to read
   in time (a very large or heavy HTML email), the conversation arrives without them; Reply,
   Reply all, Forward and Home's Forward picker now read them first, saying "Reading the email
