@@ -251,7 +251,8 @@
       "reply": "Répondre à {{name}}",
       "reply_all": "Répondre à tous",
       "forward": "Transférer",
-      "new": "Nouveau message"
+      "new": "Nouveau message",
+      "nudge": "Relancer {{name}}"
     },
     "newMessage": "Nouveau message",
     "noInbox": "Connectez une boîte mail pour envoyer depuis celle-ci.",
@@ -315,7 +316,10 @@
       "stillReply": "{{name}} a écrit {{ago}}. Faut-il encore répondre ?",
       "taughtReply": "{{name}} : à répondre, selon une règle",
       "taughtDo": "{{name}} : à faire, selon une règle",
-      "worthALook": "Vous avez demandé à voir les e-mails de {{name}}"
+      "worthALook": "Vous avez demandé à voir les e-mails de {{name}}",
+      "waiting": "Scout attend {{name}}",
+      "nudge": "{{name}} n’a pas encore écrit",
+      "nudgeSender": "Toujours pas de nouvelles de {{name}}"
     },
     "chip": {
       "reply": "À répondre",
@@ -325,7 +329,9 @@
       "suspicious": "Semble suspect",
       "check": "À confirmer",
       "expired": "Expiré",
-      "worth_a_look": "À voir"
+      "worth_a_look": "À voir",
+      "waiting": "En attente de {{name}}",
+      "nudge": "À relancer"
     },
     "due": {
       "today": "Pour aujourd’hui",
@@ -369,7 +375,9 @@
       "markPaid": "Marquer comme payée",
       "billPrompt": "Campbooks n’a pas accès à votre banque.",
       "report": "Signaler et supprimer",
-      "seen": "Vu"
+      "seen": "Vu",
+      "heardBack": "Nouvelles reçues",
+      "notWaiting": "Je n’attends plus"
     },
     "toast": {
       "done": "Fait · {{name}}",
@@ -385,7 +393,9 @@
       "allPaid_other": "{{count}} factures marquées comme payées",
       "allPaidFailed_one": "Impossible de marquer {{count}} facture comme payée. Réessayez.",
       "allPaidFailed_other": "Impossible de marquer {{count}} factures comme payées. Réessayez.",
-      "reported": "Signalé · {{name}}. Il est dans les spams"
+      "reported": "Signalé · {{name}}. Il est dans les spams",
+      "heardBack": "Nouvelles de {{name}} · Scout n’attend plus",
+      "notWaiting": "Vous n’attendez plus {{name}}"
     },
     "summary": {
       "heading": "Résumé de Scout"
@@ -815,6 +825,21 @@
       "remove": "Retirer",
       "removeLabel": "Retirer ce que Scout sait de {{name}}",
       "saved": "Enregistré"
+    }
+  },
+  "nudge": {
+    "title": "Relancer {{name}}",
+    "writing": "Scout rédige une courte relance…",
+    "description": "Dans la même conversation, pour que {{name}} sache de quoi il s’agit. Rien n’est envoyé avant que vous appuyiez sur Envoyer.",
+    "unavailable": "Scout ne peut pas écrire ici : écrivez cette relance vous-même.",
+    "draftLabel": "Votre relance",
+    "to": "À {{recipient}}",
+    "copying": "En copie : {{recipients}}",
+    "sent": "Relance envoyée à {{name}}",
+    "undone": "Non envoyée. Votre relance est revenue.",
+    "tooLate": "Trop tard pour annuler : la relance est déjà partie.",
+    "errors": {
+      "notWaiting": "{{name}} a déjà répondu : il n’y a rien à relancer."
     }
   }
 }

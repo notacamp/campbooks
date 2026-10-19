@@ -251,7 +251,8 @@
       "reply": "Reply to {{name}}",
       "reply_all": "Reply all",
       "forward": "Forward",
-      "new": "New message"
+      "new": "New message",
+      "nudge": "Nudge {{name}}"
     },
     "newMessage": "New message",
     "noInbox": "Connect a mailbox to send from it.",
@@ -315,7 +316,10 @@
       "stillReply": "{{name}} wrote {{ago}}. Still needs a reply?",
       "taughtReply": "{{name}}: a reply, by a rule",
       "taughtDo": "{{name}}: to do, by a rule",
-      "worthALook": "You asked to see mail from {{name}}"
+      "worthALook": "You asked to see mail from {{name}}",
+      "waiting": "Scout is waiting on {{name}}",
+      "nudge": "{{name}} hasn’t written yet",
+      "nudgeSender": "No word from {{name}} yet"
     },
     "chip": {
       "reply": "Needs a reply",
@@ -325,7 +329,9 @@
       "suspicious": "Looks suspicious",
       "check": "Check",
       "expired": "Expired",
-      "worth_a_look": "Worth a look"
+      "worth_a_look": "Worth a look",
+      "waiting": "Waiting on {{name}}",
+      "nudge": "Nudge"
     },
     "due": {
       "today": "Due today",
@@ -369,7 +375,9 @@
       "markPaid": "Mark paid",
       "billPrompt": "Campbooks can’t see your bank.",
       "report": "Report and delete",
-      "seen": "Seen"
+      "seen": "Seen",
+      "heardBack": "Heard from them",
+      "notWaiting": "Not waiting"
     },
     "toast": {
       "done": "Done · {{name}}",
@@ -385,7 +393,9 @@
       "allPaid_other": "Marked {{count}} invoices paid",
       "allPaidFailed_one": "Couldn’t mark {{count}} invoice paid. Try again.",
       "allPaidFailed_other": "Couldn’t mark {{count}} invoices paid. Try again.",
-      "reported": "Reported · {{name}}. It’s in spam"
+      "reported": "Reported · {{name}}. It’s in spam",
+      "heardBack": "Heard from {{name}} · Scout stopped waiting",
+      "notWaiting": "Not waiting on {{name}}"
     },
     "summary": {
       "heading": "Scout’s summary"
@@ -815,6 +825,21 @@
       "remove": "Remove",
       "removeLabel": "Remove what Scout knows about {{name}}",
       "saved": "Saved"
+    }
+  },
+  "nudge": {
+    "title": "Nudge {{name}}",
+    "writing": "Scout is writing a short nudge…",
+    "description": "In the same thread, so {{name}} sees what it’s about. Nothing is sent until you press Send.",
+    "unavailable": "Scout can’t write here, so you write this nudge.",
+    "draftLabel": "Your nudge",
+    "to": "To {{recipient}}",
+    "copying": "Copying {{recipients}}",
+    "sent": "Nudged {{name}}",
+    "undone": "Not sent. Your nudge is back.",
+    "tooLate": "Too late to undo: the nudge has already left.",
+    "errors": {
+      "notWaiting": "{{name}} already wrote back, so there’s nothing to nudge."
     }
   }
 }

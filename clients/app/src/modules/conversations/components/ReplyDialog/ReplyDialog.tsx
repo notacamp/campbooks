@@ -30,7 +30,15 @@ import {
 import { useConversation, useMessageWords, type MessageView } from "../../api/queries";
 import { answeredPerson } from "../../api/person-notes";
 import { useReplySuggestions, writeReply } from "../../api/replies";
-import { displayName, replyQuote, type QuoteWords } from "../../compose/quote";
+import {
+  addressLine,
+  firstName,
+  MAX_ASK_CHARS,
+  quotePreview,
+  quoteWords,
+  undoWindow,
+} from "../../compose/dialog";
+import { displayName, replyQuote } from "../../compose/quote";
 import { useDeleteDraft } from "../../compose/use-delete-draft";
 import type { Translate } from "../../model";
 import { AboutPerson } from "../PersonNotes/AboutPerson";
@@ -64,12 +72,6 @@ export interface ReplyDialogProps {
 
 type Stage = "choose" | "writing" | "draft";
 
-/** Longest intent or change the server takes, in characters. */
-const MAX_ASK_CHARS = 300;
-
-/** Longest quote shown from the message answered, in characters. */
-const QUOTE_CHARS = 280;
-
 /** Who a reply to `message` goes to: the server sends it there (Reply-To first). */
 function recipientOf(message: MessageView) {
   return message.direction === "outbound" ? message.to[0] : (message.reply_to[0] ?? message.from);
@@ -89,24 +91,6 @@ function recipientsOf(message: MessageView): Draft["to"] {
     parties = message.reply_to;
   }
   return parties.map((party) => ({ name: party.name ?? null, address: party.address }));
-}
-
-/** How long the send can still be undone, from its `send_at` (at least a second). */
-function undoWindow(sendAt: string | null | undefined): number | undefined {
-  return sendAt === null || sendAt === undefined
-    ? undefined
-    : Math.max(1000, new Date(sendAt).getTime() - Date.now());
-}
-
-/** "Marta Ferreira <marta@casa-lume.example>", or the address alone. */
-function addressLine(party: { name?: string | null; address: string }): string {
-  const name = party.name?.trim();
-  return name === undefined || name === "" ? party.address : `${name} <${party.address}>`;
-}
-
-/** The first name, for the title ("Reply to Marta"). */
-function firstName(name: string): string {
-  return name.includes("@") ? name : (name.split(/\s+/u, 1)[0] ?? name);
 }
 
 /**
@@ -194,14 +178,7 @@ export function ReplyDialog({
   const working = useRef(false);
 
   const unavailable = problemCode(suggestions.error) === "reply_unavailable";
-  const words: QuoteWords = {
-    wrote: (date, who) => t("compose.quote.wrote", { date, name: who }),
-    forwarded: t("compose.quote.forwarded"),
-    from: t("compose.quote.from"),
-    date: t("compose.quote.date"),
-    subject: t("compose.quote.subject"),
-    to: t("compose.quote.to"),
-  };
+  const words = quoteWords(t);
 
   const failure = (thrown: unknown): string => {
     switch (problemCode(thrown)) {
@@ -514,31 +491,11 @@ export function ReplyDialog({
   // empty quote shown as if there were nothing.
   const quoteUnread = base?.text_unread === true && unread.isError && !unread.isFetching;
   const quoteReading = base?.text_unread === true && unread.data === undefined && !quoteUnread;
-  // What the preview leaves out is said (campbooks-cloud#255): a long
-  // email's reply quotes only its first part; a long quote is shown in
-  // part, and quoted whole.
-  const said = answered?.text?.content.trim() ?? "";
-  const shortened = said.length > QUOTE_CHARS;
-  let quoteNote: string | undefined;
-  if (answered?.quote_cut === true || answered?.text?.truncated === true) {
-    quoteNote = t("reply.quoteCut");
-  } else if (shortened) {
-    quoteNote = t("reply.quoteShortened");
-  }
+  // What the preview leaves out is said (campbooks-cloud#255).
+  const preview = quotePreview(t, answered, i18n.language);
   const quote =
-    answered?.text?.content === undefined || said === "" ? undefined : (
-      <ReplyQuote
-        from={t("reply.quoteFrom", {
-          name: displayName(answered.from),
-          date: new Intl.DateTimeFormat(i18n.language, {
-            weekday: "short",
-            day: "numeric",
-            month: "short",
-          }).format(new Date(answered.sent_at)),
-        })}
-        text={shortened ? `${said.slice(0, QUOTE_CHARS)}…` : said}
-        note={quoteNote}
-      />
+    preview === undefined ? undefined : (
+      <ReplyQuote from={preview.from} text={preview.text} note={preview.note} />
     );
   const to =
     recipient === undefined ? undefined : (

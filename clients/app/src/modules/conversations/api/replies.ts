@@ -62,3 +62,51 @@ export async function writeReply(
     }),
   ).text;
 }
+
+type WriteNudge = Schema<"WriteNudge">;
+
+const nudgeKeys = {
+  text: (workspaceId: string, conversationId: string, messageId: string, nudges: number) =>
+    ["nudge-text", workspaceId, conversationId, messageId, nudges] as const,
+};
+
+/**
+ * `conversations.write_nudge`: Scout's nudge to the person the conversation
+ * waits on (campbooks-cloud#293), or the draft rewritten (shorter, or as
+ * `change` asks). Plain text; nothing is saved or sent.
+ */
+export async function writeNudge(
+  workspaceId: string,
+  conversationId: string,
+  body: WriteNudge,
+): Promise<string> {
+  return unwrap(
+    await api.POST("/api/v1/w/{workspace_id}/conversations/{conversation_id}/nudge/draft", {
+      params: { path: { workspace_id: workspaceId, conversation_id: conversationId } },
+      body,
+    }),
+  ).text;
+}
+
+/**
+ * Scout's first nudge for a wait, asked once per wait and nudge count for the
+ * session (a model call each time it is asked), never retried on its own.
+ * Not an operation key: the change feed never asks the model again.
+ */
+export function useNudgeText(
+  workspaceId: string,
+  conversationId: string,
+  wait: { messageId: string; nudges: number },
+  { enabled = true }: { enabled?: boolean } = {},
+) {
+  return useQuery({
+    queryKey: nudgeKeys.text(workspaceId, conversationId, wait.messageId, wait.nudges),
+    enabled,
+    staleTime: Infinity,
+    gcTime: 30 * 60 * 1000,
+    retry: false,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
+    queryFn: () => writeNudge(workspaceId, conversationId, {}),
+  });
+}
