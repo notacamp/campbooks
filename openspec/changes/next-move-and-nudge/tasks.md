@@ -37,10 +37,10 @@
 
 ## 5. Home
 
-- [ ] 5.1 Nudge group and row (both sentences, "Asked …", "Nudged once"), actions 1/E/S/X with Undo, read-only inbox
-- [ ] 5.2 Nudge dialog (To/Cc as the server addresses it, Scout's text, Shorter, Change…, Send ⌘↵, Open in composer, Write my own, `reply_unavailable`), bottom sheet below 48rem
-- [ ] 5.3 Waiting on others (aside on desktop, fold below 48rem, Nudge now, Not waiting)
-- [ ] 5.4 Strings in en, pt-PT, es-ES and fr (diacritics checked); stories; component and page tests; axe
+- [x] 5.1 Nudge group and row (both sentences, "Asked …", "Nudged once"), actions 1/E/S/X with Undo, read-only inbox
+- [x] 5.2 Nudge dialog (To/Cc as the server addresses it, Scout's text, Shorter, Change…, Send ⌘↵, Open in composer, Write my own, `reply_unavailable`), bottom sheet below 48rem
+- [x] 5.3 Waiting on others (aside on desktop, fold below 48rem, Nudge now, Not waiting)
+- [x] 5.4 Strings in en, pt-PT, es-ES and fr (diacritics checked); stories; component and page tests; axe
 
 ## 6. Close
 
