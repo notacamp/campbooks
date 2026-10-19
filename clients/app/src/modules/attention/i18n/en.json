@@ -7,7 +7,9 @@
     "clear": "Nothing needs you",
     "clearSubline": "Nothing in your mail asks anything of you right now. Campbooks keeps reading.",
     "waiting_one": "Scout is also waiting on {{count}} person for you.",
-    "waiting_other": "Scout is also waiting on {{count}} people for you."
+    "waiting_other": "Scout is also waiting on {{count}} people for you.",
+    "lookSubline_one": "Nothing asks anything of you. {{count}} email below is worth a look.",
+    "lookSubline_other": "Nothing asks anything of you. {{count}} emails below are worth a look."
   },
   "groups": {
     "review": "Review",

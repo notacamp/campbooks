@@ -44,7 +44,7 @@
 
 use campbooks_ai::decide::signals::{
     email::{Envelope, Party, Recipient, triage},
-    facts,
+    facts::{self, dmarc_refused, sender_authenticated, sender_checks_failed},
     moves::{self, NextMove},
 };
 use campbooks_kernel::{Error, EventBus, Result, tenancy::UserId};
@@ -474,9 +474,17 @@ fn taught_no_ask(answers: &[Answer]) -> bool {
 
 /// The need the answers about `message` raise, if any, under `settings`,
 /// without the email's people: never a wait (see [`raise_with`]).
+/// `look_ok` is whether "Worth a look" may be raised for it
+/// ([`may_be_looked_at`]): a stored highlight on mail that is not
+/// authenticated, or looks suspicious, raises nothing.
 #[cfg(test)]
-pub fn raise(message: MessageId, answers: &[Answer], settings: &NeedSettings) -> Option<Need> {
-    raise_with(message, answers, None, settings)
+pub fn raise(
+    message: MessageId,
+    answers: &[Answer],
+    settings: &NeedSettings,
+    look_ok: bool,
+) -> Option<Need> {
+    raise_with(message, answers, None, settings, look_ok)
 }
 
 /// Whether the policy accepted the model's `next_move` answer, saying
@@ -501,6 +509,7 @@ pub fn raise_with(
     answers: &[Answer],
     people: Option<&Envelope>,
     settings: &NeedSettings,
+    look_ok: bool,
 ) -> Option<Need> {
     let check_floor = settings.check_floor();
     let need = |reason, trust, basis, question, decision: &Answer| Need {
@@ -617,7 +626,7 @@ pub fn raise_with(
     // Anything that asks something of the member comes first, then what a
     // rule the member taught keeps in front of them, then a wait.
     raised
-        .or_else(|| highlighted(message, answers))
+        .or_else(|| highlighted(message, answers).filter(|_| look_ok))
         .or_else(|| {
             people
                 .filter(|_| settings.waits)
@@ -1194,6 +1203,36 @@ struct StoredRecipients {
     reply_to: Vec<Address>,
 }
 
+/// Whether "Worth a look" may be raised for `message`, whatever answer is
+/// stored for it (a rule's answer from before the check was made, say): its
+/// sender is authenticated by the receiving provider's results, and neither
+/// it nor its conversation looks suspicious, fails its sender checks or is
+/// impersonated. Fails closed.
+async fn may_be_looked_at(tx: &mut Transaction<'_, Postgres>, message: MessageId) -> Result<bool> {
+    let row: Option<(String, serde_json::Value, bool)> = sqlx::query_as(
+        "SELECT m.sender_address, m.headers,
+                (EXISTS (SELECT 1 FROM conversations.decisions d
+                          WHERE d.conversation_id = m.conversation_id
+                            AND d.question = 'suspicious' AND d.value = 'true'::jsonb)
+                 OR EXISTS (SELECT 1 FROM conversations.needs n
+                             WHERE n.conversation_id = m.conversation_id
+                               AND n.state = 'open' AND n.reason = 'review'))
+           FROM conversations.messages m WHERE m.id = $1",
+    )
+    .bind(message)
+    .fetch_optional(&mut **tx)
+    .await?;
+    let Some((sender, headers, suspicious)) = row else {
+        return Ok(false);
+    };
+    let headers: crate::ingest::Headers = serde_json::from_value(headers).unwrap_or_default();
+    let results = headers.authentication_results.as_deref();
+    Ok(!suspicious
+        && !sender_checks_failed(&sender, results)
+        && !dmarc_refused(results)
+        && sender_authenticated(&sender, results))
+}
+
 /// The need a conversation has now, before settling.
 struct Candidate {
     /// What its newest inbound message raises when that is recent (or is
@@ -1249,7 +1288,12 @@ async fn candidate(
             } else {
                 None
             };
-            raised = raise_with(newest.id, &answers, people.as_ref(), settings);
+            // Authentication is read only for mail a rule highlighted.
+            let highlight = answers
+                .iter()
+                .any(|a| a.basis == NeedBasis::Taught && a.question == WORTH_A_LOOK && a.is_true());
+            let look_ok = highlight && may_be_looked_at(tx, newest.id).await?;
+            raised = raise_with(newest.id, &answers, people.as_ref(), settings, look_ok);
         }
     }
     let open = row.filter(|r| r.state == "open");
@@ -1307,13 +1351,16 @@ async fn since(
     need: &Need,
 ) -> Result<(Since, Option<DateTime<Utc>>)> {
     // A message in spam or the trash needs nothing, as one that is gone.
-    let sent = sqlx::query_scalar!(
-        "SELECT sent_at FROM conversations.messages
+    // The same row says whether it was opened ("Worth a look" clears then).
+    let message: Option<(DateTime<Utc>, bool)> = sqlx::query_as(
+        "SELECT sent_at, read FROM conversations.messages
           WHERE id = $1 AND NOT in_spam AND NOT in_trash",
-        need.message as MessageId,
     )
+    .bind(need.message)
     .fetch_optional(&mut **tx)
     .await?;
+    let sent = message.map(|(sent, _)| sent);
+    let opened = message.is_some_and(|(_, read)| read);
     let replied = match sent {
         Some(sent) => {
             sqlx::query_scalar!(
@@ -1331,11 +1378,6 @@ async fn since(
         Some(row) => row.verdict_on(need.message)?,
         None => None,
     };
-    let opened: bool = sqlx::query_scalar("SELECT read FROM conversations.messages WHERE id = $1")
-        .bind(need.message)
-        .fetch_optional(&mut **tx)
-        .await?
-        .unwrap_or(false);
     let rule = if rule_clears(&answers(tx, need.message).await?, need.question) {
         RuleSays::NotNeeded
     } else {
@@ -2167,7 +2209,7 @@ mod tests {
     }
 
     fn raised(answers: &[Answer]) -> Option<Need> {
-        raise(MessageId::new(), answers, &settings())
+        raise(MessageId::new(), answers, &settings(), true)
     }
 
     #[test]
@@ -2210,6 +2252,12 @@ mod tests {
         ])
         .unwrap();
         assert_eq!(warning.reason, NeedReason::Review);
+    }
+
+    #[test]
+    fn a_stored_highlight_raises_nothing_on_mail_that_may_not_be_looked_at() {
+        let look = answer(WORTH_A_LOOK, NeedBasis::Taught, json!(true), true);
+        assert!(raise(MessageId::new(), &[look], &settings(), false).is_none());
     }
 
     #[test]
@@ -3136,7 +3184,7 @@ mod tests {
     }
 
     fn waits(answers: &[Answer], people: &Envelope) -> Option<Need> {
-        raise_with(MessageId::new(), answers, Some(people), &settings())
+        raise_with(MessageId::new(), answers, Some(people), &settings(), true)
     }
 
     #[test]
@@ -3203,7 +3251,7 @@ mod tests {
         assert!(waits(&answers, &people).is_some());
         let off = settings().with_waits(false);
         assert_eq!(
-            raise_with(MessageId::new(), &answers, Some(&people), &off),
+            raise_with(MessageId::new(), &answers, Some(&people), &off, true),
             None
         );
     }

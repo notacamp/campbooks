@@ -17,8 +17,8 @@
 //! - a canonical hash of its conditions and actions ([`content_hash`]):
 //!   every condition (sender, domain, list, subject, header, label, stream,
 //!   failed checks) and every action (stream, archive, label, read, the
-//!   answers, trash, spam, paid, showing images). The specificity is
-//!   computed from the conditions, so it is covered too.
+//!   answers, trash, spam, paid, showing images, worth a look). The
+//!   specificity is computed from the conditions, so it is covered too.
 //!
 //! A rule is signed only inside an authenticated member's request
 //! ([`sign`]): creating it active, confirming it (a proposal, or a rule

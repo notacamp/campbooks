@@ -7,7 +7,9 @@
     "clear": "Nada te necesita",
     "clearSubline": "Ahora mismo nada en tu correo te pide algo. Campbooks sigue leyendo.",
     "waiting_one": "Scout también está esperando a {{count}} persona por ti.",
-    "waiting_other": "Scout también está esperando a {{count}} personas por ti."
+    "waiting_other": "Scout también está esperando a {{count}} personas por ti.",
+    "lookSubline_one": "Nada te pide nada. {{count}} correo de abajo merece un vistazo.",
+    "lookSubline_other": "Nada te pide nada. {{count}} correos de abajo merecen un vistazo."
   },
   "groups": {
     "review": "Revisar",

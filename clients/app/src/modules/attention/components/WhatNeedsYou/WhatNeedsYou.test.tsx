@@ -747,6 +747,8 @@ describe("What needs you", () => {
     await screen.findByText("You asked to see mail from Design Notes");
     const groups = screen.getAllByRole("heading", { level: 2 }).map((h) => h.textContent);
     expect(groups.slice(0, 5)).toEqual(["Review 1", "Reply 2", "Do 1", "Pay 2", "Worth a look 1"]);
+    // It asks nothing of you: the heading counts the others only.
+    expect(screen.getByRole("heading", { level: 1, name: "6 things need you" })).toBeVisible();
     // Nothing is asked of you: no Reply, and no "Not needed" about your own rule.
     fireEvent.click(screen.getByText("You asked to see mail from Design Notes"));
     const row = screen.getByRole("group", { name: "Actions for Design Notes" });
@@ -763,6 +765,19 @@ describe("What needs you", () => {
       ).toEqual({ outcome: "done", message_id: DIGEST.need?.message_id });
     });
     expect(await screen.findByText("Seen · Design Notes")).toBeVisible();
+  });
+
+  it("a Home with only Worth a look says nothing needs you, and still shows what is worth a look", async () => {
+    api([DIGEST_ITEM]);
+    renderHome();
+    expect(
+      await screen.findByRole("heading", { level: 1, name: "Nothing needs you" }),
+    ).toBeVisible();
+    expect(
+      screen.getByText("Nothing asks anything of you. 1 email below is worth a look."),
+    ).toBeVisible();
+    expect(await screen.findByText("You asked to see mail from Design Notes")).toBeVisible();
+    expect(screen.getByRole("heading", { level: 2, name: "Worth a look 1" })).toBeVisible();
   });
 
   describe("Scout noticed", () => {

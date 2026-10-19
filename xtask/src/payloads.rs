@@ -221,6 +221,11 @@ pub const JOB_PAYLOAD_FIELDS: &[(&str, &str, &str)] = &[
         "counting",
         "a flag: count matches without acting",
     ),
+    (
+        "conversations.apply_rule",
+        "newest",
+        "the conversation a Worth a look run raises, and when its mail was sent (an id and a timestamp)",
+    ),
     ("conversations.backfill_needs", "inbox", INBOX_ID),
     ("conversations.backfill_needs", "after", CONVERSATION_CURSOR),
     ("conversations.check_send", "draft", DRAFT_ID),

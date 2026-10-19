@@ -7,7 +7,9 @@
     "clear": "Rien n’a besoin de vous",
     "clearSubline": "Pour l’instant, rien dans votre courrier ne vous demande quoi que ce soit. Campbooks continue de lire.",
     "waiting_one": "Scout attend aussi {{count}} personne pour vous.",
-    "waiting_other": "Scout attend aussi {{count}} personnes pour vous."
+    "waiting_other": "Scout attend aussi {{count}} personnes pour vous.",
+    "lookSubline_one": "Rien ne vous est demandé. {{count}} e-mail ci-dessous mérite un coup d’œil.",
+    "lookSubline_other": "Rien ne vous est demandé. {{count}} e-mails ci-dessous méritent un coup d’œil."
   },
   "groups": {
     "review": "À vérifier",
