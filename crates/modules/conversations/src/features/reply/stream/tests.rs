@@ -121,6 +121,27 @@ async fn a_model_that_never_stops_thinking_times_out_in_all() {
 }
 
 #[tokio::test(start_paused = true)]
+async fn work_the_model_does_not_show_keeps_it_alive() {
+    // Hidden reasoning every 20 seconds for a minute, then the words: never
+    // idle for 30 seconds, so the reply comes, and nothing is sent for the
+    // hidden work.
+    let quiet = futures_util::stream::unfold(0, |n| async move {
+        if n == 3 {
+            return None;
+        }
+        tokio::time::sleep(Duration::from_secs(20)).await;
+        Some((Ok(ChatEvent::Alive), n + 1))
+    });
+    let chat = quiet.chain(futures_util::stream::iter(vec![
+        Ok(text("Hi Maya, Friday works.")),
+        Ok(done("stop")),
+    ]));
+    let (events, took) = run(chat, Limits::default()).await;
+    assert_eq!(names(&events), ["text", "done"]);
+    assert!(took >= Duration::from_mins(1), "{took:?}");
+}
+
+#[tokio::test(start_paused = true)]
 async fn an_empty_or_cut_short_reply_fails() {
     for chat in [
         vec![Ok(reasoning("Hm")), Ok(text("  \n")), Ok(done("stop"))],

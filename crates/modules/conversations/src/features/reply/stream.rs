@@ -23,7 +23,8 @@ use tokio::time::Instant;
 use super::{prompt, types::ReplyText};
 use crate::model::MessageId;
 
-/// Longest the model may go without a sign (reasoning counts).
+/// Longest the model may go without a sign of life: any chunk it sends
+/// counts (reasoning, words, or work it does not show).
 pub(super) const IDLE: Duration = Duration::from_secs(30);
 /// Longest a streamed reply may take in all.
 pub(super) const TOTAL: Duration = Duration::from_mins(2);
@@ -166,6 +167,8 @@ where
                         return Some(delta_event("text", &delta));
                     }
                 }
+                // Nothing to send; the idle wait starts again.
+                Some(Ok(ChatEvent::Alive)) => {}
                 Some(Ok(ChatEvent::Done(summary))) => {
                     self.report.prompt_tokens = summary.usage.map(|u| u.prompt_tokens);
                     self.report.completion_tokens = summary.usage.map(|u| u.completion_tokens);

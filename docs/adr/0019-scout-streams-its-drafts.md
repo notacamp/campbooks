@@ -26,7 +26,8 @@ reasoning models served through a router keep to schemas unevenly.
    POST: `thinking` and `text` deltas as the model writes, then `done` with
    the whole bounded reply, or `error` with a problem. Every check runs
    before the response head, so a refusal is an ordinary problem answer.
-   The stream has its own limits (30 seconds idle, 2 minutes in all).
+   The stream has its own limits (30 seconds without a sign of life from the
+   model, counting reasoning it does not show; 2 minutes from the head).
 2. **The written reply is plain text.** The instruction asks for the body
    only; the answer is filtered and bounded as before. The mail stays JSON
    data in the user message. Likely replies keep their schema.

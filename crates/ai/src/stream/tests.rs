@@ -120,9 +120,40 @@ data: {\"choices\":[{\"delta\":{\"reasoning\":null,\"reasoning_details\":null,\"
 data: [DONE]\n\n";
     assert_eq!(
         joined(parse(&[body.as_bytes()]).unwrap()),
-        [reasoning("First. Second. Third.")],
-        "the encrypted entry is skipped"
+        [reasoning("First. Second. Third."), ChatEvent::Alive],
+        "the encrypted entry is skipped; the empty delta is a sign of life"
     );
+}
+
+#[test]
+fn hidden_reasoning_is_a_sign_of_life() {
+    let body = "\
+data: {\"choices\":[{\"delta\":{\"reasoning_details\":[{\"type\":\"reasoning.encrypted\",\"data\":\"c2VjcmV0\"}]}}]}\n\n\
+data: {\"choices\":[{\"delta\":{\"content\":\"Hi\"}}]}\n\n\
+data: [DONE]\n\n";
+    assert_eq!(
+        parse(&[body.as_bytes()]).unwrap(),
+        [ChatEvent::Alive, text("Hi")]
+    );
+}
+
+#[test]
+fn a_blank_start_is_not_held_for_ever() {
+    let blank = " ".repeat(MAX_THINK_LEAD + 1);
+    let mut parser = Parser::default();
+    parser.content(&blank);
+    assert!(parser.held.is_empty(), "past the lead, it is the answer");
+    assert_eq!(parser.out.pop_front(), Some(text(&blank)));
+}
+
+#[test]
+fn many_lines_in_one_chunk_are_all_read() {
+    let mut body = String::new();
+    for _ in 0..1000 {
+        body.push_str(": OPENROUTER PROCESSING\n");
+    }
+    body.push_str("data: {\"choices\":[{\"delta\":{\"content\":\"Hi\"}}]}\n\ndata: [DONE]\n\n");
+    assert_eq!(parse(&[body.as_bytes()]).unwrap(), [text("Hi")]);
 }
 
 #[test]
@@ -224,11 +255,25 @@ async fn the_stream_ends_with_its_summary() {
 }
 
 #[tokio::test]
-async fn a_body_that_ends_without_done_still_ends() {
-    let body = b"data: {\"choices\":[{\"delta\":{\"content\":\"Hi\"}}]}\n\n".to_vec();
+async fn a_body_that_ends_without_done_after_its_finish_still_ends() {
+    let body =
+        b"data: {\"choices\":[{\"delta\":{\"content\":\"Hi\"},\"finish_reason\":\"stop\"}]}\n\n"
+            .to_vec();
     let events = collect(vec![Ok(body)]).await;
     assert!(matches!(events[0], Ok(ChatEvent::Text(ref t)) if t == "Hi"));
     assert!(matches!(events[1], Ok(ChatEvent::Done(_))));
+    assert_eq!(events.len(), 2);
+}
+
+#[tokio::test]
+async fn a_body_cut_off_before_its_finish_fails() {
+    let body = b"data: {\"choices\":[{\"delta\":{\"content\":\"Hi\"}}]}\n\n".to_vec();
+    let events = collect(vec![Ok(body)]).await;
+    assert!(matches!(events[0], Ok(ChatEvent::Text(ref t)) if t == "Hi"));
+    assert!(
+        matches!(events[1], Err(Error::InvalidResponse(_))),
+        "{events:?}"
+    );
     assert_eq!(events.len(), 2);
 }
 

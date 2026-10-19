@@ -65,8 +65,11 @@ every 10 seconds. Events, each `data` a JSON object:
 | `error` | a problem (`reply_failed` or `reply_timed_out`) in the caller's language |
 
 The stream ends after `done` or `error`. Its limits: 30 seconds with no
-event from the model (thinking counts), 2 minutes in all. An empty reply,
-or one the model stopped for length, ends with `reply_failed`.
+sign of life from the model (any chunk counts, including reasoning it does
+not show, which the gateway passes on as `ChatEvent::Alive` and the module
+never forwards), 2 minutes from the head. An empty reply, one the model
+stopped for length, or a stream cut off before the model said why it
+stopped (no `[DONE]` and no `finish_reason`) ends with `reply_failed`.
 
 `Idempotency-Key` changes nothing for it: an event-stream answer is never
 stored, and its key is released as soon as the head is sent.
@@ -83,8 +86,8 @@ same `Deadline` into the in-process request (extensions are kept).
 | route | route limit | model timeout |
 |---|---|---|
 | `suggest_replies`, `write_reply` | 90 s | 80 s, then `reply_timed_out` |
-| `stream_reply` head | 35 s | 30 s to the first byte, then `reply_timed_out` |
-| `stream_reply` body | n/a | 30 s idle, 2 min total (module), 130 s (gateway) |
+| `stream_reply` head | 60 s (reading the conversation, then the model) | 30 s to the first byte, then `reply_timed_out` |
+| `stream_reply` body | n/a | 30 s idle, 2 min from the head (module), 160 s from the request (gateway: head wait + body + margin) |
 
 ## 5. The gateway
 

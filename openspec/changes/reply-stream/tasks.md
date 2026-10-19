@@ -34,8 +34,9 @@
 
 ## 7. Close
 
-- [ ] 7.1 OpenAPI regenerated
-- [ ] 7.2 Client types regenerated
+- [x] 7.1 OpenAPI regenerated
+- [x] 7.2 Client types regenerated
 - [x] 7.3 Changelog entry file (changelog/unreleased/)
-- [ ] 7.4 Gates green
-- [ ] 7.5 UI verified at 375px and desktop (recording)
+- [x] 7.4 Gates green
+- [x] 7.5 UI verified at 375px and desktop (recording)
+- [x] 7.6 Security review follow-ups: hidden reasoning keeps the stream alive (`ChatEvent::Alive`), one clock for the total, 60 s head, a cut-off stream fails, one-pass line reading, bounded `<think>` lead

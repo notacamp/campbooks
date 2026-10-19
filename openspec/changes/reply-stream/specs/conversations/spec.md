@@ -178,9 +178,11 @@ way, at most 4,000 characters forwarded); then exactly one of `done`
 (`{"message_id","text"}`, the whole reply kept as `write_reply` keeps it)
 or `error` (a problem with `code` `reply_failed` or `reply_timed_out`, in
 the caller's language), after which the stream SHALL end. The stream SHALL
-end with `reply_timed_out` after 30 seconds without an event from the model
-(reasoning counts) or after 2 minutes in all, and with `reply_failed` when
-the model fails, answers nothing, or stops for length. A caller that hangs
+end with `reply_timed_out` after 30 seconds without a sign of life from the
+model (any chunk it sends counts: reasoning, words, or reasoning it does not
+show) or after 2 minutes from its head, and with `reply_failed` when the
+model fails, answers nothing, stops for length, or its stream is cut off
+before the model says why it stopped. A caller that hangs
 up SHALL stop the model call. The thinking and the reply SHALL never be
 stored, and SHALL never appear in logs, spans or metrics; one log line per
 stream SHALL say how it ended, why, the time to the first token, the time

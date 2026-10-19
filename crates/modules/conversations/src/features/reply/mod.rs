@@ -460,9 +460,10 @@ pub async fn stream(
     extract::Path(path): extract::Path<ConversationPath>,
     extract::Json(body): extract::Json<WriteReply>,
 ) -> Result<Response> {
-    // The head waits for the model's first byte at most `IDLE`; the body
-    // has its own limits (`stream::drive`).
-    allow(deadline.as_ref(), stream::IDLE + Duration::from_secs(5));
+    // The head waits for the model's first byte at most `IDLE`, after
+    // reading the conversation (given up to 30 s more); the body has its
+    // own limits (`stream::drive`).
+    allow(deadline.as_ref(), stream::IDLE + Duration::from_secs(30));
     let written = written(
         &state,
         &writer,
@@ -474,8 +475,9 @@ pub async fn stream(
     .await?;
     let feature = "conversations.stream_reply";
     let mut request = written.request;
-    // Past the module's own limits, so those fire first.
-    request.timeout = Some(stream::TOTAL + Duration::from_secs(10));
+    // Past the module's own limits, so those fire first: the wait for the
+    // head (`IDLE`), then the body's `TOTAL`, counted from the head.
+    request.timeout = Some(stream::IDLE + stream::TOTAL + Duration::from_secs(10));
     // The daily cap is checked here, inside the scope, before the stream
     // exists: a workspace past it gets an ordinary problem.
     let usage = Scope::workspace(state.db.clone(), workspace.id, feature).interactive();

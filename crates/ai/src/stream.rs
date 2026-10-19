@@ -41,6 +41,10 @@ use crate::{
 /// Most bytes of the stream held while a line or an event is incomplete.
 const MAX_BUFFER: usize = 1024 * 1024;
 
+/// Most bytes of answer text held at the start while it may still open
+/// `<think>` (blank lines before it, say): past this it is the answer.
+const MAX_THINK_LEAD: usize = 64;
+
 /// What a streamed call yields.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ChatEvent {
@@ -48,6 +52,9 @@ pub enum ChatEvent {
     Reasoning(String),
     /// Some of its answer, as it writes.
     Text(String),
+    /// The model is at work but sent nothing to show (an encrypted
+    /// reasoning chunk, an empty delta): a sign of life only.
+    Alive,
     /// The end: why it stopped and what it cost. Nothing follows.
     Done(ChatSummary),
 }
@@ -233,11 +240,17 @@ where
             let read = match state.bytes.next().await {
                 Some(Ok(chunk)) => state.parser.push(chunk.as_ref()),
                 Some(Err(error)) => Err(error.into()),
-                None => {
-                    // The body ended without `[DONE]`: what came is the answer.
+                None if state.parser.finish_reason.is_some() => {
+                    // The body ended without `[DONE]`, after the model said
+                    // why it stopped: what came is the answer.
                     state.parser.done = true;
                     Ok(())
                 }
+                // Cut off (a proxy closing the line, say): what came is not
+                // the whole answer.
+                None => Err(Error::InvalidResponse(
+                    "the stream ended before the answer did".into(),
+                )),
             };
             if let Err(error) = read {
                 state.ended = true;
@@ -309,21 +322,26 @@ struct Parser {
 }
 
 impl Parser {
-    /// Read `bytes`: whole lines are parsed, the rest is kept.
+    /// Read `bytes`: whole lines are parsed, the rest is kept. One pass
+    /// over what came, however many lines it holds.
     fn push(&mut self, bytes: &[u8]) -> Result<(), Error> {
-        self.buf.extend_from_slice(bytes);
-        while let Some(end) = self.buf.iter().position(|b| *b == b'\n') {
-            let line: Vec<u8> = self.buf.drain(..=end).collect();
-            let line = &line[..line.len() - 1];
+        let mut buf = std::mem::take(&mut self.buf);
+        buf.extend_from_slice(bytes);
+        let mut start = 0;
+        while let Some(offset) = buf[start..].iter().position(|b| *b == b'\n') {
+            let end = start + offset;
+            let line = &buf[start..end];
             let line = line.strip_suffix(b"\r").unwrap_or(line);
             let line = std::str::from_utf8(line)
                 .map_err(|_| Error::InvalidResponse("the stream is not UTF-8".into()))?;
+            start = end + 1;
             self.line(line)?;
             if self.done {
-                self.buf.clear();
                 return Ok(());
             }
         }
+        buf.drain(..start);
+        self.buf = buf;
         if self.buf.len() + self.data.len() > MAX_BUFFER {
             return Err(Error::InvalidResponse(
                 "a stream event is longer than 1 MiB".into(),
@@ -380,12 +398,16 @@ impl Parser {
             return Ok(());
         };
         if let Some(delta) = choice.delta {
+            let before = self.out.len();
             let reasoning = delta.reasoning();
             if !reasoning.is_empty() {
                 self.out.push_back(ChatEvent::Reasoning(reasoning));
             }
             if let Some(content) = delta.content {
                 self.content(&content);
+            }
+            if self.out.len() == before {
+                self.out.push_back(ChatEvent::Alive);
             }
         }
         if choice.finish_reason.is_some() {
@@ -409,7 +431,7 @@ impl Parser {
                     self.held.clear();
                     self.think = Think::Inside;
                     self.inside(&inside);
-                } else if !THINK_OPEN.starts_with(start) {
+                } else if !THINK_OPEN.starts_with(start) || self.held.len() > MAX_THINK_LEAD {
                     self.think = Think::Text;
                     let text = std::mem::take(&mut self.held);
                     self.out.push_back(ChatEvent::Text(text));
@@ -569,7 +591,7 @@ impl Finisher {
                 self.text_chars += n;
                 n
             }
-            ChatEvent::Done(_) => 0,
+            ChatEvent::Done(_) | ChatEvent::Alive => 0,
         };
         if chars > 0 && self.first.is_none() {
             self.first = Some(self.started.elapsed());
