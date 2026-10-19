@@ -124,15 +124,16 @@ version` in `Cargo.toml` and the workspace crates in `Cargo.lock` to the new
 version (`cargo xtask arch` checks they match). Without a version it bumps the
 minor when anything was added, changed, deprecated or removed, and the patch
 otherwise; pass `X.Y.Z` for anything else. Open the PR as
-`chore: release next-vX.Y.Z`. If `next` gains entries before it merges (the
-Policy check says so), start over from `next`'s files and release again:
+`chore: release next-vX.Y.Z`. Entries merged into `next` while the release PR
+is open are not in it: they stay in `changelog/unreleased/` and go into the
+following release. To include them anyway, start over from `next`'s files:
 `git merge origin/next`, `git checkout origin/next -- CHANGELOG.md VERSION Cargo.toml Cargo.lock changelog/`,
 then `changelog.sh release X.Y.Z`.
 
 The Policy check fails the PR if the changelog section is missing, the tag
-already exists or entries are left behind, and fails any other PR that edits
-`CHANGELOG.md` (a maintainer fixing a released entry applies the
-`changelog-edit` label). Merge it; when CI is green on the merge commit,
+already exists or the branch's own entries are left behind, and fails any
+other PR that edits `CHANGELOG.md` or deletes an entry (a maintainer fixing an
+entry by hand applies the `changelog-edit` label). Merge it; when CI is green on the merge commit,
 `release-next.yml` builds the image, tags it `next-vX.Y.Z` and `next-vX.Y`,
 fails on fixable HIGH/CRITICAL Trivy findings, attests build provenance and an
 SPDX SBOM, and only then creates the tag and the prerelease (the changelog
