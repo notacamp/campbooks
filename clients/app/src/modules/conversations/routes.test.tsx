@@ -189,6 +189,28 @@ describe("the inbox", () => {
     ]);
   });
 
+  it("offers no Delete in spam: # does nothing there, ! is the way out", async () => {
+    const spammed = { ...Q4, archived: true, trashed: true, spam: true, unread_count: 0 };
+    const api = inbox({
+      [`GET ${W}/conversations/${Q4.id}`]: { body: { ...Q4_DETAIL, conversation: spammed } },
+    });
+    renderAt(`/w/${DUARTE.id}/inbox/spam/${Q4.id}`);
+    await screen.findByRole("heading", { name: Q4.subject });
+    expect(screen.queryByRole("button", { name: /^Delete/u })).toBeNull();
+
+    // Deleting would clear the spam mark, and its Undo would not bring it back.
+    fireEvent.keyDown(document, { key: "#" });
+    fireEvent.keyDown(document, { key: "!" });
+    await waitFor(() => {
+      expect(api.calls.map((call) => call.route)).toContain(
+        `POST ${W}/conversations/${Q4.id}/not-spam`,
+      );
+    });
+    expect(api.calls.map((call) => call.route)).not.toContain(
+      `POST ${W}/conversations/${Q4.id}/trash`,
+    );
+  });
+
   it("opens a conversation: newest message open, older folded, read on open", async () => {
     const api = inbox();
     renderAt(`/w/${DUARTE.id}/inbox/primary/${Q4.id}`);

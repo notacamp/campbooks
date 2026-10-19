@@ -281,7 +281,7 @@ export function ConversationReader({
   const trashTo = conversation === undefined ? undefined : trashMove(conversation);
   const spamTo = conversation === undefined ? undefined : spamMove(conversation);
   useShortcut("item.done", moveBy(archiveTo), { enabled: active && archiveTo !== undefined });
-  useShortcut("conversations.trash", moveBy(trashTo), { enabled: active });
+  useShortcut("conversations.trash", moveBy(trashTo), { enabled: active && trashTo !== undefined });
   useShortcut("conversations.report_spam", moveBy(spamTo), {
     enabled: active && spamTo !== undefined,
   });

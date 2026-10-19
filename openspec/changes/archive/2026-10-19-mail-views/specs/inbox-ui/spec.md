@@ -66,7 +66,13 @@ it is Done (E). Archived (in Archive, or in Sent when archived) it SHALL be
 Move to Inbox, on the same E. In Spam it SHALL be Not spam, on !, and in Trash
 Restore, on #: the key that sent it there brings it back. Each SHALL have its
 toast and Undo. In Spam and Trash the way back SHALL be the banner's button,
-and E does nothing there.
+and E does nothing there. Spam SHALL offer no Delete, and # does nothing there:
+moving it to the trash would clear its spam mark, and Not spam is its only way
+out.
+
+#### Scenario: No Delete in Spam
+- **WHEN** the user opens a conversation in Spam and presses #
+- **THEN** nothing happens; there is no Delete button, and ! (Not spam) is the way out
 
 #### Scenario: Move to Inbox
 - **WHEN** the user opens a conversation in Archive and presses E

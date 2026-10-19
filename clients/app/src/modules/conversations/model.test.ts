@@ -249,10 +249,10 @@ describe("attachments", () => {
     const binned = { ...Q4, trashed: true, spam: false };
     expect([archiveMove(Q4), trashMove(Q4), spamMove(Q4)]).toEqual(["archive", "trash", "spam"]);
     expect(archiveMove(FIGURES)).toBe("unarchive");
-    // In spam: ! says it is not, # deletes it, E does nothing.
+    // In spam: ! says it is not; # and E do nothing (Delete would clear the spam mark).
     expect([archiveMove(SPAMMED), trashMove(SPAMMED), spamMove(SPAMMED)]).toEqual([
       undefined,
-      "trash",
+      undefined,
       "not_spam",
     ]);
     // In the trash: # restores it; nothing else.
@@ -275,5 +275,7 @@ describe("attachments", () => {
       undone = applied(undone, move);
     }
     expect([undone.archived, undone.trashed, undone.spam]).toEqual([true, false, false]);
+    // Were spam ever deleted, Undo marks it spam again.
+    expect(undoMoves(SPAMMED, "trash")).toEqual(["untrash", "spam"]);
   });
 });

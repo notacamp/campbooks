@@ -148,6 +148,10 @@ export function undoMoves(summary: ConversationSummary, move: Move): Move[] {
   if (move === "spam" && summary.archived && !summary.trashed) {
     return ["not_spam", "archive"];
   }
+  // The trash clears the spam mark: Restore alone would leave it out of spam.
+  if (move === "trash" && summary.spam) {
+    return ["untrash", "spam"];
+  }
   return [INVERSE[move]];
 }
 
@@ -159,9 +163,16 @@ export function archiveMove(summary: ConversationSummary): Move | undefined {
   return summary.archived ? "unarchive" : "archive";
 }
 
-/** #: Delete, or Restore what is in the trash (back where it was). */
-export function trashMove(summary: ConversationSummary): Move {
-  return summary.trashed && !summary.spam ? "untrash" : "trash";
+/**
+ * #: Delete, or Restore what is in the trash (back where it was); nothing in
+ * spam, whose only way out is Not spam (moving it to the trash would clear
+ * its spam mark, and its Undo with it).
+ */
+export function trashMove(summary: ConversationSummary): Move | undefined {
+  if (summary.spam) {
+    return undefined;
+  }
+  return summary.trashed ? "untrash" : "trash";
 }
 
 /** !: Report spam, or Not spam for what is in spam; nothing in the trash. */

@@ -212,9 +212,13 @@ pub async fn handler(
         .into_iter()
         .map(ConversationSummary::try_from)
         .collect::<Result<Vec<_>>>()?;
-    suggestions::attach(&mut tx, &mut conversations).await?;
-    needs::attach(&mut tx, &mut conversations).await?;
-    actions::attach(&mut tx, settings, &mut conversations).await?;
+    // Scout leaves spam and the trash alone: no suggestion, need or action
+    // reaches those lists, whatever a client shows.
+    if !matches!(view, MailView::Spam | MailView::Trash) {
+        suggestions::attach(&mut tx, &mut conversations).await?;
+        needs::attach(&mut tx, &mut conversations).await?;
+        actions::attach(&mut tx, settings, &mut conversations).await?;
+    }
     rules::attach(&mut tx, access.user, &mut conversations).await?;
     tx.commit().await?;
     let next_cursor = if conversations.len() > limit as usize {
