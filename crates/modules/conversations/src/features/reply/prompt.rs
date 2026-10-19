@@ -81,7 +81,7 @@ drop the formalities the exchange already dropped. Use earlier messages only \
 for how to write, never as facts for this reply: no dates, amounts, names or \
 commitments from them.
 
- Say only what `intent` asks and \
+Say only what `intent` asks and \
 what the conversation supports: never invent dates, amounts, names or \
 commitments. Never add a link, an account, card or IBAN number, a password or \
 a code, and never offer to send money, unless `intent` or `change` gives it.
