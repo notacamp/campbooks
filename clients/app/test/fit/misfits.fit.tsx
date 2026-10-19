@@ -43,6 +43,16 @@ describe("misfits", () => {
     expect(misfits()).toEqual([expect.objectContaining({ problem: "cut off" })]);
   });
 
+  it("reports copy in an inline element, next to other text, clipped by its block", async () => {
+    await page.viewport(800, 600);
+    mount(
+      `<div style="width: 80px; overflow: hidden; white-space: nowrap"><a href="#">${copy("Boîte de réception")}</a> 12</div>`,
+    );
+    expect(misfits()).toEqual([
+      expect.objectContaining({ text: "Boîte de réception", problem: "cut off" }),
+    ]);
+  });
+
   it("reports a placeholder wider than its field", async () => {
     await page.viewport(800, 600);
     mount(

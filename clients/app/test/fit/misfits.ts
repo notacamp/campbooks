@@ -97,6 +97,11 @@ function checkText(node: Text, found: Misfit[]): void {
   let scrolled = false;
   for (let element: Element | null = parent; element !== null; element = element.parentElement) {
     const style = getComputedStyle(element);
+    // An inline element (a link, a <strong>) has no box of its own to clip
+    // with, and measures 0×0: look past it.
+    if (style.display === "inline") {
+      continue;
+    }
     if (scrolls(style.overflowX) || scrolls(style.overflowY)) {
       scrolled = element !== document.documentElement && element !== document.body;
       break;
