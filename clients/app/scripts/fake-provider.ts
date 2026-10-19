@@ -30,9 +30,7 @@
 // fixture emails (newsletter, receipt, Outlook, Gmail, wide layouts and a
 // hostile one) to the Gmail mailbox, for showing the reader. `--stale-asks`
 // adds a sign-in link valid for ten minutes and a request about to leave the
-// needs window (campbooks-cloud#275). `--waits` adds an email that waits on
-// someone else and a promise from its sender (campbooks-cloud#293);
-// `POST /fake/deliver?reply=ana` is the awaited person writing back.
+// needs window (campbooks-cloud#275).
 import { createHash, generateKeyPairSync, randomBytes, sign } from "node:crypto";
 import { readdirSync, readFileSync } from "node:fs";
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
@@ -49,7 +47,6 @@ import {
   htmlMailDemos,
   sendMessage,
   staleAskDemos,
-  waitDemos,
   type Mailbox,
   writeGmail,
 } from "./fake-gmail.ts";
@@ -73,8 +70,6 @@ const { values } = parseArgs({
     "html-mail": { type: "boolean", default: false },
     // Asks that lapse or go stale (campbooks-cloud#275).
     "stale-asks": { type: "boolean", default: false },
-    // Mail that waits on someone else (campbooks-cloud#293).
-    waits: { type: "boolean", default: false },
   },
 });
 
@@ -176,7 +171,6 @@ function mailboxOf(sub: string): Mailbox {
     mailbox = createMailbox(person.email, `${base}/images`, Number(values.lookalikes), [
       ...htmlMailDemos(person.email, `${base}/images`, htmlFixtures()),
       ...(values["stale-asks"] ? staleAskDemos(person.email) : []),
-      ...(values.waits ? waitDemos(person.email) : []),
     ]);
     mailboxes.set(sub, mailbox);
   }
