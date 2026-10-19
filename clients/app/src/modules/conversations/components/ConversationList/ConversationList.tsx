@@ -1,14 +1,31 @@
 import { useTranslation } from "react-i18next";
 
-import { Button, ConversationRow, EmptyState, SkeletonList, Visor } from "~/lib/ui";
+import {
+  Button,
+  ConversationRow,
+  EmptyState,
+  initialsOf,
+  SkeletonList,
+  Tag,
+  Visor,
+} from "~/lib/ui";
 
-import type { ConversationSummary, Stream } from "../../api/queries";
-import { avatarKind, displayName, listTime, streamName, type Translate } from "../../model";
+import { isView, type ConversationSummary, type Place } from "../../api/queries";
+import {
+  avatarKind,
+  displayName,
+  listTime,
+  placeName,
+  sentToLine,
+  streamName,
+  type Translate,
+} from "../../model";
 import { ruleLine } from "../../rules-text";
 import { ExpiredChip, NeedChips } from "../Needs/NeedChips";
 
 export interface ConversationListProps {
-  stream: Stream;
+  /** The stream or view listed: Sent rows say who they went to. */
+  place: Place;
   /** `undefined` while the first page loads. */
   conversations: readonly ConversationSummary[] | undefined;
   /** Only the unread ones are asked for. */
@@ -29,9 +46,13 @@ export interface ConversationListProps {
 
 export const rowId = (conversationId: string) => `conversation-${conversationId}`;
 
-/** A stream's conversations, newest first, with their loading, empty and error states. */
+/**
+ * A stream's or a view's conversations, with their loading, empty and error
+ * states. In Sent each row leads with who the inbox wrote to, at the time it
+ * wrote, and says when they replied since.
+ */
 export function ConversationList({
-  stream,
+  place,
   conversations,
   unreadOnly,
   failed,
@@ -46,7 +67,8 @@ export function ConversationList({
 }: ConversationListProps) {
   const { t: typed, i18n } = useTranslation("conversations");
   const t = typed as unknown as Translate;
-  const name = streamName(t, stream);
+  const name = placeName(t, place);
+  const sent = place === "sent";
 
   if (conversations === undefined) {
     return failed ? (
@@ -63,6 +85,10 @@ export function ConversationList({
     );
   }
   if (conversations.length === 0) {
+    if (isView(place) && !unreadOnly) {
+      // One plain line: nothing sorts mail into a view.
+      return <EmptyState title={t(`empty.${place}`)} visor="idle" visorSize="lg" />;
+    }
     return (
       <EmptyState
         title={t(unreadOnly ? "empty.unreadTitle" : "empty.streamTitle", { stream: name })}
@@ -76,15 +102,29 @@ export function ConversationList({
   return (
     <div className="flex flex-col gap-0-5 p-1-5">
       {conversations.map((conversation) => {
-        const suggestion = conversation.suggestion;
+        // Scout says nothing about mail in spam or the trash.
+        const scout = !conversation.trashed;
+        const suggestion = scout ? conversation.suggestion : undefined;
+        // Sent: who the inbox wrote to, when it last wrote.
+        const at = sent
+          ? (conversation.last_sent_at ?? conversation.last_message_at)
+          : conversation.last_message_at;
+        const to = sent ? conversation.sent_to[0] : undefined;
         return (
           <ConversationRow
             key={conversation.id}
             id={rowId(conversation.id)}
-            from={displayName(conversation.latest_from)}
-            avatar={{ kind: avatarKind(conversation) }}
-            time={listTime(conversation.last_message_at, i18n.language, now)}
-            dateTime={conversation.last_message_at}
+            from={sent ? sentToLine(t, conversation) : displayName(conversation.latest_from)}
+            avatar={
+              sent
+                ? {
+                    kind: "person",
+                    ...(to === undefined ? {} : { initials: initialsOf(displayName(to)) }),
+                  }
+                : { kind: avatarKind(conversation) }
+            }
+            time={listTime(at, i18n.language, now)}
+            dateTime={at}
             subject={conversation.subject === "" ? t("reader.noSubject") : conversation.subject}
             snippet={
               conversation.latest_from_you
@@ -97,7 +137,9 @@ export function ConversationList({
             current={conversation.id === openId}
             selected={conversation.id === cursorId && conversation.id !== openId}
             chips={
-              conversation.need === null || conversation.need === undefined ? (
+              sent && conversation.replied_since_sent ? (
+                <Tag icon="reply">{t("list.replied")}</Tag>
+              ) : conversation.need === null || conversation.need === undefined ? (
                 conversation.lapsed_need === null ||
                 conversation.lapsed_need === undefined ? undefined : (
                   <ExpiredChip />
@@ -108,7 +150,9 @@ export function ConversationList({
             }
             suggestion={
               suggestion === null || suggestion === undefined ? (
-                conversation.rule === null || conversation.rule === undefined ? undefined : (
+                !scout ||
+                conversation.rule === null ||
+                conversation.rule === undefined ? undefined : (
                   <span className="inline-flex items-center gap-1-5">
                     <Visor size="sm" />
                     {ruleLine(t, conversation.rule, i18n.language)}

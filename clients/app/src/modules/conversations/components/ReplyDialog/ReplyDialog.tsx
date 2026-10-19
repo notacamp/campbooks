@@ -19,6 +19,7 @@ import {
 
 import {
   cancelSend,
+  changedElsewhere,
   createDraft,
   deleteDraft,
   draftKeys,
@@ -29,6 +30,7 @@ import {
 import { useConversation, useMessageWords, type MessageView } from "../../api/queries";
 import { useReplySuggestions, writeReply } from "../../api/replies";
 import { displayName, replyQuote, type QuoteWords } from "../../compose/quote";
+import { useDeleteDraft } from "../../compose/use-delete-draft";
 import type { Translate } from "../../model";
 
 /** A draft whose send was taken back in time, to pick up again. */
@@ -127,6 +129,7 @@ export function ReplyDialog({
   const t = typed as unknown as Translate;
   const queryClient = useQueryClient();
   const undo = useUndoToast();
+  const deleteWithUndo = useDeleteDraft(workspaceId);
   const detail = useConversation(workspaceId, conversationId);
   const messages = detail.data?.messages ?? [];
   // The newest message, as the reader's Reply answers it.
@@ -176,6 +179,9 @@ export function ReplyDialog({
   // A draft the next one replaces (the one an Undo handed back, or one that
   // changed after it was saved): discarded once the new one exists.
   const replaced = useRef<Draft | undefined>(resume?.draft);
+  // The draft an Undo handed back, until a fresh one replaces it: Delete
+  // draft may throw it away.
+  const [handedBack, setHandedBack] = useState<Draft | undefined>(resume?.draft);
   const [rewriting, setRewriting] = useState<"shorter" | "change" | undefined>();
   const [problem, setProblem] = useState<string | undefined>();
   const [busy, setBusy] = useState(false);
@@ -348,6 +354,7 @@ export function ReplyDialog({
     setSaved(fresh);
     const old = replaced.current;
     replaced.current = undefined;
+    setHandedBack(undefined);
     // Only one that is still editable, a draft or a send that failed: a
     // send on its way is taken back by its Undo alone, never discarded here
     // (campbooks-cloud#242).
@@ -414,13 +421,15 @@ export function ReplyDialog({
       });
       onSent?.(scheduled);
     } catch (thrown) {
-      if (problemCode(thrown) === "content_changed") {
-        // Changed after it was saved: nothing sent. Send again writes what
-        // is shown here into a fresh draft, and this one goes.
+      if (changedElsewhere(thrown)) {
+        // Changed after it was saved (saved since elsewhere, `draft_changed`,
+        // refused by the save or by Send; or not what was shown,
+        // `content_changed`): nothing sent. Send again writes what is shown
+        // here into a fresh draft, and this one goes (campbooks-cloud#242).
         handle.fail({ label: t("reply.errors.changed") });
         setProblem("errors.changed");
         setSaved(undefined);
-        replaced.current = kept;
+        replaced.current = kept ?? saved;
         void queryClient.invalidateQueries({ queryKey: draftKeys.all(workspaceId) });
       } else {
         handle.fail({ label: t("reply.errors.send", { name: person }) });
@@ -452,6 +461,30 @@ export function ReplyDialog({
       onOpenDraft(draft);
     } catch {
       setProblem("errors.open");
+    } finally {
+      working.current = false;
+      setBusy(false);
+    }
+  };
+
+  // The draft that exists for this reply: the one saved here, else the one
+  // an Undo handed back while it is still editable.
+  const deletable =
+    saved ??
+    (handedBack?.state === "draft" || handedBack?.state === "failed" ? handedBack : undefined);
+
+  /** Throw away the draft that exists (Undo writes it back as on screen) and leave. */
+  const discard = async () => {
+    if (working.current || deletable === undefined) {
+      return;
+    }
+    working.current = true;
+    setBusy(true);
+    try {
+      await deleteWithUndo({ ...deletable, body: text });
+      onClose();
+    } catch {
+      setProblem("errors.delete");
     } finally {
       working.current = false;
       setBusy(false);
@@ -593,6 +626,16 @@ export function ReplyDialog({
             >
               {t("reply.openInComposer")}
             </Button>
+            {deletable === undefined ? null : (
+              <Button
+                disabled={busy || rewriting !== undefined}
+                onClick={() => {
+                  void discard();
+                }}
+              >
+                {t("compose.deleteDraft")}
+              </Button>
+            )}
           </>
         ) : stage === "choose" ? (
           writeOwn

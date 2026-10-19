@@ -31,15 +31,18 @@ ALTER TABLE conversations.need_summaries
     ADD COLUMN dates_read_at timestamptz;
 
 -- Widened NOT VALID, so the swap holds the table's exclusive lock only for a
--- moment; validated by `…030100_conversations__needs_lapse_validate`.
+-- moment; validated by `…060100_conversations__needs_lapse_validate`. The
+-- lists are the whole vocabulary, so they keep what an earlier migration
+-- added: the question `worth_a_look` and the cause `opened` ("Worth a look").
 ALTER TABLE conversations.needs DROP CONSTRAINT needs_question_check;
 ALTER TABLE conversations.needs ADD CONSTRAINT needs_question_check
-    CHECK (question IN ('needs_reply', 'asks_action', 'suspicious', 'money', 'still_to_do',
-                        'still_needs_reply')) NOT VALID;
+    CHECK (question IN ('needs_reply', 'asks_action', 'suspicious', 'money', 'worth_a_look',
+                        'still_to_do', 'still_needs_reply')) NOT VALID;
 ALTER TABLE conversations.needs DROP CONSTRAINT needs_cleared_because_check;
 ALTER TABLE conversations.needs ADD CONSTRAINT needs_cleared_because_check
     CHECK (cleared_because IN
-        ('replied', 'archived', 'trashed', 'done', 'not_needed', 'superseded', 'rule', 'lapsed'))
+        ('replied', 'archived', 'trashed', 'done', 'not_needed', 'superseded', 'rule', 'opened',
+         'lapsed'))
     NOT VALID;
 
 -- When an open need next changes with time alone: its lapse time, or when

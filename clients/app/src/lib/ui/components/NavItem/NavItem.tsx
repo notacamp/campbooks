@@ -69,3 +69,8 @@ export function NavItem({
     </a>
   );
 }
+
+/** A quiet line between groups of sidebar destinations (the streams, then the views). */
+export function NavDivider() {
+  return <hr className={styles["divider"]} />;
+}

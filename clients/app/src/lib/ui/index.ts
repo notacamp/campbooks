@@ -62,6 +62,7 @@ export {
 } from "./components/Highlight/Highlight";
 export {
   Chip,
+  ChipDivider,
   ChipLink,
   ChipRow,
   type ChipLinkProps,
@@ -162,7 +163,7 @@ export {
   type ComposerAttachment,
   type MessageComposerProps,
 } from "./components/MessageComposer/MessageComposer";
-export { NavItem, type NavItemProps } from "./components/NavItem/NavItem";
+export { NavDivider, NavItem, type NavItemProps } from "./components/NavItem/NavItem";
 export { Offer, type OfferProps } from "./components/Offer/Offer";
 export {
   Note,

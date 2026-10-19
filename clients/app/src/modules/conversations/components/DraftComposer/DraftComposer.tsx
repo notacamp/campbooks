@@ -28,7 +28,6 @@ export interface DraftComposerProps {
 
 const KNOWN_ERRORS = new Set([
   "not_saved",
-  "draft_changed",
   "content_changed",
   "no_recipients",
   "invalid_address",
@@ -88,7 +87,13 @@ export function DraftComposer({
   }
 
   async function discard() {
-    await editor.discard();
+    try {
+      await editor.discard();
+    } catch {
+      // Nothing changed: the draft is still here.
+      undoToast.notify(t("compose.errors.unknown"));
+      return;
+    }
     onDone();
   }
 

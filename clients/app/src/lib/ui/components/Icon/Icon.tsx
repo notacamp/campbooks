@@ -138,6 +138,13 @@ const ICONS = {
     path("M2.8 12S6.2 5.5 12 5.5 21.2 12 21.2 12 17.8 18.5 12 18.5 2.8 12 2.8 12Z"),
     <circle key="c" cx="12" cy="12" r="2.8" />,
   ],
+  // Delete, and the Trash it moves mail to.
+  trash: [
+    path("M4.5 7h15M9.5 7V4.5h5V7"),
+    path(
+      "M6.5 7l.8 11.6A1.5 1.5 0 0 0 8.8 20h6.4a1.5 1.5 0 0 0 1.5-1.4L17.5 7M10.2 11v5M13.8 11v5",
+    ),
+  ],
 } satisfies Record<string, ReactElement[]>;
 
 export type IconName = keyof typeof ICONS;

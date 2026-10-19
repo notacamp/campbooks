@@ -37,7 +37,7 @@ export { ReplyDialog, type ReplyResume } from "./components/ReplyDialog/ReplyDia
 // Forward from Home (campbooks-cloud#166): find the person by name, then
 // finish the forward in the composer.
 export { ForwardDialog } from "./components/ForwardDialog/ForwardDialog";
-export { displayName, listTime } from "./model";
+export { displayName, listTime, type Move } from "./model";
 export { isStream, type Stream } from "./api/queries";
 /**
  * The rules slot of Scout's memory: the assistant module's page fills it
