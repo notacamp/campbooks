@@ -188,7 +188,7 @@ message.
 
 #### Scenario: Labelled in Zoho
 - **WHEN** a member adds the Zoho label "Clients" to a known message
-- **THEN** the next run emits it with label `{key: <label id>, name: "Clients"}`, and it was not downloaded again
+- **THEN** the next sweep emits it with label `{key: <label id>, name: "Clients"}`, and it was not downloaded again
 
 #### Scenario: Deleted in Zoho
 - **WHEN** a known message is deleted for good in Zoho
