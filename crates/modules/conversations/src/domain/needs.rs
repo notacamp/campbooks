@@ -453,6 +453,7 @@ fn highlighted(message: MessageId, answers: &[Answer]) -> Option<Need> {
             question: NeedQuestion::WorthALook,
             decision: Some(a.id),
             due_on: None,
+            lapses_at: None,
             urgent: false,
         })
 }
@@ -1710,13 +1711,17 @@ mod tests {
             ..Since::default()
         };
         assert_eq!(
-            cause(&settle(need(NeedReason::WorthALook), opened)),
+            cause(&settle(need(NeedReason::WorthALook), opened, clock())),
             Some(ClearCause::Opened)
         );
         // Opening settles nothing else: a bill stays until answered.
-        assert_eq!(cause(&settle(need(NeedReason::Pay), opened)), None);
+        assert_eq!(cause(&settle(need(NeedReason::Pay), opened, clock())), None);
         assert_eq!(
-            cause(&settle(need(NeedReason::WorthALook), Since::default())),
+            cause(&settle(
+                need(NeedReason::WorthALook),
+                Since::default(),
+                clock()
+            )),
             None
         );
         // Seen (Done) clears it too.
@@ -1725,7 +1730,7 @@ mod tests {
             ..Since::default()
         };
         assert_eq!(
-            cause(&settle(need(NeedReason::WorthALook), seen)),
+            cause(&settle(need(NeedReason::WorthALook), seen, clock())),
             Some(ClearCause::Done)
         );
     }
