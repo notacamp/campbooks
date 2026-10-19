@@ -18,6 +18,8 @@
 mod threading;
 
 #[cfg(test)]
+mod mirror_tests;
+#[cfg(test)]
 mod tests;
 
 use std::{
@@ -67,6 +69,10 @@ use crate::{
         Stream, StreamSource,
     },
 };
+
+/// A message's stored provider stream when the provider has it in none of
+/// the four streams (Gmail's Social and Forums tabs, several stream marks).
+const NO_STREAM: &str = "none";
 
 /// Largest batch document read, in bytes.
 pub const MAX_BATCH_BYTES: usize = 16 * 1024 * 1024;
@@ -554,12 +560,12 @@ impl Apply<'_> {
         Ok(())
     }
 
-    /// A known message's provider stream is now `now`: stored; and when it
-    /// changed to a stream (a move in the member's mail client), its
-    /// conversation moves there (a member's move) unless it is there, the
-    /// conversation's other received messages are asked to follow at the
-    /// provider, and so is this one when its stream mark is stale. Returns
-    /// whether the conversation moved.
+    /// A known message's provider stream is now `now`: stored. When it
+    /// changed from one said value to a stream (a move in the member's mail
+    /// client), its conversation moves there as a member's move (unless
+    /// someone already placed it there), the conversation's other received
+    /// messages are asked to follow at the provider, and so is this one when
+    /// its stream mark is stale. Returns whether the conversation moved.
     async fn provider_stream(
         &self,
         tx: &mut Transaction<'static, Postgres>,
@@ -568,27 +574,35 @@ impl Apply<'_> {
         conversation: ConversationId,
         now: Option<Stream>,
     ) -> Result<bool, JobError> {
-        let now = now.map(Stream::as_str);
+        // `none`: in none of the four. NULL: no upsert said (stored before
+        // provider streams were carried), so a first value is no move.
+        let said = now.map_or(NO_STREAM, Stream::as_str);
         let stored: Option<String> =
             sqlx::query_scalar("SELECT provider_stream FROM conversations.messages WHERE id = $1")
                 .bind(id)
                 .fetch_one(&mut **tx)
                 .await?;
-        if stored.as_deref() == now {
+        if stored.as_deref() == Some(said) {
             return Ok(false);
         }
         sqlx::query("UPDATE conversations.messages SET provider_stream = $2 WHERE id = $1")
             .bind(id)
-            .bind(now)
+            .bind(said)
             .execute(&mut **tx)
             .await?;
+        if stored.is_none() {
+            return Ok(false);
+        }
+        let now = now.map(Stream::as_str);
         let (Some(now), Direction::Inbound) = (now, message.direction) else {
             return Ok(false);
         };
+        // A move to where nobody placed it yet still records the member's
+        // choice, so the model pass never overrides it.
         let moved = sqlx::query(
             "UPDATE conversations.conversations
                 SET stream = $2, stream_source = 'member', updated_at = now()
-              WHERE id = $1 AND stream <> $2",
+              WHERE id = $1 AND (stream <> $2 OR stream_source IN ('default', 'rules'))",
         )
         .bind(conversation)
         .bind(now)
@@ -967,7 +981,7 @@ impl Apply<'_> {
                   WHERE id = $1",
             )
             .bind(id)
-            .bind(stream.map(Stream::as_str))
+            .bind(stream.map_or(NO_STREAM, Stream::as_str))
             .bind(self.mirrors(message))
             .execute(&mut **tx)
             .await?;

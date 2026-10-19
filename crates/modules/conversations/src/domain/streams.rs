@@ -74,7 +74,8 @@ pub async fn sort_first_inbound(
 
 /// Ask the provider to move `conversation`'s received messages to its
 /// stream: each one that is mirrored (`mirrors_stream`) and whose stored
-/// provider stream is another (none counting as another), and `also` (a
+/// provider stream is another (`none`, or none stored, counting as
+/// another), and `also` (a
 /// message whose stream mark is stale) whatever it holds. One
 /// `changes_requested` for them all, recorded and bound like a member's
 /// (`conversation::request`); nothing when none is left to move.

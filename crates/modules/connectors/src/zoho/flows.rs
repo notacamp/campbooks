@@ -981,3 +981,230 @@ async fn a_message_zoho_fails_on_is_skipped_and_tried_again_later(db: PgPool) {
     mailbox.run(&kit).await;
     assert_eq!(upsert_of(&changes(&kit, mailbox.ws).await, &bad).len(), 1);
 }
+
+/// Every outbound change's end, as (kind, state, reason), oldest first.
+async fn outbound_ends(kit: &Kit) -> Vec<(String, String, Option<String>)> {
+    sqlx::query_as("SELECT kind, state, reason FROM connectors.outbound_changes ORDER BY id")
+        .fetch_all(&kit.db)
+        .await
+        .unwrap()
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn zoho_labels_and_stream_marks_are_read_without_a_download(db: PgPool) {
+    let kit = Kit::new(db).await;
+    let clients = kit.zoho.add_label("Clients");
+    let message = kit.zoho.deliver(
+        &synthetic(1),
+        INBOX,
+        true,
+        kit.clock.now() - TimeDelta::hours(1),
+    );
+    let mailbox = connected(&kit).await;
+    let all = changes(&kit, mailbox.ws).await;
+    let first = &upsert_of(&all, &message)[0]["message"];
+    assert_eq!(first["labels"], json!([]));
+    // No mark: Zoho's mark-free inbox is Primary.
+    assert_eq!(first["provider_stream"], "primary");
+
+    // Labelled in Zoho.
+    kit.zoho
+        .change(&message, |m| m.labels.push(clients.clone()));
+    let start = changes(&kit, mailbox.ws).await.len();
+    mailbox.run(&kit).await;
+    let now = changes(&kit, mailbox.ws).await;
+    let labelled = &upsert_of(&now[start..], &message)[0]["message"];
+    assert_eq!(
+        labelled["labels"],
+        json!([{"key": clients.clone(), "name": "Clients"}])
+    );
+
+    // A member adds `Campbooks/Newsletters` in Zoho (a label made after the
+    // last listing of the account's labels).
+    let mark = kit.zoho.add_label("Campbooks/Newsletters");
+    kit.zoho.change(&message, |m| m.labels.push(mark.clone()));
+    let start = changes(&kit, mailbox.ws).await.len();
+    mailbox.run(&kit).await;
+    let now = changes(&kit, mailbox.ws).await;
+    let marked = &upsert_of(&now[start..], &message)[0]["message"];
+    assert_eq!(marked["provider_stream"], "newsletters");
+    assert_eq!(
+        marked["labels"],
+        json!([{"key": clients, "name": "Clients"}]),
+        "a mark is never a label"
+    );
+    for batch in kit.batches(mailbox.ws).await {
+        assert_contract("message-change-batch.v1.schema.json", &batch);
+    }
+    assert_eq!(kit.zoho.raw_fetches(&message), 1, "downloaded once");
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn stream_moves_and_labels_reach_zoho_and_never_echo(db: PgPool) {
+    let kit = Kit::new(db).await;
+    let clients = kit.zoho.add_label("Clients");
+    let message = kit.zoho.deliver(
+        &synthetic(1),
+        INBOX,
+        true,
+        kit.clock.now() - TimeDelta::hours(1),
+    );
+    kit.zoho
+        .change(&message, |m| m.labels.push(clients.clone()));
+    let mailbox = connected(&kit).await;
+    let before = changes(&kit, mailbox.ws).await.len();
+    let named = |name: &str| kit.zoho.label_named(name).unwrap();
+
+    let moved = |stream: &str| json!({"kind": "move_to_stream", "stream": stream});
+    mailbox
+        .request(&kit, &[(message.as_str(), moved("updates"))])
+        .await;
+    assert_eq!(
+        kit.zoho.message(&message).labels,
+        [clients.clone(), named("Campbooks/Updates")]
+    );
+    // Updates to Receipts: the Updates mark off, the Receipts mark (made
+    // first) on.
+    mailbox
+        .request(&kit, &[(message.as_str(), moved("receipts"))])
+        .await;
+    assert_eq!(
+        kit.zoho.message(&message).labels,
+        [clients.clone(), named("Campbooks/Receipts")]
+    );
+    // Already in Receipts: nothing to call.
+    kit.zoho.clear();
+    mailbox
+        .request(&kit, &[(message.as_str(), moved("receipts"))])
+        .await;
+    assert!(
+        !kit.zoho.calls().iter().any(|c| c.starts_with("PUT")),
+        "{:?}",
+        kit.zoho.calls()
+    );
+    // A Zoho label taken off.
+    mailbox
+        .request(
+            &kit,
+            &[(
+                message.as_str(),
+                json!({"kind": "remove_label", "label": uuid::Uuid::nil(), "provider_key": clients}),
+            )],
+        )
+        .await;
+    assert!(
+        kit.zoho.calls().iter().any(|c| c.ends_with("removeLabel")),
+        "{:?}",
+        kit.zoho.calls()
+    );
+    assert_eq!(
+        kit.zoho.message(&message).labels,
+        [named("Campbooks/Receipts")]
+    );
+    // Back to Primary: no mark.
+    mailbox
+        .request(&kit, &[(message.as_str(), moved("primary"))])
+        .await;
+    assert!(kit.zoho.message(&message).labels.is_empty());
+    let ends: Vec<(String, Option<String>)> = outbound_ends(&kit)
+        .await
+        .into_iter()
+        .map(|(_, state, reason)| (state, reason))
+        .collect();
+    assert_eq!(
+        ends,
+        [
+            ("applied".to_owned(), None),
+            ("applied".to_owned(), None),
+            ("skipped".to_owned(), Some("already_set".to_owned())),
+            ("applied".to_owned(), None),
+            ("applied".to_owned(), None),
+        ]
+    );
+
+    // The writes come back as nothing.
+    mailbox.run(&kit).await;
+    mailbox.run(&kit).await;
+    assert_eq!(changes(&kit, mailbox.ws).await.len(), before);
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_zoho_grant_without_the_labels_scope_syncs_the_rest(db: PgPool) {
+    let kit = Kit::new(db).await;
+    let clients = kit.zoho.add_label("Clients");
+    let message = kit.zoho.deliver(
+        &synthetic(1),
+        INBOX,
+        false,
+        kit.clock.now() - TimeDelta::hours(1),
+    );
+    kit.zoho
+        .change(&message, |m| m.labels.push(clients.clone()));
+    // Granted before the labels scope was asked for.
+    let ws = WorkspaceId::new();
+    let sam = kit.user("sam");
+    kit.join(&sam, ws, Role::Member);
+    let connection = kit.connect_zoho(&sam, ws).await;
+    sqlx::query("UPDATE connectors.connections SET scopes = replace(scopes, $1, '')")
+        .bind(crate::zoho::LABELS_SCOPE)
+        .execute(&kit.db)
+        .await
+        .unwrap();
+    kit.zoho.refuse_labels();
+    kit.run_jobs().await;
+    let mailbox = Connected { ws, connection };
+
+    let all = changes(&kit, ws).await;
+    let first = &upsert_of(&all, &message)[0]["message"];
+    assert_eq!(first["labels"], json!([]));
+    assert!(first.get("provider_stream").is_none(), "{first}");
+
+    mailbox
+        .request(
+            &kit,
+            &[(
+                message.as_str(),
+                json!({"kind": "add_label", "label": uuid::Uuid::nil(), "provider_key": clients}),
+            )],
+        )
+        .await;
+    mailbox
+        .request(
+            &kit,
+            &[(
+                message.as_str(),
+                json!({"kind": "move_to_stream", "stream": "newsletters"}),
+            )],
+        )
+        .await;
+    mailbox
+        .request(&kit, &[(message.as_str(), json!({"kind": "mark_read"}))])
+        .await;
+    assert_eq!(
+        outbound_ends(&kit).await,
+        [
+            (
+                "add_label".to_owned(),
+                "skipped".to_owned(),
+                Some("scope_missing".to_owned())
+            ),
+            (
+                "move_to_stream".to_owned(),
+                "skipped".to_owned(),
+                Some("scope_missing".to_owned())
+            ),
+            ("mark_read".to_owned(), "applied".to_owned(), None),
+        ]
+    );
+    assert!(kit.zoho.message(&message).read);
+    assert_eq!(kit.zoho.message(&message).labels, [clients]);
+    // No label call was made, and the stream is healthy.
+    assert!(
+        !kit.zoho.calls().iter().any(|c| c.contains("/labels")
+            || c.ends_with("applyLabel")
+            || c.ends_with("removeLabel")),
+        "{:?}",
+        kit.zoho.calls()
+    );
+    assert_eq!(kit.stream().await["consecutive_failures"], 0);
+}

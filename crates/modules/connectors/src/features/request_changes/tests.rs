@@ -1159,3 +1159,202 @@ async fn a_pending_change_retagged_after_a_rotation_is_made_without_the_old_key(
     );
     assert!(ends(&kit).await.iter().all(|e| *e == end("applied", None)));
 }
+
+/// The labels of `id` at Gmail, the Receipts mark named as such.
+fn shown(kit: &Kit, id: &str) -> Vec<String> {
+    let mark = kit.google.label_named("Campbooks/Receipts");
+    kit.google
+        .labels_of(id)
+        .into_iter()
+        .map(|l| {
+            if Some(&l) == mark.as_ref() {
+                "Campbooks/Receipts".to_owned()
+            } else {
+                l
+            }
+        })
+        .collect()
+}
+
+/// Gmail's `labels.create` calls seen.
+fn creations(kit: &Kit) -> usize {
+    kit.google
+        .calls()
+        .iter()
+        .filter(|c| *c == "POST /gmail/v1/users/me/labels")
+        .count()
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn receipts_reach_gmail_through_its_mark(db: PgPool) {
+    let kit = Kit::new(db).await;
+    let m = mailbox(&kit, &[&["INBOX", "CATEGORY_PROMOTIONS"]]).await;
+    let id = m.ids[0].as_str();
+    let batches = kit.batches(m.ws).await.len();
+    kit.google.clear_calls();
+    assert!(kit.google.label_named("Campbooks/Receipts").is_none());
+
+    // The mark is created on first use: the Updates tab and the mark.
+    m.request(
+        &kit,
+        &[(id, json!({"kind": "move_to_stream", "stream": "receipts"}))],
+    )
+    .await;
+    assert_eq!(creations(&kit), 1);
+    assert_eq!(
+        shown(&kit, id),
+        labels(&["CATEGORY_UPDATES", "Campbooks/Receipts", "INBOX"])
+    );
+    assert_eq!(ends(&kit).await, [end("applied", None)]);
+
+    // The write comes back as nothing: no batch, no change recorded.
+    m.run(&kit).await;
+    m.run(&kit).await;
+    assert_eq!(kit.batches(m.ws).await.len(), batches);
+    assert_eq!(outbound(&kit).await.len(), 1);
+
+    // Out of Receipts: the mark and the Updates tab off, Primary on.
+    m.request(
+        &kit,
+        &[(id, json!({"kind": "move_to_stream", "stream": "primary"}))],
+    )
+    .await;
+    assert_eq!(shown(&kit, id), labels(&["CATEGORY_PERSONAL", "INBOX"]));
+
+    // Back to Receipts: the mark is found, not made again.
+    m.request(
+        &kit,
+        &[(id, json!({"kind": "move_to_stream", "stream": "receipts"}))],
+    )
+    .await;
+    assert_eq!(creations(&kit), 1);
+    assert_eq!(
+        shown(&kit, id),
+        labels(&["CATEGORY_UPDATES", "Campbooks/Receipts", "INBOX"])
+    );
+    assert!(ends(&kit).await.iter().all(|e| *e == end("applied", None)));
+    assert_eq!(kit.batches(m.ws).await.len(), batches);
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_mark_gmail_already_has_is_adopted(db: PgPool) {
+    let kit = Kit::new(db).await;
+    // The member made the label in Gmail after the last label listing.
+    let m = mailbox(&kit, &[&["INBOX"]]).await;
+    let made = kit.google.add_label("campbooks/receipts");
+    m.request(
+        &kit,
+        &[(
+            m.ids[0].as_str(),
+            json!({"kind": "move_to_stream", "stream": "receipts"}),
+        )],
+    )
+    .await;
+    assert!(kit.google.labels_of(&m.ids[0]).contains(&made));
+    assert_eq!(ends(&kit).await, [end("applied", None)]);
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_move_already_in_place_makes_no_call(db: PgPool) {
+    let kit = Kit::new(db).await;
+    let m = mailbox(&kit, &[&["INBOX", "CATEGORY_UPDATES"]]).await;
+    kit.google.clear_calls();
+    m.request(
+        &kit,
+        &[(
+            m.ids[0].as_str(),
+            json!({"kind": "move_to_stream", "stream": "updates"}),
+        )],
+    )
+    .await;
+    assert!(kit.google.writes().is_empty(), "{:?}", kit.google.writes());
+    assert_eq!(ends(&kit).await, [end("skipped", Some("already_set"))]);
+    assert_eq!(
+        kit.google.labels_of(&m.ids[0]),
+        labels(&["CATEGORY_UPDATES", "INBOX"])
+    );
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_change_gmail_made_since_the_last_read_is_not_taken_for_in_place(db: PgPool) {
+    let kit = Kit::new(db).await;
+    let m = mailbox(&kit, &[&["INBOX", "CATEGORY_UPDATES"]]).await;
+    // Moved to Promotions in Gmail; Campbooks has not read it yet when a
+    // move back to Updates is asked.
+    kit.google
+        .relabel(&m.ids[0], &["CATEGORY_PROMOTIONS"], &["CATEGORY_UPDATES"]);
+    m.pause(&kit, true).await;
+    m.request(
+        &kit,
+        &[(
+            m.ids[0].as_str(),
+            json!({"kind": "move_to_stream", "stream": "updates"}),
+        )],
+    )
+    .await;
+    m.pause(&kit, false).await;
+    m.run(&kit).await;
+    assert_eq!(
+        kit.google.labels_of(&m.ids[0]),
+        labels(&["CATEGORY_UPDATES", "INBOX"])
+    );
+    assert_eq!(ends(&kit).await, [end("applied", None)]);
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn gmail_says_where_a_message_is_by_its_tab_or_its_mark(db: PgPool) {
+    let kit = Kit::new(db).await;
+    let mark = kit.google.add_label("Campbooks/Receipts");
+    let m = mailbox(
+        &kit,
+        &[
+            &["INBOX", "CATEGORY_UPDATES", mark.as_str(), "Label_7"],
+            &["INBOX", "CATEGORY_UPDATES"],
+        ],
+    )
+    .await;
+    for batch in kit.batches(m.ws).await {
+        assert_contract("message-change-batch.v1.schema.json", &batch);
+    }
+    let latest = |all: &[Value], id: &str| -> Value {
+        all.iter()
+            .rev()
+            .find(|c| c["message"]["provider_message_id"] == id)
+            .unwrap()["message"]
+            .clone()
+    };
+    let all = changes(&kit, m.ws).await;
+    // A mark is not a label: it says the stream.
+    let receipt = latest(&all, &m.ids[0]);
+    assert_eq!(
+        receipt["labels"],
+        json!([{"key": "Label_7", "name": "Clients"}])
+    );
+    assert_eq!(receipt["provider_stream"], "receipts");
+    assert!(receipt.get("stream_mark_stale").is_none());
+    assert_eq!(latest(&all, &m.ids[1])["provider_stream"], "updates");
+
+    // Dragged to Promotions with its mark kept: the tab wins, the mark is
+    // stale. Moved from Updates to Primary: Primary. Neither downloaded
+    // again.
+    kit.google
+        .relabel(&m.ids[0], &["CATEGORY_PROMOTIONS"], &["CATEGORY_UPDATES"]);
+    kit.google
+        .relabel(&m.ids[1], &["CATEGORY_PERSONAL"], &["CATEGORY_UPDATES"]);
+    let start = changes(&kit, m.ws).await.len();
+    m.run(&kit).await;
+    let all = changes(&kit, m.ws).await;
+    for batch in kit.batches(m.ws).await {
+        assert_contract("message-change-batch.v1.schema.json", &batch);
+    }
+    let dragged = latest(&all[start..], &m.ids[0]);
+    assert_eq!(dragged["provider_stream"], "newsletters");
+    assert_eq!(dragged["stream_mark_stale"], true);
+    assert_eq!(dragged["labels"].as_array().unwrap().len(), 1);
+    let tab = latest(&all[start..], &m.ids[1]);
+    assert_eq!(tab["provider_stream"], "primary");
+    assert!(tab.get("stream_mark_stale").is_none());
+    for id in &m.ids {
+        assert_eq!(kit.google.raw_fetches(id), 1, "downloaded once");
+    }
+}
