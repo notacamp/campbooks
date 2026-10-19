@@ -1,6 +1,15 @@
 import { useTranslation } from "react-i18next";
 
-import { Button, ConversationRow, EmptyState, initialsOf, SkeletonList, Text } from "~/lib/ui";
+import {
+  Button,
+  ConversationRow,
+  EmptyState,
+  IconButton,
+  initialsOf,
+  SkeletonList,
+  Tag,
+  Text,
+} from "~/lib/ui";
 
 import { DRAFTS_MAX, type Draft } from "../../api/drafts";
 import { displayName, listTime, type Translate } from "../../model";
@@ -16,14 +25,14 @@ function snippetOf(draft: Draft): string {
   return text.length > 140 ? `${text.slice(0, 139)}…` : text;
 }
 
-/** Who a draft is to: "Marta Ferreira", "Marta Ferreira and 2 others", or none. */
+/** Who a draft is to: the first name, "+2" for the rest (a number, not copy), or none. */
 function toLine(t: Translate, draft: Draft): string {
   const [first, ...others] = [...draft.to, ...draft.cc, ...draft.bcc];
   if (first === undefined) {
     return t("drafts.noRecipients");
   }
   const name = displayName(first);
-  return others.length === 0 ? name : t("drafts.toOthers", { name, count: others.length });
+  return others.length === 0 ? name : `${name} +${String(others.length)}`;
 }
 
 export interface DraftsListProps {
@@ -75,7 +84,8 @@ export function DraftsList({ drafts, failed, onRetry, onOpen, onDelete, now }: D
             <div className="min-w-0 flex-1">
               <ConversationRow
                 id={`draft-${draft.id}`}
-                from={t("drafts.lead", { to: toLine(t, draft) })}
+                from={toLine(t, draft)}
+                chips={<Tag>{t("drafts.tag")}</Tag>}
                 avatar={{
                   kind: "person",
                   ...(first === undefined ? {} : { initials: initialsOf(displayName(first)) }),
@@ -89,15 +99,13 @@ export function DraftsList({ drafts, failed, onRetry, onOpen, onDelete, now }: D
                 }}
               />
             </div>
-            <Button
-              variant="ghost"
-              aria-label={t("compose.deleteDraftNamed", { title })}
+            <IconButton
+              label={t("compose.deleteDraftNamed", { title })}
+              icon="trash"
               onClick={() => {
                 onDelete(draft);
               }}
-            >
-              {t("compose.deleteDraft")}
-            </Button>
+            />
           </div>
         );
       })}

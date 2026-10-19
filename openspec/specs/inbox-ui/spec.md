@@ -805,15 +805,15 @@ delete, nothing SHALL change and the toast SHALL say so.
 ### Requirement: Drafts
 Drafts (G then 0, `/inbox/drafts`) SHALL list the user's own saved drafts from
 `conversations.list_drafts`, newest first, at most 50, without paging. Each
-row SHALL say "Draft" and whom it is to ("No recipients" when none), show the
-subject ("(no subject)" when empty), a line of its words and when it was
+row SHALL be tagged "Draft" and lead with whom it is to (the first name, "+2"
+for two more; "No recipients" when none), show the subject ("(no subject)" when empty), a line of its words and when it was
 saved. Drafts already scheduled or sending SHALL not be listed. Opening a row
 SHALL open the composer where the draft was left: a new message on its own
 screen, an answer in its thread, which opens beside the Drafts list
 (`/inbox/drafts/<conversation>?draft=<id>`, Back returning to Drafts) with the
 composer on exactly that draft, whether it is a reply, a reply to all or a
 forward. Each row SHALL
-have Delete draft, with a toast and Undo that writes the same draft again.
+have a Delete draft icon button beside it, with a toast and Undo that writes the same draft again.
 The list SHALL refresh when a draft is saved, sent or deleted. With none it
 SHALL say "No drafts." in one line, and when exactly 50 are listed it SHALL
 add "Your 50 newest drafts."

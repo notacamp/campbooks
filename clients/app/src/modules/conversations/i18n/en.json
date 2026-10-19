@@ -16,11 +16,9 @@
     "trash": "Trash"
   },
   "drafts": {
+    "tag": "Draft",
     "label": "Drafts",
-    "lead": "Draft · {{to}}",
     "noRecipients": "No recipients",
-    "toOthers_one": "{{name}} and {{count}} other",
-    "toOthers_other": "{{name}} and {{count}} others",
     "cap": "Your {{count}} newest drafts.",
     "readerTitle": "Pick a draft",
     "readerBody": "Choose one from the list to keep writing it.",

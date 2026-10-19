@@ -16,11 +16,9 @@
     "trash": "Lixo"
   },
   "drafts": {
+    "tag": "Rascunho",
     "label": "Rascunhos",
-    "lead": "Rascunho · {{to}}",
     "noRecipients": "Sem destinatários",
-    "toOthers_one": "{{name}} e mais {{count}} pessoa",
-    "toOthers_other": "{{name}} e mais {{count}} pessoas",
     "cap": "Os seus {{count}} rascunhos mais recentes.",
     "readerTitle": "Escolha um rascunho",
     "readerBody": "Escolha um na lista para continuar a escrevê-lo.",

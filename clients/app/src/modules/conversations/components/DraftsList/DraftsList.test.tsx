@@ -28,12 +28,13 @@ function show(
 describe("the drafts list", () => {
   it("says who each draft is to, its subject and its words", () => {
     show(DRAFT_LIST);
-    expect(screen.getByText("Draft · Maya Okafor")).toBeVisible();
-    expect(screen.getByText("Draft · Marta Ferreira and 2 others")).toBeVisible();
-    expect(screen.getByText("Draft · No recipients")).toBeVisible();
+    expect(screen.getByText("Maya Okafor")).toBeVisible();
+    expect(screen.getByText("Marta Ferreira +2")).toBeVisible();
+    expect(screen.getByText("No recipients")).toBeVisible();
     expect(screen.getByText(/^Thanks, Maya\. I will go through/u)).toBeVisible();
     expect(screen.getByText("Figures for the board")).toBeVisible();
     expect(screen.getByText("(no subject)")).toBeVisible();
+    expect(screen.getAllByText("Draft")).toHaveLength(3);
     expect(screen.queryByText(/newest drafts/u)).toBeNull();
   });
 
@@ -41,7 +42,7 @@ describe("the drafts list", () => {
     const onOpen = vi.fn();
     const onDelete = vi.fn();
     show(DRAFT_LIST, { onOpen, onDelete });
-    fireEvent.click(screen.getByRole("button", { name: /Draft · Marta Ferreira/u }));
+    fireEvent.click(screen.getByRole("button", { name: /Marta Ferreira/u }));
     expect(onOpen).toHaveBeenCalledWith(TO_MARTA);
     fireEvent.click(screen.getByRole("button", { name: "Delete draft: Figures for the board" }));
     expect(onDelete).toHaveBeenCalledWith(TO_MARTA);
@@ -51,7 +52,7 @@ describe("the drafts list", () => {
   it("leaves out a draft that is already on its way", () => {
     show([REPLY_WRITTEN, { ...TO_MARTA, state: "scheduled" }, BLANK]);
     expect(screen.queryByText("Figures for the board")).toBeNull();
-    expect(screen.getByText("Draft · Maya Okafor")).toBeVisible();
+    expect(screen.getByText("Maya Okafor")).toBeVisible();
   });
 
   it("says so when there are none", () => {

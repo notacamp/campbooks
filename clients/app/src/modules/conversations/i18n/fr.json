@@ -16,11 +16,9 @@
     "trash": "Corbeille"
   },
   "drafts": {
+    "tag": "Brouillon",
     "label": "Brouillons",
-    "lead": "Brouillon · {{to}}",
     "noRecipients": "Aucun destinataire",
-    "toOthers_one": "{{name}} et {{count}} autre personne",
-    "toOthers_other": "{{name}} et {{count}} autres personnes",
     "cap": "Vos {{count}} brouillons les plus récents.",
     "readerTitle": "Choisissez un brouillon",
     "readerBody": "Choisissez-en un dans la liste pour continuer à l’écrire.",

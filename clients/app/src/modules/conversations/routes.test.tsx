@@ -166,8 +166,8 @@ describe("the inbox", () => {
     const { router } = renderAt(`/w/${DUARTE.id}/inbox/drafts`);
 
     expect(await screen.findByRole("heading", { level: 1, name: "Drafts" })).toBeVisible();
-    expect(await screen.findByText("Draft · Marta Ferreira and 2 others")).toBeVisible();
-    fireEvent.click(screen.getByRole("button", { name: /Draft · Marta Ferreira/u }));
+    expect(await screen.findByText("Marta Ferreira +2")).toBeVisible();
+    fireEvent.click(screen.getByRole("button", { name: /Marta Ferreira/u }));
     await waitFor(() => {
       expect(router.state.location.pathname).toBe(`/w/${DUARTE.id}/compose`);
     });
@@ -178,7 +178,7 @@ describe("the inbox", () => {
     inbox({ [`GET ${W}/drafts`]: { body: { drafts: [REPLY_WRITTEN] } } });
     const { router } = renderAt(`/w/${DUARTE.id}/inbox/drafts`);
 
-    fireEvent.click(await screen.findByRole("button", { name: /Draft · Maya Okafor/u }));
+    fireEvent.click(await screen.findByRole("button", { name: /Maya Okafor/u }));
     await waitFor(() => {
       expect(router.state.location.pathname).toBe(`/w/${DUARTE.id}/inbox/drafts/${Q4.id}`);
     });
@@ -200,7 +200,7 @@ describe("the inbox", () => {
     inbox({ [`GET ${W}/drafts`]: { body: { drafts: [REPLY_WRITTEN, forward] } } });
     const { router } = renderAt(`/w/${DUARTE.id}/inbox/drafts`);
 
-    fireEvent.click(await screen.findByRole("button", { name: /Draft · No recipients/u }));
+    fireEvent.click(await screen.findByRole("button", { name: /No recipients/u }));
     expect(await screen.findByDisplayValue("Forwarding this to the team.")).toBeVisible();
     expect(screen.queryByDisplayValue(/^Thanks, Maya\./u)).toBeNull();
     expect(router.state.location.search).toEqual({ draft: forward.id });

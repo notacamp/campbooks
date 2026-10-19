@@ -16,11 +16,9 @@
     "trash": "Papelera"
   },
   "drafts": {
+    "tag": "Borrador",
     "label": "Borradores",
-    "lead": "Borrador · {{to}}",
     "noRecipients": "Sin destinatarios",
-    "toOthers_one": "{{name}} y {{count}} más",
-    "toOthers_other": "{{name}} y {{count}} más",
     "cap": "Tus {{count}} borradores más recientes.",
     "readerTitle": "Elige un borrador",
     "readerBody": "Elige uno de la lista para seguir escribiéndolo.",

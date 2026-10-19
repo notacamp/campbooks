@@ -609,8 +609,8 @@ const drafts: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     await expect(await canvas.findByRole("heading", { level: 1, name: "Drafts" })).toBeVisible();
-    await expect(await canvas.findByText("Draft · Marta Ferreira and 2 others")).toBeVisible();
-    await expect(canvas.getByText("Draft · No recipients")).toBeVisible();
+    await expect(await canvas.findByText("Marta Ferreira +2")).toBeVisible();
+    await expect(canvas.getByText("No recipients")).toBeVisible();
     await expect(canvas.getByText("(no subject)")).toBeVisible();
     await expect(
       canvas.getByRole("button", { name: "Delete draft: Figures for the board" }),
