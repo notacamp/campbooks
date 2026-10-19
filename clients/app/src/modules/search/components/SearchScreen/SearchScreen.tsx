@@ -25,6 +25,7 @@ import {
   useConversationSummaries,
   useInboxActions,
   type ConversationSummary,
+  type Move,
 } from "~/modules/conversations";
 
 import {
@@ -188,11 +189,14 @@ export function SearchScreen({ workspaceId, query, sort, conversationId, now }: 
     }
   };
 
-  /** Done: archive, then the next hit (or the list, on phones). */
-  const done = (conversation: ConversationSummary) => {
+  /**
+   * Done (archive), or another move from the reader (Delete, Report spam,
+   * or back), then the next hit (or the list, on phones).
+   */
+  const leave = (conversation: ConversationSummary, move: Move) => {
     const index = ids.indexOf(conversation.id);
     const following = ids[index + 1] ?? ids[index - 1];
-    actions.done(conversation);
+    actions.moveTo(conversation, move);
     if (conversationId === conversation.id) {
       if (following === undefined || isNarrow()) {
         toList();
@@ -202,6 +206,9 @@ export function SearchScreen({ workspaceId, query, sort, conversationId, now }: 
     } else {
       setCursor(following);
     }
+  };
+  const done = (conversation: ConversationSummary) => {
+    leave(conversation, "archive");
   };
 
   const listActive = conversationId === undefined;
@@ -450,7 +457,7 @@ export function SearchScreen({ workspaceId, query, sort, conversationId, now }: 
             onNext={() => {
               step(1);
             }}
-            onDone={done}
+            onMove={leave}
             renderReplySlot={renderReplyComposer}
             now={now}
           />

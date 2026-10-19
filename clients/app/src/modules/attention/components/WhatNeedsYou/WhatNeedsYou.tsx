@@ -48,6 +48,7 @@ import {
 
 import { useAttention, useRefreshAttention, useSnooze, type ItemView } from "../../api/queries";
 import {
+  ageLabel,
   doneTodayKind,
   groupByReason,
   remindTime,
@@ -269,7 +270,8 @@ export function WhatNeedsYou({ workspaceId, now, offer }: WhatNeedsYouProps) {
       ...(next === undefined ? {} : { id: next.item.id }),
       index: order[index + 1] === undefined ? Math.max(0, index - 1) : index,
     });
-    setExpandedId(undefined);
+    // Reading item by item: the one taking its place opens too.
+    setExpandedId((open) => (open === row.item.id ? next?.item.id : undefined));
     setHighlight(undefined);
   };
   // The confirmation has folded away: the row is simply hidden now.
@@ -662,9 +664,8 @@ export function WhatNeedsYou({ workspaceId, now, offer }: WhatNeedsYouProps) {
     if (next !== undefined) {
       setSelection({ id: next.item.id, index: target });
       setHighlight(undefined);
-      if (next.item.id !== selected?.item.id) {
-        setExpandedId(undefined);
-      }
+      // The row stepped onto opens, as a click on it does.
+      setExpandedId(next.item.id);
       const element: { scrollIntoView?: (options: ScrollIntoViewOptions) => void } | null =
         document.getElementById(itemId(next.item.id));
       // Not every environment scrolls (tests run without layout).
@@ -927,6 +928,7 @@ export function WhatNeedsYou({ workspaceId, now, offer }: WhatNeedsYouProps) {
                       }}
                       due={due?.text}
                       soon={due?.soon === true}
+                      age={ageLabel(row.item.since, now ?? new Date(), i18n.language)}
                       selected={isSelected}
                       expanded={expanded}
                       confirmation={row.confirmation}

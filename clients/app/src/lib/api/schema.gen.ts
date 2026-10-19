@@ -564,7 +564,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List conversations: pinned first, then newest first. */
+        /** List conversations: the inbox pinned first, then newest first, or another view. */
         get: operations["conversations.list"];
         put?: never;
         post?: never;
@@ -736,7 +736,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Take a conversation out of spam, back where it was. */
+        /** Take a conversation out of spam: received mail goes back in the inbox. */
         post: operations["conversations.not_spam"];
         delete?: never;
         options?: never;
@@ -2551,7 +2551,10 @@ export interface components {
         ConversationId: string;
         /** @description A page of conversations. */
         ConversationList: {
-            /** @description Pinned first, then newest first (archived lists and `ids`: newest first). */
+            /**
+             * @description The inbox: pinned first, then newest first. Sent: by the inbox's
+             *     latest message. Archive, Spam, Trash and `ids`: newest first.
+             */
             conversations: components["schemas"]["ConversationSummary"][];
             /** @description Pass it as `cursor` for the next page; `None` on the last page. */
             next_cursor?: string | null;
@@ -2571,6 +2574,12 @@ export interface components {
              * @description When its newest message was sent.
              */
             last_message_at: string;
+            /**
+             * Format: date-time
+             * @description When the inbox last wrote in it, outside spam and the trash; none
+             *     when it wrote nothing there. Sent lists it by this.
+             */
+            last_sent_at?: string | null;
             latest_from?: components["schemas"]["Address"] | null;
             /** @description Whether the newest message is one the inbox sent (outbound). */
             latest_from_you: boolean;
@@ -2580,10 +2589,25 @@ export interface components {
              */
             message_count: number;
             need?: components["schemas"]["NeedView"] | null;
+            /**
+             * @description Whether someone wrote back after the inbox's latest message (an
+             *     inbound message newer than `last_sent_at`, outside spam and the trash).
+             */
+            replied_since_sent: boolean;
             rule?: components["schemas"]["RuleMark"] | null;
             rule_exception?: components["schemas"]["RuleException"] | null;
+            /**
+             * @description Who the inbox's latest message there went to (to, then cc); empty
+             *     when it wrote nothing there.
+             */
+            sent_to: components["schemas"]["Address"][];
             /** @description The start of the newest message's text. */
             snippet: string;
+            /**
+             * @description Whether it is binned as spam (in Spam rather than in Trash); only
+             *     ever true when `trashed`.
+             */
+            spam: boolean;
             /** @description Whether any message is starred. */
             starred: boolean;
             /** @description Its stream. */
@@ -2593,6 +2617,8 @@ export interface components {
             /** @description The first message's subject. */
             subject: string;
             suggestion?: components["schemas"]["StreamSuggestion"] | null;
+            /** @description Whether every message is in spam or the trash. */
+            trashed: boolean;
             /**
              * Format: int32
              * @description Unread inbound messages.
@@ -3000,7 +3026,7 @@ export interface components {
          *     could be, trusted (campbooks-cloud#235).
          * @enum {string}
          */
-        ImagesHeld: "under_review" | "checks_fail" | "unverified" | "cannot_authenticate" | "not_checked" | "rule_paused" | "rule_too_broad";
+        ImagesHeld: "under_review" | "checks_fail" | "unverified" | "cannot_authenticate" | "not_checked" | "rule_paused" | "rule_too_broad" | "spam";
         /**
          * Format: uuid
          * @description InboxId (UUIDv7)
@@ -6911,7 +6937,12 @@ export interface operations {
                 stream?: components["schemas"]["Stream"];
                 /** @description Only this inbox; every inbox you can read when absent. */
                 inbox?: components["schemas"]["InboxId"];
-                /** @description `true` for archived conversations instead of those in the inbox. */
+                /** @description Which place: the inbox (default), Sent, Archive, Spam or Trash. */
+                view?: "inbox" | "sent" | "archive" | "spam" | "trash";
+                /**
+                 * @description Deprecated: use `view=archive`. `true` lists the archive, as
+                 *     `view=archive` does; with another `view` it is a bad request.
+                 */
                 archived?: boolean;
                 /** @description `next_cursor` of the previous page. */
                 cursor?: string;
@@ -6919,8 +6950,8 @@ export interface operations {
                 limit?: number;
                 /**
                  * @description These conversations only (1 to 100 ids, comma-separated), whatever
-                 *     their stream or whether archived; those you cannot see are left
-                 *     out. Other filters and the cursor are ignored.
+                 *     their stream, view or whether archived; those you cannot see are
+                 *     left out. Other filters and the cursor are ignored.
                  */
                 ids?: string;
             };
@@ -6942,7 +6973,7 @@ export interface operations {
                     "application/json": components["schemas"]["ConversationList"];
                 };
             };
-            /** @description A malformed cursor or limit. */
+            /** @description A malformed cursor or limit, or `archived=true` with another view. */
             400: {
                 headers: {
                     [name: string]: unknown;

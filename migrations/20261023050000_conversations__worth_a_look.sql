@@ -8,7 +8,7 @@
 SET LOCAL lock_timeout = '10s';
 
 -- Widened NOT VALID, so the swap holds the table's exclusive lock only for a
--- moment; validated by `…020100_conversations__worth_a_look_validate`.
+-- moment; validated by `…050100_conversations__worth_a_look_validate`.
 ALTER TABLE conversations.needs DROP CONSTRAINT needs_reason_check;
 ALTER TABLE conversations.needs ADD CONSTRAINT needs_reason_check
     CHECK (reason IN ('reply', 'do', 'pay', 'review', 'worth_a_look')) NOT VALID;

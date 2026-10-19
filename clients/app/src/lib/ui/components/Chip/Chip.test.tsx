@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 
 import { renderUi } from "../../../../../test/render";
 
-import { Chip, ChipLink, ChipRow } from "./Chip";
+import { Chip, ChipDivider, ChipLink, ChipRow } from "./Chip";
 
 describe("Chip and ChipLink", () => {
   it("a chip that goes somewhere is a link, the open page marked as such", () => {
@@ -24,5 +24,20 @@ describe("Chip and ChipLink", () => {
     renderUi(<Chip pressed>Primary</Chip>);
 
     expect(screen.getByRole("button", { name: "Primary" })).toHaveAttribute("aria-pressed", "true");
+  });
+
+  it("a divider between groups is only drawn, never read out or pressed", () => {
+    renderUi(
+      <ChipRow label="Streams">
+        <Chip pressed>Primary</Chip>
+        <ChipDivider />
+        <Chip pressed={false}>Sent</Chip>
+      </ChipRow>,
+    );
+
+    expect(screen.getAllByRole("button")).toHaveLength(2);
+    expect(
+      screen.getByRole("group", { name: "Streams" }).querySelector("[aria-hidden='true']"),
+    ).not.toBeNull();
   });
 });

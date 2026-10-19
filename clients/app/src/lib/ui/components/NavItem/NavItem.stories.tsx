@@ -1,7 +1,7 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { expect, within } from "storybook/test";
 
-import { NavItem } from "./NavItem";
+import { NavDivider, NavItem } from "./NavItem";
 
 const meta = {
   title: "Components/NavItem",
@@ -42,5 +42,26 @@ export const AsLink: Story = {
     count: undefined,
     shortcut: "nav.documents",
     href: "#documents",
+  },
+};
+
+/** The streams, a quiet divider, then the views beside them, each with its icon. */
+export const StreamsThenViews: Story = {
+  render: () => (
+    <>
+      <NavItem label="Inbox" icon="inbox" shortcut="nav.inbox" />
+      <NavItem label="Primary" sub count={12} keys="g 1" current />
+      <NavItem label="Updates" sub keys="g 2" />
+      <NavDivider />
+      <NavItem label="Sent" icon="send" sub keys="g 5" />
+      <NavItem label="Archive" icon="archive" sub keys="g 6" />
+      <NavItem label="Spam" icon="warning" sub keys="g 7" />
+      <NavItem label="Trash" icon="trash" sub keys="g 8" />
+    </>
+  ),
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(canvas.getByRole("separator")).toBeInTheDocument();
+    await expect(canvas.getByRole("button", { name: /Trash/ })).toBeInTheDocument();
   },
 };

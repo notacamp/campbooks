@@ -57,3 +57,10 @@
 .count + .hint {
   margin-left: var(--space-1);
 }
+
+.divider {
+  width: 100%;
+  margin: var(--space-1) 0;
+  border: 0;
+  border-top: var(--border-width) solid var(--border-subtle);
+}

@@ -52,6 +52,8 @@ export interface ThreadMessageProps {
   kind: "person" | "service";
   /** The conversation may be phishing: the body's links lead nowhere. */
   inertLinks?: boolean | undefined;
+  /** Its conversation is in spam: remote images never load. */
+  spam?: boolean | undefined;
   /** Show the reader's keys (⇧I, V) on its buttons; off where they are not bound. */
   shortcuts?: boolean | undefined;
   now?: Date | undefined;
@@ -77,6 +79,7 @@ export function ThreadMessage({
   sharedInbox = false,
   kind,
   inertLinks = false,
+  spam = false,
   shortcuts = true,
   now,
 }: ThreadMessageProps) {
@@ -88,6 +91,7 @@ export function ThreadMessage({
     message.id,
     showImages,
     open && message.has_html,
+    spam,
   );
   const sender = displayName(message.from);
   const yours = message.direction === "outbound";
@@ -214,14 +218,17 @@ export function ThreadMessage({
                 <Text tone="tertiary" size="sm">
                   {t("actions.imagesHidden", { count: remote })}
                 </Text>
-                <Button
-                  variant="secondary"
-                  icon="image"
-                  shortcut={shortcuts ? "inbox.show_images" : undefined}
-                  onClick={onShowImages}
-                >
-                  {t("actions.showImages")}
-                </Button>
+                {/* In spam they never load: nothing to offer. */}
+                {body.data?.images_held === "spam" ? null : (
+                  <Button
+                    variant="secondary"
+                    icon="image"
+                    shortcut={shortcuts ? "inbox.show_images" : undefined}
+                    onClick={onShowImages}
+                  >
+                    {t("actions.showImages")}
+                  </Button>
+                )}
                 {trust === undefined ? null : (
                   <Button
                     variant="secondary"
