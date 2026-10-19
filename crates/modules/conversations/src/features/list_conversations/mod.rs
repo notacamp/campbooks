@@ -827,7 +827,7 @@ mod http_tests {
     /// `last_sent_at` of the conversation holding `message`.
     async fn last_sent_at(kit: &Kit, message: &str) -> Option<String> {
         sqlx::query_scalar(
-            "SELECT to_char(c.last_sent_at AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI')
+            "SELECT to_char(c.last_sent_at AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI')
                FROM conversations.conversations c
                JOIN conversations.messages m ON m.conversation_id = c.id
               WHERE m.provider_message_id = $1",
@@ -859,7 +859,7 @@ mod http_tests {
         .await;
         assert_eq!(
             last_sent_at(&kit, "en-1").await.as_deref(),
-            Some("2026-10-06T12:00")
+            Some("2026-10-06 12:00")
         );
         // That message moved to the trash at the provider: back to the one before.
         kit.ingest_value(
@@ -870,7 +870,7 @@ mod http_tests {
         .await;
         assert_eq!(
             last_sent_at(&kit, "en-1").await.as_deref(),
-            Some("2026-10-05T10:02")
+            Some("2026-10-05 10:02")
         );
         // And without any: none.
         let mut reply = sent(
@@ -889,14 +889,14 @@ mod http_tests {
 
     #[sqlx::test(migrations = "../../../migrations")]
     async fn the_migration_backfills(db: PgPool) {
-        let kit = Kit::new(db.clone()).await;
+        let kit = Kit::new(db).await;
         let (workspace, _, sam) = with_one_started(&kit).await;
         let base = format!("/api/v1/w/{workspace}/conversations");
         let news = kit.conversation_of("en-3").await;
         kit.post(&sam, &format!("{base}/{news}/spam"), None).await;
         // As before the migration: neither column known.
         sqlx::query("UPDATE conversations.conversations SET last_sent_at = NULL, spam = false")
-            .execute(&db)
+            .execute(&kit.db)
             .await
             .unwrap();
         let migration = std::fs::read_to_string(format!(
@@ -909,7 +909,7 @@ mod http_tests {
         // The migration's own text, from the repository, twice: it is idempotent.
         for _ in 0..2 {
             sqlx::raw_sql(sqlx::AssertSqlSafe(migration[start..end].to_owned()))
-                .execute(&db)
+                .execute(&kit.db)
                 .await
                 .unwrap();
         }
@@ -923,7 +923,7 @@ mod http_tests {
         );
         assert_eq!(
             last_sent_at(&kit, "mine-1").await.as_deref(),
-            Some("2026-10-07T09:00")
+            Some("2026-10-07 09:00")
         );
     }
 
