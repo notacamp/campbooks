@@ -55,7 +55,9 @@
     "kept": {
       "title": "Kept as history",
       "lead": "{{address}} was disconnected and its mail kept here, read-only: nothing new arrives, and nothing can be sent or changed from it."
-    }
+    },
+    "readingText": "Reading…",
+    "textFailed": "Couldn’t read this email’s text."
   },
   "actions": {
     "star": "Pin",
@@ -227,12 +229,15 @@
       "unknown_outcome": "Campbooks could not confirm that this message was sent. Check your Sent folder before sending it again.",
       "unknown": "Something went wrong. Try again.",
       "not_saved": "Your last changes could not be saved, so nothing was sent. Try again.",
-      "content_changed": "This changed since you opened it. Check it and send again."
+      "content_changed": "This changed since you opened it. Check it and send again.",
+      "quote": "Couldn’t read the email to quote it. Nothing was started. Try again."
     },
     "shortcuts": {
       "newMessage": "New message"
     },
-    "tooLate": "Too late to undo: it was sent."
+    "tooLate": "Too late to undo: it was sent.",
+    "readingQuote": "Reading the email to quote it…",
+    "quoteCut": "This email is long: the quote holds its first part."
   },
   "needs": {
     "line": {
@@ -587,7 +592,13 @@
       "changed": "This reply changed since it was saved. Check it and send again."
     },
     "to": "To {{recipient}}",
-    "replyToElsewhere": "Replies go to {{recipient}}, not to the sender {{sender}}. Check before you send."
+    "replyToElsewhere": "Replies go to {{recipient}}, not to the sender {{sender}}. Check before you send.",
+    "readingQuote": "Reading the email to quote it…",
+    "quoteUnread": "Couldn’t read the email you’re replying to, so its quote can’t be shown. Nothing can be sent until it is.",
+    "quoteCut": "This email is long: your reply quotes its first part.",
+    "quoteShortened": "Shown in part: your reply quotes all of it.",
+    "newer": "A newer message from {{name}} arrived. Your reply still answers the one quoted below.",
+    "answerNewer": "Answer the newer one"
   },
   "smartRule": {
     "tag": "Smart rule",
@@ -666,6 +677,7 @@
     "failed": "Couldn’t start the forward: nothing was sent. Try again.",
     "none": "No one by that name has written to you.",
     "searchFailed": "Couldn’t search just now. Try again.",
-    "nobody": "No one has written to you yet."
+    "nobody": "No one has written to you yet.",
+    "quoteFailed": "Couldn’t read the email to quote it: nothing was sent. Try again."
   }
 }

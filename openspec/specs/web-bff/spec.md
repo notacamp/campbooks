@@ -98,7 +98,10 @@ and 8 784 hours (366 days); the server SHALL refuse to start otherwise,
 naming the setting. Its
 cookie value SHALL be replaced periodically, the previous value staying valid
 for a short grace period. Ended sessions SHALL be deleted by a scheduled job.
-A session whose tokens can no longer be decrypted SHALL end.
+A session whose tokens can no longer be decrypted SHALL end. A use SHALL be
+recorded only with an idle deadline after it: when the server's clock has
+passed the session's absolute end while the database's (behind it) still
+finds the session, the use is not recorded and the request goes on.
 
 #### Scenario: Idle session
 - **WHEN** a session has not been used for longer than the idle timeout
@@ -120,6 +123,10 @@ A session whose tokens can no longer be decrypted SHALL end.
 - **WHEN** the server starts with `CAMPBOOKS_BFF__ABSOLUTE_TIMEOUT_HOURS` of 0 or 8 785
 - **THEN** it refuses to start, naming the setting, and starts with 8 784
 
+#### Scenario: The server's clock ahead of the database's
+- **WHEN** a session is found by the database's clock but its absolute end has passed by the server's
+- **THEN** the request is answered as usual, not as a server error, and the session ends by either clock soon after
+
 ### Requirement: Current session
 `GET /bff/session` SHALL answer 200 with `authenticated`, and when
 authenticated the user's `sub`, name and email and when the session ends. It
@@ -137,7 +144,21 @@ without the browser's cookies, `Authorization` or CSRF headers. Without a live
 session it SHALL answer 401 `session_required`. The access token SHALL be
 refreshed with the refresh token shortly before it expires, never earlier
 than the identity provider allows; concurrent requests of one session SHALL
-cause one refresh. A refused refresh SHALL end the session.
+cause one refresh. A refused refresh SHALL end the session. When the API
+refuses the session's access token as invalid (401 `invalid_token`: its
+sign-in ended, though the token has not expired), the BFF SHALL force one
+refresh for that request, unless another request already replaced the token.
+A refused refresh ends the session and the BFF answers 401
+`session_required`. When the identity provider cannot be reached, the BFF
+SHALL answer 503 `idp_unavailable` and keep the session, so a later request
+refreshes. A refresh that works SHALL send the request again, once, with the
+fresh token, when its body is empty or of a known length of at most 1 MiB,
+held by the BFF. The API refuses a token while authenticating, before any
+handler runs, and the copy carries the same `Idempotency-Key`. A larger or
+streamed body SHALL get the API's refusal back, never sent twice, with the
+fresh token held for the next request. One request SHALL cause at most one
+forced refresh. The same applies to `/bff/admin`, though the admin API
+answers 404, never `invalid_token`, to a token it cannot accept.
 
 #### Scenario: Token attached
 - **WHEN** a signed-in browser requests `/bff/api/v1/<route>` of a scoped endpoint
@@ -150,6 +171,22 @@ cause one refresh. A refused refresh SHALL end the session.
 #### Scenario: No session
 - **WHEN** a browser without a live session requests `/bff/api/v1/system/version`
 - **THEN** the response is 401 with `code` = `session_required`
+
+#### Scenario: A refused token whose sign-in ended
+- **WHEN** the API refuses a session's access token as `invalid_token` because the way in the session used was removed, or the person signed out everywhere on another device, and the refresh is refused too
+- **THEN** that request gets 401 `session_required`, the session is gone and `/bff/session` says signed out, after one refresh attempt
+
+#### Scenario: A refused token refreshed
+- **WHEN** the API refuses a session's access token as `invalid_token` and the refresh works
+- **THEN** a `GET`, and a `POST` with a small body, are sent again once with the fresh token and succeed with the same body, while a `POST` of more than 1 MiB gets the 401 back and the app's retry succeeds with the held fresh token
+
+#### Scenario: Two requests refused together
+- **WHEN** two requests of one session are refused with the same token at once
+- **THEN** one refresh is made, the second request uses the token it stored, and both succeed
+
+#### Scenario: A refused token with the identity provider down
+- **WHEN** the API refuses a session's access token and the identity provider's token endpoint answers 503
+- **THEN** the response is 503 with `code` = `idp_unavailable`, the session stays signed in, and once the identity provider is back the next request succeeds
 
 ### Requirement: CSRF protection
 Every request with an unsafe method (anything but GET, HEAD, OPTIONS, TRACE) to
@@ -221,3 +258,62 @@ never end its own session. Asking for fewer scopes SHALL end no session.
 #### Scenario: Signing out of an outdated session
 - **WHEN** a person whose session predates a new scope signs out
 - **THEN** the session and the identity provider's session both end
+
+### Requirement: The instance secret key can be rotated
+The server SHALL accept a previous instance secret key beside the current one
+(`CAMPBOOKS_SECRET_KEY_PREVIOUS_FILE` or `CAMPBOOKS_SECRET_KEY_PREVIOUS`).
+Everything SHALL be sealed, signed and derived with the current key. The
+previous key SHALL only open and verify what was sealed or signed before:
+- web sessions' and sign-ins' sealed values;
+- connected accounts' credentials;
+- the sign-in signing keys and held grants;
+- signed and sealed opaque values (cursors, resume tokens);
+- the binding tags of sends and changes at mail providers.
+
+What the previous key opened SHALL be sealed again with the current key as it
+is used:
+- the signing keys when they are loaded;
+- a connection's access token when it is used, and its refresh token at its
+  next refresh;
+- a web session's refresh and ID tokens at its next refresh.
+
+What the previous key signed SHALL be signed again with the current key in
+the background. While a previous key is set, a job of each module SHALL run in every
+workspace with a change feed, at most every 15 minutes. It SHALL re-tag
+every taught rule (at its generation), rule application, running rule run,
+change request, scheduled or stored send and pending outbound change (a
+change waiting to be made at a mail provider) whose MAC verifies under the
+previous key only. The first run SHALL be at start-up. Each update SHALL be a compare-and-set on the old MAC, so
+a row signed again meanwhile is left as it is, and a row that verifies under
+neither key SHALL NOT be re-tagged. Each run SHALL log, per workspace,
+either that nothing is bound under the previous key any more or how many
+rows are left for the next run.
+
+The server SHALL refuse to start, naming the variable, when a previous key is
+set without a current one, is the same key, or is not 32 bytes of base64. No
+key SHALL appear in a log, an error or a `Debug` output. Without the previous
+key, what only it sealed SHALL fail closed, as for any wrong key.
+
+#### Scenario: Old values open and are sealed again
+- **WHEN** the key is rotated with the old one as the previous key, and a connection's access token is used, its token is refreshed, and the signing keys are loaded
+- **THEN** each opens, and is stored sealed with the new key, which alone opens it afterwards
+
+#### Scenario: The previous key removed
+- **WHEN** the previous key is removed after everything was sealed again
+- **THEN** the new key alone opens everything, and the old key alone opens nothing
+
+#### Scenario: Rules and their changes signed again
+- **WHEN** a rule moved mail under the old key, the key is rotated, the re-tag runs and the previous key is removed
+- **THEN** the rule still acts on new mail, its changes are still put back, and a second re-tag finds nothing to do
+
+#### Scenario: A wrong key
+- **WHEN** neither the current nor the previous key sealed a value
+- **THEN** it does not open: a connection needs connecting again, and the server refuses to start on signing keys it cannot open
+
+#### Scenario: A misconfigured previous key
+- **WHEN** `CAMPBOOKS_SECRET_KEY_PREVIOUS` is set without `CAMPBOOKS_SECRET_KEY`, equal to it, or not valid base64
+- **THEN** the server refuses to start with an error naming the variable and showing no key
+
+#### Scenario: Each kind of signed row
+- **WHEN** a running rule run, a change request, a scheduled send, a stored send and a pending outbound change are each signed under the old key, the key is rotated, the re-tag runs and the previous key is removed
+- **THEN** the run works through its mail, the change request stands, the scheduled send is released, the stored send stands and the outbound change is made, each under the new key alone

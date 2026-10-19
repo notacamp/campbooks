@@ -50,7 +50,8 @@ pub enum Quotes {
 }
 
 /// The text of an HTML body, without quoted `<blockquote>`s: see
-/// [`text_of`].
+/// [`text_of`] (readers go through `blobs::words`).
+#[cfg(test)]
 pub fn from_html(html: &str) -> String {
     text_of(html, Quotes::Drop)
 }
@@ -65,11 +66,16 @@ const CHUNK: usize = 1024;
 
 /// The text of an HTML body, read with html5ever's tokenizer alone (no
 /// tree, so however the tags nest; stopped at [`MAX_TEXT_TIME`]): no tags, no
-/// scripts, styles, head or title, entities decoded, a line break at each
+/// scripts, styles, head, title or `<template>`s, entities decoded, a line break at each
 /// `br` and at the end of each block, and no `<blockquote>`s when `quotes`
 /// is [`Quotes::Drop`].
 pub fn text_of(html: &str, quotes: Quotes) -> String {
-    let deadline = Instant::now() + MAX_TEXT_TIME;
+    text_of_within(html, quotes, Instant::now() + MAX_TEXT_TIME).0
+}
+
+/// [`text_of`], stopped at `deadline` instead, and whether it read all of
+/// `html` in time.
+pub fn text_of_within(html: &str, quotes: Quotes, deadline: Instant) -> (String, bool) {
     let tokenizer = Tokenizer::new(Reader::new(quotes), TokenizerOpts::default());
     let queue = BufferQueue::default();
     let mut rest = html;
@@ -83,9 +89,17 @@ pub fn text_of(html: &str, quotes: Quotes) -> String {
         let _ = tokenizer.feed(&queue);
         rest = tail;
     }
+    let complete = rest.is_empty();
     tokenizer.end();
-    tokenizer.sink.text.take()
+    (tokenizer.sink.text.take(), complete)
 }
+
+/// The elements that may stand in `<head>` (the tree builder's "in head"
+/// insertion mode); any other start tag begins the body.
+const IN_HEAD: [&str; 12] = [
+    "head", "base", "basefont", "bgsound", "link", "meta", "title", "noscript", "noframes",
+    "style", "script", "template",
+];
 
 /// Collects the characters outside the elements whose content is not text
 /// to read.
@@ -96,7 +110,12 @@ struct Reader {
     /// `style`, `title`, and the markup a `noscript`, `iframe`, `noembed` or
     /// `noframes` holds); raw text cannot nest, so its end tag ends it.
     skipping: Cell<bool>,
+    /// Inside `<head>`, until anything that cannot be in it starts the body
+    /// (as the tree builder decides, campbooks-cloud#218).
     in_head: Cell<bool>,
+    /// Inside a `<template>`: markup never shown (templates nest, so a
+    /// depth).
+    template_depth: Cell<usize>,
     quote_depth: Cell<usize>,
 }
 
@@ -107,6 +126,7 @@ impl Reader {
             text: RefCell::new(String::new()),
             skipping: Cell::new(false),
             in_head: Cell::new(false),
+            template_depth: Cell::new(0),
             quote_depth: Cell::new(0),
         }
     }
@@ -124,6 +144,10 @@ impl TokenSink for Reader {
                         "script" | "style" | "title" | "noscript" | "iframe" | "noembed"
                         | "noframes" => self.skipping.set(false),
                         "head" => self.in_head.set(false),
+                        "template" => {
+                            self.template_depth
+                                .set(self.template_depth.get().saturating_sub(1));
+                        }
                         "blockquote" => {
                             self.quote_depth
                                 .set(self.quote_depth.get().saturating_sub(1));
@@ -134,10 +158,17 @@ impl TokenSink for Reader {
                     }
                     return TokenSinkResult::Continue;
                 }
+                // A start tag that cannot be in `<head>` ends it, as the
+                // tree builder does: `<head><meta charset=utf-8><p>Invoice`
+                // has a body with no `<body>` tag.
+                if self.in_head.get() && !IN_HEAD.contains(&name) {
+                    self.in_head.set(false);
+                }
                 match name {
                     "head" => self.in_head.set(true),
                     "body" => self.in_head.set(false),
                     "blockquote" => self.quote_depth.set(self.quote_depth.get() + 1),
+                    "template" => self.template_depth.set(self.template_depth.get() + 1),
                     "br" => self.text.borrow_mut().push('\n'),
                     "script" | "style" | "title" | "noscript" | "iframe" | "noembed"
                     | "noframes" => self.skipping.set(true),
@@ -156,8 +187,18 @@ impl TokenSink for Reader {
                 }
             }
             Token::CharacterTokens(text) => {
+                // Words in `<head>` (not its raw-text elements, not the
+                // blanks between its tags) start the body, as the tree
+                // builder does.
+                if self.in_head.get()
+                    && !self.skipping.get()
+                    && !text.chars().all(char::is_whitespace)
+                {
+                    self.in_head.set(false);
+                }
                 let hidden = self.skipping.get()
                     || self.in_head.get()
+                    || self.template_depth.get() > 0
                     || (self.quotes == Quotes::Drop && self.quote_depth.get() > 0);
                 if !hidden {
                     let mut out = self.text.borrow_mut();
@@ -296,5 +337,89 @@ mod tests {
         });
         let text = text_of(&format!("<p>x</p><p {many}>y</p>"), Quotes::Keep);
         assert!(text.contains('x'), "{text}");
+    }
+
+    /// Mail as it arrives, each with its words and what must never be read.
+    const SHAPES: [(&str, &str, &str); 6] = [
+        (
+            "a head with no body tag",
+            "<head><meta charset=utf-8><p>Invoice due Friday",
+            "charset",
+        ),
+        (
+            "words straight after the head's tags",
+            "<head><meta charset=utf-8><title>Secret title</title>Invoice due Friday",
+            "Secret title",
+        ),
+        (
+            "a doctype and a full document",
+            "<!DOCTYPE html><html><head><title>Secret title</title>\
+             <style>p { color: red }</style></head><body><p>Invoice due Friday</p></body></html>",
+            "color",
+        ),
+        (
+            "a head closed, no body tag",
+            "<html><head><script>var secret = 1;</script></head><p>Invoice due Friday</p></html>",
+            "secret",
+        ),
+        (
+            "a link then a div",
+            "<head>\n  <link rel=stylesheet href=x.css>\n  <style>.secret{}</style>\n\
+             <div>Invoice due Friday</div>",
+            "secret",
+        ),
+        (
+            "Outlook",
+            "<html xmlns:o=\"urn:schemas-microsoft-com:office:office\"><head>\
+             <meta http-equiv=Content-Type content=\"text/html; charset=utf-8\">\
+             <meta name=Generator content=\"Microsoft Word 15 (filtered medium)\">\
+             <style><!-- /* Font Definitions */ @font-face {font-family:\"Cambria Math\";}\
+             p.MsoNormal {margin:0cm;} --></style>\
+             <!--[if gte mso 9]><xml><o:shapedefaults v:ext=\"edit\" spidmax=\"1026\" />\
+             </xml><![endif]--></head><body lang=EN-US link=\"#0563C1\">\
+             <div class=WordSection1><p class=MsoNormal>Invoice due Friday<o:p></o:p></p>\
+             </div></body></html>",
+            "Font",
+        ),
+    ];
+
+    #[test]
+    fn every_shape_of_mail_gives_its_words_and_never_its_head() {
+        for (shape, html, never) in SHAPES {
+            for quotes in [Quotes::Keep, Quotes::Drop] {
+                let text = text_of(html, quotes);
+                assert!(text.contains("Invoice due Friday"), "{shape}: {text:?}");
+                assert!(!text.contains(never), "{shape}: {never} in {text:?}");
+                assert!(
+                    !text.contains('<') && !text.contains("mso"),
+                    "{shape}: {text:?}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn blanks_between_head_tags_keep_the_head() {
+        let html = "<head>\n <meta charset=utf-8>\n <title>Secret title</title>\n</head>\n\
+                    <body><p>Hi</p></body>";
+        let text = from_html(html);
+        assert!(text.contains("Hi") && !text.contains("Secret"), "{text:?}");
+    }
+
+    #[test]
+    fn noscript_templates_and_uppercase_tags_in_a_head_are_not_words() {
+        let html = "<HEAD><META CHARSET=utf-8><NOSCRIPT><img src=x>Secret noscript</NOSCRIPT>\
+                    <TEMPLATE><p>Secret template <template>nested</template> still</p></TEMPLATE>\
+                    <TITLE>Secret title</TITLE></HEAD><P>Invoice due Friday</P>\
+                    <template><b>Secret body template</b></template><p>Thanks</p>";
+        let text = from_html(html);
+        assert!(
+            text.contains("Invoice due Friday") && text.contains("Thanks"),
+            "{text:?}"
+        );
+        assert!(
+            !text.contains("Secret") && !text.contains("still"),
+            "{text:?}"
+        );
     }
 }

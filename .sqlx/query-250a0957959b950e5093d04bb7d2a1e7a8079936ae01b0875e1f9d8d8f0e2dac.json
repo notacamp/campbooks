@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        DELETE FROM kernel.jobs\n         WHERE id IN (\n             SELECT id FROM kernel.jobs\n              WHERE workspace_id = $1 AND state IN ('succeeded', 'failed')\n              LIMIT $2)\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Int8"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "250a0957959b950e5093d04bb7d2a1e7a8079936ae01b0875e1f9d8d8f0e2dac"
+}

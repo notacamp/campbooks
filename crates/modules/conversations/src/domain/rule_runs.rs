@@ -304,6 +304,21 @@ pub async fn bound(
     Ok(binding.verify(&fields, mac.as_deref()))
 }
 
+/// The MAC of run `run` (a `kind` run of `rule` as stored now, asked for by
+/// `by`) under the current key, when its stored `mac` verifies under the
+/// previous key only (campbooks-cloud#191); `None` otherwise.
+pub fn retag(
+    binding: &Binding,
+    workspace: &Uuid,
+    run: RuleRunId,
+    rule: &Stored,
+    kind: RunKind,
+    by: Option<&Uuid>,
+    mac: Option<&[u8]>,
+) -> Option<Vec<u8>> {
+    binding.retag(&run_fields(workspace, run, rule, kind, by), mac)
+}
+
 /// Publish `rule_changed` for `rule` in `state`, with `run`.
 pub async fn announce(
     tx: &mut Transaction<'_, Postgres>,

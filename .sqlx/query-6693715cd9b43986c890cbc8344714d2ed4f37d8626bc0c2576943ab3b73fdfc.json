@@ -1,0 +1,28 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            INSERT INTO kernel.idempotency\n                (principal, key, operation_id, request_hash, expires_at, workspace_id)\n            VALUES ($1, $2, $3, $4, now() + make_interval(secs => $5), $6)\n            ON CONFLICT (principal, key) DO UPDATE\n               SET operation_id = EXCLUDED.operation_id,\n                   request_hash = EXCLUDED.request_hash,\n                   workspace_id = EXCLUDED.workspace_id,\n                   state = 'pending',\n                   response_status = NULL,\n                   response_content_type = NULL,\n                   response_location = NULL,\n                   response_body = NULL,\n                   created_at = now(),\n                   expires_at = EXCLUDED.expires_at\n             WHERE kernel.idempotency.expires_at <= now()\n            RETURNING true AS \"acquired!\"\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "acquired!",
+        "type_info": "Bool",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Text",
+        "Text",
+        "Bytea",
+        "Float8",
+        "Text"
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "6693715cd9b43986c890cbc8344714d2ed4f37d8626bc0c2576943ab3b73fdfc"
+}

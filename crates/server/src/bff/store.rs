@@ -72,6 +72,7 @@ pub struct LockedTokens {
     pub access_token: Vec<u8>,
     pub access_expires_at: DateTime<Utc>,
     pub refresh_token: Option<Vec<u8>>,
+    pub id_token: Option<Vec<u8>>,
 }
 
 /// An ended session: its id and its sealed refresh token (if any) for
@@ -260,26 +261,38 @@ pub async fn lock_tokens(
     hash: &[u8],
 ) -> sqlx::Result<Option<LockedTokens>> {
     sqlx::query_as(
-        "SELECT access_token, access_expires_at, refresh_token FROM bff.lock_session_tokens($1)",
+        "SELECT access_token, access_expires_at, refresh_token, id_token
+           FROM bff.lock_session_tokens($1)",
     )
     .bind(hash)
     .fetch_optional(&mut **tx)
     .await
 }
 
+/// Sealed tokens a refresh stores.
+pub struct Refreshed<'a> {
+    /// The new access token.
+    pub access_token: &'a [u8],
+    /// When it expires.
+    pub access_expires_at: DateTime<Utc>,
+    /// The refresh token to keep.
+    pub refresh_token: Option<&'a [u8]>,
+    /// The ID token to keep; `None` keeps the stored one.
+    pub id_token: Option<&'a [u8]>,
+}
+
 /// Store refreshed tokens.
 pub async fn update_tokens(
     tx: &mut Transaction<'_, Postgres>,
     hash: &[u8],
-    access_token: &[u8],
-    access_expires_at: DateTime<Utc>,
-    refresh_token: Option<&[u8]>,
+    tokens: &Refreshed<'_>,
 ) -> sqlx::Result<()> {
-    sqlx::query("SELECT bff.store_session_tokens($1, $2, $3, $4)")
+    sqlx::query("SELECT bff.store_session_tokens($1, $2, $3, $4, $5)")
         .bind(hash)
-        .bind(access_token)
-        .bind(access_expires_at)
-        .bind(refresh_token)
+        .bind(tokens.access_token)
+        .bind(tokens.access_expires_at)
+        .bind(tokens.refresh_token)
+        .bind(tokens.id_token)
         .execute(&mut **tx)
         .await?;
     Ok(())

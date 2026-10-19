@@ -25,6 +25,16 @@ pub const STATE_VERSION: i16 = 1 + campbooks_ai::decide::signals::inbox::CONTEXT
 /// 1,500 characters; the facts read none of it).
 pub const ENVELOPE_BODY_BYTES: usize = 16 * 1024;
 
+/// Bytes of the HTML body read for an envelope when the text body has no
+/// words: the words read from it are cut to [`ENVELOPE_BODY_BYTES`].
+pub const ENVELOPE_HTML_BYTES: usize = 256 * 1024;
+
+/// What an envelope reads of a message's parts ([`super::blobs::words`]).
+pub const ENVELOPE_BUDGET: super::blobs::Budget = super::blobs::Budget {
+    text: ENVELOPE_BODY_BYTES,
+    html: ENVELOPE_HTML_BYTES,
+};
+
 /// The purpose the model pass is traced and evaluated under.
 pub const PURPOSE: &str = "conversations.triage";
 

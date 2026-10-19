@@ -62,6 +62,13 @@ const keys = {
       message_id: messageId,
       show_images: String(showImages),
     }),
+  words: (workspaceId: string, conversationId: string, messageId: string) =>
+    operationKey("conversations.get_message_body", {
+      workspace_id: workspaceId,
+      conversation_id: conversationId,
+      message_id: messageId,
+      words: "true",
+    }),
 };
 
 /** Page size of a stream's list. */
@@ -171,6 +178,69 @@ export function useMessageBody(
         ),
       ),
   });
+}
+
+/** A message's words alone (`conversations.get_message_body` with `words`). */
+function wordsQuery(workspaceId: string, conversationId: string, messageId: string) {
+  return {
+    queryKey: keys.words(workspaceId, conversationId, messageId),
+    // A message's words never change once stored.
+    staleTime: Number.POSITIVE_INFINITY,
+    // As a message's text: its words, and whether they were cut.
+    queryFn: async ({ signal }: { signal: AbortSignal }) => {
+      const body = unwrap(
+        await api.GET(
+          "/api/v1/w/{workspace_id}/conversations/{conversation_id}/messages/{message_id}/body",
+          {
+            params: {
+              path: {
+                workspace_id: workspaceId,
+                conversation_id: conversationId,
+                message_id: messageId,
+              },
+              query: { words: true },
+            },
+            signal,
+          },
+        ),
+      );
+      return { content: body.text ?? "", truncated: body.truncated };
+    },
+  };
+}
+
+/**
+ * The words of a message `conversations.get` marked `text_unread` (its HTML
+ * was not read in time), asked for on their own; disabled otherwise.
+ */
+export function useMessageWords(
+  workspaceId: string,
+  conversationId: string,
+  message: MessageView | undefined,
+) {
+  return useQuery({
+    ...wordsQuery(workspaceId, conversationId, message?.id ?? ""),
+    enabled: message?.text_unread === true,
+  });
+}
+
+/**
+ * `message` with its text, for a reply's or a forward's quote: as it came,
+ * or, when `conversations.get` marked it `text_unread`, with its words asked
+ * for first. Rejects when they could not be read: a quote is never left
+ * empty silently.
+ */
+export async function withWords(
+  queryClient: QueryClient,
+  workspaceId: string,
+  conversationId: string,
+  message: MessageView,
+): Promise<MessageView> {
+  if (message.text_unread !== true) {
+    return message;
+  }
+  const text = await queryClient.query(wordsQuery(workspaceId, conversationId, message.id));
+  return { ...message, text, text_unread: false };
 }
 
 /** The conversation-changing operations, by name. */

@@ -164,6 +164,15 @@ impl Kit {
         self
     }
 
+    /// The same kit binding with `binding` (a rotated instance secret key,
+    /// campbooks-cloud#191).
+    #[must_use]
+    pub fn with_binding(mut self, binding: campbooks_kernel::binding::Binding) -> Self {
+        self.state = self.state.with_binding(binding);
+        self.app = testing::app(crate::module(self.deps.clone()), self.state.clone());
+        self
+    }
+
     /// The same kit, asking `clients` whom each client token acts for.
     #[must_use]
     pub fn with_clients(mut self, clients: campbooks_kernel::tenancy::ClientDirectoryPort) -> Self {
@@ -416,6 +425,7 @@ impl Kit {
             expires_at: None,
             issued_at: None,
             auth_time: None,
+            sign_in: None,
         };
         let mut invocation =
             operations::Invocation::new(operations::Caller::Assistant, principal, operation, input)

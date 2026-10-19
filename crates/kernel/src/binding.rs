@@ -120,12 +120,26 @@ impl Fields {
     }
 }
 
+/// Which key a tag verified under ([`Binding::verify_checked`]).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Verified {
+    /// Neither: not this binding's tag.
+    No,
+    /// The current key.
+    Current,
+    /// The previous key, during a rotation: re-tag it ([`Binding::retag`]).
+    Previous,
+}
+
 /// Signs and verifies bound requests under the key derived from the
 /// instance secret. Cheap to clone. [`Binding::disabled`] (the default,
 /// until the server installs one) signs nothing and verifies nothing.
 #[derive(Clone, Default)]
 pub struct Binding {
     key: Option<Arc<hmac::Key>>,
+    /// The previous instance secret's key, during a rotation: it verifies
+    /// what was bound before, and signs nothing (campbooks-cloud#191).
+    previous: Option<Arc<hmac::Key>>,
 }
 
 impl std::fmt::Debug for Binding {
@@ -141,12 +155,17 @@ impl std::fmt::Debug for Binding {
 impl Binding {
     /// The binding keyed by `secret` (the instance secret): every process
     /// of the install agrees.
+    /// A previous key set on `secret` verifies what it bound too.
     pub fn new(secret: &SecretKey) -> Self {
-        Self {
-            key: Some(Arc::new(hmac::Key::new(
+        let key = |secret: &SecretKey| {
+            Arc::new(hmac::Key::new(
                 hmac::HMAC_SHA256,
                 &derive_bytes(secret, KEY_PURPOSE),
-            ))),
+            ))
+        };
+        Self {
+            key: Some(key(secret)),
+            previous: secret.previous_key().map(|previous| key(&previous)),
         }
     }
 
@@ -170,17 +189,53 @@ impl Binding {
         Some(tag)
     }
 
-    /// Whether `tag` is the tag of `fields` under this key (the HMAC
-    /// compared in constant time). `false` without a key, without a tag,
-    /// or for a tag of another version.
+    /// Whether `tag` is the tag of `fields` under this key, or under the
+    /// previous one during a rotation (the HMAC compared in constant time).
+    /// `false` without a key, without a tag, or for a tag of another
+    /// version.
     pub fn verify(&self, fields: &Fields, tag: Option<&[u8]>) -> bool {
+        self.verify_checked(fields, tag) != Verified::No
+    }
+
+    /// [`verify`](Self::verify), saying which key the tag is under.
+    pub fn verify_checked(&self, fields: &Fields, tag: Option<&[u8]>) -> Verified {
         let (Some(key), Some(tag)) = (self.key.as_ref(), tag) else {
-            return false;
+            return Verified::No;
         };
         let Some((&version, mac)) = tag.split_first() else {
-            return false;
+            return Verified::No;
         };
-        version == TAG_VERSION && hmac::verify(key, &fields.bytes, mac).is_ok()
+        if version != TAG_VERSION {
+            return Verified::No;
+        }
+        if hmac::verify(key, &fields.bytes, mac).is_ok() {
+            return Verified::Current;
+        }
+        match &self.previous {
+            Some(previous) if hmac::verify(previous, &fields.bytes, mac).is_ok() => {
+                Verified::Previous
+            }
+            _ => Verified::No,
+        }
+    }
+
+    /// The tag of `fields` under the current key, when `tag` verifies under
+    /// the previous key only (campbooks-cloud#191); `None` otherwise (it
+    /// verifies under the current key already, or not at all). Re-tagging
+    /// adds no trust: what was bound stays bound, under the key that will
+    /// remain.
+    pub fn retag(&self, fields: &Fields, tag: Option<&[u8]>) -> Option<Vec<u8>> {
+        if self.verify_checked(fields, tag) == Verified::Previous {
+            self.tag(fields)
+        } else {
+            None
+        }
+    }
+
+    /// Whether a previous key is set: a rotation is under way, and what it
+    /// bound should be re-tagged ([`retag`](Self::retag)).
+    pub fn has_previous(&self) -> bool {
+        self.previous.is_some()
     }
 }
 
@@ -269,6 +324,51 @@ mod tests {
 
     /// Length prefixes, presence bytes and counts: moving bytes between
     /// fields, or an empty value for a missing one, changes the encoding.
+    /// During a rotation a tag of the previous key still verifies, new tags
+    /// are the new key's, and without the previous key an old tag fails
+    /// closed (campbooks-cloud#191).
+    #[test]
+    fn a_previous_key_verifies_what_it_bound() {
+        let fields = sample();
+        let old = binding(7).tag(&fields).unwrap();
+        let rotated = Binding::new(
+            &SecretKey::from_bytes([8; SECRET_KEY_LEN])
+                .with_previous(&SecretKey::from_bytes([7; SECRET_KEY_LEN])),
+        );
+        assert!(rotated.verify(&fields, Some(&old)));
+        assert!(rotated.has_previous() && !binding(8).has_previous());
+        assert_eq!(
+            rotated.verify_checked(&fields, Some(&old)),
+            Verified::Previous
+        );
+        // Re-tagged: only what verified under the previous key, and it then
+        // verifies under the new key alone.
+        let retagged = rotated.retag(&fields, Some(&old)).unwrap();
+        assert!(binding(8).verify(&fields, Some(&retagged)));
+        assert_eq!(
+            rotated.verify_checked(&fields, Some(&retagged)),
+            Verified::Current
+        );
+        assert!(rotated.retag(&fields, Some(&retagged)).is_none());
+        assert!(
+            rotated
+                .retag(&fields, Some(&binding(9).tag(&fields).unwrap()))
+                .is_none()
+        );
+        assert!(rotated.retag(&fields, None).is_none());
+        let fresh = rotated.tag(&fields).unwrap();
+        assert_eq!(
+            fresh,
+            binding(8).tag(&fields).unwrap(),
+            "signed with the new key"
+        );
+        assert!(!binding(7).verify(&fields, Some(&fresh)));
+        assert!(!binding(8).verify(&fields, Some(&old)));
+        let mut other = Fields::new("campbooks/test/v1");
+        other.str("hello");
+        assert!(!rotated.verify(&other, Some(&old)));
+    }
+
     #[test]
     fn the_encoding_is_unambiguous() {
         let encode = |build: fn(&mut Fields)| {

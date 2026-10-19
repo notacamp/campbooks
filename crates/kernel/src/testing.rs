@@ -71,7 +71,7 @@ pub async fn app_role_pool(db: &PgPool) -> PgPool {
         Some(db::DEFAULT_RUNTIME_ROLE),
     );
     options
-        .connect_with((*db.connect_options()).clone())
+        .connect_with(db::with_session_limits((*db.connect_options()).clone()))
         .await
         .unwrap_or_else(|e| panic!("connecting as the runtime role: {e}"))
 }

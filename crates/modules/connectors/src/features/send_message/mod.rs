@@ -29,6 +29,7 @@ use campbooks_kernel::{
     JobContext, JobError, JobHandler,
     blobs::{BlobOwner, BlobRef},
     db::BeginFor as _,
+    redact,
     tenancy::{UserId, WorkspaceId},
 };
 use chrono::{DateTime, TimeDelta, Utc};
@@ -488,8 +489,9 @@ impl SendMessage {
                         message: Box::new(message),
                     }],
                 );
-                let bytes = serde_json::to_vec(&batch)
-                    .map_err(|e| JobError::fatal(format!("encoding a batch: {e}")))?;
+                let bytes = serde_json::to_vec(&batch).map_err(|e| {
+                    JobError::fatal(format!("encoding a batch: {}", redact::json(&e)))
+                })?;
                 Some((op, state.blobs.put(&ws, bytes, BATCH_CONTENT_TYPE).await?))
             }
             None => None,
@@ -553,8 +555,12 @@ impl SendMessage {
 
 /// The stream's cursor as an event carries it, and its pass generation.
 fn cursor_of(target: &Target) -> Result<(String, i32), JobError> {
-    let unreadable =
-        |e: serde_json::Error| JobError::fatal(format!("a stream has an unreadable cursor: {e}"));
+    let unreadable = |e: serde_json::Error| {
+        JobError::fatal(format!(
+            "a stream has an unreadable cursor: {}",
+            redact::json(&e)
+        ))
+    };
     let Some(cursor) = target.cursor.clone() else {
         return Ok((String::new(), 0));
     };
@@ -592,8 +598,12 @@ async fn load(
     let Some(row) = row else {
         return Ok(None);
     };
-    let document: BlobRef = serde_json::from_value(row.document)
-        .map_err(|e| JobError::fatal(format!("send {send} has an unreadable document: {e}")))?;
+    let document: BlobRef = serde_json::from_value(row.document).map_err(|e| {
+        JobError::fatal(format!(
+            "send {send} has an unreadable document: {}",
+            redact::json(&e)
+        ))
+    })?;
     Ok(Some(Target {
         inbox: row.inbox,
         document,

@@ -56,6 +56,12 @@ pub enum Error {
     /// reads.
     #[error("denied: {0}")]
     Denied(Reason),
+    /// The request's body is larger than the operation accepts (an upload
+    /// over `CAMPBOOKS_BLOBS__MAX_OBJECT_BYTES`, a JSON body over its
+    /// limit); the reason says which, with the limit when it is known
+    /// (campbooks-cloud#179).
+    #[error("payload too large: {0}")]
+    PayloadTooLarge(Reason),
     /// The caller holds too many of a limited resource at once (e.g. open
     /// change streams); the reason says which.
     #[error("too many requests: {0}")]
@@ -96,6 +102,7 @@ impl Error {
             Self::Unauthorized(_) => StatusCode::UNAUTHORIZED,
             Self::InsufficientScope(_) | Self::Forbidden | Self::Denied(_) => StatusCode::FORBIDDEN,
             Self::Conflict(_) => StatusCode::CONFLICT,
+            Self::PayloadTooLarge(_) => StatusCode::PAYLOAD_TOO_LARGE,
             Self::TooManyRequests(_) | Self::RateLimited { .. } => StatusCode::TOO_MANY_REQUESTS,
             Self::Unavailable(_) => StatusCode::SERVICE_UNAVAILABLE,
             Self::Internal(_) => StatusCode::INTERNAL_SERVER_ERROR,
@@ -110,6 +117,7 @@ impl Error {
             Self::BadRequest(reason)
             | Self::Denied(reason)
             | Self::Conflict(reason)
+            | Self::PayloadTooLarge(reason)
             | Self::TooManyRequests(reason)
             | Self::Unavailable(reason) => reason.clone(),
             Self::NotFound => kernel.reason("not_found"),
@@ -149,8 +157,29 @@ impl From<sqlx::Error> for Error {
     fn from(err: sqlx::Error) -> Self {
         match err {
             sqlx::Error::RowNotFound => Self::NotFound,
+            ref waited if gave_up_waiting(waited) => {
+                // Logged by kind, like any database error: the client is
+                // told to try again (campbooks-cloud#251).
+                tracing::warn!(
+                    error = %crate::redact::sqlx(waited),
+                    "the database took too long; answered 503"
+                );
+                Self::Unavailable(i18n::MESSAGES.reason("database_unavailable"))
+            }
             other => Self::internal(other),
         }
+    }
+}
+
+/// Whether `err` is the database giving up on a wait rather than a fault:
+/// a statement cancelled at its `statement_timeout` (SQLSTATE 57014), a
+/// lock not had within `lock_timeout` (55P03), or no connection free within
+/// the pool's acquire timeout.
+pub fn gave_up_waiting(err: &sqlx::Error) -> bool {
+    match err {
+        sqlx::Error::PoolTimedOut => true,
+        sqlx::Error::Database(db) => matches!(db.code().as_deref(), Some("57014" | "55P03")),
+        _ => false,
     }
 }
 
@@ -295,6 +324,37 @@ mod tests {
     use http_body_util::BodyExt;
 
     use super::*;
+
+    /// An over-limit upload is a 413 naming the limit, in every locale
+    /// (campbooks-cloud#179).
+    #[tokio::test]
+    async fn an_over_limit_upload_is_a_413_with_the_limit() {
+        let err = Error::from(crate::blobs::BlobError::TooLarge { limit: 1_048_576 });
+        let (status, content_type, body) = render(err).await;
+        assert_eq!(status, StatusCode::PAYLOAD_TOO_LARGE);
+        assert_eq!(content_type, PROBLEM_JSON);
+        assert_eq!(body["code"], "file_too_large");
+        assert_eq!(body["status"], 413);
+        assert!(
+            body["detail"].as_str().unwrap().contains("1048576"),
+            "{body}"
+        );
+        for locale in [Locale::PtPt, Locale::EsEs, Locale::Fr] {
+            let problem = Error::from(crate::blobs::BlobError::TooLarge { limit: 1_048_576 })
+                .to_problem(locale);
+            assert_eq!(problem.status, 413);
+            assert_eq!(problem.code, "file_too_large");
+            assert!(
+                problem.detail.contains("1048576"),
+                "{locale:?}: {}",
+                problem.detail
+            );
+            let english = Error::from(crate::blobs::BlobError::TooLarge { limit: 1_048_576 })
+                .to_problem(Locale::En)
+                .detail;
+            assert_ne!(problem.detail, english, "{locale:?} is translated");
+        }
+    }
 
     async fn render(err: Error) -> (StatusCode, String, serde_json::Value) {
         let response = err.into_response();
@@ -457,6 +517,13 @@ mod tests {
             Error::from(sqlx::Error::RowNotFound),
             Error::NotFound
         ));
+    }
+
+    #[test]
+    fn no_free_connection_in_time_is_a_503() {
+        let error = Error::from(sqlx::Error::PoolTimedOut);
+        assert_eq!(error.status(), StatusCode::SERVICE_UNAVAILABLE);
+        assert_eq!(error.code(), "database_unavailable");
     }
 
     #[test]

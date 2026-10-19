@@ -266,18 +266,22 @@ pub enum BlobError {
     /// The object store failed.
     #[error("object store: {0}")]
     Store(#[from] object_store::Error),
-    /// The database failed.
-    #[error("database: {0}")]
+    /// The database failed. Shown by kind only (`redact::sqlx`): a database
+    /// error's message can quote the row it failed on, and this message
+    /// reaches `kernel.jobs.last_error` through `From<BlobError> for
+    /// JobError`.
+    #[error("database: {}", crate::redact::sqlx(.0))]
     Database(#[from] sqlx::Error),
 }
 
-/// For handlers: missing blobs are 404s; bad input is a 400; storage and
-/// database failures are internal.
+/// For handlers: missing blobs are 404s; an over-limit upload is a 413
+/// with the limit; other bad input is a 400; storage and database failures
+/// are internal.
 impl From<BlobError> for crate::Error {
     fn from(err: BlobError) -> Self {
         match err {
             BlobError::NotFound => Self::NotFound,
-            BlobError::TooLarge { limit } => Self::BadRequest(
+            BlobError::TooLarge { limit } => Self::PayloadTooLarge(
                 crate::i18n::MESSAGES
                     .reason("file_too_large")
                     .arg("limit", limit),

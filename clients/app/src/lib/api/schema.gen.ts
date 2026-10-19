@@ -3301,6 +3301,13 @@ export interface components {
             has_html: boolean;
             /** @description The message. */
             id: components["schemas"]["MessageId"];
+            /**
+             * @description `text` holds only the first part of its words (its HTML was cut at
+             *     256 KiB, or the words at their limit): a reply or forward quoting it
+             *     says so. The reader's own `truncated` stays about the text part
+             *     (campbooks-cloud#255).
+             */
+            quote_cut?: boolean;
             /** @description Read. */
             read: boolean;
             /** @description Where replies go, when not to the sender. */
@@ -3315,6 +3322,12 @@ export interface components {
             /** @description The subject. */
             subject: string;
             text?: components["schemas"]["MessageText"] | null;
+            /**
+             * @description Its words were to be read from its HTML and this answer ran out of
+             *     time first: `text` is absent, and the HTML is still whole
+             *     (`conversations.get_message_body`).
+             */
+            text_unread?: boolean;
             /** @description Recipients. */
             to: components["schemas"]["Address"][];
         };
@@ -7254,6 +7267,13 @@ export interface operations {
                  *     tracking pixels are removed either way.
                  */
                 show_images?: boolean;
+                /**
+                 * @description `true` for the message's words only, as `text`: its text part when it
+                 *     has any, else its HTML read as text (at most half a second). `html`
+                 *     is then absent. What a reply or forward quotes when
+                 *     `conversations.get` marked the message `text_unread`.
+                 */
+                words?: boolean;
             };
             header?: never;
             path: {
@@ -10937,7 +10957,7 @@ export interface operations {
                     "application/json": components["schemas"]["SignedInWith"];
                 };
             };
-            /** @description `invalid_body` (not a credential, or over 16 KiB). */
+            /** @description `invalid_body` (not a credential). */
             400: {
                 headers: {
                     [name: string]: unknown;
@@ -10964,6 +10984,15 @@ export interface operations {
             };
             /** @description `passkey_expired`: no ceremony waits for this browser (it took more than five minutes, or was used). */
             409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `body_too_large`: the body is over 16 KiB. */
+            413: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -11008,7 +11037,7 @@ export interface operations {
                     "application/json": components["schemas"]["RequestOptions"];
                 };
             };
-            /** @description `invalid_return_to`, or `invalid_body` (not JSON, or over 16 KiB). */
+            /** @description `invalid_return_to`, or `invalid_body` (not JSON). */
             400: {
                 headers: {
                     [name: string]: unknown;
@@ -11032,6 +11061,15 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description `body_too_large`: the body is over 16 KiB. */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
             };
             /** @description `rate_limited`: too many ceremonies, or ten challenges waiting, for this address. */
             429: {
@@ -11071,7 +11109,7 @@ export interface operations {
                     "application/json": components["schemas"]["SignedInWith"];
                 };
             };
-            /** @description `invalid_body` (not a credential, or over 16 KiB). */
+            /** @description `invalid_body` (not a credential). */
             400: {
                 headers: {
                     [name: string]: unknown;
@@ -11098,6 +11136,15 @@ export interface operations {
             };
             /** @description `passkey_expired`, or `passkey_already_registered`. */
             409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `body_too_large`: the body is over 16 KiB. */
+            413: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -11142,7 +11189,7 @@ export interface operations {
                     "application/json": components["schemas"]["CreationOptions"];
                 };
             };
-            /** @description `display_name_required`, `invalid_return_to`, or `invalid_body` (not JSON, or over 16 KiB). */
+            /** @description `display_name_required`, `invalid_return_to`, or `invalid_body` (not JSON). */
             400: {
                 headers: {
                     [name: string]: unknown;
@@ -11166,6 +11213,15 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description `body_too_large`: the body is over 16 KiB. */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
             };
             /** @description `rate_limited`: too many ceremonies, or ten challenges waiting, for this address. */
             429: {

@@ -287,15 +287,30 @@ instance-wide jobs, pruning and the admin's queue SHALL keep working there.
 ### Requirement: Idempotency keys belong to their caller
 `kernel.idempotency` SHALL enable and force row-level security. A key SHALL
 be reachable only in a transaction naming its caller
-(`campbooks.idempotency_caller`, `user:<subject>` or `client:<client id>`),
+(`campbooks.idempotency_caller`: `user:<length of the subject>:<subject>|azp:<client id>`,
+a person through one app, or `client:<client id>`),
 which only the kernel's idempotency layer opens
 (`kernel::db::begin_as_idempotency_caller`), for the claim, the stored
 answer and the release. The kernel scope SHALL read and delete expired
 keys only (the hourly prune), and SHALL NOT read a live key nor write any.
 A transaction working in a workspace, or one that set nothing, SHALL see no
-key and SHALL NOT add, change or delete one. Request bodies SHALL never be
-stored, only a hash of the request, and no stored answer SHALL hold a
-secret (see `operation-catalogue`).
+key and SHALL NOT add or change one, nor delete one other than through the
+workspace purge's function. Request bodies SHALL never be stored, only a
+hash of the request, and no stored answer SHALL hold a secret (see
+`operation-catalogue`). A person's keys through one app SHALL be that
+app's alone: the web app and every app acting for the same person keep
+separate keys.
+
+A key SHALL record the workspace of the route it was first used on: the
+`{workspace_id}` segment of the matched route, percent-decoded as the
+router decodes it for the handler, never a value from the request's body
+or query, and none for a route outside a workspace. A key taken again once
+expired SHALL record its new route's workspace. A
+workspace's purge SHALL delete its keys, expired or not, only through
+`kernel.purge_workspace_idempotency(workspace, batch)`. That function SHALL
+be a `SECURITY DEFINER` function owned by `campbooks_definer`, with a pinned
+`search_path`. It SHALL refuse a transaction that does not work in that
+workspace, and SHALL answer only how many keys it deleted.
 
 #### Scenario: A workspace transaction and the keys
 - **WHEN** a key is stored for a caller, and a transaction of the runtime role working in a workspace counts, updates, deletes and inserts idempotency keys
@@ -308,6 +323,26 @@ secret (see `operation-catalogue`).
 #### Scenario: The prune
 - **WHEN** the hourly prune runs as the runtime role while one key has expired and another is live
 - **THEN** it deletes the expired key only, and a transaction in the kernel scope sees no live key and rewrites none
+
+#### Scenario: One person through two apps
+- **WHEN** a person's web app and an app acting for them each send a request with `Idempotency-Key: k-1`
+- **THEN** each runs once and replays only to its own app, and neither gets 422 for the other's request
+
+#### Scenario: A key's workspace comes from the route
+- **WHEN** keyed requests go to a route of workspace A and to one of workspace B, both with a body naming workspace B, and to a route outside any workspace
+- **THEN** the keys record A, B and none
+
+#### Scenario: A percent-encoded workspace segment
+- **WHEN** a keyed request goes to a workspace route whose `{workspace_id}` segment is percent-encoded
+- **THEN** the key records the decoded workspace
+
+#### Scenario: An expired key taken again
+- **WHEN** a key used on workspace A's route has expired and is used on workspace B's
+- **THEN** the request runs again and the key records B
+
+#### Scenario: A workspace's purge
+- **WHEN** the purge function runs for workspace A in a transaction that set nothing, in one working in workspace B, and in one working in A
+- **THEN** the first two are refused and delete nothing, and the third deletes A's keys only while still seeing no key
 
 ### Requirement: Rate-limit counters are reached only through the kernel's functions
 The runtime role SHALL hold no privilege on `kernel.rate_limits`, which
@@ -337,10 +372,17 @@ lower or write a counter otherwise, and every limit SHALL keep limiting.
 
 ### Requirement: Every kernel table has row-level security or a stated reason
 Every table of schemas `kernel` and `bff` SHALL enable and force row-level
-security and carry at least one policy, or SHALL grant the runtime role no
+security and carry at least one policy, none of them a permissive policy for
+the runtime role (or everyone) admitting every row, to read or to write:
+no expression at all, or a `USING` or `WITH CHECK` expression that does
+not depend on the row (`USING (true)`, `USING (1 = 1)`) and is not a lone
+`false`. A policy reading every row whose writes are checked counts as
+open. Otherwise the table SHALL grant the runtime role no
 privilege of any kind on the table or on any of its columns (reached through
 `SECURITY DEFINER` functions only), or SHALL be listed, in the server's
-test, as instance-only with the reason it needs none; a listed table SHALL
+test, as instance-only with the reason it needs none. A view or materialized
+view in those schemas SHALL grant the runtime role nothing, since row-level
+security does not apply through it; a listed table SHALL
 grant the runtime role no `INSERT`, `UPDATE`, `DELETE` or `TRUNCATE`, on the
 table or a column. Today the list SHALL hold only
 `kernel.instance_rows_from_workspaces` (read-only to the runtime role,
@@ -367,6 +409,10 @@ string (`set_config`) (`cargo xtask arch`).
 - **WHEN** a migration defines a `SECURITY DEFINER` function without the pinned path, or without revoking it from `PUBLIC`
 - **THEN** the server's test fails naming the function
 
+#### Scenario: An open view or an open policy
+- **WHEN** a migration adds a view or a materialized view to schema `kernel` that the runtime role may read, or a permissive policy `USING (true)`, `USING (1 = 1)` or `USING (true) WITH CHECK (<a column test>)` for everyone or the runtime role on a kernel table
+- **THEN** the server's test fails naming it, while a policy for another role, a restrictive one, `USING (false)`, or a view the runtime role may not read passes
+
 ### Requirement: The web sign-in's tables are reached only through the BFF's functions
 The runtime role SHALL hold no privilege on `bff.sessions`,
 `bff.login_transactions` and `bff.retired_tokens`, which SHALL enable
@@ -392,7 +438,8 @@ deadlines out of order, and a landing the handler would refuse: longer than
 visible ASCII, a backslash, `"`, `'`, `<`, `>` or a backtick, or naming the
 BFF's own paths. `touch_session` SHALL refuse a missing time or idle
 deadline, or a deadline not after the use, and `store_session_tokens` a
-missing or empty sealed access or refresh token or a missing deadline.
+missing or empty sealed access or refresh token, an empty ID token or a
+missing deadline; a missing ID token keeps the stored one.
 
 #### Scenario: Direct access as the runtime role
 - **WHEN** a transaction of the runtime role selects, updates, deletes, inserts, truncates or locks any of the three tables while a session, a sign-in and a retired token exist
@@ -416,7 +463,12 @@ never by a superuser or a role that can log in (such as the migration
 login). `campbooks_definer` SHALL NOT log in, be a superuser, bypass
 row-level security, create databases or roles, or replicate; it SHALL be a
 member of no role, no runtime role SHALL be a member of it, and it SHALL own
-nothing but those functions. It SHALL hold exactly the privileges their
+nothing but those functions. The server SHALL refuse to start when the role
+it queries as is a member of it (see `workspaces`), and a migration SHALL
+fail when `campbooks_app` is. The migration login SHALL hold it with
+`INHERIT` (`USAGE`), so later migrations can replace the functions; a
+migration SHALL grant that to itself when it may (PostgreSQL 16 and later),
+and otherwise SHALL fail naming the statement an administrator runs once. It SHALL hold exactly the privileges their
 statements need: `USAGE` on schemas `kernel` and `bff`; `SELECT`, `INSERT`,
 `UPDATE` and `DELETE` on `kernel.rate_limits` and `bff.sessions`; `SELECT`,
 `INSERT` and `DELETE` on `bff.login_transactions`; `SELECT` and `INSERT` on
@@ -442,6 +494,10 @@ only.
 #### Scenario: A migration login that cannot create roles
 - **WHEN** the migration login is neither a superuser nor allowed to create roles and `campbooks_definer` does not exist or cannot be taken
 - **THEN** the migration fails, naming `CREATE ROLE campbooks_definer NOLOGIN NOINHERIT` and `GRANT campbooks_definer TO <login>`, and applies once an administrator has run them
+
+#### Scenario: The runtime role holds the owner role
+- **WHEN** an administrator grants `campbooks_definer` to `campbooks_app` and the migrations run, or to the login the server queries as and the server starts
+- **THEN** the migration fails naming `REVOKE campbooks_definer FROM campbooks_app`, and the server refuses to start naming `campbooks_definer`
 
 ### Requirement: A workspace's event alone is no proof
 Any transaction working in a workspace can append that workspace's events,

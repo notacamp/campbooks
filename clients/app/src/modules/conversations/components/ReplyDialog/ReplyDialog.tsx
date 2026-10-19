@@ -27,7 +27,7 @@ import {
   sendDraft,
   type Draft,
 } from "../../api/drafts";
-import { useConversation, type MessageView } from "../../api/queries";
+import { useConversation, useMessageWords, type MessageView } from "../../api/queries";
 import { useReplySuggestions, writeReply } from "../../api/replies";
 import { displayName, replyQuote, type QuoteWords } from "../../compose/quote";
 import type { Translate } from "../../model";
@@ -131,7 +131,29 @@ export function ReplyDialog({
   const detail = useConversation(workspaceId, conversationId);
   const messages = detail.data?.messages ?? [];
   // The newest message, as the reader's Reply answers it.
-  const answered = messages.at(-1);
+  const newest = messages.at(-1);
+  // The message a draft is written for, pinned once one is asked for (or
+  // handed back): mail arriving meanwhile never changes what Send answers
+  // (campbooks-cloud#220). Until then the dialog follows the newest.
+  const [pinned, setPinned] = useState<string | undefined>(resume?.draft.message_id ?? undefined);
+  const base = pinned === undefined ? newest : messages.find((m) => m.id === pinned);
+  // A newer message than the one the draft answers: said, with a way to
+  // answer it instead.
+  // Your own mail sent meanwhile is not something to answer.
+  const newer =
+    pinned !== undefined &&
+    newest !== undefined &&
+    newest.id !== pinned &&
+    newest.direction === "inbound"
+      ? newest
+      : undefined;
+  // Its words, asked for on their own when the conversation came without
+  // them (`text_unread`).
+  const unread = useMessageWords(workspaceId, conversationId, base);
+  const answered =
+    base?.text_unread === true && unread.data !== undefined
+      ? { ...base, text: unread.data, text_unread: false }
+      : base;
   // Who it really goes to, never only the sender's display name: a Reply-To
   // elsewhere is said out loud.
   const recipient = answered === undefined ? undefined : recipientOf(answered);
@@ -191,8 +213,12 @@ export function ReplyDialog({
     }
   };
 
-  const write = (asked: string, how?: { shorter?: boolean; change?: string }) => {
-    if (answered === undefined) {
+  const write = (
+    asked: string,
+    how?: { shorter?: boolean; change?: string },
+    target: MessageView | undefined = answered,
+  ) => {
+    if (target === undefined) {
       return;
     }
     asking.current += 1;
@@ -204,9 +230,11 @@ export function ReplyDialog({
     } else {
       setIntent(asked);
       setStage("writing");
+      // Pinned from the moment it is asked for.
+      setPinned(target.id);
     }
     void writeReply(workspaceId, conversationId, {
-      message_id: answered.id,
+      message_id: target.id,
       intent: asked,
       ...(rewrite
         ? { draft: text, shorter: how.shorter === true, change: how.change ?? null }
@@ -224,10 +252,12 @@ export function ReplyDialog({
           return;
         }
         setProblem(failure(thrown));
-        // A failed first draft goes back to the choices; a failed rewrite
-        // keeps the text the member had.
+        // A failed first draft goes back to the choices (which follow the
+        // newest message again); a failed rewrite keeps the text the member
+        // had.
         if (!rewrite) {
           setStage("choose");
+          setPinned(undefined);
         }
       })
       .finally(() => {
@@ -242,6 +272,35 @@ export function ReplyDialog({
     setRewriting(undefined);
     setProblem(undefined);
     setStage("choose");
+    setPinned(undefined);
+    // A draft already saved (a send that failed) is never reused for the
+    // next pick, which may answer another message: the next save is a fresh
+    // draft, and that one goes (campbooks-cloud#257).
+    if (saved !== undefined) {
+      replaced.current = saved;
+      setSaved(undefined);
+    }
+  };
+
+  /**
+   * Answer the newer message instead: the draft written for the old one is
+   * written again for it (or, with no intent to write from, its own text
+   * now quotes the newer one). A draft already saved for the old one is
+   * never reused: the next save is a fresh draft, and that one goes.
+   */
+  const answerNewer = () => {
+    if (newer === undefined) {
+      return;
+    }
+    if (saved !== undefined) {
+      replaced.current = saved;
+      setSaved(undefined);
+    }
+    if (intent.trim() === "") {
+      setPinned(newer.id);
+    } else {
+      write(intent, undefined, newer);
+    }
   };
 
   /**
@@ -258,6 +317,11 @@ export function ReplyDialog({
     if (answered === undefined) {
       return undefined;
     }
+    // Only the quote the dialog shows: never words read after it said
+    // they could not be, sent unseen.
+    if (answered.text_unread === true) {
+      throw new Error("the quote is not shown yet");
+    }
     // The recipients shown, and no copies: what is saved is what is seen.
     const content = {
       body: text,
@@ -266,7 +330,8 @@ export function ReplyDialog({
       cc: [],
       bcc: [],
     };
-    if (saved !== undefined) {
+    // Only a draft of the message answered is saved again.
+    if (saved?.message_id === answered.id) {
       const again = await saveDraft(workspaceId, saved.id, {
         version: saved.version,
         content_token: saved.content_token ?? null,
@@ -322,21 +387,27 @@ export function ReplyDialog({
       });
       const window = undoWindow(scheduled.send_at);
       const asked = intent;
-      handle.done({
-        label: t("reply.sending", { name: person }),
-        durationMs: window,
-        undo: () => {
-          void cancelSend(workspaceId, scheduled.id)
-            .then((back) => {
-              undo.notify(t("reply.undone"));
-              void queryClient.invalidateQueries({ queryKey: draftKeys.all(workspaceId) });
-              onUndone?.({ draft: back, intent: asked });
-            })
-            .catch(() => {
-              undo.notify(t("reply.tooLate"));
-            });
-        },
-      });
+      // No send time: there is no window to take it back in, so no Undo
+      // (it could only say "too late").
+      if (window === undefined) {
+        handle.done({ label: t("reply.sending", { name: person }) });
+      } else {
+        handle.done({
+          label: t("reply.sending", { name: person }),
+          durationMs: window,
+          undo: () => {
+            void cancelSend(workspaceId, scheduled.id)
+              .then((back) => {
+                undo.notify(t("reply.undone"));
+                void queryClient.invalidateQueries({ queryKey: draftKeys.all(workspaceId) });
+                onUndone?.({ draft: back, intent: asked });
+              })
+              .catch(() => {
+                undo.notify(t("reply.tooLate"));
+              });
+          },
+        });
+      }
       void queryClient.invalidateQueries({ queryKey: draftKeys.all(workspaceId) });
       setResult({
         title: t("reply.result", { name: person }),
@@ -375,8 +446,8 @@ export function ReplyDialog({
       if (draft === undefined) {
         throw new Error("nothing to answer yet");
       }
-      // The composer finds it at once (it reopens the reply draft of the
-      // newest message).
+      // The composer finds it at once: it reopens the reply draft of the
+      // message the draft answers (`onOpenDraft` names it).
       queryClient.setQueryData<Draft[]>(
         draftKeys.forConversation(workspaceId, conversationId),
         (list) => [draft, ...(list ?? []).filter((d) => d.id !== draft.id)],
@@ -396,13 +467,34 @@ export function ReplyDialog({
     () => {
       void send();
     },
-    { enabled: drafting && rewriting === undefined && result === undefined },
+    {
+      enabled:
+        drafting &&
+        rewriting === undefined &&
+        result === undefined &&
+        answered?.text_unread !== true,
+    },
   );
 
   const intents = suggestions.data?.intents ?? [];
   // The message answered, the one the draft replies to.
+  // Still reading its words, or they could not be read: said, never an
+  // empty quote shown as if there were nothing.
+  const quoteUnread = base?.text_unread === true && unread.isError && !unread.isFetching;
+  const quoteReading = base?.text_unread === true && unread.data === undefined && !quoteUnread;
+  // What the preview leaves out is said (campbooks-cloud#255): a long
+  // email's reply quotes only its first part; a long quote is shown in
+  // part, and quoted whole.
+  const said = answered?.text?.content.trim() ?? "";
+  const shortened = said.length > QUOTE_CHARS;
+  let quoteNote: string | undefined;
+  if (answered?.quote_cut === true || answered?.text?.truncated === true) {
+    quoteNote = t("reply.quoteCut");
+  } else if (shortened) {
+    quoteNote = t("reply.quoteShortened");
+  }
   const quote =
-    answered?.text?.content === undefined || answered.text.content.trim() === "" ? undefined : (
+    answered?.text?.content === undefined || said === "" ? undefined : (
       <ReplyQuote
         from={t("reply.quoteFrom", {
           name: displayName(answered.from),
@@ -412,7 +504,8 @@ export function ReplyDialog({
             month: "short",
           }).format(new Date(answered.sent_at)),
         })}
-        text={answered.text.content.trim().slice(0, QUOTE_CHARS)}
+        text={shortened ? `${said.slice(0, QUOTE_CHARS)}…` : said}
+        note={quoteNote}
       />
     );
   const to =
@@ -483,7 +576,12 @@ export function ReplyDialog({
               variant="primary"
               icon="send"
               shortcut="compose.send"
-              disabled={busy || rewriting !== undefined || text.trim() === ""}
+              disabled={
+                busy ||
+                rewriting !== undefined ||
+                text.trim() === "" ||
+                answered?.text_unread === true
+              }
               onClick={() => {
                 void send();
               }}
@@ -491,7 +589,7 @@ export function ReplyDialog({
               {t("reply.send")}
             </Button>
             <Button
-              disabled={busy || rewriting !== undefined}
+              disabled={busy || rewriting !== undefined || answered?.text_unread === true}
               onClick={() => {
                 void openInComposer();
               }}
@@ -505,7 +603,45 @@ export function ReplyDialog({
       }
     >
       {to}
-      {quote}
+      {newer === undefined || stage === "choose" ? null : (
+        <Banner
+          icon="mail"
+          title={t("reply.newer", { name: displayName(newer.from) })}
+          action={
+            <Button
+              variant="ghost"
+              disabled={busy || stage === "writing" || rewriting !== undefined}
+              onClick={answerNewer}
+            >
+              {t("reply.answerNewer")}
+            </Button>
+          }
+        />
+      )}
+      {quoteUnread ? (
+        <Banner
+          tone="danger"
+          role="alert"
+          title={t("reply.quoteUnread")}
+          action={
+            <Button
+              onClick={() => {
+                void unread.refetch();
+              }}
+            >
+              {t("error.retry")}
+            </Button>
+          }
+        />
+      ) : null}
+      {quoteReading ? (
+        <div role="status">
+          <Text tone="secondary" size="sm">
+            {t("reply.readingQuote")}
+          </Text>
+        </div>
+      ) : null}
+      {quoteUnread || quoteReading ? null : quote}
       {stage === "choose" ? (
         <>
           {problemLine}

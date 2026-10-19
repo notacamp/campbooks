@@ -555,3 +555,103 @@ async fn a_planted_or_edited_change_request_stands_for_nothing(db: PgPool) {
         &standing(&kit, workspace, &request, inbox, &conversation, &archive).await
     ));
 }
+
+// --- after a rotation of the instance secret key (campbooks-cloud#262) ------
+
+/// The kit's key (`testing::binding`), the one rotated away.
+fn old_key() -> campbooks_kernel::crypto::SecretKey {
+    campbooks_kernel::crypto::SecretKey::from_bytes(
+        [0x5a; campbooks_kernel::crypto::SECRET_KEY_LEN],
+    )
+}
+
+fn new_key() -> campbooks_kernel::crypto::SecretKey {
+    campbooks_kernel::crypto::SecretKey::from_bytes(
+        [0x6b; campbooks_kernel::crypto::SECRET_KEY_LEN],
+    )
+}
+
+/// The kit rotated: the new key, the old as the previous one, after one
+/// re-tag pass over `workspace` (asserted to re-tag something and leave
+/// nothing), then the previous key removed.
+async fn rotated(kit: Kit, workspace: WorkspaceId) -> Kit {
+    use campbooks_kernel::binding::Binding;
+
+    let rotating = Binding::new(&new_key().with_previous(&old_key()));
+    let kit = kit.with_binding(rotating.clone());
+    let mut tx = kit.state.db.begin_for(workspace).await.unwrap();
+    let tally = crate::features::retag_bindings::retag(&mut tx, &rotating, workspace)
+        .await
+        .unwrap();
+    tx.commit().await.unwrap();
+    assert!(tally.retagged > 0 && tally.left == 0, "{tally:?}");
+    kit.with_binding(Binding::new(&new_key()))
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_stored_send_retagged_after_a_rotation_still_stands(db: PgPool) {
+    let kit = Kit::new(db).await;
+    let (workspace, _, sam) = kit.sams_inbox().await;
+    let event = released(&kit, workspace, &sam).await;
+    let send = event["send_id"].as_str().unwrap().to_owned();
+    let kit = rotated(kit, workspace).await;
+    assert!(stored(&kit, workspace, &send).await.is_some());
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_scheduled_send_retagged_after_a_rotation_is_still_released(db: PgPool) {
+    let kit = Kit::new(db).await;
+    let (workspace, _, sam) = kit.sams_inbox().await;
+    let message = kit.message_of("en-1").await;
+    let uri = format!("/api/v1/w/{workspace}/drafts");
+    let draft = kit
+        .post(
+            &sam,
+            &uri,
+            Some(json!({"kind": "reply", "message_id": message, "body": "Done"})),
+        )
+        .await;
+    let uri = format!("{uri}/{}", draft.json["id"].as_str().unwrap());
+    let shown = kit.get(&sam, &uri).await.json;
+    let sent = kit
+        .post(
+            &sam,
+            &format!("{uri}/send"),
+            Some(json!({"version": shown["version"], "content_token": shown["content_token"]})),
+        )
+        .await;
+    assert_eq!(sent.status, StatusCode::ACCEPTED, "{:?}", sent.json);
+    // Scheduled under the old key, released under the new one alone.
+    let kit = rotated(kit, workspace).await;
+    sqlx::query(
+        "UPDATE kernel.jobs SET run_at = now() WHERE kind = 'conversations.release_send' AND state = 'pending'",
+    )
+    .execute(&kit.db)
+    .await
+    .unwrap();
+    kit.run_jobs().await;
+    let requested = kit.events("conversations.send_requested").await;
+    assert_eq!(requested.len(), 1, "released");
+    let send = requested[0]["send_id"].as_str().unwrap();
+    assert!(stored(&kit, workspace, send).await.is_some());
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_change_request_retagged_after_a_rotation_still_stands(db: PgPool) {
+    let kit = Kit::new(db).await;
+    let (workspace, inbox, sam) = kit.sams_inbox().await;
+    let conversation = kit.conversation_of("en-1").await;
+    let read = kit
+        .post(
+            &sam,
+            &format!("/api/v1/w/{workspace}/conversations/{conversation}/read"),
+            None,
+        )
+        .await;
+    assert_eq!(read.status, StatusCode::OK, "{:?}", read.json);
+    let (request, items) = last_request(&kit).await;
+    let kit = rotated(kit, workspace).await;
+    assert!(every(
+        &standing(&kit, workspace, &request, inbox, &conversation, &items).await
+    ));
+}

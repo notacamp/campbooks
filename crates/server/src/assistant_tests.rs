@@ -344,6 +344,7 @@ fn on_behalf_of(sub: &str) -> campbooks_kernel::auth::Principal {
         expires_at: None,
         issued_at: None,
         auth_time: None,
+        sign_in: None,
     }
 }
 

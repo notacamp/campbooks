@@ -146,6 +146,50 @@ describe("the inbox", () => {
     });
   });
 
+  it("folds a message that came without its words with them as its snippet", async () => {
+    const first = Q4_DETAIL.messages[0]?.id ?? "";
+    let answer!: () => void;
+    const held = new Promise<void>((resolve) => {
+      answer = resolve;
+    });
+    const api = inbox({
+      [`GET ${W}/conversations/${Q4.id}`]: {
+        body: {
+          ...Q4_DETAIL,
+          messages: Q4_DETAIL.messages.map((message) =>
+            message.id === first ? { ...message, text: null, text_unread: true } : message,
+          ),
+        },
+      },
+      [`GET ${W}/conversations/${Q4.id}/messages/${first}/body`]: {
+        body: {
+          ...Q4_BODY,
+          text: "The harbourlight pontoon plan, read from its HTML.",
+          html: null,
+        },
+      },
+    });
+    const mocked = globalThis.fetch;
+    globalThis.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
+      const request = input instanceof Request ? input : new Request(input, init);
+      if (new URL(request.url).pathname.endsWith(`/messages/${first}/body`)) {
+        await held;
+      }
+      return mocked(request);
+    };
+    renderAt(`/w/${DUARTE.id}/inbox/primary/${Q4.id}`);
+
+    const reader = await screen.findByRole("main", { name: "Conversation" });
+    // A neutral word while it reads, never an empty or made-up snippet.
+    expect(await within(reader).findByText("Reading…")).toBeVisible();
+    answer();
+    expect(
+      await within(reader).findByText("The harbourlight pontoon plan, read from its HTML."),
+    ).toBeVisible();
+    const asked = api.calls.filter((call) => call.route.endsWith(`/messages/${first}/body`));
+    expect(asked).toHaveLength(1);
+  });
+
   it("shows a kept inbox's mail as read-only history, with nothing to act on", async () => {
     const api = inbox({
       [`GET ${W}/inboxes`]: { body: { inboxes: [{ ...INBOX, read_only: true }] } },

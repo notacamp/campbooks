@@ -55,7 +55,9 @@
     "kept": {
       "title": "Conservado como historial",
       "lead": "{{address}} se desconectó y su correo se conserva aquí, solo lectura: no llega nada nuevo y no se puede enviar ni cambiar nada desde él."
-    }
+    },
+    "readingText": "Leyendo…",
+    "textFailed": "No se pudo leer el texto de este correo."
   },
   "actions": {
     "star": "Fijar",
@@ -227,12 +229,15 @@
       "unknown_outcome": "Campbooks no ha podido confirmar que este mensaje se haya enviado. Revisa la carpeta Enviados antes de enviarlo de nuevo.",
       "unknown": "Algo ha salido mal. Inténtalo de nuevo.",
       "not_saved": "No se han podido guardar los últimos cambios, así que no se ha enviado nada. Inténtalo de nuevo.",
-      "content_changed": "Esto ha cambiado desde que lo abriste. Revísalo y vuelve a enviarlo."
+      "content_changed": "Esto ha cambiado desde que lo abriste. Revísalo y vuelve a enviarlo.",
+      "quote": "No se pudo leer el correo para citarlo. No se ha iniciado nada. Inténtalo de nuevo."
     },
     "shortcuts": {
       "newMessage": "Mensaje nuevo"
     },
-    "tooLate": "Ya es tarde para deshacer: se ha enviado."
+    "tooLate": "Ya es tarde para deshacer: se ha enviado.",
+    "readingQuote": "Leyendo el correo para citarlo…",
+    "quoteCut": "Este correo es largo: la cita contiene la primera parte."
   },
   "needs": {
     "line": {
@@ -587,7 +592,13 @@
       "changed": "Esta respuesta ha cambiado desde que se guardó. Revísala y vuelve a enviarla."
     },
     "to": "Para {{recipient}}",
-    "replyToElsewhere": "Las respuestas van a {{recipient}}, no al remitente {{sender}}. Compruébalo antes de enviar."
+    "replyToElsewhere": "Las respuestas van a {{recipient}}, no al remitente {{sender}}. Compruébalo antes de enviar.",
+    "readingQuote": "Leyendo el correo para citarlo…",
+    "quoteUnread": "No se pudo leer el correo al que respondes, así que no se puede mostrar la cita. No se puede enviar nada hasta que se muestre.",
+    "quoteCut": "Este correo es largo: tu respuesta cita la primera parte.",
+    "quoteShortened": "Se muestra en parte: tu respuesta lo cita entero.",
+    "newer": "Ha llegado un mensaje más reciente de {{name}}. Tu respuesta sigue respondiendo al citado abajo.",
+    "answerNewer": "Responder al más reciente"
   },
   "smartRule": {
     "tag": "Regla inteligente",
@@ -666,6 +677,7 @@
     "failed": "No se ha podido preparar el reenvío: no se ha enviado nada. Vuelve a intentarlo.",
     "none": "Nadie con ese nombre te ha escrito.",
     "searchFailed": "No se ha podido buscar ahora. Vuelve a intentarlo.",
-    "nobody": "Todavía no te ha escrito nadie."
+    "nobody": "Todavía no te ha escrito nadie.",
+    "quoteFailed": "No se pudo leer el correo para citarlo: no se ha enviado nada. Inténtalo de nuevo."
   }
 }

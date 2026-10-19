@@ -316,16 +316,23 @@ pub(crate) async fn request_sequencing(
     Ok(())
 }
 
-/// Delete every change of `workspace` and its cursor head, e.g. when the
-/// workspace is purged. Returns how many changes were deleted.
+/// Delete up to `limit` changes of `workspace`, and its cursor head, when
+/// the workspace is purged. Returns how many changes were deleted; fewer
+/// than `limit` means none is left (see [`crate::purge::purge_workspace`],
+/// which loops over batches).
 pub async fn purge_workspace(
     tx: &mut Transaction<'_, Postgres>,
     workspace: &str,
+    limit: i64,
 ) -> Result<u64, sqlx::Error> {
     crate::db::require_scope(tx, workspace, "the purge of a workspace's feed").await?;
     let deleted = sqlx::query!(
-        "DELETE FROM kernel.changes WHERE workspace_id = $1",
-        workspace
+        r#"
+        DELETE FROM kernel.changes
+         WHERE id IN (SELECT id FROM kernel.changes WHERE workspace_id = $1 LIMIT $2)
+        "#,
+        workspace,
+        limit
     )
     .execute(&mut **tx)
     .await?

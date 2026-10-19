@@ -1045,12 +1045,21 @@ impl Standings {
 }
 
 impl TokenRevocation for Standings {
-    fn standing<'a>(&'a self, _db: &'a sqlx::PgPool, account: &'a str) -> StandingFuture<'a> {
+    fn standing<'a>(
+        &'a self,
+        _db: &'a sqlx::PgPool,
+        principal: &'a Principal,
+    ) -> StandingFuture<'a> {
         self.asked.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
         let answer = if self.broken.load(std::sync::atomic::Ordering::SeqCst) {
             Err(Error::internal("the database is down"))
         } else {
-            Ok(self.by_subject.lock().unwrap().get(account).copied())
+            Ok(self
+                .by_subject
+                .lock()
+                .unwrap()
+                .get(&principal.subject)
+                .copied())
         };
         Box::pin(async move { answer })
     }
@@ -1115,7 +1124,7 @@ async fn a_revoked_persons_token_gets_what_any_invalid_token_gets() {
         "test-user",
         TokenStanding {
             suspended: true,
-            tokens_not_before: None,
+            ..TokenStanding::default()
         },
     );
     assert_refused(call_with(&app, &token).await);
@@ -1124,8 +1133,8 @@ async fn a_revoked_persons_token_gets_what_any_invalid_token_gets() {
         standings.set(
             "test-user",
             TokenStanding {
-                suspended: false,
                 tokens_not_before: chrono::DateTime::from_timestamp(epoch, 999_000_000),
+                ..TokenStanding::default()
             },
         );
         assert_refused(call_with(&app, &token).await);
@@ -1134,8 +1143,8 @@ async fn a_revoked_persons_token_gets_what_any_invalid_token_gets() {
     standings.set(
         "test-user",
         TokenStanding {
-            suspended: false,
             tokens_not_before: chrono::DateTime::from_timestamp(now - 1, 999_000_000),
+            ..TokenStanding::default()
         },
     );
     assert_eq!(call_with(&app, &token).await.status, StatusCode::OK);
@@ -1210,8 +1219,8 @@ async fn still_stands_asks_again() {
     standings.set(
         "test-user",
         TokenStanding {
-            suspended: false,
             tokens_not_before: Some(Utc::now()),
+            ..TokenStanding::default()
         },
     );
     assert!(!verifier.still_stands(&principal).await.unwrap());

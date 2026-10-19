@@ -395,7 +395,9 @@ export function WhatNeedsYou({ workspaceId, now, offer }: WhatNeedsYouProps) {
     snoozeOrRollBack(row, until, entry);
   };
   /** The plain composer at the end of the conversation ("Write my own", "Open in composer"). */
-  const openComposer = (row: Row) => {
+  // The composer on the item's email: on the message a draft answers when
+  // one is given (it may not be the newest), else the newest.
+  const openComposer = (row: Row, messageId?: string | null) => {
     void navigate({
       to: "/w/$workspaceId/inbox/$stream/$conversationId",
       params: {
@@ -403,7 +405,10 @@ export function WhatNeedsYou({ workspaceId, now, offer }: WhatNeedsYouProps) {
         stream: row.conversation.stream,
         conversationId: row.conversation.id,
       },
-      search: { reply: true },
+      search:
+        messageId === undefined || messageId === null
+          ? { reply: true }
+          : { reply: true, to: messageId },
     });
   };
   // Reply: Scout's likely replies and draft, in a dialog over Home.
@@ -1022,9 +1027,9 @@ export function WhatNeedsYou({ workspaceId, now, offer }: WhatNeedsYouProps) {
             setReplying(undefined);
             openComposer(replying.row);
           }}
-          onOpenDraft={() => {
+          onOpenDraft={(draft) => {
             setReplying(undefined);
-            openComposer(replying.row);
+            openComposer(replying.row, draft.message_id);
           }}
           onSent={() => {
             hide(replying.row, t("confirm.replied", { name: replying.row.name }));

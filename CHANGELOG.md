@@ -77,6 +77,19 @@ All notable changes to Campbooks Next are documented here. The format follows
   (your own sent mail, say), the message shows in the trash or spam again after the sync.
   Gmail's untrash and Zoho's spam report work as their documentation says and still need
   checking on a live account. Mail in the trash or spam never needs you.
+- **Rotate the instance secret key without signing anyone out (campbooks-cloud#191).** Set
+  the old key as `CAMPBOOKS_SECRET_KEY_PREVIOUS_FILE` (or `CAMPBOOKS_SECRET_KEY_PREVIOUS`)
+  beside the new one. Web sessions, connected mailboxes, the sign-in keys, taught rules and
+  what they changed, and scheduled sends keep working. What the old key sealed is sealed
+  again with the new one as it is used, and what it signed is signed again in the
+  background. The logs say when nothing is left under the old key, which is when to remove
+  it. With compose, `server-init` gains `rotate` and `forget-previous`; the self-hosting
+  guide has the steps. Never keep a leaked key as the previous one.
+- **A separate worker container can have a health check.** A process started as
+  `campbooks-server worker` answers `GET /healthz` on `CAMPBOOKS_JOBS__HEALTH_ADDR` (default
+  `127.0.0.1:8081`): 200 while its job loop runs and reaches the database, 503 after a
+  minute without. Use `campbooks-server healthcheck --worker` as the container's health
+  check; the self-hosting guide shows how.
 
 ### Fixed
 
@@ -88,6 +101,40 @@ All notable changes to Campbooks Next are documented here. The format follows
   anything typed meanwhile stays. The reply dialog does the same (the next Send goes in a
   fresh reply draft), and Forward starts a fresh forward instead of failing
   (campbooks-cloud#242).
+- **A reply or forward never quotes nothing.** When an email's words were too slow to read
+  in time (a very large or heavy HTML email), the conversation arrives without them; Reply,
+  Reply all, Forward and Home's Forward picker now read them first, saying "Reading the email
+  to quote it…" meanwhile, and the folded message in the reader shows them too. If they
+  cannot be read, nothing is started or sent and the app says why, instead of quoting an
+  empty message; the reply dialog waits to send until the quote is shown, with Try again.
+  When only the start of a long email could be read, the composer says the quote holds its
+  first part.
+- **A request can no longer hang on the database.** The server's database connections now
+  give up on a statement after 30 seconds and on a lock wait after 10 (background jobs
+  allow their own statements 5 minutes). A request that hits either, or finds no free
+  connection in time, answers "The database is unavailable right now. Try again in a
+  moment." (503) instead of waiting indefinitely or failing as an internal error.
+- **Desktop app: a mail link opens only when its addresses are plain addresses.** A link
+  whose address part hides a line break, another field or header (`&`, `;`, `?`), even
+  encoded, an invisible character (a bidi override, a zero-width space) or bytes that are
+  not text, or that carries a `mailto://` authority, now opens nowhere instead of
+  reaching the mail app as written; the same holds for addresses in its `to`, `cc` and
+  `bcc` fields. A subject or body that could be read as another field (it holds `&` or
+  `?`) is left out, and so is a subject hiding a line break or an invisible character,
+  or a body hiding a control character other than line breaks and tabs, which could
+  start another header such as Bcc. Internationalised addresses still open.
+- **Gmail write-back stays within its quota budget.** Before writing your changes back to
+  Gmail, a sync now reserves the most those writes can cost, not just what it plans: enough
+  for Gmail to refuse a large batch (each message is then changed on its own) or for a
+  change made meanwhile in Gmail to split a batch into smaller writes. Before, such pushes
+  could spend far more than they took from the shared budget and run into Gmail's rate limit.
+- **Mail whose HTML has no body tag gets its words.** Mail written as a head followed
+  straight by its text, with no `<body>` (some mailers send it), was stored with a blank
+  text in place of its words, so search found nothing in it, its preview and Scout's read
+  were empty, and forwarding or replying to it quoted nothing. Its words are read from
+  its HTML now, everywhere, and mail stored
+  earlier is read again in the background after the update, the first time anyone
+  searches or new mail arrives in a workspace; search keeps answering meanwhile.
 - **The live feed resyncs whenever it finds an inbox nothing announced.** If an inbox ever
   became visible to someone without the change that should announce it, only the
   heartbeat's check noticed; a check triggered by a change to some other inbox let it in
@@ -182,6 +229,101 @@ All notable changes to Campbooks Next are documented here. The format follows
   For operators, `campbooks-server labelling export` writes your recent money mail as a
   sheet to label on your own machine, and `cargo xtask eval decide --set-dir` measures the
   model on it (campbooks-cloud#167).
+- **A send or sync no longer fails while another run refreshes the mailbox's sign-in.** When
+  two runs needed a fresh token at once, the second waited on the first's call to the
+  provider and, under the new 10-second lock limit, failed and used up one of its retries.
+  It now takes the token the first run stores. Replaying events and pruning expired
+  sign-in state also run in small batches, so neither meets the 30-second statement limit.
+- **Desktop app: a mail link's subject or body can't smuggle a field behind a semicolon or a
+  second encoding.** A subject or body holding `;` once decoded, or still holding an escape
+  such as `%0D` (it was encoded twice), is left out of what reaches your mail app; a
+  percent sign that is text, as in "50% off", stays.
+- **Big Gmail write-backs no longer hold back other syncs.** Writing your changes back to
+  Gmail now takes from the shared Google budget what it plans to spend, then settles what
+  its calls really cost: unused units go straight back, and any extra (Gmail refusing a
+  batch, say) is paid back before more is spent. A large archive no longer holds thousands
+  of units it never uses, or waits behind smaller syncs, and every unit stays counted
+  whatever rate is configured.
+- **A long email's quote says it holds only the first part.** Replying to or forwarding an
+  email that came as long HTML (over 256 KiB) quoted only its beginning without a word;
+  the composer now says "This email is long: the quote holds its first part.", and the
+  reply dialog says so too. When the dialog's preview shows only the start of a quote, it
+  says the reply quotes all of it.
+- **A reply keeps answering the email its draft was written for.** If new mail arrives in
+  the conversation while you review Scout's draft, Send still replies to the email it was
+  written for; the dialog says a newer message arrived and offers "Answer the newer one",
+  which writes the draft again for it. A send that can't be taken back no longer offers an
+  Undo that could only say "too late", and keyboard shortcuts on the page are no longer
+  swallowed by an open dialog that lost its focus.
+- **The reply dialog leaves no stray drafts behind.** Going back to Scout's choices after
+  a send failed, then sending another reply, now discards the failed draft instead of
+  leaving it in your drafts, and your own sent mail arriving in the conversation no longer
+  shows as "a newer message" to answer.
+- **Someone removed from a workspace gets no live updates from it, even in the moment
+  they were removed.** Opening the change feed now checks membership again once it knows
+  where it starts, so a removal made just before cannot slip past until the next heartbeat.
+- **Signing out of one place stops access there at once.** Signing out of one browser,
+  revoking an app, removing a way in, or revoking a refresh token now stops that sign-in's
+  access tokens on the very next request, instead of letting them run out their ten
+  minutes, and the web app there asks you to sign in again right away; your other sign-ins
+  keep working.
+- **Database and retry hardening (campbooks-cloud#213).**
+  - The web app and each app acting for you now keep separate `Idempotency-Key`s. A retry
+    that spans the upgrade runs again.
+  - The token endpoint's answers, and any redirect from a request that shows a secret, are
+    never kept for replay.
+  - The server refuses to start on PostgreSQL older than 15, or when its database login
+    holds the role that owns the database functions.
+  - Migrations stop after a minute behind a long-running transaction and run again at the
+    next start, instead of hanging.
+  - A queue index left broken by a hand-run migration is rebuilt.
+  - A database clock behind the server's no longer fails web requests near a session's end.
+  - The self-hosting guide says what the database separation protects, and when.
+- **An action taken just as a sign-in ends is no longer lost.** When the web app's access
+  token is refused and a fresh one can be had, a change you just made (a send, a move, a
+  rule) is now sent again with the fresh token, instead of asking you to sign in again. If
+  the sign-in service is briefly down, you stay signed in and the next try goes through.
+- **Rotating the instance secret key keeps pending mailbox changes too.** A change you
+  asked for that is still waiting to be made at your mail provider (its mailbox paused, or
+  the provider down) is now signed again with the new key during a rotation, so it is
+  still made once the old key is removed. The logs say when none are left.
+- **A file or request that is too large now says so with 413.** An upload over the
+  instance's size limit, or a request body over its limit, is answered 413 (instead of
+  400). For a file, the message names the limit in your language.
+- **A retried request is never done twice after a crash.** If a request with an
+  `Idempotency-Key` ended without its answer being kept (the server stopped, the request
+  hit the 30-second limit, or the client hung up), retrying it with the same key used to
+  run it again after two minutes. It is now never run again: the retry answers 409
+  `idempotency_outcome_unknown`, so the caller checks whether it took effect and then
+  retries with a new key. A request past the time limit now answers 503
+  `request_timed_out`, which says the same.
+- **The 30-second request limit is a hard cap.** Telling a stopped request why, in your
+  language, no longer waits on a slow lookup of your saved language: after two seconds it
+  uses your browser's.
+- **A request body that cannot be read is explained in your language.** The web app's
+  error for a body that arrived incomplete was English only; it is now in all four
+  languages.
+- **A deleted workspace leaves nothing behind once purged.** When a workspace's grace
+  period ends, its purge now deletes its history in small batches, so even a very large
+  workspace is purged without long locks. Whatever reaches that workspace afterwards (an
+  event published by another part of the app's own clean-up, or a finished job) is deleted
+  by an hourly sweep, rather than waiting up to 90 days for normal retention. A delivery
+  still waiting to run is kept until it has run. The server remembers which workspaces
+  were purged by id and time only, and forgets that too 30 days after nothing of the
+  workspace is left. A workspace that turns out to be live again is never swept. After
+  restoring a database backup, operators can delete again the workspaces deleted after
+  the backup was taken: `campbooks-server workspaces purge-again <id> --confirm <id>`. The
+  ids come from the `workspace deleted` and `workspace purged` log lines. A workspace that
+  is live in the backup is only described (member count, creation date) until the operator
+  adds `--not-deleted-in-backup`; it is then hidden at once and purged an hour later at
+  the earliest. The self-hosting guide's Backups section has the steps. Only that command
+  can shorten a workspace's grace period: there is no API for it.
+- **Purging a workspace also deletes its saved retry answers.** When a request is sent with
+  an idempotency key, the server keeps its answer for a day so a retry gets the same
+  answer, and that answer can include what you wrote. Each saved answer now records the
+  workspace in the request's address (never one named in the request itself), and purging
+  the workspace deletes them at once, even ones less than a day old. Saved answers stay
+  readable only by the person and app that made the request.
 
 ### Added
 
@@ -690,6 +832,13 @@ All notable changes to Campbooks Next are documented here. The format follows
   first line, at most 500 characters, with quoted text, email addresses,
   link paths and queries, and long tokens removed. Admin → Jobs shows the
   cleaned message. Errors already stored are left as they are.
+- **Why a background job failed no longer quotes your data.** The reason a failed job
+  keeps for an administrator, and the events and jobs the server keeps for up to 90 days,
+  hold ids, codes and references to stored files, never addresses, names, subjects or
+  what someone wrote. Some failure reasons used to repeat the piece of data they could
+  not read; they now say only what kind of error it was and where. A build check holds
+  every event, every job and every failure reason to this, with the reason written down
+  for each value it allows.
 
 ### Removed
 - **Due dates on needs, until they are extracted from the mail.** A need no longer

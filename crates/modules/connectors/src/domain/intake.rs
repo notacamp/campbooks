@@ -258,6 +258,7 @@ async fn member(state: &AppState, subject: &str, workspace: WorkspaceId) -> Resu
         expires_at: None,
         issued_at: None,
         auth_time: None,
+        sign_in: None,
     };
     state
         .membership

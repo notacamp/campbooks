@@ -22,6 +22,8 @@ export interface DraftComposerProps {
   onDone: () => void;
   /** The send was taken back: show the draft again. */
   onUndone?: (() => void) | undefined;
+  /** Said beside the quoted history (that it holds only the start of a long email). */
+  quotedNote?: string | undefined;
 }
 
 const KNOWN_ERRORS = new Set([
@@ -49,6 +51,7 @@ export function DraftComposer({
   onClose,
   onDone,
   onUndone,
+  quotedNote,
 }: DraftComposerProps) {
   const { t: typed } = useTranslation("conversations");
   const t = typed as unknown as Translate;
@@ -121,6 +124,7 @@ export function DraftComposer({
       onQuotedChange={(quoted) => {
         update({ quoted });
       }}
+      quotedNote={quotedNote}
       attachments={editor.shown.attachments.filter((a) => fields.attachments.includes(a.id))}
       onRemoveAttachment={(id) => {
         update({ attachments: fields.attachments.filter((kept) => kept !== id) });

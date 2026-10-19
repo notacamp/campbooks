@@ -45,11 +45,12 @@ use sqlx::{PgConnection, Postgres, Transaction};
 use crate::{
     documents::{PARTICIPANTS_CONTENT_TYPE, ParticipantsDocument},
     domain::{
-        blobs::{read_bytes, read_text, snippet},
+        blobs::{cut, read_bytes, snippet, words},
         conversation::{Changed, recount},
-        decide::{ENVELOPE_BODY_BYTES, MessageParts, Source, envelope},
+        decide::{ENVELOPE_BODY_BYTES, ENVELOPE_BUDGET, MessageParts, Source, envelope},
         decisions::Recorded,
         needs::{self, NeedSettings},
+        plain_text::Quotes,
         policy::Policy,
         redact, rules,
         streams::{Inbound, sort_first_inbound},
@@ -332,14 +333,19 @@ impl ApplyChanges {
             {
                 continue;
             }
-            let body = match &message.text {
-                Some(text) => {
-                    read_text(&state.blobs, ws, text, ENVELOPE_BODY_BYTES)
-                        .await?
-                        .0
-                }
-                None => String::new(),
-            };
+            // Its text part, else its HTML read as text (campbooks-cloud#218).
+            let body = cut(
+                words(
+                    &state.blobs,
+                    ws,
+                    (message.text.as_ref(), message.html.as_ref()),
+                    ENVELOPE_BUDGET,
+                    Quotes::Keep,
+                )
+                .await?
+                .0,
+                ENVELOPE_BODY_BYTES,
+            );
             let document = ParticipantsDocument {
                 version: 1,
                 from: message.from.clone(),

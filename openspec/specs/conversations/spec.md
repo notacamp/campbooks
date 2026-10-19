@@ -268,6 +268,10 @@ workspace) SHALL see them.
 - **WHEN** a member archives a conversation
 - **THEN** the feed records an upsert of that conversation within its inbox
 
+#### Scenario: Words of very long HTML
+- **WHEN** a member asks for the words of an HTML-only message longer than 256 KiB
+- **THEN** `text` holds the words of its first 256 KiB and `truncated` is true
+
 #### Scenario: Someone outside the inbox
 - **WHEN** a member who is not in an inbox follows the feed
 - **THEN** changes within that inbox are not shown to them
@@ -802,15 +806,28 @@ The module SHALL implement the kernel's `SearchSource` port for the group
 type `conversations.conversation`: a conversation's container (its inbox),
 time (its last message), subject, label names, facets (stream, unread,
 starred, archived, label ids) and, per message, its people (from, to, cc
-with names and addresses), plain text (the text part, or the HTML part
-reduced to text when there is none, quoted history removed, at most
+with names and addresses), plain text (the text part when it has words, or
+the HTML part reduced to text when there is none or it holds blanks only,
+quoted history removed, at most
 32 KiB; the HTML is reduced by html5ever's tokenizer alone, with no tree,
 fed 1 KiB at a time and stopped after 500 ms with the words read so far, keeping the characters outside scripts, styles, the head, the
-title, the markup a `noscript`, `iframe`, `noembed` or `noframes` holds, and
-`blockquote`s, with a line break at each `br` and at the end of
-each block), attachment names, mailbox (`inbox`, `archive`, `spam`, `trash`),
-direction and a content stamp made of the hashes of the blobs it is read
-from. A conversation that no longer exists SHALL be reported as gone.
+title, the markup a `noscript`, `iframe`, `noembed` or `noframes` holds,
+`template`s and `blockquote`s, with a line break at each `br` and at the end of
+each block; the head ends where the tree builder would end it, at `</head>`,
+`<body>`, any start tag that cannot stand in a head, or words outside its
+raw-text elements, so HTML with no `<body>` tag still gives its words),
+attachment names, mailbox (`inbox`, `archive`, `spam`, `trash`), direction
+and a content stamp made of the hashes of the blobs it is read from, plus,
+for a message with an HTML part, the version of how HTML becomes text. The
+same reading SHALL give every other reader of a message its words: its
+snippet and Scout's read at ingest, the decide pass, the labelling export,
+reply context, need summaries, and the text `conversations.get` returns for
+each message, which replies and forwards quote. HTML SHALL be read as text
+off the async workers; `conversations.get` SHALL read it within one second
+for all its messages together, reading at most 256 KiB of each message's
+HTML, and a message past that SHALL come without `text`, marked
+`text_unread` (the HTML is still whole). Words read from HTML SHALL never
+mark a text `truncated`. A conversation that no longer exists SHALL be reported as gone.
 Drafts SHALL NOT be returned.
 
 #### Scenario: HTML-only message
@@ -828,6 +845,22 @@ Drafts SHALL NOT be returned.
 #### Scenario: HTML built to be slow to parse
 - **WHEN** search asks for an HTML-only message whose HTML would take minutes to build as a tree
 - **THEN** it gets the message's text, or the words read within 500 ms
+
+#### Scenario: A head and no body tag
+- **WHEN** search asks for an HTML-only message `<head><meta charset=utf-8><title>T</title><p>Invoice due Friday`
+- **THEN** it gets "Invoice due Friday" and nothing of the title, styles or scripts, as for a doctype, a full document, a closed head with no body tag and Outlook's HTML
+
+#### Scenario: A text part of blanks only
+- **WHEN** a message stored earlier holds a text part of three line breaks beside its HTML
+- **THEN** search, its snippet and Scout read the words of its HTML, and its stamp names how HTML is read, so the backfill reads it again
+
+#### Scenario: Forwarding HTML-only mail
+- **WHEN** a member forwards or replies to a message that is HTML alone, or one whose text part is blanks
+- **THEN** the message's text in `conversations.get` holds the words of its HTML, so the quote carries them
+
+#### Scenario: Crafted HTML threaded into one conversation
+- **WHEN** a sender threads a dozen HTML-only messages, each slow to tokenize, into one conversation and a member opens it
+- **THEN** the answer comes within a few seconds, each message with its words or marked `text_unread`, none marked `truncated`
 
 ### Requirement: Visible inboxes as a list
 The module's container-visibility port SHALL also list the inboxes a caller
@@ -2552,3 +2585,43 @@ own "Always show images" SHALL keep working unchanged.
 #### Scenario: Scout reshapes or restores one
 - **WHEN** the assistant changes a proposal's actions to show images, or brings back an image rule Sam removed
 - **THEN** each answers 403 `images_need_you` and nothing changes
+
+### Requirement: A message's words alone
+`conversations.get_message_body` with `words=true` SHALL return the
+message's words alone, as `text`, with no `html`: its text part when it has
+words, else its HTML read as text the way every reader reads it (at most
+500 ms, at most 256 KiB of the HTML), cut at 256 KiB, and marked
+`truncated` whenever they are not whole: the text cut, the HTML cut at its
+256 KiB, or its reading stopped at the 500 ms cap. It SHALL need exactly the access of the body. This is what a
+reply or forward quotes when `conversations.get` marked the message
+`text_unread`. In a debug build only, `CAMPBOOKS_DEV_TEXT_DEADLINE_MS`, when
+set, SHALL replace the one-second deadline `conversations.get` reads HTML
+within (0 marks every message read from HTML `text_unread`); release builds
+SHALL never read it.
+
+#### Scenario: Words of HTML-only mail
+- **WHEN** a member asks for the words of a message that is HTML alone
+- **THEN** `text` holds the HTML's words and `html` is absent
+
+#### Scenario: Words of a message with a text part
+- **WHEN** a member asks for the words of a message with a text part
+- **THEN** `text` is that text part
+
+#### Scenario: Someone outside the inbox
+- **WHEN** a member of the workspace who is not in the message's inbox asks for its words
+- **THEN** the message is not found
+
+#### Scenario: Forcing text_unread for a recording
+- **WHEN** a debug server runs with `CAMPBOOKS_DEV_TEXT_DEADLINE_MS=0` and a member opens a conversation of HTML-only mail
+- **THEN** each such message comes without `text`, marked `text_unread`
+
+### Requirement: A quote says when it is cut
+`conversations.get` SHALL mark a message `quote_cut` when the `text` it
+returns holds only the first part of the message's words: the text part was
+cut, the HTML was cut at the 256 KiB it is read from, or the words were cut
+at their limit. The message's `truncated` SHALL stay about its text part
+alone, so HTML the reader shows whole is never called truncated.
+
+#### Scenario: Long HTML read in time
+- **WHEN** a member opens a conversation whose HTML-only message is 280 KiB and its words are read within the deadline
+- **THEN** the message has its words, is not `text_unread` and not `truncated`, and is marked `quote_cut`; a short HTML-only message is not

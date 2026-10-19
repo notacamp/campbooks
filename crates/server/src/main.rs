@@ -23,6 +23,7 @@ use campbooks_kernel::{
     jobs::Worker,
 };
 use campbooks_server::{bff, telemetry::Telemetry};
+use campbooks_workspaces::operator::{PurgeAgain, PurgeAgainOptions};
 use clap::{Parser, Subcommand};
 use secrecy::ExposeSecret;
 use sqlx::{Connection as _, PgConnection, PgPool};
@@ -32,6 +33,9 @@ use tokio::{sync::watch, task::JoinSet};
 const DEFAULT_PORT: u16 = 8080;
 /// How long the database pool waits for a connection.
 const DB_ACQUIRE_TIMEOUT: Duration = Duration::from_secs(5);
+/// What `healthcheck` probes on a process serving the API.
+const API_HEALTH_PATH: &str = "/api/v1/system/health";
+
 /// How long `healthcheck` waits for the server.
 const HEALTHCHECK_TIMEOUT: Duration = Duration::from_secs(5);
 
@@ -77,6 +81,11 @@ enum Command {
         #[command(subcommand)]
         command: labelling_cli::LabellingCommand,
     },
+    /// Operator work on workspaces (`purge-again`).
+    Workspaces {
+        #[command(subcommand)]
+        command: WorkspacesCommand,
+    },
     /// Work with the search index.
     Search {
         #[command(subcommand)]
@@ -96,9 +105,14 @@ enum Command {
     /// health checks (the runtime image has no shell or curl).
     Healthcheck {
         /// Port to probe on 127.0.0.1. Defaults to the port of
-        /// `CAMPBOOKS_BIND_ADDR`, else 8080.
+        /// `CAMPBOOKS_BIND_ADDR`, else 8080; with `--worker`, of
+        /// `CAMPBOOKS_JOBS__HEALTH_ADDR`, else 8081.
         #[arg(long)]
         port: Option<u16>,
+        /// Probe a worker-only process (`campbooks-server worker`): its job
+        /// loop runs and reaches the database.
+        #[arg(long)]
+        worker: bool,
     },
 }
 
@@ -128,6 +142,37 @@ enum TelemetryCommand {
     /// invented and include an address and a token the scrubber must drop,
     /// so the report shows what a real one holds. Prints the report's id.
     TestError,
+}
+
+#[derive(Debug, Subcommand)]
+enum WorkspacesCommand {
+    /// Purge a workspace again after restoring a database backup brought it
+    /// back (it was deleted after the backup was taken). A workspace deleted
+    /// in the backup has its purge queued to run now (unless one is queued
+    /// already: then nothing changes and the command says when it runs). A
+    /// workspace live in the backup is left alone, and the command prints
+    /// its member count and creation date, unless `--not-deleted-in-backup`
+    /// says it was deleted after the backup: then it is deleted now (every
+    /// part of the app purges its data too) and purged an hour later, or at
+    /// `--purge-after`. An id with no workspace changes nothing. Operator
+    /// only: no API route does this.
+    PurgeAgain {
+        /// The workspace's id (a UUID), as the `workspace deleted` or
+        /// `workspace purged` log line gives it.
+        workspace: String,
+        /// The same id again: purging cannot be undone.
+        #[arg(long)]
+        confirm: Option<String>,
+        /// The workspace is live in the restored database but was deleted
+        /// after the backup was taken: delete it again.
+        #[arg(long)]
+        not_deleted_in_backup: bool,
+        /// With `--not-deleted-in-backup`: when to purge it (RFC 3339, e.g.
+        /// the `purge_after` of its `workspace deleted` line), at least an
+        /// hour from now. Default: an hour from now.
+        #[arg(long, requires = "not_deleted_in_backup", value_parser = parse_instant)]
+        purge_after: Option<chrono::DateTime<chrono::Utc>>,
+    },
 }
 
 #[derive(Debug, Subcommand)]
@@ -184,6 +229,22 @@ fn main() -> ExitCode {
         },
         Command::Admin { command } => admin_cli::run(command),
         Command::Labelling { command } => labelling_cli::run(command),
+        Command::Workspaces {
+            command:
+                WorkspacesCommand::PurgeAgain {
+                    workspace,
+                    confirm,
+                    not_deleted_in_backup,
+                    purge_after,
+                },
+        } => purge_again(
+            &workspace,
+            confirm.as_deref(),
+            PurgeAgainOptions {
+                not_deleted_in_backup,
+                purge_after,
+            },
+        ),
         Command::Search {
             command: SearchCommand::Reindex { workspace },
         } => reindex(&workspace),
@@ -192,7 +253,14 @@ fn main() -> ExitCode {
         } => test_error(),
         Command::Openapi => print_json(&campbooks_server::openapi(), "OpenAPI document"),
         Command::Scopes => print_json(&campbooks_server::scope_catalogue(), "scope catalogue"),
-        Command::Healthcheck { port } => healthcheck(port.unwrap_or_else(port_from_env)),
+        Command::Healthcheck {
+            port,
+            worker: false,
+        } => healthcheck(port.unwrap_or_else(port_from_env), API_HEALTH_PATH),
+        Command::Healthcheck { port, worker: true } => healthcheck(
+            port.unwrap_or_else(worker_port_from_env),
+            WORKER_HEALTH_PATH,
+        ),
     }
 }
 
@@ -295,6 +363,13 @@ fn rate_limits() -> Result<campbooks_kernel::rate_limit::RateLimits, String> {
 /// them; without one, each process signs alone, which is said at startup.
 fn signer() -> Result<campbooks_kernel::crypto::Signer, String> {
     if let Some(secret) = campbooks_kernel::crypto::SecretKey::from_env()? {
+        if secret.has_previous() {
+            tracing::warn!(
+                "CAMPBOOKS_SECRET_KEY_PREVIOUS is set: what the previous instance secret key \
+                 sealed still opens and is sealed again with the current one as it is used; \
+                 remove it once the rotation is over (30 days, deploy/README.md)"
+            );
+        }
         return Ok(campbooks_kernel::crypto::Signer::new(&secret));
     }
     tracing::warn!(
@@ -365,6 +440,9 @@ async fn run(
         migrate(&config).await?;
     }
     let db = connect(&config).await?;
+    if !config.run_migrations {
+        check_server_version(&db).await?;
+    }
     check_row_security(&db, &config).await?;
     telemetry.observe_pool(&db, config.database_max_connections);
 
@@ -435,12 +513,7 @@ async fn run(
         );
     }
     if role.worker() {
-        let worker = Worker::new(state);
-        let stopped = stopped(&stop);
-        parts.spawn(async move {
-            worker.run(stopped).await;
-            Ok(())
-        });
+        spawn_worker(&mut parts, state, !role.api(), &stop).await?;
     }
 
     let signal = Arc::clone(&stop);
@@ -516,12 +589,16 @@ async fn migrate(config: &Config) -> Result<(), String> {
     let mut conn = PgConnection::connect_with(&options)
         .await
         .map_err(|e| format!("could not connect to the database to migrate: {e}"))?;
+    check_server_version(&mut conn).await?;
     sqlx::query("SELECT pg_advisory_lock($1)")
         .bind(MIGRATION_LOCK)
         .execute(&mut conn)
         .await
         .map_err(|e| format!("could not take the migration lock: {e}"))?;
-    let migrated = migrate_locked(&mut conn).await;
+    let migrated = match limit_migration_waits(&mut conn).await {
+        Ok(()) => migrate_locked(&mut conn).await,
+        Err(e) => Err(e),
+    };
     // Closing the connection releases the lock too; unlock first anyway.
     let _ = sqlx::query("SELECT pg_advisory_unlock($1)")
         .bind(MIGRATION_LOCK)
@@ -531,6 +608,37 @@ async fn migrate(config: &Config) -> Result<(), String> {
     migrated?;
     tracing::info!("migrations applied");
     Ok(())
+}
+
+/// How long a migration statement waits for a lock (or, building an index
+/// concurrently, for older transactions to end) when the migration sets no
+/// limit of its own (campbooks-cloud#213, item 16). Behind a long-running
+/// transaction the migration then fails, saying so, and the server migrates
+/// again at its next start (a concurrent build left invalid is dropped
+/// first), instead of hanging at startup with every later statement queued
+/// behind it. Statements themselves have no time limit: an index build on a
+/// large table may take long.
+const MIGRATION_LOCK_TIMEOUT: &str = "60s";
+
+/// Set [`MIGRATION_LOCK_TIMEOUT`] on the migration connection, after the
+/// migration lock is taken (another process's long migration holds it, and
+/// waiting for that is right).
+async fn limit_migration_waits(conn: &mut PgConnection) -> Result<(), String> {
+    sqlx::query("SELECT set_config('lock_timeout', $1, false)")
+        .bind(MIGRATION_LOCK_TIMEOUT)
+        .execute(&mut *conn)
+        .await
+        .map(drop)
+        .map_err(|e| format!("could not limit the migrations' lock waits: {e}"))
+}
+
+/// Refuse a PostgreSQL older than Campbooks needs, before anything runs on
+/// it (campbooks-cloud#213, item 15).
+async fn check_server_version<'c>(conn: impl sqlx::PgExecutor<'c>) -> Result<(), String> {
+    let version = db::server_version_num(conn)
+        .await
+        .map_err(|e| format!("could not read the PostgreSQL version: {e}"))?;
+    db::check_server_version(version).map_err(|why| format!("refusing to start: {why}"))
 }
 
 /// The session advisory lock every Campbooks process holds while it
@@ -742,6 +850,110 @@ fn reindex(workspace: &str) -> ExitCode {
     }
 }
 
+/// `workspaces purge-again <id> --confirm <id>` (campbooks-cloud#65).
+fn purge_again(workspace: &str, confirm: Option<&str>, options: PurgeAgainOptions) -> ExitCode {
+    if let Err(e) = confirmed(workspace, confirm) {
+        return fail(&e);
+    }
+    let Ok(id) = workspace.parse::<campbooks_kernel::tenancy::WorkspaceId>() else {
+        return fail("the workspace must be a workspace id (a UUID); nothing was done");
+    };
+    let config = match Config::from_env() {
+        Ok(config) => config,
+        Err(e) => return fail(&e.to_string()),
+    };
+    let telemetry = match Telemetry::new(&config.telemetry, "cli") {
+        Ok(telemetry) => telemetry,
+        Err(e) => return fail(&e),
+    };
+    telemetry.install_subscriber(config.log_format);
+    let registry = match campbooks_server::registry() {
+        Ok(registry) => registry,
+        Err(e) => return fail(&e.to_string()),
+    };
+    let runtime = match runtime() {
+        Ok(runtime) => runtime,
+        Err(e) => return fail(&e),
+    };
+    let outcome = runtime.block_on(async {
+        let db = connect(&config).await?;
+        let state =
+            campbooks_server::with_ports(AppState::new(db.clone(), config).with_registry(registry));
+        let outcome = campbooks_workspaces::operator::purge_again(&state, id, options)
+            .await
+            .map_err(|e| e.to_string());
+        db.close().await;
+        outcome
+    });
+    drop(runtime);
+    telemetry.shutdown();
+    match outcome {
+        Ok(outcome) => purged_again(id, outcome),
+        Err(e) => fail(&e),
+    }
+}
+
+/// What `purge-again` says it did: facts only (ids, counts, dates).
+fn purged_again(id: campbooks_kernel::tenancy::WorkspaceId, outcome: PurgeAgain) -> ExitCode {
+    let said = |message: String| {
+        let _ = writeln!(std::io::stdout(), "{message}");
+        ExitCode::SUCCESS
+    };
+    match outcome {
+        PurgeAgain::NoSuchWorkspace => said(format!(
+            "no workspace {id}: nothing to purge (purged already, or never here); nothing was done"
+        )),
+        PurgeAgain::NotDeleted {
+            members,
+            created_at,
+        } => fail(&format!(
+            "workspace {id} is live (not deleted) in this database: {members} member(s), created \
+             {}; nothing was done (if it was deleted after the backup was taken, run again with \
+             --not-deleted-in-backup)",
+            created_at.to_rfc3339()
+        )),
+        PurgeAgain::TooSoon { earliest } => fail(&format!(
+            "--purge-after must be at least an hour from now (after {}); nothing was done",
+            earliest.to_rfc3339()
+        )),
+        PurgeAgain::NoOwner => fail(&format!(
+            "workspace {id} is live and has no owner to name in its deletion; nothing was done \
+             (see Backups in the self-hosting guide)"
+        )),
+        PurgeAgain::Deleted { purge_after } => said(format!(
+            "workspace {id} deleted; a worker purges it after {}",
+            purge_after.to_rfc3339()
+        )),
+        PurgeAgain::Scheduled => said(format!(
+            "workspace {id} marked for purge now; a worker purges it"
+        )),
+        PurgeAgain::AlreadyQueued { run_at } => said(format!(
+            "workspace {id} is deleted and its purge is queued already for {}; nothing was changed",
+            run_at.to_rfc3339()
+        )),
+    }
+}
+
+/// `--purge-after`: an RFC 3339 instant.
+fn parse_instant(value: &str) -> Result<chrono::DateTime<chrono::Utc>, String> {
+    chrono::DateTime::parse_from_rfc3339(value)
+        .map(|at| at.to_utc())
+        .map_err(|_| format!("{value}: expected an RFC 3339 time, e.g. 2026-11-01T09:00:00Z"))
+}
+
+/// `--confirm` must repeat the workspace id exactly.
+fn confirmed(workspace: &str, confirm: Option<&str>) -> Result<(), String> {
+    match confirm {
+        Some(again) if again == workspace => Ok(()),
+        Some(_) => Err("--confirm must repeat the workspace id exactly; nothing was done".into()),
+        None => Err(
+            "purging cannot be undone: repeat the workspace id with --confirm <id>; nothing \
+             was done"
+                .into(),
+        ),
+    }
+}
+
 /// `--since`: an event id or an RFC 3339 instant.
 fn parse_since(since: Option<&str>) -> Result<ReplayFrom, String> {
     let Some(since) = since else {
@@ -870,6 +1082,71 @@ async fn shutdown_signal() {
     tracing::info!("shutdown signal received, draining connections and jobs");
 }
 
+/// Run the job worker until `stop`; a worker-only process (`alone`) also
+/// serves its health probe.
+async fn spawn_worker(
+    parts: &mut JoinSet<Result<(), String>>,
+    state: AppState,
+    alone: bool,
+    stop: &watch::Sender<bool>,
+) -> Result<(), String> {
+    let health_addr = state.config.jobs.health_addr;
+    let worker = Worker::new(state);
+    if alone {
+        serve_worker_health(parts, worker.liveness(), health_addr, stop).await?;
+    }
+    let stopped = stopped(stop);
+    parts.spawn(async move {
+        worker.run(stopped).await;
+        Ok(())
+    });
+    Ok(())
+}
+
+/// A worker-only process's health probe (campbooks-cloud#185): `GET
+/// /healthz` on `addr` answers 200 while the worker's loop runs and the
+/// database answers it, 503 otherwise. `campbooks-server healthcheck
+/// --worker` probes it.
+async fn serve_worker_health(
+    parts: &mut JoinSet<Result<(), String>>,
+    liveness: campbooks_kernel::jobs::Liveness,
+    addr: SocketAddr,
+    stop: &watch::Sender<bool>,
+) -> Result<(), String> {
+    let router = axum::Router::new().route(
+        WORKER_HEALTH_PATH,
+        axum::routing::get(move || {
+            let liveness = liveness.clone();
+            async move { worker_health(&liveness) }
+        }),
+    );
+    let listener = tokio::net::TcpListener::bind(addr)
+        .await
+        .map_err(|e| format!("could not bind CAMPBOOKS_JOBS__HEALTH_ADDR={addr}: {e}"))?;
+    tracing::info!(%addr, "serving the worker's health probe at {WORKER_HEALTH_PATH}");
+    let stopped = stopped(stop);
+    parts.spawn(async move {
+        axum::serve(listener, router)
+            .with_graceful_shutdown(stopped)
+            .await
+            .map_err(|e| format!("worker health listener failed: {e}"))
+    });
+    Ok(())
+}
+
+/// Where a worker-only process answers its health probe.
+const WORKER_HEALTH_PATH: &str = "/healthz";
+
+/// The worker's health: 200 while it beat within
+/// [`ALIVE_FOR`](campbooks_kernel::jobs::ALIVE_FOR), else 503.
+fn worker_health(liveness: &campbooks_kernel::jobs::Liveness) -> axum::http::StatusCode {
+    if liveness.alive(campbooks_kernel::jobs::ALIVE_FOR) {
+        axum::http::StatusCode::OK
+    } else {
+        axum::http::StatusCode::SERVICE_UNAVAILABLE
+    }
+}
+
 fn port_from_env() -> u16 {
     std::env::var("CAMPBOOKS_BIND_ADDR")
         .ok()
@@ -877,23 +1154,35 @@ fn port_from_env() -> u16 {
         .map_or(DEFAULT_PORT, |addr| addr.port())
 }
 
-/// A dependency-free HTTP/1.1 probe of the health endpoint.
-fn healthcheck(port: u16) -> ExitCode {
-    match probe(port) {
+/// The port of `CAMPBOOKS_JOBS__HEALTH_ADDR`, else the default.
+fn worker_port_from_env() -> u16 {
+    std::env::var("CAMPBOOKS_JOBS__HEALTH_ADDR")
+        .ok()
+        .and_then(|addr| addr.parse::<SocketAddr>().ok())
+        .map_or(
+            campbooks_kernel::config::DEFAULT_WORKER_HEALTH_PORT,
+            |addr| addr.port(),
+        )
+}
+
+/// A dependency-free HTTP/1.1 probe of a health endpoint: the API's, or a
+/// worker-only process's.
+fn healthcheck(port: u16, path: &str) -> ExitCode {
+    match probe(port, path) {
         Ok(true) => ExitCode::SUCCESS,
         Ok(false) => fail("unhealthy"),
         Err(e) => fail(&format!("healthcheck failed: {e}")),
     }
 }
 
-fn probe(port: u16) -> std::io::Result<bool> {
+fn probe(port: u16, path: &str) -> std::io::Result<bool> {
     let addr = SocketAddr::from(([127, 0, 0, 1], port));
     let mut stream = TcpStream::connect_timeout(&addr, HEALTHCHECK_TIMEOUT)?;
     stream.set_read_timeout(Some(HEALTHCHECK_TIMEOUT))?;
     stream.set_write_timeout(Some(HEALTHCHECK_TIMEOUT))?;
     write!(
         stream,
-        "GET /api/v1/system/health HTTP/1.1\r\nHost: 127.0.0.1:{port}\r\nConnection: close\r\n\r\n"
+        "GET {path} HTTP/1.1\r\nHost: 127.0.0.1:{port}\r\nConnection: close\r\n\r\n"
     )?;
     let mut head = [0_u8; 32];
     let read = stream.read(&mut head)?;
@@ -910,6 +1199,114 @@ fn fail(message: &str) -> ExitCode {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// `workspaces purge-again` refuses unless `--confirm` repeats the id
+    /// exactly, before reading any setting or touching the database
+    /// (campbooks-cloud#65).
+    #[test]
+    fn purging_again_needs_the_id_confirmed() {
+        let id = "0192f7a0-0000-7000-8000-000000000001";
+        assert!(confirmed(id, Some(id)).is_ok());
+        assert!(confirmed(id, None).unwrap_err().contains("--confirm"));
+        assert!(confirmed(id, Some("0192f7a0-0000-7000-8000-000000000002")).is_err());
+        assert!(confirmed(id, Some(&id.to_uppercase())).is_err());
+        let failure = format!("{:?}", ExitCode::FAILURE);
+        let options = PurgeAgainOptions::default();
+        assert_eq!(format!("{:?}", purge_again(id, None, options)), failure);
+        assert_eq!(format!("{:?}", purge_again(id, Some(""), options)), failure);
+        let cli = Cli::try_parse_from([
+            "campbooks-server",
+            "workspaces",
+            "purge-again",
+            id,
+            "--confirm",
+            id,
+        ])
+        .unwrap();
+        assert!(matches!(
+            cli.command,
+            Some(Command::Workspaces {
+                command: WorkspacesCommand::PurgeAgain {
+                    not_deleted_in_backup: false,
+                    purge_after: None,
+                    ..
+                }
+            })
+        ));
+        // `--purge-after` only with `--not-deleted-in-backup`.
+        let at = "2026-11-01T09:00:00Z";
+        let alone = [
+            "campbooks-server",
+            "workspaces",
+            "purge-again",
+            id,
+            "--confirm",
+            id,
+        ];
+        assert!(Cli::try_parse_from(alone.iter().chain(&["--purge-after", at])).is_err());
+        let told = Cli::try_parse_from(alone.iter().chain(&[
+            "--not-deleted-in-backup",
+            "--purge-after",
+            at,
+        ]))
+        .unwrap();
+        let Some(Command::Workspaces {
+            command:
+                WorkspacesCommand::PurgeAgain {
+                    not_deleted_in_backup: true,
+                    purge_after: Some(purge_after),
+                    ..
+                },
+        }) = told.command
+        else {
+            panic!("--not-deleted-in-backup --purge-after not parsed as given");
+        };
+        assert_eq!(purge_after.to_rfc3339(), "2026-11-01T09:00:00+00:00");
+        assert!(parse_instant("tomorrow").is_err());
+    }
+
+    /// The worker's probe answers 200 while it beats, 503 otherwise, and
+    /// `healthcheck --worker` reads it (campbooks-cloud#185).
+    #[tokio::test(flavor = "multi_thread")]
+    async fn the_worker_health_probe_follows_its_liveness() {
+        let liveness = campbooks_kernel::jobs::Liveness::default();
+        assert_eq!(
+            worker_health(&liveness),
+            axum::http::StatusCode::SERVICE_UNAVAILABLE
+        );
+        let mut parts: JoinSet<Result<(), String>> = JoinSet::new();
+        let stop = watch::channel(false).0;
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let addr = listener.local_addr().unwrap();
+        drop(listener);
+        serve_worker_health(&mut parts, liveness.clone(), addr, &stop)
+            .await
+            .unwrap();
+        let port = addr.port();
+        let probe_now = || async move {
+            tokio::task::spawn_blocking(move || probe(port, WORKER_HEALTH_PATH))
+                .await
+                .unwrap()
+                .unwrap()
+        };
+        assert!(!probe_now().await, "never beat: unhealthy");
+        liveness.beat();
+        assert_eq!(worker_health(&liveness), axum::http::StatusCode::OK);
+        assert!(probe_now().await, "beating: healthy");
+        stop.send_replace(true);
+        while let Some(part) = parts.join_next().await {
+            part.unwrap().unwrap();
+        }
+    }
+
+    #[test]
+    fn the_worker_probe_port_defaults_to_8081() {
+        assert_eq!(
+            campbooks_kernel::config::DEFAULT_WORKER_HEALTH_PORT,
+            8081,
+            "deploy/README.md and the compose healthcheck name it"
+        );
+    }
 
     #[test]
     fn since_accepts_an_event_id_or_a_time() {
@@ -985,6 +1382,24 @@ mod tests {
         migrate_locked(&mut conn).await.unwrap();
     }
 
+    /// The migration connection waits at most a minute for a lock where a
+    /// migration sets no limit, and the server is new enough
+    /// (campbooks-cloud#213, items 15 and 16).
+    #[sqlx::test(migrations = "../../migrations")]
+    async fn migrations_wait_for_locks_a_minute_at_most(db: PgPool) {
+        let mut conn = PgConnection::connect_with(&db.connect_options())
+            .await
+            .unwrap();
+        check_server_version(&mut conn).await.unwrap();
+        limit_migration_waits(&mut conn).await.unwrap();
+        let timeout: String = sqlx::query_scalar("SELECT current_setting('lock_timeout')")
+            .fetch_one(&mut conn)
+            .await
+            .unwrap();
+        assert_eq!(timeout, "1min");
+        migrate_locked(&mut conn).await.unwrap();
+    }
+
     #[test]
     fn every_migration_belongs_to_a_swept_schema() {
         for migration in sqlx::migrate!("../../migrations").iter() {
@@ -1032,6 +1447,40 @@ mod tests {
             .unwrap();
         login.close().await;
         testing::drop_runtime_login(&db).await;
+    }
+
+    /// A login that is a member of `campbooks_definer` could read the web
+    /// sign-in's sealed tokens directly: startup refuses it, split or not
+    /// (campbooks-cloud#213, item 8).
+    #[sqlx::test(migrations = "../../migrations")]
+    async fn startup_refuses_a_login_holding_the_definer_role(db: PgPool) {
+        use campbooks_kernel::testing;
+
+        // Not a member of the runtime role: a migration elsewhere in the
+        // cluster refusing a runtime login that holds the definer role never
+        // sees this one.
+        let name = testing::create_login(&db).await;
+        sqlx::query(sqlx::AssertSqlSafe(format!(
+            "GRANT campbooks_definer TO {name}"
+        )))
+        .execute(&db)
+        .await
+        .unwrap();
+        let login = testing::login_pool(&db, &name).await;
+        let report = db::inspect_role(&login).await.unwrap();
+        assert!(report.holds_definer_rights, "{report:?}");
+        for split in [true, false] {
+            let err = check_row_security(&login, &config(split, false))
+                .await
+                .unwrap_err();
+            assert!(err.contains("campbooks_definer"), "{err}");
+        }
+        login.close().await;
+        testing::drop_runtime_login(&db).await;
+
+        // The runtime role is no member of it.
+        let app = testing::app_role_pool(&db).await;
+        assert!(!db::inspect_role(&app).await.unwrap().holds_definer_rights);
     }
 
     #[sqlx::test(migrations = "../../migrations")]

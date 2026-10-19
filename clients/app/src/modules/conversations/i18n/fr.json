@@ -55,7 +55,9 @@
     "kept": {
       "title": "Gardée comme historique",
       "lead": "{{address}} a été déconnectée et ses e-mails sont gardés ici, en lecture seule : rien de nouveau n’arrive, et rien ne peut être envoyé ni modifié depuis cette boîte."
-    }
+    },
+    "readingText": "Lecture…",
+    "textFailed": "Impossible de lire le texte de cet e-mail."
   },
   "actions": {
     "star": "Épingler",
@@ -227,12 +229,15 @@
       "unknown_outcome": "Campbooks n’a pas pu confirmer l’envoi de ce message. Vérifiez votre dossier Envoyés avant de le renvoyer.",
       "unknown": "Un problème est survenu. Réessayez.",
       "not_saved": "Vos dernières modifications n’ont pas pu être enregistrées, rien n’a donc été envoyé. Réessayez.",
-      "content_changed": "Ceci a changé depuis que vous l’avez ouvert. Vérifiez-le et renvoyez-le."
+      "content_changed": "Ceci a changé depuis que vous l’avez ouvert. Vérifiez-le et renvoyez-le.",
+      "quote": "Impossible de lire l’e-mail pour le citer. Rien n’a été commencé. Réessayez."
     },
     "shortcuts": {
       "newMessage": "Nouveau message"
     },
-    "tooLate": "Trop tard pour annuler : il a été envoyé."
+    "tooLate": "Trop tard pour annuler : il a été envoyé.",
+    "readingQuote": "Lecture de l’e-mail pour le citer…",
+    "quoteCut": "Cet e-mail est long : la citation en contient le début."
   },
   "needs": {
     "line": {
@@ -587,7 +592,13 @@
       "changed": "Cette réponse a changé depuis son enregistrement. Vérifiez-la et renvoyez-la."
     },
     "to": "À {{recipient}}",
-    "replyToElsewhere": "Les réponses vont à {{recipient}}, pas à l’expéditeur {{sender}}. Vérifiez avant d’envoyer."
+    "replyToElsewhere": "Les réponses vont à {{recipient}}, pas à l’expéditeur {{sender}}. Vérifiez avant d’envoyer.",
+    "readingQuote": "Lecture de l’e-mail pour le citer…",
+    "quoteUnread": "Impossible de lire l’e-mail auquel vous répondez : la citation ne peut pas s’afficher. Rien ne peut être envoyé tant qu’elle n’est pas affichée.",
+    "quoteCut": "Cet e-mail est long : votre réponse en cite le début.",
+    "quoteShortened": "Affiché en partie : votre réponse le cite en entier.",
+    "newer": "Un message plus récent de {{name}} est arrivé. Votre réponse répond toujours à celui cité ci-dessous.",
+    "answerNewer": "Répondre au plus récent"
   },
   "smartRule": {
     "tag": "Règle intelligente",
@@ -666,6 +677,7 @@
     "failed": "Impossible de préparer le transfert : rien n’a été envoyé. Réessayez.",
     "none": "Personne de ce nom ne vous a écrit.",
     "searchFailed": "Impossible de chercher pour le moment. Réessayez.",
-    "nobody": "Personne ne vous a encore écrit."
+    "nobody": "Personne ne vous a encore écrit.",
+    "quoteFailed": "Impossible de lire l’e-mail pour le citer : rien n’a été envoyé. Réessayez."
   }
 }

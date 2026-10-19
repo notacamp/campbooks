@@ -76,12 +76,38 @@ pub async fn live(db: &PgPool, account: Uuid, client: &str) -> Result<Option<Con
 /// The client's refresh tokens for that person that were bound to another
 /// workspace, or granted more scopes than this consent allows, stop working
 /// (those within it, such as the same app on another device, keep going).
-/// Its id.
+/// A live consent equal to it (the same workspace, member and scopes) is
+/// kept instead, taking this grant's remembering: an app asked again (a
+/// native or agent client is never remembered) does not stop its tokens on
+/// the person's other devices, which carry that consent's id. Its id.
 pub async fn grant(
     conn: &mut PgConnection,
     consent: &NewConsent<'_>,
     now: DateTime<Utc>,
 ) -> Result<Uuid> {
+    let kept: Option<Uuid> = sqlx::query_scalar(
+        "UPDATE identity.consents
+            SET remembered = $6, redirect_uri = $7, remember_until = $8, last_used_at = $9
+          WHERE account_id = $1 AND client_id = $2 AND revoked_at IS NULL
+            AND bound_workspace_id IS NOT DISTINCT FROM $3
+            AND bound_member_id IS NOT DISTINCT FROM $4
+            AND scopes @> $5::text[] AND scopes <@ $5::text[]
+          RETURNING id",
+    )
+    .bind(consent.account_id)
+    .bind(consent.client_id)
+    .bind(consent.workspace)
+    .bind(consent.member)
+    .bind(consent.scopes)
+    .bind(consent.remembered)
+    .bind(consent.redirect_uri)
+    .bind(consent.remembered.then_some(now + REMEMBER_FOR))
+    .bind(now)
+    .fetch_optional(&mut *conn)
+    .await?;
+    if let Some(id) = kept {
+        return Ok(id);
+    }
     sqlx::query(
         "UPDATE identity.consents SET revoked_at = $3
           WHERE account_id = $1 AND client_id = $2 AND revoked_at IS NULL",
@@ -126,22 +152,27 @@ pub async fn grant(
     Ok(id)
 }
 
-/// Whether `account` still has a live consent for `client` bound to
-/// `workspace` and covering every scope of `scope`: what a code or a refresh
-/// token of a client that needs consent still stands on.
-pub async fn covers(
+/// The live consent of `account` for `client` bound to `workspace` and
+/// covering every scope of `scope`, when there is one: what a code or a
+/// refresh token of a client that needs consent still stands on. Its id is
+/// stamped on the access tokens minted under it (`cns`), so revoking it stops
+/// them at once (campbooks-cloud#143).
+pub async fn covering(
     db: &PgPool,
     account: Uuid,
     client: &str,
     workspace: Option<Uuid>,
     scope: &str,
-) -> Result<bool> {
-    Ok(live(db, account, client).await?.is_some_and(|consent| {
-        consent.bound_workspace_id == workspace
-            && scope
-                .split_whitespace()
-                .all(|s| consent.scopes.iter().any(|c| c == s))
-    }))
+) -> Result<Option<Uuid>> {
+    Ok(live(db, account, client)
+        .await?
+        .filter(|consent| {
+            consent.bound_workspace_id == workspace
+                && scope
+                    .split_whitespace()
+                    .all(|s| consent.scopes.iter().any(|c| c == s))
+        })
+        .map(|consent| consent.id))
 }
 
 /// Record that a token was minted under `consent`.

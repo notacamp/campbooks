@@ -270,8 +270,23 @@ async fn the_last_way_in_stays(db: PgPool) {
         .await;
     assert_eq!(gone.status, StatusCode::NO_CONTENT, "{gone:?}");
     removed(&kit, ws, "work-sam").await;
+    // This session signed in with the way in it removed: it is signed out,
+    // its token stopped at once (campbooks-cloud#143). Signed in again with
+    // the one left, that one stays.
+    let stopped = kit
+        .api(Method::GET, "/api/v1/identity/ways-in", &access)
+        .await;
+    assert_eq!(stopped.status, StatusCode::UNAUTHORIZED, "{stopped:?}");
+    kit.new_browser();
+    kit.google.set_user(user("work-sam"));
+    let (url, verifier) = Kit::web_authorize();
+    let request = kit.get(&url).await.location_query()["request"].clone();
+    let back = kit.round_trip(Some(&request)).await;
+    let tokens = kit.redeem(&back.location_query()["code"], &verifier).await;
+    assert_eq!(tokens.status, StatusCode::OK, "{tokens:?}");
+    let fresh = tokens.json["access_token"].as_str().unwrap().to_owned();
     assert_eq!(
-        addresses(&kit.ways_in(&access).await),
+        addresses(&kit.ways_in(&fresh).await),
         ["work-sam@example.com"]
     );
 }
