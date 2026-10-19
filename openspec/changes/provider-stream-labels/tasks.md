@@ -14,6 +14,9 @@
 - [x] 2.6 Gmail read: marks out of `labels`, `provider_stream`, `stream_mark_stale` on a category change that keeps a mark
 - [x] 2.7 Migration `connectors__zoho_labels` (RLS, grant); Zoho client list/create labels; label tokens `label:<id>` on read, write (`applyLabel` / `removeLabel`) and `after()`; marks → `provider_stream`
 - [x] 2.8 `map_zoho`: labels and stream moves through marks; `scope_missing` for an old grant
+- [x] 2.9 A write that changes a provider stream is reported once from the index (Gmail and Zoho)
+- [x] 2.10 Zoho labels read through the listing's `labelid` filter: marks each run, every label at the end of a pass; label tokens never `already_set`
+- [x] 2.11 Backfill guard: mail first indexed after the first sync but received before it completed (cursor `synced_at`) goes in a `backfill` batch
 
 ## 3. Conversations
 
@@ -21,6 +24,7 @@
 - [x] 3.2 Migration `conversations__message_provider_stream`; stored on insert and update
 - [x] 3.3 Provider move in `apply_changes` (move with source `member`, requests for other messages and stale marks)
 - [x] 3.4 Mirror helper; called from `decide_message` placement and on a message joining a sorted conversation; backfill guard
+- [x] 3.5 Mirror each conversation once per batch; validate migration for the provider stream check
 
 ## 4. Tests (fake Google, fake Zoho, in-process)
 
