@@ -186,20 +186,29 @@ pub fn check_authorize_calls(
             continue;
         }
         let declaration = format!("operation_id = \"{id}\"");
-        // A comment quoting a declaration (the kernel's docs show one) is
-        // not one: which file is read first must not decide the check.
-        let declares = |text: &str| text.contains(&declaration) || declares_by_macro(text, id);
-        let declaring = sources.iter().find(|(path, text)| {
-            if is_test_file(path) || !declares(text) {
-                return false;
-            }
-            let uncommented: String = text
-                .lines()
-                .filter(|line| !line.trim_start().starts_with("//"))
-                .flat_map(|line| [line, "\n"])
-                .collect();
-            declares(&uncommented)
-        });
+        // Only code declares: a comment quoting a declaration (the kernel's
+        // operations docs show one), line, doc or block, is not one. A
+        // `#[utoipa::path]` declaration outranks a macro's literal, and among
+        // equals the first path wins: the order the files were read in never
+        // decides the check.
+        let declaring = sources
+            .iter()
+            .filter(|(path, text)| {
+                !is_test_file(path) && (text.contains(&declaration) || declares_by_macro(text, id))
+            })
+            .filter_map(|(path, text)| {
+                let code = without_comments(text);
+                let rank = if code.contains(&declaration) {
+                    0
+                } else if declares_by_macro(&code, id) {
+                    1
+                } else {
+                    return None;
+                };
+                Some(((rank, path.as_str()), (path, text)))
+            })
+            .min_by_key(|(key, _)| *key)
+            .map(|(_, found)| found);
         let Some((path, text)) = declaring else {
             violations.push(format!(
                 "operation `{name}` (`{id}`): no source file declares it"
@@ -207,8 +216,8 @@ pub fn check_authorize_calls(
             continue;
         };
         // The operation's own declaration names its resource: only the code
-        // around it counts.
-        let stripped = without_declarations(without_tests(text));
+        // around it counts, and no comment (line, trailing or block) does.
+        let stripped = without_declarations(&without_comments(without_tests(text)));
         let code = stripped.as_str();
         let helper_for = |resource: &str| {
             file.helpers
@@ -1177,7 +1186,41 @@ mod tests {
         );
         let real = ("crates/modules/mail/src/list.rs".to_owned(), asking.clone());
         assert!(check_authorize_calls(&s, &c, &[quoted.clone(), real.clone()], &file).is_empty());
-        assert!(check_authorize_calls(&s, &c, &[real, quoted], &file).is_empty());
+        assert!(check_authorize_calls(&s, &c, &[real.clone(), quoted], &file).is_empty());
+        // Nor is one quoting it in a block comment, or holding the id as a
+        // macro's literal (`"mail.list",`) next to a real declaration: the
+        // real one is the handler, whichever is read first.
+        let block = (
+            "crates/kernel/src/block.rs".to_owned(),
+            "/* operation_id = \"mail.list\",\n */\nfn f() {}\n".to_owned(),
+        );
+        let listed = (
+            "crates/server/src/a_list.rs".to_owned(),
+            "const IDS: &[&str] = &[\n    \"mail.list\",\n];\n".to_owned(),
+        );
+        for order in [
+            vec![block.clone(), listed.clone(), real.clone()],
+            vec![real.clone(), listed.clone(), block.clone()],
+            vec![listed.clone(), real.clone(), block.clone()],
+        ] {
+            assert!(check_authorize_calls(&s, &c, &order, &file).is_empty());
+        }
+        // And a handler that never asks still fails, whatever else quotes it.
+        let silent = (
+            "crates/modules/mail/src/list.rs".to_owned(),
+            declared.to_owned(),
+        );
+        assert_eq!(
+            check_authorize_calls(&s, &c, &[block, listed, silent], &file).len(),
+            1
+        );
+        // A commented-out call is not a call: trailing or block comment.
+        for hidden in [
+            format!("{declared}fn h() {{ /* authz::require_type(\"mail.thread\"); */ }}\n"),
+            format!("{declared}fn h() {{ let _ = 1; // authz::require_type(\"mail.thread\")\n}}\n"),
+        ] {
+            assert_eq!(check_authorize_calls(&s, &c, &src(&hidden), &file).len(), 1);
+        }
         let helper = format!("{declared}fn h() {{ lock_thread(&state); }}\n");
         let with_helper = AccessFile {
             helpers: vec![Helper {
