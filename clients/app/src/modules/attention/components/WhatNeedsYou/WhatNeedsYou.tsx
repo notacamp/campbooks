@@ -814,7 +814,15 @@ export function WhatNeedsYou({ workspaceId, now, offer }: WhatNeedsYouProps) {
     month: "long",
   }).format(today);
   const loading = open.isPending || (ids.length > 0 && conversations.isPending);
-  const count = order.length;
+  // "Worth a look" asks nothing of the member: it has its own group and
+  // count, and stays out of "N things need you" (campbooks-cloud#282).
+  const count = order.filter((row) => row.item.reason !== "worth_a_look").length;
+  const looks = order.length - count;
+  // Nothing asks anything of them: say so, and what is only worth a look.
+  let subline = t("hero.subline");
+  if (count === 0 && !loading) {
+    subline = looks > 0 ? t("hero.lookSubline", { count: looks }) : t("hero.clearSubline");
+  }
   const review = order.some((row) => row.item.reason === "review");
   const times = snoozeOptions(today);
   // Remind's times: a bill's reminder before its due date first, then Snooze's.
@@ -879,7 +887,7 @@ export function WhatNeedsYou({ workspaceId, now, offer }: WhatNeedsYouProps) {
         visor={loading ? "reading" : count === 0 ? "happy" : review ? "alert" : "idle"}
         dateLine={dateLine}
         title={loading ? t("title") : count === 0 ? t("hero.clear") : t("hero.count", { count })}
-        subline={count === 0 && !loading ? t("hero.clearSubline") : t("hero.subline")}
+        subline={subline}
       />
       {offer}
       {loading ? <SkeletonList rows={4} /> : null}

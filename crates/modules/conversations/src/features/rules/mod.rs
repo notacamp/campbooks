@@ -487,6 +487,9 @@ pub async fn compute_preview(
     let mut found = Vec::new();
     let mut after = None;
     let mut looked = 0_usize;
+    // "Worth a look" is raised for the newest unread match only: its
+    // candidate, and whether another change counted it already.
+    let mut look: Option<(rules::Candidate, bool)> = None;
     loop {
         let window = rules::scan(conn, inbox, conditions, after, SCAN).await?;
         looked += window.examined;
@@ -510,12 +513,16 @@ pub async fn compute_preview(
             }
             let before = evaluate(&acting, &facts);
             let after_outcome = evaluate(&with_new, &facts);
-            if would_change(candidate, &after_outcome, NEW) {
+            let changes = would_change(candidate, &after_outcome, NEW);
+            if changes {
                 out.would_change += 1;
                 // Suspicious mail is counted, never shown as an example.
                 if !candidate.suspicious {
                     found.push(candidate.clone());
                 }
+            }
+            if after_outcome.highlight.as_deref() == Some(NEW) {
+                newest_look(&mut look, candidate, changes);
             }
             count_overrides(&before, &after_outcome, NEW, &mut overridden);
         }
@@ -529,6 +536,11 @@ pub async fn compute_preview(
             }
             next => after = next,
         }
+    }
+    // The newest unread one raises it; the rest do not change for it.
+    if let Some((candidate, false)) = look {
+        out.would_change += 1;
+        found.push(candidate);
     }
     found.sort_by_key(|c| std::cmp::Reverse(c.sent_at));
     out.samples = found.iter().take(PREVIEW_SAMPLES).map(sample).collect();
@@ -545,6 +557,22 @@ pub async fn compute_preview(
         })
         .collect();
     Ok(out)
+}
+
+/// Keep `candidate` as the one "Worth a look" is raised for when it is unread
+/// and newer than the one kept (`changes`: another change counted it).
+fn newest_look(
+    look: &mut Option<(rules::Candidate, bool)>,
+    candidate: &rules::Candidate,
+    changes: bool,
+) {
+    if candidate.unread
+        && look
+            .as_ref()
+            .is_none_or(|(kept, _)| candidate.sent_at > kept.sent_at)
+    {
+        *look = Some((candidate.clone(), changes));
+    }
 }
 
 fn sample(c: &rules::Candidate) -> PreviewSample {
@@ -615,7 +643,6 @@ fn would_change(
         // The scan leaves out mail already in the trash or spam.
         || outcome.bin.as_ref().is_some_and(|a| won(&a.rule))
         || outcome.paid.as_deref().is_some_and(won)
-        || outcome.highlight.as_deref().is_some_and(won) && candidate.unread
 }
 
 // --- Create ------------------------------------------------------------------

@@ -182,6 +182,37 @@ export const CONVERSATIONS_SHORTCUTS = [
     group: "item",
     label: "conversations:shortcuts.allPaid",
   },
+  // Scout noticed on Home: its four buttons, on Shift + a letter so none
+  // meets Home's item keys (R E S H X 1-3 ...).
+  {
+    // Its own verb: archive them, or file them under a stream.
+    id: "inbox.noticed.apply",
+    keys: "shift+f",
+    scope: "item",
+    group: "item",
+    label: "conversations:shortcuts.noticedApply",
+  },
+  {
+    id: "inbox.noticed.other",
+    keys: "shift+o",
+    scope: "item",
+    group: "item",
+    label: "conversations:shortcuts.noticedOther",
+  },
+  {
+    id: "inbox.noticed.not_now",
+    keys: "shift+l",
+    scope: "item",
+    group: "item",
+    label: "conversations:shortcuts.noticedNotNow",
+  },
+  {
+    id: "inbox.noticed.never",
+    keys: "shift+d",
+    scope: "item",
+    group: "item",
+    label: "conversations:shortcuts.noticedNever",
+  },
   {
     // Focus moves through the open messages' attachments; Enter opens one.
     id: "inbox.next_attachment",

@@ -28,7 +28,7 @@ use campbooks_kernel::{JobContext, JobError, JobHandler, tenancy::WorkspaceId};
 use crate::{
     domain::{
         needs::NeedSettings,
-        rule_runs::{self, BATCH, COUNT_WINDOW, RunBatch, SCAN},
+        rule_runs::{self, BATCH, COUNT_WINDOW, Newest, RunBatch, SCAN},
         rules::{self, Applied, Context},
     },
     model::{ConversationId, RuleId, RuleRunId, RuleState, RunKind, RunState},
@@ -116,6 +116,7 @@ impl JobHandler for ApplyRules {
                 run: batch.run,
                 after: Some(after),
                 counting: false,
+                newest: batch.newest,
             })
         };
         match next {
@@ -179,11 +180,23 @@ async fn count_batch(
 ) -> Result<Option<RunBatch>, JobError> {
     let engine = rule.engine();
     let window = rules::scan(tx, rule.inbox, &rule.conditions, batch.after, COUNT_WINDOW).await?;
-    let matched = window
+    let mut matched = 0_i64;
+    let mut newest = batch.newest;
+    for candidate in window
         .candidates
         .iter()
         .filter(|c| engine.matches(&c.facts()))
-        .count();
+    {
+        matched += 1;
+        // "Worth a look" on mail already here is raised for the newest
+        // unread one only, whatever window it is in.
+        if candidate.can_be_looked_at() && newest.is_none_or(|n| candidate.sent_at > n.sent_at) {
+            newest = Some(Newest {
+                id: candidate.id,
+                sent_at: candidate.sent_at,
+            });
+        }
+    }
     let counted = window.next.is_none();
     sqlx::query!(
         r#"UPDATE conversations.rule_runs
@@ -200,6 +213,7 @@ async fn count_batch(
         run: batch.run,
         after: window.next,
         counting: !counted,
+        newest,
     }))
 }
 
@@ -221,8 +235,16 @@ async fn apply_batch(
             continue;
         }
         tally.done += 1;
-        let applied =
-            rules::apply(tx, context, rule.id, &acting, candidate, Some(batch.run)).await?;
+        let raise = batch.newest.is_some_and(|n| n.id == candidate.id);
+        let applied = rules::apply(
+            tx,
+            context,
+            rule.id,
+            &acting,
+            (candidate, raise),
+            Some(batch.run),
+        )
+        .await?;
         tally.count(applied);
         if tally.done >= BATCH {
             return Ok(Some(candidate.id));

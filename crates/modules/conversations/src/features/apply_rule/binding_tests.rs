@@ -122,6 +122,7 @@ async fn plant_run(
         run,
         after: None,
         counting: false,
+        newest: None,
     };
     jobs::enqueue_to::<ApplyRules>(&mut tx, &batch, batch.options(&workspace.to_string()))
         .await

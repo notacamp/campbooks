@@ -4,7 +4,7 @@
 use campbooks_ai::decide::{
     signals::{
         email::subject_template,
-        facts::{dmarc_refused, sender_checks_failed},
+        facts::{dmarc_refused, sender_authenticated, sender_checks_failed},
     },
     taught::{Facts, normalise_list_id},
 };
@@ -75,7 +75,27 @@ impl Candidate {
             auth_failed: self.auth_failed(),
             impersonated: self.dmarc_refused(),
             correspondent: self.correspondent,
+            authenticated: self.authenticated(),
         }
+    }
+
+    /// Whether "Worth a look" may be raised for it: unread, not suspicious,
+    /// its sender authenticated and not failing its checks.
+    pub fn can_be_looked_at(&self) -> bool {
+        self.unread
+            && !self.suspicious
+            && !self.auth_failed()
+            && !self.dmarc_refused()
+            && self.authenticated()
+    }
+
+    /// Whether the receiving provider's results authenticate its sender
+    /// ([`sender_authenticated`]): what "Worth a look" needs.
+    pub fn authenticated(&self) -> bool {
+        sender_authenticated(
+            &self.sender_address,
+            self.headers.authentication_results.as_deref(),
+        )
     }
 
     /// Whether the receiving provider's authentication results say its

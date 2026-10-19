@@ -5,7 +5,9 @@
     "count_other": "{{count}} choses ont besoin de vous",
     "subline": "Campbooks lit votre courrier et garde ici ce qui vous demande quelque chose.",
     "clear": "Rien n’a besoin de vous",
-    "clearSubline": "Pour l’instant, rien dans votre courrier ne vous demande quoi que ce soit. Campbooks continue de lire."
+    "clearSubline": "Pour l’instant, rien dans votre courrier ne vous demande quoi que ce soit. Campbooks continue de lire.",
+    "lookSubline_one": "Rien ne vous est demandé. {{count}} e-mail ci-dessous mérite un coup d’œil.",
+    "lookSubline_other": "Rien ne vous est demandé. {{count}} e-mails ci-dessous méritent un coup d’œil."
   },
   "groups": {
     "review": "À vérifier",

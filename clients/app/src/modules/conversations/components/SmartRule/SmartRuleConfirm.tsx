@@ -198,6 +198,8 @@ function Confirm({
   const actions = noticed === undefined ? draft.actions : goalActions(goal, draft.actions, words);
   const ready = actions.length > 0;
   const images = showsImages(actions);
+  // "Highlight them": the mail already here raises only the latest one.
+  const highlight = actions.some((a) => a.action === "worth_a_look");
   const rule = { conditions, actions };
   const preview = useRulePreview(workspaceId, draft.inboxId, rule, { enabled: ready });
   const [existing, setExisting] = useState(true);
@@ -230,6 +232,10 @@ function Confirm({
       matching === 0
         ? t("smartRule.imagesNew")
         : t("smartRule.imagesMatches", { count: matching, n: number(matching) });
+  } else if (highlight && preview.data !== undefined && count > 0) {
+    // Only the latest unread one goes to Home, however many are here.
+    const matching = preview.data.matching;
+    summary = t("smartRule.matchesLatest", { count: matching, n: number(matching) });
   } else if (preview.data !== undefined) {
     summary =
       count === 0
@@ -380,12 +386,18 @@ function Confirm({
         ) : null}
         {draft.sharedInbox === undefined ? null : (
           <Text tone="secondary" size="sm">
-            {t("smartRule.shared", { inbox: draft.sharedInbox })}
+            {t(highlight ? "smartRule.sharedHighlight" : "smartRule.shared", {
+              inbox: draft.sharedInbox,
+            })}
           </Text>
         )}
         {ready && count > 0 && !images ? (
           <Checkbox
-            label={t("smartRule.existing", { count, n: number(count) })}
+            label={
+              highlight
+                ? t("smartRule.existingLatest")
+                : t("smartRule.existing", { count, n: number(count) })
+            }
             checked={existing}
             onChange={(event) => {
               setExisting(event.target.checked);

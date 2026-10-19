@@ -5,7 +5,9 @@
     "count_other": "{{count}} things need you",
     "subline": "Campbooks reads your mail and keeps here what asks something of you.",
     "clear": "Nothing needs you",
-    "clearSubline": "Nothing in your mail asks anything of you right now. Campbooks keeps reading."
+    "clearSubline": "Nothing in your mail asks anything of you right now. Campbooks keeps reading.",
+    "lookSubline_one": "Nothing asks anything of you. {{count}} email below is worth a look.",
+    "lookSubline_other": "Nothing asks anything of you. {{count}} emails below are worth a look."
   },
   "groups": {
     "review": "Review",
