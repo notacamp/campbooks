@@ -1225,7 +1225,8 @@ async fn receipts_reach_gmail_through_its_mark(db: PgPool) {
     m.run(&kit).await;
     assert_eq!(changes(&kit, m.ws).await.len(), after);
     assert_eq!(outbound(&kit).await.len(), 1);
-    assert_eq!(kit.google.raw_fetches(id), 1, "never downloaded again");
+    // (Calls were cleared above: no download since.)
+    assert_eq!(kit.google.raw_fetches(id), 0, "never downloaded again");
 
     // Out of Receipts: the mark and the Updates tab off, Primary on.
     m.request(

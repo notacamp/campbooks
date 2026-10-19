@@ -376,17 +376,16 @@ fn stopped(backlog: &Backlog, trouble: ProviderError, push: &mut Push) {
     push.trouble = Some(trouble);
 }
 
-/// Push `backlog` through the mail account `mail`, whose Inbox, Trash and
-/// Spam folders are `folders` and whose stream marks are `marks` (as the
-/// cache knows them).
-pub async fn push(
+/// `backlog` with its marks' tokens as Zoho's labels, the marks the changes
+/// put on created first where Zoho has none yet (into `push`). The changes
+/// needing a mark Zoho would not make end `skipped`. `None` when trouble
+/// stopped it (every change then pending again, in `push`).
+async fn make_marks(
     mail: &ZohoMail<'_>,
     backlog: &Backlog,
-    folders: &Folders<'_>,
     marks: &MarkIds,
-) -> Push {
-    let mut push = Push::default();
-    // The marks the changes put on, created where Zoho has none yet.
+    push: &mut Push,
+) -> Option<Backlog> {
     let mut marks = marks.clone();
     let mut unmade = BTreeMap::new();
     for stream in marks::missing(backlog, &marks) {
@@ -405,16 +404,32 @@ pub async fn push(
                 unmade.insert(stream, "refused");
             }
             Err(trouble) => {
-                stopped(backlog, trouble, &mut push);
-                return push;
+                stopped(backlog, trouble, push);
+                return None;
             }
         }
     }
-    let backlog = &marks::resolve(
+    Some(marks::resolve(
         &without_marks(backlog, &unmade, &mut push.outcome),
         &marks,
         state::label_token,
-    );
+    ))
+}
+
+/// Push `backlog` through the mail account `mail`, whose Inbox, Trash and
+/// Spam folders are `folders` and whose stream marks are `marks` (as the
+/// cache knows them).
+pub async fn push(
+    mail: &ZohoMail<'_>,
+    backlog: &Backlog,
+    folders: &Folders<'_>,
+    marks: &MarkIds,
+) -> Push {
+    let mut push = Push::default();
+    let Some(resolved) = make_marks(mail, backlog, marks, &mut push).await else {
+        return push;
+    };
+    let backlog = &resolved;
     let mut plan = Plan::merge(backlog);
     // Zoho keeps no history: the index is what is known, but for labels,
     // which are read only through listings and can be behind.

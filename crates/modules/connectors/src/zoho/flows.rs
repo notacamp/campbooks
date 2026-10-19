@@ -1166,7 +1166,8 @@ async fn stream_moves_and_labels_reach_zoho_and_never_echo(db: PgPool) {
         streams_of(&kit, mailbox.ws, before, &message).await,
         reports
     );
-    assert_eq!(kit.zoho.raw_fetches(&message), 1);
+    // (Calls were cleared above: no download since.)
+    assert_eq!(kit.zoho.raw_fetches(&message), 0);
 }
 
 #[sqlx::test(migrations = "../../../migrations")]

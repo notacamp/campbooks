@@ -258,6 +258,10 @@ impl SyncStream {
 
     /// A Gmail run: budget, push, read. `None` once the run has ended
     /// without a page (waiting, trouble recorded).
+    #[allow(
+        clippy::too_many_lines,
+        reason = "one run read top to bottom: budget, push, report, read"
+    )]
     async fn run_gmail(
         &self,
         ctx: &mut JobContext,
@@ -387,6 +391,10 @@ impl SyncStream {
 
     /// A Zoho run: the data centre, the login's budget, push, read. `None`
     /// once the run has ended without a page.
+    #[allow(
+        clippy::too_many_lines,
+        reason = "one run read top to bottom: budget, push, report, read"
+    )]
     async fn run_zoho(
         &self,
         ctx: &mut JobContext,
