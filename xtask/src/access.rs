@@ -1131,6 +1131,64 @@ mod tests {
     }
 
     #[test]
+    fn no_comment_and_no_read_order_decides_the_handler() {
+        let c = catalogue();
+        let s = spec(Some(json!({"resource": "mail.thread", "action": "read"})));
+        let declared = "#[utoipa::path(operation_id = \"mail.list\")]\nfn handler() {}\n";
+        let file = AccessFile::default();
+        let src = |text: &str| {
+            vec![(
+                "crates/modules/mail/src/list.rs".to_owned(),
+                text.to_owned(),
+            )]
+        };
+        let asking = format!("{declared}fn h() {{ authz::require_type(\"mail.thread\"); }}\n");
+        // A file whose docs quote the declaration is not its handler,
+        // whichever is read first.
+        let quoted = (
+            "crates/kernel/src/operations.rs".to_owned(),
+            "//! ```\n//!     operation_id = \"mail.list\",\n//! ```\n".to_owned(),
+        );
+        let real = ("crates/modules/mail/src/list.rs".to_owned(), asking.clone());
+        assert!(check_authorize_calls(&s, &c, &[quoted.clone(), real.clone()], &file).is_empty());
+        assert!(check_authorize_calls(&s, &c, &[real.clone(), quoted], &file).is_empty());
+        // Nor is one quoting it in a block comment, or holding the id as a
+        // macro's literal (`"mail.list",`) next to a real declaration: the
+        // real one is the handler, whichever is read first.
+        let block = (
+            "crates/kernel/src/block.rs".to_owned(),
+            "/* operation_id = \"mail.list\",\n */\nfn f() {}\n".to_owned(),
+        );
+        let listed = (
+            "crates/server/src/a_list.rs".to_owned(),
+            "const IDS: &[&str] = &[\n    \"mail.list\",\n];\n".to_owned(),
+        );
+        for order in [
+            vec![block.clone(), listed.clone(), real.clone()],
+            vec![real.clone(), listed.clone(), block.clone()],
+            vec![listed.clone(), real.clone(), block.clone()],
+        ] {
+            assert!(check_authorize_calls(&s, &c, &order, &file).is_empty());
+        }
+        // And a handler that never asks still fails, whatever else quotes it.
+        let silent = (
+            "crates/modules/mail/src/list.rs".to_owned(),
+            declared.to_owned(),
+        );
+        assert_eq!(
+            check_authorize_calls(&s, &c, &[block, listed, silent], &file).len(),
+            1
+        );
+        // A commented-out call is not a call: trailing or block comment.
+        for hidden in [
+            format!("{declared}fn h() {{ /* authz::require_type(\"mail.thread\"); */ }}\n"),
+            format!("{declared}fn h() {{ let _ = 1; // authz::require_type(\"mail.thread\")\n}}\n"),
+        ] {
+            assert_eq!(check_authorize_calls(&s, &c, &src(&hidden), &file).len(), 1);
+        }
+    }
+
+    #[test]
     fn workspace_handlers_ask_the_central_check() {
         let c = catalogue();
         let s = spec(Some(json!({"resource": "mail.thread", "action": "read"})));
@@ -1178,49 +1236,6 @@ mod tests {
             check_authorize_calls(&s, &c, &src(&in_tests), &file).len(),
             1
         );
-        // A file whose docs quote the declaration is not its handler,
-        // whichever is read first.
-        let quoted = (
-            "crates/kernel/src/operations.rs".to_owned(),
-            "//! ```\n//!     operation_id = \"mail.list\",\n//! ```\n".to_owned(),
-        );
-        let real = ("crates/modules/mail/src/list.rs".to_owned(), asking.clone());
-        assert!(check_authorize_calls(&s, &c, &[quoted.clone(), real.clone()], &file).is_empty());
-        assert!(check_authorize_calls(&s, &c, &[real.clone(), quoted], &file).is_empty());
-        // Nor is one quoting it in a block comment, or holding the id as a
-        // macro's literal (`"mail.list",`) next to a real declaration: the
-        // real one is the handler, whichever is read first.
-        let block = (
-            "crates/kernel/src/block.rs".to_owned(),
-            "/* operation_id = \"mail.list\",\n */\nfn f() {}\n".to_owned(),
-        );
-        let listed = (
-            "crates/server/src/a_list.rs".to_owned(),
-            "const IDS: &[&str] = &[\n    \"mail.list\",\n];\n".to_owned(),
-        );
-        for order in [
-            vec![block.clone(), listed.clone(), real.clone()],
-            vec![real.clone(), listed.clone(), block.clone()],
-            vec![listed.clone(), real.clone(), block.clone()],
-        ] {
-            assert!(check_authorize_calls(&s, &c, &order, &file).is_empty());
-        }
-        // And a handler that never asks still fails, whatever else quotes it.
-        let silent = (
-            "crates/modules/mail/src/list.rs".to_owned(),
-            declared.to_owned(),
-        );
-        assert_eq!(
-            check_authorize_calls(&s, &c, &[block, listed, silent], &file).len(),
-            1
-        );
-        // A commented-out call is not a call: trailing or block comment.
-        for hidden in [
-            format!("{declared}fn h() {{ /* authz::require_type(\"mail.thread\"); */ }}\n"),
-            format!("{declared}fn h() {{ let _ = 1; // authz::require_type(\"mail.thread\")\n}}\n"),
-        ] {
-            assert_eq!(check_authorize_calls(&s, &c, &src(&hidden), &file).len(), 1);
-        }
         let helper = format!("{declared}fn h() {{ lock_thread(&state); }}\n");
         let with_helper = AccessFile {
             helpers: vec![Helper {
