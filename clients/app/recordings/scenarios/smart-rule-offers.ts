@@ -16,8 +16,10 @@ import { caption, signedIn } from "./inbox.ts";
 // Report and delete on the phishing warning moves it to spam (with Undo) and
 // offers "Never see emails like this again?"; yes opens the smart-rule
 // confirmation, which alone saves, and the toast's Undo removes the rule.
-// At the bottom of Home, "Scout noticed" offers a rule for the digests:
-// Set up a smart rule…, Not now (with Undo). Fictional person and mail only;
+// Right after the first group on Home, "Scout noticed" offers a rule for the
+// digests: Archive them… / File under…, Something else… (the goal can be
+// changed: Highlight them, Newsletters, Mark them read, or your own words),
+// Not now (with Undo). Fictional person and mail only;
 // nothing is sent.
 
 function isPhone(page: Page): boolean {
@@ -80,11 +82,23 @@ export default async function smartRuleOffers({ page }: ScenarioContext): Promis
   // Scout's look at the inbox starts when Home asks; what it finds shows next.
   await homeShows(page, workspace, "Scout noticed");
   await page.getByText("Scout noticed").first().scrollIntoViewIfNeeded();
-  await caption(page, "At the bottom of Home: something Scout noticed", 2400);
+  await caption(page, "Right after the first group: something Scout noticed", 2400);
   const noticed = page.getByRole("region", { name: "Scout noticed" });
-  await noticed.getByRole("button", { name: /^Set up a smart rule/u }).click();
+  await noticed.getByRole("button", { name: /^Something else/u }).click();
+  const goal = page.getByRole("dialog", { name: /A rule for mail from/u });
+  await goal.waitFor();
+  await caption(page, "First question: what should happen to their mail? Nothing is picked", 2800);
+  await goal.getByRole("radio", { name: /^Highlight them/u }).check({ force: true });
+  await caption(
+    page,
+    "Highlight them: it waits on Home under Worth a look until opened once",
+    3000,
+  );
+  await page.keyboard.press("Escape");
+  await pause(600);
+  await noticed.getByRole("button", { name: /^(Archive them|File under)/u }).click();
   await page.getByRole("dialog", { name: /A rule for mail from/u }).waitFor();
-  await caption(page, "The same confirmation, before anything is saved", 2400);
+  await caption(page, "Scout's guess is picked when its own button opens it", 2400);
   await page.keyboard.press("Escape");
   await pause(600);
   await noticed.getByRole("button", { name: /^Not now/u }).click();

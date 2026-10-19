@@ -127,7 +127,7 @@ pub async fn handler(
                    AND NOT EXISTS (SELECT 1 FROM attention.snoozes s
                                     WHERE s.item_id = i.id AND s.user_id = $4 AND s.until > $5)
                  ORDER BY CASE i.reason WHEN 'review' THEN 0 WHEN 'reply' THEN 1
-                                        WHEN 'decide' THEN 2 WHEN 'do' THEN 3 ELSE 4 END,
+                                        WHEN 'decide' THEN 2 WHEN 'do' THEN 3 WHEN 'pay' THEN 4 ELSE 5 END,
                           (i.due_on IS NOT NULL AND i.due_on < $6) DESC,
                           i.due_on ASC NULLS LAST, i.urgent DESC, i.since ASC, i.id
                 "#,
@@ -159,7 +159,7 @@ pub async fn handler(
                    AND i.container_type || ':' || i.container_id = ANY($2)
                    AND i.reason IS NOT NULL
                    AND ((i.state = 'cleared' AND i.cleared_at >= $5
-                         AND coalesce(i.cleared_because, '') NOT IN ('superseded', 'rule'))
+                         AND coalesce(i.cleared_because, '') NOT IN ('superseded', 'rule', 'opened'))
                         OR (i.state = 'open' AND s.created_at >= $5))
                  ORDER BY greatest(i.cleared_at, s.created_at) DESC, i.id
                 "#,

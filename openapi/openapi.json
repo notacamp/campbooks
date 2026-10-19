@@ -15034,7 +15034,8 @@
           "needs_reply",
           "asks_action",
           "suspicious",
-          "money"
+          "money",
+          "worth_a_look"
         ]
       },
       "NeedReason": {
@@ -15044,7 +15045,8 @@
           "reply",
           "do",
           "pay",
-          "review"
+          "review",
+          "worth_a_look"
         ]
       },
       "NeedTrust": {
@@ -16003,7 +16005,8 @@
           "reply",
           "decide",
           "do",
-          "pay"
+          "pay",
+          "worth_a_look"
         ]
       },
       "ReasonCount": {
@@ -16689,6 +16692,21 @@
                 "type": "string",
                 "enum": [
                   "show_images"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "description": "Make sure the member sees each new message: it waits on Home under\n\"Worth a look\" until it has been opened once (\"Highlight them\",\ncampbooks-cloud#274). Not pinned: it hides nothing, and the mail can\nstill be archived like any other.",
+            "required": [
+              "action"
+            ],
+            "properties": {
+              "action": {
+                "type": "string",
+                "enum": [
+                  "worth_a_look"
                 ]
               }
             }

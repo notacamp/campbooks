@@ -1557,7 +1557,8 @@
           "done",
           "not_needed",
           "superseded",
-          "rule"
+          "rule",
+          "opened"
         ]
       },
       "ConnectionId": {
@@ -1756,7 +1757,8 @@
           "reply",
           "do",
           "pay",
-          "review"
+          "review",
+          "worth_a_look"
         ]
       },
       "NeedTrust": {

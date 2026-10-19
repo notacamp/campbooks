@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n                SELECT i.id AS \"id: ItemId\", i.record_type, i.record_id, i.container_type,\n                       i.container_id, i.cause_type, i.cause_id, i.reason AS \"reason!\", i.trust AS \"trust!\", i.due_on,\n                       i.urgent, i.since, i.state, i.cleared_because,\n                       i.cleared_by AS \"cleared_by: _\", i.cleared_at,\n                       s.until AS \"snoozed_until?\"\n                  FROM attention.items i\n                  LEFT JOIN attention.snoozes s\n                         ON s.item_id = i.id AND s.user_id = $3 AND s.until > $4\n                 WHERE i.workspace_id = $1\n                   AND i.container_type || ':' || i.container_id = ANY($2)\n                   AND i.reason IS NOT NULL\n                   AND ((i.state = 'cleared' AND i.cleared_at >= $5\n                         AND coalesce(i.cleared_because, '') NOT IN ('superseded', 'rule'))\n                        OR (i.state = 'open' AND s.created_at >= $5))\n                 ORDER BY greatest(i.cleared_at, s.created_at) DESC, i.id\n                ",
+  "query": "\n                SELECT i.id AS \"id: ItemId\", i.record_type, i.record_id, i.container_type,\n                       i.container_id, i.cause_type, i.cause_id, i.reason AS \"reason!\", i.trust AS \"trust!\", i.due_on,\n                       i.urgent, i.since, i.state, i.cleared_because,\n                       i.cleared_by AS \"cleared_by: _\", i.cleared_at,\n                       s.until AS \"snoozed_until?\"\n                  FROM attention.items i\n                  LEFT JOIN attention.snoozes s\n                         ON s.item_id = i.id AND s.user_id = $3 AND s.until > $4\n                 WHERE i.workspace_id = $1\n                   AND i.container_type || ':' || i.container_id = ANY($2)\n                   AND i.reason IS NOT NULL\n                   AND ((i.state = 'cleared' AND i.cleared_at >= $5\n                         AND coalesce(i.cleared_because, '') NOT IN ('superseded', 'rule', 'opened'))\n                        OR (i.state = 'open' AND s.created_at >= $5))\n                 ORDER BY greatest(i.cleared_at, s.created_at) DESC, i.id\n                ",
   "describe": {
     "columns": [
       {
@@ -220,5 +220,5 @@
       false
     ]
   },
-  "hash": "2e947e2a097f62d18caeb0f4a61c2d12d4ebf1f0ca6c31e85d517d0633105c9a"
+  "hash": "2a9650cef2c2527368c1f23e344b722cb702eb283dfa3df433c9526afbc3c262"
 }

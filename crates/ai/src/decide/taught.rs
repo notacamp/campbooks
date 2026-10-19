@@ -196,6 +196,10 @@ pub enum Action {
     /// when the mail is opened ([`shows_images`]), never on arrival, and
     /// only for mail whose sender passes authentication.
     ShowImages,
+    /// Make sure the member sees each new message: it waits on Home as
+    /// "Worth a look" until it has been opened once. Not pinned: it hides
+    /// nothing, and the mail can still be archived like any other.
+    WorthALook,
 }
 
 /// Where a rule puts mail it takes out of the way for good.
@@ -231,6 +235,8 @@ pub enum Slot {
     Money,
     /// Whether its remote images show without asking.
     Images,
+    /// Whether each new message is "Worth a look" on Home.
+    Highlight,
 }
 
 impl Action {
@@ -247,6 +253,7 @@ impl Action {
             Self::Trash | Self::Spam => Slot::Bin,
             Self::MarkPaid => Slot::Money,
             Self::ShowImages => Slot::Images,
+            Self::WorthALook => Slot::Highlight,
         }
     }
 }
@@ -284,6 +291,9 @@ pub enum Invalid {
     /// newsletter platform) with images.
     #[error("anyone can send from this domain: trust an address instead")]
     SharedSenderDomain,
+    /// Highlighting mail and hiding it in the same rule.
+    #[error("a rule cannot both highlight mail and hide it")]
+    HighlightHides,
 }
 
 /// Free mail providers, and the mail of internet providers, by registrable
@@ -826,6 +836,22 @@ impl TaughtRule {
         {
             return Err(Invalid::DomainToBin);
         }
+        // Highlighting mail and hiding it contradict each other.
+        if actions.contains(&Action::WorthALook)
+            && actions.iter().any(|a| match a {
+                Action::Archive
+                | Action::MarkRead
+                | Action::Trash
+                | Action::Spam
+                | Action::MarkPaid => true,
+                Action::MoveToStream { stream } => stream != "primary",
+                Action::NeedsReply { value } | Action::AsksAction { value } => !value,
+                Action::Surface { value } => *value == Surface::Never,
+                Action::AddLabel { .. } | Action::ShowImages | Action::WorthALook => false,
+            })
+        {
+            return Err(Invalid::HighlightHides);
+        }
         // Trusting a sender's images: one sender (an address, or a domain
         // the checks above allow), as the rule's only condition and action.
         if actions.contains(&Action::ShowImages)
@@ -944,6 +970,8 @@ pub struct Outcome {
     pub bin: Option<Applied<Bin>>,
     /// Its bills are paid.
     pub paid: Option<String>,
+    /// Each new message is "Worth a look" on Home.
+    pub highlight: Option<String>,
 }
 
 impl Outcome {
@@ -964,6 +992,7 @@ impl Outcome {
         out.extend(self.surface.as_ref().map(|a| a.rule.as_str()));
         out.extend(self.bin.as_ref().map(|a| a.rule.as_str()));
         out.extend(self.paid.as_deref());
+        out.extend(self.highlight.as_deref());
         out
     }
 }
@@ -1019,6 +1048,7 @@ pub fn evaluate(rules: &[TaughtRule], facts: &Facts<'_>) -> Outcome {
                     out.bin = Some(Applied { value, rule: id() });
                 }
                 Action::MarkPaid if out.paid.is_none() => out.paid = Some(id()),
+                Action::WorthALook if out.highlight.is_none() => out.highlight = Some(id()),
                 _ => {}
             }
         }

@@ -12,7 +12,8 @@
     "reply": "À répondre",
     "decide": "À décider",
     "do": "À faire",
-    "pay": "À payer"
+    "pay": "À payer",
+    "worth_a_look": "À voir"
   },
   "context": "Fait aujourd’hui",
   "doneTodayTitle": "Fait aujourd’hui",
@@ -56,7 +57,8 @@
     "snoozed": "Reporté · {{name}}, revient {{when}}",
     "replied": "Envoi à {{name}}",
     "paid": "Marquée comme payée · {{name}}",
-    "reported": "Signalé · {{name}}"
+    "reported": "Signalé · {{name}}",
+    "seen": "Vu · {{name}}"
   },
   "error": {
     "title": "Impossible de charger ce qui a besoin de vous",

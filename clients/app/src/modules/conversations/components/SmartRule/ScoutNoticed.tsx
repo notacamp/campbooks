@@ -25,6 +25,12 @@ function senderOf(notice: RuleNotice): string {
     : `${name} (${notice.sender})`;
 }
 
+/** What the question calls the sender: their name when they give one, else the address. */
+function nameOf(notice: RuleNotice): string {
+  const name = notice.sender_name?.trim();
+  return name === undefined || name === "" ? notice.sender : name;
+}
+
 /** What Scout noticed, as one sentence and its question, in the reader's words. */
 function sentence(t: Translate, locale: string, notice: RuleNotice): string {
   const { evidence } = notice;
@@ -52,11 +58,13 @@ function sentence(t: Translate, locale: string, notice: RuleNotice): string {
 }
 
 /**
- * "Scout noticed" at the bottom of Home (campbooks-cloud#169): one
- * suggestion at a time from `conversations.list_rule_notices`, with "n of N",
- * what Scout noticed in numbers, and Set up a smart rule… (the confirmation
- * alone saves), Not now and Don't suggest this (each with Undo). Nothing while
- * the list loads or fails, or when there is none.
+ * "Scout noticed" on Home, right after the first group (campbooks-cloud#169,
+ * #274): one suggestion at a time from `conversations.list_rule_notices`, with
+ * "n of N", what Scout noticed in numbers, and four buttons of one style: the
+ * notice's own verb ("Archive them…"), Something else… (with the visor), Not
+ * now and Don't suggest this (each with Undo). Both of the first two open the
+ * confirmation, which asks what should happen to the sender's mail and alone
+ * saves. Nothing while the list loads or fails, or when there is none.
  */
 export function ScoutNoticed({ workspaceId }: ScoutNoticedProps) {
   const { t: typed, i18n } = useTranslation("conversations");
@@ -128,7 +136,8 @@ export function ScoutNoticed({ workspaceId }: ScoutNoticedProps) {
   }
   const inbox = inboxes.data?.find((item) => item.id === notice.inbox_id);
   const sharedInbox = notice.shared && inbox !== undefined ? inbox.address : undefined;
-  const setUp = () => {
+  // The verb button starts on Scout's guess; Something else… on nothing.
+  const setUp = (start: "guess" | "none") => {
     setDraft({
       inboxId: notice.inbox_id,
       conditions: notice.conditions,
@@ -137,8 +146,13 @@ export function ScoutNoticed({ workspaceId }: ScoutNoticedProps) {
       origin: "suggestion",
       noticeId: notice.id,
       sharedInbox,
+      goal: { kind: notice.kind, sender: nameOf(notice), start },
     });
   };
+  const verb =
+    notice.kind === "archive_on_arrival"
+      ? t("noticed.verbArchive")
+      : t("noticed.verbFile", { stream: streamName(t, ruleStream(notice.actions) ?? "updates") });
   return (
     <>
       <Note
@@ -146,8 +160,22 @@ export function ScoutNoticed({ workspaceId }: ScoutNoticedProps) {
         label={t("noticed.title")}
         actions={
           <>
-            <Button variant="secondary" onClick={setUp}>
-              {t("noticed.setUp")}
+            <Button
+              variant="secondary"
+              onClick={() => {
+                setUp("guess");
+              }}
+            >
+              {verb}
+            </Button>
+            <Button
+              variant="secondary"
+              ai
+              onClick={() => {
+                setUp("none");
+              }}
+            >
+              {t("noticed.other")}
             </Button>
             <Button
               variant="secondary"

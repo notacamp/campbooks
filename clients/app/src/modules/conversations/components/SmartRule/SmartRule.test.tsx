@@ -190,7 +190,18 @@ describe("Scout noticed", () => {
     ).toBeVisible();
     expect(within(note).getByText("1 of 1")).toBeVisible();
 
-    fireEvent.click(within(note).getByRole("button", { name: "Set up a smart rule…" }));
+    // One style for the four buttons; the visor marks Something else….
+    for (const name of [
+      "File under Updates…",
+      "Something else…",
+      "Not now",
+      "Don’t suggest this",
+    ]) {
+      expect(within(note).getByRole("button", { name })).toBeVisible();
+    }
+    expect(within(note).queryByRole("button", { name: "Set up a smart rule…" })).toBeNull();
+
+    fireEvent.click(within(note).getByRole("button", { name: "File under Updates…" }));
     const dialog = await screen.findByRole("dialog", {
       name: "A rule for mail from builds@ci.example.com",
     });
@@ -209,6 +220,140 @@ describe("Scout noticed", () => {
         api.calls.some((call) => call.route === `DELETE ${W}/rule-notices/${NOTICE.id}/answer`),
       ).toBe(true);
     });
+  });
+
+  it("asks what should happen first: the verb button starts on Scout's guess", async () => {
+    const api = mockApi({
+      [`GET ${W}/rule-notices`]: { body: { notices: [NOTICE] } },
+      [`GET ${W}/inboxes`]: { body: { inboxes: [INBOX] } },
+      [`POST ${W}/inboxes/${INBOX.id}/rules/preview`]: { body: PREVIEW },
+      [`POST ${W}/inboxes/${INBOX.id}/rules`]: created,
+    });
+    renderWithProviders(<ScoutNoticed workspaceId={DUARTE.id} />);
+    const note = await screen.findByRole("region", { name: "Scout noticed" });
+    fireEvent.click(within(note).getByRole("button", { name: "File under Updates…" }));
+    const dialog = await screen.findByRole("dialog", {
+      name: "A rule for mail from builds@ci.example.com",
+    });
+    const goals = within(dialog).getByRole("group", { name: "What should happen to CI’s mail?" });
+    const guess = within(goals).getByRole("radio", { name: "Keep them off Home, under Updates" });
+    expect(guess).toBeChecked();
+    expect(guess).toHaveAccessibleDescription(/Scout’s guess/u);
+    expect(within(goals).getByRole("radio", { name: "Highlight them" })).not.toBeChecked();
+    expect(
+      within(goals).getByRole("radio", { name: "Highlight them" }),
+    ).toHaveAccessibleDescription(
+      /I like these.*waits on Home under Worth a look until you have opened it once\. Nothing is pinned\./u,
+    );
+    expect(within(goals).getByRole("radio", { name: "File them under Newsletters" })).toBeVisible();
+    expect(within(goals).getByRole("radio", { name: "Mark them read" })).toBeVisible();
+
+    fireEvent.click(within(dialog).getByRole("button", { name: /Save smart rule/u }));
+    await screen.findByText("Smart rule saved");
+    const made = api.calls.find((call) => call.route === `POST ${W}/inboxes/${INBOX.id}/rules`);
+    expect(made?.body).toMatchObject({
+      actions: NOTICE.actions,
+      origin: "suggestion",
+      notice_id: NOTICE.id,
+    });
+  });
+
+  it("Something else… starts on nothing, and Highlight them answers the notice", async () => {
+    const api = mockApi({
+      [`GET ${W}/rule-notices`]: { body: { notices: [NOTICE] } },
+      [`GET ${W}/inboxes`]: { body: { inboxes: [INBOX] } },
+      [`POST ${W}/inboxes/${INBOX.id}/rules/preview`]: { body: PREVIEW },
+      [`POST ${W}/inboxes/${INBOX.id}/rules`]: created,
+    });
+    renderWithProviders(<ScoutNoticed workspaceId={DUARTE.id} />);
+    const note = await screen.findByRole("region", { name: "Scout noticed" });
+    fireEvent.click(within(note).getByRole("button", { name: "Something else…" }));
+    const dialog = await screen.findByRole("dialog", {
+      name: "A rule for mail from builds@ci.example.com",
+    });
+    for (const radio of within(dialog).getAllByRole("radio")) {
+      expect(radio).not.toBeChecked();
+    }
+    // Nothing to save yet, and nothing to preview.
+    expect(within(dialog).getByRole("button", { name: /Save smart rule/u })).toBeDisabled();
+    expect(within(dialog).queryByText("Smart rule")).toBeNull();
+    expect(api.calls.some((call) => call.route.endsWith("/rules/preview"))).toBe(false);
+
+    fireEvent.click(within(dialog).getByRole("radio", { name: "Highlight them" }));
+    expect(
+      await within(dialog).findByText(
+        "Mail from builds@ci.example.com → kept on Home until you open it",
+      ),
+    ).toBeVisible();
+    fireEvent.click(within(dialog).getByRole("button", { name: /Save smart rule/u }));
+    await screen.findByText("Smart rule saved");
+    const made = api.calls.find((call) => call.route === `POST ${W}/inboxes/${INBOX.id}/rules`);
+    expect(made?.body).toMatchObject({
+      conditions: NOTICE.conditions,
+      actions: [{ action: "worth_a_look" }],
+      notice_id: NOTICE.id,
+    });
+  });
+
+  it("reads the member's own words through Scout and uses what it finds", async () => {
+    const api = mockApi({
+      [`GET ${W}/rule-notices`]: { body: { notices: [NOTICE] } },
+      [`GET ${W}/inboxes`]: { body: { inboxes: [INBOX] } },
+      [`POST ${W}/inboxes/${INBOX.id}/rules/preview`]: { body: PREVIEW },
+      [`POST ${W}/inboxes/${INBOX.id}/rules`]: created,
+      [`POST ${W}/assistant/compile`]: {
+        body: {
+          outcome: "rules",
+          text: "just archive them",
+          proposals: [{ conditions: [], actions: [{ action: "archive" }], inboxes: [] }],
+        },
+      },
+    });
+    renderWithProviders(<ScoutNoticed workspaceId={DUARTE.id} />);
+    const note = await screen.findByRole("region", { name: "Scout noticed" });
+    fireEvent.click(within(note).getByRole("button", { name: "Something else…" }));
+    const dialog = await screen.findByRole("dialog", {
+      name: "A rule for mail from builds@ci.example.com",
+    });
+    fireEvent.change(within(dialog).getByRole("textbox", { name: "Or tell Scout in your words" }), {
+      target: { value: "just archive them" },
+    });
+    fireEvent.click(within(dialog).getByRole("button", { name: "Ask Scout" }));
+    expect(await within(dialog).findByRole("radio", { name: "As you said" })).toBeChecked();
+    expect(
+      await within(dialog).findByText("Mail from builds@ci.example.com → archived"),
+    ).toBeVisible();
+    fireEvent.click(within(dialog).getByRole("button", { name: /Save smart rule/u }));
+    await screen.findByText("Smart rule saved");
+    const made = api.calls.find((call) => call.route === `POST ${W}/inboxes/${INBOX.id}/rules`);
+    expect(made?.body).toMatchObject({
+      conditions: NOTICE.conditions,
+      actions: [{ action: "archive" }],
+      notice_id: NOTICE.id,
+    });
+  });
+
+  it("says plainly when Scout cannot turn the words into a rule", async () => {
+    mockApi({
+      [`GET ${W}/rule-notices`]: { body: { notices: [NOTICE] } },
+      [`GET ${W}/inboxes`]: { body: { inboxes: [INBOX] } },
+      [`POST ${W}/assistant/compile`]: {
+        body: { outcome: "unclear", text: "hmm", proposals: [] },
+      },
+    });
+    renderWithProviders(<ScoutNoticed workspaceId={DUARTE.id} />);
+    const note = await screen.findByRole("region", { name: "Scout noticed" });
+    fireEvent.click(within(note).getByRole("button", { name: "Something else…" }));
+    const dialog = await screen.findByRole("dialog", {
+      name: "A rule for mail from builds@ci.example.com",
+    });
+    fireEvent.change(within(dialog).getByRole("textbox", { name: "Or tell Scout in your words" }), {
+      target: { value: "hmm" },
+    });
+    fireEvent.click(within(dialog).getByRole("button", { name: "Ask Scout" }));
+    expect(await within(dialog).findByText(/Scout couldn’t turn that into a rule/u)).toBeVisible();
+    expect(within(dialog).queryByRole("radio", { name: "As you said" })).toBeNull();
+    expect(within(dialog).getByRole("button", { name: /Save smart rule/u })).toBeDisabled();
   });
 
   it("shows nothing while there is nothing to say", async () => {

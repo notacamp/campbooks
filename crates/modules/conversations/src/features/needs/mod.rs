@@ -352,7 +352,11 @@ async fn judge(
     } else {
         ("true", "false")
     };
+    // "Worth a look" is the member's own rule at work, not an answer to
+    // correct: whatever the verdict, it files nothing (Seen is its Done).
+    let taught_highlight = need.question == NeedQuestion::WorthALook.as_str();
     let to = match verdict {
+        _ if taught_highlight => None,
         NeedVerdict::Done | NeedVerdict::AlreadyPaid => None,
         NeedVerdict::NotNeeded => Some(no),
         NeedVerdict::Confirmed | NeedVerdict::StillToPay => Some(yes),
