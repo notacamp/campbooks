@@ -51,7 +51,7 @@ export function useReplySuggestions(
  * `conversations.write_reply`: Scout's reply for an intent, or the draft
  * rewritten (shorter, or as `change` asks). Plain text; nothing is saved.
  */
-export async function writeReply(
+async function writeReply(
   workspaceId: string,
   conversationId: string,
   body: WriteReply,
@@ -67,7 +67,7 @@ export async function writeReply(
 }
 
 /** What a streamed reply calls back with as it is written. */
-export interface StreamHandlers {
+interface StreamHandlers {
   /** Stops the request (a new ask, Back, the dialog closed). */
   signal: AbortSignal;
   /** More of Scout's thinking. */
