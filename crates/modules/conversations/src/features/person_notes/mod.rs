@@ -27,13 +27,14 @@ use campbooks_kernel::{
 };
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
 use sqlx::PgConnection;
 use utoipa::ToSchema;
 
 use crate::{
     domain::{
         access::visible_inboxes,
-        person::{kept_char, plain_address},
+        person::{distrusted, kept_char, plain_address},
         resources::PERSON_NOTE_RECORD,
     },
     model::{InboxId, PersonNoteId},
@@ -53,14 +54,54 @@ const MAX_NAME_CHARS: usize = 200;
 const LIST: &str = "SELECT id, address, note, updated_at FROM conversations.person_notes \
      WHERE workspace_id = $1 AND user_id = $2 \
      ORDER BY updated_at DESC, id DESC LIMIT $3";
-/// The name each address last gave in mail it sent to an inbox the caller
-/// reads, spam left out. Served by `messages_inbound_sender_idx`.
-const NAMES: &str = "SELECT DISTINCT ON (sender_address) sender_address, \
-            btrim(sender->>'name') \
-       FROM conversations.messages \
-      WHERE inbox_id = ANY($1) AND direction = 'inbound' AND sender_address = ANY($2) \
-        AND NOT in_spam AND nullif(btrim(sender->>'name'), '') IS NOT NULL \
-      ORDER BY sender_address, sent_at DESC";
+/// Sent messages of each inbox looked through for the name it gave a
+/// person. Served by `messages_outbound_idx`.
+const SENT_SCAN: i64 = 500;
+/// Received messages per inbox and address looked through for the name a
+/// person gave. Served by `messages_inbound_sender_idx`.
+const RECEIVED_SCAN: i64 = 10;
+
+/// The name the caller's inboxes (`$1`) gave each address (`$2`, lower-cased)
+/// when writing to it, as a To or Cc recipient of their newest `$3` sent
+/// messages each, newest first: the member's own mail, never the sender's
+/// say.
+const SENT_NAMES: &str = "SELECT DISTINCT ON (address) address, name FROM ( \
+         SELECT lower(r->>'address') AS address, btrim(r->>'name') AS name, \
+                s.sent_at, s.id \
+           FROM unnest($1::uuid[]) AS i(id) \
+           CROSS JOIN LATERAL ( \
+               SELECT id, sent_at, recipients FROM conversations.messages \
+                WHERE inbox_id = i.id AND direction = 'outbound' \
+                ORDER BY sent_at DESC, id DESC LIMIT $3) s \
+           CROSS JOIN LATERAL jsonb_array_elements( \
+               CASE WHEN jsonb_typeof(s.recipients->'to') = 'array' \
+                    THEN s.recipients->'to' ELSE '[]'::jsonb END || \
+               CASE WHEN jsonb_typeof(s.recipients->'cc') = 'array' \
+                    THEN s.recipients->'cc' ELSE '[]'::jsonb END) r) named \
+      WHERE address = ANY($2) AND nullif(name, '') IS NOT NULL \
+      ORDER BY address, sent_at DESC, id DESC";
+/// Up to `$3` messages each address (`$2`) sent to each of the caller's
+/// inboxes (`$1`), with what decides whether they are trusted: in spam,
+/// their headers, and whether their conversation is flagged suspicious or
+/// has an open Review need (as `conversations.write_reply` reads them), and
+/// when they were stored.
+const RECEIVED_NAMES: &str = "SELECT a.address, btrim(m.sender->>'name'), m.created_at, \
+            m.in_spam, m.headers, \
+            (EXISTS (SELECT 1 FROM conversations.decisions d \
+                      WHERE d.conversation_id = m.conversation_id \
+                        AND d.workspace_id = m.workspace_id \
+                        AND d.question = 'suspicious' AND d.value = 'true'::jsonb) \
+             OR EXISTS (SELECT 1 FROM conversations.needs n \
+                         WHERE n.conversation_id = m.conversation_id \
+                           AND n.workspace_id = m.workspace_id \
+                           AND n.state = 'open' AND n.reason = 'review')) \
+       FROM unnest($1::uuid[]) AS i(id) \
+       CROSS JOIN unnest($2::text[]) AS a(address) \
+       CROSS JOIN LATERAL ( \
+           SELECT conversation_id, workspace_id, sender, created_at, in_spam, headers \
+             FROM conversations.messages \
+            WHERE inbox_id = i.id AND direction = 'inbound' AND sender_address = a.address \
+            ORDER BY sent_at DESC LIMIT $3) m";
 /// One writer at a time per member, so the limit holds.
 const LOCK: &str = "SELECT pg_advisory_xact_lock(hashtextextended($1, 0))";
 /// Whether the caller already has a note for the address, and how many
@@ -97,7 +138,7 @@ pub struct PersonNote {
     pub id: PersonNoteId,
     /// The person's address, lower-cased.
     pub address: String,
-    /// The name they gave in mail to an inbox you read, when there is one.
+    /// Their name as your mail gave it, else as their trusted mail did.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub name: Option<String>,
     /// Who they are and how to write to them, in your words.
@@ -364,15 +405,67 @@ async fn names_of(
     if inboxes.is_empty() {
         return Ok(HashMap::new());
     }
-    let rows: Vec<(String, String)> = sqlx::query_as(NAMES)
+    // First, the name the member's own mail gave them.
+    let sent: Vec<(String, String)> = sqlx::query_as(SENT_NAMES)
         .bind(inboxes.as_slice())
         .bind(addresses)
+        .bind(SENT_SCAN)
         .fetch_all(&mut *conn)
         .await?;
-    Ok(rows
+    let mut names: HashMap<String, String> = sent
         .into_iter()
-        .map(|(address, name)| (address, name.chars().take(MAX_NAME_CHARS).collect()))
-        .collect())
+        .filter_map(|(address, name)| shown(&name).map(|name| (address, name)))
+        .collect();
+    let rest: Vec<String> = addresses
+        .iter()
+        .filter(|address| !names.contains_key(*address))
+        .cloned()
+        .collect();
+    if rest.is_empty() {
+        return Ok(names);
+    }
+    // Else the name they gave in trusted mail, the one stored last: never
+    // by `sent_at`, which the sender sets.
+    let received: Vec<ReceivedRow> = sqlx::query_as(RECEIVED_NAMES)
+        .bind(inboxes.as_slice())
+        .bind(rest.as_slice())
+        .bind(RECEIVED_SCAN)
+        .fetch_all(&mut *conn)
+        .await?;
+    let mut newest: HashMap<String, (DateTime<Utc>, String)> = HashMap::new();
+    for (address, name, stored, in_spam, headers, suspicious) in received {
+        let Some(name) = name.as_deref().and_then(shown) else {
+            continue;
+        };
+        if distrusted("inbound", &address, in_spam, &headers, suspicious) {
+            continue;
+        }
+        if newest.get(&address).is_none_or(|(at, _)| stored > *at) {
+            newest.insert(address, (stored, name));
+        }
+    }
+    names.extend(
+        newest
+            .into_iter()
+            .map(|(address, (_, name))| (address, name)),
+    );
+    Ok(names)
+}
+
+/// A row of [`RECEIVED_NAMES`].
+type ReceivedRow = (String, Option<String>, DateTime<Utc>, bool, Value, bool);
+
+/// A name as shown: one line, no invisible marks, at most
+/// [`MAX_NAME_CHARS`] characters; `None` when nothing is left.
+fn shown(name: &str) -> Option<String> {
+    let name: String = name
+        .chars()
+        .map(|c| if c.is_whitespace() { ' ' } else { c })
+        .filter(|c| kept_char(*c))
+        .collect();
+    let name: String = name.split_whitespace().collect::<Vec<_>>().join(" ");
+    let name: String = name.chars().take(MAX_NAME_CHARS).collect();
+    (!name.is_empty()).then_some(name)
 }
 
 /// What `user` told Scout about `address` (lower-cased), for a reply Scout

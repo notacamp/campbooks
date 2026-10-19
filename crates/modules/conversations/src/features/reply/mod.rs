@@ -22,11 +22,7 @@ mod types;
 use std::time::{Duration, Instant};
 
 use axum::{Extension, Json, extract::State};
-use campbooks_ai::{
-    Gateway, Role,
-    decide::signals::facts::{dmarc_refused, sender_checks_failed},
-    usage::Scope,
-};
+use campbooks_ai::{Gateway, Role, usage::Scope};
 use campbooks_kernel::{
     AppState, Error, Operation, Problem, RecordRef, Result, Risk,
     authz::Action,
@@ -47,7 +43,7 @@ use crate::{
         access::visible_inboxes,
         blobs::{Budget, words},
         paths::ConversationPath,
-        person::plain_address,
+        person::{distrusted, plain_address},
         plain_text::{self, Quotes},
         resources,
     },
@@ -612,32 +608,12 @@ struct Answered {
     distrusted: bool,
 }
 
-/// Whether the message answered earns no person context. Facts only, as
-/// everywhere else (ADR 0018): spam, a `suspicious` answer or open Review
-/// need, and, for mail received, the receiving provider's results saying the
-/// sender failed its checks or is impersonated.
-fn distrusted(
-    direction: &str,
-    sender: &str,
-    in_spam: bool,
-    headers: &Value,
-    suspicious: bool,
-) -> bool {
-    if in_spam || suspicious {
-        return true;
-    }
-    let results = headers
-        .get("authentication_results")
-        .and_then(Value::as_str);
-    direction == "inbound" && (sender_checks_failed(sender, results) || dmarc_refused(results))
-}
-
 /// The conversation's length and what the inbox knows of the person
 /// answered: the other side of the message answered (the sender of an
 /// inbound one, the first recipient of one the member sent). Nothing of the
-/// person when the message is distrusted or their address is not plain:
-/// neither past mail nor the member's note, so a forged sender never gets
-/// what the member wrote about the person it imitates.
+/// person when the message is distrusted (in spam, suspicious, under
+/// review, or failing its sender's checks) or their address is not plain:
+/// neither past mail nor the member's note.
 ///
 /// Only the conversation's own inbox is read, never another one the member
 /// can see: it is the inbox the reply is sent from, which the caller was

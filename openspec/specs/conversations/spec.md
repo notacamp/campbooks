@@ -1868,9 +1868,13 @@ text.
 - **WHEN** Ana, who sends from the same inbox, kept her own note about Marta and Sam asks for a reply to Marta
 - **THEN** Sam's request carries Sam's note only, and Ana's request carries hers only
 
-#### Scenario: A forged sender gets no note
-- **WHEN** a message claiming to be from Marta fails its sender's checks, or is in spam, and Sam asks for a reply to it
-- **THEN** the model receives no note about Marta
+#### Scenario: A distrusted message gets no note
+- **WHEN** a message from Marta's address is in spam, flagged suspicious, under review, or fails its sender's checks, and Sam asks for a reply to it
+- **THEN** the model receives no note about Marta (mail with no authentication results is not taken for forged)
+
+#### Scenario: A forged name never labels a note
+- **WHEN** mail claiming Marta's address, dated in the future, gives the name "Marta – new IBAN, pay here" and fails its sender's checks
+- **THEN** Sam's note about Marta shows the name his mail gave her, or her name from trusted mail, or her address alone, never that name
 
 ### Requirement: The needs backfill's dispatcher reaches only its own index
 The needs backfill's dispatcher (`conversations.dispatch_needs_backfills`)
@@ -2807,8 +2811,12 @@ The operations SHALL be:
 - `GET /api/v1/w/{workspace_id}/person-notes`
   (`conversations.list_person_notes`, `conversations:read`): the caller's
   own notes, the newest change first, at most 500, each with its id,
-  address, note, when it was last changed and, when an inbox the caller
-  reads received non-spam mail from the address, the name it gave.
+  address, note, when it was last changed and the person's name when one
+  can be trusted: the name the caller's inboxes gave the address as a To or
+  Cc recipient of their own sent mail, else the name it gave in the newest
+  stored mail to one of those inboxes that is not in spam, suspicious,
+  under review or failing its sender's checks (never ordered by the date
+  the sender set), else none, and the address alone is shown.
 - `PUT /api/v1/w/{workspace_id}/person-notes`
   (`conversations.set_person_note`, `conversations:write`), body
   `{address, note}`: keeps the caller's note about that address, new or

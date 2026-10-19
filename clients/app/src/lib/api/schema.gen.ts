@@ -3608,7 +3608,7 @@ export interface components {
             address: string;
             /** @description The note. */
             id: components["schemas"]["PersonNoteId"];
-            /** @description The name they gave in mail to an inbox you read, when there is one. */
+            /** @description Their name as your mail gave it, else as their trusted mail did. */
             name?: string | null;
             /** @description Who they are and how to write to them, in your words. */
             note: string;

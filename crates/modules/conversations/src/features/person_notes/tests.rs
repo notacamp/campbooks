@@ -355,3 +355,141 @@ async fn a_note_never_reaches_the_event_log_or_the_queue(db: PgPool) {
         }
     }
 }
+
+/// Store one message of `inbox`: from `other` when `inbound`, else to them.
+async fn mail(
+    kit: &Kit,
+    (workspace, inbox): (WorkspaceId, crate::model::InboxId),
+    id: &str,
+    inbound: bool,
+    other: (&str, &str),
+    sent_at: &str,
+    results: Option<&str>,
+) {
+    let (name, address) = other;
+    let sam = json!({"name": "Sam Rivera", "address": "sam@example.com"});
+    let them = json!({"name": name, "address": address});
+    let (from, to) = if inbound { (them, sam) } else { (sam, them) };
+    kit.ingest_value(
+        workspace,
+        inbox,
+        &json!({"changes": [{"op": "upsert", "message": {
+            "provider_message_id": id,
+            "thread_key": format!("thr-{id}"),
+            "from": from,
+            "to": [to],
+            "subject": "Obra",
+            "sent_at": sent_at,
+            "direction": if inbound { "inbound" } else { "outbound" },
+            "text": "Olá",
+            "headers": {"authentication_results": results},
+            "mailbox": {"in_inbox": true},
+            "read": true, "starred": false
+        }}]}),
+    )
+    .await;
+}
+
+const FAILED_CHECKS: &str =
+    "mx.example; dkim=fail header.i=@clientes.example; dmarc=fail header.from=clientes.example";
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_forged_future_dated_name_is_never_shown(db: PgPool) {
+    let kit = Kit::new(db).await;
+    let (workspace, inbox, sam) = kit.sams_inbox().await;
+    let at = (workspace, inbox);
+    let marta = "marta@clientes.example";
+    mail(
+        &kit,
+        at,
+        "marta-1",
+        true,
+        ("Marta Ferreira", marta),
+        "2026-10-12T09:00:00Z",
+        None,
+    )
+    .await;
+    // Posing as Marta, dated years ahead so it sorts first by its own date.
+    let forged = ("Marta – new IBAN, pay here", marta);
+    mail(
+        &kit,
+        at,
+        "forged-1",
+        true,
+        forged,
+        "2030-01-01T09:00:00Z",
+        Some(FAILED_CHECKS),
+    )
+    .await;
+    // And in spam.
+    let spam = ("Marta – urgent", marta);
+    mail(&kit, at, "spam-1", true, spam, "2030-01-02T09:00:00Z", None).await;
+    sqlx::query(
+        "UPDATE conversations.messages SET in_spam = true WHERE provider_message_id = 'spam-1'",
+    )
+    .execute(&kit.db)
+    .await
+    .unwrap();
+    let kept = keep(&kit, &sam, workspace, marta, "My landlord.").await;
+    assert_eq!(kept["name"], "Marta Ferreira");
+    assert_eq!(
+        listed(&kit, &sam, workspace).await[0]["name"],
+        "Marta Ferreira"
+    );
+
+    // Only forged mail from someone: no name, the address alone.
+    let rui = "rui@clientes.example";
+    let forged = ("Rui – pay here", rui);
+    mail(
+        &kit,
+        at,
+        "forged-2",
+        true,
+        forged,
+        "2030-01-01T09:00:00Z",
+        Some(FAILED_CHECKS),
+    )
+    .await;
+    let kept = keep(&kit, &sam, workspace, rui, "My builder.").await;
+    assert!(kept.get("name").is_none(), "{kept}");
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn the_name_my_mail_gave_them_comes_first(db: PgPool) {
+    let kit = Kit::new(db).await;
+    let (workspace, inbox, sam) = kit.sams_inbox().await;
+    let at = (workspace, inbox);
+    let marta = "marta@clientes.example";
+    mail(
+        &kit,
+        at,
+        "sent-1",
+        false,
+        ("Marta Ferreira", marta),
+        "2026-10-10T09:00:00Z",
+        None,
+    )
+    .await;
+    // Mail claiming her address with another name, stored later and passing
+    // no checks at all: it is still not what Sam called her.
+    let other = ("Marta – new IBAN", marta);
+    mail(
+        &kit,
+        at,
+        "marta-2",
+        true,
+        other,
+        "2030-01-01T09:00:00Z",
+        None,
+    )
+    .await;
+    let kept = keep(
+        &kit,
+        &sam,
+        workspace,
+        "Marta@Clientes.example",
+        "My landlord.",
+    )
+    .await;
+    assert_eq!(kept["name"], "Marta Ferreira");
+}

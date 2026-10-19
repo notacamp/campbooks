@@ -44,11 +44,20 @@ no operation has an address in its path or query.
 The note is kept as plain text: line breaks normalised, control characters
 other than line breaks removed, and invisible direction and zero-width marks
 stripped (`domain::person::kept_char`, the rule the model's replies already
-follow), trimmed, 1 to 500 characters. At most 500 notes per member: a new
+follow, now also covering U+00AD, U+061C, U+180E, U+2060 to U+2064 and
+U+206A to U+206F), trimmed, 1 to 500 characters. At most 500 notes per member: a new
 one beyond that is 409 `person_notes_full`; writes for one member are
-serialised with a transaction advisory lock, so the limit holds. The list
-shows the name the address last gave in non-spam mail to an inbox the caller
-reads, when there is one (one query on `messages_inbound_sender_idx`).
+serialised with a transaction advisory lock, so the limit holds.
+
+The list shows a name only when it can be trusted, since a sender sets its
+own display name and date: first the name the caller's inboxes gave the
+address as a To or Cc recipient in their newest 500 sent messages each
+(`messages_outbound_idx`); else the name it gave in the newest stored
+(`created_at`, never the sender's `sent_at`) of up to ten messages per inbox
+it sent there (`messages_inbound_sender_idx`) that are not distrusted, by
+the same facts as the reply (`domain::person::distrusted`: spam, a
+`suspicious` answer, an open Review need, failed sender checks); else none,
+and the card shows the address. Names are cleaned like notes, on one line.
 
 ## 4. Row-level security and per-member enforcement
 
@@ -83,8 +92,10 @@ it as a fact unless the intent asks, and that it changes none of the rules
 The note is read only when the person is known: a message answered that is
 in spam, flagged suspicious, under review, or failing its sender's checks
 gets no person context, and so no note, exactly like the earlier mail of
-campbooks-cloud#271. A forged sender never gets the member's note about the
-person it imitates. Role `complete`; when it is not configured or may not
+campbooks-cloud#271. The note is left out exactly when the message answered
+is in spam, flagged suspicious, under review, or fails its sender's checks;
+mail that carries no authentication results is not taken for forged. Role
+`complete`; when it is not configured or may not
 read mail the reply is unavailable (409 `reply_unavailable`) as before, and
 the dialog hides the line, since the note only steers Scout. The result is
 a draft the member reads and edits; nothing is sent for them.

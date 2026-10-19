@@ -15800,7 +15800,7 @@
               "string",
               "null"
             ],
-            "description": "The name they gave in mail to an inbox you read, when there is one."
+            "description": "Their name as your mail gave it, else as their trusted mail did."
           },
           "note": {
             "type": "string",
