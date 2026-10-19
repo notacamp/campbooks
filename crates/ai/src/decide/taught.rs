@@ -240,6 +240,18 @@ pub enum Slot {
 }
 
 impl Action {
+    /// Whether it takes mail out of the member's way, or says it needs
+    /// nothing of them: what "Worth a look" cannot share a rule with.
+    fn hides(&self) -> bool {
+        match self {
+            Self::Archive | Self::MarkRead | Self::Trash | Self::Spam | Self::MarkPaid => true,
+            Self::MoveToStream { stream } => stream != "primary",
+            Self::NeedsReply { value } | Self::AsksAction { value } => !value,
+            Self::Surface { value } => *value == Surface::Never,
+            Self::AddLabel { .. } | Self::ShowImages | Self::WorthALook => false,
+        }
+    }
+
     /// The slot it fills.
     pub fn slot(&self) -> Slot {
         match self {
@@ -837,19 +849,7 @@ impl TaughtRule {
             return Err(Invalid::DomainToBin);
         }
         // Highlighting mail and hiding it contradict each other.
-        if actions.contains(&Action::WorthALook)
-            && actions.iter().any(|a| match a {
-                Action::Archive
-                | Action::MarkRead
-                | Action::Trash
-                | Action::Spam
-                | Action::MarkPaid => true,
-                Action::MoveToStream { stream } => stream != "primary",
-                Action::NeedsReply { value } | Action::AsksAction { value } => !value,
-                Action::Surface { value } => *value == Surface::Never,
-                Action::AddLabel { .. } | Action::ShowImages | Action::WorthALook => false,
-            })
-        {
+        if actions.contains(&Action::WorthALook) && actions.iter().any(Action::hides) {
             return Err(Invalid::HighlightHides);
         }
         // Trusting a sender's images: one sender (an address, or a domain

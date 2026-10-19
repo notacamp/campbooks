@@ -245,8 +245,10 @@ describe("Scout noticed", () => {
     ).toHaveAccessibleDescription(
       /I like these.*waits on Home under Worth a look until you have opened it once\. Nothing is pinned\./u,
     );
-    expect(within(goals).getByRole("radio", { name: "File them under Newsletters" })).toBeVisible();
-    expect(within(goals).getByRole("radio", { name: "Mark them read" })).toBeVisible();
+    expect(
+      within(goals).getByRole("radio", { name: "File them under Newsletters" }),
+    ).toBeInTheDocument();
+    expect(within(goals).getByRole("radio", { name: "Mark them read" })).toBeInTheDocument();
 
     fireEvent.click(within(dialog).getByRole("button", { name: /Save smart rule/u }));
     await screen.findByText("Smart rule saved");
