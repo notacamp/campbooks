@@ -154,10 +154,11 @@ describe("the change feed", () => {
         client.setQueryData(body("plain"), { html: "", images_trusted: false, images_held: null });
         createCacheBinding(client, WS).change({ type: "conversations.rule", id: "r1" }, op);
         await vi.advanceTimersByTimeAsync(50);
-        expect(stale(body("trusted")), op).toBe(true);
-        expect(stale(body("held")), op).toBe(true);
-        expect(stale(body("offered")), op).toBe(true);
-        expect(stale(body("plain")), `${op}: no remote-image state`).toBe(false);
+        // Bodies with remote-image state are re-read; one without is not.
+        expect({ op, trusted: stale(body("trusted")) }).toEqual({ op, trusted: true });
+        expect({ op, held: stale(body("held")) }).toEqual({ op, held: true });
+        expect({ op, offered: stale(body("offered")) }).toEqual({ op, offered: true });
+        expect({ op, plain: stale(body("plain")) }).toEqual({ op, plain: false });
       }
 
       // A message's own change still re-reads every body of it.
