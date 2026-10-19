@@ -9,13 +9,24 @@ import {
   type Stream,
 } from "../../api/queries";
 import type { TaughtAction } from "../../api/rules";
-import { streamName, type Translate } from "../../model";
+import { streamName, undoMoves, type Move, type Translate } from "../../model";
 import { useTeachOnce } from "../TeachOnce/TeachOnce";
+
+/** Each move's toast. */
+const TOASTS: Record<Move, string> = {
+  archive: "toast.done",
+  unarchive: "toast.toInbox",
+  trash: "toast.deleted",
+  untrash: "toast.restored",
+  spam: "toast.spam",
+  not_spam: "toast.notSpam",
+};
 
 /**
  * The inbox's actions on one conversation, each pushed to the undo stack
- * with its toast (Z or the toast's Undo takes it back): Done (archive),
- * star, read/unread, move to a stream.
+ * with its toast (Z or the toast's Undo takes it back): Done (archive) and
+ * Move to Inbox, Delete and Restore, Report spam and Not spam, star,
+ * read/unread, move to a stream.
  */
 export function useInboxActions(workspaceId: string) {
   const { t: typed } = useTranslation("conversations");
@@ -41,6 +52,22 @@ export function useInboxActions(workspaceId: string) {
           if (taught !== undefined) {
             teach?.after(conversation, taught);
           }
+        },
+      },
+    );
+  };
+  /** Run `moves` one after the other, each on the summary the last one returned. */
+  const runInOrder = (conversation: ConversationSummary, moves: readonly Move[]) => {
+    const [first, ...rest] = moves;
+    if (first === undefined) {
+      return;
+    }
+    mutation.mutate(
+      { conversation, action: first },
+      {
+        onSuccess: (summary) => {
+          teach?.exception(summary.rule_exception);
+          runInOrder(summary, rest);
         },
       },
     );
@@ -74,14 +101,21 @@ export function useInboxActions(workspaceId: string) {
     dismissFailure: () => {
       mutation.reset();
     },
-    done: (conversation: ConversationSummary) => {
-      undoable(
-        conversation,
-        "archive",
-        "unarchive",
-        t("toast.done", { subject: subjectOf(conversation) }),
-        { kind: "archive" },
-      );
+    /** Move it to another place; Done (archive) offers to teach archiving. */
+    moveTo: (conversation: ConversationSummary, move: Move) => {
+      // One toast and one Undo entry, which puts it back exactly where it
+      // was, in as many steps as that takes.
+      const back = undoMoves(conversation, move);
+      run(conversation, move, move === "archive" ? { kind: "archive" } : undefined);
+      undo.push({
+        label: t(TOASTS[move], { subject: subjectOf(conversation) }),
+        undo: () => {
+          runInOrder(conversation, back);
+        },
+        redo: () => {
+          run(conversation, move);
+        },
+      });
     },
     toggleStar: (conversation: ConversationSummary) => {
       const starring = !conversation.starred;

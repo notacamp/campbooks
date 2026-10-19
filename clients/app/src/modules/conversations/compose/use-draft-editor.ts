@@ -5,6 +5,7 @@ import { problemCode } from "~/lib/api";
 
 import {
   cancelSend,
+  changedElsewhere,
   draftKeys,
   fetchDraft,
   saveDraft,
@@ -58,11 +59,6 @@ function changesOf(
   contentToken: string | null | undefined,
 ): DraftChanges {
   return { version, content_token: contentToken ?? null, ...fields };
-}
-
-/** A save or send refused because the draft is not what the composer holds. */
-function changedElsewhere(code: string | undefined): boolean {
-  return code === "content_changed" || code === "draft_changed";
 }
 
 /**
@@ -139,8 +135,7 @@ export function useDraftEditor(workspaceId: string, draft: Draft) {
         setSaveState(latest.current === current ? "saved" : "unsaved");
         setError(undefined);
       } catch (thrown) {
-        const code = problemCode(thrown);
-        if (!changedElsewhere(code)) {
+        if (!changedElsewhere(thrown)) {
           setSaveState("failed");
           return;
         }
@@ -216,9 +211,9 @@ export function useDraftEditor(workspaceId: string, draft: Draft) {
   /** Send: save first, then schedule. Resolves with the scheduled draft, or undefined. */
   const send = useCallback(async (): Promise<Draft | undefined> => {
     setSending(true);
+    // Send only what the member sees: the server sends the saved version.
+    const current = latest.current;
     try {
-      // Send only what the member sees: the server sends the saved version.
-      const current = latest.current;
       if (!(await flush()) || latest.current !== current) {
         // A save refused as changed has said so already; keep that notice.
         setError((shownError) => (shownError === "content_changed" ? shownError : "not_saved"));
@@ -232,18 +227,30 @@ export function useDraftEditor(workspaceId: string, draft: Draft) {
       void refresh();
       return scheduled;
     } catch (thrown) {
-      const code = problemCode(thrown) ?? "unknown";
-      if (code === "content_changed") {
-        // Not what the member was shown (changed elsewhere, or opened
-        // before the server checked): show it as it is now and let them
-        // send again. Never sent on their behalf.
-        try {
-          showCurrent(await fetchDraft(workspaceId, draft.id));
-        } catch {
-          // The notice still says to check it; the next send asks again.
-        }
+      if (!changedElsewhere(thrown)) {
+        setError(problemCode(thrown) ?? "unknown");
+        return undefined;
       }
-      setError(code);
+      // Not the draft the member was shown: saved since elsewhere (another
+      // tab, another device, the assistant: `draft_changed`) or changed
+      // under it (`content_changed`). Nothing was sent. Read it again and
+      // show it as it is now, so the next Send names its version and token
+      // (campbooks-cloud#242); never sent on their behalf.
+      try {
+        const fresh = await fetchDraft(workspaceId, draft.id);
+        if (latest.current === current) {
+          showCurrent(fresh);
+        } else {
+          // Typed while the send was refused: keep it, take only the
+          // version and token, and the next save writes it over them.
+          version.current = fresh.version;
+          shownToken.current = fresh.content_token;
+          setShown(shownOf(fresh));
+        }
+      } catch {
+        // The notice still says to check it; the next send asks again.
+      }
+      setError("content_changed");
       return undefined;
     } finally {
       setSending(false);
@@ -281,11 +288,18 @@ export function useDraftEditor(workspaceId: string, draft: Draft) {
     const seen = latest.current;
     // Nothing may save into a draft that is going.
     latest.current = saved.current;
-    await deleteWithUndo({
-      ...draft,
-      ...seen,
-      attachments: draft.attachments.filter((a) => seen.attachments.includes(a.id)),
-    });
+    try {
+      await deleteWithUndo({
+        ...draft,
+        ...seen,
+        attachments: draft.attachments.filter((a) => seen.attachments.includes(a.id)),
+      });
+    } catch (error) {
+      // Refused: the draft stays, and what was typed is still to be saved
+      // (the next save or Send writes it, never the last saved version).
+      latest.current = seen;
+      throw error;
+    }
   }, [deleteWithUndo, draft]);
 
   return { fields, shown, update, saveState, error, sending, send, undo, discard, flush };

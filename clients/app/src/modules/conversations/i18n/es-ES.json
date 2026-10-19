@@ -7,13 +7,25 @@
     "receipts": "Recibos",
     "newsletters": "Boletines"
   },
+  "views": {
+    "sent": "Enviados",
+    "archive": "Archivo",
+    "spam": "Spam",
+    "trash": "Papelera"
+  },
   "list": {
     "label": "Conversaciones",
     "show": "Mostrar",
     "all": "Todas",
     "unread": "No leídas",
     "more": "Mostrar más",
-    "loadingMore": "Cargando más conversaciones"
+    "loadingMore": "Cargando más conversaciones",
+    "youPrefix": "Yo: {{snippet}}",
+    "to": "Para {{name}}",
+    "toOthers_one": "Para {{name}} y {{count}} más",
+    "toOthers_other": "Para {{name}} y {{count}} más",
+    "toHidden": "Para destinatarios ocultos",
+    "replied": "Respondió"
   },
   "empty": {
     "streamTitle": "Nada en {{stream}}",
@@ -23,7 +35,11 @@
     "noInboxTitle": "Aún no hay buzón",
     "noInboxBody": "Conecta un buzón y su correo aparecerá aquí, ordenado en flujos.",
     "readerTitle": "Elige una conversación",
-    "readerBody": "Elige una de la lista o usa el teclado:"
+    "readerBody": "Elige una de la lista o usa el teclado:",
+    "sent": "Nada en Enviados.",
+    "archive": "Nada en Archivo.",
+    "spam": "Nada en Spam.",
+    "trash": "Nada en la Papelera."
   },
   "error": {
     "listTitle": "No se ha podido cargar {{stream}}",
@@ -56,8 +72,24 @@
       "title": "Conservado como historial",
       "lead": "{{address}} se desconectó y su correo se conserva aquí, solo lectura: no llega nada nuevo y no se puede enviar ni cambiar nada desde él."
     },
+    "you": "Yo",
+    "toName": "→ {{name}}",
+    "toNameOthers_one": "→ {{name}} y {{count}} persona más",
+    "toNameOthers_other": "→ {{name}} y {{count}} personas más",
+    "more_one": "{{count}} mensaje más",
+    "more_other": "{{count}} mensajes más",
+    "showQuoted": "Mostrar texto citado",
+    "hideQuoted": "Ocultar texto citado",
     "readingText": "Leyendo…",
-    "textFailed": "No se pudo leer el texto de este correo."
+    "textFailed": "No se pudo leer el texto de este correo.",
+    "spam": {
+      "title": "Esta conversación está en Spam.",
+      "lead": "Sus imágenes nunca se cargan, y Scout no la toca."
+    },
+    "trash": {
+      "title": "Esta conversación está en la Papelera.",
+      "lead": "Tu proveedor de correo vacía la papelera cuando le toca."
+    }
   },
   "actions": {
     "star": "Fijar",
@@ -82,8 +114,14 @@
       "cannot_authenticate": "Las imágenes siguen retenidas: este proveedor de correo no comparte las comprobaciones del remitente, así que aquí no se puede confiar en ningún remitente.",
       "not_checked": "Las imágenes esperan a que Scout revise este correo. Mientras Scout esté desactivado o haya superado su límite diario, siguen retenidas.",
       "rule_paused": "Las imágenes siguen retenidas: la regla inteligente que confía en este remitente está en pausa o esperando un sí.",
-      "rule_too_broad": "Las imágenes siguen retenidas: la regla inteligente para todo el dominio de este remitente confiaría en desconocidos (cualquiera puede enviar desde él), así que no actúa. Aún puedes confiar en esta dirección."
-    }
+      "rule_too_broad": "Las imágenes siguen retenidas: la regla inteligente para todo el dominio de este remitente confiaría en desconocidos (cualquiera puede enviar desde él), así que no actúa. Aún puedes confiar en esta dirección.",
+      "spam": "Las imágenes nunca se cargan en Spam."
+    },
+    "delete": "Eliminar",
+    "restore": "Restaurar",
+    "reportSpam": "Marcar como spam",
+    "notSpam": "No es spam",
+    "toInbox": "Mover a la bandeja de entrada"
   },
   "toast": {
     "done": "Hecho · {{subject}}",
@@ -91,7 +129,12 @@
     "unstarred": "Ya no está fijada · {{subject}}",
     "read": "Marcada como leída · {{subject}}",
     "unread": "Marcada como no leída · {{subject}}",
-    "moved": "Movida a {{stream}} · {{subject}}"
+    "moved": "Movida a {{stream}} · {{subject}}",
+    "toInbox": "Movida a la bandeja de entrada · {{subject}}",
+    "deleted": "Eliminada · {{subject}}",
+    "restored": "Restaurada · {{subject}}",
+    "spam": "Marcada como spam · {{subject}}",
+    "notSpam": "No es spam · {{subject}}"
   },
   "scout": {
     "label": "Cómo está la cosa",
@@ -186,7 +229,13 @@
     "undoAll": "Deshacer todo lo que hizo una regla",
     "allPaid": "Todas las facturas ya pagadas",
     "saveRule": "Guardar la regla inteligente",
-    "trustImages": "Mostrar siempre las imágenes de este remitente"
+    "trustImages": "Mostrar siempre las imágenes de este remitente",
+    "sent": "Ir a Enviados",
+    "archive": "Ir a Archivo",
+    "spam": "Ir a Spam",
+    "trash": "Ir a Papelera",
+    "delete": "Eliminar, o restaurar de la Papelera",
+    "reportSpam": "Marcar como spam, o no es spam"
   },
   "compose": {
     "title": {
@@ -233,7 +282,6 @@
       "unknown_outcome": "Campbooks no ha podido confirmar que este mensaje se haya enviado. Revisa la carpeta Enviados antes de enviarlo de nuevo.",
       "unknown": "Algo ha salido mal. Inténtalo de nuevo.",
       "not_saved": "No se han podido guardar los últimos cambios, así que no se ha enviado nada. Inténtalo de nuevo.",
-      "draft_changed": "Este borrador ha cambiado en otro sitio. Ciérralo y vuelve a abrirlo para ver la última versión.",
       "content_changed": "Esto ha cambiado desde que lo abriste. Revísalo y vuelve a enviarlo.",
       "quote": "No se pudo leer el correo para citarlo. No se ha iniciado nada. Inténtalo de nuevo."
     },

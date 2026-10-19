@@ -13,6 +13,8 @@ const D = `${W}/drafts`;
 const NEWEST = Q4_DETAIL.messages.at(-1)?.id ?? "";
 const DRAFT = "Hi Maya,\n\nThursday works for me.\n\nSam Rivera";
 const SHORT = "Hi Maya, Thursday works.\n\nSam";
+/** What the dialog says when its draft changed since it was saved. */
+const CHANGED = "This reply changed since it was saved. Check it and send again.";
 /** The reply draft the dialog creates when it does not reuse one. */
 const FRESH = {
   ...REPLY,
@@ -773,6 +775,102 @@ describe("ReplyDialog", () => {
     fireEvent.click(screen.getByRole("button", { name: "Open in composer" }));
     await waitFor(() => {
       expect(screen.getByRole("button", { name: "Delete draft" })).toBeVisible();
+    });
+  });
+
+  it("sends in a fresh draft when Send finds its draft saved elsewhere since", async () => {
+    let created = 0;
+    const api = routes({
+      // The first reply draft, then a fresh one for the next Send.
+      [`POST ${D}`]: (_request, body) => {
+        created += 1;
+        const made = created === 1 ? { ...REPLY, message_id: NEWEST } : FRESH;
+        return { status: 201, body: { ...made, body: (body as { body: string }).body } };
+      },
+      // Saved in another tab before it could go (campbooks-cloud#242).
+      [`POST ${D}/${REPLY.id}/send`]: problem(409, "draft_changed"),
+      [`POST ${D}/${FRESH.id}/send`]: {
+        status: 202,
+        body: { ...FRESH, state: "scheduled", send_at: "2026-10-13T15:00:10Z" },
+      },
+      [`DELETE ${D}/${REPLY.id}`]: { status: 204 },
+    });
+    const handlers = dialog();
+    const pick = await screen.findByRole("button", { name: /Say Thursday works/u });
+    fireEvent.keyDown(pick, { key: "1" });
+    await screen.findByRole("textbox", { name: "Your reply" });
+    fireEvent.click(screen.getByRole("button", { name: /^Send/u }));
+    expect((await screen.findAllByText(CHANGED)).length).toBeGreaterThan(0);
+    expect(handlers.onSent).not.toHaveBeenCalled();
+    // The text stays, and Send writes it into a fresh draft; the old one goes.
+    expect(screen.getByRole("textbox", { name: "Your reply" })).toHaveValue(DRAFT);
+    fireEvent.click(screen.getByRole("button", { name: /^Send/u }));
+    await waitFor(() => {
+      expect(handlers.onSent).toHaveBeenCalled();
+    });
+    expect(api.calls.filter((c) => c.route === `POST ${D}`)).toHaveLength(2);
+    expect(api.calls.some((c) => c.route.startsWith("PATCH"))).toBe(false);
+    expect(api.calls.find((c) => c.route === `POST ${D}/${FRESH.id}/send`)?.body).toEqual({
+      version: FRESH.version,
+      content_token: FRESH.content_token,
+    });
+    await waitFor(() => {
+      expect(api.calls.map((c) => c.route)).toContain(`DELETE ${D}/${REPLY.id}`);
+    });
+  });
+
+  it("never stays stuck when the draft it saved again was changed elsewhere since", async () => {
+    let created = 0;
+    let sends = 0;
+    const api = routes({
+      [`POST ${D}`]: (_request, body) => {
+        created += 1;
+        const made = created === 1 ? { ...REPLY, message_id: NEWEST } : FRESH;
+        return { status: 201, body: { ...made, body: (body as { body: string }).body } };
+      },
+      // The first Send fails for another reason, so the dialog keeps its draft…
+      [`POST ${D}/${REPLY.id}/send`]: () => {
+        sends += 1;
+        return problem(503, "unavailable");
+      },
+      // …which is saved elsewhere before the next Send saves it again.
+      [`PATCH ${D}/${REPLY.id}`]: problem(409, "draft_changed"),
+      [`POST ${D}/${FRESH.id}/send`]: {
+        status: 202,
+        body: { ...FRESH, state: "scheduled", send_at: "2026-10-13T15:00:10Z" },
+      },
+      [`DELETE ${D}/${REPLY.id}`]: { status: 204 },
+    });
+    const handlers = dialog();
+    const pick = await screen.findByRole("button", { name: /Say Thursday works/u });
+    fireEvent.keyDown(pick, { key: "1" });
+    await screen.findByRole("textbox", { name: "Your reply" });
+    const send = () => {
+      fireEvent.click(screen.getByRole("button", { name: /^Send/u }));
+    };
+    send();
+    await waitFor(() => {
+      expect(sends).toBe(1);
+    });
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: /^Send/u })).toBeEnabled();
+    });
+    send();
+    expect((await screen.findAllByText(CHANGED)).length).toBeGreaterThan(0);
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: /^Send/u })).toBeEnabled();
+    });
+    send();
+    await waitFor(() => {
+      expect(handlers.onSent).toHaveBeenCalled();
+    });
+    expect(api.calls.filter((c) => c.route.startsWith("PATCH"))).toHaveLength(1);
+    expect(api.calls.find((c) => c.route === `POST ${D}/${FRESH.id}/send`)?.body).toEqual({
+      version: FRESH.version,
+      content_token: FRESH.content_token,
+    });
+    await waitFor(() => {
+      expect(api.calls.map((c) => c.route)).toContain(`DELETE ${D}/${REPLY.id}`);
     });
   });
 });

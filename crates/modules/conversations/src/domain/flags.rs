@@ -35,8 +35,8 @@ pub enum Flag {
     Untrash,
     /// Report every message as spam: out of the inbox, into spam.
     Spam,
-    /// Take every message out of spam, back where it was (in the inbox only
-    /// if it was there).
+    /// Take every message out of spam: received mail back in the inbox,
+    /// never the member's own.
     Unspam,
 }
 

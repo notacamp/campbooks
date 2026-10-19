@@ -12,7 +12,7 @@ import { useTranslation } from "react-i18next";
 import { useShortcut } from "~/lib/shortcuts";
 import { Button } from "~/lib/ui";
 
-import { isStream } from "./api/queries";
+import { isPlace } from "./api/queries";
 import { InboxScreen } from "./components/InboxScreen/InboxScreen";
 import { NewMessage } from "./components/NewMessage/NewMessage";
 import { TeachOnceProvider } from "./components/TeachOnce/TeachOnce";
@@ -21,7 +21,11 @@ import { renderReplyComposer } from "./components/ReplyComposer/ReplyComposer";
 /** A message id, as the API writes them. */
 const MESSAGE_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/u;
 
-/** `/w/$workspaceId/inbox…`: a stream, and the conversation open in it. */
+/**
+ * `/w/$workspaceId/inbox…`: a stream or a view beside them (Sent, Archive,
+ * Spam, Trash), and the conversation open in it. The `$stream` param holds
+ * either; anything else goes to Primary.
+ */
 function InboxPage() {
   const params: { workspaceId?: string; stream?: string; conversationId?: string } = useParams({
     strict: false,
@@ -35,7 +39,7 @@ function InboxPage() {
     void navigate({ to: "/w/$workspaceId/compose", params: { workspaceId } });
   };
   useShortcut("compose.new", compose);
-  if (!isStream(stream)) {
+  if (!isPlace(stream)) {
     return (
       <Navigate
         to="/w/$workspaceId/inbox/$stream"

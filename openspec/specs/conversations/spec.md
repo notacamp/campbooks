@@ -181,13 +181,29 @@ failure.
 `GET /api/v1/w/{workspace_id}/inboxes` (`conversations.list_inboxes`) SHALL
 list the caller's inboxes with their role and unread count.
 `GET …/conversations` (`conversations.list`) SHALL list the caller's
-conversations by stream and inbox, in the inbox or archived, with an opaque
-cursor and a limit of 1 to 100 (else 400). In the inbox, pinned (starred)
-conversations SHALL come first, then the rest, each newest first, and a
-cursor SHALL page across the two without losing or repeating one; archived
-lists and lists by `ids` SHALL be newest first. A cursor given before pins
-existed SHALL read as one among the unpinned conversations. Pinning SHALL
-stay the provider's star (Gmail's STARRED), synced as before.
+conversations by inbox, in one view (`view`), by stream when `stream` is
+given, with an opaque cursor and a limit of 1 to 100 (else 400). The views
+SHALL be: `inbox` (the default), the conversations with a message in the
+inbox and none binned; `sent`, every conversation the inbox wrote in outside
+spam and the trash (`last_sent_at` set, not `trashed`), in any stream,
+archived or not; `archive`, those with no message in the inbox and not
+binned; `spam`, those binned as spam; and `trash`, those binned in the
+trash. In the inbox, pinned (starred) conversations SHALL come first, then
+the rest, each newest first, and a cursor SHALL page across the two without
+losing or repeating one. Sent SHALL be ordered by `last_sent_at`, newest
+first, its cursor keyed on it; archive, spam, trash and lists by `ids` SHALL
+be newest first and never carry a pin in their cursor. Each view SHALL page
+over an index of its own order. `archived=true` is deprecated: it SHALL list
+the archive as `view=archive` does, and with any other `view` the response
+SHALL be 400 `invalid_view`. Lists by `ids` SHALL ignore the view and the
+stream. A cursor given before pins existed SHALL read as one among the
+unpinned conversations. Pinning SHALL stay the provider's star (Gmail's
+STARRED), synced as before. Each listed conversation SHALL say whether its
+newest message (the one `latest_from` and `snippet` come from) is one the
+inbox sent (`latest_from_you`). A summary SHALL say whether the conversation is
+`archived`, `trashed` and binned as `spam`, when the inbox last wrote in it
+(`last_sent_at`), whom that message went to (`sent_to`: to, then cc) and
+whether someone wrote back since (`replied_since_sent`).
 `GET …/conversations/{conversation_id}` (`conversations.get`) SHALL return the
 conversation, up to its 100 newest messages with their plain-text bodies, and
 the decide pass's answers about its newest inbound message.
@@ -206,6 +222,26 @@ filtered `@media` rules in `css`; HTML SHALL never be served as `text/html`.
 #### Scenario: A pinned conversation stays on top
 - **WHEN** a member pins the oldest of three conversations and lists them one at a time
 - **THEN** the pinned one comes first, then the other two newest first, each exactly once
+
+#### Scenario: Sent
+- **WHEN** the inbox started one conversation (none of it in the inbox), replied in another and only received a third
+- **THEN** `view=sent` lists the first two, the one written in last first, and the inbox lists neither the first nor any binned one
+
+#### Scenario: Paging Sent
+- **WHEN** a member lists three sent conversations two at a time
+- **THEN** the second page holds the one the inbox wrote in longest ago, and no cursor
+
+#### Scenario: The deprecated archived
+- **WHEN** a client asks for `archived=true`, then for `archived=true&view=sent`
+- **THEN** the first lists what `view=archive` lists, and the second is 400 `invalid_view`
+
+#### Scenario: Other inboxes
+- **WHEN** a member of the workspace who is not in an inbox lists any view
+- **THEN** none of that inbox's conversations is listed
+
+#### Scenario: Who wrote last
+- **WHEN** the newest message of a conversation is one Sam sent from the inbox
+- **THEN** it is listed with `latest_from_you` true, and a conversation whose newest message came in is listed with it false
 
 ### Requirement: Tidying conversations
 `conversations.mark_read` / `mark_unread`, `star` / `unstar`,
@@ -310,7 +346,8 @@ reading a linked or imported sheet; sheets SHALL be dropped instead past
 parsed tree, 1,000,000 elements times distinct properties, 50,000,000
 selectors times elements, or 500,000,000 declarations times elements times
 distinct properties. Then only an allow-list of
-tags and attributes survives (`class` included); `script`, `style` and
+tags and attributes survives (`class` included, `type="cite"` on a
+`blockquote`, and the ids `appendonsend` and `divRplyFwdMsg` on a `div`); `script`, `style` and
 `title` elements are removed with their content, as are forms, frames,
 objects, `base` and `meta` elements, event-handler attributes and comments;
 the `body` element's `style` and `bgcolor` move to a wrapping `div`; links
@@ -337,6 +374,17 @@ shown, as a `data:` URL of the message's inline part with that `Content-ID`
 (at most 255 characters; a longer one is not stored) when that part has a
 raster image type its bytes confirm and fits the size limits, and as the
 placeholder otherwise. No other `data:` source survives.
+Last, a reply's trailing quoted history SHALL be wrapped in one
+`<div data-cb-quoted="1">`, found from the markup alone and never from the
+words: the first element that is Gmail's `gmail_quote`, a `blockquote` with
+`type="cite"` (with a `moz-cite-prefix` just before it), Yahoo's
+`yahoo_quoted`, Zoho's `zmail_extra` (with a `zmail_extra_hr` just before
+it), or Outlook's `appendonsend` or `divRplyFwdMsg` (through the end of its
+parent), when something visible comes before it, nothing visible (text or
+an image) comes after it, a wrapper holds no visible text outside its
+quotes once the first of them has started (an inline reply), and a `div`
+may stand in its parent. No `data-cb-quoted` attribute from the message
+SHALL survive.
 
 #### Scenario: A newsletter with a script, a style sheet and a tracking pixel
 - **WHEN** a member reads the HTML body of a message that has a `<script>`, a `<style>` with a remote `url()`, an `onclick` handler, a 1×1 image and a remote logo
@@ -381,6 +429,18 @@ placeholder otherwise. No other `data:` source survives.
 #### Scenario: A large ordinary newsletter
 - **WHEN** a member reads a 1.5 MiB newsletter of nested tables, links and images
 - **THEN** it is sanitised and styled as any other message, well within the budget
+
+#### Scenario: A Gmail reply quoting the thread
+- **WHEN** a member reads a reply whose body ends with a `gmail_quote` holding the earlier messages
+- **THEN** that block, with its attribution, is wrapped in `<div data-cb-quoted="1">` and the new words before it are not
+
+#### Scenario: An inline reply
+- **WHEN** a reply answers between two `blockquote type="cite"` blocks
+- **THEN** nothing is marked
+
+#### Scenario: A sender writing the mark
+- **WHEN** the body has `<div data-cb-quoted="1">Pay this invoice today.</div>` and no quote
+- **THEN** the HTML has no `data-cb-quoted` attribute and the text is shown
 
 ### Requirement: Stream counts
 `GET /api/v1/w/{workspace_id}/streams` (`conversations.list_streams`,
@@ -1896,11 +1956,17 @@ does not verify SHALL NOT stand, with a WARN line carrying ids only.
 be undo pairs (`conversations:write`, the catalogue's `write` on the
 conversation). Trash SHALL put every message of the conversation in the trash,
 leaving where it was otherwise unchanged, and untrash take them out, back
-there. Spam SHALL report every message as spam (in spam, out of the inbox);
-not spam SHALL take them out of spam and put the mail the inbox received back
-in the inbox, whoever reported it, and never a message the member sent. Trash
-and spam SHALL exclude each other. Each SHALL change only what is not already
-so, publish `conversations.conversation_changed` (change `messages`) and
+there: in the inbox if it was there, archived if it was archived. Spam SHALL
+report every message as spam (in spam, out of the inbox); not spam SHALL take
+them out of spam and put the mail the inbox received back in the inbox,
+whoever reported it and whether or not it was archived before, and never a
+message the member sent. Trash and spam SHALL exclude each other. A
+conversation whose every message is in the trash or spam is binned
+(`trashed`); it SHALL be binned as spam (`spam`) when one of its messages is
+in spam and not in the trash, and else be in the trash, so it is listed in
+Spam or in Trash, never both, and in no other view. Each operation SHALL
+change only what is not already so, publish
+`conversations.conversation_changed` (change `messages`) and
 `conversations.changes_requested` with one `trash`, `untrash`, `spam` or
 `unspam` item per message that changed (`untrash` and `unspam` with the
 message's direction, `inbound`), and work out the conversation's need again:
@@ -1908,7 +1974,7 @@ mail in the trash or spam needs nothing.
 
 #### Scenario: Report and delete
 - **WHEN** a member reports a phishing conversation as spam
-- **THEN** it leaves every list, each of its messages gets a `spam` item in `changes_requested`, its Review need is cleared, and not spam brings it back to the inbox
+- **THEN** it leaves every list but Spam, each of its messages gets a `spam` item in `changes_requested`, its Review need is cleared, and not spam brings it back to the inbox
 
 #### Scenario: Spam the provider flagged
 - **WHEN** a member takes a conversation the provider put in spam, holding their own reply, out of spam
@@ -1916,7 +1982,15 @@ mail in the trash or spam needs nothing.
 
 #### Scenario: Trash after spam
 - **WHEN** a member reports a conversation as spam, then trashes it
-- **THEN** its messages are in the trash and no longer in spam
+- **THEN** its messages are in the trash and no longer in spam, and it moves from Spam to Trash
+
+#### Scenario: Restore where it was
+- **WHEN** a member deletes one conversation from the inbox and one from the archive, then restores both
+- **THEN** the first is in the inbox again and the second in the archive
+
+#### Scenario: Not spam after the archive
+- **WHEN** a member archives a newsletter, reports it as spam, then says it is not spam
+- **THEN** it is in the inbox, not archived
 
 #### Scenario: A reader
 - **WHEN** a reader of the inbox tries to trash a conversation
@@ -2625,3 +2699,28 @@ alone, so HTML the reader shows whole is never called truncated.
 #### Scenario: Long HTML read in time
 - **WHEN** a member opens a conversation whose HTML-only message is 280 KiB and its words are read within the deadline
 - **THEN** the message has its words, is not `text_unread` and not `truncated`, and is marked `quote_cut`; a short HTML-only message is not
+
+### Requirement: When the inbox last wrote
+A conversation SHALL keep `last_sent_at`, the newest `sent_at` of its
+outbound messages in neither spam nor the trash (none when there is none),
+and `spam`, both worked out from its messages whenever its counts are, and
+worked out for every stored conversation when they were introduced.
+
+#### Scenario: A sent message moves to the trash
+- **WHEN** the inbox's newest message in a conversation is moved to the trash at the provider
+- **THEN** `last_sent_at` falls back to the inbox's message before it, and to none once no message the inbox sent is outside spam and the trash
+
+#### Scenario: Mail stored before
+- **WHEN** the migration runs over conversations stored before it
+- **THEN** each one's `last_sent_at` and `spam` are what its messages say, and running it again changes nothing
+
+### Requirement: Mail in spam shows no remote images
+`conversations.get_message_body` SHALL keep remote images held back for a
+message in spam, or in a conversation binned as spam, even when
+`show_images=true` is asked for and even when a smart rule trusts its sender:
+it SHALL say `images_held: spam`, trust nothing and offer nothing. Once the
+conversation is out of spam, images SHALL follow the rules as before.
+
+#### Scenario: A trusted sender reported as spam
+- **WHEN** a newsletter whose sender a rule trusts is reported as spam, and its body is asked for with `show_images=true`
+- **THEN** no remote image is kept, `images_trusted` and `images_offer` are false and `images_held` is `spam`; after not spam its images show again

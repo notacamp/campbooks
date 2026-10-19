@@ -247,6 +247,51 @@ describe("ReplyComposer", () => {
     ]);
   });
 
+  it("reads the draft again when Send finds it saved elsewhere since, and the next Send goes", async () => {
+    // Saved in another tab while this one had nothing unsaved
+    // (campbooks-cloud#242): version 2, another text, another token.
+    const elsewhere = {
+      ...REPLY,
+      body: "Thursday at ten works.",
+      version: 2,
+      content_token: "demo-token-elsewhere",
+    };
+    let sends = 0;
+    const api = mockApi({
+      [`GET ${D}`]: { body: { drafts: [REPLY] } },
+      [`GET ${D}/${REPLY.id}`]: { body: elsewhere },
+      [`POST ${D}/${REPLY.id}/send`]: () => {
+        sends += 1;
+        return sends === 1
+          ? problem(409, "draft_changed")
+          : {
+              status: 202,
+              body: { ...elsewhere, state: "scheduled", send_at: "2026-10-13T15:00:10Z" },
+            };
+      },
+    });
+    const onClose = vi.fn();
+    renderWithProviders(slot({ mode: "reply", messageId: FIRST, nonce: 1 }, onClose));
+    fireEvent.click(await screen.findByRole("button", { name: /Send/u }));
+    expect(
+      await screen.findByText("This changed since you opened it. Check it and send again."),
+    ).toBeVisible();
+    // Shown as it is now, and nothing sent for the member.
+    expect(screen.getByRole("textbox", { name: "Message" })).toHaveValue("Thursday at ten works.");
+    expect(sends).toBe(1);
+    expect(onClose).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: /Send/u }));
+    expect(await screen.findByText("Sending to Maya Okafor")).toBeVisible();
+    expect(
+      api.calls.filter((call) => call.route.endsWith("/send")).map((call) => call.body),
+    ).toEqual([
+      { version: 1, content_token: REPLY.content_token },
+      { version: 2, content_token: "demo-token-elsewhere" },
+    ]);
+    // Nothing was saved over it: the member had nothing unsaved.
+    expect(api.calls.some((call) => call.route.startsWith("PATCH"))).toBe(false);
+  });
+
   it("keeps the typed text when an autosave is refused as changed, and saves it with the fresh token", async () => {
     const changed = {
       ...REPLY,
@@ -480,5 +525,37 @@ describe("ReplyComposer", () => {
       message_id: FIRST,
       body: "Not saved yet.",
     });
+  });
+
+  it("keeps what was typed when a discard is refused, and Send saves it first", async () => {
+    const api = mockApi({
+      [`GET ${D}`]: { body: { drafts: [REPLY] } },
+      [`DELETE ${D}/${REPLY.id}`]: problem(409, "draft_not_editable"),
+      [`PATCH ${D}/${REPLY.id}`]: (_request, body) => ({
+        body: { ...REPLY, ...(body as object), version: 2 },
+      }),
+      [`POST ${D}/${REPLY.id}/send`]: {
+        status: 202,
+        body: { ...REPLY, version: 2, state: "scheduled" },
+      },
+    });
+    renderWithProviders(slot({ mode: "reply", messageId: FIRST, nonce: 1 }));
+    const box = await screen.findByRole("textbox", { name: "Message" });
+    fireEvent.change(box, { target: { value: "Typed, not saved yet." } });
+    fireEvent.click(screen.getByRole("button", { name: "Discard" }));
+    await waitFor(() => {
+      expect(api.calls.some((c) => c.route.startsWith("DELETE"))).toBe(true);
+    });
+    // Still here, with the text the member typed.
+    expect(screen.getByRole("textbox", { name: "Message" })).toHaveValue("Typed, not saved yet.");
+    fireEvent.click(screen.getByRole("button", { name: /Send/u }));
+    await waitFor(() => {
+      expect(api.calls.some((c) => c.route.endsWith("/send"))).toBe(true);
+    });
+    const routes = api.calls.map((c) => c.route);
+    const saved = routes.indexOf(`PATCH ${D}/${REPLY.id}`);
+    expect(saved).toBeGreaterThanOrEqual(0);
+    expect(saved).toBeLessThan(routes.indexOf(`POST ${D}/${REPLY.id}/send`));
+    expect(api.calls[saved]?.body).toMatchObject({ body: "Typed, not saved yet." });
   });
 });

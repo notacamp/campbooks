@@ -330,6 +330,10 @@
   --home-min: 640px;
   --home-main-min: 520px;
   --reader-min: 480px;
+  /* A thread's own messages sit this far in from the left (more from 48rem). */
+  --message-yours-indent: var(--space-5);
+  /* The reader's pinned reply area grows up to this, then scrolls. */
+  --reader-footer-max: 60dvh;
   --scrollbar-size: 10px;
   --scrollbar-gap: 2px;
   --icon-size: var(--space-4);
@@ -351,6 +355,7 @@
 [data-theme],
 [data-accent] {
   --kbd-bg: var(--surface-sunken);
+  --message-yours-bg: var(--surface-sunken);
   --kbd-fg: var(--text-tertiary);
   --kbd-border: var(--border-strong);
   --swipe-later-bg: var(--signal-decide);
@@ -360,6 +365,12 @@
     oklch(0.99 0.004 var(--neutral-h)),
     oklch(0.17 0.01 var(--neutral-h))
   );
+}
+
+@media (width >= 48rem) {
+  :root {
+    --message-yours-indent: var(--space-10);
+  }
 }
 
 /* Phones navigate with a bottom tab bar: toasts sit above it. */

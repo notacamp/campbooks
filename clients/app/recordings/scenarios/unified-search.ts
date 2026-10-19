@@ -43,6 +43,7 @@ const summary = (
   unread_count: unread,
   starred: false,
   latest_from: from,
+  latest_from_you: false,
   snippet,
 });
 

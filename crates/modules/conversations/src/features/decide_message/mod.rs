@@ -776,12 +776,12 @@ mod tests {
         .await
         .unwrap();
         assert_eq!(rows.len(), 3 * 7);
-        // Recorded with the envelope version (context 2, the facts) and the
+        // Recorded with the envelope version (context 3, copied-only) and the
         // stamp of the passed answers check.
         assert!(rows.iter().all(
             |(.., version, model_version)| *version == crate::STATE_VERSION
-                && *version == 3
-                && model_version.as_deref() == Some("checked:ctx2")
+                && *version == 4
+                && model_version.as_deref() == Some("checked:ctx3")
         ));
         // Acted where the policy (0.9 for every model answer here) accepts
         // it: the stream (0.97), the reply (0.9) and "not suspicious"
@@ -1482,6 +1482,6 @@ mod tests {
         .fetch_all(&db)
         .await
         .unwrap();
-        assert_eq!(versions, [Some("checked:ctx2".to_owned())]);
+        assert_eq!(versions, [Some("checked:ctx3".to_owned())]);
     }
 }

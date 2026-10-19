@@ -42,8 +42,8 @@ export interface Mailbox {
   /** The history id before the first record still kept. */
   baseHistoryId: number;
   historyId: number;
-  /** Each demo thread's Gmail thread id and first Message-ID, to answer in it later. */
-  threads?: Map<string, { threadId: string; messageId: string }>;
+  /** Each demo thread's Gmail thread id and Message-IDs, to answer in it later. */
+  threads?: Map<string, { threadId: string; messageIds: string[] }>;
 }
 
 const LABELS = [
@@ -181,12 +181,176 @@ function brightloopLogo(): Buffer {
   });
 }
 
+/** One turn of a demo back-and-forth: who wrote it, when, and their own words. */
+interface Turn {
+  mine: boolean;
+  hoursAgo: number;
+  text: string;
+  /** Their own words as HTML; the quoted history is added after it. */
+  html: string;
+  /** An inline reply: `html` and `text` already answer between the quotes. */
+  inline?: boolean;
+  files?: DemoFile[];
+}
+
+const escapeHtml = (text: string) =>
+  text.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;");
+
+/** Gmail's attribution line for a message sent `hoursAgo` hours ago. */
+function wrote(from: string, hoursAgo: number): string {
+  const day = new Date(Date.now() - hoursAgo * 3_600_000).toUTCString().slice(0, 16);
+  return `On ${day}, ${from} wrote:`;
+}
+
+/** Gmail's quoted history of a message: its attribution, then a blockquote. */
+function gmailQuote(attribution: string, html: string): string {
+  return `<div class="gmail_quote gmail_quote_container"><div dir="ltr" class="gmail_attr">${escapeHtml(attribution)}<br></div><blockquote class="gmail_quote" style="margin:0px 0px 0px 0.8ex;border-left:1px solid rgb(204,204,204);padding-left:1ex">${html}</blockquote></div>`;
+}
+
+/** Plain text quoted as mail clients do: `> ` before every line. */
+function quoteLines(attribution: string, text: string): string {
+  return `${attribution}\n${text
+    .split("\n")
+    .map((line) => (line === "" ? ">" : `> ${line}`))
+    .join("\n")}`;
+}
+
+/**
+ * A thread as mail clients write it: every reply after the first quotes the
+ * whole message before it (Gmail's `gmail_quote` in the HTML, `>` lines in
+ * the text), except an inline reply, which already answers between quotes.
+ * The member's turns are SENT only; the other person's are in the inbox, the
+ * newest of them unread.
+ */
+function backAndForth(
+  me: string,
+  them: string,
+  subject: string,
+  thread: string,
+  turns: Turn[],
+): DemoMessage[] {
+  const owner = `Sam Rivera <${me}>`;
+  const newestTheirs = turns.findLastIndex((turn) => !turn.mine);
+  let previous: { from: string; hoursAgo: number; text: string; html: string } | undefined;
+  return turns.map((turn, index) => {
+    const from = turn.mine ? owner : them;
+    let text = turn.text;
+    let html = `<div dir="ltr">${turn.html}</div>`;
+    if (previous !== undefined && turn.inline !== true) {
+      const attribution = wrote(previous.from, previous.hoursAgo);
+      text = `${turn.text}\n\n${quoteLines(attribution, previous.text)}`;
+      html = `${html}<br>${gmailQuote(attribution, previous.html)}`;
+    }
+    previous = { from, hoursAgo: turn.hoursAgo, text, html };
+    return {
+      from,
+      to: turn.mine ? them : me,
+      subject: index === 0 ? subject : `Re: ${subject}`,
+      hoursAgo: turn.hoursAgo,
+      thread,
+      ...(index === 0 ? {} : { replyTo: thread }),
+      labels: turn.mine
+        ? ["SENT"]
+        : ["INBOX", "CATEGORY_PERSONAL", ...(index === newestTheirs ? ["UNREAD"] : [])],
+      text,
+      html,
+      ...(turn.files === undefined ? {} : { files: turn.files }),
+    };
+  });
+}
+
+/**
+ * Clara's kitchen shelving: seven messages back and forth over three days,
+ * every reply quoting the thread, one answered inline (campbooks-cloud#239).
+ */
+function kitchenShelving(me: string): DemoMessage[] {
+  const clara = "Clara Nunes <clara@casa-nunes.example>";
+  const inlineQuote = (html: string) =>
+    `<blockquote class="gmail_quote" style="margin:0px 0px 0px 0.8ex;border-left:1px solid rgb(204,204,204);padding-left:1ex">${html}</blockquote>`;
+  const askedOak = "Oak, please. And can you add two brackets under the long shelf?";
+  const askedFinish = "Should the oak be oiled or varnished?";
+  return backAndForth(me, clara, "Kitchen shelving quote", "kitchen", [
+    {
+      mine: false,
+      hoursAgo: 75,
+      text: "Hi Sam,\n\nCould you send me a quote for the kitchen shelving? Three shelves along the back wall, about 2.4 m long.\n\nClara",
+      html: "<p>Hi Sam,</p><p>Could you send me a quote for the kitchen shelving? Three shelves along the back wall, about 2.4 m long.</p><p>Clara</p>",
+    },
+    {
+      mine: true,
+      hoursAgo: 71,
+      text: "Hi Clara,\n\nHappy to. Pine or oak? Oak is about €300 more for that length.\n\nSam",
+      html: "<p>Hi Clara,</p><p>Happy to. Pine or oak? Oak is about €300 more for that length.</p><p>Sam</p>",
+    },
+    {
+      mine: false,
+      hoursAgo: 52,
+      text: `${askedOak}\n${askedFinish}\n\nClara`,
+      html: `<p>${askedOak}</p><p>${askedFinish}</p><p>Clara</p>`,
+    },
+    {
+      // Answered between the lines: shown whole, never folded.
+      mine: true,
+      hoursAgo: 49,
+      inline: true,
+      text: `Answers below.\n\n> ${askedOak}\nYes, two black steel brackets under the long shelf.\n> ${askedFinish}\nOiled, with a natural finish. The revised quote follows tomorrow.`,
+      html: `<p>Answers below.</p><div class="gmail_quote">${inlineQuote(askedOak)}<p>Yes, two black steel brackets under the long shelf.</p>${inlineQuote(askedFinish)}<p>Oiled, with a natural finish. The revised quote follows tomorrow.</p></div>`,
+    },
+    {
+      mine: false,
+      hoursAgo: 30,
+      text: "Lovely, thank you. I'll wait for the revised quote.\n\nClara",
+      html: "<p>Lovely, thank you. I'll wait for the revised quote.</p><p>Clara</p>",
+    },
+    {
+      mine: true,
+      hoursAgo: 26,
+      text: "Revised quote attached: €2,340 incl. VAT, oak with a natural oil finish, two brackets included.\n\nSam",
+      html: "<p>Revised quote attached: <b>€2,340 incl. VAT</b>, oak with a natural oil finish, two brackets included.</p><p>Sam</p>",
+      files: [
+        {
+          name: "quote-0412.pdf",
+          type: "application/pdf",
+          content: pdf("Quote 0412, oak shelving"),
+        },
+      ],
+    },
+    {
+      mine: false,
+      hoursAgo: 4,
+      text: "Perfect, approved. When can you start?\n\nClara",
+      html: "<p>Perfect, approved. When can you start?</p><p>Clara</p>",
+    },
+  ]);
+}
+
 /**
  * The demo mailbox, newest last. `images` is where the fake serves its demo
  * pictures, so "Show images" has something real to load.
  */
 function demoMessages(me: string, images: string): DemoMessage[] {
   return [
+    ...kitchenShelving(me),
+    // A thread where the member wrote last: its row reads "You: …".
+    {
+      from: "Leo Brandt <leo@northwind-studio.example>",
+      to: me,
+      subject: "Photos from Tuesday's shoot",
+      hoursAgo: 44,
+      thread: "photos",
+      labels: ["INBOX", "CATEGORY_PERSONAL"],
+      text: "Hi Sam,\n\nThe photos from Tuesday are in the shared folder. Pick your favourite three?\n\nLeo",
+    },
+    {
+      from: `Sam Rivera <${me}>`,
+      to: "Leo Brandt <leo@northwind-studio.example>",
+      subject: "Re: Photos from Tuesday's shoot",
+      hoursAgo: 40,
+      thread: "photos",
+      replyTo: "photos",
+      labels: ["SENT"],
+      text: "Got them, thanks Leo. I'll pick three by Monday.\n\nSam",
+    },
     {
       from: "Maya Okafor <maya@northwind-studio.example>",
       to: me,
@@ -423,6 +587,7 @@ export function rfc822(
   date: Date,
   messageId: string,
   parent?: string,
+  references = parent ?? "",
 ): string {
   const headers: [string, string][] = [
     ["From", message.from],
@@ -433,7 +598,10 @@ export function rfc822(
     ["Message-ID", messageId],
     ...(parent === undefined
       ? []
-      : [["In-Reply-To", parent] as [string, string], ["References", parent] as [string, string]]),
+      : [
+          ["In-Reply-To", parent] as [string, string],
+          ["References", references] as [string, string],
+        ]),
     ["MIME-Version", "1.0"],
     ...Object.entries(message.headers ?? {}),
   ];
@@ -619,19 +787,32 @@ export function createMailbox(
     baseHistoryId: 1000,
     historyId: 1000,
   };
-  const threads = new Map<string, { threadId: string; messageId: string }>();
+  // Each demo thread's Gmail thread id and its messages so far, oldest first.
+  const threads = new Map<string, { threadId: string; messageIds: string[] }>();
   const now = Date.now();
   for (const demo of [...demoMessages(address, images), ...lookalikes(address, extra), ...more]) {
     const date = new Date(now - demo.hoursAgo * 3_600_000);
     const messageId = `<${hex(6)}@demo.example>`;
     const parent = demo.replyTo === undefined ? undefined : threads.get(demo.replyTo);
-    const raw = rfc822(demo, date, messageId, parent?.messageId);
+    // A reply answers the thread's latest message and lists them all.
+    const raw = rfc822(
+      demo,
+      date,
+      messageId,
+      parent?.messageIds.at(-1),
+      parent?.messageIds.join(" "),
+    );
     const stored = appendMessage(mailbox, raw, demo.labels, {
       ...(parent === undefined ? {} : { threadId: parent.threadId }),
       internalDate: date.getTime(),
     });
-    if (demo.thread !== undefined && !threads.has(demo.thread)) {
-      threads.set(demo.thread, { threadId: stored.threadId, messageId });
+    if (demo.thread !== undefined) {
+      const known = threads.get(demo.thread);
+      if (known === undefined) {
+        threads.set(demo.thread, { threadId: stored.threadId, messageIds: [messageId] });
+      } else {
+        known.messageIds.push(messageId);
+      }
     }
   }
   // The backfill reads the mailbox as it is; history starts after it.
@@ -662,7 +843,8 @@ export function deliverDemo(mailbox: Mailbox, reply?: string): StoredMessage {
       },
       date,
       `<${hex(6)}@demo.example>`,
-      thread.messageId,
+      thread.messageIds.at(-1),
+      thread.messageIds.join(" "),
     );
     return appendMessage(mailbox, raw, ["INBOX", "UNREAD", "Label_1", "CATEGORY_PERSONAL"], {
       threadId: thread.threadId,

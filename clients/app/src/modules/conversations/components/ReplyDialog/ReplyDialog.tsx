@@ -19,6 +19,7 @@ import {
 
 import {
   cancelSend,
+  changedElsewhere,
   createDraft,
   deleteDraft,
   draftKeys,
@@ -420,13 +421,15 @@ export function ReplyDialog({
       });
       onSent?.(scheduled);
     } catch (thrown) {
-      if (problemCode(thrown) === "content_changed") {
-        // Changed after it was saved: nothing sent. Send again writes what
-        // is shown here into a fresh draft, and this one goes.
+      if (changedElsewhere(thrown)) {
+        // Changed after it was saved (saved since elsewhere, `draft_changed`,
+        // refused by the save or by Send; or not what was shown,
+        // `content_changed`): nothing sent. Send again writes what is shown
+        // here into a fresh draft, and this one goes (campbooks-cloud#242).
         handle.fail({ label: t("reply.errors.changed") });
         setProblem("errors.changed");
         setSaved(undefined);
-        replaced.current = kept;
+        replaced.current = kept ?? saved;
         void queryClient.invalidateQueries({ queryKey: draftKeys.all(workspaceId) });
       } else {
         handle.fail({ label: t("reply.errors.send", { name: person }) });

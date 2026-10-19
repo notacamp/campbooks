@@ -14,7 +14,12 @@ listed under Inbox in the sidebar (chips on phones) with their unread counts,
 opened with G then 1 to 4. A stream's page SHALL list its pinned
 conversations first, then the rest newest first, a page at a time, with
 sender, time, subject, snippet, unread, pinned and message count, and All or
-Unread.
+Unread. Four views SHALL sit under the streams, after a quiet divider: Sent,
+Archive, Spam and Trash, each with its icon and no count, opened with G then
+5 to 8. On phones they SHALL follow the stream chips, after a divider, in the
+same row, which scrolls sideways on its own; the page never does. Views are
+not streams: nothing is sorted into them, and a conversation can be in a
+stream and a view at once. Any other place in the address SHALL open Primary.
 
 #### Scenario: Open a stream from the keyboard
 - **WHEN** the user presses G then 3
@@ -23,6 +28,18 @@ Unread.
 #### Scenario: A pinned conversation
 - **WHEN** the user pins an older conversation in Primary
 - **THEN** it moves to the top of Primary, marked pinned, and stays there as newer mail arrives
+
+#### Scenario: Open a view from the keyboard
+- **WHEN** the user presses G then 8
+- **THEN** Trash opens, marked as the current place in the sidebar
+
+#### Scenario: Views on a phone
+- **WHEN** the inbox is open at 375px
+- **THEN** the chips show the four streams, a divider, then Sent, Archive, Spam and Trash, and only the chip row scrolls sideways
+
+#### Scenario: An empty view
+- **WHEN** Spam has nothing in it
+- **THEN** it says "Nothing in Spam." in one line
 
 ### Requirement: Suggestions shown as suggestions
 The decide pass's answers SHALL be shown as suggestions, never applied by the
@@ -47,6 +64,19 @@ to, and whether it acted. A stream suggestion SHALL offer "Move to <stream>"
 The reader SHALL show the conversation's subject, the note, and its messages
 newest first with the newest (and any unread) open and older ones folded to
 one line until opened, each with sender, recipients, time and attachments.
+A message the inbox sent SHALL read "You", then "→" and its first recipient
+(and how many others), set in from the left on the sunken surface (further
+from 48rem); everyone else's messages SHALL stay flush left. In a thread of
+more than four messages the reader SHALL keep the newest two, the first,
+every unread one and every one the member opened, and fold each run of two
+or more of the others into one "N more messages" button that shows them, as
+folded lines, in its place until another conversation opens. A message's
+trailing quoted history SHALL be folded behind "Show quoted text" ("Hide
+quoted text" once shown): in an HTML body the block the server marked, as a
+`details` element that opens with no script, the frame growing to fit; in a
+plain-text body the trailing run of lines that start with `>`, when the
+message has words of its own before it. Nothing about the words decides what
+is quoted.
 HTML bodies SHALL be shown only in a sandboxed frame that never runs scripts
 (sandbox exactly `allow-same-origin allow-popups
 allow-popups-to-escape-sandbox`: no `allow-scripts`, no forms, no top
@@ -75,6 +105,18 @@ SHALL mark it read.
 - **WHEN** a message's `@media (max-width: 620px)` rule makes its container full width and the frame is 343px wide
 - **THEN** the rule applies inside the frame, the layout fits without shrinking, and the app's own page is unaffected
 
+#### Scenario: A long back and forth
+- **WHEN** the member opens a thread of seven read messages, three of them sent by Sam
+- **THEN** the newest two and the first show, "4 more messages" stands between them, Sam's read "You → Marta Silva" set in from the left, and pressing it shows the four as folded lines
+
+#### Scenario: A reply with the whole thread quoted
+- **WHEN** the member opens Marta's Gmail reply whose body ends with the earlier messages in a `gmail_quote`
+- **THEN** only her new words show, with "Show quoted text" under them, and opening it shows the quote in the frame
+
+#### Scenario: An inline reply is not folded
+- **WHEN** a plain-text reply answers between the lines it quotes
+- **THEN** the whole message shows and there is no "Show quoted text"
+
 ### Requirement: Tidying with undo
 Done (E, archive), Pin or unpin (P, the provider's star), read or unread (U)
 and move to a stream (M, then 1 to 4) SHALL act on the open conversation, or
@@ -91,10 +133,16 @@ phones). The UI SHALL call it Pin everywhere, in en, pt-PT, es-ES and fr.
 - **THEN** it is pinned, the toast says "Pinned · <subject>" with Undo, and Gmail shows it starred
 
 ### Requirement: The reply slot
-The reader SHALL expose a slot at the end of the thread for the send slice's
-composer, with Reply (R), Reply all (Shift+R) and Forward (F) that tell the slot
-which message to answer and how; without a composer those actions SHALL be
-hidden. Reply SHALL first open the reply dialog (Scout's likely replies and
+The reader SHALL expose a slot for the send slice's composer, pinned to the
+bottom of the reader after the thread and never between or after its
+messages in the flow, with Reply (R), Reply all (Shift+R) and Forward (F) that
+tell the slot which message to answer and how; without a composer those
+actions SHALL be hidden. From 48rem the pinned area SHALL stay in view while
+the thread scrolls under it, showing "Reply to <name>" (R) while the composer
+is closed and the open composer in its place, growing upward to 60% of the
+window's height and then scrolling inside itself. Below 48rem the floating
+bar above the tab bar SHALL offer Reply and Done, and an open composer SHALL
+take its place. Reply SHALL first open the reply dialog (Scout's likely replies and
 draft); its "Write my own" and "Open in composer" SHALL open the slot's
 composer on the newest message, the latter on the draft Scout wrote. Reply
 all and Forward SHALL open the composer directly.
@@ -105,7 +153,11 @@ all and Forward SHALL open the composer directly.
 
 #### Scenario: Write my own
 - **WHEN** the user presses R in the reader, then chooses "Write my own"
-- **THEN** the dialog closes and the composer opens at the end of the thread, as before
+- **THEN** the dialog closes and the composer opens in the pinned area at the bottom of the reader
+
+#### Scenario: A long thread on a desktop
+- **WHEN** the member opens a twelve-message thread at 1440px and scrolls it
+- **THEN** "Reply to Marta Silva" stays at the bottom of the reader and no reply box sits between or after the messages
 
 ### Requirement: Separate screens on phones
 From 64rem the list and the reader SHALL show side by side at every width,
@@ -459,10 +511,14 @@ list or a read it does not show. When an autosave answers 409
 typed, read the draft again for its version, token and attachments, show
 the notice once, and save nothing on its own: the next edit or Send saves
 the typed text with the fresh token. When Send answers 409
-`content_changed` it SHALL read the draft again and show it as it is now
-(its recipients, Cc and Bcc included, its subject and text), with "This
-changed since you opened it. Check it and send again." in all four locales,
-and SHALL NOT send it again on its own. The message composer SHALL show Cc
+`content_changed` or `draft_changed` (saved since elsewhere: another tab,
+another device, the assistant) it SHALL read the draft again and show it
+as it is now (its recipients, Cc and Bcc included, its subject and text)
+with its version and token, with "This changed since you opened it. Check
+it and send again." in all four locales, and SHALL NOT send it again on its
+own: the next Send names the fresh version and token. Text typed while the
+refused Send was in flight SHALL be kept, taking only the fresh version and
+token. The message composer SHALL show Cc
 and Bcc whenever the draft has any, also ones that arrive after it opened.
 The reply dialog SHALL show every recipient the reply goes to and SHALL
 NOT reuse a draft it did not create (one from the drafts list, or the one
@@ -472,13 +528,18 @@ the draft it replaces while that one is editable (a `draft`, or a `failed`
 send) and never one that is `scheduled` or `sending`, which only its Undo
 takes back, and send with the token of that draft; it MAY save
 again only the draft it created, with its token. On 409 `content_changed`
-it SHALL say so and send nothing until the member sends again, in a fresh
-draft. The forward dialog SHALL save into an untouched forward draft with
-its token and start a fresh forward when that is refused.
+or `draft_changed`, from that save or from Send, it SHALL say so and send
+nothing until the member sends again, in a fresh draft. The forward dialog
+SHALL save into an untouched forward draft with its version and token and
+start a fresh forward when that is refused with either code.
 
 #### Scenario: The draft changed since it was opened
 - **WHEN** Sam presses Send and the server answers 409 `content_changed`
 - **THEN** the composer shows the draft as the server holds it, a Bcc Sam never added included, with the notice, and nothing is sent until Sam presses Send again
+
+#### Scenario: The draft was saved elsewhere since
+- **WHEN** Sam has a draft open with nothing unsaved, adds a line to it on his phone, and presses Send here, and the server answers 409 `draft_changed`
+- **THEN** the composer reads the draft again and shows it with the phone's line and the notice, nothing is sent, and the next Send carries the fresh version and token and goes
 
 #### Scenario: An autosave refused
 - **WHEN** the composer's autosave answers 409 `content_changed`
@@ -487,6 +548,10 @@ its token and start a fresh forward when that is refused.
 #### Scenario: A reply dialog after an Undo
 - **WHEN** the draft an Undo handed back holds a Bcc and an attachment the dialog does not show, and Sam sends from the dialog
 - **THEN** a fresh draft with only the recipients shown is created and sent, and the old one is discarded
+
+#### Scenario: A reply dialog whose draft was saved elsewhere
+- **WHEN** the reply draft the dialog created is saved elsewhere, and its save or Send answers 409 `draft_changed`
+- **THEN** the dialog says the reply changed and sends nothing, and the next Send creates a fresh reply draft, sends it with its own version and token, and discards the old one
 
 #### Scenario: Opened before the upgrade
 - **WHEN** Sam types or presses Send in a composer opened before the upgrade
@@ -548,6 +613,94 @@ quotes, that it is shown in part (the preview ending in "…").
 #### Scenario: A long quote in a short preview
 - **WHEN** the reply dialog answers a message whose words are longer than its preview
 - **THEN** the preview ends in "…" and says "Shown in part: your reply quotes all of it."
+
+### Requirement: Delete and Report spam with undo
+Delete (#) SHALL move the open conversation, or the one under the list's
+cursor, to the trash, and Report spam (!) SHALL report it as spam, each shown
+at once, with a toast ("Deleted · <subject>", "Reported as spam · <subject>")
+and an entry that Undo (Z, or the toast) takes back, putting the conversation
+back exactly where it was: Report spam on an archived conversation is undone
+by Not spam and archiving it again, as one entry with one toast, while Not
+spam on its own still brings received mail to the inbox. When it leaves the list
+on screen, the next conversation opens (the list, on phones), as after Done.
+The shortcuts SHALL be keyed by their operations (`conversations.trash`,
+`conversations.report_spam`) and shown wherever their buttons are. Both SHALL
+be icon buttons beside Pin and Mark read: one button style per toolbar.
+
+#### Scenario: Delete and Undo
+- **WHEN** the user presses # on an open conversation, then Z
+- **THEN** it leaves the stream for Trash, the toast says "Deleted · <subject>", and Z restores it
+
+#### Scenario: Report spam
+- **WHEN** the user presses ! on a conversation in Primary
+- **THEN** it leaves Primary for Spam, with Undo
+
+#### Scenario: Undo Report spam from the archive
+- **WHEN** the user presses ! on an archived conversation, then Z
+- **THEN** it is out of Spam and back in Archive, not the inbox, in one Undo
+
+### Requirement: The way back from each view
+The reader's main action SHALL follow where the conversation is. In the inbox
+it is Done (E). Archived (in Archive, or in Sent when archived) it SHALL be
+Move to Inbox, on the same E. In Spam it SHALL be Not spam, on !, and in Trash
+Restore, on #: the key that sent it there brings it back. Each SHALL have its
+toast and Undo. In Spam and Trash the way back SHALL be the banner's button,
+and E does nothing there. Spam SHALL offer no Delete, and # does nothing there:
+moving it to the trash would clear its spam mark, and Not spam is its only way
+out.
+
+#### Scenario: No Delete in Spam
+- **WHEN** the user opens a conversation in Spam and presses #
+- **THEN** nothing happens; there is no Delete button, and ! (Not spam) is the way out
+
+#### Scenario: Move to Inbox
+- **WHEN** the user opens a conversation in Archive and presses E
+- **THEN** it moves back to the inbox, the toast says "Moved to Inbox · <subject>", with Undo
+
+#### Scenario: Restore
+- **WHEN** the user opens a conversation in Trash and presses #
+- **THEN** it goes back where it was, in the inbox or the archive, with Undo
+
+#### Scenario: Not spam
+- **WHEN** the user opens a conversation in Spam and presses !
+- **THEN** its received mail is back in the inbox, with Undo
+
+### Requirement: Sent rows
+In Sent each row SHALL lead with whom the inbox's latest message there went
+to ("To Marta Ferreira", "To Marta Ferreira and 2 others"), with that
+person's avatar, and show the time of that message; it SHALL carry a
+"Replied" mark when someone wrote back since. The list SHALL be ordered by
+the inbox's latest message.
+
+#### Scenario: They replied
+- **WHEN** Maya answers a conversation the user wrote in last week
+- **THEN** its Sent row stays where the user's message puts it and says "Replied"
+
+### Requirement: Reading spam and the trash
+A conversation in Spam SHALL say so in a plain banner ("This conversation is
+in Spam.") with Not spam; one in Trash the same ("This conversation is in
+Trash.") with Restore. In either, the reader SHALL offer no reply box, no
+Reply, Reply all or Forward, and none of Scout's suggestions, needs or
+drafts; restoring brings them back. In Spam remote images SHALL never load:
+Show images, its ⇧I and "Always show images from …" are not offered, even
+for a sender a rule trusts (the server says `images_held: spam`), and links
+are inert as in mail that may be phishing.
+
+#### Scenario: A trusted sender in Spam
+- **WHEN** the user opens a reported newsletter from a sender a smart rule trusts
+- **THEN** the banner says it is in Spam, its images stay held back with "Images never load in Spam.", and no Show images is offered
+
+#### Scenario: No reply in the trash
+- **WHEN** the user opens a conversation in Trash
+- **THEN** there is no reply box and no Reply, and Restore brings both back
+### Requirement: Who wrote last
+A conversation row whose newest message the inbox sent SHALL start its
+snippet with "You:" ("Eu:", "Yo:", "Moi :" in pt-PT, es-ES and fr), read
+from the list's `latest_from_you`.
+
+#### Scenario: Waiting on them
+- **WHEN** Sam's reply is the newest message of a conversation in Primary
+- **THEN** its row's snippet reads "You: Revised quote attached…"
 
 ### Requirement: Deleting a draft
 While the composer is closed, the reader SHALL list every draft the member
