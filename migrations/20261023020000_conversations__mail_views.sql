@@ -41,5 +41,5 @@ ALTER TABLE conversations.conversations FORCE ROW LEVEL SECURITY;
 -- seed end
 
 -- The views' lists have an index each, built concurrently by
--- `…070100_conversations__sent_list_index`, `…070200_conversations__spam_list_index`,
--- `…070300_conversations__trash_list_index` and `…070400_conversations__archive_list_index`.
+-- `…020100_conversations__sent_list_index`, `…020200_conversations__spam_list_index`,
+-- `…020300_conversations__trash_list_index` and `…020400_conversations__archive_list_index`.

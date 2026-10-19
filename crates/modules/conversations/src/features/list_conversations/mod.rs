@@ -900,7 +900,7 @@ mod http_tests {
             .await
             .unwrap();
         let migration = std::fs::read_to_string(format!(
-            "{}/../../../migrations/20261022070000_conversations__mail_views.sql",
+            "{}/../../../migrations/20261023020000_conversations__mail_views.sql",
             env!("CARGO_MANIFEST_DIR")
         ))
         .unwrap();
