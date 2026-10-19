@@ -278,6 +278,7 @@ async fn without_a_model_that_may_read_mail_nothing_is_asked(db: PgPool) {
     for (uri, body) in [
         (suggestions(workspace, &id), json!({})),
         (draft(workspace, &id), json!({"intent": "Say yes"})),
+        (stream_uri(workspace, &id), json!({"intent": "Say yes"})),
     ] {
         let response = kit.post(&sam, &uri, Some(body)).await;
         assert_eq!(response.status, StatusCode::CONFLICT, "{uri}");
@@ -1315,7 +1316,7 @@ async fn a_reply_streams_its_thinking_and_its_words(db: PgPool) {
 async fn the_stream_refuses_as_a_problem_before_it_opens(db: PgPool) {
     let server = MockServer::start().await;
     stream_with(&server, &["Hi"]).await;
-    let kit = kit_with_model(db.clone(), &server).await;
+    let kit = kit_with_model(db, &server).await;
     let (workspace, inbox, _) = kit.sams_inbox().await;
     let id = kit.conversation_of("en-1").await;
     let (ana, ana_id) = kit.member("ana", workspace);
@@ -1334,20 +1335,6 @@ async fn the_stream_refuses_as_a_problem_before_it_opens(db: PgPool) {
         Some("application/problem+json")
     );
     assert!(server.received_requests().await.unwrap().is_empty());
-
-    // No model that may read mail: 409, as for the JSON route.
-    let kit = Kit::new(db).await;
-    let (workspace, _, sam) = kit.sams_inbox().await;
-    let id = kit.conversation_of("en-1").await;
-    let response = kit
-        .post(
-            &sam,
-            &stream_uri(workspace, &id),
-            Some(json!({"intent": "Say yes"})),
-        )
-        .await;
-    assert_eq!(response.status, StatusCode::CONFLICT);
-    assert_eq!(response.json["code"], "reply_unavailable");
 }
 
 #[sqlx::test(migrations = "../../../migrations")]
