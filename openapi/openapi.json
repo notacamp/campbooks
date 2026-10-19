@@ -13600,6 +13600,17 @@
             },
             "description": "Its labels, by name."
           },
+          "lapsed_need": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/LapsedNeed",
+                "description": "The ask that lapsed (its link expired, its offer closed), while its\nmessage is still the newest: shown as \"Expired\"."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "last_message_at": {
             "type": "string",
             "format": "date-time",
@@ -15030,6 +15041,35 @@
           }
         }
       },
+      "LapsedNeed": {
+        "type": "object",
+        "description": "A conversation's ask that lapsed (campbooks-cloud#275): what it was and\nwhen it stopped being possible, while its message is still the newest.\nClients show it as \"Expired\".",
+        "required": [
+          "reason",
+          "question",
+          "message_id",
+          "lapsed_at"
+        ],
+        "properties": {
+          "lapsed_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When what it asked stopped being possible."
+          },
+          "message_id": {
+            "$ref": "#/components/schemas/MessageId",
+            "description": "The message it came from."
+          },
+          "question": {
+            "$ref": "#/components/schemas/NeedQuestion",
+            "description": "The question that raised it."
+          },
+          "reason": {
+            "$ref": "#/components/schemas/NeedReason",
+            "description": "Why it was needed."
+          }
+        }
+      },
       "Likeness": {
         "type": "string",
         "description": "How a suggestion picks the mail that looks the same.",
@@ -15365,7 +15405,10 @@
           "needs_reply",
           "asks_action",
           "suspicious",
-          "money"
+          "money",
+          "worth_a_look",
+          "still_to_do",
+          "still_needs_reply"
         ]
       },
       "NeedReason": {
@@ -15375,7 +15418,8 @@
           "reply",
           "do",
           "pay",
-          "review"
+          "review",
+          "worth_a_look"
         ]
       },
       "NeedTrust": {
@@ -15419,7 +15463,15 @@
               "null"
             ],
             "format": "date",
-            "description": "When it is due: none until a due date is extracted from the mail\n(needs raised before ADR 0018 may carry one)."
+            "description": "When it is due, as Scout read the email: none until it has, or when\nthe email names no date."
+          },
+          "lapses_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "When what it asks stops being possible, as Scout read the email\n(never for a bill or a warning)."
           },
           "message_id": {
             "$ref": "#/components/schemas/MessageId",
@@ -15455,6 +15507,14 @@
             ],
             "description": "The rule that decided it (`model.decide`, …), for the sentence the\nclient words it with.",
             "example": "model.decide"
+          },
+          "sent_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "When that message was sent."
           },
           "trust": {
             "$ref": "#/components/schemas/NeedTrust",
@@ -16391,7 +16451,8 @@
           "reply",
           "decide",
           "do",
-          "pay"
+          "pay",
+          "worth_a_look"
         ]
       },
       "ReasonCount": {
@@ -17077,6 +17138,21 @@
                 "type": "string",
                 "enum": [
                   "show_images"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "description": "Make sure the member sees each new message: it waits on Home under\n\"Worth a look\" until it has been opened once (\"Highlight them\",\ncampbooks-cloud#274). Not pinned: it hides nothing, and the mail can\nstill be archived like any other.",
+            "required": [
+              "action"
+            ],
+            "properties": {
+              "action": {
+                "type": "string",
+                "enum": [
+                  "worth_a_look"
                 ]
               }
             }

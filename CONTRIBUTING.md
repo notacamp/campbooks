@@ -23,9 +23,10 @@ The rules are in [`AGENTS.md`](AGENTS.md); this is the walkthrough.
    pnpm --dir clients lint typecheck test deps:check deadcode format:check api:check i18n:check
    ```
 6. **Changelog:** for anything user-visible, add an entry *file* with
-   `.github/scripts/changelog.sh new <kind> <issue>-<slug>` (`feat/` and `fix/`
-   branches are checked). Never edit `CHANGELOG.md` itself; see
-   [`changelog/README.md`](changelog/README.md).
+   `.github/scripts/changelog.sh new <kind> <issue>-<slug>` (required when the
+   branch, `feat/` or `fix/`, or the title, `feat:` or `fix:`, says so). Never
+   edit `CHANGELOG.md` itself, and never delete an entry: only a release does;
+   see [`changelog/README.md`](changelog/README.md).
 7. **Open a PR into `next`.** Title = Conventional Commit (it becomes the
    squash commit). Commits must be **signed** (SSH or GPG).
 8. **UI changes:** verify at 375px and desktop, and **attach a screen recording**
@@ -124,22 +125,24 @@ version` in `Cargo.toml` and the workspace crates in `Cargo.lock` to the new
 version (`cargo xtask arch` checks they match). Without a version it bumps the
 minor when anything was added, changed, deprecated or removed, and the patch
 otherwise; pass `X.Y.Z` for anything else. Open the PR as
-`chore: release next-vX.Y.Z`. If `next` gains entries before it merges (the
-Policy check says so), start over from `next`'s files and release again:
+`chore: release next-vX.Y.Z`. Entries merged into `next` while the release PR
+is open are not in it: they stay in `changelog/unreleased/` and go into the
+following release. To include them anyway, start over from `next`'s files:
 `git merge origin/next`, `git checkout origin/next -- CHANGELOG.md VERSION Cargo.toml Cargo.lock changelog/`,
 then `changelog.sh release X.Y.Z`.
 
 The Policy check fails the PR if the changelog section is missing, the tag
-already exists or entries are left behind, and fails any other PR that edits
-`CHANGELOG.md` (a maintainer fixing a released entry applies the
-`changelog-edit` label). Merge it; when CI is green on the merge commit,
-`release-next.yml` builds the image, tags it `next-vX.Y.Z` and `next-vX.Y`,
-fails on fixable HIGH/CRITICAL Trivy findings, attests build provenance and an
-SPDX SBOM, and only then creates the tag and the prerelease (the changelog
-section is the release notes). Nothing is committed back to `next`: its branch
-ruleset requires checks on every commit, so the changelog is rolled in the PR.
-If the workflow fails after the merge, fix the cause and re-run it from the
-Actions tab (`Release next`, branch `next`); it is idempotent until the tag exists.
+already exists or the branch's own entries are left behind, and fails any
+other PR that edits `CHANGELOG.md` or deletes an entry (a maintainer fixing an
+entry by hand applies the `changelog-edit` label). Merge the release PR; when
+CI is green on the merge commit, `release-next.yml` builds the image, tags it
+`next-vX.Y.Z` and `next-vX.Y`, fails on fixable HIGH/CRITICAL Trivy findings,
+attests build provenance and an SPDX SBOM, and only then creates the tag and
+the prerelease (the changelog section is the release notes). Nothing is
+committed back to `next`: its branch ruleset requires checks on every commit,
+so the changelog is rolled in the PR. If the workflow fails after the merge,
+fix the cause and re-run it from the Actions tab (`Release next`, branch
+`next`); it is idempotent until the tag exists.
 Verify an image with `gh attestation verify oci://ghcr.io/notacamp/campbooks:next-vX.Y.Z --repo notacamp/campbooks`.
 
 Releases deploy nothing: production already runs every green merge. GitHub

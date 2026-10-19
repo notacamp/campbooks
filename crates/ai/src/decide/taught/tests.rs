@@ -760,3 +760,47 @@ fn an_image_rule_kept_from_before_a_domain_was_listed_never_shows_images() {
     );
     assert!(rules.iter().all(TaughtRule::images_too_broad));
 }
+
+#[test]
+fn worth_a_look_is_its_own_slot_and_hides_nothing() {
+    let rules = [rule(
+        "look",
+        vec![Condition::SenderAddress("digest@shop.example".into())],
+        vec![Action::WorthALook],
+        1,
+    )];
+    let out = evaluate(&rules, &facts("digest@shop.example", "Weekly picks", None));
+    assert_eq!(out.highlight.as_deref(), Some("look"));
+    assert!(out.archive.is_none() && out.read.is_none() && out.surface.is_none());
+    assert!(out.rules().contains("look"));
+    assert!(evaluate(&rules, &facts("someone@example.com", "Hi", None)).is_empty());
+}
+
+#[test]
+fn worth_a_look_cannot_share_a_rule_with_something_that_hides() {
+    let sender = vec![Condition::SenderAddress("digest@shop.example".into())];
+    assert_eq!(TaughtRule::validate(&sender, &[Action::WorthALook]), Ok(()));
+    for hiding in [
+        Action::Archive,
+        Action::MarkRead,
+        Action::Trash,
+        Action::MarkPaid,
+        to_stream("newsletters"),
+        Action::Surface {
+            value: Surface::Never,
+        },
+    ] {
+        assert_eq!(
+            TaughtRule::validate(&sender, &[Action::WorthALook, hiding]),
+            Err(Invalid::HighlightHides)
+        );
+    }
+    assert_eq!(
+        TaughtRule::validate(&sender, &[Action::WorthALook, to_stream("primary")]),
+        Ok(())
+    );
+    assert_eq!(
+        TaughtRule::validate(&sender, &[Action::WorthALook, Action::WorthALook]),
+        Err(Invalid::SameSlot)
+    );
+}

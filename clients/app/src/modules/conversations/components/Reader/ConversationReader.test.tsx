@@ -73,6 +73,27 @@ describe("ConversationReader", () => {
     expect(await screen.findByRole("dialog")).toBeVisible();
   });
 
+  it("says an ask that lapsed has expired, and offers nothing to resolve", async () => {
+    // A sign-in link valid for ten minutes, long past (campbooks-cloud#275).
+    // Read already: the read call's answer would replace it.
+    routes({
+      ...Q4,
+      unread_count: 0,
+      need: null,
+      lapsed_need: {
+        reason: "do",
+        question: "asks_action",
+        message_id: "0192f1a0-0000-7000-8000-0000000000e1",
+        lapsed_at: "2026-10-11T11:10:00Z",
+      },
+    });
+    renderWithProviders(<Reader />);
+    await screen.findByRole("heading", { name: Q4.subject });
+    expect(await screen.findByText("Expired")).toBeVisible();
+    expect(screen.queryByRole("button", { name: /^Not needed/u })).toBeNull();
+    expect(screen.queryByRole("button", { name: /^Yes/u })).toBeNull();
+  });
+
   it("deletes with #, reports spam with !, and is done with E", async () => {
     routes();
     const onMove = vi.fn<OnMove>();

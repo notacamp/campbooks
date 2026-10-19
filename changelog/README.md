@@ -31,7 +31,7 @@ A PR that fixes one thing and adds another adds one file in `fixed/` and one in
 .github/scripts/changelog.sh preview                    # the next release's notes so far
 ```
 
-`feat/` and `fix/` PRs must add an entry (the Policy check fails them
+`feat` and `fix` PRs (by branch or title) must add an entry (the Policy check fails them
 otherwise), and **no PR edits `CHANGELOG.md` directly**: it is written only by
 `changelog.sh release`, which gathers every entry into a dated
 `## [next-vX.Y.Z]` section, deletes the files and bumps the version

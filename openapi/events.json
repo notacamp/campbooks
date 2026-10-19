@@ -1557,7 +1557,9 @@
           "done",
           "not_needed",
           "superseded",
-          "rule"
+          "rule",
+          "opened",
+          "lapsed"
         ]
       },
       "ConnectionId": {
@@ -1735,6 +1737,14 @@
             "format": "date",
             "description": "When it is due, when the message names a date that resolves."
           },
+          "lapses_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "When what it asks stops being possible, as Scout read the email\n(campbooks-cloud#275). Absent from events written before."
+          },
           "reason": {
             "$ref": "#/components/schemas/NeedReason",
             "description": "Why."
@@ -1756,7 +1766,8 @@
           "reply",
           "do",
           "pay",
-          "review"
+          "review",
+          "worth_a_look"
         ]
       },
       "NeedTrust": {

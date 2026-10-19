@@ -1,5 +1,5 @@
 import { useNavigate } from "@tanstack/react-router";
-import { useEffect, useEffectEvent, useRef, useState, type ReactNode } from "react";
+import { Fragment, useEffect, useEffectEvent, useRef, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 
 import { useShortcut } from "~/lib/shortcuts";
@@ -53,6 +53,7 @@ import {
   groupByReason,
   remindTime,
   rowChoices,
+  signalOf,
   snoozeOptions,
   type OwnActionId,
   type OwnChoice,
@@ -105,6 +106,10 @@ const READ_ONLY_STEPS: ReadonlySet<OwnActionId> = new Set(["remind_when", "open_
 const kindOf = (need: NeedView): RowKind => {
   if (need.question === "suspicious") {
     return "warning";
+  }
+  // A rule the member taught keeps it here until they open it: no question.
+  if (need.question === "worth_a_look") {
+    return "highlight";
   }
   // A bill: asked "Is it paid?" until the member answers, then "Pay …".
   const bill = billKind(need);
@@ -328,7 +333,10 @@ export function WhatNeedsYou({ workspaceId, now, offer }: WhatNeedsYouProps) {
     }).format(until);
 
   const done = (row: Row) => {
-    hide(row, t("confirm.done", { name: row.name }));
+    hide(
+      row,
+      t(kindOf(row.need) === "highlight" ? "confirm.seen" : "confirm.done", { name: row.name }),
+    );
     needActions.done(row.conversation);
   };
   const notNeeded = (row: Row) => {
@@ -522,7 +530,7 @@ export function WhatNeedsYou({ workspaceId, now, offer }: WhatNeedsYouProps) {
         : t("actions.combo", { first: first ?? "", second });
     };
     const universalLabel: Record<UniversalActionId, string> = {
-      done: tc("needs.actions.done"),
+      done: tc(kind === "highlight" ? "needs.actions.seen" : "needs.actions.done"),
       snooze: t("snooze.button"),
       not_needed: tc("needs.actions.notNeeded"),
     };
@@ -822,6 +830,11 @@ export function WhatNeedsYou({ workspaceId, now, offer }: WhatNeedsYouProps) {
     ),
   ];
 
+  // Scout noticed sits right after the first group, so it is met before the
+  // list is long (campbooks-cloud#274); with nothing that needs the member,
+  // it is where the list would be. Never while the list loads.
+  const noticed = loading ? null : <ScoutNoticed workspaceId={workspaceId} />;
+
   const aside = (
     <AsideSection title={t("doneTodayTitle")}>
       <DoneToday
@@ -871,106 +884,108 @@ export function WhatNeedsYou({ workspaceId, now, offer }: WhatNeedsYouProps) {
       {offer}
       {loading ? <SkeletonList rows={4} /> : null}
       <div ref={list} className="flex flex-col">
-        {groups.map((group) => {
+        {groups.map((group, position) => {
           const live = group.rows.filter((row) => row.confirmation === undefined);
           const bills = live.filter((row) => kindOf(row.need) === "bill");
           return (
-            <QueueGroup
-              key={group.reason}
-              signal={group.reason}
-              name={t(`groups.${group.reason}`)}
-              count={live.length}
-              note={bills.length > 0 ? t("pay.note") : undefined}
-              action={
-                bills.length > 1 ? (
-                  <Button
-                    shortcut="item.all_paid"
-                    onClick={() => {
-                      allPaid(bills);
-                    }}
-                  >
-                    {t("pay.allPaid", { count: bills.length })}
-                  </Button>
-                ) : undefined
-              }
-            >
-              {group.rows.map((row) => {
-                const due = dueLabel(tc, row.need, i18n.language, now);
-                const expanded = expandedId === row.item.id;
-                const isSelected = row.item.id === selected?.item.id;
-                const actions = isSelected ? actionsOf(row) : undefined;
-                return (
-                  <Item
-                    key={row.item.id}
-                    id={itemId(row.item.id)}
-                    who={row.name}
-                    what={needSentence(tc, row.need, row.name)}
-                    excerpt={row.need.quote?.text}
-                    avatar={{
-                      name: row.name,
-                      kind:
-                        row.item.reason === "pay" || row.need.question === "suspicious"
-                          ? "service"
-                          : "person",
-                    }}
-                    due={due?.text}
-                    soon={due?.soon === true}
-                    age={ageLabel(row.item.since, now ?? new Date(), i18n.language)}
-                    selected={isSelected}
-                    expanded={expanded}
-                    confirmation={row.confirmation}
-                    onConfirmEnd={() => {
-                      folded(row);
-                    }}
-                    onToggle={() => {
-                      select(row.item.id);
-                      setExpandedId(expanded ? undefined : row.item.id);
-                    }}
-                    actions={
-                      actions === undefined ? undefined : (
-                        <ItemActions
-                          label={t("actions.label", { name: row.name })}
-                          own={actions.own}
-                          universal={actions.universal}
-                          highlighted={highlight}
-                          onHighlight={setHighlight}
-                          picked={actions.picked ? t("actions.picked") : undefined}
-                          onAction={(id) => {
-                            run(row, id);
+            <Fragment key={group.reason}>
+              <QueueGroup
+                signal={signalOf(group.reason)}
+                name={t(`groups.${group.reason}`)}
+                count={live.length}
+                note={bills.length > 0 ? t("pay.note") : undefined}
+                action={
+                  bills.length > 1 ? (
+                    <Button
+                      shortcut="item.all_paid"
+                      onClick={() => {
+                        allPaid(bills);
+                      }}
+                    >
+                      {t("pay.allPaid", { count: bills.length })}
+                    </Button>
+                  ) : undefined
+                }
+              >
+                {group.rows.map((row) => {
+                  const due = dueLabel(tc, row.need, i18n.language, now);
+                  const expanded = expandedId === row.item.id;
+                  const isSelected = row.item.id === selected?.item.id;
+                  const actions = isSelected ? actionsOf(row) : undefined;
+                  return (
+                    <Item
+                      key={row.item.id}
+                      id={itemId(row.item.id)}
+                      who={row.name}
+                      what={needSentence(tc, row.need, row.name, { locale: i18n.language, now })}
+                      excerpt={row.need.quote?.text}
+                      avatar={{
+                        name: row.name,
+                        kind:
+                          row.item.reason === "pay" || row.need.question === "suspicious"
+                            ? "service"
+                            : "person",
+                      }}
+                      due={due?.text}
+                      soon={due?.soon === true}
+                      age={ageLabel(row.item.since, now ?? new Date(), i18n.language)}
+                      selected={isSelected}
+                      expanded={expanded}
+                      confirmation={row.confirmation}
+                      onConfirmEnd={() => {
+                        folded(row);
+                      }}
+                      onToggle={() => {
+                        select(row.item.id);
+                        setExpandedId(expanded ? undefined : row.item.id);
+                      }}
+                      actions={
+                        actions === undefined ? undefined : (
+                          <ItemActions
+                            label={t("actions.label", { name: row.name })}
+                            own={actions.own}
+                            universal={actions.universal}
+                            highlighted={highlight}
+                            onHighlight={setHighlight}
+                            picked={actions.picked ? t("actions.picked") : undefined}
+                            onAction={(id) => {
+                              run(row, id);
+                            }}
+                          />
+                        )
+                      }
+                      detail={
+                        <NeedDetail
+                          workspaceId={workspaceId}
+                          row={row}
+                          t={t}
+                          tc={tc}
+                          locale={i18n.language}
+                          now={now}
+                          focusAttachment={attachmentFor === row.item.id}
+                          onAttachmentFocused={(found) => {
+                            setAttachmentFor(undefined);
+                            // Nothing to focus (only images its body shows):
+                            // say so rather than do nothing.
+                            if (!found) {
+                              undo.notify(t("actions.noAttachment"));
+                            }
+                          }}
+                          onOpen={() => {
+                            openConversation(row);
                           }}
                         />
-                      )
-                    }
-                    detail={
-                      <NeedDetail
-                        workspaceId={workspaceId}
-                        row={row}
-                        t={t}
-                        tc={tc}
-                        locale={i18n.language}
-                        now={now}
-                        focusAttachment={attachmentFor === row.item.id}
-                        onAttachmentFocused={(found) => {
-                          setAttachmentFor(undefined);
-                          // Nothing to focus (only images its body shows):
-                          // say so rather than do nothing.
-                          if (!found) {
-                            undo.notify(t("actions.noAttachment"));
-                          }
-                        }}
-                        onOpen={() => {
-                          openConversation(row);
-                        }}
-                      />
-                    }
-                  />
-                );
-              })}
-            </QueueGroup>
+                      }
+                    />
+                  );
+                })}
+              </QueueGroup>
+              {position === 0 ? noticed : null}
+            </Fragment>
           );
         })}
+        {groups.length === 0 ? noticed : null}
       </div>
-      {loading ? null : <ScoutNoticed workspaceId={workspaceId} />}
       {ahead.element}
       <Dialog
         open={snoozing !== undefined}

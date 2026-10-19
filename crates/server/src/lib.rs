@@ -998,7 +998,7 @@ mod tests {
                 "ALL".to_owned()
             )]
         );
-        // The maintenance scope: these five, on module tables.
+        // The maintenance scope: these six, on module tables.
         let policies = mentioning(testing::maintenance_scope_setting());
         let expected = [
             // The stream dispatcher (connectors): reads and leases.
@@ -1010,6 +1010,13 @@ mod tests {
             (
                 "connectors.sync_due",
                 "maintenance_reads_schedule",
+                "SELECT",
+            ),
+            // The needs' clock (conversations, campbooks-cloud#275): which
+            // workspaces have a due row, read only.
+            (
+                "conversations.need_clocks",
+                "maintenance_reads_need_clocks",
                 "SELECT",
             ),
             // The needs backfill's dispatcher (conversations): reads ids and

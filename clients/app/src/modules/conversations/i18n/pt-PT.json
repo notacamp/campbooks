@@ -302,8 +302,11 @@
       "checkReply": "{{name}} precisa de resposta?",
       "checkDo": "{{name}} pediu-lhe para fazer algo?",
       "checkPay": "{{name}} enviou uma fatura. Já está paga?",
+      "stillDo": "{{name}} pediu {{ago}}. Ainda por fazer?",
+      "stillReply": "{{name}} escreveu {{ago}}. Ainda precisa de resposta?",
       "taughtReply": "{{name}}: responder, por uma regra",
-      "taughtDo": "{{name}}: a fazer, por uma regra"
+      "taughtDo": "{{name}}: a fazer, por uma regra",
+      "worthALook": "Pediu para ver os emails de {{name}}"
     },
     "chip": {
       "reply": "Precisa de resposta",
@@ -311,7 +314,9 @@
       "pay": "Pagar",
       "review": "Rever",
       "suspicious": "Parece suspeito",
-      "check": "Confirmar"
+      "check": "Confirmar",
+      "expired": "Expirado",
+      "worth_a_look": "Vale a pena ver"
     },
     "due": {
       "today": "Até hoje",
@@ -354,11 +359,13 @@
       "stillToPay": "Ainda por pagar",
       "markPaid": "Marcar como paga",
       "billPrompt": "O Campbooks não tem acesso ao seu banco.",
-      "report": "Denunciar e apagar"
+      "report": "Denunciar e apagar",
+      "seen": "Visto"
     },
     "toast": {
       "done": "Feito · {{name}}",
       "notNeeded": "Não é preciso · {{name}}. O Campbooks vai aprender com isto",
+      "noLongerNeeded": "Já não é preciso · {{name}}",
       "safe": "Marcado como seguro · {{name}}. O Campbooks vai aprender com isto",
       "confirmed": "Obrigado · {{name}} fica na sua lista",
       "failed": "Não foi possível alterar {{name}}: nada mudou. Tente de novo.",
@@ -406,7 +413,8 @@
       "trash": "vai para o lixo",
       "spam": "denunciado como spam",
       "paid": "as faturas já estão pagas",
-      "images": "as imagens aparecem sempre"
+      "images": "as imagens aparecem sempre",
+      "worthALook": "fica na Página inicial até o abrir"
     },
     "likeness": {
       "sender": "Tudo de {{address}}",
@@ -533,7 +541,8 @@
       "trash": "O Campbooks pôs isto no lixo",
       "spam": "O Campbooks denunciou isto como spam",
       "paid": "O Campbooks diz que isto já está pago",
-      "images": "O Campbooks mostra as imagens deste remetente"
+      "images": "O Campbooks mostra as imagens deste remetente",
+      "worthALook": "O Campbooks mantém esta na Página inicial até a abrir"
     },
     "reader": {
       "stop": "Deixar de fazer isto"
@@ -688,7 +697,31 @@
     "imagesMatches_other": "Já cá estão {{n}} conversas deste remetente. As imagens aparecem sempre que o correio passa as verificações.",
     "imagesNew": "As imagens vão aparecer no correio novo deste remetente que passe as verificações.",
     "imagesHow": "Só para correio que passa as verificações do remetente e em que o Scout não encontrou nada suspeito; por isso, enquanto o Scout estiver desligado ou acima do limite diário, continuam retidas. Nunca para correio que finge ser dele. Os píxeis de rastreio continuam removidos.",
-    "imagesAlready": "Já existe uma regra inteligente para as imagens deste remetente, mesmo que esteja em pausa ou à espera de um sim. Encontra-a na memória do Scout."
+    "imagesAlready": "Já existe uma regra inteligente para as imagens deste remetente, mesmo que esteja em pausa ou à espera de um sim. Encontra-a na memória do Scout.",
+    "goal": {
+      "question": "O que deve acontecer aos emails de {{sender}}?",
+      "guess": "Palpite do Scout",
+      "archive": "Arquivá-los à chegada",
+      "archiveDetail": "Não passam pela Página inicial e saem da caixa de entrada assim que chegam. Continua a encontrá-los no Arquivo.",
+      "fileOffHome": "Tirá-los da Página inicial, em {{stream}}",
+      "fileOffHomeDetail": "Ficam na caixa de entrada em {{stream}} e nunca aparecem na Página inicial.",
+      "highlight": "Destacá-los",
+      "highlightTag": "Gosto destes",
+      "highlightDetail": "O Scout garante que vê cada novo: fica na Página inicial em «Vale a pena ver» até o abrir uma vez. Nada fica fixado.",
+      "newsletters": "Arquivá-los em {{stream}}",
+      "newslettersDetail": "Fora da Página inicial, mas ainda na caixa de entrada.",
+      "read": "Marcá-los como lidos",
+      "readDetail": "Nada mais muda.",
+      "words": "Como disse",
+      "wordsLabel": "Ou diga ao Scout por palavras suas",
+      "wordsPlaceholder": "Por exemplo: manter, mas não marcar como lidos",
+      "wordsAsk": "Perguntar ao Scout",
+      "wordsUnclear": "O Scout não conseguiu transformar isso numa regra. Escolha uma das opções acima ou use outras palavras.",
+      "wordsNoModel": "O Scout não consegue ler frases neste servidor. Escolha uma das opções acima.",
+      "wordsBusy": "O Scout está ocupado neste momento. Tente de novo daqui a pouco.",
+      "wordsFailed": "O Scout não conseguiu ler isso. Nada mudou.",
+      "pick": "Escolha o que deve acontecer para ver a que corresponde."
+    }
   },
   "ahead": {
     "reportTitle": "Nunca mais ver emails como este?",
@@ -713,13 +746,15 @@
       "weekly": "Chegam todas as semanas.",
       "monthly": "Chegam todos os meses."
     },
-    "setUp": "Criar uma regra inteligente…",
     "notNow": "Agora não",
     "never": "Não sugerir isto",
     "notNowDone": "O Scout pergunta outra vez mais tarde",
     "neverDone": "O Scout não volta a sugerir isso",
     "failed": "O Campbooks não conseguiu registar isso. Tente de novo.",
-    "shared": "Para todos em {{inbox}}."
+    "shared": "Para todos em {{inbox}}.",
+    "verbArchive": "Arquivá-los…",
+    "verbFile": "Arquivar em {{stream}}…",
+    "other": "Outra coisa…"
   },
   "forward": {
     "title": "Reencaminhar o email de {{name}} para…",

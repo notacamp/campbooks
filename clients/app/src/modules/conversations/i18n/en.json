@@ -302,8 +302,11 @@
       "checkReply": "Does {{name}} need a reply?",
       "checkDo": "Did {{name}} ask you to do something?",
       "checkPay": "{{name}} sent an invoice. Is it paid?",
+      "stillDo": "{{name}} asked {{ago}}. Still to do?",
+      "stillReply": "{{name}} wrote {{ago}}. Still needs a reply?",
       "taughtReply": "{{name}}: a reply, by a rule",
-      "taughtDo": "{{name}}: to do, by a rule"
+      "taughtDo": "{{name}}: to do, by a rule",
+      "worthALook": "You asked to see mail from {{name}}"
     },
     "chip": {
       "reply": "Needs a reply",
@@ -311,7 +314,9 @@
       "pay": "Pay",
       "review": "Review",
       "suspicious": "Looks suspicious",
-      "check": "Check"
+      "check": "Check",
+      "expired": "Expired",
+      "worth_a_look": "Worth a look"
     },
     "due": {
       "today": "Due today",
@@ -354,11 +359,13 @@
       "stillToPay": "Still to pay",
       "markPaid": "Mark paid",
       "billPrompt": "Campbooks can’t see your bank.",
-      "report": "Report and delete"
+      "report": "Report and delete",
+      "seen": "Seen"
     },
     "toast": {
       "done": "Done · {{name}}",
       "notNeeded": "Not needed · {{name}}. Campbooks will learn from it",
+      "noLongerNeeded": "No longer needed · {{name}}",
       "safe": "Marked safe · {{name}}. Campbooks will learn from it",
       "confirmed": "Thanks · {{name}} stays on your list",
       "failed": "Could not change {{name}}: nothing changed. Try again.",
@@ -406,7 +413,8 @@
       "trash": "put in the trash",
       "spam": "reported as spam",
       "paid": "its bills are already paid",
-      "images": "its images always show"
+      "images": "its images always show",
+      "worthALook": "kept on Home until you open it"
     },
     "likeness": {
       "sender": "Everything from {{address}}",
@@ -533,7 +541,8 @@
       "trash": "Campbooks put this in the trash",
       "spam": "Campbooks reported this as spam",
       "paid": "Campbooks says this is already paid",
-      "images": "Campbooks shows this sender’s images"
+      "images": "Campbooks shows this sender’s images",
+      "worthALook": "Campbooks is keeping this on Home until you open it"
     },
     "reader": {
       "stop": "Stop doing this"
@@ -688,7 +697,31 @@
     "imagesMatches_other": "{{n}} conversations from them are already here. Their images show whenever their mail passes its checks.",
     "imagesNew": "Their images will show in new mail from them that passes its sender checks.",
     "imagesHow": "Only for mail that passes the sender’s checks and that Scout found nothing suspicious in, so while Scout is off or past its daily limit they stay held back. Never for mail pretending to be them. Tracking pixels stay removed.",
-    "imagesAlready": "A smart rule already covers this sender’s images, even if it’s paused or waiting for a yes. Find it in Scout’s memory."
+    "imagesAlready": "A smart rule already covers this sender’s images, even if it’s paused or waiting for a yes. Find it in Scout’s memory.",
+    "goal": {
+      "question": "What should happen to {{sender}}’s mail?",
+      "guess": "Scout’s guess",
+      "archive": "Archive them as they arrive",
+      "archiveDetail": "They skip Home and leave the inbox the moment they come in. You can still find them in Archive.",
+      "fileOffHome": "Keep them off Home, under {{stream}}",
+      "fileOffHomeDetail": "They stay in the inbox under {{stream}} and never raise anything on Home.",
+      "highlight": "Highlight them",
+      "highlightTag": "I like these",
+      "highlightDetail": "Scout makes sure you see each new one: it waits on Home under Worth a look until you have opened it once. Nothing is pinned.",
+      "newsletters": "File them under {{stream}}",
+      "newslettersDetail": "Off Home, still in the inbox.",
+      "read": "Mark them read",
+      "readDetail": "Nothing else changes.",
+      "words": "As you said",
+      "wordsLabel": "Or tell Scout in your words",
+      "wordsPlaceholder": "For example: keep them, but don’t mark them read",
+      "wordsAsk": "Ask Scout",
+      "wordsUnclear": "Scout couldn’t turn that into a rule. Pick one of the choices above, or try other words.",
+      "wordsNoModel": "Scout can’t read sentences on this server. Pick one of the choices above.",
+      "wordsBusy": "Scout is busy right now. Try again in a moment.",
+      "wordsFailed": "Scout couldn’t read that. Nothing changed.",
+      "pick": "Pick what should happen to see what it matches."
+    }
   },
   "ahead": {
     "reportTitle": "Never see emails like this again?",
@@ -713,13 +746,15 @@
       "weekly": "They come every week.",
       "monthly": "They come every month."
     },
-    "setUp": "Set up a smart rule…",
     "notNow": "Not now",
     "never": "Don’t suggest this",
     "notNowDone": "Scout will ask another time",
     "neverDone": "Scout won’t suggest that again",
     "failed": "Campbooks could not record that. Try again.",
-    "shared": "For everyone in {{inbox}}."
+    "shared": "For everyone in {{inbox}}.",
+    "verbArchive": "Archive them…",
+    "verbFile": "File under {{stream}}…",
+    "other": "Something else…"
   },
   "forward": {
     "title": "Forward {{name}}’s email to…",

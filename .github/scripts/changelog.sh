@@ -42,7 +42,7 @@ entries() {
 entries_of() {
   local f t
   [ -d "$dir/$1" ] || return 0
-  for f in $(find "$dir/$1" -type f -name '*.md' | LC_ALL=C sort); do
+  find "$dir/$1" -type f -name '*.md' | LC_ALL=C sort | while IFS= read -r f; do
     t=$(git -C "$root" log --diff-filter=A --format=%ct -1 -- "$f" 2>/dev/null || true)
     printf '%s\t%s\n' "${t:-9999999999}" "$f"
   done | LC_ALL=C sort -t "$(printf '\t')" -k1,1nr -k2,2 | cut -f2
@@ -93,7 +93,7 @@ notes() {
     [ "$any" = 0 ] || echo
     any=1
     printf '### %s\n\n' "$(title "$kind")"
-    for f in $files; do
+    printf '%s\n' "$files" | while IFS= read -r f; do
       # Drop leading/trailing blank lines; keep the entry's own wrapping.
       sed -e '/./,$!d' "$f" | sed -e :a -e '/^\n*$/{$d;N;ba' -e '}'
     done
@@ -115,7 +115,7 @@ EOF
 release() {
   local current version tag body tmp
   current=$(tr -d '[:space:]' < "$root/VERSION")
-  check >/dev/null
+  check >&2
   [ -n "$(entries)" ] || die "nothing to release: changelog/unreleased is empty"
   version=${1:-$(bump "$current")}
   [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || die "'$version' is not X.Y.Z"
@@ -156,7 +156,7 @@ release() {
   ' "$root/Cargo.lock" > "$tmp"
   mv "$tmp" "$root/Cargo.lock"
 
-  entries | while read -r f; do git -C "$root" rm -q --cached --ignore-unmatch -- "$f" >/dev/null; rm -f "$f"; done
+  entries | while IFS= read -r f; do git -C "$root" rm -q --cached --ignore-unmatch -- "$f" >/dev/null; rm -f "$f"; done
   find "$dir" -mindepth 1 -type d -empty -delete
 
   echo "changelog: released $tag ($current → $version). Review the diff, then open"

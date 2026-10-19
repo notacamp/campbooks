@@ -159,6 +159,80 @@ async fn mail_never_opened_is_noticed_and_offered_as_a_rule(db: PgPool) {
 }
 
 #[sqlx::test(migrations = "../../../migrations")]
+async fn a_suggestion_can_be_answered_with_another_goal_worth_a_look(db: PgPool) {
+    let kit = Kit::with_deps(db, ConversationsDeps::offline()).await;
+    let (workspace, inbox, sam) = sams_inbox(&kit).await;
+    kit.ingest_value(workspace, inbox, &daily("ci", BUILDS, 12))
+        .await;
+    let notices = noticed(&kit, &sam, workspace).await;
+    let notice = &notices[0];
+
+    // The member likes these: "Highlight them" answers the suggestion with a
+    // rule of their own choosing, not the one Scout guessed.
+    let created = kit
+        .post(
+            &sam,
+            &format!("/api/v1/w/{workspace}/inboxes/{inbox}/rules"),
+            Some(json!({
+                "conditions": notice["conditions"],
+                "actions": [{"action": "worth_a_look"}],
+                "origin": "suggestion",
+                "notice_id": notice["id"],
+            })),
+        )
+        .await;
+    assert_eq!(created.status, StatusCode::CREATED, "{:?}", created.json);
+    assert_eq!(created.json["rule"]["state"], "active");
+    assert!(noticed(&kit, &sam, workspace).await.is_empty());
+    kit.run_jobs().await;
+
+    // Each unread one waits on Home as Worth a look, not pinned.
+    let summary = |provider_id: &'static str| {
+        let kit = &kit;
+        let sam = &sam;
+        async move {
+            let id = kit.conversation_of(provider_id).await;
+            let list = kit
+                .get(
+                    sam,
+                    &format!("/api/v1/w/{workspace}/conversations?ids={id}"),
+                )
+                .await;
+            assert_eq!(list.status, StatusCode::OK, "{:?}", list.json);
+            (id, list.json["conversations"][0].clone())
+        }
+    };
+    let (id, before) = summary("ci-3").await;
+    assert_eq!(before["need"]["reason"], "worth_a_look", "{before}");
+    assert_eq!(before["need"]["trust"], "sure");
+    assert_eq!(before["need"]["question"], "worth_a_look");
+
+    // Opening it once clears it, and only that one.
+    let read = kit
+        .post(
+            &sam,
+            &format!("/api/v1/w/{workspace}/conversations/{id}/read"),
+            None,
+        )
+        .await;
+    assert_eq!(read.status, StatusCode::OK, "{:?}", read.json);
+    let (_, after) = summary("ci-3").await;
+    assert!(after["need"].is_null(), "{after}");
+    let (_, other) = summary("ci-4").await;
+    assert_eq!(other["need"]["reason"], "worth_a_look");
+
+    // The Home item clears as "opened".
+    let cleared: i64 = sqlx::query_scalar(
+        "SELECT count(*) FROM conversations.needs
+          WHERE state = 'cleared' AND cleared_because = 'opened'",
+    )
+    .fetch_one(&kit.db)
+    .await
+    .unwrap();
+    assert_eq!(cleared, 1);
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
 async fn a_pass_before_the_first_sync_looks_again_once_mail_arrives(db: PgPool) {
     let kit = Kit::with_deps(db, ConversationsDeps::offline()).await;
     let (workspace, inbox, sam) = sams_inbox(&kit).await;
