@@ -8,6 +8,7 @@ import {
   SkeletonList,
   Tag,
   Visor,
+  type RowLeaving,
 } from "~/lib/ui";
 
 import { isView, type ConversationSummary, type Place } from "../../api/queries";
@@ -40,6 +41,12 @@ export interface ConversationListProps {
   /** The keyboard cursor. */
   cursorId?: string | undefined;
   onOpen: (conversation: ConversationSummary) => void;
+  /**
+   * Rows leaving the list (Done, Delete, Report spam, a move), by id: each
+   * says what happened, then folds away and `onLeft` runs.
+   */
+  leaving?: ReadonlyMap<string, RowLeaving> | undefined;
+  onLeft?: ((conversationId: string) => void) | undefined;
   /** For "now": tests and stories pin the clock. */
   now?: Date | undefined;
 }
@@ -49,7 +56,8 @@ export const rowId = (conversationId: string) => `conversation-${conversationId}
 /**
  * A stream's or a view's conversations, with their loading, empty and error
  * states. In Sent each row leads with who the inbox wrote to, at the time it
- * wrote, and says when they replied since.
+ * wrote, and says when they replied since. A row leaving the list says what
+ * happened to it before it folds away.
  */
 export function ConversationList({
   place,
@@ -63,6 +71,8 @@ export function ConversationList({
   openId,
   cursorId,
   onOpen,
+  leaving,
+  onLeft,
   now,
 }: ConversationListProps) {
   const { t: typed, i18n } = useTranslation("conversations");
@@ -165,6 +175,10 @@ export function ConversationList({
                 </span>
               )
             }
+            leaving={leaving?.get(conversation.id)}
+            onLeft={() => {
+              onLeft?.(conversation.id);
+            }}
             onSelect={() => {
               onOpen(conversation);
             }}

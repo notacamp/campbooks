@@ -39,6 +39,7 @@ import {
   threadLayout,
   trashMove,
   undoMoves,
+  withLeaving,
   type ThreadEntry,
   type Translate,
 } from "./model";
@@ -277,5 +278,42 @@ describe("attachments", () => {
     expect([undone.archived, undone.trashed, undone.spam]).toEqual([true, false, false]);
     // Were spam ever deleted, Undo marks it spam again.
     expect(undoMoves(SPAMMED, "trash")).toEqual(["untrash", "spam"]);
+  });
+});
+
+describe("withLeaving", () => {
+  const row = (id: string) => ({ ...Q4, id });
+  const a = row("a");
+  const b = row("b");
+  const c = row("c");
+  const d = row("d");
+  const ids = (rows: readonly { id: string }[]) => rows.map((summary) => summary.id).join("");
+
+  it("keeps each leaving row above the row it sat above, as rows go one after the other", () => {
+    // E, E from the top: a left from above b, then b from above c.
+    const leaving = [
+      { conversation: a, before: "b", at: 0 },
+      { conversation: b, before: "c", at: 1 },
+    ];
+    expect(ids(withLeaving([c, d], leaving))).toBe("abcd");
+    // a has folded away: b is still above c.
+    expect(ids(withLeaving([c, d], leaving.slice(1)))).toBe("bcd");
+  });
+
+  it("puts the last row back last, and a row above it before it", () => {
+    const leaving = [
+      { conversation: d, before: undefined, at: 3 },
+      { conversation: c, before: "d", at: 2 },
+    ];
+    expect(ids(withLeaving([a, b], leaving))).toBe("abcd");
+  });
+
+  it("falls back to where it was when the row below is gone", () => {
+    expect(ids(withLeaving([a, c, d], [{ conversation: b, before: "x", at: 1 }]))).toBe("abcd");
+    expect(ids(withLeaving([a], [{ conversation: b, before: "x", at: 5 }]))).toBe("ab");
+  });
+
+  it("drops a leaving row that is back on the list (Undo while it folded)", () => {
+    expect(ids(withLeaving([a, b, c], [{ conversation: b, before: "c", at: 1 }]))).toBe("abc");
   });
 });
