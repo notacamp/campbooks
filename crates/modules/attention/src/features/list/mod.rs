@@ -1,6 +1,7 @@
 //! `GET /api/v1/w/{workspace_id}/attention` — what needs the caller, in the
 //! order Home shows it; or, with `state=cleared`, what left their list today
-//! (Done today).
+//! (Done today); or, with `state=waiting`, who the caller is waiting on
+//! (campbooks-cloud#293).
 
 use axum::{Json, extract::State};
 use campbooks_kernel::{
@@ -27,13 +28,15 @@ pub enum ListState {
     Open,
     /// What was cleared or put off since the start of the caller's day.
     Cleared,
+    /// Who the caller is waiting on (`waiting` items), soonest nudge first.
+    Waiting,
 }
 
 /// Which items.
 #[derive(Debug, Clone, Default, Deserialize, IntoParams)]
 #[into_params(parameter_in = Query)]
 pub struct ListQuery {
-    /// `open` (default) or `cleared`.
+    /// `open` (default), `cleared` or `waiting`.
     #[serde(default)]
     #[param(inline)]
     pub state: ListState,
@@ -46,25 +49,26 @@ pub struct ListQuery {
 /// The widest offset from UTC a time zone has (UTC+14:00), in minutes.
 const MAX_OFFSET_MINUTES: i32 = 14 * 60;
 
-/// The caller's open items: in containers they may see (`$2`), not more
-/// than [`OVERDUE_DAYS`] past their due date (`$3`) unless a bill (it stays
-/// until a member answers it), not lapsed (what they ask is no longer
-/// possible, campbooks-cloud#275) and not snoozed by the caller (`$4`) at
-/// `$5`; by reason, then overdue (before `$6`, the caller's today), due
-/// date, urgent and age.
+/// The caller's open items: in containers they may see (`$2`), not waits
+/// (`state=waiting` lists them), not more than [`OVERDUE_DAYS`] past their
+/// due date (`$3`) unless a bill or a nudge (each stays until a member
+/// answers it), not lapsed (what they ask is no longer possible,
+/// campbooks-cloud#275) and not snoozed by the caller (`$4`) at `$5`; by
+/// reason, then overdue (before `$6`, the caller's today), due date, urgent
+/// and age.
 const OPEN: &str = "SELECT i.id, i.record_type, i.record_id, i.container_type, i.container_id, \
             i.cause_type, i.cause_id, i.reason, i.trust, i.due_on, i.urgent, i.since, i.state, \
             i.cleared_because, i.cleared_by, i.cleared_at, NULL::timestamptz AS snoozed_until \
        FROM attention.items i \
-      WHERE i.workspace_id = $1 AND i.state = 'open' \
+      WHERE i.workspace_id = $1 AND i.state = 'open' AND i.reason <> 'waiting' \
         AND i.container_type || ':' || i.container_id = ANY($2) \
-        AND (i.due_on IS NULL OR i.due_on >= $3 OR i.reason = 'pay') \
+        AND (i.due_on IS NULL OR i.due_on >= $3 OR i.reason IN ('pay', 'nudge')) \
         AND (i.lapses_at IS NULL OR i.lapses_at > $5) \
         AND NOT EXISTS (SELECT 1 FROM attention.snoozes s \
                          WHERE s.item_id = i.id AND s.user_id = $4 AND s.until > $5) \
       ORDER BY CASE i.reason WHEN 'review' THEN 0 WHEN 'reply' THEN 1 \
                              WHEN 'decide' THEN 2 WHEN 'do' THEN 3 WHEN 'pay' THEN 4 \
-                             ELSE 5 END, \
+                             WHEN 'nudge' THEN 5 ELSE 6 END, \
                (i.due_on IS NOT NULL AND i.due_on < $6) DESC, \
                i.due_on ASC NULLS LAST, i.urgent DESC, i.since ASC, i.id";
 
@@ -84,8 +88,22 @@ const CLEARED: &str = "SELECT i.id, i.record_type, i.record_id, i.container_type
         AND ((i.state = 'cleared' AND i.cleared_at >= $5 \
               AND coalesce(i.cleared_because, '') \
                   NOT IN ('superseded', 'rule', 'opened', 'lapsed')) \
-             OR (i.state = 'open' AND s.created_at >= $5)) \
+             OR (i.state = 'open' AND i.reason <> 'waiting' AND s.created_at >= $5)) \
       ORDER BY greatest(i.cleared_at, s.created_at) DESC, i.id";
+
+/// The caller's open waits (`waiting` items) in containers they may see
+/// (`$2`), not snoozed by the caller (`$3`) at `$4`: soonest due date (when
+/// Scout nudges) first, then oldest cause first.
+const WAITING: &str = "SELECT i.id, i.record_type, i.record_id, i.container_type, \
+            i.container_id, i.cause_type, i.cause_id, i.reason, i.trust, i.due_on, i.urgent, \
+            i.since, i.state, i.cleared_because, i.cleared_by, i.cleared_at, \
+            NULL::timestamptz AS snoozed_until \
+       FROM attention.items i \
+      WHERE i.workspace_id = $1 AND i.state = 'open' AND i.reason = 'waiting' \
+        AND i.container_type || ':' || i.container_id = ANY($2) \
+        AND NOT EXISTS (SELECT 1 FROM attention.snoozes s \
+                         WHERE s.item_id = i.id AND s.user_id = $3 AND s.until > $4) \
+      ORDER BY i.due_on ASC NULLS LAST, i.since ASC, i.id";
 
 /// How many open items there are for one reason.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
@@ -99,11 +117,13 @@ pub struct ReasonCount {
 /// The caller's items.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 pub struct AttentionList {
-    /// Open: by reason (review, reply, decide, do, pay), then overdue, by
-    /// due date, urgent first, oldest first. Cleared: newest first.
+    /// Open: by reason (review, reply, decide, do, pay, nudge, worth a
+    /// look), then overdue, by due date, urgent first, oldest first.
+    /// Cleared: newest first. Waiting: soonest nudge first.
     pub items: Vec<ItemView>,
-    /// Open items per reason, every reason listed (open lists only; empty
-    /// for cleared).
+    /// Open items per reason, every reason of the queue listed (all but
+    /// `waiting`); for `state=waiting`, the `waiting` count alone; empty for
+    /// cleared.
     pub counts: Vec<ReasonCount>,
 }
 
@@ -118,7 +138,7 @@ pub struct AttentionList {
     params(("workspace_id" = WorkspaceId, Path, description = "The workspace."), ListQuery),
     responses(
         (status = OK, description = "The caller's items.", body = AttentionList),
-        (status = BAD_REQUEST, description = "Not a state, or an offset beyond 14 hours (`invalid_offset`).", body = Problem,
+        (status = BAD_REQUEST, description = "Not a state (`open`, `cleared`, `waiting`), or an offset beyond 14 hours (`invalid_offset`).", body = Problem,
             content_type = "application/problem+json"),
         (status = UNAUTHORIZED, description = "No valid access token.", body = Problem,
             content_type = "application/problem+json"),
@@ -177,21 +197,29 @@ pub async fn handler(
                 .fetch_all(&mut *tx)
                 .await?
         }
+        ListState::Waiting => {
+            sqlx::query_as(WAITING)
+                .bind(access.workspace.as_uuid())
+                .bind(visible.as_slice())
+                .bind(user)
+                .bind(now)
+                .fetch_all(&mut *tx)
+                .await?
+        }
     };
     tx.commit().await?;
     let items = rows
         .into_iter()
         .map(|row| row.view(today))
         .collect::<Result<Vec<_>>>()?;
+    let count = |reason: Reason| ReasonCount {
+        reason,
+        count: u32::try_from(items.iter().filter(|i| i.reason == reason).count())
+            .unwrap_or(u32::MAX),
+    };
     let counts = match query.state {
-        ListState::Open => Reason::ALL
-            .into_iter()
-            .map(|reason| ReasonCount {
-                reason,
-                count: u32::try_from(items.iter().filter(|i| i.reason == reason).count())
-                    .unwrap_or(u32::MAX),
-            })
-            .collect(),
+        ListState::Open => Reason::QUEUE.into_iter().map(count).collect(),
+        ListState::Waiting => vec![count(Reason::Waiting)],
         ListState::Cleared => Vec::new(),
     };
     Ok(Json(AttentionList { items, counts }))

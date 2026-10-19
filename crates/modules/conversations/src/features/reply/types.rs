@@ -49,6 +49,23 @@ pub struct WriteReply {
     pub suggestions: Vec<String>,
 }
 
+/// How to write the nudge to the person a conversation waits on
+/// (campbooks-cloud#293): Scout's own, or your draft rewritten.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[serde(deny_unknown_fields)]
+pub struct WriteNudge {
+    /// The nudge as it stands, to rewrite with `change` or `shorter`.
+    #[serde(default)]
+    pub draft: Option<String>,
+    /// How to change the draft, in plain words (at most 300 characters).
+    #[serde(default)]
+    #[schema(example = "warmer")]
+    pub change: Option<String>,
+    /// Make the draft shorter.
+    #[serde(default)]
+    pub shorter: bool,
+}
+
 /// Scout's reply, as plain text. Nothing is saved or sent.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 pub struct ReplyText {

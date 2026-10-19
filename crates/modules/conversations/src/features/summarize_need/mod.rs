@@ -77,7 +77,8 @@ const OVER_LIMIT_WAIT: Duration = Duration::from_hours(4);
 /// phishing warning: its sender,
 /// subject, parts, where it is, and what is stored for it.
 const LOAD: &str = "SELECT m.sender, m.subject, m.bodies, m.sent_at, m.conversation_id, \
-            m.inbox_id, s.state, s.attempts, s.dates_read_at \
+            m.inbox_id, s.state, s.attempts, s.dates_read_at, \
+            n.reason IN ('waiting', 'nudge') AS waiting \
        FROM conversations.messages m \
        JOIN conversations.inboxes i ON i.id = m.inbox_id AND i.detached_at IS NULL \
        JOIN conversations.needs n ON n.conversation_id = m.conversation_id \
@@ -121,6 +122,8 @@ struct Loaded {
     attempts: Option<i16>,
     /// When its dates were read, if they were.
     dates_read_at: Option<DateTime<Utc>>,
+    /// Its need waits on someone else (campbooks-cloud#293).
+    waiting: bool,
 }
 
 /// The message to summarise.
@@ -188,7 +191,7 @@ impl JobHandler for SummarizeNeed {
         let email = loaded.email;
         let usage = Scope::workspace(ctx.state().db.clone(), workspace, FEATURE);
         let answer = match usage
-            .run(gateway.chat(Role::Complete, prompt::request(&email)))
+            .run(gateway.chat(Role::Complete, prompt::request_for(&email, loaded.waiting)))
             .await
         {
             Ok(response) => parsed(&response),
@@ -377,6 +380,9 @@ struct Read {
     sent_at: DateTime<Utc>,
     /// A summary is written but its dates were never read.
     rereading: bool,
+    /// Its need waits on someone else: `due_on` is when they are expected
+    /// to act.
+    waiting: bool,
 }
 
 /// The message as the model reads it, when it is worth a call: its need is
@@ -446,6 +452,7 @@ async fn load(
         inbox: row.inbox_id,
         sent_at: row.sent_at,
         rereading,
+        waiting: row.waiting,
     }))
 }
 

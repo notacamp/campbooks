@@ -104,6 +104,7 @@ pub struct Kit {
 }
 
 /// A need as `conversations.need_changed` would carry it.
+#[derive(Clone)]
 pub struct Need {
     pub conversation: String,
     pub inbox: String,

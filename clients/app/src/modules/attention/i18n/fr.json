@@ -6,6 +6,8 @@
     "subline": "Campbooks lit votre courrier et garde ici ce qui vous demande quelque chose.",
     "clear": "Rien n’a besoin de vous",
     "clearSubline": "Pour l’instant, rien dans votre courrier ne vous demande quoi que ce soit. Campbooks continue de lire.",
+    "waiting_one": "Scout attend aussi {{count}} personne pour vous.",
+    "waiting_other": "Scout attend aussi {{count}} personnes pour vous.",
     "lookSubline_one": "Rien ne vous est demandé. {{count}} e-mail ci-dessous mérite un coup d’œil.",
     "lookSubline_other": "Rien ne vous est demandé. {{count}} e-mails ci-dessous méritent un coup d’œil."
   },
@@ -15,7 +17,8 @@
     "decide": "À décider",
     "do": "À faire",
     "pay": "À payer",
-    "worth_a_look": "À voir"
+    "worth_a_look": "À voir",
+    "nudge": "À relancer"
   },
   "context": "Fait aujourd’hui",
   "doneTodayTitle": "Fait aujourd’hui",
@@ -26,7 +29,8 @@
     "replied": "Répondu · {{subject}}",
     "archived": "Archivé · {{subject}}",
     "snoozed": "Reporté · {{subject}}",
-    "gone": "Plus nécessaire · {{subject}}"
+    "gone": "Plus nécessaire · {{subject}}",
+    "heardBack": "Nouvelles reçues · {{subject}}"
   },
   "snooze": {
     "title": "Reporter {{name}} jusqu’à…",
@@ -50,7 +54,8 @@
     "forward": "Transférer…",
     "combo": "{{first}}, puis {{second}}",
     "picked": "Scout a choisi celles-ci pour cet e-mail",
-    "noAttachment": "Cet e-mail n’a aucun fichier à ouvrir."
+    "noAttachment": "Cet e-mail n’a aucun fichier à ouvrir.",
+    "nudge": "Relancer {{name}}…"
   },
   "confirm": {
     "done": "Fait · {{name}}",
@@ -60,7 +65,10 @@
     "replied": "Envoi à {{name}}",
     "paid": "Marquée comme payée · {{name}}",
     "reported": "Signalé · {{name}}",
-    "seen": "Vu · {{name}}"
+    "seen": "Vu · {{name}}",
+    "nudged": "Relance envoyée à {{name}}",
+    "heardBack": "Nouvelles de {{name}}",
+    "notWaiting": "Vous n’attendez plus {{name}}"
   },
   "error": {
     "title": "Impossible de charger ce qui a besoin de vous",
@@ -81,5 +89,20 @@
     "allPaid_one": "J’ai déjà payé {{count}}",
     "allPaid_other": "J’ai déjà payé les {{count}}",
     "note": "Campbooks n’a pas accès à votre banque : il demande donc si chaque facture est payée."
+  },
+  "nudge": {
+    "note": "Des personnes qui n’ont pas encore répondu. Scout rédige la relance, vous l’envoyez.",
+    "asked": "Demandé le {{date}}",
+    "nudged_one": "{{count}} relance envoyée",
+    "nudged_other": "{{count}} relances envoyées"
+  },
+  "waiting": {
+    "title": "En attente d’autres personnes",
+    "sub": "Scout vous prévient en cas de silence.",
+    "checks": "Vérifie {{day}}",
+    "nudgeNow": "Relancer maintenant",
+    "notWaiting": "Je n’attends plus",
+    "label": "En attente de {{name}}",
+    "fold": "En attente d’autres personnes · {{count}}"
   }
 }

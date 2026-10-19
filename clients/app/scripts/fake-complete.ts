@@ -1,6 +1,7 @@
 // A fake `complete` model for recordings and local development only: an
 // OpenAI-compatible `POST /v1/chat/completions` that answers Scout's reply
-// requests (campbooks-cloud#168) and need summaries (campbooks-cloud#204) with
+// requests (campbooks-cloud#168), nudges (campbooks-cloud#293) and need
+// summaries (campbooks-cloud#204) with
 // canned, fictional text, so they can be shown without a real model reading
 // anyone's mail. Point the
 // server at it:
@@ -37,6 +38,15 @@ interface ReplyInput {
   change?: string;
   shorter?: boolean;
   suggestions?: { number: number; says: string }[];
+}
+
+/** A nudge to the person a conversation waits on (campbooks-cloud#293). */
+interface NudgeInput {
+  awaited?: string;
+  my_name?: string | null;
+  draft?: string;
+  change?: string;
+  shorter?: boolean;
 }
 
 interface SummaryInput {
@@ -119,6 +129,20 @@ function reply(input: ReplyInput): string {
   return `Hi ${name},\n\nThanks for your message. ${sentence(intent)} Let me know if anything changes.\n\nBest,${sign}`;
 }
 
+function nudge(input: NudgeInput): string {
+  const awaited = input.awaited ?? "there";
+  const name = awaited.includes("@") ? awaited : (awaited.split(/\s+/u, 1)[0] ?? awaited);
+  const signature = input.my_name ?? "";
+  const sign = signature === "" ? "" : `\n\n${signature}`;
+  if (input.draft !== undefined && input.shorter === true) {
+    return `Hi ${name},\n\nAny news on this?${sign}`;
+  }
+  if (input.draft !== undefined && input.change !== undefined) {
+    return `Hi ${name},\n\nJust checking in on the note below, when you have a moment. (${input.change})\n\nThanks,${sign}`;
+  }
+  return `Hi ${name},\n\nJust following up on the note below: could you send it when you have a moment?\n\nThanks,${sign}`;
+}
+
 /** The answer's content: likely replies and summaries as JSON, a written reply as text. */
 function answer(request: ChatRequest): string | undefined {
   const schema = request.response_format?.json_schema?.name;
@@ -132,6 +156,9 @@ function answer(request: ChatRequest): string | undefined {
         "Say you'll confirm by tomorrow",
       ],
     });
+  }
+  if (schema === "nudge_draft") {
+    return JSON.stringify({ reply: nudge(JSON.parse(content) as NudgeInput) });
   }
   if (schema === "need_summary") {
     return JSON.stringify(summary((JSON.parse(content) as { email?: SummaryInput }).email ?? {}));

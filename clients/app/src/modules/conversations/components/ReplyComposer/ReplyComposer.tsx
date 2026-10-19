@@ -17,11 +17,11 @@ function editable(draft: Draft): boolean {
   return draft.state === "draft" || draft.state === "failed";
 }
 
-/** What a draft is, as its title says it: "Reply to Maya Okafor", "Forward". */
+/** What a draft is, as its title says it: "Reply to Maya Okafor", "Nudge Ana Costa", "Forward". */
 function titleOf(draft: Draft, t: Translate) {
   const first = draft.to[0];
-  return draft.kind === "reply"
-    ? t("compose.title.reply", { name: first === undefined ? "" : displayName(first) })
+  return draft.kind === "reply" || draft.kind === "nudge"
+    ? t(`compose.title.${draft.kind}`, { name: first === undefined ? "" : displayName(first) })
     : t(`compose.title.${draft.kind}`);
 }
 

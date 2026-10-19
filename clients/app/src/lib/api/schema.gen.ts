@@ -744,6 +744,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/w/{workspace_id}/conversations/{conversation_id}/nudge/draft": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Scout's nudge to the person the conversation waits on, or your draft of it rewritten. */
+        post: operations["conversations.write_nudge"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/w/{workspace_id}/conversations/{conversation_id}/read": {
         parameters: {
             query?: never;
@@ -2186,13 +2203,15 @@ export interface components {
         /** @description The caller's items. */
         AttentionList: {
             /**
-             * @description Open items per reason, every reason listed (open lists only; empty
-             *     for cleared).
+             * @description Open items per reason, every reason of the queue listed (all but
+             *     `waiting`); for `state=waiting`, the `waiting` count alone; empty for
+             *     cleared.
              */
             counts: components["schemas"]["ReasonCount"][];
             /**
-             * @description Open: by reason (review, reply, decide, do, pay), then overdue, by
-             *     due date, urgent first, oldest first. Cleared: newest first.
+             * @description Open: by reason (review, reply, decide, do, pay, nudge, worth a
+             *     look), then overdue, by due date, urgent first, oldest first.
+             *     Cleared: newest first. Waiting: soonest nudge first.
              */
             items: components["schemas"]["ItemView"][];
         };
@@ -2903,7 +2922,7 @@ export interface components {
          * @description What a draft answers.
          * @enum {string}
          */
-        DraftKind: "new" | "reply" | "reply_all" | "forward";
+        DraftKind: "new" | "reply" | "reply_all" | "forward" | "nudge";
         /** @description The caller's drafts. */
         DraftList: {
             /** @description Newest first, at most 50. */
@@ -3226,7 +3245,7 @@ export interface components {
             cleared_at?: string | null;
             /**
              * @description Why it was cleared (`replied`, `archived`, `trashed`, `done`,
-             *     `not_needed`), as the producing module said.
+             *     `not_needed`, `heard_back`), as the producing module said.
              */
             cleared_because?: string | null;
             cleared_by?: components["schemas"]["UserId"] | null;
@@ -3464,12 +3483,12 @@ export interface components {
          * @description The question whose answer raised a need.
          * @enum {string}
          */
-        NeedQuestion: "needs_reply" | "asks_action" | "suspicious" | "money" | "worth_a_look" | "still_to_do" | "still_needs_reply";
+        NeedQuestion: "needs_reply" | "asks_action" | "suspicious" | "money" | "worth_a_look" | "still_to_do" | "still_needs_reply" | "next_move";
         /**
          * @description Why a conversation needs its inbox's members (attention).
          * @enum {string}
          */
-        NeedReason: "reply" | "do" | "pay" | "review" | "worth_a_look";
+        NeedReason: "reply" | "do" | "pay" | "review" | "worth_a_look" | "waiting" | "nudge";
         /**
          * @description How much Campbooks stands behind a need.
          * @enum {string}
@@ -3501,6 +3520,12 @@ export interface components {
             lapses_at?: string | null;
             /** @description The message it comes from. */
             message_id: components["schemas"]["MessageId"];
+            /**
+             * Format: int32
+             * @description How many times the member wrote to them since (a `waiting` or
+             *     `nudge` need only).
+             */
+            nudges?: number | null;
             /** @description Whether the due date has passed. */
             overdue: boolean;
             /** @description The question that raised it. */
@@ -3523,6 +3548,7 @@ export interface components {
             trust: components["schemas"]["NeedTrust"];
             /** @description Whether it is for today. */
             urgent: boolean;
+            waiting_on?: components["schemas"]["Address"] | null;
         };
         /** @description The pending new account, as the new-account screen shows it. */
         NewAccount: {
@@ -3898,7 +3924,7 @@ export interface components {
          * @description Why an item needs someone, in the order Home shows the groups.
          * @enum {string}
          */
-        Reason: "review" | "reply" | "decide" | "do" | "pay" | "worth_a_look";
+        Reason: "review" | "reply" | "decide" | "do" | "pay" | "nudge" | "worth_a_look" | "waiting";
         /** @description How many open items there are for one reason. */
         ReasonCount: {
             /**
@@ -5133,6 +5159,21 @@ export interface components {
              */
             name: string;
             role?: components["schemas"]["Role"] | null;
+        };
+        /**
+         * @description How to write the nudge to the person a conversation waits on
+         *     (campbooks-cloud#293): Scout's own, or your draft rewritten.
+         */
+        WriteNudge: {
+            /**
+             * @description How to change the draft, in plain words (at most 300 characters).
+             * @example warmer
+             */
+            change?: string | null;
+            /** @description The nudge as it stands, to rewrite with `change` or `shorter`. */
+            draft?: string | null;
+            /** @description Make the draft shorter. */
+            shorter?: boolean;
         };
         /** @description What the reply should say, or how to change the draft. */
         WriteReply: {
@@ -6528,8 +6569,8 @@ export interface operations {
     "attention.list": {
         parameters: {
             query?: {
-                /** @description `open` (default) or `cleared`. */
-                state?: "open" | "cleared";
+                /** @description `open` (default), `cleared` or `waiting`. */
+                state?: "open" | "cleared" | "waiting";
                 /**
                  * @description The caller's offset from UTC, in minutes (-840 to 840; default 0,
                  *     UTC): where their day starts, for Done today and for what is overdue.
@@ -6554,7 +6595,7 @@ export interface operations {
                     "application/json": components["schemas"]["AttentionList"];
                 };
             };
-            /** @description Not a state, or an offset beyond 14 hours (`invalid_offset`). */
+            /** @description Not a state (`open`, `cleared`, `waiting`), or an offset beyond 14 hours (`invalid_offset`). */
             400: {
                 headers: {
                     [name: string]: unknown;
@@ -7763,6 +7804,98 @@ export interface operations {
             };
         };
     };
+    "conversations.write_nudge": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The workspace. */
+                workspace_id: components["schemas"]["WorkspaceId"];
+                /** @description The conversation. */
+                conversation_id: components["schemas"]["ConversationId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WriteNudge"];
+            };
+        };
+        responses: {
+            /** @description The nudge as plain text, answering the message the wait comes from; nothing is saved or sent. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReplyText"];
+                };
+            };
+            /** @description A change or draft too long (`reply_ask_invalid`). */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No valid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Missing scope, or you may only read this inbox (`inbox_read_only`). */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No such conversation, or you cannot see it. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description The conversation waits on nobody (`not_waiting`), or no language model may read mail here (`reply_unavailable`): write it yourself. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Too many replies asked for this hour. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description The language model failed (`reply_failed`), or the workspace used its whole daily AI limit (`ai_daily_limit_reached`). */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
     "conversations.mark_read": {
         parameters: {
             query?: never;
@@ -8731,6 +8864,15 @@ export interface operations {
             };
             /** @description No such inbox or message, or you cannot see it. */
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description A nudge for a conversation that waits on nobody (`not_waiting`). */
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };

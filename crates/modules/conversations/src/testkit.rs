@@ -569,6 +569,92 @@ pub fn sorting_deps() -> ConversationsDeps {
     deps
 }
 
+/// Joao's address in the waiting fixtures (campbooks-cloud#293).
+pub const JOAO: (&str, &str) = ("Joao Pereira", "joao@studio.example");
+/// Ana Costa's address in the waiting fixtures.
+pub const ANA: (&str, &str) = ("Ana Costa", "ana@studio.example");
+/// The inbox of the waiting fixtures: Sam's.
+pub const SAM: (&str, &str) = ("Sam Rivers", "sam@example.com");
+
+/// [`sorting_deps`] with the action catalogue on, so whose move it is is
+/// asked (campbooks-cloud#293), and a model reading Joao's mail as asking
+/// nothing of the recipient while someone else on it has the next move
+/// (`someone_else` at 0.91), the first person it may name (`p1`): Ana
+/// Costa in [`mail`]s Joao sends to Ana. Anyone else's mail is abstained
+/// on.
+pub fn waiting_deps() -> ConversationsDeps {
+    let mut deps =
+        sorting_deps().with_model(Arc::new(Scripted::model([(JOAO.1, someone_else_moves())])));
+    deps.config.actions.enabled = true;
+    deps
+}
+
+/// What [`waiting_deps`]' model answers about Joao's mail: it asks nothing
+/// of the recipient, and someone else on it, the first person it may name
+/// (`p1`), has the next move.
+pub fn someone_else_moves() -> Script {
+    let mut joao = script("primary", false, false, false, 0.0, false);
+    joao.push((
+        campbooks_ai::decide::signals::moves::question::NEXT_MOVE,
+        AnswerValue::Choice("someone_else".to_owned()),
+        0.91,
+    ));
+    joao.push((
+        campbooks_ai::decide::signals::moves::question::AWAITED,
+        AnswerValue::Choice("p1".to_owned()),
+        0.9,
+    ));
+    joao
+}
+
+/// One message as a recorded batch (the fixtures' format): `from` to `to`,
+/// copying `cc`, in thread `thread`, sent `minutes_ago` minutes ago;
+/// outbound when `from` is [`SAM`].
+pub fn mail(
+    id: &str,
+    thread: &str,
+    from: (&str, &str),
+    to: &[(&str, &str)],
+    cc: &[(&str, &str)],
+    minutes_ago: i64,
+) -> Value {
+    let party =
+        |(name, address): (&str, &str)| serde_json::json!({"name": name, "address": address});
+    let sent_at = chrono::Utc::now() - chrono::TimeDelta::minutes(minutes_ago);
+    serde_json::json!({"changes": [{"op": "upsert", "message": {
+        "provider_message_id": id,
+        "thread_key": thread,
+        "rfc_message_id": format!("{id}@studio.example"),
+        "from": party(from),
+        "to": to.iter().copied().map(party).collect::<Vec<_>>(),
+        "cc": cc.iter().copied().map(party).collect::<Vec<_>>(),
+        "subject": "Floor plan",
+        "sent_at": sent_at.to_rfc3339(),
+        "direction": if from == SAM { "outbound" } else { "inbound" },
+        "text": "Ana, could you send Sam the floor plan?",
+        "mailbox": {"in_inbox": true},
+        "read": false, "starred": false
+    }}]})
+}
+
+/// Sam's inbox holding Joao's message asking Ana Costa (To) to send Sam the
+/// floor plan, copying the inbox, an hour ago (`joao-1`): the workspace,
+/// the inbox and Sam's token.
+pub async fn joao_asks_ana(kit: &Kit) -> (WorkspaceId, InboxId, String) {
+    let workspace = WorkspaceId::new();
+    let (token, sam) = kit.member("sam", workspace);
+    let inbox = kit
+        .inbox(workspace, SAM.1, &[(sam, InboxRole::Manager)])
+        .await;
+    kit.ingest_value(
+        workspace,
+        inbox,
+        &mail("joao-1", "thr-floor-plan", JOAO, &[ANA], &[SAM], 60),
+    )
+    .await;
+    (workspace, inbox, token)
+}
+
 /// What a scripted strategy answers about one sender's mail: per question,
 /// the answer and its confidence.
 pub type Script = Vec<(&'static str, AnswerValue, f64)>;

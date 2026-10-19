@@ -19,6 +19,7 @@ export { useAheadOffer } from "./components/SmartRule/AheadOffer";
 export { ScoutNoticed } from "./components/SmartRule/ScoutNoticed";
 export { NeedMessage, needMessageOf } from "./components/NeedMessage/NeedMessage";
 export {
+  awaitedOf,
   billKind,
   dueLabel,
   howRows,
@@ -34,6 +35,9 @@ export { ConversationReader } from "./components/Reader/ConversationReader";
 export { useInboxActions } from "./components/InboxScreen/use-inbox-actions";
 export { renderReplyComposer } from "./components/ReplyComposer/ReplyComposer";
 export { ReplyDialog, type ReplyResume } from "./components/ReplyDialog/ReplyDialog";
+// Nudge from Home (campbooks-cloud#293): Scout's few lines to the person a
+// conversation waits on.
+export { NudgeDialog, type NudgeResume } from "./components/NudgeDialog/NudgeDialog";
 // Forward from Home (campbooks-cloud#166): find the person by name, then
 // finish the forward in the composer.
 export { ForwardDialog } from "./components/ForwardDialog/ForwardDialog";

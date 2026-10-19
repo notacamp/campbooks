@@ -10,6 +10,7 @@ use campbooks_ai::{
         signals::{
             actions::question,
             email::{Envelope, triage_questions},
+            moves,
         },
     },
 };
@@ -249,6 +250,9 @@ async fn on_its_questions_ride_along_and_change_no_triage_answer(db: PgPool) {
         for (id, asked) in before {
             assert_eq!(after.get(id), Some(asked), "{id} is asked as before");
         }
+        // Whose move it is rides along with them; this stand-in answers
+        // neither, which records nothing and fails nothing.
+        assert!(after.contains_key(moves::question::NEXT_MOVE));
         assert!(after.contains_key(question::REMIND));
         assert!(after.contains_key(question::FORWARD));
         assert!(after.contains_key(question::PAID_AUTOMATICALLY));
@@ -326,7 +330,58 @@ fn off_the_pass_asks_exactly_the_triage_questions() {
     });
     let asked = on.0.asked(&triage, &envelope);
     assert_eq!(asked[..triage.len()], triage[..]);
-    assert_eq!(asked.len(), triage.len() + question::ALL.len());
+    // No one but the sender is named: only `next_move` is asked, right
+    // after triage, then the catalogue.
+    assert_eq!(asked[triage.len()].id, moves::question::NEXT_MOVE);
+    assert_eq!(asked.len(), triage.len() + 1 + question::ALL.len());
+    assert_eq!(on.0.moves(&envelope).len(), 1);
+    assert!(pass_off_moves().is_empty());
+}
+
+fn pass_off_moves() -> Vec<campbooks_ai::decide::Question> {
+    let pass = super::DecideMessage::new(
+        None,
+        14,
+        crate::Policy::baseline(),
+        crate::domain::needs::NeedSettings::new(14, &crate::Policy::baseline()),
+    );
+    let envelope: Envelope = serde_json::from_value(json!({
+        "from": {"name": "Ana", "address": "ana@example.com"},
+        "to": [{"name": "Rui", "address": "rui@example.com"}]
+    }))
+    .unwrap();
+    pass.0.moves(&envelope)
+}
+
+#[test]
+fn with_people_to_pick_awaited_is_asked_after_next_move() {
+    let on = super::DecideMessage::new(
+        None,
+        14,
+        crate::Policy::baseline(),
+        crate::domain::needs::NeedSettings::new(14, &crate::Policy::baseline()),
+    )
+    .with_actions(ActionSettings {
+        enabled: true,
+        ..ActionSettings::default()
+    });
+    let envelope: Envelope = serde_json::from_value(json!({
+        "from": {"name": "Joao", "address": "joao@studio.example"},
+        "to": [{"name": "Ana Costa", "address": "ana@studio.example"}],
+        "cc": [{"address": "no-reply@tickets.example.com"}]
+    }))
+    .unwrap();
+    let triage = triage_questions();
+    let asked: Vec<String> =
+        on.0.asked(&triage, &envelope)
+            .into_iter()
+            .skip(triage.len())
+            .map(|q| q.id)
+            .collect();
+    assert_eq!(
+        asked[..2],
+        [moves::question::NEXT_MOVE, moves::question::AWAITED]
+    );
 }
 
 /// The catalogue's answers broken three ways: Remind missing, Forward not a

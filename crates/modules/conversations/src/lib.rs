@@ -55,7 +55,7 @@ mod testkit;
 
 pub use config::{
     ActionSettings, ConversationsConfig, DEFAULT_DECIDE_BACKFILL_DAYS, DEFAULT_NEEDS_WINDOW_DAYS,
-    NoticeSettings,
+    NoticeSettings, WaitSettings,
 };
 pub use domain::{
     decide::STATE_VERSION,
@@ -160,6 +160,7 @@ impl ConversationsDeps {
 
 /// The `conversations` module, composed with `deps`, ready for the server
 /// to mount.
+#[allow(clippy::too_many_lines)]
 pub fn module(deps: ConversationsDeps) -> Module {
     // Scout's summary of a need's email: only while the `complete` role may
     // receive mail here.
@@ -179,7 +180,9 @@ pub fn module(deps: ConversationsDeps) -> Module {
         }),
     };
     let needs = domain::needs::NeedSettings::new(deps.config.needs_window_days, &deps.policy)
-        .with_summaries(summaries.is_some());
+        .with_summaries(summaries.is_some())
+        .with_wait_days(deps.config.wait.working_days)
+        .with_waits(deps.config.actions.enabled);
     Module {
         name: NAME,
         scopes: scopes::ALL,
@@ -226,11 +229,14 @@ pub fn module(deps: ConversationsDeps) -> Module {
                 deps.policy.clone(),
                 needs.clone(),
             ))
-            .handler(features::backfill_needs::BackfillNeeds::new(
-                needs.clone(),
-                model.clone(),
-                deps.config.decide_backfill_days,
-            ))
+            .handler(
+                features::backfill_needs::BackfillNeeds::new(
+                    needs.clone(),
+                    model.clone(),
+                    deps.config.decide_backfill_days,
+                )
+                .with_actions(deps.config.actions),
+            )
             .schedule::<features::backfill_needs::DispatchNeedsBackfills>(
                 features::backfill_needs::EVERY,
             )
@@ -342,6 +348,7 @@ fn router() -> OpenApiRouter<AppState> {
         .routes(routes!(rule_notices::answer, rule_notices::clear_answer))
         .routes(routes!(reply::suggest))
         .routes(routes!(reply::write))
+        .routes(routes!(reply::nudge))
         .routes(routes!(reply::stream))
         .routes(routes!(person_notes::list, person_notes::set))
         .routes(routes!(person_notes::delete))

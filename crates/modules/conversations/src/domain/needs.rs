@@ -3,7 +3,7 @@
 //!
 //! At most one need per conversation, kept in `conversations.needs`:
 //!
-//! - **Raised** ([`raise`], pure) from the decide pass's answers about the
+//! - **Raised** ([`raise_with`], pure) from the decide pass's answers about the
 //!   newest inbound message that is not in spam or the trash: `pay` when the
 //!   money answer says a payment is still owed, always as a question ("Is it
 //!   paid?", campbooks-cloud#167: Campbooks cannot see the bank); `reply` or
@@ -22,6 +22,15 @@
 //!   cleared as lapsed (never a bill or a warning), and an undated `do` or
 //!   `reply` whose message left the needs window, that no member confirmed,
 //!   becomes a question: "Still to do?", "Still needs a reply?".
+//! - **Waiting** (campbooks-cloud#293): when the newest inbound message asks
+//!   nothing of the member but someone else has the next move (the model's
+//!   `next_move` and `awaited` answers, the person only ever one the headers
+//!   name), the conversation waits on that person ([`NeedReason::Waiting`],
+//!   shown nowhere in the queue). At its nudge time ([`nudge_time`]: the
+//!   working day after the date Scout read for them, else
+//!   `CAMPBOOKS_CONVERSATIONS__WAIT__WORKING_DAYS` working days) it becomes a
+//!   Nudge; mail from them reaching the inbox clears it as `heard_back`; the
+//!   member writing to them re-arms it from the send. Archiving leaves it.
 //! - **Refreshed** ([`refresh`]) wherever those inputs change, publishing
 //!   `conversations.need_changed` with a growing revision when the need did,
 //!   and writing when it next changes with time alone
@@ -34,18 +43,24 @@
 //! sentence, only ever shown, quoted.
 
 use campbooks_ai::decide::signals::{
-    email::triage,
-    facts::{dmarc_refused, sender_authenticated, sender_checks_failed},
+    email::{Envelope, Party, Recipient, triage},
+    facts::{self, dmarc_refused, sender_authenticated, sender_checks_failed},
+    moves::{self, NextMove},
 };
 use campbooks_kernel::{Error, EventBus, Result, tenancy::UserId};
-use chrono::{DateTime, NaiveDate, TimeDelta, Utc};
+use chrono::{DateTime, Datelike, NaiveDate, TimeDelta, Utc, Weekday};
 use serde::{Deserialize, Serialize};
 use sqlx::{PgConnection, Postgres, Transaction};
 use utoipa::ToSchema;
 
-use super::{conversation::ConversationSummary, decide::Source, policy::Policy};
+use super::{
+    conversation::ConversationSummary,
+    decide::{MessageParts, Source, envelope},
+    policy::Policy,
+};
 use crate::{
     events::{NeedChanged, NeedFacts},
+    ingest::Headers,
     model::{
         Address, ClearCause, ConversationId, DecisionId, InboxId, MessageId, NeedBasis,
         NeedQuestion, NeedReason, NeedTrust, NeedVerdict,
@@ -67,6 +82,12 @@ const RECEIPTS: &str = "receipts";
 const PRIMARY: &str = "primary";
 /// The stream of list mail, which never needs anything of the recipient.
 const NEWSLETTERS: &str = "newsletters";
+/// The confidence from which the model's `next_move` raises a wait the
+/// policy does not accept yet (campbooks-cloud#293): put as a question.
+const WAIT_FLOOR: f64 = 0.8;
+/// The facts that say a message is list, automatic or no-reply mail: it
+/// waits on nobody.
+const MACHINE_MAIL: [&str; 3] = [facts::LIST_MAIL, facts::AUTOMATIC, facts::NO_REPLY_SENDER];
 
 /// How needs are raised: the window of mail that may raise one, and the
 /// policy (which stream answers count, and its floor for questions).
@@ -80,6 +101,13 @@ pub struct NeedSettings {
     /// (`conversations.summarize_need`): only when the `complete` role may
     /// receive mail on this server.
     pub summaries: bool,
+    /// Working days a wait lasts before Scout nudges, when its email gives
+    /// no date (`CAMPBOOKS_CONVERSATIONS__WAIT__WORKING_DAYS`).
+    pub wait_days: u32,
+    /// Whether a new wait may be raised: only while the action catalogue is
+    /// switched on (`CAMPBOOKS_CONVERSATIONS__ACTIONS__ENABLED`). Off, an
+    /// open wait keeps its course; none opens.
+    pub waits: bool,
 }
 
 impl NeedSettings {
@@ -89,7 +117,23 @@ impl NeedSettings {
             window: TimeDelta::days(i64::from(days)),
             policy: policy.clone(),
             summaries: false,
+            wait_days: crate::config::DEFAULT_WAIT_WORKING_DAYS,
+            waits: true,
         }
+    }
+
+    /// The same settings, raising new waits only when `on`.
+    #[must_use]
+    pub const fn with_waits(mut self, on: bool) -> Self {
+        self.waits = on;
+        self
+    }
+
+    /// The same settings, a wait lasting `days` working days.
+    #[must_use]
+    pub const fn with_wait_days(mut self, days: u32) -> Self {
+        self.wait_days = days;
+        self
     }
 
     /// The same settings, queueing a summary for each need that opens when
@@ -106,7 +150,7 @@ impl NeedSettings {
     }
 }
 
-/// One stored answer, as [`raise`] reads it.
+/// One stored answer, as [`raise_with`] reads it.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Answer {
     /// The stored decision.
@@ -123,6 +167,9 @@ pub struct Answer {
     pub acted: bool,
     /// Its reasons.
     pub reasons: Vec<StoredReason>,
+    /// The options it was asked with (`awaited`'s carry their
+    /// descriptions); empty when unknown.
+    pub options: serde_json::Value,
 }
 
 /// A stored reason.
@@ -179,6 +226,28 @@ pub struct Need {
     pub lapses_at: Option<DateTime<Utc>>,
     /// Whether it is for today.
     pub urgent: bool,
+    /// Who it waits on (a `waiting` or `nudge` need only).
+    pub awaited: Option<Awaited>,
+    /// When Scout nudges (a `waiting` or `nudge` need only).
+    pub nudge_at: Option<DateTime<Utc>>,
+    /// How many times the member wrote to the person waited on since.
+    pub nudges: i32,
+}
+
+/// The person a wait is on, as the email's headers gave them.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Awaited {
+    /// Their display name; empty when the headers gave none.
+    pub name: String,
+    /// Their address, trimmed.
+    pub address: String,
+}
+
+impl Awaited {
+    /// The address as hearing back compares it: lower-cased.
+    fn key(&self) -> String {
+        self.address.trim().to_lowercase()
+    }
 }
 
 /// What Scout read about a message's dates (`need_summaries`).
@@ -196,11 +265,43 @@ impl Need {
     /// (a rule the member taught keeps it until it is opened: nothing the
     /// mail says undoes that).
     pub fn can_lapse(&self) -> bool {
-        !matches!(self.reason, NeedReason::Pay | NeedReason::WorthALook)
-            && !matches!(
-                self.question,
-                NeedQuestion::Money | NeedQuestion::Suspicious | NeedQuestion::WorthALook
-            )
+        !matches!(
+            self.reason,
+            NeedReason::Pay | NeedReason::WorthALook | NeedReason::Waiting | NeedReason::Nudge
+        ) && !matches!(
+            self.question,
+            NeedQuestion::Money
+                | NeedQuestion::Suspicious
+                | NeedQuestion::WorthALook
+                | NeedQuestion::NextMove
+        )
+    }
+
+    /// Whether it waits on someone: `waiting`, or `nudge` once its time
+    /// passed. Never dropped by age, never lapsing (campbooks-cloud#293).
+    pub const fn is_wait(&self) -> bool {
+        matches!(self.reason, NeedReason::Waiting | NeedReason::Nudge)
+    }
+
+    /// The wait with its nudge time worked out: from the member's newest
+    /// message to the person (`sends`, which also counts the nudges), else
+    /// from its own message (`sent`) and the date Scout read for the person
+    /// (`due_on`, as [`Self::dated`] set it). Its due date is the nudge
+    /// time's date. Anything but a wait is returned as it is.
+    #[must_use]
+    pub fn armed(mut self, sent: DateTime<Utc>, sends: Option<Sends>, wait_days: u32) -> Self {
+        if !self.is_wait() {
+            return self;
+        }
+        let (at, nudges) = match sends {
+            Some(sends) => (after_working_days(sends.last, wait_days), sends.count),
+            None => (nudge_time(sent, self.due_on, wait_days), 0),
+        };
+        self.nudge_at = Some(at);
+        self.nudges = nudges;
+        self.due_on = Some(at.date_naive());
+        self.lapses_at = None;
+        self
     }
 
     /// The need with its message's `dates`: the due date, and the lapse
@@ -232,6 +333,8 @@ pub struct Clock {
     pub now: DateTime<Utc>,
     /// The needs window.
     pub window: TimeDelta,
+    /// Working days a wait lasts when its email gives no date.
+    pub wait_days: u32,
 }
 
 impl Clock {
@@ -240,7 +343,46 @@ impl Clock {
         Self {
             now: Utc::now(),
             window: settings.window,
+            wait_days: settings.wait_days,
         }
+    }
+}
+
+/// Whether `day` is a working day: Monday to Friday.
+fn working_day(day: NaiveDate) -> bool {
+    !matches!(day.weekday(), Weekday::Sat | Weekday::Sun)
+}
+
+/// The first working day after `day`.
+fn next_working_day(day: NaiveDate) -> NaiveDate {
+    let mut next = day;
+    while let Some(after) = next.succ_opt() {
+        next = after;
+        if working_day(next) {
+            break;
+        }
+    }
+    next
+}
+
+/// `from` plus `days` working days (Monday to Friday, by UTC date), at the
+/// same time of day.
+pub fn after_working_days(from: DateTime<Utc>, days: u32) -> DateTime<Utc> {
+    let mut day = from.date_naive();
+    for _ in 0..days {
+        day = next_working_day(day);
+    }
+    day.and_time(from.time()).and_utc()
+}
+
+/// When Scout nudges about a message sent at `sent` (campbooks-cloud#293):
+/// the working day after `due_on` (the date Scout read for the person
+/// waited on), else `wait_days` working days after it; at the time of day it
+/// was sent.
+pub fn nudge_time(sent: DateTime<Utc>, due_on: Option<NaiveDate>, wait_days: u32) -> DateTime<Utc> {
+    match due_on {
+        Some(due) => next_working_day(due).and_time(sent.time()).and_utc(),
+        None => after_working_days(sent, wait_days),
     }
 }
 
@@ -330,13 +472,42 @@ fn taught_no_ask(answers: &[Answer]) -> bool {
         .any(|a| a.basis == NeedBasis::Taught && a.question == triage::ASKS_ACTION && !a.is_true())
 }
 
-/// The need the answers about `message` raise, if any, under `settings`.
+/// The need the answers about `message` raise, if any, under `settings`,
+/// without the email's people: never a wait (see [`raise_with`]).
 /// `look_ok` is whether "Worth a look" may be raised for it
 /// ([`may_be_looked_at`]): a stored highlight on mail that is not
 /// authenticated, or looks suspicious, raises nothing.
+#[cfg(test)]
 pub fn raise(
     message: MessageId,
     answers: &[Answer],
+    settings: &NeedSettings,
+    look_ok: bool,
+) -> Option<Need> {
+    raise_with(message, answers, None, settings, look_ok)
+}
+
+/// Whether the policy accepted the model's `next_move` answer, saying
+/// someone other than the recipient has the move: a model's own "needs a
+/// reply" or "asks for an action" then raises nothing (campbooks-cloud#293).
+/// The shipped policy accepts none yet.
+fn moved_on(answers: &[Answer]) -> bool {
+    answers.iter().any(|a| {
+        a.question == moves::question::NEXT_MOVE
+            && a.basis == NeedBasis::Model
+            && a.acted
+            && a.value.as_str() != Some(NextMove::Recipient.as_str())
+    })
+}
+
+/// The need the answers about `message` raise, if any, under `settings`;
+/// with its `people` (the envelope's sender and recipients, and whose inbox
+/// it is), a wait when nothing else is raised.
+#[allow(clippy::too_many_lines)]
+pub fn raise_with(
+    message: MessageId,
+    answers: &[Answer],
+    people: Option<&Envelope>,
     settings: &NeedSettings,
     look_ok: bool,
 ) -> Option<Need> {
@@ -351,6 +522,9 @@ pub fn raise(
         due_on: None,
         lapses_at: None,
         urgent: false,
+        awaited: None,
+        nudge_at: None,
+        nudges: 0,
     };
     // A suspicious message is only ever a warning: its asks are not ours.
     let suspicious = answers
@@ -376,7 +550,11 @@ pub fn raise(
             && (a.question == triage::NEEDS_REPLY || a.question == triage::ASKS_ACTION)
     });
     let may_ask = taught_ask || may_ask(stream, answers);
-    let asks = accepted(answers, triage::ASKS_ACTION);
+    // The policy says someone else has the move: a model's own ask is not
+    // the member's (a taught rule's still is).
+    let moved_on = moved_on(answers);
+    let ours = |a: &&Answer| !(moved_on && a.basis == NeedBasis::Model);
+    let asks = accepted(answers, triage::ASKS_ACTION).filter(ours);
     let owed = owed(answers, settings).filter(|_| stream != Some(NEWSLETTERS));
     let raised = if let Some(owed) = owed {
         // Campbooks cannot see the bank: a payment still owed is always a
@@ -392,7 +570,7 @@ pub fn raise(
         // Money mail asks for nothing but a payment, and the money answer
         // says none is owed (a receipt, a payment confirmation): nothing.
         None
-    } else if let Some(reply) = accepted(answers, triage::NEEDS_REPLY) {
+    } else if let Some(reply) = accepted(answers, triage::NEEDS_REPLY).filter(ours) {
         Some(need(
             NeedReason::Reply,
             NeedTrust::Sure,
@@ -417,7 +595,7 @@ pub fn raise(
             (triage::ASKS_ACTION, NeedQuestion::AsksAction),
         ]
         .into_iter()
-        .filter(|(id, _)| !settled_no(answers, id))
+        .filter(|(id, _)| !moved_on && !settled_no(answers, id))
         .find_map(|(id, question)| {
             answers
                 .iter()
@@ -445,8 +623,113 @@ pub fn raise(
         });
         need
     });
-    // Anything that asks something of the member comes first.
-    raised.or_else(|| highlighted(message, answers).filter(|_| look_ok))
+    // Anything that asks something of the member comes first, then what a
+    // rule the member taught keeps in front of them, then a wait.
+    raised
+        .or_else(|| highlighted(message, answers).filter(|_| look_ok))
+        .or_else(|| {
+            people
+                .filter(|_| settings.waits)
+                .and_then(|people| waiting(message, answers, people, settings))
+        })
+}
+
+/// The wait the answers about `message` raise when nothing else is raised
+/// (campbooks-cloud#293): on the sender, when the model says the sender has
+/// the next move; on the person its `awaited` answer names, when someone
+/// else has. Only for mail the facts do not mark as list, automatic or
+/// no-reply mail, sorted to Primary or not sorted by an accepted answer. A
+/// `next_move` the policy accepts is `sure`; one it does not, a question,
+/// from [`WAIT_FLOOR`]. The person is only ever one of the email's own
+/// people, and a stored `pN` is read only as the person its option named
+/// when it was asked.
+fn waiting(
+    message: MessageId,
+    answers: &[Answer],
+    people: &Envelope,
+    settings: &NeedSettings,
+) -> Option<Need> {
+    let machine = answers.iter().any(|a| {
+        a.basis == NeedBasis::Rules
+            && a.reasons
+                .iter()
+                .any(|r| MACHINE_MAIL.contains(&r.rule.as_str()))
+    });
+    if machine
+        || !matches!(
+            sorted_stream(answers, &settings.policy),
+            None | Some(PRIMARY)
+        )
+    {
+        return None;
+    }
+    let model = |question: &str| {
+        answers
+            .iter()
+            .find(|a| a.question == question && a.basis == NeedBasis::Model)
+    };
+    let next = model(moves::question::NEXT_MOVE)?;
+    if !next.acted && !next.confidence.is_some_and(|c| c >= WAIT_FLOOR) {
+        return None;
+    }
+    let person = match NextMove::parse(next.value.as_str()?)? {
+        // A sender that is a machine (a no-reply or service address) is
+        // never waited on.
+        NextMove::Sender if !facts::is_machine_sender(people) => people.from.clone(),
+        NextMove::SomeoneElse => {
+            let awaited = model(moves::question::AWAITED)?;
+            let label = awaited.value.as_str()?;
+            let person = moves::awaited_party(people, label)?;
+            let asked_about = option_description(&awaited.options, label)?;
+            moves::describes(asked_about, &person).then_some(person)?
+        }
+        NextMove::Sender | NextMove::Recipient | NextMove::Nobody => return None,
+    };
+    let Party { name, address } = person;
+    let address = address.trim().to_owned();
+    // Never a wait on the inbox itself: Gmail and Zoho file mail the inbox
+    // sent itself as received, so its sender can be the inbox.
+    let ours = people.recipient.as_ref().is_some_and(|inbox| {
+        inbox
+            .addresses
+            .iter()
+            .any(|own| own.trim().eq_ignore_ascii_case(&address))
+    });
+    if address.is_empty() || ours {
+        return None;
+    }
+    Some(Need {
+        message,
+        reason: NeedReason::Waiting,
+        trust: if next.acted {
+            NeedTrust::Sure
+        } else {
+            NeedTrust::Check
+        },
+        basis: NeedBasis::Model,
+        question: NeedQuestion::NextMove,
+        decision: Some(next.id),
+        due_on: None,
+        lapses_at: None,
+        urgent: false,
+        awaited: Some(Awaited {
+            name: name.trim().to_owned(),
+            address,
+        }),
+        nudge_at: None,
+        nudges: 0,
+    })
+}
+
+/// The description stored with option `label` of a choice's `options`
+/// (`[{label, description}]`), if it was stored.
+fn option_description<'a>(options: &'a serde_json::Value, label: &str) -> Option<&'a str> {
+    options
+        .as_array()?
+        .iter()
+        .find(|o| o.get("label").and_then(serde_json::Value::as_str) == Some(label))?
+        .get("description")?
+        .as_str()
 }
 
 /// "Worth a look": what a rule the member taught keeps in front of them
@@ -466,6 +749,9 @@ fn highlighted(message: MessageId, answers: &[Answer]) -> Option<Need> {
             due_on: None,
             lapses_at: None,
             urgent: false,
+            awaited: None,
+            nudge_at: None,
+            nudges: 0,
         })
 }
 
@@ -507,7 +793,8 @@ fn asked(question: NeedQuestion) -> NeedQuestion {
         | NeedQuestion::AsksAction
         | NeedQuestion::Suspicious
         | NeedQuestion::Money
-        | NeedQuestion::WorthALook => question,
+        | NeedQuestion::WorthALook
+        | NeedQuestion::NextMove => question,
     }
 }
 
@@ -546,6 +833,19 @@ pub struct Since {
     pub sent_at: Option<DateTime<Utc>>,
     /// The message was opened (read) by someone, here or at the provider.
     pub opened: bool,
+    /// Mail from the person a wait is on reached the inbox after it.
+    pub heard_back: bool,
+    /// The member's messages to the person a wait is on since it, if any.
+    pub sends: Option<Sends>,
+}
+
+/// The member's messages to the person a wait is on, since its message.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Sends {
+    /// When the newest was sent.
+    pub last: DateTime<Utc>,
+    /// How many.
+    pub count: i32,
 }
 
 /// What a taught rule says about a need.
@@ -570,6 +870,11 @@ pub enum Settled {
 /// Settle `need` against what happened since and the time now (the
 /// clearing table of the design).
 pub fn settle(mut need: Need, since: Since, clock: Clock) -> Settled {
+    // A wait's nudge time: from its message, or the member's newest message
+    // to the person since.
+    if let Some(sent) = since.sent_at {
+        need = need.armed(sent, since.sends, clock.wait_days);
+    }
     match since.verdict {
         // Paid already is done for a Pay need: nothing is filed yet.
         Some(NeedVerdict::Done | NeedVerdict::AlreadyPaid) => {
@@ -586,6 +891,8 @@ pub fn settle(mut need: Need, since: Since, clock: Clock) -> Settled {
                     | NeedQuestion::Suspicious
                     | NeedQuestion::StillNeedsReply => NeedReason::Reply,
                     NeedQuestion::WorthALook => NeedReason::WorthALook,
+                    // "Yes, I'm waiting": still a wait.
+                    NeedQuestion::NextMove => need.reason,
                 };
                 need.question = asked(need.question);
             }
@@ -602,6 +909,10 @@ pub fn settle(mut need: Need, since: Since, clock: Clock) -> Settled {
     }
     if since.trashed {
         return Settled::Cleared(need, ClearCause::Trashed);
+    }
+    // They wrote: nothing to wait for. Archiving never ends a wait.
+    if since.heard_back && need.is_wait() {
+        return Settled::Cleared(need, ClearCause::HeardBack);
     }
     // "Worth a look" asks only that the member opens it once.
     if since.opened && need.reason == NeedReason::WorthALook {
@@ -635,6 +946,15 @@ pub fn settle(mut need: Need, since: Since, clock: Clock) -> Settled {
         need.reason = NeedReason::Review;
         need.trust = NeedTrust::Check;
     }
+    // A wait whose nudge time passed is a Nudge; written to since, a wait
+    // again.
+    if need.is_wait() {
+        need.reason = if need.nudge_at.is_some_and(|at| at <= clock.now) {
+            NeedReason::Nudge
+        } else {
+            NeedReason::Waiting
+        };
+    }
     Settled::Open(need)
 }
 
@@ -653,7 +973,8 @@ pub fn next_wake(
     let stale = sent_at
         .filter(|_| need.may_go_stale())
         .and_then(|sent| sent.checked_add_signed(clock.window));
-    [lapse, stale]
+    let nudge = need.nudge_at.filter(|_| need.reason == NeedReason::Waiting);
+    [lapse, stale, nudge]
         .into_iter()
         .flatten()
         .filter(|at| *at > clock.now)
@@ -678,6 +999,10 @@ struct Row {
     verdict_message_id: Option<MessageId>,
     verdict_by: Option<UserId>,
     latest_inbound_id: Option<MessageId>,
+    awaited_name: Option<String>,
+    awaited_address: Option<String>,
+    nudge_at: Option<DateTime<Utc>>,
+    nudges: i32,
 }
 
 impl Row {
@@ -692,6 +1017,12 @@ impl Row {
             due_on: self.due_on,
             lapses_at: self.lapses_at,
             urgent: self.urgent,
+            awaited: self.awaited_address.clone().map(|address| Awaited {
+                name: self.awaited_name.clone().unwrap_or_default(),
+                address,
+            }),
+            nudge_at: self.nudge_at,
+            nudges: self.nudges,
         })
     }
 
@@ -709,7 +1040,7 @@ async fn current(conn: &mut PgConnection, conversation: ConversationId) -> Resul
     Ok(sqlx::query_as::<_, Row>(
         "SELECT message_id, reason, trust, basis, question, decision_id, due_on, lapses_at,
                 urgent, state, cleared_because, verdict, verdict_message_id, verdict_by,
-                latest_inbound_id
+                latest_inbound_id, awaited_name, awaited_address, nudge_at, nudges
            FROM conversations.needs WHERE conversation_id = $1 FOR UPDATE",
     )
     .bind(conversation)
@@ -769,14 +1100,14 @@ async fn set_clock(
 /// was given while the model passed its answers check
 /// (`campbooks_ai::decide::check::STAMP`): the rest are kept, never read.
 async fn answers(conn: &mut PgConnection, message: MessageId) -> Result<Vec<Answer>> {
-    let rows = sqlx::query!(
-        r#"
-        SELECT id AS "id: DecisionId", question, source, value, confidence, acted, reasons
-          FROM conversations.decisions
-         WHERE message_id = $1 AND (source <> 'model' OR model_version LIKE 'checked:%')
-        "#,
-        message as MessageId,
+    // A runtime query, so the column read since (`options`) needs no entry
+    // in the `.sqlx` offline cache.
+    let rows: Vec<AnswerRow> = sqlx::query_as(
+        "SELECT id, question, source, value, confidence, acted, reasons, options
+           FROM conversations.decisions
+          WHERE message_id = $1 AND (source <> 'model' OR model_version LIKE 'checked:%')",
     )
+    .bind(message)
     .fetch_all(conn)
     .await?;
     rows.into_iter()
@@ -794,9 +1125,82 @@ async fn answers(conn: &mut PgConnection, message: MessageId) -> Result<Vec<Answ
                 acted: row.acted,
                 reasons: serde_json::from_value(row.reasons)
                     .map_err(|e| Error::internal(super::redact::json(&e)))?,
+                options: row.options,
             })
         })
         .collect()
+}
+
+/// A row of [`answers`].
+#[derive(sqlx::FromRow)]
+struct AnswerRow {
+    id: DecisionId,
+    question: String,
+    source: String,
+    value: serde_json::Value,
+    confidence: Option<f64>,
+    acted: bool,
+    reasons: serde_json::Value,
+    options: serde_json::Value,
+}
+
+/// A row of [`people`]: sender, recipients, headers, and the inbox's
+/// address and name.
+type PeopleRow = (
+    serde_json::Value,
+    serde_json::Value,
+    serde_json::Value,
+    String,
+    Option<String>,
+);
+
+/// The people of `message` as the decide pass read them: its sender,
+/// recipients and list headers, and whose inbox it is. `None` once it is
+/// gone.
+async fn people(conn: &mut PgConnection, message: MessageId) -> Result<Option<Envelope>> {
+    let row: Option<PeopleRow> = sqlx::query_as(
+        "SELECT m.sender, m.recipients, m.headers, i.address, i.display_name
+               FROM conversations.messages m
+               JOIN conversations.inboxes i ON i.id = m.inbox_id
+              WHERE m.id = $1",
+    )
+    .bind(message)
+    .fetch_optional(conn)
+    .await?;
+    let Some((sender, recipients, headers, inbox_address, inbox_name)) = row else {
+        return Ok(None);
+    };
+    let decode = |e: serde_json::Error| Error::internal(super::redact::json(&e));
+    let from: Address = serde_json::from_value(sender).map_err(decode)?;
+    let recipients: StoredRecipients = serde_json::from_value(recipients).map_err(decode)?;
+    let headers: Headers = serde_json::from_value(headers).map_err(decode)?;
+    let mut people = envelope(MessageParts {
+        from: &from,
+        to: &recipients.to,
+        cc: &recipients.cc,
+        reply_to: &recipients.reply_to,
+        subject: "",
+        headers: &headers,
+        attachments: &[],
+        body: "",
+    });
+    people.recipient = Some(Recipient {
+        name: inbox_name.unwrap_or_default(),
+        addresses: vec![inbox_address],
+        shared: false,
+    });
+    Ok(Some(people))
+}
+
+/// `messages.recipients`.
+#[derive(Deserialize)]
+struct StoredRecipients {
+    #[serde(default)]
+    to: Vec<Address>,
+    #[serde(default)]
+    cc: Vec<Address>,
+    #[serde(default)]
+    reply_to: Vec<Address>,
 }
 
 /// Whether "Worth a look" may be raised for `message`, whatever answer is
@@ -867,18 +1271,29 @@ async fn candidate(
     let mut reread = false;
     let mut recent = false;
     let mut money_asked = true;
+    // Whether the newest message was asked whose move it is.
+    let mut move_asked = false;
     if let Some(newest) = &newest {
         recent = newest.sent_at >= Utc::now() - settings.window;
         reread = row.is_some_and(|r| r.message_id == newest.id);
         if recent || reread {
             let answers = answers(tx, newest.id).await?;
             money_asked = answers.iter().any(|a| a.question == triage::MONEY);
+            move_asked = answers
+                .iter()
+                .any(|a| a.question == moves::question::NEXT_MOVE);
+            // Its people only matter to a wait, which needs a move answer.
+            let people = if move_asked {
+                people(tx, newest.id).await?
+            } else {
+                None
+            };
             // Authentication is read only for mail a rule highlighted.
             let highlight = answers
                 .iter()
                 .any(|a| a.basis == NeedBasis::Taught && a.question == WORTH_A_LOOK && a.is_true());
             let look_ok = highlight && may_be_looked_at(tx, newest.id).await?;
-            raised = raise(newest.id, &answers, settings, look_ok);
+            raised = raise_with(newest.id, &answers, people.as_ref(), settings, look_ok);
         }
     }
     let open = row.filter(|r| r.state == "open");
@@ -896,10 +1311,21 @@ async fn candidate(
         {
             false
         }
+        // Waits switched off: an open wait keeps its course, though its own
+        // message no longer raises it.
+        Some(row) if reread && raised.is_none() && !settings.waits && row.need()?.is_wait() => {
+            false
+        }
         Some(row) if reread && raised.is_none() => !matches!(
             row.verdict_on(row.message_id)?,
             Some(NeedVerdict::Confirmed | NeedVerdict::StillToPay)
         ),
+        // A newer message in the conversation was read again for whose move
+        // it is and waits on nobody ("never mind, I sent it myself"): the
+        // wait it followed is over, replaced by what that message says. A
+        // newer message from the person waited on ends it as heard back
+        // first (`settle`), and one that raises its own need replaces it.
+        Some(row) if !reread && recent && move_asked && raised.is_none() => row.need()?.is_wait(),
         _ => false,
     };
     let need = match (raised, open) {
@@ -919,7 +1345,7 @@ async fn candidate(
 /// was sent (`None` once it is gone).
 async fn since(
     tx: &mut Transaction<'_, Postgres>,
-    id: ConversationId,
+    (id, inbox): (ConversationId, InboxId),
     state: &(bool, bool),
     row: Option<&Row>,
     need: &Need,
@@ -957,6 +1383,12 @@ async fn since(
     } else {
         RuleSays::Nothing
     };
+    let (heard_back, sends) = match (&need.awaited, sent) {
+        (Some(awaited), Some(sent)) if need.is_wait() => {
+            heard_from(tx, inbox, &awaited.key(), sent).await?
+        }
+        _ => (false, None),
+    };
     Ok((
         Since {
             replied,
@@ -966,9 +1398,73 @@ async fn since(
             rule,
             sent_at: sent,
             opened,
+            heard_back,
+            sends,
         },
         sent,
     ))
+}
+
+/// Most messages from the person waited on read for one that passes its
+/// sender's checks: past these, the wait is not taken for heard back.
+const HEARD_SCAN: i64 = 50;
+
+/// How long after a wait's message the inbox's own messages are read for a
+/// nudge to the person: what bounds the scan (`messages_outbound_idx`). A
+/// message to them sent later than this does not arm the wait again.
+const SENDS_SCAN_DAYS: i32 = 60;
+
+/// Whether mail from `address` (lower-cased) reached `inbox` after `after`
+/// (spam aside), in any conversation, that the receiving provider did not
+/// mark as failing its sender's checks (a forged From hears nothing); and
+/// the inbox's messages to it, in To or Cc, in the [`SENDS_SCAN_DAYS`]
+/// after.
+async fn heard_from(
+    tx: &mut Transaction<'_, Postgres>,
+    inbox: InboxId,
+    address: &str,
+    after: DateTime<Utc>,
+) -> Result<(bool, Option<Sends>)> {
+    // Served by `messages_inbound_sender_idx`; `sender_address` is stored
+    // lower-cased. Oldest first, at most [`HEARD_SCAN`].
+    let from_them: Vec<serde_json::Value> = sqlx::query_scalar(
+        "SELECT headers FROM conversations.messages
+          WHERE inbox_id = $1 AND direction = 'inbound' AND sender_address = $2
+            AND sent_at > $3 AND NOT in_spam
+          ORDER BY sent_at, id LIMIT $4",
+    )
+    .bind(inbox)
+    .bind(address)
+    .bind(after)
+    .bind(HEARD_SCAN)
+    .fetch_all(&mut **tx)
+    .await?;
+    let heard = from_them
+        .iter()
+        .any(|headers| !super::person::distrusted("inbound", address, false, headers, false));
+    // Served by `messages_outbound_idx` (inbox, sent_at): a bounded range.
+    let (last, count): (Option<DateTime<Utc>>, i64) = sqlx::query_as(
+        "SELECT max(m.sent_at), count(*) FROM conversations.messages m
+          WHERE m.inbox_id = $1 AND m.direction = 'outbound' AND m.sent_at > $3
+            AND m.sent_at <= $3 + make_interval(days => $4)
+            AND EXISTS (SELECT 1 FROM jsonb_array_elements(
+                    CASE WHEN jsonb_typeof(m.recipients->'to') = 'array'
+                         THEN m.recipients->'to' ELSE '[]'::jsonb END ||
+                    CASE WHEN jsonb_typeof(m.recipients->'cc') = 'array'
+                         THEN m.recipients->'cc' ELSE '[]'::jsonb END) r
+                         WHERE lower(trim(r->>'address')) = $2)",
+    )
+    .bind(inbox)
+    .bind(address)
+    .bind(after)
+    .bind(SENDS_SCAN_DAYS)
+    .fetch_one(&mut **tx)
+    .await?;
+    let sends = last.map(|last| Sends {
+        last,
+        count: i32::try_from(count).unwrap_or(i32::MAX),
+    });
+    Ok((heard, sends))
 }
 
 /// A conversation whose need can change.
@@ -1261,7 +1757,14 @@ async fn refresh_pass(
     let need = need.dated(read);
 
     let clock = Clock::now(settings);
-    let (since, sent) = since(tx, id, &conversation_state, row.as_ref(), &need).await?;
+    let (since, sent) = since(
+        tx,
+        (id, conversation.inbox),
+        &conversation_state,
+        row.as_ref(),
+        &need,
+    )
+    .await?;
     let settled = match settle(need, since, clock) {
         // Its own message no longer raises it: cleared as replaced.
         Settled::Open(need) if withdrawn => Settled::Cleared(need, ClearCause::Superseded),
@@ -1304,9 +1807,10 @@ async fn refresh_pass(
         "INSERT INTO conversations.needs
              (conversation_id, workspace_id, message_id, reason, trust, basis, question,
               decision_id, due_on, urgent, state, cleared_because, cleared_by, cleared_at,
-              latest_inbound_id, lapses_at)
+              latest_inbound_id, lapses_at, awaited_name, awaited_address, nudge_at, nudges)
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13,
-                 CASE WHEN $12::text IS NULL THEN NULL ELSE now() END, $14, $15)
+                 CASE WHEN $12::text IS NULL THEN NULL ELSE now() END, $14, $15, $16, $17, $18,
+                 $19)
          ON CONFLICT (conversation_id) DO UPDATE
             SET message_id = EXCLUDED.message_id, reason = EXCLUDED.reason,
                 trust = EXCLUDED.trust, basis = EXCLUDED.basis, question = EXCLUDED.question,
@@ -1314,7 +1818,9 @@ async fn refresh_pass(
                 urgent = EXCLUDED.urgent, state = EXCLUDED.state,
                 cleared_because = EXCLUDED.cleared_because, cleared_by = EXCLUDED.cleared_by,
                 cleared_at = EXCLUDED.cleared_at, latest_inbound_id = EXCLUDED.latest_inbound_id,
-                lapses_at = EXCLUDED.lapses_at,
+                lapses_at = EXCLUDED.lapses_at, awaited_name = EXCLUDED.awaited_name,
+                awaited_address = EXCLUDED.awaited_address, nudge_at = EXCLUDED.nudge_at,
+                nudges = EXCLUDED.nudges,
                 revision = conversations.needs.revision + 1, updated_at = now()
          RETURNING revision",
     )
@@ -1333,6 +1839,10 @@ async fn refresh_pass(
     .bind(cleared_by.map(|u| *u.as_uuid()))
     .bind(latest)
     .bind(need.lapses_at)
+    .bind(need.awaited.as_ref().map(|a| a.name.as_str()))
+    .bind(need.awaited.as_ref().map(|a| a.address.as_str()))
+    .bind(need.nudge_at)
+    .bind(need.nudges)
     .fetch_one(&mut **tx)
     .await?;
     set_clock(tx, conversation.workspace_id, id, wake).await?;
@@ -1502,6 +2012,15 @@ pub struct NeedView {
     /// rated: the client then offers its fixed actions.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub actions: Option<Vec<super::actions::SuggestedAction>>,
+    /// Who a `waiting` or `nudge` need waits on: their name and address as
+    /// the email's headers gave them (campbooks-cloud#293). Absent for every
+    /// other need.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub waiting_on: Option<Address>,
+    /// How many times the member wrote to them since (a `waiting` or
+    /// `nudge` need only).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub nudges: Option<u32>,
 }
 
 /// A conversation's ask that lapsed (campbooks-cloud#275): what it was and
@@ -1535,6 +2054,9 @@ struct AttachRow {
     sender: Option<serde_json::Value>,
     sent_at: Option<DateTime<Utc>>,
     reasons: Option<serde_json::Value>,
+    awaited_name: Option<String>,
+    awaited_address: Option<String>,
+    nudges: i32,
 }
 
 /// The open needs of some conversations, and their lapsed ones while the
@@ -1543,7 +2065,7 @@ struct AttachRow {
 /// entry in the `.sqlx` offline cache.
 const ATTACH: &str = "SELECT n.conversation_id, n.message_id, n.reason, n.trust, n.basis, \
             n.question, n.due_on, n.lapses_at, n.urgent, n.state, m.sender, m.sent_at, \
-            d.reasons \
+            d.reasons, n.awaited_name, n.awaited_address, n.nudges \
        FROM conversations.needs n \
        LEFT JOIN conversations.messages m ON m.id = n.message_id \
        LEFT JOIN conversations.decisions d ON d.id = n.decision_id \
@@ -1627,6 +2149,15 @@ pub async fn attach(conn: &mut PgConnection, summaries: &mut [ConversationSummar
             sent_at: row.sent_at,
             quote,
             actions: None,
+            waiting_on: row
+                .awaited_address
+                .filter(|_| matches!(reason, NeedReason::Waiting | NeedReason::Nudge))
+                .map(|address| Address {
+                    name: row.awaited_name.filter(|name| !name.trim().is_empty()),
+                    address,
+                }),
+            nudges: matches!(reason, NeedReason::Waiting | NeedReason::Nudge)
+                .then(|| u32::try_from(row.nudges).unwrap_or_default()),
         });
     }
     Ok(())
@@ -1647,6 +2178,7 @@ mod tests {
             confidence: Some(0.9),
             acted,
             reasons: Vec::new(),
+            options: serde_json::Value::Null,
         }
     }
 
@@ -2131,14 +2663,18 @@ mod tests {
             due_on: None,
             lapses_at: None,
             urgent: false,
+            awaited: None,
+            nudge_at: None,
+            nudges: 0,
         }
     }
 
-    /// Now, with the shipped 14-day window.
+    /// Now, with the shipped 14-day window and 3-day wait.
     fn clock() -> Clock {
         Clock {
             now: Utc::now(),
             window: TimeDelta::days(14),
+            wait_days: 3,
         }
     }
 
@@ -2533,5 +3069,433 @@ mod tests {
             ),
             None
         );
+    }
+
+    // --- Waiting on someone (campbooks-cloud#293) ---
+
+    fn at(rfc3339: &str) -> DateTime<Utc> {
+        rfc3339.parse().unwrap()
+    }
+
+    fn day(ymd: &str) -> NaiveDate {
+        ymd.parse().unwrap()
+    }
+
+    #[test]
+    fn a_nudge_comes_working_days_later_at_the_same_time_of_day() {
+        // Wednesday 14 October 10:00, three working days: Monday 10:00.
+        assert_eq!(
+            nudge_time(at("2026-10-14T10:00:00Z"), None, 3),
+            at("2026-10-19T10:00:00Z")
+        );
+        // A date for them, Friday 16 October: the working day after it, at
+        // the time the message was sent.
+        assert_eq!(
+            nudge_time(at("2026-10-14T08:30:00Z"), Some(day("2026-10-16")), 3),
+            at("2026-10-19T08:30:00Z")
+        );
+        // Nudged on Monday 19 October 11:00: Thursday 11:00.
+        assert_eq!(
+            after_working_days(at("2026-10-19T11:00:00Z"), 3),
+            at("2026-10-22T11:00:00Z")
+        );
+        // Sent on a Saturday: Monday is the first working day.
+        assert_eq!(
+            nudge_time(at("2026-10-17T15:00:00Z"), None, 1),
+            at("2026-10-19T15:00:00Z")
+        );
+        assert_eq!(
+            nudge_time(at("2026-10-17T15:00:00Z"), None, 3),
+            at("2026-10-21T15:00:00Z")
+        );
+        // A date on a weekend: the Monday after.
+        assert_eq!(
+            nudge_time(at("2026-10-14T10:00:00Z"), Some(day("2026-10-17")), 3),
+            at("2026-10-19T10:00:00Z")
+        );
+        // Fifteen working days: three weeks.
+        assert_eq!(
+            after_working_days(at("2026-10-14T10:00:00Z"), 15),
+            at("2026-11-04T10:00:00Z")
+        );
+    }
+
+    fn party(name: &str, address: &str) -> Party {
+        Party {
+            name: name.into(),
+            address: address.into(),
+        }
+    }
+
+    /// Joao writes to Ana Costa, copying the inbox.
+    fn joao_to_ana() -> Envelope {
+        Envelope {
+            from: party("Joao", "joao@studio.example"),
+            to: vec![party("Ana Costa", "ana@studio.example")],
+            cc: vec![party("Sam", "sam@example.com")],
+            recipient: Some(Recipient {
+                name: "Sam".into(),
+                addresses: vec!["sam@example.com".into()],
+                shared: false,
+            }),
+            ..Envelope::default()
+        }
+    }
+
+    fn next_move(label: &str, confidence: f64, acted: bool) -> Answer {
+        confident(
+            answer(
+                moves::question::NEXT_MOVE,
+                NeedBasis::Model,
+                json!(label),
+                acted,
+            ),
+            confidence,
+        )
+    }
+
+    /// The model's `awaited` answer `label`, stored with the options the
+    /// decide pass asked about `people`.
+    fn awaited(people: &Envelope, label: &str) -> Answer {
+        let question = moves::awaited_question(people).unwrap();
+        let options = match &question.kind {
+            campbooks_ai::decide::QuestionKind::Choice { options, .. } => options
+                .iter()
+                .map(|o| json!({"label": o.label, "description": o.description}))
+                .collect::<Vec<_>>(),
+            other => panic!("not a choice: {other:?}"),
+        };
+        let mut a = answer(
+            moves::question::AWAITED,
+            NeedBasis::Model,
+            json!(label),
+            false,
+        );
+        a.options = json!(options);
+        a
+    }
+
+    fn quiet() -> Vec<Answer> {
+        vec![
+            stream(NeedBasis::Model, "primary", true),
+            answer(triage::NEEDS_REPLY, NeedBasis::Model, json!(false), true),
+            answer(triage::ASKS_ACTION, NeedBasis::Model, json!(false), true),
+        ]
+    }
+
+    fn waits(answers: &[Answer], people: &Envelope) -> Option<Need> {
+        raise_with(MessageId::new(), answers, Some(people), &settings(), true)
+    }
+
+    #[test]
+    fn ana_was_asked_to_write() {
+        let people = joao_to_ana();
+        let mut answers = quiet();
+        answers.push(next_move("someone_else", 0.91, false));
+        answers.push(awaited(&people, "p1"));
+        let need = waits(&answers, &people).expect("a wait on Ana");
+        assert_eq!(
+            (need.reason, need.trust, need.basis, need.question),
+            (
+                NeedReason::Waiting,
+                NeedTrust::Check,
+                NeedBasis::Model,
+                NeedQuestion::NextMove
+            )
+        );
+        assert_eq!(
+            need.awaited,
+            Some(Awaited {
+                name: "Ana Costa".into(),
+                address: "ana@studio.example".into()
+            })
+        );
+        assert!(!need.can_lapse());
+        // Without the people (a pass that does not read them), no wait.
+        assert_eq!(raised(&answers), None);
+    }
+
+    #[test]
+    fn a_promise_from_the_sender_waits_on_the_sender() {
+        let people = joao_to_ana();
+        let mut answers = quiet();
+        answers.push(next_move("sender", 0.86, false));
+        let need = waits(&answers, &people).unwrap();
+        assert_eq!(
+            need.awaited.map(|a| a.address),
+            Some("joao@studio.example".to_owned())
+        );
+        // A sender that is a machine is never waited on.
+        let mut machine = joao_to_ana();
+        machine.from = party("Tickets", "no-reply@tickets.example.com");
+        assert_eq!(waits(&answers, &machine), None);
+    }
+
+    #[test]
+    fn never_a_wait_on_the_inbox_itself() {
+        // Mail the inbox sent itself, filed as received: its sender is the
+        // inbox, whatever the case or spaces.
+        let mut own = joao_to_ana();
+        own.from = party("Sam", " SAM@example.com ");
+        let mut answers = quiet();
+        answers.push(next_move("sender", 0.95, true));
+        assert_eq!(waits(&answers, &own), None);
+    }
+
+    #[test]
+    fn no_new_wait_while_waits_are_switched_off() {
+        let people = joao_to_ana();
+        let mut answers = quiet();
+        answers.push(next_move("someone_else", 0.91, false));
+        answers.push(awaited(&people, "p1"));
+        assert!(waits(&answers, &people).is_some());
+        let off = settings().with_waits(false);
+        assert_eq!(
+            raise_with(MessageId::new(), &answers, Some(&people), &off, true),
+            None
+        );
+    }
+
+    #[test]
+    fn unsure_or_nobody_named_waits_on_nobody() {
+        let people = joao_to_ana();
+        let mut unsure = quiet();
+        unsure.push(next_move("someone_else", 0.6, false));
+        unsure.push(awaited(&people, "p1"));
+        assert_eq!(waits(&unsure, &people), None);
+        let mut nobody = quiet();
+        nobody.push(next_move("someone_else", 0.9, false));
+        nobody.push(awaited(&people, "none"));
+        assert_eq!(waits(&nobody, &people), None);
+        // No `awaited` answer at all.
+        let mut missing = quiet();
+        missing.push(next_move("someone_else", 0.9, false));
+        assert_eq!(waits(&missing, &people), None);
+        // The recipient's move, or nobody's: no wait.
+        for label in ["recipient", "nobody"] {
+            let mut answers = quiet();
+            answers.push(next_move(label, 0.99, false));
+            assert_eq!(waits(&answers, &people), None, "{label}");
+        }
+    }
+
+    #[test]
+    fn a_stored_label_is_only_read_as_the_person_it_named() {
+        let people = joao_to_ana();
+        let mut answers = quiet();
+        answers.push(next_move("someone_else", 0.9, false));
+        let asked = awaited(&people, "p1");
+        answers.push(asked.clone());
+        // The headers now put someone else first: `p1` is not Ana any more.
+        let mut changed = people.clone();
+        changed.to.insert(0, party("Rui", "rui@studio.example"));
+        assert_eq!(waits(&answers, &changed), None);
+        // Options stored without their descriptions say nothing: no wait.
+        let mut bare = asked;
+        bare.options = json!(["p1", "none"]);
+        answers.pop();
+        answers.push(bare);
+        assert_eq!(waits(&answers, &people), None);
+    }
+
+    #[test]
+    fn the_members_move_and_machine_mail_win() {
+        let people = joao_to_ana();
+        let wait = [
+            next_move("someone_else", 0.95, false),
+            awaited(&people, "p1"),
+        ];
+        // The message also raises a reply: the reply, nothing waits.
+        let mut reply = vec![
+            stream(NeedBasis::Model, "primary", true),
+            answer(triage::NEEDS_REPLY, NeedBasis::Model, json!(true), true),
+        ];
+        reply.extend(wait.clone());
+        assert_eq!(waits(&reply, &people).unwrap().reason, NeedReason::Reply);
+        // List mail, sorted out of Primary, or a no-reply sender: no wait.
+        let mut list = quiet();
+        list.push(with_reason(
+            answer(triage::NEEDS_REPLY, NeedBasis::Rules, json!(false), true),
+            facts::LIST_MAIL,
+            "List-Id",
+        ));
+        list.extend(wait.clone());
+        assert_eq!(waits(&list, &people), None);
+        let mut updates = vec![stream(NeedBasis::Model, "updates", true)];
+        updates.extend(wait.clone());
+        assert_eq!(waits(&updates, &people), None);
+        // No stream answer accepted: a wait.
+        assert!(waits(&wait, &people).is_some());
+        // A rule the member taught saying "never": nothing.
+        let mut never = wait.to_vec();
+        never.push(answer(SURFACE, NeedBasis::Taught, json!("never"), true));
+        assert_eq!(waits(&never, &people), None);
+    }
+
+    #[test]
+    fn once_measured_an_accepted_move_takes_away_the_models_reply() {
+        let people = joao_to_ana();
+        // The policy accepts `next_move` (acted) and the model's reply.
+        let answers = [
+            stream(NeedBasis::Model, "primary", true),
+            answer(triage::NEEDS_REPLY, NeedBasis::Model, json!(true), true),
+            answer(triage::ASKS_ACTION, NeedBasis::Model, json!(true), true),
+            next_move("someone_else", 0.95, true),
+            awaited(&people, "p1"),
+        ];
+        let need = waits(&answers, &people).unwrap();
+        assert_eq!(
+            (need.reason, need.trust),
+            (NeedReason::Waiting, NeedTrust::Sure)
+        );
+        // Not measured (not acted): the reply is raised as before.
+        let mut unmeasured = answers.to_vec();
+        unmeasured[3].acted = false;
+        assert_eq!(
+            waits(&unmeasured, &people).unwrap().reason,
+            NeedReason::Reply
+        );
+        // Accepted "nobody": no reply, no wait either.
+        let mut nobody = answers.to_vec();
+        nobody[3] = next_move("nobody", 0.95, true);
+        assert_eq!(waits(&nobody, &people), None);
+        // A taught rule's ask still stands.
+        let mut taught = answers.to_vec();
+        taught.push(answer(
+            triage::NEEDS_REPLY,
+            NeedBasis::Taught,
+            json!(true),
+            true,
+        ));
+        assert_eq!(waits(&taught, &people).unwrap().reason, NeedReason::Reply);
+        // The shipped policy never accepts it.
+        assert_eq!(
+            Policy::baseline().switch(moves::question::NEXT_MOVE, Source::Model),
+            super::super::policy::Switch::Record
+        );
+    }
+
+    fn wait_on_ana(sent: DateTime<Utc>) -> (Need, Since) {
+        let mut need = model(NeedReason::Waiting, NeedQuestion::NextMove);
+        need.trust = NeedTrust::Check;
+        need.awaited = Some(Awaited {
+            name: "Ana Costa".into(),
+            address: "ana@studio.example".into(),
+        });
+        let since = Since {
+            sent_at: Some(sent),
+            ..Since::default()
+        };
+        (need, since)
+    }
+
+    fn open(settled: Settled) -> Need {
+        match settled {
+            Settled::Open(need) => need,
+            Settled::Cleared(need, cause) => panic!("cleared as {cause:?}: {need:?}"),
+        }
+    }
+
+    #[test]
+    fn a_wait_becomes_a_nudge_at_its_time_and_is_never_dropped() {
+        let clock = clock();
+        // Sent an hour ago: waiting, nudged three working days later.
+        let sent = clock.now - TimeDelta::hours(1);
+        let (need, since) = wait_on_ana(sent);
+        let waiting = open(settle(need.clone(), since, clock));
+        assert_eq!(waiting.reason, NeedReason::Waiting);
+        assert_eq!(waiting.nudge_at, Some(after_working_days(sent, 3)));
+        assert_eq!(waiting.due_on, waiting.nudge_at.map(|at| at.date_naive()));
+        assert_eq!(
+            next_wake(&Settled::Open(waiting.clone()), Some(sent), clock),
+            waiting.nudge_at
+        );
+        // Long ago: a Nudge, however old, and nothing more to wake for.
+        let old = clock.now - TimeDelta::days(40);
+        let (need, since) = wait_on_ana(old);
+        let nudge = open(settle(need, since, clock));
+        assert_eq!(nudge.reason, NeedReason::Nudge);
+        assert_eq!(next_wake(&Settled::Open(nudge), Some(old), clock), None);
+    }
+
+    #[test]
+    fn archiving_leaves_a_wait_and_hearing_back_ends_it() {
+        let clock = clock();
+        let (wait, since) = wait_on_ana(clock.now - TimeDelta::days(1));
+        let archived = Since {
+            archived: true,
+            replied: true,
+            ..since
+        };
+        assert_eq!(
+            open(settle(wait.clone(), archived, clock)).reason,
+            NeedReason::Waiting
+        );
+        let heard = Since {
+            heard_back: true,
+            ..since
+        };
+        assert_eq!(
+            cause(&settle(wait.clone(), heard, clock)),
+            Some(ClearCause::HeardBack)
+        );
+        // Heard back says nothing to anything but a wait.
+        assert_eq!(cause(&settle(need(NeedReason::Reply), heard, clock)), None);
+        // Trash wins; Heard from them is Done; Not waiting is Not needed.
+        let trashed = Since {
+            trashed: true,
+            ..since
+        };
+        assert_eq!(
+            cause(&settle(wait.clone(), trashed, clock)),
+            Some(ClearCause::Trashed)
+        );
+        for (verdict, cleared) in [
+            (NeedVerdict::Done, ClearCause::Done),
+            (NeedVerdict::NotNeeded, ClearCause::NotNeeded),
+        ] {
+            let judged = Since {
+                verdict: Some(verdict),
+                ..since
+            };
+            assert_eq!(cause(&settle(wait.clone(), judged, clock)), Some(cleared));
+        }
+        // Yes, still waiting: a wait Campbooks stands behind.
+        let confirmed = Since {
+            verdict: Some(NeedVerdict::Confirmed),
+            ..since
+        };
+        let kept = open(settle(wait, confirmed, clock));
+        assert_eq!(
+            (kept.reason, kept.trust, kept.basis),
+            (NeedReason::Waiting, NeedTrust::Sure, NeedBasis::Member)
+        );
+    }
+
+    #[test]
+    fn writing_to_them_arms_the_wait_again() {
+        let clock = clock();
+        // Nudge time long past, then the member wrote to Ana an hour ago.
+        let (wait, since) = wait_on_ana(clock.now - TimeDelta::days(20));
+        let last = clock.now - TimeDelta::hours(1);
+        let nudged = Since {
+            sends: Some(Sends { last, count: 1 }),
+            ..since
+        };
+        let again = open(settle(wait.clone(), nudged, clock));
+        assert_eq!(again.reason, NeedReason::Waiting);
+        assert_eq!(again.nudges, 1);
+        assert_eq!(again.nudge_at, Some(after_working_days(last, 3)));
+        // A date read for Ana counts only until the member writes.
+        let mut dated = wait;
+        dated.due_on = Some(clock.now.date_naive() + TimeDelta::days(30));
+        let armed = dated.clone().armed(clock.now, None, 3);
+        assert_eq!(armed.nudge_at, Some(nudge_time(clock.now, dated.due_on, 3)));
+        let rearmed = dated.armed(clock.now, Some(Sends { last, count: 2 }), 3);
+        assert_eq!(rearmed.nudge_at, Some(after_working_days(last, 3)));
+        assert_eq!(rearmed.nudges, 2);
+        // Anything but a wait is not armed.
+        let reply = need(NeedReason::Reply).armed(clock.now, None, 3);
+        assert_eq!((reply.nudge_at, reply.due_on), (None, None));
     }
 }

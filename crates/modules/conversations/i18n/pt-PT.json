@@ -24,6 +24,7 @@
     "invalid_view": "Peça as conversas arquivadas só com view=archive: archived=true não se combina com outra vista.",
     "no_open_need": "Já nada aqui precisa de si.",
     "not_a_payment": "Isto não é um pagamento a fazer.",
+    "not_waiting": "Já não está à espera de ninguém nesta conversa, por isso não há a quem insistir.",
     "nothing_to_reopen": "Não há nada para recuperar aqui.",
     "need_changed": "Isto mudou enquanto estava a ver. Volte a ver.",
     "invalid_rule": "Não é possível guardar esta regra. Precisa de uma a quatro condições que digam a que mensagens se aplica, e de uma a quatro ações de tipos diferentes.",

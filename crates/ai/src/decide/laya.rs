@@ -154,9 +154,9 @@ impl Response {
     }
 
     /// Match every question to its answer. A missing or malformed answer
-    /// fails the call, except to a catalogue question
-    /// ([`is_catalogue`](super::signals::actions::question::is_catalogue)),
-    /// which is then unanswered (`None`).
+    /// fails the call, except to a catalogue or a move question
+    /// ([`is_tolerant`](super::signals::is_tolerant)), which is then
+    /// unanswered (`None`).
     pub fn into_raw(mut self, questions: &[Question]) -> Result<Vec<Option<RawAnswer>>, Error> {
         questions
             .iter()
@@ -175,9 +175,9 @@ impl Response {
                     });
                 match raw {
                     Ok(raw) => Ok(Some(raw)),
-                    Err(error) if super::signals::actions::question::is_catalogue(&q.id) => {
+                    Err(error) if super::signals::is_tolerant(&q.id) => {
                         // The error names the question only, never the mail.
-                        tracing::debug!(question = %q.id, %error, "catalogue answer dropped");
+                        tracing::debug!(question = %q.id, %error, "tolerated answer dropped");
                         Ok(None)
                     }
                     Err(error) => Err(error),
@@ -411,5 +411,30 @@ mod tests {
             raw[3..].iter().all(Option::is_none),
             "no rating, no failure"
         );
+    }
+
+    #[test]
+    fn a_move_answer_that_does_not_fit_is_nothing_to_record_and_fails_nothing() {
+        use crate::decide::signals::moves;
+        let mut qs = questions();
+        qs.push(moves::next_move_question());
+        qs.push(Question::choice(
+            moves::question::AWAITED,
+            "Who?",
+            [("p1", "Ana"), ("none", "Nobody")],
+        ));
+        // `next_move` missing, `awaited` outside its options.
+        let response: Response = serde_json::from_value(json!({
+            "answers": {
+                "category": {"choice": "alpha", "probabilities": {"zeta": 0.3, "alpha": 0.7}},
+                "urgency": {"score": 1.0, "probabilities": {"0": 0.2, "1": 0.6, "2": 0.2}},
+                "asks_user": {"noul": 0.8},
+                "awaited": {"choice": "p9", "probabilities": {"p1": 0.5, "none": 0.5}}
+            }
+        }))
+        .unwrap();
+        let raw = response.into_raw(&qs).unwrap();
+        assert!(raw[..3].iter().all(Option::is_some), "triage as always");
+        assert!(raw[3..].iter().all(Option::is_none), "nothing to record");
     }
 }

@@ -22,9 +22,13 @@
           "required": ["reason", "trust", "urgent"],
           "additionalProperties": false,
           "properties": {
-            "reason": { "enum": ["reply", "do", "pay", "review", "worth_a_look"] },
+            "reason": { "enum": ["reply", "do", "pay", "review", "worth_a_look", "waiting", "nudge"] },
             "trust": { "enum": ["sure", "check"] },
-            "due_on": { "type": "string", "format": "date" },
+            "due_on": {
+              "description": "When it is due. For a waiting or nudge need, the day Scout nudges the person waited on (who is never named here).",
+              "type": "string",
+              "format": "date"
+            },
             "lapses_at": {
               "description": "When what the need asks stops being possible (a link or a code expiring, an offer closing), as Scout read the email. Absent from events written before it existed, and never on a pay need or a warning.",
               "type": "string",
@@ -45,7 +49,8 @@
         "superseded",
         "rule",
         "opened",
-        "lapsed"
+        "lapsed",
+        "heard_back"
       ]
     },
     "cleared_by": { "$ref": "#/$defs/uuid" },

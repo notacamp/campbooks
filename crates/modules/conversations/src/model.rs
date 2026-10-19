@@ -83,6 +83,9 @@ pub enum DraftKind {
     ReplyAll,
     /// A forward, with the message's attachments.
     Forward,
+    /// A nudge: a reply all of a waiting need's message to the person
+    /// waited on, everyone else copied (campbooks-cloud#293).
+    Nudge,
 }
 
 impl DraftKind {
@@ -93,6 +96,7 @@ impl DraftKind {
             Self::Reply => "reply",
             Self::ReplyAll => "reply_all",
             Self::Forward => "forward",
+            Self::Nudge => "nudge",
         }
     }
 }
@@ -106,6 +110,7 @@ impl FromStr for DraftKind {
             "reply" => Ok(Self::Reply),
             "reply_all" => Ok(Self::ReplyAll),
             "forward" => Ok(Self::Forward),
+            "nudge" => Ok(Self::Nudge),
             other => Err(Error::internal(format!("unknown draft kind `{other}`"))),
         }
     }
@@ -438,6 +443,12 @@ vocabulary!(
         /// A rule the member taught keeps this in front of them until they
         /// have opened it once (campbooks-cloud#274).
         WorthALook => "worth_a_look",
+        /// Someone else has the next move: the member waits on them
+        /// (campbooks-cloud#293). Shown nowhere in the queue.
+        Waiting => "waiting",
+        /// The wait passed its nudge time and nobody wrote: time to nudge
+        /// them (campbooks-cloud#293).
+        Nudge => "nudge",
     }
 );
 
@@ -486,6 +497,9 @@ vocabulary!(
         /// A `reply` need whose message left the needs window with no date:
         /// "Still needs a reply?" (campbooks-cloud#275).
         StillNeedsReply => "still_needs_reply",
+        /// `next_move`: someone other than the recipient has the next move
+        /// (a `waiting` or `nudge` need, campbooks-cloud#293).
+        NextMove => "next_move",
     }
 );
 
@@ -534,6 +548,8 @@ vocabulary!(
         /// What it asks stopped being possible (a link or a code expired,
         /// an offer closed), as Scout read the email (campbooks-cloud#275).
         Lapsed => "lapsed",
+        /// The person waited on wrote to the inbox (campbooks-cloud#293).
+        HeardBack => "heard_back",
     }
 );
 
@@ -684,6 +700,7 @@ mod tests {
             DraftKind::Reply,
             DraftKind::ReplyAll,
             DraftKind::Forward,
+            DraftKind::Nudge,
         ] {
             assert_eq!(kind.as_str().parse::<DraftKind>().unwrap(), kind);
         }

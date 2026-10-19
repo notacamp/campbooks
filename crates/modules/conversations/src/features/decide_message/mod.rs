@@ -23,6 +23,10 @@
 //! are added. A backlog pass waits while the answers check has not
 //! run or the provider did not answer it (about a day at most); when the
 //! check failed on the model's answers, the backfill queues nothing.
+//! With the catalogue on, a backlog message whose triage answers are all on
+//! record but which has no `next_move` answer (mail stored before whose
+//! move it is was asked, campbooks-cloud#293) is asked only the move
+//! questions: its other questions are not asked again.
 //!
 //! Every pass's call counts against the workspace's daily AI limit
 //! (`campbooks_ai::usage`, campbooks-cloud#152). Over the limit the pass
@@ -41,6 +45,7 @@ use campbooks_ai::{
         signals::{
             actions::{action_questions, likelihoods},
             email::{Attachment, Envelope, Recipient, triage_questions},
+            moves::{move_questions, next_move_question},
         },
         strategy::Strategy,
     },
@@ -156,14 +161,27 @@ struct Pass {
 
 impl Pass {
     /// The questions asked about `envelope`: the triage questions, then,
-    /// with the catalogue on, its own (each in a slot of its own). With it
-    /// off, exactly the triage questions.
+    /// with the catalogue on, whose move it is ([`Self::moves`]) and the
+    /// catalogue's own (each in a slot of its own). With it off, exactly the
+    /// triage questions.
     fn asked(&self, triage: &[Question], envelope: &Envelope) -> Vec<Question> {
         let mut asked = triage.to_vec();
         if self.actions.enabled {
+            asked.extend(move_questions(envelope));
             asked.extend(action_questions(envelope));
         }
         asked
+    }
+
+    /// The questions about whose move it is that `asked` adds to triage: the
+    /// ones recorded with the triage answers (same switch as the catalogue,
+    /// campbooks-cloud#293). None with it off.
+    fn moves(&self, envelope: &Envelope) -> Vec<Question> {
+        if self.actions.enabled {
+            move_questions(envelope)
+        } else {
+            Vec::new()
+        }
     }
 
     /// The envelope the catalogue's facts read: its attachments are the
@@ -217,6 +235,7 @@ impl Pass {
     /// Ask the model about `message` and store its answers: sort the
     /// conversation when its stream answer is accepted and the message is
     /// its first inbound one, then refresh its need.
+    #[allow(clippy::too_many_lines)]
     async fn run(
         &self,
         ctx: &mut JobContext,
@@ -232,8 +251,20 @@ impl Pass {
             return Ok(Passed::NotTrusted);
         }
         let questions = triage_questions();
-        let Some(loaded) = load(ctx, workspace, message, &questions, answered).await? else {
-            return Ok(Passed::Done);
+        // Every triage answer on record (the backlog): with the catalogue
+        // on, only whose move it is may still be missing.
+        let mut moves_only = false;
+        let loaded = match load(ctx, workspace, message, &questions, answered).await? {
+            Some(loaded) => loaded,
+            None if answered == Answered::Every && self.actions.enabled => {
+                let moves = [next_move_question()];
+                let Some(loaded) = load(ctx, workspace, message, &moves, answered).await? else {
+                    return Ok(Passed::Done);
+                };
+                moves_only = true;
+                loaded
+            }
+            None => return Ok(Passed::Done),
         };
         if loaded.sent_at < Utc::now() - self.backfill {
             return Ok(Passed::Done);
@@ -241,10 +272,17 @@ impl Pass {
 
         // Counted against the workspace's daily AI limit (campbooks-cloud#152).
         let usage = Scope::workspace(ctx.state().db.clone(), workspace, PURPOSE);
-        let facts = self
-            .facts(ctx, workspace, message, &loaded.envelope)
-            .await?;
-        let all = self.asked(&questions, &facts);
+        let facts = if moves_only {
+            Cow::Borrowed(&loaded.envelope)
+        } else {
+            self.facts(ctx, workspace, message, &loaded.envelope)
+                .await?
+        };
+        let all = if moves_only {
+            move_questions(&facts)
+        } else {
+            self.asked(&questions, &facts)
+        };
         let asked = model.strategy.decide(&loaded.envelope, &all);
         let mut answers = match usage.run(asked).await {
             Ok(decisions) => decisions.answers,
@@ -260,16 +298,30 @@ impl Pass {
             }
             Err(error) => return Err(redact::ai(&error)),
         };
-        // The catalogue's answers are rated, never stored as decisions:
-        // the triage answers are recorded exactly as without it.
-        let rated = self.rate(&facts, &answers);
-        answers.truncate(questions.len());
+        // The catalogue's answers are rated, never stored as decisions: the
+        // triage answers are recorded exactly as without it. The move
+        // answers (asked right after them) are recorded with them, and only
+        // recorded: the policy has no switch for them, so none acts.
+        let (rated, recorded_questions) = if moves_only {
+            (None, all.clone())
+        } else {
+            let moves = self.moves(&facts);
+            (
+                self.rate(&facts, &answers),
+                questions
+                    .iter()
+                    .chain(&moves)
+                    .cloned()
+                    .collect::<Vec<Question>>(),
+            )
+        };
+        answers.truncate(recorded_questions.len());
         let recorded = Recorded {
             message,
             conversation: loaded.conversation,
             source: Source::Model,
             strategy: model.strategy.name(),
-            questions: &questions,
+            questions: &recorded_questions,
             answers: &answers,
             policy: &self.policy,
         };

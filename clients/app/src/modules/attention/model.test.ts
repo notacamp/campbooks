@@ -49,6 +49,34 @@ describe("attention model", () => {
     expect(signalOf("pay")).toBe("pay");
   });
 
+  it("puts Nudge after Pay and before Worth a look, and never lists a wait", () => {
+    const groups = groupByReason([
+      item("a", "worth_a_look"),
+      item("b", "nudge"),
+      item("c", "waiting"),
+      item("d", "pay"),
+    ]);
+    expect(groups.map((g) => g.reason)).toEqual(["pay", "nudge", "worth_a_look"]);
+    expect(signalOf("nudge")).toBe("nudge");
+    expect(signalOf("waiting")).toBe("nudge");
+  });
+
+  it("offers a nudge its own actions, whatever the catalogue rated", () => {
+    expect(rowActionIds("nudge")).toEqual({
+      own: ["nudge"],
+      universal: ["done", "snooze", "not_needed"],
+    });
+    const choices = rowChoices("nudge", [{ actions: ["reply"], likelihood: 90 }]);
+    expect(choices.own.map((c) => c.id)).toEqual(["nudge"]);
+    expect(choices.picked).toBe(false);
+  });
+
+  it("says when the person Scout waited on wrote back", () => {
+    expect(
+      doneTodayKind(item("a", "waiting", { state: "cleared", cleared_because: "heard_back" })),
+    ).toEqual({ key: "doneToday.heardBack", undo: undefined });
+  });
+
   it("offers later today only while it is worth it, and next week", () => {
     // Tuesday 13 October 2026, 09:00 local.
     const morning = new Date(2026, 9, 13, 9, 0);
@@ -225,6 +253,13 @@ describe("ageLabel", () => {
   it("says minutes, then hours, the same day", () => {
     expect(ageLabel(at(2026, 9, 16, 14, 48), now, "en-GB").text).toBe("12 minutes ago");
     expect(ageLabel(at(2026, 9, 16, 9, 30), now, "en-GB").text).toBe("5 hours ago");
+  });
+
+  it("names the day when asked for a date, whatever the age", () => {
+    expect(ageLabel(at(2026, 9, 14, 10, 2), now, "en-GB", { asDate: true }).text).toBe("14 Oct");
+    expect(ageLabel(at(2025, 11, 30, 10, 2), now, "en-GB", { asDate: true }).text).toBe(
+      "30 Dec 2025",
+    );
   });
 
   it("says now for what just arrived, even from a clock ahead", () => {

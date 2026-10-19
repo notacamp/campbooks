@@ -19,10 +19,7 @@ use serde_json::{Map, Value, json};
 
 use crate::{
     Error,
-    decide::{
-        AnswerValue, DecisionState, Question, QuestionKind, RawAnswer,
-        signals::actions::question::is_catalogue,
-    },
+    decide::{AnswerValue, DecisionState, Question, QuestionKind, RawAnswer, signals::is_tolerant},
     gateway::Message,
 };
 
@@ -188,13 +185,14 @@ impl Response {
                         Error::InvalidResponse(format!("no answer for question `{}`", q.id))
                     })
                     .and_then(|value| parse_value(q, value));
-                // A catalogue question's missing or unfitting answer is no
-                // rating; any other fails the call, as it always has.
+                // A catalogue or move question's missing or unfitting answer
+                // is nothing to record; any other fails the call, as it
+                // always has.
                 let value = match value {
                     Ok(value) => value,
-                    Err(error) if is_catalogue(&q.id) => {
+                    Err(error) if is_tolerant(&q.id) => {
                         // The error names the question only, never the mail.
-                        tracing::debug!(question = %q.id, %error, "catalogue answer dropped");
+                        tracing::debug!(question = %q.id, %error, "tolerated answer dropped");
                         return Ok(None);
                     }
                     Err(error) => return Err(error),
@@ -698,6 +696,43 @@ mod tests {
         );
         assert!(
             response(r#"{"action_remind": true, "action_forward": true}"#)
+                .into_raw(&questions)
+                .is_err()
+        );
+    }
+
+    #[test]
+    fn a_move_answer_that_does_not_fit_is_nothing_to_record_and_fails_nothing() {
+        use crate::decide::signals::moves;
+        let questions = [
+            Question::noul("needs_reply", "?"),
+            moves::next_move_question(),
+            Question::choice(
+                moves::question::AWAITED,
+                "?",
+                [("p1", "Ana"), ("none", "-")],
+            ),
+        ];
+        let response = |content: &str| -> Response {
+            serde_json::from_value(json!({"choices": [{"message": {"content": content}}]})).unwrap()
+        };
+        // `next_move` missing, `awaited` outside its options.
+        let raw = response(r#"{"needs_reply": true, "awaited": "p7"}"#)
+            .into_raw(&questions)
+            .unwrap();
+        assert_eq!(
+            raw[0].as_ref().map(|r| &r.value),
+            Some(&AnswerValue::Noul(true))
+        );
+        assert!(raw[1].is_none() && raw[2].is_none());
+        // A fitting answer is kept, and a triage answer that does not fit
+        // still fails the call.
+        let kept = response(r#"{"needs_reply": true, "next_move": "sender", "awaited": "none"}"#)
+            .into_raw(&questions)
+            .unwrap();
+        assert!(kept.iter().all(Option::is_some));
+        assert!(
+            response(r#"{"needs_reply": "maybe", "next_move": "sender"}"#)
                 .into_raw(&questions)
                 .is_err()
         );

@@ -270,7 +270,8 @@
       "reply": "Responder a {{name}}",
       "reply_all": "Responder a todos",
       "forward": "Reenviar",
-      "new": "Mensaje nuevo"
+      "new": "Mensaje nuevo",
+      "nudge": "Recordar a {{name}}"
     },
     "newMessage": "Mensaje nuevo",
     "noInbox": "Conecta un buzón para enviar desde él.",
@@ -334,7 +335,10 @@
       "stillReply": "{{name}} escribió {{ago}}. ¿Sigue necesitando respuesta?",
       "taughtReply": "{{name}}: responder, por una regla",
       "taughtDo": "{{name}}: por hacer, por una regla",
-      "worthALook": "Pediste ver los correos de {{name}}"
+      "worthALook": "Pediste ver los correos de {{name}}",
+      "waiting": "Scout está esperando a {{name}}",
+      "nudge": "{{name}} aún no ha escrito",
+      "nudgeSender": "Aún sin noticias de {{name}}"
     },
     "chip": {
       "reply": "Necesita respuesta",
@@ -344,7 +348,9 @@
       "suspicious": "Parece sospechoso",
       "check": "Confirmar",
       "expired": "Caducado",
-      "worth_a_look": "Merece un vistazo"
+      "worth_a_look": "Merece un vistazo",
+      "waiting": "Esperando a {{name}}",
+      "nudge": "Recordar"
     },
     "due": {
       "today": "Vence hoy",
@@ -388,7 +394,9 @@
       "markPaid": "Marcar como pagada",
       "billPrompt": "Campbooks no tiene acceso a tu banco.",
       "report": "Denunciar y eliminar",
-      "seen": "Visto"
+      "seen": "Visto",
+      "heardBack": "Ya hay noticias",
+      "notWaiting": "No estoy esperando"
     },
     "toast": {
       "done": "Hecho · {{name}}",
@@ -404,7 +412,9 @@
       "allPaid_other": "{{count}} facturas marcadas como pagadas",
       "allPaidFailed_one": "No se ha podido marcar {{count}} factura como pagada. Inténtalo de nuevo.",
       "allPaidFailed_other": "No se han podido marcar {{count}} facturas como pagadas. Inténtalo de nuevo.",
-      "reported": "Denunciado · {{name}}. Está en spam"
+      "reported": "Denunciado · {{name}}. Está en spam",
+      "heardBack": "Noticias de {{name}} · Scout ha dejado de esperar",
+      "notWaiting": "Ya no esperas a {{name}}"
     },
     "summary": {
       "heading": "Resumen de Scout"
@@ -842,6 +852,23 @@
       "remove": "Quitar",
       "removeLabel": "Quitar lo que Scout sabe de {{name}}",
       "saved": "Guardado"
+    }
+  },
+  "nudge": {
+    "title": "Recordar a {{name}}",
+    "writing": "Scout está redactando un recordatorio breve…",
+    "description": "En la misma conversación, para que {{name}} sepa de qué se trata. No se envía nada hasta que pulses Enviar.",
+    "unavailable": "Scout no puede escribir aquí, así que escribe tú este recordatorio.",
+    "draftLabel": "Tu recordatorio",
+    "to": "Para",
+    "copying": "Con copia a",
+    "sent": "Recordatorio enviado a {{name}}",
+    "undone": "No se ha enviado. Tu recordatorio ha vuelto.",
+    "tooLate": "Es tarde para deshacer: el recordatorio ya ha salido.",
+    "errors": {
+      "notWaiting": "{{name}} ya ha respondido, así que no hay nada que recordar.",
+      "addressed": "Este recordatorio va ahora a personas distintas de las indicadas. Revisa a quién va y vuelve a enviarlo.",
+      "ownAddress": "Esto espera a tu propia dirección, así que no hay nadie a quien recordar."
     }
   }
 }

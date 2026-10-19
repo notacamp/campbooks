@@ -3,6 +3,11 @@
 //! forward the server fills the recipients, the subject, the threading
 //! headers and (forward) the attachments; the caller may give any field to
 //! use instead. The quoted history is the client's to write.
+//!
+//! A nudge (campbooks-cloud#293) is a reply all of the message a waiting
+//! need comes from, to the person waited on, everyone else reply all would
+//! address copied, the inbox's own address in neither; only while the
+//! conversation waits on someone (else 409 `not_waiting`).
 
 use axum::{Json, extract::State, http::StatusCode};
 use campbooks_kernel::{
@@ -83,6 +88,8 @@ pub struct NewDraft {
             body = Problem, content_type = "application/problem+json"),
         (status = NOT_FOUND, description = "No such inbox or message, or you cannot see it.",
             body = Problem, content_type = "application/problem+json"),
+        (status = CONFLICT, description = "A nudge for a conversation that waits on nobody (`not_waiting`).",
+            body = Problem, content_type = "application/problem+json"),
     )
 )]
 pub async fn handler(
@@ -103,6 +110,12 @@ pub async fn handler(
             }
             Filled::new(inbox)
         }
+        DraftKind::Nudge => {
+            let message = body
+                .message_id
+                .ok_or_else(|| Error::BadRequest(crate::MESSAGES.reason("draft_needs_message")))?;
+            nudge(&mut tx, access, message).await?
+        }
         kind => {
             let message = body
                 .message_id
@@ -119,11 +132,15 @@ pub async fn handler(
     )
     .await?;
 
-    let [to, cc, bcc] = tidy([
-        body.to.unwrap_or(filled.to),
-        body.cc.unwrap_or(filled.cc),
-        body.bcc.unwrap_or_default(),
-    ]);
+    // A nudge goes where the server addresses it, whatever the client sent:
+    // the member changes recipients in the composer afterwards, as with any
+    // draft.
+    let (to, cc) = if body.kind == DraftKind::Nudge {
+        (filled.to, filled.cc)
+    } else {
+        (body.to.unwrap_or(filled.to), body.cc.unwrap_or(filled.cc))
+    };
+    let [to, cc, bcc] = tidy([to, cc, body.bcc.unwrap_or_default()]);
     let subject = body.subject.unwrap_or(filled.subject);
     let text = body.body.unwrap_or_default();
     let quoted = body.quoted.unwrap_or_default();
@@ -263,7 +280,7 @@ async fn fill(
             cc.retain(|a| !ours(a));
             (to, cc)
         }
-        DraftKind::Forward | DraftKind::New => (Vec::new(), Vec::new()),
+        DraftKind::Forward | DraftKind::New | DraftKind::Nudge => (Vec::new(), Vec::new()),
     };
     let mut references = row.reference_ids;
     if let Some(id) = &row.rfc_message_id {
@@ -288,6 +305,59 @@ async fn fill(
         thread_key: row.thread_key,
         attachments,
     })
+}
+
+/// The open wait of a conversation: its message, and the person's address
+/// and name.
+const WAIT: &str = "SELECT message_id, awaited_address, awaited_name FROM conversations.needs \
+      WHERE conversation_id = $1 AND state = 'open' AND reason IN ('waiting', 'nudge') \
+        AND awaited_address IS NOT NULL";
+
+/// Fill a nudge from `message`'s conversation (campbooks-cloud#293): a reply
+/// all of its waiting need's message, the person waited on in `To` and
+/// everyone else reply all would address in `Cc`. 404 when the caller cannot
+/// see `message`, 409 `not_waiting` when the conversation waits on nobody.
+async fn nudge(
+    conn: &mut sqlx::PgConnection,
+    access: &campbooks_kernel::tenancy::Access,
+    message: MessageId,
+) -> Result<Filled> {
+    let seen = fill(conn, access, DraftKind::ReplyAll, message).await?;
+    let wait: Option<(MessageId, String, Option<String>)> = sqlx::query_as(WAIT)
+        .bind(seen.conversation)
+        .fetch_optional(&mut *conn)
+        .await?;
+    let (waited, address, name) =
+        wait.ok_or_else(|| Error::Conflict(crate::MESSAGES.reason("not_waiting")))?;
+    let mut filled = if waited == message {
+        seen
+    } else {
+        fill(conn, access, DraftKind::ReplyAll, waited).await?
+    };
+    // Never a nudge to the inbox itself (mail it sent itself, filed as
+    // received): nothing to wait for.
+    let inbox: String =
+        sqlx::query_scalar("SELECT address FROM conversations.inboxes WHERE id = $1")
+            .bind(filled.inbox)
+            .fetch_one(&mut *conn)
+            .await?;
+    if address.trim().eq_ignore_ascii_case(inbox.trim()) {
+        return Err(Error::Conflict(crate::MESSAGES.reason("not_waiting")));
+    }
+    let awaited = Address {
+        name: name.filter(|n| !n.trim().is_empty()),
+        address,
+    };
+    let mut cc: Vec<Address> = std::mem::take(&mut filled.to);
+    cc.append(&mut filled.cc);
+    cc.retain(|a| {
+        !a.address
+            .trim()
+            .eq_ignore_ascii_case(awaited.address.trim())
+    });
+    filled.to = vec![awaited];
+    filled.cc = cc;
+    Ok(filled)
 }
 
 /// The attachments of `message` a forward carries (not the inline ones).

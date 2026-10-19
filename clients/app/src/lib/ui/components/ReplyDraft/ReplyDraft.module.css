@@ -11,6 +11,7 @@
 .quoteFrom {
   font-size: var(--text-xs);
   color: var(--text-tertiary);
+  unicode-bidi: isolate;
 }
 
 .quoteText {

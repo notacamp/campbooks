@@ -322,3 +322,123 @@ export const PHISH_DETAIL: Detail = {
     },
   ],
 };
+
+/**
+ * Waits (campbooks-cloud#293). João Matos asked Ana Costa, copying Sam, to
+ * send Sam the revised floor plan on Wednesday 7 October; Ana hasn't written
+ * since, so on Tuesday it is time to nudge. Not among NEEDS.
+ */
+export const ANA = conversation({
+  n: 20,
+  subject: "Revised floor plan",
+  from: { name: "João Matos", address: "joao@obras-matos.example" },
+  sent: "2026-10-07T10:02:00Z",
+  need: {
+    reason: "nudge",
+    trust: "sure",
+    question: "next_move",
+    rule: "model.decide",
+    due_on: "2026-10-12",
+    waiting_on: { name: "Ana Costa", address: "ana@costa-arquitetos.example" },
+    nudges: 0,
+    quote: "Ana, could you send Sam the revised floor plan directly, before Thursday’s visit?",
+  },
+});
+
+export const ANA_ITEM: Item = item(ANA);
+
+/** João's email to Ana, as the reader (and the nudge dialog) reads it. */
+export const ANA_DETAIL: Detail = {
+  conversation: ANA,
+  messages: [
+    {
+      id: ANA.need?.message_id ?? "",
+      direction: "inbound",
+      from: { name: "João Matos", address: "joao@obras-matos.example" },
+      to: [{ name: "Ana Costa", address: "ana@costa-arquitetos.example" }],
+      cc: [{ name: "Sam Rivera", address: "sam.rivera@example.com" }],
+      reply_to: [],
+      subject: ANA.subject,
+      sent_at: ANA.last_message_at,
+      read: true,
+      starred: false,
+      text: {
+        content:
+          "Ana,\n\nCould you send Sam the revised floor plan directly, before Thursday’s visit?\n\nThanks,\nJoão",
+        truncated: false,
+      },
+      has_html: false,
+      attachments: [],
+    },
+  ],
+  decisions: [],
+  need_summary:
+    "João asked Ana Costa to send you the revised floor plan before Thursday’s visit. Nothing has come from Ana since.",
+};
+
+/** Rui Matos promised the signed contract by Friday: Scout checks then. */
+export const RUI = conversation({
+  n: 21,
+  subject: "Signed contract for the kitchen units",
+  from: { name: "Rui Matos", address: "rui@matos-carpintaria.example" },
+  sent: "2026-10-12T16:40:00Z",
+  need: {
+    reason: "waiting",
+    trust: "sure",
+    question: "next_move",
+    rule: "model.decide",
+    due_on: "2026-10-16",
+    waiting_on: { name: "Rui Matos", address: "rui@matos-carpintaria.example" },
+    nudges: 0,
+    quote: "I’ll send the signed contract by Friday 16 October.",
+  },
+});
+
+/** Rita Lopes asked Inês Cardoso for a quote; nudged once, Scout checks Monday. */
+export const INES = conversation({
+  n: 22,
+  subject: "Revised quote for the bathroom and the hall",
+  from: { name: "Rita Lopes", address: "rita@atelier-lume.example" },
+  sent: "2026-10-09T11:30:00Z",
+  need: {
+    reason: "waiting",
+    trust: "sure",
+    question: "next_move",
+    rule: "model.decide",
+    due_on: "2026-10-19",
+    waiting_on: { name: "Inês Cardoso", address: "ines@atelier-lume.example" },
+    nudges: 1,
+    quote: "Inês, can you send Sam the revised bathroom quote next week?",
+  },
+});
+
+/** Who Scout waits on, soonest check first, as `attention.list state=waiting` returns them. */
+export const WAITING: Item[] = [item(RUI), item(INES)];
+
+/** Rui's email, as the nudge dialog reads it. */
+export const RUI_DETAIL: Detail = {
+  conversation: RUI,
+  messages: [
+    {
+      id: RUI.need?.message_id ?? "",
+      direction: "inbound",
+      from: { name: "Rui Matos", address: "rui@matos-carpintaria.example" },
+      to: [{ name: "Sam Rivera", address: "sam.rivera@example.com" }],
+      cc: [],
+      reply_to: [],
+      subject: RUI.subject,
+      sent_at: RUI.last_message_at,
+      read: true,
+      starred: false,
+      text: {
+        content:
+          "Hi Sam,\n\nThanks for confirming the measurements. I’ll send the signed contract by Friday 16 October.\n\nRui",
+        truncated: false,
+      },
+      has_html: false,
+      attachments: [],
+    },
+  ],
+  decisions: [],
+  need_summary: null,
+};

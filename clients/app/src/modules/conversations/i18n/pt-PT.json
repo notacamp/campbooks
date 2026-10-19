@@ -270,7 +270,8 @@
       "reply": "Responder a {{name}}",
       "reply_all": "Responder a todos",
       "forward": "Reencaminhar",
-      "new": "Nova mensagem"
+      "new": "Nova mensagem",
+      "nudge": "Relembrar {{name}}"
     },
     "newMessage": "Nova mensagem",
     "noInbox": "Ligue uma caixa de correio para enviar a partir dela.",
@@ -334,7 +335,10 @@
       "stillReply": "{{name}} escreveu {{ago}}. Ainda precisa de resposta?",
       "taughtReply": "{{name}}: responder, por uma regra",
       "taughtDo": "{{name}}: a fazer, por uma regra",
-      "worthALook": "Pediu para ver os emails de {{name}}"
+      "worthALook": "Pediu para ver os emails de {{name}}",
+      "waiting": "O Scout está à espera de {{name}}",
+      "nudge": "{{name}} ainda não escreveu",
+      "nudgeSender": "Ainda sem notícias de {{name}}"
     },
     "chip": {
       "reply": "Precisa de resposta",
@@ -344,7 +348,9 @@
       "suspicious": "Parece suspeito",
       "check": "Confirmar",
       "expired": "Expirado",
-      "worth_a_look": "Vale a pena ver"
+      "worth_a_look": "Vale a pena ver",
+      "waiting": "À espera de {{name}}",
+      "nudge": "Relembrar"
     },
     "due": {
       "today": "Até hoje",
@@ -388,7 +394,9 @@
       "markPaid": "Marcar como paga",
       "billPrompt": "O Campbooks não tem acesso ao seu banco.",
       "report": "Denunciar e apagar",
-      "seen": "Visto"
+      "seen": "Visto",
+      "heardBack": "Já tive notícias",
+      "notWaiting": "Não estou à espera"
     },
     "toast": {
       "done": "Feito · {{name}}",
@@ -404,7 +412,9 @@
       "allPaid_other": "{{count}} faturas marcadas como pagas",
       "allPaidFailed_one": "Não foi possível marcar {{count}} fatura como paga. Tente de novo.",
       "allPaidFailed_other": "Não foi possível marcar {{count}} faturas como pagas. Tente de novo.",
-      "reported": "Denunciado · {{name}}. Está no spam"
+      "reported": "Denunciado · {{name}}. Está no spam",
+      "heardBack": "Teve notícias de {{name}} · o Scout deixou de esperar",
+      "notWaiting": "Deixou de esperar por {{name}}"
     },
     "summary": {
       "heading": "Resumo do Scout"
@@ -842,6 +852,23 @@
       "remove": "Remover",
       "removeLabel": "Remover o que o Scout sabe sobre {{name}}",
       "saved": "Guardado"
+    }
+  },
+  "nudge": {
+    "title": "Relembrar {{name}}",
+    "writing": "O Scout está a escrever um lembrete curto…",
+    "description": "Na mesma conversa, para que {{name}} saiba do que se trata. Nada é enviado até carregar em Enviar.",
+    "unavailable": "O Scout não pode escrever aqui, por isso escreva este lembrete.",
+    "draftLabel": "O seu lembrete",
+    "to": "Para",
+    "copying": "Com cópia para",
+    "sent": "Lembrete enviado a {{name}}",
+    "undone": "Não enviado. O seu lembrete voltou.",
+    "tooLate": "Já é tarde para anular: o lembrete já saiu.",
+    "errors": {
+      "notWaiting": "{{name}} já respondeu, por isso não há nada a relembrar.",
+      "addressed": "Este lembrete vai agora para pessoas diferentes das indicadas. Verifique para quem vai e envie de novo.",
+      "ownAddress": "Isto está à espera do seu próprio endereço, por isso não há ninguém a relembrar."
     }
   }
 }

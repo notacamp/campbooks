@@ -24,6 +24,7 @@
     "invalid_view": "Demandez les conversations archivées avec view=archive seul : archived=true ne se combine pas avec une autre vue.",
     "no_open_need": "Plus rien ici n’a besoin de vous.",
     "not_a_payment": "Ce n’est pas un paiement à faire.",
+    "not_waiting": "Vous n’attendez plus personne dans cette conversation : il n’y a personne à relancer.",
     "nothing_to_reopen": "Il n’y a rien à rétablir ici.",
     "need_changed": "Ceci a changé pendant que vous le regardiez. Jetez-y un nouveau coup d’œil.",
     "invalid_rule": "Impossible d’enregistrer cette règle. Il lui faut une à quatre conditions qui disent à quels e-mails elle s’applique, et une à quatre actions de types différents.",

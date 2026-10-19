@@ -236,3 +236,83 @@ async fn a_new_message_needs_an_inbox(db: PgPool) {
     let response = kit.post(&sam, &uri, Some(json!({"kind": "reply"}))).await;
     assert_eq!(response.json["code"], "draft_needs_message");
 }
+
+/// campbooks-cloud#293: a nudge is a reply all of the waiting need's
+/// message, to the person waited on, everyone else copied, the inbox in
+/// neither; only while the conversation waits on someone.
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_nudge_goes_to_the_person_waited_on_and_copies_the_rest(db: PgPool) {
+    use crate::testkit::{ANA, JOAO, SAM, joao_asks_ana, waiting_deps};
+
+    let kit = Kit::with_deps(db, waiting_deps()).await;
+    let (workspace, inbox, sam) = joao_asks_ana(&kit).await;
+    let uri = format!("/api/v1/w/{workspace}/drafts");
+    let message = kit.message_of("joao-1").await;
+    let created = kit
+        .post(
+            &sam,
+            &uri,
+            Some(json!({"kind": "nudge", "message_id": message})),
+        )
+        .await;
+    assert_eq!(created.status, StatusCode::CREATED, "{:?}", created.json);
+    let draft = &created.json;
+    assert_eq!(draft["kind"], "nudge");
+    assert_eq!(addresses(&draft["to"]), [ANA.1]);
+    assert_eq!(draft["to"][0]["name"], ANA.0);
+    assert_eq!(addresses(&draft["cc"]), [JOAO.1]);
+    // The inbox's own address is in neither list.
+    for list in ["to", "cc"] {
+        assert!(!addresses(&draft[list]).contains(&SAM.1), "{list}");
+    }
+    assert_eq!(draft["from"]["address"], SAM.1);
+    assert_eq!(draft["subject"], "Re: Floor plan");
+    assert_eq!(
+        draft["conversation_id"],
+        kit.conversation_of("joao-1").await
+    );
+    let (in_reply_to, thread_key): (Option<String>, Option<String>) =
+        sqlx::query_as("SELECT in_reply_to, thread_key FROM conversations.drafts")
+            .fetch_one(&kit.db)
+            .await
+            .unwrap();
+    assert_eq!(in_reply_to.as_deref(), Some("joao-1@studio.example"));
+    assert_eq!(thread_key.as_deref(), Some("thr-floor-plan"));
+
+    // A reader of the inbox may not start one.
+    let (reader_token, reader) = kit.member("reader", workspace);
+    kit.add_to_inbox(inbox, reader, InboxRole::Reader).await;
+    let refused = kit
+        .post(
+            &reader_token,
+            &uri,
+            Some(json!({"kind": "nudge", "message_id": message})),
+        )
+        .await;
+    assert_eq!(refused.status, StatusCode::FORBIDDEN, "{:?}", refused.json);
+
+    // Heard from them: nothing to wait for, no nudge, no draft.
+    let id = kit.conversation_of("joao-1").await;
+    let done = kit
+        .post(
+            &sam,
+            &format!("/api/v1/w/{workspace}/conversations/{id}/need/resolve"),
+            Some(json!({"outcome": "done", "message_id": message})),
+        )
+        .await;
+    assert_eq!(done.status, StatusCode::OK, "{:?}", done.json);
+    let conflict = kit
+        .post(
+            &sam,
+            &uri,
+            Some(json!({"kind": "nudge", "message_id": message})),
+        )
+        .await;
+    assert_eq!(conflict.status, StatusCode::CONFLICT, "{:?}", conflict.json);
+    assert_eq!(conflict.json["code"], "not_waiting");
+    let drafts: i64 = sqlx::query_scalar("SELECT count(*) FROM conversations.drafts")
+        .fetch_one(&kit.db)
+        .await
+        .unwrap();
+    assert_eq!(drafts, 1);
+}

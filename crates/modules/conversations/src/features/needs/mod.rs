@@ -15,6 +15,11 @@
 //! it as done and files nothing (yet); Still to pay keeps it as a need
 //! Campbooks stands behind, stored as a correction confirming the money
 //! answer. Both are only for a Pay need (409 `not_a_payment`).
+//!
+//! A wait on someone (campbooks-cloud#293) is resolved the same way: Done is
+//! "Heard from them" and files nothing; Not needed is "Not waiting", stored
+//! as a correction of the model's `next_move` answer (from what it said to
+//! [`NOT_WAITING`]).
 
 use axum::{Extension, Json, extract::State};
 use campbooks_ai::decide::signals::email::triage;
@@ -43,10 +48,17 @@ use crate::{
 
 #[cfg(test)]
 mod tests;
+#[cfg(test)]
+mod waiting_tests;
 
 /// What a correction of a Pay need's money answer says when the member
 /// marks it Not needed: no payment is owed (paid already, or no bill).
 pub const NOT_OWED: &str = "not_owed";
+
+/// What a correction of a wait's `next_move` answer says when the member
+/// marks it Not waiting: the model's choice was wrong (which option was
+/// right is the labeller's to say).
+pub const NOT_WAITING: &str = "not_waiting";
 
 /// How a member resolves a need.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
@@ -351,8 +363,24 @@ async fn judge(
     let earlier_correction = earlier.flatten().map(CorrectionId::from_uuid);
     // The money question is a choice: its answer behind a Pay need is
     // "owed"; "not owed" is what Not needed says of it.
+    // The move question is a choice too: its answer behind a wait is who
+    // had the move ("sender", "someone_else").
+    let moved: Option<String> = match need.decision {
+        Some(decision) if need.question == NeedQuestion::NextMove.as_str() => {
+            sqlx::query_scalar::<_, Option<String>>(
+                "SELECT value #>> '{}' FROM conversations.decisions WHERE id = $1",
+            )
+            .bind(decision)
+            .fetch_optional(&mut *tx)
+            .await?
+            .flatten()
+        }
+        _ => None,
+    };
     let (yes, no) = if need.question == NeedQuestion::Money.as_str() {
         (triage::OWED, NOT_OWED)
+    } else if let Some(moved) = moved.as_deref() {
+        (moved, NOT_WAITING)
     } else {
         ("true", "false")
     };
