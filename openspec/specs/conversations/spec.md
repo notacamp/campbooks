@@ -1795,7 +1795,12 @@ answered (their shown name, whether the inbox wrote to them before, and the
 counts of mail each way in the last year, each at most 100); and up to three
 of the same inbox's own sent messages to that person from other
 conversations within the last year (own words, at most 1.5 KiB each and
-4 KiB in all, with only their time and text). The instruction SHALL tell the
+4 KiB in all, with only their time and text), found by the person's address
+being exactly the address of a To or Cc recipient. The person's address SHALL
+be plain (one `@` with text on both sides, no quote, backslash, whitespace or
+control character), and a message answered that is in spam, flagged
+suspicious or under review, or failing its sender's checks SHALL get none of
+this about the person. The instruction SHALL tell the
 model to match its greeting, sign-off, form of address, length and warmth to
 how the member wrote to that person, and to use those messages only for how
 to write, never as facts. Mail of another inbox, the member's preferences
@@ -1832,6 +1837,10 @@ text.
 #### Scenario: Someone new
 - **WHEN** Sam asks for a reply to someone the inbox never wrote to
 - **THEN** the model is told Sam did not write to them before and receives no earlier messages, and follows how the other person writes
+
+#### Scenario: A message that fails its sender's checks gets no earlier mail
+- **WHEN** Sam asks for a reply to a message in spam, flagged suspicious, or whose sender failed its checks, or whose sender address is not plain
+- **THEN** the model receives the conversation and its length, and nothing about the person or Sam's earlier mail
 
 #### Scenario: Suggestions read only the thread
 - **WHEN** Sam asks for likely replies

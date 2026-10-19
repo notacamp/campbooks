@@ -1,0 +1,14 @@
+{
+  "conversation": { "subject": "Obra", "total_messages": 10, "messages": ["..."] },
+  "them": {
+    "name": "Marta Ferreira",
+    "i_wrote_to_them_before": true,
+    "from_them_last_year": 12,
+    "from_me_last_year": 9
+  },
+  "my_recent_messages_to_them": [
+    { "sent_at": "2026-09-09T09:12:00Z", "text": "Oi Marta, mensagem 2.\n\nAbraço,\nSam" },
+    { "sent_at": "2026-09-19T14:03:00Z", "text": "Oi Marta, mensagem 3.\n\nAbraço,\nSam" }
+  ],
+  "intent": "Say yes"
+}

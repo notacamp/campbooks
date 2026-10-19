@@ -397,6 +397,8 @@ struct Mail<'a> {
     other: (&'a str, &'a str),
     days_ago: i64,
     text: String,
+    /// The receiving provider's authentication results.
+    results: Option<&'a str>,
 }
 
 /// Store `mail` in `inbox`, whose address is `me`.
@@ -423,6 +425,7 @@ async fn store(kit: &Kit, workspace: WorkspaceId, inbox: InboxId, me: &str, mail
             "sent_at": sent_at,
             "direction": if mail.outbound { "outbound" } else { "inbound" },
             "text": mail.text,
+            "headers": {"authentication_results": mail.results},
             "mailbox": {"in_inbox": true},
             "read": true, "starred": false
         }}]}),
@@ -454,6 +457,7 @@ fn sent(
         other,
         days_ago,
         text: text.to_owned(),
+        results: None,
     }
 }
 
@@ -838,4 +842,202 @@ async fn the_length_of_a_long_conversation_is_counted(db: PgPool) {
         input["conversation"]["messages"].as_array().unwrap().len(),
         8
     );
+}
+
+/// Past mail to Marta that a forged sender could ask for.
+async fn marta_is_written_to(kit: &Kit, workspace: WorkspaceId, inbox: InboxId) {
+    for (n, days) in [(1, 20), (2, 10)] {
+        let id = format!("past-{n}");
+        let thread = format!("thr-past-{n}");
+        store(
+            kit,
+            workspace,
+            inbox,
+            "sam@example.com",
+            sent(&id, &thread, MARTA, days, "Private words to Marta"),
+        )
+        .await;
+    }
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_forged_sender_address_matches_nothing(db: PgPool) {
+    let server = MockServer::start().await;
+    answer_with(&server, &json!({"reply": "Hi"})).await;
+    let kit = kit_with_model(db, &server).await;
+    let (workspace, inbox, sam, _) = demo(&kit).await;
+    marta_is_written_to(&kit, workspace, inbox).await;
+    for (n, address) in [
+        "address",
+        "x\", \"address\": \"y@z.example",
+        "name",
+        "a@b@c.example",
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        store(
+            &kit,
+            workspace,
+            inbox,
+            "sam@example.com",
+            received(
+                &format!("evil-{n}"),
+                &format!("thr-evil-{n}"),
+                ("Mallory", address),
+                1,
+                "Hello",
+            ),
+        )
+        .await;
+        let id = kit.conversation_of(&format!("evil-{n}")).await;
+        write_reply(&kit, &sam, workspace, &id, None).await;
+    }
+    let asked = asked(&server).await;
+    assert_eq!(asked.len(), 4);
+    for (_, input) in asked {
+        assert!(input.get("them").is_none(), "{input}");
+        assert!(input.get("my_recent_messages_to_them").is_none());
+        assert!(!input.to_string().contains("Private words"));
+        assert_eq!(input["conversation"]["total_messages"], 1);
+    }
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_name_that_looks_like_the_address_is_not_the_address(db: PgPool) {
+    let server = MockServer::start().await;
+    answer_with(&server, &json!({"reply": "Hi"})).await;
+    let kit = kit_with_model(db, &server).await;
+    let (workspace, inbox, sam, _) = demo(&kit).await;
+    // Sent to someone else whose display name is Marta's address.
+    store(
+        &kit,
+        workspace,
+        inbox,
+        "sam@example.com",
+        sent(
+            "past-1",
+            "thr-past",
+            ("marta@clientes.example", "other@elsewhere.example"),
+            5,
+            "Words to someone else",
+        ),
+    )
+    .await;
+    store(
+        &kit,
+        workspace,
+        inbox,
+        "sam@example.com",
+        received("now-1", "thr-now", MARTA, 1, "Podemos falar?"),
+    )
+    .await;
+    let id = kit.conversation_of("now-1").await;
+
+    write_reply(&kit, &sam, workspace, &id, None).await;
+    let input = the_input(&server).await;
+    assert_eq!(input["them"]["i_wrote_to_them_before"], false);
+    assert_eq!(input["them"]["from_me_last_year"], 0);
+    assert!(input.get("my_recent_messages_to_them").is_none());
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn spam_and_failed_checks_get_no_person_context(db: PgPool) {
+    let server = MockServer::start().await;
+    answer_with(&server, &json!({"reply": "Hi"})).await;
+    let kit = kit_with_model(db, &server).await;
+    let (workspace, inbox, sam, _) = demo(&kit).await;
+    marta_is_written_to(&kit, workspace, inbox).await;
+    // In spam.
+    store(
+        &kit,
+        workspace,
+        inbox,
+        "sam@example.com",
+        received("spam-1", "thr-spam", MARTA, 1, "Hello"),
+    )
+    .await;
+    sqlx::query(
+        "UPDATE conversations.messages SET in_spam = true WHERE provider_message_id = 'spam-1'",
+    )
+    .execute(&kit.db)
+    .await
+    .unwrap();
+    // Failing its sender's checks.
+    let mut forged = received("forged-1", "thr-forged", MARTA, 1, "Hello");
+    forged.results = Some(
+        "mx.example; dkim=fail header.i=@clientes.example; dmarc=fail header.from=clientes.example",
+    );
+    store(&kit, workspace, inbox, "sam@example.com", forged).await;
+    for provider_id in ["spam-1", "forged-1"] {
+        let id = kit.conversation_of(provider_id).await;
+        write_reply(&kit, &sam, workspace, &id, None).await;
+    }
+    let asked = asked(&server).await;
+    assert_eq!(asked.len(), 2);
+    for (_, input) in asked {
+        assert!(input.get("them").is_none(), "{input}");
+        assert!(!input.to_string().contains("Private words"));
+        assert_eq!(input["conversation"]["total_messages"], 1);
+    }
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn trashed_and_year_old_mail_is_not_past_mail(db: PgPool) {
+    let server = MockServer::start().await;
+    answer_with(&server, &json!({"reply": "Hi"})).await;
+    let kit = kit_with_model(db, &server).await;
+    let (workspace, inbox, sam, _) = demo(&kit).await;
+    store(
+        &kit,
+        workspace,
+        inbox,
+        "sam@example.com",
+        sent("kept", "thr-kept", MARTA, 20, "Kept words"),
+    )
+    .await;
+    store(
+        &kit,
+        workspace,
+        inbox,
+        "sam@example.com",
+        sent("trashed", "thr-trashed", MARTA, 10, "Trashed words"),
+    )
+    .await;
+    store(
+        &kit,
+        workspace,
+        inbox,
+        "sam@example.com",
+        sent("old", "thr-old", MARTA, 400, "Old words"),
+    )
+    .await;
+    sqlx::query(
+        "UPDATE conversations.messages SET in_trash = true WHERE provider_message_id = 'trashed'",
+    )
+    .execute(&kit.db)
+    .await
+    .unwrap();
+    store(
+        &kit,
+        workspace,
+        inbox,
+        "sam@example.com",
+        received("now-1", "thr-now", MARTA, 1, "Podemos falar?"),
+    )
+    .await;
+    let id = kit.conversation_of("now-1").await;
+
+    write_reply(&kit, &sam, workspace, &id, None).await;
+    let input = the_input(&server).await;
+    let texts: Vec<&str> = input["my_recent_messages_to_them"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|m| m["text"].as_str().unwrap())
+        .collect();
+    assert_eq!(texts, ["Kept words"]);
+    assert_eq!(input["them"]["from_me_last_year"], 1);
+    // An old message still shows they were written to.
+    assert_eq!(input["them"]["i_wrote_to_them_before"], true);
 }

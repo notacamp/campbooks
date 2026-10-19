@@ -21,7 +21,11 @@ mod types;
 use std::time::{Duration, Instant};
 
 use axum::{Extension, Json, extract::State};
-use campbooks_ai::{Gateway, Role, usage::Scope};
+use campbooks_ai::{
+    Gateway, Role,
+    decide::signals::facts::{dmarc_refused, sender_checks_failed},
+    usage::Scope,
+};
 use campbooks_kernel::{
     AppState, Error, Operation, Problem, RecordRef, Result, Risk,
     authz::Action,
@@ -83,26 +87,8 @@ const PAST_BYTES: usize = 4 * 1024;
 /// Each mail count sent to the model stops here.
 const COUNT_CAP: i64 = 100;
 /// Messages counted in a conversation, at most.
-const TOTAL_CAP: i64 = 1000;
-
-/// The conversation's inbox, if the caller can see it.
-const INBOX: &str = "SELECT i.id, i.display_name FROM conversations.conversations c \
-     JOIN conversations.inboxes i ON i.id = c.inbox_id \
-     WHERE c.id = $1 AND c.inbox_id = ANY($2)";
-/// The message answered: the one asked for, or the newest.
-const ANSWERED: &str = "SELECT id, sent_at, direction, sender_address, recipients \
-     FROM conversations.messages \
-     WHERE conversation_id = $1 AND ($2::uuid IS NULL OR id = $2) \
-     ORDER BY sent_at DESC, id DESC LIMIT 1";
-/// The messages up to the one answered, newest first.
-const THREAD: &str = "SELECT id, direction, sender, subject, sent_at, bodies \
-     FROM conversations.messages \
-     WHERE conversation_id = $1 AND (sent_at, id) <= ($2, $3) \
-     ORDER BY sent_at DESC, id DESC LIMIT $4";
-
-/// How many messages the conversation has, capped.
-const TOTAL: &str = "SELECT LEAST(count(*), $2) FROM conversations.messages \
-     WHERE conversation_id = $1";
+const TOTAL: &str = "SELECT count(*) FROM ( \
+         SELECT 1 FROM conversations.messages WHERE conversation_id = $1 LIMIT $2) counted";
 /// Their mail to the inbox in the last year, capped at `$3`. Served by
 /// `messages_inbound_sender_idx`.
 const FROM_THEM: &str = "SELECT count(*) FROM ( \
@@ -117,9 +103,12 @@ macro_rules! sent_to_them {
         concat!(
             "WITH sent AS ( \
                  SELECT id, conversation_id, sent_at, in_spam, in_trash, bodies, \
-                        position(('\"' || $2::text || '\"') IN lower( \
-                            coalesce(recipients->'to', '[]'::jsonb)::text || \
-                            coalesce(recipients->'cc', '[]'::jsonb)::text)) > 0 AS to_them \
+                        EXISTS (SELECT 1 FROM jsonb_array_elements( \
+                            CASE WHEN jsonb_typeof(recipients->'to') = 'array' \
+                                 THEN recipients->'to' ELSE '[]'::jsonb END || \
+                            CASE WHEN jsonb_typeof(recipients->'cc') = 'array' \
+                                 THEN recipients->'cc' ELSE '[]'::jsonb END) r \
+                            WHERE lower(r->>'address') = $2::text) AS to_them \
                  FROM conversations.messages \
                  WHERE inbox_id = $1 AND direction = 'outbound' \
                  ORDER BY sent_at DESC, id DESC LIMIT $3) ",
@@ -129,8 +118,8 @@ macro_rules! sent_to_them {
 }
 /// Whether the inbox ever wrote to `$2` (a lower-cased address) in its
 /// newest `$3` sent messages, and how many such messages went in the last
-/// year (capped at `$4`). The address is matched as a whole JSON string, as
-/// `rules::facts::corresponds` does.
+/// year (capped at `$4`). The address must equal the `address` of a To or
+/// Cc recipient, never a name or any other text of the row.
 const WROTE_TO_THEM: &str = sent_to_them!(
     "SELECT coalesce(bool_or(to_them), false), \
             LEAST(count(*) FILTER (WHERE to_them AND NOT in_spam AND NOT in_trash \
@@ -151,7 +140,16 @@ type MessageRow = (MessageId, String, Value, String, DateTime<Utc>, Value);
 /// Sent messages read for their words: when, and their bodies.
 type PastRows = Vec<(DateTime<Utc>, Value)>;
 /// A row of [`ANSWERED`].
-type AnsweredRow = (MessageId, DateTime<Utc>, String, String, Value);
+type AnsweredRow = (
+    MessageId,
+    DateTime<Utc>,
+    String,
+    String,
+    Value,
+    bool,
+    Value,
+    bool,
+);
 
 /// The AI gateway, when one is composed.
 #[derive(Debug, Clone)]
@@ -447,8 +445,14 @@ async fn prepare<'a>(
         .bind(requested)
         .fetch_optional(&mut *tx)
         .await?;
-    let (message, sent_at, direction, sender_address, recipients) =
+    let (message, sent_at, direction, sender_address, recipients, in_spam, headers, suspicious) =
         answered.ok_or(Error::NotFound)?;
+    let answered = Answered {
+        distrusted: distrusted(&direction, &sender_address, in_spam, &headers, suspicious),
+        direction,
+        sender_address,
+        recipients,
+    };
     let rows: Vec<MessageRow> = sqlx::query_as(THREAD)
         .bind(conversation)
         .bind(sent_at)
@@ -457,17 +461,7 @@ async fn prepare<'a>(
         .fetch_all(&mut *tx)
         .await?;
     let known = if with_person {
-        Some(
-            known_person(
-                &mut tx,
-                inbox_id,
-                conversation,
-                &direction,
-                &sender_address,
-                &recipients,
-            )
-            .await?,
-        )
+        Some(known_person(&mut tx, inbox_id, conversation, &answered).await?)
     } else {
         None
     };
@@ -572,9 +566,54 @@ impl Known {
     }
 }
 
+/// The message answered, as far as the person is concerned.
+struct Answered {
+    direction: String,
+    sender_address: String,
+    recipients: Value,
+    /// In spam, flagged suspicious, or failing its sender's checks: it is
+    /// no reason to open the member's earlier mail to that address.
+    distrusted: bool,
+}
+
+/// Whether the message answered earns no person context. Facts only, as
+/// everywhere else (ADR 0018): spam, a `suspicious` answer or open Review
+/// need, and, for mail received, the receiving provider's results saying the
+/// sender failed its checks or is impersonated.
+fn distrusted(
+    direction: &str,
+    sender: &str,
+    in_spam: bool,
+    headers: &Value,
+    suspicious: bool,
+) -> bool {
+    if in_spam || suspicious {
+        return true;
+    }
+    let results = headers
+        .get("authentication_results")
+        .and_then(Value::as_str);
+    direction == "inbound" && (sender_checks_failed(sender, results) || dmarc_refused(results))
+}
+
+/// Whether `address` is plain enough to look up: one `@` with something on
+/// both sides, and no quote, backslash, whitespace or control character.
+fn plain_address(address: &str) -> bool {
+    let mut parts = address.split('@');
+    let (Some(local), Some(domain), None) = (parts.next(), parts.next(), parts.next()) else {
+        return false;
+    };
+    !local.is_empty()
+        && !domain.is_empty()
+        && !address
+            .chars()
+            .any(|c| c == '"' || c == '\\' || c.is_whitespace() || c.is_control())
+}
+
 /// The conversation's length and what the inbox knows of the person
-/// answered: their other side of the message answered (the sender of an
-/// inbound one, the first recipient of one the member sent).
+/// answered: the other side of the message answered (the sender of an
+/// inbound one, the first recipient of one the member sent). Nothing of the
+/// person when the message is distrusted or their address is not plain.
 ///
 /// Only the conversation's own inbox is read, never another one the member
 /// can see: it is the inbox the reply is sent from, which the caller was
@@ -583,10 +622,14 @@ async fn known_person(
     tx: &mut sqlx::PgConnection,
     inbox: InboxId,
     conversation: ConversationId,
-    direction: &str,
-    sender_address: &str,
-    recipients: &Value,
+    answered: &Answered,
 ) -> Result<Known> {
+    let Answered {
+        direction,
+        sender_address,
+        recipients,
+        distrusted,
+    } = answered;
     let total: i64 = sqlx::query_scalar(TOTAL)
         .bind(conversation)
         .bind(TOTAL_CAP)
@@ -619,7 +662,8 @@ async fn known_person(
                 })
             })
     };
-    let Some(correspondent) = correspondent.filter(|c| !c.address.trim().is_empty()) else {
+    let correspondent = correspondent.filter(|c| !distrusted && plain_address(c.address.trim()));
+    let Some(correspondent) = correspondent else {
         return Ok(Known {
             total_messages,
             them: None,
@@ -678,7 +722,6 @@ async fn own_words(state: &AppState, workspace: &str, bodies: &Bodies) -> Result
     Ok(plain_text::own_words(&raw))
 }
 
-/// `text` cut to at most `max` bytes, at a character boundary.
 /// A sender as the model reads them: their name, else their address, capped.
 fn shown_name(sender: Address) -> String {
     let name = sender
@@ -688,6 +731,7 @@ fn shown_name(sender: Address) -> String {
     cut_bytes(&name, NAME_BYTES)
 }
 
+/// `text` cut to at most `max` bytes, at a character boundary.
 fn cut_bytes(text: &str, max: usize) -> String {
     if text.len() <= max {
         return text.to_owned();
