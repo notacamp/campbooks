@@ -166,11 +166,6 @@ impl MarkIds {
     pub fn insert(&mut self, stream: ProviderStream, id: String) {
         self.0.insert(stream, id);
     }
-
-    /// Whether label `id` is a mark.
-    pub fn contains_id(&self, id: &str) -> bool {
-        self.0.values().any(|held| held == id)
-    }
 }
 
 /// The marks the winning changes of `backlog` put on that the provider has
@@ -275,7 +270,6 @@ mod tests {
         ]);
         assert_eq!(ids.get(ProviderStream::Receipts), Some("Label_3"));
         assert!(ids.get(ProviderStream::Updates).is_none());
-        assert!(ids.contains_id("Label_3") && !ids.contains_id("Label_7"));
     }
 
     #[test]

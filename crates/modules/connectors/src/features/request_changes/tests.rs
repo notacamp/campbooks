@@ -1163,7 +1163,8 @@ async fn a_pending_change_retagged_after_a_rotation_is_made_without_the_old_key(
 /// The labels of `id` at Gmail, the Receipts mark named as such.
 fn shown(kit: &Kit, id: &str) -> Vec<String> {
     let mark = kit.google.label_named("Campbooks/Receipts");
-    kit.google
+    let mut shown: Vec<String> = kit
+        .google
         .labels_of(id)
         .into_iter()
         .map(|l| {
@@ -1173,7 +1174,9 @@ fn shown(kit: &Kit, id: &str) -> Vec<String> {
                 l
             }
         })
-        .collect()
+        .collect();
+    shown.sort();
+    shown
 }
 
 /// Gmail's `labels.create` calls seen.
