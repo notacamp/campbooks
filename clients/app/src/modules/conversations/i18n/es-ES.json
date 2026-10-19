@@ -136,6 +136,15 @@
     "spam": "Marcada como spam · {{subject}}",
     "notSpam": "No es spam · {{subject}}"
   },
+  "leaving": {
+    "done": "Hecho",
+    "toInbox": "Movida a la bandeja de entrada",
+    "deleted": "Eliminada",
+    "restored": "Restaurada",
+    "spam": "Marcada como spam",
+    "notSpam": "No es spam",
+    "moved": "Movida a {{stream}}"
+  },
   "scout": {
     "label": "Cómo está la cosa",
     "suggestion": "Sugiere {{stream}}",

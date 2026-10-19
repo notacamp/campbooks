@@ -8,6 +8,14 @@ import { UndoProvider } from "~/lib/ui";
 
 import { createAppRouter } from "../../src/app/router";
 import {
+  applied,
+  belongsIn,
+  isPlace,
+  type ConversationAction,
+  type ConversationSummary,
+  type Stream,
+} from "../../src/modules/conversations/api/queries";
+import {
   INBOX,
   INVOICE,
   LEDGER,
@@ -553,3 +561,113 @@ export const TrashReader: Story = {
     await expect(canvas.getByRole("button", { name: /^Restore/u })).toBeVisible();
   },
 };
+
+// A mailbox that keeps what is done to it: Done, Report spam, Delete and a
+// move take a row out of the list, and their Undo brings it back.
+const MORE: ConversationSummary[] = [
+  {
+    ...INVOICE,
+    id: "0192f1a0-0000-7000-8000-0000000000e1",
+    stream: "primary",
+    subject: "Studio keys for the weekend",
+    latest_from: { name: "Inês Duarte", address: "ines@atelier-norte.example" },
+    snippet: "I left them with the concierge, ask for Rui.",
+    last_message_at: "2026-10-07T17:20:00Z",
+  },
+  {
+    ...INVOICE,
+    id: "0192f1a0-0000-7000-8000-0000000000e2",
+    stream: "primary",
+    subject: "Claim your prize now!!!",
+    latest_from: { name: "Prize Desk", address: "winner@prize-desk.example" },
+    snippet: "You have been selected. Reply with your bank details to receive it.",
+    last_message_at: "2026-10-06T08:02:00Z",
+    unread_count: 1,
+  },
+  {
+    ...INVOICE,
+    id: "0192f1a0-0000-7000-8000-0000000000e3",
+    stream: "primary",
+    subject: "Photos from Saturday",
+    latest_from: { name: "Tomás Pereira", address: "tomas@example.com" },
+    snippet: "Here are the ones from the boat, the light was perfect.",
+    last_message_at: "2026-10-05T19:45:00Z",
+  },
+];
+
+const MOVES: Record<string, ConversationAction> = {
+  archive: "archive",
+  unarchive: "unarchive",
+  trash: "trash",
+  untrash: "untrash",
+  spam: "spam",
+  "not-spam": "not_spam",
+};
+
+function keptMailbox(): Record<string, MockRoute> {
+  const mailbox = new Map(
+    [...PRIMARY, ...MORE].map((conversation) => [conversation.id, conversation] as const),
+  );
+  const routes: Record<string, MockRoute> = {
+    [`GET ${W}/conversations`]: (_body, url) => {
+      const place = url.searchParams.get("view") ?? url.searchParams.get("stream") ?? "primary";
+      return {
+        body: {
+          conversations: isPlace(place)
+            ? [...mailbox.values()].filter((conversation) => belongsIn(place, conversation))
+            : [],
+          next_cursor: null,
+        },
+      };
+    },
+  };
+  const act = (id: string, action: ConversationAction) => () => {
+    const conversation = mailbox.get(id);
+    if (conversation === undefined) {
+      return { status: 404 };
+    }
+    const next = applied(conversation, action);
+    mailbox.set(id, next);
+    return { body: next };
+  };
+  for (const id of mailbox.keys()) {
+    for (const [path, action] of Object.entries(MOVES)) {
+      routes[`POST ${W}/conversations/${id}/${path}`] = act(id, action);
+    }
+    routes[`POST ${W}/conversations/${id}/stream`] = (body) =>
+      act(id, { stream: (body as { stream: Stream }).stream })();
+  }
+  return inbox(routes);
+}
+
+/**
+ * Rows leaving the list: Done (E), Report spam (!) and Delete (#) on the
+ * cursor's row, or a move to another stream. Each row says what happened,
+ * then folds away and the rows below close the gap; Undo (Z) brings it back.
+ */
+const rowsLeave: Pick<Story, "args" | "play"> = {
+  args: { path: `${PATH}/primary`, api: keptMailbox() },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await canvas.findByText(Q4.subject);
+    await userEvent.keyboard("je");
+    await waitFor(async () => {
+      await expect(canvasElement.querySelector(`#conversation-${Q4.id}`)).toHaveTextContent("Done");
+    });
+    // Then it is gone, and the next row has the cursor.
+    await waitFor(
+      async () => {
+        await expect(canvasElement.querySelector(`#conversation-${Q4.id}`)).toBeNull();
+      },
+      { timeout: 3000 },
+    );
+  },
+};
+
+export const RowsLeave: Story = { ...rowsLeave, ...at("desktop", 1440, 900) };
+
+/** The same mailbox with nothing pressed yet (the recording presses the keys). */
+export const RowsLeaveIdle: Story = { args: rowsLeave.args, ...at("desktop", 1440, 900) };
+
+/** On a phone, with nothing pressed yet. */
+export const RowsLeavePhone: Story = { args: rowsLeave.args, ...at("phone", 375, 812) };

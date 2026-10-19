@@ -136,6 +136,15 @@
     "spam": "Reported as spam · {{subject}}",
     "notSpam": "Not spam · {{subject}}"
   },
+  "leaving": {
+    "done": "Done",
+    "toInbox": "Moved to Inbox",
+    "deleted": "Deleted",
+    "restored": "Restored",
+    "spam": "Reported as spam",
+    "notSpam": "Not spam",
+    "moved": "Moved to {{stream}}"
+  },
   "scout": {
     "label": "Where things stand",
     "suggestion": "Suggests {{stream}}",

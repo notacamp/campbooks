@@ -183,6 +183,47 @@ export function spamMove(summary: ConversationSummary): Move | undefined {
   return summary.trashed ? undefined : "spam";
 }
 
+/** A row leaving the list on screen, kept in place while it folds away. */
+export interface LeavingRow {
+  /** The conversation as it was listed. */
+  conversation: ConversationSummary;
+  /** The row it sat above (`undefined`: the last), which may be leaving too. */
+  before: string | undefined;
+  /** Where it was, for when that row is gone. */
+  at: number;
+}
+
+/**
+ * The list with its leaving rows back in their places, each above the row it
+ * sat above (placed first when that one is leaving too), else where it was.
+ * One back on the list (Undo while it folded) is itself again.
+ */
+export function withLeaving<Row extends LeavingRow>(
+  listed: readonly ConversationSummary[],
+  leaving: readonly Row[],
+): ConversationSummary[] {
+  const shown = [...listed];
+  const has = (id: string | undefined) => shown.some((conversation) => conversation.id === id);
+  let pending = leaving.filter((row) => !has(row.conversation.id));
+  while (pending.length > 0) {
+    const placeable = pending.filter((row) => row.before === undefined || has(row.before));
+    // The rows they sat above are gone: back where they were.
+    const batch = placeable.length > 0 ? placeable : pending;
+    for (const row of batch) {
+      const above = shown.findIndex((conversation) => conversation.id === row.before);
+      const at =
+        row.before === undefined
+          ? shown.length
+          : above === -1
+            ? Math.min(row.at, shown.length)
+            : above;
+      shown.splice(at, 0, row.conversation);
+    }
+    pending = pending.filter((row) => !batch.includes(row));
+  }
+  return shown;
+}
+
 /** One stored reason, as a sentence in the reader's language. */
 export function reasonText(
   t: Translate,
