@@ -409,3 +409,120 @@ async fn an_interactive_scope_says_a_person_is_waiting() {
     scope(workspace).run(chat(&gateway)).await.unwrap();
     assert_eq!(*meter.interactive.lock().unwrap(), [true, false]);
 }
+
+// --- streamed calls (campbooks-cloud#288) ----------------------------------
+
+/// A provider streaming a reply in two chunks with its usage; the second
+/// chunk comes after `pause`.
+async fn streaming(pause: Duration) -> MockServer {
+    let server = MockServer::start().await;
+    let body = "\
+data: {\"choices\":[{\"delta\":{\"content\":\"Hi\"}}]}\n\n\
+data: {\"choices\":[{\"delta\":{\"content\":\" Maya.\"},\"finish_reason\":\"stop\"}]}\n\n\
+data: {\"choices\":[],\"usage\":{\"prompt_tokens\":30,\"completion_tokens\":7}}\n\n\
+data: [DONE]\n\n";
+    Mock::given(method("POST"))
+        .respond_with(
+            ResponseTemplate::new(200)
+                .set_body_raw(body, "text/event-stream")
+                .set_delay(pause),
+        )
+        .mount(&server)
+        .await;
+    server
+}
+
+/// What the meter saw once a spawned settlement had time to land.
+async fn settled(meter: &Fake, count: usize) -> Vec<Seen> {
+    for _ in 0..100 {
+        let seen = meter.seen();
+        if seen.len() >= count {
+            return seen;
+        }
+        tokio::time::sleep(Duration::from_millis(10)).await;
+    }
+    meter.seen()
+}
+
+#[tokio::test]
+async fn a_streamed_call_is_admitted_first_and_settled_with_its_tokens() {
+    use futures_util::StreamExt as _;
+    let server = streaming(Duration::ZERO).await;
+    let meter = Fake::capped(100);
+    let gateway = gateway(&server, Some(meter.clone()));
+    let workspace = WorkspaceId::new();
+    let events: Vec<_> = scope(workspace)
+        .run(async {
+            gateway
+                .chat_stream(Role::Complete, ChatRequest::new(vec![Message::user("Hi")]))
+                .await
+                .unwrap()
+                .collect::<Vec<_>>()
+                .await
+        })
+        .await;
+    assert_eq!(events.len(), 3, "{events:?}");
+    assert_eq!(
+        settled(&meter, 2).await,
+        [
+            Seen::Admit(workspace, Role::Complete, FEATURE.to_owned()),
+            Seen::Settle(
+                workspace,
+                Role::Complete,
+                FEATURE.to_owned(),
+                day(),
+                Outcome {
+                    failed: false,
+                    prompt_tokens: 30,
+                    completion_tokens: 7,
+                }
+            ),
+        ]
+    );
+}
+
+#[tokio::test]
+async fn a_streamed_call_over_the_cap_sends_nothing() {
+    let server = streaming(Duration::ZERO).await;
+    let meter = Fake::capped(0);
+    let gateway = gateway(&server, Some(meter));
+    let result = scope(WorkspaceId::new())
+        .run(gateway.chat_stream(Role::Complete, ChatRequest::new(vec![Message::user("Hi")])))
+        .await;
+    assert!(
+        matches!(result, Err(Error::OverDailyCap { cap: 0 })),
+        "{result:?}"
+    );
+    assert_eq!(requests(&server).await, 0);
+    let unscoped = gateway
+        .chat_stream(Role::Complete, ChatRequest::new(vec![Message::user("Hi")]))
+        .await;
+    assert!(matches!(unscoped, Err(Error::Unattributed)), "{unscoped:?}");
+}
+
+#[tokio::test]
+async fn a_dropped_stream_is_settled_as_failed() {
+    let server = streaming(Duration::ZERO).await;
+    let meter = Fake::capped(100);
+    let gateway = gateway(&server, Some(meter.clone()));
+    let workspace = WorkspaceId::new();
+    let stream = scope(workspace)
+        .run(gateway.chat_stream(Role::Complete, ChatRequest::new(vec![Message::user("Hi")])))
+        .await
+        .unwrap();
+    // The member closed the dialog before the first word was read.
+    drop(stream);
+    assert_eq!(
+        settled(&meter, 2).await[1],
+        Seen::Settle(
+            workspace,
+            Role::Complete,
+            FEATURE.to_owned(),
+            day(),
+            Outcome {
+                failed: true,
+                ..Outcome::default()
+            }
+        )
+    );
+}

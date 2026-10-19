@@ -9,9 +9,20 @@
   },
   "views": {
     "sent": "Sent",
+    "starred": "Pinned",
+    "drafts": "Drafts",
     "archive": "Archive",
     "spam": "Spam",
     "trash": "Trash"
+  },
+  "drafts": {
+    "tag": "Draft",
+    "label": "Drafts",
+    "noRecipients": "No recipients",
+    "cap": "Your {{count}} newest drafts.",
+    "readerTitle": "Pick a draft",
+    "readerBody": "Choose one from the list to keep writing it.",
+    "errorTitle": "Could not load your drafts"
   },
   "list": {
     "label": "Conversations",
@@ -20,7 +31,7 @@
     "unread": "Unread",
     "more": "Show more",
     "loadingMore": "Loading more conversations",
-    "youPrefix": "You: {{snippet}}",
+    "youPrefix": "You:",
     "to": "To {{name}}",
     "toOthers_one": "To {{name}} and {{count}} other",
     "toOthers_other": "To {{name}} and {{count}} others",
@@ -37,6 +48,8 @@
     "readerTitle": "Pick a conversation",
     "readerBody": "Choose one from the list, or use the keyboard:",
     "sent": "Nothing in Sent.",
+    "starred": "Nothing pinned.",
+    "drafts": "No drafts.",
     "archive": "Nothing in Archive.",
     "spam": "Nothing in Spam.",
     "trash": "Nothing in Trash."
@@ -104,7 +117,7 @@
     "imagesHidden_one": "{{count}} remote image hidden, so the sender cannot see when you read this.",
     "imagesHidden_other": "{{count}} remote images hidden, so the sender cannot see when you read this.",
     "imagesShown": "Remote images shown.",
-    "trustImages": "Always show images from {{name}}",
+    "trustImages": "Always from this sender",
     "imagesTrusted": "Images shown: you trust {{name}}. Tracking pixels stay removed.",
     "imagesTrustedInbox": "Images shown: this inbox trusts {{name}}. Tracking pixels stay removed.",
     "imagesHeld": {
@@ -240,6 +253,8 @@
     "saveRule": "Save the smart rule",
     "trustImages": "Always show images from this sender",
     "sent": "Go to Sent",
+    "starred": "Go to Pinned",
+    "drafts": "Go to Drafts",
     "archive": "Go to Archive",
     "spam": "Go to Spam",
     "trash": "Go to Trash",
@@ -634,6 +649,9 @@
       "action": "Draft it"
     },
     "writing": "Writing the draft…",
+    "thinking": "Scout is thinking…",
+    "thoughts": "How Scout thought about it",
+    "typing": "Scout is writing…",
     "draftDescription": "Scout's draft. Edit it here, or ask for a change. Nothing is sent until you press Send.",
     "draftLabel": "Your reply",
     "shorter": "Shorter",
@@ -656,6 +674,7 @@
     "tooLate": "Too late to undo: the reply has already left.",
     "errors": {
       "write": "Scout couldn't write that just now. Try again, or write it yourself.",
+      "timeout": "Scout took too long to answer. Try again, or write it yourself.",
       "limit": "Scout has written a lot of replies this hour. Try again later, or write it yourself.",
       "dailyLimit": "This workspace has used today's AI allowance. Write this one yourself.",
       "send": "Couldn't send to {{name}}. Your draft is kept.",
@@ -699,7 +718,7 @@
     "whose": "Show images from",
     "imagesTitle": "Always show images from {{sender}}",
     "imagesAddress": "Only {{address}}",
-    "imagesAddressDetail": "This address alone.",
+    "imagesAddressDetail": "Mail from this address when its domain’s checks pass. Those checks vouch for the domain, not for this one person.",
     "imagesDomain": "Anyone at {{domain}}",
     "imagesDomainDetail": "Every address at {{domain}} and its subdomains, when the domain’s own checks pass.",
     "imagesMatches_one": "{{n}} conversation from them is already here. Their images show whenever their mail passes its checks.",

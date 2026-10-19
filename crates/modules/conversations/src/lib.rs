@@ -342,6 +342,7 @@ fn router() -> OpenApiRouter<AppState> {
         .routes(routes!(rule_notices::answer, rule_notices::clear_answer))
         .routes(routes!(reply::suggest))
         .routes(routes!(reply::write))
+        .routes(routes!(reply::stream))
         .routes(routes!(person_notes::list, person_notes::set))
         .routes(routes!(person_notes::delete))
 }

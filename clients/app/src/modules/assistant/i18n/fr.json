@@ -155,7 +155,7 @@
     "teach": {
       "title": "Apprendre quelque chose à Scout",
       "label": "Que doit faire Scout ?",
-      "placeholder": "Par exemple : tout ce qui vient de mon comptable compte toujours",
+      "placeholder": "Ex. : tout ce qui vient de mon comptable compte",
       "privacy": "Seule votre phrase est envoyée, jamais votre courrier.",
       "submit": "Apprendre",
       "reading": "Lecture de votre phrase",

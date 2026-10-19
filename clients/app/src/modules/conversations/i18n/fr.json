@@ -9,9 +9,20 @@
   },
   "views": {
     "sent": "Envoyés",
+    "starred": "Épinglées",
+    "drafts": "Brouillons",
     "archive": "Archives",
     "spam": "Spam",
     "trash": "Corbeille"
+  },
+  "drafts": {
+    "tag": "Brouillon",
+    "label": "Brouillons",
+    "noRecipients": "Aucun destinataire",
+    "cap": "Vos {{count}} brouillons les plus récents.",
+    "readerTitle": "Choisissez un brouillon",
+    "readerBody": "Choisissez-en un dans la liste pour continuer à l’écrire.",
+    "errorTitle": "Impossible de charger les brouillons"
   },
   "list": {
     "label": "Conversations",
@@ -20,7 +31,7 @@
     "unread": "Non lues",
     "more": "Afficher plus",
     "loadingMore": "Chargement d’autres conversations",
-    "youPrefix": "Moi : {{snippet}}",
+    "youPrefix": "Moi :",
     "to": "À {{name}}",
     "toOthers_one": "À {{name}} et {{count}} autre personne",
     "toOthers_other": "À {{name}} et {{count}} autres personnes",
@@ -37,6 +48,8 @@
     "readerTitle": "Choisissez une conversation",
     "readerBody": "Choisissez-en une dans la liste, ou utilisez le clavier :",
     "sent": "Rien dans Envoyés.",
+    "starred": "Rien d’épinglé.",
+    "drafts": "Aucun brouillon.",
     "archive": "Rien dans Archives.",
     "spam": "Rien dans Spam.",
     "trash": "Rien dans la Corbeille."
@@ -104,7 +117,7 @@
     "imagesHidden_one": "{{count}} image distante masquée, pour que l’expéditeur ne sache pas quand vous lisez ceci.",
     "imagesHidden_other": "{{count}} images distantes masquées, pour que l’expéditeur ne sache pas quand vous lisez ceci.",
     "imagesShown": "Images distantes affichées.",
-    "trustImages": "Toujours afficher les images de {{name}}",
+    "trustImages": "Toujours pour cet expéditeur",
     "imagesTrusted": "Images affichées : vous faites confiance à {{name}}. Les pixels de suivi restent supprimés.",
     "imagesTrustedInbox": "Images affichées : cette boîte fait confiance à {{name}}. Les pixels de suivi restent supprimés.",
     "imagesHeld": {
@@ -240,6 +253,8 @@
     "saveRule": "Enregistrer la règle intelligente",
     "trustImages": "Toujours afficher les images de cet expéditeur",
     "sent": "Aller à Envoyés",
+    "starred": "Aller à Épinglées",
+    "drafts": "Aller à Brouillons",
     "archive": "Aller à Archives",
     "spam": "Aller à Spam",
     "trash": "Aller à Corbeille",
@@ -634,6 +649,9 @@
       "action": "Rédiger"
     },
     "writing": "Rédaction du brouillon…",
+    "thinking": "Scout réfléchit…",
+    "thoughts": "Comment Scout y a réfléchi",
+    "typing": "Scout écrit…",
     "draftDescription": "Le brouillon de Scout. Modifiez-le ici ou demandez un changement. Rien n’est envoyé avant que vous appuyiez sur Envoyer.",
     "draftLabel": "Votre réponse",
     "shorter": "Plus courte",
@@ -656,6 +674,7 @@
     "tooLate": "Trop tard pour annuler : la réponse est déjà partie.",
     "errors": {
       "write": "Scout n’a pas pu écrire cela pour l’instant. Réessayez ou écrivez-la vous-même.",
+      "timeout": "Scout a mis trop de temps à répondre. Réessayez ou écrivez-la vous-même.",
       "limit": "Scout a écrit beaucoup de réponses cette heure-ci. Réessayez plus tard ou écrivez-la vous-même.",
       "dailyLimit": "Cet espace de travail a utilisé son quota d’IA du jour. Écrivez celle-ci vous-même.",
       "send": "Impossible d’envoyer à {{name}}. Votre brouillon est conservé.",
@@ -699,7 +718,7 @@
     "whose": "Afficher les images de",
     "imagesTitle": "Toujours afficher les images de {{sender}}",
     "imagesAddress": "Seulement {{address}}",
-    "imagesAddressDetail": "Cette adresse seulement.",
+    "imagesAddressDetail": "Les messages de cette adresse quand les vérifications de son domaine réussissent. Elles garantissent le domaine, pas cette personne en particulier.",
     "imagesDomain": "Toute adresse de {{domain}}",
     "imagesDomainDetail": "Toutes les adresses de {{domain}} et de ses sous-domaines, quand les vérifications du domaine lui-même réussissent.",
     "imagesMatches_one": "{{n}} conversation de cet expéditeur est déjà ici. Ses images s’affichent chaque fois que son courrier réussit ses vérifications.",

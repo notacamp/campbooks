@@ -3,8 +3,7 @@ import { Outlet, useLocation, useNavigate, useParams } from "@tanstack/react-rou
 import { useEffect, useState, type MouseEvent } from "react";
 import { useTranslation } from "react-i18next";
 
-import { createWebChangeSource, subscribeToChanges } from "~/lib/api";
-import { isTauri } from "~/lib/platform";
+import { createWebChangeSource, followsChangesLive, subscribeToChanges } from "~/lib/api";
 import { useShortcut, useShortcuts } from "~/lib/shortcuts";
 import {
   Button,
@@ -28,7 +27,7 @@ import {
   WorkspaceSwitcher,
 } from "~/lib/ui";
 import { useAttentionCount } from "~/modules/attention";
-import { StreamNav, streamPath } from "~/modules/conversations";
+import { StreamNav, isPlace, streamPath, type Place } from "~/modules/conversations";
 import { useWorkspaces, type Workspace } from "~/modules/workspaces";
 
 import { AccountMenu } from "../account/AccountMenu";
@@ -50,13 +49,14 @@ function useInAppLink() {
 
 /**
  * Keeps the open workspace's cached queries fresh from its change feed (web
- * only for now: the native source is not built yet, and there is nothing to
- * follow where `EventSource` is missing).
+ * only for now: the native source is not built yet, see
+ * `followsChangesLive`, and there is nothing to follow where `EventSource`
+ * is missing).
  */
 function useWorkspaceChanges(workspaceId: string) {
   const queryClient = useQueryClient();
   useEffect(() => {
-    if (isTauri() || typeof EventSource === "undefined") {
+    if (!followsChangesLive()) {
       return;
     }
     return subscribeToChanges({
@@ -155,20 +155,9 @@ function WorkspaceFrame({ workspace, all }: { workspace: Workspace; all: Workspa
   const needsYou = useAttentionCount(workspace.id);
   const inboxPath = streamPath(workspace.id, "primary");
   const searchPath = `${base}/search`;
-  // The stream or view on screen (`/inbox/sent`…): views are places, not streams.
-  const openStream =
-    /\/inbox\/(primary|updates|receipts|newsletters|sent|archive|spam|trash)\b/u.exec(
-      pathname,
-    )?.[1] as
-      | "primary"
-      | "updates"
-      | "receipts"
-      | "newsletters"
-      | "sent"
-      | "archive"
-      | "spam"
-      | "trash"
-      | undefined;
+  // The stream, view or Drafts on screen (`/inbox/sent`…): these are places, not streams.
+  const place = /\/inbox\/([^/]+)/u.exec(pathname)?.[1];
+  const openStream: Place | undefined = place !== undefined && isPlace(place) ? place : undefined;
 
   useShortcut("workspace.switch", () => {
     setSwitching((open) => !open);

@@ -27,6 +27,11 @@
 //! below 500 except 401, 403, 408, 409, 425 and 429. Otherwise the key is
 //! released, so a retry runs the operation again.
 //!
+//! **An event stream is never stored** (campbooks-cloud#288). A
+//! `text/event-stream` answer (a streamed reply) is returned as it is
+//! written, never buffered to be stored: its key is released when its head
+//! is sent, so a retry with the key runs the operation again.
+//!
 //! **A replay is authorized like the request it repeats.** Before a stored
 //! response is served, the caller must still hold the operation's scopes
 //! (else 403, as [`Scoped`](crate::auth::Scoped) answers), still belong to
@@ -134,7 +139,7 @@ pub const MAX_STORED_RESPONSE_BYTES: usize = 1024 * 1024;
 /// A pending key older than this belongs to a request that died with its
 /// process (requests time out well before). It is never taken over: a retry
 /// learns that its outcome is unknown (campbooks-cloud#63).
-const ABANDONED_AFTER: Duration = Duration::from_mins(2);
+pub(crate) const ABANDONED_AFTER: Duration = Duration::from_mins(2);
 
 /// What the middleware needs: the database, the token verifier and the
 /// catalogue telling it which operations mutate.
@@ -625,6 +630,20 @@ fn storable(status: StatusCode) -> bool {
         )
 }
 
+/// Whether `response` is a Server-Sent Events stream.
+fn is_event_stream(response: &Response) -> bool {
+    response
+        .headers()
+        .get(header::CONTENT_TYPE)
+        .and_then(|value| value.to_str().ok())
+        .is_some_and(|value| {
+            value
+                .trim_start()
+                .to_ascii_lowercase()
+                .starts_with("text/event-stream")
+        })
+}
+
 /// What [`finish`] keeps of a settled response.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Keep {
@@ -647,7 +666,9 @@ async fn finish(
     keep: Keep,
 ) -> Response {
     let status = response.status();
-    if !storable(status) {
+    if !storable(status) || is_event_stream(&response) {
+        // An event stream goes out as it is written: buffering it to store
+        // would hold its head until its end.
         release(db, owner, key).await;
         return response;
     }

@@ -1,14 +1,22 @@
-//! `POST …/conversations/{conversation_id}/reply/suggestions` and
-//! `POST …/conversations/{conversation_id}/reply/draft` — Scout proposes a
-//! reply (campbooks-cloud#168).
+//! `POST …/conversations/{conversation_id}/reply/suggestions`,
+//! `POST …/conversations/{conversation_id}/reply/draft` and
+//! `POST …/conversations/{conversation_id}/reply/draft/stream` — Scout
+//! proposes a reply (campbooks-cloud#168).
 //!
 //! Only on the member's own action (Reply, then a pick). The `complete` role
 //! reads the conversation's newest messages up to the one answered, as
 //! plain text without quoted history, with the same checks as reading the
 //! conversation, and only from someone who may send from its inbox. It
-//! proposes text in a strict schema with no tools; nothing is stored, and
-//! nothing is sent until the member sends a draft through
-//! `conversations.create_draft` and `conversations.send_draft`.
+//! proposes text with no tools (likely replies in a strict schema, a written
+//! reply as plain text); nothing is stored, and nothing is sent until the
+//! member sends a draft through `conversations.create_draft` and
+//! `conversations.send_draft`.
+//!
+//! A written reply also streams (campbooks-cloud#288): the same request,
+//! answered as Server-Sent Events while the model thinks and writes
+//! ([`stream`]). Every check runs before the stream opens. The JSON routes
+//! allow themselves [`JSON_ROUTE_LIMIT`] past the server's default, and give
+//! the model [`JSON_AI_TIMEOUT`] of it.
 //!
 //! A written reply also learns who is answered and how the member writes to
 //! them (campbooks-cloud#271): the conversation's length, the person's
@@ -17,12 +25,21 @@
 //! asking only, what they told Scout about that person (campbooks-cloud#272).
 
 mod prompt;
+mod stream;
 mod types;
 
 use std::time::{Duration, Instant};
 
-use axum::{Extension, Json, extract::State};
-use campbooks_ai::{Gateway, Role, usage::Scope};
+use axum::{
+    Extension, Json,
+    extract::State,
+    http::HeaderValue,
+    response::{
+        IntoResponse as _, Response,
+        sse::{KeepAlive, Sse},
+    },
+};
+use campbooks_ai::{ChatRequest, ChatResponse, Gateway, Role, usage::Scope};
 use campbooks_kernel::{
     AppState, Error, Operation, Problem, RecordRef, Result, Risk,
     authz::Action,
@@ -31,12 +48,14 @@ use campbooks_kernel::{
     i18n::Locale,
     rate_limit::{Limit, RateKey},
     tenancy::{Access, Workspace, WorkspaceId},
+    time_limit::Deadline,
 };
 use chrono::{DateTime, SecondsFormat, Utc};
-use serde::de::DeserializeOwned;
 use serde_json::Value;
 
-use self::prompt::{Ask, Author, Context, PastMessage, Person, Them, Thread, ThreadMessage};
+use self::prompt::{
+    Ask, Author, Context, PastMessage, Person, Suggestion, Them, Thread, ThreadMessage,
+};
 use self::types::{ReplySuggestions, ReplyText, SuggestReplies, WriteReply};
 use crate::{
     domain::{
@@ -52,6 +71,14 @@ use crate::{
     model::{Address, ConversationId, InboxId, MessageId},
     scopes::ConversationsSend,
 };
+
+/// How long the JSON routes may run, past the server's default limit: a
+/// reasoning model takes 10 to 40 seconds (campbooks-cloud#288).
+pub const JSON_ROUTE_LIMIT: Duration = Duration::from_secs(90);
+/// How long the JSON routes wait for the model: less than the route's
+/// limit, so a slow model is answered `reply_timed_out` and logged, never
+/// cut off by the server.
+pub const JSON_AI_TIMEOUT: Duration = Duration::from_secs(80);
 
 /// Model calls per member per hour, suggestions and drafts together.
 const LIMIT: Limit = Limit::new("conversations.reply", 100, Duration::from_hours(1));
@@ -234,7 +261,8 @@ impl ReplyWriter {
         (status = CONFLICT, description = "No language model may read mail here (`reply_unavailable`): write the reply yourself.",
             body = Problem, content_type = "application/problem+json"),
         (status = SERVICE_UNAVAILABLE, description = "The language model failed (`reply_failed`), \
-            or the workspace used its whole daily AI limit (`ai_daily_limit_reached`).",
+            took too long (`reply_timed_out`), or the workspace used its whole daily AI limit \
+            (`ai_daily_limit_reached`).",
             body = Problem, content_type = "application/problem+json"),
     )
 )]
@@ -243,9 +271,11 @@ pub async fn suggest(
     Extension(writer): Extension<ReplyWriter>,
     workspace: Workspace<ConversationsSend>,
     locale: Locale,
+    deadline: Option<Extension<Deadline>>,
     extract::Path(path): extract::Path<ConversationPath>,
     extract::Json(body): extract::Json<SuggestReplies>,
 ) -> Result<Json<ReplySuggestions>> {
+    allow(deadline.as_ref(), JSON_ROUTE_LIMIT);
     let started = Instant::now();
     let read = prepare(
         &state,
@@ -257,19 +287,25 @@ pub async fn suggest(
     )
     .await?;
     let context = read.context(locale);
-    let answer: prompt::Intents = ask(
+    let feature = "conversations.suggest_replies";
+    let response = ask(
         &state,
         read.gateway,
         workspace.id,
-        "conversations.suggest_replies",
+        feature,
         prompt::suggest(&context),
+        JSON_AI_TIMEOUT,
     )
     .await?;
+    let answer: prompt::Intents = response.json().map_err(|_| unusable(feature, &response))?;
     let intents = prompt::intents(answer);
     tracing::info!(
         intents = intents.len(),
         messages = context.conversation.messages.len(),
-        latency_ms = u64::try_from(started.elapsed().as_millis()).unwrap_or(u64::MAX),
+        elapsed_ms = millis(started.elapsed()),
+        prompt_tokens = response.usage.map(|usage| usage.prompt_tokens),
+        completion_tokens = response.usage.map(|usage| usage.completion_tokens),
+        finish_reason = response.finish_kind(),
         "reply suggestions"
     );
     Ok(Json(ReplySuggestions {
@@ -294,7 +330,8 @@ pub async fn suggest(
     request_body = WriteReply,
     responses(
         (status = OK, description = "The reply as plain text; nothing is saved or sent.", body = ReplyText),
-        (status = BAD_REQUEST, description = "No intent, or an intent, change or draft too long (`reply_ask_invalid`).",
+        (status = BAD_REQUEST, description = "No intent, or an intent, change, draft or suggestion too long, \
+            or more than three suggestions (`reply_ask_invalid`).",
             body = Problem, content_type = "application/problem+json"),
         (status = UNAUTHORIZED, description = "No valid access token.", body = Problem,
             content_type = "application/problem+json"),
@@ -307,7 +344,8 @@ pub async fn suggest(
         (status = CONFLICT, description = "No language model may read mail here (`reply_unavailable`): write the reply yourself.",
             body = Problem, content_type = "application/problem+json"),
         (status = SERVICE_UNAVAILABLE, description = "The language model failed (`reply_failed`), \
-            or the workspace used its whole daily AI limit (`ai_daily_limit_reached`).",
+            took too long (`reply_timed_out`), or the workspace used its whole daily AI limit \
+            (`ai_daily_limit_reached`).",
             body = Problem, content_type = "application/problem+json"),
     )
 )]
@@ -316,10 +354,204 @@ pub async fn write(
     Extension(writer): Extension<ReplyWriter>,
     workspace: Workspace<ConversationsSend>,
     locale: Locale,
+    deadline: Option<Extension<Deadline>>,
     extract::Path(path): extract::Path<ConversationPath>,
     extract::Json(body): extract::Json<WriteReply>,
 ) -> Result<Json<ReplyText>> {
+    allow(deadline.as_ref(), JSON_ROUTE_LIMIT);
     let started = Instant::now();
+    let written = written(
+        &state,
+        &writer,
+        &workspace,
+        path.conversation_id,
+        &body,
+        locale,
+    )
+    .await?;
+    let feature = "conversations.write_reply";
+    let response = ask(
+        &state,
+        written.gateway,
+        workspace.id,
+        feature,
+        written.request,
+        JSON_AI_TIMEOUT,
+    )
+    .await?;
+    // A reply cut short is not a reply.
+    let text = if response.finish_kind() == "length" {
+        None
+    } else {
+        prompt::reply(&response.content)
+    };
+    let text = text.ok_or_else(|| unusable(feature, &response))?;
+    tracing::info!(
+        rewrite = written.rewrite,
+        noted = written.noted,
+        messages = written.messages,
+        elapsed_ms = millis(started.elapsed()),
+        prompt_tokens = response.usage.map(|usage| usage.prompt_tokens),
+        completion_tokens = response.usage.map(|usage| usage.completion_tokens),
+        finish_reason = response.finish_kind(),
+        "reply written"
+    );
+    Ok(Json(ReplyText {
+        message_id: written.message,
+        text,
+    }))
+}
+
+/// Scout's reply for an intent, or your draft rewritten, as it is written.
+///
+/// The same request as `conversations.write_reply`, answered as a
+/// Server-Sent Events stream once every check passed (a refusal is an
+/// ordinary problem answer). Events, each `data` a JSON object:
+/// `thinking` (`{"delta"}`: Scout's reasoning as it arrives, when the model
+/// shows it, at most 8,000 characters in all), `text` (`{"delta"}`: the
+/// reply's words as they arrive, at most 4,000 characters), then exactly one
+/// of `done` (a `ReplyText`: the whole reply, as `write_reply` answers it)
+/// or `error` (a problem: `reply_failed` or `reply_timed_out`), after which
+/// the stream ends. A comment every 10 seconds keeps the connection open.
+/// The stream ends with `reply_timed_out` after 30 seconds without a sign
+/// from the model or 2 minutes in all. Nothing is saved or sent, and an
+/// `Idempotency-Key` does not make the answer replayable.
+#[utoipa::path(
+    post,
+    path = "/api/v1/w/{workspace_id}/conversations/{conversation_id}/reply/draft/stream",
+    operation_id = "conversations.stream_reply",
+    tag = "conversations",
+    security(("bearer" = ["conversations:send"])),
+    // A command, like `write_reply`: nothing is saved or sent.
+    extensions(("x-campbooks" = json!(Operation::command(Risk::Low).records(["conversations.message"]).access("conversations.inbox", campbooks_kernel::authz::Action::Send)))),
+    params(
+        ("workspace_id" = WorkspaceId, Path, description = "The workspace."),
+        ("conversation_id" = ConversationId, Path, description = "The conversation."),
+    ),
+    request_body = WriteReply,
+    responses(
+        (status = OK, description = "The reply as it is written: `thinking`, `text`, then `done` or `error`.",
+            content_type = "text/event-stream", body = String),
+        (status = BAD_REQUEST, description = "No intent, or an intent, change, draft or suggestion too long, \
+            or more than three suggestions (`reply_ask_invalid`).",
+            body = Problem, content_type = "application/problem+json"),
+        (status = UNAUTHORIZED, description = "No valid access token.", body = Problem,
+            content_type = "application/problem+json"),
+        (status = FORBIDDEN, description = "Missing scope, or you may only read this inbox (`inbox_read_only`).",
+            body = Problem, content_type = "application/problem+json"),
+        (status = NOT_FOUND, description = "No such conversation or message, or you cannot see it.",
+            body = Problem, content_type = "application/problem+json"),
+        (status = TOO_MANY_REQUESTS, description = "Too many replies asked for this hour.", body = Problem,
+            content_type = "application/problem+json"),
+        (status = CONFLICT, description = "No language model may read mail here (`reply_unavailable`): write the reply yourself.",
+            body = Problem, content_type = "application/problem+json"),
+        (status = SERVICE_UNAVAILABLE, description = "The language model failed (`reply_failed`), \
+            sent nothing in time (`reply_timed_out`), or the workspace used its whole daily AI limit \
+            (`ai_daily_limit_reached`).",
+            body = Problem, content_type = "application/problem+json"),
+    )
+)]
+pub async fn stream(
+    State(state): State<AppState>,
+    Extension(writer): Extension<ReplyWriter>,
+    workspace: Workspace<ConversationsSend>,
+    locale: Locale,
+    deadline: Option<Extension<Deadline>>,
+    extract::Path(path): extract::Path<ConversationPath>,
+    extract::Json(body): extract::Json<WriteReply>,
+) -> Result<Response> {
+    // The head waits for the model's first byte at most `IDLE`, after
+    // reading the conversation (given up to 30 s more); the body has its
+    // own limits (`stream::drive`).
+    allow(deadline.as_ref(), stream::IDLE + Duration::from_secs(30));
+    let written = written(
+        &state,
+        &writer,
+        &workspace,
+        path.conversation_id,
+        &body,
+        locale,
+    )
+    .await?;
+    let feature = "conversations.stream_reply";
+    let mut request = written.request;
+    // Past the module's own limits, so those fire first: the wait for the
+    // head (`IDLE`), then the body's `TOTAL`, counted from the head.
+    request.timeout = Some(stream::IDLE + stream::TOTAL + Duration::from_secs(10));
+    // The daily cap is checked here, inside the scope, before the stream
+    // exists: a workspace past it gets an ordinary problem.
+    let usage = Scope::workspace(state.db.clone(), workspace.id, feature).interactive();
+    let opened = usage
+        .run(tokio::time::timeout(
+            stream::IDLE,
+            written.gateway.chat_stream(Role::Complete, request),
+        ))
+        .await;
+    let chat = match opened {
+        Ok(Ok(chat)) => chat,
+        Ok(Err(error @ campbooks_ai::Error::OverDailyCap { .. })) => return Err(error.into()),
+        Ok(Err(error)) => {
+            // The kind only: a provider's error can echo the request.
+            tracing::warn!(
+                feature,
+                error = error_kind(&error),
+                "reply: the model call failed"
+            );
+            return Err(failure(&error));
+        }
+        Err(_) => {
+            tracing::warn!(
+                feature,
+                error = "timeout",
+                "reply: the model sent nothing in time"
+            );
+            return Err(Error::Unavailable(
+                crate::MESSAGES.reason("reply_timed_out"),
+            ));
+        }
+    };
+    let frames = stream::drive(
+        chat,
+        stream::Limits::default(),
+        written.message,
+        locale,
+        written.rewrite,
+    );
+    let mut response = Sse::new(frames)
+        .keep_alive(KeepAlive::new().interval(stream::KEEP_ALIVE))
+        .into_response();
+    // Tell buffering reverse proxies (nginx) to pass frames through at once.
+    response
+        .headers_mut()
+        .insert("x-accel-buffering", HeaderValue::from_static("no"));
+    Ok(response)
+}
+
+/// Let the request run `limit` past the server's default, when it has a
+/// deadline (the server's routes; not a bare module in tests).
+fn allow(deadline: Option<&Extension<Deadline>>, limit: Duration) {
+    if let Some(Extension(deadline)) = deadline {
+        deadline.allow(limit);
+    }
+}
+
+/// What a written reply is asked for, checked.
+struct Asked<'a> {
+    intent: &'a str,
+    change: Option<&'a str>,
+    draft: Option<&'a str>,
+    shorter: bool,
+    /// The likely replies shown, cleaned, in order.
+    suggestions: Vec<String>,
+}
+
+/// The request's bounds: an intent of 1 to [`MAX_ASK_CHARS`] characters, a
+/// change as long at most, a draft of at most [`MAX_DRAFT_CHARS`], and at
+/// most [`prompt::MAX_INTENTS`] suggestions of 1 to
+/// [`prompt::MAX_INTENT_CHARS`] characters; otherwise 400
+/// `reply_ask_invalid`, before anything is read. Nothing reads the member's
+/// words to decide anything: the model resolves "1 and 3".
+fn validate(body: &WriteReply) -> Result<Asked<'_>> {
     let intent = body.intent.trim();
     let change = body
         .change
@@ -328,10 +560,16 @@ pub async fn write(
         .filter(|c| !c.is_empty());
     let draft = body.draft.as_deref().filter(|d| !d.trim().is_empty());
     let too_long = |text: &str, max: usize| text.chars().count() > max;
+    let bad_suggestion = |text: &String| {
+        let text = text.trim();
+        text.is_empty() || too_long(text, prompt::MAX_INTENT_CHARS)
+    };
     if intent.is_empty()
         || too_long(intent, MAX_ASK_CHARS)
         || change.is_some_and(|c| too_long(c, MAX_ASK_CHARS))
         || draft.is_some_and(|d| too_long(d, MAX_DRAFT_CHARS))
+        || body.suggestions.len() > prompt::MAX_INTENTS
+        || body.suggestions.iter().any(bad_suggestion)
     {
         return Err(Error::BadRequest(
             crate::MESSAGES
@@ -339,11 +577,50 @@ pub async fn write(
                 .arg("max", MAX_ASK_CHARS),
         ));
     }
+    Ok(Asked {
+        intent,
+        change,
+        draft,
+        shorter: body.shorter,
+        suggestions: body
+            .suggestions
+            .iter()
+            .map(|s| prompt::suggestion(s))
+            .collect(),
+    })
+}
+
+/// A written reply's request, ready for the model.
+struct Written<'a> {
+    gateway: &'a Gateway,
+    /// The message answered.
+    message: MessageId,
+    request: ChatRequest,
+    /// A rewrite of the member's draft.
+    rewrite: bool,
+    /// The member's note about the person went with it.
+    noted: bool,
+    /// Messages of the conversation the model reads.
+    messages: usize,
+}
+
+/// Check the request and the caller, read what a written reply is written
+/// from, and build the model's request: shared by `write_reply` and
+/// `stream_reply`.
+async fn written<'a>(
+    state: &AppState,
+    writer: &'a ReplyWriter,
+    workspace: &Workspace<ConversationsSend>,
+    conversation: ConversationId,
+    body: &WriteReply,
+    locale: Locale,
+) -> Result<Written<'a>> {
+    let asked = validate(body)?;
     let read = prepare(
-        &state,
-        &writer,
-        &workspace,
-        path.conversation_id,
+        state,
+        writer,
+        workspace,
+        conversation,
         body.message_id,
         true,
     )
@@ -356,35 +633,31 @@ pub async fn write(
         .or(read.inbox_name.as_deref())
         .map(str::trim)
         .filter(|name| !name.is_empty());
-    let rewriting = draft.is_some() && (change.is_some() || body.shorter);
-    let asked = Ask {
-        intent,
+    let rewriting = asked.draft.is_some() && (asked.change.is_some() || asked.shorter);
+    let ask = Ask {
+        intent: asked.intent,
         my_name,
-        draft: if rewriting { draft } else { None },
-        change: if rewriting { change } else { None },
-        shorter: rewriting && body.shorter,
+        draft: if rewriting { asked.draft } else { None },
+        change: if rewriting { asked.change } else { None },
+        shorter: rewriting && asked.shorter,
+        suggestions: asked
+            .suggestions
+            .iter()
+            .enumerate()
+            .map(|(at, says)| Suggestion {
+                number: at + 1,
+                says,
+            })
+            .collect(),
     };
-    let answer: prompt::Reply = ask(
-        &state,
-        read.gateway,
-        workspace.id,
-        "conversations.write_reply",
-        prompt::write(&context, &read.person, &asked),
-    )
-    .await?;
-    let text = prompt::reply(&answer.reply)
-        .ok_or_else(|| Error::Unavailable(crate::MESSAGES.reason("reply_failed")))?;
-    tracing::info!(
-        rewrite = rewriting,
-        noted = read.person.note.is_some(),
-        messages = context.conversation.messages.len(),
-        latency_ms = u64::try_from(started.elapsed().as_millis()).unwrap_or(u64::MAX),
-        "reply written"
-    );
-    Ok(Json(ReplyText {
-        message_id: read.message,
-        text,
-    }))
+    Ok(Written {
+        gateway: read.gateway,
+        message: read.message,
+        request: prompt::write(&context, &read.person, &ask),
+        rewrite: rewriting,
+        noted: read.person.note.is_some(),
+        messages: context.conversation.messages.len(),
+    })
 }
 
 /// What a reply is written from.
@@ -752,37 +1025,24 @@ fn cut_bytes(text: &str, max: usize) -> String {
 }
 
 /// Ask the model, as a person waiting (the interactive share of the
-/// workspace's daily AI limit), and read its answer as `T`.
-async fn ask<T: DeserializeOwned>(
+/// workspace's daily AI limit), giving it `timeout`. A failure is 503
+/// `reply_timed_out` when the model took too long, else `reply_failed`, and
+/// is logged by kind only.
+async fn ask(
     state: &AppState,
     gateway: &Gateway,
     workspace: WorkspaceId,
     feature: &'static str,
-    request: campbooks_ai::ChatRequest,
-) -> Result<T> {
+    mut request: ChatRequest,
+    timeout: Duration,
+) -> Result<ChatResponse> {
+    request.timeout = Some(timeout);
     let usage = Scope::workspace(state.db.clone(), workspace, feature).interactive();
-    match usage.run(gateway.chat(Role::Complete, request)).await {
-        Ok(response) => response.json::<T>().map_err(|_| {
-            // Why it stopped and how long its answer was, never what it
-            // wrote; nor the parser's message, which can quote it.
-            let finish_reason = response.finish_kind();
-            let reason = if response.content.trim().is_empty() {
-                "empty"
-            } else if finish_reason == "length" {
-                "truncated"
-            } else {
-                "not_json"
-            };
-            tracing::warn!(
-                feature,
-                reason,
-                finish_reason,
-                completion_tokens = response.usage.map(|usage| usage.completion_tokens),
-                content_chars = response.content.chars().count(),
-                "reply: the model's answer is not the schema"
-            );
-            Error::Unavailable(crate::MESSAGES.reason("reply_failed"))
-        }),
+    let mut waiting = Waiting::new(feature);
+    let result = usage.run(gateway.chat(Role::Complete, request)).await;
+    let elapsed_ms = waiting.answered();
+    match result {
+        Ok(response) => Ok(response),
         // The workspace used its whole daily AI limit: 503, saying so.
         Err(error @ campbooks_ai::Error::OverDailyCap { .. }) => Err(error.into()),
         Err(error) => {
@@ -790,11 +1050,88 @@ async fn ask<T: DeserializeOwned>(
             tracing::warn!(
                 feature,
                 error = error_kind(&error),
+                elapsed_ms,
                 "reply: the model call failed"
             );
-            Err(Error::Unavailable(crate::MESSAGES.reason("reply_failed")))
+            Err(failure(&error))
         }
     }
+}
+
+/// A model call being waited on: says so in the log if it is dropped before
+/// the model answered (the server's time limit stopped it, or the caller
+/// hung up), with how long it had waited.
+struct Waiting {
+    feature: &'static str,
+    started: Instant,
+    pending: bool,
+}
+
+impl Waiting {
+    fn new(feature: &'static str) -> Self {
+        Self {
+            feature,
+            started: Instant::now(),
+            pending: true,
+        }
+    }
+
+    /// The model answered (or failed): milliseconds waited.
+    fn answered(&mut self) -> u64 {
+        self.pending = false;
+        millis(self.started.elapsed())
+    }
+}
+
+impl Drop for Waiting {
+    fn drop(&mut self) {
+        if self.pending {
+            tracing::warn!(
+                feature = self.feature,
+                elapsed_ms = millis(self.started.elapsed()),
+                "reply: stopped before the model answered"
+            );
+        }
+    }
+}
+
+/// An answer that cannot be used: logged by why the model stopped and how
+/// long its answer was, never what it wrote (nor a parser's message, which
+/// can quote it); 503 `reply_failed`.
+fn unusable(feature: &'static str, response: &ChatResponse) -> Error {
+    let finish_reason = response.finish_kind();
+    let reason = if response.content.trim().is_empty() {
+        "empty"
+    } else if finish_reason == "length" {
+        "truncated"
+    } else {
+        "not_json"
+    };
+    tracing::warn!(
+        feature,
+        reason,
+        finish_reason,
+        completion_tokens = response.usage.map(|usage| usage.completion_tokens),
+        content_chars = response.content.chars().count(),
+        "reply: the model's answer cannot be used"
+    );
+    Error::Unavailable(crate::MESSAGES.reason("reply_failed"))
+}
+
+/// The problem for a failed model call: `reply_timed_out` when it took too
+/// long, else `reply_failed`.
+fn failure(error: &campbooks_ai::Error) -> Error {
+    let code = if timed_out(error) {
+        "reply_timed_out"
+    } else {
+        "reply_failed"
+    };
+    Error::Unavailable(crate::MESSAGES.reason(code))
+}
+
+/// Whether the model call failed by taking too long.
+fn timed_out(error: &campbooks_ai::Error) -> bool {
+    matches!(error, campbooks_ai::Error::Transport(e) if e.is_timeout())
 }
 
 /// What kind of failure, for the log: never the provider's words.
@@ -802,6 +1139,7 @@ fn error_kind(error: &campbooks_ai::Error) -> &'static str {
     match error {
         campbooks_ai::Error::RoleNotConfigured(_) => "role_not_configured",
         campbooks_ai::Error::ExternalContentRefused { .. } => "external_content_refused",
+        campbooks_ai::Error::Transport(e) if e.is_timeout() => "timeout",
         campbooks_ai::Error::Transport(_) => "transport",
         campbooks_ai::Error::Status { .. } => "status",
         campbooks_ai::Error::InvalidResponse(_) => "invalid_response",
@@ -811,6 +1149,10 @@ fn error_kind(error: &campbooks_ai::Error) -> &'static str {
         campbooks_ai::Error::Unattributed => "unattributed",
         campbooks_ai::Error::Metering => "metering",
     }
+}
+
+fn millis(duration: Duration) -> u64 {
+    u64::try_from(duration.as_millis()).unwrap_or(u64::MAX)
 }
 
 #[cfg(test)]

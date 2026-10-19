@@ -4,7 +4,13 @@ import { describe, expect, it, vi } from "vitest";
 import { Q4, Q4_DETAIL, W } from "../../../../../test/demo/conversations";
 import { REPLY } from "../../../../../test/demo/drafts";
 import { DUARTE } from "../../../../../test/demo/workspaces";
-import { mockApi, problem, renderWithProviders } from "../../../../../test/render";
+import {
+  mockApi,
+  problem,
+  renderWithProviders,
+  replyStream,
+  type MockHandler,
+} from "../../../../../test/render";
 
 import { ReplyDialog, type ReplyResume } from "./ReplyDialog";
 
@@ -39,13 +45,39 @@ const NEWER = {
   attachments: [],
 };
 const WITH_NEWER = { ...Q4_DETAIL, messages: [...Q4_DETAIL.messages, NEWER] };
+/** The likely replies the dialog shows, sent with every draft asked for. */
+const INTENTS = ["Say Thursday works", "Ask for more time"];
+/** The draft route the web dialog calls: the reply streams. */
+const WRITE = `POST ${C}/reply/draft/stream`;
 
+/**
+ * The streamed reply route answering what `write` answers as JSON: some
+ * thinking, the words, then done (a problem stays a problem).
+ */
+function streamed(write: MockHandler): MockHandler {
+  return (request, body) => {
+    const answer = typeof write === "function" ? write(request, body) : write;
+    if ((answer.status ?? 200) >= 400) {
+      return answer;
+    }
+    const done = answer.body as { message_id: string; text: string };
+    return replyStream(done.message_id, done.text);
+  };
+}
+
+/** The API, its draft answers (`POST …/reply/draft`) streamed as the web dialog asks them. */
 function routes(extra: Parameters<typeof mockApi>[0] = {}) {
-  return mockApi({
+  const all = defaults(extra);
+  const draft = all[`POST ${C}/reply/draft`];
+  return mockApi(
+    draft === undefined || all[WRITE] !== undefined ? all : { ...all, [WRITE]: streamed(draft) },
+  );
+}
+
+function defaults(extra: Parameters<typeof mockApi>[0]): Parameters<typeof mockApi>[0] {
+  return {
     [`GET ${C}`]: { body: Q4_DETAIL },
-    [`POST ${C}/reply/suggestions`]: {
-      body: { message_id: NEWEST, intents: ["Say Thursday works", "Ask for more time"] },
-    },
+    [`POST ${C}/reply/suggestions`]: { body: { message_id: NEWEST, intents: INTENTS } },
     [`POST ${C}/reply/draft`]: (_request, body) => ({
       body: {
         message_id: NEWEST,
@@ -62,7 +94,7 @@ function routes(extra: Parameters<typeof mockApi>[0] = {}) {
     },
     [`POST ${D}/${REPLY.id}/cancel_send`]: { body: { ...REPLY, body: SHORT, version: 3 } },
     ...extra,
-  });
+  };
 }
 
 function dialog(props: Partial<Parameters<typeof ReplyDialog>[0]> = {}) {
@@ -88,23 +120,25 @@ describe("ReplyDialog", () => {
     const first = await screen.findByRole("button", { name: /Say Thursday works/u });
     expect(first).toHaveFocus();
     // Nothing is written before a pick.
-    expect(api.calls.some((c) => c.route === `POST ${C}/reply/draft`)).toBe(false);
+    expect(api.calls.some((c) => c.route === WRITE)).toBe(false);
 
     fireEvent.keyDown(first, { key: "1" });
     const text = await screen.findByRole("textbox", { name: "Your reply" });
     expect(text).toHaveValue(DRAFT);
-    expect(api.calls.find((c) => c.route === `POST ${C}/reply/draft`)?.body).toEqual({
+    expect(api.calls.find((c) => c.route === WRITE)?.body).toEqual({
       message_id: NEWEST,
       intent: "Say Thursday works",
+      suggestions: INTENTS,
     });
 
     fireEvent.click(screen.getByRole("button", { name: /Shorter/u }));
     await waitFor(() => {
       expect(screen.getByRole("textbox", { name: "Your reply" })).toHaveValue(SHORT);
     });
-    expect(api.calls.findLast((c) => c.route === `POST ${C}/reply/draft`)?.body).toEqual({
+    expect(api.calls.findLast((c) => c.route === WRITE)?.body).toEqual({
       message_id: NEWEST,
       intent: "Say Thursday works",
+      suggestions: INTENTS,
       draft: DRAFT,
       shorter: true,
       change: null,
@@ -357,9 +391,10 @@ describe("ReplyDialog", () => {
         "Hi Leo, Friday works too.",
       );
     });
-    expect(api.calls.findLast((c) => c.route === `POST ${C}/reply/draft`)?.body).toEqual({
+    expect(api.calls.findLast((c) => c.route === WRITE)?.body).toEqual({
       message_id: NEWER.id,
       intent: "Say Thursday works",
+      suggestions: INTENTS,
     });
     expect(screen.queryByText(/A newer message from/u)).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: /^Send/u }));
@@ -421,7 +456,7 @@ describe("ReplyDialog", () => {
     await queryClient.refetchQueries();
     fireEvent.click(await screen.findByRole("button", { name: "Answer the newer one" }));
     await waitFor(() => {
-      expect(api.calls.findLast((c) => c.route === `POST ${C}/reply/draft`)?.body).toMatchObject({
+      expect(api.calls.findLast((c) => c.route === WRITE)?.body).toMatchObject({
         message_id: NEWER.id,
       });
     });
@@ -571,15 +606,101 @@ describe("ReplyDialog", () => {
     ).toBeVisible();
   });
 
+  it("shows Scout thinking, then the reply typing in, then folds the thinking away", async () => {
+    const frame = (event: string, data: unknown) =>
+      `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
+    let asked: Request | undefined;
+    routes({
+      [WRITE]: (request) => {
+        asked = request;
+        return {
+          stream: [frame("thinking", { delta: "Maya asks whether Thursday works." })],
+          open: true,
+        };
+      },
+    });
+    const { unmount } = renderWithProviders(
+      <ReplyDialog
+        workspaceId={DUARTE.id}
+        conversationId={Q4.id}
+        onClose={vi.fn()}
+        onWriteOwn={vi.fn()}
+        onOpenDraft={vi.fn()}
+      />,
+    );
+    fireEvent.keyDown(await screen.findByRole("button", { name: /Say Thursday works/u }), {
+      key: "1",
+    });
+    expect(await screen.findByText("Maya asks whether Thursday works.")).toBeVisible();
+    expect(screen.getByText("Scout is thinking…")).toBeVisible();
+    // Closing stops the request in flight.
+    unmount();
+    expect(asked?.signal.aborted).toBe(true);
+  });
+
+  it("folds Scout's thinking away once the reply is written", async () => {
+    routes();
+    dialog();
+    fireEvent.keyDown(await screen.findByRole("button", { name: /Say Thursday works/u }), {
+      key: "1",
+    });
+    expect(await screen.findByRole("textbox", { name: "Your reply" })).toHaveValue(DRAFT);
+    const thoughts = screen.getByText("How Scout thought about it");
+    expect(thoughts.closest("details")).not.toHaveAttribute("open");
+    fireEvent.click(thoughts);
+    expect(screen.getByText("Reading the message.")).toBeVisible();
+  });
+
+  it("says when Scout took too long, and offers the choices again", async () => {
+    routes({
+      [WRITE]: {
+        stream: [
+          `event: error\ndata: ${JSON.stringify({ status: 503, code: "reply_timed_out", title: "x", detail: "y", type: "about:blank" })}\n\n`,
+        ],
+      },
+    });
+    dialog();
+    fireEvent.keyDown(await screen.findByRole("button", { name: /Say Thursday works/u }), {
+      key: "1",
+    });
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "Scout took too long to answer. Try again, or write it yourself.",
+    );
+    expect(screen.getByRole("button", { name: /Say Thursday works/u })).toBeVisible();
+  });
+
+  it("puts the member's text back when a rewrite fails after its first words", async () => {
+    routes({
+      [WRITE]: {
+        stream: [
+          `event: text\ndata: {"delta":"Hi"}\n\n`,
+          `event: error\ndata: ${JSON.stringify({ status: 503, code: "reply_failed" })}\n\n`,
+        ],
+      },
+    });
+    const resume: ReplyResume = {
+      draft: { ...REPLY, message_id: NEWEST, body: DRAFT },
+      intent: "Say Thursday works",
+    };
+    dialog({ resume });
+    const text = await screen.findByRole("textbox", { name: "Your reply" });
+    fireEvent.change(text, { target: { value: `${DRAFT} Edited.` } });
+    fireEvent.click(screen.getByRole("button", { name: /Shorter/u }));
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "Scout couldn't write that just now",
+    );
+    expect(screen.getByRole("textbox", { name: "Your reply" })).toHaveValue(`${DRAFT} Edited.`);
+  });
+
   it("closes with Esc and creates nothing", async () => {
     const api = routes();
     const handlers = dialog();
     const first = await screen.findByRole("button", { name: /Say Thursday works/u });
     fireEvent.keyDown(first, { key: "Escape" });
     expect(handlers.onClose).toHaveBeenCalled();
-    expect(api.calls.some((c) => c.route === `POST ${D}` || c.route.endsWith("/reply/draft"))).toBe(
-      false,
-    );
+    expect(
+      api.calls.some((c) => c.route === `POST ${D}` || c.route.endsWith("/reply/draft/stream")),
+    ).toBe(false);
   });
 
   it("offers only Write my own when no model may read mail on this server", async () => {
@@ -937,15 +1058,16 @@ describe("ReplyDialog: telling Scout about the person", () => {
     expect(await screen.findByRole("button", { name: /^Undo/u })).toBeInTheDocument();
 
     // Nothing is written again on its own: only on Rewrite with this.
-    const writes = () => api.calls.filter((c) => c.route === `POST ${C}/reply/draft`).length;
+    const writes = () => api.calls.filter((c) => c.route === WRITE).length;
     expect(writes()).toBe(1);
     fireEvent.click(screen.getByRole("button", { name: /Rewrite with this/u }));
     await waitFor(() => {
       expect(writes()).toBe(2);
     });
-    expect(api.calls.findLast((c) => c.route === `POST ${C}/reply/draft`)?.body).toEqual({
+    expect(api.calls.findLast((c) => c.route === WRITE)?.body).toEqual({
       message_id: NEWEST,
       intent: "Say Thursday works",
+      suggestions: INTENTS,
     });
   });
 

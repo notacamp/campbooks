@@ -13,7 +13,10 @@ const API_URL_ENV: &str = "CAMPBOOKS_API_URL";
 const DEFAULT_API_URL: &str = "http://localhost:8080";
 /// Only the versioned public API is reachable through the bridge.
 const API_PREFIX: &str = "/api/v1/";
-const TIMEOUT: Duration = Duration::from_secs(30);
+/// How long a request may take: the server's longest route limit (100 s,
+/// `kernel::time_limit::MAX`), so a slow reply draft (90 s) is answered by
+/// the server, never cut off here (campbooks-cloud#288).
+const TIMEOUT: Duration = Duration::from_secs(100);
 
 #[derive(Debug, thiserror::Error)]
 pub enum ApiError {
