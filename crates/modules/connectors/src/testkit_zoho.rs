@@ -64,6 +64,10 @@ enum SendFault {
 }
 
 #[derive(Debug)]
+#[allow(
+    clippy::struct_excessive_bools,
+    reason = "independent switches of the fake, one per fault"
+)]
 struct State {
     /// The time sends are stamped with (the module's clock).
     clock: Arc<FixedClock>,

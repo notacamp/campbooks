@@ -1098,6 +1098,13 @@ mod tests {
             }),
             Mapped::Skip("label_not_at_provider")
         );
+    }
+
+    #[test]
+    fn zoho_moves_go_through_stream_marks() {
+        let lab = uuid::Uuid::nil();
+        let known: HashSet<String> = ["123".to_owned()].into();
+        let map_zoho = |change: &RequestedChange| super::map_zoho(change, Some(&known));
         let moved = |stream: &str| {
             map_zoho(&RequestedChange::MoveToStream {
                 stream: stream.into(),

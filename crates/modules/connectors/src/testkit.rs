@@ -1279,34 +1279,37 @@ fn has_message_id(raw: &[u8], id: &str) -> bool {
         .contains(&needle)
 }
 
+/// `labels.list`: Gmail's system labels and the user labels.
+fn labels_list(mailbox: &Mailbox) -> ResponseTemplate {
+    let mut labels = vec![
+        serde_json::json!({"id": "INBOX", "name": "INBOX", "type": "system"}),
+        serde_json::json!({"id": "UNREAD", "name": "UNREAD", "type": "system"}),
+        serde_json::json!({"id": "STARRED", "name": "STARRED", "type": "system"}),
+        serde_json::json!({"id": "SENT", "name": "SENT", "type": "system"}),
+        serde_json::json!({"id": "CATEGORY_PERSONAL", "name": "CATEGORY_PERSONAL", "type": "system"}),
+        serde_json::json!({"id": "CATEGORY_UPDATES", "name": "CATEGORY_UPDATES", "type": "system"}),
+        serde_json::json!({"id": "CATEGORY_PROMOTIONS", "name": "CATEGORY_PROMOTIONS", "type": "system"}),
+        serde_json::json!({"id": "CATEGORY_SOCIAL", "name": "CATEGORY_SOCIAL", "type": "system"}),
+        serde_json::json!({"id": "CATEGORY_FORUMS", "name": "CATEGORY_FORUMS", "type": "system"}),
+        serde_json::json!({"id": "Label_7", "name": "Clients", "type": "user"}),
+        serde_json::json!({"id": "Label_9", "name": "Receipts", "type": "user"}),
+    ];
+    labels.extend(
+        mailbox
+            .user_labels
+            .iter()
+            .map(|(id, name)| serde_json::json!({"id": id, "name": name, "type": "user"})),
+    );
+    json(200, &serde_json::json!({ "labels": labels }))
+}
+
 fn gmail_api(mailbox: &Mailbox, path: &str, query: &HashMap<String, String>) -> ResponseTemplate {
     match path {
         "profile" => json(
             200,
             &serde_json::json!({"emailAddress": ACCOUNT_EMAIL, "historyId": mailbox.history_id.to_string()}),
         ),
-        "labels" => {
-            let mut labels = vec![
-                serde_json::json!({"id": "INBOX", "name": "INBOX", "type": "system"}),
-                serde_json::json!({"id": "UNREAD", "name": "UNREAD", "type": "system"}),
-                serde_json::json!({"id": "STARRED", "name": "STARRED", "type": "system"}),
-                serde_json::json!({"id": "SENT", "name": "SENT", "type": "system"}),
-                serde_json::json!({"id": "CATEGORY_PERSONAL", "name": "CATEGORY_PERSONAL", "type": "system"}),
-                serde_json::json!({"id": "CATEGORY_UPDATES", "name": "CATEGORY_UPDATES", "type": "system"}),
-                serde_json::json!({"id": "CATEGORY_PROMOTIONS", "name": "CATEGORY_PROMOTIONS", "type": "system"}),
-                serde_json::json!({"id": "CATEGORY_SOCIAL", "name": "CATEGORY_SOCIAL", "type": "system"}),
-                serde_json::json!({"id": "CATEGORY_FORUMS", "name": "CATEGORY_FORUMS", "type": "system"}),
-                serde_json::json!({"id": "Label_7", "name": "Clients", "type": "user"}),
-                serde_json::json!({"id": "Label_9", "name": "Receipts", "type": "user"}),
-            ];
-            labels.extend(
-                mailbox
-                    .user_labels
-                    .iter()
-                    .map(|(id, name)| serde_json::json!({"id": id, "name": name, "type": "user"})),
-            );
-            json(200, &serde_json::json!({ "labels": labels }))
-        }
+        "labels" => labels_list(mailbox),
         "messages" => {
             let after = query
                 .get("q")
