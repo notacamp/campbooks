@@ -676,7 +676,7 @@
     "whose": "Mostrar imágenes de",
     "imagesTitle": "Mostrar siempre las imágenes de {{sender}}",
     "imagesAddress": "Solo {{address}}",
-    "imagesAddressDetail": "Correo de esta dirección cuando pasan las comprobaciones de {{domain}}. Esas comprobaciones avalan el dominio, no a esta persona en concreto.",
+    "imagesAddressDetail": "Correo de esta dirección cuando pasan las comprobaciones de su dominio. Esas comprobaciones avalan el dominio, no a esta persona en concreto.",
     "imagesDomain": "Cualquier dirección de {{domain}}",
     "imagesDomainDetail": "Todas las direcciones de {{domain}} y de sus subdominios, cuando pasan las comprobaciones del propio dominio.",
     "imagesMatches_one": "Ya hay {{n}} conversación de este remitente. Sus imágenes se muestran siempre que su correo pasa las comprobaciones.",

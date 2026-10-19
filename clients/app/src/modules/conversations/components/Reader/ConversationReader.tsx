@@ -239,14 +239,13 @@ export function ConversationReader({
       return;
     }
     const address = message.from.address.trim().toLowerCase();
-    // What the checks vouch for: the domain, not the one person
-    // (campbooks-cloud#236).
-    const vouching = address.slice(address.lastIndexOf("@") + 1);
     const byAddress = {
       id: "address",
       heading: t("smartRule.imagesTitle", { sender: address }),
       title: t("smartRule.imagesAddress", { address }),
-      description: t("smartRule.imagesAddressDetail", { domain: vouching }),
+      // What the checks vouch for: its domain (the registrable one, as DKIM
+      // and DMARC align), not the one person (campbooks-cloud#236).
+      description: t("smartRule.imagesAddressDetail"),
       conditions: [{ field: "sender_address" as const, value: address }],
     };
     const byDomain =

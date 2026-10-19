@@ -6,7 +6,14 @@ import {
   useQueryClient,
 } from "@tanstack/react-query";
 
-import { api, operationKey, unwrap, unwrapEmpty, type Schema } from "~/lib/api";
+import {
+  api,
+  operationKey,
+  refreshBodiesAfterRules,
+  unwrap,
+  unwrapEmpty,
+  type Schema,
+} from "~/lib/api";
 
 export type Proactivity = Schema<"Proactivity">;
 export type CompileResult = Schema<"CompileResult">;
@@ -212,15 +219,14 @@ export function useRemoveRules(workspaceId: string) {
 }
 
 /**
- * After rules were created or removed here: the rules, and every message
- * body of the workspace, since a rule that trusts a sender's images shows or
- * hides them (campbooks-cloud#236). Other devices and members get the same
- * through the live change of the rule (`conversations.rule` is a record
- * `conversations.get_message_body` reads).
+ * After rules were created or removed here: the rules, and the workspace's
+ * message bodies, since a rule that trusts a sender's images shows or hides
+ * them; a body a rule trusted is dropped, never shown again from the cache
+ * (campbooks-cloud#236, `refreshBodiesAfterRules`). Other devices and members
+ * get the same through the live change of the rule (`conversations.rule` is
+ * a record `conversations.get_message_body` reads).
  */
 function refreshAfterRules(queryClient: QueryClient, workspaceId: string) {
   void queryClient.invalidateQueries({ queryKey: keys.rules(workspaceId) });
-  void queryClient.invalidateQueries({
-    queryKey: operationKey("conversations.get_message_body", { workspace_id: workspaceId }),
-  });
+  void refreshBodiesAfterRules(queryClient, workspaceId);
 }

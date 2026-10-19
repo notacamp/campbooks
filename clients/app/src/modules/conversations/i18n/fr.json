@@ -676,7 +676,7 @@
     "whose": "Afficher les images de",
     "imagesTitle": "Toujours afficher les images de {{sender}}",
     "imagesAddress": "Seulement {{address}}",
-    "imagesAddressDetail": "Les messages de cette adresse quand les vérifications de {{domain}} réussissent. Elles garantissent le domaine, pas cette personne en particulier.",
+    "imagesAddressDetail": "Les messages de cette adresse quand les vérifications de son domaine réussissent. Elles garantissent le domaine, pas cette personne en particulier.",
     "imagesDomain": "Toute adresse de {{domain}}",
     "imagesDomainDetail": "Toutes les adresses de {{domain}} et de ses sous-domaines, quand les vérifications du domaine lui-même réussissent.",
     "imagesMatches_one": "{{n}} conversation de cet expéditeur est déjà ici. Ses images s’affichent chaque fois que son courrier réussit ses vérifications.",

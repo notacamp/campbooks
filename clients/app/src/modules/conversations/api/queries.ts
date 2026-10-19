@@ -19,7 +19,7 @@ import {
   type Schema,
 } from "~/lib/api";
 
-import { bodyStaleTime, refetchBodyOnFocus } from "./body-freshness";
+import { bodyRefetchInterval, bodyStaleTime, refetchBodyOnFocus } from "./body-freshness";
 
 export type Stream = Schema<"Stream">;
 export type ConversationSummary = Schema<"ConversationSummary">;
@@ -221,10 +221,11 @@ export function useMessageBody(
   return useQuery<MessageBody>({
     queryKey: keys.body(workspaceId, conversationId, messageId, showImages, spam),
     enabled,
-    // Fresh until a live rule change re-reads it, or, without a live feed
-    // (the desktop and mobile shells), a minute for a body whose images
-    // depend on rules (campbooks-cloud#236).
+    // Fresh until a rule changes, live; without a live feed (the desktop and
+    // mobile shells), a body whose images depend on rules is read again
+    // (campbooks-cloud#236, `body-freshness.ts`).
     staleTime: (query) => bodyStaleTime(query.state.data, followsChangesLive()),
+    refetchInterval: (query) => bodyRefetchInterval(query.state.data, followsChangesLive()),
     refetchOnWindowFocus: (query) => refetchBodyOnFocus(query.state.data, followsChangesLive()),
     // "Show images" refetches it: keep the blocked version up meanwhile. Never
     // in spam: the version before may have had its images.

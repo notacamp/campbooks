@@ -102,6 +102,24 @@ describe("SafeHtml", () => {
     expect(frame(container).getAttribute("srcdoc")).toContain("img-src data: https: http:");
   });
 
+  it("takes remote images' sources out when holding them back from markup sent with them", () => {
+    const html =
+      '<img src="https://cdn.example.com/a.png" srcset="https://cdn.example.com/a2.png 2x" alt="A">' +
+      '<img src="data:image/png;base64,AAAA" alt="Part">';
+    const { container, rerender } = renderUi(
+      <SafeHtml html={html} title="Message" remoteImages holdRemoteImages />,
+    );
+    const held = frame(container).getAttribute("srcdoc") ?? "";
+    expect(held).not.toContain("cdn.example.com");
+    expect(held).toContain('src="data:image/png;base64,AAAA"');
+    expect(held).toContain(framePolicy(false));
+
+    rerender(<SafeHtml html={html} title="Message" remoteImages />);
+    expect(frame(container).getAttribute("srcdoc")).toContain(
+      'src="https://cdn.example.com/a.png"',
+    );
+  });
+
   it("sends no referrer and opens links in a new tab", () => {
     const { container } = renderUi(
       <SafeHtml html="<a href='https://example.com'>x</a>" title="M" />,

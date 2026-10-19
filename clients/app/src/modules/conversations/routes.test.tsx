@@ -505,7 +505,7 @@ describe("the inbox", () => {
     // The one choice still says what the checks vouch for (campbooks-cloud#236).
     expect(
       within(dialog).getByText(
-        "Mail from this address when weekly-ledger.example’s checks pass. Those checks vouch for the domain, not for this one person.",
+        "Mail from this address when its domain’s checks pass. Those checks vouch for the domain, not for this one person.",
       ),
     ).toBeVisible();
   });

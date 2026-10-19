@@ -134,7 +134,7 @@ describe("the change feed", () => {
       expect(stale(detail)).toBe("gone");
     });
 
-    it("re-reads, on a rule's change, the bodies whose images depend on rules", async () => {
+    it("drops, on a rule's change, the bodies a rule trusted, and re-reads those whose images depend on rules", async () => {
       // A rule that trusts a sender shows or hides its images: changed or
       // removed on another device or by another member, the bodies here
       // follow at once (campbooks-cloud#236). The server sends a removal as
@@ -148,14 +148,19 @@ describe("the change feed", () => {
         });
       for (const op of ["upsert", "delete"] as const) {
         const { client, stale } = seededClient();
-        client.setQueryData(body("trusted"), { html: "", images_trusted: true });
+        client.setQueryData(body("trusted"), { html: "<img src=x>", images_trusted: true });
         client.setQueryData(body("held"), { html: "", images_held: "rule_paused" });
         client.setQueryData(body("offered"), { html: "", images_offer: true, images_held: null });
         client.setQueryData(body("plain"), { html: "", images_trusted: false, images_held: null });
         createCacheBinding(client, WS).change({ type: "conversations.rule", id: "r1" }, op);
         await vi.advanceTimersByTimeAsync(50);
-        // Bodies with remote-image state are re-read; one without is not.
-        expect({ op, trusted: stale(body("trusted")) }).toEqual({ op, trusted: true });
+        // A trusted body is gone from the cache: reopened, it cannot show its
+        // remote images before it is read again.
+        expect({ op, trusted: client.getQueryData(body("trusted")) }).toEqual({
+          op,
+          trusted: undefined,
+        });
+        // Bodies with other remote-image state are re-read; one without is not.
         expect({ op, held: stale(body("held")) }).toEqual({ op, held: true });
         expect({ op, offered: stale(body("offered")) }).toEqual({ op, offered: true });
         expect({ op, plain: stale(body("plain")) }).toEqual({ op, plain: false });
@@ -170,6 +175,25 @@ describe("the change feed", () => {
       );
       await vi.advanceTimersByTimeAsync(50);
       expect(stale(body("plain"))).toBe(true);
+    });
+
+    it("drops the trusted bodies of the workspace alone, on a reset too", () => {
+      const body = (workspace: string) =>
+        operationKey("conversations.get_message_body", {
+          workspace_id: workspace,
+          conversation_id: "c1",
+          message_id: "m1",
+          show_images: "false",
+        });
+      const { client } = seededClient();
+      client.setQueryData(body(WS), { html: "<img src=x>", images_trusted: true });
+      client.setQueryData(body(OTHER_WS), { html: "<img src=x>", images_trusted: true });
+      createCacheBinding(client, WS).reset();
+      expect(client.getQueryData(body(WS))).toBeUndefined();
+      expect(client.getQueryData(body(OTHER_WS))).toEqual({
+        html: "<img src=x>",
+        images_trusted: true,
+      });
     });
 
     it("ignores record types no read operation returns", async () => {
