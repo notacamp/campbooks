@@ -1,5 +1,6 @@
 //! `GET /api/v1/w/{workspace_id}/conversations` — conversations by stream,
-//! pinned first (the provider's star), then newest first, a page at a time.
+//! pinned first (the provider's star), then newest first, a page at a time;
+//! or one of the inbox's other places (Sent, Archive, Spam, Trash; campbooks-cloud#240).
 
 use axum::{Extension, Json, extract::State};
 use base64::{Engine as _, engine::general_purpose::URL_SAFE_NO_PAD};
@@ -21,7 +22,7 @@ use crate::{
     domain::{
         access::visible_inboxes,
         actions,
-        conversation::{ConversationSummary, SummaryRow},
+        conversation::{ConversationSummary, SUMMARY_SELECT, SummaryRow},
         needs, rules, suggestions,
     },
     model::{ConversationId, InboxId, Stream},
@@ -34,6 +35,67 @@ pub const DEFAULT_LIMIT: u32 = 50;
 /// Largest page.
 pub const MAX_LIMIT: u32 = 100;
 
+/// Which of the inbox's places a list shows. The streams are the inbox;
+/// the other views sit beside them and are not streams.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Deserialize, ToSchema)]
+#[serde(rename_all = "lowercase")]
+pub enum MailView {
+    /// Conversations in the inbox (by stream with `stream`), pinned first.
+    #[default]
+    Inbox,
+    /// Every conversation the inbox wrote in, outside spam and the trash, in
+    /// any stream, archived or not, by the inbox's latest message.
+    Sent,
+    /// Conversations out of the inbox, outside spam and the trash.
+    Archive,
+    /// Conversations reported as spam.
+    Spam,
+    /// Conversations in the trash.
+    Trash,
+}
+
+/// How a view filters and orders its list: fixed SQL fragments only.
+struct Order {
+    /// The `WHERE` condition on `c`.
+    filter: &'static str,
+    /// The column pages are keyed on and sorted by, newest first.
+    at: &'static str,
+    /// Pinned conversations come first (the inbox only).
+    pinned: bool,
+}
+
+impl MailView {
+    const fn order(self) -> Order {
+        match self {
+            Self::Inbox => Order {
+                filter: "c.archived_at IS NULL AND NOT c.trashed",
+                at: "c.last_message_at",
+                pinned: true,
+            },
+            Self::Sent => Order {
+                filter: "c.last_sent_at IS NOT NULL AND NOT c.trashed",
+                at: "c.last_sent_at",
+                pinned: false,
+            },
+            Self::Archive => Order {
+                filter: "c.archived_at IS NOT NULL AND NOT c.trashed",
+                at: "c.last_message_at",
+                pinned: false,
+            },
+            Self::Spam => Order {
+                filter: "c.trashed AND c.spam",
+                at: "c.last_message_at",
+                pinned: false,
+            },
+            Self::Trash => Order {
+                filter: "c.trashed AND NOT c.spam",
+                at: "c.last_message_at",
+                pinned: false,
+            },
+        }
+    }
+}
+
 /// Which conversations, and which page.
 #[derive(Debug, Clone, Default, Deserialize, IntoParams)]
 #[into_params(parameter_in = Query)]
@@ -42,7 +104,11 @@ pub struct ListQuery {
     pub stream: Option<Stream>,
     /// Only this inbox; every inbox you can read when absent.
     pub inbox: Option<InboxId>,
-    /// `true` for archived conversations instead of those in the inbox.
+    /// Which place: the inbox (default), Sent, Archive, Spam or Trash.
+    #[param(inline)]
+    pub view: Option<MailView>,
+    /// Deprecated: use `view=archive`. `true` lists the archive, as
+    /// `view=archive` does; with another `view` it is a bad request.
     #[serde(default)]
     pub archived: bool,
     /// `next_cursor` of the previous page.
@@ -50,21 +116,33 @@ pub struct ListQuery {
     /// Page size, 1 to 100 (default 50).
     pub limit: Option<u32>,
     /// These conversations only (1 to 100 ids, comma-separated), whatever
-    /// their stream or whether archived; those you cannot see are left
-    /// out. Other filters and the cursor are ignored.
+    /// their stream, view or whether archived; those you cannot see are
+    /// left out. Other filters and the cursor are ignored.
     pub ids: Option<String>,
+}
+
+impl ListQuery {
+    /// The view asked for, `archived=true` read as `view=archive`.
+    fn view(&self) -> Result<MailView> {
+        match (self.archived, self.view) {
+            (false, view) => Ok(view.unwrap_or_default()),
+            (true, None | Some(MailView::Archive)) => Ok(MailView::Archive),
+            (true, Some(_)) => Err(Error::BadRequest(crate::MESSAGES.reason("invalid_view"))),
+        }
+    }
 }
 
 /// A page of conversations.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 pub struct ConversationList {
-    /// Pinned first, then newest first (archived lists and `ids`: newest first).
+    /// The inbox: pinned first, then newest first. Sent: by the inbox's
+    /// latest message. Archive, Spam, Trash and `ids`: newest first.
     pub conversations: Vec<ConversationSummary>,
     /// Pass it as `cursor` for the next page; `None` on the last page.
     pub next_cursor: Option<String>,
 }
 
-/// List conversations: pinned first, then newest first.
+/// List conversations: the inbox pinned first, then newest first, or another view.
 #[utoipa::path(
     get,
     path = "/api/v1/w/{workspace_id}/conversations",
@@ -75,7 +153,7 @@ pub struct ConversationList {
     params(("workspace_id" = WorkspaceId, Path, description = "The workspace."), ListQuery),
     responses(
         (status = OK, description = "A page of conversations.", body = ConversationList),
-        (status = BAD_REQUEST, description = "A malformed cursor or limit.", body = Problem,
+        (status = BAD_REQUEST, description = "A malformed cursor or limit, or `archived=true` with another view.", body = Problem,
             content_type = "application/problem+json"),
         (status = UNAUTHORIZED, description = "No valid access token.", body = Problem,
             content_type = "application/problem+json"),
@@ -99,6 +177,7 @@ pub async fn handler(
                 .arg("max", MAX_LIMIT),
         ));
     }
+    let view = query.view()?;
     let ids = query.ids.as_deref().map(parse_ids).transpose()?;
     let after = query.cursor.as_deref().map(decode_cursor).transpose()?;
     let access = &workspace.access;
@@ -127,25 +206,32 @@ pub async fn handler(
         }
         inboxes = vec![inbox];
     }
-    let rows = fetch_page(&mut tx, &inboxes, &query, after, limit).await?;
+    let order = view.order();
+    let rows = fetch_page(&mut tx, &inboxes, query.stream, &order, after, limit).await?;
     let mut conversations = rows
         .into_iter()
         .map(ConversationSummary::try_from)
         .collect::<Result<Vec<_>>>()?;
-    suggestions::attach(&mut tx, &mut conversations).await?;
-    needs::attach(&mut tx, &mut conversations).await?;
-    actions::attach(&mut tx, settings, &mut conversations).await?;
+    // Scout leaves spam and the trash alone: no suggestion, need or action
+    // reaches those lists, whatever a client shows.
+    if !matches!(view, MailView::Spam | MailView::Trash) {
+        suggestions::attach(&mut tx, &mut conversations).await?;
+        needs::attach(&mut tx, &mut conversations).await?;
+        actions::attach(&mut tx, settings, &mut conversations).await?;
+    }
     rules::attach(&mut tx, access.user, &mut conversations).await?;
     tx.commit().await?;
     let next_cursor = if conversations.len() > limit as usize {
         conversations.truncate(limit as usize);
         conversations.last().map(|last| {
-            // Archived lists ignore pins, so their cursor never carries one.
-            encode_cursor(
-                last.starred && !query.archived,
-                last.last_message_at,
-                last.id,
-            )
+            // Only the inbox puts pins first, so only its cursor carries
+            // one; Sent pages on the inbox's latest message.
+            let at = if view == MailView::Sent {
+                last.last_sent_at.unwrap_or(last.last_message_at)
+            } else {
+                last.last_message_at
+            };
+            encode_cursor(last.starred && order.pinned, at, last.id)
         })
     } else {
         None
@@ -156,86 +242,50 @@ pub async fn handler(
     }))
 }
 
-/// One page (plus one row, to tell whether there is a next page).
+/// One page of a view (plus one row, to tell whether there is a next page),
+/// in `stream` when given. The SQL is built from the view's fixed fragments
+/// only; every value is bound.
 async fn fetch_page(
     conn: &mut PgConnection,
     inboxes: &[InboxId],
-    query: &ListQuery,
+    stream: Option<Stream>,
+    order: &Order,
     after: Option<Cursor>,
     limit: u32,
 ) -> Result<Vec<SummaryRow>> {
-    let stream = query.stream.map(Stream::as_str);
-    let after_pinned = after.is_some_and(|cursor| cursor.pinned);
-    let (after_at, after_id) = after.map(|cursor| (cursor.at, cursor.id)).unzip();
-    let fetch = i64::from(limit) + 1;
-    let rows = if query.archived {
-        sqlx::query_as!(
-            SummaryRow,
-            r#"
-            SELECT c.id AS "id: ConversationId", c.inbox_id AS "inbox_id: InboxId", c.subject,
-                   c.stream, c.stream_source, c.last_message_at, c.message_count, c.unread_count,
-                   c.starred, c.archived_at IS NOT NULL AS "archived!",
-                   m.sender AS "sender?", m.snippet AS "snippet?",
-                   coalesce((SELECT jsonb_agg(jsonb_build_object('id', l.id, 'name', l.name)
-                                              ORDER BY l.name)
-                               FROM conversations.conversation_labels cl
-                               JOIN conversations.labels l ON l.id = cl.label_id
-                              WHERE cl.conversation_id = c.id), '[]') AS "labels!"
-              FROM conversations.conversations c
-              LEFT JOIN LATERAL (
-                  SELECT sender, snippet FROM conversations.messages
-                   WHERE conversation_id = c.id ORDER BY sent_at DESC, id DESC LIMIT 1
-              ) m ON true
-             WHERE c.inbox_id = ANY($1) AND c.archived_at IS NOT NULL AND NOT c.trashed
-               AND ($2::text IS NULL OR c.stream = $2)
-               AND ($3::timestamptz IS NULL OR (c.last_message_at, c.id) < ($3, $4))
-             ORDER BY c.last_message_at DESC, c.id DESC
-             LIMIT $5
-            "#,
-            inboxes as &[InboxId],
-            stream,
-            after_at,
-            after_id as Option<ConversationId>,
-            fetch,
+    let Order { filter, at, pinned } = *order;
+    let (keyset, sort) = if pinned {
+        (
+            format!("(c.starred, {at}, c.id) < ($6::bool, $3, $4)"),
+            format!("c.starred DESC, {at} DESC, c.id DESC"),
         )
-        .fetch_all(&mut *conn)
-        .await?
     } else {
-        sqlx::query_as!(
-            SummaryRow,
-            r#"
-            SELECT c.id AS "id: ConversationId", c.inbox_id AS "inbox_id: InboxId", c.subject,
-                   c.stream, c.stream_source, c.last_message_at, c.message_count, c.unread_count,
-                   c.starred, c.archived_at IS NOT NULL AS "archived!",
-                   m.sender AS "sender?", m.snippet AS "snippet?",
-                   coalesce((SELECT jsonb_agg(jsonb_build_object('id', l.id, 'name', l.name)
-                                              ORDER BY l.name)
-                               FROM conversations.conversation_labels cl
-                               JOIN conversations.labels l ON l.id = cl.label_id
-                              WHERE cl.conversation_id = c.id), '[]') AS "labels!"
-              FROM conversations.conversations c
-              LEFT JOIN LATERAL (
-                  SELECT sender, snippet FROM conversations.messages
-                   WHERE conversation_id = c.id ORDER BY sent_at DESC, id DESC LIMIT 1
-              ) m ON true
-             WHERE c.inbox_id = ANY($1) AND c.archived_at IS NULL AND NOT c.trashed
-               AND ($2::text IS NULL OR c.stream = $2)
-               AND ($3::timestamptz IS NULL
-                    OR (c.starred, c.last_message_at, c.id) < ($6::bool, $3, $4))
-             ORDER BY c.starred DESC, c.last_message_at DESC, c.id DESC
-             LIMIT $5
-            "#,
-            inboxes as &[InboxId],
-            stream,
-            after_at,
-            after_id as Option<ConversationId>,
-            fetch,
-            after_pinned,
+        (
+            format!("({at}, c.id) < ($3, $4)"),
+            format!("{at} DESC, c.id DESC"),
         )
-        .fetch_all(&mut *conn)
-        .await?
     };
-    Ok(rows)
+    let sql = format!(
+        "{SUMMARY_SELECT}
+         WHERE c.inbox_id = ANY($1) AND {filter}
+           AND ($2::text IS NULL OR c.stream = $2)
+           AND ($3::timestamptz IS NULL OR {keyset})
+         ORDER BY {sort}
+         LIMIT $5"
+    );
+    let (after_at, after_id) = after.map(|cursor| (cursor.at, cursor.id)).unzip();
+    let query = sqlx::query_as::<_, SummaryRow>(sqlx::AssertSqlSafe(sql))
+        .bind(inboxes)
+        .bind(stream.map(Stream::as_str))
+        .bind(after_at)
+        .bind(after_id)
+        .bind(i64::from(limit) + 1);
+    let query = if pinned {
+        query.bind(after.is_some_and(|cursor| cursor.pinned))
+    } else {
+        query
+    };
+    Ok(query.fetch_all(&mut *conn).await?)
 }
 
 /// `ids=a,b,c`: 1 to [`MAX_LIMIT`] conversation ids.
@@ -257,35 +307,19 @@ async fn fetch_ids(
     inboxes: &[InboxId],
     ids: &[ConversationId],
 ) -> Result<Vec<SummaryRow>> {
-    Ok(sqlx::query_as!(
-        SummaryRow,
-        r#"
-        SELECT c.id AS "id: ConversationId", c.inbox_id AS "inbox_id: InboxId", c.subject,
-               c.stream, c.stream_source, c.last_message_at, c.message_count, c.unread_count,
-               c.starred, c.archived_at IS NOT NULL AS "archived!",
-               m.sender AS "sender?", m.snippet AS "snippet?",
-               coalesce((SELECT jsonb_agg(jsonb_build_object('id', l.id, 'name', l.name)
-                                          ORDER BY l.name)
-                           FROM conversations.conversation_labels cl
-                           JOIN conversations.labels l ON l.id = cl.label_id
-                          WHERE cl.conversation_id = c.id), '[]') AS "labels!"
-          FROM conversations.conversations c
-          LEFT JOIN LATERAL (
-              SELECT sender, snippet FROM conversations.messages
-               WHERE conversation_id = c.id ORDER BY sent_at DESC, id DESC LIMIT 1
-          ) m ON true
+    Ok(sqlx::query_as::<_, SummaryRow>(sqlx::AssertSqlSafe(format!(
+        "{SUMMARY_SELECT}
          WHERE c.inbox_id = ANY($1) AND c.id = ANY($2)
-         ORDER BY c.last_message_at DESC, c.id DESC
-        "#,
-        inboxes as &[InboxId],
-        ids as &[ConversationId],
-    )
+         ORDER BY c.last_message_at DESC, c.id DESC"
+    )))
+    .bind(inboxes)
+    .bind(ids)
     .fetch_all(conn)
     .await?)
 }
 
-/// Where the previous page ended: whether its last row was pinned, its
-/// `last_message_at` and its id.
+/// Where the previous page ended: whether its last row was pinned, the time
+/// its view pages on (`last_sent_at` in Sent, else `last_message_at`) and its id.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 struct Cursor {
     pinned: bool,
@@ -293,7 +327,7 @@ struct Cursor {
     id: ConversationId,
 }
 
-/// `(pinned, last_message_at, id)` of the last row of a page, opaque.
+/// `(pinned, time, id)` of the last row of a page, opaque.
 fn encode_cursor(pinned: bool, at: DateTime<Utc>, id: ConversationId) -> String {
     URL_SAFE_NO_PAD.encode(format!(
         "{}|{}|{id}",
@@ -363,6 +397,8 @@ mod tests {
 #[cfg(test)]
 mod http_tests {
     use axum::http::StatusCode;
+    use campbooks_kernel::tenancy::WorkspaceId;
+    use serde_json::{Value, json};
     use sqlx::PgPool;
 
     use crate::{model::InboxId, testkit::Kit};
@@ -392,6 +428,9 @@ mod http_tests {
         let q4 = &all.json["conversations"][2];
         assert_eq!(q4["message_count"], 2);
         assert_eq!(q4["latest_from"]["address"], "sam@example.com");
+        // Sam wrote last; the newsletter's newest message is theirs.
+        assert_eq!(q4["latest_from_you"], true);
+        assert_eq!(all.json["conversations"][1]["latest_from_you"], false);
         assert_eq!(q4["labels"][0]["name"], "Clients");
         assert!(all.json["next_cursor"].is_null());
 
@@ -510,5 +549,473 @@ mod http_tests {
         );
         let filtered = kit.get(&ana, &format!("{base}?inbox={inbox}")).await;
         assert_eq!(filtered.status, StatusCode::NOT_FOUND);
+    }
+
+    /// A recorded message Sam sent in `thread` at `at` (RFC 3339) to Marta
+    /// Ferreira, copying two others, with its `mailbox` flags.
+    fn sent(id: &str, thread: &str, subject: &str, at: &str, mailbox: &Value) -> Value {
+        json!({"op": "upsert", "message": {
+            "provider_message_id": id, "thread_key": thread,
+            "from": {"name": "Sam Rivers", "address": "sam@example.com"},
+            "to": [{"name": "Marta Ferreira", "address": "marta@example.com"}],
+            "cc": [{"name": "Leo Park", "address": "leo@example.com"},
+                   {"address": "ana@example.com"}],
+            "subject": subject, "sent_at": at, "direction": "outbound",
+            "text": "Here are the figures.",
+            "mailbox": mailbox, "read": true, "starred": false
+        }})
+    }
+
+    /// Maya's answer in the Q4 thread at `at`.
+    fn maya_replies(id: &str, at: &str) -> Value {
+        json!({"op": "upsert", "message": {
+            "provider_message_id": id, "thread_key": "thr-en-q4",
+            "in_reply_to": "q4-plan-2@example.com",
+            "from": {"name": "Maya Okafor", "address": "maya@northwind-studio.example"},
+            "to": [{"name": "Sam Rivers", "address": "sam@example.com"}],
+            "subject": "Re: Q4 plan: can you review by Friday?", "sent_at": at,
+            "direction": "inbound", "text": "Thanks, that helps.",
+            "mailbox": {"in_inbox": true}, "read": false, "starred": false
+        }})
+    }
+
+    /// Sam's inbox plus a conversation Sam started (archived on arrival:
+    /// none of it is in the inbox).
+    async fn with_one_started(kit: &Kit) -> (WorkspaceId, InboxId, String) {
+        let (workspace, inbox, sam) = kit.sams_inbox().await;
+        let started = sent(
+            "mine-1",
+            "thr-mine-1",
+            "Figures for the board",
+            "2026-10-07T09:00:00Z",
+            &json!({"in_inbox": false}),
+        );
+        kit.ingest_value(workspace, inbox, &json!({"changes": [started]}))
+            .await;
+        (workspace, inbox, sam)
+    }
+
+    /// The subjects of the list at `uri`, in order.
+    async fn subjects(kit: &Kit, token: &str, uri: &str) -> Vec<String> {
+        let page = kit.get(token, uri).await;
+        assert_eq!(page.status, StatusCode::OK, "{uri}: {:?}", page.json);
+        page.json["conversations"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|c| c["subject"].as_str().unwrap().to_owned())
+            .collect()
+    }
+
+    const Q4: &str = "Q4 plan: can you review by Friday?";
+    const NEWS: &str = "Issue 142: five tools for calmer mornings";
+    const SIGN_IN: &str = "New sign-in to your account from Linux";
+    const STARTED: &str = "Figures for the board";
+
+    #[sqlx::test(migrations = "../../../migrations")]
+    async fn sent_lists_every_conversation_i_wrote_in(db: PgPool) {
+        let kit = Kit::new(db).await;
+        let (workspace, _, sam) = with_one_started(&kit).await;
+        let base = format!("/api/v1/w/{workspace}/conversations");
+
+        // The one Sam started, then the Q4 plan Sam replied to; never the
+        // ones Sam only received.
+        assert_eq!(
+            subjects(&kit, &sam, &format!("{base}?view=sent")).await,
+            [STARTED, Q4]
+        );
+        let page = kit.get(&sam, &format!("{base}?view=sent")).await;
+        let started = &page.json["conversations"][0];
+        assert_eq!(started["archived"], true);
+        assert_eq!(started["last_sent_at"], "2026-10-07T09:00:00Z");
+        assert_eq!(started["sent_to"][0]["name"], "Marta Ferreira");
+        assert_eq!(started["sent_to"].as_array().unwrap().len(), 3);
+        let q4 = &page.json["conversations"][1];
+        assert_eq!(q4["last_sent_at"], "2026-10-05T10:02:00Z");
+        assert_eq!(q4["sent_to"][0]["name"], "Maya Okafor");
+        // Mail Sam starts stays out of the inbox until someone replies.
+        assert!(
+            !subjects(&kit, &sam, &base)
+                .await
+                .contains(&STARTED.to_owned())
+        );
+        // A stream still filters, when one is asked for.
+        assert_eq!(
+            subjects(&kit, &sam, &format!("{base}?view=sent&stream=newsletters")).await,
+            Vec::<String>::new()
+        );
+    }
+
+    #[sqlx::test(migrations = "../../../migrations")]
+    async fn sent_says_when_they_replied_since(db: PgPool) {
+        let kit = Kit::new(db).await;
+        let (workspace, inbox, sam) = with_one_started(&kit).await;
+        let uri = format!("/api/v1/w/{workspace}/conversations?view=sent");
+        let replied = |json: &Value| -> Vec<bool> {
+            json["conversations"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(|c| c["replied_since_sent"].as_bool().unwrap())
+                .collect()
+        };
+        assert_eq!(replied(&kit.get(&sam, &uri).await.json), [false, false]);
+
+        kit.ingest_value(
+            workspace,
+            inbox,
+            &json!({"changes": [maya_replies("en-5", "2026-10-08T07:30:00Z")]}),
+        )
+        .await;
+        // Still sorted by Sam's latest message: the Q4 plan stays second.
+        let page = kit.get(&sam, &uri).await;
+        assert_eq!(page.json["conversations"][1]["subject"], Q4);
+        assert_eq!(replied(&page.json), [false, true]);
+    }
+
+    #[sqlx::test(migrations = "../../../migrations")]
+    async fn sent_leaves_out_spam_and_trash(db: PgPool) {
+        let kit = Kit::new(db).await;
+        let (workspace, _, sam) = with_one_started(&kit).await;
+        let base = format!("/api/v1/w/{workspace}/conversations");
+        let q4 = kit.conversation_of("en-1").await;
+        let started = kit.conversation_of("mine-1").await;
+        kit.post(&sam, &format!("{base}/{q4}/trash"), None).await;
+        assert_eq!(
+            subjects(&kit, &sam, &format!("{base}?view=sent")).await,
+            [STARTED]
+        );
+        kit.post(&sam, &format!("{base}/{started}/spam"), None)
+            .await;
+        assert!(
+            subjects(&kit, &sam, &format!("{base}?view=sent"))
+                .await
+                .is_empty()
+        );
+        assert_eq!(
+            subjects(&kit, &sam, &format!("{base}?view=trash")).await,
+            [Q4]
+        );
+        assert_eq!(
+            subjects(&kit, &sam, &format!("{base}?view=spam")).await,
+            [STARTED]
+        );
+        // Restored, it is back in Sent.
+        kit.post(&sam, &format!("{base}/{q4}/untrash"), None).await;
+        assert_eq!(
+            subjects(&kit, &sam, &format!("{base}?view=sent")).await,
+            [Q4]
+        );
+    }
+
+    #[sqlx::test(migrations = "../../../migrations")]
+    async fn archive_leaves_out_spam_and_trash(db: PgPool) {
+        let kit = Kit::new(db).await;
+        let (workspace, _, sam) = kit.sams_inbox().await;
+        let base = format!("/api/v1/w/{workspace}/conversations");
+        let news = kit.conversation_of("en-3").await;
+        let sign_in = kit.conversation_of("en-4").await;
+        for id in [&news, &sign_in] {
+            kit.post(&sam, &format!("{base}/{id}/archive"), None).await;
+        }
+        assert_eq!(
+            subjects(&kit, &sam, &format!("{base}?view=archive")).await,
+            [SIGN_IN, NEWS]
+        );
+        kit.post(&sam, &format!("{base}/{sign_in}/trash"), None)
+            .await;
+        kit.post(&sam, &format!("{base}/{news}/spam"), None).await;
+        assert!(
+            subjects(&kit, &sam, &format!("{base}?view=archive"))
+                .await
+                .is_empty()
+        );
+    }
+
+    #[sqlx::test(migrations = "../../../migrations")]
+    async fn spam_and_trash_are_separate_views(db: PgPool) {
+        let kit = Kit::new(db).await;
+        let (workspace, _, sam) = kit.sams_inbox().await;
+        let base = format!("/api/v1/w/{workspace}/conversations");
+        let news = kit.conversation_of("en-3").await;
+        let sign_in = kit.conversation_of("en-4").await;
+        let reported = kit.post(&sam, &format!("{base}/{news}/spam"), None).await;
+        assert_eq!(reported.json["trashed"], true);
+        assert_eq!(reported.json["spam"], true);
+        let deleted = kit
+            .post(&sam, &format!("{base}/{sign_in}/trash"), None)
+            .await;
+        assert_eq!(deleted.json["trashed"], true);
+        assert_eq!(deleted.json["spam"], false);
+
+        assert_eq!(
+            subjects(&kit, &sam, &format!("{base}?view=spam")).await,
+            [NEWS]
+        );
+        assert_eq!(
+            subjects(&kit, &sam, &format!("{base}?view=trash")).await,
+            [SIGN_IN]
+        );
+        assert_eq!(subjects(&kit, &sam, &base).await, [Q4]);
+        assert!(
+            subjects(&kit, &sam, &format!("{base}?view=archive"))
+                .await
+                .is_empty()
+        );
+        // Deleting what is in spam moves it to Trash.
+        kit.post(&sam, &format!("{base}/{news}/trash"), None).await;
+        assert!(
+            subjects(&kit, &sam, &format!("{base}?view=spam"))
+                .await
+                .is_empty()
+        );
+        assert_eq!(
+            subjects(&kit, &sam, &format!("{base}?view=trash")).await,
+            [SIGN_IN, NEWS]
+        );
+    }
+
+    #[sqlx::test(migrations = "../../../migrations")]
+    async fn not_spam_comes_back_to_the_inbox(db: PgPool) {
+        let kit = Kit::new(db).await;
+        let (workspace, _, sam) = kit.sams_inbox().await;
+        let base = format!("/api/v1/w/{workspace}/conversations");
+        let news = kit.conversation_of("en-3").await;
+        // Archived first: Not spam still puts received mail in the inbox,
+        // as a provider's own "Not spam" does.
+        kit.post(&sam, &format!("{base}/{news}/archive"), None)
+            .await;
+        kit.post(&sam, &format!("{base}/{news}/spam"), None).await;
+        let back = kit
+            .post(&sam, &format!("{base}/{news}/not-spam"), None)
+            .await;
+        assert_eq!(back.json["archived"], false);
+        assert_eq!(back.json["spam"], false);
+        assert_eq!(back.json["trashed"], false);
+        assert!(subjects(&kit, &sam, &base).await.contains(&NEWS.to_owned()));
+        assert!(
+            subjects(&kit, &sam, &format!("{base}?view=spam"))
+                .await
+                .is_empty()
+        );
+    }
+
+    #[sqlx::test(migrations = "../../../migrations")]
+    async fn restore_brings_trash_back_where_it_was(db: PgPool) {
+        let kit = Kit::new(db).await;
+        let (workspace, _, sam) = kit.sams_inbox().await;
+        let base = format!("/api/v1/w/{workspace}/conversations");
+        let news = kit.conversation_of("en-3").await;
+        let sign_in = kit.conversation_of("en-4").await;
+        // One in the inbox, one archived; both deleted, then restored.
+        kit.post(&sam, &format!("{base}/{news}/archive"), None)
+            .await;
+        for id in [&news, &sign_in] {
+            kit.post(&sam, &format!("{base}/{id}/trash"), None).await;
+        }
+        assert_eq!(subjects(&kit, &sam, &base).await, [Q4]);
+        for id in [&news, &sign_in] {
+            kit.post(&sam, &format!("{base}/{id}/untrash"), None).await;
+        }
+        assert_eq!(subjects(&kit, &sam, &base).await, [SIGN_IN, Q4]);
+        assert_eq!(
+            subjects(&kit, &sam, &format!("{base}?view=archive")).await,
+            [NEWS]
+        );
+        assert!(
+            subjects(&kit, &sam, &format!("{base}?view=trash"))
+                .await
+                .is_empty()
+        );
+    }
+
+    /// `last_sent_at` of the conversation holding `message`.
+    async fn last_sent_at(kit: &Kit, message: &str) -> Option<String> {
+        sqlx::query_scalar(
+            "SELECT to_char(c.last_sent_at AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI')
+               FROM conversations.conversations c
+               JOIN conversations.messages m ON m.conversation_id = c.id
+              WHERE m.provider_message_id = $1",
+        )
+        .bind(message)
+        .fetch_one(&kit.db)
+        .await
+        .unwrap()
+    }
+
+    #[sqlx::test(migrations = "../../../migrations")]
+    async fn recount_keeps_last_sent_at(db: PgPool) {
+        let kit = Kit::new(db).await;
+        let (workspace, inbox, _) = kit.sams_inbox().await;
+        let later = |mailbox: Value| {
+            sent(
+                "en-6",
+                "thr-en-q4",
+                "Re: Q4 plan: can you review by Friday?",
+                "2026-10-06T12:00:00Z",
+                &mailbox,
+            )
+        };
+        kit.ingest_value(
+            workspace,
+            inbox,
+            &json!({"changes": [later(json!({"in_inbox": true}))]}),
+        )
+        .await;
+        assert_eq!(
+            last_sent_at(&kit, "en-1").await.as_deref(),
+            Some("2026-10-06 12:00")
+        );
+        // That message moved to the trash at the provider: back to the one before.
+        kit.ingest_value(
+            workspace,
+            inbox,
+            &json!({"changes": [later(json!({"in_inbox": false, "in_trash": true}))]}),
+        )
+        .await;
+        assert_eq!(
+            last_sent_at(&kit, "en-1").await.as_deref(),
+            Some("2026-10-05 10:02")
+        );
+        // And without any: none.
+        let mut reply = sent(
+            "en-2",
+            "thr-en-q4",
+            "Re: Q4 plan: can you review by Friday?",
+            "2026-10-05T10:02:00Z",
+            &json!({"in_inbox": false, "in_spam": true}),
+        );
+        reply["message"]["to"] =
+            json!([{"name": "Maya Okafor", "address": "maya@northwind-studio.example"}]);
+        kit.ingest_value(workspace, inbox, &json!({"changes": [reply]}))
+            .await;
+        assert_eq!(last_sent_at(&kit, "en-1").await, None);
+    }
+
+    #[sqlx::test(migrations = "../../../migrations")]
+    async fn the_migration_backfills(db: PgPool) {
+        let kit = Kit::new(db).await;
+        let (workspace, _, sam) = with_one_started(&kit).await;
+        let base = format!("/api/v1/w/{workspace}/conversations");
+        let news = kit.conversation_of("en-3").await;
+        kit.post(&sam, &format!("{base}/{news}/spam"), None).await;
+        // As before the migration: neither column known.
+        sqlx::query("UPDATE conversations.conversations SET last_sent_at = NULL, spam = false")
+            .execute(&kit.db)
+            .await
+            .unwrap();
+        let migration = std::fs::read_to_string(format!(
+            "{}/../../../migrations/20261023040000_conversations__mail_views.sql",
+            env!("CARGO_MANIFEST_DIR")
+        ))
+        .unwrap();
+        let start = migration.find("-- seed begin").unwrap();
+        let end = migration.find("-- seed end").unwrap();
+        // The migration's own text, from the repository, twice: it is idempotent.
+        for _ in 0..2 {
+            sqlx::raw_sql(sqlx::AssertSqlSafe(migration[start..end].to_owned()))
+                .execute(&kit.db)
+                .await
+                .unwrap();
+        }
+        assert_eq!(
+            subjects(&kit, &sam, &format!("{base}?view=sent")).await,
+            [STARTED, Q4]
+        );
+        assert_eq!(
+            subjects(&kit, &sam, &format!("{base}?view=spam")).await,
+            [NEWS]
+        );
+        assert_eq!(
+            last_sent_at(&kit, "mine-1").await.as_deref(),
+            Some("2026-10-07 09:00")
+        );
+    }
+
+    #[sqlx::test(migrations = "../../../migrations")]
+    async fn a_view_cursor_pages_through(db: PgPool) {
+        let kit = Kit::new(db).await;
+        let (workspace, inbox, sam) = with_one_started(&kit).await;
+        let other = sent(
+            "mine-2",
+            "thr-mine-2",
+            "Studio keys",
+            "2026-10-06T18:00:00Z",
+            &json!({"in_inbox": false}),
+        );
+        kit.ingest_value(workspace, inbox, &json!({"changes": [other]}))
+            .await;
+        let base = format!("/api/v1/w/{workspace}/conversations?view=sent&limit=2");
+        let first = kit.get(&sam, &base).await;
+        let cursor = first.json["next_cursor"].as_str().unwrap().to_owned();
+        assert_eq!(subjects(&kit, &sam, &base).await, [STARTED, "Studio keys"]);
+        let rest = kit.get(&sam, &format!("{base}&cursor={cursor}")).await;
+        assert_eq!(rest.json["conversations"][0]["subject"], Q4);
+        assert_eq!(rest.json["conversations"].as_array().unwrap().len(), 1);
+        assert!(rest.json["next_cursor"].is_null());
+    }
+
+    #[sqlx::test(migrations = "../../../migrations")]
+    async fn archived_true_still_lists_the_archive(db: PgPool) {
+        let kit = Kit::new(db).await;
+        let (workspace, _, sam) = with_one_started(&kit).await;
+        let base = format!("/api/v1/w/{workspace}/conversations");
+        let news = kit.conversation_of("en-3").await;
+        kit.post(&sam, &format!("{base}/{news}/archive"), None)
+            .await;
+        let deprecated = subjects(&kit, &sam, &format!("{base}?archived=true")).await;
+        assert_eq!(deprecated, [STARTED, NEWS]);
+        assert_eq!(
+            subjects(&kit, &sam, &format!("{base}?view=archive")).await,
+            deprecated
+        );
+        assert_eq!(
+            subjects(&kit, &sam, &format!("{base}?archived=true&view=archive")).await,
+            deprecated
+        );
+    }
+
+    #[sqlx::test(migrations = "../../../migrations")]
+    async fn archived_and_another_view_is_a_bad_request(db: PgPool) {
+        let kit = Kit::new(db).await;
+        let (workspace, _, sam) = kit.sams_inbox().await;
+        let base = format!("/api/v1/w/{workspace}/conversations");
+        for view in ["inbox", "sent", "spam", "trash"] {
+            let refused = kit
+                .get(&sam, &format!("{base}?archived=true&view={view}"))
+                .await;
+            assert_eq!(refused.status, StatusCode::BAD_REQUEST, "{view}");
+            assert_eq!(refused.json["code"], "invalid_view", "{view}");
+        }
+        assert_eq!(
+            kit.get(&sam, &format!("{base}?view=starred")).await.status,
+            StatusCode::BAD_REQUEST
+        );
+    }
+
+    #[sqlx::test(migrations = "../../../migrations")]
+    async fn no_view_shows_another_inbox_or_workspace(db: PgPool) {
+        let kit = Kit::new(db).await;
+        let (workspace, _, sam) = with_one_started(&kit).await;
+        let base = format!("/api/v1/w/{workspace}/conversations");
+        let news = kit.conversation_of("en-3").await;
+        let sign_in = kit.conversation_of("en-4").await;
+        kit.post(&sam, &format!("{base}/{news}/spam"), None).await;
+        kit.post(&sam, &format!("{base}/{sign_in}/trash"), None)
+            .await;
+        // A member of the workspace who is not in Sam's inbox.
+        let (ana, _) = kit.member("ana", workspace);
+        // A member of another workspace only.
+        let (leo, _) = kit.member("leo", WorkspaceId::new());
+        for (view, seen) in [("sent", 2), ("archive", 1), ("spam", 1), ("trash", 1)] {
+            let uri = format!("{base}?view={view}");
+            assert_eq!(subjects(&kit, &sam, &uri).await.len(), seen, "{view}");
+            assert!(subjects(&kit, &ana, &uri).await.is_empty(), "{view}");
+            assert_eq!(
+                kit.get(&leo, &uri).await.status,
+                StatusCode::NOT_FOUND,
+                "{view}"
+            );
+        }
     }
 }

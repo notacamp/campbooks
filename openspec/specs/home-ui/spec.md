@@ -15,9 +15,14 @@ hero SHALL say how many things need the user, with the Visor `alert` when
 Review has an item. The selected item SHALL be shown by the selected background and a full focus
 ring, never by a coloured stripe on one edge. Each item SHALL show who it is from, its sentence (from a
 template chosen by reason and by the rule that decided it, in the user's
-language), the sender's sentence quoted on one line, and its chips (due date
-or overdue, urgent, how long it has waited). Rows SHALL come from the owning
-module's batch read (`conversations.list` with `ids`), not from `attention`.
+language), the sender's sentence quoted on one line, and, at the row's end,
+how long it has waited above its due date or overdue. The age SHALL count
+from when the item's cause arrived (`since`), in the user's language: minutes
+or hours the same day, "Yesterday" and days ago in the week after, the date
+from a week on (with the year when it is another year's), with the full date
+and time on hover; every row SHALL show it, dated or not. Rows SHALL come from
+the owning module's batch read (`conversations.list` with `ids`), not from
+`attention`.
 
 #### Scenario: A mixed morning
 - **WHEN** the user has a phishing warning, two replies, a dated ask and a bill
@@ -26,6 +31,10 @@ module's batch read (`conversations.list` with `ids`), not from `attention`.
 #### Scenario: Due soonest first
 - **WHEN** the Reply group holds a question due Wednesday and an older one with no date
 - **THEN** the one due Wednesday is first
+
+#### Scenario: How long it has waited
+- **WHEN** Marta's question arrived at 10:00 today, Pedro's on Monday and the bill on 2 October, and it is Friday 15:00
+- **THEN** Marta's row says "5 hours ago", Pedro's "4 days ago" and the bill's "2 Oct" above "Due 30 Oct", each with its full date on hover
 
 ### Requirement: Acting from Home
 Enter SHALL open an item in place when no action is highlighted, showing
@@ -37,7 +46,9 @@ frame, remote images held back, its links leading nowhere when the need is a
 warning), a few lines deep with "Show the whole email" to read it in place,
 and "How Campbooks decided" (closed by default); the sender's quote SHALL be
 shown only when there is no email to show. ↑/↓ and J/K SHALL move between
-items (closing an open one), R SHALL open the reply dialog for the item's
+items and open the item moved onto, as a click on it does (Enter or Esc
+closes it again); when an open item leaves the list, the item taking its
+place SHALL open, so reading goes on item by item. R SHALL open the reply dialog for the item's
 conversation, E SHALL mark it done (`conversations.resolve_need`), S SHALL
 open the Snooze dialog (`attention.snooze`), X SHALL mark it not needed (a
 warning's "It's safe", a question's No), and 1 to 3 SHALL run the item's own
@@ -56,6 +67,10 @@ safe, since each of those writes in the inbox.
 #### Scenario: Done and Undo
 - **WHEN** the user presses J then E on Pedro's lease, then Z
 - **THEN** the item leaves the list with the toast "Done · Pedro Alves", and Z brings it back
+
+#### Scenario: Reading item by item with the keys
+- **WHEN** the user presses J on Home, then E
+- **THEN** J selects and opens Marta's item, showing her email as a click would, and after E the item below opens in her place
 
 #### Scenario: The selected item goes away
 - **WHEN** the selected item is cleared elsewhere while Home is open
@@ -420,3 +435,19 @@ on the whole document: a key the page itself receives SHALL be the page's.
 #### Scenario: A step replaces the focused control
 - **WHEN** the focused button of a dialog is replaced by choices, and the user presses 2
 - **THEN** the second choice is picked, and Esc closes the dialog
+
+### Requirement: Deleting the draft from the Reply dialog
+In its draft stage the Reply dialog SHALL offer "Delete draft" once a draft
+exists: when it opened on a draft whose send was undone, or after Open in
+composer saved one. It SHALL NOT be offered before anything is saved. It
+SHALL delete that draft, close the dialog and show "Draft deleted" with
+Undo, which recreates the draft with the text that was on screen. A failed
+delete SHALL keep the dialog and the draft and say so.
+
+#### Scenario: Delete a resumed draft
+- **WHEN** the dialog opens on a draft whose send was undone and the user chooses Delete draft
+- **THEN** the draft is deleted, the dialog closes and the toast offers Undo
+
+#### Scenario: Nothing to delete yet
+- **WHEN** the user has picked one of Scout's replies but not saved a draft
+- **THEN** the dialog does not offer Delete draft

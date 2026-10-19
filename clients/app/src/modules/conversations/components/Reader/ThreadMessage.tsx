@@ -7,7 +7,9 @@ import {
   Button,
   FoldedMessage,
   ImagePreview,
+  initialsOf,
   MessageCard,
+  QuotedText,
   SafeHtml,
   Skeleton,
   Text,
@@ -16,11 +18,13 @@ import {
 import { downloadAttachment, imageUrl, openPdf, type AttachmentRef } from "../../api/attachments";
 import { useMessageBody, useMessageWords, type MessageView } from "../../api/queries";
 import {
+  addresseeLine,
   attachmentKind,
   cleanFileName,
   displayName,
   messageTime,
   recipientsLine,
+  splitQuoted,
   type Translate,
 } from "../../model";
 
@@ -48,6 +52,8 @@ export interface ThreadMessageProps {
   kind: "person" | "service";
   /** The conversation may be phishing: the body's links lead nowhere. */
   inertLinks?: boolean | undefined;
+  /** Its conversation is in spam: remote images never load. */
+  spam?: boolean | undefined;
   /** Show the reader's keys (⇧I, V) on its buttons; off where they are not bound. */
   shortcuts?: boolean | undefined;
   now?: Date | undefined;
@@ -56,7 +62,9 @@ export interface ThreadMessageProps {
 /**
  * One message of the thread: its plain text, or its HTML body (sanitised by
  * the server) in the sandboxed frame, with "Show images" when remote images
- * were held back, and its attachments.
+ * were held back, and its attachments. Its quoted history is folded behind
+ * "Show quoted text"; a message the inbox sent reads "You → <recipient>",
+ * set in from the left.
  */
 export function ThreadMessage({
   workspaceId,
@@ -71,6 +79,7 @@ export function ThreadMessage({
   sharedInbox = false,
   kind,
   inertLinks = false,
+  spam = false,
   shortcuts = true,
   now,
 }: ThreadMessageProps) {
@@ -82,8 +91,14 @@ export function ThreadMessage({
     message.id,
     showImages,
     open && message.has_html,
+    spam,
   );
-  const from = displayName(message.from);
+  const sender = displayName(message.from);
+  const yours = message.direction === "outbound";
+  const from = yours ? t("reader.you") : sender;
+  const side = yours ? "yours" : "theirs";
+  const addressee = yours ? addresseeLine(t, message) : undefined;
+  const avatar = yours ? { kind, initials: initialsOf(sender) } : { kind };
   const time = messageTime(message.sent_at, i18n.language, now);
   // Its words for the folded snippet, asked for on their own when the
   // conversation came without them (`text_unread`); open, it shows its HTML.
@@ -110,7 +125,9 @@ export function ThreadMessage({
     return (
       <FoldedMessage
         from={from}
-        avatar={{ kind }}
+        addressee={addressee}
+        side={side}
+        avatar={avatar}
         time={time}
         dateTime={message.sent_at}
         snippet={
@@ -128,9 +145,13 @@ export function ThreadMessage({
   const remote = body.data?.remote_images ?? 0;
   const html = body.data?.html;
 
+  const plain = splitQuoted(text);
   let content;
+  // A plain-text body's quoted history, folded under its own words.
+  let quoted: string | undefined;
   if (!message.has_html) {
-    content = text;
+    content = plain.own;
+    quoted = plain.quoted;
   } else if (body.isPending) {
     content = (
       <span className="flex flex-col gap-2" aria-busy="true">
@@ -140,15 +161,22 @@ export function ThreadMessage({
       </span>
     );
   } else if (html === undefined || html === null) {
-    content = body.isError ? <Text tone="tertiary">{t("error.body")}</Text> : text;
+    if (body.isError) {
+      content = <Text tone="tertiary">{t("error.body")}</Text>;
+    } else {
+      content = plain.own;
+      quoted = plain.quoted;
+    }
   } else {
     content = (
       <SafeHtml
         html={html}
-        title={t("reader.frameTitle", { name: from })}
+        title={t("reader.frameTitle", { name: sender })}
         remoteImages={body.data?.images_shown ?? false}
         css={body.data?.css}
         inertLinks={inertLinks}
+        showQuoted={t("reader.showQuoted")}
+        hideQuoted={t("reader.hideQuoted")}
       />
     );
   }
@@ -157,12 +185,26 @@ export function ThreadMessage({
   return (
     <MessageCard
       from={from}
-      avatar={{ kind }}
+      addressee={addressee}
+      side={side}
+      avatar={avatar}
       time={time}
       dateTime={message.sent_at}
-      recipients={recipientsLine(t, message, i18n.language)}
+      // "You → Clara" already names a lone recipient.
+      recipients={
+        yours && message.to.length + message.cc.length === 1
+          ? undefined
+          : recipientsLine(t, message, i18n.language)
+      }
       rich={message.has_html}
       files={files}
+      quoted={
+        quoted === undefined ? undefined : (
+          <QuotedText showLabel={t("reader.showQuoted")} hideLabel={t("reader.hideQuoted")}>
+            {quoted}
+          </QuotedText>
+        )
+      }
       actions={
         remote > 0 || truncated ? (
           <>
@@ -176,21 +218,24 @@ export function ThreadMessage({
                 <Text tone="tertiary" size="sm">
                   {t("actions.imagesHidden", { count: remote })}
                 </Text>
-                <Button
-                  variant="secondary"
-                  icon="image"
-                  shortcut={shortcuts ? "inbox.show_images" : undefined}
-                  onClick={onShowImages}
-                >
-                  {t("actions.showImages")}
-                </Button>
+                {/* In spam they never load: nothing to offer. */}
+                {body.data?.images_held === "spam" ? null : (
+                  <Button
+                    variant="secondary"
+                    icon="image"
+                    shortcut={shortcuts ? "inbox.show_images" : undefined}
+                    onClick={onShowImages}
+                  >
+                    {t("actions.showImages")}
+                  </Button>
+                )}
                 {trust === undefined ? null : (
                   <Button
                     variant="secondary"
                     shortcut={shortcuts && trustKey ? "inbox.trust_images" : undefined}
                     onClick={trust}
                   >
-                    {t("actions.trustImages", { name: from })}
+                    {t("actions.trustImages", { name: sender })}
                   </Button>
                 )}
                 {body.data?.images_held === undefined || body.data.images_held === null ? null : (
@@ -203,7 +248,7 @@ export function ThreadMessage({
             {remote > 0 && body.data?.images_trusted === true ? (
               <Text tone="tertiary" size="sm">
                 {t(sharedInbox ? "actions.imagesTrustedInbox" : "actions.imagesTrusted", {
-                  name: from,
+                  name: sender,
                 })}
               </Text>
             ) : null}

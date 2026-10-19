@@ -262,3 +262,51 @@ export function rowChoices(
   const all = [...missing.map((id) => ({ id, steps: [id] })), ...own];
   return { own: all.slice(0, MAX_OWN), universal: fixed.universal, picked: true };
 }
+
+const HOUR_MS = 60 * 60 * 1000;
+
+/**
+ * How long an item has waited, from `since` (when its cause arrived): "5
+ * minutes ago" and "3 hours ago" the same day, "Yesterday" and "4 days ago"
+ * in the week after, the date from a week on ("12 Oct", with the year when it
+ * is another year's). `label` is the full date and time, for the tooltip.
+ */
+export function ageLabel(
+  since: string,
+  now: Date,
+  locale: string,
+): { text: string; dateTime: string; label: string } {
+  const at = new Date(since);
+  const label = new Intl.DateTimeFormat(locale, { dateStyle: "full", timeStyle: "short" }).format(
+    at,
+  );
+  const relative = new Intl.RelativeTimeFormat(locale, { numeric: "auto" });
+  // A clock a little ahead of the server's: it just arrived.
+  const ms = Math.max(0, now.getTime() - at.getTime());
+  const midnight = (date: Date) =>
+    new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime();
+  const days = Math.round((midnight(now) - midnight(at)) / (24 * HOUR_MS));
+  let text: string;
+  if (ms < 60_000) {
+    // "Now", not "this minute".
+    text = relative.format(0, "second");
+  } else if (days <= 0 && ms < HOUR_MS) {
+    text = relative.format(-Math.floor(ms / 60_000), "minute");
+  } else if (days <= 0) {
+    text = relative.format(-Math.floor(ms / HOUR_MS), "hour");
+  } else if (days < 7) {
+    text = relative.format(-days, "day");
+  } else {
+    text = new Intl.DateTimeFormat(locale, {
+      day: "numeric",
+      month: "short",
+      ...(at.getFullYear() === now.getFullYear() ? {} : { year: "numeric" }),
+    }).format(at);
+  }
+  // "yesterday" starts the line: capitalised as the locale does.
+  return {
+    text: text.charAt(0).toLocaleUpperCase(locale) + text.slice(1),
+    dateTime: at.toISOString(),
+    label,
+  };
+}

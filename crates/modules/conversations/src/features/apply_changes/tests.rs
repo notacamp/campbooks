@@ -344,7 +344,7 @@ async fn with_no_decide_role_only_the_facts_no_acts(db: PgPool) {
                 "needs_reply".to_owned(),
                 Value::Bool(false),
                 true,
-                3,
+                4,
                 serde_json::json!("facts.list_mail")
             ),
             (
@@ -352,7 +352,7 @@ async fn with_no_decide_role_only_the_facts_no_acts(db: PgPool) {
                 "needs_reply".to_owned(),
                 Value::Bool(false),
                 true,
-                3,
+                4,
                 serde_json::json!("facts.automatic")
             ),
         ]
