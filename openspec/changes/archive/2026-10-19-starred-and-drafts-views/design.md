@@ -18,11 +18,16 @@ that would add nothing). Its cursor is the same `(time, id)` as Archive's.
 Spam is binned, so a pinned conversation in spam or the trash leaves the
 view and returns on Restore.
 
-**No new index.** Starred conversations are few, and the list's existing
-`conversations_list_idx (… WHERE NOT trashed)` already serves a query
-ordered by `last_message_at` over non-trashed rows, filtering the handful of
-starred ones. The other views have an index each because they select most of
-the table. Revisit if a workspace pins in the tens of thousands.
+**An index of its own.** Because few conversations are pinned, the list
+index (`conversations_list_idx … WHERE NOT trashed`) would have to walk every
+unbinned conversation of the inbox to fill one page, and the list refetches on
+every change. So Pinned pages over
+`conversations_starred_list_idx (inbox_id, last_message_at DESC, id DESC)
+WHERE starred AND NOT trashed` (migration
+`20261023070100_conversations__starred_list_index`, built concurrently), as
+Sent, Archive, Spam and Trash each have theirs. (The first draft of this change
+relied on the list index; the review caught that it gets the selectivity
+backwards.)
 
 **Pinned, not Starred, in the UI.** The app says Pin, Unpin and "Pinned ·
 subject" in all four locales, so the view is "Pinned" (pt-PT Fixadas, es-ES

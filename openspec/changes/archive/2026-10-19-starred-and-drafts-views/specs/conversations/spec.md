@@ -16,9 +16,8 @@ trash. In the inbox, pinned (starred) conversations SHALL come first, then
 the rest, each newest first, and a cursor SHALL page across the two without
 losing or repeating one. Sent SHALL be ordered by `last_sent_at`, newest
 first, its cursor keyed on it; starred, archive, spam, trash and lists by `ids`
-SHALL be newest first and never carry a pin in their cursor. Sent, archive,
-spam and trash SHALL page over an index of their own order; starred SHALL
-page over the list index, since few conversations are pinned. `archived=true` is deprecated: it SHALL list
+SHALL be newest first and never carry a pin in their cursor. Sent, starred, archive,
+spam and trash SHALL each page over an index of their own order. `archived=true` is deprecated: it SHALL list
 the archive as `view=archive` does, and with any other `view` the response
 SHALL be 400 `invalid_view`. Lists by `ids` SHALL ignore the view and the
 stream. A cursor given before pins existed SHALL read as one among the
