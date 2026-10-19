@@ -1455,3 +1455,104 @@ async fn a_mark_just_written_is_not_taken_off_by_the_sweep(db: PgPool) {
         "the mark stays as written"
     );
 }
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn an_empty_label_listing_deletes_nothing(db: PgPool) {
+    let kit = Kit::new(db).await;
+    let (mailbox, ids, _) = labelled_mailbox(&kit, 1).await;
+    kit.zoho.empty_label_listing();
+    let from = changes(&kit, mailbox.ws).await.len();
+    sweep(&kit).await;
+    assert_eq!(labels_since(&kit, mailbox.ws, from, &ids[0]).await, None);
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn labels_vanishing_at_once_are_confirmed_a_pass_later(db: PgPool) {
+    let kit = Kit::new(db).await;
+    let projects = kit.zoho.add_label("Projects");
+    let (mailbox, ids, clients) = labelled_mailbox(&kit, 1).await;
+    kit.zoho
+        .change(&ids[0], |m| m.labels.push(projects.clone()));
+    sweep(&kit).await;
+    let both = labels_since(&kit, mailbox.ws, 0, &ids[0]).await.unwrap();
+    assert_eq!(both.as_array().unwrap().len(), 2, "{both}");
+    // Both labels deleted in Zoho: every label the account had, at once.
+    kit.zoho.delete_label(&clients);
+    kit.zoho.delete_label(&projects);
+    let from = changes(&kit, mailbox.ws).await.len();
+    sweep(&kit).await;
+    assert_eq!(labels_since(&kit, mailbox.ws, from, &ids[0]).await, None);
+    // The next pass sees the same: confirmed.
+    sweep(&kit).await;
+    assert_eq!(
+        labels_since(&kit, mailbox.ws, from, &ids[0]).await,
+        Some(json!([]))
+    );
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_bulk_mark_removal_is_confirmed_on_the_second_pass(db: PgPool) {
+    let kit = Kit::new(db).await;
+    let mark = kit.zoho.add_label("Campbooks/Newsletters");
+    let ids: Vec<String> = (0..6)
+        .map(|n| {
+            let id = kit.zoho.deliver(
+                &synthetic(n),
+                INBOX,
+                true,
+                kit.clock.now() - TimeDelta::hours(i64::try_from(n).unwrap() + 1),
+            );
+            kit.zoho.change(&id, |m| m.labels.push(mark.clone()));
+            id
+        })
+        .collect();
+    let mailbox = connected(&kit).await;
+    for id in &ids {
+        assert_eq!(
+            streams_of(&kit, mailbox.ws, 0, id).await.last(),
+            Some(&json!("newsletters"))
+        );
+    }
+    for id in &ids {
+        kit.zoho.change(id, |m| m.labels.clear());
+    }
+    let from = changes(&kit, mailbox.ws).await.len();
+    sweep(&kit).await;
+    for id in &ids {
+        assert!(
+            streams_of(&kit, mailbox.ws, from, id).await.is_empty(),
+            "{id}"
+        );
+    }
+    sweep(&kit).await;
+    for id in &ids {
+        assert_eq!(
+            streams_of(&kit, mailbox.ws, from, id).await,
+            [json!("primary")],
+            "{id}"
+        );
+    }
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_different_losing_set_is_not_confirmed(db: PgPool) {
+    let kit = Kit::new(db).await;
+    let (mailbox, ids, clients) = labelled_mailbox(&kit, 12).await;
+    let (first, second) = ids.split_at(6);
+    for id in first {
+        kit.zoho.change(id, |m| m.labels.clear());
+    }
+    let from = changes(&kit, mailbox.ws).await.len();
+    sweep(&kit).await;
+    // Back on the first six, off the other six: not what was held back.
+    for id in first {
+        kit.zoho.change(id, |m| m.labels.push(clients.clone()));
+    }
+    for id in second {
+        kit.zoho.change(id, |m| m.labels.clear());
+    }
+    sweep(&kit).await;
+    for id in &ids {
+        assert_eq!(labels_since(&kit, mailbox.ws, from, id).await, None, "{id}");
+    }
+}

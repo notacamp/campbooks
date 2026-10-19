@@ -25,7 +25,7 @@
 //! again from the index, without a download.
 
 use std::{
-    collections::{HashMap, HashSet},
+    collections::{BTreeMap, HashMap, HashSet},
     sync::{Mutex, MutexGuard, PoisonError},
 };
 
@@ -166,6 +166,15 @@ pub struct Cursor {
     /// is never mirrored (set by the run, `sync_stream`).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub synced_at: Option<DateTime<Utc>>,
+    /// Removals the end of the last pass held back (label id → the messages
+    /// its listing left out): the next pass makes them when its listing
+    /// leaves out the same messages, or fewer.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub held_back: BTreeMap<String, Vec<String>>,
+    /// Labels the account's listing left out at the end of the last pass,
+    /// held back likewise.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub vanished: Vec<String>,
 }
 
 impl Cursor {
@@ -228,6 +237,12 @@ struct Labels {
     written: HashSet<(String, String)>,
     /// Label requests made this run.
     calls: u32,
+    /// Whether this run read every label whole (the end of a pass).
+    passed: bool,
+    /// Removals held back this pass (label → messages).
+    held: BTreeMap<String, Vec<String>>,
+    /// Deletions held back this pass.
+    vanished: Vec<String>,
 }
 
 /// The messages a label was read on this run; `whole` when its whole
@@ -270,6 +285,14 @@ impl LabelCache {
             .collect()
     }
 
+    /// The run read every label whole; what it held back.
+    fn pass(&self) -> Option<(BTreeMap<String, Vec<String>>, Vec<String>)> {
+        let labels = self.lock();
+        labels
+            .passed
+            .then(|| (labels.held.clone(), labels.vanished.clone()))
+    }
+
     /// Never take labels off the (message, label) pairs of `written`.
     fn protect(&self, written: HashSet<(String, String)>) {
         self.lock().written = written;
@@ -300,6 +323,11 @@ impl LabelCache {
     /// Zoho's listing of the labels, kept as fresh when it changed them.
     fn replace(&self, listed: Vec<ZohoLabel>) {
         let mut labels = self.lock();
+        // An empty answer while labels are known is not believed: read as
+        // no answer at all.
+        if listed.is_empty() && !labels.names.is_empty() {
+            return;
+        }
         labels.listed = true;
         let names: HashMap<String, String> = listed
             .iter()
@@ -430,6 +458,14 @@ impl Reader<'_> {
         }
         let mut page = self.page().await?;
         self.relabel_known(&mut page).await?;
+        let ended = self.phase != Phase::Incremental && page.phase == Phase::Incremental;
+        if let Some((held, vanished)) = self.labels.and_then(LabelCache::pass).filter(|_| ended) {
+            // What this pass held back, for the next to confirm; nothing
+            // held back clears it. Only a pass that ended: a listing read
+            // again (over the run's limits) is the same pass.
+            page.cursor.held_back = held;
+            page.cursor.vanished = vanished;
+        }
         Ok(page)
     }
 
@@ -530,7 +566,8 @@ impl Reader<'_> {
     /// Whether a whole listing of `label` (on `messages`) may take it off
     /// the indexed messages it leaves out: not when that would be more than
     /// a fifth of those carrying it, and five or more (a listing that may
-    /// miss folders or lag behind; the next pass tries again).
+    /// miss folders or lag behind), unless the last pass held back the same
+    /// messages, or more (a member's bulk change, confirmed a pass late).
     ///
     /// TODO(campbooks-cloud#292): check against a recorded Zoho answer
     /// which folders a `labelid` listing covers (archived, spam, trash,
@@ -546,18 +583,31 @@ impl Reader<'_> {
         .fetch_all(&mut *tx)
         .await?;
         tx.commit().await?;
-        let losing = carrying.iter().filter(|id| !messages.contains(*id)).count();
-        if losing >= 5 && losing * 5 > carrying.len() {
-            tracing::warn!(
-                stream = %self.stream,
-                label,
-                carrying = carrying.len(),
-                losing,
-                "a Zoho label's listing would take it off too many messages; nothing taken off this pass"
-            );
-            return Ok(false);
+        let mut losing: Vec<String> = carrying
+            .iter()
+            .filter(|id| !messages.contains(*id))
+            .cloned()
+            .collect();
+        losing.sort();
+        if losing.len() < 5 || losing.len() * 5 <= carrying.len() {
+            return Ok(true);
         }
-        Ok(true)
+        // The last pass held back the same, or more: confirmed.
+        let before = self.cursor.held_back.get(label);
+        if before.is_some_and(|held| losing.iter().all(|id| held.contains(id))) {
+            return Ok(true);
+        }
+        tracing::warn!(
+            stream = %self.stream,
+            label,
+            carrying = carrying.len(),
+            losing = losing.len(),
+            "a Zoho label's listing would take it off too many messages; held back until the next pass sees the same"
+        );
+        if let Some(cache) = self.labels {
+            cache.lock().held.insert(label.to_owned(), losing);
+        }
+        Ok(false)
     }
 
     /// Every label's messages, whole (the end of a pass): a label Zoho no
@@ -580,9 +630,31 @@ impl Reader<'_> {
         .fetch_all(&mut *tx)
         .await?;
         tx.commit().await?;
-        for label in cache.deleted(held) {
-            cache.record(&label, HashSet::new(), true);
+        let known = held
+            .iter()
+            .cloned()
+            .chain(cache.ids(false))
+            .collect::<HashSet<String>>()
+            .len();
+        let mut gone = cache.deleted(held);
+        gone.sort();
+        let confirmed = gone.iter().all(|id| self.cursor.vanished.contains(id));
+        if gone.len() >= 2 && gone.len() * 5 > known && !confirmed {
+            // A listing that lost many labels at once: held back until the
+            // next pass sees them gone too.
+            tracing::warn!(
+                stream = %self.stream,
+                labels = ?gone,
+                known,
+                "Zoho's label listing left out many labels; held back until the next pass sees the same"
+            );
+            cache.lock().vanished = gone;
+        } else {
+            for label in gone {
+                cache.record(&label, HashSet::new(), true);
+            }
         }
+        cache.lock().passed = true;
         Ok(())
     }
 

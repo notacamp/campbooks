@@ -90,6 +90,8 @@ struct State {
     failing: Vec<String>,
     /// The labels API refuses the grant (no labels scope).
     labels_refused: bool,
+    /// The labels listing answers an empty list.
+    labels_emptied: bool,
     /// Labels whose `labelid` listing answers 404.
     unlisted_labels: Vec<String>,
     /// Messages `labelid` listings leave out (a listing that lags behind).
@@ -141,6 +143,7 @@ impl FakeZoho {
             trash_hidden: false,
             failing: Vec::new(),
             labels_refused: false,
+            labels_emptied: false,
             unlisted_labels: Vec::new(),
             hidden_from_labels: Vec::new(),
         }));
@@ -341,6 +344,11 @@ impl FakeZoho {
     /// listed.
     pub fn fail_label_listing(&self, id: &str) {
         self.lock().unlisted_labels.push(id.to_owned());
+    }
+
+    /// The labels listing answers an empty list (a glitch).
+    pub fn empty_label_listing(&self) {
+        self.lock().labels_emptied = true;
     }
 
     /// `labelid` listings leave message `id` out.
@@ -625,6 +633,7 @@ fn mail(
     let parts: Vec<&str> = path.split('/').collect();
     match (method, parts.as_slice()) {
         ("GET", ["folders"]) => ok(&folders(state.sent_hidden, state.trash_hidden)),
+        ("GET", ["labels"]) if state.labels_emptied => ok(&serde_json::json!([])),
         ("GET", ["labels"]) => {
             let labels: Vec<_> = state.accounts[index]
                 .labels
