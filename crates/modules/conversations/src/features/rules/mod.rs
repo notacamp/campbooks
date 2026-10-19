@@ -521,13 +521,8 @@ pub async fn compute_preview(
                     found.push(candidate.clone());
                 }
             }
-            if after_outcome.highlight.as_deref() == Some(NEW)
-                && candidate.unread
-                && look
-                    .as_ref()
-                    .is_none_or(|(c, _)| candidate.sent_at > c.sent_at)
-            {
-                look = Some((candidate.clone(), changes));
+            if after_outcome.highlight.as_deref() == Some(NEW) {
+                newest_look(&mut look, candidate, changes);
             }
             count_overrides(&before, &after_outcome, NEW, &mut overridden);
         }
@@ -562,6 +557,22 @@ pub async fn compute_preview(
         })
         .collect();
     Ok(out)
+}
+
+/// Keep `candidate` as the one "Worth a look" is raised for when it is unread
+/// and newer than the one kept (`changes`: another change counted it).
+fn newest_look(
+    look: &mut Option<(rules::Candidate, bool)>,
+    candidate: &rules::Candidate,
+    changes: bool,
+) {
+    if candidate.unread
+        && look
+            .as_ref()
+            .is_none_or(|(kept, _)| candidate.sent_at > kept.sent_at)
+    {
+        *look = Some((candidate.clone(), changes));
+    }
 }
 
 fn sample(c: &rules::Candidate) -> PreviewSample {
