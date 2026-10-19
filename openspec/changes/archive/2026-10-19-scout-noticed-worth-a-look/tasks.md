@@ -30,5 +30,5 @@
 
 - [x] 4.1 OpenAPI, events and contract updated; client types updated
 - [x] 4.2 CHANGELOG updated
-- [ ] 4.3 Gates green in CI
-- [ ] 4.4 UI verified at 375px and desktop (recording)
+- [x] 4.3 Gates green in CI
+- [x] 4.4 UI verified at 375px and desktop (recording)

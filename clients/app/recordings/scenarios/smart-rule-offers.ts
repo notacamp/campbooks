@@ -117,7 +117,10 @@ export default async function smartRuleOffers({ page }: ScenarioContext): Promis
   await page.getByText("Smart rule saved").first().waitFor();
   await caption(page, "Saved: the suggestion is answered and won't come back", 2200);
   await homeShows(page, workspace, "Worth a look");
-  const group = page.getByText("Worth a look").first();
-  await group.scrollIntoViewIfNeeded();
-  await caption(page, "Each one waits on Home under Worth a look, nothing pinned", 2800);
+  // The group's own heading (the last group), scrolled to the top of the view.
+  await page
+    .getByRole("heading", { level: 2, name: /^Worth a look/u })
+    .evaluate("(el) => el.scrollIntoView({ block: 'start', behavior: 'smooth' })");
+  await pause(1200);
+  await caption(page, "Each one waits on Home under Worth a look, nothing pinned", 3200);
 }
