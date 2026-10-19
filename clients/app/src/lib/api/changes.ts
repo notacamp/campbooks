@@ -1,5 +1,7 @@
 import type { Query, QueryClient } from "@tanstack/react-query";
 
+import { isTauri } from "~/lib/platform";
+
 import { recordReaders } from "./records.gen";
 import type { operations } from "./schema.gen";
 
@@ -148,6 +150,46 @@ function readsAny(query: Query, operationIds: ReadonlySet<string>): boolean {
   return typeof id === "string" && operationIds.has(id);
 }
 
+/**
+ * Whether a message body's remote images depend on the rules: a rule trusts
+ * its sender (`images_trusted`), keeps them back (`images_held`), or could
+ * (`images_offer`). The bodies a rule's change can change (campbooks-cloud#236).
+ */
+export function holdsImageState(data: unknown): boolean {
+  if (typeof data !== "object" || data === null) {
+    return false;
+  }
+  const body = data as { images_trusted?: unknown; images_held?: unknown; images_offer?: unknown };
+  return (
+    body.images_trusted === true ||
+    (body.images_held !== undefined && body.images_held !== null) ||
+    body.images_offer === true
+  );
+}
+
+/**
+ * Readers a record type reaches only in part: `[type][operationId]` keeps
+ * the queries whose data the change can affect. A rule's change re-reads only
+ * the message bodies whose images depend on rules; a message's own change
+ * still re-reads every body of it.
+ */
+const NARROWED: Readonly<Record<string, Readonly<Record<string, (data: unknown) => boolean>>>> = {
+  "conversations.rule": { "conversations.get_message_body": holdsImageState },
+};
+
+/**
+ * Whether this client follows its workspaces' change feeds live: the web,
+ * through `EventSource`. The desktop and mobile shells (Tauri) have none yet,
+ * so what must follow other devices refreshes on a timer and on focus there.
+ *
+ * TODO(native change source): a Tauri change source (`ChangeSource` over the
+ * shell's own streaming HTTP client, with the session's token) so desktop and
+ * mobile follow changes live too; then drop the timers keyed on this.
+ */
+export function followsChangesLive(): boolean {
+  return !isTauri() && typeof EventSource !== "undefined";
+}
+
 /** How long changes are gathered before the cache is touched. */
 const BATCH_MS = 50;
 
@@ -164,7 +206,20 @@ export function createCacheBinding(queryClient: QueryClient, workspace: string) 
 
   const flush = () => {
     timer = undefined;
-    const readers = new Set([...pending].flatMap((type) => recordReaders[type] ?? []));
+    // Every reader of a changed type, except those a type narrows to the
+    // queries whose data it can change (`NARROWED`).
+    const readers = new Set<string>();
+    const narrowed = new Map<string, ((data: unknown) => boolean)[]>();
+    for (const type of pending) {
+      for (const operation of recordReaders[type] ?? []) {
+        const only = NARROWED[type]?.[operation];
+        if (only === undefined) {
+          readers.add(operation);
+        } else {
+          narrowed.set(operation, [...(narrowed.get(operation) ?? []), only]);
+        }
+      }
+    }
     const gone = deleted;
     pending = new Set();
     deleted = [];
@@ -177,9 +232,12 @@ export function createCacheBinding(queryClient: QueryClient, workspace: string) 
           Object.values(keyParams(query)).includes(record.id),
       });
     }
-    if (readers.size > 0) {
+    if (readers.size > 0 || narrowed.size > 0) {
       void queryClient.invalidateQueries({
-        predicate: (query) => readsAny(query, readers) && inWorkspace(query, workspace),
+        predicate: (query) =>
+          inWorkspace(query, workspace) &&
+          (readsAny(query, readers) ||
+            (narrowed.get(String(query.queryKey[0])) ?? []).some((only) => only(query.state.data))),
       });
     }
   };

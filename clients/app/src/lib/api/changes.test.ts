@@ -134,21 +134,41 @@ describe("the change feed", () => {
       expect(stale(detail)).toBe("gone");
     });
 
-    it("re-reads the message bodies it holds when a rule changes or goes", async () => {
-      // A rule that trusts a sender shows or hides its images: removed on
-      // another device or by another member, the bodies here follow at once
-      // (campbooks-cloud#236), and stay cached until then.
+    it("re-reads, on a rule's change, the bodies whose images depend on rules", async () => {
+      // A rule that trusts a sender shows or hides its images: changed or
+      // removed on another device or by another member, the bodies here
+      // follow at once (campbooks-cloud#236). The server sends a removal as
+      // an upsert of the rule (its state), and a deletion only when it goes.
+      const body = (message: string) =>
+        operationKey("conversations.get_message_body", {
+          workspace_id: WS,
+          conversation_id: "c1",
+          message_id: message,
+          show_images: "false",
+        });
+      for (const op of ["upsert", "delete"] as const) {
+        const { client, stale } = seededClient();
+        client.setQueryData(body("trusted"), { html: "", images_trusted: true });
+        client.setQueryData(body("held"), { html: "", images_held: "rule_paused" });
+        client.setQueryData(body("offered"), { html: "", images_offer: true, images_held: null });
+        client.setQueryData(body("plain"), { html: "", images_trusted: false, images_held: null });
+        createCacheBinding(client, WS).change({ type: "conversations.rule", id: "r1" }, op);
+        await vi.advanceTimersByTimeAsync(50);
+        expect(stale(body("trusted")), op).toBe(true);
+        expect(stale(body("held")), op).toBe(true);
+        expect(stale(body("offered")), op).toBe(true);
+        expect(stale(body("plain")), `${op}: no remote-image state`).toBe(false);
+      }
+
+      // A message's own change still re-reads every body of it.
       const { client, stale } = seededClient();
-      const body = operationKey("conversations.get_message_body", {
-        workspace_id: WS,
-        conversation_id: "c1",
-        message_id: "m1",
-        show_images: "false",
-      });
-      client.setQueryData(body, { cached: true });
-      createCacheBinding(client, WS).change({ type: "conversations.rule", id: "r1" }, "delete");
+      client.setQueryData(body("plain"), { html: "", images_trusted: false, images_held: null });
+      createCacheBinding(client, WS).change(
+        { type: "conversations.message", id: "plain" },
+        "upsert",
+      );
       await vi.advanceTimersByTimeAsync(50);
-      expect(stale(body)).toBe(true);
+      expect(stale(body("plain"))).toBe(true);
     });
 
     it("ignores record types no read operation returns", async () => {

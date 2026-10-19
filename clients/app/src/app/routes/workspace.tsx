@@ -3,8 +3,7 @@ import { Outlet, useLocation, useNavigate, useParams } from "@tanstack/react-rou
 import { useEffect, useState, type MouseEvent } from "react";
 import { useTranslation } from "react-i18next";
 
-import { createWebChangeSource, subscribeToChanges } from "~/lib/api";
-import { isTauri } from "~/lib/platform";
+import { createWebChangeSource, followsChangesLive, subscribeToChanges } from "~/lib/api";
 import { useShortcut, useShortcuts } from "~/lib/shortcuts";
 import {
   Button,
@@ -50,13 +49,14 @@ function useInAppLink() {
 
 /**
  * Keeps the open workspace's cached queries fresh from its change feed (web
- * only for now: the native source is not built yet, and there is nothing to
- * follow where `EventSource` is missing).
+ * only for now: the native source is not built yet, see
+ * `followsChangesLive`, and there is nothing to follow where `EventSource`
+ * is missing).
  */
 function useWorkspaceChanges(workspaceId: string) {
   const queryClient = useQueryClient();
   useEffect(() => {
-    if (isTauri() || typeof EventSource === "undefined") {
+    if (!followsChangesLive()) {
       return;
     }
     return subscribeToChanges({

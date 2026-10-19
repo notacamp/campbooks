@@ -1,5 +1,7 @@
 export {
   createWebChangeSource,
+  followsChangesLive,
+  holdsImageState,
   operationKey,
   subscribeToChanges,
   type ChangeFrame,

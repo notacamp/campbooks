@@ -316,12 +316,14 @@ All notable changes to Campbooks Next are documented here. The format follows
   workspace in the request's address (never one named in the request itself), and purging
   the workspace deletes them at once, even ones less than a day old. Saved answers stay
   readable only by the person and app that made the request.
-- **Removing a trusted sender hides their images everywhere at once.** When a smart rule
-  that shows a sender's images is removed, whether in Scout's memory, from the assistant,
-  on another device or by another member of a shared inbox, open mail from them holds its
-  images back again straight away, without a reload. The choice to trust one address now
-  says honestly what is checked: images show for mail from that address when its domain's
-  checks pass, and those checks vouch for the domain, not for one person.
+- **Removing a trusted sender hides their images everywhere.** When a smart rule that
+  shows a sender's images is removed, whether in Scout's memory, from the assistant, on
+  another device or by another member of a shared inbox, open mail from them holds its
+  images back again without a reload: at once in the web app, and within a minute (or as
+  soon as you switch back to it) in the desktop and mobile apps, until they get live
+  updates too. The choice to trust one address now says honestly what is checked: images
+  show for mail from that address when its domain's checks pass, and those checks vouch
+  for the domain, not for one person.
 
 ### Added
 

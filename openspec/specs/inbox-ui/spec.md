@@ -331,7 +331,10 @@ in Scout's memory SHALL say, as it asks to confirm, that the images are held
 back again; once removed, Show images is back. A rule created or removed
 anywhere (Scout's memory, the assistant, another device, another member of a
 shared inbox) SHALL show or hold back the images of the message bodies the
-client holds without a reload: a live change of a rule re-reads them. A member who only reads the inbox SHALL not be
+client holds without a reload: on the web at once, a live change of a rule
+re-reading the bodies whose images depend on rules (trusted, held back or
+offered); on the desktop and mobile apps, until they follow the change feed
+live, within a minute or when the window regains focus. A member who only reads the inbox SHALL not be
 offered it, nor SHALL anyone on mail that may be phishing. No visor: no AI
 is involved.
 
@@ -348,8 +351,12 @@ is involved.
 - **THEN** the address choice says the images show for mail from that address when acme.example's checks pass, and that those checks vouch for acme.example, not for Ana alone
 
 #### Scenario: Removed on another device
-- **WHEN** a rule trusting The Weekly Ledger's images is removed on another device, or by another member of the shared inbox, while its newsletter is open here
+- **WHEN** a rule trusting The Weekly Ledger's images is removed on another device, or by another member of the shared inbox, while its newsletter is open here on the web
 - **THEN** the open newsletter holds its images back again and offers Show images, without a reload
+
+#### Scenario: Removed while the desktop app is open
+- **WHEN** the same rule is removed while the newsletter is open in the desktop app
+- **THEN** within a minute, or as soon as the window regains focus, it holds its images back again and offers Show images
 
 ### Requirement: HTML mail on the desktop app
 The desktop app SHALL render HTML mail as the web app does: the same

@@ -406,6 +406,12 @@ describe("the inbox", () => {
       name: "Always show images from hello@weekly-ledger.example",
     });
     expect(within(dialog).queryByRole("radio")).toBeNull();
+    // The one choice still says what the checks vouch for (campbooks-cloud#236).
+    expect(
+      within(dialog).getByText(
+        "Mail from this address when weekly-ledger.example’s checks pass. Those checks vouch for the domain, not for this one person.",
+      ),
+    ).toBeVisible();
   });
 
   it("says the inbox trusts the sender when others use it", async () => {

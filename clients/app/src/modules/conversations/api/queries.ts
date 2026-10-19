@@ -10,7 +10,9 @@ import {
   type QueryClient,
 } from "@tanstack/react-query";
 
-import { api, operationKey, unwrap, type Schema } from "~/lib/api";
+import { api, followsChangesLive, operationKey, unwrap, type Schema } from "~/lib/api";
+
+import { bodyStaleTime, refetchBodyOnFocus } from "./body-freshness";
 
 export type Stream = Schema<"Stream">;
 export type ConversationSummary = Schema<"ConversationSummary">;
@@ -156,9 +158,11 @@ export function useMessageBody(
   return useQuery({
     queryKey: keys.body(workspaceId, conversationId, messageId, showImages),
     enabled,
-    // A body never changes once stored; whether its images show does, with
-    // the rules: a live rule change re-reads it (`conversations.rule`).
-    staleTime: Number.POSITIVE_INFINITY,
+    // Fresh until a live rule change re-reads it, or, without a live feed
+    // (the desktop and mobile shells), a minute for a body whose images
+    // depend on rules (campbooks-cloud#236).
+    staleTime: (query) => bodyStaleTime(query.state.data, followsChangesLive()),
+    refetchOnWindowFocus: (query) => refetchBodyOnFocus(query.state.data, followsChangesLive()),
     // "Show images" refetches it: keep the blocked version up meanwhile.
     placeholderData: keepPreviousData,
     queryFn: async ({ signal }) =>
