@@ -27,9 +27,20 @@ the upsert carries the category's stream and `stream_mark_stale` true.
 - **WHEN** a member drags a message carrying `Campbooks/Receipts` to Gmail's Promotions tab
 - **THEN** the next batch carries it with `provider_stream` `newsletters` and `stream_mark_stale` true
 
+Zoho's message listing names no labels, so the Zoho adapter SHALL read
+them through the listing's `labelid` filter: each run, the newest page for
+every stream mark; each sweep, every label's messages in the window, a
+message missing from a label's listing having lost it. Until a label has
+been read this way, the adapter SHALL not take its own index as the
+message's labels.
+
 #### Scenario: Zoho stream from a mark
-- **WHEN** a member adds `Campbooks/Newsletters` to a message in Zoho
-- **THEN** the next batch carries it with `provider_stream` `newsletters`, without downloading it again
+- **WHEN** a member adds `Campbooks/Newsletters` to a recent message in Zoho
+- **THEN** the next run's batch carries it with `provider_stream` `newsletters`, without downloading it again
+
+#### Scenario: A mark removed in Zoho
+- **WHEN** a member takes `Campbooks/Updates` off a message in Zoho
+- **THEN** the next sweep's batch carries it with `provider_stream` `primary`
 
 #### Scenario: A Zoho grant without the labels scope
 - **WHEN** a Zoho connection was granted before the labels scope was asked for
@@ -221,3 +232,25 @@ index SHALL hold the state written, so the next run emits nothing for it.
 #### Scenario: A Zoho label
 - **WHEN** a member takes off a Zoho label the provider knows
 - **THEN** Zoho receives `removeLabel` for it and the change is `applied`
+
+### Requirement: Write-backs never echo
+Changes that came from Gmail SHALL never be written back to Gmail. After a
+write, the adapter's index SHALL hold the labels it set, so that Gmail's
+history record of that write produces no change in the next batch. While a
+member's change is pending, a run that emits that message SHALL emit it with
+the change applied. The one exception: a write that changed a message's
+provider stream SHALL be emitted once from the index (no download, no
+provider call), so conversations stores where the message now is; that
+emission SHALL carry no change conversations sends back.
+
+#### Scenario: The next sync after a write-back
+- **WHEN** a member's star has been written to Gmail and the stream runs again
+- **THEN** no `connectors.messages_changed` batch carries that message, and no new outbound change is recorded
+
+#### Scenario: A Gmail change still arrives
+- **WHEN** a member's archive is written while the same message was starred in Gmail and not yet read
+- **THEN** the next batch carries the message starred and archived
+
+#### Scenario: A stream write is reported once
+- **WHEN** a move to Primary is written to a message in Gmail's Promotions tab
+- **THEN** one batch carries the message with `provider_stream` `primary`, conversations publishes nothing for it, and a later run emits nothing more
