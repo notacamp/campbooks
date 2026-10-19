@@ -1,10 +1,17 @@
 import { writePref } from "~/lib/storage/prefs";
 import { DEFAULT_WORKSPACE } from "~/lib/ui/theme/theme";
 
-/** A mocked endpoint's answer: a fixed response, or one computed from the request body. */
-export type MockRoute =
-  | { status?: number; body?: unknown }
-  | ((body: unknown, url: URL) => { status?: number; body?: unknown });
+/**
+ * A mocked endpoint's answer: a fixed response, or one computed from the
+ * request body. `stream` is Server-Sent Events text, sent as a
+ * `text/event-stream` body in those chunks.
+ */
+interface MockAnswer {
+  status?: number;
+  body?: unknown;
+  stream?: string[];
+}
+export type MockRoute = MockAnswer | ((body: unknown, url: URL) => MockAnswer);
 
 /**
  * Replaces `fetch` with in-memory answers keyed by "METHOD /path" (stories
@@ -26,6 +33,21 @@ export function mockFetch(routes: Record<string, MockRoute>): () => void {
         ? handler(text === "" ? undefined : JSON.parse(text), url)
         : handler;
     const status = answer.status ?? 200;
+    if (answer.stream !== undefined) {
+      const encoder = new TextEncoder();
+      const chunks = answer.stream;
+      return new Response(
+        new ReadableStream<Uint8Array>({
+          start(controller) {
+            for (const chunk of chunks) {
+              controller.enqueue(encoder.encode(chunk));
+            }
+            controller.close();
+          },
+        }),
+        { status, headers: { "content-type": "text/event-stream" } },
+      );
+    }
     return answer.body === undefined
       ? new Response(null, { status })
       : Response.json(answer.body, { status });

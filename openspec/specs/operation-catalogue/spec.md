@@ -121,9 +121,15 @@ was stopped at its time limit, or when the client or a proxy hung up, each
 perhaps after committing its effects. Once the key has been pending for two
 minutes, longer than any request runs, a retry SHALL receive 409
 `idempotency_outcome_unknown` in the caller's language, until the key
-expires. A request still running after the server's time limit (30 seconds)
-SHALL be answered 503 `request_timed_out`, which does not release its key:
-the caller checks the result, then retries with a new key. A server error
+expires. A request still running after its time limit SHALL be answered 503
+`request_timed_out`, which does not release its key: the caller checks the
+result, then retries with a new key. The limit SHALL be 30 seconds unless
+the operation's handler raises it for itself, never above 100 seconds
+(less than the two minutes after which a pending key counts as
+abandoned), and SHALL cover the response head only, so an answer that
+streams after its head is not cut. An answer of type `text/event-stream`
+SHALL never be stored: its key SHALL be released when its head is sent,
+and a retry runs the operation again. A server error
 the operation itself answers still releases the key, so a retry runs it
 again. If the operation committed before that error (or before an
 acknowledgement was lost), only the operation's own guard (a draft's send
@@ -183,6 +189,14 @@ running the operation again or showing the secret.
 #### Scenario: A request past its time limit
 - **WHEN** a request is still running after the server's time limit
 - **THEN** it is answered 503 `request_timed_out` in the caller's language, and a retry with the same key is not run again
+
+#### Scenario: An operation that allows itself longer
+- **WHEN** an operation's handler raises its limit to 90 seconds and answers after 40
+- **THEN** its answer is delivered, and a handler that raises nothing is still answered 503 `request_timed_out` after 30 seconds
+
+#### Scenario: An event stream with a key
+- **WHEN** a client calls an operation answering `text/event-stream` with `Idempotency-Key: s-1`, then again with the same key
+- **THEN** the first stream's head arrives without waiting for its end, nothing is stored for the key, and the second request runs again
 
 ### Requirement: Record references
 The kernel SHALL provide a record reference `{ type, id }` whose `type` is

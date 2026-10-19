@@ -17,6 +17,8 @@ const config: KnipConfig = {
         "recordings/scenarios/*.ts",
         // The mail frame's WebKit policy test (`pnpm test:csp`).
         "test/webkit/*.webkit.ts",
+        // Copy fits in every language (`pnpm test:fit`).
+        "test/fit/*.fit.tsx",
         // The mail frame in the real desktop shell (`pnpm test:tauri`).
         "test/tauri/*.tauri.ts",
         // Library surfaces modules build on: every export is public API,

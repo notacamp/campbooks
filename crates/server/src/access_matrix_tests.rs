@@ -926,7 +926,9 @@ fn body(world: &World, id: &str) -> Option<Value> {
         "conversations.answer_rule_notice" => json!({"answer": "not_now"}),
         "assistant.update_profile" => json!({"proactivity": "ask_first", "asked": true}),
         "assistant.compile_instruction" => json!({"text": "newsletters never need me"}),
-        "conversations.write_reply" => json!({"intent": "Say yes"}),
+        "conversations.write_reply" | "conversations.stream_reply" => {
+            json!({"intent": "Say yes"})
+        }
         _ => return None,
     })
 }
@@ -973,6 +975,7 @@ fn acts_in_the_inbox(id: &str) -> bool {
             | "conversations.dismiss_rule_suggestion"
             | "conversations.suggest_replies"
             | "conversations.write_reply"
+            | "conversations.stream_reply"
             | "conversations.answer_rule_notice"
             | "conversations.clear_rule_notice_answer"
     )

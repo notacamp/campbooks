@@ -40,7 +40,8 @@
   gap: var(--space-3);
 }
 
-.head > :first-child {
+/* The visor keeps its size; the heading (first when there is no visor) shrinks. */
+.head > :first-child:not(.heading) {
   flex: none;
   margin-top: var(--space-0-5);
 }
