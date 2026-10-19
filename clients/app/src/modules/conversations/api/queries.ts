@@ -19,6 +19,7 @@ export type ConversationSummary = Schema<"ConversationSummary">;
 export type ConversationDetail = Schema<"ConversationDetail">;
 type ConversationList = Schema<"ConversationList">;
 export type MessageView = Schema<"MessageView">;
+type MessageBody = Schema<"MessageBody">;
 export type DecisionView = Schema<"DecisionView">;
 export type ReasonView = Schema<"ReasonView">;
 export type NeedView = Schema<"NeedView">;
@@ -155,7 +156,7 @@ export function useMessageBody(
   showImages: boolean,
   enabled: boolean,
 ) {
-  return useQuery({
+  return useQuery<MessageBody>({
     queryKey: keys.body(workspaceId, conversationId, messageId, showImages),
     enabled,
     // Fresh until a live rule change re-reads it, or, without a live feed
