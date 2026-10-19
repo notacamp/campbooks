@@ -31,7 +31,7 @@ ALTER TABLE conversations.need_summaries
     ADD COLUMN dates_read_at timestamptz;
 
 -- Widened NOT VALID, so the swap holds the table's exclusive lock only for a
--- moment; validated by `…020100_conversations__needs_lapse_validate`.
+-- moment; validated by `…030100_conversations__needs_lapse_validate`.
 ALTER TABLE conversations.needs DROP CONSTRAINT needs_question_check;
 ALTER TABLE conversations.needs ADD CONSTRAINT needs_question_check
     CHECK (question IN ('needs_reply', 'asks_action', 'suspicious', 'money', 'still_to_do',
