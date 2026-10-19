@@ -1221,14 +1221,12 @@ async fn stream_with(server: &MockServer, words: &[&str]) {
     let mut body = String::from(
         "data: {\"model\":\"test-model\",\"choices\":[{\"delta\":{\"reasoning\":\"Maya asks about Friday.\"}}]}\n\n",
     );
-    let chunks: String = words
-        .iter()
-        .map(|word| {
-            let chunk = json!({"choices": [{"delta": {"content": word}}]});
-            format!("data: {chunk}\n\n")
-        })
-        .collect();
-    body.push_str(&chunks);
+    for word in words {
+        let chunk = json!({"choices": [{"delta": {"content": word}}]});
+        body.push_str("data: ");
+        body.push_str(&chunk.to_string());
+        body.push_str("\n\n");
+    }
     body.push_str(
         "data: {\"choices\":[{\"delta\":{},\"finish_reason\":\"stop\"}]}\n\n\
          data: {\"choices\":[],\"usage\":{\"prompt_tokens\":90,\"completion_tokens\":12}}\n\n\

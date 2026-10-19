@@ -56,7 +56,8 @@ describe("readEventStream", () => {
 
   it("keeps a character split across chunks whole", async () => {
     const bytes = new TextEncoder().encode('data: {"delta":"até"}\n\n');
-    const at = bytes.indexOf(0xc3) + 1;
+    // Split inside "é" (two bytes in UTF-8).
+    const at = bytes.indexOf(new TextEncoder().encode("é")[0] ?? 0) + 1;
     expect(await frames([bytes.slice(0, at), bytes.slice(at)])).toEqual([
       { event: "message", data: '{"delta":"até"}' },
     ]);
