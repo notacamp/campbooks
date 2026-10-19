@@ -291,6 +291,7 @@ async fn withdraw(tx: &mut Transaction<'_, Postgres>, correction: CorrectionId) 
 }
 
 /// Record `verdict` on conversation `id`'s open need.
+#[allow(clippy::too_many_lines)]
 async fn judge(
     state: &AppState,
     settings: &NeedSettings,

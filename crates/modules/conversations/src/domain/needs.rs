@@ -359,23 +359,27 @@ pub fn raise(message: MessageId, answers: &[Answer], settings: &NeedSettings) ->
         });
         need
     });
-    // Anything that asks something of the member comes first; "Worth a look"
-    // is what a rule they taught keeps in front of them otherwise. It is
-    // never urgent and never a question: they asked for it.
-    raised.or_else(|| {
-        answers
-            .iter()
-            .find(|a| a.basis == NeedBasis::Taught && a.question == WORTH_A_LOOK && a.is_true())
-            .map(|a| {
-                need(
-                    NeedReason::WorthALook,
-                    NeedTrust::Sure,
-                    a.basis,
-                    NeedQuestion::WorthALook,
-                    a,
-                )
-            })
-    })
+    // Anything that asks something of the member comes first.
+    raised.or_else(|| highlighted(message, answers))
+}
+
+/// "Worth a look": what a rule the member taught keeps in front of them
+/// until they have opened it, when nothing asks more of them. It is never
+/// urgent and never a question: they asked for it.
+fn highlighted(message: MessageId, answers: &[Answer]) -> Option<Need> {
+    answers
+        .iter()
+        .find(|a| a.basis == NeedBasis::Taught && a.question == WORTH_A_LOOK && a.is_true())
+        .map(|a| Need {
+            message,
+            reason: NeedReason::WorthALook,
+            trust: NeedTrust::Sure,
+            basis: a.basis,
+            question: NeedQuestion::WorthALook,
+            decision: Some(a.id),
+            due_on: None,
+            urgent: false,
+        })
 }
 
 /// The answers with a taught rule's speaking for the member: its answer to
@@ -422,6 +426,7 @@ fn rule_clears(answers: &[Answer], question: NeedQuestion) -> bool {
 
 /// What happened in the conversation since the need's message.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+#[allow(clippy::struct_excessive_bools)]
 pub struct Since {
     /// A message was sent from the inbox after it.
     pub replied: bool,
