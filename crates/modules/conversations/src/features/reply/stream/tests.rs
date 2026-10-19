@@ -26,12 +26,12 @@ fn done(finish: &str) -> ChatEvent {
     })
 }
 
-fn reasoning(text: &str) -> Result<ChatEvent, AiError> {
-    Ok(ChatEvent::Reasoning(text.into()))
+fn reasoning(text: &str) -> ChatEvent {
+    ChatEvent::Reasoning(text.into())
 }
 
-fn text(text: &str) -> Result<ChatEvent, AiError> {
-    Ok(ChatEvent::Text(text.into()))
+fn text(text: &str) -> ChatEvent {
+    ChatEvent::Text(text.into())
 }
 
 /// The SSE events `chat` makes, as (event, data), and how long they took.
@@ -72,9 +72,9 @@ fn names(events: &[(String, Value)]) -> Vec<&str> {
 #[tokio::test(start_paused = true)]
 async fn thinking_then_words_then_the_whole_reply() {
     let chat = futures_util::stream::iter(vec![
-        reasoning("Maya asks about Friday."),
-        text("Hi Maya,\r\n"),
-        text("Friday works.\u{0007}\u{202E}"),
+        Ok(reasoning("Maya asks about Friday.")),
+        Ok(text("Hi Maya,\r\n")),
+        Ok(text("Friday works.\u{0007}\u{202E}")),
         Ok(done("stop")),
     ]);
     let (events, _) = run(chat, Limits::default()).await;
@@ -92,7 +92,7 @@ async fn thinking_then_words_then_the_whole_reply() {
 
 #[tokio::test(start_paused = true)]
 async fn a_model_that_goes_quiet_times_out() {
-    let chat = futures_util::stream::iter(vec![reasoning("Thinking")])
+    let chat = futures_util::stream::iter(vec![Ok(reasoning("Thinking"))])
         .chain(futures_util::stream::pending());
     let (events, took) = run(chat, Limits::default()).await;
     assert_eq!(names(&events), ["thinking", "error"]);
@@ -109,7 +109,7 @@ async fn a_model_that_never_stops_thinking_times_out_in_all() {
     // A sign every 20 seconds: never idle, never done.
     let chat = futures_util::stream::unfold((), |()| async {
         tokio::time::sleep(Duration::from_secs(20)).await;
-        Some((reasoning("…"), ()))
+        Some((Ok(reasoning("…")), ()))
     });
     let (events, took) = run(chat, Limits::default()).await;
     assert_eq!(events.last().unwrap().0, "error");
@@ -123,8 +123,8 @@ async fn a_model_that_never_stops_thinking_times_out_in_all() {
 #[tokio::test(start_paused = true)]
 async fn an_empty_or_cut_short_reply_fails() {
     for chat in [
-        vec![reasoning("Hm"), text("  \n"), Ok(done("stop"))],
-        vec![text("Hi Maya, Fri"), Ok(done("length"))],
+        vec![Ok(reasoning("Hm")), Ok(text("  \n")), Ok(done("stop"))],
+        vec![Ok(text("Hi Maya, Fri")), Ok(done("length"))],
     ] {
         let (events, _) = run(futures_util::stream::iter(chat), Limits::default()).await;
         assert_eq!(events.last().unwrap().0, "error", "{events:?}");
@@ -137,10 +137,10 @@ async fn an_empty_or_cut_short_reply_fails() {
 async fn a_failing_or_vanishing_model_fails() {
     for chat in [
         vec![
-            text("Hi"),
+            Ok(text("Hi")),
             Err(AiError::InvalidResponse("mid-stream".into())),
         ],
-        vec![text("Hi")],
+        vec![Ok(text("Hi"))],
     ] {
         let (events, _) = run(futures_util::stream::iter(chat), Limits::default()).await;
         assert_eq!(names(&events), ["text", "error"]);
@@ -156,11 +156,11 @@ async fn thinking_and_words_are_forwarded_within_their_bounds() {
         ..Limits::default()
     };
     let chat = futures_util::stream::iter(vec![
-        reasoning("abcdefgh"),
-        reasoning("ijklmnop"),
-        reasoning("qrstuvwx"),
-        text("Hello world"),
-        text("!"),
+        Ok(reasoning("abcdefgh")),
+        Ok(reasoning("ijklmnop")),
+        Ok(reasoning("qrstuvwx")),
+        Ok(text("Hello world")),
+        Ok(text("!")),
         Ok(done("stop")),
     ]);
     let (events, _) = run(chat, limits).await;

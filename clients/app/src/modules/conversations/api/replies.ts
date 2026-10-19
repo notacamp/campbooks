@@ -61,7 +61,7 @@ async function writeReply(
     await api.POST("/api/v1/w/{workspace_id}/conversations/{conversation_id}/reply/draft", {
       params: { path: { workspace_id: workspaceId, conversation_id: conversationId } },
       body,
-      signal,
+      ...(signal === undefined ? {} : { signal }),
     }),
   ).text;
 }

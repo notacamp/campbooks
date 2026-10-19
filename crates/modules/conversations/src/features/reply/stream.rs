@@ -126,16 +126,13 @@ where
             }
             let left = self.limits.total.saturating_sub(self.started.elapsed());
             let wait = self.limits.idle.min(left);
-            let next = match tokio::time::timeout(wait, self.chat.next()).await {
-                Ok(next) => next,
-                Err(_) => {
-                    let reason = if left <= self.limits.idle {
-                        "total"
-                    } else {
-                        "idle"
-                    };
-                    return Some(self.fail("timed_out", reason, "reply_timed_out"));
-                }
+            let Ok(next) = tokio::time::timeout(wait, self.chat.next()).await else {
+                let reason = if left <= self.limits.idle {
+                    "total"
+                } else {
+                    "idle"
+                };
+                return Some(self.fail("timed_out", reason, "reply_timed_out"));
             };
             match next {
                 None => return Some(self.fail("failed", "provider", "reply_failed")),
