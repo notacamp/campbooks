@@ -359,12 +359,12 @@ async fn members_changes_reach_zoho_and_never_echo(db: PgPool) {
                 Some("label_not_at_provider".to_owned())
             ),
             ("applied".to_owned(), None),
-            (
-                "skipped".to_owned(),
-                Some("no_provider_equivalent".to_owned())
-            ),
+            // A move to Newsletters: its stream mark, made first.
+            ("applied".to_owned(), None),
         ]
     );
+    let mark = kit.zoho.label_named("Campbooks/Newsletters").unwrap();
+    assert_eq!(kit.zoho.message(&two).labels, [mark]);
     let writes: Vec<String> = kit
         .zoho
         .calls()

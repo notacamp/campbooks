@@ -7,11 +7,21 @@
 //! placement (`model`) is never overridden, and later messages never re-sort
 //! it. A placement by the retired content rules (`rules`, before ADR 0018;
 //! the facts never answer `stream`) gives way to the model's.
+//!
+//! Every placement is mirrored to the provider ([`mirror`]): each received
+//! message whose stream at the provider is not its conversation's is asked
+//! to move there, through the same recorded, bound requests as a member's
+//! change. Mail stored before its inbox's first sync completed, or before
+//! this was, is never asked (`mirrors_stream`).
 
-use campbooks_kernel::Result;
-use sqlx::PgConnection;
+use campbooks_kernel::{EventBus, Result, binding::Binding};
+use sqlx::{PgConnection, Postgres, Transaction};
 
-use crate::model::{ConversationId, MessageId, Stream, StreamSource};
+use super::conversation::{Changed, request};
+use crate::{
+    events::{Change, Origin, RequestedChange},
+    model::{ConversationId, InboxId, MessageId, Stream, StreamSource},
+};
 
 /// Which inbound message an answer is about, for [`sort_first_inbound`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -60,4 +70,58 @@ pub async fn sort_first_inbound(
     .await?
     .rows_affected();
     Ok(sorted > 0)
+}
+
+/// Ask the provider to move `conversation`'s received messages to its
+/// stream: each one that is mirrored (`mirrors_stream`) and whose stored
+/// provider stream is another (none counting as another), and `also` (a
+/// message whose stream mark is stale) whatever it holds. One
+/// `changes_requested` for them all, recorded and bound like a member's
+/// (`conversation::request`); nothing when none is left to move.
+pub async fn mirror(
+    binding: &Binding,
+    events: &EventBus,
+    tx: &mut Transaction<'_, Postgres>,
+    workspace: &str,
+    conversation: ConversationId,
+    also: Option<&str>,
+) -> Result<()> {
+    let Some((stream, inbox)): Option<(String, InboxId)> =
+        sqlx::query_as("SELECT stream, inbox_id FROM conversations.conversations WHERE id = $1")
+            .bind(conversation)
+            .fetch_optional(&mut **tx)
+            .await?
+    else {
+        return Ok(());
+    };
+    let mut moving: Vec<String> = sqlx::query_scalar(
+        "SELECT provider_message_id FROM conversations.messages
+          WHERE conversation_id = $1 AND direction = 'inbound' AND mirrors_stream
+            AND provider_stream IS DISTINCT FROM $2
+          ORDER BY sent_at, id",
+    )
+    .bind(conversation)
+    .bind(&stream)
+    .fetch_all(&mut **tx)
+    .await?;
+    if let Some(also) = also
+        && !moving.iter().any(|id| id == also)
+    {
+        moving.push(also.to_owned());
+    }
+    if moving.is_empty() {
+        return Ok(());
+    }
+    let changed = Changed {
+        workspace: workspace.to_owned(),
+        inbox,
+        conversation,
+        origin: Origin::Provider,
+        changes: vec![Change::Stream],
+        provider_message_ids: moving,
+    };
+    let to = RequestedChange::MoveToStream {
+        stream: stream.parse()?,
+    };
+    request(binding, events, tx, &changed, &to).await
 }

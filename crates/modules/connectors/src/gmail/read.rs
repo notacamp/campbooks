@@ -14,8 +14,9 @@ use uuid::Uuid;
 
 use super::{Cursor, FETCH_CONCURRENCY, LIST_PAGE, MAX_CHANGED, Page, normalize};
 use crate::{
-    contract::{MessageChange, NormalizedMessage},
+    contract::{Direction, MessageChange, NormalizedMessage},
     domain::{
+        marks::{self, MarkIds},
         model::{Phase, StreamId},
         outbound,
     },
@@ -306,12 +307,26 @@ impl Reader<'_> {
             if labels != before || forced.contains(&id) {
                 let mut message = self.document(&known.document).await?;
                 // A member's change still waiting to be made shows as
-                // they left it.
+                // they left it (its stream marks as the labels they are).
                 let shown = overlay.get(&id).map_or_else(
                     || meta.label_ids.clone(),
-                    |changes| outbound::apply_labels(&meta.label_ids, changes),
+                    |changes| {
+                        let changes =
+                            marks::resolve_changes(changes, &names.marks(), ToOwned::to_owned);
+                        outbound::apply_labels(&meta.label_ids, &changes)
+                    },
                 );
-                apply_flags(&mut message, &normalize::flags(&shown, &names.user));
+                let mut flags = normalize::flags(&shown, &names.user);
+                // Moved to another tab while keeping its stream mark: the
+                // tab wins, and the mark is stale.
+                if flags.direction == Direction::Inbound
+                    && let Some(stream) =
+                        normalize::category_won(&known.label_ids, &meta.label_ids, &names.user)
+                {
+                    flags.provider_stream = Some(stream);
+                    flags.stream_mark_stale = true;
+                }
+                apply_flags(&mut message, &flags);
                 changes.push(MessageChange::Upsert {
                     message: Box::new(message),
                 });
@@ -594,6 +609,15 @@ struct LabelNames {
 }
 
 impl LabelNames {
+    /// The stream marks among the user labels.
+    fn marks(&self) -> MarkIds {
+        MarkIds::from_labels(
+            self.user
+                .iter()
+                .map(|(id, name)| (id.as_str(), name.as_str())),
+        )
+    }
+
     fn from_list(labels: &[LabelInfo]) -> Self {
         let mut names = Self::default();
         for label in labels {

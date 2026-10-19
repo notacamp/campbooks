@@ -21,7 +21,7 @@ pub mod write;
 use secrecy::ExposeSecret as _;
 use url::Url;
 
-pub use api::{Listed, OriginalFetch, ZohoMail};
+pub use api::{Listed, OriginalFetch, ZohoLabel, ZohoMail};
 
 use crate::provider::{
     ClientSecret, FORM, OAuthError, ProviderError, TokenGrant, form_body, http_client, transport,
@@ -29,13 +29,28 @@ use crate::provider::{
 };
 
 /// The scopes the `messages` capability needs: list the login's mail
-/// accounts, read folders, read and change messages, send. The Zoho OAuth
-/// app must allow these besides `openid email profile`.
-pub const MAIL_SCOPES: [&str; 3] = [
+/// accounts, read folders, read and change messages, send, and read, make
+/// and create labels (the member's labels and the stream marks). The Zoho
+/// OAuth app must allow these besides `openid email profile`.
+pub const MAIL_SCOPES: [&str; 4] = [
     "ZohoMail.accounts.READ",
     "ZohoMail.folders.READ",
     "ZohoMail.messages.ALL",
+    LABELS_SCOPE,
 ];
+
+/// The scope of Zoho's labels API. A connection granted before it was
+/// asked for keeps syncing without labels or streams until the member
+/// connects again ([`labels_granted`]).
+pub const LABELS_SCOPE: &str = "ZohoMail.tags.ALL";
+
+/// Whether a connection's granted `scopes` (as stored, space- or
+/// comma-separated) include the labels scope.
+pub fn labels_granted(scopes: &str) -> bool {
+    crate::provider::split_scopes(scopes)
+        .iter()
+        .any(|s| s == LABELS_SCOPE)
+}
 
 /// Zoho's accounts servers, one per data centre (the identity module
 /// accepts the same list).

@@ -12,7 +12,7 @@ use serde_json::{Value, json};
 use sqlx::PgPool;
 
 use crate::{
-    domain::{model::StreamId, schedule},
+    domain::{marks::MarkIds, model::StreamId, schedule},
     events::ChangesRequested,
     testkit::{Kit, assert_contract, synthetic},
 };
@@ -240,18 +240,10 @@ async fn every_intent_reaches_gmail(db: PgPool) {
         ],
     )
     .await;
-    m.request(
-        &kit,
-        &[(
-            id(4),
-            json!({"kind": "move_to_stream", "stream": "receipts"}),
-        )],
-    )
-    .await;
     m.request(&kit, &[("msg-never", json!({"kind": "archive"}))])
         .await;
     let rows = outbound(&kit).await;
-    let tail: Vec<_> = rows[rows.len() - 4..]
+    let tail: Vec<_> = rows[rows.len() - 3..]
         .iter()
         .map(|(_, kind, state, reason)| (kind.as_str(), state.as_str(), reason.as_deref()))
         .collect();
@@ -260,11 +252,26 @@ async fn every_intent_reaches_gmail(db: PgPool) {
         [
             ("add_label", "skipped", Some("label_not_at_provider")),
             ("add_label", "skipped", Some("label_not_at_provider")),
-            ("move_to_stream", "skipped", Some("no_provider_equivalent")),
             ("archive", "skipped", Some("message_gone")),
         ]
     );
     assert!(kit.google.writes().is_empty(), "{:?}", kit.google.writes());
+
+    // Receipts: the Updates tab and the Receipts mark, made first.
+    m.request(
+        &kit,
+        &[(
+            id(4),
+            json!({"kind": "move_to_stream", "stream": "receipts"}),
+        )],
+    )
+    .await;
+    let mark = kit.google.label_named("Campbooks/Receipts").unwrap();
+    let mut want = labels(&["CATEGORY_UPDATES", "INBOX"]);
+    want.push(mark);
+    want.sort();
+    assert_eq!(kit.google.labels_of(id(4)), want);
+    assert_eq!(outbound(&kit).await.last().unwrap().2, "applied");
 
     // A replayed event records nothing twice.
     let before = outbound(&kit).await.len();
@@ -411,17 +418,21 @@ async fn a_push_counts_the_units_its_calls_spent(db: PgPool) {
     // As planned: the profile, one batch, the profile after.
     let planned = backlog(&m.ids);
     assert_eq!(
-        crate::gmail::write::units(&planned),
+        crate::gmail::write::units(&planned, &MarkIds::default()),
         2 + 4 * 2 + 50,
         "reserved: both profiles, the history pages it may read, the batch"
     );
-    let pushed = crate::gmail::write::push(&google.gmail(&access), &planned).await;
+    let pushed =
+        crate::gmail::write::push(&google.gmail(&access), &planned, &MarkIds::default(), None)
+            .await;
     assert_eq!(pushed.spent, 1 + 50 + 1);
 
     // A batch Gmail refuses: the batch, then each message on its own.
     kit.google.refuse_changes(&m.ids[3]);
     let refused = backlog(&m.ids);
-    let pushed = crate::gmail::write::push(&google.gmail(&access), &refused).await;
+    let pushed =
+        crate::gmail::write::push(&google.gmail(&access), &refused, &MarkIds::default(), None)
+            .await;
     assert_eq!(pushed.spent, 1 + 50 + 12 * 5 + 1);
 }
 

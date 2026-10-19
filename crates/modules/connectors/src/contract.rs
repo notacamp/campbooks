@@ -21,6 +21,11 @@ pub struct MessageChangeBatch {
     pub version: u16,
     /// The inbox the batch is for.
     pub inbox: InboxId,
+    /// Read by the stream's first sync (its backfill): mail the inbox held
+    /// before it was connected. Its streams are never mirrored to the
+    /// provider.
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub backfill: bool,
     /// Applied in this order.
     pub changes: Vec<MessageChange>,
 }
@@ -31,9 +36,26 @@ impl MessageChangeBatch {
         Self {
             version: 1,
             inbox,
+            backfill: false,
             changes,
         }
     }
+}
+
+/// Whether `value` is false (left out of the document).
+#[allow(clippy::trivially_copy_pass_by_ref, reason = "serde's signature")]
+const fn is_false(value: &bool) -> bool {
+    !*value
+}
+
+/// A present value, as `Some` (absent stays `None`): an optional field that
+/// may also be `null`.
+fn present<'de, D, T>(deserializer: D) -> Result<Option<T>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+    T: Deserialize<'de>,
+{
+    T::deserialize(deserializer).map(Some)
 }
 
 /// One change.
@@ -99,6 +121,56 @@ pub struct NormalizedMessage {
     pub read: bool,
     /// Starred at the provider.
     pub starred: bool,
+    /// The stream a received message is in at the provider (its stream
+    /// mark, else its native place): absent when the adapter cannot tell
+    /// (sent mail, a grant without labels), `Some(None)` (`null`) when it is
+    /// in none of the four (Gmail's Social and Forums tabs, several marks).
+    #[serde(
+        default,
+        deserialize_with = "present",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub provider_stream: Option<Option<ProviderStream>>,
+    /// The message's category changed at the provider while it kept a
+    /// stream mark: `provider_stream` is the category's, and the mark is
+    /// stale.
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub stream_mark_stale: bool,
+}
+
+/// A Campbooks stream, as a provider carries it (natively or by its stream
+/// mark).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ProviderStream {
+    /// Primary.
+    Primary,
+    /// Updates.
+    Updates,
+    /// Receipts.
+    Receipts,
+    /// Newsletters.
+    Newsletters,
+}
+
+impl ProviderStream {
+    /// Every stream.
+    pub const ALL: [Self; 4] = [Self::Primary, Self::Updates, Self::Receipts, Self::Newsletters];
+
+    /// The wire name.
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Primary => "primary",
+            Self::Updates => "updates",
+            Self::Receipts => "receipts",
+            Self::Newsletters => "newsletters",
+        }
+    }
+
+    /// The stream named `name`.
+    pub fn parse(name: &str) -> Option<Self> {
+        Self::ALL.into_iter().find(|s| s.as_str() == name)
+    }
 }
 
 /// An email address with its display name.

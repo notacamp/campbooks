@@ -7,8 +7,10 @@
 //! 2. for each new message, store its participants document and ask the
 //!    rules strategy, the facts (blob reads and writes, no transaction);
 //! 3. in the job's transaction, apply every change in order: insert and
-//!    thread new messages, update flags and labels of known ones, remove
-//!    deleted ones, record the rules' answers, and publish the events.
+//!    thread new messages, update flags, labels and provider stream of known
+//!    ones (a provider stream that changed is a move in the member's mail
+//!    client, which the conversation follows), remove deleted ones, record
+//!    the rules' answers, and publish the events.
 //!
 //! Batches of one inbox are enqueued with the same ordering key, so they
 //! apply one at a time, in order.
@@ -53,7 +55,7 @@ use crate::{
         plain_text::Quotes,
         policy::Policy,
         redact, rules,
-        streams::{Inbound, sort_first_inbound},
+        streams::{self, Inbound, sort_first_inbound},
     },
     events::{Change, MESSAGE_RECORD, MessageFacts, MessageReceived, MessageSent, Origin},
     ingest::{
@@ -205,6 +207,7 @@ impl JobHandler for ApplyChanges {
             policy: &self.policy,
             needs: &self.needs,
             inbox: batch.inbox,
+            backfill: batch.backfill,
             touched: BTreeMap::new(),
             new_in: BTreeSet::new(),
             taught: None,
@@ -408,6 +411,9 @@ struct Apply<'a> {
     policy: &'a Policy,
     needs: &'a NeedSettings,
     inbox: InboxId,
+    /// The batch was read by the inbox's first sync: its messages' streams
+    /// are never mirrored.
+    backfill: bool,
     /// Conversations whose existing messages changed or went: what changed
     /// and which messages, announced at the end.
     touched: BTreeMap<ConversationId, (BTreeSet<Change>, BTreeSet<String>)>,
@@ -507,6 +513,13 @@ impl Apply<'_> {
         if old != new {
             changes.insert(Change::Labels);
         }
+        if let Some(stream) = message.provider_stream
+            && self
+                .provider_stream(tx, message, known.id, known.conversation, stream)
+                .await?
+        {
+            changes.insert(Change::Stream);
+        }
         if changes.is_empty() {
             return Ok(());
         }
@@ -539,6 +552,65 @@ impl Apply<'_> {
         entry.0.extend(changes);
         entry.1.insert(message.provider_message_id.clone());
         Ok(())
+    }
+
+    /// A known message's provider stream is now `now`: stored; and when it
+    /// changed to a stream (a move in the member's mail client), its
+    /// conversation moves there (a member's move) unless it is there, the
+    /// conversation's other received messages are asked to follow at the
+    /// provider, and so is this one when its stream mark is stale. Returns
+    /// whether the conversation moved.
+    async fn provider_stream(
+        &self,
+        tx: &mut Transaction<'static, Postgres>,
+        message: &NormalizedMessage,
+        id: MessageId,
+        conversation: ConversationId,
+        now: Option<Stream>,
+    ) -> Result<bool, JobError> {
+        let now = now.map(Stream::as_str);
+        let stored: Option<String> =
+            sqlx::query_scalar("SELECT provider_stream FROM conversations.messages WHERE id = $1")
+                .bind(id)
+                .fetch_one(&mut **tx)
+                .await?;
+        if stored.as_deref() == now {
+            return Ok(false);
+        }
+        sqlx::query("UPDATE conversations.messages SET provider_stream = $2 WHERE id = $1")
+            .bind(id)
+            .bind(now)
+            .execute(&mut **tx)
+            .await?;
+        let (Some(now), Direction::Inbound) = (now, message.direction) else {
+            return Ok(false);
+        };
+        let moved = sqlx::query(
+            "UPDATE conversations.conversations
+                SET stream = $2, stream_source = 'member', updated_at = now()
+              WHERE id = $1 AND stream <> $2",
+        )
+        .bind(conversation)
+        .bind(now)
+        .execute(&mut **tx)
+        .await?
+        .rows_affected()
+            > 0;
+        if moved || message.stream_mark_stale {
+            let stale = message
+                .stream_mark_stale
+                .then_some(message.provider_message_id.as_str());
+            streams::mirror(
+                &self.state.binding,
+                self.events,
+                tx,
+                self.ws,
+                conversation,
+                stale,
+            )
+            .await?;
+        }
+        Ok(moved)
     }
 
     /// Insert a new message, threading it into a conversation.
@@ -582,6 +654,29 @@ impl Apply<'_> {
         let id = self
             .store(tx, message, prepared, conversation, template.as_deref())
             .await?;
+        // A received message joining a conversation already placed goes
+        // where it is at the provider too (a placement made now asks for
+        // itself: a taught rule's on arrival, the model pass's after it).
+        let mirrored = self.mirrors(message);
+        if mirrored && placement.conversation.is_some() && !sorted {
+            let placed: bool = sqlx::query_scalar(
+                "SELECT stream_source <> 'default' FROM conversations.conversations WHERE id = $1",
+            )
+            .bind(conversation)
+            .fetch_one(&mut **tx)
+            .await?;
+            if placed {
+                streams::mirror(
+                    &self.state.binding,
+                    self.events,
+                    tx,
+                    self.ws,
+                    conversation,
+                    None,
+                )
+                .await?;
+            }
+        }
 
         if inbound {
             let recorded = Recorded {
@@ -866,7 +961,27 @@ impl Apply<'_> {
         for label in &message.labels {
             link_provider_label(tx, self.workspace, self.inbox, conversation, label).await?;
         }
+        if let Some(stream) = message.provider_stream {
+            sqlx::query(
+                "UPDATE conversations.messages SET provider_stream = $2, mirrors_stream = $3
+                  WHERE id = $1",
+            )
+            .bind(id)
+            .bind(stream.map(Stream::as_str))
+            .bind(self.mirrors(message))
+            .execute(&mut **tx)
+            .await?;
+        }
         Ok(id)
+    }
+
+    /// Whether `message`'s stream is mirrored to the provider: a received
+    /// message whose upsert says where it is at the provider, outside the
+    /// inbox's first sync.
+    fn mirrors(&self, message: &NormalizedMessage) -> bool {
+        message.direction == Direction::Inbound
+            && !self.backfill
+            && message.provider_stream.is_some()
     }
 
     /// Publish `message_received` or `message_sent` for a new message.

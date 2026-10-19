@@ -65,7 +65,7 @@ use crate::{
         plain_text::Quotes,
         policy::Policy,
         redact,
-        streams::{Inbound, sort_first_inbound},
+        streams::{self, Inbound, sort_first_inbound},
     },
     events::{Change, MessageReceived, Origin},
     ingest::Headers,
@@ -274,6 +274,7 @@ impl Pass {
             policy: &self.policy,
         };
         let events = ctx.state().events.clone();
+        let binding = ctx.state().binding.clone();
         let ws = workspace.to_string();
         let tx = ctx.tx().await?;
         // Holding the inbox `FOR SHARE` until this commits, as a batch does:
@@ -315,7 +316,6 @@ impl Pass {
             actions::store(tx, (*workspace.as_uuid(), message), rated, model_name).await?;
         }
         if placed {
-            // Not a member's change: nothing is sent back to the provider.
             let provider_message_ids = provider_message_ids(tx, loaded.conversation).await?;
             Changed {
                 workspace: ws.clone(),
@@ -327,6 +327,10 @@ impl Pass {
             }
             .publish(&events, tx)
             .await?;
+            // Placed, whether or not the stream changed (a placement in
+            // Primary takes Gmail's Updates tab off too): its received
+            // messages go to the stream at the provider as well.
+            streams::mirror(&binding, &events, tx, &ws, loaded.conversation, None).await?;
         }
         needs::refresh(tx, &events, &ws, loaded.conversation, &self.needs).await?;
         Ok(Passed::Done)

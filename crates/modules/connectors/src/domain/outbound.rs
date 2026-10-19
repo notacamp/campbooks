@@ -15,8 +15,11 @@ use chrono::{DateTime, Utc};
 use sqlx::{PgConnection, PgPool};
 use uuid::Uuid;
 
-use super::model::StreamId;
-use crate::events::RequestedChange;
+use super::{
+    marks::{gmail_place, with_mark, zoho_mark},
+    model::StreamId,
+};
+use crate::{contract::ProviderStream, events::RequestedChange};
 
 /// Gmail's category labels: a message is in one of them.
 pub const CATEGORIES: [&str; 5] = [
@@ -48,7 +51,7 @@ pub fn is_system(label: &str) -> bool {
 }
 
 /// Whether a change may put on or take off `label`: the labels of the
-/// flag intents and the categories, or a user label.
+/// flag intents and the categories, a stream mark's token, or a user label.
 pub fn writable(label: &str) -> bool {
     matches!(label, "UNREAD" | "STARRED" | "INBOX" | "TRASH" | "SPAM")
         || CATEGORIES.contains(&label)
@@ -127,9 +130,16 @@ pub const fn kind(change: &RequestedChange) -> &'static str {
     }
 }
 
+/// The stream `stream` names, if it is one.
+fn stream_of(stream: &str) -> Option<ProviderStream> {
+    ProviderStream::parse(stream)
+}
+
 /// `change` in Gmail labels. `known` holds the stream's *user* label ids
-/// (from `labels.list`): a provider key Gmail no longer has, or a system
-/// label, is skipped.
+/// (from `labels.list`) other than stream marks: a provider key Gmail no
+/// longer has, a system label or a stream mark is skipped. A move puts the
+/// message in its stream's place ([`gmail_place`]) and takes every other
+/// category and stream mark off.
 pub fn map(change: &RequestedChange, known: &HashSet<String>) -> Mapped {
     let add = |label: &str| Mapped::Labels {
         add: vec![label.to_owned()],
@@ -173,31 +183,31 @@ pub fn map(change: &RequestedChange, known: &HashSet<String>) -> Mapped {
             }
         }
         RequestedChange::MoveToStream { stream } => {
-            let category = match stream.as_str() {
-                "primary" => "CATEGORY_PERSONAL",
-                "updates" => "CATEGORY_UPDATES",
-                "newsletters" => "CATEGORY_PROMOTIONS",
-                "receipts" => return Mapped::Skip("no_provider_equivalent"),
-                _ => return Mapped::Skip("unsupported"),
+            let Some(stream) = stream_of(stream) else {
+                return Mapped::Skip("unsupported");
             };
-            Mapped::Labels {
-                add: vec![category.to_owned()],
-                remove: CATEGORIES
-                    .iter()
-                    .filter(|&&c| c != category)
-                    .map(|&c| c.to_owned())
-                    .collect(),
-            }
+            let (category, mark) = gmail_place(stream);
+            let others = CATEGORIES
+                .iter()
+                .filter(|&&c| c != category)
+                .map(|&c| c.to_owned())
+                .collect();
+            let (add, remove) = with_mark(vec![category.to_owned()], others, mark);
+            Mapped::Labels { add, remove }
         }
         RequestedChange::Unsupported => Mapped::Skip("unsupported"),
     }
 }
 
 /// `change` in a Zoho message's state tokens (`zoho/state.rs`): read,
-/// flag, inbox, trash and spam. Zoho's labels are not carried and it has no
-/// streams of its own, so label changes and moves between streams are
-/// skipped. Out of the trash or spam means back where the message was.
-pub fn map_zoho(change: &RequestedChange) -> Mapped {
+/// flag, inbox, trash and spam, a Zoho label (`label:<id>`) and a stream
+/// mark. `labels` holds the ids of the stream's Zoho labels other than
+/// stream marks, or is `None` when the grant has no labels scope: label
+/// changes and moves are then skipped (`scope_missing`). Zoho has no
+/// streams of its own, so a move puts its stream's mark on
+/// ([`zoho_mark`], none for Primary) and every other mark off. Out of the
+/// trash or spam means back where the message was.
+pub fn map_zoho(change: &RequestedChange, labels: Option<&HashSet<String>>) -> Mapped {
     let set = |token: &str, on: bool| Mapped::Labels {
         add: if on {
             vec![token.to_owned()]
@@ -230,15 +240,29 @@ pub fn map_zoho(change: &RequestedChange) -> Mapped {
         },
         RequestedChange::Untrash { inbound } => out_of("TRASH", *inbound),
         RequestedChange::Unspam { inbound } => out_of("SPAM", *inbound),
-        RequestedChange::AddLabel { .. } | RequestedChange::RemoveLabel { .. } => {
-            Mapped::Skip("label_not_at_provider")
-        }
-        RequestedChange::MoveToStream { stream } => match stream.as_str() {
-            "primary" | "updates" | "newsletters" | "receipts" => {
-                Mapped::Skip("no_provider_equivalent")
+        RequestedChange::AddLabel { provider_key, .. }
+        | RequestedChange::RemoveLabel { provider_key, .. } => {
+            let Some(labels) = labels else {
+                return Mapped::Skip("scope_missing");
+            };
+            match provider_key.as_deref().filter(|key| labels.contains(*key)) {
+                None => Mapped::Skip("label_not_at_provider"),
+                Some(key) => set(
+                    &crate::zoho::state::label_token(key),
+                    matches!(change, RequestedChange::AddLabel { .. }),
+                ),
             }
-            _ => Mapped::Skip("unsupported"),
-        },
+        }
+        RequestedChange::MoveToStream { stream } => {
+            let Some(stream) = stream_of(stream) else {
+                return Mapped::Skip("unsupported");
+            };
+            if labels.is_none() {
+                return Mapped::Skip("scope_missing");
+            }
+            let (add, remove) = with_mark(Vec::new(), Vec::new(), zoho_mark(stream));
+            Mapped::Labels { add, remove }
+        }
         RequestedChange::Unsupported => Mapped::Skip("unsupported"),
     }
 }
@@ -968,15 +992,24 @@ mod tests {
             panic!("newsletters maps to promotions");
         };
         assert_eq!(add, ["CATEGORY_PROMOTIONS"]);
-        assert_eq!(remove.len(), 4);
+        // The other four categories and every stream mark.
+        assert_eq!(remove.len(), 8);
         assert!(!remove.contains(&"CATEGORY_PROMOTIONS".to_owned()));
+        assert!(remove.contains(&"mark:receipts".to_owned()));
         assert!(
             matches!(moved("primary"), Mapped::Labels { add, .. } if add == ["CATEGORY_PERSONAL"])
         );
         assert!(
             matches!(moved("updates"), Mapped::Labels { add, .. } if add == ["CATEGORY_UPDATES"])
         );
-        assert_eq!(moved("receipts"), Mapped::Skip("no_provider_equivalent"));
+        // Receipts: Gmail's Updates tab and the Receipts mark.
+        let Mapped::Labels { add, remove } = moved("receipts") else {
+            panic!("receipts has a place at Gmail");
+        };
+        assert_eq!(add, ["CATEGORY_UPDATES", "mark:receipts"]);
+        assert!(remove.contains(&"CATEGORY_PROMOTIONS".to_owned()));
+        assert!(!remove.contains(&"mark:receipts".to_owned()));
+        assert!(remove.contains(&"mark:updates".to_owned()));
         assert_eq!(moved("someday"), Mapped::Skip("unsupported"));
         assert_eq!(
             map(&RequestedChange::Unsupported, &known),
@@ -987,6 +1020,8 @@ mod tests {
     #[test]
     fn intents_map_to_zoho_state() {
         let lab = uuid::Uuid::nil();
+        let known: HashSet<String> = ["123".to_owned()].into();
+        let map_zoho = |change: &RequestedChange| super::map_zoho(change, Some(&known));
         assert_eq!(
             map_zoho(&RequestedChange::Archive),
             Mapped::Labels {
@@ -1041,13 +1076,74 @@ mod tests {
                 label: lab,
                 provider_key: Some("123".into())
             }),
-            Mapped::Skip("label_not_at_provider")
+            Mapped::Labels {
+                add: labels(&["label:123"]),
+                remove: vec![]
+            }
         );
         assert_eq!(
-            map_zoho(&RequestedChange::MoveToStream {
-                stream: "newsletters".into()
+            map_zoho(&RequestedChange::RemoveLabel {
+                label: lab,
+                provider_key: Some("123".into())
             }),
-            Mapped::Skip("no_provider_equivalent")
+            Mapped::Labels {
+                add: vec![],
+                remove: labels(&["label:123"])
+            }
+        );
+        assert_eq!(
+            map_zoho(&RequestedChange::AddLabel {
+                label: lab,
+                provider_key: Some("404".into())
+            }),
+            Mapped::Skip("label_not_at_provider")
+        );
+        let moved = |stream: &str| {
+            map_zoho(&RequestedChange::MoveToStream {
+                stream: stream.into(),
+            })
+        };
+        assert_eq!(
+            moved("newsletters"),
+            Mapped::Labels {
+                add: labels(&["mark:newsletters"]),
+                remove: labels(&["mark:primary", "mark:updates", "mark:receipts"])
+            }
+        );
+        // Primary is the mark-free inbox.
+        assert_eq!(
+            moved("primary"),
+            Mapped::Labels {
+                add: vec![],
+                remove: labels(&[
+                    "mark:primary",
+                    "mark:updates",
+                    "mark:receipts",
+                    "mark:newsletters"
+                ])
+            }
+        );
+        // A grant without the labels scope.
+        for change in [
+            RequestedChange::MoveToStream {
+                stream: "updates".into(),
+            },
+            RequestedChange::AddLabel {
+                label: lab,
+                provider_key: Some("123".into()),
+            },
+        ] {
+            assert_eq!(
+                super::map_zoho(&change, None),
+                Mapped::Skip("scope_missing")
+            );
+        }
+        assert_eq!(
+            super::map_zoho(&RequestedChange::Archive, None),
+            Mapped::Labels {
+                add: vec![],
+                remove: labels(&["INBOX"])
+            }
         );
     }
 
