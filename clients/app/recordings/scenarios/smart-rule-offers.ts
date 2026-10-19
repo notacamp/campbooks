@@ -118,10 +118,12 @@ export default async function smartRuleOffers({ page }: ScenarioContext): Promis
   await caption(page, "Saved: the suggestion is answered and won't come back", 2200);
   await homeShows(page, workspace, "Worth a look");
   // The group's own heading (the last group), scrolled to the top of the view.
-  await page
-    .getByRole("heading", { level: 2, name: /^Worth a look/u })
-    .evaluate("(el) => el.scrollIntoView({ block: 'start', behavior: 'smooth' })");
-  await pause(1200);
+  // At once, not smooth: Home's live updates would interrupt an animation.
+  const look = page.getByRole("heading", { level: 2, name: /^Worth a look/u });
+  await look.waitFor();
+  await pause(1500);
+  await look.evaluate("(el) => el.scrollIntoView({ block: 'center' })");
+  await pause(800);
   await caption(
     page,
     "Only the latest one already here waits on Home under Worth a look, nothing pinned",
