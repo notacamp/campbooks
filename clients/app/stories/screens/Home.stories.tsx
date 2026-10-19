@@ -8,15 +8,22 @@ import { UndoProvider } from "~/lib/ui";
 
 import { createAppRouter } from "../../src/app/router";
 import {
+  ANA,
+  ANA_DETAIL,
+  ANA_ITEM,
   CLEARED,
   COUNTS,
+  INES,
   ITEMS,
   MARTA,
   MARTA_DETAIL,
   NEEDS,
   PHISH,
   PHISH_DETAIL,
+  RUI,
+  RUI_DETAIL,
   SOFIA,
+  WAITING,
 } from "../../test/demo/attention";
 import { INBOX, STREAM_COUNTS, W } from "../../test/demo/conversations";
 import { DUARTE, SESSION } from "../../test/demo/workspaces";
@@ -323,3 +330,94 @@ export const BusyNarrowDesktop: Story = { ...busy, ...at("narrowDesktop", 1100, 
 
 /** A busy Home in a wide desktop window: Home scrolls, the page doesn't. */
 export const BusyDesktop: Story = { ...busy, ...at("desktop", 1440, 900) };
+
+// Waits and nudges (campbooks-cloud#293): Ana Costa hasn't written since
+// João asked on 7 October, and Scout waits on Rui Matos and Inês Cardoso.
+function waits(open = [...ITEMS, ANA_ITEM]): Record<string, MockRoute> {
+  return home({
+    [`GET ${W}/attention`]: (_body, url) => {
+      const state = url.searchParams.get("state");
+      if (state === "cleared") {
+        return { body: { items: CLEARED, counts: [] } };
+      }
+      if (state === "waiting") {
+        return { body: { items: WAITING, counts: [{ reason: "waiting", count: WAITING.length }] } };
+      }
+      return { body: { items: open, counts: COUNTS } };
+    },
+    [`GET ${W}/conversations`]: {
+      body: { conversations: [...NEEDS, ANA, RUI, INES, SOFIA], next_cursor: null },
+    },
+    [`GET ${W}/conversations/${ANA.id}`]: { body: ANA_DETAIL },
+    [`GET ${W}/conversations/${RUI.id}`]: { body: RUI_DETAIL },
+    [`GET ${W}/drafts`]: { body: { drafts: [] } },
+    [`POST ${W}/conversations/${ANA.id}/nudge/draft`]: {
+      body: {
+        message_id: ANA.need?.message_id,
+        text: "Hi Ana,\n\nJust following up on João’s note below: could you send me the revised floor plan when you have a moment? I’d like to go through it before Thursday’s visit.\n\nThanks,\nSam Rivera",
+      },
+    },
+  });
+}
+
+/** Under Nudge, after Pay: Ana hasn't written. Waiting on others sits above Done today. */
+export const NudgeAndWaiting: Story = {
+  args: { path: PATH, api: waits() },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(await canvas.findByText("Ana Costa hasn’t written yet")).toBeVisible();
+    await expect(
+      await canvas.findByRole("heading", { level: 2, name: "Waiting on others" }),
+    ).toBeVisible();
+    await expect(canvas.getByText("Checks Fri")).toBeVisible();
+  },
+};
+
+const nudgeOpen: Pick<Story, "args" | "play"> = {
+  args: { path: PATH, api: waits() },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await userEvent.click(await canvas.findByText("Ana Costa hasn’t written yet"));
+    await userEvent.keyboard("1");
+    const body = within(canvasElement.ownerDocument.body);
+    const dialog = await body.findByRole("dialog", { name: "Nudge Ana" });
+    await waitFor(async () => {
+      await expect(dialog).toBeVisible();
+    });
+    await expect(await body.findByRole("textbox", { name: "Your nudge" })).toBeVisible();
+    await expect(body.getByText("Copying João Matos <joao@obras-matos.example>")).toBeVisible();
+  },
+};
+
+/** 1 on Ana's item: Scout's nudge, to Ana, copying João, editable before Send. */
+export const NudgeDialog: Story = nudgeOpen;
+
+/** The nudge dialog on a phone: a bottom sheet, nothing scrolls sideways. */
+export const NudgeDialogPhone: Story = { ...nudgeOpen, ...at("phone", 375, 812) };
+
+/** On a phone, Waiting on others is a fold after the list, with its count. */
+export const WaitingPhone: Story = {
+  args: { path: PATH, api: waits() },
+  ...at("phone", 375, 812),
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(await canvas.findByText("Waiting on others · 2")).toBeVisible();
+    await expect(canvasElement.ownerDocument.documentElement.scrollWidth).toBeLessThanOrEqual(
+      globalThis.innerWidth,
+    );
+  },
+};
+
+/** Nothing needs you, but Scout waits on two people: said under the hero. */
+export const NothingNeedsYouWaiting: Story = {
+  args: { path: PATH, api: waits([]) },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(
+      await canvas.findByRole("heading", { level: 1, name: "Nothing needs you" }),
+    ).toBeVisible();
+    await expect(
+      await canvas.findByText(/Scout is also waiting on 2 people for you\./u),
+    ).toBeVisible();
+  },
+};
