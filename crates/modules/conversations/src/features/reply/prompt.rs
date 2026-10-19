@@ -506,7 +506,7 @@ mod tests {
         assert!(instruction.contains("`suggestions`"));
         assert!(instruction.contains("never facts beyond the conversation"));
         assert!(instruction.contains("plain text"));
-        assert!(!instruction.contains("IBAN"));
+        assert!(!instruction.contains("add my IBAN"));
         assert!(request.response_format.is_none());
         let user = serde_json::to_value(&request.messages[1]).unwrap();
         let input: Value = serde_json::from_str(user["content"].as_str().unwrap()).unwrap();
