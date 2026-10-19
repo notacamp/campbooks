@@ -120,33 +120,46 @@ impl Job for PruneEvents {
     }
 }
 
-/// Delete a purged workspace's finished jobs (succeeded or failed) and its
-/// events, except events still waiting to be delivered. Unfinished jobs stay:
-/// other modules' purges may still be queued. Returns how many jobs and
-/// events were deleted. Runs in a transaction working in `workspace` (the
-/// purge job's own); refused in one that cannot reach its rows.
+/// Delete up to `limit` of a purged workspace's finished jobs (succeeded or
+/// failed), then up to `limit` of its events, except events still waiting
+/// to be delivered. Unfinished jobs stay: other modules' purges may still be
+/// queued. Returns how many jobs and events were deleted; fewer than `limit`
+/// of both means none is left. Runs in a transaction working in `workspace`
+/// (see [`crate::purge::purge_workspace`], which loops over batches);
+/// refused in one that cannot reach its rows.
 pub async fn purge_workspace(
     tx: &mut Transaction<'_, Postgres>,
     workspace: &str,
+    limit: i64,
 ) -> Result<(u64, u64), sqlx::Error> {
     crate::db::require_scope(tx, workspace, "the purge of a workspace's jobs").await?;
     let jobs = sqlx::query!(
-        "DELETE FROM kernel.jobs
-          WHERE workspace_id = $1 AND state IN ('succeeded', 'failed')",
-        workspace
+        r#"
+        DELETE FROM kernel.jobs
+         WHERE id IN (
+             SELECT id FROM kernel.jobs
+              WHERE workspace_id = $1 AND state IN ('succeeded', 'failed')
+              LIMIT $2)
+        "#,
+        workspace,
+        limit
     )
     .execute(&mut **tx)
     .await?
     .rows_affected();
     let events = sqlx::query!(
         r#"
-        DELETE FROM kernel.events e
-         WHERE e.workspace_id = $1
-           AND NOT EXISTS (
-               SELECT 1 FROM kernel.jobs j
-                WHERE j.event_id = e.id AND j.state IN ('pending', 'running'))
+        DELETE FROM kernel.events
+         WHERE id IN (
+             SELECT e.id FROM kernel.events e
+              WHERE e.workspace_id = $1
+                AND NOT EXISTS (
+                    SELECT 1 FROM kernel.jobs j
+                     WHERE j.event_id = e.id AND j.state IN ('pending', 'running'))
+              LIMIT $2)
         "#,
-        workspace
+        workspace,
+        limit
     )
     .execute(&mut **tx)
     .await?

@@ -23,7 +23,22 @@ with `mutates: false` SHALL use GET or HEAD. An `undo` SHALL name an existing
 mutating operation and SHALL only appear on a mutating operation. A
 `rate_limit` SHALL only appear on a mutating operation and SHALL only be
 `send`. A `secret_once` SHALL be a boolean and SHALL only appear on a
-mutating operation. The architecture check SHALL fail on any violation.
+mutating operation. An operation with `risk: high` SHALL NOT opt
+automation or the assistant in (`automation` and `assistant` false): a
+high-risk operation is the person's own request only, since whether an
+invocation is "confirmed" is said by the code making it. A mutating operation
+whose answer below 400 has a field that looks like a secret, at any depth
+of its schema, or that redirects (a 3xx, whose `Location` may carry a
+ticket), SHALL declare `secret_once`, or the field (or `Location`) SHALL be
+listed in the architecture check with the reason it is none; a listed field
+no longer answered SHALL be reported. A field looks like a secret by its
+words, in any case: split at `_`, `-`, `.`, a space, camelCase, the end of
+a run of capitals (`IDToken`) and before a trailing number (`token2`). A
+guarded word is `secret`, `token`, `ticket`, `password`, `passwd`,
+`passphrase`, `credential`, `code`, `apikey` or `otp`, singular or plural.
+An API, private, access, signing or secret key anywhere is guarded, and so
+is `url`, `uri`, `link` or `key` as the last word. The architecture check SHALL fail on
+any violation.
 
 #### Scenario: Health and version are catalogued
 - **WHEN** the OpenAPI document is generated
@@ -44,6 +59,14 @@ mutating operation. The architecture check SHALL fail on any violation.
 #### Scenario: A secret flag on a read
 - **WHEN** a non-mutating operation declares `x-campbooks.secret_once: true`, or any operation declares it as a string
 - **THEN** `cargo xtask arch` fails naming the operation
+
+#### Scenario: A high-risk operation opted in for an invoker
+- **WHEN** an operation declares `x-campbooks.risk: high` with `assistant: true` or `automation: true`
+- **THEN** `cargo xtask arch` fails naming the operation and the caller kind
+
+#### Scenario: A secret-looking answer
+- **WHEN** a mutating operation without `secret_once` answers 201 with a nested `refresh_token`, `clientSecret`, `api_key`, `invite_link` or `code`, or redirects (303)
+- **THEN** `cargo xtask arch` fails naming the operation and the field (or `Location`), unless it is listed with its reason, while `tokenizer`, `codec` or `key_id` pass and `IDToken`, `OTPCode` or `public_key` do not
 
 ### Requirement: Events catalogue
 Modules SHALL declare the domain events they publish. The server SHALL
@@ -92,14 +115,35 @@ and caller while the key is retained (24 hours): an identical retry SHALL
 receive the stored response with `Idempotency-Replayed: true`; a different
 request (operation, method, path, query or body) with the same key SHALL
 receive 422; a retry while the first request is running SHALL receive 409.
+A key whose first request ended without a stored answer SHALL never run
+the operation again. That happens when its process died, when the request
+was stopped at its time limit, or when the client or a proxy hung up, each
+perhaps after committing its effects. Once the key has been pending for two
+minutes, longer than any request runs, a retry SHALL receive 409
+`idempotency_outcome_unknown` in the caller's language, until the key
+expires. A request still running after the server's time limit (30 seconds)
+SHALL be answered 503 `request_timed_out`, which does not release its key:
+the caller checks the result, then retries with a new key. A server error
+the operation itself answers still releases the key, so a retry runs it
+again. If the operation committed before that error (or before an
+acknowledgement was lost), only the operation's own guard (a draft's send
+state, for mail) keeps the work from running twice. Therefore an operation
+with an irreversible external effect (a send, a change at a provider, a
+payment) SHALL have a domain-level guard, a state machine or a unique key on
+the effect, and SHALL NOT rely on idempotency alone. A keyed request body
+SHALL be at most 10 MiB, since the layer holds it to hash it. A larger
+upload SHALL be stored in its own step without a key (blobs are content
+addressed, so the same bytes are the same blob) and attached by reference in
+a small keyed operation.
 Server errors and authentication or rate-limit failures SHALL release the
 key. GET and HEAD requests SHALL ignore the header, and no operation SHALL be
 able to opt out. Expired keys SHALL be deleted by an hourly job. For an
 operation declaring `x-campbooks.secret_once` (`identity.register_client`,
 `identity.rotate_client_secret`, `workspaces.invite_member`,
-`identity.start_link`, `connectors.start_connection`), a successful answer
-SHALL NOT be stored: the key SHALL be kept as used (`withheld`: its status
-and `Location`, no body), and a replay SHALL answer 409 problem+json
+`identity.start_link`, `connectors.start_connection`, `identity.token`), an
+answer below 400 SHALL NOT be stored: the key SHALL be kept as used
+(`withheld`: its status, and a success's `Location`, never a redirect's, no
+body), and a replay SHALL answer 409 problem+json
 `idempotency_secret_shown_once` with `Idempotency-Replayed: true`, in the
 caller's language, after the same authorization as any replay, without
 running the operation again or showing the secret.
@@ -123,6 +167,22 @@ running the operation again or showing the secret.
 #### Scenario: The key of a secret reused
 - **WHEN** the key of a withheld answer is reused for another request
 - **THEN** the answer is 422, as for any reused key
+
+#### Scenario: The token endpoint and a key
+- **WHEN** a client calling `/oauth2/token` also sends a valid bearer token and an `Idempotency-Key`, then sends the same request again
+- **THEN** the issued tokens are not stored, and the second request answers 409 `idempotency_secret_shown_once`
+
+#### Scenario: A crash between the commit and the stored answer
+- **WHEN** a request with `Idempotency-Key: k-9` commits its effects and its process stops before its answer is stored, and the same request is sent again right away, then after two minutes, then once more
+- **THEN** the first retry receives 409 `idempotency_key_in_flight`, the later ones 409 `idempotency_outcome_unknown`, and the operation never runs a second time
+
+#### Scenario: Two requests with one key at once
+- **WHEN** two identical requests with the same key arrive while the first is still running
+- **THEN** exactly one runs and the other receives 409 `idempotency_key_in_flight`, and a retry afterwards replays the one answer
+
+#### Scenario: A request past its time limit
+- **WHEN** a request is still running after the server's time limit
+- **THEN** it is answered 503 `request_timed_out` in the caller's language, and a retry with the same key is not run again
 
 ### Requirement: Record references
 The kernel SHALL provide a record reference `{ type, id }` whose `type` is
@@ -160,3 +220,20 @@ again.
 #### Scenario: Taken out of the inbox
 - **WHEN** a member repeats, with the same key, a request whose response is stored, after being taken out of the inbox it acted in
 - **THEN** the answer is 404 and no stored body is returned
+
+### Requirement: A handler knows who invoked it
+The `Workspace<S>` extractor SHALL tell a handler who ran the request
+in-process (`invoked_by`: the assistant or automation, through `invoke`) or
+that it arrived over HTTP (`None`). The kernel SHALL set it only from a
+request extension that `invoke` attaches, private to the kernel: no
+header, token claim or body can set or clear it, and no module can make
+one. A request the idempotency layer authenticated SHALL keep how it
+arrived.
+
+#### Scenario: The assistant calls an operation
+- **WHEN** the assistant invokes an operation for Sam in his workspace
+- **THEN** its handler sees `invoked_by` as the assistant, with Sam's access
+
+#### Scenario: Sam's own request
+- **WHEN** Sam's client calls the same operation over HTTP with his token, whatever headers it sends
+- **THEN** its handler sees `invoked_by` as `None`

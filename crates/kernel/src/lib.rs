@@ -8,6 +8,7 @@
 pub mod admin;
 pub mod auth;
 pub mod authz;
+pub mod binding;
 pub mod blobs;
 pub mod changes;
 pub mod clock;
@@ -27,6 +28,7 @@ pub mod module;
 pub mod operations;
 pub mod outbound;
 pub mod preferences;
+pub mod purge;
 pub mod rate_limit;
 pub mod records;
 pub mod redact;

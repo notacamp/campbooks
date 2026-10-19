@@ -14,13 +14,38 @@ All notable changes to Campbooks Next are documented here. The format follows
   once it holds a saved draft. Every delete, the composer's Discard included, says "Draft
   deleted" and offers Undo, which writes the draft back as you saw it. A forward's
   attachments you had removed come back with it.
+- **Usage analytics, without a tracking script (off by default).** An instance can count
+  which screens people use in its own Matomo (`CAMPBOOKS_ANALYTICS__MATOMO_URL`,
+  `__MATOMO_SITE_ID` and `__MATOMO_VISITOR_KEY`, all three or nothing). The app loads no
+  analytics script and its security policy is unchanged: after each navigation it tells
+  its own server the screen's route template, such as `/w/:workspaceId/inbox`, never the
+  address, an id, a search or a title, and it sends nothing while the browser asks not to
+  be tracked (Do Not Track or Global Privacy Control). The server checks the template and
+  passes it on in the background with the browser's user agent and a visitor id that
+  changes every day, so Matomo sees daily visitors per screen but never an IP, an account
+  or a workspace. A slow or unreachable Matomo only drops views; the app never waits for it.
 - **Always show images from a sender you trust.** In the reader, beside Show images, "Always
   show images from <sender>" (⇧A) saves a smart rule, after the usual confirmation, for that
   address or anyone at its domain. Their images then show on their own, but only when the
   mail passes the sender's checks and Campbooks has found nothing suspicious about it: mail
   pretending to be them, mail failing DMARC, and mail with no checks keep their images held
-  back. Tracking pixels stay removed either way, and
-  no AI is involved. Remove the rule in Scout's memory and Show images is back.
+  back. Tracking pixels stay removed either way. The rule itself is plain (no AI), but
+  images wait for Scout's check of each email, so while Scout is off or past its daily
+  limit they stay held back. Remove the rule in Scout's memory and Show images is back.
+  The offer only appears where it can take effect (not for a sender already trusted, mail
+  failing its checks, mail under review, or a provider that shares no sender checks), and
+  otherwise the reader says in one line why images stay held back. "Anyone at" offers the
+  sender's own domain, never a parent of it (a domain rule reaches its subdomains), and
+  never a free mail or internet provider's domain (over 300 of them, subdomains included),
+  a platform anyone can send from (Substack, Mailchimp, Google Groups and the like), a
+  help desk whose customers send from its subdomains (Zendesk, Freshdesk) or an address
+  relay (Hide My Email, SimpleLogin). The server refuses such a rule however it is made,
+  and a rule like that stored earlier never acts: Scout's memory shows it paused as too
+  broad, and the reader says why while the address alone may still be trusted. The wider
+  free mail list also refuses domain-only rules of any kind for those providers' domains
+  (trust an address instead). A second rule for a sender already covered, even by a
+  paused one, is refused with a pointer to Scout's memory, also when a rule is confirmed
+  or brought back. In a shared inbox the note says the inbox trusts the sender.
 - **Home offers each email's own actions, picked by Scout (with the catalogue on).** When
   the action catalogue is switched on, the selected item's buttons are the ones the model
   ranked for that email, likelier first on 1, 2 and 3, with the visor saying Scout picked
@@ -58,9 +83,101 @@ All notable changes to Campbooks Next are documented here. The format follows
   (your own sent mail, say), the message shows in the trash or spam again after the sync.
   Gmail's untrash and Zoho's spam report work as their documentation says and still need
   checking on a live account. Mail in the trash or spam never needs you.
+- **Rotate the instance secret key without signing anyone out (campbooks-cloud#191).** Set
+  the old key as `CAMPBOOKS_SECRET_KEY_PREVIOUS_FILE` (or `CAMPBOOKS_SECRET_KEY_PREVIOUS`)
+  beside the new one. Web sessions, connected mailboxes, the sign-in keys, taught rules and
+  what they changed, and scheduled sends keep working. What the old key sealed is sealed
+  again with the new one as it is used, and what it signed is signed again in the
+  background. The logs say when nothing is left under the old key, which is when to remove
+  it. With compose, `server-init` gains `rotate` and `forget-previous`; the self-hosting
+  guide has the steps. Never keep a leaked key as the previous one.
+- **A separate worker container can have a health check.** A process started as
+  `campbooks-server worker` answers `GET /healthz` on `CAMPBOOKS_JOBS__HEALTH_ADDR` (default
+  `127.0.0.1:8081`): 200 while its job loop runs and reaches the database, 503 after a
+  minute without. Use `campbooks-server healthcheck --worker` as the container's health
+  check; the self-hosting guide shows how.
 
 ### Fixed
 
+- **A reply or forward never quotes nothing.** When an email's words were too slow to read
+  in time (a very large or heavy HTML email), the conversation arrives without them; Reply,
+  Reply all, Forward and Home's Forward picker now read them first, saying "Reading the email
+  to quote it…" meanwhile, and the folded message in the reader shows them too. If they
+  cannot be read, nothing is started or sent and the app says why, instead of quoting an
+  empty message; the reply dialog waits to send until the quote is shown, with Try again.
+  When only the start of a long email could be read, the composer says the quote holds its
+  first part.
+- **A request can no longer hang on the database.** The server's database connections now
+  give up on a statement after 30 seconds and on a lock wait after 10 (background jobs
+  allow their own statements 5 minutes). A request that hits either, or finds no free
+  connection in time, answers "The database is unavailable right now. Try again in a
+  moment." (503) instead of waiting indefinitely or failing as an internal error.
+- **Desktop app: a mail link opens only when its addresses are plain addresses.** A link
+  whose address part hides a line break, another field or header (`&`, `;`, `?`), even
+  encoded, an invisible character (a bidi override, a zero-width space) or bytes that are
+  not text, or that carries a `mailto://` authority, now opens nowhere instead of
+  reaching the mail app as written; the same holds for addresses in its `to`, `cc` and
+  `bcc` fields. A subject or body that could be read as another field (it holds `&` or
+  `?`) is left out, and so is a subject hiding a line break or an invisible character,
+  or a body hiding a control character other than line breaks and tabs, which could
+  start another header such as Bcc. Internationalised addresses still open.
+- **Gmail write-back stays within its quota budget.** Before writing your changes back to
+  Gmail, a sync now reserves the most those writes can cost, not just what it plans: enough
+  for Gmail to refuse a large batch (each message is then changed on its own) or for a
+  change made meanwhile in Gmail to split a batch into smaller writes. Before, such pushes
+  could spend far more than they took from the shared budget and run into Gmail's rate limit.
+- **Mail whose HTML has no body tag gets its words.** Mail written as a head followed
+  straight by its text, with no `<body>` (some mailers send it), was stored with a blank
+  text in place of its words, so search found nothing in it, its preview and Scout's read
+  were empty, and forwarding or replying to it quoted nothing. Its words are read from
+  its HTML now, everywhere, and mail stored
+  earlier is read again in the background after the update, the first time anyone
+  searches or new mail arrives in a workspace; search keeps answering meanwhile.
+- **The live feed resyncs whenever it finds an inbox nothing announced.** If an inbox ever
+  became visible to someone without the change that should announce it, only the
+  heartbeat's check noticed; a check triggered by a change to some other inbox let it in
+  silently, and mail read past in the meantime was never sent. Every check now resyncs
+  the client in that case, while an announced grant still needs none.
+- **Desktop app: links stay where they belong.** On macOS and Linux the main window no
+  longer treats `tauri.localhost` as the app (there it is the computer itself, where any
+  local program could answer), only on Windows and Android, where the app is served from
+  it. Mail links keep their spaces as `%20` instead of turning them into `+`, which mail
+  apps showed as plus signs; files (`attach=`) are still never handed to the mail app,
+  not even hidden after a `#` or inside another field's value.
+- **Forward's picker stays fast on a big inbox.** Checking that no one it offers was
+  reported or found suspicious now looks only at the senders it is about to show, through
+  a new index, instead of reading a year of the inbox's mail on every keystroke (three
+  indexes, built without blocking writes).
+- **Home no longer keeps an older need when two changes race.** When a conversation's
+  need changed twice in quick succession before it had an item on Home, two workers could
+  both create the item and the older change could land last, leaving Home on the older
+  need until the next change. The item now only ever moves to a newer revision. This was
+  also why a replay test failed now and then in CI.
+- **Home's Forward never offers a sender under review or a no-reply address.** The picker
+  lists only people it is safe to write to: the server leaves out no-reply addresses,
+  senders whose newest mail fails their sender checks or pretends to be them, and
+  senders with any mail reported as spam, under review (even once a later email
+  replaced the review) or found suspicious and not marked safe, from facts alone, never
+  what the mail says. Only the flagged email's own sender is left out, so the real
+  people in a hijacked thread stay. A name typed
+  for one of them finds nobody. Closing Forward while it starts, then forwarding again,
+  addresses the same draft rather than making a second one; a forward that fails while it
+  starts no longer opens the composer after saying so; and Open attachment with no file
+  says "This email has no file to open".
+- **The labelling export says whom it is for.** Before reading any mail, `campbooks-server
+  labelling export` prints the member it resolved (id and role) and the inboxes it will
+  read, and records them in the folder's `.campbooks-labelling` marker.
+- **The labelling export stays within one member's inboxes.** `campbooks-server labelling export`
+  now requires `--member` (a member id or verified address) and exports only from the inboxes
+  that member can read, never a teammate's private inbox; `--inbox` narrows it to one of them.
+  The command prints where the folder is and how to delete it, and `campbooks-server labelling
+  purge --out <folder>` removes a folder only if the export wrote it. A committed eval set can
+  no longer claim `private` to skip its reserved-domain checks.
+- **HTML mail looks right in the desktop app.** The desktop app now shows HTML mail as the web
+  app does: styled, with its pictures, and remote images still held back until Show images or
+  a trusted sender. Its page policy allows only inline style attributes and `https:`, `data:`
+  and `blob:` images; nothing in a mail ever runs, posts or navigates. A link in a mail opens
+  in your browser, never inside the app. Plain `http:` images stay blocked on desktop.
 - **A signature logo is no attachment to open.** With the action catalogue on, an image
   shown in an email's text (a logo sent inline) no longer counts as an attachment, so
   Open attachment is never offered for mail that has nothing else attached.
@@ -110,6 +227,101 @@ All notable changes to Campbooks Next are documented here. The format follows
   For operators, `campbooks-server labelling export` writes your recent money mail as a
   sheet to label on your own machine, and `cargo xtask eval decide --set-dir` measures the
   model on it (campbooks-cloud#167).
+- **A send or sync no longer fails while another run refreshes the mailbox's sign-in.** When
+  two runs needed a fresh token at once, the second waited on the first's call to the
+  provider and, under the new 10-second lock limit, failed and used up one of its retries.
+  It now takes the token the first run stores. Replaying events and pruning expired
+  sign-in state also run in small batches, so neither meets the 30-second statement limit.
+- **Desktop app: a mail link's subject or body can't smuggle a field behind a semicolon or a
+  second encoding.** A subject or body holding `;` once decoded, or still holding an escape
+  such as `%0D` (it was encoded twice), is left out of what reaches your mail app; a
+  percent sign that is text, as in "50% off", stays.
+- **Big Gmail write-backs no longer hold back other syncs.** Writing your changes back to
+  Gmail now takes from the shared Google budget what it plans to spend, then settles what
+  its calls really cost: unused units go straight back, and any extra (Gmail refusing a
+  batch, say) is paid back before more is spent. A large archive no longer holds thousands
+  of units it never uses, or waits behind smaller syncs, and every unit stays counted
+  whatever rate is configured.
+- **A long email's quote says it holds only the first part.** Replying to or forwarding an
+  email that came as long HTML (over 256 KiB) quoted only its beginning without a word;
+  the composer now says "This email is long: the quote holds its first part.", and the
+  reply dialog says so too. When the dialog's preview shows only the start of a quote, it
+  says the reply quotes all of it.
+- **A reply keeps answering the email its draft was written for.** If new mail arrives in
+  the conversation while you review Scout's draft, Send still replies to the email it was
+  written for; the dialog says a newer message arrived and offers "Answer the newer one",
+  which writes the draft again for it. A send that can't be taken back no longer offers an
+  Undo that could only say "too late", and keyboard shortcuts on the page are no longer
+  swallowed by an open dialog that lost its focus.
+- **The reply dialog leaves no stray drafts behind.** Going back to Scout's choices after
+  a send failed, then sending another reply, now discards the failed draft instead of
+  leaving it in your drafts, and your own sent mail arriving in the conversation no longer
+  shows as "a newer message" to answer.
+- **Someone removed from a workspace gets no live updates from it, even in the moment
+  they were removed.** Opening the change feed now checks membership again once it knows
+  where it starts, so a removal made just before cannot slip past until the next heartbeat.
+- **Signing out of one place stops access there at once.** Signing out of one browser,
+  revoking an app, removing a way in, or revoking a refresh token now stops that sign-in's
+  access tokens on the very next request, instead of letting them run out their ten
+  minutes, and the web app there asks you to sign in again right away; your other sign-ins
+  keep working.
+- **Database and retry hardening (campbooks-cloud#213).**
+  - The web app and each app acting for you now keep separate `Idempotency-Key`s. A retry
+    that spans the upgrade runs again.
+  - The token endpoint's answers, and any redirect from a request that shows a secret, are
+    never kept for replay.
+  - The server refuses to start on PostgreSQL older than 15, or when its database login
+    holds the role that owns the database functions.
+  - Migrations stop after a minute behind a long-running transaction and run again at the
+    next start, instead of hanging.
+  - A queue index left broken by a hand-run migration is rebuilt.
+  - A database clock behind the server's no longer fails web requests near a session's end.
+  - The self-hosting guide says what the database separation protects, and when.
+- **An action taken just as a sign-in ends is no longer lost.** When the web app's access
+  token is refused and a fresh one can be had, a change you just made (a send, a move, a
+  rule) is now sent again with the fresh token, instead of asking you to sign in again. If
+  the sign-in service is briefly down, you stay signed in and the next try goes through.
+- **Rotating the instance secret key keeps pending mailbox changes too.** A change you
+  asked for that is still waiting to be made at your mail provider (its mailbox paused, or
+  the provider down) is now signed again with the new key during a rotation, so it is
+  still made once the old key is removed. The logs say when none are left.
+- **A file or request that is too large now says so with 413.** An upload over the
+  instance's size limit, or a request body over its limit, is answered 413 (instead of
+  400). For a file, the message names the limit in your language.
+- **A retried request is never done twice after a crash.** If a request with an
+  `Idempotency-Key` ended without its answer being kept (the server stopped, the request
+  hit the 30-second limit, or the client hung up), retrying it with the same key used to
+  run it again after two minutes. It is now never run again: the retry answers 409
+  `idempotency_outcome_unknown`, so the caller checks whether it took effect and then
+  retries with a new key. A request past the time limit now answers 503
+  `request_timed_out`, which says the same.
+- **The 30-second request limit is a hard cap.** Telling a stopped request why, in your
+  language, no longer waits on a slow lookup of your saved language: after two seconds it
+  uses your browser's.
+- **A request body that cannot be read is explained in your language.** The web app's
+  error for a body that arrived incomplete was English only; it is now in all four
+  languages.
+- **A deleted workspace leaves nothing behind once purged.** When a workspace's grace
+  period ends, its purge now deletes its history in small batches, so even a very large
+  workspace is purged without long locks. Whatever reaches that workspace afterwards (an
+  event published by another part of the app's own clean-up, or a finished job) is deleted
+  by an hourly sweep, rather than waiting up to 90 days for normal retention. A delivery
+  still waiting to run is kept until it has run. The server remembers which workspaces
+  were purged by id and time only, and forgets that too 30 days after nothing of the
+  workspace is left. A workspace that turns out to be live again is never swept. After
+  restoring a database backup, operators can delete again the workspaces deleted after
+  the backup was taken: `campbooks-server workspaces purge-again <id> --confirm <id>`. The
+  ids come from the `workspace deleted` and `workspace purged` log lines. A workspace that
+  is live in the backup is only described (member count, creation date) until the operator
+  adds `--not-deleted-in-backup`; it is then hidden at once and purged an hour later at
+  the earliest. The self-hosting guide's Backups section has the steps. Only that command
+  can shorten a workspace's grace period: there is no API for it.
+- **Purging a workspace also deletes its saved retry answers.** When a request is sent with
+  an idempotency key, the server keeps its answer for a day so a retry gets the same
+  answer, and that answer can include what you wrote. Each saved answer now records the
+  workspace in the request's address (never one named in the request itself), and purging
+  the workspace deletes them at once, even ones less than a day old. Saved answers stay
+  readable only by the person and app that made the request.
 
 ### Added
 
@@ -216,6 +428,91 @@ All notable changes to Campbooks Next are documented here. The format follows
 
 ### Security
 
+- **Scout can write a draft for you but never send it (campbooks-cloud#242).** When the
+  assistant (or an automation) calls the API on your behalf, the server now refuses to
+  send a draft (`send_needs_you`) or to take back a send you made, even with the token it
+  read for you and even if the call was marked as confirmed: nothing is scheduled, nothing
+  is signed and nothing reaches your mail provider. It may still write, change and discard
+  drafts; you send them with your own Send. Before, sending was gated only by a "confirmed"
+  flag that the calling code sets itself. The build now refuses any high-risk operation
+  that the assistant or an automation could call. The assistant can also no longer save,
+  reshape or bring back a rule that shows a sender's images (`images_need_you`), so a
+  suggestion of its own can't stand in the way of your "Always show images" for that
+  sender. No Scout feature calls any of these on its own today: this closes the door
+  before one does. The Scout reply dialog now also discards the draft it replaces when
+  that draft's send had failed, not only while it was a draft.
+- **Scout can propose rules but never keep them for you (campbooks-cloud#242).** When the
+  assistant (or an automation) calls the API on your behalf, the server now refuses (`rule_needs_your_yes`) to
+  say yes to a rule, to adopt one, to let a paused one act again, to change what a kept
+  rule does, or to bring a removed rule back acting, even with the token it read for you
+  and even if the call was marked as confirmed: nothing is signed and nothing changes. A
+  rule it saves is always a suggestion waiting for your yes in Scout's memory, whatever it
+  asked for and even if you let Campbooks act without asking. It may still pause, remove
+  or turn down a rule, and change a suggestion before you see it. Your own Keep works as
+  before. Which requests come from the assistant is decided inside the server and cannot
+  be set by an app. A yes to a suggestion now makes you its author, as a yes again already
+  did, so it acts with your rights rather than those of whoever it was stored under. A
+  message that is scheduled to send can no longer be discarded, only taken back with Undo
+  (then it can be deleted), and the Scout reply dialog never discards a message on its way.
+  No Scout feature in this release calls these on its own yet: this closes the door before
+  one does.
+- **Send, saves and Keep act only on what you were shown (campbooks-cloud#242).** Every
+  draft and rule the server shows you now comes with a token bound to you and to exactly
+  that draft or rule: a draft's recipients (Bcc too), subject, text, quoted text, reply
+  headers, inbox and attachments at its version, or a rule's conditions, actions, inbox,
+  state and author. Every save of a draft, Send, a yes to a suggested rule and adopting a
+  rule take that token back, and the server acts only if the row is still what your app
+  read; each save hands back the token of what it saved. A draft or suggestion changed with
+  SQL after your app read it, or a token of another draft, rule or person, is refused
+  (`content_changed`, a warning in the log with ids only): nothing is saved, sent or kept.
+  The composer keeps what you typed, reads the draft again and says "This changed since you
+  opened it" once; a refused Send shows the draft as it now is, Bcc included. Scout's reply
+  dialog no longer reuses a draft it didn't create: it writes a fresh one with only the
+  recipients it shows, no copies and no attachments. What changed before your app first
+  read a draft is in what it shows you; fields no screen shows (reply headers, the file
+  behind an attachment's name) are not checked at that point. An editor open at the
+  upgrade shows the notice once, keeps your text, and works on the next save or Send.
+  Scheduled sends are not affected.
+- **A planted rule run or undo changes nothing (campbooks-cloud#242).** Applying a rule to
+  the mail already in your inbox, and removing a rule while putting back what it changed,
+  now sign the run for the member who asked, under the key of campbooks-cloud#227, and each
+  change a rule records about a conversation is signed where the rule makes it, over what it
+  was before and what the rule did. A run written with SQL, or one copied from another run,
+  stops before its first change (a warning in the log with ids only), and putting a rule's
+  changes back skips any record that was written or edited with SQL, so it can no longer take
+  mail out of spam or the trash at Gmail or Zoho; the rest is still put back. A run of a rule
+  that has been changed, or paused and resumed, since it started stops too. Runs going
+  during the upgrade stop: apply the rule again if you need to. What a rule changed before the
+  upgrade can't be put back automatically: removing such a rule while putting its changes
+  back answers `undo_unavailable`, and removing it keeping its changes still works.
+- **A taught rule planted or changed with SQL changes nothing (campbooks-cloud#242).**
+  Saving, confirming, changing, pausing, removing or bringing back a rule now signs it for
+  the member who did it, under the key of campbooks-cloud#227, over its conditions,
+  actions, inbox, author, state and precedence. A rule acts on arriving mail, on the mail
+  already in the inbox and on "Always show images" only while that signature holds, so a
+  rule written or edited with SQL is skipped (a warning in the log with ids only), asks
+  Gmail or Zoho for nothing, and the other rules still act. Arriving mail is never held up
+  by a bad rule. Such a rule is listed as needing a yes again (`needs_confirmation`), and
+  confirming it signs it as it is. The rules you have when you upgrade keep working: the
+  migration records a fingerprint of each one, and a job signs each rule once, only if it
+  is still exactly as the migration found it. A rule changed in between waits for you to
+  confirm it. Rules don't act for the first minute or so after the upgrade, until that job
+  has run, and without `CAMPBOOKS_SECRET_KEY` a rule can't be saved active.
+- **SQL alone can't make a mailbox send (campbooks-cloud#227).** Sending a
+  draft now signs the author's request, under a key derived from the instance secret that
+  never goes in the database, over the draft, its send, the author, the inbox and
+  everything that goes out: recipients, subject, body, reply headers and attachments. A
+  draft is released only while that signature still holds, so a draft planted or edited
+  with SQL (other recipients, another body, another author) is never sent and is left as
+  it is, with a warning in the log and no content. The released send is signed in turn
+  and checked before every call to Gmail or Zoho, and so are change requests and each
+  change the connector records, before it is made at the provider; one that doesn't hold
+  is skipped and the provider's state comes back. Changes made by taught rules are
+  still signed by the server, so a rule planted with SQL can still change mail; that is
+  campbooks-cloud#242. Without `CAMPBOOKS_SECRET_KEY` nothing
+  is sent (it was already needed to connect a mailbox). Two migrations add the signatures;
+  drafts waiting in their undo window during the upgrade go back to drafts, to be sent
+  again, and a change pending during the upgrade isn't made.
 - **An event alone can't make a mailbox send or change mail (campbooks-cloud#226).**
   The connector no longer takes a send or change request event as proof. Before it records
   a send, and again before every call to Gmail or Zoho for it, it asks the conversations
@@ -533,6 +830,13 @@ All notable changes to Campbooks Next are documented here. The format follows
   first line, at most 500 characters, with quoted text, email addresses,
   link paths and queries, and long tokens removed. Admin → Jobs shows the
   cleaned message. Errors already stored are left as they are.
+- **Why a background job failed no longer quotes your data.** The reason a failed job
+  keeps for an administrator, and the events and jobs the server keeps for up to 90 days,
+  hold ids, codes and references to stored files, never addresses, names, subjects or
+  what someone wrote. Some failure reasons used to repeat the piece of data they could
+  not read; they now say only what kind of error it was and where. A build check holds
+  every event, every job and every failure reason to this, with the reason written down
+  for each value it allows.
 
 ### Removed
 - **Due dates on needs, until they are extracted from the mail.** A need no longer

@@ -58,6 +58,29 @@ async fn whoami(
     }))
 }
 
+/// How many times [`record`] ran (only the replay test calls it).
+static RECORDED: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+
+/// A catalogued, mutating test operation (so the idempotency layer keys
+/// it) that counts its runs.
+#[utoipa::path(
+    post,
+    path = "/api/v1/test/record",
+    operation_id = "test.record",
+    security(("bearer" = ["test:read"])),
+    extensions(("x-campbooks" = json!(campbooks_kernel::Operation::command(
+        campbooks_kernel::Risk::Low
+    ).records(["test.note"])))),
+    responses((status = CREATED, body = Value)),
+)]
+async fn record(_: Scoped<TestRead>, body: String) -> (StatusCode, Json<Value>) {
+    let run = RECORDED.fetch_add(1, std::sync::atomic::Ordering::SeqCst) + 1;
+    (
+        StatusCode::CREATED,
+        Json(json!({ "run": run, "body": body })),
+    )
+}
+
 /// A session's id, current and previous token hashes, and sealed access,
 /// refresh and ID tokens, as stored.
 type StoredSession = (
@@ -139,7 +162,9 @@ fn app(state: AppState, settings: Option<config::Settings>) -> Router {
         spec,
         state,
     } = operations::compose(
-        crate::api().route("/api/v1/test/whoami", any(whoami)),
+        crate::api()
+            .route("/api/v1/test/whoami", any(whoami))
+            .routes(utoipa_axum::routes!(record)),
         state,
     );
     let api_only: Router = routes
@@ -779,6 +804,33 @@ async fn a_sign_in_keeps_the_scopes_it_started_with(db: PgPool) {
     );
 }
 
+/// A use is recorded at most every minute, never past the session's end,
+/// and not at all when this server's clock has passed the end the database
+/// still finds the session before (campbooks-cloud#213, item 9).
+#[test]
+fn a_use_is_recorded_only_with_a_later_deadline() {
+    use super::touch_until;
+    use chrono::{TimeDelta, Utc};
+
+    let now = Utc::now();
+    let idle = TimeDelta::hours(8);
+    let long = now + TimeDelta::days(30);
+    let earlier = now - TimeDelta::minutes(5);
+    assert_eq!(touch_until(now, earlier, idle, long), Some(now + idle));
+    assert_eq!(
+        touch_until(now, now - TimeDelta::seconds(10), idle, long),
+        None,
+        "not due yet"
+    );
+    let soon = now + TimeDelta::minutes(30);
+    assert_eq!(touch_until(now, earlier, idle, soon), Some(soon));
+    // Clock skew: the database's clock is behind, this server's has passed
+    // the end (or reached it exactly).
+    for end in [now - TimeDelta::seconds(2), now] {
+        assert_eq!(touch_until(now, earlier, idle, end), None);
+    }
+}
+
 #[test]
 fn asked_for_all_compares_sets() {
     use super::asked_for_all;
@@ -1249,6 +1301,269 @@ async fn api_calls_carry_the_sessions_token_in_process(db: PgPool) {
         missing.header(header::CONTENT_TYPE),
         Some("application/problem+json")
     );
+}
+
+/// Replace the session's held access token with one the API refuses as
+/// invalid (as it refuses a token whose sign-in ended: a way in removed,
+/// signed out on another device), while the BFF still counts it as valid
+/// for minutes (campbooks-cloud#143).
+async fn hold_a_refused_token(h: &Harness) {
+    let mut claims = h.idp.claims("test:read");
+    let past = chrono::Utc::now().timestamp() - 3_600;
+    claims["iat"] = json!(past);
+    claims["nbf"] = json!(past);
+    claims["exp"] = json!(past + 600);
+    let token = h.idp.token(&claims);
+    let id: uuid::Uuid = sqlx::query_scalar("SELECT id FROM bff.sessions")
+        .fetch_one(&h.db)
+        .await
+        .unwrap();
+    sqlx::query("UPDATE bff.sessions SET access_token = $1")
+        .bind(cipher().seal(&token, &super::sealed_for(id, "access_token")))
+        .execute(&h.db)
+        .await
+        .unwrap();
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn a_token_the_api_refuses_is_refreshed_once_and_a_read_goes_through(db: PgPool) {
+    let h = harness(db).await;
+    let mut browser = Browser::new(&h.app);
+    browser.sign_in(&h.idp, "/").await;
+    let before = h.idp.refreshes();
+
+    // A read: one forced refresh, then sent again with the fresh token.
+    hold_a_refused_token(&h).await;
+    let reply = browser.get("/bff/api/v1/test/whoami?x=1").await;
+    assert_eq!(reply.status, StatusCode::OK, "{}", reply.body);
+    assert_eq!(h.idp.refreshes(), before + 1);
+    assert_eq!(
+        browser.get("/bff/api/v1/test/whoami").await.status,
+        StatusCode::OK
+    );
+    assert_eq!(h.idp.refreshes(), before + 1, "the fresh token is kept");
+
+    // A write with a small body is held and sent again too: the API refused
+    // it while authenticating, before its handler ran (campbooks-cloud#259).
+    hold_a_refused_token(&h).await;
+    let reply = browser.post("/bff/api/v1/test/whoami", r#"{"a":1}"#).await;
+    assert_eq!(reply.status, StatusCode::OK, "{}", reply.body);
+    assert_eq!(reply.json()["method"], "POST");
+    assert_eq!(reply.json()["body"], r#"{"a":1}"#, "the same body");
+    assert_eq!(h.idp.refreshes(), before + 2);
+
+    // A body larger than the BFF holds is not sent twice: the refusal comes
+    // back, the fresh token is held, and the app's retry goes through.
+    hold_a_refused_token(&h).await;
+    let large = format!(
+        r#"{{"a":"{}"}}"#,
+        "x".repeat(super::handlers::REPLAY_BODY_LIMIT)
+    );
+    let reply = browser.post("/bff/api/v1/test/whoami", &large).await;
+    assert_eq!(reply.status, StatusCode::UNAUTHORIZED, "{}", reply.body);
+    assert!(
+        reply
+            .header(header::WWW_AUTHENTICATE)
+            .is_some_and(|value| value.contains("error=\"invalid_token\"")),
+        "the API's own refusal: {:?}",
+        reply.headers
+    );
+    assert_eq!(h.idp.refreshes(), before + 3);
+    let retried = browser.post("/bff/api/v1/test/whoami", &large).await;
+    assert_eq!(retried.status, StatusCode::OK, "{}", retried.body);
+    assert_eq!(h.idp.refreshes(), before + 3);
+}
+
+/// Two requests refused with the same token at once: the first refreshes,
+/// the second (waiting on the session's refresh lock) finds the token
+/// replaced and uses it, with no second refresh (campbooks-cloud#259).
+#[sqlx::test(migrations = "../../migrations")]
+async fn requests_refused_together_share_one_forced_refresh(db: PgPool) {
+    let h = harness(db).await;
+    let mut browser = Browser::new(&h.app);
+    browser.sign_in(&h.idp, "/").await;
+    let before = h.idp.refreshes();
+    hold_a_refused_token(&h).await;
+    // Both requests start together and present the stored token, which is
+    // refused; the stored token is replaced only once the (700 ms) refresh
+    // ends. So the one that did not refresh waited on the session's refresh
+    // lock and took the "already replaced" branch: one refresh for both,
+    // and both took at least as long as the refresh.
+    let delay = std::time::Duration::from_millis(700);
+    h.idp.delay_refreshes(delay);
+    let mut other = browser.clone();
+    let started = std::time::Instant::now();
+    let (first, second) = tokio::join!(
+        async {
+            let reply = browser.get("/bff/api/v1/test/whoami?n=1").await;
+            (reply, started.elapsed())
+        },
+        async {
+            let reply = other.get("/bff/api/v1/test/whoami?n=2").await;
+            (reply, started.elapsed())
+        },
+    );
+    assert_eq!(first.0.status, StatusCode::OK, "{}", first.0.body);
+    assert_eq!(second.0.status, StatusCode::OK, "{}", second.0.body);
+    assert_eq!(h.idp.refreshes(), before + 1, "one refresh for both");
+    assert!(
+        first.1 >= delay && second.1 >= delay,
+        "both waited for the one refresh: {:?}, {:?}",
+        first.1,
+        second.1
+    );
+}
+
+/// A small keyed POST refused with the held token, then refreshed and sent
+/// again, is answered once: 201, its handler run exactly once, and the same
+/// key afterwards replays that answer (campbooks-cloud#263). The refused
+/// attempt never reached the handler, nor claimed the key.
+#[sqlx::test(migrations = "../../migrations")]
+async fn a_keyed_write_refused_then_replayed_runs_once(db: PgPool) {
+    let h = harness(db).await;
+    let mut browser = Browser::new(&h.app);
+    browser.sign_in(&h.idp, "/").await;
+    hold_a_refused_token(&h).await;
+    let before = RECORDED.load(std::sync::atomic::Ordering::SeqCst);
+    let keyed = |browser: &mut Browser| {
+        let request = Request::post("/bff/api/v1/test/record")
+            .header(CSRF_HEADER, "1")
+            .header("sec-fetch-site", "same-origin")
+            .header(header::CONTENT_TYPE, "application/json")
+            .header("idempotency-key", "record-1");
+        let mut browser = browser.clone();
+        async move { browser.send(request, Body::from(r#"{"a":1}"#)).await }
+    };
+    let reply = keyed(&mut browser).await;
+    assert_eq!(reply.status, StatusCode::CREATED, "{}", reply.body);
+    assert_eq!(reply.json()["body"], r#"{"a":1}"#);
+    assert_eq!(
+        RECORDED.load(std::sync::atomic::Ordering::SeqCst),
+        before + 1,
+        "the handler ran once"
+    );
+    // The same key again: the stored answer, not a second run.
+    let again = keyed(&mut browser).await;
+    assert_eq!(again.status, StatusCode::CREATED, "{}", again.body);
+    assert_eq!(again.header("idempotency-replayed"), Some("true"));
+    assert_eq!(again.json(), reply.json());
+    assert_eq!(
+        RECORDED.load(std::sync::atomic::Ordering::SeqCst),
+        before + 1
+    );
+}
+
+/// A refused token while the identity provider is down: 503
+/// `idp_unavailable`, the session kept, and the next request, with the
+/// identity provider back, goes through (campbooks-cloud#259).
+#[sqlx::test(migrations = "../../migrations")]
+async fn a_refused_token_with_the_identity_provider_down_is_a_503(db: PgPool) {
+    let h = harness(db).await;
+    let mut browser = Browser::new(&h.app);
+    browser.sign_in(&h.idp, "/").await;
+    hold_a_refused_token(&h).await;
+    h.idp.set_token_endpoint_down(true);
+    let reply = browser.get("/bff/api/v1/test/whoami").await;
+    reply.assert_problem(StatusCode::SERVICE_UNAVAILABLE, "idp_unavailable");
+    assert_eq!(count(&h.db, "SELECT count(*) FROM bff.sessions").await, 1);
+    assert_eq!(
+        browser.get("/bff/session").await.json()["authenticated"],
+        true,
+        "still signed in"
+    );
+
+    h.idp.set_token_endpoint_down(false);
+    let reply = browser.get("/bff/api/v1/test/whoami").await;
+    assert_eq!(reply.status, StatusCode::OK, "{}", reply.body);
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn a_refused_token_whose_refresh_is_refused_ends_the_session(db: PgPool) {
+    let h = harness(db).await;
+    let mut browser = Browser::new(&h.app);
+    browser.sign_in(&h.idp, "/").await;
+    let before = h.idp.token_requests();
+    hold_a_refused_token(&h).await;
+    h.idp.revoke_refresh_tokens();
+
+    // At once, not when the held token would have expired: the app signs in
+    // again. One refresh attempt, no loop.
+    let reply = browser.get("/bff/api/v1/test/whoami").await;
+    reply.assert_problem(StatusCode::UNAUTHORIZED, "session_required");
+    assert_eq!(h.idp.token_requests(), before + 1, "one refresh attempt");
+    assert_eq!(count(&h.db, "SELECT count(*) FROM bff.sessions").await, 0);
+    assert_eq!(
+        browser.get("/bff/session").await.json()["authenticated"],
+        false
+    );
+}
+
+/// The app over `h`'s database and identity provider, with the instance
+/// secret key `secret` (a rotated one, campbooks-cloud#191).
+async fn app_with_secret(h: &Harness, secret: campbooks_kernel::crypto::SecretKey) -> Router {
+    let mut config = testing::config("postgres://test@localhost/test");
+    config.auth = h.idp.auth_config();
+    ORIGIN.clone_into(&mut config.public_url);
+    let bff = BffConfig {
+        client_secret: Some(SecretString::from(WEB_CLIENT_SECRET)),
+        ..BffConfig::default()
+    };
+    let Ok(Loaded::Enabled(settings)) =
+        config::settings(&config, bff, Some(secret), &["test:read", "admin:access"])
+    else {
+        panic!("test BFF settings are valid");
+    };
+    let state = crate::with_ports(AppState::new(testing::app_role_pool(&h.db).await, config));
+    app(state, Some(*settings))
+}
+
+/// After the instance secret key is rotated (the old one kept as the
+/// previous key), a web session goes on, and its next refresh seals its
+/// refresh and ID tokens again with the new key: the new key alone opens
+/// them afterwards (campbooks-cloud#191).
+#[sqlx::test(migrations = "../../migrations")]
+async fn a_refresh_after_a_rotation_seals_the_sessions_tokens_again(db: PgPool) {
+    use campbooks_kernel::crypto::{Cipher, SecretKey};
+
+    let h = harness(db).await;
+    let mut browser = Browser::new(&h.app);
+    browser.sign_in(&h.idp, "/").await;
+    let old = SecretKey::from_bytes([7; 32]);
+    let new = SecretKey::from_bytes([8; 32]);
+    let mut rotated = Browser {
+        app: app_with_secret(&h, new.clone().with_previous(&old)).await,
+        jar: browser.jar.clone(),
+    };
+    // Due for a refresh.
+    exec(&h.db, "UPDATE bff.sessions SET access_expires_at = now()").await;
+    let before = h.idp.refreshes();
+    let reply = rotated.get("/bff/api/v1/test/whoami").await;
+    assert_eq!(reply.status, StatusCode::OK, "{}", reply.body);
+    assert_eq!(h.idp.refreshes(), before + 1);
+
+    let (id, access, refresh, id_token): (uuid::Uuid, Vec<u8>, Vec<u8>, Vec<u8>) =
+        sqlx::query_as("SELECT id, access_token, refresh_token, id_token FROM bff.sessions")
+            .fetch_one(&h.db)
+            .await
+            .unwrap();
+    let new_only = Cipher::new(&new, config::KEY_PURPOSE);
+    let old_only = Cipher::new(&old, config::KEY_PURPOSE);
+    for (column, sealed) in [
+        ("access_token", &access),
+        ("refresh_token", &refresh),
+        ("id_token", &id_token),
+    ] {
+        let context = super::sealed_for(id, column);
+        assert!(new_only.open(sealed, &context).is_ok(), "{column}");
+        assert!(old_only.open(sealed, &context).is_err(), "{column}");
+    }
+    // The previous key removed: the session still works.
+    let mut new_alone = Browser {
+        app: app_with_secret(&h, new).await,
+        jar: rotated.jar.clone(),
+    };
+    let reply = new_alone.get("/bff/api/v1/test/whoami").await;
+    assert_eq!(reply.status, StatusCode::OK, "{}", reply.body);
 }
 
 #[sqlx::test(migrations = "../../migrations")]
@@ -1952,7 +2267,7 @@ async fn the_functions_refuse_bad_input(db: PgPool) {
                                                 '\\x01', '\\x02', $1, now(),
                                                 now() + interval '10 minutes', NULL)";
     const TOUCH: &str = "SELECT bff.touch_session($1, $2, $3)";
-    const STORE: &str = "SELECT bff.store_session_tokens($1, $2, $3, $4)";
+    const STORE: &str = "SELECT bff.store_session_tokens($1, $2, $3, $4, $5)";
     const CREATE: &str = "SELECT bff.create_session(gen_random_uuid(),
                                                     sha256(gen_random_uuid()::text::bytea),
                                                     'test-user', NULL, NULL, NULL, '\\x01', now(),
@@ -2017,11 +2332,12 @@ async fn the_functions_refuse_bad_input(db: PgPool) {
         .await
         .unwrap();
 
-    for (access, until, refresh) in [
-        (None, Some(later), Some(sealed)),
-        (Some(sealed), None, Some(sealed)),
-        (Some(sealed), Some(later), None),
-        (Some(&b""[..]), Some(later), Some(sealed)),
+    for (access, until, refresh, id) in [
+        (None, Some(later), Some(sealed), None),
+        (Some(sealed), None, Some(sealed), None),
+        (Some(sealed), Some(later), None, None),
+        (Some(&b""[..]), Some(later), Some(sealed), None),
+        (Some(sealed), Some(later), Some(sealed), Some(&b""[..])),
     ] {
         invalid(
             sqlx::query(STORE)
@@ -2029,6 +2345,7 @@ async fn the_functions_refuse_bad_input(db: PgPool) {
                 .bind(access)
                 .bind(until)
                 .bind(refresh)
+                .bind(id)
                 .execute(&runtime)
                 .await,
             "store_session_tokens",

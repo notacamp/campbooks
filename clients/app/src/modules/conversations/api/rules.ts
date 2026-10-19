@@ -283,12 +283,15 @@ export function useRuleMutations(workspaceId: string) {
     },
     onSettled: settle,
   });
+  // A yes names the rule as it was shown (its `content_token`): one that
+  // changed since answers 409 `content_changed`, and the refetch below
+  // shows it as it is now.
   const confirm = useMutation({
-    mutationFn: async ({ ruleId }: { ruleId: string }) =>
+    mutationFn: async ({ rule }: { rule: Pick<RuleView, "id" | "content_token"> }) =>
       unwrap(
         await api.POST("/api/v1/w/{workspace_id}/rules/{rule_id}/confirm", {
-          params: { path: { workspace_id: workspaceId, rule_id: ruleId } },
-          body: { apply_to_existing: true },
+          params: { path: { workspace_id: workspaceId, rule_id: rule.id } },
+          body: { apply_to_existing: true, content_token: rule.content_token ?? null },
         }),
       ),
     onSettled: settle,

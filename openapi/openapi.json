@@ -1394,6 +1394,78 @@
         }
       }
     },
+    "/api/v1/system/screen-views": {
+      "post": {
+        "tags": [
+          "system"
+        ],
+        "summary": "Report the screen the app shows.",
+        "operationId": "system.report_screen_view",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ScreenView"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Taken: relayed in the background when the instance records usage analytics, otherwise dropped."
+          },
+          "400": {
+            "description": "`invalid_route`: not a route template.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid access token.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The token lacks `system:read`.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [
+              "system:read"
+            ]
+          }
+        ],
+        "x-campbooks": {
+          "access": {
+            "action": "create",
+            "resource": "system.screen_view"
+          },
+          "assistant": false,
+          "automation": false,
+          "mutates": true,
+          "records": [],
+          "risk": "low"
+        }
+      }
+    },
     "/api/v1/system/version": {
       "get": {
         "tags": [
@@ -3622,6 +3694,15 @@
             "schema": {
               "type": "boolean"
             }
+          },
+          {
+            "name": "words",
+            "in": "query",
+            "description": "`true` for the message's words only, as `text`: its text part when it\nhas any, else its HTML read as text (at most half a second). `html`\nis then absent. What a reply or forward quotes when\n`conversations.get` marked the message `text_unread`.",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
           }
         ],
         "responses": {
@@ -5757,7 +5838,7 @@
         "tags": [
           "conversations"
         ],
-        "summary": "Discard a draft (also a scheduled one, which then never leaves).",
+        "summary": "Discard a draft (not one on its way: cancel its send first).",
         "operationId": "conversations.delete_draft",
         "parameters": [
           {
@@ -5814,7 +5895,7 @@
             }
           },
           "409": {
-            "description": "On its way (`draft_not_editable`).",
+            "description": "Scheduled or on its way (`draft_not_editable`): cancel its send first.",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -5933,7 +6014,7 @@
             }
           },
           "409": {
-            "description": "Changed since that version (`draft_changed`), or on its way (`draft_not_editable`).",
+            "description": "Changed since that version (`draft_changed`), on its way (`draft_not_editable`), or not what you were shown (`content_changed`): read it again, then save.",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -6014,7 +6095,7 @@
             }
           },
           "403": {
-            "description": "Missing scope, or you only read its inbox.",
+            "description": "Missing scope, you only read its inbox, or not your own request (`send_needs_you`).",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -6056,7 +6137,7 @@
             "action": "write",
             "resource": "conversations.draft"
           },
-          "assistant": true,
+          "assistant": false,
           "automation": false,
           "mutates": true,
           "records": [
@@ -6135,7 +6216,7 @@
             }
           },
           "403": {
-            "description": "Missing scope, or you only read its inbox.",
+            "description": "Missing scope, you only read its inbox, or not your own request (`send_needs_you`): the assistant and automation never send.",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -6155,7 +6236,7 @@
             }
           },
           "409": {
-            "description": "Already on its way (`draft_not_editable`), or saved since that version (`draft_changed`).",
+            "description": "Already on its way (`draft_not_editable`), saved since that version (`draft_changed`), or not what you were shown (`content_changed`): read it again, check it, and send again.",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -6187,7 +6268,7 @@
             "action": "send",
             "resource": "conversations.draft"
           },
-          "assistant": true,
+          "assistant": false,
           "automation": false,
           "mutates": true,
           "rate_limit": "send",
@@ -6822,7 +6903,7 @@
             }
           },
           "403": {
-            "description": "Missing scope, or you may only read this inbox.",
+            "description": "Missing scope, you may only read this inbox, a suggestion saved by the assistant rather than by you (`rule_needs_your_yes`), or a rule showing a sender's images saved other than in your own request (`images_need_you`).",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -8152,6 +8233,16 @@
                 }
               }
             }
+          },
+          "409": {
+            "description": "Some of what it changed can't be put back: remove it keeping its changes.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -8244,7 +8335,7 @@
             }
           },
           "403": {
-            "description": "Missing scope, or not your rule.",
+            "description": "Missing scope, not your rule, adopting, resuming or reshaping a kept rule other than in your own request (`rule_needs_your_yes`), or reshaping a rule that shows a sender's images other than in your own request (`images_need_you`).",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -8255,6 +8346,16 @@
           },
           "404": {
             "description": "No such rule, or you cannot see it.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "It needs a yes again first (`rule_needs_confirmation`), or you adopt one that is not what you were shown (`content_changed`).",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -8355,7 +8456,7 @@
             }
           },
           "403": {
-            "description": "Missing scope, or you may only read this inbox.",
+            "description": "Missing scope, you may only read this inbox, or not your own request (`rule_needs_your_yes`): only you say yes to a rule.",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -8375,7 +8476,7 @@
             }
           },
           "409": {
-            "description": "It is not waiting for a yes.",
+            "description": "It is not waiting for a yes (`rule_not_proposed`), or it is not what you were shown (`content_changed`): read it again, check it, and say yes again.",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -8397,7 +8498,7 @@
             "action": "write",
             "resource": "conversations.inbox"
           },
-          "assistant": true,
+          "assistant": false,
           "automation": false,
           "mutates": true,
           "records": [
@@ -8570,7 +8671,7 @@
             }
           },
           "403": {
-            "description": "Missing scope, or not your rule.",
+            "description": "Missing scope, not your rule, bringing a kept rule back other than in your own request (`rule_needs_your_yes`), or bringing back a rule that shows a sender's images other than in your own request (`images_need_you`).",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -8925,6 +9026,15 @@
               "type": "integer",
               "format": "int32",
               "minimum": 0
+            }
+          },
+          {
+            "name": "reachable",
+            "in": "query",
+            "description": "Only senders it is safe to write to (Forward's picker): never a\nno-reply address, nor a sender whose newest mail fails their checks\nor pretends to be them, nor one with mail reported (in spam), under\nreview or found suspicious. Default false.",
+            "required": false,
+            "schema": {
+              "type": "boolean"
             }
           }
         ],
@@ -9765,7 +9875,7 @@
             }
           },
           "400": {
-            "description": "`invalid_body` (not a credential, or over 16 KiB).",
+            "description": "`invalid_body` (not a credential).",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -9789,6 +9899,16 @@
           },
           "409": {
             "description": "`passkey_expired`: no ceremony waits for this browser (it took more than five minutes, or was used).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "`body_too_large`: the body is over 16 KiB.",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -9873,7 +9993,7 @@
             }
           },
           "400": {
-            "description": "`invalid_return_to`, or `invalid_body` (not JSON, or over 16 KiB).",
+            "description": "`invalid_return_to`, or `invalid_body` (not JSON).",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -9894,6 +10014,16 @@
           },
           "404": {
             "description": "No such waiting sign-in request (or it expired), this instance offers no passkeys (not https), or another identity provider serves it."
+          },
+          "413": {
+            "description": "`body_too_large`: the body is over 16 KiB.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
           },
           "429": {
             "description": "`rate_limited`: too many ceremonies, or ten challenges waiting, for this address.",
@@ -9972,7 +10102,7 @@
             }
           },
           "400": {
-            "description": "`invalid_body` (not a credential, or over 16 KiB).",
+            "description": "`invalid_body` (not a credential).",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -9996,6 +10126,16 @@
           },
           "409": {
             "description": "`passkey_expired`, or `passkey_already_registered`.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "`body_too_large`: the body is over 16 KiB.",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -10082,7 +10222,7 @@
             }
           },
           "400": {
-            "description": "`display_name_required`, `invalid_return_to`, or `invalid_body` (not JSON, or over 16 KiB).",
+            "description": "`display_name_required`, `invalid_return_to`, or `invalid_body` (not JSON).",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -10103,6 +10243,16 @@
           },
           "404": {
             "description": "No such waiting sign-in request (or it expired), this instance offers no passkeys, or another identity provider serves it."
+          },
+          "413": {
+            "description": "`body_too_large`: the body is over 16 KiB.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
           },
           "429": {
             "description": "`rate_limited`: too many ceremonies, or ten challenges waiting, for this address.",
@@ -11931,7 +12081,8 @@
             "identity.authorization_code",
             "identity.refresh_token"
           ],
-          "risk": "low"
+          "risk": "low",
+          "secret_once": true
         }
       }
     }
@@ -12693,6 +12844,13 @@
           "apply_to_existing": {
             "type": "boolean",
             "description": "Apply it to the mail already in the inbox too (default true)."
+          },
+          "content_token": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The `content_token` that came with the rule on screen. Missing,\nanother member's, or not the rule as it is now: 409\n`content_changed`, and nothing is kept (campbooks-cloud#242)."
           }
         },
         "additionalProperties": false
@@ -13675,6 +13833,13 @@
             },
             "description": "Copied recipients."
           },
+          "content_token": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The `content_token` that came with the draft on screen (its last\nsave's answer, or the draft as read). Every save keeps fields it\ncannot set (the inbox, the reply headers, the attachments' files),\nso every save names what it was shown: missing, another member's, or\nnot the draft as it is now answers 409 `content_changed` and nothing\nis saved (campbooks-cloud#242)."
+          },
           "quoted": {
             "type": [
               "string",
@@ -13793,6 +13958,13 @@
               "$ref": "#/components/schemas/Address"
             },
             "description": "Copied recipients."
+          },
+          "content_token": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "What you were shown, bound to you (campbooks-cloud#242): send it\nback with `conversations.send_draft`. Keep the one that came with\nthe content on screen (a save's answer replaces it); absent when the\nserver has no instance secret."
           },
           "conversation_id": {
             "oneOf": [
@@ -14158,6 +14330,19 @@
             "description": "Their display name."
           }
         }
+      },
+      "ImagesHeld": {
+        "type": "string",
+        "description": "Why a message's remote images stay held back although its sender is, or\ncould be, trusted (campbooks-cloud#235).",
+        "enum": [
+          "under_review",
+          "checks_fail",
+          "unverified",
+          "cannot_authenticate",
+          "not_checked",
+          "rule_paused",
+          "rule_too_broad"
+        ]
       },
       "InboxId": {
         "type": "string",
@@ -14614,7 +14799,8 @@
           "truncated",
           "remote_images",
           "images_shown",
-          "images_trusted"
+          "images_trusted",
+          "images_offer"
         ],
         "properties": {
           "css": {
@@ -14630,6 +14816,28 @@
               "null"
             ],
             "description": "The HTML part, sanitised; still to be shown only in a sandboxed frame."
+          },
+          "images_domain": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The sender's domain the member may trust instead of the address\n(owned, not a free mail provider's), when it may be offered."
+          },
+          "images_held": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/ImagesHeld",
+                "description": "Why the remote images stay held back although the sender is, or\ncould be, trusted."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "images_offer": {
+            "type": "boolean",
+            "description": "Whether \"Always show images from …\" can take effect here: remote\nimages were held back, no rule trusts the sender yet, and nothing\nabout the email would keep its images back."
           },
           "images_shown": {
             "type": "boolean",
@@ -14729,6 +14937,10 @@
             "$ref": "#/components/schemas/MessageId",
             "description": "The message."
           },
+          "quote_cut": {
+            "type": "boolean",
+            "description": "`text` holds only the first part of its words (its HTML was cut at\n256 KiB, or the words at their limit): a reply or forward quoting it\nsays so. The reader's own `truncated` stays about the text part\n(campbooks-cloud#255)."
+          },
           "read": {
             "type": "boolean",
             "description": "Read."
@@ -14763,6 +14975,10 @@
                 "type": "null"
               }
             ]
+          },
+          "text_unread": {
+            "type": "boolean",
+            "description": "Its words were to be read from its HTML and this answer ran out of\ntime first: `text` is absent, and the HTML is still whole\n(`conversations.get_message_body`)."
           },
           "to": {
             "type": "array",
@@ -17069,6 +17285,13 @@
             "format": "date-time",
             "description": "When a member said yes to it."
           },
+          "content_token": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "What you were shown, bound to you (campbooks-cloud#242): send it\nback to say yes to it (`conversations.confirm_rule`) or to adopt it.\nAbsent when the server has no instance secret."
+          },
           "created_at": {
             "type": "string",
             "format": "date-time",
@@ -17105,6 +17328,10 @@
             "type": "boolean",
             "description": "Whether the caller may change or remove it."
           },
+          "needs_confirmation": {
+            "type": "boolean",
+            "description": "Whether it waits for a member to confirm it again before it acts."
+          },
           "origin": {
             "$ref": "#/components/schemas/RuleOrigin",
             "description": "Where it came from."
@@ -17120,7 +17347,7 @@
             "oneOf": [
               {
                 "$ref": "#/components/schemas/PausedReason",
-                "description": "For a proposed rule, why it would be paused once kept (confirming\nkeeps its author): say so before a member says yes. Absent for any\nother rule, or when it would act."
+                "description": "For a proposed rule, why it would be paused once kept (the member\nwho says yes becomes its author): say so before a member says yes.\nAbsent for any other rule, or when it would act."
               },
               {
                 "type": "null"
@@ -17274,6 +17501,20 @@
           }
         }
       },
+      "ScreenView": {
+        "type": "object",
+        "description": "A screen the app shows.",
+        "required": [
+          "route"
+        ],
+        "properties": {
+          "route": {
+            "type": "string",
+            "description": "The screen's route template, never its address: `/`, or segments of\nlowercase letters, `-` and `_` and parameters `:name`, with no digit,\nquery or fragment.",
+            "example": "/w/:workspaceId/inbox"
+          }
+        }
+      },
       "SearchResults": {
         "type": "object",
         "description": "A page of results.",
@@ -17393,6 +17634,13 @@
           "version"
         ],
         "properties": {
+          "content_token": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The `content_token` that came with the draft on screen (its last\nsave's answer, or the draft as read). Missing, another member's, or\nnot the draft as it is now: 409 `content_changed`, and nothing is\nsent (campbooks-cloud#242)."
+          },
           "version": {
             "type": "integer",
             "format": "int32",
@@ -18158,6 +18406,13 @@
               "$ref": "#/components/schemas/RuleCondition"
             },
             "description": "New conditions."
+          },
+          "content_token": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "With `adopt`, unless this change sets both the conditions and the\nactions: the `content_token` that came with the rule on screen, so\nyou adopt only what you were shown (409 `content_changed`\notherwise)."
           },
           "paused": {
             "type": [

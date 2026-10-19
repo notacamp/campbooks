@@ -12,13 +12,30 @@ import { ReplyComposer } from "./ReplyComposer";
 const D = `${W}/drafts`;
 const FIRST = Q4_DETAIL.messages[0]?.id ?? "";
 
-function slot(request: ReplyRequest | null, onClose = vi.fn()) {
+// The first message as `conversations.get` sends it when reading its HTML as
+// text ran out of time: no words, marked `text_unread`.
+const UNREAD = Q4_DETAIL.messages.map((message) =>
+  message.id === FIRST ? { ...message, text: null, text_unread: true } : message,
+);
+const WORDS = `GET ${W}/conversations/${Q4.id}/messages/${FIRST}/body`;
+const WORDS_BODY = {
+  text: "Hi Sam, the plan only came as HTML: the harbourlight pontoon budget is attached.",
+  html: null,
+  truncated: false,
+  remote_images: 0,
+  images_shown: false,
+  images_trusted: false,
+  images_offer: false,
+  images_domain: null,
+};
+
+function slot(request: ReplyRequest | null, onClose = vi.fn(), messages = Q4_DETAIL.messages) {
   return (
     <ReplyComposer
       workspaceId={DUARTE.id}
       inboxId={INBOX.id}
       conversation={Q4}
-      messages={Q4_DETAIL.messages}
+      messages={messages}
       request={request}
       onClose={onClose}
     />
@@ -184,7 +201,203 @@ describe("ReplyComposer", () => {
     fireEvent.click(await screen.findByRole("button", { name: /Send/u }));
     fireEvent.click(await screen.findByRole("button", { name: /^Undo/u }));
     expect(await screen.findByText("Too late to undo: it was sent.")).toBeVisible();
-    expect(api.calls.find((call) => call.route.endsWith("/send"))?.body).toEqual({ version: 4 });
+    expect(api.calls.find((call) => call.route.endsWith("/send"))?.body).toEqual({
+      version: 4,
+      content_token: REPLY.content_token,
+    });
+  });
+
+  it("shows the draft as it is now when it changed since it was shown, and sends only on a new Send", async () => {
+    const changed = {
+      ...REPLY,
+      bcc: [{ name: null, address: "eve@example.com" }],
+      content_token: "demo-token-changed",
+    };
+    let sends = 0;
+    const api = mockApi({
+      [`GET ${D}`]: { body: { drafts: [REPLY] } },
+      [`GET ${D}/${REPLY.id}`]: { body: changed },
+      [`POST ${D}/${REPLY.id}/send`]: () => {
+        sends += 1;
+        return sends === 1
+          ? problem(409, "content_changed")
+          : {
+              status: 202,
+              body: { ...changed, state: "scheduled", send_at: "2026-10-13T15:00:10Z" },
+            };
+      },
+    });
+    renderWithProviders(slot({ mode: "reply", messageId: FIRST, nonce: 1 }));
+    fireEvent.click(await screen.findByRole("button", { name: /Send/u }));
+    expect(
+      await screen.findByText("This changed since you opened it. Check it and send again."),
+    ).toBeVisible();
+    // The Bcc it gained is on screen, and nothing was sent for the member.
+    expect(await screen.findByText("eve@example.com")).toBeVisible();
+    expect(sends).toBe(1);
+    fireEvent.click(screen.getByRole("button", { name: /Send/u }));
+    await waitFor(() => {
+      expect(sends).toBe(2);
+    });
+    expect(
+      api.calls.filter((call) => call.route.endsWith("/send")).map((call) => call.body),
+    ).toEqual([
+      { version: 1, content_token: REPLY.content_token },
+      { version: 1, content_token: "demo-token-changed" },
+    ]);
+  });
+
+  it("keeps the typed text when an autosave is refused as changed, and saves it with the fresh token", async () => {
+    const changed = {
+      ...REPLY,
+      quoted: "Pay the new account",
+      attachments: [
+        { id: "a1", filename: "invoice.pdf.exe", content_type: "application/pdf", size: 1 },
+      ],
+      content_token: "demo-token-changed",
+    };
+    let saves = 0;
+    const api = mockApi({
+      [`GET ${D}`]: { body: { drafts: [REPLY] } },
+      [`GET ${D}/${REPLY.id}`]: { body: changed },
+      [`PATCH ${D}/${REPLY.id}`]: (_request, body) => {
+        saves += 1;
+        return saves === 1
+          ? problem(409, "content_changed")
+          : {
+              body: { ...changed, ...(body as object), version: 2, content_token: "demo-token-2" },
+            };
+      },
+    });
+    renderWithProviders(slot({ mode: "reply", messageId: FIRST, nonce: 1 }));
+    const box = await screen.findByRole("textbox", { name: "Message" });
+    fireEvent.change(box, { target: { value: "Thursday works." } });
+    expect(
+      await screen.findByText(
+        "This changed since you opened it. Check it and send again.",
+        undefined,
+        {
+          timeout: 3000,
+        },
+      ),
+    ).toBeVisible();
+    // Nothing typed is lost, and nothing is saved again on its own.
+    expect(screen.getByRole("textbox", { name: "Message" })).toHaveValue("Thursday works.");
+    expect(saves).toBe(1);
+    // The next edit saves the typed text with the token of the draft read again.
+    fireEvent.change(box, { target: { value: "Thursday works for me." } });
+    await waitFor(
+      () => {
+        expect(saves).toBe(2);
+      },
+      { timeout: 3000 },
+    );
+    const bodies = api.calls.filter((call) => call.route.startsWith("PATCH")).map((c) => c.body);
+    expect(bodies[0]).toMatchObject({
+      content_token: REPLY.content_token,
+      body: "Thursday works.",
+    });
+    expect(bodies[1]).toMatchObject({
+      content_token: "demo-token-changed",
+      body: "Thursday works for me.",
+    });
+  });
+
+  it("reads the words of a message that came without them before quoting it", async () => {
+    let answer: (() => void) | undefined;
+    const held = new Promise<void>((resolve) => {
+      answer = resolve;
+    });
+    const stored: (typeof REPLY)[] = [];
+    const api = mockApi({
+      [`GET ${D}`]: () => ({ body: { drafts: stored } }),
+      [WORDS]: (request) => {
+        expect(new URL(request.url).searchParams.get("words")).toBe("true");
+        return { body: WORDS_BODY };
+      },
+      [`POST ${D}`]: () => {
+        stored.push(REPLY);
+        return { status: 201, body: REPLY };
+      },
+    });
+    // The words arrive only once the reading state was seen.
+    const fetched = globalThis.fetch;
+    globalThis.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
+      const request = input instanceof Request ? input : new Request(input, init);
+      if (new URL(request.url).searchParams.get("words") === "true") {
+        await held;
+      }
+      return fetched(request);
+    };
+    renderWithProviders(slot({ mode: "forward", messageId: FIRST, nonce: 1 }, vi.fn(), UNREAD));
+
+    expect(await screen.findByText("Reading the email to quote it…")).toBeVisible();
+    expect(api.calls.some((call) => call.route === `POST ${D}`)).toBe(false);
+    answer?.();
+    await waitFor(() => {
+      expect(api.calls.some((call) => call.route === `POST ${D}`)).toBe(true);
+    });
+    const quoted = (
+      api.calls.find((call) => call.route === `POST ${D}`)?.body as { quoted: string }
+    ).quoted;
+    expect(quoted).toMatch(/^---------- Forwarded message ----------/u);
+    expect(quoted).toContain("the harbourlight pontoon budget is attached");
+  });
+
+  it("quotes the read words in a reply too", async () => {
+    const stored: (typeof REPLY)[] = [];
+    const api = mockApi({
+      [`GET ${D}`]: () => ({ body: { drafts: stored } }),
+      [WORDS]: { body: WORDS_BODY },
+      [`POST ${D}`]: () => {
+        stored.push(REPLY);
+        return { status: 201, body: REPLY };
+      },
+    });
+    renderWithProviders(slot({ mode: "reply", messageId: FIRST, nonce: 1 }, vi.fn(), UNREAD));
+    await screen.findByRole("textbox", { name: "Message" });
+    expect(
+      (api.calls.find((call) => call.route === `POST ${D}`)?.body as { quoted: string }).quoted,
+    ).toMatch(/Maya Okafor wrote:\n> Hi Sam, the plan only came as HTML/u);
+  });
+
+  it("says the quote holds only the first part when the words were cut", async () => {
+    const stored: (typeof REPLY)[] = [];
+    mockApi({
+      [`GET ${D}`]: () => ({ body: { drafts: stored } }),
+      [WORDS]: { body: { ...WORDS_BODY, truncated: true } },
+      [`POST ${D}`]: () => {
+        stored.push({ ...REPLY, kind: "forward", message_id: FIRST });
+        return { status: 201, body: { ...REPLY, kind: "forward", message_id: FIRST } };
+      },
+    });
+    renderWithProviders(slot({ mode: "forward", messageId: FIRST, nonce: 1 }, vi.fn(), UNREAD));
+    expect(
+      await screen.findByText("This email is long: the quote holds its first part."),
+    ).toBeVisible();
+  });
+
+  it("says the quote holds only the first part of a long email read in time", async () => {
+    const long = Q4_DETAIL.messages.map((message) =>
+      message.id === FIRST ? { ...message, quote_cut: true } : message,
+    );
+    mockApi({ [`GET ${D}`]: { body: { drafts: [REPLY] } } });
+    renderWithProviders(slot(null, vi.fn(), long));
+    expect(
+      await screen.findByText("This email is long: the quote holds its first part."),
+    ).toBeVisible();
+  });
+
+  it("starts nothing when the words cannot be read, and says why", async () => {
+    const api = mockApi({
+      [`GET ${D}`]: { body: { drafts: [] } },
+      [WORDS]: problem(503, "unavailable"),
+    });
+    renderWithProviders(slot({ mode: "forward", messageId: FIRST, nonce: 1 }, vi.fn(), UNREAD));
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "Couldn’t read the email to quote it. Nothing was started. Try again.",
+    );
+    expect(api.calls.some((call) => call.route === `POST ${D}`)).toBe(false);
   });
 
   it("says so when a draft cannot be started", async () => {

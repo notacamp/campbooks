@@ -112,8 +112,7 @@ async fn remove_their_clients(
                     client: client.clone(),
                 },
             )
-            .await
-            .map_err(|e| JobError::retry(e.to_string()))?;
+            .await?;
         revoked.extend(ended.into_iter().map(|(account, bound)| consents::Revoked {
             account_id: account,
             client_id: client.clone(),
@@ -145,8 +144,7 @@ pub(crate) async fn publish(
                 reason: reason.to_owned(),
             },
         )
-        .await
-        .map_err(|e| JobError::retry(e.to_string()))?;
+        .await?;
     Ok(())
 }
 

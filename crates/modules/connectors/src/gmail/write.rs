@@ -17,7 +17,10 @@
 //!   spam and "not spam" are label changes (`outbound::map`), so a report on
 //!   mail that is not in the trash is batched like any other.
 
-use std::collections::{BTreeMap, HashMap};
+use std::{
+    collections::{BTreeMap, HashMap},
+    sync::atomic::{AtomicU32, Ordering},
+};
 
 use futures_util::{StreamExt as _, stream::FuturesOrdered};
 
@@ -50,27 +53,55 @@ const BATCH_UNITS: u32 = 50;
 /// Of `modify`, `trash` and `untrash` each.
 const CALL_UNITS: u32 = 5;
 
-/// Gmail quota units pushing `backlog` may spend: the profile before and
-/// after, the history pages, and the writes it plans (a batch per chunk;
-/// per message its untrash, modify and trash, as each is needed). Later
-/// writers only take writes away.
+/// Gmail quota units pushing `backlog` is planned to spend: the profile
+/// before and after, the history pages, and the writes it plans (a batch per
+/// chunk; per message its untrash, modify and trash, as each is needed).
+/// The run takes this much from the shared budget before it pushes, then
+/// settles what the push really spent ([`Push::spent`]): less (later writers
+/// took writes away, history was short) is given back, more (Gmail refused a
+/// batch, a group split) is owed, and later runs wait it out
+/// (campbooks-cloud#252).
 pub fn units(backlog: &Backlog) -> u32 {
     let writes = Writes::plan(&Plan::merge(backlog).groups(), &backlog.labels);
-    let pages = u32::try_from(HISTORY_PAGES).unwrap_or(u32::MAX);
-    let batches = u32::try_from(writes.batches.len()).unwrap_or(u32::MAX);
-    let calls = writes
-        .singles
-        .iter()
-        .map(Single::calls)
-        .fold(0_u32, u32::saturating_add);
+    let pages = count(HISTORY_PAGES);
     (2 * PROFILE_UNITS)
         .saturating_add(pages.saturating_mul(HISTORY_UNITS))
-        .saturating_add(batches.saturating_mul(BATCH_UNITS))
-        .saturating_add(calls.saturating_mul(CALL_UNITS))
+        .saturating_add(writes.planned())
+}
+
+/// The Gmail API, counting the quota units of each call it is asked for
+/// (charged before the call: Gmail counts a refused call too).
+struct Metered<'g, 'a> {
+    gmail: &'g Gmail<'a>,
+    spent: AtomicU32,
+}
+
+impl<'a> Metered<'_, 'a> {
+    /// The API, with `units` counted as spent.
+    fn charge(&self, units: u32) -> &Gmail<'a> {
+        self.spent.fetch_add(units, Ordering::Relaxed);
+        self.gmail
+    }
+}
+
+/// `n` as a count of quota-bearing things.
+fn count(n: usize) -> u32 {
+    u32::try_from(n).unwrap_or(u32::MAX)
 }
 
 /// Push `backlog` through `gmail`.
 pub async fn push(gmail: &Gmail<'_>, backlog: &Backlog) -> Push {
+    let gmail = Metered {
+        gmail,
+        spent: AtomicU32::new(0),
+    };
+    let mut push = pushed(&gmail, backlog).await;
+    push.spent = gmail.spent.into_inner();
+    push
+}
+
+/// [`push`], through the metered API.
+async fn pushed(gmail: &Metered<'_, '_>, backlog: &Backlog) -> Push {
     let mut push = Push::default();
     let mut plan = Plan::merge(backlog);
     // Later writers at Gmail.
@@ -97,6 +128,7 @@ pub async fn push(gmail: &Gmail<'_>, backlog: &Backlog) -> Push {
     // After writing: the window our writes fall in.
     if !done.written.is_empty() {
         let after = gmail
+            .charge(PROFILE_UNITS)
             .profile()
             .await
             .ok()
@@ -182,6 +214,19 @@ impl Writes {
         writes
     }
 
+    /// What these writes cost if Gmail takes them as planned: a
+    /// `batchModify` per chunk, and each single's calls.
+    fn planned(&self) -> u32 {
+        let calls = self
+            .singles
+            .iter()
+            .map(Single::calls)
+            .fold(0_u32, u32::saturating_add);
+        count(self.batches.len())
+            .saturating_mul(BATCH_UNITS)
+            .saturating_add(calls.saturating_mul(CALL_UNITS))
+    }
+
     /// `messages` all getting (`add`, `remove`): nothing, one by one, or in
     /// batches.
     fn group(&mut self, add: &[String], remove: &[String], messages: &[String]) {
@@ -206,7 +251,11 @@ impl Writes {
 /// Write `writes`: each batch (a batch Gmail refused is written one message
 /// at a time), then the messages one by one. Returns the trouble that
 /// stopped it.
-async fn write(gmail: &Gmail<'_>, writes: Writes, done: &mut Results) -> Option<ProviderError> {
+async fn write(
+    gmail: &Metered<'_, '_>,
+    writes: Writes,
+    done: &mut Results,
+) -> Option<ProviderError> {
     let Writes {
         batches,
         mut singles,
@@ -214,7 +263,11 @@ async fn write(gmail: &Gmail<'_>, writes: Writes, done: &mut Results) -> Option<
     } = writes;
     done.written.extend(nothing);
     for ((add, remove), chunk) in &batches {
-        match gmail.batch_modify(chunk, add, remove).await {
+        match gmail
+            .charge(BATCH_UNITS)
+            .batch_modify(chunk, add, remove)
+            .await
+        {
             Ok(()) => done.written.extend(chunk.iter().cloned()),
             // Refused as a whole: find the message that refuses by asking
             // one at a time.
@@ -239,17 +292,18 @@ fn has(list: &[String], label: &str) -> bool {
 
 /// Make one message's write: out of the trash first, then its labels, then
 /// into the trash.
-async fn write_one(gmail: &Gmail<'_>, single: &Single) -> Result<(), ProviderError> {
+async fn write_one(gmail: &Metered<'_, '_>, single: &Single) -> Result<(), ProviderError> {
     if single.trash == Some(false) {
-        gmail.untrash(&single.message).await?;
+        gmail.charge(CALL_UNITS).untrash(&single.message).await?;
     }
     if !single.add.is_empty() || !single.remove.is_empty() {
         gmail
+            .charge(CALL_UNITS)
             .modify(&single.message, &single.add, &single.remove)
             .await?;
     }
     if single.trash == Some(true) {
-        gmail.trash(&single.message).await?;
+        gmail.charge(CALL_UNITS).trash(&single.message).await?;
     }
     Ok(())
 }
@@ -259,7 +313,7 @@ async fn write_one(gmail: &Gmail<'_>, single: &Single) -> Result<(), ProviderErr
 /// Returns Gmail's history id before any write (the start of our write
 /// window), when it could be read.
 async fn overtaken(
-    gmail: &Gmail<'_>,
+    gmail: &Metered<'_, '_>,
     backlog: &Backlog,
     wants: &Wants,
     fates: &mut Fates,
@@ -276,7 +330,11 @@ async fn overtaken(
     let mut token: Option<String> = None;
     let mut latest = None;
     for _ in 0..HISTORY_PAGES {
-        let page = match gmail.history(&start, token.as_deref(), 500).await {
+        let page = match gmail
+            .charge(HISTORY_UNITS)
+            .history(&start, token.as_deref(), 500)
+            .await
+        {
             Ok(page) => page,
             // Gmail no longer has that far back: arrival order.
             Err(ProviderError::NotFound) => return profile_id(gmail).await,
@@ -329,14 +387,20 @@ async fn overtaken(
 }
 
 /// Gmail's current history id.
-async fn profile_id(gmail: &Gmail<'_>) -> Result<Option<i64>, ProviderError> {
-    Ok(gmail.profile().await?.history_id.parse::<i64>().ok())
+async fn profile_id(gmail: &Metered<'_, '_>) -> Result<Option<i64>, ProviderError> {
+    Ok(gmail
+        .charge(PROFILE_UNITS)
+        .profile()
+        .await?
+        .history_id
+        .parse::<i64>()
+        .ok())
 }
 
 /// Write each of `singles` ([`write_one`]), [`FETCH_CONCURRENCY`] at a
 /// time, starting none after trouble. Returns the trouble.
 async fn modify_each(
-    gmail: &Gmail<'_>,
+    gmail: &Metered<'_, '_>,
     singles: &[Single],
     done: &mut Results,
 ) -> Option<ProviderError> {
@@ -377,6 +441,29 @@ mod tests {
 
     fn strings(list: &[&str]) -> Vec<String> {
         list.iter().map(ToString::to_string).collect()
+    }
+
+    fn messages(from: usize, to: usize) -> Vec<String> {
+        (from..to).map(|i| format!("m{i:03}")).collect()
+    }
+
+    #[test]
+    fn a_push_reserves_what_it_plans() {
+        let labels = HashMap::new();
+        let archive = (Vec::new(), strings(&["INBOX"]));
+        // Thirty-three archives: one batch.
+        let batch = Writes::plan(
+            &BTreeMap::from([(archive.clone(), messages(0, 33))]),
+            &labels,
+        );
+        assert_eq!(batch.planned(), BATCH_UNITS);
+        // Three: one by one.
+        let few = Writes::plan(&BTreeMap::from([(archive, messages(0, 3))]), &labels);
+        assert_eq!(few.planned(), 3 * CALL_UNITS);
+        // Into the trash with a label: a modify and a trash each.
+        let trash = (strings(&["Label_1", "TRASH"]), strings(&["INBOX"]));
+        let trashed = Writes::plan(&BTreeMap::from([(trash, messages(0, 12))]), &labels);
+        assert_eq!(trashed.planned(), 12 * 2 * CALL_UNITS);
     }
 
     #[test]

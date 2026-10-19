@@ -1,13 +1,25 @@
 //! The labelling export over `fixtures/needs.json`.
 
-use campbooks_kernel::tenancy::WorkspaceId;
+use campbooks_kernel::{
+    Error,
+    tenancy::{Access, Role, UserId, WorkspaceId},
+};
 use sqlx::PgPool;
 
-use super::{LabellingSet, OWNER, export_for_labelling, export_set, manifest, manifest_for};
+use super::{LabellingSet, OWNER, export_inboxes, export_set, manifest, manifest_for};
 use crate::{model::InboxRole, testkit::Kit};
 
 /// Every fixture is recent enough.
 const ALL: u32 = 100_000;
+
+/// `user`, a member of `workspace`, as an export is bounded by.
+fn member(workspace: WorkspaceId, user: UserId) -> Access {
+    Access {
+        workspace,
+        user: Some(user),
+        role: Some(Role::Member),
+    }
+}
 
 #[sqlx::test(migrations = "../../../migrations")]
 async fn lists_money_mail_only_unlabelled_and_in_the_eval_format(db: PgPool) {
@@ -19,9 +31,15 @@ async fn lists_money_mail_only_unlabelled_and_in_the_eval_format(db: PgPool) {
         .await;
     kit.ingest(workspace, inbox, "needs").await;
 
-    let items = export_for_labelling(&kit.state, workspace, ALL)
-        .await
-        .unwrap();
+    let items = export_set(
+        &kit.state,
+        &member(workspace, sam),
+        None,
+        ALL,
+        LabellingSet::Money,
+    )
+    .await
+    .unwrap();
     // The bill sorted to Receipts; not the people's questions or phishing.
     assert_eq!(
         items.len(),
@@ -66,14 +84,26 @@ async fn another_workspace_exports_nothing_of_it(db: PgPool) {
         .await;
     kit.ingest(workspace, inbox, "needs").await;
 
-    let other = export_for_labelling(&kit.state, WorkspaceId::new(), ALL)
-        .await
-        .unwrap();
-    assert!(other.is_empty());
+    // In another workspace Sam reads no inbox: refused, nothing written.
+    let other = export_set(
+        &kit.state,
+        &member(WorkspaceId::new(), sam),
+        None,
+        ALL,
+        LabellingSet::Money,
+    )
+    .await;
+    assert!(matches!(other, Err(Error::NotFound)), "{other:?}");
     // Old mail is left out.
-    let recent = export_for_labelling(&kit.state, workspace, 0)
-        .await
-        .unwrap();
+    let recent = export_set(
+        &kit.state,
+        &member(workspace, sam),
+        None,
+        0,
+        LabellingSet::Money,
+    )
+    .await
+    .unwrap();
     assert!(recent.is_empty());
 }
 
@@ -114,9 +144,15 @@ async fn the_actions_set_lists_mail_that_had_a_need(db: PgPool) {
     .await
     .unwrap();
 
-    let items = export_set(&kit.state, workspace, ALL, LabellingSet::Actions)
-        .await
-        .unwrap();
+    let items = export_set(
+        &kit.state,
+        &member(workspace, sam),
+        None,
+        ALL,
+        LabellingSet::Actions,
+    )
+    .await
+    .unwrap();
     assert_eq!(
         i64::try_from(items.len()).unwrap(),
         with_needs,
@@ -150,4 +186,134 @@ async fn the_actions_set_lists_mail_that_had_a_need(db: PgPool) {
     assert_eq!(actions["actions"][0], "reply");
     // The money set is as it was.
     assert_eq!(manifest_for(LabellingSet::Money), manifest());
+}
+
+/// Sam's and Leo's private inboxes in one workspace, both full of mail.
+async fn two_private_inboxes(
+    kit: &Kit,
+) -> (
+    WorkspaceId,
+    (UserId, crate::model::InboxId),
+    (UserId, crate::model::InboxId),
+) {
+    let workspace = WorkspaceId::new();
+    let (_, sam) = kit.member("sam", workspace);
+    let (_, leo) = kit.member("leo", workspace);
+    let sams = kit
+        .inbox(workspace, "sam@example.com", &[(sam, InboxRole::Manager)])
+        .await;
+    let leos = kit
+        .inbox(workspace, "leo@example.com", &[(leo, InboxRole::Manager)])
+        .await;
+    kit.ingest(workspace, sams, "needs").await;
+    kit.ingest(workspace, leos, "needs").await;
+    (workspace, (sam, sams), (leo, leos))
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_member_never_exports_a_teammate_s_private_inbox(db: PgPool) {
+    let kit = Kit::with_deps(db, crate::testkit::sorting_deps()).await;
+    let (workspace, (sam, _), (leo, _)) = two_private_inboxes(&kit).await;
+    for set in [LabellingSet::Money, LabellingSet::Actions] {
+        let sams = export_set(&kit.state, &member(workspace, sam), None, ALL, set)
+            .await
+            .unwrap();
+        assert!(!sams.is_empty(), "{set:?}");
+        // Every item went to Sam's inbox: none of Leo's.
+        assert!(
+            sams.iter().all(|i| {
+                i.item["message"]["recipient"]["addresses"]
+                    == serde_json::json!(["sam@example.com"])
+            }),
+            "{set:?}"
+        );
+        let leos = export_set(&kit.state, &member(workspace, leo), None, ALL, set)
+            .await
+            .unwrap();
+        assert!(!leos.is_empty(), "{set:?}");
+        assert!(
+            leos.iter().all(|i| {
+                i.item["message"]["recipient"]["addresses"]
+                    == serde_json::json!(["leo@example.com"])
+            }),
+            "{set:?}"
+        );
+    }
+    // A member who reads no inbox is refused: nothing to bound an export by.
+    let (_, nobody) = kit.member("nobody", workspace);
+    let none = export_set(
+        &kit.state,
+        &member(workspace, nobody),
+        None,
+        ALL,
+        LabellingSet::Money,
+    )
+    .await;
+    assert!(matches!(none, Err(Error::NotFound)), "{none:?}");
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn an_inbox_the_member_cannot_read_is_refused(db: PgPool) {
+    let kit = Kit::new(db).await;
+    let (workspace, (sam, sams), (leo, leos)) = two_private_inboxes(&kit).await;
+    // A shared inbox Sam reads.
+    let team = kit
+        .inbox(
+            workspace,
+            "team@example.com",
+            &[(leo, InboxRole::Manager), (sam, InboxRole::Reader)],
+        )
+        .await;
+    kit.ingest(workspace, team, "needs").await;
+    let access = member(workspace, sam);
+    let export = |inbox| export_set(&kit.state, &access, inbox, ALL, LabellingSet::Money);
+    let addresses = |items: &[super::LabellingItem]| {
+        let mut found: Vec<String> = items
+            .iter()
+            .map(|i| {
+                i.item["message"]["recipient"]["addresses"][0]
+                    .as_str()
+                    .unwrap_or_default()
+                    .to_owned()
+            })
+            .collect();
+        found.sort();
+        found
+    };
+    // Everything Sam reads: their own inbox and the shared one.
+    assert_eq!(
+        addresses(&export(None).await.unwrap()),
+        ["sam@example.com", "team@example.com"]
+    );
+    // Narrowed to one of them.
+    assert_eq!(
+        addresses(&export(Some(sams)).await.unwrap()),
+        ["sam@example.com"]
+    );
+    assert_eq!(
+        addresses(&export(Some(team)).await.unwrap()),
+        ["team@example.com"]
+    );
+    // Leo's private inbox: refused.
+    let refused = export(Some(leos)).await;
+    assert!(matches!(refused, Err(Error::NotFound)), "{refused:?}");
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn an_export_says_which_inboxes_it_reads(db: PgPool) {
+    let kit = Kit::new(db).await;
+    let (workspace, (sam, sams), (_, leos)) = two_private_inboxes(&kit).await;
+    let access = member(workspace, sam);
+    assert_eq!(
+        export_inboxes(&kit.state, &access, None).await.unwrap(),
+        vec![sams]
+    );
+    assert_eq!(
+        export_inboxes(&kit.state, &access, Some(sams))
+            .await
+            .unwrap(),
+        vec![sams]
+    );
+    let refused = export_inboxes(&kit.state, &access, Some(leos)).await;
+    assert!(matches!(refused, Err(Error::NotFound)), "{refused:?}");
 }

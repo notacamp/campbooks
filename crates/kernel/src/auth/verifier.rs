@@ -312,6 +312,9 @@ struct Claims {
     email_verified: Option<bool>,
     name: Option<String>,
     preferred_username: Option<String>,
+    sid: Option<String>,
+    fam: Option<String>,
+    cns: Option<String>,
 }
 
 /// Per-client claims an IdP may nest under `custom` instead of the root.
@@ -363,6 +366,20 @@ impl Claims {
             ),
             PrincipalKind::Client => (None, false, None),
         };
+        // The sign-in only the in-process issuer names, on a person's token.
+        let sign_in = match kind {
+            PrincipalKind::User
+                if own_issuer
+                    && (self.sid.is_some() || self.fam.is_some() || self.cns.is_some()) =>
+            {
+                Some(super::SignIn {
+                    session: self.sid,
+                    family: self.fam,
+                    consent: self.cns,
+                })
+            }
+            _ => None,
+        };
         let subject = sub.or_else(|| azp.clone())?;
         let scopes: BTreeSet<Scope> = self
             .scope
@@ -390,6 +407,7 @@ impl Claims {
                     .and_then(|at| chrono::DateTime::from_timestamp(at, 0)),
                 PrincipalKind::Client => None,
             },
+            sign_in,
         })
     }
 }

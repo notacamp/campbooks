@@ -21,6 +21,25 @@ jobs:
       - uses: actions/checkout@v6
         with: { fetch-depth: 0 }
 
+      - name: The PR's own changes
+        # The checkout is the PR's merge ref, built on the base branch as it
+        # is now: parent 1 is that base tip, parent 2 the PR's head. Diffing
+        # the two (from their merge base) gives the PR's own files, never
+        # those of PRs merged since it was opened, which `base.sha` (the base
+        # tip when the PR was opened) would add (campbooks-cloud#231).
+        if: always() && github.event_name == 'pull_request'
+        env:
+          BASE_REF: ${{ github.base_ref }}
+        run: |
+          if git rev-parse -q --verify 'HEAD^2' >/dev/null; then
+            range='HEAD^1...HEAD^2'
+          else
+            range="origin/${BASE_REF}...HEAD"
+          fi
+          echo "PR_RANGE=$range" >> "$GITHUB_ENV"
+          echo "The PR's own changes ($range):"
+          git diff --name-only "$range" | sed 's/^/  /'
+
       - name: PR title is a Conventional Commit
         if: always() && github.event_name == 'pull_request'
         env:
@@ -36,11 +55,10 @@ jobs:
         if: always() && github.event_name == 'pull_request'
         env:
           HEAD_REF: ${{ github.head_ref }}
-          BASE_SHA: ${{ github.event.pull_request.base.sha }}
         run: |
           case "$HEAD_REF" in
             feat/*|fix/*)
-              if ! git diff --name-only "$BASE_SHA"...HEAD | grep -qx CHANGELOG.md; then
+              if ! git diff --name-only "$PR_RANGE" | grep -qx CHANGELOG.md; then
                 echo "::error::feat/ and fix/ PRs must add a line under [Unreleased] in CHANGELOG.md"
                 exit 1
               fi ;;
@@ -58,9 +76,8 @@ jobs:
           !contains(github.event.pull_request.labels.*.name, 'no-recording')
         env:
           BODY: ${{ github.event.pull_request.body }}
-          BASE_SHA: ${{ github.event.pull_request.base.sha }}
         run: |
-          ui=$(git diff --name-only "$BASE_SHA"...HEAD -- clients/app/src clients/app/index.html \
+          ui=$(git diff --name-only "$PR_RANGE" -- clients/app/src clients/app/index.html \
                  | grep -vE '\.(test|spec)\.[jt]sx?$|/schema\.gen\.ts$' || true)
           if [ -z "$ui" ]; then echo "No client UI changes — no recording required."; exit 0; fi
           echo "UI files changed:"; echo "$ui" | sed 's/^/  /'
@@ -75,10 +92,8 @@ jobs:
 
       - name: A VERSION bump rolls the changelog
         if: always() && github.event_name == 'pull_request'
-        env:
-          BASE_SHA: ${{ github.event.pull_request.base.sha }}
         run: |
-          if git diff --quiet "$BASE_SHA"...HEAD -- VERSION; then
+          if git diff --quiet "$PR_RANGE" -- VERSION; then
             echo "VERSION unchanged."; exit 0
           fi
           version=$(tr -d '[:space:]' < VERSION)

@@ -37,7 +37,7 @@ use std::{fmt::Write as _, sync::Arc, time::Duration};
 use axum::{
     Json, Router,
     extract::Request as AxumRequest,
-    http::{HeaderName, HeaderValue, StatusCode, header},
+    http::{HeaderName, HeaderValue, header},
     middleware,
     routing::get,
 };
@@ -55,7 +55,6 @@ use tower_http::{
     compression::CompressionLayer,
     request_id::{MakeRequestUuid, PropagateRequestIdLayer, SetRequestIdLayer},
     set_header::SetResponseHeaderLayer,
-    timeout::TimeoutLayer,
 };
 use utoipa::{
     OpenApi as _,
@@ -166,6 +165,7 @@ impl Composition {
             facts: facts(config, &identity, &connectors),
             started_at: chrono::Utc::now(),
             ai_usage,
+            screen_views: campbooks_system::ScreenViewRelay::default(),
         };
         Ok(Self {
             connectors,
@@ -676,18 +676,38 @@ fn compose(
             .layer(SetRequestIdLayer::new(request_id.clone(), MakeRequestUuid))
             .layer(middleware::from_fn_with_state(metrics, telemetry::observe))
             .layer(PropagateRequestIdLayer::new(request_id))
-            .layer(TimeoutLayer::with_status_code(
-                StatusCode::SERVICE_UNAVAILABLE,
-                REQUEST_TIMEOUT,
-            ))
             .layer(CompressionLayer::new())
-            .layer(localize),
+            .layer(localize)
+            // Inside `localize`, so its problem is in the caller's language.
+            .layer(middleware::from_fn_with_state(REQUEST_TIMEOUT, time_limit)),
     )
+}
+
+/// Stop a request still running after `limit` and answer 503 problem+json
+/// `request_timed_out`. A mutating request with an `Idempotency-Key` keeps
+/// its key: the request may have committed before it was stopped, so the
+/// key is not released, and retrying with it answers 409 (in flight, then
+/// `idempotency_outcome_unknown`); check the result, then retry with a new
+/// key (campbooks-cloud#63).
+async fn time_limit(
+    axum::extract::State(limit): axum::extract::State<Duration>,
+    request: AxumRequest,
+    next: middleware::Next,
+) -> axum::response::Response {
+    match tokio::time::timeout(limit, next.run(request)).await {
+        Ok(response) => response,
+        Err(_) => axum::response::IntoResponse::into_response(Error::Unavailable(
+            i18n::MESSAGES.reason("request_timed_out"),
+        )),
+    }
 }
 
 #[cfg(test)]
 mod tests {
-    use axum::{body::Body, http::Request};
+    use axum::{
+        body::Body,
+        http::{Request, StatusCode},
+    };
     use campbooks_kernel::testing;
     use tower::ServiceExt;
 
@@ -695,6 +715,45 @@ mod tests {
 
     fn app() -> Router {
         router(testing::state(testing::unreachable_pool()), None)
+    }
+
+    /// A request still running past its limit is a 503 problem
+    /// `request_timed_out`, in the caller's language (campbooks-cloud#63).
+    #[tokio::test]
+    async fn a_request_past_its_time_limit_is_a_503_problem() {
+        let state = testing::state(testing::unreachable_pool());
+        let localize = middleware::from_fn_with_state(state.clone(), i18n::localize);
+        let app =
+            Router::new()
+                .route(
+                    "/slow",
+                    get(|| async {
+                        tokio::time::sleep(Duration::from_secs(5)).await;
+                        "done"
+                    }),
+                )
+                .layer(ServiceBuilder::new().layer(localize).layer(
+                    middleware::from_fn_with_state(Duration::from_millis(50), time_limit),
+                ));
+        let request = Request::get("/slow")
+            .header(header::ACCEPT_LANGUAGE, "pt-PT")
+            .body(Body::empty())
+            .unwrap();
+        let response = testing::send(&app, request).await;
+        assert_eq!(response.status, StatusCode::SERVICE_UNAVAILABLE);
+        assert_eq!(
+            response.content_type.as_deref(),
+            Some("application/problem+json")
+        );
+        assert_eq!(response.json["code"], "request_timed_out");
+        assert!(
+            response.json["detail"]
+                .as_str()
+                .unwrap()
+                .contains("Idempotency-Key"),
+            "{}",
+            response.json
+        );
     }
 
     #[test]
@@ -939,7 +998,7 @@ mod tests {
                 "ALL".to_owned()
             )]
         );
-        // The maintenance scope: these four, on module tables.
+        // The maintenance scope: these five, on module tables.
         let policies = mentioning(testing::maintenance_scope_setting());
         let expected = [
             // The stream dispatcher (connectors): reads and leases.
@@ -964,6 +1023,13 @@ mod tests {
                 "conversations.needs_backfills",
                 "maintenance_starts_backfills",
                 "UPDATE",
+            ),
+            // The re-sign of the rules kept at the deploy (campbooks-cloud#242):
+            // which workspaces still have rows, read only.
+            (
+                "conversations.rule_resigns",
+                "maintenance_reads_resigns",
+                "SELECT",
             ),
         ]
         .map(|(table, policy, cmd)| (table.to_owned(), policy.to_owned(), cmd.to_owned()));
@@ -1046,9 +1112,18 @@ mod tests {
         // The rate-limit counters: no privilege at all; the runtime role
         // counts and prunes through the kernel's functions (campbooks-cloud#210).
         let functions_only = "kernel.rate_limits";
+        // The snapshot of the rules kept when rules were bound
+        // (campbooks-cloud#242): read only; its rows leave through
+        // `conversations.take_rule_resign` alone.
+        let snapshot = "conversations.rule_resigns";
         let missing: Vec<String> = missing
             .into_iter()
-            .filter(|t| t != read_only && t != functions_only && !BFF_TABLES.contains(&t.as_str()))
+            .filter(|t| {
+                t != read_only
+                    && t != functions_only
+                    && t != snapshot
+                    && !BFF_TABLES.contains(&t.as_str())
+            })
             .collect();
         assert!(
             missing.is_empty(),
@@ -1067,6 +1142,21 @@ mod tests {
             privileges,
             (true, false, false, false),
             "`{role}` only reads {read_only}"
+        );
+        let privileges: (bool, bool, bool, bool, bool) = sqlx::query_as(
+            "SELECT has_table_privilege($1, $2, 'SELECT'), has_table_privilege($1, $2, 'INSERT'),
+                    has_table_privilege($1, $2, 'UPDATE'), has_table_privilege($1, $2, 'DELETE'),
+                    has_function_privilege($1, 'conversations.take_rule_resign(uuid)', 'EXECUTE')",
+        )
+        .bind(role)
+        .bind(snapshot)
+        .fetch_one(&db)
+        .await
+        .unwrap();
+        assert_eq!(
+            privileges,
+            (true, false, false, false, true),
+            "`{role}` only reads {snapshot}, and takes rows out through its function"
         );
         let privileges: (bool, bool, bool, bool, bool, bool, bool) = sqlx::query_as(
             "SELECT has_table_privilege($1, $2, 'SELECT'), has_table_privilege($1, $2, 'INSERT'),
@@ -1232,22 +1322,145 @@ mod tests {
         }
     }
 
-    /// Whether each table of the kernel's and the BFF's schemas is protected
-    /// from the runtime role (`$1`): row-level security enabled and forced
-    /// with a policy, or no privilege of any kind on the table or on any of
-    /// its columns (`has_table_privilege` does not see a column's grant).
+    /// Whether each table, view and materialized view of the kernel's and
+    /// the BFF's schemas is protected from the runtime role (`$1`): a table
+    /// with row-level security enabled and forced, a policy, and no
+    /// permissive policy for that role (or everyone) that admits every row,
+    /// to read or to write: one with no expression, or an expression that
+    /// does not depend on the row (reads no column, calls no function, holds
+    /// no subquery or parameter: `USING (true)`, `USING (1 = 1)`) and is not
+    /// a lone `false`, on either side (campbooks-cloud#260); or no privilege
+    /// of any
+    /// kind on the relation or on any of its columns (`has_table_privilege`
+    /// does not see a column's grant). Row-level security does not apply
+    /// through a view, so a view is protected by having no grant
+    /// (campbooks-cloud#213, item 7).
     const KERNEL_TABLES_PROTECTED: &str = "
         SELECT n.nspname || '.' || c.relname,
-               (c.relrowsecurity AND c.relforcerowsecurity
-                   AND EXISTS (SELECT 1 FROM pg_policy p WHERE p.polrelid = c.oid))
+               (c.relkind IN ('r', 'p') AND c.relrowsecurity AND c.relforcerowsecurity
+                   AND EXISTS (SELECT 1 FROM pg_policy p WHERE p.polrelid = c.oid)
+                   AND NOT EXISTS (
+                       SELECT 1 FROM pg_policy p
+                        WHERE p.polrelid = c.oid AND p.polpermissive
+                          AND (0 = ANY (p.polroles)
+                               OR EXISTS (SELECT 1 FROM unnest(p.polroles) AS r(oid)
+                                           WHERE r.oid <> 0
+                                             AND pg_has_role($1, r.oid, 'MEMBER')))
+                          AND ((p.polqual IS NULL AND p.polwithcheck IS NULL)
+                               OR (p.polqual IS NOT NULL
+                                   AND p.polqual::text !~ '[{](VAR|FUNCEXPR|SUBLINK|PARAM) '
+                                   AND pg_get_expr(p.polqual, p.polrelid) <> 'false')
+                               OR (p.polwithcheck IS NOT NULL
+                                   AND p.polwithcheck::text
+                                       !~ '[{](VAR|FUNCEXPR|SUBLINK|PARAM) '
+                                   AND pg_get_expr(p.polwithcheck, p.polrelid) <> 'false'))))
                OR NOT (has_table_privilege($1, c.oid,
                            'SELECT, INSERT, UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER')
                        OR has_any_column_privilege($1, c.oid,
                            'SELECT, INSERT, UPDATE, REFERENCES'))
           FROM pg_class c
           JOIN pg_namespace n ON n.oid = c.relnamespace
-         WHERE n.nspname IN ('kernel', 'bff') AND c.relkind IN ('r', 'p')
+         WHERE n.nspname IN ('kernel', 'bff') AND c.relkind IN ('r', 'p', 'v', 'm')
          ORDER BY 1";
+
+    /// A view the runtime role may read, and a policy admitting the runtime
+    /// role to every row, leave the kernel open; a policy for another role
+    /// or a restrictive one does not (campbooks-cloud#213, item 7).
+    #[sqlx::test(migrations = "../../migrations")]
+    async fn an_open_view_or_policy_leaves_the_kernel_open(db: sqlx::PgPool) {
+        let role = campbooks_kernel::db::DEFAULT_RUNTIME_ROLE;
+        let protected = |tables: &[(String, bool)], name: &str| {
+            tables
+                .iter()
+                .find(|(t, _)| t == name)
+                .map(|(_, protected)| *protected)
+        };
+        for statement in [
+            "CREATE VIEW kernel.peek AS SELECT principal FROM kernel.idempotency",
+            "CREATE MATERIALIZED VIEW kernel.peek_later AS SELECT 1 AS one",
+            "GRANT SELECT ON kernel.peek_later TO campbooks_app",
+            "CREATE POLICY only_for_the_definer ON kernel.idempotency TO campbooks_definer
+                 USING (true)",
+            "CREATE POLICY never_more ON kernel.idempotency AS RESTRICTIVE TO campbooks_app
+                 USING (true)",
+        ] {
+            sqlx::query(statement).execute(&db).await.unwrap();
+        }
+        let tables: Vec<(String, bool)> = sqlx::query_as(KERNEL_TABLES_PROTECTED)
+            .bind(role)
+            .fetch_all(&db)
+            .await
+            .unwrap();
+        assert_eq!(
+            protected(&tables, "kernel.peek"),
+            Some(true),
+            "no grant yet"
+        );
+        assert_eq!(protected(&tables, "kernel.peek_later"), Some(false));
+        assert_eq!(protected(&tables, "kernel.idempotency"), Some(true));
+
+        for statement in [
+            "GRANT SELECT ON kernel.peek TO campbooks_app",
+            "CREATE POLICY everyone ON kernel.idempotency FOR SELECT USING (true)",
+        ] {
+            sqlx::query(statement).execute(&db).await.unwrap();
+        }
+        let tables: Vec<(String, bool)> = sqlx::query_as(KERNEL_TABLES_PROTECTED)
+            .bind(role)
+            .fetch_all(&db)
+            .await
+            .unwrap();
+        assert_eq!(protected(&tables, "kernel.peek"), Some(false));
+        assert_eq!(protected(&tables, "kernel.idempotency"), Some(false));
+
+        // Any constant expression admits every row, not only `true`, and
+        // either side open is open: a policy reading every row whose writes
+        // are checked still lets every row be read (campbooks-cloud#260). A
+        // lone `false` admits nothing.
+        let after = |statements: &'static [&'static str]| {
+            let db = db.clone();
+            async move {
+                for &statement in statements {
+                    sqlx::query(statement).execute(&db).await.unwrap();
+                }
+                let tables: Vec<(String, bool)> = sqlx::query_as(KERNEL_TABLES_PROTECTED)
+                    .bind(role)
+                    .fetch_all(&db)
+                    .await
+                    .unwrap();
+                protected(&tables, "kernel.idempotency")
+            }
+        };
+        assert_eq!(
+            after(&[
+                "DROP POLICY everyone ON kernel.idempotency",
+                "CREATE POLICY tautology ON kernel.idempotency FOR SELECT TO campbooks_app
+                     USING (1 = 1)",
+            ])
+            .await,
+            Some(false)
+        );
+        assert_eq!(
+            after(&[
+                "DROP POLICY tautology ON kernel.idempotency",
+                "CREATE POLICY read_open ON kernel.idempotency FOR ALL TO campbooks_app
+                     USING (true) WITH CHECK (principal = current_user)",
+            ])
+            .await,
+            Some(false),
+            "readable by everyone, whatever its writes"
+        );
+        assert_eq!(
+            after(&[
+                "DROP POLICY read_open ON kernel.idempotency",
+                "CREATE POLICY closed ON kernel.idempotency FOR SELECT TO campbooks_app
+                     USING (false)",
+            ])
+            .await,
+            Some(true),
+            "`false` admits nothing"
+        );
+    }
 
     /// A grant on one column of a BFF table is a privilege the coverage
     /// test sees (campbooks-cloud#214, item 6).
@@ -1366,6 +1579,11 @@ mod tests {
             ("bff.login_transactions", "DELETE, INSERT, SELECT"),
             ("bff.retired_tokens", "INSERT, SELECT"),
             ("bff.sessions", "DELETE, INSERT, SELECT, UPDATE"),
+            // `conversations.take_rule_resign` (campbooks-cloud#242).
+            ("conversations.rule_resigns", "DELETE, SELECT"),
+            ("conversations.rules", "SELECT"),
+            // `kernel.purge_workspace_idempotency` (campbooks-cloud#65).
+            ("kernel.idempotency", "DELETE, SELECT"),
             ("kernel.rate_limits", "DELETE, INSERT, SELECT, UPDATE"),
         ]
         .map(|(table, privileges)| (table.to_owned(), privileges.to_owned()));
@@ -1385,9 +1603,13 @@ mod tests {
         .unwrap();
         assert_eq!(
             schemas,
-            [("bff", "USAGE"), ("kernel", "USAGE")]
-                .map(|(schema, privilege)| (schema.to_owned(), privilege.to_owned())),
-            "`{DEFINER_ROLE}` may use the two schemas, and create nothing"
+            [
+                ("bff", "USAGE"),
+                ("conversations", "USAGE"),
+                ("kernel", "USAGE")
+            ]
+            .map(|(schema, privilege)| (schema.to_owned(), privilege.to_owned())),
+            "`{DEFINER_ROLE}` may use the three schemas, and create nothing"
         );
         let elsewhere: i64 = sqlx::query_scalar(
             "SELECT (SELECT count(*) FROM pg_attribute a, aclexplode(a.attacl) x
@@ -1520,6 +1742,7 @@ mod tests {
             expires_at: None,
             issued_at: None,
             auth_time: None,
+            sign_in: None,
         };
         // Probes opt neither automation nor the assistant in.
         let refused = operations::invoke(

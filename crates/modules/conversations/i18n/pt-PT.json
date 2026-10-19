@@ -13,6 +13,7 @@
     "invalid_subject": "O assunto é uma só linha com no máximo {{max}} carateres.",
     "draft_too_long": "Esta mensagem é demasiado longa para ser enviada.",
     "draft_changed": "Este rascunho foi alterado noutro sítio. Recarregue-o para ver a versão mais recente.",
+    "content_changed": "Isto mudou desde que o abriu. Verifique-o e tente novamente.",
     "draft_not_editable": "Esta mensagem já está a caminho e não pode ser alterada.",
     "no_recipients": "Adicione pelo menos um destinatário.",
     "invalid_address": "Este endereço não é válido: {{address}}",
@@ -29,6 +30,12 @@
     "rule_needs_member": "As regras são ensinadas por um membro da caixa de entrada, não por uma aplicação.",
     "rule_not_active": "Esta regra está à espera de um sim. Mantenha-a primeiro e depois pode pô-la em pausa.",
     "rule_not_restorable": "Esta regra já não pode ser reposta. Volte a ensiná-la.",
-    "invalid_senders_query": "Pesquise com 2 a 100 caracteres e peça entre 1 e {{max}} remetentes."
+    "rule_needs_confirmation": "Esta regra precisa de um novo sim antes de voltar a agir. Confirme-a primeiro e depois pode alterá-la.",
+    "rule_needs_your_yes": "Só você pode dizer sim a esta regra. O Scout pode propô-la: verifique-a na memória do Scout e mantenha-a aí.",
+    "undo_unavailable": "Parte do que esta regra alterou já não pode ser reposta. Remova-a mantendo as alterações.",
+    "invalid_senders_query": "Pesquise com 2 a 100 caracteres e peça entre 1 e {{max}} remetentes.",
+    "images_already_trusted": "Já existe uma regra inteligente para as imagens deste remetente, mesmo que esteja em pausa ou à espera de um sim. Encontra-a na memória do Scout.",
+    "send_needs_you": "Só você pode enviar mensagens ou anular um envio. O Scout pode escrever um rascunho: verifique-o e envie-o você mesmo.",
+    "images_need_you": "Só você pode escolher mostrar sempre as imagens de um remetente. Abra uma das mensagens dele e escolha-o aí."
   }
 }

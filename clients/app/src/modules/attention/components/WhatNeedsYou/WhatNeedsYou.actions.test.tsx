@@ -28,7 +28,12 @@ import {
 import { INBOX, NOW, W } from "../../../../../test/demo/conversations";
 import { REPLY } from "../../../../../test/demo/drafts";
 import { DUARTE } from "../../../../../test/demo/workspaces";
-import { mockApi, renderWithProviders } from "../../../../../test/render";
+import {
+  mockApi,
+  problem,
+  renderWithProviders,
+  type MockHandler,
+} from "../../../../../test/render";
 
 import { WhatNeedsYou } from "./WhatNeedsYou";
 
@@ -70,6 +75,12 @@ const PEOPLE: Schema<"SenderView">[] = [
   { address: "joao@obras-matos.example", name: "João Matos", received: 7, replied: 5 },
 ];
 
+/** Senders the server leaves out with `reachable` (campbooks-cloud#233). */
+const UNSAFE: Schema<"SenderView">[] = [
+  { address: "it-support@at3lier-sol.example", name: "IT Support", received: 1, replied: 0 },
+  { address: "no-reply@accounts.example", name: "Accounts", received: 4, replied: 0 },
+];
+
 const FORWARD = {
   ...REPLY,
   id: "0192f1a0-0000-7000-8000-00000000fd01",
@@ -103,9 +114,23 @@ interface Options {
   role?: "manager" | "reader";
   /** Marta's drafts already there. */
   drafts?: Schema<"DraftView">[];
+  /** The words of Marta's last email, asked for alone. */
+  words?: MockHandler;
 }
 
+const MARTA_LAST = MARTA_DETAIL.messages.at(-1)?.id ?? "";
+
+/** Marta's email as `conversations.get` sends it when its HTML was not read in time. */
+const TEXT_UNREAD: Schema<"ConversationDetail"> = {
+  ...MARTA_DETAIL,
+  messages: MARTA_DETAIL.messages.map((message) =>
+    message.id === MARTA_LAST ? { ...message, text: null, text_unread: true } : message,
+  ),
+};
+
 function api(conversations: Summary[], detail = MARTA_DETAIL, options: Options = {}) {
+  // The drafts started here, as the server would list them afterwards.
+  let started: Schema<"DraftView">[] = [];
   return mockApi({
     [`GET ${W}/inboxes`]: { body: { inboxes: [{ ...INBOX, role: options.role ?? "manager" }] } },
     [`GET ${W}/attention`]: (request) =>
@@ -119,11 +144,14 @@ function api(conversations: Summary[], detail = MARTA_DETAIL, options: Options =
     [`POST ${W}/conversations/${PHISH.id}/need/reopen`]: { body: PHISH },
     [`POST ${W}/attention/${MARTA_ITEM}/snooze`]: { body: ITEMS[1] },
     // Found by name: the server matches what is typed.
+    // Without `reachable`, the server would list the unsafe senders too.
     [`GET ${W}/senders`]: (request) => {
-      const q = (new URL(request.url).searchParams.get("q") ?? "").toLowerCase();
+      const params = new URL(request.url).searchParams;
+      const q = (params.get("q") ?? "").toLowerCase();
+      const known = params.get("reachable") === "true" ? PEOPLE : [...PEOPLE, ...UNSAFE];
       return {
         body: {
-          senders: PEOPLE.filter((p) =>
+          senders: known.filter((p) =>
             `${p.name ?? ""} ${p.address}`
               .normalize("NFD")
               .replaceAll(/\p{Diacritic}/gu, "")
@@ -133,9 +161,15 @@ function api(conversations: Summary[], detail = MARTA_DETAIL, options: Options =
         },
       };
     },
-    [`GET ${W}/drafts`]: { body: { drafts: options.drafts ?? [] } },
-    [`POST ${W}/drafts`]: { status: 201, body: FORWARD },
+    [`GET ${W}/drafts`]: () => ({ body: { drafts: [...started, ...(options.drafts ?? [])] } }),
+    [`POST ${W}/drafts`]: () => {
+      started = [FORWARD];
+      return { status: 201, body: FORWARD };
+    },
     [`PATCH ${W}/drafts/${FORWARD.id}`]: { body: FORWARD },
+    ...(options.words === undefined
+      ? {}
+      : { [`GET ${W}/conversations/${MARTA.id}/messages/${MARTA_LAST}/body`]: options.words }),
   });
 }
 
@@ -278,6 +312,68 @@ describe("What needs you: the actions Scout picked", () => {
     expect(created.quoted).toContain("Forwarded message");
   });
 
+  it("forwards an email that came without its words with them quoted", async () => {
+    const calls = api(
+      [PHISH, ranked(MARTA, [{ actions: ["forward"], likelihood: 88 }]), ...others],
+      TEXT_UNREAD,
+      {
+        words: {
+          body: {
+            text: "The walkthrough is on Thursday at the harbourlight pontoon.",
+            html: null,
+            truncated: false,
+            remote_images: 0,
+            images_shown: false,
+            images_trusted: false,
+            images_offer: false,
+            images_domain: null,
+          },
+        },
+      },
+    );
+    const { router } = renderHome();
+    await actions(PHISH_NAME);
+    fireEvent.keyDown(document, { key: "j" });
+    await actions("Marta Ferreira");
+    fireEvent.keyDown(document, { key: "1" });
+    const dialog = await screen.findByRole("dialog", {
+      name: "Forward Marta Ferreira’s email to…",
+    });
+    fireEvent.click(await within(dialog).findByRole("button", { name: /Rita Gomes/u }));
+    await waitFor(() => {
+      expect(router.state.location.pathname).toContain(MARTA.id);
+    });
+    const created = calls.calls.find((c) => c.route === `POST ${W}/drafts`)?.body as {
+      quoted: string;
+    };
+    expect(created.quoted).toContain("Forwarded message");
+    expect(created.quoted).toContain("The walkthrough is on Thursday at the harbourlight pontoon.");
+  });
+
+  it("sends nothing when the words of an email that came without them cannot be read", async () => {
+    const calls = api(
+      [PHISH, ranked(MARTA, [{ actions: ["forward"], likelihood: 88 }]), ...others],
+      TEXT_UNREAD,
+      { words: problem(503, "unavailable") },
+    );
+    const { router } = renderHome();
+    await actions(PHISH_NAME);
+    fireEvent.keyDown(document, { key: "j" });
+    await actions("Marta Ferreira");
+    fireEvent.keyDown(document, { key: "1" });
+    const dialog = await screen.findByRole("dialog", {
+      name: "Forward Marta Ferreira’s email to…",
+    });
+    fireEvent.click(await within(dialog).findByRole("button", { name: /Rita Gomes/u }));
+    expect(
+      await within(dialog).findByText(
+        "Couldn’t read the email to quote it: nothing was sent. Try again.",
+      ),
+    ).toBeVisible();
+    expect(calls.calls.some((c) => c.route === `POST ${W}/drafts`)).toBe(false);
+    expect(router.state.location.pathname).not.toContain(MARTA.id);
+  });
+
   it("opens the item on its file with Open attachment", async () => {
     api(
       [PHISH, ranked(MARTA, [{ actions: ["open_attachment"], likelihood: 77 }]), ...others],
@@ -393,6 +489,7 @@ describe("What needs you: the actions Scout picked", () => {
       expect(calls.calls.find((c) => c.route === `PATCH ${W}/drafts/${FORWARD.id}`)?.body).toEqual({
         to: [{ name: "Rita Gomes", address: "rita@silva-contas.example" }],
         version: FORWARD.version,
+        content_token: FORWARD.content_token,
       });
     });
     expect(calls.calls.some((c) => c.route === `POST ${W}/drafts`)).toBe(false);
@@ -443,6 +540,112 @@ describe("What needs you: the actions Scout picked", () => {
     expect(router.state.location.pathname).not.toContain(MARTA.id);
   });
 
+  it("never offers to forward to a sender under review or a no-reply address", async () => {
+    api([PHISH, ranked(MARTA, [{ actions: ["forward"], likelihood: 88 }]), ...others]);
+    renderHome();
+    await actions(PHISH_NAME);
+    fireEvent.keyDown(document, { key: "j" });
+    await actions("Marta Ferreira");
+    fireEvent.keyDown(document, { key: "1" });
+    const dialog = await screen.findByRole("dialog", {
+      name: "Forward Marta Ferreira’s email to…",
+    });
+    await within(dialog).findByRole("button", { name: /Rita Gomes/u });
+    expect(within(dialog).queryByRole("button", { name: /IT Support/u })).toBeNull();
+    expect(within(dialog).queryByRole("button", { name: /Accounts/u })).toBeNull();
+    // Typed by name, they find nobody: no warning, no list.
+    const box = within(dialog).getByRole("searchbox", { name: "Find someone by name" });
+    for (const typed of ["support", "accounts"]) {
+      fireEvent.change(box, { target: { value: typed } });
+      expect(
+        await within(dialog).findByText("No one by that name has written to you."),
+      ).toBeVisible();
+      expect(within(dialog).queryByRole("button", { name: /IT Support|Accounts/u })).toBeNull();
+    }
+  });
+
+  it("addresses the same draft when Forward is reopened after Esc mid-start", async () => {
+    const calls = api([
+      PHISH,
+      ranked(MARTA, [{ actions: ["forward"], likelihood: 88 }]),
+      ...others,
+    ]);
+    renderHome();
+    await actions(PHISH_NAME);
+    fireEvent.keyDown(document, { key: "j" });
+    await actions("Marta Ferreira");
+    fireEvent.keyDown(document, { key: "1" });
+    const first = await screen.findByRole("dialog", {
+      name: "Forward Marta Ferreira’s email to…",
+    });
+    fireEvent.click(await within(first).findByRole("button", { name: /Rita Gomes/u }));
+    fireEvent.keyDown(first, { key: "Escape" });
+    await waitFor(() => {
+      expect(screen.queryByRole("dialog")).toBeNull();
+    });
+    await waitFor(() => {
+      expect(calls.calls.filter((c) => c.route === `POST ${W}/drafts`)).toHaveLength(1);
+    });
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    fireEvent.keyDown(document, { key: "1" });
+    const again = await screen.findByRole("dialog", {
+      name: "Forward Marta Ferreira’s email to…",
+    });
+    fireEvent.click(await within(again).findByRole("button", { name: /João Matos/u }));
+    await waitFor(() => {
+      expect(calls.calls.find((c) => c.route === `PATCH ${W}/drafts/${FORWARD.id}`)?.body).toEqual({
+        to: [{ name: "João Matos", address: "joao@obras-matos.example" }],
+        version: FORWARD.version,
+        content_token: FORWARD.content_token,
+      });
+    });
+    expect(calls.calls.filter((c) => c.route === `POST ${W}/drafts`)).toHaveLength(1);
+  });
+
+  it("opens nothing when the drafts can't be read while a forward starts", async () => {
+    api([PHISH, ranked(MARTA, [{ actions: ["forward"], likelihood: 88 }]), ...others]);
+    // The draft's creation waits; meanwhile the drafts can no longer be read.
+    const mocked = globalThis.fetch;
+    let release!: () => void;
+    const held = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    let unreadable = false;
+    globalThis.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
+      const request = input instanceof Request ? input : new Request(input, init);
+      const path = new URL(request.url).pathname;
+      if (path === `${W}/drafts` && request.method === "POST") {
+        await held;
+      } else if (path === `${W}/drafts` && unreadable) {
+        return Response.json({ title: "Unavailable", status: 503 }, { status: 503 });
+      }
+      return mocked(request);
+    };
+    const { router, queryClient } = renderHome();
+    await actions(PHISH_NAME);
+    fireEvent.keyDown(document, { key: "j" });
+    await actions("Marta Ferreira");
+    fireEvent.keyDown(document, { key: "1" });
+    const dialog = await screen.findByRole("dialog", {
+      name: "Forward Marta Ferreira’s email to…",
+    });
+    fireEvent.click(await within(dialog).findByRole("button", { name: /Rita Gomes/u }));
+    await within(dialog).findByText("Starting the forward…");
+    unreadable = true;
+    await queryClient.refetchQueries({
+      predicate: (query) => JSON.stringify(query.queryKey).includes("conversations.list_drafts"),
+    });
+    expect(
+      await within(dialog).findByText("Couldn’t start the forward: nothing was sent. Try again."),
+    ).toBeVisible();
+    release();
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(router.state.location.pathname).not.toContain(MARTA.id);
+    expect(
+      screen.getByRole("dialog", { name: "Forward Marta Ferreira’s email to…" }),
+    ).toBeVisible();
+  });
+
   it("says so when Open attachment finds no file to open", async () => {
     api([PHISH, ranked(MARTA, [{ actions: ["open_attachment"], likelihood: 77 }]), ...others]);
     renderHome();
@@ -450,9 +653,7 @@ describe("What needs you: the actions Scout picked", () => {
     fireEvent.keyDown(document, { key: "j" });
     await actions("Marta Ferreira");
     fireEvent.keyDown(document, { key: "1" });
-    expect(
-      await screen.findByText("This email has no file to open: only pictures shown in its text."),
-    ).toBeInTheDocument();
+    expect(await screen.findByText("This email has no file to open.")).toBeInTheDocument();
   });
 
   it("is never stuck starting when the email can't be read", async () => {

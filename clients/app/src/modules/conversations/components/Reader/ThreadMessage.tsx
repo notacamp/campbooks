@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 
+import { useShortcut } from "~/lib/shortcuts";
 import {
   AttachmentList,
   Button,
@@ -13,7 +14,7 @@ import {
 } from "~/lib/ui";
 
 import { downloadAttachment, imageUrl, openPdf, type AttachmentRef } from "../../api/attachments";
-import { useMessageBody, type MessageView } from "../../api/queries";
+import { useMessageBody, useMessageWords, type MessageView } from "../../api/queries";
 import {
   attachmentKind,
   cleanFileName,
@@ -35,9 +36,15 @@ export interface ThreadMessageProps {
   onShowImages: () => void;
   /**
    * "Always show images from <sender>": a smart rule for this sender
-   * (campbooks-cloud#200); absent where the member may not teach rules.
+   * (campbooks-cloud#200), with the domain the server says may be trusted
+   * instead; absent where the member may not teach rules. Offered only
+   * where it can take effect (`images_offer`, campbooks-cloud#235).
    */
-  onTrustImages?: (() => void) | undefined;
+  onTrustImages?: ((domain: string | undefined) => void) | undefined;
+  /** ⇧A trusts this message's sender (the newest message from someone else). */
+  trustKey?: boolean | undefined;
+  /** Other members use the inbox: a rule that trusts a sender is the inbox's. */
+  sharedInbox?: boolean | undefined;
   kind: "person" | "service";
   /** The conversation may be phishing: the body's links lead nowhere. */
   inertLinks?: boolean | undefined;
@@ -60,6 +67,8 @@ export function ThreadMessage({
   showImages,
   onShowImages,
   onTrustImages,
+  trustKey = false,
+  sharedInbox = false,
   kind,
   inertLinks = false,
   shortcuts = true,
@@ -76,8 +85,26 @@ export function ThreadMessage({
   );
   const from = displayName(message.from);
   const time = messageTime(message.sent_at, i18n.language, now);
-  const text = message.text?.content ?? "";
+  // Its words for the folded snippet, asked for on their own when the
+  // conversation came without them (`text_unread`); open, it shows its HTML.
+  const unread = useMessageWords(workspaceId, conversationId, open ? undefined : message);
+  const text = message.text?.content ?? unread.data?.content ?? "";
   const files = useAttachments(workspaceId, conversationId, message, t, shortcuts);
+  // Trusting the sender, only where the server says it can take effect.
+  const domain = body.data?.images_domain ?? undefined;
+  const trust =
+    onTrustImages !== undefined && body.data?.images_offer === true
+      ? () => {
+          onTrustImages(domain);
+        }
+      : undefined;
+  useShortcut(
+    "inbox.trust_images",
+    () => {
+      trust?.();
+    },
+    { enabled: trustKey && shortcuts && trust !== undefined },
+  );
 
   if (!open) {
     return (
@@ -86,7 +113,13 @@ export function ThreadMessage({
         avatar={{ kind }}
         time={time}
         dateTime={message.sent_at}
-        snippet={text.replaceAll(/\s+/gu, " ").trim()}
+        snippet={
+          message.text_unread !== true || unread.data !== undefined
+            ? text.replaceAll(/\s+/gu, " ").trim()
+            : unread.isError
+              ? t("reader.textFailed")
+              : t("reader.readingText")
+        }
         onOpen={onOpen}
       />
     );
@@ -151,20 +184,27 @@ export function ThreadMessage({
                 >
                   {t("actions.showImages")}
                 </Button>
-                {onTrustImages === undefined ? null : (
+                {trust === undefined ? null : (
                   <Button
                     variant="secondary"
-                    shortcut={shortcuts ? "inbox.trust_images" : undefined}
-                    onClick={onTrustImages}
+                    shortcut={shortcuts && trustKey ? "inbox.trust_images" : undefined}
+                    onClick={trust}
                   >
                     {t("actions.trustImages", { name: from })}
                   </Button>
+                )}
+                {body.data?.images_held === undefined || body.data.images_held === null ? null : (
+                  <Text tone="tertiary" size="sm">
+                    {t(`actions.imagesHeld.${body.data.images_held}`)}
+                  </Text>
                 )}
               </>
             ) : null}
             {remote > 0 && body.data?.images_trusted === true ? (
               <Text tone="tertiary" size="sm">
-                {t("actions.imagesTrusted", { name: from })}
+                {t(sharedInbox ? "actions.imagesTrustedInbox" : "actions.imagesTrusted", {
+                  name: from,
+                })}
               </Text>
             ) : null}
           </>

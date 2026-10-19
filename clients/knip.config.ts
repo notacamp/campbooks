@@ -15,6 +15,10 @@ const config: KnipConfig = {
       // scenario is loaded by name at runtime, so none is imported statically.
       entry: [
         "recordings/scenarios/*.ts",
+        // The mail frame's WebKit policy test (`pnpm test:csp`).
+        "test/webkit/*.webkit.ts",
+        // The mail frame in the real desktop shell (`pnpm test:tauri`).
+        "test/tauri/*.tauri.ts",
         // Library surfaces modules build on: every export is public API,
         // used or not yet (AGENTS.md → UI).
         "src/lib/ui/index.ts",
@@ -23,6 +27,8 @@ const config: KnipConfig = {
         // by the first module that follows a workspace).
         "src/lib/api/index.ts",
       ],
+      // Installed by CI's `tauri-shell` job (`cargo install tauri-driver`).
+      ignoreBinaries: ["tauri-driver"],
       project: [
         "src/**/*.{ts,tsx,css}",
         "stories/**/*.{ts,tsx,css}",

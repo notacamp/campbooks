@@ -92,7 +92,9 @@ longer has SHALL trigger a resync of the window that emits upserts for new
 or changed messages and removals for indexed messages in the window that
 are gone. Messages SHALL be fetched as raw MIME; the raw message, text part,
 HTML part and attachments SHALL be stored as blobs before the batch that
-references them. A change of labels only SHALL be emitted without
+references them. A text part SHALL be stored only when the message has a
+`text/plain` part: none SHALL be made out of its HTML, which conversations
+reads as text itself. A change of labels only SHALL be emitted without
 downloading the message again. Drafts and chats SHALL be skipped.
 
 #### Scenario: Backfill then incremental
@@ -118,6 +120,10 @@ downloading the message again. Drafts and chats SHALL be skipped.
 #### Scenario: Expired history
 - **WHEN** `history.list` answers 404 for the stored history id
 - **THEN** the stream resyncs its window and emits a removal for an indexed message in the window that Gmail no longer lists
+
+#### Scenario: HTML alone
+- **WHEN** a message is a single `text/html` part opening with `<head><meta>` and no `<body>` tag
+- **THEN** its upsert carries its HTML part and no text part
 
 ### Requirement: The message change stream
 Each sync run that finds changes for a messages stream SHALL store one
@@ -293,7 +299,16 @@ longer has the history, a change SHALL apply in arrival order.
 Provider trouble while writing (429, 5xx, a network failure, a refused
 token) SHALL stop the push, keep the unwritten changes pending, and use the
 run's backoff, throttling and health rules; writes SHALL take Gmail quota
-from the shared provider budget. A change Gmail refuses for good, or that
+from the shared provider budget: before the push, what it plans (both
+profile reads, the history pages it may read, a `batchModify` per chunk and
+each single message's calls), then, once it is done, what its calls really
+spent, counted call by call: what it did not spend SHALL be given back
+(never filling the budget past its two seconds' worth), and what it spent
+beyond the plan (a batch Gmail refused, a group the later-writer check
+split) SHALL be owed, taking the budget below zero until the rate pays it
+back. A run planned to cost more than the budget holds SHALL wait for a full
+budget and owe the rest, so no unit goes uncounted whatever rate is
+configured. A change Gmail refuses for good, or that
 has met trouble eight times, SHALL be recorded `failed` with a reason code
 and no content, and the message's Gmail state SHALL be emitted again. A
 message Gmail no longer has SHALL be recorded `skipped` (`message_gone`).
@@ -305,6 +320,14 @@ message Gmail no longer has SHALL be recorded `skipped` (`message_gone`).
 #### Scenario: A message that refuses changes
 - **WHEN** Gmail refuses the change for one message of a conversation
 - **THEN** the other messages are changed, that one is recorded `failed` (`refused`), and conversations is told its Gmail state
+
+#### Scenario: A refused batch is owed
+- **WHEN** a push plans one `batchModify` of 12 archives and Gmail refuses the batch
+- **THEN** it takes 60 units before writing (both profiles, four history pages, the batch) and, once each message is archived on its own, settles the 112 it spent (one profile read before, the batch, twelve modifies, one after): 52 more are owed
+
+#### Scenario: A push spends less than planned
+- **WHEN** a push of one batch reads one history page and Gmail takes the batch
+- **THEN** the units it did not spend go back to the budget at once
 
 ### Requirement: Sending through Gmail
 On `conversations.send_requested` v1 the consumer `connectors.queue_send`
@@ -805,3 +828,43 @@ account.
 #### Scenario: An undo Zoho cannot make
 - **WHEN** a member untrashes, or takes out of spam, their own sent mail at Zoho, or a message with no remembered folder that is not received mail
 - **THEN** no move is made and the change is recorded `skipped` (`not_movable`); the conversation shows out of the trash or spam at once, and the run that skipped the change emits the message's Zoho state again, so it shows in the trash or spam again
+
+### Requirement: Outbound changes are bound to the request they were recorded for
+When the connector records an outbound change (after the outbound-requests
+port confirmed its request), it SHALL store, for each row it inserted, a MAC
+under the binding key derived from the instance secret, over the
+workspace, the row, its stream, its request, the provider message id, the
+kind and the labels to add and remove. Before a stream's run makes any
+change at the provider it SHALL verify each pending change's MAC; a change
+whose MAC does not verify, or that has none, SHALL NOT be made: it SHALL end
+`skipped` with the reason `unverified`, its message SHALL be re-read from
+the provider so Campbooks shows the provider's state, and a WARN line
+carrying ids and a count only SHALL be logged. Without an instance secret
+no change SHALL be made at the provider.
+
+#### Scenario: A change planted with SQL
+- **WHEN** a transaction of the runtime role in a workspace inserts a pending outbound change no member asked for
+- **THEN** the next run writes nothing to the provider and the change ends `skipped` (`unverified`)
+
+#### Scenario: A member's change edited with SQL
+- **WHEN** a member's recorded star is turned into an archive before the run
+- **THEN** the run writes nothing to the provider for it and it ends `skipped` (`unverified`)
+
+#### Scenario: A member's change as recorded
+- **WHEN** a member stars a message and the connector records the change
+- **THEN** the run makes it at the provider
+
+### Requirement: Token refresh never waits on a lock
+An expired access token SHALL be refreshed once per connection however many
+runs need it: the run that takes the connection's refresh lock (only ever
+tried, never waited on) SHALL refresh and store it, and the others SHALL use
+the stored token once it is there, looking again every 100 ms for at most
+the provider call's limit and five seconds more, or refresh themselves if
+the lock is freed without a token. Waiting for another run's refresh, within
+the provider call's limit, SHALL never fail a run or use up one of its
+attempts; a refresh still running past that limit and five seconds more
+fails the waiting run as the provider being unavailable.
+
+#### Scenario: A send during a slow refresh
+- **WHEN** a sync is refreshing a connection's token and Google takes 1.5 seconds to answer, and a send of the same connection runs meanwhile on connections whose `lock_timeout` is 200 ms
+- **THEN** the send uses the refreshed token and is sent on its first attempt, and Google is asked for a token once

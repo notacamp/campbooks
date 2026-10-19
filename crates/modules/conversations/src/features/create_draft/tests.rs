@@ -117,7 +117,7 @@ async fn a_forward_holds_the_attachments(db: PgPool) {
         .patch(
             &sam,
             &format!("/api/v1/w/{workspace}/drafts/{id}"),
-            json!({"version": 1, "attachments": []}),
+            json!({"version": 1, "attachments": [], "content_token": draft["content_token"]}),
         )
         .await;
     assert_eq!(saved.status, StatusCode::OK, "{:?}", saved.json);
@@ -198,7 +198,8 @@ async fn saving_needs_the_current_version(db: PgPool) {
         .patch(
             &sam,
             &one,
-            json!({"version": 1, "to": [{"address": " ana@example.com "}], "body": "Hi Ana"}),
+            json!({"version": 1, "to": [{"address": " ana@example.com "}], "body": "Hi Ana",
+                "content_token": draft.json["content_token"]}),
         )
         .await;
     assert_eq!(first.status, StatusCode::OK, "{:?}", first.json);
@@ -211,7 +212,11 @@ async fn saving_needs_the_current_version(db: PgPool) {
     assert_eq!(stale.status, StatusCode::CONFLICT);
     assert_eq!(stale.json["code"], "draft_changed");
     let long = kit
-        .patch(&sam, &one, json!({"version": 2, "subject": "a\nb"}))
+        .patch(
+            &sam,
+            &one,
+            json!({"version": 2, "subject": "a\nb", "content_token": first.json["content_token"]}),
+        )
         .await;
     assert_eq!(long.status, StatusCode::BAD_REQUEST);
     assert_eq!(long.json["code"], "invalid_subject");

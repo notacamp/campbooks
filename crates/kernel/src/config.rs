@@ -148,6 +148,11 @@ pub struct Config {
     /// (`CAMPBOOKS_RATE_LIMITS__*`; [`rate_limit::api`](crate::rate_limit::api)).
     #[serde(default)]
     pub rate_limits: RateLimitsConfig,
+
+    /// Usage analytics: the screens the app shows, relayed to a Matomo
+    /// instance (`CAMPBOOKS_ANALYTICS__*`); off by default.
+    #[serde(default)]
+    pub analytics: AnalyticsConfig,
 }
 
 impl Config {
@@ -227,6 +232,7 @@ impl Config {
         self.mail.check()?;
         self.events.check()?;
         self.rate_limits.check()?;
+        self.analytics.check()?;
         self.telemetry.check()
     }
 }
@@ -438,6 +444,125 @@ impl TelemetryConfig {
         }
         Ok(())
     }
+}
+
+/// Shortest usage analytics visitor key accepted, in characters.
+pub const MIN_VISITOR_KEY_CHARS: usize = 32;
+
+/// Usage analytics (`CAMPBOOKS_ANALYTICS__*`): the server relays the screens
+/// the app shows, as route templates, to a [Matomo](https://matomo.org)
+/// instance's HTTP tracking API. Off unless the URL, the site id and the
+/// visitor key are all set (blank counts as unset): self-hosted instances
+/// and development send nothing.
+#[derive(Debug, Clone, Default, Deserialize)]
+#[serde(default)]
+pub struct AnalyticsConfig {
+    /// Base URL of the Matomo instance
+    /// (`CAMPBOOKS_ANALYTICS__MATOMO_URL`, e.g.
+    /// `https://analytics.example.com`). Hits go to `<url>/matomo.php`.
+    pub matomo_url: Option<String>,
+    /// The Matomo site the app's screens are recorded under
+    /// (`CAMPBOOKS_ANALYTICS__MATOMO_SITE_ID`, a positive whole number).
+    #[serde(deserialize_with = "text_or_number")]
+    pub matomo_site_id: Option<String>,
+    /// Key of the daily visitor id
+    /// (`CAMPBOOKS_ANALYTICS__MATOMO_VISITOR_KEY`, at least
+    /// [`MIN_VISITOR_KEY_CHARS`] characters, e.g. from
+    /// `openssl rand -base64 32`): Matomo sees an HMAC of the account and
+    /// the day under it, never the account. Secret.
+    pub matomo_visitor_key: Option<SecretString>,
+}
+
+/// The Matomo settings of an [`AnalyticsConfig`] with all three set
+/// ([`AnalyticsConfig::matomo`]). Its `Debug` hides the visitor key.
+#[derive(Clone, Copy)]
+pub struct Matomo<'a> {
+    /// The base URL, without a trailing slash.
+    pub url: &'a str,
+    /// The site id.
+    pub site_id: &'a str,
+    visitor_key: &'a str,
+}
+
+impl Matomo<'_> {
+    /// The visitor key's bytes, for the HMAC of the daily visitor id.
+    pub fn visitor_key(&self) -> &[u8] {
+        self.visitor_key.as_bytes()
+    }
+}
+
+impl std::fmt::Debug for Matomo<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Matomo")
+            .field("url", &self.url)
+            .field("site_id", &self.site_id)
+            .field("visitor_key", &"<redacted>")
+            .finish()
+    }
+}
+
+impl AnalyticsConfig {
+    /// The Matomo settings when the URL, the site id and the visitor key are
+    /// all set; `None` (analytics off) otherwise.
+    pub fn matomo(&self) -> Option<Matomo<'_>> {
+        Some(Matomo {
+            url: non_blank(self.matomo_url.as_deref())?.trim_end_matches('/'),
+            site_id: non_blank(self.matomo_site_id.as_deref())?,
+            visitor_key: non_blank(
+                self.matomo_visitor_key
+                    .as_ref()
+                    .map(SecretString::expose_secret),
+            )?,
+        })
+    }
+
+    /// Startup check of the settings that are set: an http(s) URL, a
+    /// positive site id and a long enough key. The message names the
+    /// offending setting, never the key.
+    pub fn check(&self) -> Result<(), String> {
+        if let Some(url) = non_blank(self.matomo_url.as_deref()) {
+            check_url("CAMPBOOKS_ANALYTICS__MATOMO_URL", url)?;
+        }
+        if let Some(site_id) = non_blank(self.matomo_site_id.as_deref())
+            && !site_id.parse::<u32>().is_ok_and(|id| id > 0)
+        {
+            return Err(format!(
+                "CAMPBOOKS_ANALYTICS__MATOMO_SITE_ID={site_id} must be a positive whole number"
+            ));
+        }
+        if let Some(key) = non_blank(
+            self.matomo_visitor_key
+                .as_ref()
+                .map(SecretString::expose_secret),
+        ) && key.chars().count() < MIN_VISITOR_KEY_CHARS
+        {
+            return Err(format!(
+                "CAMPBOOKS_ANALYTICS__MATOMO_VISITOR_KEY must be at least \
+                 {MIN_VISITOR_KEY_CHARS} characters (e.g. `openssl rand -base64 32`)"
+            ));
+        }
+        Ok(())
+    }
+}
+
+/// A setting that may arrive as text or, from the environment, as a number
+/// (`2`): kept as text.
+fn text_or_number<'de, D>(deserializer: D) -> Result<Option<String>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    #[derive(Deserialize)]
+    #[serde(untagged)]
+    enum TextOrNumber {
+        Text(String),
+        Number(u64),
+    }
+    Ok(
+        Option::<TextOrNumber>::deserialize(deserializer)?.map(|value| match value {
+            TextOrNumber::Text(text) => text,
+            TextOrNumber::Number(number) => number.to_string(),
+        }),
+    )
 }
 
 /// The kind of deployment (`CAMPBOOKS_ENV`).
@@ -746,6 +871,9 @@ impl S3Config {
     }
 }
 
+/// The port a worker-only process answers its health probe on by default.
+pub const DEFAULT_WORKER_HEALTH_PORT: u16 = 8081;
+
 /// Background job worker settings (`CAMPBOOKS_JOBS__*`, ADR 0012).
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
 #[serde(default)]
@@ -782,6 +910,12 @@ pub struct JobsConfig {
     pub retry_base_ms: u64,
     /// Longest retry delay in seconds (`CAMPBOOKS_JOBS__RETRY_MAX_SECONDS`).
     pub retry_max_seconds: u64,
+    /// Where a worker-only process (`campbooks-server worker`) answers its
+    /// health probe, `GET /healthz` (`CAMPBOOKS_JOBS__HEALTH_ADDR`, default
+    /// `127.0.0.1:8081`, inside the container only); `campbooks-server
+    /// healthcheck --worker` probes it (campbooks-cloud#185). A process that
+    /// serves the API answers `/api/v1/system/health` instead.
+    pub health_addr: std::net::SocketAddr,
 }
 
 impl Default for JobsConfig {
@@ -796,6 +930,7 @@ impl Default for JobsConfig {
             shutdown_grace_seconds: 8,
             retry_base_ms: 1_000,
             retry_max_seconds: 3_600,
+            health_addr: std::net::SocketAddr::from(([127, 0, 0, 1], DEFAULT_WORKER_HEALTH_PORT)),
         }
     }
 }
@@ -1891,6 +2026,116 @@ mod tests {
         assert_eq!(blank.error_dsn(), None);
         assert_eq!(blank.client_collector_url(), None);
         assert_eq!(blank.environment(), "production");
+    }
+
+    #[test]
+    fn analytics_is_off_unless_all_three_are_set() {
+        let key = "k".repeat(MIN_VISITOR_KEY_CHARS);
+        let full = AnalyticsConfig {
+            matomo_url: Some("https://analytics.example.com/".into()),
+            matomo_site_id: Some("2".into()),
+            matomo_visitor_key: Some(SecretString::from(key.clone())),
+        };
+        let matomo = full.matomo().unwrap();
+        assert_eq!(matomo.url, "https://analytics.example.com");
+        assert_eq!(matomo.site_id, "2");
+        assert_eq!(matomo.visitor_key(), key.as_bytes());
+        assert!(full.check().is_ok());
+        assert!(AnalyticsConfig::default().matomo().is_none());
+        assert!(AnalyticsConfig::default().check().is_ok());
+        for partial in [
+            AnalyticsConfig {
+                matomo_url: None,
+                ..full.clone()
+            },
+            AnalyticsConfig {
+                matomo_site_id: Some(" ".into()),
+                ..full.clone()
+            },
+            AnalyticsConfig {
+                matomo_visitor_key: Some(SecretString::from("")),
+                ..full.clone()
+            },
+        ] {
+            assert!(partial.matomo().is_none(), "{partial:?}");
+            assert!(partial.check().is_ok(), "{partial:?}");
+        }
+    }
+
+    #[test]
+    fn analytics_site_id_is_read_as_text_or_number() {
+        for (value, expected) in [
+            (serde_json::json!(2), Some("2")),
+            (serde_json::json!("2"), Some("2")),
+            (serde_json::json!(""), None),
+        ] {
+            let figment = figment(&[("database_url", "postgres://localhost/x")]).merge(
+                Serialized::default("analytics", serde_json::json!({ "matomo_site_id": value })),
+            );
+            let config = Config::from_figment(&figment).unwrap();
+            assert_eq!(
+                non_blank(config.analytics.matomo_site_id.as_deref()),
+                expected
+            );
+        }
+    }
+
+    #[test]
+    fn analytics_check_names_the_bad_setting_never_the_key() {
+        let cases = [
+            (
+                AnalyticsConfig {
+                    matomo_url: Some("analytics.example.com".into()),
+                    ..AnalyticsConfig::default()
+                },
+                "CAMPBOOKS_ANALYTICS__MATOMO_URL",
+            ),
+            (
+                AnalyticsConfig {
+                    matomo_site_id: Some("0".into()),
+                    ..AnalyticsConfig::default()
+                },
+                "CAMPBOOKS_ANALYTICS__MATOMO_SITE_ID",
+            ),
+            (
+                AnalyticsConfig {
+                    matomo_site_id: Some("two".into()),
+                    ..AnalyticsConfig::default()
+                },
+                "CAMPBOOKS_ANALYTICS__MATOMO_SITE_ID",
+            ),
+            (
+                AnalyticsConfig {
+                    matomo_visitor_key: Some(SecretString::from("hunter2")),
+                    ..AnalyticsConfig::default()
+                },
+                "CAMPBOOKS_ANALYTICS__MATOMO_VISITOR_KEY",
+            ),
+        ];
+        for (config, setting) in cases {
+            let err = config.check().unwrap_err();
+            assert!(err.contains(setting), "{setting}: {err}");
+            assert!(!err.contains("hunter2"), "{err}");
+        }
+    }
+
+    #[test]
+    fn debug_redacts_the_visitor_key() {
+        let key = format!("hunter2{}", "k".repeat(MIN_VISITOR_KEY_CHARS));
+        let figment =
+            figment(&[("database_url", "postgres://localhost/x")]).merge(Serialized::default(
+                "analytics",
+                serde_json::json!({
+                    "matomo_url": "https://analytics.example.com",
+                    "matomo_site_id": "2",
+                    "matomo_visitor_key": key,
+                }),
+            ));
+        let config = Config::from_figment(&figment).unwrap();
+        assert!(config.check().is_ok());
+        assert!(!format!("{config:?}").contains("hunter2"));
+        let matomo = config.analytics.matomo().unwrap();
+        assert!(!format!("{matomo:?}").contains("hunter2"));
     }
 
     #[test]

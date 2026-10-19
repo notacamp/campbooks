@@ -10,14 +10,17 @@ export interface ReplyQuoteProps {
   from: string;
   /** Their own words: untrusted mail text, shown quoted, as plain text, a few lines at most. */
   text: string;
+  /** Said under the words when they are not all shown or not all quoted. */
+  note?: ReactNode | undefined;
 }
 
 /** The words being answered, quoted at the top of a reply dialog. */
-export function ReplyQuote({ from, text }: ReplyQuoteProps) {
+export function ReplyQuote({ from, text, note }: ReplyQuoteProps) {
   return (
     <figure className={styles["quote"]}>
       <figcaption className={styles["quoteFrom"]}>{from}</figcaption>
       <blockquote className={styles["quoteText"]}>{text}</blockquote>
+      {note === undefined ? null : <p className={styles["quoteNote"]}>{note}</p>}
     </figure>
   );
 }

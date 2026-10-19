@@ -3,10 +3,10 @@
 //! `conversation_changed`, and a `changes_requested` per kind of change so
 //! the provider makes it too.
 
-use campbooks_kernel::{EventBus, Result};
-use serde_json::json;
+use campbooks_kernel::{EventBus, Result, binding::Binding};
 use sqlx::{PgConnection, Postgres, Transaction, types::Uuid};
 
+use super::applications;
 use crate::{
     domain::{
         conversation::{Changed, provider_message_ids, request},
@@ -41,6 +41,7 @@ impl Effects {
     pub async fn publish(
         self,
         tx: &mut Transaction<'_, Postgres>,
+        binding: &Binding,
         events: &EventBus,
         at: (&str, InboxId, ConversationId),
         announce: bool,
@@ -59,7 +60,7 @@ impl Effects {
         };
         for (messages, change) in self.requests {
             changed.provider_message_ids = messages;
-            request(events, tx, &changed, &change).await?;
+            request(binding, events, tx, &changed, &change).await?;
         }
         if announce {
             changed.provider_message_ids = provider_message_ids(tx, conversation).await?;
@@ -266,86 +267,38 @@ pub async fn store_decision(
     Ok(())
 }
 
-/// Record that `rule` changed conversation `id` (in `run`, or as mail
-/// arrived), and count it unless it already held it changed. A
-/// conversation it changed again keeps what it was before the first time,
-/// adds what the rule did since and where it last moved it.
+/// Record that `rule` (of `inbox`, in `workspace`) changed conversation
+/// `id` (in `run`, or as mail arrived), and count it unless it already held
+/// it changed. A conversation it changed again keeps what it was before the
+/// first time, adds what the rule did since and where it last moved it.
+///
+/// Only right after the rule verified (`rules::acting`, on arrival and in a
+/// run): the row is signed here (campbooks-cloud#242). It is claimed and
+/// locked first (a row another transaction is inserting is waited for),
+/// merged in Rust with what it held only when that row verifies, and
+/// written with its MAC in one statement, so what is signed is never a
+/// value SQL produced.
 pub async fn record(
     conn: &mut PgConnection,
-    workspace: Uuid,
-    rule: RuleId,
+    binding: &Binding,
+    owner: applications::Owner,
     at: (ConversationId, Option<RuleRunId>),
     before: &super::Before,
 ) -> Result<()> {
+    let (_, _, rule) = owner;
     let (id, run) = at;
+    let held = applications::claim(conn, binding, owner, id).await?;
+    let run = run.map(|r| *r.as_uuid());
+    let (merged, run) = match held.bound {
+        Some((old, old_run)) if held.holds => (applications::merge(old, before), run.or(old_run)),
+        Some((_, old_run)) => (before.clone(), run.or(old_run)),
+        None => (before.clone(), run),
+    };
+    applications::write(conn, binding, owner, (id, run), &merged).await?;
     // Counted once per conversation it holds changed: not again when it
     // changes one it already holds (a new message in it), again after a
     // revert put it back.
-    let holds = sqlx::query_scalar!(
-        r#"SELECT reverted_at IS NULL AS "holds!" FROM conversations.rule_applications
-            WHERE rule_id = $1 AND conversation_id = $2 FOR UPDATE"#,
-        rule as RuleId,
-        id as ConversationId,
-    )
-    .fetch_optional(&mut *conn)
-    .await?
-    .unwrap_or(false);
-    sqlx::query!(
-        r#"
-        INSERT INTO conversations.rule_applications
-            (rule_id, conversation_id, workspace_id, run_id, before)
-        VALUES ($1, $2, $3, $4, $5)
-        ON CONFLICT (rule_id, conversation_id) DO UPDATE
-           SET applied_at = now(), reverted_at = NULL,
-               run_id = coalesce(EXCLUDED.run_id, conversations.rule_applications.run_id),
-               before = CASE WHEN conversations.rule_applications.reverted_at IS NULL
-                             THEN conversations.rule_applications.before || jsonb_strip_nulls(
-                                 jsonb_build_object(
-                                     'stream', coalesce(
-                                         conversations.rule_applications.before -> 'stream',
-                                         EXCLUDED.before -> 'stream'),
-                                     'moved_to', coalesce(
-                                         EXCLUDED.before -> 'moved_to',
-                                         conversations.rule_applications.before -> 'moved_to'),
-                                     'archived',
-                                         coalesce((conversations.rule_applications.before
-                                                   ->> 'archived')::boolean, false)
-                                         OR coalesce((EXCLUDED.before ->> 'archived')::boolean,
-                                                     false),
-                                     'read',
-                                         coalesce((conversations.rule_applications.before
-                                                   ->> 'read')::boolean, false)
-                                         OR coalesce((EXCLUDED.before ->> 'read')::boolean, false),
-                                     'labels', (SELECT jsonb_agg(DISTINCT l) FROM jsonb_array_elements(
-                                         coalesce(conversations.rule_applications.before -> 'labels',
-                                                  '[]'::jsonb)
-                                         || coalesce(EXCLUDED.before -> 'labels', '[]'::jsonb)) l),
-                                     'answered', (SELECT jsonb_agg(DISTINCT q) FROM jsonb_array_elements(
-                                         coalesce(conversations.rule_applications.before -> 'answered',
-                                                  '[]'::jsonb)
-                                         || coalesce(EXCLUDED.before -> 'answered', '[]'::jsonb)) q),
-                                     'binned', coalesce(
-                                         conversations.rule_applications.before -> 'binned',
-                                         EXCLUDED.before -> 'binned'),
-                                     'binned_messages', (SELECT jsonb_agg(DISTINCT m) FROM jsonb_array_elements(
-                                         coalesce(conversations.rule_applications.before -> 'binned_messages',
-                                                  '[]'::jsonb)
-                                         || coalesce(EXCLUDED.before -> 'binned_messages', '[]'::jsonb)) m),
-                                     'binned_archived',
-                                         coalesce((conversations.rule_applications.before
-                                                   ->> 'binned_archived')::boolean, false)
-                                         OR coalesce((EXCLUDED.before ->> 'binned_archived')::boolean,
-                                                     false)))
-                             ELSE EXCLUDED.before END
-        "#,
-        rule as RuleId,
-        id as ConversationId,
-        workspace,
-        run as Option<RuleRunId>,
-        json!(before),
-    )
-    .execute(&mut *conn)
-    .await?;
+    let holds = held.holds;
     sqlx::query!(
         r#"UPDATE conversations.rules
               SET applied_count = applied_count + CASE WHEN $2 THEN 0 ELSE 1 END,

@@ -34,6 +34,8 @@ pub mod record_send;
 pub mod refresh_need;
 pub mod release_send;
 pub mod reply;
+pub mod resign_rules;
+pub mod retag_bindings;
 pub mod rule_notices;
 pub mod rules;
 pub mod search_source;

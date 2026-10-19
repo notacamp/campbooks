@@ -15,15 +15,27 @@
    "Built-in sign-in" below. Upgrading from a release that shipped Rauthy: see "Upgrading
    from the Rauthy sign-in".
 6. Upgrades: `docker compose pull && docker compose up -d`; migrations run on startup
-   (the server's).
+   (the server's). Campbooks needs PostgreSQL 15 or later and is built and tested on 17,
+   the bundled image; the server refuses to start on an older one. A migration waits a
+   few seconds for each lock it needs (a minute at most where it sets no limit of its
+   own). Behind a long-running transaction, such as a web session's token refresh holding
+   its row for up to ten seconds while a migration changes the sign-in tables, the
+   migration fails, the server says so and exits, and it migrates again at its next start
+   (compose restarts it). Nothing is half-applied: each migration is one transaction, and
+   an index build it leaves unfinished is dropped and built again.
 7. Background work (maintenance today; mail sync and the AI pass as they land)
    runs inside the same container: the image runs `campbooks-server all`, the
    API plus the job worker. Jobs live in Postgres, so nothing is lost on restart. To run the
    worker separately, add a second service with the same image and env and
-   `command: ["worker"]` (and `healthcheck: { disable: true }`: the health
-   check probes the API, which a worker does not serve), and give the first
-   one `command: ["api"]`. Worker settings are the `CAMPBOOKS_JOBS__*` block
-   of `.env.example`.
+   `command: ["worker"]`, and give the first one `command: ["api"]`. The
+   image's health check probes the API, which a worker does not serve, so
+   give the worker its own: `healthcheck: { test: ["CMD", "/app/campbooks-server",
+   "healthcheck", "--worker"] }` (the image has no shell, and `/app` is not on
+   `PATH`). A worker answers `GET /healthz` on
+   `CAMPBOOKS_JOBS__HEALTH_ADDR` (default `127.0.0.1:8081`, inside the
+   container only): 200 while its job loop runs and reaches the database
+   (checked every 10 s), 503 after a minute without. Worker settings are the
+   `CAMPBOOKS_JOBS__*` block of `.env.example`.
 
 8. Files (message bodies, attachments, documents) are stored outside Postgres,
    in the `blobs-data` volume by default. See "Blob storage" below to use an
@@ -84,9 +96,12 @@ GRANT campbooks_definer TO <migration user>;
 `campbooks_definer` owns the database functions that run with their owner's
 rights (`SECURITY DEFINER`), so they never run as the migration login. It
 cannot log in, holds only the few table privileges those functions need, and
-must not be granted to the runtime login. The migrations create it when the
-migration user may create roles; otherwise they stop, naming the statements
-above, until an administrator has run them.
+must not be granted to the runtime login or to `campbooks_app`: the server
+refuses to start when the role it queries as holds it, and the migrations
+refuse a `campbooks_app` that does. The migration user must hold it with
+`INHERIT` (the default) so later migrations can replace those functions. The
+migrations create it when the migration user may create roles; otherwise they
+stop, naming the statements above, until an administrator has run them.
 
 Then set `CAMPBOOKS_DATABASE_URL=postgres://campbooks_runtime:<password>@host/db`
 (or omit the password and point `CAMPBOOKS_DATABASE_PASSWORD_FILE` at a file
@@ -95,13 +110,22 @@ managed services the "owner" is the user that created the database; do not
 reuse it as the runtime login.
 
 **Startup checks.** The server refuses to start (and says why) when the role
-it queries as is a superuser, has `BYPASSRLS`, is a member of such a role, or
-owns tables with row-level security; and, when a migration login is
-configured, when the runtime login could still switch to a privileged role.
-Only the old single-URL setup (a privileged login that `SET ROLE campbooks_app`)
-keeps working, with a warning to split the logins. If you cannot yet, set
-`CAMPBOOKS_DATABASE_ALLOW_RLS_BYPASS=true` to start anyway; workspace
-isolation then rests on the queries alone.
+it queries as is a superuser, has `BYPASSRLS`, is a member of such a role,
+owns tables with row-level security, or is a member of `campbooks_definer`;
+and, when a migration login is configured, when the runtime login could still
+switch to a privileged role. Only the old single-URL setup (a privileged login
+that `SET ROLE campbooks_app`) keeps working, with a warning to split the
+logins. If you cannot yet, set `CAMPBOOKS_DATABASE_ALLOW_RLS_BYPASS=true` to
+start anyway; workspace isolation then rests on the queries alone.
+
+**What the separation protects, and when.** With a dedicated runtime login
+(the bundled setup, and the one above), no request or job can read, reset or
+rewrite the rate-limit counters, the idempotency keys of another caller, or
+the web sign-in's tables (sessions and their sealed tokens): it reaches them
+only through the database functions. That holds against SQL running as the
+runtime role, injected or mistaken. In the single-URL setup, or when the
+server runs as the owner login, a query able to `RESET ROLE` gets the owner's
+rights back, and with them every table, as it escapes row-level security.
 
 ## Local AI
 
@@ -228,6 +252,59 @@ docker run --rm -v campbooks_blobs-data:/data -v "$PWD":/backup busybox:1.37.0-m
   tar czf /backup/blobs-data.tgz -C /data .
 ```
 
+### After restoring a backup: purge deleted workspaces again
+
+A restore brings every workspace back as it was when the backup was taken. That
+includes the ones deleted since, whether already purged or still in their 30-day grace
+period, with their members, their mail and their files. Delete each of them again before
+anyone signs in. Keep server logs at least as long as your oldest backup, since the logs
+are how you find them.
+
+1. **List them.** Search your logs from the backup's time onwards for two messages:
+   - `workspace purged`: the workspace was purged after the backup. The line holds the
+     workspace's id and the time, nothing else.
+   - `workspace deleted`: the workspace was deleted after the backup and may not have
+     been purged yet. Its line also holds the `purge_after` it was given.
+2. **Purge each again** from the restored database, giving the id twice as
+   confirmation:
+
+   ```sh
+   docker compose exec server campbooks-server workspaces purge-again <id> --confirm <id>
+   ```
+
+   - **If it was already deleted in the backup,** its purge is queued again, or, if a
+     purge is queued already, the command changes nothing and says when that purge runs.
+   - **If it was still live in the backup** (deleted after the backup was taken), the
+     command refuses at first. It prints only that the workspace is live, how many
+     members it has and when it was created, so a mistyped id costs nothing. Check those,
+     then run it again with `--not-deleted-in-backup`:
+
+     ```sh
+     docker compose exec server campbooks-server workspaces purge-again <id> --confirm <id> \
+       --not-deleted-in-backup [--purge-after <purge_after from its "workspace deleted" line>]
+     ```
+
+     The workspace is hidden at once, and its mailbox connections and app clients are
+     revoked at once. Everything else is purged at its purge time: an hour from now, or
+     the `--purge-after` you give, which cannot be sooner. Until then, a workspace deleted
+     by mistake can still be brought back by restoring again, though its mailboxes then
+     need reconnecting.
+   - **If the command says the workspace has no owner,** it changes nothing. Every
+     workspace keeps an owner, so this means the restored data is not what you expect:
+     do not edit the database by hand. Check that you restored the right backup, and if
+     it persists, open an issue with the command's output (it holds only ids, counts and
+     dates).
+   - **An id with no workspace** is reported as such and changes nothing.
+
+   Running the command twice queues a single purge. It logs one line, with the
+   workspace's id only, when it changes something.
+
+The server also records each purge in the database: a tombstone, so data that arrives
+for a purged workspace later is deleted by the hourly sweep. Those records are restored
+to the backup's moment along with everything else, which is why the log lines, not the
+database, tell you which workspaces went after it. There is no API for any of this; only
+the command does it.
+
 ## Monitoring
 
 Out of the box Campbooks exports nothing and opens no extra port. It writes JSON logs to
@@ -301,6 +378,28 @@ browser's name and platform, and for an error its class, the head of its message
 file names and positions of its stack. Without a receiver the app is told to stop and
 sends nothing more.
 
+**Usage analytics.** To see which screens people use, point the server at a
+[Matomo](https://matomo.org) site:
+
+```sh
+CAMPBOOKS_ANALYTICS__MATOMO_URL=https://analytics.example.com
+CAMPBOOKS_ANALYTICS__MATOMO_SITE_ID=1
+CAMPBOOKS_ANALYTICS__MATOMO_VISITOR_KEY=<openssl rand -base64 32>     # secret
+```
+
+Off unless all three are set. The app loads no analytics script: after each navigation
+it tells its own server the screen's route template (`/w/:workspaceId/inbox`, never the
+address, an id, a search or a title), and nothing at all while the browser sends Do Not
+Track or Global Privacy Control. The server checks the template and sends it to Matomo's
+tracking API in the background, with the browser's user agent, the language when
+Campbooks ships it and a visitor id that is an HMAC of the account and the UTC day under
+the visitor key: daily unique visitors per screen, with no way to follow a person across
+days. The id goes as Matomo's forced visitor id (`cid`), which needs no `token_auth`
+and makes Matomo tell visits apart by that id alone, although they all come from the
+server's address; no Matomo setting has to change. No IP, user id, workspace or custom
+dimension is sent. A slow or unreachable Matomo costs dropped views
+(`campbooks_screen_views_total{outcome="failed"}`), never a slower app.
+
 **What you get.**
 
 | Metric (Prometheus name) | What | Labels |
@@ -318,6 +417,7 @@ sends nothing more.
 | `campbooks_connector_overdue_streams` | Streams due for more than 5 minutes that no run picked up | |
 | `campbooks_errors_reported_total` | Error reports sent to the tracker | `source` |
 | `campbooks_client_telemetry_items_total` | The app's errors, timings and events | `kind`, `outcome` (`forwarded`, `dropped`) |
+| `campbooks_screen_views_total` | Screen views relayed to usage analytics | `outcome` (`forwarded`, `failed`, `dropped`: the queue was full) |
 | `campbooks_build_info` | Always 1 | `service_version`, `campbooks_role` |
 
 Good first alerts: a rising share of 5xx in `http_server_request_duration_seconds_count`,
@@ -375,12 +475,15 @@ Sessions end after 48 hours unused or 30 days at most, or when you sign out. The
 
 The `server-secrets` volume holds one file, `secret-key`: `CAMPBOOKS_SECRET_KEY`, which
 encrypts the web sessions' tokens, connected accounts' credentials and the sign-in signing
-keys. It is generated on first boot by `server-init` and mounted read-only into the server
-(through group 10001). Back it up with the database: without it the stored keys and grants
-cannot be opened.
+keys, and signs every send and every change Campbooks makes at a mail provider (so rows
+written straight into the database never send mail). The server and the worker must share
+it: without it, or with a different one, nothing is sent. It is generated on first boot by
+`server-init` and mounted read-only into the server (through group 10001). Back it up with
+the database: without it the stored keys and grants cannot be opened.
 
 - **Instance secret key:** do not replace it casually; the server refuses to start when it
-  cannot open the stored signing keys (see Built-in sign-in). To start over on purpose,
+  cannot open the stored signing keys (see Built-in sign-in). To change it without signing
+  anyone out, rotate it (see "Rotating the instance secret key" below). To start over on purpose,
   delete the rows of `identity.signing_keys`, then
   `docker compose run --rm server-init rm /secrets/secret-key` and
   `docker compose up -d && docker compose restart server`. Everyone has to sign in again,
@@ -388,6 +491,70 @@ cannot be opened.
   again. (Without compose, set `CAMPBOOKS_SECRET_KEY` to `openssl rand -base64 32`.)
 
 Settings (all optional; defaults shown in `.env.example`) are the `CAMPBOOKS_BFF__*` block.
+
+## Rotating the instance secret key
+
+`CAMPBOOKS_SECRET_KEY` seals the web sessions' tokens, connected accounts' credentials and
+the sign-in signing keys, and signs sends and changes at mail providers. To replace it
+without signing anyone out or disconnecting any mailbox, run the old key beside the new
+one for a while as `CAMPBOOKS_SECRET_KEY_PREVIOUS_FILE` (or `CAMPBOOKS_SECRET_KEY_PREVIOUS`).
+
+- **What the previous key does:**
+  - it only opens and verifies what was sealed or signed before the rotation;
+  - everything new is sealed, signed and derived with the new key;
+  - what it opens is sealed again with the new key as it is used: signing keys at once,
+    connected accounts within the hour, web sessions (all their tokens) at their next
+    token refresh (minutes of use);
+  - what it signed is signed again with the new key in the background: taught rules,
+    what each rule changed (so it can still be put back), rule runs, change requests,
+    scheduled sends, and changes still waiting to be made at a mail provider (outbound
+    changes). At start-up and every 15 minutes, in every workspace, two jobs re-tag what
+    still verifies only under the old key. Each run logs, per workspace, either
+    `binding re-tag: nothing in this workspace is bound under the previous key any more`
+    and `binding re-tag: no outbound change in this workspace is bound under the previous
+    key any more`, or a warning with how many rows are `left` for the next run.
+- **What it does not cover:** the rate-limit counters are keyed by the current key only,
+  so they start afresh, which is harmless.
+- **Errors:** the server refuses to start when the previous key is set without a current
+  one, or equals it. Neither key is ever logged.
+
+With compose:
+
+```sh
+# 1. Move the key to secret-key-previous and generate a new one.
+docker compose run --rm server-init sh /server/init.sh rotate
+# 2. Tell the server about the previous key (compose.override.yaml):
+#      services:
+#        server:
+#          environment:
+#            CAMPBOOKS_SECRET_KEY_PREVIOUS_FILE: /run/campbooks/secret-key-previous
+docker compose up -d && docker compose restart server
+# 3. Before forgetting the old key: the background re-tag has finished. Every workspace
+#    has logged both "... bound under the previous key any more" lines (taught rules and
+#    sends; outbound changes) since the restart, and no "binding re-tag" warning came
+#    after them:
+docker compose logs server | grep 'binding re-tag'
+# 4. After 30 days (the longest web session; held sign-up grants last 7), remove the
+#    variable, then delete the old key:
+docker compose run --rm server-init sh /server/init.sh forget-previous
+docker compose up -d && docker compose restart server
+```
+
+Without compose, set `CAMPBOOKS_SECRET_KEY` to the new key (`openssl rand -base64 32`) and
+`CAMPBOOKS_SECRET_KEY_PREVIOUS` to the old one, on every process (API and worker) at once;
+remove the previous key after 30 days, once the logs show the re-tag finished (step 3).
+
+- **Before removing the previous key:** wait for step 3. A rule still signed with the old
+  key would need confirming again, and its changes could not be put back. An outbound
+  change still waiting under the old key (its mailbox paused, or the provider down
+  throughout) would be skipped, and its message read again from the provider. A web session
+  unused since the rotation (and so not refreshed) ends at its next use, and its member
+  signs in again. A connection whose credentials were not used since needs connecting
+  again. With mail syncing, connections are used every few minutes.
+- **If the old key leaked, do not set it as the previous key.** Whoever holds it could still
+  open and forge what it protects for as long as it is accepted. Start over instead (see
+  "Instance secret key" above): everyone signs in again, and connected accounts are
+  connected again.
 
 ## Built-in sign-in (Campbooks as its own identity provider)
 

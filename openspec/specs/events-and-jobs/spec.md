@@ -252,7 +252,11 @@ remain an alias of `all`. Idle workers SHALL be woken by enqueue
 notifications and SHALL otherwise poll every
 `CAMPBOOKS_JOBS__POLL_INTERVAL_MS`. A role that runs the worker SHALL refuse
 to start, naming the setting, when a `CAMPBOOKS_JOBS__*` value is out of
-range.
+range. A `worker` process SHALL answer `GET /healthz` on
+`CAMPBOOKS_JOBS__HEALTH_ADDR` (default `127.0.0.1:8081`): 200 while its job
+loop has reached the database (`SELECT 1`, every 10 seconds) within the last
+minute, 503 otherwise. `campbooks-server healthcheck --worker` SHALL exit 0
+only on a 200, for container health checks.
 
 #### Scenario: Low latency without hot polling
 - **WHEN** a worker with a 10-minute poll interval is idle and a job is enqueued
@@ -261,6 +265,10 @@ range.
 #### Scenario: Invalid concurrency
 - **WHEN** the worker starts with `CAMPBOOKS_JOBS__CONCURRENCY=0`
 - **THEN** it exits with an error naming `CAMPBOOKS_JOBS__CONCURRENCY`
+
+#### Scenario: A worker's health probe
+- **WHEN** a `worker` process has started and its loop reached the database, and later stops reaching it for over a minute
+- **THEN** `GET /healthz` answers 200 and `healthcheck --worker` exits 0, then 503 and 1
 
 ### Requirement: Graceful worker shutdown
 On Ctrl-C or SIGTERM a worker SHALL stop claiming, give running jobs
@@ -298,3 +306,92 @@ registry SHALL list the instance-only kinds.
 #### Scenario: The registry lists them
 - **WHEN** the registry is built from a module with a job, consumers of a workspace event and of an instance-wide event, and the kernel's schedules
 - **THEN** its instance-only kinds are the kernel's schedules and the instance-wide event's consumer
+
+### Requirement: The queue's key indexes are valid after migrating
+After the migrations have run, by the server or by `cargo sqlx migrate run`,
+the job queue's per-workspace unique-key and ordering indexes SHALL exist and
+be valid. A migration SHALL build again, in its transaction, each one that is
+missing or invalid (what a failed concurrent build leaves), and SHALL leave a
+valid one alone.
+
+#### Scenario: An invalid unique-key index
+- **WHEN** the unique-key index was left invalid, or the ordering index missing, by a migration run that does not drop invalid indexes first, and the migration runs
+- **THEN** both indexes exist and are valid, enqueues with a unique key work, and a valid index is not rebuilt
+
+### Requirement: Sweeping purged workspaces
+The kernel SHALL schedule `kernel.sweep_purged_workspaces` hourly. For every
+tombstone of a purged workspace it SHALL delete, whatever their age, the
+workspace's changes and cursor head, finished jobs, events no pending or
+running delivery reads, and idempotency keys (through
+`kernel.purge_workspace_idempotency`, in short transactions of their own). It SHALL work 5,000 rows per table per transaction,
+in a transaction working in that workspace. A pending or running delivery,
+and the event it reads, SHALL survive.
+
+A tombstoned workspace that is live (its row is back and not deleted) SHALL
+be skipped: nothing of it is deleted, its tombstone stays, and one warning
+names its id only. A workspace whose check or purge fails SHALL be logged
+and skipped, its tombstone kept, and the sweep SHALL go on to the others.
+
+A tombstone SHALL be dropped once it is older than 30 days and nothing of
+its workspace is left in the queue, the event log or the change feed.
+Tombstones SHALL carry the standard workspace-isolation policy of the
+kernel's tables: a transaction working in one workspace SHALL NOT write
+another workspace's tombstone.
+
+#### Scenario: Leftovers of a purged workspace
+- **WHEN** a tombstoned workspace has a finished delivery, a failed job, a change and its head, and a pending and a running delivery, all recent, and the sweep runs
+- **THEN** only the pending and running deliveries and their events are left, and a live workspace's recent rows are untouched
+
+#### Scenario: A tombstoned workspace that is live
+- **WHEN** the sweep runs over tombstones of a live workspace with rows, a live one with none, one whose check fails, and a purged one, all older than 30 days
+- **THEN** nothing of the first three is deleted and their tombstones stay, while the purged one's rows and tombstone go
+
+#### Scenario: Dropping tombstones
+- **WHEN** the sweep runs over a 31-day-old tombstone with nothing left, a 31-day-old one with a pending delivery, and a day-old one with nothing left
+- **THEN** only the first is dropped
+
+#### Scenario: Another workspace's tombstone
+- **WHEN** a transaction working in one workspace inserts a tombstone for another, as raw SQL
+- **THEN** row-level security refuses it
+
+### Requirement: Personal data stays out of the queue and the event log
+Event payloads, job payloads and job errors (`kernel.jobs.last_error`) SHALL
+hold ids, codes, counts and blob references, never addresses, names,
+subjects or what someone wrote; such data SHALL travel as a blob.
+
+`cargo xtask arch` SHALL check three things, and SHALL report an entry in
+any of its three lists that no longer matches anything:
+- every field of every event payload in the catalogue, at any depth, that
+  can hold free text (a string that is not an id, a date or one of a closed
+  set, outside a blob reference) SHALL be listed by its full path in
+  `EVENT_FIELDS_ALLOWED` with its reason, for that event (for every event
+  only the routing field `workspace`), and an open map
+  (`additionalProperties: true`) SHALL be reported;
+- every field of every job kind's payload SHALL be listed in
+  `JOB_PAYLOAD_FIELDS` with its reason, and a job whose name or payload
+  cannot be read SHALL be reported;
+- every value a job error message is built from, other than its own wording,
+  SHALL be listed for its file with its number of uses in `JOB_ERROR_VALUES`
+  with its reason, including messages built in an `impl From<…> for
+  JobError` or by writing a variant out, and a `JobError` constructor passed
+  as a function SHALL be reported.
+
+A job error built from a JSON or database error SHALL name it by kind
+(`redact::json`, `redact::sqlx`), never by its message, including through an
+error enum's message.
+
+#### Scenario: A free-text event field
+- **WHEN** an event payload carries `items[].subject` as a plain string, not listed by that path
+- **THEN** `cargo xtask arch` fails naming the event and the path, and passes once it is a blob reference, an id or listed with a reason
+
+#### Scenario: A new job payload field
+- **WHEN** a job's payload struct gains a field no audit entry lists
+- **THEN** `cargo xtask arch` fails naming the job and the field
+
+#### Scenario: A job error built from a new value
+- **WHEN** a job error interpolates a value no audit entry lists for its file, or one more time than listed
+- **THEN** `cargo xtask arch` fails naming the file and the value
+
+#### Scenario: A stale entry
+- **WHEN** a list names an event field, a payload field or an error value that no longer exists
+- **THEN** `cargo xtask arch` fails asking for the entry to be removed

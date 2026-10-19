@@ -199,20 +199,64 @@ describe("Dialog", () => {
     expect(screen.getByRole("button", { name: /Later today/ })).toHaveFocus();
   });
 
-  it("keeps keys when the focused control went away: Esc still closes, page shortcuts don't fire", () => {
+  it("takes the focus back when it left for nowhere: Esc still closes, page shortcuts don't fire", async () => {
     const onClose = vi.fn();
     const onPageDone = vi.fn();
     renderUi(<Snooze onClose={onClose} onPageDone={onPageDone} />);
     (document.activeElement as HTMLElement | null)?.blur();
-    expect(document.activeElement).toBe(document.body);
+    await act(async () => {
+      await Promise.resolve();
+    });
+    const dialog = screen.getByRole("dialog");
+    expect(dialog).toHaveFocus();
 
-    fireEvent.keyDown(document.body, { key: "e" });
+    fireEvent.keyDown(dialog, { key: "e" });
     expect(onPageDone).not.toHaveBeenCalled();
-    expect(screen.getByRole("dialog")).toHaveFocus();
-
-    (document.activeElement as HTMLElement | null)?.blur();
-    fireEvent.keyDown(document.body, { key: "Escape" });
+    fireEvent.keyDown(dialog, { key: "2" });
+    fireEvent.keyDown(dialog, { key: "Escape" });
     expect(onClose).toHaveBeenCalledOnce();
+  });
+
+  it("takes the focus back when the focused control is replaced", async () => {
+    const onChoose = vi.fn();
+    function Steps() {
+      const [step, setStep] = useState(1);
+      return (
+        <Dialog open onClose={vi.fn()} title="Two steps">
+          {step === 1 ? (
+            <button
+              type="button"
+              onClick={() => {
+                setStep(2);
+              }}
+            >
+              Next
+            </button>
+          ) : (
+            <DialogChoices label="When" choices={TIMES} onChoose={onChoose} />
+          )}
+        </Dialog>
+      );
+    }
+    renderUi(<Steps />);
+    const next = screen.getByRole("button", { name: "Next" });
+    next.focus();
+    fireEvent.click(next);
+    await act(async () => {
+      await Promise.resolve();
+    });
+    const dialog = screen.getByRole("dialog");
+    expect(document.activeElement === document.body).toBe(false);
+    fireEvent.keyDown(document.activeElement ?? dialog, { key: "2" });
+    expect(onChoose).toHaveBeenCalledWith("tomorrow");
+  });
+
+  it("listens on itself only: a key the page receives is the page's", () => {
+    const onPageDone = vi.fn();
+    renderUi(<Snooze onPageDone={onPageDone} />);
+    // Nothing of the dialog's lost the focus: this key is the page's own.
+    fireEvent.keyDown(document.body, { key: "e" });
+    expect(onPageDone).toHaveBeenCalledOnce();
   });
 
   it("leaves the focus with someone typing when choices arrive", () => {

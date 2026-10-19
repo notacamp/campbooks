@@ -42,6 +42,8 @@ async fn mint(
         grant: &grant,
         profile: &profile,
         amr: &[],
+        family: None,
+        consent: None,
         now: Utc::now(),
     }
     .access_token()
@@ -257,7 +259,8 @@ async fn a_suspension_stops_issued_tokens_on_every_door(db: PgPool) {
         &forged,
     );
     // The web BFF's stored token too: the API refuses it before the BFF's
-    // session is dropped by `identity.account_suspended`.
+    // session is dropped by `identity.account_suspended`, and the BFF's one
+    // forced refresh is refused, so the web app signs in again at once.
     let through_bff = browser.get("/bff/api/v1/workspaces").await;
     assert_eq!(
         through_bff.status,
@@ -265,8 +268,10 @@ async fn a_suspension_stops_issued_tokens_on_every_door(db: PgPool) {
         "{}",
         through_bff.body
     );
-    assert_eq!(through_bff.json()["code"], "invalid_token");
-    step("replaying Idempotency-Key create-shop: 401; the web app's stored token: 401");
+    assert_eq!(through_bff.json()["code"], "session_required");
+    step(
+        "replaying Idempotency-Key create-shop: 401; the web app: 401 session_required (sign in again)",
+    );
 
     // Unsuspended: the old token stays refused; a new sign-in works.
     let lifted = call(
@@ -355,6 +360,94 @@ async fn the_admin_api_refuses_a_revoked_administrators_token(db: PgPool) {
     tx.commit().await.unwrap();
     let refused = call(&browser, Method::GET, overview, &fresh, None, None).await;
     assert_eq!(refused.status, StatusCode::NOT_FOUND);
+}
+
+/// Whether the web app's session in `browser` is still signed in.
+async fn signed_in(browser: &mut Browser) -> bool {
+    browser.get("/bff/session").await.json()["authenticated"] == true
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn removing_the_way_in_a_web_session_used_signs_it_out_at_once(db: PgPool) {
+    println!("\nAna removes the way in her web session signed in with:");
+    let (mut browser, google, _issuer) = world(db.clone()).await;
+    sign_up_through_bff(&mut browser, &google).await;
+    let ana = the_person(&db, &[]).await;
+    // The way in her sign-up (and so this session) used.
+    let google_way_in: Uuid = sqlx::query_scalar(
+        "SELECT id FROM identity.provider_identities
+          WHERE account_id = $1 AND linked_via = 'sign_up'",
+    )
+    .bind(ana)
+    .fetch_one(&db)
+    .await
+    .unwrap();
+    // A second way in, so the first is not her last.
+    sqlx::query(
+        "INSERT INTO identity.provider_identities
+             (id, account_id, provider, issuer, subject, linked_via, linked_at)
+         VALUES ($1, $2, 'zoho', 'https://accounts.zoho.example', 'ana-zoho', 'link', now())",
+    )
+    .bind(Uuid::now_v7())
+    .bind(ana)
+    .execute(&db)
+    .await
+    .unwrap();
+    assert_eq!(
+        browser.get("/bff/api/v1/workspaces").await.status,
+        StatusCode::OK
+    );
+    step("signed in with Google, Zoho linked too -> the web app: 200");
+
+    let removed = browser
+        .send(
+            Method::DELETE,
+            &format!("/bff/api/v1/identity/ways-in/{google_way_in}"),
+            None,
+        )
+        .await;
+    assert_eq!(removed.status, StatusCode::NO_CONTENT, "{}", removed.body);
+    step("DELETE /bff/api/v1/identity/ways-in/{google}: 204");
+
+    // The BFF still holds an access token with minutes left; the API
+    // refuses it, the forced refresh is refused, the session ends.
+    let next = browser.get("/bff/api/v1/workspaces").await;
+    assert_eq!(next.status, StatusCode::UNAUTHORIZED, "{}", next.body);
+    assert_eq!(next.json()["code"], "session_required", "{}", next.body);
+    assert!(!signed_in(&mut browser).await);
+    step("the next call: 401 session_required; /bff/session: signed out");
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn signing_out_everywhere_on_another_device_signs_the_web_app_out_at_once(db: PgPool) {
+    println!("\nAna signs out everywhere from her phone; her laptop's web app:");
+    let (mut laptop, google, _issuer) = world(db.clone()).await;
+    sign_up_through_bff(&mut laptop, &google).await;
+    let mut phone = laptop.another();
+    sign_in_again(&mut phone, &google).await;
+    assert_eq!(
+        laptop.get("/bff/api/v1/workspaces").await.status,
+        StatusCode::OK
+    );
+    step("signed in on a laptop and a phone -> the laptop's web app: 200");
+
+    let ended = phone
+        .send(
+            Method::POST,
+            "/bff/api/v1/identity/sign-out-everywhere",
+            None,
+        )
+        .await;
+    assert_eq!(ended.status, StatusCode::NO_CONTENT, "{}", ended.body);
+    step("the phone: POST /bff/api/v1/identity/sign-out-everywhere: 204");
+
+    // No job has run to drop the laptop's BFF session: its next call ends
+    // it, instead of failing until its held token would have expired.
+    let next = laptop.get("/bff/api/v1/workspaces").await;
+    assert_eq!(next.status, StatusCode::UNAUTHORIZED, "{}", next.body);
+    assert_eq!(next.json()["code"], "session_required", "{}", next.body);
+    assert!(!signed_in(&mut laptop).await);
+    step("the laptop's next call: 401 session_required; /bff/session: signed out");
 }
 
 #[tokio::test]

@@ -3,7 +3,12 @@
 //!
 //! - **The instance secret** ([`SecretKey`]) is 32 random bytes from
 //!   `CAMPBOOKS_SECRET_KEY_FILE` or `CAMPBOOKS_SECRET_KEY` (standard base64),
-//!   loaded with [`SecretKey::from_env`].
+//!   loaded with [`SecretKey::from_env`], with the key it replaced, when one
+//!   is rotated, from `CAMPBOOKS_SECRET_KEY_PREVIOUS_FILE` or
+//!   `CAMPBOOKS_SECRET_KEY_PREVIOUS` (campbooks-cloud#191). Everything is
+//!   sealed, signed and derived with the current key; the previous one only
+//!   opens and verifies what was made before the rotation, and a value it
+//!   opened says so ([`Opened::by_previous`]) so its owner seals it again.
 //! - **Sealing** ([`Cipher`]): AES-256-GCM under a key derived (HKDF-SHA256)
 //!   from the instance secret and a **purpose label**, so every use (the web
 //!   BFF's session tokens, connectors' credentials) has its own key. Each
@@ -34,27 +39,62 @@ pub const SECRET_KEY_LEN: usize = 32;
 /// First byte of every sealed value, so the format can change later.
 const FORMAT_V1: u8 = 1;
 
-/// The instance secret, `CAMPBOOKS_SECRET_KEY[_FILE]`. Never printed.
+/// The instance secret, `CAMPBOOKS_SECRET_KEY[_FILE]`, and the key it
+/// replaced while a rotation is under way,
+/// `CAMPBOOKS_SECRET_KEY_PREVIOUS[_FILE]`. Never printed.
 #[derive(Clone, PartialEq, Eq)]
-pub struct SecretKey([u8; SECRET_KEY_LEN]);
+pub struct SecretKey {
+    bytes: [u8; SECRET_KEY_LEN],
+    previous: Option<[u8; SECRET_KEY_LEN]>,
+}
 
 impl std::fmt::Debug for SecretKey {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str("SecretKey(<redacted>)")
+        f.write_str(if self.previous.is_some() {
+            "SecretKey(<redacted>, previous: <redacted>)"
+        } else {
+            "SecretKey(<redacted>)"
+        })
     }
 }
 
-/// Where the instance secret may be set.
+/// Where the instance secret, and the one it replaced, may be set.
+// The fields are the variables' names (`CAMPBOOKS_SECRET_KEY*`).
+#[allow(clippy::struct_field_names)]
 #[derive(Debug, Default, Deserialize)]
 struct SecretEnv {
     secret_key: Option<SecretString>,
     secret_key_file: Option<PathBuf>,
+    secret_key_previous: Option<SecretString>,
+    secret_key_previous_file: Option<PathBuf>,
 }
 
 impl SecretKey {
-    /// A key made of `bytes` (tests, or a key read elsewhere).
+    /// A key made of `bytes` (tests, or a key read elsewhere), with no
+    /// previous key.
     pub const fn from_bytes(bytes: [u8; SECRET_KEY_LEN]) -> Self {
-        Self(bytes)
+        Self {
+            bytes,
+            previous: None,
+        }
+    }
+
+    /// This key, which replaced `previous`: what `previous` sealed or signed
+    /// still opens and verifies, nothing new is made with it.
+    #[must_use]
+    pub fn with_previous(mut self, previous: &Self) -> Self {
+        self.previous = Some(previous.bytes);
+        self
+    }
+
+    /// Whether a previous key is set (a rotation under way).
+    pub fn has_previous(&self) -> bool {
+        self.previous.is_some()
+    }
+
+    /// The previous key alone, when one is set.
+    pub(crate) fn previous_key(&self) -> Option<Self> {
+        self.previous.map(Self::from_bytes)
     }
 
     /// Decode standard base64 of 32 random bytes.
@@ -62,7 +102,7 @@ impl SecretKey {
         let bytes = STANDARD
             .decode(encoded.trim())
             .map_err(|_| "is not valid base64".to_owned())?;
-        bytes.try_into().map(Self).map_err(|bytes: Vec<u8>| {
+        bytes.try_into().map(Self::from_bytes).map_err(|bytes: Vec<u8>| {
             format!(
                 "decodes to {} bytes; it must be {SECRET_KEY_LEN} (e.g. `openssl rand -base64 32`)",
                 bytes.len()
@@ -71,23 +111,58 @@ impl SecretKey {
     }
 
     /// The instance secret from `CAMPBOOKS_SECRET_KEY_FILE` (preferred) or
-    /// `CAMPBOOKS_SECRET_KEY`; `None` when neither is set. An error names the
-    /// variable at fault.
+    /// `CAMPBOOKS_SECRET_KEY`, with the previous key from
+    /// `CAMPBOOKS_SECRET_KEY_PREVIOUS_FILE` (preferred) or
+    /// `CAMPBOOKS_SECRET_KEY_PREVIOUS` when one is set; `None` when no
+    /// current key is set. An error names the variable at fault, never a
+    /// key: a previous key without a current one, or equal to it, is one.
     pub fn from_env() -> Result<Option<Self>, String> {
-        let env: SecretEnv = crate::config::env_source()
+        Self::from_figment(&crate::config::env_source())
+    }
+
+    /// [`from_env`](Self::from_env) over any source (tests).
+    pub fn from_figment(figment: &figment::Figment) -> Result<Option<Self>, String> {
+        let env: SecretEnv = figment
             .extract()
             .map_err(|e| format!("invalid configuration: {e}"))?;
-        match (env.secret_key_file, env.secret_key) {
+        let current = Self::read("CAMPBOOKS_SECRET_KEY", env.secret_key_file, env.secret_key)?;
+        let previous = Self::read(
+            "CAMPBOOKS_SECRET_KEY_PREVIOUS",
+            env.secret_key_previous_file,
+            env.secret_key_previous,
+        )?;
+        match (current, previous) {
+            (current, None) => Ok(current),
+            (None, Some(_)) => Err(
+                "CAMPBOOKS_SECRET_KEY_PREVIOUS is set without CAMPBOOKS_SECRET_KEY: the previous \
+                 key only opens what was sealed before a rotation; set the new key too"
+                    .to_owned(),
+            ),
+            (Some(current), Some(previous)) if current.bytes == previous.bytes => Err(
+                "CAMPBOOKS_SECRET_KEY_PREVIOUS is the same key as CAMPBOOKS_SECRET_KEY: set it \
+                 to the key being replaced, or unset it"
+                    .to_owned(),
+            ),
+            (Some(current), Some(previous)) => Ok(Some(current.with_previous(&previous))),
+        }
+    }
+
+    /// The key `<name>_FILE` (preferred) or `<name>` holds.
+    fn read(
+        name: &str,
+        file: Option<PathBuf>,
+        inline: Option<SecretString>,
+    ) -> Result<Option<Self>, String> {
+        match (file, inline) {
             (Some(path), _) => std::fs::read_to_string(&path)
-                .map_err(|e| format!("CAMPBOOKS_SECRET_KEY_FILE={}: {e}", path.display()))
+                .map_err(|e| format!("{name}_FILE={}: {e}", path.display()))
                 .and_then(|key| {
-                    Self::decode(&key)
-                        .map_err(|e| format!("CAMPBOOKS_SECRET_KEY_FILE={}: {e}", path.display()))
+                    Self::decode(&key).map_err(|e| format!("{name}_FILE={}: {e}", path.display()))
                 })
                 .map(Some),
             (None, Some(key)) => Self::decode(key.expose_secret())
                 .map(Some)
-                .map_err(|e| format!("CAMPBOOKS_SECRET_KEY {e}")),
+                .map_err(|e| format!("{name} {e}")),
             (None, None) => Ok(None),
         }
     }
@@ -102,15 +177,16 @@ pub fn derive_secret(secret: &SecretKey, purpose: &'static [u8]) -> SecretString
     SecretString::from(URL_SAFE_NO_PAD.encode(derive_bytes(secret, purpose)))
 }
 
-/// The 32 bytes behind [`derive_secret`] (HKDF-SHA256, `purpose` as `info`).
-fn derive_bytes(secret: &SecretKey, purpose: &'static [u8]) -> [u8; 32] {
+/// The 32 bytes behind [`derive_secret`] (HKDF-SHA256, `purpose` as `info`),
+/// from the current key only.
+pub(crate) fn derive_bytes(secret: &SecretKey, purpose: &'static [u8]) -> [u8; 32] {
     struct Len32;
     impl hkdf::KeyType for Len32 {
         fn len(&self) -> usize {
             32
         }
     }
-    let prk = hkdf::Salt::new(hkdf::HKDF_SHA256, &[]).extract(&secret.0);
+    let prk = hkdf::Salt::new(hkdf::HKDF_SHA256, &[]).extract(&secret.bytes);
     let info = [purpose];
     let mut bytes = [0_u8; 32];
     prk.expand(&info, Len32)
@@ -146,10 +222,38 @@ pub fn pkce_challenge(verifier: &str) -> String {
     URL_SAFE_NO_PAD.encode(digest::digest(&digest::SHA256, verifier.as_bytes()))
 }
 
-/// Seals and opens secrets kept at rest, for one purpose.
+/// HMAC-SHA256 of `message` under `key`: a pseudonym only the key's holder
+/// can link back to `message` (the usage analytics' daily visitor id).
+pub fn hmac_sha256(key: &[u8], message: &[u8]) -> Vec<u8> {
+    hmac::sign(&hmac::Key::new(hmac::HMAC_SHA256, key), message)
+        .as_ref()
+        .to_vec()
+}
+
+/// Seals and opens secrets kept at rest, for one purpose: sealed with the
+/// current key, opened with it or, during a rotation, with the previous one.
 pub struct Cipher {
     key: LessSafeKey,
+    previous: Option<LessSafeKey>,
     rng: SystemRandom,
+}
+
+/// What [`Cipher::open_checked`] opened.
+pub struct Opened {
+    /// The plaintext.
+    pub value: String,
+    /// It was sealed with the previous key: seal it again (with
+    /// [`Cipher::seal`]) and store that, so it still opens once the
+    /// previous key is gone.
+    pub by_previous: bool,
+}
+
+impl std::fmt::Debug for Opened {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Opened")
+            .field("by_previous", &self.by_previous)
+            .finish_non_exhaustive()
+    }
 }
 
 impl std::fmt::Debug for Cipher {
@@ -169,16 +273,25 @@ impl Cipher {
     /// `purpose` is the HKDF `info`: a fixed, versioned label per use
     /// (`b"campbooks bff token encryption v1"`); never change a label in
     /// use, or what it sealed cannot be opened.
+    /// A previous key set on `secret` opens what it sealed too.
     pub fn new(secret: &SecretKey, purpose: &'static [u8]) -> Self {
-        let prk = hkdf::Salt::new(hkdf::HKDF_SHA256, &[]).extract(&secret.0);
+        Self {
+            key: Self::key(&secret.bytes, purpose),
+            previous: secret
+                .previous
+                .as_ref()
+                .map(|previous| Self::key(previous, purpose)),
+            rng: SystemRandom::new(),
+        }
+    }
+
+    fn key(secret: &[u8; SECRET_KEY_LEN], purpose: &'static [u8]) -> LessSafeKey {
+        let prk = hkdf::Salt::new(hkdf::HKDF_SHA256, &[]).extract(secret);
         let info = [purpose];
         let okm = prk
             .expand(&info, &AES_256_GCM)
             .unwrap_or_else(|_| unreachable!("HKDF can expand to one AES-256 key"));
-        Self {
-            key: LessSafeKey::new(UnboundKey::from(okm)),
-            rng: SystemRandom::new(),
-        }
+        LessSafeKey::new(UnboundKey::from(okm))
     }
 
     /// `FORMAT_V1 || nonce || ciphertext || tag`, bound to `context`.
@@ -202,8 +315,31 @@ impl Cipher {
         sealed
     }
 
-    /// The plaintext of `sealed`, which must have been sealed for `context`.
+    /// The plaintext of `sealed`, which must have been sealed for `context`
+    /// with the current key or the previous one. Where the value is kept
+    /// for long, prefer [`open_checked`](Self::open_checked) and seal again
+    /// what the previous key opened.
     pub fn open(&self, sealed: &[u8], context: &[u8]) -> Result<String, OpenError> {
+        self.open_checked(sealed, context)
+            .map(|opened| opened.value)
+    }
+
+    /// [`open`](Self::open), saying whether the previous key opened it.
+    pub fn open_checked(&self, sealed: &[u8], context: &[u8]) -> Result<Opened, OpenError> {
+        if let Ok(value) = Self::open_with(&self.key, sealed, context) {
+            return Ok(Opened {
+                value,
+                by_previous: false,
+            });
+        }
+        let previous = self.previous.as_ref().ok_or(OpenError)?;
+        Self::open_with(previous, sealed, context).map(|value| Opened {
+            value,
+            by_previous: true,
+        })
+    }
+
+    fn open_with(key: &LessSafeKey, sealed: &[u8], context: &[u8]) -> Result<String, OpenError> {
         let (&format, rest) = sealed.split_first().ok_or(OpenError)?;
         if format != FORMAT_V1 || rest.len() < NONCE_LEN {
             return Err(OpenError);
@@ -211,8 +347,7 @@ impl Cipher {
         let (nonce, body) = rest.split_at(NONCE_LEN);
         let nonce = Nonce::try_assume_unique_for_key(nonce).map_err(|_| OpenError)?;
         let mut body = body.to_vec();
-        let plaintext = self
-            .key
+        let plaintext = key
             .open_in_place(nonce, Aad::from(context), &mut body)
             .map_err(|_| OpenError)?;
         String::from_utf8(plaintext.to_vec()).map_err(|_| OpenError)
@@ -240,6 +375,8 @@ const SEALER_PURPOSE: &[u8] = b"campbooks kernel sealed values v1";
 pub struct Signer {
     key: std::sync::Arc<hmac::Key>,
     sealer: std::sync::Arc<LessSafeKey>,
+    /// The previous key's: verify and open only, during a rotation.
+    previous: Option<std::sync::Arc<(hmac::Key, LessSafeKey)>>,
     rng: SystemRandom,
 }
 
@@ -263,20 +400,29 @@ impl Default for Signer {
 
 impl Signer {
     /// A signer keyed by `secret` (the instance secret): every process of
-    /// the install agrees.
+    /// the install agrees. A previous key set on `secret` verifies and opens
+    /// what it signed and sealed too.
     pub fn new(secret: &SecretKey) -> Self {
-        let key = derive_secret(secret, SIGNER_PURPOSE);
+        let (key, sealer) = Self::keys(secret);
         Self {
-            key: std::sync::Arc::new(hmac::Key::new(
-                hmac::HMAC_SHA256,
-                key.expose_secret().as_bytes(),
-            )),
-            sealer: std::sync::Arc::new(LessSafeKey::new(
-                UnboundKey::new(&AES_256_GCM_SIV, &derive_bytes(secret, SEALER_PURPOSE))
-                    .unwrap_or_else(|_| unreachable!("32 bytes make an AES-256-GCM-SIV key")),
-            )),
+            key: std::sync::Arc::new(key),
+            sealer: std::sync::Arc::new(sealer),
+            previous: secret
+                .previous_key()
+                .map(|previous| std::sync::Arc::new(Self::keys(&previous))),
             rng: SystemRandom::new(),
         }
+    }
+
+    fn keys(secret: &SecretKey) -> (hmac::Key, LessSafeKey) {
+        let key = derive_secret(secret, SIGNER_PURPOSE);
+        (
+            hmac::Key::new(hmac::HMAC_SHA256, key.expose_secret().as_bytes()),
+            LessSafeKey::new(
+                UnboundKey::new(&AES_256_GCM_SIV, &derive_bytes(secret, SEALER_PURPOSE))
+                    .unwrap_or_else(|_| unreachable!("32 bytes make an AES-256-GCM-SIV key")),
+            ),
+        )
     }
 
     fn input(context: &[u8], value: &[u8]) -> Vec<u8> {
@@ -294,9 +440,15 @@ impl Signer {
             .to_vec()
     }
 
-    /// Whether `tag` is `value`'s for `context` (constant time).
+    /// Whether `tag` is `value`'s for `context` (constant time), under the
+    /// current key or the previous one.
     pub fn verify(&self, context: &[u8], value: &[u8], tag: &[u8]) -> bool {
-        hmac::verify(&self.key, &Self::input(context, value), tag).is_ok()
+        let input = Self::input(context, value);
+        hmac::verify(&self.key, &input, tag).is_ok()
+            || self
+                .previous
+                .as_ref()
+                .is_some_and(|previous| hmac::verify(&previous.0, &input, tag).is_ok())
     }
 
     /// `value` sealed for `context`: unreadable and unalterable without the
@@ -323,8 +475,16 @@ impl Signer {
     }
 
     /// The value `sealed` holds, if it was sealed for `context` under this
-    /// key and not altered since.
+    /// key (or the previous one) and not altered since.
     pub fn open(&self, context: &[u8], sealed: &[u8]) -> Option<Vec<u8>> {
+        Self::open_with(&self.sealer, context, sealed).or_else(|| {
+            self.previous
+                .as_ref()
+                .and_then(|previous| Self::open_with(&previous.1, context, sealed))
+        })
+    }
+
+    fn open_with(key: &LessSafeKey, context: &[u8], sealed: &[u8]) -> Option<Vec<u8>> {
         let (&format, rest) = sealed.split_first()?;
         if format != FORMAT_V1 || rest.len() < NONCE_LEN {
             return None;
@@ -332,8 +492,7 @@ impl Signer {
         let (nonce, body) = rest.split_at(NONCE_LEN);
         let nonce = Nonce::try_assume_unique_for_key(nonce).ok()?;
         let mut body = body.to_vec();
-        let value = self
-            .sealer
+        let value = key
             .open_in_place(nonce, Aad::from(context), &mut body)
             .ok()?;
         Some(value.to_vec())
@@ -373,6 +532,133 @@ mod tests {
         assert_eq!(cipher.open(&[], b"row-1:refresh"), Err(OpenError));
         // A fresh nonce every time.
         assert_ne!(sealed, cipher.seal("refresh-token", b"row-1:refresh"));
+    }
+
+    /// During a rotation, what the previous key sealed opens, says so, and
+    /// sealed again opens with the new key alone; what neither key sealed,
+    /// or the previous key without the new one, fails closed
+    /// (campbooks-cloud#191).
+    #[test]
+    fn a_previous_key_opens_old_values_until_they_are_sealed_again() {
+        let old = Cipher::new(&key(7), PURPOSE);
+        let sealed = old.seal("refresh-token", b"row-1:refresh");
+        let rotated = Cipher::new(&key(8).with_previous(&key(7)), PURPOSE);
+        let opened = rotated.open_checked(&sealed, b"row-1:refresh").unwrap();
+        assert_eq!(opened.value, "refresh-token");
+        assert!(opened.by_previous);
+        assert_eq!(format!("{opened:?}"), "Opened { by_previous: true, .. }");
+        assert_eq!(
+            rotated.open(&sealed, b"row-1:refresh").as_deref(),
+            Ok("refresh-token")
+        );
+        // Sealed again: the new key alone opens it, as current.
+        let resealed = rotated.seal(&opened.value, b"row-1:refresh");
+        let new_only = Cipher::new(&key(8), PURPOSE);
+        let again = new_only.open_checked(&resealed, b"row-1:refresh").unwrap();
+        assert_eq!(again.value, "refresh-token");
+        assert!(!again.by_previous);
+        assert_eq!(old.open(&resealed, b"row-1:refresh"), Err(OpenError));
+        // Without the previous key, an old value no longer opens.
+        assert_eq!(new_only.open(&sealed, b"row-1:refresh"), Err(OpenError));
+        // A wrong key, either way round, a wrong context or tampering.
+        assert_eq!(
+            Cipher::new(&key(9).with_previous(&key(8)), PURPOSE).open(&sealed, b"row-1:refresh"),
+            Err(OpenError)
+        );
+        assert_eq!(
+            rotated.open(&sealed, b"row-2:refresh").map(|_| ()),
+            Err(OpenError)
+        );
+        let mut tampered = sealed.clone();
+        if let Some(last) = tampered.last_mut() {
+            *last ^= 1;
+        }
+        assert_eq!(rotated.open(&tampered, b"row-1:refresh"), Err(OpenError));
+        // Derived secrets come from the current key only.
+        assert_eq!(
+            derive_secret(&key(8).with_previous(&key(7)), b"campbooks one v1").expose_secret(),
+            derive_secret(&key(8), b"campbooks one v1").expose_secret()
+        );
+        assert_eq!(
+            format!("{:?}", key(8).with_previous(&key(7))),
+            "SecretKey(<redacted>, previous: <redacted>)"
+        );
+    }
+
+    #[test]
+    fn a_previous_key_verifies_and_opens_signed_and_sealed_values() {
+        let old = Signer::new(&key(7));
+        let tag = old.sign(b"search.cursor", b"page 2");
+        let sealed = old.seal(b"changes.cursor", b"position");
+        let rotated = Signer::new(&key(8).with_previous(&key(7)));
+        assert!(rotated.verify(b"search.cursor", b"page 2", &tag));
+        assert!(!rotated.verify(b"search.cursor", b"page 3", &tag));
+        assert_eq!(
+            rotated.open(b"changes.cursor", &sealed).as_deref(),
+            Some(&b"position"[..])
+        );
+        // New values are the new key's alone.
+        let fresh = rotated.sign(b"search.cursor", b"page 2");
+        assert!(Signer::new(&key(8)).verify(b"search.cursor", b"page 2", &fresh));
+        assert!(!old.verify(b"search.cursor", b"page 2", &fresh));
+        // The previous key gone: old values fail closed.
+        let new_only = Signer::new(&key(8));
+        assert!(!new_only.verify(b"search.cursor", b"page 2", &tag));
+        assert!(new_only.open(b"changes.cursor", &sealed).is_none());
+    }
+
+    /// The previous key comes from `CAMPBOOKS_SECRET_KEY_PREVIOUS[_FILE]`,
+    /// never alone and never equal to the current one; errors name the
+    /// variable, never a key.
+    #[test]
+    fn the_previous_key_is_read_beside_the_current_one() {
+        use figment::{Figment, providers::Serialized};
+
+        let encoded = |byte: u8| STANDARD.encode([byte; SECRET_KEY_LEN]);
+        let read = |values: serde_json::Value| {
+            SecretKey::from_figment(&Figment::from(Serialized::defaults(values)))
+        };
+        assert_eq!(
+            read(serde_json::json!({ "secret_key": encoded(8) })),
+            Ok(Some(key(8)))
+        );
+        let both = read(serde_json::json!({
+            "secret_key": encoded(8), "secret_key_previous": encoded(7),
+        }))
+        .unwrap()
+        .unwrap();
+        assert!(both.has_previous());
+        assert_eq!(both, key(8).with_previous(&key(7)));
+        let dir = std::env::temp_dir().join(format!("cb-prev-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let file = dir.join("previous");
+        std::fs::write(&file, format!("{}\n", encoded(7))).unwrap();
+        assert_eq!(
+            read(serde_json::json!({
+                "secret_key": encoded(8), "secret_key_previous_file": file,
+            })),
+            Ok(Some(key(8).with_previous(&key(7))))
+        );
+        std::fs::remove_dir_all(dir).unwrap();
+
+        let alone = read(serde_json::json!({ "secret_key_previous": encoded(7) })).unwrap_err();
+        assert!(alone.contains("without CAMPBOOKS_SECRET_KEY"), "{alone}");
+        let same = read(serde_json::json!({
+            "secret_key": encoded(8), "secret_key_previous": encoded(8),
+        }))
+        .unwrap_err();
+        assert!(same.contains("the same key"), "{same}");
+        let broken = read(serde_json::json!({
+            "secret_key": encoded(8), "secret_key_previous": "not base64!",
+        }))
+        .unwrap_err();
+        assert!(
+            broken.starts_with("CAMPBOOKS_SECRET_KEY_PREVIOUS "),
+            "{broken}"
+        );
+        for error in [&alone, &same, &broken] {
+            assert!(!error.contains(&encoded(7)) && !error.contains(&encoded(8)));
+        }
     }
 
     #[test]
@@ -449,6 +735,20 @@ mod tests {
     }
 
     #[test]
+    fn hmac_sha256_matches_rfc_4231_test_case_2() {
+        let tag = hmac_sha256(b"Jefe", b"what do ya want for nothing?");
+        let hex = tag.iter().fold(String::new(), |mut hex, byte| {
+            use std::fmt::Write as _;
+            let _ = write!(hex, "{byte:02x}");
+            hex
+        });
+        assert_eq!(
+            hex,
+            "5bdcc146bf60754e6a042426089575c75a003f089d2739839dec58b964ec3843"
+        );
+    }
+
+    #[test]
     fn pkce_s256_matches_rfc_7636_appendix_b() {
         assert_eq!(
             pkce_challenge("dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk"),
@@ -458,7 +758,7 @@ mod tests {
 
     #[test]
     fn signed_values_verify_only_for_their_context_and_key() {
-        let secret = SecretKey([7_u8; SECRET_KEY_LEN]);
+        let secret = SecretKey::from_bytes([7_u8; SECRET_KEY_LEN]);
         let signer = Signer::new(&secret);
         let tag = signer.sign(b"search.cursor", b"page 2");
         assert!(signer.verify(b"search.cursor", b"page 2", &tag));
@@ -470,7 +770,7 @@ mod tests {
 
     #[test]
     fn sealed_values_open_only_for_their_context_and_key_and_hide_their_content() {
-        let secret = SecretKey([7_u8; SECRET_KEY_LEN]);
+        let secret = SecretKey::from_bytes([7_u8; SECRET_KEY_LEN]);
         let signer = Signer::new(&secret);
         let value = [0_u8, 0, 0, 0, 0, 0, 0, 42];
         let sealed = signer.seal(b"changes.cursor", &value);

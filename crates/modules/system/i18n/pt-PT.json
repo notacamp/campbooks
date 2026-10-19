@@ -1,6 +1,7 @@
 {
   "errors": {
     "database_unreachable": "Não é possível contactar a base de dados. A instância não está pronta para responder a pedidos.",
-    "database_timeout": "A base de dados não respondeu a tempo. A instância não está pronta para responder a pedidos."
+    "database_timeout": "A base de dados não respondeu a tempo. A instância não está pronta para responder a pedidos.",
+    "invalid_route": "Só é possível comunicar um modelo de rota: palavras em minúsculas e parâmetros como :workspaceId, sem identificadores, números, consulta nem fragmento."
   }
 }

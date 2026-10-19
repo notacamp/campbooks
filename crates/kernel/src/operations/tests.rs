@@ -148,6 +148,46 @@ async fn issue_secret(_: Scoped<TestWrite>) -> (StatusCode, Json<Value>) {
     )
 }
 
+/// Send the caller on to a secret link: a redirect whose `Location` is the
+/// secret.
+#[utoipa::path(
+    post,
+    path = "/api/v1/test/links",
+    operation_id = "test.issue_link",
+    security(("bearer" = ["test:write"])),
+    extensions(("x-campbooks" = json!(Operation::command(Risk::High)
+        .secret_once()
+        .records(["test.secret"])))),
+    responses((status = SEE_OTHER)),
+)]
+async fn issue_link(_: Scoped<TestWrite>) -> (StatusCode, [(header::HeaderName, String); 1]) {
+    (
+        StatusCode::SEE_OTHER,
+        [(
+            header::LOCATION,
+            format!("https://app.example.com/accept/{}", uuid::Uuid::now_v7()),
+        )],
+    )
+}
+
+/// Take a while, then answer with a fresh run id (a request still in flight
+/// when another arrives with its key).
+#[utoipa::path(
+    post,
+    path = "/api/v1/test/slow",
+    operation_id = "test.slow",
+    security(("bearer" = ["test:write"])),
+    extensions(("x-campbooks" = json!(Operation::command(Risk::Low).records(["test.note"])))),
+    responses((status = CREATED, body = Value)),
+)]
+async fn slow(_: Scoped<TestWrite>) -> (StatusCode, Json<Value>) {
+    tokio::time::sleep(std::time::Duration::from_millis(400)).await;
+    (
+        StatusCode::CREATED,
+        Json(json!({ "run": uuid::Uuid::now_v7() })),
+    )
+}
+
 /// Reasons of the test operations.
 static TEST_MESSAGES: crate::i18n::Catalogue =
     crate::i18n::Catalogue::new("test", [r#"{"errors": {"flaky": "Busy ({{run}})"}}"#; 4]);
@@ -207,6 +247,8 @@ fn api() -> OpenApiRouter<AppState> {
         .routes(routes!(delete_note))
         .routes(routes!(flaky))
         .routes(routes!(issue_secret))
+        .routes(routes!(issue_link))
+        .routes(routes!(slow))
 }
 
 /// The test API over `state`: the HTTP router and the state that invokes
@@ -229,6 +271,7 @@ fn principal(scopes: &[&str]) -> Principal {
         expires_at: None,
         issued_at: None,
         auth_time: None,
+        sign_in: None,
     }
 }
 
@@ -245,7 +288,7 @@ fn status(error: &InvokeError) -> Option<StatusCode> {
 fn catalogue_reads_ids_metadata_and_routes() {
     let (_, spec) = api().split_for_parts();
     let catalogue = Catalogue::from_openapi(&spec);
-    assert_eq!(catalogue.len(), 7);
+    assert_eq!(catalogue.len(), 9);
     assert!(catalogue.get("test.issue_secret").unwrap().secret_once());
     assert!(!catalogue.get("test.archive").unwrap().secret_once());
 
@@ -530,6 +573,17 @@ impl Http {
         }
     }
 
+    /// The same app, called by the same person through app `client`.
+    fn through_app(&self, client: &str) -> Self {
+        let mut claims = self.idp.claims("test:write");
+        claims["azp"] = json!(client);
+        Self {
+            app: self.app.clone(),
+            token: self.idp.token(&claims),
+            idp: self.idp.clone(),
+        }
+    }
+
     async fn send(
         &self,
         method: &str,
@@ -651,14 +705,37 @@ async fn a_key_still_in_flight_is_409(db: PgPool) {
     assert_eq!(status, StatusCode::CONFLICT);
     assert_eq!(problem["status"], 409);
 
-    // Once abandoned (its process died), the same request takes it over.
+    assert_eq!(problem["code"], "idempotency_key_in_flight");
+
+    // Once abandoned (its process died), it is never run again: it may have
+    // committed before its answer was stored (campbooks-cloud#63).
     sqlx::query(
         "UPDATE kernel.idempotency SET created_at = now() - interval '1 hour' WHERE key = 'busy'",
     )
     .execute(&db)
     .await
     .unwrap();
-    let (status, headers, _) = http
+    let (status, headers, problem) = http
+        .send(
+            "POST",
+            ARCHIVE,
+            Some("busy"),
+            Some(json!({ "reason": "x" })),
+        )
+        .await;
+    assert_eq!(status, StatusCode::CONFLICT);
+    assert_eq!(problem["code"], "idempotency_outcome_unknown");
+    assert!(!headers.contains_key(idempotency::REPLAYED_HEADER));
+
+    // Once expired, the key is free again.
+    sqlx::query(
+        "UPDATE kernel.idempotency SET expires_at = now() - interval '1 second'
+          WHERE key = 'busy'",
+    )
+    .execute(&db)
+    .await
+    .unwrap();
+    let (status, ..) = http
         .send(
             "POST",
             ARCHIVE,
@@ -667,7 +744,93 @@ async fn a_key_still_in_flight_is_409(db: PgPool) {
         )
         .await;
     assert_eq!(status, StatusCode::CREATED);
-    assert!(!headers.contains_key(idempotency::REPLAYED_HEADER));
+}
+
+/// A request that committed its effects, then stopped before its answer was
+/// stored (simulated: the key left pending, with no answer, its process
+/// gone), is never run again with its key: a retry right away hears it is
+/// in flight, and once it is abandoned that its outcome is unknown
+/// (campbooks-cloud#63).
+#[sqlx::test(migrations = "../../migrations")]
+async fn a_crash_between_the_commit_and_the_stored_answer_never_runs_twice(db: PgPool) {
+    let http = http(db.clone()).await;
+    let body = json!({ "reason": "x" });
+    let (status, ..) = http
+        .send("POST", ARCHIVE, Some("crash"), Some(body.clone()))
+        .await;
+    assert_eq!(status, StatusCode::CREATED);
+    // What a crash after the commit and before the store leaves.
+    sqlx::query(
+        "UPDATE kernel.idempotency
+            SET state = 'pending', response_status = NULL, response_content_type = NULL,
+                response_location = NULL, response_body = NULL
+          WHERE key = 'crash'",
+    )
+    .execute(&db)
+    .await
+    .unwrap();
+    let (status, _, problem) = http
+        .send("POST", ARCHIVE, Some("crash"), Some(body.clone()))
+        .await;
+    assert_eq!(status, StatusCode::CONFLICT);
+    assert_eq!(problem["code"], "idempotency_key_in_flight");
+    sqlx::query(
+        "UPDATE kernel.idempotency SET created_at = now() - interval '3 minutes'
+          WHERE key = 'crash'",
+    )
+    .execute(&db)
+    .await
+    .unwrap();
+    for _ in 0..2 {
+        let (status, headers, problem) = http
+            .send("POST", ARCHIVE, Some("crash"), Some(body.clone()))
+            .await;
+        assert_eq!(status, StatusCode::CONFLICT, "{problem}");
+        assert_eq!(problem["code"], "idempotency_outcome_unknown");
+        assert!(problem["run"].is_null(), "the handler did not run");
+        assert!(!headers.contains_key(idempotency::REPLAYED_HEADER));
+    }
+    // Another request with the key is still another request.
+    let (status, ..) = http
+        .send(
+            "POST",
+            ARCHIVE,
+            Some("crash"),
+            Some(json!({ "reason": "y" })),
+        )
+        .await;
+    assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
+}
+
+/// Two requests with one key at once: one runs, the other hears it is in
+/// flight, and a retry afterwards replays the one answer.
+#[sqlx::test(migrations = "../../migrations")]
+async fn concurrent_requests_with_one_key_run_once(db: PgPool) {
+    let http = http(db).await;
+    let (first, second) = tokio::join!(
+        http.send("POST", "/api/v1/test/slow", Some("together"), None),
+        async {
+            tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+            http.send("POST", "/api/v1/test/slow", Some("together"), None)
+                .await
+        },
+    );
+    // Exactly one ran, whichever it was; the other heard it was in flight.
+    let (ran, refused) = match (first.0, second.0) {
+        (StatusCode::CREATED, StatusCode::CONFLICT) => (first, second),
+        (StatusCode::CONFLICT, StatusCode::CREATED) => (second, first),
+        other => panic!(
+            "one 201 and one 409, not {other:?}: {} / {}",
+            first.2, second.2
+        ),
+    };
+    assert_eq!(refused.2["code"], "idempotency_key_in_flight");
+    let (status, headers, again) = http
+        .send("POST", "/api/v1/test/slow", Some("together"), None)
+        .await;
+    assert_eq!(status, StatusCode::CREATED);
+    assert_eq!(headers[idempotency::REPLAYED_HEADER], "true");
+    assert_eq!(again["run"], ran.2["run"], "it ran once");
 }
 
 #[sqlx::test(migrations = "../../migrations")]
@@ -729,6 +892,48 @@ async fn keys_belong_to_their_caller(db: PgPool) {
     assert!(!headers.contains_key(idempotency::REPLAYED_HEADER));
     assert_ne!(mine["run"], theirs["run"]);
     assert_eq!(theirs["by"], "someone-else");
+}
+
+/// One person's keys through two apps are separate (campbooks-cloud#213,
+/// item 3): the same key with another body is no 422 across apps, and each
+/// app's replay is its own.
+#[sqlx::test(migrations = "../../migrations")]
+async fn a_persons_keys_are_per_app(db: PgPool) {
+    let http = http(db).await;
+    let helper = http.through_app("mail-helper");
+    let (status, _, web) = http
+        .send(
+            "POST",
+            ARCHIVE,
+            Some("k-1"),
+            Some(json!({ "reason": "done" })),
+        )
+        .await;
+    assert_eq!(status, StatusCode::CREATED);
+    let (status, headers, app) = helper
+        .send(
+            "POST",
+            ARCHIVE,
+            Some("k-1"),
+            Some(json!({ "reason": "later" })),
+        )
+        .await;
+    assert_eq!(status, StatusCode::CREATED, "{app}");
+    assert!(!headers.contains_key(idempotency::REPLAYED_HEADER));
+    assert_ne!(web["run"], app["run"]);
+    assert_eq!(app["by"], web["by"], "the same person");
+
+    let (status, headers, again) = helper
+        .send(
+            "POST",
+            ARCHIVE,
+            Some("k-1"),
+            Some(json!({ "reason": "later" })),
+        )
+        .await;
+    assert_eq!(status, StatusCode::CREATED);
+    assert_eq!(headers[idempotency::REPLAYED_HEADER], "true");
+    assert_eq!(again, app, "the app's own answer");
 }
 
 #[sqlx::test(migrations = "../../migrations")]
@@ -817,6 +1022,31 @@ async fn stored(db: &PgPool) -> Vec<Kept> {
     .fetch_all(db)
     .await
     .unwrap()
+}
+
+/// A redirect from an operation showing a secret is withheld too, its
+/// `Location` (the secret) not kept (campbooks-cloud#213, item 4).
+#[sqlx::test(migrations = "../../migrations")]
+async fn a_secret_redirect_is_withheld_without_its_location(db: PgPool) {
+    let http = http(testing::app_role_pool(&db).await).await;
+    let (status, headers, _) = http
+        .send("POST", "/api/v1/test/links", Some("l-1"), None)
+        .await;
+    assert_eq!(status, StatusCode::SEE_OTHER);
+    let link = headers[header::LOCATION].to_str().unwrap().to_owned();
+    let kept: (String, Option<i16>, Option<String>) =
+        sqlx::query_as("SELECT state, response_status, response_location FROM kernel.idempotency")
+            .fetch_one(&db)
+            .await
+            .unwrap();
+    assert_eq!(kept, ("withheld".to_owned(), Some(303), None), "{link}");
+    let (status, headers, problem) = http
+        .send("POST", "/api/v1/test/links", Some("l-1"), None)
+        .await;
+    assert_eq!(status, StatusCode::CONFLICT);
+    assert_eq!(headers[idempotency::REPLAYED_HEADER], "true");
+    assert_eq!(problem["code"], "idempotency_secret_shown_once");
+    assert!(!headers.contains_key(header::LOCATION));
 }
 
 #[sqlx::test(migrations = "../../migrations")]
@@ -1074,4 +1304,222 @@ async fn a_replay_needs_the_access_the_first_run_had(db: PgPool) {
     // Allowed again: the same stored response.
     let (status, _, last) = http.send("POST", &uri, Some("k-box"), None).await;
     assert_eq!((status, last), (StatusCode::OK, first));
+}
+
+// --- a workspace's keys go with it (campbooks-cloud#65) ---------------------
+
+/// Every key with the workspace it records, as the database owner.
+async fn workspace_keys(db: &PgPool) -> Vec<(String, Option<String>)> {
+    sqlx::query_as("SELECT key, workspace_id FROM kernel.idempotency ORDER BY key")
+        .fetch_all(db)
+        .await
+        .unwrap()
+}
+
+/// A key of a `{workspace_id}` route records that workspace, taken from the
+/// matched route alone: a `workspace_id` in the body changes nothing, and a
+/// route outside a workspace records none. The workspace's purge deletes its
+/// keys through `kernel.purge_workspace_idempotency`, only in a transaction
+/// working in that workspace, and leaves every other key.
+#[sqlx::test(migrations = "../../migrations")]
+async fn a_workspace_routes_keys_name_it_and_go_with_its_purge(db: PgPool) {
+    use crate::db::BeginFor as _;
+
+    let idp = TestIdp::start().await;
+    let switches = SwitchPorts(std::sync::Arc::default());
+    let state = idp
+        .state(db.clone())
+        .with_membership(std::sync::Arc::new(switches.clone()))
+        .with_visibility(std::sync::Arc::new(switches));
+    let (app, _) = app(state);
+    let http = Http {
+        app,
+        token: idp.token(&idp.claims("test:write")),
+        idp: idp.clone(),
+    };
+    let (ws, elsewhere) = (
+        crate::tenancy::WorkspaceId::new(),
+        crate::tenancy::WorkspaceId::new(),
+    );
+    let claimed = json!({ "workspace_id": elsewhere.to_string(), "reason": "done" });
+    for (uri, key) in [
+        (format!("/api/v1/w/{ws}/boxes/b1/edit"), "k-box"),
+        (format!("/api/v1/w/{elsewhere}/boxes/b2/edit"), "k-other"),
+        (ARCHIVE.to_owned(), "k-note"),
+    ] {
+        let (status, _, body) = http
+            .send("POST", &uri, Some(key), Some(claimed.clone()))
+            .await;
+        assert!(status.is_success(), "{uri}: {status} {body}");
+    }
+    assert_eq!(
+        workspace_keys(&db).await,
+        [
+            ("k-box".to_owned(), Some(ws.to_string())),
+            ("k-note".to_owned(), None),
+            ("k-other".to_owned(), Some(elsewhere.to_string())),
+        ]
+    );
+
+    // Refused unless the transaction works in that workspace.
+    let pool = testing::app_role_pool(&db).await;
+    let purge = "SELECT kernel.purge_workspace_idempotency($1, 100)";
+    for mut tx in [
+        pool.begin().await.unwrap(),
+        pool.begin_for(elsewhere).await.unwrap(),
+    ] {
+        let refused = sqlx::query_scalar::<_, i64>(purge)
+            .bind(ws.to_string())
+            .fetch_one(&mut *tx)
+            .await
+            .unwrap_err();
+        assert!(
+            refused
+                .to_string()
+                .contains("in a transaction working in that workspace"),
+            "{refused}"
+        );
+    }
+    assert_eq!(workspace_keys(&db).await.len(), 3, "nothing was deleted");
+
+    // In the workspace: its key goes, expired or not; the others stay, and
+    // the transaction still sees no key at all.
+    let mut tx = pool.begin_for(ws).await.unwrap();
+    let deleted: i64 = sqlx::query_scalar(purge)
+        .bind(ws.to_string())
+        .fetch_one(&mut *tx)
+        .await
+        .unwrap();
+    assert_eq!(deleted, 1);
+    let seen: i64 = sqlx::query_scalar("SELECT count(*) FROM kernel.idempotency")
+        .fetch_one(&mut *tx)
+        .await
+        .unwrap();
+    assert_eq!(seen, 0);
+    tx.commit().await.unwrap();
+    assert_eq!(
+        crate::idempotency::purge_workspace(&pool, &ws.to_string())
+            .await
+            .unwrap(),
+        0,
+        "nothing left; the purge's own short transactions"
+    );
+    assert_eq!(
+        workspace_keys(&db).await,
+        [
+            ("k-note".to_owned(), None),
+            ("k-other".to_owned(), Some(elsewhere.to_string())),
+        ]
+    );
+}
+
+/// The app over `db` with membership and visibility switched on, and a
+/// writer's client.
+async fn workspace_http(db: &PgPool) -> Http {
+    let idp = TestIdp::start().await;
+    let switches = SwitchPorts(std::sync::Arc::default());
+    let state = idp
+        .state(db.clone())
+        .with_membership(std::sync::Arc::new(switches.clone()))
+        .with_visibility(std::sync::Arc::new(switches));
+    let (app, _) = app(state);
+    Http {
+        app,
+        token: idp.token(&idp.claims("test:write")),
+        idp: idp.clone(),
+    }
+}
+
+/// A percent-encoded workspace segment records the workspace the router
+/// decodes for the handler, not the raw text.
+#[sqlx::test(migrations = "../../migrations")]
+async fn a_percent_encoded_workspace_segment_records_the_decoded_workspace(db: PgPool) {
+    let http = workspace_http(&db).await;
+    let ws = crate::tenancy::WorkspaceId::new();
+    let id = ws.to_string();
+    let encoded = format!("%{:02X}{}", id.as_bytes()[0], &id[1..]);
+    let uri = format!("/api/v1/w/{encoded}/boxes/b1/edit");
+    let (status, _, body) = http.send("POST", &uri, Some("k-enc"), None).await;
+    assert!(status.is_success(), "{uri}: {status} {body}");
+    assert_eq!(workspace_keys(&db).await, [("k-enc".to_owned(), Some(id))]);
+}
+
+/// A key taken again once expired records its new route's workspace, not
+/// the old one's.
+#[sqlx::test(migrations = "../../migrations")]
+async fn an_expired_key_taken_again_records_its_new_workspace(db: PgPool) {
+    let http = workspace_http(&db).await;
+    let (first, second) = (
+        crate::tenancy::WorkspaceId::new(),
+        crate::tenancy::WorkspaceId::new(),
+    );
+    let (status, ..) = http
+        .send(
+            "POST",
+            &format!("/api/v1/w/{first}/boxes/b1/edit"),
+            Some("k"),
+            None,
+        )
+        .await;
+    assert!(status.is_success());
+    sqlx::query("UPDATE kernel.idempotency SET expires_at = now() - interval '1 second'")
+        .execute(&db)
+        .await
+        .unwrap();
+    let (status, headers, _) = http
+        .send(
+            "POST",
+            &format!("/api/v1/w/{second}/boxes/b1/edit"),
+            Some("k"),
+            None,
+        )
+        .await;
+    assert!(status.is_success());
+    assert!(
+        !headers.contains_key(idempotency::REPLAYED_HEADER),
+        "ran again"
+    );
+    assert_eq!(
+        workspace_keys(&db).await,
+        [("k".to_owned(), Some(second.to_string()))]
+    );
+}
+
+/// A replay of a request whose `{workspace_id}` segment is percent-encoded
+/// checks the access to the workspace the router decoded: it is served while
+/// the caller may work there, and refused (404) once they may not
+/// (campbooks-cloud#267).
+#[sqlx::test(migrations = "../../migrations")]
+async fn a_replay_with_a_percent_encoded_workspace_checks_its_access(db: PgPool) {
+    let idp = TestIdp::start().await;
+    let switches = SwitchPorts(std::sync::Arc::default());
+    let state = idp
+        .state(db)
+        .with_membership(std::sync::Arc::new(switches.clone()))
+        .with_visibility(std::sync::Arc::new(switches.clone()));
+    let (app, _) = app(state);
+    let http = Http {
+        app,
+        token: idp.token(&idp.claims("test:write")),
+        idp: idp.clone(),
+    };
+    let id = crate::tenancy::WorkspaceId::new().to_string();
+    let uri = format!(
+        "/api/v1/w/%{:02X}{}/boxes/b1/edit",
+        id.as_bytes()[0],
+        &id[1..]
+    );
+    let (status, _, first) = http.send("POST", &uri, Some("k-enc"), None).await;
+    assert_eq!(status, StatusCode::OK, "{first}");
+    let (status, headers, again) = http.send("POST", &uri, Some("k-enc"), None).await;
+    assert_eq!((status, again), (StatusCode::OK, first));
+    assert_eq!(headers[idempotency::REPLAYED_HEADER], "true");
+
+    switches
+        .0
+        .left
+        .store(true, std::sync::atomic::Ordering::SeqCst);
+    let (status, headers, _) = http.send("POST", &uri, Some("k-enc"), None).await;
+    assert_eq!(status, StatusCode::NOT_FOUND);
+    assert!(!headers.contains_key(idempotency::REPLAYED_HEADER));
 }

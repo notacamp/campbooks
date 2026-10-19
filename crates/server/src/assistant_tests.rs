@@ -10,6 +10,12 @@
 //!   operations as the member: a `who` question's candidates never come
 //!   from an inbox they can't read, and nothing from anyone's mail reaches
 //!   the model.
+//! - Scout acting for a member (`operations::invoke` as the assistant) only
+//!   proposes rules: it never says yes to one, even with the member's
+//!   content token, and the member's own yes still keeps it
+//!   (campbooks-cloud#242). It may write a draft, but never send it nor take
+//!   back a send, even with the member's content token and as a call marked
+//!   confirmed: only the member's own Send and Undo do.
 
 use axum::{
     Router,
@@ -39,7 +45,7 @@ use wiremock::{
 use crate::Composition;
 
 const SCOPES: &str = "workspaces:read workspaces:write conversations:read conversations:write \
-                      assistant:read assistant:write";
+                      conversations:send assistant:read assistant:write";
 
 struct Server {
     app: Router,
@@ -55,6 +61,9 @@ impl Server {
         let pool = testing::app_role_pool(db).await;
         let state = crate::with_ports(
             AppState::new(pool.clone(), config)
+                // Rules are bound to the member who saves them
+                // (campbooks-cloud#242): the instance's key.
+                .with_binding(testing::binding())
                 .with_blobs(BlobStore::memory(&BlobsConfig::default(), pool))
                 .with_registry(crate::registry_with(composition).expect("valid registrations")),
         );
@@ -316,4 +325,231 @@ async fn who_candidates_come_only_from_the_members_own_inboxes(db: PgPool) {
         assert!(!sent.contains("northwind"), "{sent}");
         assert!(!sent.contains("Q4 plan"), "{sent}");
     }
+}
+
+/// `sub` as the assistant acts for them: their scopes, no token.
+fn on_behalf_of(sub: &str) -> campbooks_kernel::auth::Principal {
+    campbooks_kernel::auth::Principal {
+        subject: sub.to_owned(),
+        kind: campbooks_kernel::auth::PrincipalKind::User,
+        client_id: None,
+        scopes: SCOPES
+            .split_whitespace()
+            .map(campbooks_kernel::auth::Scope::new)
+            .collect(),
+        workspace: None,
+        email: Some(format!("{sub}@example.com")),
+        email_verified: true,
+        name: None,
+        expires_at: None,
+        issued_at: None,
+        auth_time: None,
+        sign_in: None,
+    }
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn scout_proposes_rules_but_only_the_member_keeps_them(db: PgPool) {
+    let server = Server::new(&db, &Composition::default()).await;
+    let (workspace, ines_id) = server.workspace(&db, "ines").await;
+    let ines = server.token("ines");
+    let inbox = dev::create_inbox(
+        &server.state,
+        workspace,
+        "ines@example.com",
+        &[(ines_id, InboxRole::Manager)],
+    )
+    .await
+    .unwrap();
+    server.ingest(workspace, inbox, EN).await;
+    let scout = |operation: &str, input: Value| {
+        operations::Invocation::new(
+            operations::Caller::Assistant,
+            on_behalf_of("ines"),
+            operation,
+            input,
+        )
+        .in_workspace(workspace.to_string())
+        .idempotency_key(uuid::Uuid::now_v7().to_string())
+    };
+
+    // Scout saves a rule, asking for it to act: it is only proposed.
+    let mut rule = suggestion();
+    rule["state"] = json!("active");
+    rule["inbox_id"] = json!(inbox.to_string());
+    let created = operations::invoke(&server.state, scout("conversations.create_rule", rule))
+        .await
+        .unwrap();
+    assert_eq!(
+        created.body["rule"]["state"], "proposed",
+        "{}",
+        created.body
+    );
+    let id = created.body["rule"]["id"].as_str().unwrap().to_owned();
+    // It reads the proposal, with Ines's token for it, and says yes: never
+    // run, even marked as confirmed.
+    let read = operations::invoke(
+        &server.state,
+        scout("conversations.get_rule", json!({"rule_id": id})),
+    )
+    .await
+    .unwrap();
+    let token = read.body["content_token"].clone();
+    assert!(token.is_string(), "{}", read.body);
+    let yes = json!({"rule_id": id, "apply_to_existing": false, "content_token": token});
+    for confirmed in [false, true] {
+        let mut call = scout("conversations.confirm_rule", yes.clone());
+        if confirmed {
+            call = call.confirmed();
+        }
+        let refused = operations::invoke(&server.state, call).await;
+        assert!(
+            matches!(refused, Err(operations::InvokeError::NotAllowed { .. })),
+            "{refused:?}"
+        );
+    }
+    let uri = format!("/api/v1/w/{workspace}/rules/{id}");
+    let (_, still) = server.call(&ines, "GET", &uri, None).await;
+    assert_eq!(still["state"], "proposed");
+
+    // Ines's own Keep, with the token her screen got: kept, and hers.
+    let (_, shown) = server.call(&ines, "GET", &uri, None).await;
+    let (status, kept) = server
+        .call(
+            &ines,
+            "POST",
+            &format!("{uri}/confirm"),
+            Some(json!({"apply_to_existing": false, "content_token": shown["content_token"]})),
+        )
+        .await;
+    assert_eq!(status, StatusCode::OK, "{kept}");
+    assert_eq!(kept["state"], "active");
+    assert_eq!(kept["taught_by"], ines_id.to_string());
+}
+
+/// Draft `id`'s state and the MAC binding its author's request to send.
+async fn held(db: &PgPool, id: uuid::Uuid) -> (String, Option<Vec<u8>>) {
+    sqlx::query_as("SELECT state, request_mac FROM conversations.drafts WHERE id = $1")
+        .bind(id)
+        .fetch_one(db)
+        .await
+        .unwrap()
+}
+
+/// How many sends were asked of the connector.
+async fn sends_requested(db: &PgPool) -> i64 {
+    sqlx::query_scalar(
+        "SELECT count(*) FROM kernel.events WHERE name = 'conversations.send_requested'",
+    )
+    .fetch_one(db)
+    .await
+    .unwrap()
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn scout_writes_drafts_but_only_the_member_sends_or_takes_one_back(db: PgPool) {
+    let server = Server::new(&db, &Composition::default()).await;
+    let (workspace, ines_id) = server.workspace(&db, "ines").await;
+    let ines = server.token("ines");
+    let inbox = dev::create_inbox(
+        &server.state,
+        workspace,
+        "ines@example.com",
+        &[(ines_id, InboxRole::Manager)],
+    )
+    .await
+    .unwrap();
+    server.ingest(workspace, inbox, EN).await;
+    let scout = |operation: &str, input: Value, confirmed: bool| {
+        let call = operations::Invocation::new(
+            operations::Caller::Assistant,
+            on_behalf_of("ines"),
+            operation,
+            input,
+        )
+        .in_workspace(workspace.to_string())
+        .idempotency_key(uuid::Uuid::now_v7().to_string());
+        if confirmed { call.confirmed() } else { call }
+    };
+
+    // Scout writes a message for Ines (mail may have asked it to) and reads
+    // it back: the content token it gets is Ines's.
+    let written = operations::invoke(
+        &server.state,
+        scout(
+            "conversations.create_draft",
+            json!({"kind": "new", "inbox_id": inbox.to_string(),
+                   "to": [{"name": "Maya Okafor", "address": "maya@northwind-studio.example"}],
+                   "subject": "Thursday", "body": "Thursday works."}),
+            false,
+        ),
+    )
+    .await
+    .unwrap();
+    let id = written.body["id"].as_str().unwrap().to_owned();
+    let read = operations::invoke(
+        &server.state,
+        scout("conversations.get_draft", json!({"draft_id": id}), false),
+    )
+    .await
+    .unwrap();
+    assert!(read.body["content_token"].is_string(), "{}", read.body);
+    let input = json!({"draft_id": id, "version": read.body["version"],
+                       "content_token": read.body["content_token"]});
+    // Sending it, as a call the user confirmed or not: refused before the
+    // handler runs.
+    for confirmed in [false, true] {
+        let refused = operations::invoke(
+            &server.state,
+            scout("conversations.send_draft", input.clone(), confirmed),
+        )
+        .await;
+        assert!(
+            matches!(refused, Err(operations::InvokeError::NotAllowed { .. })),
+            "{refused:?}"
+        );
+    }
+    // Nothing scheduled, signed or asked of the connector.
+    let draft: uuid::Uuid = id.parse().unwrap();
+    assert_eq!(held(&db, draft).await, ("draft".to_owned(), None));
+    let stats = Worker::new(server.state.clone()).run_until_idle().await;
+    assert_eq!(stats.failed, 0, "{stats:?}");
+    assert_eq!(sends_requested(&db).await, 0);
+
+    // Ines's own Send, with the token her screen got: on its way.
+    let uri = format!("/api/v1/w/{workspace}/drafts/{id}");
+    let (_, shown) = server.call(&ines, "GET", &uri, None).await;
+    let (status, sent) = server
+        .call(
+            &ines,
+            "POST",
+            &format!("{uri}/send"),
+            Some(json!({"version": shown["version"], "content_token": shown["content_token"]})),
+        )
+        .await;
+    assert_eq!(status, StatusCode::ACCEPTED, "{sent}");
+    assert_eq!(sent["state"], "scheduled");
+    // Scout can't take it back; Ines's Undo can.
+    for confirmed in [false, true] {
+        let refused = operations::invoke(
+            &server.state,
+            scout(
+                "conversations.cancel_send",
+                json!({"draft_id": id}),
+                confirmed,
+            ),
+        )
+        .await;
+        assert!(
+            matches!(refused, Err(operations::InvokeError::NotAllowed { .. })),
+            "{refused:?}"
+        );
+    }
+    assert_eq!(held(&db, draft).await.0, "scheduled");
+    let (status, undone) = server
+        .call(&ines, "POST", &format!("{uri}/cancel_send"), None)
+        .await;
+    assert_eq!(status, StatusCode::OK, "{undone}");
+    assert_eq!(undone["state"], "draft");
+    assert_eq!(sends_requested(&db).await, 0);
 }

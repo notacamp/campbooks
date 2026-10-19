@@ -10,8 +10,12 @@
     "vite.config.ts",
     "vitest.config.ts",
     "vitest.storybook.config.ts",
+    "vitest.webkit.config.ts",
+    "vitest.tauri.config.ts",
     ".storybook/main.ts",
     "test/architecture",
+    "test/webkit",
+    "test/tauri",
     "scripts",
     "recordings"
   ]

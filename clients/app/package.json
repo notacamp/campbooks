@@ -21,6 +21,8 @@
     "lint": "eslint . --max-warnings 0 && stylelint --allow-empty-input \"src/**/*.css\" \"stories/**/*.css\"",
     "test": "vitest run --coverage",
     "test:watch": "vitest",
+    "test:csp": "vitest run --config vitest.webkit.config.ts",
+    "test:tauri": "vitest run --config vitest.tauri.config.ts",
     "test-storybook": "vitest run --config vitest.storybook.config.ts && VITE_STORYBOOK_THEME=dark vitest run --config vitest.storybook.config.ts",
     "deps:check": "depcruise src --config .dependency-cruiser.cjs",
     "api:generate": "openapi-typescript ../../openapi/openapi.json --output src/lib/api/schema.gen.ts && openapi-typescript ../../openapi/admin.json --output src/lib/api/admin.gen.ts && node scripts/records-gen.ts",

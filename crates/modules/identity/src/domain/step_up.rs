@@ -74,6 +74,7 @@ mod tests {
             expires_at: None,
             issued_at: None,
             auth_time: at,
+            sign_in: None,
         }
     }
 

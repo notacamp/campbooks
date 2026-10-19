@@ -6,13 +6,13 @@ use campbooks_ai::decide::{
     signals::email::triage,
     taught::{self, Bin, Outcome, Surface, TaughtRule},
 };
-use campbooks_kernel::{EventBus, Result};
+use campbooks_kernel::{EventBus, Result, binding::Binding};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use sqlx::{PgConnection, Postgres, Transaction};
 
 use super::{
-    Candidate, Stored,
+    Candidate, Stored, applications,
     effects::{self, Effects, TaughtAnswer},
 };
 use crate::{
@@ -75,6 +75,8 @@ pub struct Before {
 
 /// Where a rule acts: the inbox, the workspace's event key and the events.
 pub struct Context<'a> {
+    /// What binds the changes asked of the provider (campbooks-cloud#227).
+    pub binding: &'a Binding,
     /// The event bus.
     pub events: &'a EventBus,
     /// The workspace, as events key it.
@@ -134,10 +136,18 @@ pub async fn apply(
     if before == Before::default() {
         return Ok(Applied::Unchanged);
     }
-    effects::record(tx, ctx.workspace_id, rule, (candidate.id, run), &before).await?;
+    effects::record(
+        tx,
+        ctx.binding,
+        (ctx.workspace_id, ctx.inbox, rule),
+        (candidate.id, run),
+        &before,
+    )
+    .await?;
     effects
         .publish(
             tx,
+            ctx.binding,
             ctx.events,
             (ctx.workspace, ctx.inbox, candidate.id),
             true,
@@ -372,6 +382,11 @@ pub async fn acting_on(
 /// Put back what `rule` changed on conversation `id`, where the
 /// conversation still holds what the rule set. Returns whether anything
 /// changed.
+///
+/// Only an application bound to the rule (`applications`,
+/// campbooks-cloud#242) is put back: one planted or changed with SQL, or
+/// written before applications were bound, is left as it is, with a WARN
+/// carrying ids only, and the run goes on with the rest.
 pub async fn revert(
     tx: &mut Transaction<'_, Postgres>,
     ctx: &Context<'_>,
@@ -398,7 +413,17 @@ pub async fn revert(
     .fetch_optional(&mut **tx)
     .await?;
     let Some(row) = row else { return Ok(false) };
-    let before: Before = serde_json::from_value(row.before).unwrap_or_default();
+    // Its MAC, read under the lock just taken.
+    let owner = (ctx.workspace_id, rule.inbox, rule.id);
+    let Some(before) = applications::bound(tx, ctx.binding, owner, id, row.before).await? else {
+        tracing::warn!(
+            workspace = %ctx.workspace_id,
+            rule = %rule.id,
+            conversation = %id,
+            "an application of a taught rule is not bound to it; it is not put back"
+        );
+        return Ok(false);
+    };
     // Where the rule moved it then; its action now, for an application
     // recorded without it.
     let moved_to = before.moved_to.or_else(|| {
@@ -437,7 +462,13 @@ pub async fn revert(
     .execute(&mut **tx)
     .await?;
     effects
-        .publish(tx, ctx.events, (ctx.workspace, ctx.inbox, id), true)
+        .publish(
+            tx,
+            ctx.binding,
+            ctx.events,
+            (ctx.workspace, ctx.inbox, id),
+            true,
+        )
         .await?;
     needs::refresh(tx, ctx.events, ctx.workspace, id, ctx.needs).await?;
     Ok(true)

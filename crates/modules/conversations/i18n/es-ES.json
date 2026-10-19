@@ -13,6 +13,7 @@
     "invalid_subject": "El asunto es una sola línea de como máximo {{max}} caracteres.",
     "draft_too_long": "Este mensaje es demasiado largo para enviarlo.",
     "draft_changed": "Este borrador se ha cambiado en otro sitio. Vuelve a cargarlo para ver la última versión.",
+    "content_changed": "Esto ha cambiado desde que lo abriste. Revísalo y vuelve a intentarlo.",
     "draft_not_editable": "Este mensaje ya está en camino y no se puede cambiar.",
     "no_recipients": "Añade al menos un destinatario.",
     "invalid_address": "Esta dirección no es válida: {{address}}",
@@ -29,6 +30,12 @@
     "rule_needs_member": "Las reglas las enseña un miembro de la bandeja de entrada, no una aplicación.",
     "rule_not_active": "Esta regla está esperando un sí. Mantenla primero y luego podrás pausarla.",
     "rule_not_restorable": "Esta regla ya no se puede recuperar. Vuelve a enseñarla.",
-    "invalid_senders_query": "Busca con 2 a 100 caracteres y pide entre 1 y {{max}} remitentes."
+    "rule_needs_confirmation": "Esta regla necesita un nuevo sí antes de volver a actuar. Confírmala primero y luego podrás cambiarla.",
+    "rule_needs_your_yes": "Solo tú puedes decir sí a esta regla. Scout puede proponerla: revísala en la memoria de Scout y mantenla allí.",
+    "undo_unavailable": "Parte de lo que cambió esta regla no se puede deshacer. Elimínala conservando sus cambios.",
+    "invalid_senders_query": "Busca con 2 a 100 caracteres y pide entre 1 y {{max}} remitentes.",
+    "images_already_trusted": "Ya hay una regla inteligente para las imágenes de este remitente, aunque esté en pausa o esperando un sí. La encontrarás en la memoria de Scout.",
+    "send_needs_you": "Solo tú puedes enviar correo o deshacer un envío. Scout puede escribir un borrador: revísalo y envíalo tú.",
+    "images_need_you": "Solo tú puedes elegir mostrar siempre las imágenes de un remitente. Abre uno de sus mensajes y elígelo allí."
   }
 }

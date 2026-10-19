@@ -55,6 +55,8 @@ export interface InboxScreenProps {
   composeAction?: ReactNode | undefined;
   /** Open the reply composer once the conversation is loaded (Home's R). */
   startReply?: boolean | undefined;
+  /** The message that reply answers (a draft written for it), else the newest. */
+  replyTo?: string | undefined;
   /** Pins the clock (stories and tests). */
   now?: Date | undefined;
 }
@@ -72,6 +74,7 @@ export function InboxScreen({
   renderReplySlot,
   composeAction,
   startReply = false,
+  replyTo,
   now,
 }: InboxScreenProps) {
   const { t: typed } = useTranslation("conversations");
@@ -303,6 +306,7 @@ export function InboxScreen({
             onDone={done}
             renderReplySlot={renderReplySlot}
             startReply={startReply}
+            replyTo={replyTo}
             now={now}
           />
         )}

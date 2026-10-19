@@ -231,6 +231,12 @@ jobs:
       - name: Storybook stories (render, interactions, axe in light and dark)
         if: always()
         run: pnpm test-storybook
+      - name: WebKit for the mail frame policy test
+        if: always()
+        run: pnpm --filter @campbooks/app exec playwright install --with-deps webkit
+      - name: Mail frame under the desktop and web page policies (WebKit)
+        if: always()
+        run: pnpm --filter @campbooks/app test:csp
       - name: Audit (prod deps)
         if: always()
         run: pnpm audit --prod
@@ -260,6 +266,43 @@ jobs:
       - name: Clippy
         if: always()
         run: cargo clippy --all-targets -- -D warnings
+      - name: Tests (links open outside, IPC grants, the page policy)
+        if: always()
+        run: cargo test
+
+  tauri-shell:
+    # The mail frame in the real desktop shell (campbooks-cloud#237): a debug
+    # build driven by tauri-driver and WebKitWebDriver under a virtual display,
+    # against a mock API serving hostile HTML mail. Its own job, in parallel
+    # with the rest, and not a required check.
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run: { working-directory: clients }
+    steps:
+      - uses: actions/checkout@v6
+      - name: System libraries, WebKitWebDriver and a virtual display
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf webkit2gtk-driver xvfb
+      - uses: actions-rust-lang/setup-rust-toolchain@v2
+        with: { cache: false }
+      - uses: Swatinem/rust-cache@v2
+        with: { workspaces: clients/app/src-tauri, key: shell }
+      - name: tauri-driver
+        run: cargo install tauri-driver --version 2.1.0 --locked
+      - uses: pnpm/action-setup@v6
+        with: { package_json_file: clients/package.json }
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: clients/.nvmrc
+          cache: pnpm
+          cache-dependency-path: clients/pnpm-lock.yaml
+      - run: pnpm install --frozen-lockfile
+      - name: Debug build of the desktop app
+        run: pnpm --filter @campbooks/app tauri build --debug --no-bundle
+      - name: The mail frame in the real shell (no IPC, no script, nothing outside)
+        run: xvfb-run -a pnpm --filter @campbooks/app test:tauri
 
   image:
     # On a pull request: builds the release image exactly as published and
@@ -341,10 +384,19 @@ jobs:
       - name: Changed?
         id: changed
         env:
-          BASE: ${{ github.event.pull_request.base.sha || github.event.before }}
+          BASE: ${{ github.event.before }}
+          EVENT: ${{ github.event_name }}
         run: |
           paths=(deploy/laya .github/workflows/ci.yml .github/workflows/image.yml)
-          if ! files=$(git diff --name-only "$BASE" HEAD -- "${paths[@]}" 2>/dev/null); then
+          # A PR: its own changes, between the merge ref's parents (the base
+          # tip now, the PR's head), never those of PRs merged since it was
+          # opened (campbooks-cloud#231). A push: since the previous tip.
+          if [ "$EVENT" = pull_request ] && git rev-parse -q --verify 'HEAD^2' >/dev/null; then
+            set -- 'HEAD^1...HEAD^2'
+          else
+            set -- "$BASE" HEAD
+          fi
+          if ! files=$(git diff --name-only "$@" -- "${paths[@]}" 2>/dev/null); then
             files=unknown   # no usable base (new branch, force push): build anyway
           fi
           if [ -n "$files" ]; then echo "run=true"; else echo "run=false"; fi >> "$GITHUB_OUTPUT"

@@ -101,6 +101,7 @@ impl EventConsumer for RequestChanges {
         tx.commit().await?;
 
         let stamp = self.stamp(ctx, workspace, &target).await;
+        let binding = ctx.state().binding.clone();
         let tx = ctx.tx().await?;
         // Serialise with the stream's run, which checks for changes recorded
         // while it ran under the same lock.
@@ -111,27 +112,10 @@ impl EventConsumer for RequestChanges {
         .fetch_one(&mut **tx)
         .await?;
         let mut pending = 0;
-        let writable = |label: &str| match target.provider {
-            Provider::Google => outbound::writable(label),
-            Provider::Zoho => zoho::state::writable(label),
-        };
+        let mut recorded = Vec::new();
         for item in items {
-            let mapped = match target.provider {
-                Provider::Google => outbound::map(&item.change, &known),
-                Provider::Zoho => outbound::map_zoho(&item.change),
-            };
-            let (state, reason, add, remove) = match mapped {
-                // Defence in depth: only the flag labels, categories and
-                // user labels (Gmail), or read, flag and inbox (Zoho), are
-                // ever written.
-                Mapped::Labels { add, remove }
-                    if !add.iter().chain(&remove).all(|l| writable(l)) =>
-                {
-                    (State::Skipped, Some("unsupported"), Vec::new(), Vec::new())
-                }
-                Mapped::Labels { add, remove } => (State::Pending, None, add, remove),
-                Mapped::Skip(reason) => (State::Skipped, Some(reason), Vec::new(), Vec::new()),
-            };
+            let (state, reason, add, remove) = outcome(target.provider, &item.change, &known);
+            let id = Uuid::now_v7();
             let inserted = sqlx::query!(
                 r#"INSERT INTO connectors.outbound_changes
                        (id, workspace_id, stream_id, request_id, provider_message_id, kind,
@@ -139,7 +123,7 @@ impl EventConsumer for RequestChanges {
                         done_at)
                    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
                    ON CONFLICT (request_id, provider_message_id) DO NOTHING"#,
-                Uuid::now_v7(),
+                id,
                 workspace as WorkspaceId,
                 target.stream as StreamId,
                 *event.id.as_uuid(),
@@ -156,15 +140,47 @@ impl EventConsumer for RequestChanges {
             .execute(&mut **tx)
             .await?
             .rows_affected();
-            if inserted > 0 && state == State::Pending {
-                pending += 1;
+            if inserted > 0 {
+                recorded.push(id);
+                if state == State::Pending {
+                    pending += 1;
+                }
             }
         }
+        // Each row as written, bound for the run that makes it
+        // (campbooks-cloud#227): only rows recorded here, never one found.
+        outbound::bind(tx, &binding, workspace, &recorded).await?;
         if pending > 0 && !target.paused {
             schedule::run_now(tx, workspace, target.stream, now).await?;
         }
         tracing::info!(%workspace, stream = %target.stream, pending, "outbound changes recorded");
         Ok(())
+    }
+}
+
+/// How `change` is recorded for `provider` (`known`: Gmail's user labels):
+/// its state, the reason when it is not pending, and the labels to add and
+/// remove. Defence in depth: only the flag labels, categories and user
+/// labels (Gmail), or read, flag and inbox (Zoho), are ever written.
+fn outcome(
+    provider: Provider,
+    change: &crate::events::RequestedChange,
+    known: &HashSet<String>,
+) -> (State, Option<&'static str>, Vec<String>, Vec<String>) {
+    let writable = |label: &str| match provider {
+        Provider::Google => outbound::writable(label),
+        Provider::Zoho => zoho::state::writable(label),
+    };
+    let mapped = match provider {
+        Provider::Google => outbound::map(change, known),
+        Provider::Zoho => outbound::map_zoho(change),
+    };
+    match mapped {
+        Mapped::Labels { add, remove } if !add.iter().chain(&remove).all(|l| writable(l)) => {
+            (State::Skipped, Some("unsupported"), Vec::new(), Vec::new())
+        }
+        Mapped::Labels { add, remove } => (State::Pending, None, add, remove),
+        Mapped::Skip(reason) => (State::Skipped, Some(reason), Vec::new(), Vec::new()),
     }
 }
 
@@ -198,10 +214,16 @@ async fn standing<'r>(
         .iter()
         .map(serde_json::to_value)
         .collect::<Result<_, _>>()
-        .map_err(|e| JobError::fatal(format!("encoding requested changes: {e}")))?;
+        .map_err(|e| {
+            JobError::fatal(format!(
+                "encoding requested changes: {}",
+                campbooks_kernel::redact::json(&e)
+            ))
+        })?;
     let standing = state
         .outbound
         .changes_standing(
+            state,
             conn,
             workspace,
             id,

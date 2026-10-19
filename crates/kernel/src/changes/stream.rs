@@ -300,12 +300,16 @@ struct Containers {
 }
 
 /// What was numbered in a range a read covered, seen or not.
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
 struct AccessChanges {
     /// A change that may change who belongs to the workspace.
     members: bool,
     /// A change that may change who sees inside a container.
     containers: bool,
+    /// What those container changes named (each change's record and its
+    /// container): a container they gained the caller was announced; any
+    /// other gained was not (campbooks-cloud#232).
+    announced: HashSet<RecordRef>,
 }
 
 /// The record types [`access_changes`] looks for, each in its own range
@@ -327,8 +331,8 @@ struct Watched<'a> {
 }
 
 /// Whether a change of a watched record type was numbered in its range of
-/// `workspace`, whoever may see it. Ids are not read: only whether one
-/// exists.
+/// `workspace`, whoever may see it, and when a container change was, what
+/// those changes named (a handful of rows at most).
 async fn access_changes(
     conn: &mut PgConnection,
     workspace: &str,
@@ -360,9 +364,31 @@ async fn access_changes(
     .bind(watched.containers_upto)
     .fetch_one(&mut *conn)
     .await?;
+    let mut announced = HashSet::new();
+    if containers {
+        let named: Vec<(String, String, Option<String>, Option<String>)> = sqlx::query_as(
+            "SELECT record_type, record_id, container_type, container_id
+               FROM kernel.changes
+              WHERE workspace_id = $1 AND record_type = ANY($2::text[])
+                AND seq > $3 AND seq <= $4",
+        )
+        .bind(workspace)
+        .bind(watched.containers)
+        .bind(watched.containers_from)
+        .bind(watched.containers_upto)
+        .fetch_all(&mut *conn)
+        .await?;
+        for (record_type, record_id, container_type, container_id) in named {
+            announced.insert(RecordRef::new(record_type, &record_id));
+            if let (Some(container_type), Some(container_id)) = (container_type, container_id) {
+                announced.insert(RecordRef::new(container_type, &container_id));
+            }
+        }
+    }
     Ok(AccessChanges {
         members,
         containers,
+        announced,
     })
 }
 
@@ -540,6 +566,44 @@ fn opens_limit(config: &crate::config::ChangesConfig) -> Option<Limit> {
     })
 }
 
+/// Count an open against `principal`'s limit of opens per window.
+async fn count_open(state: &AppState, principal: &Principal) -> Result<(), Error> {
+    if let Some(limit) = opens_limit(&state.config.changes) {
+        // Counted per caller, whatever happens in the workspace.
+        let key = RateKey::text(&caller(principal));
+        state.rate_limits.check(&state.db, &limit, &key).await?;
+    }
+    Ok(())
+}
+
+/// `subscription`'s caller's access in its workspace now, asked once the
+/// open has read its head: the request resolved it before, and a removal
+/// numbered in between falls in no range the stream reads (it reads
+/// membership changes after the head only). As a heartbeat's
+/// `check_access` asks it: a token that no longer stands (its account
+/// suspended or signed out everywhere since it was verified), a former
+/// member or a revoked client is refused like any non-member (404), and a
+/// changed role is the one the stream starts with.
+async fn access_now(state: &AppState, subscription: &Subscription) -> Result<Access, Error> {
+    if !state.auth.still_stands(&subscription.principal).await? {
+        return Err(Error::NotFound);
+    }
+    match crate::tenancy::resolve_access(
+        state.membership.as_ref(),
+        state.clients.as_ref(),
+        &state.db,
+        &subscription.principal,
+        subscription.workspace,
+    )
+    .await
+    {
+        Ok(Some(access)) => Ok(access),
+        // Gone, or a revoked client: as for anyone who is not a member.
+        Ok(None) | Err(Error::Unauthorized(_)) => Err(Error::NotFound),
+        Err(error) => Err(error),
+    }
+}
+
 /// Open `subscription`'s feed. The caller has been admitted to the
 /// workspace already (`Workspace<S>`); this checks the per-caller limits
 /// and decides where to start.
@@ -547,19 +611,17 @@ fn opens_limit(config: &crate::config::ChangesConfig) -> Option<Limit> {
 /// # Errors
 /// [`Error::RateLimited`] when the caller opened too many streams lately;
 /// [`Error::TooManyRequests`] (`too_many_streams`) beyond the per-caller
-/// limit of open streams; a database error reading the head.
+/// limit of open streams; [`Error::NotFound`] when the caller is no
+/// longer a member once the head is read; a database error reading the
+/// head.
 pub async fn open(
     state: &AppState,
-    subscription: Subscription,
+    mut subscription: Subscription,
 ) -> Result<impl Stream<Item = Result<Frame, Infallible>> + Send + 'static, Error> {
     let config = &state.config.changes;
     let workspace = subscription.workspace.to_string();
     let binding = binding(&workspace, &subscription.principal);
-    if let Some(limit) = opens_limit(config) {
-        // Counted per caller, whatever happens in the workspace.
-        let key = RateKey::text(&caller(&subscription.principal));
-        state.rate_limits.check(&state.db, &limit, &key).await?;
-    }
+    count_open(state, &subscription.principal).await?;
     let slot = state
         .changes
         .admit(&subscription.principal.subject)
@@ -578,6 +640,8 @@ pub async fn open(
     .fetch_one(&mut *tx)
     .await?;
     tx.commit().await?;
+    // Asked again after the head: see `access_now` (campbooks-cloud#216).
+    subscription.access = access_now(state, &subscription).await?;
     let after = subscription
         .after
         .as_deref()
@@ -629,7 +693,7 @@ pub async fn open(
         containers: None,
         members_seen: position.seq,
         listed: None,
-        relist_unannounced: false,
+        announced: HashSet::new(),
         pacer: Pacer::new(Duration::from_millis(config.catch_up_tick_ms)),
         release_at: None,
         woken: false,
@@ -724,12 +788,13 @@ struct Feed {
     /// Membership changes up to this sequence number were looked for (and
     /// membership resolved when one was found).
     members_seen: i64,
-    /// The containers as last listed, to tell a gain at a heartbeat.
+    /// The containers as last listed, to tell a gain.
     listed: Option<HashSet<RecordRef>>,
-    /// Whether the next listing is the heartbeat's, which no change
-    /// announced: a container it finds that the last list lacked had
-    /// changes numbered in between that were skipped.
-    relist_unannounced: bool,
+    /// What the container changes behind the next listing named. A
+    /// container that listing gains which they did not name (at a
+    /// heartbeat they named nothing) was gained unannounced: its changes
+    /// since the last list were read past (campbooks-cloud#232).
+    announced: HashSet<RecordRef>,
     pacer: Pacer,
     /// When the queued frames may leave (a paced read's tick).
     release_at: Option<Instant>,
@@ -884,12 +949,13 @@ impl Feed {
         let covers = head(&mut tx, &self.workspace).await?;
         tx.commit().await?;
         let set = self.visible_containers().await?;
-        let gained_unannounced = self.relist_unannounced
-            && self
-                .listed
-                .as_ref()
-                .is_some_and(|before| set.iter().any(|c| !before.contains(c)));
-        self.relist_unannounced = false;
+        // Whatever made the stream list again (a heartbeat, a change of
+        // access, a container change about some other container).
+        let announced = std::mem::take(&mut self.announced);
+        let gained_unannounced = self.listed.as_ref().is_some_and(|before| {
+            set.iter()
+                .any(|c| !before.contains(c) && !announced.contains(c))
+        });
         // A container lost, or one gained that no change announced (its
         // changes since the last list were read past): the client drops
         // its cache and refetches, so nothing is lost for good.
@@ -936,9 +1002,11 @@ impl Feed {
                     containers_from: containers.covers.max(self.cursor),
                     containers_upto: end,
                 };
-                let changed = access_changes(&mut tx, &self.workspace, &watched).await?;
+                let mut changed = access_changes(&mut tx, &self.workspace, &watched).await?;
                 tx.commit().await?;
-                if !changed.containers {
+                if changed.containers {
+                    self.announced = std::mem::take(&mut changed.announced);
+                } else {
                     self.containers = Some(containers);
                 }
                 (page, end, changed)
@@ -1132,7 +1200,6 @@ impl Feed {
         // change of access nothing announced is not kept any longer (and a
         // container it gained makes the client resync).
         self.containers = None;
-        self.relist_unannounced = true;
         self.check_access().await?;
         if self.done {
             self.release_at = self.pacer.after_read(started, Instant::now(), false);
@@ -1383,6 +1450,7 @@ mod tests {
             expires_at: None,
             issued_at: None,
             auth_time: None,
+            sign_in: None,
         }
     }
 

@@ -63,8 +63,11 @@ pub use read_rules::ReadRules;
 /// Name of the OpenAPI vendor extension that carries an [`Operation`].
 pub const EXTENSION: &str = "x-campbooks";
 
-/// How much harm a mistaken call can do. High-risk operations always need
-/// the user's confirmation before automation or the assistant runs them.
+/// How much harm a mistaken call can do. High-risk operations are a
+/// person's own request only: none opts automation or the assistant in
+/// (`cargo xtask arch`, campbooks-cloud#242), since a call's `confirmed`
+/// flag is set by the code making it and proves no click. [`invoke`] still
+/// refuses one that is not confirmed.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Risk {

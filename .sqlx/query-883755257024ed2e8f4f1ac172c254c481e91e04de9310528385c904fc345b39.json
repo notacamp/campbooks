@@ -1,0 +1,16 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE connectors.provider_budgets SET tokens = least($2, tokens + $3)\n          WHERE provider = $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Float8",
+        "Float8"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "883755257024ed2e8f4f1ac172c254c481e91e04de9310528385c904fc345b39"
+}

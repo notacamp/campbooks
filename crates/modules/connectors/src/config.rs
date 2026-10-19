@@ -78,7 +78,10 @@ pub struct PollConfig {
 #[serde(default, deny_unknown_fields)]
 pub struct BudgetConfig {
     /// Google API quota units per second shared by every process (default
-    /// 5000, a quarter of Gmail's default per-project quota).
+    /// 5000, a quarter of Gmail's default per-project quota). The budget
+    /// holds two seconds' worth: a run planned to cost more waits for a full
+    /// budget and owes the rest once it is done, so a low rate slows big
+    /// pushes down but never lets them spend uncounted.
     pub units_per_second: u32,
 }
 

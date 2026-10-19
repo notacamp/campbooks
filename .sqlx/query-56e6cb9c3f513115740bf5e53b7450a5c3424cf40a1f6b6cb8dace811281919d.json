@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            DELETE FROM kernel.purged_workspaces p\n             WHERE p.purged_at < now() - make_interval(days => $1)\n               AND p.workspace_id <> ALL($2)\n               AND NOT EXISTS (SELECT 1 FROM kernel.jobs j WHERE j.workspace_id = p.workspace_id)\n               AND NOT EXISTS (SELECT 1 FROM kernel.events e WHERE e.workspace_id = p.workspace_id)\n               AND NOT EXISTS (SELECT 1 FROM kernel.changes c WHERE c.workspace_id = p.workspace_id)\n               AND NOT EXISTS (\n                   SELECT 1 FROM kernel.change_heads h WHERE h.workspace_id = p.workspace_id)\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Int4",
+        "TextArray"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "56e6cb9c3f513115740bf5e53b7450a5c3424cf40a1f6b6cb8dace811281919d"
+}

@@ -8,11 +8,20 @@ use sqlx::{PgConnection, PgPool};
 use super::model::{ConnectionId, Provider};
 use crate::{
     deps::Deps,
-    provider::{ProviderError, TokenGrant},
+    provider::{HTTP_TIMEOUT, ProviderError, TokenGrant},
 };
 
 /// An access token is refreshed this long before it expires.
 const EXPIRY_MARGIN: TimeDelta = TimeDelta::minutes(2);
+
+/// How often a run waiting for another run's refresh looks again.
+const REFRESH_POLL: std::time::Duration = std::time::Duration::from_millis(100);
+
+/// How long a run waits for another run's refresh: that run's call to the
+/// provider is bounded by [`HTTP_TIMEOUT`], storing its result takes a
+/// moment more.
+const REFRESH_WAIT: std::time::Duration =
+    HTTP_TIMEOUT.saturating_add(std::time::Duration::from_secs(5));
 
 /// Associated data of a sealed credential column.
 fn context(column: &str, id: ConnectionId) -> Vec<u8> {
@@ -118,14 +127,49 @@ pub async fn access_token(
         return Ok(token);
     }
     // Refresh under a per-connection lock, so concurrent runs (a sync and
-    // a disconnect, two workers) refresh once and share the result.
-    let mut tx = pool.begin_for(workspace).await?;
-    sqlx::query_scalar!(
-        "SELECT pg_advisory_xact_lock(hashtextextended('connectors.credentials:' || $1::text, 0))",
-        id.to_string()
-    )
-    .fetch_one(&mut *tx)
-    .await?;
+    // a send, two workers) refresh once and share the result. The lock is
+    // only ever tried, never waited on: the run that holds it calls the
+    // provider (up to `HTTP_TIMEOUT`), longer than a lock wait may last
+    // (`lock_timeout`), so the others look for its token until it is stored
+    // instead (campbooks-cloud#254).
+    let waited_until = tokio::time::Instant::now() + REFRESH_WAIT;
+    loop {
+        let mut tx = pool.begin_for(workspace).await?;
+        let locked: bool = sqlx::query_scalar(
+            "SELECT pg_try_advisory_xact_lock(hashtextextended('connectors.credentials:' || $1::text, 0))",
+        )
+        .bind(id.to_string())
+        .fetch_one(&mut *tx)
+        .await?;
+        if locked {
+            return refresh_locked(tx, cipher, deps, workspace, id, now).await;
+        }
+        // Another run is refreshing: its token, once it is stored.
+        let stored = stored_access(&mut tx, cipher, id, now).await?;
+        tx.commit().await?;
+        if let Some(token) = stored {
+            return Ok(token);
+        }
+        if tokio::time::Instant::now() >= waited_until {
+            return Err(TokenError::Provider(ProviderError::Unavailable(
+                "another run's token refresh did not finish".into(),
+            )));
+        }
+        tokio::time::sleep(REFRESH_POLL).await;
+    }
+}
+
+/// Refresh connection `id`'s access token in `tx`, which holds the
+/// connection's refresh lock: the stored token if a run stored one
+/// meanwhile, else the provider's, stored back.
+async fn refresh_locked(
+    mut tx: sqlx::Transaction<'static, sqlx::Postgres>,
+    cipher: &Cipher,
+    deps: &Deps,
+    workspace: WorkspaceId,
+    id: ConnectionId,
+    now: DateTime<Utc>,
+) -> Result<String, TokenError> {
     if let Some(token) = stored_access(&mut tx, cipher, id, now).await? {
         tx.commit().await?;
         return Ok(token);
@@ -138,24 +182,23 @@ pub async fn access_token(
     .await?
     .ok_or(TokenError::NeedsReauth("credentials_unreadable"))?;
     let refresh = cipher
-        .open(&sealed, &context("refresh_token", id))
+        .open_checked(&sealed, &context("refresh_token", id))
         .map_err(|_| TokenError::NeedsReauth("credentials_unreadable"))?;
-    let grant = match refresh_at_provider(&mut tx, deps, id, &refresh).await? {
+    let grant = match refresh_at_provider(&mut tx, deps, id, &refresh.value).await? {
         Ok(grant) => grant,
         Err(ProviderError::InvalidGrant) => return Err(TokenError::NeedsReauth("grant_revoked")),
         Err(other) => return Err(TokenError::Provider(other)),
     };
-    store(
-        &mut tx,
-        cipher,
-        workspace,
-        id,
-        grant.refresh_token.as_deref(),
-        &grant,
-        now,
-    )
-    .await
-    .map_err(TokenError::Database)?;
+    // A refresh token the previous instance secret sealed is sealed again
+    // with the current one when the provider sends none back
+    // (campbooks-cloud#191).
+    let kept = grant
+        .refresh_token
+        .as_deref()
+        .or_else(|| refresh.by_previous.then_some(refresh.value.as_str()));
+    store(&mut tx, cipher, workspace, id, kept, &grant, now)
+        .await
+        .map_err(TokenError::Database)?;
     tx.commit().await?;
     Ok(grant.access_token)
 }
@@ -209,15 +252,34 @@ async fn stored_access(
              FROM connectors.credentials WHERE connection_id = $1"#,
         id as ConnectionId
     )
-    .fetch_optional(conn)
+    .fetch_optional(&mut *conn)
     .await?
     .ok_or(TokenError::NeedsReauth("credentials_unreadable"))?;
-    Ok(match (row.access_token, row.access_expires_at) {
-        (Some(sealed), Some(expires_at)) if expires_at - EXPIRY_MARGIN > now => {
-            cipher.open(&sealed, &context("access_token", id)).ok()
-        }
-        _ => None,
-    })
+    let (Some(sealed), Some(expires_at)) = (row.access_token, row.access_expires_at) else {
+        return Ok(None);
+    };
+    if expires_at - EXPIRY_MARGIN <= now {
+        return Ok(None);
+    }
+    let Ok(opened) = cipher.open_checked(&sealed, &context("access_token", id)) else {
+        return Ok(None);
+    };
+    if opened.by_previous {
+        // Sealed with the previous instance secret: sealed again with the
+        // current one (campbooks-cloud#191). The refresh token follows at
+        // the next refresh.
+        // Compare-and-set: a refresh that stored a new token meanwhile wins.
+        sqlx::query(
+            "UPDATE connectors.credentials SET access_token = $2
+              WHERE connection_id = $1 AND access_token = $3",
+        )
+        .bind(*id.as_uuid())
+        .bind(cipher.seal(&opened.value, &context("access_token", id)))
+        .bind(&sealed)
+        .execute(&mut *conn)
+        .await?;
+    }
+    Ok(Some(opened.value))
 }
 
 /// Forget connection `id`'s access token, so the next run refreshes it

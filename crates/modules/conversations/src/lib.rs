@@ -68,7 +68,7 @@ pub use features::{
 /// The owner's money mail as an eval set to label (campbooks-cloud#167).
 pub mod labelling {
     pub use crate::features::labelling_export::{
-        LabellingItem, LabellingSet, MAX_ITEMS, OWNER, export_for_labelling, export_set, manifest,
+        LabellingItem, LabellingSet, MAX_ITEMS, OWNER, export_inboxes, export_set, manifest,
         manifest_for,
     };
 }
@@ -229,6 +229,9 @@ pub fn module(deps: ConversationsDeps) -> Module {
             .schedule::<features::backfill_needs::DispatchNeedsBackfills>(
                 features::backfill_needs::EVERY,
             )
+            .schedule::<features::resign_rules::DispatchRuleResigns>(features::resign_rules::EVERY)
+            .job::<features::resign_rules::ResignRules>()
+            .rekey::<features::retag_bindings::RetagBindings>()
             .consumer(
                 features::decide_message::DecideMessage::new(
                     model.clone(),
@@ -374,14 +377,15 @@ mod tests {
             "conversations.summarize_need",
             "conversations.backfill_needs",
             "conversations.dispatch_needs_backfills",
+            "conversations.dispatch_rule_resigns",
+            "conversations.resign_rules",
+            "conversations.retag_bindings",
         ] {
             assert!(kinds.contains(&kind), "{kind}");
         }
-        assert!(
-            registry
-                .schedule_names()
-                .contains(&"conversations.dispatch_needs_backfills")
-        );
+        let schedules = registry.schedule_names();
+        assert!(schedules.contains(&"conversations.dispatch_needs_backfills"));
+        assert!(schedules.contains(&"conversations.dispatch_rule_resigns"));
     }
 
     // A runtime query rather than `query!`, so this test needs no entry in

@@ -8,5 +8,5 @@
     "paths": { "~/*": ["./src/*"] }
   },
   "include": ["src", "test", "stories", ".storybook/preview.tsx"],
-  "exclude": ["test/fixtures", "test/architecture"]
+  "exclude": ["test/fixtures", "test/architecture", "test/webkit", "test/tauri"]
 }

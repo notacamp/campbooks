@@ -4,7 +4,7 @@
 use std::collections::BTreeSet;
 
 use campbooks_ai::decide::{signals::email::triage, taught::Outcome};
-use campbooks_kernel::{EventBus, Result};
+use campbooks_kernel::{EventBus, Result, binding::Binding};
 use serde_json::json;
 use sqlx::{Postgres, Transaction, types::Uuid};
 
@@ -100,6 +100,7 @@ async fn flag_on_arrival(
 /// announce.
 pub async fn on_arrival(
     tx: &mut Transaction<'_, Postgres>,
+    binding: &Binding,
     events: &EventBus,
     arrival: &Arrival<'_>,
     outcome: &Outcome,
@@ -165,6 +166,7 @@ pub async fn on_arrival(
     effects
         .publish(
             tx,
+            binding,
             events,
             (arrival.ws, arrival.inbox, arrival.conversation),
             false,
@@ -176,8 +178,8 @@ pub async fn on_arrival(
         };
         effects::record(
             tx,
-            arrival.workspace,
-            rule,
+            binding,
+            (arrival.workspace, arrival.inbox, rule),
             (arrival.conversation, None),
             &before,
         )

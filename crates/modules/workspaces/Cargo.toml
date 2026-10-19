@@ -28,6 +28,7 @@ uuid.workspace = true
 campbooks-kernel = { workspace = true, features = ["test-util"] }
 secrecy.workspace = true
 tokio.workspace = true
+tracing-subscriber.workspace = true
 
 [lints]
 workspace = true
