@@ -1079,111 +1079,117 @@ export function WhatNeedsYou({ workspaceId, now, offer }: WhatNeedsYouProps) {
         {groups.map((group, position) => {
           const live = group.rows.filter((row) => row.confirmation === undefined);
           const bills = live.filter((row) => kindOf(row.need) === "bill");
+          const items = group.rows.map((row) => {
+            const due = rowEnd(row);
+            const expanded = expandedId === row.item.id;
+            const isSelected = row.item.id === selected?.item.id;
+            const actions = isSelected ? actionsOf(row) : undefined;
+            return (
+              <Item
+                key={row.item.id}
+                id={itemId(row.item.id)}
+                who={row.name}
+                what={needSentence(
+                  tc,
+                  row.need,
+                  row.name,
+                  { locale: i18n.language, now },
+                  row.conversation,
+                )}
+                excerpt={row.need.quote?.text}
+                avatar={{
+                  name: row.name,
+                  kind:
+                    row.item.reason === "pay" || row.need.question === "suspicious"
+                      ? "service"
+                      : "person",
+                }}
+                due={due?.text}
+                soon={due?.soon === true}
+                age={rowAge(row)}
+                selected={isSelected}
+                expanded={expanded}
+                confirmation={row.confirmation}
+                onConfirmEnd={() => {
+                  folded(row);
+                }}
+                onToggle={() => {
+                  select(row.item.id);
+                  setExpandedId(expanded ? undefined : row.item.id);
+                }}
+                actions={
+                  actions === undefined ? undefined : (
+                    <ItemActions
+                      label={t("actions.label", { name: row.name })}
+                      own={actions.own}
+                      universal={actions.universal}
+                      highlighted={highlight}
+                      onHighlight={setHighlight}
+                      picked={actions.picked ? t("actions.picked") : undefined}
+                      onAction={(id) => {
+                        run(row, id);
+                      }}
+                    />
+                  )
+                }
+                detail={
+                  <NeedDetail
+                    workspaceId={workspaceId}
+                    row={row}
+                    t={t}
+                    tc={tc}
+                    locale={i18n.language}
+                    now={now}
+                    focusAttachment={attachmentFor === row.item.id}
+                    onAttachmentFocused={(found) => {
+                      setAttachmentFor(undefined);
+                      // Nothing to focus (only images its body shows):
+                      // say so rather than do nothing.
+                      if (!found) {
+                        undo.notify(t("actions.noAttachment"));
+                      }
+                    }}
+                    onOpen={() => {
+                      openConversation(row);
+                    }}
+                  />
+                }
+              />
+            );
+          });
+          // The last row folding away takes its group with it: no "Nudge 0".
           return (
             <Fragment key={group.reason}>
-              <QueueGroup
-                signal={signalOf(group.reason)}
-                name={t(`groups.${group.reason}`)}
-                count={live.length}
-                note={
-                  bills.length > 0
-                    ? t("pay.note")
-                    : group.reason === "nudge"
-                      ? t("nudge.note")
-                      : undefined
-                }
-                action={
-                  bills.length > 1 ? (
-                    <Button
-                      shortcut="item.all_paid"
-                      onClick={() => {
-                        allPaid(bills);
-                      }}
-                    >
-                      {t("pay.allPaid", { count: bills.length })}
-                    </Button>
-                  ) : undefined
-                }
-              >
-                {group.rows.map((row) => {
-                  const due = rowEnd(row);
-                  const expanded = expandedId === row.item.id;
-                  const isSelected = row.item.id === selected?.item.id;
-                  const actions = isSelected ? actionsOf(row) : undefined;
-                  return (
-                    <Item
-                      key={row.item.id}
-                      id={itemId(row.item.id)}
-                      who={row.name}
-                      what={needSentence(
-                        tc,
-                        row.need,
-                        row.name,
-                        { locale: i18n.language, now },
-                        row.conversation,
-                      )}
-                      excerpt={row.need.quote?.text}
-                      avatar={{
-                        name: row.name,
-                        kind:
-                          row.item.reason === "pay" || row.need.question === "suspicious"
-                            ? "service"
-                            : "person",
-                      }}
-                      due={due?.text}
-                      soon={due?.soon === true}
-                      age={rowAge(row)}
-                      selected={isSelected}
-                      expanded={expanded}
-                      confirmation={row.confirmation}
-                      onConfirmEnd={() => {
-                        folded(row);
-                      }}
-                      onToggle={() => {
-                        select(row.item.id);
-                        setExpandedId(expanded ? undefined : row.item.id);
-                      }}
-                      actions={
-                        actions === undefined ? undefined : (
-                          <ItemActions
-                            label={t("actions.label", { name: row.name })}
-                            own={actions.own}
-                            universal={actions.universal}
-                            highlighted={highlight}
-                            onHighlight={setHighlight}
-                            picked={actions.picked ? t("actions.picked") : undefined}
-                            onAction={(id) => {
-                              run(row, id);
-                            }}
-                          />
-                        )
-                      }
-                      detail={
-                        <NeedDetail
-                          workspaceId={workspaceId}
-                          row={row}
-                          t={t}
-                          tc={tc}
-                          locale={i18n.language}
-                          now={now}
-                          focusAttachment={attachmentFor === row.item.id}
-                          onAttachmentFocused={(found) => {
-                            setAttachmentFor(undefined);
-                            // Nothing to focus (only images its body shows):
-                            // say so rather than do nothing.
-                            if (!found) {
-                              undo.notify(t("actions.noAttachment"));
-                            }
-                          }}
-                          onOpen={() => {
-                            openConversation(row);
-                          }}
-                        />
-                      }
-                    />
-                  );
-                })}
-              </QueueGroup>
+              {live.length === 0 ? (
+                <div className="flex flex-col">{items}</div>
+              ) : (
+                <QueueGroup
+                  signal={signalOf(group.reason)}
+                  name={t(`groups.${group.reason}`)}
+                  count={live.length}
+                  note={
+                    bills.length > 0
+                      ? t("pay.note")
+                      : group.reason === "nudge"
+                        ? t("nudge.note")
+                        : undefined
+                  }
+                  action={
+                    bills.length > 1 ? (
+                      <Button
+                        shortcut="item.all_paid"
+                        onClick={() => {
+                          allPaid(bills);
+                        }}
+                      >
+                        {t("pay.allPaid", { count: bills.length })}
+                      </Button>
+                    ) : undefined
+                  }
+                >
+                  {items}
+                </QueueGroup>
+              )}
               {position === 0 ? noticed : null}
             </Fragment>
           );
