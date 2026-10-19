@@ -25,9 +25,9 @@ import {
 import {
   useConversation,
   useInboxes,
+  type ConversationPlace,
   type ConversationSummary,
   type MessageView,
-  type Place,
 } from "../../api/queries";
 import {
   archiveMove,
@@ -71,7 +71,7 @@ export interface ConversationReaderProps {
   workspaceId: string;
   conversationId: string;
   /** The stream or view the list shows (Back goes there). */
-  stream: Place;
+  stream: ConversationPlace;
   /** What Back says when the list is not a stream (search results). */
   backLabel?: string | undefined;
   actions: InboxActions;
@@ -89,6 +89,8 @@ export interface ConversationReaderProps {
   startReply?: boolean | undefined;
   /** The message that reply answers (a draft written for it), else the newest. */
   replyTo?: string | undefined;
+  /** A saved draft to open in the composer on arrival (from Drafts). */
+  draftId?: string | undefined;
   now?: Date | undefined;
 }
 
@@ -111,6 +113,7 @@ export function ConversationReader({
   renderReplySlot: replySlot,
   startReply = false,
   replyTo,
+  draftId,
   now,
 }: ConversationReaderProps) {
   const { t: typed, i18n } = useTranslation("conversations");
@@ -470,6 +473,7 @@ export function ConversationReader({
     conversation,
     messages,
     request: reply,
+    draftId,
     onClose: () => {
       setReply(null);
     },

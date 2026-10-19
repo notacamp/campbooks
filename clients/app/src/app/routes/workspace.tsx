@@ -27,7 +27,7 @@ import {
   WorkspaceSwitcher,
 } from "~/lib/ui";
 import { useAttentionCount } from "~/modules/attention";
-import { StreamNav, streamPath } from "~/modules/conversations";
+import { StreamNav, isPlace, streamPath, type Place } from "~/modules/conversations";
 import { useWorkspaces, type Workspace } from "~/modules/workspaces";
 
 import { AccountMenu } from "../account/AccountMenu";
@@ -155,20 +155,9 @@ function WorkspaceFrame({ workspace, all }: { workspace: Workspace; all: Workspa
   const needsYou = useAttentionCount(workspace.id);
   const inboxPath = streamPath(workspace.id, "primary");
   const searchPath = `${base}/search`;
-  // The stream or view on screen (`/inbox/sent`…): views are places, not streams.
-  const openStream =
-    /\/inbox\/(primary|updates|receipts|newsletters|sent|archive|spam|trash)\b/u.exec(
-      pathname,
-    )?.[1] as
-      | "primary"
-      | "updates"
-      | "receipts"
-      | "newsletters"
-      | "sent"
-      | "archive"
-      | "spam"
-      | "trash"
-      | undefined;
+  // The stream, view or Drafts on screen (`/inbox/sent`…): these are places, not streams.
+  const place = /\/inbox\/([^/]+)/u.exec(pathname)?.[1];
+  const openStream: Place | undefined = place !== undefined && isPlace(place) ? place : undefined;
 
   useShortcut("workspace.switch", () => {
     setSwitching((open) => !open);

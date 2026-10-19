@@ -1,19 +1,29 @@
 import { useNavigate } from "@tanstack/react-router";
-import type { MouseEvent } from "react";
+import { useEffect, useRef, type MouseEvent } from "react";
 import { useTranslation } from "react-i18next";
 
 import { useShortcut } from "~/lib/shortcuts";
 import { Chip, ChipDivider, ChipRow, NavDivider, NavItem, type IconName } from "~/lib/ui";
 
-import { STREAMS, VIEWS, useStreams, type Place, type Stream, type View } from "../../api/queries";
+import {
+  SIDE_PLACES,
+  STREAMS,
+  useStreams,
+  type Drafts,
+  type Place,
+  type Stream,
+  type View,
+} from "../../api/queries";
 import { placeName, type Translate } from "../../model";
 
 /** `/w/$workspaceId/inbox/$stream`: a stream's list, or a view's. */
 export const streamPath = (workspaceId: string, place: Place) => `/w/${workspaceId}/inbox/${place}`;
 
 /** Each view's icon in the sidebar. */
-const VIEW_ICONS: Record<View, IconName> = {
+const VIEW_ICONS: Record<View | Drafts, IconName> = {
   sent: "send",
+  starred: "pin",
+  drafts: "document",
   archive: "archive",
   spam: "warning",
   trash: "trash",
@@ -29,7 +39,11 @@ function useUnread(workspaceId: string): Record<Stream, number> {
   return unread;
 }
 
-/** G then 1–4 opens a stream and G then 5–8 a view, from anywhere in the workspace. */
+/**
+ * G then 1–4 opens a stream, G then 5–8 Sent, Archive, Spam or Trash, G then 9
+ * Pinned and G then 0 Drafts, from anywhere in the workspace. The keys of 5–8
+ * stay as they were; the sidebar follows meaning, the keys follow history.
+ */
 function usePlaceShortcuts(workspaceId: string) {
   const navigate = useNavigate();
   const go = (place: Place) => () => {
@@ -43,6 +57,8 @@ function usePlaceShortcuts(workspaceId: string) {
   useShortcut("inbox.view.archive", go("archive"));
   useShortcut("inbox.view.spam", go("spam"));
   useShortcut("inbox.view.trash", go("trash"));
+  useShortcut("inbox.view.starred", go("starred"));
+  useShortcut("inbox.view.drafts", go("drafts"));
 }
 
 export interface StreamNavProps {
@@ -53,9 +69,9 @@ export interface StreamNavProps {
 
 /**
  * The streams under Inbox in the sidebar, with their unread counts, then a
- * quiet divider and the views beside them (Sent, Archive, Spam, Trash; no
- * counts), each with its shortcut (G then 1–8, bound here so they work from
- * every page).
+ * quiet divider and the places beside them (Sent, Pinned, Drafts, Archive,
+ * Spam, Trash; no counts), each with its shortcut (G then 1–9 and 0, bound
+ * here so they work from every page).
  */
 export function StreamNav({ workspaceId, current }: StreamNavProps) {
   const { t: typed } = useTranslation("conversations");
@@ -93,23 +109,52 @@ export function StreamNav({ workspaceId, current }: StreamNavProps) {
         }),
       )}
       <NavDivider />
-      {VIEWS.map((view) => item(view, `inbox.view.${view}`, { icon: VIEW_ICONS[view] }))}
+      {SIDE_PLACES.map((place) => item(place, `inbox.view.${place}`, { icon: VIEW_ICONS[place] }))}
     </>
   );
 }
 
 /**
- * The streams, then the views behind a divider, as chips for phones (where
- * the sidebar is hidden): one row that scrolls sideways on its own.
+ * The streams, then the other places behind a divider, as chips for phones
+ * (where the sidebar is hidden): one row that scrolls sideways on its own,
+ * and brings the chip of the place you are in into view.
  */
 export function StreamChips({ workspaceId, current }: StreamNavProps) {
   const { t: typed } = useTranslation("conversations");
   const t = typed as unknown as Translate;
   const navigate = useNavigate();
   const unread = useUnread(workspaceId);
+  const active = useRef<HTMLButtonElement | null>(null);
+  // The counts widen the chips once they load: look again when they change.
+  const counts = STREAMS.map((stream) => unread[stream]).join(",");
+  useEffect(() => {
+    // Not every environment lays out or animates (tests, old webviews).
+    const reduced =
+      typeof globalThis.matchMedia === "function" &&
+      globalThis.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const bring = () => {
+      const chip: { scrollIntoView?: (options: ScrollIntoViewOptions) => void } | null =
+        active.current;
+      chip?.scrollIntoView?.({
+        inline: "nearest",
+        block: "nearest",
+        behavior: reduced ? "auto" : "smooth",
+      });
+    };
+    bring();
+    // The row may still be laid out as the page settles (the pane showing, the
+    // list arriving): look again once it has.
+    const frame = requestAnimationFrame(() => {
+      requestAnimationFrame(bring);
+    });
+    return () => {
+      cancelAnimationFrame(frame);
+    };
+  }, [current, counts]);
   const chip = (place: Place, count = 0) => (
     <Chip
       key={place}
+      ref={place === current ? active : undefined}
       pressed={place === current}
       onClick={() => {
         void navigate({ to: streamPath(workspaceId, place) });
@@ -123,7 +168,7 @@ export function StreamChips({ workspaceId, current }: StreamNavProps) {
     <ChipRow label={t("streams.label")}>
       {STREAMS.map((stream) => chip(stream, unread[stream]))}
       <ChipDivider />
-      {VIEWS.map((view) => chip(view))}
+      {SIDE_PLACES.map((place) => chip(place))}
     </ChipRow>
   );
 }

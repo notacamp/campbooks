@@ -31,6 +31,8 @@ export interface ReplySlotContext {
   messages: Schema<"MessageView">[];
   /** `null` until a button is pressed (render nothing, or a collapsed box). */
   request: ReplyRequest | null;
+  /** A saved draft to open on arrival (Drafts), whatever its kind. */
+  draftId?: string | undefined;
   onClose: () => void;
 }
 

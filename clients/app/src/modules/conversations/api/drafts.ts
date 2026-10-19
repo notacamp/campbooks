@@ -7,6 +7,9 @@ export type NewDraft = Schema<"NewDraft">;
 export type DraftChanges = Schema<"DraftChanges">;
 export type Inbox = Schema<"InboxView">;
 
+/** Most drafts `conversations.list_drafts` returns. */
+export const DRAFTS_MAX = 50;
+
 // Keyed by operationId (`operationKey`), so the change feed invalidates them
 // when a send is requested, fails or completes.
 export const draftKeys = {
@@ -38,6 +41,24 @@ export function changedElsewhere(thrown: unknown): boolean {
 const draftPath = (workspaceId: string, draftId: string) => ({
   path: { workspace_id: workspaceId, draft_id: draftId },
 });
+
+/**
+ * `conversations.list_drafts`: your newest drafts across every conversation
+ * (at most {@link DRAFTS_MAX}). Keyed as {@link draftKeys.all}, so every save,
+ * send and delete refreshes it.
+ */
+export function useDrafts(workspaceId: string) {
+  return useQuery({
+    queryKey: draftKeys.all(workspaceId),
+    queryFn: async ({ signal }) =>
+      unwrap(
+        await api.GET("/api/v1/w/{workspace_id}/drafts", {
+          params: { path: { workspace_id: workspaceId } },
+          signal,
+        }),
+      ).drafts,
+  });
+}
 
 /** `conversations.list_drafts` for one conversation: the caller's own drafts answering it. */
 export function useConversationDrafts(workspaceId: string, conversationId: string) {
