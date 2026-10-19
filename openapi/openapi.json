@@ -4368,7 +4368,7 @@
             }
           },
           "400": {
-            "description": "No intent, or an intent, change or draft too long (`reply_ask_invalid`).",
+            "description": "No intent, or an intent, change, draft or suggestion too long, or more than three suggestions (`reply_ask_invalid`).",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -4428,7 +4428,149 @@
             }
           },
           "503": {
-            "description": "The language model failed (`reply_failed`), or the workspace used its whole daily AI limit (`ai_daily_limit_reached`).",
+            "description": "The language model failed (`reply_failed`), took too long (`reply_timed_out`), or the workspace used its whole daily AI limit (`ai_daily_limit_reached`).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [
+              "conversations:send"
+            ]
+          }
+        ],
+        "x-campbooks": {
+          "access": {
+            "action": "send",
+            "resource": "conversations.inbox"
+          },
+          "assistant": false,
+          "automation": false,
+          "mutates": true,
+          "records": [
+            "conversations.message"
+          ],
+          "risk": "low"
+        }
+      }
+    },
+    "/api/v1/w/{workspace_id}/conversations/{conversation_id}/reply/draft/stream": {
+      "post": {
+        "tags": [
+          "conversations"
+        ],
+        "summary": "Scout's reply for an intent, or your draft rewritten, as it is written.",
+        "description": "The same request as `conversations.write_reply`, answered as a\nServer-Sent Events stream once every check passed (a refusal is an\nordinary problem answer). Events, each `data` a JSON object:\n`thinking` (`{\"delta\"}`: Scout's reasoning as it arrives, when the model\nshows it, at most 8,000 characters in all), `text` (`{\"delta\"}`: the\nreply's words as they arrive, at most 4,000 characters), then exactly one\nof `done` (a `ReplyText`: the whole reply, as `write_reply` answers it)\nor `error` (a problem: `reply_failed` or `reply_timed_out`), after which\nthe stream ends. A comment every 10 seconds keeps the connection open.\nThe stream ends with `reply_timed_out` after 30 seconds without a sign\nfrom the model or 2 minutes in all. Nothing is saved or sent, and an\n`Idempotency-Key` does not make the answer replayable.",
+        "operationId": "conversations.stream_reply",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "description": "The workspace.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId"
+            }
+          },
+          {
+            "name": "conversation_id",
+            "in": "path",
+            "description": "The conversation.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ConversationId"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WriteReply"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "The reply as it is written: `thinking`, `text`, then `done` or `error`.",
+            "content": {
+              "text/event-stream": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "No intent, or an intent, change, draft or suggestion too long, or more than three suggestions (`reply_ask_invalid`).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid access token.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing scope, or you may only read this inbox (`inbox_read_only`).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such conversation or message, or you cannot see it.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "No language model may read mail here (`reply_unavailable`): write the reply yourself.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many replies asked for this hour.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "The language model failed (`reply_failed`), sent nothing in time (`reply_timed_out`), or the workspace used its whole daily AI limit (`ai_daily_limit_reached`).",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -4559,7 +4701,7 @@
             }
           },
           "503": {
-            "description": "The language model failed (`reply_failed`), or the workspace used its whole daily AI limit (`ai_daily_limit_reached`).",
+            "description": "The language model failed (`reply_failed`), took too long (`reply_timed_out`), or the workspace used its whole daily AI limit (`ai_daily_limit_reached`).",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -19313,6 +19455,13 @@
           "shorter": {
             "type": "boolean",
             "description": "Make the draft shorter."
+          },
+          "suggestions": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "The likely replies shown, in order (at most 3, each at most 80\ncharacters), so `intent` may pick or combine them (\"1 and 3\")."
           }
         },
         "additionalProperties": false

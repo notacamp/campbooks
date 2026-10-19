@@ -634,6 +634,9 @@
       "action": "Draft it"
     },
     "writing": "Writing the draft…",
+    "thinking": "Scout is thinking…",
+    "thoughts": "How Scout thought about it",
+    "typing": "Scout is writing…",
     "draftDescription": "Scout's draft. Edit it here, or ask for a change. Nothing is sent until you press Send.",
     "draftLabel": "Your reply",
     "shorter": "Shorter",
@@ -656,6 +659,7 @@
     "tooLate": "Too late to undo: the reply has already left.",
     "errors": {
       "write": "Scout couldn't write that just now. Try again, or write it yourself.",
+      "timeout": "Scout took too long to answer. Try again, or write it yourself.",
       "limit": "Scout has written a lot of replies this hour. Try again later, or write it yourself.",
       "dailyLimit": "This workspace has used today's AI allowance. Write this one yourself.",
       "send": "Couldn't send to {{name}}. Your draft is kept.",

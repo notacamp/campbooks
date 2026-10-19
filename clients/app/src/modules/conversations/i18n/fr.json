@@ -634,6 +634,9 @@
       "action": "Rédiger"
     },
     "writing": "Rédaction du brouillon…",
+    "thinking": "Scout réfléchit…",
+    "thoughts": "Comment Scout y a réfléchi",
+    "typing": "Scout écrit…",
     "draftDescription": "Le brouillon de Scout. Modifiez-le ici ou demandez un changement. Rien n’est envoyé avant que vous appuyiez sur Envoyer.",
     "draftLabel": "Votre réponse",
     "shorter": "Plus courte",
@@ -656,6 +659,7 @@
     "tooLate": "Trop tard pour annuler : la réponse est déjà partie.",
     "errors": {
       "write": "Scout n’a pas pu écrire cela pour l’instant. Réessayez ou écrivez-la vous-même.",
+      "timeout": "Scout a mis trop de temps à répondre. Réessayez ou écrivez-la vous-même.",
       "limit": "Scout a écrit beaucoup de réponses cette heure-ci. Réessayez plus tard ou écrivez-la vous-même.",
       "dailyLimit": "Cet espace de travail a utilisé son quota d’IA du jour. Écrivez celle-ci vous-même.",
       "send": "Impossible d’envoyer à {{name}}. Votre brouillon est conservé.",
