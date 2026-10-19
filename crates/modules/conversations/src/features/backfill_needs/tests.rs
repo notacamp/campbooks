@@ -888,40 +888,8 @@ async fn tick_reporting(kit: &Kit) {
 /// then wait on someone; running it again asks nothing more.
 #[sqlx::test(migrations = "../../../migrations")]
 async fn the_upgrade_asks_recent_mail_whose_move_it_is_once(db: PgPool) {
-    use crate::testkit::{ANA, JOAO, SAM, mail, waiting_deps};
+    use crate::testkit::{JOAO, joao_asks_ana, waiting_deps};
 
-    // Before the upgrade: the catalogue was off, so only triage was asked.
-    let mut before = waiting_deps();
-    before.config.actions.enabled = false;
-    let old = Kit::with_deps(db.clone(), before).await;
-    let workspace = WorkspaceId::new();
-    let (_, sam) = old.member("sam", workspace);
-    let inbox = old
-        .inbox(workspace, SAM.1, &[(sam, InboxRole::Manager)])
-        .await;
-    let batch = dev::record(
-        &old.state,
-        workspace,
-        inbox,
-        &mail("joao-1", "thr-floor-plan", JOAO, &[ANA], &[SAM], 60),
-    )
-    .await
-    .unwrap();
-    dev::submit(&old.state, workspace, &batch).await.unwrap();
-    campbooks_kernel::jobs::Worker::new(old.state.clone())
-        .run_until_idle()
-        .await;
-    failed_jobs(&db).await;
-    assert!(needs_of(&db, workspace).await.is_empty());
-    let moves: i64 = sqlx::query_scalar(
-        "SELECT count(*) FROM conversations.decisions WHERE question = 'next_move'",
-    )
-    .fetch_one(&db)
-    .await
-    .unwrap();
-    assert_eq!(moves, 0);
-
-    // The upgraded server, the catalogue on: the migration's seed, a tick.
     let mut joao = script("primary", false, false, false, 0.0, false);
     joao.push((
         "next_move",
@@ -933,7 +901,21 @@ async fn the_upgrade_asks_recent_mail_whose_move_it_is_once(db: PgPool) {
         inner: Scripted::model([(JOAO.1, joao)]),
         asked: std::sync::Mutex::new(Vec::new()),
     });
-    let upgraded = Kit::with_deps(db.clone(), waiting_deps().with_model(recording.clone())).await;
+    let kit = Kit::with_deps(db.clone(), waiting_deps().with_model(recording.clone())).await;
+    let (workspace, _, _) = joao_asks_ana(&kit).await;
+    // Make it look as it did before the upgrade (the catalogue off): the
+    // triage answers only, no need and no need event.
+    for statement in [
+        "DELETE FROM conversations.decisions WHERE question IN ('next_move', 'awaited')",
+        "DELETE FROM conversations.needs",
+        "DELETE FROM kernel.events WHERE name = 'conversations.need_changed'",
+    ] {
+        sqlx::query(statement).execute(&db).await.unwrap();
+    }
+    assert!(needs_of(&db, workspace).await.is_empty());
+    recording.asked.lock().unwrap().clear();
+
+    // The upgraded server: the migration's seed, a tick.
     let migration = std::fs::read_to_string(format!(
         "{}/../../../migrations/20261023090000_conversations__needs_waiting.sql",
         env!("CARGO_MANIFEST_DIR")
@@ -946,7 +928,7 @@ async fn the_upgrade_asks_recent_mail_whose_move_it_is_once(db: PgPool) {
         .execute(&db)
         .await
         .unwrap();
-    tick_reporting(&upgraded).await;
+    tick_reporting(&kit).await;
 
     // Asked once, the move questions only.
     let asked = recording.asked.lock().unwrap().clone();
@@ -975,6 +957,6 @@ async fn the_upgrade_asks_recent_mail_whose_move_it_is_once(db: PgPool) {
         .execute(&db)
         .await
         .unwrap();
-    tick_reporting(&upgraded).await;
+    tick_reporting(&kit).await;
     assert_eq!(recording.asked.lock().unwrap().len(), 1);
 }
