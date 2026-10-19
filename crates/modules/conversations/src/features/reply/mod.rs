@@ -14,6 +14,12 @@
 //! them (campbooks-cloud#271): the conversation's length, the person's
 //! name, how much mail passed between them, and a few of the same inbox's
 //! earlier messages to them, for the register only.
+//!
+//! `POST …/conversations/{conversation_id}/nudge/draft` writes the nudge to
+//! the person a conversation waits on (campbooks-cloud#293), on the same
+//! terms: a short, friendly follow-up about what they were expected to do,
+//! or the member's draft of it rewritten. Only while the conversation waits
+//! on someone (409 `not_waiting`).
 
 mod prompt;
 mod types;
@@ -39,8 +45,10 @@ use chrono::{DateTime, SecondsFormat, Utc};
 use serde::de::DeserializeOwned;
 use serde_json::Value;
 
-use self::prompt::{Ask, Author, Context, PastMessage, Person, Them, Thread, ThreadMessage};
-use self::types::{ReplySuggestions, ReplyText, SuggestReplies, WriteReply};
+use self::prompt::{
+    Ask, Author, Context, NudgeAsk, PastMessage, Person, Them, Thread, ThreadMessage,
+};
+use self::types::{ReplySuggestions, ReplyText, SuggestReplies, WriteNudge, WriteReply};
 use crate::{
     domain::{
         access::visible_inboxes,
@@ -88,6 +96,12 @@ const PAST_BYTES: usize = 4 * 1024;
 const COUNT_CAP: i64 = 100;
 /// Messages counted in a conversation, at most.
 const TOTAL_CAP: i64 = 1000;
+
+/// The conversation's open wait (campbooks-cloud#293): its message, and the
+/// person's name and address.
+const WAIT: &str = "SELECT message_id, awaited_name, awaited_address FROM conversations.needs \
+      WHERE conversation_id = $1 AND state = 'open' AND reason IN ('waiting', 'nudge') \
+        AND awaited_address IS NOT NULL";
 
 /// The conversation's inbox, if the caller can see it.
 const INBOX: &str = "SELECT i.id, i.display_name FROM conversations.conversations c \
@@ -254,7 +268,7 @@ pub async fn suggest(
         &writer,
         &workspace,
         path.conversation_id,
-        body.message_id,
+        Answering::Message(body.message_id),
         false,
     )
     .await?;
@@ -346,7 +360,7 @@ pub async fn write(
         &writer,
         &workspace,
         path.conversation_id,
-        body.message_id,
+        Answering::Message(body.message_id),
         true,
     )
     .await?;
@@ -388,6 +402,119 @@ pub async fn write(
     }))
 }
 
+/// Scout's nudge to the person the conversation waits on, or your draft of it rewritten.
+#[utoipa::path(
+    post,
+    path = "/api/v1/w/{workspace_id}/conversations/{conversation_id}/nudge/draft",
+    operation_id = "conversations.write_nudge",
+    tag = "conversations",
+    security(("bearer" = ["conversations:send"])),
+    // A command, like `write_reply`: nothing is saved or sent.
+    extensions(("x-campbooks" = json!(Operation::command(Risk::Low).records(["conversations.message"]).access("conversations.inbox", campbooks_kernel::authz::Action::Send)))),
+    params(
+        ("workspace_id" = WorkspaceId, Path, description = "The workspace."),
+        ("conversation_id" = ConversationId, Path, description = "The conversation."),
+    ),
+    request_body = WriteNudge,
+    responses(
+        (status = OK, description = "The nudge as plain text, answering the message the wait comes from; nothing is saved or sent.", body = ReplyText),
+        (status = BAD_REQUEST, description = "A change or draft too long (`reply_ask_invalid`).",
+            body = Problem, content_type = "application/problem+json"),
+        (status = UNAUTHORIZED, description = "No valid access token.", body = Problem,
+            content_type = "application/problem+json"),
+        (status = FORBIDDEN, description = "Missing scope, or you may only read this inbox (`inbox_read_only`).",
+            body = Problem, content_type = "application/problem+json"),
+        (status = NOT_FOUND, description = "No such conversation, or you cannot see it.",
+            body = Problem, content_type = "application/problem+json"),
+        (status = TOO_MANY_REQUESTS, description = "Too many replies asked for this hour.", body = Problem,
+            content_type = "application/problem+json"),
+        (status = CONFLICT, description = "The conversation waits on nobody (`not_waiting`), or no language model may read mail here (`reply_unavailable`): write it yourself.",
+            body = Problem, content_type = "application/problem+json"),
+        (status = SERVICE_UNAVAILABLE, description = "The language model failed (`reply_failed`), \
+            or the workspace used its whole daily AI limit (`ai_daily_limit_reached`).",
+            body = Problem, content_type = "application/problem+json"),
+    )
+)]
+pub async fn nudge(
+    State(state): State<AppState>,
+    Extension(writer): Extension<ReplyWriter>,
+    workspace: Workspace<ConversationsSend>,
+    locale: Locale,
+    extract::Path(path): extract::Path<ConversationPath>,
+    extract::Json(body): extract::Json<WriteNudge>,
+) -> Result<Json<ReplyText>> {
+    let started = Instant::now();
+    let change = body
+        .change
+        .as_deref()
+        .map(str::trim)
+        .filter(|c| !c.is_empty());
+    let draft = body.draft.as_deref().filter(|d| !d.trim().is_empty());
+    if change.is_some_and(|c| c.chars().count() > MAX_ASK_CHARS)
+        || draft.is_some_and(|d| d.chars().count() > MAX_DRAFT_CHARS)
+    {
+        return Err(Error::BadRequest(
+            crate::MESSAGES
+                .reason("reply_ask_invalid")
+                .arg("max", MAX_ASK_CHARS),
+        ));
+    }
+    let read = prepare(
+        &state,
+        &writer,
+        &workspace,
+        path.conversation_id,
+        Answering::Wait,
+        false,
+    )
+    .await?;
+    let context = read.context(locale);
+    let my_name = workspace
+        .principal
+        .name
+        .as_deref()
+        .or(read.inbox_name.as_deref())
+        .map(str::trim)
+        .filter(|name| !name.is_empty());
+    let rewriting = draft.is_some() && (change.is_some() || body.shorter);
+    let asked = NudgeAsk {
+        awaited: read.awaited.as_deref().unwrap_or_default(),
+        my_name,
+        draft: if rewriting { draft } else { None },
+        change: if rewriting { change } else { None },
+        shorter: rewriting && body.shorter,
+    };
+    let answer: prompt::Reply = ask(
+        &state,
+        read.gateway,
+        workspace.id,
+        "conversations.write_nudge",
+        prompt::nudge(&context, &asked),
+    )
+    .await?;
+    let text = prompt::reply(&answer.reply)
+        .ok_or_else(|| Error::Unavailable(crate::MESSAGES.reason("reply_failed")))?;
+    tracing::info!(
+        rewrite = rewriting,
+        messages = context.conversation.messages.len(),
+        latency_ms = u64::try_from(started.elapsed().as_millis()).unwrap_or(u64::MAX),
+        "nudge written"
+    );
+    Ok(Json(ReplyText {
+        message_id: read.message,
+        text,
+    }))
+}
+
+/// What a text is written to answer.
+#[derive(Debug, Clone, Copy)]
+enum Answering {
+    /// A message of the conversation: the one given, else the newest.
+    Message(Option<MessageId>),
+    /// The message the conversation's wait comes from (a nudge).
+    Wait,
+}
+
 /// What a reply is written from.
 struct Read<'a> {
     gateway: &'a Gateway,
@@ -400,6 +527,8 @@ struct Read<'a> {
     /// Who is answered and how the member writes to them; empty for
     /// suggestions.
     person: Person,
+    /// The person a nudge goes to: their name, else their address.
+    awaited: Option<String>,
 }
 
 impl Read<'_> {
@@ -421,11 +550,11 @@ async fn prepare<'a>(
     writer: &'a ReplyWriter,
     workspace: &Workspace<ConversationsSend>,
     conversation: ConversationId,
-    requested: Option<MessageId>,
+    answering: Answering,
     with_person: bool,
 ) -> Result<Read<'a>> {
     let access = &workspace.access;
-    let (inbox_id, inbox_name) = {
+    let (inbox_id, inbox_name, requested, awaited) = {
         let mut tx = state.db.begin_for(access.workspace).await?;
         resources::authorize(
             state,
@@ -451,8 +580,26 @@ async fn prepare<'a>(
             &resources::inbox(inbox),
         )
         .await?;
+        let (requested, awaited) = match answering {
+            Answering::Message(requested) => (requested, None),
+            // Only while it waits on someone: the nudge answers the message
+            // the wait comes from.
+            Answering::Wait => {
+                let wait: Option<(MessageId, Option<String>, String)> = sqlx::query_as(WAIT)
+                    .bind(conversation)
+                    .fetch_optional(&mut *tx)
+                    .await?;
+                let (message, name, address) =
+                    wait.ok_or_else(|| Error::Conflict(crate::MESSAGES.reason("not_waiting")))?;
+                let shown = name
+                    .map(|n| n.trim().to_owned())
+                    .filter(|n| !n.is_empty())
+                    .unwrap_or(address);
+                (Some(message), Some(cut_bytes(&shown, NAME_BYTES)))
+            }
+        };
         tx.commit().await?;
-        (inbox, name)
+        (inbox, name, requested, awaited)
     };
     let gateway = writer.gateway()?;
     let who = access.user.map_or_else(
@@ -508,6 +655,7 @@ async fn prepare<'a>(
         inbox_name,
         thread,
         person,
+        awaited,
     })
 }
 

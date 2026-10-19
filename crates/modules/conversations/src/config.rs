@@ -19,6 +19,13 @@ pub const DEFAULT_UNDO_SEND_SECONDS: u32 = 10;
 /// The longest undo window that may be configured.
 pub const MAX_UNDO_SEND_SECONDS: u32 = 60;
 
+/// Working days a wait lasts before Scout nudges, unless configured
+/// otherwise (campbooks-cloud#293).
+pub const DEFAULT_WAIT_WORKING_DAYS: u32 = 3;
+
+/// The working days a wait may be configured to last.
+pub const WAIT_WORKING_DAYS: std::ops::RangeInclusive<u32> = 1..=15;
+
 /// Settings of the `conversations` module.
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -47,6 +54,28 @@ pub struct ConversationsConfig {
     /// catalogue (`CAMPBOOKS_CONVERSATIONS__ACTIONS__*`); off by default.
     #[serde(default)]
     pub actions: ActionSettings,
+    /// How long a wait on someone lasts before Scout nudges
+    /// (`CAMPBOOKS_CONVERSATIONS__WAIT__*`).
+    #[serde(default)]
+    pub wait: WaitSettings,
+}
+
+/// Waiting on someone (campbooks-cloud#293).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
+#[serde(default, deny_unknown_fields)]
+pub struct WaitSettings {
+    /// Working days (Monday to Friday) after an email before Scout nudges
+    /// the person it waits on, when the email gives them no date
+    /// (`WORKING_DAYS`, default 3, from 1 to 15).
+    pub working_days: u32,
+}
+
+impl Default for WaitSettings {
+    fn default() -> Self {
+        Self {
+            working_days: DEFAULT_WAIT_WORKING_DAYS,
+        }
+    }
 }
 
 /// The action catalogue (campbooks-cloud#166). Off by default: until the
@@ -147,6 +176,7 @@ impl Default for ConversationsConfig {
             needs_window_days: DEFAULT_NEEDS_WINDOW_DAYS,
             notices: NoticeSettings::default(),
             actions: ActionSettings::default(),
+            wait: WaitSettings::default(),
         }
     }
 }
@@ -171,6 +201,14 @@ impl ConversationsConfig {
                 config.undo_send_seconds
             ));
         }
+        if !WAIT_WORKING_DAYS.contains(&config.wait.working_days) {
+            return Err(format!(
+                "CAMPBOOKS_CONVERSATIONS__WAIT__WORKING_DAYS={}: from {} to {}",
+                config.wait.working_days,
+                WAIT_WORKING_DAYS.start(),
+                WAIT_WORKING_DAYS.end()
+            ));
+        }
         Ok(config)
     }
 }
@@ -187,6 +225,24 @@ mod tests {
         assert_eq!(config.decide_backfill_days, 14);
         assert_eq!(config.undo_send_seconds, 10);
         assert_eq!(config.needs_window_days, 14);
+        assert_eq!(config.wait.working_days, 3);
+    }
+
+    #[test]
+    fn reads_and_bounds_the_wait() {
+        let at = |days: u32| {
+            ConversationsConfig::from_figment(&Figment::from(Serialized::defaults(
+                serde_json::json!({"conversations": {"wait": {"working_days": days}}}),
+            )))
+        };
+        assert_eq!(at(1).unwrap().wait.working_days, 1);
+        assert_eq!(at(15).unwrap().wait.working_days, 15);
+        for refused in [0, 16] {
+            assert!(
+                at(refused).unwrap_err().contains("WAIT__WORKING_DAYS"),
+                "{refused}"
+            );
+        }
     }
 
     #[test]

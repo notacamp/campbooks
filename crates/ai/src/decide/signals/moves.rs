@@ -165,6 +165,14 @@ pub fn awaited_party(envelope: &Envelope, label: &str) -> Option<Party> {
     awaitable(envelope).into_iter().nth(index)
 }
 
+/// Whether an `awaited` option's `description`, as it was asked, still names
+/// `person`'s address: the check that a stored `pN`, mapped back through
+/// today's headers ([`awaited_party`]), is the person the model was shown.
+pub fn describes(description: &str, person: &Party) -> bool {
+    let address = quoted(&person.address);
+    !address.is_empty() && description.contains(&format!("<{address}>"))
+}
+
 fn option_label(index: usize) -> String {
     format!("p{}", index + 1)
 }
@@ -296,6 +304,22 @@ mod tests {
         for off in ["none", "p3", "p0", "p01", "p", "q1", "", "p-1"] {
             assert!(awaited_party(&env, off).is_none(), "{off}");
         }
+    }
+
+    #[test]
+    fn a_description_names_the_person_it_was_asked_about() {
+        let env = envelope();
+        let question = awaited_question(&env).unwrap();
+        let described = options(&question);
+        let ana = awaited_party(&env, "p1").unwrap();
+        let rui = awaited_party(&env, "p2").unwrap();
+        assert!(describes(described[0].1, &ana));
+        assert!(!describes(described[0].1, &rui));
+        assert!(describes(described[1].1, &rui));
+        // An address that only starts the same way is someone else.
+        let ann = party("Ann", "ann@studio.example");
+        assert!(!describes(described[0].1, &ann));
+        assert!(!describes("", &ana));
     }
 
     #[test]

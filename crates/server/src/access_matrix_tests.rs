@@ -897,7 +897,8 @@ fn body(world: &World, id: &str) -> Option<Value> {
         "conversations.update_rule" => json!({"actions": [{"action": "mark_read"}]}),
         "conversations.confirm_rule"
         | "conversations.restore_rule"
-        | "conversations.suggest_replies" => json!({}),
+        | "conversations.suggest_replies"
+        | "conversations.write_nudge" => json!({}),
         "conversations.dismiss_rule_suggestion" => json!({"key": "matrix"}),
         "conversations.answer_rule_notice" => json!({"answer": "not_now"}),
         "assistant.update_profile" => json!({"proactivity": "ask_first", "asked": true}),
@@ -948,6 +949,7 @@ fn acts_in_the_inbox(id: &str) -> bool {
             | "conversations.dismiss_rule_suggestion"
             | "conversations.suggest_replies"
             | "conversations.write_reply"
+            | "conversations.write_nudge"
             | "conversations.answer_rule_notice"
             | "conversations.clear_rule_notice_answer"
     )

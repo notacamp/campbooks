@@ -235,3 +235,113 @@ async fn today_is_the_callers_today(db: PgPool) {
     assert_eq!(bad.status, StatusCode::BAD_REQUEST);
     assert_eq!(bad.json["code"], "invalid_offset");
 }
+
+/// campbooks-cloud#293: a wait is not in the queue; a Nudge is, after Pay
+/// and before Worth a look, and stays however overdue; `state=waiting`
+/// lists the waits, soonest first; hearing back is in Done today and going
+/// back to waiting is not.
+#[sqlx::test(migrations = "../../../migrations")]
+async fn waits_stay_out_of_the_queue_and_nudges_come_after_pay(db: PgPool) {
+    let kit = Kit::new(db).await;
+    let workspace = WorkspaceId::new();
+    let (sam, sam_id) = kit.member("sam", workspace);
+    kit.let_see(INBOX, sam_id);
+    let today = Utc::now().date_naive();
+    let waiting_soon = need(1, Reason::Waiting, Some(3));
+    let waiting_later = need(2, Reason::Waiting, Some(6));
+    let nudge = need(3, Reason::Nudge, Some(-10));
+    for need in [
+        &waiting_later,
+        &waiting_soon,
+        &nudge,
+        &need(4, Reason::Pay, None),
+        &need(5, Reason::WorthALook, None),
+    ] {
+        kit.need(workspace, need).await;
+    }
+    let list = kit
+        .get(&sam, &format!("/api/v1/w/{workspace}/attention"))
+        .await;
+    assert_eq!(list.status, StatusCode::OK, "{:?}", list.json);
+    assert_eq!(
+        reasons(&list.json),
+        [
+            ("pay".into(), None),
+            ("nudge".into(), Some(today - TimeDelta::days(10))),
+            ("worth_a_look".into(), None),
+        ]
+    );
+    let counts: Vec<&str> = list.json["counts"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|c| c["reason"].as_str().unwrap())
+        .collect();
+    assert_eq!(
+        counts,
+        [
+            "review",
+            "reply",
+            "decide",
+            "do",
+            "pay",
+            "nudge",
+            "worth_a_look"
+        ]
+    );
+
+    let waiting = kit
+        .get(
+            &sam,
+            &format!("/api/v1/w/{workspace}/attention?state=waiting"),
+        )
+        .await;
+    assert_eq!(waiting.status, StatusCode::OK, "{:?}", waiting.json);
+    assert_eq!(
+        reasons(&waiting.json),
+        [
+            ("waiting".into(), Some(today + TimeDelta::days(3))),
+            ("waiting".into(), Some(today + TimeDelta::days(6))),
+        ]
+    );
+    assert_eq!(waiting.json["counts"][0]["reason"], "waiting");
+    assert_eq!(waiting.json["counts"][0]["count"], 2);
+
+    // Nudged: back to waiting, out of the queue, not done today. Heard
+    // back: done today.
+    let mut nudged = need(3, Reason::Waiting, Some(4));
+    nudged.revision = 2;
+    kit.need(workspace, &nudged).await;
+    let mut heard = need(1, Reason::Waiting, Some(3));
+    heard.revision = 2;
+    kit.cleared(workspace, &heard, "heard_back", None).await;
+    let list = kit
+        .get(&sam, &format!("/api/v1/w/{workspace}/attention"))
+        .await;
+    assert_eq!(
+        reasons(&list.json),
+        [("pay".into(), None), ("worth_a_look".into(), None)]
+    );
+    let done = kit
+        .get(
+            &sam,
+            &format!("/api/v1/w/{workspace}/attention?state=cleared"),
+        )
+        .await;
+    let items = done.json["items"].as_array().unwrap();
+    assert_eq!(items.len(), 1, "{items:?}");
+    assert_eq!(items[0]["cleared_because"], "heard_back");
+    let waiting = kit
+        .get(
+            &sam,
+            &format!("/api/v1/w/{workspace}/attention?state=waiting"),
+        )
+        .await;
+    assert_eq!(
+        reasons(&waiting.json),
+        [
+            ("waiting".into(), Some(today + TimeDelta::days(4))),
+            ("waiting".into(), Some(today + TimeDelta::days(6))),
+        ]
+    );
+}

@@ -31,6 +31,13 @@
 //!   (`conversations.decide_backlog`, one job per message, ids only), which
 //!   sorts it and works out its need again.
 //!
+//! - With the action catalogue on (`CAMPBOOKS_CONVERSATIONS__ACTIONS__ENABLED`)
+//!   and the same model, each of those conversations with no open need whose
+//!   newest inbound message, sent within both windows, has no checked
+//!   `next_move` answer is queued too: the pass then asks only whose move it
+//!   is (campbooks-cloud#293), within the workspace's daily AI limit, and the
+//!   conversation may wait on someone.
+//!
 //! - When the `complete` role may receive mail on this server, each open need
 //!   of those conversations whose email Scout has not summarised is queued
 //!   for `conversations.summarize_need` (campbooks-cloud#204): one job per
@@ -59,6 +66,7 @@ use serde::{Deserialize, Serialize};
 use sqlx::{Postgres, Transaction};
 
 use crate::{
+    config::ActionSettings,
     domain::needs::{self, NeedSettings},
     features::{
         decide_message::{Backlog, DecideBacklog, ModelPass},
@@ -76,6 +84,24 @@ const NEEDING_SUMMARY: &str = "SELECT n.message_id FROM conversations.needs n \
         AND n.question <> 'suspicious' \
         AND (s.message_id IS NULL OR (s.state = 'failed' AND s.attempts < 2) \
              OR (s.state = 'written' AND s.dates_read_at IS NULL))";
+
+/// The newest inbound message of some conversations (`$1`), sent since
+/// `$2`, whose conversation holds no open need and which no checked model
+/// asked whose move it is (campbooks-cloud#293).
+const MOVES_UNASKED: &str = "SELECT newest.id FROM ( \
+         SELECT DISTINCT ON (m.conversation_id) m.id, m.conversation_id, m.sent_at \
+           FROM conversations.messages m \
+          WHERE m.conversation_id = ANY($1) AND m.direction = 'inbound' \
+            AND NOT m.in_spam AND NOT m.in_trash \
+          ORDER BY m.conversation_id, m.sent_at DESC, m.id DESC) newest \
+      WHERE newest.sent_at >= $2 \
+        AND NOT EXISTS (SELECT 1 FROM conversations.needs n \
+                         WHERE n.conversation_id = newest.conversation_id \
+                           AND n.state = 'open') \
+        AND NOT EXISTS (SELECT 1 FROM conversations.decisions d \
+                         WHERE d.message_id = newest.id AND d.source = 'model' \
+                           AND d.model_version LIKE 'checked:%' \
+                           AND d.question = 'next_move')";
 
 /// How often pending backfills are started.
 pub const EVERY: Duration = Duration::from_mins(1);
@@ -198,6 +224,8 @@ pub struct BackfillNeeds {
     needs: NeedSettings,
     model: Option<ModelPass>,
     decide_window: TimeDelta,
+    /// The action catalogue: on, recent mail is asked whose move it is.
+    actions: ActionSettings,
 }
 
 impl BackfillNeeds {
@@ -209,7 +237,15 @@ impl BackfillNeeds {
             needs,
             model,
             decide_window: TimeDelta::days(i64::from(decide_backfill_days)),
+            actions: ActionSettings::default(),
         }
+    }
+
+    /// The same backfill, asking whose move it is as `actions` says.
+    #[must_use]
+    pub const fn with_actions(mut self, actions: ActionSettings) -> Self {
+        self.actions = actions;
+        self
     }
 }
 
@@ -430,7 +466,19 @@ impl BackfillNeeds {
         )
         .fetch_all(&mut **tx)
         .await?;
-        for message in unanswered {
+        // Whose move it is, for mail that needs nothing yet: within the
+        // needs window too, since only such mail can wait on someone.
+        let moves: Vec<MessageId> = if self.actions.enabled {
+            sqlx::query_scalar(MOVES_UNASKED)
+                .bind(conversations)
+                .bind(since.max(Utc::now() - self.needs.window))
+                .fetch_all(&mut **tx)
+                .await?
+        } else {
+            Vec::new()
+        };
+        // One pending job per message: a message in both lists is queued once.
+        for message in unanswered.into_iter().chain(moves) {
             let backlog = Backlog { message };
             jobs::enqueue_to::<DecideBacklog>(tx, &backlog, backlog.options(workspace)).await?;
         }

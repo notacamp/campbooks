@@ -320,3 +320,71 @@ async fn a_deleted_inbox_takes_its_items_along(db: PgPool) {
     assert_eq!(gone, 1);
     assert!(items(&db).await.is_empty());
 }
+
+/// campbooks-cloud#293: a wait, its Nudge, the member nudging (back to
+/// waiting: an update, not a clear) and hearing back (a clear Done today
+/// lists), whatever order the deliveries come in.
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_wait_turns_into_a_nudge_goes_back_to_waiting_and_ends_heard_back(db: PgPool) {
+    let kit = Kit::new(db.clone()).await;
+    let workspace = WorkspaceId::new();
+    kit.need(workspace, &need(1, Reason::Waiting)).await;
+    kit.need(workspace, &need(2, Reason::Nudge)).await;
+    assert_eq!(items(&db).await, [("nudge".into(), "open".into(), 2)]);
+    // The member wrote to them: waiting again, still open.
+    kit.need(workspace, &need(3, Reason::Waiting)).await;
+    assert_eq!(items(&db).await, [("waiting".into(), "open".into(), 3)]);
+    // They wrote back.
+    kit.cleared(workspace, &need(4, Reason::Waiting), "heard_back", None)
+        .await;
+    let (state, cause): (String, String) =
+        sqlx::query_as("SELECT state, cleared_because FROM attention.items")
+            .fetch_one(&db)
+            .await
+            .unwrap();
+    assert_eq!((state.as_str(), cause.as_str()), ("cleared", "heard_back"));
+
+    // The same history delivered backwards ends in the same place.
+    let mut other = need(1, Reason::Waiting);
+    other.conversation = "0192f0c4-7d4e-7b39-a7f1-3a8f0e2b9c99".into();
+    let mut heard = other.clone();
+    heard.revision = 4;
+    kit.cleared(workspace, &heard, "heard_back", None).await;
+    for (revision, reason) in [
+        (3, Reason::Waiting),
+        (2, Reason::Nudge),
+        (1, Reason::Waiting),
+    ] {
+        let mut late = other.clone();
+        late.revision = revision;
+        late.reason = reason;
+        kit.need(workspace, &late).await;
+    }
+    let (state, cause, revision): (String, Option<String>, i64) = sqlx::query_as(
+        "SELECT state, cleared_because, producer_revision FROM attention.items
+          WHERE record_id = $1",
+    )
+    .bind(&other.conversation)
+    .fetch_one(&db)
+    .await
+    .unwrap();
+    assert_eq!(
+        (state.as_str(), cause.as_deref(), revision),
+        ("cleared", Some("heard_back"), 4)
+    );
+    // A late Nudge after the member nudged changes nothing either.
+    let mut third = need(3, Reason::Waiting);
+    third.conversation = "0192f0c4-7d4e-7b39-a7f1-3a8f0e2b9c98".into();
+    kit.need(workspace, &third).await;
+    let mut stale = third.clone();
+    stale.revision = 2;
+    stale.reason = Reason::Nudge;
+    kit.need(workspace, &stale).await;
+    let reason: String =
+        sqlx::query_scalar("SELECT reason FROM attention.items WHERE record_id = $1")
+            .bind(&third.conversation)
+            .fetch_one(&db)
+            .await
+            .unwrap();
+    assert_eq!(reason, "waiting");
+}

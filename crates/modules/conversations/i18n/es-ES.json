@@ -23,6 +23,7 @@
     "invalid_view": "Pide las conversaciones archivadas solo con view=archive: archived=true no se puede combinar con otra vista.",
     "no_open_need": "Aquí ya no hay nada que te necesite.",
     "not_a_payment": "Esto no es un pago pendiente.",
+    "not_waiting": "Ya no estás esperando a nadie en esta conversación, así que no hay a quién insistir.",
     "nothing_to_reopen": "Aquí no hay nada que recuperar.",
     "need_changed": "Esto ha cambiado mientras lo mirabas. Vuelve a mirarlo.",
     "invalid_rule": "No se puede guardar esta regla. Necesita de una a cuatro condiciones que digan a qué correos se aplica, y de una a cuatro acciones de tipos distintos.",

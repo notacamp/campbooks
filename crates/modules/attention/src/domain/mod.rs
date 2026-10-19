@@ -33,19 +33,39 @@ pub enum Reason {
     Do,
     /// Money is owed.
     Pay,
+    /// Someone the member waits on has not written by when they were
+    /// expected to: time to nudge them (campbooks-cloud#293). Never dropped
+    /// by age.
+    Nudge,
     /// A rule the member taught keeps it in front of them until they have
     /// opened it once (campbooks-cloud#274). Shown last.
     WorthALook,
+    /// The member waits on someone (campbooks-cloud#293): never in the
+    /// queue, listed with `state=waiting`.
+    Waiting,
 }
 
 impl Reason {
-    /// Every reason, in display order.
-    pub const ALL: [Self; 6] = [
+    /// Every reason, in display order (`waiting` is never in the queue).
+    pub const ALL: [Self; 8] = [
         Self::Review,
         Self::Reply,
         Self::Decide,
         Self::Do,
         Self::Pay,
+        Self::Nudge,
+        Self::WorthALook,
+        Self::Waiting,
+    ];
+
+    /// The reasons of the queue, in display order: all but `waiting`.
+    pub const QUEUE: [Self; 7] = [
+        Self::Review,
+        Self::Reply,
+        Self::Decide,
+        Self::Do,
+        Self::Pay,
+        Self::Nudge,
         Self::WorthALook,
     ];
 
@@ -57,7 +77,9 @@ impl Reason {
             Self::Decide => "decide",
             Self::Do => "do",
             Self::Pay => "pay",
+            Self::Nudge => "nudge",
             Self::WorthALook => "worth_a_look",
+            Self::Waiting => "waiting",
         }
     }
 }
@@ -145,7 +167,7 @@ pub struct ItemView {
     /// Open or cleared.
     pub state: ItemState,
     /// Why it was cleared (`replied`, `archived`, `trashed`, `done`,
-    /// `not_needed`), as the producing module said.
+    /// `not_needed`, `heard_back`), as the producing module said.
     pub cleared_because: Option<String>,
     /// The member who cleared it, when one did.
     pub cleared_by: Option<UserId>,

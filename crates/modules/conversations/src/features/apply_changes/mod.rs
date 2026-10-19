@@ -61,8 +61,8 @@ use crate::{
         ProviderLabel,
     },
     model::{
-        AttachmentId, BlobPointer, Channel, ConversationId, Direction, InboxId, LabelId, MessageId,
-        Stream, StreamSource,
+        Address, AttachmentId, BlobPointer, Channel, ConversationId, Direction, InboxId, LabelId,
+        MessageId, Stream, StreamSource,
     },
 };
 
@@ -208,6 +208,7 @@ impl JobHandler for ApplyChanges {
             touched: BTreeMap::new(),
             new_in: BTreeSet::new(),
             taught: None,
+            correspondents: BTreeSet::new(),
         };
         for change in &batch.changes {
             match change {
@@ -415,6 +416,11 @@ struct Apply<'a> {
     new_in: BTreeSet<ConversationId>,
     /// The inbox's taught rules, read once per batch.
     taught: Option<Vec<TaughtRule>>,
+    /// Who wrote to the inbox (senders of new inbound mail) or was written
+    /// to (To and Cc of new mail it sent), lower-cased: a wait on one of
+    /// them in another conversation is worked out again (hearing back,
+    /// campbooks-cloud#293).
+    correspondents: BTreeSet<String>,
 }
 
 /// A stored message's mutable state.
@@ -636,6 +642,17 @@ impl Apply<'_> {
         self.announce(tx, message, prepared, conversation, id)
             .await?;
         self.new_in.insert(conversation);
+        let people: Vec<&Address> = if inbound {
+            vec![&message.from]
+        } else {
+            message.to.iter().chain(&message.cc).collect()
+        };
+        self.correspondents.extend(
+            people
+                .into_iter()
+                .map(|a| a.address.trim().to_lowercase())
+                .filter(|a| !a.is_empty()),
+        );
         Ok(())
     }
 
@@ -985,12 +1002,24 @@ impl Apply<'_> {
                 recount(tx, *conversation).await?;
             }
         }
-        let refresh: BTreeSet<ConversationId> = self
+        let mut refresh: BTreeSet<ConversationId> = self
             .new_in
             .iter()
             .chain(self.touched.keys())
             .copied()
             .collect();
+        // The open waits on someone who just wrote, or was just written to,
+        // in this inbox's other conversations: heard back, or nudged.
+        if !self.correspondents.is_empty() {
+            let addresses: Vec<&str> = self.correspondents.iter().map(String::as_str).collect();
+            let waiting: Vec<ConversationId> = sqlx::query_scalar(WAITING_ON)
+                .bind(self.workspace.as_uuid())
+                .bind(self.inbox)
+                .bind(&addresses)
+                .fetch_all(&mut **tx)
+                .await?;
+            refresh.extend(waiting);
+        }
         for (conversation, (changes, provider_ids)) in self.touched {
             Changed {
                 workspace: self.ws.to_owned(),
@@ -1011,6 +1040,13 @@ impl Apply<'_> {
         Ok(())
     }
 }
+
+/// The conversations of inbox `$2` (workspace `$1`) with an open wait on
+/// one of `$3` (lower-cased addresses). Served by `needs_awaited_idx`.
+const WAITING_ON: &str = "SELECT n.conversation_id FROM conversations.needs n \
+       JOIN conversations.conversations c ON c.id = n.conversation_id \
+      WHERE n.workspace_id = $1 AND n.state = 'open' AND n.reason IN ('waiting', 'nudge') \
+        AND lower(n.awaited_address) = ANY($3) AND c.inbox_id = $2";
 
 /// The stream the rules' answers may set, if the policy accepts one.
 fn accepted_stream(

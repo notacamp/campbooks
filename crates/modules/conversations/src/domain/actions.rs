@@ -141,6 +141,9 @@ pub fn rank(
     floor: f64,
 ) -> Vec<SuggestedAction> {
     let (pair, allowed): (Option<[ActionId; 2]>, &[ActionId]) = match (reason, question) {
+        // A wait offers the client's own actions (Nudge, Heard from them,
+        // Later, Not waiting): nothing of the catalogue (campbooks-cloud#293).
+        (NeedReason::Waiting | NeedReason::Nudge, _) => return Vec::new(),
         (NeedReason::Review, NeedQuestion::Suspicious) => {
             (Some([ActionId::Report, ActionId::Safe]), &[])
         }

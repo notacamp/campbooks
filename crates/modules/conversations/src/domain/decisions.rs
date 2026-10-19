@@ -1,7 +1,9 @@
 //! Storing the decide pass's answers.
 
 use campbooks_ai::decide::{
-    AnswerValue, Question, QuestionKind, signals::email::triage, strategy::Decided,
+    AnswerValue, Question, QuestionKind,
+    signals::{email::triage, moves},
+    strategy::Decided,
 };
 use campbooks_kernel::tenancy::WorkspaceId;
 use serde_json::{Value, json};
@@ -132,9 +134,18 @@ fn value_json(value: &AnswerValue) -> Value {
     }
 }
 
-/// The options in the order the probabilities are given.
+/// The options in the order the probabilities are given. The `awaited`
+/// question's options keep their descriptions too (`{label, description}`):
+/// each names the person it stood for when it was asked, so a stored `p2`
+/// is only ever read as that person (campbooks-cloud#293).
 fn options_json(question: &Question) -> Value {
     match &question.kind {
+        QuestionKind::Choice { options, .. } if question.id == moves::question::AWAITED => json!(
+            options
+                .iter()
+                .map(|o| json!({"label": o.label, "description": o.description}))
+                .collect::<Vec<_>>()
+        ),
         QuestionKind::Choice { options, .. } => {
             json!(options.iter().map(|o| o.label.as_str()).collect::<Vec<_>>())
         }
