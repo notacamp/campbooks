@@ -58,6 +58,24 @@ async fn whoami(
     }))
 }
 
+/// A streamed answer, as a streamed reply sends it: its one frame says
+/// whether the request carried the server's deadline, and the limit after
+/// the handler allowed itself 90 seconds (campbooks-cloud#288).
+async fn events(
+    _: Scoped<TestRead>,
+    deadline: Option<axum::Extension<campbooks_kernel::time_limit::Deadline>>,
+) -> impl axum::response::IntoResponse {
+    let limit = deadline.map(|axum::Extension(deadline)| {
+        deadline.allow(std::time::Duration::from_secs(90));
+        deadline.limit().as_secs()
+    });
+    let frame = json!({ "limit": limit });
+    (
+        [(header::CONTENT_TYPE, "text/event-stream")],
+        format!("event: deadline\ndata: {frame}\n\n"),
+    )
+}
+
 /// How many times [`record`] ran (only the replay test calls it).
 static RECORDED: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
 
@@ -164,6 +182,7 @@ fn app(state: AppState, settings: Option<config::Settings>) -> Router {
     } = operations::compose(
         crate::api()
             .route("/api/v1/test/whoami", any(whoami))
+            .route("/api/v1/test/events", axum::routing::post(events))
             .routes(utoipa_axum::routes!(record)),
         state,
     );
@@ -1710,6 +1729,42 @@ async fn the_change_feed_streams_through_the_bff(db: PgPool) {
         )
         .await;
     assert_eq!(other.status, StatusCode::NOT_FOUND);
+}
+
+/// A POST answered with an event stream passes through the BFF, after the
+/// CSRF check, with the outer request's deadline, which the handler may
+/// raise (campbooks-cloud#288).
+#[sqlx::test(migrations = "../../migrations")]
+async fn a_streamed_post_passes_through_the_bff(db: PgPool) {
+    let h = harness(db).await;
+    let mut browser = Browser::new(&h.app);
+    browser.sign_in(&h.idp, "/").await;
+    let reply = browser
+        .send(
+            Request::post("/bff/api/v1/test/events")
+                .header(CSRF_HEADER, "1")
+                .header("sec-fetch-site", "same-origin"),
+            Body::empty(),
+        )
+        .await;
+    assert_eq!(reply.status, StatusCode::OK, "{}", reply.body);
+    assert_eq!(
+        reply.header(header::CONTENT_TYPE),
+        Some("text/event-stream")
+    );
+    assert!(
+        reply.body.contains("event: deadline\ndata: {\"limit\":90}"),
+        "{}",
+        reply.body
+    );
+    // Without the CSRF header, the API never runs.
+    browser
+        .send(
+            Request::post("/bff/api/v1/test/events").header("sec-fetch-site", "same-origin"),
+            Body::empty(),
+        )
+        .await
+        .assert_problem(StatusCode::FORBIDDEN, "csrf_check_failed");
 }
 
 #[sqlx::test(migrations = "../../migrations")]

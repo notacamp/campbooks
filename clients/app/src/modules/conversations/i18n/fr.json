@@ -20,7 +20,7 @@
     "unread": "Non lues",
     "more": "Afficher plus",
     "loadingMore": "Chargement d’autres conversations",
-    "youPrefix": "Moi : {{snippet}}",
+    "youPrefix": "Moi :",
     "to": "À {{name}}",
     "toOthers_one": "À {{name}} et {{count}} autre personne",
     "toOthers_other": "À {{name}} et {{count}} autres personnes",
@@ -104,7 +104,7 @@
     "imagesHidden_one": "{{count}} image distante masquée, pour que l’expéditeur ne sache pas quand vous lisez ceci.",
     "imagesHidden_other": "{{count}} images distantes masquées, pour que l’expéditeur ne sache pas quand vous lisez ceci.",
     "imagesShown": "Images distantes affichées.",
-    "trustImages": "Toujours afficher les images de {{name}}",
+    "trustImages": "Toujours pour cet expéditeur",
     "imagesTrusted": "Images affichées : vous faites confiance à {{name}}. Les pixels de suivi restent supprimés.",
     "imagesTrustedInbox": "Images affichées : cette boîte fait confiance à {{name}}. Les pixels de suivi restent supprimés.",
     "imagesHeld": {
@@ -634,6 +634,9 @@
       "action": "Rédiger"
     },
     "writing": "Rédaction du brouillon…",
+    "thinking": "Scout réfléchit…",
+    "thoughts": "Comment Scout y a réfléchi",
+    "typing": "Scout écrit…",
     "draftDescription": "Le brouillon de Scout. Modifiez-le ici ou demandez un changement. Rien n’est envoyé avant que vous appuyiez sur Envoyer.",
     "draftLabel": "Votre réponse",
     "shorter": "Plus courte",
@@ -656,6 +659,7 @@
     "tooLate": "Trop tard pour annuler : la réponse est déjà partie.",
     "errors": {
       "write": "Scout n’a pas pu écrire cela pour l’instant. Réessayez ou écrivez-la vous-même.",
+      "timeout": "Scout a mis trop de temps à répondre. Réessayez ou écrivez-la vous-même.",
       "limit": "Scout a écrit beaucoup de réponses cette heure-ci. Réessayez plus tard ou écrivez-la vous-même.",
       "dailyLimit": "Cet espace de travail a utilisé son quota d’IA du jour. Écrivez celle-ci vous-même.",
       "send": "Impossible d’envoyer à {{name}}. Votre brouillon est conservé.",

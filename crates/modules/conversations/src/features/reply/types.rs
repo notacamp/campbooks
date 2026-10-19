@@ -43,6 +43,10 @@ pub struct WriteReply {
     /// Make the draft shorter.
     #[serde(default)]
     pub shorter: bool,
+    /// The likely replies shown, in order (at most 3, each at most 80
+    /// characters), so `intent` may pick or combine them ("1 and 3").
+    #[serde(default)]
+    pub suggestions: Vec<String>,
 }
 
 /// Scout's reply, as plain text. Nothing is saved or sent.
