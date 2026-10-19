@@ -475,10 +475,16 @@ fn admin_operation_owners() -> Result<arch::Owners> {
     Ok(owners)
 }
 
-/// Every `.rs` file under `dir`, as (path relative to `root`, text).
+/// Every `.rs` file under `dir`, as (path relative to `root`, text), in path
+/// order: the file system's own order differs between machines and runs, and
+/// no check may depend on it.
 fn rust_sources(root: &Path, dir: &Path, out: &mut Vec<(String, String)>) -> Result<()> {
+    let mut paths = Vec::new();
     for entry in fs::read_dir(dir).with_context(|| format!("reading {}", dir.display()))? {
-        let path = entry?.path();
+        paths.push(entry?.path());
+    }
+    paths.sort();
+    for path in paths {
         let name = path
             .file_name()
             .map(|n| n.to_string_lossy().into_owned())
