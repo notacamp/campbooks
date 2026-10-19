@@ -339,6 +339,65 @@ async fn worth_a_look_is_never_raised_for_a_sender_that_is_not_authenticated(db:
     assert_eq!(good["need"]["reason"], "worth_a_look", "{good}");
 }
 
+/// A highlight answer a rule stored on `provider_id`'s message, as one from
+/// before the engine checked the sender could be stored.
+async fn store_highlight(kit: &Kit, provider_id: &str) {
+    sqlx::query(
+        "INSERT INTO conversations.decisions
+                (id, workspace_id, message_id, conversation_id, question, source, strategy,
+                 value, confidence, model, latency_ms, acted, state_version)
+         SELECT gen_random_uuid(), workspace_id, id, conversation_id, 'worth_a_look', 'taught',
+                'taught', 'true'::jsonb, 1.0, 'taught', 0, true, 1
+           FROM conversations.messages WHERE provider_message_id = $1",
+    )
+    .bind(provider_id)
+    .execute(&kit.db)
+    .await
+    .unwrap();
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_stored_highlight_on_unauthenticated_mail_raises_no_need(db: PgPool) {
+    let kit = Kit::with_deps(db, ConversationsDeps::offline()).await;
+    let (workspace, inbox, sam) = sams_inbox(&kit).await;
+    kit.ingest_value(workspace, inbox, &daily("bare", BUILDS, 1))
+        .await;
+    kit.ingest_value(
+        workspace,
+        inbox,
+        &received_with(daily("spoof", BUILDS, 1), SPOOFED),
+    )
+    .await;
+    kit.ingest_value(
+        workspace,
+        inbox,
+        &received_with(daily("good", BUILDS, 1), PASSES),
+    )
+    .await;
+    for id in ["bare-0", "spoof-0", "good-0"] {
+        store_highlight(&kit, id).await;
+        // Reading then unreading works the need out again.
+        let conversation = kit.conversation_of(id).await;
+        for step in ["read", "unread"] {
+            let done = kit
+                .post(
+                    &sam,
+                    &format!("/api/v1/w/{workspace}/conversations/{conversation}/{step}"),
+                    None,
+                )
+                .await;
+            assert_eq!(done.status, StatusCode::OK, "{:?}", done.json);
+        }
+    }
+    kit.run_jobs().await;
+    for id in ["bare-0", "spoof-0"] {
+        let (_, none) = listed(&kit, &sam, workspace, id).await;
+        assert!(none["need"].is_null(), "{id}: {none}");
+    }
+    let (_, good) = listed(&kit, &sam, workspace, "good-0").await;
+    assert_eq!(good["need"]["reason"], "worth_a_look", "{good}");
+}
+
 #[sqlx::test(migrations = "../../../migrations")]
 async fn a_pass_before_the_first_sync_looks_again_once_mail_arrives(db: PgPool) {
     let kit = Kit::with_deps(db, ConversationsDeps::offline()).await;

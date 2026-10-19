@@ -2959,7 +2959,9 @@ From domain, or an aligned DKIM pass; no results at all is not a pass), and
 never for mail that looks suspicious, fails its sender checks or is
 impersonated, whoever the rule names. This SHALL hold on arrival, when a rule is
 applied to existing mail and in the preview, so the count a member is shown
-matches what happens.
+matches what happens. The need itself SHALL be checked the same way when it is raised, so a
+highlight answer stored earlier on mail that is not authenticated, or looks
+suspicious, raises nothing.
 
 #### Scenario: A spoofed message
 - **WHEN** a rule highlights builds@ci.example.com and a message arrives from that address whose results authenticate another domain
