@@ -22,8 +22,8 @@ import {
   belongsIn,
   useConversations,
   useInboxes,
+  type ConversationPlace,
   type ConversationSummary,
-  type Place,
 } from "../../api/queries";
 import {
   archiveMove,
@@ -53,7 +53,7 @@ function isNarrow(): boolean {
 export interface InboxScreenProps {
   workspaceId: string;
   /** The stream listed, or a view beside them (Sent, Archive, Spam, Trash). */
-  stream: Place;
+  stream: ConversationPlace;
   /** The conversation open in the reader, if any. */
   conversationId?: string | undefined;
   /**

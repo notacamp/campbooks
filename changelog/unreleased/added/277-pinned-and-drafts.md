@@ -1,0 +1,1 @@
+- **Pinned and Drafts beside Sent, Archive, Spam and Trash** (G then 9 and 0). Pinned lists what you pinned, in any stream, archived or not, newest first. Drafts lists your saved drafts (newest 50); opening one opens the composer where you left it, and Delete draft has Undo. G then 5 to 8 keep their keys. On phones, the folder you are in now stays in view in the chip row.

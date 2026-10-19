@@ -66,6 +66,22 @@ export const CONVERSATIONS_SHORTCUTS = [
     group: "navigation",
     label: "conversations:shortcuts.trash",
   },
+  // Pinned and Drafts sit after Sent in the sidebar but take the keys left
+  // over, so G 5–8 keep meaning what they always did (campbooks-cloud#277).
+  {
+    id: "inbox.view.starred",
+    keys: "g 9",
+    scope: "global",
+    group: "navigation",
+    label: "conversations:shortcuts.starred",
+  },
+  {
+    id: "inbox.view.drafts",
+    keys: "g 0",
+    scope: "global",
+    group: "navigation",
+    label: "conversations:shortcuts.drafts",
+  },
   {
     // Delete; in the trash the same key restores it, back where it was.
     id: "conversations.trash",

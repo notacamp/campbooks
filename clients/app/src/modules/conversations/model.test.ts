@@ -212,9 +212,15 @@ describe("attachments", () => {
     expect(VIEWS.every((view) => isView(view) && isPlace(view))).toBe(true);
     expect(STREAMS.some((stream) => isView(stream))).toBe(false);
     expect(STREAMS.every((stream) => isPlace(stream))).toBe(true);
-    for (const junk of ["inbox", "starred", "drafts", "Sent", ""]) {
+    for (const junk of ["inbox", "Starred", "Sent", "pinned", ""]) {
       expect(isPlace(junk)).toBe(false);
     }
+    // Pinned is a view; Drafts is a place whose list is not conversations.
+    expect(isPlace("starred") && isView("starred")).toBe(true);
+    expect(isPlace("drafts")).toBe(true);
+    expect(isView("drafts")).toBe(false);
+    expect(placeName(t, "starred")).toBe("views.starred");
+    expect(placeName(t, "drafts")).toBe("views.drafts");
     expect(placeName(t, "trash")).toBe("views.trash");
     expect(placeName(t, "primary")).toBe("streams.primary");
   });
@@ -243,6 +249,20 @@ describe("attachments", () => {
     // Done and Move to Inbox.
     expect(where(applied(Q4, "archive"))).toEqual(["sent", "archive"]);
     expect(where(applied(FIGURES, "unarchive"))).toEqual(["primary", "sent"]);
+  });
+
+  it("lists a pinned conversation in Pinned, archived or not, and never from the trash", () => {
+    const pinned = { ...Q4, starred: true };
+    const where = (summary: typeof Q4) => VIEWS.filter((view) => belongsIn(view, summary));
+    expect(where(Q4)).toEqual(["sent"]);
+    expect(where(pinned)).toEqual(["sent", "starred"]);
+    expect(where(applied(pinned, "archive"))).toEqual(["sent", "starred", "archive"]);
+    expect(where(applied(pinned, "trash"))).toEqual(["trash"]);
+    expect(where(applied(applied(pinned, "trash"), "untrash"))).toEqual(["sent", "starred"]);
+    expect(where(applied(pinned, "spam"))).toEqual(["spam"]);
+    // Pin and Unpin move it in and out of Pinned and nowhere else.
+    expect(where(applied(Q4, "star"))).toEqual(["sent", "starred"]);
+    expect(where(applied(pinned, "unstar"))).toEqual(["sent"]);
   });
 
   it("gives each key the move that fits where the conversation is", () => {

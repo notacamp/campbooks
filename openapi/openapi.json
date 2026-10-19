@@ -3029,7 +3029,7 @@
           {
             "name": "view",
             "in": "query",
-            "description": "Which place: the inbox (default), Sent, Archive, Spam or Trash.",
+            "description": "Which place: the inbox (default), Sent, Starred, Archive, Spam or Trash.",
             "required": false,
             "schema": {
               "type": "string",
@@ -3037,6 +3037,7 @@
               "enum": [
                 "inbox",
                 "sent",
+                "starred",
                 "archive",
                 "spam",
                 "trash"

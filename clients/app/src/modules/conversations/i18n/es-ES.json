@@ -9,9 +9,22 @@
   },
   "views": {
     "sent": "Enviados",
+    "starred": "Fijadas",
+    "drafts": "Borradores",
     "archive": "Archivo",
     "spam": "Spam",
     "trash": "Papelera"
+  },
+  "drafts": {
+    "label": "Borradores",
+    "lead": "Borrador · {{to}}",
+    "noRecipients": "Sin destinatarios",
+    "toOthers_one": "{{name}} y {{count}} más",
+    "toOthers_other": "{{name}} y {{count}} más",
+    "cap": "Tus {{count}} borradores más recientes.",
+    "readerTitle": "Elige un borrador",
+    "readerBody": "Elige uno de la lista para seguir escribiéndolo.",
+    "errorTitle": "No se han podido cargar los borradores"
   },
   "list": {
     "label": "Conversaciones",
@@ -37,6 +50,8 @@
     "readerTitle": "Elige una conversación",
     "readerBody": "Elige una de la lista o usa el teclado:",
     "sent": "Nada en Enviados.",
+    "starred": "Nada fijado.",
+    "drafts": "Sin borradores.",
     "archive": "Nada en Archivo.",
     "spam": "Nada en Spam.",
     "trash": "Nada en la Papelera."
@@ -231,6 +246,8 @@
     "saveRule": "Guardar la regla inteligente",
     "trustImages": "Mostrar siempre las imágenes de este remitente",
     "sent": "Ir a Enviados",
+    "starred": "Ir a Fijadas",
+    "drafts": "Ir a Borradores",
     "archive": "Ir a Archivo",
     "spam": "Ir a Spam",
     "trash": "Ir a Papelera",

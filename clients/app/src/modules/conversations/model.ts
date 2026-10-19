@@ -105,7 +105,7 @@ export function streamName(t: Translate, stream: Stream): string {
 
 /** A stream's name, or a view's ("Sent", "Trash"). */
 export function placeName(t: Translate, place: Place): string {
-  return isView(place) ? t(`views.${place}`) : streamName(t, place);
+  return isView(place) || place === "drafts" ? t(`views.${place}`) : streamName(t, place);
 }
 
 /**

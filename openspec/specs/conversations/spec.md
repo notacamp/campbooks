@@ -186,14 +186,16 @@ given, with an opaque cursor and a limit of 1 to 100 (else 400). The views
 SHALL be: `inbox` (the default), the conversations with a message in the
 inbox and none binned; `sent`, every conversation the inbox wrote in outside
 spam and the trash (`last_sent_at` set, not `trashed`), in any stream,
-archived or not; `archive`, those with no message in the inbox and not
+archived or not; `starred`, those pinned (`starred`) and not binned, in any
+stream, archived or not; `archive`, those with no message in the inbox and not
 binned; `spam`, those binned as spam; and `trash`, those binned in the
 trash. In the inbox, pinned (starred) conversations SHALL come first, then
 the rest, each newest first, and a cursor SHALL page across the two without
 losing or repeating one. Sent SHALL be ordered by `last_sent_at`, newest
-first, its cursor keyed on it; archive, spam, trash and lists by `ids` SHALL
-be newest first and never carry a pin in their cursor. Each view SHALL page
-over an index of its own order. `archived=true` is deprecated: it SHALL list
+first, its cursor keyed on it; starred, archive, spam, trash and lists by `ids`
+SHALL be newest first and never carry a pin in their cursor. Sent, archive,
+spam and trash SHALL page over an index of their own order; starred SHALL
+page over the list index, since few conversations are pinned. `archived=true` is deprecated: it SHALL list
 the archive as `view=archive` does, and with any other `view` the response
 SHALL be 400 `invalid_view`. Lists by `ids` SHALL ignore the view and the
 stream. A cursor given before pins existed SHALL read as one among the
@@ -230,6 +232,14 @@ filtered `@media` rules in `css`; HTML SHALL never be served as `text/html`.
 #### Scenario: Paging Sent
 - **WHEN** a member lists three sent conversations two at a time
 - **THEN** the second page holds the one the inbox wrote in longest ago, and no cursor
+
+#### Scenario: Starred
+- **WHEN** a member pins one conversation in the inbox, pins and archives another, and pins a third that is then binned
+- **THEN** `view=starred` lists the first two, the more recent first, and not the binned one, and unpinning one takes it out
+
+#### Scenario: Paging Starred
+- **WHEN** a member lists three pinned conversations two at a time
+- **THEN** the second page holds the oldest of them and no cursor
 
 #### Scenario: The deprecated archived
 - **WHEN** a client asks for `archived=true`, then for `archived=true&view=sent`

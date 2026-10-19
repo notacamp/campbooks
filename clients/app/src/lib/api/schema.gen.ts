@@ -6937,8 +6937,8 @@ export interface operations {
                 stream?: components["schemas"]["Stream"];
                 /** @description Only this inbox; every inbox you can read when absent. */
                 inbox?: components["schemas"]["InboxId"];
-                /** @description Which place: the inbox (default), Sent, Archive, Spam or Trash. */
-                view?: "inbox" | "sent" | "archive" | "spam" | "trash";
+                /** @description Which place: the inbox (default), Sent, Starred, Archive, Spam or Trash. */
+                view?: "inbox" | "sent" | "starred" | "archive" | "spam" | "trash";
                 /**
                  * @description Deprecated: use `view=archive`. `true` lists the archive, as
                  *     `view=archive` does; with another `view` it is a bad request.

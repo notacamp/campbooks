@@ -9,9 +9,22 @@
   },
   "views": {
     "sent": "Sent",
+    "starred": "Pinned",
+    "drafts": "Drafts",
     "archive": "Archive",
     "spam": "Spam",
     "trash": "Trash"
+  },
+  "drafts": {
+    "label": "Drafts",
+    "lead": "Draft · {{to}}",
+    "noRecipients": "No recipients",
+    "toOthers_one": "{{name}} and {{count}} other",
+    "toOthers_other": "{{name}} and {{count}} others",
+    "cap": "Your {{count}} newest drafts.",
+    "readerTitle": "Pick a draft",
+    "readerBody": "Choose one from the list to keep writing it.",
+    "errorTitle": "Could not load your drafts"
   },
   "list": {
     "label": "Conversations",
@@ -37,6 +50,8 @@
     "readerTitle": "Pick a conversation",
     "readerBody": "Choose one from the list, or use the keyboard:",
     "sent": "Nothing in Sent.",
+    "starred": "Nothing pinned.",
+    "drafts": "No drafts.",
     "archive": "Nothing in Archive.",
     "spam": "Nothing in Spam.",
     "trash": "Nothing in Trash."
@@ -231,6 +246,8 @@
     "saveRule": "Save the smart rule",
     "trustImages": "Always show images from this sender",
     "sent": "Go to Sent",
+    "starred": "Go to Pinned",
+    "drafts": "Go to Drafts",
     "archive": "Go to Archive",
     "spam": "Go to Spam",
     "trash": "Go to Trash",

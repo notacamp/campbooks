@@ -17,6 +17,7 @@ import {
   LEDGER_RUN,
   LEDGER_SUGGESTIONS,
   ledgerBody,
+  NDA,
   PRIMARY,
   Q4,
   Q4_BODY,
@@ -25,6 +26,7 @@ import {
   STREAM_COUNTS,
   W,
 } from "../../../test/demo/conversations";
+import { BLANK, DRAFT_LIST, REPLY_WRITTEN, TO_MARTA } from "../../../test/demo/drafts";
 import { DUARTE } from "../../../test/demo/workspaces";
 import { mockApi, problem, renderWithProviders } from "../../../test/render";
 import type { Schema } from "~/lib/api";
@@ -141,6 +143,72 @@ describe("the inbox", () => {
 
     expect(await screen.findByRole("heading", { level: 1, name: "Spam" })).toBeVisible();
     expect(await screen.findByRole("heading", { name: "Nothing in Spam." })).toBeVisible();
+  });
+
+  it("lists what you pinned in Pinned, archived or not", async () => {
+    inbox({
+      [`GET ${W}/conversations`]: (request) => ({
+        body: {
+          conversations: new URL(request.url).searchParams.get("view") === "starred" ? [NDA] : [],
+          next_cursor: null,
+        },
+      }),
+    });
+    renderAt(`/w/${DUARTE.id}/inbox/starred`);
+
+    expect(await screen.findByRole("heading", { level: 1, name: "Pinned" })).toBeVisible();
+    const list = screen.getByRole("region", { name: "Conversations" });
+    expect(await within(list).findByText(NDA.subject)).toBeVisible();
+  });
+
+  it("lists your drafts, and opens a new message where it was left", async () => {
+    inbox({ [`GET ${W}/drafts`]: { body: { drafts: DRAFT_LIST } } });
+    const { router } = renderAt(`/w/${DUARTE.id}/inbox/drafts`);
+
+    expect(await screen.findByRole("heading", { level: 1, name: "Drafts" })).toBeVisible();
+    expect(await screen.findByText("Draft · Marta Ferreira and 2 others")).toBeVisible();
+    fireEvent.click(screen.getByRole("button", { name: /Draft · Marta Ferreira/u }));
+    await waitFor(() => {
+      expect(router.state.location.pathname).toBe(`/w/${DUARTE.id}/compose`);
+    });
+    expect(router.state.location.search).toEqual({ draft: TO_MARTA.id });
+  });
+
+  it("opens a reply draft under its thread, on the message it answers", async () => {
+    inbox({ [`GET ${W}/drafts`]: { body: { drafts: [REPLY_WRITTEN] } } });
+    const { router } = renderAt(`/w/${DUARTE.id}/inbox/drafts`);
+
+    fireEvent.click(await screen.findByRole("button", { name: /Draft · Maya Okafor/u }));
+    await waitFor(() => {
+      expect(router.state.location.pathname).toBe(`/w/${DUARTE.id}/inbox/primary/${Q4.id}`);
+    });
+    expect(router.state.location.search).toEqual({ reply: true, to: REPLY_WRITTEN.message_id });
+  });
+
+  it("deletes a draft from the list, and Undo brings it back", async () => {
+    let stored = [TO_MARTA, BLANK];
+    const api = inbox({
+      [`GET ${W}/drafts`]: () => ({ body: { drafts: stored } }),
+      [`DELETE ${W}/drafts/${TO_MARTA.id}`]: () => {
+        stored = stored.filter((draft) => draft.id !== TO_MARTA.id);
+        return { status: 204 };
+      },
+      [`POST ${W}/drafts`]: () => {
+        stored = [TO_MARTA, BLANK];
+        return { status: 201, body: TO_MARTA };
+      },
+    });
+    renderAt(`/w/${DUARTE.id}/inbox/drafts`);
+
+    await screen.findByText("Figures for the board");
+    fireEvent.click(screen.getByRole("button", { name: "Delete draft: Figures for the board" }));
+    expect(await screen.findByText("Draft deleted")).toBeVisible();
+    await waitFor(() => {
+      expect(screen.queryByText("Figures for the board")).toBeNull();
+    });
+    fireEvent.click(screen.getByRole("button", { name: /^Undo/u }));
+    expect(await screen.findByText("Figures for the board")).toBeVisible();
+    expect(api.calls.some((call) => call.route === `POST ${W}/drafts`)).toBe(true);
   });
 
   it("deletes with # and takes it back with Z", async () => {

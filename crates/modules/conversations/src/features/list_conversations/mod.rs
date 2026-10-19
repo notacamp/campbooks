@@ -1,6 +1,7 @@
 //! `GET /api/v1/w/{workspace_id}/conversations` — conversations by stream,
 //! pinned first (the provider's star), then newest first, a page at a time;
-//! or one of the inbox's other places (Sent, Archive, Spam, Trash; campbooks-cloud#240).
+//! or one of the inbox's other places (Sent, Starred, Archive, Spam, Trash;
+//! campbooks-cloud#240, #277).
 
 use axum::{Extension, Json, extract::State};
 use base64::{Engine as _, engine::general_purpose::URL_SAFE_NO_PAD};
@@ -46,6 +47,9 @@ pub enum MailView {
     /// Every conversation the inbox wrote in, outside spam and the trash, in
     /// any stream, archived or not, by the inbox's latest message.
     Sent,
+    /// Starred (pinned in the UI) conversations, outside the trash, in any
+    /// stream, archived or not, newest first.
+    Starred,
     /// Conversations out of the inbox, outside spam and the trash.
     Archive,
     /// Conversations reported as spam.
@@ -77,6 +81,11 @@ impl MailView {
                 at: "c.last_sent_at",
                 pinned: false,
             },
+            Self::Starred => Order {
+                filter: "c.starred AND NOT c.trashed",
+                at: "c.last_message_at",
+                pinned: false,
+            },
             Self::Archive => Order {
                 filter: "c.archived_at IS NOT NULL AND NOT c.trashed",
                 at: "c.last_message_at",
@@ -104,7 +113,7 @@ pub struct ListQuery {
     pub stream: Option<Stream>,
     /// Only this inbox; every inbox you can read when absent.
     pub inbox: Option<InboxId>,
-    /// Which place: the inbox (default), Sent, Archive, Spam or Trash.
+    /// Which place: the inbox (default), Sent, Starred, Archive, Spam or Trash.
     #[param(inline)]
     pub view: Option<MailView>,
     /// Deprecated: use `view=archive`. `true` lists the archive, as
@@ -730,6 +739,75 @@ mod http_tests {
                 .await
                 .is_empty()
         );
+    }
+
+    #[sqlx::test(migrations = "../../../migrations")]
+    async fn starred_lists_pinned_conversations_inbox_or_archive(db: PgPool) {
+        let kit = Kit::new(db).await;
+        let (workspace, _, sam) = kit.sams_inbox().await;
+        let base = format!("/api/v1/w/{workspace}/conversations");
+        let q4 = kit.conversation_of("en-1").await;
+        let news = kit.conversation_of("en-3").await;
+        assert!(
+            subjects(&kit, &sam, &format!("{base}?view=starred"))
+                .await
+                .is_empty()
+        );
+        for id in [&q4, &news] {
+            kit.post(&sam, &format!("{base}/{id}/star"), None).await;
+        }
+        // Archiving does not unpin: newest first, not pinned-first.
+        kit.post(&sam, &format!("{base}/{news}/archive"), None)
+            .await;
+        assert_eq!(
+            subjects(&kit, &sam, &format!("{base}?view=starred")).await,
+            [NEWS, Q4]
+        );
+    }
+
+    #[sqlx::test(migrations = "../../../migrations")]
+    async fn starred_leaves_out_unstarred_spam_and_trash(db: PgPool) {
+        let kit = Kit::new(db).await;
+        let (workspace, _, sam) = kit.sams_inbox().await;
+        let base = format!("/api/v1/w/{workspace}/conversations");
+        let q4 = kit.conversation_of("en-1").await;
+        let news = kit.conversation_of("en-3").await;
+        let sign_in = kit.conversation_of("en-4").await;
+        for id in [&q4, &news, &sign_in] {
+            kit.post(&sam, &format!("{base}/{id}/star"), None).await;
+        }
+        kit.post(&sam, &format!("{base}/{news}/spam"), None).await;
+        kit.post(&sam, &format!("{base}/{sign_in}/trash"), None)
+            .await;
+        assert_eq!(
+            subjects(&kit, &sam, &format!("{base}?view=starred")).await,
+            [Q4]
+        );
+        kit.post(&sam, &format!("{base}/{q4}/unstar"), None).await;
+        assert!(
+            subjects(&kit, &sam, &format!("{base}?view=starred"))
+                .await
+                .is_empty()
+        );
+    }
+
+    #[sqlx::test(migrations = "../../../migrations")]
+    async fn a_starred_cursor_pages_through(db: PgPool) {
+        let kit = Kit::new(db).await;
+        let (workspace, _, sam) = kit.sams_inbox().await;
+        let base = format!("/api/v1/w/{workspace}/conversations");
+        for id in ["en-1", "en-3", "en-4"] {
+            let id = kit.conversation_of(id).await;
+            kit.post(&sam, &format!("{base}/{id}/star"), None).await;
+        }
+        let list = format!("{base}?view=starred&limit=2");
+        let first = kit.get(&sam, &list).await;
+        let cursor = first.json["next_cursor"].as_str().unwrap().to_owned();
+        assert_eq!(subjects(&kit, &sam, &list).await, [SIGN_IN, NEWS]);
+        let rest = kit.get(&sam, &format!("{list}&cursor={cursor}")).await;
+        assert_eq!(rest.json["conversations"][0]["subject"], Q4);
+        assert_eq!(rest.json["conversations"].as_array().unwrap().len(), 1);
+        assert!(rest.json["next_cursor"].is_null());
     }
 
     #[sqlx::test(migrations = "../../../migrations")]

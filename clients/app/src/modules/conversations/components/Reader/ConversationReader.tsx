@@ -25,9 +25,9 @@ import {
 import {
   useConversation,
   useInboxes,
+  type ConversationPlace,
   type ConversationSummary,
   type MessageView,
-  type Place,
 } from "../../api/queries";
 import {
   archiveMove,
@@ -71,7 +71,7 @@ export interface ConversationReaderProps {
   workspaceId: string;
   conversationId: string;
   /** The stream or view the list shows (Back goes there). */
-  stream: Place;
+  stream: ConversationPlace;
   /** What Back says when the list is not a stream (search results). */
   backLabel?: string | undefined;
   actions: InboxActions;

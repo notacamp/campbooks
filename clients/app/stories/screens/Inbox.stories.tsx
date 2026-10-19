@@ -13,6 +13,7 @@ import {
   LEDGER,
   LEDGER_DETAIL,
   ledgerBody,
+  NDA,
   PRIMARY,
   Q4,
   Q4_BODY,
@@ -22,6 +23,7 @@ import {
   STREAM_COUNTS,
   W,
 } from "../../test/demo/conversations";
+import { DRAFT_LIST } from "../../test/demo/drafts";
 import { DUARTE, SESSION } from "../../test/demo/workspaces";
 
 import { mockFetch, type MockRoute } from "./mock-fetch";
@@ -551,5 +553,95 @@ export const TrashReader: Story = {
     const canvas = within(canvasElement);
     await expect(await canvas.findByText("This conversation is in Trash.")).toBeVisible();
     await expect(canvas.getByRole("button", { name: /^Restore/u })).toBeVisible();
+  },
+};
+
+/** Pinned (G then 9): what you pinned, archived or not, newest first. */
+const pinned: Story = {
+  args: {
+    path: `${PATH}/starred`,
+    api: inbox({
+      [`GET ${W}/conversations`]: { body: { conversations: [NDA], next_cursor: null } },
+    }),
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(await canvas.findByRole("heading", { level: 1, name: "Pinned" })).toBeVisible();
+    await expect(await canvas.findByText(NDA.subject)).toBeVisible();
+  },
+};
+export const PinnedView: Story = pinned;
+
+/** The sidebar on a desktop: the streams, then all six views in order. */
+export const SidebarViews: Story = {
+  ...pinned,
+  ...at("desktop", 1440, 900),
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await canvas.findByRole("heading", { level: 1, name: "Pinned" });
+    const names = ["Sent", "Pinned", "Drafts", "Archive", "Spam", "Trash"];
+    const links = canvas
+      .getAllByRole("link")
+      .map((link) => names.find((name) => link.textContent.startsWith(name)))
+      .filter((name) => name !== undefined);
+    await expect(links).toEqual(names);
+  },
+};
+
+/** Pinned on a phone. */
+export const PinnedViewPhone: Story = { ...pinned, ...at("phone", 375, 812) };
+
+/** Drafts (G then 0): who each is to, the subject, a line of the words and when it was saved. */
+const drafts: Story = {
+  args: {
+    path: `${PATH}/drafts`,
+    api: inbox({ [`GET ${W}/drafts`]: { body: { drafts: DRAFT_LIST } } }),
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(await canvas.findByRole("heading", { level: 1, name: "Drafts" })).toBeVisible();
+    await expect(await canvas.findByText("Draft · Marta Ferreira and 2 others")).toBeVisible();
+    await expect(canvas.getByText("Draft · No recipients")).toBeVisible();
+    await expect(canvas.getByText("(no subject)")).toBeVisible();
+    await expect(
+      canvas.getByRole("button", { name: "Delete draft: Figures for the board" }),
+    ).toBeVisible();
+    await waitFor(() =>
+      expect(document.documentElement.scrollWidth).toBeLessThanOrEqual(globalThis.innerWidth),
+    );
+  },
+};
+export const DraftsView: Story = drafts;
+
+/** Drafts on a phone. */
+export const DraftsViewPhone: Story = { ...drafts, ...at("phone", 375, 812) };
+
+/** No drafts: one plain line. */
+export const EmptyDrafts: Story = {
+  args: {
+    path: `${PATH}/drafts`,
+    api: inbox({ [`GET ${W}/drafts`]: { body: { drafts: [] } } }),
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(await canvas.findByRole("heading", { name: "No drafts." })).toBeVisible();
+  },
+};
+
+/** Trash on a phone: its chip is the last in the row, scrolled into view. */
+export const TrashChipPhone: Story = {
+  args: {
+    path: `${PATH}/trash`,
+    api: inbox({ [`GET ${W}/conversations`]: { body: { conversations: [], next_cursor: null } } }),
+  },
+  ...at("phone", 375, 812),
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const trash = await canvas.findByRole("button", { name: "Trash" });
+    await expect(trash).toHaveAttribute("aria-pressed", "true");
+    await waitFor(() => {
+      const edge = trash.getBoundingClientRect().right;
+      return expect(edge).toBeLessThanOrEqual(globalThis.innerWidth);
+    });
   },
 };

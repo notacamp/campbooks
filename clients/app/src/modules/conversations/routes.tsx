@@ -12,7 +12,8 @@ import { useTranslation } from "react-i18next";
 import { useShortcut } from "~/lib/shortcuts";
 import { Button } from "~/lib/ui";
 
-import { isPlace } from "./api/queries";
+import { DRAFTS, isPlace } from "./api/queries";
+import { DraftsScreen } from "./components/InboxScreen/DraftsScreen";
 import { InboxScreen } from "./components/InboxScreen/InboxScreen";
 import { NewMessage } from "./components/NewMessage/NewMessage";
 import { TeachOnceProvider } from "./components/TeachOnce/TeachOnce";
@@ -22,9 +23,10 @@ import { renderReplyComposer } from "./components/ReplyComposer/ReplyComposer";
 const MESSAGE_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/u;
 
 /**
- * `/w/$workspaceId/inbox…`: a stream or a view beside them (Sent, Archive,
- * Spam, Trash), and the conversation open in it. The `$stream` param holds
- * either; anything else goes to Primary.
+ * `/w/$workspaceId/inbox…`: a stream or a place beside them (Sent, Pinned,
+ * Drafts, Archive, Spam, Trash), and the conversation open in it. The
+ * `$stream` param holds any; anything else goes to Primary. Drafts lists
+ * drafts, not conversations, so it has a screen of its own.
  */
 function InboxPage() {
   const params: { workspaceId?: string; stream?: string; conversationId?: string } = useParams({
@@ -48,6 +50,16 @@ function InboxPage() {
       />
     );
   }
+  const composeAction = (
+    <Button variant="primary" icon="plus" shortcut="compose.new" onClick={compose}>
+      {t("compose.newMessage")}
+    </Button>
+  );
+  if (stream === DRAFTS) {
+    return (
+      <DraftsScreen key={workspaceId} workspaceId={workspaceId} composeAction={composeAction} />
+    );
+  }
   return (
     <TeachOnceProvider workspaceId={workspaceId}>
       <InboxScreen
@@ -58,11 +70,7 @@ function InboxPage() {
         renderReplySlot={renderReplyComposer}
         startReply={search.reply === true}
         replyTo={search.to}
-        composeAction={
-          <Button variant="primary" icon="plus" shortcut="compose.new" onClick={compose}>
-            {t("compose.newMessage")}
-          </Button>
-        }
+        composeAction={composeAction}
       />
     </TeachOnceProvider>
   );
