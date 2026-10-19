@@ -12,10 +12,26 @@ type Detail = Schema<"ConversationDetail">;
 
 const base: Pick<
   Summary,
-  "inbox_id" | "archived" | "labels" | "suggestion" | "stream" | "stream_source" | "starred"
+  | "inbox_id"
+  | "archived"
+  | "trashed"
+  | "spam"
+  | "last_sent_at"
+  | "sent_to"
+  | "replied_since_sent"
+  | "labels"
+  | "suggestion"
+  | "stream"
+  | "stream_source"
+  | "starred"
 > = {
   inbox_id: INBOX.id,
   archived: false,
+  trashed: false,
+  spam: false,
+  last_sent_at: null,
+  sent_to: [],
+  replied_since_sent: false,
   labels: [],
   suggestion: null,
   stream: "primary",

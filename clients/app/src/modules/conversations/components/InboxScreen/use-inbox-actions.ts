@@ -9,13 +9,24 @@ import {
   type Stream,
 } from "../../api/queries";
 import type { TaughtAction } from "../../api/rules";
-import { streamName, type Translate } from "../../model";
+import { streamName, type Move, type Translate } from "../../model";
 import { useTeachOnce } from "../TeachOnce/TeachOnce";
+
+/** Each move's inverse (its Undo) and its toast. */
+const MOVES: Record<Move, { inverse: Move; toast: string }> = {
+  archive: { inverse: "unarchive", toast: "toast.done" },
+  unarchive: { inverse: "archive", toast: "toast.toInbox" },
+  trash: { inverse: "untrash", toast: "toast.deleted" },
+  untrash: { inverse: "trash", toast: "toast.restored" },
+  spam: { inverse: "not_spam", toast: "toast.spam" },
+  not_spam: { inverse: "spam", toast: "toast.notSpam" },
+};
 
 /**
  * The inbox's actions on one conversation, each pushed to the undo stack
- * with its toast (Z or the toast's Undo takes it back): Done (archive),
- * star, read/unread, move to a stream.
+ * with its toast (Z or the toast's Undo takes it back): Done (archive) and
+ * Move to Inbox, Delete and Restore, Report spam and Not spam, star,
+ * read/unread, move to a stream.
  */
 export function useInboxActions(workspaceId: string) {
   const { t: typed } = useTranslation("conversations");
@@ -74,13 +85,15 @@ export function useInboxActions(workspaceId: string) {
     dismissFailure: () => {
       mutation.reset();
     },
-    done: (conversation: ConversationSummary) => {
+    /** Move it to another place; Done (archive) offers to teach archiving. */
+    moveTo: (conversation: ConversationSummary, move: Move) => {
+      const { inverse, toast } = MOVES[move];
       undoable(
         conversation,
-        "archive",
-        "unarchive",
-        t("toast.done", { subject: subjectOf(conversation) }),
-        { kind: "archive" },
+        move,
+        inverse,
+        t(toast, { subject: subjectOf(conversation) }),
+        move === "archive" ? { kind: "archive" } : undefined,
       );
     },
     toggleStar: (conversation: ConversationSummary) => {

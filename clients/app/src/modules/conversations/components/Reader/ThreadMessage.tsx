@@ -176,14 +176,17 @@ export function ThreadMessage({
                 <Text tone="tertiary" size="sm">
                   {t("actions.imagesHidden", { count: remote })}
                 </Text>
-                <Button
-                  variant="secondary"
-                  icon="image"
-                  shortcut={shortcuts ? "inbox.show_images" : undefined}
-                  onClick={onShowImages}
-                >
-                  {t("actions.showImages")}
-                </Button>
+                {/* In spam they never load: nothing to offer. */}
+                {body.data?.images_held === "spam" ? null : (
+                  <Button
+                    variant="secondary"
+                    icon="image"
+                    shortcut={shortcuts ? "inbox.show_images" : undefined}
+                    onClick={onShowImages}
+                  >
+                    {t("actions.showImages")}
+                  </Button>
+                )}
                 {trust === undefined ? null : (
                   <Button
                     variant="secondary"

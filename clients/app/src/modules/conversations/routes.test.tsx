@@ -21,6 +21,7 @@ import {
   Q4,
   Q4_BODY,
   Q4_DETAIL,
+  SENT,
   STREAM_COUNTS,
   W,
 } from "../../../test/demo/conversations";
@@ -63,10 +64,12 @@ function inbox(extra: Parameters<typeof mockApi>[0] = {}) {
     [`GET ${W}/inboxes`]: { body: { inboxes: [INBOX] } },
     [`GET ${W}/streams`]: { body: { streams: STREAM_COUNTS } },
     [`GET ${W}/conversations`]: (request) => {
-      const stream = new URL(request.url).searchParams.get("stream");
+      const query = new URL(request.url).searchParams;
+      const stream = query.get("stream");
+      const view = query.get("view");
       return {
         body: {
-          conversations: stream === "primary" ? PRIMARY : [],
+          conversations: stream === "primary" ? PRIMARY : view === "sent" ? SENT : [],
           next_cursor: null,
         },
       };
@@ -83,6 +86,12 @@ function inbox(extra: Parameters<typeof mockApi>[0] = {}) {
     [`POST ${W}/conversations/${LEDGER.id}/read`]: { body: { ...LEDGER, unread_count: 0 } },
     [`POST ${W}/conversations/${Q4.id}/archive`]: { body: { ...Q4, archived: true } },
     [`POST ${W}/conversations/${Q4.id}/unarchive`]: { body: Q4 },
+    [`POST ${W}/conversations/${Q4.id}/trash`]: { body: { ...Q4, trashed: true } },
+    [`POST ${W}/conversations/${Q4.id}/untrash`]: { body: Q4 },
+    [`POST ${W}/conversations/${Q4.id}/spam`]: {
+      body: { ...Q4, archived: true, trashed: true, spam: true },
+    },
+    [`POST ${W}/conversations/${Q4.id}/not-spam`]: { body: Q4 },
     [`POST ${W}/conversations/${LEDGER.id}/stream`]: (_request, body) => ({
       body: { ...LEDGER, ...(body as object), stream_source: "member", suggestion: null },
     }),
@@ -106,12 +115,51 @@ describe("the inbox", () => {
     expect(screen.getByRole("heading", { name: "Pick a conversation" })).toBeVisible();
   });
 
-  it("goes to Primary from an unknown stream", async () => {
+  it("goes to Primary from an unknown stream or view", async () => {
     inbox();
-    const { router } = renderAt(`/w/${DUARTE.id}/inbox/spam`);
+    const { router } = renderAt(`/w/${DUARTE.id}/inbox/promotions`);
 
     await waitFor(() => {
       expect(router.state.location.pathname).toBe(`/w/${DUARTE.id}/inbox/primary`);
+    });
+  });
+
+  it("lists Sent by your latest message: to whom, and whether they replied", async () => {
+    inbox();
+    renderAt(`/w/${DUARTE.id}/inbox/sent`);
+
+    expect(await screen.findByRole("heading", { level: 1, name: "Sent" })).toBeVisible();
+    const list = screen.getByRole("region", { name: "Conversations" });
+    expect(await within(list).findByText("To Marta Ferreira and 2 others")).toBeVisible();
+    expect(within(list).getByText("To Maya Okafor")).toBeVisible();
+    expect(within(list).getAllByText("Replied")).toHaveLength(1);
+  });
+
+  it("says when a view is empty, in one plain line", async () => {
+    inbox();
+    renderAt(`/w/${DUARTE.id}/inbox/spam`);
+
+    expect(await screen.findByRole("heading", { level: 1, name: "Spam" })).toBeVisible();
+    expect(await screen.findByRole("heading", { name: "Nothing in Spam." })).toBeVisible();
+  });
+
+  it("deletes with # and takes it back with Z", async () => {
+    const api = inbox();
+    renderAt(`/w/${DUARTE.id}/inbox/primary/${Q4.id}`);
+    await screen.findByRole("heading", { name: Q4.subject });
+
+    fireEvent.keyDown(document, { key: "#" });
+    expect(await screen.findByText(`Deleted · ${Q4.subject}`)).toBeVisible();
+    await waitFor(() => {
+      expect(api.calls.map((call) => call.route)).toContain(
+        `POST ${W}/conversations/${Q4.id}/trash`,
+      );
+    });
+    fireEvent.keyDown(document, { key: "z" });
+    await waitFor(() => {
+      expect(api.calls.map((call) => call.route)).toContain(
+        `POST ${W}/conversations/${Q4.id}/untrash`,
+      );
     });
   });
 

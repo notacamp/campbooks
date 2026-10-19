@@ -7,13 +7,24 @@
     "receipts": "Recibos",
     "newsletters": "Newsletters"
   },
+  "views": {
+    "sent": "Enviados",
+    "archive": "Arquivo",
+    "spam": "Spam",
+    "trash": "Lixo"
+  },
   "list": {
     "label": "Conversas",
     "show": "Mostrar",
     "all": "Todas",
     "unread": "Não lidas",
     "more": "Mostrar mais",
-    "loadingMore": "A carregar mais conversas"
+    "loadingMore": "A carregar mais conversas",
+    "to": "Para {{name}}",
+    "toOthers_one": "Para {{name}} e mais {{count}} pessoa",
+    "toOthers_other": "Para {{name}} e mais {{count}} pessoas",
+    "toHidden": "Para destinatários não revelados",
+    "replied": "Respondeu"
   },
   "empty": {
     "streamTitle": "Nada em {{stream}}",
@@ -23,7 +34,11 @@
     "noInboxTitle": "Ainda sem caixa de correio",
     "noInboxBody": "Ligue uma caixa de correio e o correio aparece aqui, arrumado em fluxos.",
     "readerTitle": "Escolha uma conversa",
-    "readerBody": "Escolha uma na lista ou use o teclado:"
+    "readerBody": "Escolha uma na lista ou use o teclado:",
+    "sent": "Nada em Enviados.",
+    "archive": "Nada no Arquivo.",
+    "spam": "Nada no Spam.",
+    "trash": "Nada no Lixo."
   },
   "error": {
     "listTitle": "Não foi possível carregar {{stream}}",
@@ -57,7 +72,15 @@
       "lead": "{{address}} foi desligada e o correio dela ficou aqui, só de leitura: nada de novo chega, e nada pode ser enviado nem alterado a partir dela."
     },
     "readingText": "A ler…",
-    "textFailed": "Não foi possível ler o texto deste email."
+    "textFailed": "Não foi possível ler o texto deste email.",
+    "spam": {
+      "title": "Esta conversa está no Spam.",
+      "lead": "As imagens nunca carregam, e o Scout não lhe toca."
+    },
+    "trash": {
+      "title": "Esta conversa está no Lixo.",
+      "lead": "O seu fornecedor de correio esvazia o lixo quando entende."
+    }
   },
   "actions": {
     "star": "Fixar",
@@ -82,8 +105,14 @@
       "cannot_authenticate": "As imagens continuam retidas: este fornecedor de email não partilha as verificações do remetente, por isso aqui não se pode confiar em nenhum remetente.",
       "not_checked": "As imagens esperam que o Scout verifique este email. Enquanto o Scout estiver desligado ou acima do limite diário, continuam retidas.",
       "rule_paused": "As imagens continuam retidas: a regra inteligente que confia neste remetente está em pausa ou à espera de um sim.",
-      "rule_too_broad": "As imagens continuam retidas: a regra inteligente para todo o domínio deste remetente confiaria em desconhecidos (qualquer pessoa pode enviar a partir dele), por isso não atua. Ainda pode confiar neste endereço."
-    }
+      "rule_too_broad": "As imagens continuam retidas: a regra inteligente para todo o domínio deste remetente confiaria em desconhecidos (qualquer pessoa pode enviar a partir dele), por isso não atua. Ainda pode confiar neste endereço.",
+      "spam": "As imagens nunca carregam no Spam."
+    },
+    "delete": "Eliminar",
+    "restore": "Restaurar",
+    "reportSpam": "Denunciar spam",
+    "notSpam": "Não é spam",
+    "toInbox": "Mover para a Caixa de entrada"
   },
   "toast": {
     "done": "Concluída · {{subject}}",
@@ -91,7 +120,12 @@
     "unstarred": "Desafixada · {{subject}}",
     "read": "Marcada como lida · {{subject}}",
     "unread": "Marcada como não lida · {{subject}}",
-    "moved": "Movida para {{stream}} · {{subject}}"
+    "moved": "Movida para {{stream}} · {{subject}}",
+    "toInbox": "Movida para a Caixa de entrada · {{subject}}",
+    "deleted": "Eliminada · {{subject}}",
+    "restored": "Restaurada · {{subject}}",
+    "spam": "Denunciada como spam · {{subject}}",
+    "notSpam": "Não é spam · {{subject}}"
   },
   "scout": {
     "label": "Ponto da situação",
@@ -186,7 +220,13 @@
     "undoAll": "Anular tudo o que uma regra fez",
     "allPaid": "Todas as faturas já pagas",
     "saveRule": "Guardar a regra inteligente",
-    "trustImages": "Mostrar sempre as imagens deste remetente"
+    "trustImages": "Mostrar sempre as imagens deste remetente",
+    "sent": "Ir para Enviados",
+    "archive": "Ir para Arquivo",
+    "spam": "Ir para Spam",
+    "trash": "Ir para Lixo",
+    "delete": "Eliminar, ou restaurar do Lixo",
+    "reportSpam": "Denunciar spam, ou não é spam"
   },
   "compose": {
     "title": {

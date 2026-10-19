@@ -17,6 +17,8 @@ import {
   Q4,
   Q4_BODY,
   Q4_DETAIL,
+  SENT,
+  SPAMMED,
   STREAM_COUNTS,
   W,
 } from "../../test/demo/conversations";
@@ -468,3 +470,86 @@ export const ManyConversationsNarrowDesktop: Story = { ...many, ...at("narrowDes
 
 /** A full inbox in a wide desktop window: the list scrolls, the page doesn't. */
 export const ManyConversationsDesktop: Story = { ...many, ...at("desktop", 1440, 900) };
+
+/** Sent (G then 5): by Sam's latest message, to whom, and whether they replied since. */
+const sent: Story = {
+  args: {
+    path: `${PATH}/sent`,
+    api: inbox({
+      [`GET ${W}/conversations`]: { body: { conversations: SENT, next_cursor: null } },
+    }),
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(await canvas.findByText("To Marta Ferreira and 2 others")).toBeVisible();
+    await expect(canvas.getByText("Replied")).toBeVisible();
+    // The views sit after the streams, behind a divider; the page never scrolls sideways.
+    await waitFor(() =>
+      expect(document.documentElement.scrollWidth).toBeLessThanOrEqual(globalThis.innerWidth),
+    );
+  },
+};
+export const SentView: Story = sent;
+
+/** Sent on a phone: the stream chips, then the views, in a row that scrolls on its own. */
+export const SentViewPhone: Story = { ...sent, ...at("phone", 375, 812) };
+
+/** Spam with nothing in it: one plain line. */
+export const EmptySpam: Story = {
+  args: {
+    path: `${PATH}/spam`,
+    api: inbox({ [`GET ${W}/conversations`]: { body: { conversations: [], next_cursor: null } } }),
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(await canvas.findByRole("heading", { name: "Nothing in Spam." })).toBeVisible();
+  },
+};
+
+/** A conversation in Spam: the banner and Not spam (!); no reply, no Scout, images never load. */
+export const SpamReader: Story = {
+  args: {
+    path: `${PATH}/spam/${LEDGER.id}`,
+    api: inbox({
+      [`GET ${W}/conversations`]: { body: { conversations: [SPAMMED], next_cursor: null } },
+      [`GET ${W}/conversations/${LEDGER.id}`]: {
+        body: { ...LEDGER_DETAIL, conversation: { ...SPAMMED, id: LEDGER.id, unread_count: 0 } },
+      },
+      [`GET ${W}/conversations/${LEDGER.id}/messages/${ledgerMessage}/body`]: {
+        body: {
+          ...ledgerBody(false),
+          images_offer: false,
+          images_domain: null,
+          images_held: "spam",
+        },
+      },
+    }),
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(await canvas.findByText("This conversation is in Spam.")).toBeVisible();
+    await expect(await canvas.findByText("Images never load in Spam.")).toBeVisible();
+    await expect(canvas.queryByRole("button", { name: /^Show images/u })).toBeNull();
+    await expect(canvas.getByRole("button", { name: /^Not spam/u })).toBeVisible();
+  },
+};
+
+/** A conversation in Trash: the banner and Restore (#). */
+export const TrashReader: Story = {
+  args: {
+    path: `${PATH}/trash/${Q4.id}`,
+    api: inbox({
+      [`GET ${W}/conversations`]: {
+        body: { conversations: [{ ...Q4, trashed: true }], next_cursor: null },
+      },
+      [`GET ${W}/conversations/${Q4.id}`]: {
+        body: { ...Q4_DETAIL, conversation: { ...Q4, trashed: true, unread_count: 0 } },
+      },
+    }),
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(await canvas.findByText("This conversation is in Trash.")).toBeVisible();
+    await expect(canvas.getByRole("button", { name: /^Restore/u })).toBeVisible();
+  },
+};

@@ -36,6 +36,10 @@ pub struct LabelView {
 
 /// A conversation as lists show it.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[expect(
+    clippy::struct_excessive_bools,
+    reason = "the wire shape: independent facts about one conversation"
+)]
 pub struct ConversationSummary {
     /// The conversation.
     pub id: ConversationId,
@@ -57,6 +61,20 @@ pub struct ConversationSummary {
     pub starred: bool,
     /// Whether no message is in the inbox.
     pub archived: bool,
+    /// Whether every message is in spam or the trash.
+    pub trashed: bool,
+    /// Whether it is binned as spam (in Spam rather than in Trash); only
+    /// ever true when `trashed`.
+    pub spam: bool,
+    /// When the inbox last wrote in it, outside spam and the trash; none
+    /// when it wrote nothing there. Sent lists it by this.
+    pub last_sent_at: Option<DateTime<Utc>>,
+    /// Who the inbox's latest message there went to (to, then cc); empty
+    /// when it wrote nothing there.
+    pub sent_to: Vec<Address>,
+    /// Whether someone wrote back after the inbox's latest message (an
+    /// inbound message newer than `last_sent_at`, outside spam and the trash).
+    pub replied_since_sent: bool,
     /// The sender of the newest message.
     pub latest_from: Option<Address>,
     /// The start of the newest message's text.
@@ -77,7 +95,44 @@ pub struct ConversationSummary {
     pub rule_exception: Option<RuleException>,
 }
 
-/// A row of the summary queries.
+/// The columns of a [`SummaryRow`] from `conversations.conversations c`, for
+/// every query that lists conversations: callers add their `WHERE`, `ORDER
+/// BY` and `LIMIT`.
+pub const SUMMARY_SELECT: &str = r"
+    SELECT c.id, c.inbox_id, c.subject, c.stream, c.stream_source, c.last_message_at,
+           c.message_count, c.unread_count, c.starred, c.archived_at IS NOT NULL AS archived,
+           c.trashed, c.spam, c.last_sent_at,
+           coalesce(o.recipients -> 'to', '[]') || coalesce(o.recipients -> 'cc', '[]')
+               AS sent_to,
+           c.last_sent_at IS NOT NULL AND EXISTS (
+               SELECT 1 FROM conversations.messages r
+                WHERE r.conversation_id = c.id AND r.direction = 'inbound'
+                  AND NOT r.in_spam AND NOT r.in_trash AND r.sent_at > c.last_sent_at
+           ) AS replied_since_sent,
+           m.sender, m.snippet,
+           coalesce((SELECT jsonb_agg(jsonb_build_object('id', l.id, 'name', l.name)
+                                      ORDER BY l.name)
+                       FROM conversations.conversation_labels cl
+                       JOIN conversations.labels l ON l.id = cl.label_id
+                      WHERE cl.conversation_id = c.id), '[]') AS labels
+      FROM conversations.conversations c
+      LEFT JOIN LATERAL (
+          SELECT sender, snippet FROM conversations.messages
+           WHERE conversation_id = c.id ORDER BY sent_at DESC, id DESC LIMIT 1
+      ) m ON true
+      LEFT JOIN LATERAL (
+          SELECT recipients FROM conversations.messages
+           WHERE conversation_id = c.id AND direction = 'outbound'
+             AND NOT in_spam AND NOT in_trash
+           ORDER BY sent_at DESC, id DESC LIMIT 1
+      ) o ON true";
+
+/// A row of [`SUMMARY_SELECT`].
+#[derive(sqlx::FromRow)]
+#[expect(
+    clippy::struct_excessive_bools,
+    reason = "one column each of the summary's facts"
+)]
 pub struct SummaryRow {
     pub id: ConversationId,
     pub inbox_id: InboxId,
@@ -89,6 +144,11 @@ pub struct SummaryRow {
     pub unread_count: i32,
     pub starred: bool,
     pub archived: bool,
+    pub trashed: bool,
+    pub spam: bool,
+    pub last_sent_at: Option<DateTime<Utc>>,
+    pub sent_to: serde_json::Value,
+    pub replied_since_sent: bool,
     pub sender: Option<serde_json::Value>,
     pub snippet: Option<String>,
     pub labels: serde_json::Value,
@@ -98,6 +158,7 @@ impl TryFrom<SummaryRow> for ConversationSummary {
     type Error = Error;
 
     fn try_from(row: SummaryRow) -> Result<Self> {
+        let json = |e: serde_json::Error| Error::internal(crate::domain::redact::json(&e));
         Ok(Self {
             id: row.id,
             inbox_id: row.inbox_id,
@@ -109,14 +170,18 @@ impl TryFrom<SummaryRow> for ConversationSummary {
             unread_count: count(row.unread_count),
             starred: row.starred,
             archived: row.archived,
+            trashed: row.trashed,
+            spam: row.spam,
+            last_sent_at: row.last_sent_at,
+            sent_to: serde_json::from_value(row.sent_to).map_err(json)?,
+            replied_since_sent: row.replied_since_sent,
             latest_from: row
                 .sender
                 .map(serde_json::from_value)
                 .transpose()
-                .map_err(|e| Error::internal(crate::domain::redact::json(&e)))?,
+                .map_err(json)?,
             snippet: row.snippet.unwrap_or_default(),
-            labels: serde_json::from_value(row.labels)
-                .map_err(|e| Error::internal(crate::domain::redact::json(&e)))?,
+            labels: serde_json::from_value(row.labels).map_err(json)?,
             suggestion: None,
             need: None,
             rule: None,
@@ -135,27 +200,10 @@ pub async fn summary(
     user: Option<UserId>,
     id: ConversationId,
 ) -> Result<ConversationSummary> {
-    let row = sqlx::query_as!(
-        SummaryRow,
-        r#"
-        SELECT c.id AS "id: ConversationId", c.inbox_id AS "inbox_id: InboxId", c.subject,
-               c.stream, c.stream_source, c.last_message_at, c.message_count, c.unread_count,
-               c.starred, c.archived_at IS NOT NULL AS "archived!",
-               m.sender AS "sender?", m.snippet AS "snippet?",
-               coalesce((SELECT jsonb_agg(jsonb_build_object('id', l.id, 'name', l.name)
-                                          ORDER BY l.name)
-                           FROM conversations.conversation_labels cl
-                           JOIN conversations.labels l ON l.id = cl.label_id
-                          WHERE cl.conversation_id = c.id), '[]') AS "labels!"
-          FROM conversations.conversations c
-          LEFT JOIN LATERAL (
-              SELECT sender, snippet FROM conversations.messages
-               WHERE conversation_id = c.id ORDER BY sent_at DESC, id DESC LIMIT 1
-          ) m ON true
-         WHERE c.id = $1
-        "#,
-        id as ConversationId,
-    )
+    let row: SummaryRow = sqlx::query_as(sqlx::AssertSqlSafe(format!(
+        "{SUMMARY_SELECT} WHERE c.id = $1"
+    )))
+    .bind(id)
     .fetch_optional(&mut *conn)
     .await?
     .ok_or(Error::NotFound)?;
@@ -167,38 +215,57 @@ pub async fn summary(
     Ok(summary)
 }
 
+/// What [`recount`] works out of the messages, and the state it returns.
+/// `spam` and `last_sent_at` are what the Spam, Trash and Sent lists page on
+/// (campbooks-cloud#240): a binned conversation is in Spam when a message is
+/// in spam and not in the trash, and it was last written in at the newest
+/// outbound message in neither.
+const RECOUNT: &str = r"
+    WITH s AS (
+        SELECT count(*)::int AS n,
+               count(*) FILTER (WHERE direction = 'inbound' AND NOT read)::int AS unread,
+               coalesce(bool_or(starred), false) AS starred,
+               max(sent_at) AS last,
+               coalesce(bool_or(in_inbox), false) AS in_inbox,
+               coalesce(bool_and(in_trash OR in_spam), false) AS trashed,
+               coalesce(bool_or(in_spam AND NOT in_trash), false) AS in_spam,
+               max(sent_at) FILTER (WHERE direction = 'outbound'
+                                      AND NOT in_spam AND NOT in_trash) AS last_sent
+          FROM conversations.messages WHERE conversation_id = $1
+    )
+    UPDATE conversations.conversations c
+       SET message_count = s.n, unread_count = s.unread, starred = s.starred,
+           last_message_at = coalesce(s.last, c.last_message_at),
+           archived_at = CASE WHEN s.in_inbox THEN NULL ELSE coalesce(c.archived_at, now()) END,
+           trashed = s.trashed, spam = s.trashed AND s.in_spam, last_sent_at = s.last_sent,
+           updated_at = now()
+      FROM s
+     WHERE c.id = $1
+    RETURNING s.n, c.stream, c.unread_count, c.starred,
+              c.archived_at IS NOT NULL AS archived, c.trashed";
+
+/// A row of [`RECOUNT`].
+#[derive(sqlx::FromRow)]
+struct Recounted {
+    n: i32,
+    stream: String,
+    unread_count: i32,
+    starred: bool,
+    archived: bool,
+    trashed: bool,
+}
+
 /// Recompute conversation `id`'s counts and flags from its messages; delete
 /// it when it has none. Returns its state, or `None` once deleted.
 pub async fn recount(
     conn: &mut PgConnection,
     id: ConversationId,
 ) -> Result<Option<ConversationState>> {
-    let row = sqlx::query!(
-        r#"
-        WITH s AS (
-            SELECT count(*)::int AS n,
-                   count(*) FILTER (WHERE direction = 'inbound' AND NOT read)::int AS unread,
-                   coalesce(bool_or(starred), false) AS starred,
-                   max(sent_at) AS last,
-                   coalesce(bool_or(in_inbox), false) AS in_inbox,
-                   coalesce(bool_and(in_trash OR in_spam), false) AS trashed
-              FROM conversations.messages WHERE conversation_id = $1
-        )
-        UPDATE conversations.conversations c
-           SET message_count = s.n, unread_count = s.unread, starred = s.starred,
-               last_message_at = coalesce(s.last, c.last_message_at),
-               archived_at = CASE WHEN s.in_inbox THEN NULL ELSE coalesce(c.archived_at, now()) END,
-               trashed = s.trashed, updated_at = now()
-          FROM s
-         WHERE c.id = $1
-        RETURNING s.n AS "n!", c.stream, c.unread_count, c.starred,
-                  c.archived_at IS NOT NULL AS "archived!", c.trashed
-        "#,
-        id as ConversationId,
-    )
-    .fetch_optional(&mut *conn)
-    .await?
-    .ok_or(Error::NotFound)?;
+    let row: Option<Recounted> = sqlx::query_as(RECOUNT)
+        .bind(id)
+        .fetch_optional(&mut *conn)
+        .await?;
+    let row = row.ok_or(Error::NotFound)?;
     if row.n == 0 {
         sqlx::query!(
             "DELETE FROM conversations.conversations WHERE id = $1",

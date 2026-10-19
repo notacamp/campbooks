@@ -8,6 +8,14 @@ All notable changes to Campbooks Next are documented here. The format follows
 
 ### Added
 
+- **Sent, Archive, Spam and Trash under the streams** (G then 5 to 8), and **Delete (#)
+  and Report spam (!)** with Undo. Sent lists every conversation you wrote in, by your
+  latest message, with whom it went to and whether they replied since. The key that sent a
+  conversation somewhere brings it back: E moves it from Archive to the inbox, # restores it
+  from Trash and ! says it is not spam. In Spam, images never load (not even from a sender
+  you trust), and there is no reply box and nothing from Scout. The API's
+  `conversations.list` takes `view=inbox|sent|archive|spam|trash`; `archived=true` still
+  works and is deprecated.
 - **Usage analytics, without a tracking script (off by default).** An instance can count
   which screens people use in its own Matomo (`CAMPBOOKS_ANALYTICS__MATOMO_URL`,
   `__MATOMO_SITE_ID` and `__MATOMO_VISITOR_KEY`, all three or nothing). The app loads no
