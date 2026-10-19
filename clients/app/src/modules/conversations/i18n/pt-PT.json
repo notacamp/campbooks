@@ -238,7 +238,6 @@
       "unknown_outcome": "O Campbooks não conseguiu confirmar que esta mensagem foi enviada. Verifique a pasta Enviados antes de a enviar de novo.",
       "unknown": "Algo correu mal. Tente de novo.",
       "not_saved": "Não foi possível guardar as últimas alterações, por isso nada foi enviado. Tente de novo.",
-      "draft_changed": "Este rascunho foi alterado noutro sítio. Feche-o e abra-o de novo para ver a versão mais recente.",
       "content_changed": "Isto mudou desde que o abriu. Verifique-o e envie de novo.",
       "quote": "Não foi possível ler o email para o citar. Nada foi iniciado. Tente novamente."
     },

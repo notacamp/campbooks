@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 
-import { api, operationKey, unwrap, unwrapEmpty, type Schema } from "~/lib/api";
+import { api, operationKey, problemCode, unwrap, unwrapEmpty, type Schema } from "~/lib/api";
 
 export type Draft = Schema<"DraftView">;
 export type NewDraft = Schema<"NewDraft">;
@@ -22,6 +22,18 @@ export const draftKeys = {
   inboxes: (workspaceId: string) =>
     operationKey("conversations.list_inboxes", { workspace_id: workspaceId }),
 };
+
+/**
+ * A save or send refused because the draft is not the one the caller holds
+ * (campbooks-cloud#242): saved since that version (409 `draft_changed`:
+ * another tab, another device, later the assistant) or not the content
+ * shown (409 `content_changed`). Nothing was saved or sent either way: read
+ * it again, show it, and let the member act.
+ */
+export function changedElsewhere(thrown: unknown): boolean {
+  const code = problemCode(thrown);
+  return code === "content_changed" || code === "draft_changed";
+}
 
 const draftPath = (workspaceId: string, draftId: string) => ({
   path: { workspace_id: workspaceId, draft_id: draftId },

@@ -114,6 +114,8 @@ interface Options {
   role?: "manager" | "reader";
   /** Marta's drafts already there. */
   drafts?: Schema<"DraftView">[];
+  /** The 409 code a save of the untouched forward answers, if refused. */
+  refuseSave?: "draft_changed" | "content_changed";
   /** The words of Marta's last email, asked for alone. */
   words?: MockHandler;
 }
@@ -166,7 +168,8 @@ function api(conversations: Summary[], detail = MARTA_DETAIL, options: Options =
       started = [FORWARD];
       return { status: 201, body: FORWARD };
     },
-    [`PATCH ${W}/drafts/${FORWARD.id}`]: { body: FORWARD },
+    [`PATCH ${W}/drafts/${FORWARD.id}`]:
+      options.refuseSave === undefined ? { body: FORWARD } : problem(409, options.refuseSave),
     ...(options.words === undefined
       ? {}
       : { [`GET ${W}/conversations/${MARTA.id}/messages/${MARTA_LAST}/body`]: options.words }),
@@ -493,6 +496,37 @@ describe("What needs you: the actions Scout picked", () => {
       });
     });
     expect(calls.calls.some((c) => c.route === `POST ${W}/drafts`)).toBe(false);
+  });
+
+  it("starts a new forward when the untouched one was saved elsewhere since", async () => {
+    // Listed at version 1, saved since in another tab (campbooks-cloud#242):
+    // the save is refused as `draft_changed`, so it is left alone.
+    const untouched = { ...FORWARD, to: [] };
+    const calls = api(
+      [PHISH, ranked(MARTA, [{ actions: ["forward"], likelihood: 88 }]), ...others],
+      MARTA_DETAIL,
+      { drafts: [untouched], refuseSave: "draft_changed" },
+    );
+    const { router } = renderHome();
+    await actions(PHISH_NAME);
+    fireEvent.keyDown(document, { key: "j" });
+    await actions("Marta Ferreira");
+    fireEvent.keyDown(document, { key: "1" });
+    const dialog = await screen.findByRole("dialog", {
+      name: "Forward Marta Ferreira’s email to…",
+    });
+    fireEvent.click(await within(dialog).findByRole("button", { name: /Rita Gomes/u }));
+    await waitFor(() => {
+      expect(router.state.location.pathname).toContain(MARTA.id);
+    });
+    expect(calls.calls.some((c) => c.route === `PATCH ${W}/drafts/${FORWARD.id}`)).toBe(true);
+    expect(calls.calls.find((c) => c.route === `POST ${W}/drafts`)?.body).toMatchObject({
+      kind: "forward",
+      to: [{ name: "Rita Gomes", address: "rita@silva-contas.example" }],
+    });
+    expect(
+      screen.queryByText("Couldn’t start the forward: nothing was sent. Try again."),
+    ).toBeNull();
   });
 
   it("never re-addresses a forward the member wrote in", async () => {
