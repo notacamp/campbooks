@@ -125,6 +125,58 @@ pub struct ProviderConfig {
     /// servers that reject the parameter; answers then carry no probability.
     #[serde(default = "default_logprobs")]
     pub logprobs: bool,
+    /// How much a reasoning model thinks before it answers
+    /// (`CAMPBOOKS_AI__<ROLE>__REASONING_EFFORT`): sent as
+    /// `reasoning: {"effort": …}` on the role's chat calls, streamed or not.
+    /// Unset (the default) sends nothing. Only for a provider that documents
+    /// the `reasoning` object; a strict OpenAI-compatible server rejects it.
+    /// Models are addressed by role, so nothing here detects a provider.
+    #[serde(default, deserialize_with = "reasoning_effort")]
+    pub reasoning_effort: Option<ReasoningEffort>,
+}
+
+/// How much a reasoning model thinks before it answers.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum ReasoningEffort {
+    /// As little as the model allows.
+    Minimal,
+    /// A little.
+    Low,
+    /// The model's usual amount.
+    Medium,
+    /// As much as it needs.
+    High,
+}
+
+impl ReasoningEffort {
+    /// Lower-case name, as in `CAMPBOOKS_AI__<ROLE>__REASONING_EFFORT`.
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Minimal => "minimal",
+            Self::Low => "low",
+            Self::Medium => "medium",
+            Self::High => "high",
+        }
+    }
+}
+
+/// `minimal`, `low`, `medium` or `high`, any case; blank (left empty in
+/// `.env`) is unset.
+fn reasoning_effort<'de, D: Deserializer<'de>>(d: D) -> Result<Option<ReasoningEffort>, D::Error> {
+    let Some(raw) = Option::<String>::deserialize(d)? else {
+        return Ok(None);
+    };
+    match raw.trim().to_ascii_lowercase().as_str() {
+        "" => Ok(None),
+        "minimal" => Ok(Some(ReasoningEffort::Minimal)),
+        "low" => Ok(Some(ReasoningEffort::Low)),
+        "medium" => Ok(Some(ReasoningEffort::Medium)),
+        "high" => Ok(Some(ReasoningEffort::High)),
+        other => Err(serde::de::Error::custom(format!(
+            "REASONING_EFFORT must be `minimal`, `low`, `medium` or `high`, not `{other}`"
+        ))),
+    }
 }
 
 const fn default_logprobs() -> bool {
@@ -144,7 +196,15 @@ impl ProviderConfig {
             calibration: Calibration::default(),
             external_content: ExternalContent::default(),
             logprobs: default_logprobs(),
+            reasoning_effort: None,
         }
+    }
+
+    /// The same provider asking its model for `effort` of reasoning.
+    #[must_use]
+    pub fn with_reasoning_effort(mut self, effort: ReasoningEffort) -> Self {
+        self.reasoning_effort = Some(effort);
+        self
     }
 
     /// The same provider, allowed (or not) to receive mail content when it
@@ -762,6 +822,30 @@ mod tests {
         })));
         let err = AiConfig::from_figment(&figment).unwrap_err().to_string();
         assert!(err.contains("EXTERNAL_CONTENT must be"), "{err}");
+    }
+
+    #[test]
+    fn the_reasoning_effort_is_unset_by_default_and_any_case() {
+        let effort = |value: Option<&str>| {
+            let mut role = serde_json::json!({"base_url": "http://x/v1", "model": "m"});
+            if let Some(value) = value {
+                role["reasoning_effort"] = serde_json::json!(value);
+            }
+            let figment = Figment::from(Serialized::defaults(serde_json::json!({
+                "ai": {"complete": role}
+            })));
+            AiConfig::from_figment(&figment)
+                .map(|config| config.roles[&Role::Complete].reasoning_effort)
+        };
+        assert_eq!(effort(None).unwrap(), None);
+        assert_eq!(effort(Some("")).unwrap(), None, "left empty in .env");
+        assert_eq!(effort(Some(" LOW ")).unwrap(), Some(ReasoningEffort::Low));
+        assert_eq!(
+            effort(Some("minimal")).unwrap(),
+            Some(ReasoningEffort::Minimal)
+        );
+        let err = effort(Some("lots")).unwrap_err().to_string();
+        assert!(err.contains("REASONING_EFFORT must be"), "{err}");
     }
 
     #[test]

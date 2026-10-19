@@ -69,18 +69,19 @@ impl Instruments {
 }
 
 /// One provider call being observed: its span, its start, its attributes.
-pub(crate) struct Call<'a> {
-    instruments: &'a Instruments,
+/// Owns its instruments (cheap handles), so a streamed call can carry it.
+pub(crate) struct Call {
+    instruments: Instruments,
     span: Span,
     started: Instant,
     attributes: Vec<KeyValue>,
 }
 
-impl<'a> Call<'a> {
+impl Call {
     /// Start observing `operation` (`chat`, `embeddings`, `decide`) for
     /// `role` against `provider`.
     pub(crate) fn start(
-        instruments: &'a Instruments,
+        instruments: &Instruments,
         operation: &'static str,
         role: Role,
         provider: &ProviderConfig,
@@ -101,7 +102,7 @@ impl<'a> Call<'a> {
             error.type = tracing::field::Empty,
         );
         Self {
-            instruments,
+            instruments: instruments.clone(),
             span,
             started: Instant::now(),
             attributes: vec![
@@ -121,41 +122,61 @@ impl<'a> Call<'a> {
     /// Record how the call ended: the response model and token usage on
     /// success, the error type on failure.
     pub(crate) fn finish<T>(
-        mut self,
+        self,
         result: &Result<T, Error>,
         details: impl FnOnce(&T) -> (Option<&str>, Option<Usage>),
     ) {
-        let elapsed = self.started.elapsed().as_secs_f64();
         match result {
             Ok(value) => {
                 let (model, usage) = details(value);
-                if let Some(model) = model.filter(|m| !m.is_empty()) {
-                    self.span.record("gen_ai.response.model", model);
-                }
-                if let Some(usage) = usage {
-                    self.span
-                        .record("gen_ai.usage.input_tokens", usage.prompt_tokens);
-                    self.span
-                        .record("gen_ai.usage.output_tokens", usage.completion_tokens);
-                    for (kind, count) in [
-                        ("input", usage.prompt_tokens),
-                        ("output", usage.completion_tokens),
-                    ] {
-                        let mut attributes = self.attributes.clone();
-                        attributes.push(KeyValue::new("gen_ai.token.type", kind));
-                        self.instruments
-                            .tokens
-                            .record(u64::from(count), &attributes);
-                    }
-                }
+                self.succeeded(model, usage);
             }
-            Err(error) => {
-                let kind = error_type(error);
-                self.span.record("otel.status_code", "error");
-                self.span.record("error.type", kind);
-                self.attributes.push(KeyValue::new("error.type", kind));
+            Err(error) => self.failed(error),
+        }
+    }
+
+    /// Record a call that answered: the response model and token usage.
+    pub(crate) fn succeeded(self, model: Option<&str>, usage: Option<Usage>) {
+        let elapsed = self.started.elapsed().as_secs_f64();
+        if let Some(model) = model.filter(|m| !m.is_empty()) {
+            self.span.record("gen_ai.response.model", model);
+        }
+        if let Some(usage) = usage {
+            self.span
+                .record("gen_ai.usage.input_tokens", usage.prompt_tokens);
+            self.span
+                .record("gen_ai.usage.output_tokens", usage.completion_tokens);
+            for (kind, count) in [
+                ("input", usage.prompt_tokens),
+                ("output", usage.completion_tokens),
+            ] {
+                let mut attributes = self.attributes.clone();
+                attributes.push(KeyValue::new("gen_ai.token.type", kind));
+                self.instruments
+                    .tokens
+                    .record(u64::from(count), &attributes);
             }
         }
+        self.instruments.duration.record(elapsed, &self.attributes);
+    }
+
+    /// Record a call that failed: its error type.
+    pub(crate) fn failed(self, error: &Error) {
+        self.ended_with(error_type(error));
+    }
+
+    /// Record that the call was given up before it ended (a streamed call
+    /// whose stream was dropped): `error.type=cancelled`.
+    pub(crate) fn cancel(self) {
+        self.ended_with("cancelled");
+    }
+
+    /// Record a call that ended without an answer, as `kind`.
+    fn ended_with(mut self, kind: &'static str) {
+        let elapsed = self.started.elapsed().as_secs_f64();
+        self.span.record("otel.status_code", "error");
+        self.span.record("error.type", kind);
+        self.attributes.push(KeyValue::new("error.type", kind));
         self.instruments.duration.record(elapsed, &self.attributes);
     }
 }
