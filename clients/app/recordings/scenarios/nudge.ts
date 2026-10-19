@@ -206,7 +206,7 @@ function anaDetail() {
 
 /** An attention item for `conversation`, as `attention.list` returns it. */
 function item(n: number, conversation: ReturnType<typeof summary>, extra = {}) {
-  const need = conversation.need;
+  const need = conversation.need as { reason?: unknown; trust?: unknown; due_on?: unknown } | null;
   return {
     id: itemId(n),
     record: { type: "conversations.conversation", id: conversation.id },
