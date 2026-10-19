@@ -380,7 +380,8 @@ export const NudgeAndWaiting: Story = {
     await expect(
       await canvas.findByRole("heading", { level: 2, name: "Waiting on others" }),
     ).toBeVisible();
-    await expect(canvas.getByText("Checks Fri")).toBeVisible();
+    // When Scout checks Rui again, as a weekday or a date (the story's clock is today's).
+    await expect(canvas.getAllByText(/^Checks /u)[0]).toBeVisible();
   },
 };
 

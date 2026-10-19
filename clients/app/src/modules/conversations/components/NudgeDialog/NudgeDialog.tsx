@@ -91,12 +91,10 @@ function nudgeRecipients(
   if (ours(awaited)) {
     return undefined;
   }
-  let parties: Address[];
-  if (message.direction === "outbound") {
-    parties = message.to;
-  } else {
-    parties = [...(message.reply_to.length > 0 ? message.reply_to : [message.from]), ...message.to];
-  }
+  const parties =
+    message.direction === "outbound"
+      ? message.to
+      : [...(message.reply_to.length > 0 ? message.reply_to : [message.from]), ...message.to];
   const cc: Address[] = [];
   for (const party of [...parties, ...message.cc]) {
     const address = party.address.trim();

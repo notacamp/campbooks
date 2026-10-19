@@ -119,10 +119,6 @@ async function toAna() {
   return within(await screen.findByRole("group", { name: "Actions for Ana Costa" }));
 }
 
-afterEach(() => {
-  vi.unstubAllGlobals();
-});
-
 describe("What needs you: Nudge", () => {
   it("lists the nudge after the bills, saying who hasn't written and since when", async () => {
     api();
@@ -244,6 +240,10 @@ describe("What needs you: Nudge", () => {
 });
 
 describe("What needs you: Waiting on others", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
   it("lists who Scout waits on, soonest check first, outside the count", async () => {
     api();
     renderHome();

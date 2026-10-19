@@ -61,15 +61,17 @@ export function WaitingOnOthers({ rows, t, onNudge, onNotWaiting }: WaitingOnOth
               </Text>
             )}
           </div>
-          <Text size="sm" tone="secondary" truncate>
-            <bdi>{fewWords(row.subject)}</bdi>
+          <div className="flex min-w-0 items-baseline gap-1">
+            <Text as="span" size="sm" tone="secondary" truncate className="min-w-0 flex-1">
+              <bdi>{fewWords(row.subject)}</bdi>
+            </Text>
+            {/* Never cut short by a long subject: its own box, after it. */}
             {row.nudges > 0 ? (
-              <>
-                {" · "}
+              <Text as="span" size="sm" tone="tertiary" className="shrink-0">
                 <bdi>{t("nudge.nudged", { count: row.nudges })}</bdi>
-              </>
+              </Text>
             ) : null}
-          </Text>
+          </div>
           <div className="flex flex-wrap gap-x-3">
             <Button
               variant="link"

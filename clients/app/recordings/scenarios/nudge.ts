@@ -389,7 +389,7 @@ async function answer(route: Route): Promise<void> {
     return json({ message_id: messageId(3), text: sent["shorter"] === true ? SHORT : TEXT });
   }
   if (path === `${API}/drafts` && method === "POST") {
-    return json(draftView(String(sent["body"] ?? ""), false), 201);
+    return json(draftView(typeof sent["body"] === "string" ? sent["body"] : "", false), 201);
   }
   if (path === `${API}/drafts/${DRAFT}/send` && method === "POST") {
     return json(draftView(SHORT, true), 202);

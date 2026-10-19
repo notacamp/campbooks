@@ -153,7 +153,9 @@ const NARROW = "(width < 48rem)";
 
 function subscribeNarrow(change: () => void): () => void {
   if (typeof globalThis.matchMedia !== "function") {
-    return () => undefined;
+    return () => {
+      // Nothing was listened to.
+    };
   }
   const query = globalThis.matchMedia(NARROW);
   query.addEventListener("change", change);
@@ -977,9 +979,7 @@ export function WhatNeedsYou({ workspaceId, now, offer }: WhatNeedsYouProps) {
     const need = conversation?.need;
     if (
       conversation === undefined ||
-      need === null ||
-      need === undefined ||
-      need.reason !== "waiting" ||
+      need?.reason !== "waiting" ||
       waitsGone.has(waitKey(conversation))
     ) {
       return [];
