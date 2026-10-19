@@ -287,7 +287,10 @@ export function ageLabel(
     new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime();
   const days = Math.round((midnight(now) - midnight(at)) / (24 * HOUR_MS));
   let text: string;
-  if (days <= 0 && ms < HOUR_MS) {
+  if (ms < 60_000) {
+    // "Now", not "this minute".
+    text = relative.format(0, "second");
+  } else if (days <= 0 && ms < HOUR_MS) {
     text = relative.format(-Math.floor(ms / 60_000), "minute");
   } else if (days <= 0) {
     text = relative.format(-Math.floor(ms / HOUR_MS), "hour");
