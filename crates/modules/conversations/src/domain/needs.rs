@@ -2230,7 +2230,7 @@ mod tests {
         mine.basis = NeedBasis::Member;
         match settle(mine, sent(60), clock()) {
             Settled::Open(need) => {
-                assert_eq!((need.reason, need.trust), (NeedReason::Do, NeedTrust::Sure))
+                assert_eq!((need.reason, need.trust), (NeedReason::Do, NeedTrust::Sure));
             }
             Settled::Cleared(..) => panic!("a member's ask stays"),
         }

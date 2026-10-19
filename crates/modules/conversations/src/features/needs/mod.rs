@@ -350,8 +350,7 @@ async fn judge(
     let earlier_correction = earlier.flatten().map(CorrectionId::from_uuid);
     // The money question is a choice: its answer behind a Pay need is
     // "owed"; "not owed" is what Not needed says of it.
-    let money = need.question == NeedQuestion::Money.as_str();
-    let (yes, no) = if money {
+    let (yes, no) = if need.question == NeedQuestion::Money.as_str() {
         (triage::OWED, NOT_OWED)
     } else {
         ("true", "false")
@@ -361,13 +360,8 @@ async fn judge(
         NeedVerdict::NotNeeded => Some(no),
         NeedVerdict::Confirmed | NeedVerdict::StillToPay => Some(yes),
     };
-    // "Still needed?" asks about time, not about the model's reading of the
-    // mail: neither answer is a labelled example (campbooks-cloud#275).
-    let still = [NeedQuestion::StillToDo, NeedQuestion::StillNeedsReply]
-        .iter()
-        .any(|q| need.question == q.as_str());
     let correction = match to {
-        Some(_) if still => None,
+        Some(_) if about_time(&need.question) => None,
         Some(to) => Some(
             correct(
                 &mut tx,
@@ -419,6 +413,15 @@ async fn judge(
     let summary = summary(&mut tx, access.user, id).await?;
     tx.commit().await?;
     Ok(summary)
+}
+
+/// Whether `question` is "Still needed?": it asks about time, not about
+/// the model's reading of the mail, so neither answer is a labelled example
+/// (campbooks-cloud#275).
+fn about_time(question: &str) -> bool {
+    [NeedQuestion::StillToDo, NeedQuestion::StillNeedsReply]
+        .iter()
+        .any(|q| question == q.as_str())
 }
 
 /// A correction of the answer behind a need.
