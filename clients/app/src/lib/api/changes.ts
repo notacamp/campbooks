@@ -226,9 +226,7 @@ export async function refreshBodiesAfterRules(
     dropped,
     queryClient.invalidateQueries({
       predicate: (query) =>
-        readsBodyOf(query, workspace) &&
-        query.state.data !== undefined &&
-        only(query.state.data),
+        readsBodyOf(query, workspace) && query.state.data !== undefined && only(query.state.data),
     }),
   ]);
 }
