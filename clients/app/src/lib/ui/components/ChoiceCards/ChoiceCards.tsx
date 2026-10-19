@@ -1,6 +1,7 @@
 import { useId, type ReactNode } from "react";
 
 import { Icon } from "../Icon/Icon";
+import { Tag } from "../Tag/Tag";
 
 import styles from "./ChoiceCards.module.css";
 
@@ -8,6 +9,8 @@ export interface ChoiceCardOption<T extends string> {
   value: T;
   title: string;
   description?: string | undefined;
+  /** A short label after the title ("Scout's guess"). */
+  tag?: string | undefined;
   /** Drawn before the text (a workspace mark, an icon). */
   leading?: ReactNode | undefined;
 }
@@ -22,6 +25,18 @@ export interface ChoiceCardsProps<T extends string> {
   onChange: (value: T) => void;
   /** Radios share a name; defaults to a generated one. */
   name?: string | undefined;
+}
+
+/** The ids a card is described by: its tag, then its sentence. */
+function describedBy<T extends string>(
+  id: string,
+  option: ChoiceCardOption<T>,
+): string | undefined {
+  const ids = [
+    ...(option.tag === undefined ? [] : [`${id}-tag`]),
+    ...(option.description === undefined ? [] : [`${id}-description`]),
+  ];
+  return ids.length === 0 ? undefined : ids.join(" ");
 }
 
 /**
@@ -56,15 +71,22 @@ export function ChoiceCards<T extends string>({
               value={option.value}
               checked={checked}
               aria-labelledby={`${id}-title`}
-              aria-describedby={option.description === undefined ? undefined : `${id}-description`}
+              aria-describedby={describedBy(id, option)}
               onChange={() => {
                 onChange(option.value);
               }}
             />
             {option.leading}
             <span className={styles["text"]}>
-              <span id={`${id}-title`} className={styles["title"]}>
-                {option.title}
+              <span className={styles["heading"]}>
+                <span id={`${id}-title`} className={styles["title"]}>
+                  {option.title}
+                </span>
+                {option.tag === undefined ? null : (
+                  <span id={`${id}-tag`}>
+                    <Tag>{option.tag}</Tag>
+                  </span>
+                )}
               </span>
               {option.description === undefined ? null : (
                 <span id={`${id}-description`} className={styles["description"]}>

@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n                SELECT i.id AS \"id: ItemId\", i.record_type, i.record_id, i.container_type,\n                       i.container_id, i.cause_type, i.cause_id, i.reason AS \"reason!\", i.trust AS \"trust!\", i.due_on,\n                       i.urgent, i.since, i.state, i.cleared_because,\n                       i.cleared_by AS \"cleared_by: _\", i.cleared_at,\n                       NULL::timestamptz AS \"snoozed_until?\"\n                  FROM attention.items i\n                 WHERE i.workspace_id = $1 AND i.state = 'open'\n                   AND i.container_type || ':' || i.container_id = ANY($2)\n                   AND (i.due_on IS NULL OR i.due_on >= $3)\n                   AND NOT EXISTS (SELECT 1 FROM attention.snoozes s\n                                    WHERE s.item_id = i.id AND s.user_id = $4 AND s.until > $5)\n                 ORDER BY CASE i.reason WHEN 'review' THEN 0 WHEN 'reply' THEN 1\n                                        WHEN 'decide' THEN 2 WHEN 'do' THEN 3 ELSE 4 END,\n                          (i.due_on IS NOT NULL AND i.due_on < $6) DESC,\n                          i.due_on ASC NULLS LAST, i.urgent DESC, i.since ASC, i.id\n                ",
+  "query": "\n                SELECT i.id AS \"id: ItemId\", i.record_type, i.record_id, i.container_type,\n                       i.container_id, i.cause_type, i.cause_id, i.reason AS \"reason!\", i.trust AS \"trust!\", i.due_on,\n                       i.urgent, i.since, i.state, i.cleared_because,\n                       i.cleared_by AS \"cleared_by: _\", i.cleared_at,\n                       NULL::timestamptz AS \"snoozed_until?\"\n                  FROM attention.items i\n                 WHERE i.workspace_id = $1 AND i.state = 'open'\n                   AND i.container_type || ':' || i.container_id = ANY($2)\n                   AND (i.due_on IS NULL OR i.due_on >= $3)\n                   AND NOT EXISTS (SELECT 1 FROM attention.snoozes s\n                                    WHERE s.item_id = i.id AND s.user_id = $4 AND s.until > $5)\n                 ORDER BY CASE i.reason WHEN 'review' THEN 0 WHEN 'reply' THEN 1\n                                        WHEN 'decide' THEN 2 WHEN 'do' THEN 3 WHEN 'pay' THEN 4 ELSE 5 END,\n                          (i.due_on IS NOT NULL AND i.due_on < $6) DESC,\n                          i.due_on ASC NULLS LAST, i.urgent DESC, i.since ASC, i.id\n                ",
   "describe": {
     "columns": [
       {
@@ -216,5 +216,5 @@
       null
     ]
   },
-  "hash": "9116bca5c2b66421e00dd2bf04555dfe1ea6ece4854088edea1a656dc2c572b8"
+  "hash": "9a86161d045e4363cf3821084b77e844ebdead914ef4f504cafc47c73575e075"
 }

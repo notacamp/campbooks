@@ -33,11 +33,21 @@ pub enum Reason {
     Do,
     /// Money is owed.
     Pay,
+    /// A rule the member taught keeps it in front of them until they have
+    /// opened it once (campbooks-cloud#274). Shown last.
+    WorthALook,
 }
 
 impl Reason {
     /// Every reason, in display order.
-    pub const ALL: [Self; 5] = [Self::Review, Self::Reply, Self::Decide, Self::Do, Self::Pay];
+    pub const ALL: [Self; 6] = [
+        Self::Review,
+        Self::Reply,
+        Self::Decide,
+        Self::Do,
+        Self::Pay,
+        Self::WorthALook,
+    ];
 
     /// The wire and database name.
     pub const fn as_str(self) -> &'static str {
@@ -47,6 +57,7 @@ impl Reason {
             Self::Decide => "decide",
             Self::Do => "do",
             Self::Pay => "pay",
+            Self::WorthALook => "worth_a_look",
         }
     }
 }

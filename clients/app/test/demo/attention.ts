@@ -210,6 +210,27 @@ function item(summary: Summary, extra: Partial<Item> = {}): Item {
 
 export const ITEMS: Item[] = NEEDS.map((summary) => item(summary));
 
+/**
+ * Mail a rule the member taught ("Highlight them") keeps in front of them
+ * until they open it once: Worth a look, the last group. Not among NEEDS.
+ */
+export const DIGEST = conversation({
+  n: 8,
+  subject: "This week’s picks",
+  from: { name: "Design Notes", address: "digest@design-notes.example" },
+  sent: "2026-10-13T08:00:00Z",
+  need: {
+    reason: "worth_a_look",
+    trust: "sure",
+    question: "worth_a_look",
+    rule: "taught.rule",
+    due_on: null,
+    quote: "Five pieces on type, spacing and colour.",
+  },
+});
+
+export const DIGEST_ITEM: Item = item(DIGEST);
+
 export const COUNTS = (["review", "reply", "decide", "do", "pay"] as const).map((reason) => ({
   reason,
   count: ITEMS.filter((i) => i.reason === reason).length,
