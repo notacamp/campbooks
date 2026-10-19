@@ -837,13 +837,15 @@
     "description": "In the same thread, so {{name}} sees what it’s about. Nothing is sent until you press Send.",
     "unavailable": "Scout can’t write here, so you write this nudge.",
     "draftLabel": "Your nudge",
-    "to": "To {{recipient}}",
-    "copying": "Copying {{recipients}}",
+    "to": "To",
+    "copying": "Copying",
     "sent": "Nudged {{name}}",
     "undone": "Not sent. Your nudge is back.",
     "tooLate": "Too late to undo: the nudge has already left.",
     "errors": {
-      "notWaiting": "{{name}} already wrote back, so there’s nothing to nudge."
+      "notWaiting": "{{name}} already wrote back, so there’s nothing to nudge.",
+      "addressed": "This nudge now goes to other people than shown. Check who it goes to and send again.",
+      "ownAddress": "This waits on your own address, so there is nobody to nudge."
     }
   }
 }

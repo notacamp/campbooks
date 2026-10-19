@@ -92,8 +92,12 @@ describe("NudgeDialog", () => {
     });
     expect(api.calls.find((c) => c.route === `POST ${C}/nudge/draft`)?.body).toEqual({});
     // To the awaited person, copying the others; never the inbox itself.
-    expect(await screen.findByText("To Ana Costa <ana@costa-arquitetos.example>")).toBeVisible();
-    expect(screen.getByText("Copying João Matos <joao@obras-matos.example>")).toBeVisible();
+    const ana = await screen.findByText("Ana Costa <ana@costa-arquitetos.example>");
+    expect(ana.tagName).toBe("BDI");
+    expect(ana.closest("p")).toHaveTextContent("To Ana Costa <ana@costa-arquitetos.example>");
+    expect(
+      screen.getByText("João Matos <joao@obras-matos.example>").closest("p"),
+    ).toHaveTextContent("Copying João Matos <joao@obras-matos.example>");
     // The line it follows up on.
     expect(screen.getByText(/Could you send Sam the revised floor plan directly/u)).toBeVisible();
 
@@ -116,14 +120,10 @@ describe("NudgeDialog", () => {
     const created = api.calls.find((c) => c.route === `POST ${D}`)?.body as {
       quoted: string;
     };
-    expect(created).toMatchObject({
-      kind: "nudge",
-      message_id: WAITED,
-      body: SHORT,
-      to: [ANA_ADDRESS],
-      cc: [JOAO_ADDRESS],
-      bcc: [],
-    });
+    expect(created).toMatchObject({ kind: "nudge", message_id: WAITED, body: SHORT, bcc: [] });
+    // The server addresses a nudge: the client sends no To or Cc.
+    expect(created).not.toHaveProperty("to");
+    expect(created).not.toHaveProperty("cc");
     expect(created.quoted).toMatch(/João Matos wrote:/u);
     expect(api.calls.map((c) => c.route)).toContain(`POST ${D}/${NUDGE.id}/send`);
     expect(screen.getAllByText("Sending to Ana").length).toBeGreaterThan(0);
@@ -162,13 +162,9 @@ describe("NudgeDialog", () => {
     await waitFor(() => {
       expect(handlers.onOpenDraft).toHaveBeenCalled();
     });
-    expect(api.calls.find((c) => c.route === `POST ${D}`)?.body).toMatchObject({
-      kind: "nudge",
-      message_id: WAITED,
-      body: "",
-      to: [ANA_ADDRESS],
-      cc: [JOAO_ADDRESS],
-    });
+    const created = api.calls.find((c) => c.route === `POST ${D}`)?.body;
+    expect(created).toMatchObject({ kind: "nudge", message_id: WAITED, body: "" });
+    expect(created).not.toHaveProperty("to");
   });
 
   it("opens the nudge the member already started, never writing over it", async () => {
@@ -204,5 +200,59 @@ describe("NudgeDialog", () => {
     dialog({ resume });
     expect(await screen.findByRole("textbox", { name: "Your nudge" })).toHaveValue(SHORT);
     expect(api.calls.some((c) => c.route === `POST ${C}/nudge/draft`)).toBe(false);
+  });
+
+  it("sends nothing when the server addresses it otherwise than shown, then sends what it shows", async () => {
+    const elsewhere = {
+      ...NUDGE,
+      cc: [{ name: "Rita Lopes", address: "rita@obras-matos.example" }],
+    };
+    const api = routes({
+      [`POST ${D}`]: { status: 201, body: elsewhere },
+      [`PATCH ${D}/${NUDGE.id}`]: { body: { ...elsewhere, version: 2 } },
+    });
+    const handlers = dialog();
+    const text = await screen.findByRole("textbox", { name: "Your nudge" });
+    await waitFor(() => {
+      expect(text).toHaveValue(TEXT);
+    });
+    const send = screen.getByRole("button", { name: /^Send/u });
+    await waitFor(() => {
+      expect(send).toBeEnabled();
+    });
+    fireEvent.click(send);
+    expect(
+      (
+        await screen.findAllByText(
+          "This nudge now goes to other people than shown. Check who it goes to and send again.",
+        )
+      ).length,
+    ).toBeGreaterThan(0);
+    expect(api.calls.map((c) => c.route)).not.toContain(`POST ${D}/${NUDGE.id}/send`);
+    expect(handlers.onSent).not.toHaveBeenCalled();
+    // It now shows where the draft goes; Send again sends that.
+    expect(await screen.findByText("Rita Lopes <rita@obras-matos.example>")).toBeVisible();
+    fireEvent.click(screen.getByRole("button", { name: /^Send/u }));
+    await waitFor(() => {
+      expect(handlers.onSent).toHaveBeenCalled();
+    });
+    const saved = api.calls.find((c) => c.route === `PATCH ${D}/${NUDGE.id}`)?.body;
+    expect(saved).not.toHaveProperty("to");
+  });
+
+  it("nudges nobody when it waits on the inbox's own address", async () => {
+    const api = routes({ [`POST ${C}/nudge/draft`]: problem(409, "not_waiting") });
+    if (ANA.need === null || ANA.need === undefined) {
+      throw new Error("the fixture has no need");
+    }
+    dialog({
+      need: { ...ANA.need, waiting_on: { name: "Sam Rivera", address: INBOX.address } },
+    });
+    expect(
+      await screen.findByText("This waits on your own address, so there is nobody to nudge."),
+    ).toBeVisible();
+    expect(screen.queryByRole("textbox")).toBeNull();
+    expect(screen.queryByRole("button", { name: /Write my own/u })).toBeNull();
+    expect(api.calls.some((c) => c.route === `POST ${D}`)).toBe(false);
   });
 });

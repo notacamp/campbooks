@@ -837,13 +837,15 @@
     "description": "Na mesma conversa, para que {{name}} saiba do que se trata. Nada é enviado até carregar em Enviar.",
     "unavailable": "O Scout não pode escrever aqui, por isso escreva este lembrete.",
     "draftLabel": "O seu lembrete",
-    "to": "Para {{recipient}}",
-    "copying": "Com cópia para {{recipients}}",
+    "to": "Para",
+    "copying": "Com cópia para",
     "sent": "Lembrete enviado a {{name}}",
     "undone": "Não enviado. O seu lembrete voltou.",
     "tooLate": "Já é tarde para anular: o lembrete já saiu.",
     "errors": {
-      "notWaiting": "{{name}} já respondeu, por isso não há nada a relembrar."
+      "notWaiting": "{{name}} já respondeu, por isso não há nada a relembrar.",
+      "addressed": "Este lembrete vai agora para pessoas diferentes das indicadas. Verifique para quem vai e envie de novo.",
+      "ownAddress": "Isto está à espera do seu próprio endereço, por isso não há ninguém a relembrar."
     }
   }
 }

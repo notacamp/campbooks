@@ -85,8 +85,12 @@ function nudgeRecipients(
   message: MessageView,
   awaited: Address,
   inbox: string,
-): { to: Address[]; cc: Address[] } {
+): { to: Address[]; cc: Address[] } | undefined {
   const ours = (party: Address) => same(party, { address: inbox });
+  // Never a nudge to the inbox itself: nothing to wait for.
+  if (ours(awaited)) {
+    return undefined;
+  }
   let parties: Address[];
   if (message.direction === "outbound") {
     parties = message.to;
@@ -108,6 +112,30 @@ function nudgeRecipients(
     cc.push({ address, name: name === undefined || name === "" ? null : name });
   }
   return { to: [awaited], cc };
+}
+
+/** Whether `draft` goes to exactly the people `shown` (case aside). */
+function sameAddressing(draft: Draft, shown: { to: Address[]; cc: Address[] }): boolean {
+  const key = (parties: Address[]) =>
+    parties
+      .map((party) => party.address.trim().toLowerCase())
+      .toSorted()
+      .join(",");
+  return key(draft.to) === key(shown.to) && key(draft.cc) === key(shown.cc);
+}
+
+/** People as their addresses read, each isolated from the line's text direction. */
+function People({ parties }: { parties: Address[] }) {
+  return (
+    <>
+      {parties.map((party, index) => (
+        <span key={party.address}>
+          {index === 0 ? null : ", "}
+          <bdi>{addressLine(party)}</bdi>
+        </span>
+      ))}
+    </>
+  );
 }
 
 /** A draft the member can still change. */
@@ -153,10 +181,19 @@ export function NudgeDialog({
   const awaited = need.waiting_on ?? undefined;
   const person = awaited === undefined ? "" : displayName(awaited);
   const first = firstName(person);
+  // The draft this dialog created and saved: the only one it saves again.
+  const [saved, setSaved] = useState<Draft | undefined>();
+  // Waiting on the inbox's own address (mail it sent itself): nobody to nudge.
+  const ownAddress =
+    awaited !== undefined && inbox !== undefined && same(awaited, { address: inbox.address });
+  // Who it goes to: as the server addressed the draft once one exists, else
+  // as the server will (shown before anything is created).
   const recipients =
-    answered === undefined || awaited === undefined || inbox === undefined
-      ? undefined
-      : nudgeRecipients(answered, awaited, inbox.address);
+    saved === undefined
+      ? answered === undefined || awaited === undefined || inbox === undefined
+        ? undefined
+        : nudgeRecipients(answered, awaited, inbox.address)
+      : { to: saved.to, cc: saved.cc };
 
   const scout = useNudgeText(
     workspaceId,
@@ -167,8 +204,6 @@ export function NudgeDialog({
   // What the member has on screen once they (or a rewrite) changed it.
   const [edited, setEdited] = useState<string | undefined>(resume?.draft.body);
   const text = edited ?? scout.data ?? "";
-  // The draft this dialog created and saved: the only one it saves again.
-  const [saved, setSaved] = useState<Draft | undefined>();
   // A draft the next one replaces (the one an Undo handed back, or one that
   // changed after it was saved): discarded once the new one exists.
   const replaced = useRef<Draft | undefined>(resume?.draft);
@@ -187,7 +222,7 @@ export function NudgeDialog({
   const firstError: unknown = resume === undefined && scout.isError ? scout.error : undefined;
   const firstFailure = firstError === undefined ? undefined : problemCode(firstError);
   const unavailable = firstFailure === "reply_unavailable";
-  const notWaiting = firstFailure === "not_waiting" || problem === "notWaiting";
+  const notWaiting = firstFailure === "not_waiting" || problem === "notWaiting" || ownAddress;
   const writing = resume === undefined && scout.isPending;
   const drafting = !writing && (resume !== undefined || scout.data !== undefined) && !notWaiting;
 
@@ -253,11 +288,11 @@ export function NudgeDialog({
     if (answered === undefined || recipients === undefined || answered.text_unread === true) {
       throw new Error("not shown yet");
     }
+    // No To or Cc: the server addresses a nudge, and keeps its addressing
+    // when the draft is saved again.
     const content = {
       body,
       quoted: replyQuote(answered, i18n.language, words),
-      to: recipients.to,
-      cc: recipients.cc,
       bcc: [],
     };
     if (saved !== undefined) {
@@ -298,8 +333,16 @@ export function NudgeDialog({
     const handle = undo.pending({ label: t("reply.pending", { name: first }) });
     let kept: Draft | undefined;
     try {
+      const shown = recipients;
       const draft = await keep(text);
       kept = draft;
+      // Addressed otherwise than shown (the people on the email changed):
+      // nothing sent; the dialog now shows where it goes.
+      if (shown === undefined || !sameAddressing(draft, shown)) {
+        handle.fail({ label: t("nudge.errors.addressed") });
+        setProblem("addressed");
+        return;
+      }
       // As just saved: the save's answer is what the dialog shows.
       const scheduled = await sendDraft(workspaceId, draft.id, {
         version: draft.version,
@@ -440,15 +483,16 @@ export function NudgeDialog({
   const quoteUnread = waited?.text_unread === true && unread.isError && !unread.isFetching;
   const quoteReading = waited?.text_unread === true && unread.data === undefined && !quoteUnread;
   const preview = quotePreview(t, answered, i18n.language);
-  const shownProblem = problem ?? firstProblem;
+  const shownProblem = problem ?? (ownAddress ? "ownAddress" : firstProblem);
+  const calm = shownProblem === "notWaiting" || shownProblem === "ownAddress";
   const problemLine =
     shownProblem === undefined ? null : (
       <Banner
-        tone={shownProblem === "notWaiting" ? "neutral" : "danger"}
-        role={shownProblem === "notWaiting" ? undefined : "alert"}
+        tone={calm ? "neutral" : "danger"}
+        role={calm ? undefined : "alert"}
         title={
-          shownProblem === "notWaiting"
-            ? t("nudge.errors.notWaiting", { name: person })
+          calm || shownProblem === "addressed"
+            ? t(`nudge.errors.${shownProblem}`, { name: person })
             : t(`reply.${shownProblem}`, { name: person })
         }
         action={
@@ -538,11 +582,11 @@ export function NudgeDialog({
       {recipients === undefined ? null : (
         <div>
           <Text tone="secondary" size="sm">
-            {t("nudge.to", { recipient: recipients.to.map(addressLine).join(", ") })}
+            {t("nudge.to")} <People parties={recipients.to} />
           </Text>
           {recipients.cc.length === 0 ? null : (
             <Text tone="secondary" size="sm">
-              {t("nudge.copying", { recipients: recipients.cc.map(addressLine).join(", ") })}
+              {t("nudge.copying")} <People parties={recipients.cc} />
             </Text>
           )}
         </div>

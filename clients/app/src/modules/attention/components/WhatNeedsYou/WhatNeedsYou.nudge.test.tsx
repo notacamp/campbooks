@@ -258,7 +258,9 @@ describe("What needs you: Waiting on others", () => {
     expect(rui.getByText("Checks Fri")).toBeVisible();
     const ines = within(screen.getByRole("listitem", { name: "Waiting on Inês Cardoso" }));
     expect(ines.getByText("Checks Mon")).toBeVisible();
-    expect(ines.getByText(/Nudged once/u)).toBeVisible();
+    // Each part isolated from the page's text direction.
+    expect(ines.getByText("Nudged once").tagName).toBe("BDI");
+    expect(rui.getByText("Rui Matos").tagName).toBe("BDI");
     expect(screen.getByRole("heading", { level: 1, name: "3 things need you" })).toBeVisible();
   });
 
@@ -275,8 +277,9 @@ describe("What needs you: Waiting on others", () => {
       `POST ${W}/conversations/${RUI.id}/nudge/draft`,
     );
     // Rui wrote the email, so the nudge copies nobody.
-    expect(await screen.findByText("To Rui Matos <rui@matos-carpintaria.example>")).toBeVisible();
-    expect(screen.queryByText(/^Copying/u)).toBeNull();
+    const rui = await screen.findByText("Rui Matos <rui@matos-carpintaria.example>");
+    expect(rui.closest("p")).toHaveTextContent("To Rui Matos <rui@matos-carpintaria.example>");
+    expect(screen.getByRole("dialog")).not.toHaveTextContent("Copying");
   });
 
   it("stops waiting on Inês with Not waiting, and Undo brings the row back", async () => {

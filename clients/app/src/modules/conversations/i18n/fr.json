@@ -837,13 +837,15 @@
     "description": "Dans la même conversation, pour que {{name}} sache de quoi il s’agit. Rien n’est envoyé avant que vous appuyiez sur Envoyer.",
     "unavailable": "Scout ne peut pas écrire ici : écrivez cette relance vous-même.",
     "draftLabel": "Votre relance",
-    "to": "À {{recipient}}",
-    "copying": "En copie : {{recipients}}",
+    "to": "À",
+    "copying": "En copie :",
     "sent": "Relance envoyée à {{name}}",
     "undone": "Non envoyée. Votre relance est revenue.",
     "tooLate": "Trop tard pour annuler : la relance est déjà partie.",
     "errors": {
-      "notWaiting": "{{name}} a déjà répondu : il n’y a rien à relancer."
+      "notWaiting": "{{name}} a déjà répondu : il n’y a rien à relancer.",
+      "addressed": "Cette relance part maintenant à d’autres personnes que celles indiquées. Vérifiez à qui elle part et renvoyez-la.",
+      "ownAddress": "Ceci attend votre propre adresse : il n’y a personne à relancer."
     }
   }
 }

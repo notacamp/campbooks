@@ -396,7 +396,7 @@ const nudgeOpen: Pick<Story, "args" | "play"> = {
       await expect(dialog).toBeVisible();
     });
     await expect(await body.findByRole("textbox", { name: "Your nudge" })).toBeVisible();
-    await expect(body.getByText("Copying João Matos <joao@obras-matos.example>")).toBeVisible();
+    await expect(body.getByText("João Matos <joao@obras-matos.example>")).toBeVisible();
   },
 };
 

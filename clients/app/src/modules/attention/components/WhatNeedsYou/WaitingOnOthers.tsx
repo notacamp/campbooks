@@ -49,7 +49,7 @@ export function WaitingOnOthers({ rows, t, onNudge, onNotWaiting }: WaitingOnOth
         <li key={row.id} aria-label={t("waiting.label", { name: row.name })}>
           <div className="flex min-w-0 items-baseline gap-2">
             <Text as="span" size="sm" weight="semibold" truncate className="min-w-0 flex-1">
-              {row.name}
+              <bdi>{row.name}</bdi>
             </Text>
             {row.checksOn === undefined ? (
               <Text as="span" size="xs" tone="tertiary" numeric>
@@ -62,9 +62,13 @@ export function WaitingOnOthers({ rows, t, onNudge, onNotWaiting }: WaitingOnOth
             )}
           </div>
           <Text size="sm" tone="secondary" truncate>
-            {row.nudges > 0
-              ? `${fewWords(row.subject)} · ${t("nudge.nudged", { count: row.nudges })}`
-              : fewWords(row.subject)}
+            <bdi>{fewWords(row.subject)}</bdi>
+            {row.nudges > 0 ? (
+              <>
+                {" · "}
+                <bdi>{t("nudge.nudged", { count: row.nudges })}</bdi>
+              </>
+            ) : null}
           </Text>
           <div className="flex flex-wrap gap-x-3">
             <Button
