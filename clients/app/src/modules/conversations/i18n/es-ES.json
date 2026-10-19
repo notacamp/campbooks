@@ -716,7 +716,7 @@
     "whose": "Mostrar imágenes de",
     "imagesTitle": "Mostrar siempre las imágenes de {{sender}}",
     "imagesAddress": "Solo {{address}}",
-    "imagesAddressDetail": "Solo esta dirección.",
+    "imagesAddressDetail": "Correo de esta dirección cuando pasan las comprobaciones de su dominio. Esas comprobaciones avalan el dominio, no a esta persona en concreto.",
     "imagesDomain": "Cualquier dirección de {{domain}}",
     "imagesDomainDetail": "Todas las direcciones de {{domain}} y de sus subdominios, cuando pasan las comprobaciones del propio dominio.",
     "imagesMatches_one": "Ya hay {{n}} conversación de este remitente. Sus imágenes se muestran siempre que su correo pasa las comprobaciones.",
@@ -794,5 +794,44 @@
     "searchFailed": "No se ha podido buscar ahora. Vuelve a intentarlo.",
     "nobody": "Todavía no te ha escrito nadie.",
     "quoteFailed": "No se pudo leer el correo para citarlo: no se ha enviado nada. Inténtalo de nuevo."
+  },
+  "personNotes": {
+    "line": {
+      "tell": "Hablarle a Scout de {{name}}",
+      "knows": "Scout sabe: {{note}}",
+      "edit": "Editar",
+      "editLabel": "Editar lo que Scout sabe de {{name}}",
+      "rewrite": "Reescribir con esto",
+      "saved": "Guardado. A partir de ahora, Scout le escribe así a {{name}}."
+    },
+    "form": {
+      "label": "Sobre {{name}} y cómo escribirle",
+      "placeholder": "p. ej., Mi casero. Formal, en portugués.",
+      "left_one": "Queda {{n}} carácter",
+      "left_other": "Quedan {{n}} caracteres",
+      "save": "Guardar",
+      "cancel": "Cancelar",
+      "forget": "Olvidar esto",
+      "failed": "Scout no ha podido guardar esta nota. Inténtalo de nuevo.",
+      "full": "Ya tienes 500 notas sobre personas. Quita una en la memoria de Scout primero.",
+      "invalid": "Escribe entre 1 y 500 caracteres sobre esta persona."
+    },
+    "toast": {
+      "saved": "Scout ya sabe de {{name}}",
+      "forgotten": "Scout ha olvidado lo que dijiste de {{name}}",
+      "failed": "Campbooks no pudo cambiar esa nota. No ha cambiado nada."
+    },
+    "list": {
+      "label": "Personas de las que le hablaste a Scout",
+      "emptyTitle": "Nadie todavía",
+      "empty": "Cuando respondas a alguien, puedes decirle a Scout quién es esa persona y cómo escribirle.",
+      "failed": "No se ha podido cargar lo que le dijiste a Scout sobre personas",
+      "retry": "Reintentar",
+      "edit": "Editar",
+      "editLabel": "Editar lo que Scout sabe de {{name}}",
+      "remove": "Quitar",
+      "removeLabel": "Quitar lo que Scout sabe de {{name}}",
+      "saved": "Guardado"
+    }
   }
 }

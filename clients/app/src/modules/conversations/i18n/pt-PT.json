@@ -716,7 +716,7 @@
     "whose": "Mostrar imagens de",
     "imagesTitle": "Mostrar sempre as imagens de {{sender}}",
     "imagesAddress": "Só {{address}}",
-    "imagesAddressDetail": "Só este endereço.",
+    "imagesAddressDetail": "Correio deste endereço quando as verificações do seu domínio passam. Essas verificações garantem o domínio, não esta pessoa em concreto.",
     "imagesDomain": "Qualquer endereço de {{domain}}",
     "imagesDomainDetail": "Todos os endereços de {{domain}} e dos seus subdomínios, quando as verificações do próprio domínio passam.",
     "imagesMatches_one": "Já cá está {{n}} conversa deste remetente. As imagens aparecem sempre que o correio passa as verificações.",
@@ -794,5 +794,44 @@
     "searchFailed": "Não foi possível procurar agora. Tente de novo.",
     "nobody": "Ainda ninguém lhe escreveu.",
     "quoteFailed": "Não foi possível ler o email para o citar: nada foi enviado. Tente novamente."
+  },
+  "personNotes": {
+    "line": {
+      "tell": "Falar de {{name}} ao Scout",
+      "knows": "O Scout sabe: {{note}}",
+      "edit": "Editar",
+      "editLabel": "Editar o que o Scout sabe sobre {{name}}",
+      "rewrite": "Reescrever com isto",
+      "saved": "Guardado. A partir de agora, o Scout escreve assim a {{name}}."
+    },
+    "form": {
+      "label": "Sobre {{name}} e como lhe escrever",
+      "placeholder": "p. ex. O meu senhorio. Formal, em português.",
+      "left_one": "Falta {{n}} carácter",
+      "left_other": "Faltam {{n}} caracteres",
+      "save": "Guardar",
+      "cancel": "Cancelar",
+      "forget": "Esquecer isto",
+      "failed": "O Scout não conseguiu guardar esta nota. Tente de novo.",
+      "full": "Já tem 500 notas sobre pessoas. Remova uma na memória do Scout primeiro.",
+      "invalid": "Escreva entre 1 e 500 caracteres sobre esta pessoa."
+    },
+    "toast": {
+      "saved": "O Scout já sabe sobre {{name}}",
+      "forgotten": "O Scout esqueceu o que disse sobre {{name}}",
+      "failed": "O Campbooks não conseguiu alterar essa nota. Nada mudou."
+    },
+    "list": {
+      "label": "Pessoas de quem falou ao Scout",
+      "emptyTitle": "Ainda ninguém",
+      "empty": "Quando responder a alguém, pode dizer ao Scout quem é essa pessoa e como lhe escrever.",
+      "failed": "Não foi possível carregar o que disse ao Scout sobre pessoas",
+      "retry": "Tentar de novo",
+      "edit": "Editar",
+      "editLabel": "Editar o que o Scout sabe sobre {{name}}",
+      "remove": "Remover",
+      "removeLabel": "Remover o que o Scout sabe sobre {{name}}",
+      "saved": "Guardado"
+    }
   }
 }

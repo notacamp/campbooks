@@ -246,6 +246,8 @@ export function ConversationReader({
       id: "address",
       heading: t("smartRule.imagesTitle", { sender: address }),
       title: t("smartRule.imagesAddress", { address }),
+      // What the checks vouch for: its domain (the registrable one, as DKIM
+      // and DMARC align), not the one person (campbooks-cloud#236).
       description: t("smartRule.imagesAddressDetail"),
       conditions: [{ field: "sender_address" as const, value: address }],
     };

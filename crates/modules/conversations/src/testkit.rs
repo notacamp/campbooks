@@ -355,6 +355,11 @@ impl Kit {
         self.call(Method::PATCH, token, uri, Some(body)).await
     }
 
+    /// `PUT uri` with a JSON body.
+    pub async fn put(&self, token: &str, uri: &str, body: serde_json::Value) -> TestResponse {
+        self.call(Method::PUT, token, uri, Some(body)).await
+    }
+
     /// Run `operation` by id as the assistant acting for member `sub` in
     /// `workspace` ([`operations::invoke`]): the same routes, scope and
     /// membership checks as their HTTP request, with an idempotency key, and

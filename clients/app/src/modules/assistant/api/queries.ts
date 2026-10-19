@@ -1,6 +1,19 @@
-import { useMutation, useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  type QueryClient,
+  useMutation,
+  useQueries,
+  useQuery,
+  useQueryClient,
+} from "@tanstack/react-query";
 
-import { api, operationKey, unwrap, unwrapEmpty, type Schema } from "~/lib/api";
+import {
+  api,
+  operationKey,
+  refreshBodiesAfterRules,
+  unwrap,
+  unwrapEmpty,
+  type Schema,
+} from "~/lib/api";
 
 export type Proactivity = Schema<"Proactivity">;
 export type CompileResult = Schema<"CompileResult">;
@@ -181,7 +194,7 @@ export function useCreateRules(workspaceId: string) {
       return { created, failed: false };
     },
     onSettled: () => {
-      void queryClient.invalidateQueries({ queryKey: keys.rules(workspaceId) });
+      refreshAfterRules(queryClient, workspaceId);
     },
   });
 }
@@ -200,7 +213,20 @@ export function useRemoveRules(workspaceId: string) {
       }
     },
     onSettled: () => {
-      void queryClient.invalidateQueries({ queryKey: keys.rules(workspaceId) });
+      refreshAfterRules(queryClient, workspaceId);
     },
   });
+}
+
+/**
+ * After rules were created or removed here: the rules, and the workspace's
+ * message bodies, since a rule that trusts a sender's images shows or hides
+ * them; a body a rule trusted is dropped, never shown again from the cache
+ * (campbooks-cloud#236, `refreshBodiesAfterRules`). Other devices and members
+ * get the same through the live change of the rule (`conversations.rule` is
+ * a record `conversations.get_message_body` reads).
+ */
+function refreshAfterRules(queryClient: QueryClient, workspaceId: string) {
+  void queryClient.invalidateQueries({ queryKey: keys.rules(workspaceId) });
+  void refreshBodiesAfterRules(queryClient, workspaceId);
 }

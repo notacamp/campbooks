@@ -165,6 +165,7 @@ export {
   type MessageComposerProps,
 } from "./components/MessageComposer/MessageComposer";
 export { NavDivider, NavItem, type NavItemProps } from "./components/NavItem/NavItem";
+export { NoteField, type NoteFieldProps } from "./components/NoteField/NoteField";
 export { Offer, type OfferProps } from "./components/Offer/Offer";
 export {
   Note,

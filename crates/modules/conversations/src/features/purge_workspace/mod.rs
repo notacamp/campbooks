@@ -61,6 +61,11 @@ impl Job for PurgeWorkspace {
         )
         .execute(&mut **tx)
         .await?;
+        // Nor what members told Scout about people (campbooks-cloud#272).
+        sqlx::query("DELETE FROM conversations.person_notes WHERE workspace_id = $1")
+            .bind(workspace.as_uuid())
+            .execute(&mut **tx)
+            .await?;
         tracing::info!(
             inboxes = deleted,
             "conversations purged for a deleted workspace"
@@ -90,6 +95,16 @@ mod tests {
                 "INSERT INTO conversations.member_suspensions
                      (workspace_id, user_id, suspended, as_of)
                  VALUES ($1, gen_random_uuid(), true, now())",
+            )
+            .bind(workspace.as_uuid())
+            .execute(&db)
+            .await
+            .unwrap();
+            // What a member told Scout about a person.
+            sqlx::query(
+                "INSERT INTO conversations.person_notes (id, workspace_id, user_id, address, note)
+                 VALUES (gen_random_uuid(), $1, gen_random_uuid(), 'marta@clientes.example',
+                         'My landlord. Formal, in Portuguese.')",
             )
             .bind(workspace.as_uuid())
             .execute(&db)
@@ -127,5 +142,11 @@ mod tests {
                 .await
                 .unwrap();
         assert_eq!(suspensions, [kept.to_string()]);
+        let notes: Vec<String> =
+            sqlx::query_scalar("SELECT workspace_id::text FROM conversations.person_notes")
+                .fetch_all(&db)
+                .await
+                .unwrap();
+        assert_eq!(notes, [kept.to_string()]);
     }
 }

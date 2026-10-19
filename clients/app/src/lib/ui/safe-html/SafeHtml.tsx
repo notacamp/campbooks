@@ -83,21 +83,49 @@ function foldQuoted(doc: Document, show: string, hide: string): void {
 }
 
 /**
+ * Take the remote images' sources out of a document: every image source but
+ * a `data:` one (the server's placeholder and a message's own parts), for
+ * markup sent with its remote images that the reader holds back after all.
+ * The frame's policy blocks them already; without a source nothing is even
+ * asked for.
+ */
+function stripRemoteImages(doc: Document): void {
+  for (const image of doc.querySelectorAll("img")) {
+    const src = image.getAttribute("src");
+    if (src !== null && !src.trim().toLowerCase().startsWith("data:")) {
+      image.removeAttribute("src");
+    }
+    image.removeAttribute("srcset");
+  }
+}
+
+/** How {@link prepareHtml} prepares the mail for the frame. */
+interface PrepareOptions {
+  inertLinks: boolean;
+  quoted?: { show: string; hide: string };
+  /** Remote images held back from markup sent with them ({@link stripRemoteImages}). */
+  holdImages?: boolean;
+}
+
+/**
  * `html` as the frame shows it, parsed inertly (a `DOMParser` document
  * loads and runs nothing): its links taken out ({@link stripLinks}) when
  * `inertLinks`, its quoted history folded ({@link foldQuoted}) when labels
- * are given.
+ * are given, its remote images' sources taken out when `holdImages`.
  */
 export function prepareHtml(
   html: string,
-  { inertLinks, quoted }: { inertLinks: boolean; quoted?: { show: string; hide: string } },
+  { inertLinks, quoted, holdImages = false }: PrepareOptions,
 ): string {
-  if (!inertLinks && quoted === undefined) {
+  if (!inertLinks && quoted === undefined && !holdImages) {
     return html;
   }
   const doc = new DOMParser().parseFromString(html, "text/html");
   if (inertLinks) {
     stripLinks(doc);
+  }
+  if (holdImages) {
+    stripRemoteImages(doc);
   }
   if (quoted !== undefined) {
     foldQuoted(doc, quoted.show, quoted.hide);
@@ -198,6 +226,12 @@ export interface SafeHtmlProps {
   title: string;
   /** Let remote images load (the member chose "Show images"). */
   remoteImages?: boolean | undefined;
+  /**
+   * The markup came with its remote images' sources, but they are held back
+   * after all (the reader is checking a sender's trust again): the sources
+   * are taken out before the frame parses the mail.
+   */
+  holdRemoteImages?: boolean | undefined;
   /** The message's `@media` rules, filtered by the server; frame only. */
   css?: string | null | undefined;
   /** Mail that may be phishing: its links lead nowhere. */
@@ -221,6 +255,7 @@ export function SafeHtml({
   html,
   title,
   remoteImages = false,
+  holdRemoteImages = false,
   css,
   inertLinks = false,
   showQuoted,
@@ -235,13 +270,14 @@ export function SafeHtml({
       frameDocument(
         prepareHtml(html, {
           inertLinks,
+          holdImages: holdRemoteImages,
           ...(showQuoted === undefined
             ? {}
             : { quoted: { show: showQuoted, hide: hideQuoted ?? showQuoted } }),
         }),
-        remoteImages,
+        remoteImages && !holdRemoteImages,
       ),
-    [html, remoteImages, inertLinks, showQuoted, hideQuoted],
+    [html, remoteImages, holdRemoteImages, inertLinks, showQuoted, hideQuoted],
   );
   const rules = css ?? undefined;
 
