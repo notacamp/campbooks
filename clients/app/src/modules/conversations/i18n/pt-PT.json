@@ -616,6 +616,9 @@
       "action": "Escrever rascunho"
     },
     "writing": "A escrever o rascunho…",
+    "thinking": "O Scout está a pensar…",
+    "thoughts": "Como o Scout pensou",
+    "typing": "O Scout está a escrever…",
     "draftDescription": "O rascunho do Scout. Edite-o aqui ou peça uma alteração. Nada é enviado até carregar em Enviar.",
     "draftLabel": "A sua resposta",
     "shorter": "Mais curta",
@@ -638,6 +641,7 @@
     "tooLate": "Já é tarde para anular: a resposta já saiu.",
     "errors": {
       "write": "O Scout não conseguiu escrever isso agora. Tente de novo ou escreva-a você mesmo.",
+      "timeout": "O Scout demorou demasiado a responder. Tente de novo ou escreva-a você mesmo.",
       "limit": "O Scout escreveu muitas respostas nesta hora. Tente mais tarde ou escreva-a você mesmo.",
       "dailyLimit": "Este espaço de trabalho já usou a quota de IA de hoje. Escreva esta você mesmo.",
       "send": "Não foi possível enviar para {{name}}. O seu rascunho foi guardado.",

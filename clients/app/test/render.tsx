@@ -113,6 +113,10 @@ export function stubApi(routes: Record<string, { status?: number; body: unknown 
 interface MockAnswer {
   status?: number;
   body?: unknown;
+  /** Server-Sent Events text, sent as one `text/event-stream` body in these chunks. */
+  stream?: string[];
+  /** Keep the stream open after its chunks, as a reply still being written. */
+  open?: boolean;
 }
 export type MockHandler = MockAnswer | ((request: Request, body: unknown) => MockAnswer);
 
@@ -139,6 +143,23 @@ export function mockApi(routes: Record<string, MockHandler>): MockedApi {
     }
     const answer = typeof handler === "function" ? handler(request, body) : handler;
     const status = answer.status ?? 200;
+    if (answer.stream !== undefined) {
+      const encoder = new TextEncoder();
+      const chunks = answer.stream;
+      return new Response(
+        new ReadableStream<Uint8Array>({
+          start(controller) {
+            for (const chunk of chunks) {
+              controller.enqueue(encoder.encode(chunk));
+            }
+            if (answer.open !== true) {
+              controller.close();
+            }
+          },
+        }),
+        { status, headers: { "content-type": "text/event-stream" } },
+      );
+    }
     return answer.body === undefined
       ? new Response(null, { status })
       : Response.json(answer.body, {
@@ -149,6 +170,26 @@ export function mockApi(routes: Record<string, MockHandler>): MockedApi {
         });
   };
   return mocked;
+}
+
+/**
+ * A streamed reply as `conversations.stream_reply` sends it: some thinking,
+ * the words, then `done` with `text`.
+ */
+export function replyStream(
+  messageId: string,
+  text: string,
+  thinking = "Reading the message.",
+): MockAnswer {
+  const frame = (event: string, data: unknown) =>
+    `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
+  return {
+    stream: [
+      frame("thinking", { delta: thinking }) +
+        frame("text", { delta: text }) +
+        frame("done", { message_id: messageId, text }),
+    ],
+  };
 }
 
 /** A problem+json body as the API sends it. */

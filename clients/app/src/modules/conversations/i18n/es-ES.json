@@ -616,6 +616,9 @@
       "action": "Redactar"
     },
     "writing": "Redactando el borrador…",
+    "thinking": "Scout está pensando…",
+    "thoughts": "Cómo lo ha pensado Scout",
+    "typing": "Scout está escribiendo…",
     "draftDescription": "El borrador de Scout. Edítalo aquí o pide un cambio. No se envía nada hasta que pulses Enviar.",
     "draftLabel": "Tu respuesta",
     "shorter": "Más corta",
@@ -638,6 +641,7 @@
     "tooLate": "Es tarde para deshacer: la respuesta ya ha salido.",
     "errors": {
       "write": "Scout no ha podido escribir eso ahora. Inténtalo de nuevo o escríbela tú mismo.",
+      "timeout": "Scout ha tardado demasiado en responder. Inténtalo de nuevo o escríbela tú mismo.",
       "limit": "Scout ha escrito muchas respuestas en esta hora. Inténtalo más tarde o escríbela tú mismo.",
       "dailyLimit": "Este espacio de trabajo ya ha usado la cuota de IA de hoy. Escribe esta tú mismo.",
       "send": "No se ha podido enviar a {{name}}. Tu borrador se ha guardado.",

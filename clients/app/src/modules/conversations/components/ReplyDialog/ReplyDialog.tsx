@@ -1,5 +1,5 @@
 import { useQueryClient } from "@tanstack/react-query";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { problemCode } from "~/lib/api";
@@ -13,6 +13,7 @@ import {
   ReplyDraft,
   ReplyQuote,
   Text,
+  ThinkingTrace,
   useUndoToast,
   type DialogResult,
 } from "~/lib/ui";
@@ -28,7 +29,7 @@ import {
   type Draft,
 } from "../../api/drafts";
 import { useConversation, useMessageWords, type MessageView } from "../../api/queries";
-import { useReplySuggestions, writeReply } from "../../api/replies";
+import { streamReply, useReplySuggestions } from "../../api/replies";
 import { displayName, replyQuote, type QuoteWords } from "../../compose/quote";
 import { useDeleteDraft } from "../../compose/use-delete-draft";
 import type { Translate } from "../../model";
@@ -113,6 +114,8 @@ function firstName(name: string): string {
  * then), shown editable with Shorter and Change…; Send saves it as a reply
  * draft and sends it with the usual undo window. Nothing is created before
  * Send or Open in composer, and Scout's text is only ever shown as text.
+ * On the web the draft streams (campbooks-cloud#288): Scout's thinking
+ * shows as it arrives, then the reply types in.
  */
 export function ReplyDialog({
   workspaceId,
@@ -170,6 +173,7 @@ export function ReplyDialog({
   const suggestions = useReplySuggestions(workspaceId, conversationId, answered?.id, {
     enabled: resume === undefined,
   });
+  const intents = suggestions.data?.intents ?? [];
 
   const [stage, setStage] = useState<Stage>(resume === undefined ? "choose" : "draft");
   const [intent, setIntent] = useState(resume?.intent ?? "");
@@ -183,11 +187,23 @@ export function ReplyDialog({
   // draft may throw it away.
   const [handedBack, setHandedBack] = useState<Draft | undefined>(resume?.draft);
   const [rewriting, setRewriting] = useState<"shorter" | "change" | undefined>();
+  // Scout's thinking for the draft being asked for, as it arrives.
+  const [thinking, setThinking] = useState("");
+  // The reply's words are still arriving.
+  const [streaming, setStreaming] = useState(false);
   const [problem, setProblem] = useState<string | undefined>();
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<DialogResult | undefined>();
   // Answers to a question no longer asked (Back, another pick) are dropped.
   const asking = useRef(0);
+  // The request in flight, stopped by a new ask, Back, or closing.
+  const inFlight = useRef<AbortController | undefined>(undefined);
+  useEffect(() => {
+    const request = inFlight;
+    return () => {
+      request.current?.abort();
+    };
+  }, []);
   // One send or save at a time, even for two quick ⌘↵.
   const working = useRef(false);
 
@@ -212,6 +228,10 @@ export function ReplyDialog({
       case "ai_daily_limit_reached": {
         return "errors.dailyLimit";
       }
+      case "reply_timed_out":
+      case "request_timed_out": {
+        return "errors.timeout";
+      }
       default: {
         return "errors.write";
       }
@@ -228,8 +248,17 @@ export function ReplyDialog({
     }
     asking.current += 1;
     const ticket = asking.current;
+    inFlight.current?.abort();
+    const request = new AbortController();
+    inFlight.current = request;
+    const current = () => asking.current === ticket;
     const rewrite = how !== undefined;
+    // A rewrite keeps the member's text until Scout's first word, and puts
+    // it back if the rewrite fails.
+    const before = text;
+    let typing = false;
     setProblem(undefined);
+    setThinking("");
     if (rewrite) {
       setRewriting(how.shorter === true ? "shorter" : "change");
     } else {
@@ -238,43 +267,76 @@ export function ReplyDialog({
       // Pinned from the moment it is asked for.
       setPinned(target.id);
     }
-    void writeReply(workspaceId, conversationId, {
-      message_id: target.id,
-      intent: asked,
-      ...(rewrite
-        ? { draft: text, shorter: how.shorter === true, change: how.change ?? null }
-        : {}),
-    })
+    void streamReply(
+      workspaceId,
+      conversationId,
+      {
+        message_id: target.id,
+        intent: asked,
+        // The likely replies shown, so "1 and 3" means something.
+        suggestions: intents,
+        ...(rewrite
+          ? { draft: text, shorter: how.shorter === true, change: how.change ?? null }
+          : {}),
+      },
+      {
+        signal: request.signal,
+        onThinking: (delta) => {
+          if (current()) {
+            setThinking((so) => so + delta);
+          }
+        },
+        onText: (delta) => {
+          if (!current()) {
+            return;
+          }
+          if (typing) {
+            setText((so) => so + delta);
+            return;
+          }
+          typing = true;
+          setText(delta);
+          setStreaming(true);
+          setStage("draft");
+        },
+      },
+    )
       .then((written) => {
-        if (asking.current !== ticket) {
+        if (!current()) {
           return;
         }
         setText(written);
         setStage("draft");
       })
       .catch((thrown: unknown) => {
-        if (asking.current !== ticket) {
+        if (!current() || request.signal.aborted) {
           return;
         }
         setProblem(failure(thrown));
         // A failed first draft goes back to the choices (which follow the
         // newest message again); a failed rewrite keeps the text the member
         // had.
-        if (!rewrite) {
+        if (rewrite) {
+          setText(before);
+        } else {
           setStage("choose");
           setPinned(undefined);
         }
       })
       .finally(() => {
-        if (asking.current === ticket) {
+        if (current()) {
           setRewriting(undefined);
+          setStreaming(false);
         }
       });
   };
 
   const back = () => {
     asking.current += 1;
+    inFlight.current?.abort();
     setRewriting(undefined);
+    setStreaming(false);
+    setThinking("");
     setProblem(undefined);
     setStage("choose");
     setPinned(undefined);
@@ -501,12 +563,12 @@ export function ReplyDialog({
       enabled:
         drafting &&
         rewriting === undefined &&
+        !streaming &&
         result === undefined &&
         answered?.text_unread !== true,
     },
   );
 
-  const intents = suggestions.data?.intents ?? [];
   // The message answered, the one the draft replies to.
   // Still reading its words, or they could not be read: said, never an
   // empty quote shown as if there were nothing.
@@ -569,6 +631,16 @@ export function ReplyDialog({
     </Button>
   );
 
+  // What Scout is doing to the draft: typing it in, or rewriting it.
+  let busyLabel: string | undefined;
+  if (streaming) {
+    busyLabel = t("reply.typing");
+  } else if (rewriting === "shorter") {
+    busyLabel = t("reply.shortening");
+  } else if (rewriting === "change") {
+    busyLabel = t("reply.changing");
+  }
+
   const describe = (): string => {
     if (stage === "writing") {
       return t("reply.writing");
@@ -609,6 +681,7 @@ export function ReplyDialog({
               disabled={
                 busy ||
                 rewriting !== undefined ||
+                streaming ||
                 text.trim() === "" ||
                 answered?.text_unread === true
               }
@@ -619,7 +692,9 @@ export function ReplyDialog({
               {t("reply.send")}
             </Button>
             <Button
-              disabled={busy || rewriting !== undefined || answered?.text_unread === true}
+              disabled={
+                busy || rewriting !== undefined || streaming || answered?.text_unread === true
+              }
               onClick={() => {
                 void openInComposer();
               }}
@@ -628,7 +703,7 @@ export function ReplyDialog({
             </Button>
             {deletable === undefined ? null : (
               <Button
-                disabled={busy || rewriting !== undefined}
+                disabled={busy || rewriting !== undefined || streaming}
                 onClick={() => {
                   void discard();
                 }}
@@ -682,6 +757,14 @@ export function ReplyDialog({
         </div>
       ) : null}
       {quoteUnread || quoteReading ? null : quote}
+      {stage === "writing" || (drafting && thinking !== "") ? (
+        <ThinkingTrace
+          label={t("reply.thinking")}
+          text={thinking}
+          live={stage === "writing" || (rewriting !== undefined && !streaming)}
+          summary={t("reply.thoughts")}
+        />
+      ) : null}
       {stage === "choose" ? (
         <>
           {problemLine}
@@ -717,19 +800,13 @@ export function ReplyDialog({
             label={t("reply.draftLabel")}
             value={text}
             onChange={setText}
-            busy={rewriting !== undefined}
-            busyLabel={
-              rewriting === "shorter"
-                ? t("reply.shortening")
-                : rewriting === "change"
-                  ? t("reply.changing")
-                  : undefined
-            }
+            busy={rewriting !== undefined || streaming}
+            busyLabel={busyLabel}
             tools={
               <>
                 <Button
                   ai
-                  disabled={busy || rewriting !== undefined || text.trim() === ""}
+                  disabled={busy || rewriting !== undefined || streaming || text.trim() === ""}
                   onClick={() => {
                     write(intent, { shorter: true });
                   }}
@@ -749,7 +826,7 @@ export function ReplyDialog({
             placeholder={t("reply.change.placeholder")}
             action={t("reply.change.action")}
             maxLength={MAX_ASK_CHARS}
-            disabled={busy || rewriting !== undefined || text.trim() === ""}
+            disabled={busy || rewriting !== undefined || streaming || text.trim() === ""}
             onSubmit={(change) => {
               write(intent, { change });
             }}

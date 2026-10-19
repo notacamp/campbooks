@@ -27,7 +27,7 @@ import {
 import { NOW, W } from "../../../../../test/demo/conversations";
 import { REPLY } from "../../../../../test/demo/drafts";
 import { DUARTE } from "../../../../../test/demo/workspaces";
-import { mockApi, problem, renderWithProviders } from "../../../../../test/render";
+import { mockApi, problem, renderWithProviders, replyStream } from "../../../../../test/render";
 
 import { WhatNeedsYou } from "./WhatNeedsYou";
 
@@ -72,9 +72,10 @@ function api(items = ITEMS, live?: { items: typeof ITEMS }) {
         intents: ["Say Thursday works", "Ask to move it"],
       },
     },
-    [`POST ${W}/conversations/${MARTA.id}/reply/draft`]: {
-      body: { message_id: MARTA_DETAIL.messages.at(-1)?.id, text: MARTA_REPLY },
-    },
+    [`POST ${W}/conversations/${MARTA.id}/reply/draft/stream`]: replyStream(
+      MARTA_DETAIL.messages.at(-1)?.id ?? "",
+      MARTA_REPLY,
+    ),
     [`POST ${W}/drafts`]: { status: 201, body: MARTA_DRAFT },
     [`POST ${W}/drafts/${MARTA_DRAFT.id}/send`]: {
       status: 202,
@@ -490,7 +491,7 @@ describe("What needs you", () => {
       calls.calls.find((c) => c.route === `POST ${W}/conversations/${MARTA.id}/reply/suggestions`)
         ?.body,
     ).toEqual({ message_id: MARTA_DETAIL.messages.at(-1)?.id });
-    expect(calls.calls.some((c) => c.route.endsWith("/reply/draft"))).toBe(false);
+    expect(calls.calls.some((c) => c.route.endsWith("/reply/draft/stream"))).toBe(false);
     fireEvent.click(screen.getByRole("button", { name: /Write my own/u }));
     await waitFor(() => {
       expect(router.state.location.pathname).toBe(`/w/${DUARTE.id}/inbox/primary/${MARTA.id}`);
