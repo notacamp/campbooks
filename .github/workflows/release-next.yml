@@ -3,10 +3,11 @@ name: Release next
 # Versioned releases of `next`, in the `next-v<semver>` namespace so they never
 # collide with the Rails `v0.x.y` tags owned by `main` (until cutover).
 #
-# A release is cut by merging a PR that bumps `VERSION` (and the workspace
-# version in Cargo.toml) and rolls CHANGELOG.md `[Unreleased]` into a dated
-# `## [next-vX.Y.Z]` section (CONTRIBUTING.md → Releases). When CI is green on
-# that commit, this workflow:
+# A release is cut by merging the PR that `.github/scripts/changelog.sh release`
+# prepares: it bumps `VERSION` (and the workspace version in Cargo.toml) and
+# gathers the entry files under changelog/unreleased/ into a dated
+# `## [next-vX.Y.Z]` section of CHANGELOG.md (CONTRIBUTING.md → Releases).
+# When CI is green on that commit, this workflow:
 #
 #   1. sees `next-vX.Y.Z` does not exist yet and the changelog section does
 #   2. builds + scans + attests the image as :next-vX.Y.Z and :next-vX.Y
@@ -15,7 +16,7 @@ name: Release next
 #   3. creates the tag and a GitHub PRERELEASE with the changelog as notes
 #
 # It never commits to `next`: the branch ruleset needs checks on every commit,
-# so a bot cannot push the changelog roll. The roll is part of the bump PR and
+# so a bot cannot push the changelog. The release section is part of the PR and
 # the Policy check verifies it. Tags are created only after the image passed
 # Trivy, so a failed scan leaves nothing to clean up; re-run the workflow.
 #
@@ -132,8 +133,18 @@ jobs:
           LAYA_DIGEST: ${{ needs.laya-image.outputs.digest }}
           IMAGE: ghcr.io/${{ github.repository }}
         run: |
+          # GitHub refuses release notes over 125,000 characters. Keep whole
+          # entries up to ~100 kB and link the rest (the section in
+          # CHANGELOG.md at the tag is always complete).
+          .github/scripts/release-notes.sh "$VERSION" > "$RUNNER_TEMP/section.md"
           {
-            .github/scripts/release-notes.sh "$VERSION"
+            if [ "$(wc -c < "$RUNNER_TEMP/section.md")" -le 100000 ]; then
+              cat "$RUNNER_TEMP/section.md"
+            else
+              awk '{ size += length($0) + 1 } size > 100000 && /^- / { exit } { print }' "$RUNNER_TEMP/section.md"
+              printf '\n…and more: [the full %s notes](%s/%s/blob/%s/CHANGELOG.md).\n' \
+                "$TAG" "$GITHUB_SERVER_URL" "$GITHUB_REPOSITORY" "$TAG"
+            fi
             printf '\n---\n\nImage: `%s:%s` (`%s@%s`), linux/amd64 + linux/arm64.\n' \
               "$IMAGE" "$TAG" "$IMAGE" "$DIGEST"
             printf 'Laya model server (optional, the `decide` role): `%s-laya:%s` (`%s-laya@%s`).\n' \
