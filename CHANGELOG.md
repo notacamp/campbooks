@@ -8,6 +8,10 @@ All notable changes to Campbooks Next are documented here. The format follows
 
 ### Added
 
+- **Home says how long each thing has waited.** Every row on Home now shows its age at the
+  end of the line, above its due date: "12 minutes ago", "5 hours ago", "Yesterday", "4
+  days ago", then the date once it is a week old ("2 Oct"). Hover it for the full date and
+  time.
 - **Usage analytics, without a tracking script (off by default).** An instance can count
   which screens people use in its own Matomo (`CAMPBOOKS_ANALYTICS__MATOMO_URL`,
   `__MATOMO_SITE_ID` and `__MATOMO_VISITOR_KEY`, all three or nothing). The app loads no
@@ -93,6 +97,10 @@ All notable changes to Campbooks Next are documented here. The format follows
 
 ### Fixed
 
+- **The arrow keys open Home's items, as a click does.** Moving with ↑/↓ or J/K on Home now
+  opens the item you land on (Scout's summary and the email), instead of only selecting it.
+  Enter or Esc closes it. When you finish the open item, the next one opens in its place,
+  so you can read and clear Home one item at a time.
 - **A reply or forward never quotes nothing.** When an email's words were too slow to read
   in time (a very large or heavy HTML email), the conversation arrives without them; Reply,
   Reply all, Forward and Home's Forward picker now read them first, saying "Reading the email
