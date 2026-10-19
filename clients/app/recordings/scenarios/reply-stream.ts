@@ -21,7 +21,7 @@ import { caption } from "./inbox.ts";
  * The page's stand-in for the BFF, installed before the app loads. A script
  * string: the recordings are type-checked without the DOM types.
  */
-const FAKE_BFF = `(() => {
+const FAKE_BFF = String.raw`(() => {
   const original = window.fetch.bind(window);
   const demo = Promise.all([
     import("/test/demo/attention.ts"),
@@ -29,7 +29,7 @@ const FAKE_BFF = `(() => {
     import("/test/demo/workspaces.ts"),
   ]);
   const sleep = (ms) => new Promise((done) => setTimeout(done, ms));
-  const frame = (event, data) => "event: " + event + "\\ndata: " + JSON.stringify(data) + "\\n\\n";
+  const frame = (event, data) => "event: " + event + "\ndata: " + JSON.stringify(data) + "\n\n";
   const json = (body, status = 200) => Response.json(body, { status });
   let drafts = 0;
   const THINKING = [
@@ -47,9 +47,9 @@ const FAKE_BFF = `(() => {
     ],
   ];
   const REPLIES = [
-    "Hi Marta,\\n\\nThursday works for me. See you at the walkthrough at 10:00.\\n\\nBest,\\nSam",
-    "Hi Marta,\\n\\nThank you, it's lovely to hear from you! Thursday should work for me. " +
-      "I'll confirm by tomorrow once I've checked the morning.\\n\\nBest,\\nSam",
+    "Hi Marta,\n\nThursday works for me. See you at the walkthrough at 10:00.\n\nBest,\nSam",
+    "Hi Marta,\n\nThank you, it's lovely to hear from you! Thursday should work for me. " +
+      "I'll confirm by tomorrow once I've checked the morning.\n\nBest,\nSam",
   ];
   function stream(messageId) {
     const turn = Math.min(drafts, THINKING.length - 1);
@@ -68,7 +68,7 @@ const FAKE_BFF = `(() => {
             await sleep(250);
           }
           const reply = REPLIES[turn];
-          for (const word of reply.split(/(?<=[ \\n])/u)) {
+          for (const word of reply.split(/(?<=[ \n])/u)) {
             send("text", { delta: word });
             await sleep(70);
           }
