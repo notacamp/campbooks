@@ -5,14 +5,29 @@ import type { Schema } from "~/lib/api";
 
 import type { ItemView, Reason } from "./api/queries";
 
-/** The groups, in the order Home shows them. */
-const REASONS: readonly Reason[] = ["review", "reply", "decide", "do", "pay", "worth_a_look"];
+/**
+ * The groups, in the order Home shows them. A wait (`waiting`) is never in
+ * the queue: Home lists it under "Waiting on others" until it turns into a
+ * nudge (campbooks-cloud#293).
+ */
+const REASONS: readonly Reason[] = [
+  "review",
+  "reply",
+  "decide",
+  "do",
+  "pay",
+  "nudge",
+  "worth_a_look",
+];
 
 /**
  * The signal colour of a group: its reason's, except "Worth a look", which
- * has a hue of its own (`look`).
+ * has a hue of its own (`look`), and a wait, which shares the nudge's.
  */
-export function signalOf(reason: Reason): Exclude<Reason, "worth_a_look"> | "look" {
+export function signalOf(reason: Reason): Exclude<Reason, "worth_a_look" | "waiting"> | "look" {
+  if (reason === "waiting") {
+    return "nudge";
+  }
   return reason === "worth_a_look" ? "look" : reason;
 }
 
@@ -74,15 +89,17 @@ export type OwnActionId =
   | "remind"
   | "remind_when"
   | "open_attachment"
-  | "forward";
+  | "forward"
+  | "nudge";
 export type UniversalActionId = "done" | "snooze" | "not_needed";
 
 /**
  * What a row is: a question, a warning, a bill Campbooks asks about ("Is it
  * paid?"), a bill the member said is still to pay, mail a rule they taught
- * keeps in front of them until opened ("Worth a look"), or any other need.
+ * keeps in front of them until opened ("Worth a look"), someone who has not
+ * written back yet (a nudge), or any other need.
  */
-export type RowKind = "question" | "warning" | "need" | "bill" | "toPay" | "highlight";
+export type RowKind = "question" | "warning" | "need" | "bill" | "toPay" | "highlight" | "nudge";
 
 /**
  * The actions Home offers for a need today. A question (`check`) is
@@ -121,6 +138,11 @@ export function rowActionIds(kind: RowKind): {
     // needed" about, the rule that raised it is theirs.
     case "highlight": {
       return { own: [], universal: ["done", "snooze"] };
+    }
+    // Someone has not written back: Nudge them (Scout drafts it), Heard
+    // from them (its Done), Later, or Not waiting (its not needed).
+    case "nudge": {
+      return { own: ["nudge"], universal: ["done", "snooze", "not_needed"] };
     }
   }
 }
@@ -174,6 +196,10 @@ export function doneTodayKind(item: ItemView): {
     }
     case "archived": {
       return { key: "doneToday.archived", undo: undefined };
+    }
+    // The person Scout waited on wrote (campbooks-cloud#293).
+    case "heard_back": {
+      return { key: "doneToday.heardBack", undo: undefined };
     }
     default: {
       return { key: "doneToday.gone", undo: undefined };
@@ -249,7 +275,8 @@ export function rowChoices(
     picked: false,
   };
   // Only a missing key means "not rated": `null` never comes from the server.
-  if (ranked === undefined || kind === "question" || kind === "highlight") {
+  // The catalogue rates nothing for a wait: a nudge keeps its own actions.
+  if (ranked === undefined || kind === "question" || kind === "highlight" || kind === "nudge") {
     return fallback;
   }
   const own: OwnChoice[] = [];
@@ -285,11 +312,14 @@ const HOUR_MS = 60 * 60 * 1000;
  * minutes ago" and "3 hours ago" the same day, "Yesterday" and "4 days ago"
  * in the week after, the date from a week on ("12 Oct", with the year when it
  * is another year's). `label` is the full date and time, for the tooltip.
+ * With `asDate`, always the date, for a sentence that names the day ("Asked
+ * 14 Oct").
  */
 export function ageLabel(
   since: string,
   now: Date,
   locale: string,
+  { asDate = false }: { asDate?: boolean } = {},
 ): { text: string; dateTime: string; label: string } {
   const at = new Date(since);
   const label = new Intl.DateTimeFormat(locale, { dateStyle: "full", timeStyle: "short" }).format(
@@ -302,7 +332,13 @@ export function ageLabel(
     new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime();
   const days = Math.round((midnight(now) - midnight(at)) / (24 * HOUR_MS));
   let text: string;
-  if (ms < 60_000) {
+  if (asDate) {
+    text = new Intl.DateTimeFormat(locale, {
+      day: "numeric",
+      month: "short",
+      ...(at.getFullYear() === now.getFullYear() ? {} : { year: "numeric" }),
+    }).format(at);
+  } else if (ms < 60_000) {
     // "Now", not "this minute".
     text = relative.format(0, "second");
   } else if (days <= 0 && ms < HOUR_MS) {

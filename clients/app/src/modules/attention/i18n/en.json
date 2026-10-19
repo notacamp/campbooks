@@ -5,7 +5,9 @@
     "count_other": "{{count}} things need you",
     "subline": "Campbooks reads your mail and keeps here what asks something of you.",
     "clear": "Nothing needs you",
-    "clearSubline": "Nothing in your mail asks anything of you right now. Campbooks keeps reading."
+    "clearSubline": "Nothing in your mail asks anything of you right now. Campbooks keeps reading.",
+    "waiting_one": "Scout is also waiting on {{count}} person for you.",
+    "waiting_other": "Scout is also waiting on {{count}} people for you."
   },
   "groups": {
     "review": "Review",
@@ -13,7 +15,8 @@
     "decide": "Decide",
     "do": "Do",
     "pay": "Pay",
-    "worth_a_look": "Worth a look"
+    "worth_a_look": "Worth a look",
+    "nudge": "Nudge"
   },
   "context": "Done today",
   "doneTodayTitle": "Done today",
@@ -24,7 +27,8 @@
     "replied": "Replied · {{subject}}",
     "archived": "Archived · {{subject}}",
     "snoozed": "Snoozed · {{subject}}",
-    "gone": "No longer needed · {{subject}}"
+    "gone": "No longer needed · {{subject}}",
+    "heardBack": "Heard back · {{subject}}"
   },
   "snooze": {
     "title": "Snooze {{name}} until…",
@@ -48,7 +52,8 @@
     "forward": "Forward…",
     "combo": "{{first}}, then {{second}}",
     "picked": "Scout picked these for this email",
-    "noAttachment": "This email has no file to open."
+    "noAttachment": "This email has no file to open.",
+    "nudge": "Nudge {{name}}…"
   },
   "confirm": {
     "done": "Done · {{name}}",
@@ -58,7 +63,10 @@
     "replied": "Sending to {{name}}",
     "paid": "Marked paid · {{name}}",
     "reported": "Reported · {{name}}",
-    "seen": "Seen · {{name}}"
+    "seen": "Seen · {{name}}",
+    "nudged": "Nudged {{name}}",
+    "heardBack": "Heard from {{name}}",
+    "notWaiting": "Not waiting on {{name}}"
   },
   "error": {
     "title": "Could not load what needs you",
@@ -79,5 +87,20 @@
     "allPaid_one": "{{count}} already paid",
     "allPaid_other": "All {{count}} already paid",
     "note": "Campbooks can’t see your bank, so it asks whether each invoice is paid."
+  },
+  "nudge": {
+    "note": "People who haven’t written back yet. Scout drafts the nudge, you send it.",
+    "asked": "Asked {{date}}",
+    "nudged_one": "Nudged once",
+    "nudged_other": "Nudged {{count}} times"
+  },
+  "waiting": {
+    "title": "Waiting on others",
+    "sub": "Scout tells you if they go quiet.",
+    "checks": "Checks {{day}}",
+    "nudgeNow": "Nudge now",
+    "notWaiting": "Not waiting",
+    "label": "Waiting on {{name}}",
+    "fold": "Waiting on others · {{count}}"
   }
 }

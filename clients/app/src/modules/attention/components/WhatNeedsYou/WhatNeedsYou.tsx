@@ -1,5 +1,13 @@
 import { useNavigate } from "@tanstack/react-router";
-import { Fragment, useEffect, useEffectEvent, useRef, useState, type ReactNode } from "react";
+import {
+  Fragment,
+  useEffect,
+  useEffectEvent,
+  useRef,
+  useState,
+  useSyncExternalStore,
+  type ReactNode,
+} from "react";
 import { useTranslation } from "react-i18next";
 
 import { useShortcut } from "~/lib/shortcuts";
@@ -8,6 +16,7 @@ import {
   Button,
   Dialog,
   DialogChoices,
+  Disclosure,
   EmptyState,
   focusNextAttachment,
   HomeLayout,
@@ -24,6 +33,7 @@ import {
   type ItemAction,
 } from "~/lib/ui";
 import {
+  awaitedOf,
   billKind,
   dueLabel,
   ForwardDialog,
@@ -32,6 +42,7 @@ import {
   needMessageOf,
   needSender,
   needSentence,
+  NudgeDialog,
   quoteAttribution,
   ReplyDialog,
   ScoutNoticed,
@@ -43,6 +54,7 @@ import {
   warningReasons,
   type ConversationSummary,
   type NeedView,
+  type NudgeResume,
   type ReplyResume,
 } from "~/modules/conversations";
 
@@ -60,6 +72,8 @@ import {
   type RowKind,
   type UniversalActionId,
 } from "../../model";
+
+import { WaitingOnOthers, type WaitingRow } from "./WaitingOnOthers";
 
 /** `t` for keys only known at runtime. */
 type Translate = (key: string, options?: Record<string, unknown>) => string;
@@ -88,6 +102,7 @@ interface Row {
   item: ItemView;
   conversation: ConversationSummary;
   need: NeedView;
+  /** Who it is from; for a nudge, who has not written yet. */
   name: string;
   /** Acted on: the one-line confirmation it shows while it folds away. */
   confirmation?: string | undefined;
@@ -97,13 +112,72 @@ interface Row {
 
 type ActionId = OwnActionId | UniversalActionId;
 
+/** Done's confirmation on a row, by kind ("Done · Marta Ferreira" otherwise). */
+const DONE_CONFIRMATION: Partial<Record<RowKind, string>> = {
+  highlight: "confirm.seen",
+  nudge: "confirm.heardBack",
+};
+
+/** Not needed's confirmation on a row, by kind ("Not needed · Marta Ferreira" otherwise). */
+const NOT_NEEDED_CONFIRMATION: Partial<Record<RowKind, string>> = {
+  warning: "confirm.safe",
+  nudge: "confirm.notWaiting",
+};
+
+/** Done's label on a row, by kind (Done otherwise). */
+const DONE_LABEL: Partial<Record<RowKind, string>> = {
+  highlight: "needs.actions.seen",
+  nudge: "needs.actions.heardBack",
+};
+
+/** What the nudge dialog nudges: a Home row, or a row of Waiting on others. */
+interface NudgeTarget {
+  conversation: ConversationSummary;
+  need: NeedView;
+  name: string;
+  /** The Home row it came from, which folds away once the nudge is sent. */
+  row?: Row | undefined;
+}
+
 /** The steps that open a dialog: a pair runs at most one of them. */
-const DIALOG_STEPS: ReadonlySet<ActionId> = new Set(["reply", "remind_when", "forward", "snooze"]);
+const DIALOG_STEPS: ReadonlySet<ActionId> = new Set([
+  "reply",
+  "remind_when",
+  "forward",
+  "snooze",
+  "nudge",
+]);
+
+/** Below 48rem, Waiting on others is a fold after the list rather than in the aside. */
+const NARROW = "(width < 48rem)";
+
+function subscribeNarrow(change: () => void): () => void {
+  if (typeof globalThis.matchMedia !== "function") {
+    return () => undefined;
+  }
+  const query = globalThis.matchMedia(NARROW);
+  query.addEventListener("change", change);
+  return () => {
+    query.removeEventListener("change", change);
+  };
+}
+
+const isNarrow = () =>
+  typeof globalThis.matchMedia === "function" && globalThis.matchMedia(NARROW).matches;
+
+/** "Ana", for a button ("Nudge Ana…"); an address stays whole. */
+const firstNameOf = (name: string) =>
+  name.includes("@") ? name : (name.split(/\s+/u, 1)[0] ?? name);
 
 /** What an own action needs to work in an inbox the member may only read. */
 const READ_ONLY_STEPS: ReadonlySet<OwnActionId> = new Set(["remind_when", "open_attachment"]);
 
 const kindOf = (need: NeedView): RowKind => {
+  // Someone has not written back: whatever its trust, the member is asked
+  // nothing but whether to nudge them.
+  if (need.reason === "nudge" || need.reason === "waiting") {
+    return "nudge";
+  }
   if (need.question === "suspicious") {
     return "warning";
   }
@@ -138,6 +212,10 @@ export function WhatNeedsYou({ workspaceId, now, offer }: WhatNeedsYouProps) {
 
   const open = useAttention(workspaceId, "open");
   const cleared = useAttention(workspaceId, "cleared");
+  // Who Scout waits on for the member (campbooks-cloud#293): never in the
+  // queue, listed under Waiting on others until it turns into a nudge.
+  const waits = useAttention(workspaceId, "waiting");
+  const narrow = useSyncExternalStore(subscribeNarrow, isNarrow, () => false);
   const refresh = useRefreshAttention(workspaceId);
   const snooze = useSnooze(workspaceId);
 
@@ -148,9 +226,11 @@ export function WhatNeedsYou({ workspaceId, now, offer }: WhatNeedsYouProps) {
   const openItems = open.data?.items ?? [];
 
   const clearedItems = cleared.data?.items ?? [];
+  // Only waits, whatever else a list holds.
+  const waitItems = (waits.data?.items ?? []).filter((item) => item.reason === "waiting");
   const ids = [
     ...new Set(
-      [...openItems, ...clearedItems]
+      [...openItems, ...clearedItems, ...waitItems]
         .filter((item) => item.record.type === CONVERSATION)
         .map((item) => item.record.id),
     ),
@@ -177,7 +257,8 @@ export function WhatNeedsYou({ workspaceId, now, offer }: WhatNeedsYouProps) {
     if (conversation === undefined || need === null || need === undefined) {
       return [];
     }
-    return [{ item, conversation, need, name: needSender(need, conversation) }];
+    const name = awaitedOf(need, conversation)?.name ?? needSender(need, conversation);
+    return [{ item, conversation, need, name }];
   });
   const rows = shown.filter((row) => row.confirmation === undefined);
   const groups = groupByReason(shown.map((row) => row.item)).map((group) => ({
@@ -206,6 +287,13 @@ export function WhatNeedsYou({ workspaceId, now, offer }: WhatNeedsYouProps) {
     { row: Row; resume?: ReplyResume | undefined; opened: number } | undefined
   >();
   const replies = useRef(0);
+  // The nudge dialog's conversation, and the draft to pick up again after an undone send.
+  const [nudging, setNudging] = useState<
+    { target: NudgeTarget; resume?: NudgeResume | undefined; opened: number } | undefined
+  >();
+  // Waits the member said they are not waiting on, hidden while the server
+  // catches up; keyed by the wait's message, so a later wait shows.
+  const [waitsGone, setWaitsGone] = useState<ReadonlySet<string>>(new Set());
   const inboxes = useInboxes(workspaceId).data;
   const foundAt = order.findIndex((row) => row.item.id === selection.id);
   if (order.length > 0 && (foundAt === -1 || foundAt !== selection.index)) {
@@ -240,13 +328,14 @@ export function WhatNeedsYou({ workspaceId, now, offer }: WhatNeedsYouProps) {
       highlight !== undefined ||
       snoozing !== undefined ||
       replying !== undefined ||
-      forwarding !== undefined
+      forwarding !== undefined ||
+      nudging !== undefined
     ) {
       return;
     }
     focusFollows.current = false;
     document.getElementById(itemId(selectedId))?.focus({ preventScroll: true });
-  }, [selectedId, highlight, snoozing, replying, forwarding]);
+  }, [selectedId, highlight, snoozing, replying, forwarding, nudging]);
 
   const select = (id: string) => {
     setSelection({
@@ -291,24 +380,42 @@ export function WhatNeedsYou({ workspaceId, now, offer }: WhatNeedsYouProps) {
   // it needs nothing.
   const rowOf = (conversation: ConversationSummary) =>
     [...rows, ...gone.values()].find((row) => row.conversation.id === conversation.id);
+  // A row of Waiting on others, hidden or shown again with its verdict.
+  const showWait = (conversation: ConversationSummary, shown: boolean) => {
+    const key = waitKey(conversation);
+    setWaitsGone((current) => {
+      const next = new Set(current);
+      if (shown) {
+        next.delete(key);
+      } else {
+        next.add(key);
+      }
+      return next;
+    });
+  };
   const ahead = useAheadOffer(workspaceId);
   const needActions = useNeedActions(workspaceId, {
     onChanged: refresh,
     onUndo: (conversation) => {
       // Undone (Already paid, Report and delete…): no offer about it.
       ahead.cancel(conversation.id);
+      showWait(conversation, true);
       const row = rowOf(conversation);
       if (row !== undefined) {
         show(row);
       }
     },
     onRedo: (conversation) => {
+      if (conversation.need?.reason === "waiting") {
+        showWait(conversation, false);
+      }
       const row = rowOf(conversation);
       if (row !== undefined) {
         hide(row);
       }
     },
     onFailed: (conversation) => {
+      showWait(conversation, true);
       const row = rowOf(conversation);
       if (row !== undefined) {
         show(row);
@@ -333,15 +440,14 @@ export function WhatNeedsYou({ workspaceId, now, offer }: WhatNeedsYouProps) {
     }).format(until);
 
   const done = (row: Row) => {
-    hide(
-      row,
-      t(kindOf(row.need) === "highlight" ? "confirm.seen" : "confirm.done", { name: row.name }),
-    );
+    hide(row, t(DONE_CONFIRMATION[kindOf(row.need)] ?? "confirm.done", { name: row.name }));
     needActions.done(row.conversation);
   };
   const notNeeded = (row: Row) => {
-    const warning = kindOf(row.need) === "warning";
-    hide(row, t(warning ? "confirm.safe" : "confirm.notNeeded", { name: row.name }));
+    hide(
+      row,
+      t(NOT_NEEDED_CONFIRMATION[kindOf(row.need)] ?? "confirm.notNeeded", { name: row.name }),
+    );
     needActions.notNeeded(row.conversation);
   };
   const confirm = (row: Row) => {
@@ -437,7 +543,14 @@ export function WhatNeedsYou({ workspaceId, now, offer }: WhatNeedsYouProps) {
     const inbox = inboxes.find((candidate) => candidate.id === row.conversation.inbox_id);
     return inbox !== undefined && !inbox.read_only && inbox.role !== "reader";
   };
-  const openConversation = (row: Row) => {
+  // Nudge: Scout's few lines to the person not written yet, in a dialog over Home.
+  const nudge = (target: NudgeTarget, resume?: NudgeResume) => {
+    keepFocus();
+    setHighlight(undefined);
+    replies.current += 1;
+    setNudging({ target, resume, opened: replies.current });
+  };
+  const openConversation = (row: { conversation: ConversationSummary }) => {
     void navigate({
       to: "/w/$workspaceId/inbox/$stream/$conversationId",
       params: {
@@ -446,6 +559,21 @@ export function WhatNeedsYou({ workspaceId, now, offer }: WhatNeedsYouProps) {
         conversationId: row.conversation.id,
       },
     });
+  };
+
+  // A row's end: how long it has waited above its due date. A nudge says
+  // when it was asked ("Asked 14 Oct") and how many nudges went.
+  const rowEnd = (row: Row) => {
+    if (kindOf(row.need) !== "nudge") {
+      return dueLabel(tc, row.need, i18n.language, now);
+    }
+    const nudges = row.need.nudges ?? 0;
+    return nudges > 0 ? { text: t("nudge.nudged", { count: nudges }), soon: false } : undefined;
+  };
+  const rowAge = (row: Row) => {
+    const asked = kindOf(row.need) === "nudge";
+    const age = ageLabel(row.item.since, now ?? new Date(), i18n.language, { asDate: asked });
+    return asked ? { ...age, text: t("nudge.asked", { date: age.text }) } : age;
   };
 
   const reminder = (row: Row) => remindTime(row.need.due_on, now ?? new Date());
@@ -521,6 +649,9 @@ export function WhatNeedsYou({ workspaceId, now, offer }: WhatNeedsYouProps) {
         case "forward": {
           return t("actions.forward");
         }
+        case "nudge": {
+          return t("actions.nudge", { name: firstNameOf(row.name) });
+        }
       }
     };
     const choiceLabel = (choice: OwnChoice): string => {
@@ -530,17 +661,17 @@ export function WhatNeedsYou({ workspaceId, now, offer }: WhatNeedsYouProps) {
         : t("actions.combo", { first: first ?? "", second });
     };
     const universalLabel: Record<UniversalActionId, string> = {
-      done: tc(kind === "highlight" ? "needs.actions.seen" : "needs.actions.done"),
+      done: tc(DONE_LABEL[kind] ?? "needs.actions.done"),
       snooze: t("snooze.button"),
-      not_needed: tc("needs.actions.notNeeded"),
+      not_needed: tc(kind === "nudge" ? "needs.actions.notWaiting" : "needs.actions.notNeeded"),
     };
     const own = choices.slice(0, CHOICE_KEYS.length);
     return {
       own: own.map((choice, index) => ({
         id: choice.id,
         label: choiceLabel(choice),
-        // Reply asks Scout for likely replies: the visor marks it.
-        ai: choice.steps.includes("reply"),
+        // Reply asks Scout for likely replies, Nudge for the nudge: the visor marks them.
+        ai: choice.steps.includes("reply") || choice.steps.includes("nudge"),
         key: CHOICE_KEYS[index] ?? "item.choice1",
       })),
       universal: universal.map((id) => ({
@@ -607,6 +738,10 @@ export function WhatNeedsYou({ workspaceId, now, offer }: WhatNeedsYouProps) {
       }
       case "forward": {
         forward(row);
+        return;
+      }
+      case "nudge": {
+        nudge({ conversation: row.conversation, need: row.need, name: row.name, row });
         return;
       }
       case "no":
@@ -835,20 +970,74 @@ export function WhatNeedsYou({ workspaceId, now, offer }: WhatNeedsYouProps) {
   // it is where the list would be. Never while the list loads.
   const noticed = loading ? null : <ScoutNoticed workspaceId={workspaceId} />;
 
-  const aside = (
-    <AsideSection title={t("doneTodayTitle")}>
-      <DoneToday
-        items={clearedItems}
-        byId={byId}
+  // Who Scout waits on, soonest check first (the server's order), less the
+  // ones the member just said they are not waiting on.
+  const waiting = waitItems.flatMap((item) => {
+    const conversation = byId.get(item.record.id);
+    const need = conversation?.need;
+    if (
+      conversation === undefined ||
+      need === null ||
+      need === undefined ||
+      need.reason !== "waiting" ||
+      waitsGone.has(waitKey(conversation))
+    ) {
+      return [];
+    }
+    const name = awaitedOf(need, conversation)?.name ?? needSender(need, conversation);
+    const row: WaitingRow = {
+      id: item.id,
+      name,
+      subject: conversation.subject === "" ? t("noSubject") : conversation.subject,
+      checks: checksLabel(item.due_on, today, i18n.language, t),
+      checksOn: checksDate(item.due_on, i18n.language),
+      nudges: need.nudges ?? 0,
+    };
+    return [{ row, target: { conversation, need, name } }];
+  });
+  const waitingList =
+    waiting.length === 0 ? null : (
+      <WaitingOnOthers
+        rows={waiting.map((wait) => wait.row)}
         t={t}
-        onReopen={(conversation) => {
-          needActions.reopen(conversation);
+        onNudge={(row) => {
+          const wait = waiting.find((each) => each.row.id === row.id);
+          if (wait !== undefined) {
+            nudge(wait.target);
+          }
         }}
-        onUnsnooze={(item) => {
-          snooze.mutate({ item: item.id, until: undefined });
+        onNotWaiting={(row) => {
+          const wait = waiting.find((each) => each.row.id === row.id);
+          if (wait !== undefined) {
+            showWait(wait.target.conversation, false);
+            needActions.notNeeded(wait.target.conversation);
+          }
         }}
       />
-    </AsideSection>
+    );
+
+  const aside = (
+    <>
+      {narrow || waitingList === null ? null : (
+        <AsideSection title={t("waiting.title")}>
+          <LineMeta>{t("waiting.sub")}</LineMeta>
+          {waitingList}
+        </AsideSection>
+      )}
+      <AsideSection title={t("doneTodayTitle")}>
+        <DoneToday
+          items={clearedItems}
+          byId={byId}
+          t={t}
+          onReopen={(conversation) => {
+            needActions.reopen(conversation);
+          }}
+          onUnsnooze={(item) => {
+            snooze.mutate({ item: item.id, until: undefined });
+          }}
+        />
+      </AsideSection>
+    </>
   );
 
   if (open.isError) {
@@ -879,7 +1068,10 @@ export function WhatNeedsYou({ workspaceId, now, offer }: WhatNeedsYouProps) {
         visor={loading ? "reading" : count === 0 ? "happy" : review ? "alert" : "idle"}
         dateLine={dateLine}
         title={loading ? t("title") : count === 0 ? t("hero.clear") : t("hero.count", { count })}
-        subline={count === 0 && !loading ? t("hero.clearSubline") : t("hero.subline")}
+        subline={[
+          count === 0 && !loading ? t("hero.clearSubline") : t("hero.subline"),
+          ...(waiting.length > 0 ? [t("hero.waiting", { count: waiting.length })] : []),
+        ].join(" ")}
       />
       {offer}
       {loading ? <SkeletonList rows={4} /> : null}
@@ -893,7 +1085,13 @@ export function WhatNeedsYou({ workspaceId, now, offer }: WhatNeedsYouProps) {
                 signal={signalOf(group.reason)}
                 name={t(`groups.${group.reason}`)}
                 count={live.length}
-                note={bills.length > 0 ? t("pay.note") : undefined}
+                note={
+                  bills.length > 0
+                    ? t("pay.note")
+                    : group.reason === "nudge"
+                      ? t("nudge.note")
+                      : undefined
+                }
                 action={
                   bills.length > 1 ? (
                     <Button
@@ -908,7 +1106,7 @@ export function WhatNeedsYou({ workspaceId, now, offer }: WhatNeedsYouProps) {
                 }
               >
                 {group.rows.map((row) => {
-                  const due = dueLabel(tc, row.need, i18n.language, now);
+                  const due = rowEnd(row);
                   const expanded = expandedId === row.item.id;
                   const isSelected = row.item.id === selected?.item.id;
                   const actions = isSelected ? actionsOf(row) : undefined;
@@ -917,7 +1115,13 @@ export function WhatNeedsYou({ workspaceId, now, offer }: WhatNeedsYouProps) {
                       key={row.item.id}
                       id={itemId(row.item.id)}
                       who={row.name}
-                      what={needSentence(tc, row.need, row.name, { locale: i18n.language, now })}
+                      what={needSentence(
+                        tc,
+                        row.need,
+                        row.name,
+                        { locale: i18n.language, now },
+                        row.conversation,
+                      )}
                       excerpt={row.need.quote?.text}
                       avatar={{
                         name: row.name,
@@ -928,7 +1132,7 @@ export function WhatNeedsYou({ workspaceId, now, offer }: WhatNeedsYouProps) {
                       }}
                       due={due?.text}
                       soon={due?.soon === true}
-                      age={ageLabel(row.item.since, now ?? new Date(), i18n.language)}
+                      age={rowAge(row)}
                       selected={isSelected}
                       expanded={expanded}
                       confirmation={row.confirmation}
@@ -986,6 +1190,11 @@ export function WhatNeedsYou({ workspaceId, now, offer }: WhatNeedsYouProps) {
         })}
         {groups.length === 0 ? noticed : null}
       </div>
+      {narrow && waitingList !== null ? (
+        <Disclosure summary={t("waiting.fold", { count: waiting.length })} defaultOpen>
+          {waitingList}
+        </Disclosure>
+      ) : null}
       {ahead.element}
       <Dialog
         open={snoozing !== undefined}
@@ -1030,6 +1239,35 @@ export function WhatNeedsYou({ workspaceId, now, offer }: WhatNeedsYouProps) {
           }}
         />
       )}
+      {nudging === undefined ? null : (
+        <NudgeDialog
+          key={nudging.opened}
+          workspaceId={workspaceId}
+          conversationId={nudging.target.conversation.id}
+          need={nudging.target.need}
+          resume={nudging.resume}
+          onClose={() => {
+            setNudging(undefined);
+          }}
+          onOpenDraft={() => {
+            // The nudge waits in the reader, addressed, to finish there.
+            setNudging(undefined);
+            openConversation(nudging.target);
+          }}
+          onSent={() => {
+            const { row, name } = nudging.target;
+            if (row !== undefined) {
+              hide(row, t("confirm.nudged", { name: firstNameOf(name) }));
+            }
+          }}
+          onUndone={(resume) => {
+            if (nudging.target.row !== undefined) {
+              show(nudging.target.row);
+            }
+            nudge(nudging.target, resume);
+          }}
+        />
+      )}
       {replying === undefined ? null : (
         <ReplyDialog
           key={replying.opened}
@@ -1061,10 +1299,57 @@ export function WhatNeedsYou({ workspaceId, now, offer }: WhatNeedsYouProps) {
   );
 }
 
+/** A calendar date ("2026-10-19") at UTC midnight. */
+function utcDate(isoDate: string): Date {
+  const [year, month, day] = isoDate.split("-").map(Number);
+  return new Date(Date.UTC(year ?? 0, (month ?? 1) - 1, day ?? 1));
+}
+
+/** When Scout checks a wait again: "Checks Mon" within the week, else "Checks 30 Oct". */
+function checksLabel(
+  dueOn: string | null | undefined,
+  today: Date,
+  locale: string,
+  t: Translate,
+): string {
+  if (dueOn === null || dueOn === undefined) {
+    return "";
+  }
+  const date = utcDate(dueOn);
+  const days = Math.round(
+    (date.getTime() - Date.UTC(today.getFullYear(), today.getMonth(), today.getDate())) /
+      86_400_000,
+  );
+  const day = new Intl.DateTimeFormat(locale, {
+    timeZone: "UTC",
+    ...(days >= 0 && days < 7 ? { weekday: "short" } : { day: "numeric", month: "short" }),
+  }).format(date);
+  return t("waiting.checks", { day });
+}
+
+/** The date a wait is checked again, whole, for the tooltip. */
+function checksDate(
+  dueOn: string | null | undefined,
+  locale: string,
+): { dateTime: string; label: string } | undefined {
+  if (dueOn === null || dueOn === undefined) {
+    return undefined;
+  }
+  return {
+    dateTime: dueOn,
+    label: new Intl.DateTimeFormat(locale, { timeZone: "UTC", dateStyle: "full" }).format(
+      utcDate(dueOn),
+    ),
+  };
+}
+
 const ITEM_ID_PREFIX = "attention-";
 const itemId = (id: string) => `${ITEM_ID_PREFIX}${id}`;
 
 const goneKey = (item: ItemView) => `${item.id}:${item.cause.id}`;
+
+const waitKey = (conversation: ConversationSummary) =>
+  `${conversation.id}:${conversation.need?.message_id ?? ""}`;
 
 interface NeedDetailProps {
   workspaceId: string;
@@ -1135,7 +1420,7 @@ function NeedDetail({
             />
           )
         }
-        quoteFrom={quoteAttribution(need, row.name, locale)}
+        quoteFrom={quoteAttribution(need, needSender(need, row.conversation), locale)}
         quote={need.quote?.text}
         actions={
           <Button variant="link" onClick={onOpen}>

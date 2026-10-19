@@ -5,7 +5,9 @@
     "count_other": "{{count}} coisas precisam de si",
     "subline": "O Campbooks lê o seu correio e guarda aqui o que lhe pede algo.",
     "clear": "Nada precisa de si",
-    "clearSubline": "Neste momento nada no seu correio lhe pede algo. O Campbooks continua a ler."
+    "clearSubline": "Neste momento nada no seu correio lhe pede algo. O Campbooks continua a ler.",
+    "waiting_one": "O Scout também está à espera de {{count}} pessoa por si.",
+    "waiting_other": "O Scout também está à espera de {{count}} pessoas por si."
   },
   "groups": {
     "review": "Rever",
@@ -13,7 +15,8 @@
     "decide": "Decidir",
     "do": "Fazer",
     "pay": "Pagar",
-    "worth_a_look": "Vale a pena ver"
+    "worth_a_look": "Vale a pena ver",
+    "nudge": "Relembrar"
   },
   "context": "Feito hoje",
   "doneTodayTitle": "Feito hoje",
@@ -24,7 +27,8 @@
     "replied": "Respondido · {{subject}}",
     "archived": "Arquivado · {{subject}}",
     "snoozed": "Adiado · {{subject}}",
-    "gone": "Já não é preciso · {{subject}}"
+    "gone": "Já não é preciso · {{subject}}",
+    "heardBack": "Teve notícias · {{subject}}"
   },
   "snooze": {
     "title": "Adiar {{name}} até…",
@@ -48,7 +52,8 @@
     "forward": "Reencaminhar…",
     "combo": "{{first}} e depois {{second}}",
     "picked": "O Scout escolheu estas para este email",
-    "noAttachment": "Este email não tem nenhum ficheiro para abrir."
+    "noAttachment": "Este email não tem nenhum ficheiro para abrir.",
+    "nudge": "Relembrar {{name}}…"
   },
   "confirm": {
     "done": "Feito · {{name}}",
@@ -58,7 +63,10 @@
     "replied": "A enviar para {{name}}",
     "paid": "Marcada como paga · {{name}}",
     "reported": "Denunciado · {{name}}",
-    "seen": "Visto · {{name}}"
+    "seen": "Visto · {{name}}",
+    "nudged": "Lembrete enviado a {{name}}",
+    "heardBack": "Teve notícias de {{name}}",
+    "notWaiting": "Deixou de esperar por {{name}}"
   },
   "error": {
     "title": "Não foi possível carregar o que precisa de si",
@@ -79,5 +87,20 @@
     "allPaid_one": "Já paguei {{count}}",
     "allPaid_other": "Já paguei as {{count}}",
     "note": "O Campbooks não tem acesso ao seu banco, por isso pergunta se cada fatura está paga."
+  },
+  "nudge": {
+    "note": "Pessoas que ainda não responderam. O Scout escreve o lembrete e é você que o envia.",
+    "asked": "Pedido a {{date}}",
+    "nudged_one": "{{count}} lembrete enviado",
+    "nudged_other": "{{count}} lembretes enviados"
+  },
+  "waiting": {
+    "title": "À espera de outros",
+    "sub": "O Scout avisa se ficarem em silêncio.",
+    "checks": "Verifica {{day}}",
+    "nudgeNow": "Relembrar já",
+    "notWaiting": "Não estou à espera",
+    "label": "À espera de {{name}}",
+    "fold": "À espera de outros · {{count}}"
   }
 }

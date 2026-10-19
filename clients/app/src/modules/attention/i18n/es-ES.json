@@ -5,7 +5,9 @@
     "count_other": "{{count}} cosas te necesitan",
     "subline": "Campbooks lee tu correo y guarda aquí lo que te pide algo.",
     "clear": "Nada te necesita",
-    "clearSubline": "Ahora mismo nada en tu correo te pide algo. Campbooks sigue leyendo."
+    "clearSubline": "Ahora mismo nada en tu correo te pide algo. Campbooks sigue leyendo.",
+    "waiting_one": "Scout también está esperando a {{count}} persona por ti.",
+    "waiting_other": "Scout también está esperando a {{count}} personas por ti."
   },
   "groups": {
     "review": "Revisar",
@@ -13,7 +15,8 @@
     "decide": "Decidir",
     "do": "Hacer",
     "pay": "Pagar",
-    "worth_a_look": "Merece un vistazo"
+    "worth_a_look": "Merece un vistazo",
+    "nudge": "Recordar"
   },
   "context": "Hecho hoy",
   "doneTodayTitle": "Hecho hoy",
@@ -24,7 +27,8 @@
     "replied": "Respondido · {{subject}}",
     "archived": "Archivado · {{subject}}",
     "snoozed": "Pospuesto · {{subject}}",
-    "gone": "Ya no hace falta · {{subject}}"
+    "gone": "Ya no hace falta · {{subject}}",
+    "heardBack": "Hay noticias · {{subject}}"
   },
   "snooze": {
     "title": "Posponer {{name}} hasta…",
@@ -48,7 +52,8 @@
     "forward": "Reenviar…",
     "combo": "{{first}} y después {{second}}",
     "picked": "Scout ha elegido estas para este correo",
-    "noAttachment": "Este correo no tiene ningún archivo que abrir."
+    "noAttachment": "Este correo no tiene ningún archivo que abrir.",
+    "nudge": "Recordar a {{name}}…"
   },
   "confirm": {
     "done": "Hecho · {{name}}",
@@ -58,7 +63,10 @@
     "replied": "Enviando a {{name}}",
     "paid": "Marcada como pagada · {{name}}",
     "reported": "Denunciado · {{name}}",
-    "seen": "Visto · {{name}}"
+    "seen": "Visto · {{name}}",
+    "nudged": "Recordatorio enviado a {{name}}",
+    "heardBack": "Noticias de {{name}}",
+    "notWaiting": "Ya no esperas a {{name}}"
   },
   "error": {
     "title": "No se ha podido cargar lo que te necesita",
@@ -79,5 +87,20 @@
     "allPaid_one": "Ya he pagado {{count}}",
     "allPaid_other": "Ya he pagado las {{count}}",
     "note": "Campbooks no tiene acceso a tu banco, así que pregunta si cada factura está pagada."
+  },
+  "nudge": {
+    "note": "Personas que aún no han respondido. Scout redacta el recordatorio y tú lo envías.",
+    "asked": "Pedido el {{date}}",
+    "nudged_one": "{{count}} recordatorio enviado",
+    "nudged_other": "{{count}} recordatorios enviados"
+  },
+  "waiting": {
+    "title": "Esperando a otros",
+    "sub": "Scout te avisa si no dicen nada.",
+    "checks": "Revisa {{day}}",
+    "nudgeNow": "Recordar ahora",
+    "notWaiting": "No estoy esperando",
+    "label": "Esperando a {{name}}",
+    "fold": "Esperando a otros · {{count}}"
   }
 }

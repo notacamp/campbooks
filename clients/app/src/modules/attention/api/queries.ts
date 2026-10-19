@@ -5,8 +5,8 @@ import { api, operationKey, unwrap, type Schema } from "~/lib/api";
 export type ItemView = Schema<"ItemView">;
 export type Reason = Schema<"Reason">;
 
-/** Open items, or what left the list today. */
-export type ListState = "open" | "cleared";
+/** Open items, what left the list today, or who Scout waits on for the caller. */
+export type ListState = "open" | "cleared" | "waiting";
 
 // Keyed by operationId, so the change feed refetches them when an
 // `attention.item` changes.
@@ -16,7 +16,10 @@ const keys = {
     operationKey("attention.list", { workspace_id: workspaceId, state }),
 };
 
-/** `attention.list`: what needs the caller (or, `cleared`, what left their list today). */
+/**
+ * `attention.list`: what needs the caller (or, `cleared`, what left their
+ * list today; `waiting`, who Scout waits on for them, soonest check first).
+ */
 export function useAttention(workspaceId: string, state: ListState = "open") {
   return useQuery({
     queryKey: keys.list(workspaceId, state),
