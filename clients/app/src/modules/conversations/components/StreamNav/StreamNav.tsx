@@ -125,6 +125,8 @@ export function StreamChips({ workspaceId, current }: StreamNavProps) {
   const navigate = useNavigate();
   const unread = useUnread(workspaceId);
   const active = useRef<HTMLButtonElement | null>(null);
+  // The counts widen the chips once they load: look again when they change.
+  const counts = STREAMS.map((stream) => unread[stream]).join(",");
   useEffect(() => {
     // Not every environment lays out or animates (tests, old webviews).
     const reduced =
@@ -137,7 +139,7 @@ export function StreamChips({ workspaceId, current }: StreamNavProps) {
       block: "nearest",
       behavior: reduced ? "auto" : "smooth",
     });
-  }, [current]);
+  }, [current, counts]);
   const chip = (place: Place, count = 0) => (
     <Chip
       key={place}
