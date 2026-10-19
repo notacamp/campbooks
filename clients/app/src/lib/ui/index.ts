@@ -87,6 +87,7 @@ export { CopyField, type CopyFieldProps } from "./components/CopyField/CopyField
 export {
   ConversationRow,
   type ConversationRowProps,
+  type RowLeaving,
 } from "./components/ConversationRow/ConversationRow";
 export { Disclosure, type DisclosureProps } from "./components/Disclosure/Disclosure";
 export {
@@ -164,6 +165,7 @@ export {
   type MessageComposerProps,
 } from "./components/MessageComposer/MessageComposer";
 export { NavDivider, NavItem, type NavItemProps } from "./components/NavItem/NavItem";
+export { NoteField, type NoteFieldProps } from "./components/NoteField/NoteField";
 export { Offer, type OfferProps } from "./components/Offer/Offer";
 export {
   Note,

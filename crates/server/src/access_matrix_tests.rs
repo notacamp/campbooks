@@ -484,6 +484,22 @@ impl World {
         rule
     }
 
+    /// What `member` told Scout about a person (campbooks-cloud#272).
+    async fn seed_note(&self, member: UserId) -> Uuid {
+        let note = Uuid::now_v7();
+        sqlx::query(
+            "INSERT INTO conversations.person_notes (id, workspace_id, user_id, address, note)
+             VALUES ($1, $2, $3, 'marta@clientes.example', 'My landlord. Formal, in Portuguese.')",
+        )
+        .bind(note)
+        .bind(self.a.as_uuid())
+        .bind(member.as_uuid())
+        .execute(&self.db)
+        .await
+        .unwrap();
+        note
+    }
+
     /// Something Scout noticed in the inbox (campbooks-cloud#169).
     async fn seed_notice(&self, inbox: campbooks_conversations::model::InboxId) -> Uuid {
         let notice = Uuid::now_v7();
@@ -542,6 +558,7 @@ impl World {
         .unwrap();
         let rule = self.seed_rule(inbox, sender).await;
         let notice = self.seed_notice(inbox).await;
+        let note = self.seed_note(u(Who::Member)).await;
         let invitation = Uuid::now_v7();
         sqlx::query(
             "INSERT INTO workspaces.invitations
@@ -588,6 +605,9 @@ impl World {
             ("attention.item", item.to_string()),
             // A profile is the member's own, addressed by their user id.
             ("assistant.profile", u(Who::Member).to_string()),
+            // What a member told Scout about a person: theirs alone, in no
+            // inbox (campbooks-cloud#272).
+            ("conversations.person_note", note.to_string()),
         ]);
         let mut ids: Vec<String> = sqlx::query_scalar(
             "SELECT id::text FROM conversations.conversations WHERE inbox_id = $1
@@ -629,8 +649,9 @@ impl World {
             .and_then(Who::inbox_role)
             .map(ToOwned::to_owned);
         match resource_type {
-            // A profile is addressed by its member, like a membership.
-            "workspaces.member" | "assistant.profile" => {
+            // A profile is addressed by its member, like a membership; a
+            // person note is the member's, in no inbox.
+            "workspaces.member" | "assistant.profile" | "conversations.person_note" => {
                 Facts::owned_by(OwnerFact::User(u(Who::Member)))
             }
             "connectors.connection" => Facts::owned_by(OwnerFact::User(u(Who::Connector))),
@@ -649,7 +670,7 @@ impl World {
             }
             _ => Facts::owned_by(OwnerFact::Nobody),
         }
-        .frozen(self.mail == Mail::Kept && resource_type.starts_with("conversations."))
+        .frozen(self.mail == Mail::Kept && in_the_inbox(resource_type))
     }
 
     fn token(&self, sub: &str) -> String {
@@ -895,6 +916,9 @@ fn body(world: &World, id: &str) -> Option<Value> {
         })
         .unwrap_or_default(),
         "conversations.update_rule" => json!({"actions": [{"action": "mark_read"}]}),
+        "conversations.set_person_note" => {
+            json!({"address": "matrix@example.com", "note": "A client. Formal."})
+        }
         "conversations.confirm_rule"
         | "conversations.restore_rule"
         | "conversations.suggest_replies"
@@ -921,6 +945,7 @@ fn instance_of(world: &World, id: &str, path: &str, resource: &str) -> Option<St
         "conversations.attachment" => "{attachment_id}",
         "conversations.draft" => "{draft_id}",
         "conversations.rule" => "{rule_id}",
+        "conversations.person_note" => "{note_id}",
         "attention.item" => "{item_id}",
         "conversations.inbox" if acts_in_the_inbox(id) => {
             return world.instances.get(resource).cloned();
@@ -953,6 +978,12 @@ fn acts_in_the_inbox(id: &str) -> bool {
             | "conversations.answer_rule_notice"
             | "conversations.clear_rule_notice_answer"
     )
+}
+
+/// Whether a resource type lives inside the inbox (its module's records
+/// but a person note, which is a member's own, campbooks-cloud#272).
+fn in_the_inbox(resource_type: &str) -> bool {
+    resource_type.starts_with("conversations.") && resource_type != "conversations.person_note"
 }
 
 /// Operations on one of Scout's suggestions (campbooks-cloud#169).
@@ -989,6 +1020,7 @@ fn fill(world: &World, path: &str) -> String {
         .replace("{inbox_id}", &world.instances["conversations.inbox"])
         .replace("{rule_id}", &world.instances["conversations.rule"])
         .replace("{notice_id}", &world.instances["conversations.rule_notice"])
+        .replace("{note_id}", &world.instances["conversations.person_note"])
         .replace("{id}", &Uuid::now_v7().to_string())
 }
 
@@ -1263,9 +1295,10 @@ async fn a_disconnected_mailbox_answers_as_declared(db: PgPool) {
                 let Some(resource) = access["resource"].as_str() else {
                     continue;
                 };
-                let inside = ["conversations.", "attention.", "search."]
-                    .iter()
-                    .any(|module| resource.starts_with(module));
+                let inside = in_the_inbox(resource)
+                    || ["attention.", "search."]
+                        .iter()
+                        .any(|module| resource.starts_with(module));
                 if !path.contains("{workspace_id}") || !inside {
                     continue;
                 }

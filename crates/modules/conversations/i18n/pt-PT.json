@@ -38,6 +38,9 @@
     "invalid_senders_query": "Pesquise com 2 a 100 caracteres e peça entre 1 e {{max}} remetentes.",
     "images_already_trusted": "Já existe uma regra inteligente para as imagens deste remetente, mesmo que esteja em pausa ou à espera de um sim. Encontra-a na memória do Scout.",
     "send_needs_you": "Só você pode enviar mensagens ou anular um envio. O Scout pode escrever um rascunho: verifique-o e envie-o você mesmo.",
-    "images_need_you": "Só você pode escolher mostrar sempre as imagens de um remetente. Abra uma das mensagens dele e escolha-o aí."
+    "images_need_you": "Só você pode escolher mostrar sempre as imagens de um remetente. Abra uma das mensagens dele e escolha-o aí.",
+    "person_note_invalid": "Uma nota precisa de um endereço de email simples e de 1 a {{max}} caracteres sobre a pessoa.",
+    "person_notes_full": "Já tem {{max}} notas sobre pessoas. Remova uma para acrescentar outra.",
+    "person_notes_need_member": "Só um membro deste espaço de trabalho guarda notas sobre pessoas."
   }
 }

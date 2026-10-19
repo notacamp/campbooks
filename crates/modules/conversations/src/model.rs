@@ -65,6 +65,11 @@ define_id!(
     /// connector's idempotency key.
     SendId
 );
+define_id!(
+    /// What a member told Scout about a person: who they are and how to
+    /// write to them.
+    PersonNoteId
+);
 
 /// What a draft answers.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]

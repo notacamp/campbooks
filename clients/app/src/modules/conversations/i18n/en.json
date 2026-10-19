@@ -136,6 +136,15 @@
     "spam": "Reported as spam · {{subject}}",
     "notSpam": "Not spam · {{subject}}"
   },
+  "leaving": {
+    "done": "Done",
+    "toInbox": "Moved to Inbox",
+    "deleted": "Deleted",
+    "restored": "Restored",
+    "spam": "Reported as spam",
+    "notSpam": "Not spam",
+    "moved": "Moved to {{stream}}"
+  },
   "scout": {
     "label": "Where things stand",
     "suggestion": "Suggests {{stream}}",
@@ -768,5 +777,44 @@
     "searchFailed": "Couldn’t search just now. Try again.",
     "nobody": "No one has written to you yet.",
     "quoteFailed": "Couldn’t read the email to quote it: nothing was sent. Try again."
+  },
+  "personNotes": {
+    "line": {
+      "tell": "Tell Scout about {{name}}",
+      "knows": "Scout knows: {{note}}",
+      "edit": "Edit",
+      "editLabel": "Edit what Scout knows about {{name}}",
+      "rewrite": "Rewrite with this",
+      "saved": "Saved. Scout writes to {{name}} this way from now on."
+    },
+    "form": {
+      "label": "About {{name}}, and how to write to them",
+      "placeholder": "e.g. My landlord. Formal, in Portuguese.",
+      "left_one": "{{n}} character left",
+      "left_other": "{{n}} characters left",
+      "save": "Save",
+      "cancel": "Cancel",
+      "forget": "Forget this",
+      "failed": "Scout couldn't keep this note. Try again.",
+      "full": "You keep 500 notes about people already. Remove one in Scout's memory first.",
+      "invalid": "Write 1 to 500 characters about them."
+    },
+    "toast": {
+      "saved": "Scout knows about {{name}} now",
+      "forgotten": "Scout forgot what you said about {{name}}",
+      "failed": "Campbooks couldn't change that note. Nothing changed."
+    },
+    "list": {
+      "label": "People you told Scout about",
+      "emptyTitle": "No one yet",
+      "empty": "When you reply to someone, you can tell Scout who they are and how to write to them.",
+      "failed": "Could not load what you told Scout about people",
+      "retry": "Try again",
+      "edit": "Edit",
+      "editLabel": "Edit what Scout knows about {{name}}",
+      "remove": "Remove",
+      "removeLabel": "Remove what Scout knows about {{name}}",
+      "saved": "Saved"
+    }
   }
 }

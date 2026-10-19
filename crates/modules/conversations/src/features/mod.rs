@@ -29,6 +29,7 @@ pub mod mark_read;
 pub mod move_to_stream;
 pub mod needs;
 pub mod outbound_requests;
+pub mod person_notes;
 pub mod purge_workspace;
 pub mod record_send;
 pub mod refresh_need;
