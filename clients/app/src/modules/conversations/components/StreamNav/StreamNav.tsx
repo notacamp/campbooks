@@ -132,13 +132,24 @@ export function StreamChips({ workspaceId, current }: StreamNavProps) {
     const reduced =
       typeof globalThis.matchMedia === "function" &&
       globalThis.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    const chip: { scrollIntoView?: (options: ScrollIntoViewOptions) => void } | null =
-      active.current;
-    chip?.scrollIntoView?.({
-      inline: "nearest",
-      block: "nearest",
-      behavior: reduced ? "auto" : "smooth",
+    const bring = () => {
+      const chip: { scrollIntoView?: (options: ScrollIntoViewOptions) => void } | null =
+        active.current;
+      chip?.scrollIntoView?.({
+        inline: "nearest",
+        block: "nearest",
+        behavior: reduced ? "auto" : "smooth",
+      });
+    };
+    bring();
+    // The row may still be laid out as the page settles (the pane showing, the
+    // list arriving): look again once it has.
+    const frame = requestAnimationFrame(() => {
+      requestAnimationFrame(bring);
     });
+    return () => {
+      cancelAnimationFrame(frame);
+    };
   }, [current, counts]);
   const chip = (place: Place, count = 0) => (
     <Chip
