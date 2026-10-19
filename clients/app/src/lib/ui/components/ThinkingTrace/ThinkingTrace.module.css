@@ -15,9 +15,6 @@
 }
 
 .lines {
-  /* About five lines, following the newest. */
-  max-height: calc(var(--text-sm) * var(--leading-normal) * 5);
-  overflow-y: auto;
   padding: var(--space-2) var(--space-3);
   border-radius: var(--radius-md);
   background: var(--surface-sunken);
@@ -25,6 +22,15 @@
   overflow-wrap: anywhere;
   white-space: pre-wrap;
   unicode-bidi: isolate;
+}
+
+/* While live: about five lines, the newest at the bottom. */
+.tail {
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  max-height: calc(var(--text-sm) * var(--leading-normal) * 5 + var(--space-2) * 2);
+  overflow: hidden;
 }
 
 .summary {

@@ -1,5 +1,4 @@
-import { useEffect, useRef } from "react";
-
+import { cx } from "../../internal/cx";
 import { Icon } from "../Icon/Icon";
 import { Visor } from "../Visor/Visor";
 
@@ -24,15 +23,6 @@ export interface ThinkingTraceProps {
  * not read aloud as it grows.
  */
 export function ThinkingTrace({ label, text, live, summary }: ThinkingTraceProps) {
-  const lines = useRef<HTMLDivElement>(null);
-  // Follow the newest line. A jump, never a smooth scroll, so nothing moves
-  // under reduced motion beyond the text itself.
-  useEffect(() => {
-    const element = lines.current;
-    if (live && element !== null) {
-      element.scrollTop = element.scrollHeight;
-    }
-  }, [text, live]);
   if (live) {
     return (
       <div className={styles["trace"]}>
@@ -41,7 +31,9 @@ export function ThinkingTrace({ label, text, live, summary }: ThinkingTraceProps
           {label}
         </p>
         {text === "" ? null : (
-          <div ref={lines} className={styles["lines"]} aria-live="off">
+          // The newest lines show; older ones slide out of view at the top.
+          // Nothing scrolls, so there is nothing to reach by keyboard.
+          <div className={cx(styles["lines"], styles["tail"])} aria-live="off">
             {text}
           </div>
         )}
