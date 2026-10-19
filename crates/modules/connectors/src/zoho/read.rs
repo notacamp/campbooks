@@ -219,6 +219,10 @@ pub struct Page {
     pub more: bool,
 }
 
+/// What a pass held back: removals per label (label → messages), and
+/// deletions.
+type Held = (BTreeMap<String, Vec<String>>, Vec<String>);
+
 /// The account's Zoho labels as a run knows them, for a grant with the labels
 /// scope: their names (id → name), the listing read fresh when it changed
 /// them (for the run to store), and the messages each label was read on.
@@ -286,7 +290,7 @@ impl LabelCache {
     }
 
     /// The run read every label whole; what it held back.
-    fn pass(&self) -> Option<(BTreeMap<String, Vec<String>>, Vec<String>)> {
+    fn pass(&self) -> Option<Held> {
         let labels = self.lock();
         labels
             .passed

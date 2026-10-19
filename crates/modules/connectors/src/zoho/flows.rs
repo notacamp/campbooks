@@ -1387,6 +1387,8 @@ async fn a_label_listing_zoho_fails_takes_nothing_off(db: PgPool) {
 #[sqlx::test(migrations = "../../../migrations")]
 async fn a_label_deleted_in_zoho_comes_off(db: PgPool) {
     let kit = Kit::new(db).await;
+    // Another label stays: a listing of no labels at all is not believed.
+    kit.zoho.add_label("Projects");
     let (mailbox, ids, clients) = labelled_mailbox(&kit, 1).await;
     kit.zoho.delete_label(&clients);
     let from = changes(&kit, mailbox.ws).await.len();
