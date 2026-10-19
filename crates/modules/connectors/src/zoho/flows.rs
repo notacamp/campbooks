@@ -1471,6 +1471,8 @@ async fn an_empty_label_listing_deletes_nothing(db: PgPool) {
 #[sqlx::test(migrations = "../../../migrations")]
 async fn labels_vanishing_at_once_are_confirmed_a_pass_later(db: PgPool) {
     let kit = Kit::new(db).await;
+    // A third label stays: a listing of no labels at all is not believed.
+    kit.zoho.add_label("Archive");
     let projects = kit.zoho.add_label("Projects");
     let (mailbox, ids, clients) = labelled_mailbox(&kit, 1).await;
     kit.zoho
@@ -1478,7 +1480,7 @@ async fn labels_vanishing_at_once_are_confirmed_a_pass_later(db: PgPool) {
     sweep(&kit).await;
     let both = labels_since(&kit, mailbox.ws, 0, &ids[0]).await.unwrap();
     assert_eq!(both.as_array().unwrap().len(), 2, "{both}");
-    // Both labels deleted in Zoho: every label the account had, at once.
+    // Two of the account's three labels deleted in Zoho at once.
     kit.zoho.delete_label(&clients);
     kit.zoho.delete_label(&projects);
     let from = changes(&kit, mailbox.ws).await.len();

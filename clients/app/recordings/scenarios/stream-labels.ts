@@ -99,7 +99,6 @@ async function syncNow(page: Page, workspace: string): Promise<void> {
 
 export default async function streamLabels({ page }: ScenarioContext): Promise<void> {
   const workspace = await signedIn(page);
-  const phone = (page.viewportSize()?.width ?? 1440) < 768;
 
   // a. The invoice, in Primary or Updates, and what Gmail holds. (The page
   // opens first: the API is called from it, through the BFF.)
