@@ -108,6 +108,9 @@ function actionPhrase(t: Translate, action: RuleAction): string {
     case "show_images": {
       return t("rules.do.images");
     }
+    case "worth_a_look": {
+      return t("rules.do.worthALook");
+    }
   }
 }
 
@@ -232,6 +235,9 @@ function markKey(actions: readonly RuleAction[]): string {
     }
     case "show_images": {
       return "images";
+    }
+    case "worth_a_look": {
+      return "worthALook";
     }
   }
 }

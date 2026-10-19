@@ -71,6 +71,14 @@
   min-width: 0;
 }
 
+.heading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
 .title {
   font-size: var(--text-md);
   font-weight: var(--weight-semibold);

@@ -729,7 +729,9 @@ A need SHALL be cleared, with its cause, when: a message is sent from the
 inbox in the conversation after the message that raised it (`replied`; clears
 `reply` and `do`), the conversation is archived (`archived`; clears `reply` and
 `review`), every message is in the trash or spam or removed (`trashed`; clears
-any), or a member resolves it. A new inbound message SHALL derive the need
+any), the member opens the message of a "Worth a look" need (`opened`; clears
+`worth_a_look` only: the message is read, here or at the provider), or a
+member resolves it. A new inbound message SHALL derive the need
 again from that message (`superseded` for the old one). When the open need's
 own message, read again, raises no need and no member confirmed it, the need
 SHALL be cleared as `superseded`. Changes SHALL come from the provider or
@@ -742,6 +744,10 @@ from members alike.
 #### Scenario: Archiving a bill
 - **WHEN** a member archives a conversation with a `pay` need
 - **THEN** the need stays open until a member chooses Done or Not needed
+
+#### Scenario: Opening a highlighted message
+- **WHEN** Ana opens the conversation of a `worth_a_look` need, or reads it on her phone and the read state reaches the conversation
+- **THEN** the need is cleared with cause `opened`, and a `pay` need on an opened conversation stays open
 
 #### Scenario: Done in a shared inbox
 - **WHEN** Ana chooses Done on a need in an inbox she shares with Leo
@@ -936,8 +942,8 @@ SHALL list nothing for other container types.
 The module SHALL store taught rules: deterministic condition → action pairs
 for one inbox, with one to four conditions that must all hold and one to four
 actions, at most one per slot (`stream`, `archive`, `read`, `needs_reply`,
-`asks_action`, `surface`, `bin` (the trash or spam), `money`; `add_label` is
-additive). Conditions SHALL be
+`asks_action`, `surface`, `bin` (the trash or spam), `money`, `highlight`;
+`add_label` is additive). Conditions SHALL be
 `sender_address is`, `sender_domain is` (never a free-mail domain on its
 own), `list_id is`, `subject_template is`, `subject_contains` (whole words,
 case- and accent-insensitive), `header is|present` (a stored header),
@@ -950,7 +956,11 @@ for mail from an address the inbox writes to, on arrival and over existing
 mail alike). Actions SHALL be
 `move_to_stream`, `archive`,
 `add_label`, `mark_read`, `needs_reply` true or false, `asks_action` true or
-false, `surface` always or never, `trash`, `spam` and `mark_paid`. A rule
+false, `surface` always or never, `trash`, `spam`, `mark_paid` and
+`worth_a_look` ("Highlight them": see Worth a look). A rule with
+`worth_a_look` SHALL hide nothing: with `archive`, `mark_read`, `trash`,
+`spam`, `mark_paid`, `surface` never, a `false` `needs_reply` or `asks_action`
+or a move out of Primary it answers 400 `invalid_rule`. A rule
 SHALL record its origin
 (`action`, `onboarding`, `instruction`, `correction`, `suggestion`), the
 member's words for an instruction, its author, and its state (`proposed`,
@@ -974,6 +984,10 @@ now a public suffix answers 400 `invalid_rule` and is not kept.
 #### Scenario: Two actions in one slot
 - **WHEN** a rule asks to move to `updates` and to `receipts`, or to put mail in the trash and in spam
 - **THEN** the response is 400 with code `invalid_rule`
+
+#### Scenario: Highlighting and hiding
+- **WHEN** a rule asks for `worth_a_look` and `archive`
+- **THEN** the response is 400 with code `invalid_rule` and nothing is stored
 
 #### Scenario: Failed checks alone
 - **WHEN** a rule's only condition is `sender_checks_fail`
@@ -2095,7 +2109,10 @@ unread, last week, the window, the cadence) and whether the inbox is shared.
 hide it from that member for `NOT_NOW_DAYS` (14), or for good for that sender
 and kind; other members still see it. `conversations.create_rule` with the
 suggestion's `notice_id` SHALL create its rule active with origin
-`suggestion` (the member confirmed it) and accept the suggestion; a
+`suggestion` (the member confirmed it) and accept the suggestion, whatever
+actions the member chose: Scout's guess, or another goal they picked ("Highlight
+them", filing under Newsletters, marking read, or what Scout made of their own
+words), since the member's yes is to what they were shown; a
 suggestion of another inbox, or not open, answers 400 `invalid_rule`.
 Removing that rule with `restore` within 15 minutes SHALL offer the
 suggestion again, and bringing the rule back (`conversations.restore_rule`)
@@ -2117,6 +2134,10 @@ its suggestions; a departing member's answers SHALL go.
 #### Scenario: Saying yes
 - **WHEN** Sam saves the suggestion's rule with its `notice_id`, then undoes it
 - **THEN** the rule acted at once, its mail is put back, and the suggestion is offered again; undoing that brings the rule back and the suggestion goes, and saving it again answers 400
+
+#### Scenario: Another goal
+- **WHEN** Sam answers a suggestion to archive builds@ci.example.com with a rule that only has `worth_a_look`, passing the suggestion's `notice_id`
+- **THEN** the rule is created active with origin `suggestion`, the suggestion is accepted and never offered again
 
 #### Scenario: Before the first sync
 - **WHEN** Home lists suggestions before any of Sam's mail arrived, and then his first sync lands
@@ -2735,6 +2756,33 @@ alone, so HTML the reader shows whole is never called truncated.
 #### Scenario: Long HTML read in time
 - **WHEN** a member opens a conversation whose HTML-only message is 280 KiB and its words are read within the deadline
 - **THEN** the message has its words, is not `text_unread` and not `truncated`, and is marked `quote_cut`; a short HTML-only message is not
+
+### Requirement: Worth a look
+A taught rule with `worth_a_look` SHALL answer a question `worth_a_look` (`true`,
+source `taught`) on each new inbound message that matches it, and on the
+mail already there when applied to it (unread mail only counts as changed). A
+conversation whose newest inbound message carries that answer and raises no
+other need (a reply, a task, a bill or a warning comes first: one need per
+conversation) SHALL have a need with reason and question `worth_a_look`,
+`trust` `sure`, basis `taught`, never urgent and never a question. It SHALL
+not pin, archive, mark read or move the mail: the conversation stays where
+it was and can be archived like any other. The need SHALL clear itself as
+`opened` once that message is read, here or at the provider, so marking a
+conversation read or unread (`conversations.mark_read`, `mark_unread`) SHALL
+work its need out again; a member's Seen is Done, with no correction filed.
+`surface` never wins over `worth_a_look` (nothing raised).
+
+#### Scenario: Highlighting a digest
+- **WHEN** Sam's active rule `worth_a_look` matches 12 unread digests from one sender
+- **THEN** each of the 12 conversations has an open `worth_a_look` need and none is archived or read
+
+#### Scenario: Opened once
+- **WHEN** Sam opens one of them
+- **THEN** its need is cleared with cause `opened` and the other 11 stay open
+
+#### Scenario: A reply comes first
+- **WHEN** a highlighted sender's message also needs a reply
+- **THEN** the conversation's need is Reply, not Worth a look
 
 ### Requirement: When the inbox last wrote
 A conversation SHALL keep `last_sent_at`, the newest `sent_at` of its

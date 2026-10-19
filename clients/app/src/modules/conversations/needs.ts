@@ -33,6 +33,10 @@ export function needSentence(t: Translate, need: NeedView, name: string): string
   if (need.question === "suspicious") {
     return t("needs.line.warning");
   }
+  // A rule the member taught keeps it in front of them until they open it.
+  if (need.question === "worth_a_look") {
+    return t("needs.line.worthALook", { name });
+  }
   if (need.trust === "check") {
     if (billKind(need) === "ask") {
       // Campbooks can't see the bank: a bill is a question until answered
@@ -62,6 +66,9 @@ export function needSentence(t: Translate, need: NeedView, name: string): string
         name,
       });
     }
+    case "worth_a_look": {
+      return t("needs.line.worthALook", { name });
+    }
   }
 }
 
@@ -77,8 +84,11 @@ export function needChip(t: Translate, need: NeedView): string {
 }
 
 /** The signal colour of a need's chip. */
-export function needSignal(need: NeedView): "reply" | "do" | "pay" | "review" {
-  return need.trust === "check" && billKind(need) === undefined ? "review" : need.reason;
+export function needSignal(need: NeedView): "reply" | "do" | "pay" | "review" | "look" {
+  if (need.trust === "check" && billKind(need) === undefined) {
+    return "review";
+  }
+  return need.reason === "worth_a_look" ? "look" : need.reason;
 }
 
 /** Days from `today` to `isoDate` (a calendar date), negative when past. */
