@@ -6,6 +6,7 @@ use std::sync::Arc;
 use axum::http::StatusCode;
 use campbooks_ai::decide::{AnswerValue, signals::moves::question::NEXT_MOVE};
 use campbooks_kernel::{
+    db::BeginFor as _,
     jobs::{self, EnqueueOptions},
     tenancy::WorkspaceId,
 };
