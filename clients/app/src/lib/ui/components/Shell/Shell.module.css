@@ -264,6 +264,9 @@
 
 .paneHeader {
   display: flex;
+  /* In a pane that scrolls (a column), a header that wraps keeps its height
+     instead of shrinking and spilling its second line over the content. */
+  flex: none;
   flex-wrap: wrap;
   align-items: center;
   gap: var(--space-2);
