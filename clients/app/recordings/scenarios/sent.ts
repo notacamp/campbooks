@@ -44,7 +44,7 @@ export default async function sent({ page }: ScenarioContext): Promise<void> {
   }
   await page.getByRole("heading", { level: 1, name: "Sent" }).waitFor();
   const list = page.getByRole("region", { name: "Conversations" });
-  await list.getByText("To Clara Nunes").waitFor();
+  await list.getByText("To Clara Nunes").first().waitFor();
   await caption(
     page,
     phone ? "Sent: the chip after the streams" : "Sent: G then 5 from anywhere",
