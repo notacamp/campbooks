@@ -148,6 +148,8 @@ const PAST: &str = sent_to_them!(
 
 /// A row of [`THREAD`].
 type MessageRow = (MessageId, String, Value, String, DateTime<Utc>, Value);
+/// Sent messages read for their words: when, and their bodies.
+type PastRows = Vec<(DateTime<Utc>, Value)>;
 /// A row of [`ANSWERED`].
 type AnsweredRow = (MessageId, DateTime<Utc>, String, String, Value);
 
@@ -471,8 +473,24 @@ async fn prepare<'a>(
     };
     tx.commit().await?;
 
-    // Newest first, within the budget; then oldest first for the model.
     let ws = access.workspace.to_string();
+    let thread = read_thread(state, &ws, rows).await?;
+    let person = match known {
+        Some(known) => known.read(state, &ws).await?,
+        None => Person::default(),
+    };
+    Ok(Read {
+        gateway,
+        message,
+        inbox_name,
+        thread,
+        person,
+    })
+}
+
+/// The thread as the model reads it: newest first within the budget, then
+/// oldest first.
+async fn read_thread(state: &AppState, ws: &str, rows: Vec<MessageRow>) -> Result<Thread> {
     let subject = rows
         .first()
         .map(|row| cut_bytes(&row.3, NAME_BYTES))
@@ -488,7 +506,7 @@ async fn prepare<'a>(
         let sender: Address = serde_json::from_value(sender)
             .map_err(|e| Error::internal(crate::domain::redact::json(&e)))?;
         let text = cut_bytes(
-            &own_words(state, &ws, &bodies).await?,
+            &own_words(state, ws, &bodies).await?,
             MESSAGE_BYTES.min(budget),
         );
         budget = budget.saturating_sub(text.len());
@@ -504,23 +522,13 @@ async fn prepare<'a>(
         });
     }
     messages.reverse();
-    let person = match known {
-        Some(known) => known.read(state, &ws).await?,
-        None => Person::default(),
-    };
-    Ok(Read {
-        gateway,
-        message,
-        inbox_name,
-        thread: Thread { subject, messages },
-        person,
-    })
+    Ok(Thread { subject, messages })
 }
 
 /// What is read about the person answered, before the bodies are.
 struct Known {
     total_messages: usize,
-    them: Option<(Them, Vec<(DateTime<Utc>, Value)>)>,
+    them: Option<(Them, PastRows)>,
 }
 
 impl Known {
@@ -632,7 +640,7 @@ async fn known_person(
         .fetch_one(&mut *tx)
         .await?;
     // A few more than are kept: some have no words of their own.
-    let rows: Vec<(DateTime<Utc>, Value)> = sqlx::query_as(PAST)
+    let rows: PastRows = sqlx::query_as(PAST)
         .bind(inbox)
         .bind(&address)
         .bind(SENT_SCAN)
