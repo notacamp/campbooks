@@ -6,6 +6,8 @@ import { Questions } from "./components/Questions/Questions";
 
 /** The rules list Scout's memory shows (the conversations module's, plugged in by the app). */
 type MemoryRulesSlot = ComponentType<{ workspaceId: string }>;
+/** What the member told Scout about people (the conversations module's, plugged in by the app). */
+type MemoryPeopleSlot = ComponentType<{ workspaceId: string }>;
 
 export interface AssistantRouteParents<TRoot extends AnyRoute, TWorkspace extends AnyRoute> {
   /** Pages outside any workspace's frame, behind the session gate. */
@@ -14,6 +16,8 @@ export interface AssistantRouteParents<TRoot extends AnyRoute, TWorkspace extend
   workspace: TWorkspace;
   /** What Scout's memory lists under "Your rules". */
   rules?: MemoryRulesSlot | undefined;
+  /** What Scout's memory lists under "People you told Scout about". */
+  people?: MemoryPeopleSlot | undefined;
 }
 
 /**
@@ -24,6 +28,7 @@ export function buildAssistantRoutes<TRoot extends AnyRoute, TWorkspace extends 
   root,
   workspace,
   rules,
+  people,
 }: AssistantRouteParents<TRoot, TWorkspace>) {
   const questions = createRoute({
     getParentRoute: () => root,
@@ -56,6 +61,7 @@ export function buildAssistantRoutes<TRoot extends AnyRoute, TWorkspace extends 
         <MemoryPage
           workspaceId={id}
           rules={rules}
+          people={people}
           onQuestions={() => {
             void navigate({ to: `/scout/${id}` });
           }}

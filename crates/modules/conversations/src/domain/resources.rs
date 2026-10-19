@@ -13,7 +13,9 @@
 //! inbox they are not a member of. An inbox kept after its connection was
 //! removed is frozen read-only. A **rule** taught to an inbox is read by its
 //! readers and changed by its author (while they may write there) or a
-//! manager.
+//! manager. A **person note** (what a member told Scout about a person) is
+//! its member's alone, in no inbox: nobody else, owners and admins
+//! included, reads, changes or deletes it.
 
 use std::sync::Arc;
 
@@ -39,6 +41,8 @@ pub const DECISION_RECORD: &str = "conversations.decision";
 pub const LABEL_RECORD: &str = "conversations.label";
 /// The record type of a member's correction.
 pub const CORRECTION_RECORD: &str = "conversations.correction";
+/// The record type of what a member told Scout about a person.
+pub const PERSON_NOTE_RECORD: &str = "conversations.person_note";
 
 use Action::{Delete, Read, Send, Share, Write};
 
@@ -64,7 +68,7 @@ const fn inside(
 }
 
 /// The module's resource types.
-static TYPES: [ResourceType; 9] = [
+static TYPES: [ResourceType; 10] = [
     ResourceType {
         owner: Owner::Member,
         owner_actions: &[Read],
@@ -157,6 +161,18 @@ static TYPES: [ResourceType; 9] = [
             Tenancy::Workspace,
         )
     },
+    ResourceType {
+        owner: Owner::Member,
+        owner_actions: &[Read, Write, Delete],
+        ..ResourceType::new(
+            PERSON_NOTE_RECORD,
+            "What a member told Scout about a person and how to write to them \
+             (campbooks-cloud#272), keyed by the person's address: private to that member, in \
+             no inbox. No workspace role, owners and admins included, and no client token of \
+             its own gets it; an app a member registered acts as that member.",
+            Tenancy::Workspace,
+        )
+    },
 ];
 
 /// The module's resources, for its descriptor.
@@ -220,6 +236,21 @@ impl ResourceFacts for ConversationFacts {
                 return Ok(None);
             };
             let id = *id.as_uuid();
+            if resource.record_type == PERSON_NOTE_RECORD {
+                // A note is in no inbox: it is its member's, in the
+                // transaction's workspace.
+                let owner: Option<sqlx::types::Uuid> = sqlx::query_scalar(
+                    "SELECT user_id FROM conversations.person_notes \
+                      WHERE id = $1 AND workspace_id = $2",
+                )
+                .bind(id)
+                .bind(access.workspace.as_uuid())
+                .fetch_optional(&mut *conn)
+                .await?;
+                return Ok(
+                    owner.map(|user| Facts::owned_by(OwnerFact::User(UserId::from_uuid(user))))
+                );
+            }
             // One statement whatever the type, and whether the record is
             // missing or only out of the caller's sight: the answer takes
             // the same time either way. The inbox it lives in, its owner

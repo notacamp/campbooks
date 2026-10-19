@@ -28,10 +28,12 @@ import {
   type Draft,
 } from "../../api/drafts";
 import { useConversation, useMessageWords, type MessageView } from "../../api/queries";
+import { answeredPerson } from "../../api/person-notes";
 import { useReplySuggestions, writeReply } from "../../api/replies";
 import { displayName, replyQuote, type QuoteWords } from "../../compose/quote";
 import { useDeleteDraft } from "../../compose/use-delete-draft";
 import type { Translate } from "../../model";
+import { AboutPerson } from "../PersonNotes/AboutPerson";
 
 /** A draft whose send was taken back in time, to pick up again. */
 export interface ReplyResume {
@@ -557,6 +559,26 @@ export function ReplyDialog({
         title={t(`reply.${problem}`, { name: person })}
       />
     );
+  // Who Scout writes to, as the server reads them (the sender of mail
+  // received, the first recipient of mail sent): what the member may tell
+  // Scout about them. Not while Scout can't write replies here; a sender
+  // that fails its checks gets no note on the server, whatever this shows.
+  const about = answered === undefined ? undefined : answeredPerson(answered);
+  const aboutLine =
+    about === undefined || unavailable || problem === "unavailable" ? null : (
+      <AboutPerson
+        workspaceId={workspaceId}
+        address={about.address}
+        name={firstName(about.name ?? about.address)}
+        onRewrite={
+          stage === "draft" && intent.trim() !== ""
+            ? () => {
+                write(intent);
+              }
+            : undefined
+        }
+      />
+    );
   const writeOwn = (
     <Button
       variant={unavailable ? "primary" : "secondary"}
@@ -682,6 +704,7 @@ export function ReplyDialog({
         </div>
       ) : null}
       {quoteUnread || quoteReading ? null : quote}
+      {aboutLine}
       {stage === "choose" ? (
         <>
           {problemLine}

@@ -1,8 +1,9 @@
 //! `conversations.forget_member` ← `workspaces.member_left`: a member who
-//! leaves (or is removed) loses every inbox membership and their drafts are
-//! deleted, and they stop owning the inboxes their connections fed (which
-//! the connectors module removes, deleting or keeping their mail). Coming
-//! back to the workspace never brings any of it back. Idempotent.
+//! leaves (or is removed) loses every inbox membership, their drafts and
+//! what they told Scout about people are deleted, and they stop owning the
+//! inboxes their connections fed (which the connectors module removes,
+//! deleting or keeping their mail). Coming back to the workspace never
+//! brings any of it back. Idempotent.
 
 use campbooks_kernel::{Event, EventHandler, JobContext, JobError, tenancy::WorkspaceId};
 
@@ -59,6 +60,18 @@ impl EventHandler for ForgetMember {
         )
         .execute(&mut **tx)
         .await?;
+        // What they told Scout about people (campbooks-cloud#272): theirs
+        // alone, and personal data. One changed since they came back stays.
+        let notes = sqlx::query(
+            "DELETE FROM conversations.person_notes
+              WHERE workspace_id = $1 AND user_id = $2 AND updated_at <= $3",
+        )
+        .bind(workspace.as_uuid())
+        .bind(left.user.as_uuid())
+        .bind(before)
+        .execute(&mut **tx)
+        .await?
+        .rows_affected();
         // Whatever held their rules off ends with their membership: they
         // can only come back by signing in, so they are not suspended then.
         // Recorded as of their departure, so a suspension that took effect
@@ -115,7 +128,8 @@ impl EventHandler for ForgetMember {
         tracing::info!(
             inboxes = inboxes.len(),
             drafts = drafts.len(),
-            "a departed member's inbox access and drafts removed"
+            notes,
+            "a departed member's inbox access, drafts and notes removed"
         );
         Ok(())
     }
