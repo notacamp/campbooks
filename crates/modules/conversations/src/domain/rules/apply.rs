@@ -92,14 +92,19 @@ pub struct Context<'a> {
 /// Carry out what `rule` wins in `rules`' outcome on `candidate`, as part of
 /// `run`. Records the application; a conversation the rule already changed,
 /// or that a member made an exception of, is left alone.
+///
+/// `target` is the conversation and whether "Worth a look" is raised for it:
+/// a run raises it for the newest unread match only, never a backlog
+/// (campbooks-cloud#282).
 pub async fn apply(
     tx: &mut Transaction<'_, Postgres>,
     ctx: &Context<'_>,
     rule: RuleId,
     rules: &[TaughtRule],
-    candidate: &Candidate,
+    target: (&Candidate, bool),
     run: Option<RuleRunId>,
 ) -> Result<Applied> {
+    let (candidate, raise_highlight) = target;
     let existing = sqlx::query!(
         r#"SELECT excepted_at IS NOT NULL AS "excepted!", reverted_at IS NOT NULL AS "reverted!"
              FROM conversations.rule_applications WHERE rule_id = $1 AND conversation_id = $2"#,
