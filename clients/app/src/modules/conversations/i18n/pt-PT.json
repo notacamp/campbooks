@@ -250,6 +250,8 @@
       "checkReply": "{{name}} precisa de resposta?",
       "checkDo": "{{name}} pediu-lhe para fazer algo?",
       "checkPay": "{{name}} enviou uma fatura. Já está paga?",
+      "stillDo": "{{name}} pediu {{ago}}. Ainda por fazer?",
+      "stillReply": "{{name}} escreveu {{ago}}. Ainda precisa de resposta?",
       "taughtReply": "{{name}}: responder, por uma regra",
       "taughtDo": "{{name}}: a fazer, por uma regra"
     },
@@ -259,7 +261,8 @@
       "pay": "Pagar",
       "review": "Rever",
       "suspicious": "Parece suspeito",
-      "check": "Confirmar"
+      "check": "Confirmar",
+      "expired": "Expirado"
     },
     "due": {
       "today": "Até hoje",
@@ -307,6 +310,7 @@
     "toast": {
       "done": "Feito · {{name}}",
       "notNeeded": "Não é preciso · {{name}}. O Campbooks vai aprender com isto",
+      "noLongerNeeded": "Já não é preciso · {{name}}",
       "safe": "Marcado como seguro · {{name}}. O Campbooks vai aprender com isto",
       "confirmed": "Obrigado · {{name}} fica na sua lista",
       "failed": "Não foi possível alterar {{name}}: nada mudou. Tente de novo.",

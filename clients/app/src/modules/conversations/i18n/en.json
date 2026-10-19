@@ -250,6 +250,8 @@
       "checkReply": "Does {{name}} need a reply?",
       "checkDo": "Did {{name}} ask you to do something?",
       "checkPay": "{{name}} sent an invoice. Is it paid?",
+      "stillDo": "{{name}} asked {{ago}}. Still to do?",
+      "stillReply": "{{name}} wrote {{ago}}. Still needs a reply?",
       "taughtReply": "{{name}}: a reply, by a rule",
       "taughtDo": "{{name}}: to do, by a rule"
     },
@@ -259,7 +261,8 @@
       "pay": "Pay",
       "review": "Review",
       "suspicious": "Looks suspicious",
-      "check": "Check"
+      "check": "Check",
+      "expired": "Expired"
     },
     "due": {
       "today": "Due today",
@@ -307,6 +310,7 @@
     "toast": {
       "done": "Done · {{name}}",
       "notNeeded": "Not needed · {{name}}. Campbooks will learn from it",
+      "noLongerNeeded": "No longer needed · {{name}}",
       "safe": "Marked safe · {{name}}. Campbooks will learn from it",
       "confirmed": "Thanks · {{name}} stays on your list",
       "failed": "Could not change {{name}}: nothing changed. Try again.",

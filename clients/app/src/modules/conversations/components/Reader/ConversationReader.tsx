@@ -44,7 +44,7 @@ import {
   quoteAttribution,
   warningReasons,
 } from "../../needs";
-import { NeedChips } from "../Needs/NeedChips";
+import { ExpiredChip, NeedChips } from "../Needs/NeedChips";
 import { ruleLine } from "../../rules-text";
 import { useNeedActions } from "../Needs/use-need-actions";
 import { useTeachOnce } from "../TeachOnce/TeachOnce";
@@ -559,6 +559,9 @@ export function ConversationReader({
             key={conversation.id}
             label={t("scout.label")}
             visor={suggestion === undefined ? "idle" : "unsure"}
+            {...(conversation.lapsed_need === null || conversation.lapsed_need === undefined
+              ? {}
+              : { chips: <ExpiredChip /> })}
             footer={footerLine(conversation)}
             {...(stopButton === null ? {} : { actions: stopButton })}
             how={
@@ -708,7 +711,10 @@ export function ConversationReader({
               <HowDecided rows={howRows(t, exists, decisions)} footnote={t("needs.how.footnote")} />
             }
           >
-            {needSentence(t, need, needSender(need, conversation))}
+            {needSentence(t, need, needSender(need, conversation), {
+              locale: i18n.language,
+              now,
+            })}
           </Note>
         )}
         {messages.toReversed().map((message) => (

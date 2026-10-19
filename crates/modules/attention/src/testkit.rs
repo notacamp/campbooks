@@ -114,6 +114,8 @@ pub struct Need {
     pub sent_at: DateTime<Utc>,
     /// The conversation's newest inbound message, when not `message`.
     pub latest: Option<String>,
+    /// When what it asks stops being possible.
+    pub lapses_at: Option<DateTime<Utc>>,
 }
 
 impl Kit {
@@ -187,6 +189,7 @@ impl Kit {
                     reason: need.reason,
                     trust: Trust::Sure,
                     due_on: need.due_on,
+                    lapses_at: need.lapses_at,
                     urgent: false,
                 }),
                 cleared_because: None,

@@ -7,6 +7,10 @@
 //! it into a need Campbooks stands behind, and is stored as a correction too.
 //! Reopen undoes either, withdrawing the correction.
 //!
+//! A "Still needed?" question (an old undated ask, campbooks-cloud#275) is
+//! about time, not the model's reading: Yes keeps it as the member's own,
+//! Not needed clears it, and neither stores a correction.
+//!
 //! A Pay need asks "Is it paid?" (campbooks-cloud#167): Already paid clears
 //! it as done and files nothing (yet); Still to pay keeps it as a need
 //! Campbooks stands behind, stored as a correction confirming the money
@@ -357,7 +361,13 @@ async fn judge(
         NeedVerdict::NotNeeded => Some(no),
         NeedVerdict::Confirmed | NeedVerdict::StillToPay => Some(yes),
     };
+    // "Still needed?" asks about time, not about the model's reading of the
+    // mail: neither answer is a labelled example (campbooks-cloud#275).
+    let still = [NeedQuestion::StillToDo, NeedQuestion::StillNeedsReply]
+        .iter()
+        .any(|q| need.question == q.as_str());
     let correction = match to {
+        Some(_) if still => None,
         Some(to) => Some(
             correct(
                 &mut tx,

@@ -470,6 +470,12 @@ vocabulary!(
         /// `money`: it asks for a payment still owed (a Pay need, always a
         /// question until a member answers it, campbooks-cloud#167).
         Money => "money",
+        /// A `do` need whose message left the needs window with no date:
+        /// "Still to do?" (campbooks-cloud#275).
+        StillToDo => "still_to_do",
+        /// A `reply` need whose message left the needs window with no date:
+        /// "Still needs a reply?" (campbooks-cloud#275).
+        StillNeedsReply => "still_needs_reply",
     }
 );
 
@@ -513,6 +519,9 @@ vocabulary!(
         Superseded => "superseded",
         /// A rule a member taught says this mail never needs anyone.
         Rule => "rule",
+        /// What it asks stopped being possible (a link or a code expired,
+        /// an offer closed), as Scout read the email (campbooks-cloud#275).
+        Lapsed => "lapsed",
     }
 );
 

@@ -5,7 +5,7 @@ import { Button, ConversationRow, EmptyState, SkeletonList, Visor } from "~/lib/
 import type { ConversationSummary, Stream } from "../../api/queries";
 import { avatarKind, displayName, listTime, streamName, type Translate } from "../../model";
 import { ruleLine } from "../../rules-text";
-import { NeedChips } from "../Needs/NeedChips";
+import { ExpiredChip, NeedChips } from "../Needs/NeedChips";
 
 export interface ConversationListProps {
   stream: Stream;
@@ -93,7 +93,12 @@ export function ConversationList({
             current={conversation.id === openId}
             selected={conversation.id === cursorId && conversation.id !== openId}
             chips={
-              conversation.need === null || conversation.need === undefined ? undefined : (
+              conversation.need === null || conversation.need === undefined ? (
+                conversation.lapsed_need === null ||
+                conversation.lapsed_need === undefined ? undefined : (
+                  <ExpiredChip />
+                )
+              ) : (
                 <NeedChips need={conversation.need} now={now} />
               )
             }

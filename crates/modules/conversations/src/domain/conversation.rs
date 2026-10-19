@@ -20,7 +20,7 @@ use crate::{
 };
 
 use super::{
-    needs::{self, NeedView},
+    needs::{self, LapsedNeed, NeedView},
     rules::{self, RuleException, RuleMark},
     suggestions::{self, StreamSuggestion},
 };
@@ -68,6 +68,9 @@ pub struct ConversationSummary {
     pub suggestion: Option<StreamSuggestion>,
     /// What it needs from its inbox's members, while it needs something.
     pub need: Option<NeedView>,
+    /// The ask that lapsed (its link expired, its offer closed), while its
+    /// message is still the newest: shown as "Expired".
+    pub lapsed_need: Option<LapsedNeed>,
     /// The taught rule that placed or changed it, while no member changed
     /// that back.
     pub rule: Option<RuleMark>,
@@ -119,6 +122,7 @@ impl TryFrom<SummaryRow> for ConversationSummary {
                 .map_err(|e| Error::internal(crate::domain::redact::json(&e)))?,
             suggestion: None,
             need: None,
+            lapsed_need: None,
             rule: None,
             rule_exception: None,
         })

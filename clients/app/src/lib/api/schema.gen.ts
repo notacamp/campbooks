@@ -2566,6 +2566,7 @@ export interface components {
             inbox_id: components["schemas"]["InboxId"];
             /** @description Its labels, by name. */
             labels: components["schemas"]["LabelView"][];
+            lapsed_need?: components["schemas"]["LapsedNeed"] | null;
             /**
              * Format: date-time
              * @description When its newest message was sent.
@@ -3190,6 +3191,24 @@ export interface components {
             name: string;
         };
         /**
+         * @description A conversation's ask that lapsed (campbooks-cloud#275): what it was and
+         *     when it stopped being possible, while its message is still the newest.
+         *     Clients show it as "Expired".
+         */
+        LapsedNeed: {
+            /**
+             * Format: date-time
+             * @description When what it asked stopped being possible.
+             */
+            lapsed_at: string;
+            /** @description The message it came from. */
+            message_id: components["schemas"]["MessageId"];
+            /** @description The question that raised it. */
+            question: components["schemas"]["NeedQuestion"];
+            /** @description Why it was needed. */
+            reason: components["schemas"]["NeedReason"];
+        };
+        /**
          * @description How a suggestion picks the mail that looks the same.
          * @enum {string}
          */
@@ -3351,7 +3370,7 @@ export interface components {
          * @description The question whose answer raised a need.
          * @enum {string}
          */
-        NeedQuestion: "needs_reply" | "asks_action" | "suspicious" | "money";
+        NeedQuestion: "needs_reply" | "asks_action" | "suspicious" | "money" | "still_to_do" | "still_needs_reply";
         /**
          * @description Why a conversation needs its inbox's members (attention).
          * @enum {string}
@@ -3376,10 +3395,16 @@ export interface components {
             basis: components["schemas"]["NeedBasis"];
             /**
              * Format: date
-             * @description When it is due: none until a due date is extracted from the mail
-             *     (needs raised before ADR 0018 may carry one).
+             * @description When it is due, as Scout read the email: none until it has, or when
+             *     the email names no date.
              */
             due_on?: string | null;
+            /**
+             * Format: date-time
+             * @description When what it asks stops being possible, as Scout read the email
+             *     (never for a bill or a warning).
+             */
+            lapses_at?: string | null;
             /** @description The message it comes from. */
             message_id: components["schemas"]["MessageId"];
             /** @description Whether the due date has passed. */
@@ -3395,6 +3420,11 @@ export interface components {
              * @example model.decide
              */
             rule?: string | null;
+            /**
+             * Format: date-time
+             * @description When that message was sent.
+             */
+            sent_at?: string | null;
             /** @description `sure`, or `check` for a question to the member. */
             trust: components["schemas"]["NeedTrust"];
             /** @description Whether it is for today. */

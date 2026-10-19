@@ -388,3 +388,149 @@ async fn the_backfill_summarises_the_open_needs_that_have_none(db: PgPool) {
     kit.run_jobs().await;
     assert_eq!(calls(&server).await, after);
 }
+
+/// The summary with dates read from the email (campbooks-cloud#275): a lapse
+/// time twenty minutes after Marta's mail, and a due date of 16 October.
+fn dated() -> Value {
+    let mut answer = good();
+    answer["lapses_at"] = json!("2026-10-12T17:00:00Z");
+    answer["due_on"] = json!("2026-10-16");
+    answer
+}
+
+/// `(state, cleared_because, due_on, lapses_at)` of the need of
+/// `provider_message_id`'s conversation.
+async fn need_of(
+    kit: &Kit,
+    provider_message_id: &str,
+) -> (
+    String,
+    Option<String>,
+    Option<chrono::NaiveDate>,
+    Option<chrono::DateTime<chrono::Utc>>,
+) {
+    let conversation = kit.conversation_of(provider_message_id).await;
+    sqlx::query_as(
+        "SELECT state, cleared_because, due_on, lapses_at FROM conversations.needs
+          WHERE conversation_id = $1::uuid",
+    )
+    .bind(&conversation)
+    .fetch_one(&kit.db)
+    .await
+    .unwrap()
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn the_dates_scout_reads_reach_the_need(db: PgPool) {
+    let server = complete(&dated()).await;
+    let kit = kit(db, &server).await;
+    let (workspace, _, sam, _) = sams_needs(&kit).await;
+
+    // Marta's ask lapsed twenty minutes after she sent it: cleared, and the
+    // inbox says it expired.
+    let (state, cleared, _, lapses_at) = need_of(&kit, "needs-1").await;
+    assert_eq!(
+        (state.as_str(), cleared.as_deref()),
+        ("cleared", Some("lapsed"))
+    );
+    assert_eq!(lapses_at, Some("2026-10-12T17:00:00Z".parse().unwrap()));
+    let id = kit.conversation_of("needs-1").await;
+    let list = kit
+        .get(
+            &sam,
+            &format!("/api/v1/w/{workspace}/conversations?ids={id}"),
+        )
+        .await;
+    let marta = &list.json["conversations"][0];
+    assert_eq!(marta["need"], Value::Null);
+    assert_eq!(marta["lapsed_need"]["lapsed_at"], "2026-10-12T17:00:00Z");
+    let events = kit.events("conversations.need_changed").await;
+    assert!(
+        events
+            .iter()
+            .any(|e| e["conversation"] == id.as_str() && e["cleared_because"] == "lapsed"),
+        "{events:?}"
+    );
+
+    // The bill was sent after that time, so no lapse time is kept (and a
+    // bill never lapses); its due date is.
+    let (state, _, due_on, lapses_at) = need_of(&kit, "needs-3").await;
+    assert_eq!(state, "open");
+    assert_eq!(due_on, chrono::NaiveDate::from_ymd_opt(2026, 10, 16));
+    assert_eq!(lapses_at, None);
+    let opened = events
+        .iter()
+        .rev()
+        .find(|e| e["need"]["reason"] == "pay")
+        .unwrap();
+    assert_eq!(opened["need"]["due_on"], "2026-10-16");
+
+    // Every summary says its dates were read.
+    let unread: i64 = sqlx::query_scalar(
+        "SELECT count(*) FROM conversations.need_summaries WHERE dates_read_at IS NULL",
+    )
+    .fetch_one(&kit.db)
+    .await
+    .unwrap();
+    assert_eq!(unread, 0);
+}
+
+/// The upgrade's needs backfill of `inbox`, as the migration queues it and
+/// the scheduler's tick runs it.
+async fn run_backfill(kit: &Kit, inbox: InboxId) {
+    sqlx::query(
+        "INSERT INTO conversations.needs_backfills (inbox_id, workspace_id)
+         SELECT id, workspace_id FROM conversations.inboxes WHERE id = $1
+         ON CONFLICT (inbox_id) DO UPDATE SET state = 'pending', after_id = NULL,
+                                              refreshed = 0, finished_at = NULL",
+    )
+    .bind(inbox)
+    .execute(&kit.db)
+    .await
+    .unwrap();
+    let mut tx = kit.state.db.begin().await.unwrap();
+    jobs::enqueue(
+        &mut tx,
+        &crate::features::backfill_needs::DispatchNeedsBackfills,
+        EnqueueOptions::default(),
+    )
+    .await
+    .unwrap();
+    tx.commit().await.unwrap();
+    kit.run_jobs().await;
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_summary_from_before_the_dates_is_read_once_more(db: PgPool) {
+    let server = complete(&good()).await;
+    let kit = kit(db, &server).await;
+    let (_, inbox, ..) = sams_needs(&kit).await;
+    // Summaries written before dates were read.
+    sqlx::query("UPDATE conversations.need_summaries SET dates_read_at = NULL")
+        .execute(&kit.db)
+        .await
+        .unwrap();
+    let written = stored(&kit).await;
+    let before = calls(&server).await;
+
+    run_backfill(&kit, inbox).await;
+    let after = calls(&server).await;
+    assert_eq!(after - before, written.len(), "each asked once more");
+    let unread: i64 = sqlx::query_scalar(
+        "SELECT count(*) FROM conversations.need_summaries WHERE dates_read_at IS NULL",
+    )
+    .fetch_one(&kit.db)
+    .await
+    .unwrap();
+    assert_eq!(unread, 0);
+    assert!(
+        stored(&kit)
+            .await
+            .iter()
+            .all(|(_, state, _)| state == "written")
+    );
+
+    // Never again.
+    run_backfill(&kit, inbox).await;
+    assert_eq!(calls(&server).await, after);
+}

@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://campbooks.example.com/contracts/conversations.need_changed.v1.schema.json",
   "title": "conversations.need_changed v1 (event payload)",
-  "description": "Published by the conversations module when what a conversation needs from its inbox's members opens, changes or is cleared; the attention module projects it into each member's queue. Ids, enums and a date only, never names, addresses, subjects or text. `revision` grows with every change of one conversation's need: apply only newer ones. Workspace-scoped; also listed in openapi/events.json.",
+  "description": "Published by the conversations module when what a conversation needs from its inbox's members opens, changes or is cleared; the attention module projects it into each member's queue. Ids, enums, a date and a time only, never names, addresses, subjects or text. `revision` grows with every change of one conversation's need: apply only newer ones. Workspace-scoped; also listed in openapi/events.json.",
   "type": "object",
   "required": ["workspace", "inbox", "conversation", "message", "revision", "sent_at", "need"],
   "additionalProperties": false,
@@ -25,13 +25,18 @@
             "reason": { "enum": ["reply", "do", "pay", "review"] },
             "trust": { "enum": ["sure", "check"] },
             "due_on": { "type": "string", "format": "date" },
+            "lapses_at": {
+              "description": "When what the need asks stops being possible (a link or a code expiring, an offer closing), as Scout read the email. Absent from events written before it existed, and never on a pay need or a warning.",
+              "type": "string",
+              "format": "date-time"
+            },
             "urgent": { "type": "boolean" }
           }
         }
       ]
     },
     "cleared_because": {
-      "enum": ["replied", "archived", "trashed", "done", "not_needed", "superseded", "rule"]
+      "enum": ["replied", "archived", "trashed", "done", "not_needed", "superseded", "rule", "lapsed"]
     },
     "cleared_by": { "$ref": "#/$defs/uuid" },
     "latest_message": {

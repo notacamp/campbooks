@@ -605,6 +605,34 @@ export function htmlMailDemos(
   });
 }
 
+/**
+ * Asks that lapse or go stale (campbooks-cloud#275), for `--stale-asks`: a
+ * sign-in link valid for ten minutes, sent two hours ago (the fake
+ * `complete` model reads its lapse time), and an undated request sent just
+ * inside the 14-day needs window, which becomes "Still to do?" a few
+ * minutes after the mailbox is made.
+ */
+export function staleAskDemos(me: string): DemoMessage[] {
+  return [
+    {
+      from: "Brightloop <no-reply@brightloop.example>",
+      to: me,
+      subject: "Your Brightloop sign-in link",
+      hoursAgo: 2,
+      labels: ["INBOX", "UNREAD", "CATEGORY_UPDATES"],
+      text: "Hi Sam,\n\nUse this link to sign in to Brightloop. It is valid for 10 minutes and can be used once.\n\nBrightloop",
+    },
+    {
+      from: "Pedro Alves <pedro.alves@example.com>",
+      to: me,
+      subject: "Studio keys",
+      hoursAgo: 14 * 24 - 0.05,
+      labels: ["INBOX", "CATEGORY_PERSONAL"],
+      text: "Hi Sam,\n\nCould you drop the spare studio keys at the front desk when you pass by?\n\nPedro",
+    },
+  ];
+}
+
 /** A new demo mailbox for `address`, with `more` messages on top of the demo. */
 export function createMailbox(
   address: string,
