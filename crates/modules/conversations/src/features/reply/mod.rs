@@ -13,7 +13,8 @@
 //! A written reply also learns who is answered and how the member writes to
 //! them (campbooks-cloud#271): the conversation's length, the person's
 //! name, how much mail passed between them, and a few of the same inbox's
-//! earlier messages to them, for the register only.
+//! earlier messages to them, for the register only. And, for the member
+//! asking only, what they told Scout about that person (campbooks-cloud#272).
 
 mod prompt;
 mod types;
@@ -21,11 +22,7 @@ mod types;
 use std::time::{Duration, Instant};
 
 use axum::{Extension, Json, extract::State};
-use campbooks_ai::{
-    Gateway, Role,
-    decide::signals::facts::{dmarc_refused, sender_checks_failed},
-    usage::Scope,
-};
+use campbooks_ai::{Gateway, Role, usage::Scope};
 use campbooks_kernel::{
     AppState, Error, Operation, Problem, RecordRef, Result, Risk,
     authz::Action,
@@ -33,7 +30,7 @@ use campbooks_kernel::{
     extract,
     i18n::Locale,
     rate_limit::{Limit, RateKey},
-    tenancy::{Workspace, WorkspaceId},
+    tenancy::{Access, Workspace, WorkspaceId},
 };
 use chrono::{DateTime, SecondsFormat, Utc};
 use serde::de::DeserializeOwned;
@@ -46,11 +43,12 @@ use crate::{
         access::visible_inboxes,
         blobs::{Budget, words},
         paths::ConversationPath,
+        person::{distrusted, plain_address},
         plain_text::{self, Quotes},
         resources,
     },
     events::CONVERSATION_RECORD,
-    features::get_conversation::Bodies,
+    features::{get_conversation::Bodies, person_notes::note_about},
     model::{Address, ConversationId, InboxId, MessageId},
     scopes::ConversationsSend,
 };
@@ -378,6 +376,7 @@ pub async fn write(
         .ok_or_else(|| Error::Unavailable(crate::MESSAGES.reason("reply_failed")))?;
     tracing::info!(
         rewrite = rewriting,
+        noted = read.person.note.is_some(),
         messages = context.conversation.messages.len(),
         latency_ms = u64::try_from(started.elapsed().as_millis()).unwrap_or(u64::MAX),
         "reply written"
@@ -490,7 +489,7 @@ async fn prepare<'a>(
         .fetch_all(&mut *tx)
         .await?;
     let known = if with_person {
-        Some(known_person(&mut tx, inbox_id, conversation, &answered).await?)
+        Some(known_person(&mut tx, access, inbox_id, conversation, &answered).await?)
     } else {
         None
     };
@@ -552,6 +551,8 @@ async fn read_thread(state: &AppState, ws: &str, rows: Vec<MessageRow>) -> Resul
 struct Known {
     total_messages: usize,
     them: Option<(Them, PastRows)>,
+    /// What the member asking told Scout about them.
+    note: Option<String>,
 }
 
 impl Known {
@@ -565,6 +566,7 @@ impl Known {
                 ..Person::default()
             });
         };
+        let note = self.note;
         let mut past = Vec::with_capacity(PAST_MESSAGES);
         let mut budget = PAST_BYTES;
         for (sent, bodies) in rows {
@@ -591,6 +593,7 @@ impl Known {
             total_messages: self.total_messages,
             them: Some(them),
             past,
+            note,
         })
     }
 }
@@ -605,50 +608,20 @@ struct Answered {
     distrusted: bool,
 }
 
-/// Whether the message answered earns no person context. Facts only, as
-/// everywhere else (ADR 0018): spam, a `suspicious` answer or open Review
-/// need, and, for mail received, the receiving provider's results saying the
-/// sender failed its checks or is impersonated.
-fn distrusted(
-    direction: &str,
-    sender: &str,
-    in_spam: bool,
-    headers: &Value,
-    suspicious: bool,
-) -> bool {
-    if in_spam || suspicious {
-        return true;
-    }
-    let results = headers
-        .get("authentication_results")
-        .and_then(Value::as_str);
-    direction == "inbound" && (sender_checks_failed(sender, results) || dmarc_refused(results))
-}
-
-/// Whether `address` is plain enough to look up: one `@` with something on
-/// both sides, and no quote, backslash, whitespace or control character.
-fn plain_address(address: &str) -> bool {
-    let mut parts = address.split('@');
-    let (Some(local), Some(domain), None) = (parts.next(), parts.next(), parts.next()) else {
-        return false;
-    };
-    !local.is_empty()
-        && !domain.is_empty()
-        && !address
-            .chars()
-            .any(|c| c == '"' || c == '\\' || c.is_whitespace() || c.is_control())
-}
-
 /// The conversation's length and what the inbox knows of the person
 /// answered: the other side of the message answered (the sender of an
 /// inbound one, the first recipient of one the member sent). Nothing of the
-/// person when the message is distrusted or their address is not plain.
+/// person when the message is distrusted (in spam, suspicious, under
+/// review, or failing its sender's checks) or their address is not plain:
+/// neither past mail nor the member's note.
 ///
 /// Only the conversation's own inbox is read, never another one the member
 /// can see: it is the inbox the reply is sent from, which the caller was
-/// just authorized to read and send from.
+/// just authorized to read and send from. The note is the caller's own,
+/// never a teammate's, and an app acting for nobody has none.
 async fn known_person(
     tx: &mut sqlx::PgConnection,
+    access: &Access,
     inbox: InboxId,
     conversation: ConversationId,
     answered: &Answered,
@@ -696,6 +669,7 @@ async fn known_person(
         return Ok(Known {
             total_messages,
             them: None,
+            note: None,
         });
     };
     let address = correspondent.address.trim().to_lowercase();
@@ -721,6 +695,10 @@ async fn known_person(
         .bind(i64::try_from(PAST_MESSAGES * 2).unwrap_or(6))
         .fetch_all(&mut *tx)
         .await?;
+    let note = match access.user {
+        Some(user) => note_about(&mut *tx, access.workspace, user, &address).await?,
+        None => None,
+    };
     let them = Them {
         name: shown_name(correspondent),
         i_wrote_to_them_before: wrote_before,
@@ -730,6 +708,7 @@ async fn known_person(
     Ok(Known {
         total_messages,
         them: Some((them, rows)),
+        note,
     })
 }
 

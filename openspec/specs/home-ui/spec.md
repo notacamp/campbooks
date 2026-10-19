@@ -10,7 +10,7 @@ honest empty state.
 ### Requirement: What needs you
 When the user can see at least one inbox, Home SHALL show their open
 attention items (`attention.list`) in groups, in the order Review, Reply,
-Decide, Do, Pay, leaving out empty groups, each item in the list's order. The
+Decide, Do, Pay, Worth a look, leaving out empty groups, each item in the list's order. The
 hero SHALL say how many things need the user, with the Visor `alert` when
 Review has an item. The selected item SHALL be shown by the selected background and a full focus
 ring, never by a coloured stripe on one edge. Each item SHALL show who it is from, its sentence (from a
@@ -312,21 +312,32 @@ for "mark <payee>'s invoices paid". "All N already paid" offers nothing.
 - **THEN** the offer asks whether EDP's invoices are always paid, and Yes opens the confirmation of the paid rule
 
 ### Requirement: Scout noticed
-At the bottom of Home, below the groups (and in place of nothing when
+Right after the first group of Home (and where the groups would be when
 nothing needs the member), Home SHALL show at most one suggestion from
 `conversations.list_rule_notices`: "Scout noticed", "n of N", what Scout
-noticed in a sentence built from the counts in the member's language ("You
-got 34 emails from builds@ci.example.com in the last 60 days and opened 2.
-Keep them off Home and file them under Updates?"), and three buttons in one
-style: "Set up a smart rule…" (opens the smart-rule confirmation with the
-suggestion's rule), "Not now" and "Don't suggest this" (each with a toast and
-Undo, and the next suggestion shows). In a shared inbox it SHALL say the rule
-would act for everyone in that inbox. It SHALL not show while the list
-loads or fails.
+noticed in a sentence built from the counts in the member's language ("Design
+Notes sent you 88 emails in the last 60 days, and you archived or deleted 88
+of them unread. Archive them as they arrive?"), and four buttons in one style:
+the suggestion's own verb ("Archive them…", or "File under Updates…"),
+"Something else…" (with the visor before it), "Not now" and "Don't suggest
+this" (each of the last two with a toast and Undo, and the next suggestion
+shows). Both of the first two SHALL open the smart-rule confirmation, which
+asks what should happen to the sender's mail first. In a shared inbox it
+SHALL say the rule would act for everyone in that inbox. It SHALL not show
+while Home loads or the list fails or is empty, and at 375px as on desktop it
+sits after the first group.
 
 #### Scenario: Two suggestions
 - **WHEN** Scout noticed build notifications and job alerts
 - **THEN** Home shows "1 of 2" with the build notifications; Not now shows "1 of 1" with the job alerts, and Undo brings the first back
+
+#### Scenario: Higher on Home
+- **WHEN** Home has Review, Reply and Pay groups and Scout noticed something
+- **THEN** the note sits between the Review group and the Reply group
+
+#### Scenario: Nothing needs the member
+- **WHEN** nothing needs the member and Scout noticed something
+- **THEN** the note shows under the hero, where the groups would be
 
 ### Requirement: Scout's ranked actions
 A need that carries `actions` (the catalogue is on and its message was
@@ -436,6 +447,47 @@ on the whole document: a key the page itself receives SHALL be the page's.
 - **WHEN** the focused button of a dialog is replaced by choices, and the user presses 2
 - **THEN** the second choice is picked, and Esc closes the dialog
 
+### Requirement: Still needed?
+An item whose need is a still-needed question SHALL be shown in Review as a
+question naming the sender and how long ago they wrote, in the user's
+language: "Pedro Alves asked 3 weeks ago. Still to do?" for `still_to_do`,
+"Pedro Alves wrote 3 weeks ago. Still needs a reply?" for
+`still_needs_reply` (the plain question "Did … ask you to do something?" or
+"Does … need a reply?" when the sent time is unknown). Its Yes (1) SHALL call
+`conversations.confirm_need` and its No (2, X) `conversations.resolve_need`
+with `not_needed`; both take the item off the list with Undo, and No SHALL
+neither say Campbooks will learn from it nor offer to teach a rule. An item
+whose ask lapsed SHALL not be shown.
+
+#### Scenario: An old lease
+- **WHEN** Pedro Alves's undated request to sign a lease is three weeks old
+- **THEN** Home shows it under Review as "Pedro Alves asked 3 weeks ago. Still to do?" with Yes and No
+
+#### Scenario: Yes
+- **WHEN** the user presses 1 on it
+- **THEN** the item leaves Review with the toast "Thanks · Pedro Alves stays on your list", Z brings the question back, and it returns under Do as the user's own
+
+#### Scenario: No longer needed
+- **WHEN** the user presses 2 on it
+- **THEN** the item leaves the list with the toast "No longer needed · Pedro Alves" and no rule is offered
+
+### Requirement: Worth a look
+Home SHALL show mail a rule the member taught with "Highlight them" in a last
+group, "Worth a look", after Pay, with a signal colour of its own (the
+`signal-look` token): one item per conversation, saying "You asked to see mail
+from <name>". Its row SHALL offer Seen (Done, E) and Snooze (S) only: no
+Reply, and no Not needed, since nothing is asked of the member. Seen SHALL
+fold the row with "Seen · <name>" and Undo like Done. The item SHALL leave
+Home by itself once the message is opened, and Done today SHALL not list that.
+
+#### Scenario: Seen
+- **WHEN** Ana presses E on a Worth a look item
+- **THEN** it folds into "Seen · Design Notes" with Undo, and the conversation is not archived
+
+#### Scenario: Opened elsewhere
+- **WHEN** Ana opens the highlighted conversation from the inbox
+- **THEN** its item leaves Home, and Done today does not list it
+
 ### Requirement: Deleting the draft from the Reply dialog
 In its draft stage the Reply dialog SHALL offer "Delete draft" once a draft
 exists: when it opened on a draft whose send was undone, or after Open in
@@ -451,3 +503,49 @@ delete SHALL keep the dialog and the draft and say so.
 #### Scenario: Nothing to delete yet
 - **WHEN** the user has picked one of Scout's replies but not saved a draft
 - **THEN** the dialog does not offer Delete draft
+
+### Requirement: Telling Scout about the person in the reply dialog
+Under the quoted message, the reply dialog SHALL show one quiet line about
+the person answered, found as the server finds them (the sender of a
+message received, the first recipient of one sent): "Tell Scout about
+<first name>" (marked with the visor) when the member has no note about
+their address, or "Scout knows: <the note, on one line, cut with an
+ellipsis>" with "Edit" when they have one. The line SHALL be hidden when the
+address is not plain, while the member's notes load or fail to load, and
+when the server has no model for replies (`reply_unavailable`), since the
+note only steers Scout. The client SHALL NOT try to tell a distrusted
+conversation apart: the server gives a distrusted message no note.
+
+Activating the line SHALL open, in the dialog and never as a dialog of its
+own, one field labelled "About <name>, and how to write to them" with the
+placeholder "e.g. My landlord. Formal, in Portuguese.", at most 500
+characters with a counter near the limit, Save (⌘↵ / Ctrl+Enter, shown as
+the app shows its hints) and Cancel (Esc), and, for a note kept, "Forget
+this". ⌘↵ and Esc in the field SHALL save and cancel the note only: they
+SHALL never send the reply or close the dialog. Save SHALL call
+`conversations.set_person_note` with the address in the body, show the new
+line, put the focus back on it, announce "Saved" in a live region, and say
+so in a toast with Undo that puts back what was there before. Forget this
+SHALL call `conversations.delete_person_note`, with Undo. Once a note is
+saved while a draft shows, the dialog SHALL offer "Rewrite with this", which
+calls `conversations.write_reply` again with the same intent; it SHALL never
+rewrite on its own. A note that can't be kept SHALL say why under the field
+(`person_notes_full`, `person_note_invalid`, or that it failed) and keep the
+words. In en, pt-PT, es-ES and fr, and at 375px with no horizontal
+scrolling.
+
+#### Scenario: Tell Scout about Marta
+- **WHEN** Sam opens Reply on Marta's email, chooses "Tell Scout about Marta", types "My landlord. Formal, in Portuguese." and presses ⌘↵
+- **THEN** the note is kept for marta's address, the line reads "Scout knows: My landlord. Formal, in Portuguese." with Edit, the focus is on it, and nothing is sent
+
+#### Scenario: Rewrite with this
+- **WHEN** a draft shows and Sam saves a note about Marta
+- **THEN** "Rewrite with this" is offered, and Scout writes the draft again only when Sam chooses it
+
+#### Scenario: Esc keeps the dialog
+- **WHEN** Sam presses Esc in the note's field
+- **THEN** the field closes with nothing kept, the dialog stays open, and the focus is back on the line
+
+#### Scenario: No model on this server
+- **WHEN** the server answers `reply_unavailable`
+- **THEN** the dialog shows no line about the person

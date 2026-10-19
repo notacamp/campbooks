@@ -7745,6 +7745,283 @@
         }
       }
     },
+    "/api/v1/w/{workspace_id}/person-notes": {
+      "get": {
+        "tags": [
+          "conversations"
+        ],
+        "summary": "List what you told Scout about people.",
+        "operationId": "conversations.list_person_notes",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "description": "The workspace.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Your notes; nobody else's.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PersonNoteList"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid access token.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing scope, or not a member (`person_notes_need_member`).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such workspace, or you are not a member.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [
+              "conversations:read"
+            ]
+          }
+        ],
+        "x-campbooks": {
+          "access": {
+            "action": "read",
+            "resource": "conversations.person_note"
+          },
+          "assistant": false,
+          "automation": false,
+          "mutates": false,
+          "records": [
+            "conversations.person_note"
+          ],
+          "risk": "low"
+        }
+      },
+      "put": {
+        "tags": [
+          "conversations"
+        ],
+        "summary": "Tell Scout about a person, or change what you told it.",
+        "operationId": "conversations.set_person_note",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "description": "The workspace.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetPersonNote"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "The note as kept.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PersonNote"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Not a plain address, or a note that is empty or too long (`person_note_invalid`).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid access token.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing scope, or not a member (`person_notes_need_member`).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such workspace, or you are not a member.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "You keep 500 notes already (`person_notes_full`): remove one first.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [
+              "conversations:write"
+            ]
+          }
+        ],
+        "x-campbooks": {
+          "access": {
+            "action": "write",
+            "resource": "conversations.person_note"
+          },
+          "assistant": false,
+          "automation": false,
+          "mutates": true,
+          "records": [
+            "conversations.person_note"
+          ],
+          "risk": "low"
+        }
+      }
+    },
+    "/api/v1/w/{workspace_id}/person-notes/{note_id}": {
+      "delete": {
+        "tags": [
+          "conversations"
+        ],
+        "summary": "Forget what you told Scout about a person.",
+        "operationId": "conversations.delete_person_note",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "description": "The workspace.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId"
+            }
+          },
+          {
+            "name": "note_id",
+            "in": "path",
+            "description": "The note.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/PersonNoteId"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Forgotten."
+          },
+          "401": {
+            "description": "No valid access token.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing scope.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such note of yours.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [
+              "conversations:write"
+            ]
+          }
+        ],
+        "x-campbooks": {
+          "access": {
+            "action": "delete",
+            "resource": "conversations.person_note"
+          },
+          "assistant": false,
+          "automation": false,
+          "mutates": true,
+          "records": [
+            "conversations.person_note"
+          ],
+          "risk": "low",
+          "undo": "conversations.set_person_note"
+        }
+      }
+    },
     "/api/v1/w/{workspace_id}/rule-notices": {
       "get": {
         "tags": [
@@ -13323,6 +13600,17 @@
             },
             "description": "Its labels, by name."
           },
+          "lapsed_need": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/LapsedNeed",
+                "description": "The ask that lapsed (its link expired, its offer closed), while its\nmessage is still the newest: shown as \"Expired\"."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "last_message_at": {
             "type": "string",
             "format": "date-time",
@@ -14753,6 +15041,35 @@
           }
         }
       },
+      "LapsedNeed": {
+        "type": "object",
+        "description": "A conversation's ask that lapsed (campbooks-cloud#275): what it was and\nwhen it stopped being possible, while its message is still the newest.\nClients show it as \"Expired\".",
+        "required": [
+          "reason",
+          "question",
+          "message_id",
+          "lapsed_at"
+        ],
+        "properties": {
+          "lapsed_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When what it asked stopped being possible."
+          },
+          "message_id": {
+            "$ref": "#/components/schemas/MessageId",
+            "description": "The message it came from."
+          },
+          "question": {
+            "$ref": "#/components/schemas/NeedQuestion",
+            "description": "The question that raised it."
+          },
+          "reason": {
+            "$ref": "#/components/schemas/NeedReason",
+            "description": "Why it was needed."
+          }
+        }
+      },
       "Likeness": {
         "type": "string",
         "description": "How a suggestion picks the mail that looks the same.",
@@ -15088,7 +15405,10 @@
           "needs_reply",
           "asks_action",
           "suspicious",
-          "money"
+          "money",
+          "worth_a_look",
+          "still_to_do",
+          "still_needs_reply"
         ]
       },
       "NeedReason": {
@@ -15098,7 +15418,8 @@
           "reply",
           "do",
           "pay",
-          "review"
+          "review",
+          "worth_a_look"
         ]
       },
       "NeedTrust": {
@@ -15142,7 +15463,15 @@
               "null"
             ],
             "format": "date",
-            "description": "When it is due: none until a due date is extracted from the mail\n(needs raised before ADR 0018 may carry one)."
+            "description": "When it is due, as Scout read the email: none until it has, or when\nthe email names no date."
+          },
+          "lapses_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "When what it asks stops being possible, as Scout read the email\n(never for a bill or a warning)."
           },
           "message_id": {
             "$ref": "#/components/schemas/MessageId",
@@ -15178,6 +15507,14 @@
             ],
             "description": "The rule that decided it (`model.decide`, …), for the sentence the\nclient words it with.",
             "example": "model.decide"
+          },
+          "sent_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "When that message was sent."
           },
           "trust": {
             "$ref": "#/components/schemas/NeedTrust",
@@ -15499,6 +15836,63 @@
           "paused_by_member",
           "author_unavailable"
         ]
+      },
+      "PersonNote": {
+        "type": "object",
+        "description": "What you told Scout about a person.",
+        "required": [
+          "id",
+          "address",
+          "note",
+          "updated_at"
+        ],
+        "properties": {
+          "address": {
+            "type": "string",
+            "description": "The person's address, lower-cased."
+          },
+          "id": {
+            "$ref": "#/components/schemas/PersonNoteId",
+            "description": "The note."
+          },
+          "name": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Their name as your mail gave it, else as their trusted mail did."
+          },
+          "note": {
+            "type": "string",
+            "description": "Who they are and how to write to them, in your words."
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When you last changed it."
+          }
+        }
+      },
+      "PersonNoteId": {
+        "type": "string",
+        "format": "uuid",
+        "description": "PersonNoteId (UUIDv7)"
+      },
+      "PersonNoteList": {
+        "type": "object",
+        "description": "Your notes, the newest change first.",
+        "required": [
+          "notes"
+        ],
+        "properties": {
+          "notes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PersonNote"
+            },
+            "description": "At most 500."
+          }
+        }
       },
       "Phase": {
         "type": "string",
@@ -16057,7 +16451,8 @@
           "reply",
           "decide",
           "do",
-          "pay"
+          "pay",
+          "worth_a_look"
         ]
       },
       "ReasonCount": {
@@ -16743,6 +17138,21 @@
                 "type": "string",
                 "enum": [
                   "show_images"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "description": "Make sure the member sees each new message: it waits on Home under\n\"Worth a look\" until it has been opened once (\"Highlight them\",\ncampbooks-cloud#274). Not pinned: it hides nothing, and the mail can\nstill be archived like any other.",
+            "required": [
+              "action"
+            ],
+            "properties": {
+              "action": {
+                "type": "string",
+                "enum": [
+                  "worth_a_look"
                 ]
               }
             }
@@ -17813,6 +18223,27 @@
             "description": "Stable user id at the identity provider."
           }
         }
+      },
+      "SetPersonNote": {
+        "type": "object",
+        "description": "The note to keep about a person.",
+        "required": [
+          "address",
+          "note"
+        ],
+        "properties": {
+          "address": {
+            "type": "string",
+            "description": "The person's address.",
+            "example": "marta@clientes.example"
+          },
+          "note": {
+            "type": "string",
+            "description": "Who they are and how to write to them (1 to 500 characters).",
+            "example": "My landlord. Formal, in Portuguese."
+          }
+        },
+        "additionalProperties": false
       },
       "SignInStart": {
         "type": "object",

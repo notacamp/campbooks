@@ -23,6 +23,7 @@ fn need(revision: i64, message: &str) -> Need {
         due_on: None,
         sent_at: Utc::now() - TimeDelta::hours(1),
         latest: None,
+        lapses_at: None,
     }
 }
 

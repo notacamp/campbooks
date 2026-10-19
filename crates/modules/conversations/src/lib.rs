@@ -215,7 +215,12 @@ pub fn module(deps: ConversationsDeps) -> Module {
                 deps.config.notices,
             ))
             .handler(features::refresh_need::RefreshNeed::new(needs.clone()))
-            .handler(features::summarize_need::SummarizeNeed::new(summaries))
+            .handler(features::summarize_need::SummarizeNeed::new(
+                summaries,
+                needs.clone(),
+            ))
+            .handler(features::wake_needs::WakeNeeds::new(needs.clone()))
+            .schedule::<features::wake_needs::DispatchNeedClocks>(features::wake_needs::EVERY)
             .handler(features::apply_changes::ApplyChanges::new(
                 deps.rules,
                 deps.policy.clone(),
@@ -288,8 +293,8 @@ fn router() -> OpenApiRouter<AppState> {
     use features::{
         archive, create_draft, get_attachment, get_conversation, get_message_body, labels,
         list_conversations, list_drafts, list_inboxes, list_labels, list_senders, list_streams,
-        mark_read, move_to_stream, needs, reply, rule_notices, rules, send_draft, spam, star,
-        suggest_rules, trash, update_draft,
+        mark_read, move_to_stream, needs, person_notes, reply, rule_notices, rules, send_draft,
+        spam, star, suggest_rules, trash, update_draft,
     };
     OpenApiRouter::new()
         .routes(routes!(list_inboxes::handler))
@@ -337,6 +342,8 @@ fn router() -> OpenApiRouter<AppState> {
         .routes(routes!(rule_notices::answer, rule_notices::clear_answer))
         .routes(routes!(reply::suggest))
         .routes(routes!(reply::write))
+        .routes(routes!(person_notes::list, person_notes::set))
+        .routes(routes!(person_notes::delete))
 }
 
 #[cfg(test)]
@@ -380,12 +387,15 @@ mod tests {
             "conversations.dispatch_rule_resigns",
             "conversations.resign_rules",
             "conversations.retag_bindings",
+            "conversations.wake_needs",
+            "conversations.dispatch_need_clocks",
         ] {
             assert!(kinds.contains(&kind), "{kind}");
         }
         let schedules = registry.schedule_names();
         assert!(schedules.contains(&"conversations.dispatch_needs_backfills"));
         assert!(schedules.contains(&"conversations.dispatch_rule_resigns"));
+        assert!(schedules.contains(&"conversations.dispatch_need_clocks"));
     }
 
     // A runtime query rather than `query!`, so this test needs no entry in

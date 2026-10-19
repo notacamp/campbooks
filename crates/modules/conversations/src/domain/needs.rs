@@ -13,17 +13,25 @@
 //!   payment still owed: a receipt or a payment confirmation needs nothing.
 //!   The facts only ever say "no" (ADR 0018), so a sure need comes from the
 //!   model; a facts "no" still wins over a model's "yes".
-//! - **Settled** ([`settle`], pure) against what happened since: a reply
-//!   clears Reply and Do, an archive clears Reply and Review, the trash or
-//!   spam (the conversation's, or the need's own message's) clears
-//!   everything, and a member's verdict (Done, Not needed, a confirmed
-//!   question, Already paid, Still to pay) wins.
+//! - **Settled** ([`settle`], pure) against what happened since and the
+//!   time now ([`Clock`]): a reply clears Reply and Do, an archive clears
+//!   Reply and Review, the trash or spam (the conversation's, or the need's
+//!   own message's) clears everything, and a member's verdict (Done, Not
+//!   needed, a confirmed question, Already paid, Still to pay) wins. Then
+//!   the clock (campbooks-cloud#275): a need whose lapse time has passed is
+//!   cleared as lapsed (never a bill or a warning), and an undated `do` or
+//!   `reply` whose message left the needs window, that no member confirmed,
+//!   becomes a question: "Still to do?", "Still needs a reply?".
 //! - **Refreshed** ([`refresh`]) wherever those inputs change, publishing
-//!   `conversations.need_changed` with a growing revision when the need did.
+//!   `conversations.need_changed` with a growing revision when the need did,
+//!   and writing when it next changes with time alone
+//!   (`conversations.need_clocks`), which `conversations.wake_needs` acts on.
 //!
-//! Mail text is never an instruction here. A need carries no due date until
-//! one is extracted from the mail (a follow-up of ADR 0018); answers stored
-//! before then may carry the sender's sentence, only ever shown, quoted.
+//! Mail text is never an instruction here. A need's due date and lapse time
+//! are what Scout read from its message's email (`summarize_need`, the
+//! `complete` role), kept with the message in `need_summaries` and copied
+//! onto the need; answers stored before ADR 0018 may carry the sender's
+//! sentence, only ever shown, quoted.
 
 use campbooks_ai::decide::signals::email::triage;
 use campbooks_kernel::{Error, EventBus, Result, tenancy::UserId};
@@ -43,6 +51,10 @@ use crate::{
 
 /// The question a taught rule's `surface` answer is stored under.
 pub const SURFACE: &str = "surface";
+/// The question a taught rule's "Worth a look" answer is stored under
+/// (campbooks-cloud#274): the member asked to see each message from a sender
+/// until they have opened it once.
+pub const WORTH_A_LOOK: &str = "worth_a_look";
 /// The `urgency` level meaning "today".
 const TODAY_LEVEL: f64 = 2.0;
 /// The stream of automated money mail: only a payment still owed needs
@@ -159,8 +171,74 @@ pub struct Need {
     pub decision: Option<DecisionId>,
     /// When it is due.
     pub due_on: Option<NaiveDate>,
+    /// When what it asks stops being possible (none for a bill or a
+    /// warning, which never lapse).
+    pub lapses_at: Option<DateTime<Utc>>,
     /// Whether it is for today.
     pub urgent: bool,
+}
+
+/// What Scout read about a message's dates (`need_summaries`).
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct Dates {
+    /// By when the recipient is asked to act.
+    pub due_on: Option<NaiveDate>,
+    /// When what it asks stops being possible.
+    pub lapses_at: Option<DateTime<Utc>>,
+}
+
+impl Need {
+    /// Whether it can lapse: anything but a bill (it stays until a member
+    /// answers it), a warning (it keeps its own rules) and "Worth a look"
+    /// (a rule the member taught keeps it until it is opened: nothing the
+    /// mail says undoes that).
+    pub fn can_lapse(&self) -> bool {
+        !matches!(self.reason, NeedReason::Pay | NeedReason::WorthALook)
+            && !matches!(
+                self.question,
+                NeedQuestion::Money | NeedQuestion::Suspicious | NeedQuestion::WorthALook
+            )
+    }
+
+    /// The need with its message's `dates`: the due date, and the lapse
+    /// time when it can lapse.
+    #[must_use]
+    pub fn dated(mut self, dates: Dates) -> Self {
+        self.due_on = dates.due_on;
+        self.lapses_at = dates.lapses_at.filter(|_| self.can_lapse());
+        self
+    }
+
+    /// Whether it is an ask that time alone turns into "Still needed?": a
+    /// sure `do` or `reply` with no date of its own that no member
+    /// confirmed.
+    fn may_go_stale(&self) -> bool {
+        matches!(self.reason, NeedReason::Do | NeedReason::Reply)
+            && self.trust == NeedTrust::Sure
+            && self.basis != NeedBasis::Member
+            && self.due_on.is_none()
+            && self.lapses_at.is_none()
+    }
+}
+
+/// The time a need is settled against: now, and the needs window (an
+/// undated ask whose message is older than it is asked again).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Clock {
+    /// Now.
+    pub now: DateTime<Utc>,
+    /// The needs window.
+    pub window: TimeDelta,
+}
+
+impl Clock {
+    /// The clock at this moment, with `settings`' window.
+    pub fn now(settings: &NeedSettings) -> Self {
+        Self {
+            now: Utc::now(),
+            window: settings.window,
+        }
+    }
 }
 
 /// The answer to `question` the policy let act, when it says yes: the
@@ -260,6 +338,7 @@ pub fn raise(message: MessageId, answers: &[Answer], settings: &NeedSettings) ->
         question,
         decision: Some(decision.id),
         due_on: None,
+        lapses_at: None,
         urgent: false,
     };
     // A suspicious message is only ever a warning: its asks are not ours.
@@ -349,12 +428,34 @@ pub fn raise(message: MessageId, answers: &[Answer], settings: &NeedSettings) ->
                 })
         })
     };
-    raised.map(|mut need| {
+    let raised = raised.map(|mut need| {
         need.urgent = answers.iter().any(|a| {
             a.question == triage::URGENCY && a.acted && a.level().is_some_and(|l| l >= TODAY_LEVEL)
         });
         need
-    })
+    });
+    // Anything that asks something of the member comes first.
+    raised.or_else(|| highlighted(message, answers))
+}
+
+/// "Worth a look": what a rule the member taught keeps in front of them
+/// until they have opened it, when nothing asks more of them. It is never
+/// urgent and never a question: they asked for it.
+fn highlighted(message: MessageId, answers: &[Answer]) -> Option<Need> {
+    answers
+        .iter()
+        .find(|a| a.basis == NeedBasis::Taught && a.question == WORTH_A_LOOK && a.is_true())
+        .map(|a| Need {
+            message,
+            reason: NeedReason::WorthALook,
+            trust: NeedTrust::Sure,
+            basis: a.basis,
+            question: NeedQuestion::WorthALook,
+            decision: Some(a.id),
+            due_on: None,
+            lapses_at: None,
+            urgent: false,
+        })
 }
 
 /// The answers with a taught rule's speaking for the member: its answer to
@@ -385,10 +486,26 @@ fn surfaces_never(answers: &[Answer]) -> bool {
     })
 }
 
+/// The question an ask was raised by: a "Still needed?" question stands for
+/// the ask it was raised as; every other question is its own.
+fn asked(question: NeedQuestion) -> NeedQuestion {
+    match question {
+        NeedQuestion::StillToDo => NeedQuestion::AsksAction,
+        NeedQuestion::StillNeedsReply => NeedQuestion::NeedsReply,
+        NeedQuestion::NeedsReply
+        | NeedQuestion::AsksAction
+        | NeedQuestion::Suspicious
+        | NeedQuestion::Money
+        | NeedQuestion::WorthALook => question,
+    }
+}
+
 /// Whether a taught rule now says the need raised by `question` is not
 /// needed: "never", or a false answer to that question. A warning about
 /// suspicious mail is never cleared this way.
 fn rule_clears(answers: &[Answer], question: NeedQuestion) -> bool {
+    // A "Still needed?" question stands for the ask it was raised as.
+    let question = asked(question);
     if question == NeedQuestion::Suspicious {
         return false;
     }
@@ -401,6 +518,7 @@ fn rule_clears(answers: &[Answer], question: NeedQuestion) -> bool {
 
 /// What happened in the conversation since the need's message.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+#[allow(clippy::struct_excessive_bools)]
 pub struct Since {
     /// A message was sent from the inbox after it.
     pub replied: bool,
@@ -413,6 +531,10 @@ pub struct Since {
     pub verdict: Option<NeedVerdict>,
     /// What the inbox's taught rules say about it.
     pub rule: RuleSays,
+    /// When the need's message was sent (`None` once it is gone).
+    pub sent_at: Option<DateTime<Utc>>,
+    /// The message was opened (read) by someone, here or at the provider.
+    pub opened: bool,
 }
 
 /// What a taught rule says about a need.
@@ -434,9 +556,9 @@ pub enum Settled {
     Cleared(Need, ClearCause),
 }
 
-/// Settle `need` against what happened since (the clearing table of the
-/// design).
-pub fn settle(mut need: Need, since: Since) -> Settled {
+/// Settle `need` against what happened since and the time now (the
+/// clearing table of the design).
+pub fn settle(mut need: Need, since: Since, clock: Clock) -> Settled {
     match since.verdict {
         // Paid already is done for a Pay need: nothing is filed yet.
         Some(NeedVerdict::Done | NeedVerdict::AlreadyPaid) => {
@@ -447,10 +569,14 @@ pub fn settle(mut need: Need, since: Since) -> Settled {
             // "Yes, it needs a reply": the question becomes what it asked.
             if need.trust == NeedTrust::Check {
                 need.reason = match need.question {
-                    NeedQuestion::AsksAction => NeedReason::Do,
+                    NeedQuestion::AsksAction | NeedQuestion::StillToDo => NeedReason::Do,
                     NeedQuestion::Money => NeedReason::Pay,
-                    NeedQuestion::NeedsReply | NeedQuestion::Suspicious => NeedReason::Reply,
+                    NeedQuestion::NeedsReply
+                    | NeedQuestion::Suspicious
+                    | NeedQuestion::StillNeedsReply => NeedReason::Reply,
+                    NeedQuestion::WorthALook => NeedReason::WorthALook,
                 };
+                need.question = asked(need.question);
             }
             need.trust = NeedTrust::Sure;
             need.basis = NeedBasis::Member;
@@ -466,6 +592,10 @@ pub fn settle(mut need: Need, since: Since) -> Settled {
     if since.trashed {
         return Settled::Cleared(need, ClearCause::Trashed);
     }
+    // "Worth a look" asks only that the member opens it once.
+    if since.opened && need.reason == NeedReason::WorthALook {
+        return Settled::Cleared(need, ClearCause::Opened);
+    }
     if since.replied && matches!(need.reason, NeedReason::Reply | NeedReason::Do) {
         return Settled::Cleared(need, ClearCause::Replied);
     }
@@ -474,11 +604,53 @@ pub fn settle(mut need: Need, since: Since) -> Settled {
     if since.archived && matches!(need.reason, NeedReason::Reply | NeedReason::Review) {
         return Settled::Cleared(need, ClearCause::Archived);
     }
+    // What it asks is no longer possible (the link expired, the offer
+    // closed): whoever stood behind it, there is nothing left to do.
+    if need.can_lapse() && need.lapses_at.is_some_and(|at| at <= clock.now) {
+        return Settled::Cleared(need, ClearCause::Lapsed);
+    }
+    // An undated ask from longer ago than the window: asked again, as a
+    // question, until a member says it still is (campbooks-cloud#275).
+    if need.may_go_stale()
+        && since
+            .sent_at
+            .is_some_and(|sent| sent + clock.window <= clock.now)
+    {
+        need.question = if need.reason == NeedReason::Do {
+            NeedQuestion::StillToDo
+        } else {
+            NeedQuestion::StillNeedsReply
+        };
+        need.reason = NeedReason::Review;
+        need.trust = NeedTrust::Check;
+    }
     Settled::Open(need)
 }
 
+/// When `settled`, if open, next changes with time alone: its lapse time,
+/// or when its message (sent at `sent_at`) leaves the window while it is an
+/// undated ask, whichever comes first and is still ahead of `clock`.
+pub fn next_wake(
+    settled: &Settled,
+    sent_at: Option<DateTime<Utc>>,
+    clock: Clock,
+) -> Option<DateTime<Utc>> {
+    let Settled::Open(need) = settled else {
+        return None;
+    };
+    let lapse = need.lapses_at.filter(|_| need.can_lapse());
+    let stale = sent_at
+        .filter(|_| need.may_go_stale())
+        .and_then(|sent| sent.checked_add_signed(clock.window));
+    [lapse, stale]
+        .into_iter()
+        .flatten()
+        .filter(|at| *at > clock.now)
+        .min()
+}
+
 /// The stored row.
-#[derive(Debug)]
+#[derive(Debug, sqlx::FromRow)]
 struct Row {
     message_id: MessageId,
     reason: String,
@@ -487,6 +659,7 @@ struct Row {
     question: String,
     decision_id: Option<DecisionId>,
     due_on: Option<NaiveDate>,
+    lapses_at: Option<DateTime<Utc>>,
     urgent: bool,
     state: String,
     cleared_because: Option<String>,
@@ -506,6 +679,7 @@ impl Row {
             question: self.question.parse()?,
             decision: self.decision_id,
             due_on: self.due_on,
+            lapses_at: self.lapses_at,
             urgent: self.urgent,
         })
     }
@@ -518,21 +692,66 @@ impl Row {
     }
 }
 
+/// The conversation's stored need, locked. A runtime query, so the columns
+/// added since need no entry in the `.sqlx` offline cache.
 async fn current(conn: &mut PgConnection, conversation: ConversationId) -> Result<Option<Row>> {
-    Ok(sqlx::query_as!(
-        Row,
-        r#"
-        SELECT message_id AS "message_id: MessageId", reason, trust, basis, question,
-               decision_id AS "decision_id: DecisionId", due_on, urgent, state, cleared_because,
-               verdict, verdict_message_id AS "verdict_message_id: MessageId",
-               verdict_by AS "verdict_by: UserId",
-               latest_inbound_id AS "latest_inbound_id: MessageId"
-          FROM conversations.needs WHERE conversation_id = $1 FOR UPDATE
-        "#,
-        conversation as ConversationId,
+    Ok(sqlx::query_as::<_, Row>(
+        "SELECT message_id, reason, trust, basis, question, decision_id, due_on, lapses_at,
+                urgent, state, cleared_because, verdict, verdict_message_id, verdict_by,
+                latest_inbound_id
+           FROM conversations.needs WHERE conversation_id = $1 FOR UPDATE",
     )
+    .bind(conversation)
     .fetch_optional(conn)
     .await?)
+}
+
+/// What Scout read about `message`'s dates, if it has read them.
+async fn dates(conn: &mut PgConnection, message: MessageId) -> Result<Dates> {
+    let row: Option<(Option<DateTime<Utc>>, Option<NaiveDate>)> = sqlx::query_as(
+        "SELECT lapses_at, due_on FROM conversations.need_summaries WHERE message_id = $1",
+    )
+    .bind(message)
+    .fetch_optional(conn)
+    .await?;
+    Ok(
+        row.map_or_else(Dates::default, |(lapses_at, due_on)| Dates {
+            due_on,
+            lapses_at,
+        }),
+    )
+}
+
+/// Write when conversation `id`'s open need next changes with time alone,
+/// or forget it (`None`). After the needs row is written and locked, as
+/// every caller of [`refresh`] locks the needs row first.
+async fn set_clock(
+    tx: &mut Transaction<'_, Postgres>,
+    workspace_id: sqlx::types::Uuid,
+    id: ConversationId,
+    wake: Option<DateTime<Utc>>,
+) -> Result<()> {
+    match wake {
+        Some(at) => {
+            sqlx::query(
+                "INSERT INTO conversations.need_clocks (conversation_id, workspace_id, wake_at)
+                 VALUES ($1, $2, $3)
+                 ON CONFLICT (conversation_id) DO UPDATE SET wake_at = EXCLUDED.wake_at",
+            )
+            .bind(id)
+            .bind(workspace_id)
+            .bind(at)
+            .execute(&mut **tx)
+            .await?;
+        }
+        None => {
+            sqlx::query("DELETE FROM conversations.need_clocks WHERE conversation_id = $1")
+                .bind(id)
+                .execute(&mut **tx)
+                .await?;
+        }
+    }
+    Ok(())
 }
 
 /// The answers stored about `message`. A model's answer counts only when it
@@ -684,6 +903,11 @@ async fn since(
         Some(row) => row.verdict_on(need.message)?,
         None => None,
     };
+    let opened: bool = sqlx::query_scalar("SELECT read FROM conversations.messages WHERE id = $1")
+        .bind(need.message)
+        .fetch_optional(&mut **tx)
+        .await?
+        .unwrap_or(false);
     let rule = if rule_clears(&answers(tx, need.message).await?, need.question) {
         RuleSays::NotNeeded
     } else {
@@ -696,6 +920,8 @@ async fn since(
             trashed: state.1 || sent.is_none(),
             verdict,
             rule,
+            sent_at: sent,
+            opened,
         },
         sent,
     ))
@@ -986,13 +1212,18 @@ async fn refresh_pass(
     let Some(need) = need else {
         return Ok(Pass::Done(Refreshed::Settled));
     };
+    // Its dates, as Scout read them from its message's email.
+    let read = dates(tx, need.message).await?;
+    let need = need.dated(read);
 
+    let clock = Clock::now(settings);
     let (since, sent) = since(tx, id, &conversation_state, row.as_ref(), &need).await?;
-    let settled = match settle(need, since) {
+    let settled = match settle(need, since, clock) {
         // Its own message no longer raises it: cleared as replaced.
         Settled::Open(need) if withdrawn => Settled::Cleared(need, ClearCause::Superseded),
         settled => settled,
     };
+    let wake = next_wake(&settled, sent, clock);
 
     let (need, cause) = match &settled {
         Settled::Open(need) => (need, None),
@@ -1012,47 +1243,55 @@ async fn refresh_pass(
         }
     }
     if !worth_announcing(row.as_ref(), need, cause, latest)? {
+        // Unchanged, but when it next changes may be new (a need from
+        // before the clock existed): only over a stored row.
+        if row.is_some() {
+            set_clock(tx, conversation.workspace_id, id, wake).await?;
+        }
         return Ok(Pass::Done(Refreshed::Settled));
     }
     let cleared_by = match cause {
         Some(ClearCause::Done | ClearCause::NotNeeded) => row.as_ref().and_then(|r| r.verdict_by),
         _ => None,
     };
-    let revision = sqlx::query_scalar!(
-        r#"
-        INSERT INTO conversations.needs
-            (conversation_id, workspace_id, message_id, reason, trust, basis, question,
-             decision_id, due_on, urgent, state, cleared_because, cleared_by, cleared_at,
-             latest_inbound_id)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13,
-                CASE WHEN $12::text IS NULL THEN NULL ELSE now() END, $14)
-        ON CONFLICT (conversation_id) DO UPDATE
-           SET message_id = EXCLUDED.message_id, reason = EXCLUDED.reason,
-               trust = EXCLUDED.trust, basis = EXCLUDED.basis, question = EXCLUDED.question,
-               decision_id = EXCLUDED.decision_id, due_on = EXCLUDED.due_on,
-               urgent = EXCLUDED.urgent, state = EXCLUDED.state,
-               cleared_because = EXCLUDED.cleared_because, cleared_by = EXCLUDED.cleared_by,
-               cleared_at = EXCLUDED.cleared_at, latest_inbound_id = EXCLUDED.latest_inbound_id,
-               revision = conversations.needs.revision + 1, updated_at = now()
-        RETURNING revision
-        "#,
-        id as ConversationId,
-        conversation.workspace_id,
-        need.message as MessageId,
-        need.reason.as_str(),
-        need.trust.as_str(),
-        need.basis.as_str(),
-        need.question.as_str(),
-        need.decision as Option<DecisionId>,
-        need.due_on,
-        need.urgent,
-        if cause.is_some() { "cleared" } else { "open" },
-        cause.map(ClearCause::as_str),
-        cleared_by.map(|u| *u.as_uuid()),
-        latest as Option<MessageId>,
+    // A runtime query, so the columns added since need no entry in the
+    // `.sqlx` offline cache.
+    let revision: i64 = sqlx::query_scalar(
+        "INSERT INTO conversations.needs
+             (conversation_id, workspace_id, message_id, reason, trust, basis, question,
+              decision_id, due_on, urgent, state, cleared_because, cleared_by, cleared_at,
+              latest_inbound_id, lapses_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13,
+                 CASE WHEN $12::text IS NULL THEN NULL ELSE now() END, $14, $15)
+         ON CONFLICT (conversation_id) DO UPDATE
+            SET message_id = EXCLUDED.message_id, reason = EXCLUDED.reason,
+                trust = EXCLUDED.trust, basis = EXCLUDED.basis, question = EXCLUDED.question,
+                decision_id = EXCLUDED.decision_id, due_on = EXCLUDED.due_on,
+                urgent = EXCLUDED.urgent, state = EXCLUDED.state,
+                cleared_because = EXCLUDED.cleared_because, cleared_by = EXCLUDED.cleared_by,
+                cleared_at = EXCLUDED.cleared_at, latest_inbound_id = EXCLUDED.latest_inbound_id,
+                lapses_at = EXCLUDED.lapses_at,
+                revision = conversations.needs.revision + 1, updated_at = now()
+         RETURNING revision",
     )
+    .bind(id)
+    .bind(conversation.workspace_id)
+    .bind(need.message)
+    .bind(need.reason.as_str())
+    .bind(need.trust.as_str())
+    .bind(need.basis.as_str())
+    .bind(need.question.as_str())
+    .bind(need.decision)
+    .bind(need.due_on)
+    .bind(need.urgent)
+    .bind(if cause.is_some() { "cleared" } else { "open" })
+    .bind(cause.map(ClearCause::as_str))
+    .bind(cleared_by.map(|u| *u.as_uuid()))
+    .bind(latest)
+    .bind(need.lapses_at)
     .fetch_one(&mut **tx)
     .await?;
+    set_clock(tx, conversation.workspace_id, id, wake).await?;
     // A need that opens for a message (new, or back after being cleared)
     // gets Scout's summary of the email, through a job: never here, and
     // once per message however often the need is worked out again. Mail
@@ -1080,6 +1319,7 @@ async fn refresh_pass(
                         reason: need.reason,
                         trust: need.trust,
                         due_on: need.due_on,
+                        lapses_at: need.lapses_at,
                         urgent: need.urgent,
                     }),
                     Some(_) => None,
@@ -1194,15 +1434,20 @@ pub struct NeedView {
     /// client words it with.
     #[schema(example = "model.decide")]
     pub rule: Option<String>,
-    /// When it is due: none until a due date is extracted from the mail
-    /// (needs raised before ADR 0018 may carry one).
+    /// When it is due, as Scout read the email: none until it has, or when
+    /// the email names no date.
     pub due_on: Option<NaiveDate>,
     /// Whether the due date has passed.
     pub overdue: bool,
+    /// When what it asks stops being possible, as Scout read the email
+    /// (never for a bill or a warning).
+    pub lapses_at: Option<DateTime<Utc>>,
     /// Whether it is for today.
     pub urgent: bool,
     /// The message it comes from.
     pub message_id: MessageId,
+    /// When that message was sent.
+    pub sent_at: Option<DateTime<Utc>>,
     /// What the sender wrote, when an answer stored before ADR 0018 quoted
     /// it.
     pub quote: Option<Quote>,
@@ -1215,32 +1460,92 @@ pub struct NeedView {
     pub actions: Option<Vec<super::actions::SuggestedAction>>,
 }
 
-/// Fill in each summary's open [`NeedView`].
+/// A conversation's ask that lapsed (campbooks-cloud#275): what it was and
+/// when it stopped being possible, while its message is still the newest.
+/// Clients show it as "Expired".
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+pub struct LapsedNeed {
+    /// Why it was needed.
+    pub reason: NeedReason,
+    /// The question that raised it.
+    pub question: NeedQuestion,
+    /// The message it came from.
+    pub message_id: MessageId,
+    /// When what it asked stopped being possible.
+    pub lapsed_at: DateTime<Utc>,
+}
+
+/// A row of [`ATTACH`].
+#[derive(sqlx::FromRow)]
+struct AttachRow {
+    conversation_id: ConversationId,
+    message_id: MessageId,
+    reason: String,
+    trust: String,
+    basis: String,
+    question: String,
+    due_on: Option<NaiveDate>,
+    lapses_at: Option<DateTime<Utc>>,
+    urgent: bool,
+    state: String,
+    sender: Option<serde_json::Value>,
+    sent_at: Option<DateTime<Utc>>,
+    reasons: Option<serde_json::Value>,
+}
+
+/// The open needs of some conversations, and their lapsed ones while the
+/// lapsed need's message is still the newest inbound message that is not in
+/// spam or the trash. A runtime query, so the columns added since need no
+/// entry in the `.sqlx` offline cache.
+const ATTACH: &str = "SELECT n.conversation_id, n.message_id, n.reason, n.trust, n.basis, \
+            n.question, n.due_on, n.lapses_at, n.urgent, n.state, m.sender, m.sent_at, \
+            d.reasons \
+       FROM conversations.needs n \
+       LEFT JOIN conversations.messages m ON m.id = n.message_id \
+       LEFT JOIN conversations.decisions d ON d.id = n.decision_id \
+      WHERE n.conversation_id = ANY($1) \
+        AND (n.state = 'open' \
+             OR (n.cleared_because = 'lapsed' AND n.lapses_at IS NOT NULL \
+                 AND m.id IS NOT NULL AND NOT m.in_spam AND NOT m.in_trash \
+                 AND NOT EXISTS ( \
+                     SELECT 1 FROM conversations.messages later \
+                      WHERE later.conversation_id = n.conversation_id \
+                        AND later.direction = 'inbound' \
+                        AND NOT later.in_spam AND NOT later.in_trash \
+                        AND (later.sent_at, later.id) > (m.sent_at, m.id))))";
+
+/// Fill in each summary's open [`NeedView`], or its [`LapsedNeed`] when its
+/// ask lapsed (an open need whose lapse time passed counts as lapsed before
+/// the clock has woken it).
 pub async fn attach(conn: &mut PgConnection, summaries: &mut [ConversationSummary]) -> Result<()> {
     let ids: Vec<ConversationId> = summaries.iter().map(|s| s.id).collect();
     if ids.is_empty() {
         return Ok(());
     }
-    let rows = sqlx::query!(
-        r#"
-        SELECT n.conversation_id AS "conversation_id: ConversationId",
-               n.message_id AS "message_id: MessageId", n.reason, n.trust, n.basis, n.question,
-               n.due_on, n.urgent, m.sender AS "sender?", m.sent_at AS "sent_at?",
-               d.reasons AS "reasons?"
-          FROM conversations.needs n
-          LEFT JOIN conversations.messages m ON m.id = n.message_id
-          LEFT JOIN conversations.decisions d ON d.id = n.decision_id
-         WHERE n.conversation_id = ANY($1) AND n.state = 'open'
-        "#,
-        &ids as &[ConversationId],
-    )
-    .fetch_all(&mut *conn)
-    .await?;
-    let today = Utc::now().date_naive();
+    let rows: Vec<AttachRow> = sqlx::query_as(ATTACH)
+        .bind(ids.as_slice())
+        .fetch_all(&mut *conn)
+        .await?;
+    let now = Utc::now();
+    let today = now.date_naive();
     for row in rows {
         let Some(summary) = summaries.iter_mut().find(|s| s.id == row.conversation_id) else {
             continue;
         };
+        let reason: NeedReason = row.reason.parse()?;
+        let question: NeedQuestion = row.question.parse()?;
+        let lapsed = row.state != "open" || row.lapses_at.is_some_and(|at| at <= now);
+        if lapsed {
+            if let Some(lapsed_at) = row.lapses_at {
+                summary.lapsed_need = Some(LapsedNeed {
+                    reason,
+                    question,
+                    message_id: row.message_id,
+                    lapsed_at,
+                });
+            }
+            continue;
+        }
         let reasons: Vec<StoredReason> = row
             .reasons
             .map(serde_json::from_value)
@@ -1265,15 +1570,17 @@ pub async fn attach(conn: &mut PgConnection, summaries: &mut [ConversationSummar
             _ => None,
         };
         summary.need = Some(NeedView {
-            reason: row.reason.parse()?,
+            reason,
             trust: row.trust.parse()?,
             basis: row.basis.parse()?,
-            question: row.question.parse()?,
+            question,
             rule: reasons.first().map(|r| r.rule.clone()),
             due_on: row.due_on,
             overdue: row.due_on.is_some_and(|due| due < today),
+            lapses_at: row.lapses_at,
             urgent: row.urgent,
             message_id: row.message_id,
+            sent_at: row.sent_at,
             quote,
             actions: None,
         });
@@ -1372,18 +1679,75 @@ mod tests {
     }
 
     #[test]
+    fn a_highlight_rule_raises_worth_a_look_only_when_nothing_asks_more() {
+        let look = answer(WORTH_A_LOOK, NeedBasis::Taught, json!(true), true);
+        let need = raised(std::slice::from_ref(&look)).unwrap();
+        assert_eq!(
+            (need.reason, need.trust, need.basis, need.question),
+            (
+                NeedReason::WorthALook,
+                NeedTrust::Sure,
+                NeedBasis::Taught,
+                NeedQuestion::WorthALook
+            )
+        );
+        assert!(!need.urgent);
+        // A reply someone is waiting for outranks it: one need per conversation.
+        let reply = raised(&[
+            answer(triage::NEEDS_REPLY, NeedBasis::Taught, json!(true), true),
+            look.clone(),
+        ])
+        .unwrap();
+        assert_eq!(reply.reason, NeedReason::Reply);
+        // "Never needs anyone" is the opposite of a highlight.
+        let never = answer(SURFACE, NeedBasis::Taught, json!("never"), true);
+        assert_eq!(raised(&[look, never]), None);
+    }
+
+    #[test]
+    fn worth_a_look_clears_itself_once_opened() {
+        let opened = Since {
+            opened: true,
+            ..Since::default()
+        };
+        assert_eq!(
+            cause(&settle(need(NeedReason::WorthALook), opened, clock())),
+            Some(ClearCause::Opened)
+        );
+        // Opening settles nothing else: a bill stays until answered.
+        assert_eq!(cause(&settle(need(NeedReason::Pay), opened, clock())), None);
+        assert_eq!(
+            cause(&settle(
+                need(NeedReason::WorthALook),
+                Since::default(),
+                clock()
+            )),
+            None
+        );
+        // Seen (Done) clears it too.
+        let seen = Since {
+            verdict: Some(NeedVerdict::Done),
+            ..Since::default()
+        };
+        assert_eq!(
+            cause(&settle(need(NeedReason::WorthALook), seen, clock())),
+            Some(ClearCause::Done)
+        );
+    }
+
+    #[test]
     fn a_rule_clears_what_it_says_is_not_needed() {
         let by_rule = Since {
             rule: RuleSays::NotNeeded,
             ..Since::default()
         };
         assert_eq!(
-            cause(&settle(need(NeedReason::Pay), by_rule)),
+            cause(&settle(need(NeedReason::Pay), by_rule, clock())),
             Some(ClearCause::Rule)
         );
         let mut confirmed = need(NeedReason::Reply);
         confirmed.basis = NeedBasis::Member;
-        assert_eq!(cause(&settle(confirmed, by_rule)), None);
+        assert_eq!(cause(&settle(confirmed, by_rule, clock())), None);
         assert!(rule_clears(
             &[answer(
                 triage::NEEDS_REPLY,
@@ -1715,7 +2079,16 @@ mod tests {
             question: NeedQuestion::NeedsReply,
             decision: None,
             due_on: None,
+            lapses_at: None,
             urgent: false,
+        }
+    }
+
+    /// Now, with the shipped 14-day window.
+    fn clock() -> Clock {
+        Clock {
+            now: Utc::now(),
+            window: TimeDelta::days(14),
         }
     }
 
@@ -1766,7 +2139,7 @@ mod tests {
         for (since, causes) in expect {
             for (reason, expected) in [Reply, Do, Pay, Review].into_iter().zip(causes) {
                 assert_eq!(
-                    cause(&settle(need(reason), since)),
+                    cause(&settle(need(reason), since, clock())),
                     expected,
                     "{reason:?} {since:?}"
                 );
@@ -1781,7 +2154,7 @@ mod tests {
             ..Since::default()
         };
         assert_eq!(
-            cause(&settle(need(NeedReason::Pay), done)),
+            cause(&settle(need(NeedReason::Pay), done, clock())),
             Some(ClearCause::Done)
         );
         let confirmed = Since {
@@ -1790,7 +2163,7 @@ mod tests {
         };
         let mut question = need(NeedReason::Review);
         question.trust = NeedTrust::Check;
-        match settle(question, confirmed) {
+        match settle(question, confirmed, clock()) {
             Settled::Open(need) => {
                 assert_eq!(
                     (need.reason, need.trust, need.basis),
@@ -1811,19 +2184,304 @@ mod tests {
             ..Since::default()
         };
         assert_eq!(
-            cause(&settle(question.clone(), paid)),
+            cause(&settle(question.clone(), paid, clock())),
             Some(ClearCause::Done)
         );
         let to_pay = Since {
             verdict: Some(NeedVerdict::StillToPay),
             ..Since::default()
         };
-        match settle(question, to_pay) {
+        match settle(question, to_pay, clock()) {
             Settled::Open(need) => assert_eq!(
                 (need.reason, need.trust, need.basis),
                 (NeedReason::Pay, NeedTrust::Sure, NeedBasis::Member)
             ),
             Settled::Cleared(..) => panic!("still to pay stays open"),
         }
+    }
+
+    fn sent(days_ago: i64) -> Since {
+        Since {
+            sent_at: Some(Utc::now() - TimeDelta::days(days_ago)),
+            ..Since::default()
+        }
+    }
+
+    fn lapsing(mut need: Need, minutes: i64) -> Need {
+        need.lapses_at = Some(Utc::now() + TimeDelta::minutes(minutes));
+        need
+    }
+
+    fn model(reason: NeedReason, question: NeedQuestion) -> Need {
+        let mut need = need(reason);
+        need.basis = NeedBasis::Model;
+        need.question = question;
+        need
+    }
+
+    /// The bug of campbooks-cloud#275: a sign-in link valid for 10 minutes,
+    /// long used, still "asked you to do something".
+    #[test]
+    fn a_lapsed_ask_is_cleared() {
+        let link = lapsing(model(NeedReason::Do, NeedQuestion::AsksAction), -1);
+        assert_eq!(
+            cause(&settle(link.clone(), sent(0), clock())),
+            Some(ClearCause::Lapsed)
+        );
+        // Still possible: open, as it was.
+        let fresh = lapsing(model(NeedReason::Do, NeedQuestion::AsksAction), 9);
+        assert_eq!(cause(&settle(fresh, sent(0), clock())), None);
+        // A member's own ask lapses too: nothing is left to do.
+        let mut confirmed = link.clone();
+        confirmed.basis = NeedBasis::Member;
+        assert_eq!(
+            cause(&settle(confirmed, sent(0), clock())),
+            Some(ClearCause::Lapsed)
+        );
+        // So does a question, and a reply.
+        let mut question = link;
+        question.reason = NeedReason::Review;
+        question.trust = NeedTrust::Check;
+        assert_eq!(
+            cause(&settle(question, sent(0), clock())),
+            Some(ClearCause::Lapsed)
+        );
+        let reply = lapsing(model(NeedReason::Reply, NeedQuestion::NeedsReply), -5);
+        assert_eq!(
+            cause(&settle(reply, sent(0), clock())),
+            Some(ClearCause::Lapsed)
+        );
+    }
+
+    #[test]
+    fn a_bill_never_lapses_and_a_warning_keeps_its_rules() {
+        let mut bill = lapsing(model(NeedReason::Pay, NeedQuestion::Money), -60);
+        bill.trust = NeedTrust::Check;
+        assert_eq!(cause(&settle(bill.clone(), sent(30), clock())), None);
+        // Its dates: a due date, never a lapse time.
+        let dated = bill.dated(Dates {
+            due_on: Some(Utc::now().date_naive()),
+            lapses_at: Some(Utc::now()),
+        });
+        assert_eq!(dated.lapses_at, None);
+        assert!(dated.due_on.is_some());
+        let warning = lapsing(model(NeedReason::Review, NeedQuestion::Suspicious), -60);
+        match settle(warning, sent(30), clock()) {
+            Settled::Open(need) => assert_eq!(
+                (need.reason, need.trust, need.question),
+                (
+                    NeedReason::Review,
+                    NeedTrust::Sure,
+                    NeedQuestion::Suspicious
+                )
+            ),
+            Settled::Cleared(..) => panic!("a warning neither lapses nor goes stale"),
+        }
+        assert_eq!(
+            model(NeedReason::Review, NeedQuestion::Suspicious)
+                .dated(Dates {
+                    due_on: None,
+                    lapses_at: Some(Utc::now()),
+                })
+                .lapses_at,
+            None
+        );
+    }
+
+    /// A taught "Worth a look" rule keeps its need until the message is
+    /// opened: no lapse time read from the mail undoes it.
+    #[test]
+    fn worth_a_look_never_lapses() {
+        let mut look = lapsing(model(NeedReason::WorthALook, NeedQuestion::WorthALook), -60);
+        look.basis = NeedBasis::Taught;
+        assert!(!look.can_lapse());
+        match settle(look.clone(), sent(30), clock()) {
+            Settled::Open(need) => assert_eq!(
+                (need.reason, need.trust, need.question),
+                (
+                    NeedReason::WorthALook,
+                    NeedTrust::Sure,
+                    NeedQuestion::WorthALook
+                )
+            ),
+            Settled::Cleared(_, cause) => panic!("worth a look stays until opened, not {cause:?}"),
+        }
+        // Its dates carry no lapse time, and the clock never wakes it.
+        assert_eq!(
+            look.clone()
+                .dated(Dates {
+                    due_on: None,
+                    lapses_at: Some(Utc::now() + TimeDelta::minutes(5)),
+                })
+                .lapses_at,
+            None
+        );
+        assert_eq!(
+            next_wake(
+                &Settled::Open(look),
+                Some(Utc::now() - TimeDelta::days(30)),
+                clock()
+            ),
+            None
+        );
+    }
+
+    #[test]
+    fn an_old_undated_ask_becomes_a_question() {
+        for (reason, raised, asked) in [
+            (
+                NeedReason::Do,
+                NeedQuestion::AsksAction,
+                NeedQuestion::StillToDo,
+            ),
+            (
+                NeedReason::Reply,
+                NeedQuestion::NeedsReply,
+                NeedQuestion::StillNeedsReply,
+            ),
+        ] {
+            match settle(model(reason, raised), sent(21), clock()) {
+                Settled::Open(need) => assert_eq!(
+                    (need.reason, need.trust, need.question),
+                    (NeedReason::Review, NeedTrust::Check, asked),
+                    "{reason:?}"
+                ),
+                Settled::Cleared(..) => panic!("an old ask stays, as a question"),
+            }
+            // Inside the window: as it was.
+            match settle(model(reason, raised), sent(10), clock()) {
+                Settled::Open(need) => assert_eq!(need.reason, reason),
+                Settled::Cleared(..) => panic!("a recent ask stays"),
+            }
+        }
+    }
+
+    #[test]
+    fn a_dated_or_confirmed_ask_is_not_asked_again() {
+        let mut dated = model(NeedReason::Do, NeedQuestion::AsksAction);
+        dated.due_on = Some(Utc::now().date_naive() - TimeDelta::days(3));
+        match settle(dated, sent(21), clock()) {
+            Settled::Open(need) => assert_eq!(need.reason, NeedReason::Do),
+            Settled::Cleared(..) => panic!("a dated ask stays"),
+        }
+        let ahead = lapsing(model(NeedReason::Do, NeedQuestion::AsksAction), 60);
+        match settle(ahead, sent(21), clock()) {
+            Settled::Open(need) => assert_eq!(need.reason, NeedReason::Do),
+            Settled::Cleared(..) => panic!("an ask still possible stays"),
+        }
+        let mut mine = model(NeedReason::Do, NeedQuestion::AsksAction);
+        mine.basis = NeedBasis::Member;
+        match settle(mine, sent(60), clock()) {
+            Settled::Open(need) => {
+                assert_eq!((need.reason, need.trust), (NeedReason::Do, NeedTrust::Sure));
+            }
+            Settled::Cleared(..) => panic!("a member's ask stays"),
+        }
+    }
+
+    #[test]
+    fn yes_to_still_needed_keeps_the_ask_for_good() {
+        // Raised again from its answers, with the member's Yes on it.
+        let yes = Since {
+            verdict: Some(NeedVerdict::Confirmed),
+            ..sent(40)
+        };
+        match settle(
+            model(NeedReason::Do, NeedQuestion::AsksAction),
+            yes,
+            clock(),
+        ) {
+            Settled::Open(need) => assert_eq!(
+                (need.reason, need.trust, need.basis, need.question),
+                (
+                    NeedReason::Do,
+                    NeedTrust::Sure,
+                    NeedBasis::Member,
+                    NeedQuestion::AsksAction
+                )
+            ),
+            Settled::Cleared(..) => panic!("a confirmed ask stays"),
+        }
+        // The stored question itself, confirmed.
+        let mut question = model(NeedReason::Review, NeedQuestion::StillNeedsReply);
+        question.trust = NeedTrust::Check;
+        match settle(question, yes, clock()) {
+            Settled::Open(need) => assert_eq!(
+                (need.reason, need.question, need.basis),
+                (
+                    NeedReason::Reply,
+                    NeedQuestion::NeedsReply,
+                    NeedBasis::Member
+                )
+            ),
+            Settled::Cleared(..) => panic!("a confirmed question stays"),
+        }
+        let no = Since {
+            verdict: Some(NeedVerdict::NotNeeded),
+            ..sent(40)
+        };
+        assert_eq!(
+            cause(&settle(
+                model(NeedReason::Do, NeedQuestion::AsksAction),
+                no,
+                clock()
+            )),
+            Some(ClearCause::NotNeeded)
+        );
+    }
+
+    #[test]
+    fn a_rule_reads_a_still_needed_question_as_its_ask() {
+        let taught_no = [answer(
+            triage::ASKS_ACTION,
+            NeedBasis::Taught,
+            json!(false),
+            true,
+        )];
+        assert!(rule_clears(&taught_no, NeedQuestion::StillToDo));
+        assert!(!rule_clears(&taught_no, NeedQuestion::StillNeedsReply));
+    }
+
+    #[test]
+    fn the_next_wake_is_the_first_change_still_ahead() {
+        let clock = clock();
+        let sent_at = clock.now - TimeDelta::days(10);
+        let ask = model(NeedReason::Do, NeedQuestion::AsksAction);
+        // Undated: when its message leaves the window.
+        assert_eq!(
+            next_wake(&Settled::Open(ask.clone()), Some(sent_at), clock),
+            Some(sent_at + TimeDelta::days(14))
+        );
+        // Lapsing in 10 minutes: then.
+        let mut link = ask.clone();
+        link.lapses_at = Some(clock.now + TimeDelta::minutes(10));
+        assert_eq!(
+            next_wake(&Settled::Open(link.clone()), Some(sent_at), clock),
+            link.lapses_at
+        );
+        // A bill, a member's undated ask, a cleared need: nothing to wait for.
+        let mut bill = model(NeedReason::Pay, NeedQuestion::Money);
+        bill.lapses_at = link.lapses_at;
+        assert_eq!(next_wake(&Settled::Open(bill), Some(sent_at), clock), None);
+        let mut mine = ask.clone();
+        mine.basis = NeedBasis::Member;
+        assert_eq!(next_wake(&Settled::Open(mine), Some(sent_at), clock), None);
+        assert_eq!(
+            next_wake(
+                &Settled::Cleared(link, ClearCause::Done),
+                Some(sent_at),
+                clock
+            ),
+            None
+        );
+        // Already past the window: settled as a question, nothing ahead.
+        assert_eq!(
+            next_wake(
+                &Settled::Open(ask),
+                Some(clock.now - TimeDelta::days(20)),
+                clock
+            ),
+            None
+        );
     }
 }
