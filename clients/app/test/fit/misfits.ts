@@ -61,6 +61,9 @@ function checkText(node: Text, found: Misfit[]): void {
   if (rect.width === 0 && rect.height === 0) {
     return;
   }
+  // Glyphs may overhang a tight line box (`line-height: 1`) by a few px; a
+  // clamp or a cut line is at least half a line, so that is the bar for height.
+  const ySlack = Math.max(SLACK, Number.parseFloat(getComputedStyle(parent).fontSize) / 2);
 
   // The box the text sits in, cut short (an ellipsis or a clamp measures as overflow).
   // Only when the box holds this copy alone, so other content in it is never blamed.
@@ -77,7 +80,7 @@ function checkText(node: Text, found: Misfit[]): void {
       });
       return;
     }
-    if (clips(style.overflowY) && box.scrollHeight - box.clientHeight > SLACK) {
+    if (clips(style.overflowY) && box.scrollHeight - box.clientHeight > ySlack) {
       found.push({
         text,
         problem: "cut off",
@@ -89,10 +92,13 @@ function checkText(node: Text, found: Misfit[]): void {
     }
   }
 
-  // Any ancestor that clips it, up to the first one that scrolls (scrolling is fine).
+  // Any ancestor that clips it, up to the first one that scrolls (scrolling
+  // is fine: a row of chips that scrolls sideways shows every chip in turn).
+  let scrolled = false;
   for (let element: Element | null = parent; element !== null; element = element.parentElement) {
     const style = getComputedStyle(element);
     if (scrolls(style.overflowX) || scrolls(style.overflowY)) {
+      scrolled = element !== document.documentElement && element !== document.body;
       break;
     }
     if (collapsed(element)) {
@@ -113,7 +119,7 @@ function checkText(node: Text, found: Misfit[]): void {
       });
       return;
     }
-    if (clips(style.overflowY) && (rect.top < top - SLACK || rect.bottom > bottom + SLACK)) {
+    if (clips(style.overflowY) && (rect.top < top - ySlack || rect.bottom > bottom + ySlack)) {
       found.push({
         text,
         problem: "cut off",
@@ -125,7 +131,10 @@ function checkText(node: Text, found: Misfit[]): void {
     }
   }
 
-  if (rect.left < -SLACK || rect.right > document.documentElement.clientWidth + SLACK) {
+  if (
+    !scrolled &&
+    (rect.left < -SLACK || rect.right > document.documentElement.clientWidth + SLACK)
+  ) {
     found.push({
       text,
       problem: "off screen",

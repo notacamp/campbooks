@@ -76,7 +76,9 @@ describe.each(VIEWPORTS)("copy fits at $name width ($width px)", ({ width, heigh
     try {
       root.render(<Story />);
       await settle();
-      expect(misfits().map(formatMisfit)).toEqual([]);
+      const found = misfits().map(formatMisfit);
+      // The whole list in the message: the diff of a long array is cut short.
+      expect(found, `\n${found.join("\n")}\n`).toEqual([]);
     } finally {
       root.unmount();
       container.remove();

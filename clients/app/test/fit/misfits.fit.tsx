@@ -66,6 +66,10 @@ describe("misfits", () => {
       <span style="display: block; ${ELLIPSIS}">Maria do Carmo Sant’Ana Albuquerque</span>
       <div style="width: 80px">${copy("Aplicação do espaço de trabalho")}</div>
       <div style="width: 0; height: 0; overflow: hidden">${copy("Visually hidden")}</div>
+      <div style="width: 100px; overflow-x: auto; white-space: nowrap">
+        <button>${copy("Corbeille")}</button><button>${copy("Archives")}</button><button>${copy("Newsletters")}</button>
+      </div>
+      <span style="display: block; overflow: hidden; line-height: 1">${copy("Não verificada")}</span>
     `);
     expect(misfits()).toEqual([]);
   });
