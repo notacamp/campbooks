@@ -26,8 +26,8 @@ import {
   useConversation,
   useInboxes,
   type ConversationSummary,
+  type ListView,
   type MessageView,
-  type Stream,
 } from "../../api/queries";
 import {
   avatarKind,
@@ -66,7 +66,7 @@ export interface ConversationReaderProps {
   workspaceId: string;
   conversationId: string;
   /** The stream the list shows (Back goes there). */
-  stream: Stream;
+  stream: ListView;
   /** What Back says when the list is not a stream (search results). */
   backLabel?: string | undefined;
   actions: InboxActions;

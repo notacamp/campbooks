@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n        WITH s AS (\n            SELECT count(*)::int AS n,\n                   count(*) FILTER (WHERE direction = 'inbound' AND NOT read)::int AS unread,\n                   coalesce(bool_or(starred), false) AS starred,\n                   max(sent_at) AS last,\n                   coalesce(bool_or(in_inbox), false) AS in_inbox,\n                   coalesce(bool_and(in_trash OR in_spam), false) AS trashed\n              FROM conversations.messages WHERE conversation_id = $1\n        )\n        UPDATE conversations.conversations c\n           SET message_count = s.n, unread_count = s.unread, starred = s.starred,\n               last_message_at = coalesce(s.last, c.last_message_at),\n               archived_at = CASE WHEN s.in_inbox THEN NULL ELSE coalesce(c.archived_at, now()) END,\n               trashed = s.trashed, updated_at = now()\n          FROM s\n         WHERE c.id = $1\n        RETURNING s.n AS \"n!\", c.stream, c.unread_count, c.starred,\n                  c.archived_at IS NOT NULL AS \"archived!\", c.trashed\n        ",
+  "query": "\n        WITH s AS (\n            SELECT count(*)::int AS n,\n                   count(*) FILTER (WHERE direction = 'inbound' AND NOT read)::int AS unread,\n                   coalesce(bool_or(starred), false) AS starred,\n                   max(sent_at) AS last,\n                   max(sent_at) FILTER (WHERE direction = 'outbound' AND NOT in_trash\n                                          AND NOT in_spam) AS last_sent,\n                   coalesce(bool_or(in_inbox), false) AS in_inbox,\n                   coalesce(bool_and(in_trash OR in_spam), false) AS trashed\n              FROM conversations.messages WHERE conversation_id = $1\n        )\n        UPDATE conversations.conversations c\n           SET message_count = s.n, unread_count = s.unread, starred = s.starred,\n               last_message_at = coalesce(s.last, c.last_message_at),\n               last_sent_at = s.last_sent,\n               archived_at = CASE WHEN s.in_inbox THEN NULL ELSE coalesce(c.archived_at, now()) END,\n               trashed = s.trashed, updated_at = now()\n          FROM s\n         WHERE c.id = $1\n        RETURNING s.n AS \"n!\", c.stream, c.unread_count, c.starred,\n                  c.archived_at IS NOT NULL AS \"archived!\", c.trashed\n        ",
   "describe": {
     "columns": [
       {
@@ -74,5 +74,5 @@
       false
     ]
   },
-  "hash": "bec4138112a79f289b801ba23be17142434beaadb6777cc3b8e5fd8f60adf248"
+  "hash": "5548e2ca7d84406d43410c8ac1dd398e06b215812a07f8af2986850ded84a040"
 }

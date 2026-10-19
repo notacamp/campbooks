@@ -35,6 +35,23 @@ export const Sub: Story = {
   args: { label: "Primary", icon: undefined, count: 12, sub: true, shortcut: undefined, keys: "1" },
 };
 
+/** Sent, set a little apart from the streams above it. */
+export const Apart: Story = {
+  args: {
+    label: "Sent",
+    icon: undefined,
+    count: undefined,
+    sub: true,
+    apart: true,
+    shortcut: undefined,
+    keys: "g 5",
+  },
+  play: async ({ canvasElement }) => {
+    const item = within(canvasElement).getByRole("button", { name: /Sent/ });
+    await expect(item).toHaveAttribute("data-apart", "true");
+  },
+};
+
 export const AsLink: Story = {
   args: {
     label: "Documents",

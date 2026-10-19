@@ -2551,7 +2551,10 @@ export interface components {
         ConversationId: string;
         /** @description A page of conversations. */
         ConversationList: {
-            /** @description Pinned first, then newest first (archived lists and `ids`: newest first). */
+            /**
+             * @description Pinned first, then newest first (archived lists and `ids`: newest
+             *     first; `sent`: your latest message first).
+             */
             conversations: components["schemas"]["ConversationSummary"][];
             /** @description Pass it as `cursor` for the next page; `None` on the last page. */
             next_cursor?: string | null;
@@ -2571,6 +2574,12 @@ export interface components {
              * @description When its newest message was sent.
              */
             last_message_at: string;
+            /**
+             * Format: date-time
+             * @description When the newest message you sent in it was sent (not trashed);
+             *     `None` when you wrote none.
+             */
+            last_sent_at?: string | null;
             latest_from?: components["schemas"]["Address"] | null;
             /** @description Whether the newest message is one the inbox sent (outbound). */
             latest_from_you: boolean;
@@ -2582,6 +2591,7 @@ export interface components {
             need?: components["schemas"]["NeedView"] | null;
             rule?: components["schemas"]["RuleMark"] | null;
             rule_exception?: components["schemas"]["RuleException"] | null;
+            sent_to?: components["schemas"]["Address"] | null;
             /** @description The start of the newest message's text. */
             snippet: string;
             /** @description Whether any message is starred. */
@@ -6908,8 +6918,18 @@ export interface operations {
                 stream?: components["schemas"]["Stream"];
                 /** @description Only this inbox; every inbox you can read when absent. */
                 inbox?: components["schemas"]["InboxId"];
-                /** @description `true` for archived conversations instead of those in the inbox. */
+                /**
+                 * @description `true` for archived conversations instead of those in the inbox.
+                 *     Ignored with `sent`.
+                 */
                 archived?: boolean;
+                /**
+                 * @description `true` for the conversations you have written in, in any stream,
+                 *     archived or not (trash and spam left out), newest message of yours
+                 *     first. Nothing is pinned first. `stream` and `inbox` still narrow it.
+                 *     A cursor from a list that was not `sent` is refused.
+                 */
+                sent?: boolean;
                 /** @description `next_cursor` of the previous page. */
                 cursor?: string;
                 /** @description Page size, 1 to 100 (default 50). */

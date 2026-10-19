@@ -155,8 +155,9 @@ function WorkspaceFrame({ workspace, all }: { workspace: Workspace; all: Workspa
   const needsYou = useAttentionCount(workspace.id);
   const inboxPath = streamPath(workspace.id, "primary");
   const searchPath = `${base}/search`;
-  const openStream = /\/inbox\/(primary|updates|receipts|newsletters)\b/u.exec(pathname)?.[1] as
-    "primary" | "updates" | "receipts" | "newsletters" | undefined;
+  const openStream = /\/inbox\/(primary|updates|receipts|newsletters|sent)\b/u.exec(
+    pathname,
+  )?.[1] as "primary" | "updates" | "receipts" | "newsletters" | "sent" | undefined;
 
   useShortcut("workspace.switch", () => {
     setSwitching((open) => !open);

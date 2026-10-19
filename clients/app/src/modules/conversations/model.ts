@@ -89,6 +89,19 @@ export function addresseeLine(t: Translate, message: MessageView): string {
     : t("reader.toNameOthers", { name, count: others });
 }
 
+/** What a Sent row leads with: "To Clara Nunes" (the address when no name), from the newest message you sent. */
+export function sentToLabel(t: Translate, conversation: ConversationSummary): string {
+  const name = displayName(conversation.sent_to);
+  return name === "" ? t("list.toNobody") : t("list.to", { name });
+}
+
+/** Whether someone answered after your latest message: the newest message is not yours. */
+export function repliedSince(conversation: ConversationSummary): boolean {
+  return conversation.last_sent_at !== null && conversation.last_sent_at !== undefined
+    ? !conversation.latest_from_you
+    : false;
+}
+
 /** Who Reply answers: the sender, or for a message of yours, its first recipient. */
 export function replyName(message: MessageView): string {
   if (message.direction === "outbound") {
@@ -97,7 +110,7 @@ export function replyName(message: MessageView): string {
   return displayName(message.from);
 }
 
-export function streamName(t: Translate, stream: Stream): string {
+export function streamName(t: Translate, stream: Stream | "sent"): string {
   return t(`streams.${stream}`);
 }
 

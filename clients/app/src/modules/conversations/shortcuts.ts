@@ -37,6 +37,14 @@ export const CONVERSATIONS_SHORTCUTS = [
     label: "conversations:shortcuts.newsletters",
   },
   {
+    // Sent: every conversation you wrote in, after the four streams.
+    id: "inbox.sent",
+    keys: "g 5",
+    scope: "global",
+    group: "navigation",
+    label: "conversations:shortcuts.sent",
+  },
+  {
     // Pin: the provider's star (Gmail STARRED), named Pin in the UI.
     id: "conversations.star",
     keys: "p",

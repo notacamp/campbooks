@@ -3029,7 +3029,16 @@
           {
             "name": "archived",
             "in": "query",
-            "description": "`true` for archived conversations instead of those in the inbox.",
+            "description": "`true` for archived conversations instead of those in the inbox.\nIgnored with `sent`.",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "sent",
+            "in": "query",
+            "description": "`true` for the conversations you have written in, in any stream,\narchived or not (trash and spam left out), newest message of yours\nfirst. Nothing is pinned first. `stream` and `inbox` still narrow it.\nA cursor from a list that was not `sent` is refused.",
             "required": false,
             "schema": {
               "type": "boolean"
@@ -13253,7 +13262,7 @@
             "items": {
               "$ref": "#/components/schemas/ConversationSummary"
             },
-            "description": "Pinned first, then newest first (archived lists and `ids`: newest first)."
+            "description": "Pinned first, then newest first (archived lists and `ids`: newest\nfirst; `sent`: your latest message first)."
           },
           "next_cursor": {
             "type": [
@@ -13307,6 +13316,14 @@
             "format": "date-time",
             "description": "When its newest message was sent."
           },
+          "last_sent_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "When the newest message you sent in it was sent (not trashed);\n`None` when you wrote none."
+          },
           "latest_from": {
             "oneOf": [
               {
@@ -13355,6 +13372,17 @@
               {
                 "$ref": "#/components/schemas/RuleException",
                 "description": "In the response of an operation that changed back what a rule did:\nthat rule, now leaving this conversation alone."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "sent_to": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Address",
+                "description": "Who the newest message you sent went to: its first recipient.\n`None` when you wrote none."
               },
               {
                 "type": "null"

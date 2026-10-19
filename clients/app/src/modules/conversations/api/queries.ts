@@ -29,6 +29,9 @@ export type NeedVerdict =
 /** The built-in streams, in display order. */
 export const STREAMS: readonly Stream[] = ["primary", "updates", "receipts", "newsletters"];
 
+/** What a list shows: a stream's inbox, or Sent (every conversation you wrote in). */
+export type ListView = Stream | "sent";
+
 export function isStream(value: string): value is Stream {
   return (STREAMS as readonly string[]).includes(value);
 }
@@ -40,8 +43,13 @@ const keys = {
     operationKey("conversations.list_inboxes", { workspace_id: workspaceId }),
   streams: (workspaceId: string) =>
     operationKey("conversations.list_streams", { workspace_id: workspaceId }),
-  list: (workspaceId: string, stream: Stream) =>
-    operationKey("conversations.list", { workspace_id: workspaceId, stream }),
+  list: (workspaceId: string, view: ListView) =>
+    operationKey(
+      "conversations.list",
+      view === "sent"
+        ? { workspace_id: workspaceId, sent: "true" }
+        : { workspace_id: workspaceId, stream: view },
+    ),
   /** Every list of the workspace, whatever the stream. */
   lists: (workspaceId: string) => operationKey("conversations.list", { workspace_id: workspaceId }),
   conversation: (workspaceId: string, conversationId: string) =>
@@ -102,9 +110,9 @@ export function useStreams(workspaceId: string) {
   });
 }
 
-const conversationsQuery = (workspaceId: string, stream: Stream) =>
+const conversationsQuery = (workspaceId: string, view: ListView) =>
   infiniteQueryOptions({
-    queryKey: keys.list(workspaceId, stream),
+    queryKey: keys.list(workspaceId, view),
     initialPageParam: undefined as string | undefined,
     queryFn: async ({ pageParam, signal }) =>
       unwrap(
@@ -112,7 +120,7 @@ const conversationsQuery = (workspaceId: string, stream: Stream) =>
           params: {
             path: { workspace_id: workspaceId },
             query: {
-              stream,
+              ...(view === "sent" ? { sent: true } : { stream: view }),
               limit: PAGE,
               ...(pageParam === undefined ? {} : { cursor: pageParam }),
             },
@@ -123,9 +131,12 @@ const conversationsQuery = (workspaceId: string, stream: Stream) =>
     getNextPageParam: (page) => page.next_cursor ?? undefined,
   });
 
-/** `conversations.list` for one stream, newest first, a page at a time. */
-export function useConversations(workspaceId: string, stream: Stream) {
-  return useInfiniteQuery(conversationsQuery(workspaceId, stream));
+/**
+ * `conversations.list` for one stream, newest first, or for Sent (`sent`),
+ * your latest message first, a page at a time.
+ */
+export function useConversations(workspaceId: string, view: ListView) {
+  return useInfiniteQuery(conversationsQuery(workspaceId, view));
 }
 
 /** `conversations.get`: the conversation, its messages (oldest first) and the decide answers. */
@@ -435,10 +446,24 @@ export function useConversationSummaries(
 
 /**
  * Put `next` in every cached list it belongs to (its stream, not archived),
- * and out of the others. Optimistic: the server's answer and the change feed
- * settle it.
+ * and out of the others. Sent keeps its rows where they are, whatever their
+ * stream or whether archived: only the row's state changes. Optimistic: the
+ * server's answer and the change feed settle it.
  */
 function placeInLists(queryClient: QueryClient, workspaceId: string, next: ConversationSummary) {
+  queryClient.setQueryData<ListData>(keys.list(workspaceId, "sent"), (data) =>
+    data === undefined
+      ? data
+      : {
+          ...data,
+          pages: data.pages.map((page) => ({
+            ...page,
+            conversations: page.conversations.map((conversation) =>
+              conversation.id === next.id ? next : conversation,
+            ),
+          })),
+        },
+  );
   for (const stream of STREAMS) {
     queryClient.setQueryData<ListData>(keys.list(workspaceId, stream), (data) => {
       if (data === undefined) {

@@ -8,6 +8,7 @@ All notable changes to Campbooks Next are documented here. The format follows
 
 ### Added
 
+- **A Sent view under the streams (G then 5)** lists every conversation you've written in, newest of yours first, with who it went to and whether they replied.
 - **Threads read as a back and forth.** Your own messages in a thread read "You → Marta
   Silva" and sit in from the left, while theirs stay flush left. A long thread keeps its
   newest two messages, its first and anything unread, and folds the middle into "N more

@@ -5,7 +5,8 @@
     "primary": "Principal",
     "updates": "Atualizações",
     "receipts": "Recibos",
-    "newsletters": "Newsletters"
+    "newsletters": "Newsletters",
+    "sent": "Enviados"
   },
   "list": {
     "label": "Conversas",
@@ -14,7 +15,10 @@
     "unread": "Não lidas",
     "more": "Mostrar mais",
     "loadingMore": "A carregar mais conversas",
-    "youPrefix": "Eu: {{snippet}}"
+    "youPrefix": "Eu: {{snippet}}",
+    "to": "Para {{name}}",
+    "toNobody": "Sem destinatário",
+    "replied": "Respondeu"
   },
   "empty": {
     "streamTitle": "Nada em {{stream}}",
@@ -24,7 +28,9 @@
     "noInboxTitle": "Ainda sem caixa de correio",
     "noInboxBody": "Ligue uma caixa de correio e o correio aparece aqui, arrumado em fluxos.",
     "readerTitle": "Escolha uma conversa",
-    "readerBody": "Escolha uma na lista ou use o teclado:"
+    "readerBody": "Escolha uma na lista ou use o teclado:",
+    "sentTitle": "Ainda não enviou nada",
+    "sentBody": "As conversas em que escrever aparecem aqui, com o destinatário."
   },
   "error": {
     "listTitle": "Não foi possível carregar {{stream}}",
@@ -195,7 +201,8 @@
     "undoAll": "Anular tudo o que uma regra fez",
     "allPaid": "Todas as faturas já pagas",
     "saveRule": "Guardar a regra inteligente",
-    "trustImages": "Mostrar sempre as imagens deste remetente"
+    "trustImages": "Mostrar sempre as imagens deste remetente",
+    "sent": "Ir para Enviados"
   },
   "compose": {
     "title": {

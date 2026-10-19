@@ -115,6 +115,47 @@ const LONG: Summary = {
 
 export const PRIMARY = [Q4, NDA, LEDGER, LONG];
 
+const SAM_ME = { name: "Sam Rivera", address: "sam.rivera@example.com" };
+
+/** A conversation Sam started: no reply yet, so it is archived and only Sent lists it. */
+export const SENT_WAITING: Summary = {
+  ...base,
+  id: "0192f1a0-0000-7000-8000-0000000000c6",
+  subject: "Quote for the harbour workshop",
+  stream: "primary",
+  stream_source: "default",
+  archived: true,
+  latest_from_you: true,
+  last_message_at: "2026-10-12T16:00:00Z",
+  last_sent_at: "2026-10-12T16:00:00Z",
+  message_count: 1,
+  unread_count: 0,
+  starred: false,
+  latest_from: SAM_ME,
+  sent_to: { name: "Clara Nunes", address: "clara.nunes@example.com" },
+  snippet: "Here is the quote for the two-day workshop.",
+};
+
+/** One Sam started and someone answered: in the inbox again, and in Sent with a Replied mark. */
+export const SENT_REPLIED: Summary = {
+  ...base,
+  id: "0192f1a0-0000-7000-8000-0000000000c7",
+  subject: "Can we move Thursday’s call?",
+  stream: "primary",
+  stream_source: "default",
+  last_message_at: "2026-10-13T08:00:00Z",
+  last_sent_at: "2026-10-11T10:00:00Z",
+  message_count: 2,
+  unread_count: 1,
+  starred: false,
+  latest_from: { address: "pedro.alves@example.com" },
+  sent_to: { address: "pedro.alves@example.com" },
+  snippet: "Thursday is fine, same time.",
+};
+
+/** Sent: your latest message first. */
+export const SENT = [SENT_WAITING, SENT_REPLIED];
+
 const SAM = { name: "Sam Rivera", address: "sam.rivera@example.com" };
 const MAYA = { name: "Maya Okafor", address: "maya@northwind-studio.example" };
 

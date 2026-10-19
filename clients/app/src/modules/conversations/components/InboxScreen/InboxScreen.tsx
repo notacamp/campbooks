@@ -21,7 +21,7 @@ import {
   useConversations,
   useInboxes,
   type ConversationSummary,
-  type Stream,
+  type ListView,
 } from "../../api/queries";
 import { streamName, type Translate } from "../../model";
 import { ConversationList, rowId } from "../ConversationList/ConversationList";
@@ -43,7 +43,8 @@ function isNarrow(): boolean {
 
 export interface InboxScreenProps {
   workspaceId: string;
-  stream: Stream;
+  /** A stream, or Sent. */
+  stream: ListView;
   /** The conversation open in the reader, if any. */
   conversationId?: string | undefined;
   /**

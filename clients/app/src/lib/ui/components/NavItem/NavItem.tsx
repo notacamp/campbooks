@@ -25,6 +25,8 @@ export interface NavItemProps {
   current?: boolean | undefined;
   /** A stream nested under its place. */
   sub?: boolean | undefined;
+  /** Set a little apart from the items before it (Sent, after the streams). */
+  apart?: boolean | undefined;
   href?: string | undefined;
   onClick?: MouseEventHandler<HTMLElement> | undefined;
 }
@@ -38,6 +40,7 @@ export function NavItem({
   keys,
   current = false,
   sub = false,
+  apart = false,
   href,
   onClick,
 }: NavItemProps) {
@@ -55,6 +58,7 @@ export function NavItem({
   const shared = {
     className: styles["nav"],
     "data-sub": sub || undefined,
+    "data-apart": apart || undefined,
     "aria-current": current ? ("page" as const) : undefined,
     "aria-keyshortcuts": binding === undefined ? undefined : ariaKeyShortcut(binding, platform),
     onClick,

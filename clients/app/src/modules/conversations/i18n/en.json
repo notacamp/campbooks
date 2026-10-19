@@ -5,7 +5,8 @@
     "primary": "Primary",
     "updates": "Updates",
     "receipts": "Receipts",
-    "newsletters": "Newsletters"
+    "newsletters": "Newsletters",
+    "sent": "Sent"
   },
   "list": {
     "label": "Conversations",
@@ -14,7 +15,10 @@
     "unread": "Unread",
     "more": "Show more",
     "loadingMore": "Loading more conversations",
-    "youPrefix": "You: {{snippet}}"
+    "youPrefix": "You: {{snippet}}",
+    "to": "To {{name}}",
+    "toNobody": "No recipient",
+    "replied": "Replied"
   },
   "empty": {
     "streamTitle": "Nothing in {{stream}}",
@@ -24,7 +28,9 @@
     "noInboxTitle": "No mailbox yet",
     "noInboxBody": "Connect a mailbox and its mail appears here, sorted into streams.",
     "readerTitle": "Pick a conversation",
-    "readerBody": "Choose one from the list, or use the keyboard:"
+    "readerBody": "Choose one from the list, or use the keyboard:",
+    "sentTitle": "Nothing sent yet",
+    "sentBody": "Conversations you write in show up here, with who they went to."
   },
   "error": {
     "listTitle": "Could not load {{stream}}",
@@ -195,7 +201,8 @@
     "undoAll": "Undo all a rule did",
     "allPaid": "All bills already paid",
     "saveRule": "Save the smart rule",
-    "trustImages": "Always show images from this sender"
+    "trustImages": "Always show images from this sender",
+    "sent": "Go to Sent"
   },
   "compose": {
     "title": {

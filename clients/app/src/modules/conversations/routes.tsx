@@ -23,19 +23,29 @@ const MESSAGE_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12
 
 /** `/w/$workspaceId/inbox…`: a stream, and the conversation open in it. */
 function InboxPage() {
-  const params: { workspaceId?: string; stream?: string; conversationId?: string } = useParams({
+  const params: { stream?: string } = useParams({ strict: false });
+  return <InboxView view={params.stream ?? ""} />;
+}
+
+/** `/w/$workspaceId/inbox/sent…`: Sent, and the conversation open in it. */
+function SentPage() {
+  return <InboxView view="sent" />;
+}
+
+/** A list (a stream, or Sent) and the conversation open in it. */
+function InboxView({ view: stream }: { view: string }) {
+  const params: { workspaceId?: string; conversationId?: string } = useParams({
     strict: false,
   });
   const search: { reply?: boolean; to?: string } = useSearch({ strict: false });
   const workspaceId = params.workspaceId ?? "";
-  const stream = params.stream ?? "";
   const { t } = useTranslation("conversations");
   const navigate = useNavigate();
   const compose = () => {
     void navigate({ to: "/w/$workspaceId/compose", params: { workspaceId } });
   };
   useShortcut("compose.new", compose);
-  if (!isStream(stream)) {
+  if (stream !== "sent" && !isStream(stream)) {
     return (
       <Navigate
         to="/w/$workspaceId/inbox/$stream"
@@ -100,21 +110,34 @@ export function buildConversationsRoutes<TParent extends AnyRoute>(parent: TPare
     path: "/inbox/$stream",
     component: InboxPage,
   });
+  // `?reply=true` (Home's R) opens the reply composer.
+  // `reply`: open the composer on arrival; `to`: the message it answers
+  // (a draft written for it), else the newest.
+  const validateReply = (search: Record<string, unknown>): { reply?: boolean; to?: string } => {
+    const reply = search["reply"] === true || search["reply"] === "true";
+    const to = search["to"];
+    if (!reply) {
+      return {};
+    }
+    return typeof to === "string" && MESSAGE_ID.test(to) ? { reply, to } : { reply };
+  };
   const conversation = createRoute({
     getParentRoute: () => parent,
     path: "/inbox/$stream/$conversationId",
-    // `?reply=true` (Home's R) opens the reply composer.
-    // `reply`: open the composer on arrival; `to`: the message it answers
-    // (a draft written for it), else the newest.
-    validateSearch: (search: Record<string, unknown>): { reply?: boolean; to?: string } => {
-      const reply = search["reply"] === true || search["reply"] === "true";
-      const to = search["to"];
-      if (!reply) {
-        return {};
-      }
-      return typeof to === "string" && MESSAGE_ID.test(to) ? { reply, to } : { reply };
-    },
+    validateSearch: validateReply,
     component: InboxPage,
+  });
+  // Static segments win over `$stream`: "sent" is not a stream.
+  const sent = createRoute({
+    getParentRoute: () => parent,
+    path: "/inbox/sent",
+    component: SentPage,
+  });
+  const sentConversation = createRoute({
+    getParentRoute: () => parent,
+    path: "/inbox/sent/$conversationId",
+    validateSearch: validateReply,
+    component: SentPage,
   });
   const compose = createRoute({
     getParentRoute: () => parent,
@@ -123,5 +146,5 @@ export function buildConversationsRoutes<TParent extends AnyRoute>(parent: TPare
       typeof search["draft"] === "string" ? { draft: search["draft"] } : {},
     component: ComposePage,
   });
-  return [inbox, stream, conversation, compose] as const;
+  return [inbox, stream, conversation, sent, sentConversation, compose] as const;
 }

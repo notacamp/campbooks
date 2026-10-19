@@ -21,6 +21,7 @@ import {
   Q4,
   Q4_BODY,
   Q4_DETAIL,
+  SENT,
   STREAM_COUNTS,
   W,
 } from "../../../test/demo/conversations";
@@ -63,7 +64,11 @@ function inbox(extra: Parameters<typeof mockApi>[0] = {}) {
     [`GET ${W}/inboxes`]: { body: { inboxes: [INBOX] } },
     [`GET ${W}/streams`]: { body: { streams: STREAM_COUNTS } },
     [`GET ${W}/conversations`]: (request) => {
-      const stream = new URL(request.url).searchParams.get("stream");
+      const query = new URL(request.url).searchParams;
+      const stream = query.get("stream");
+      if (query.get("sent") === "true") {
+        return { body: { conversations: SENT, next_cursor: null } };
+      }
       return {
         body: {
           conversations: stream === "primary" ? PRIMARY : [],
@@ -104,6 +109,31 @@ describe("the inbox", () => {
     expect(await within(list).findByText(Q4.subject)).toBeVisible();
     expect(within(list).getByText("Suggests Newsletters")).toBeVisible();
     expect(screen.getByRole("heading", { name: "Pick a conversation" })).toBeVisible();
+  });
+
+  it("lists Sent: who each went to, your latest message's time, and which were answered", async () => {
+    inbox();
+    renderAt(`/w/${DUARTE.id}/inbox/sent`);
+
+    expect(await screen.findByRole("heading", { level: 1, name: "Sent" })).toBeVisible();
+    const list = screen.getByRole("region", { name: "Conversations" });
+    expect(await within(list).findByText("To Clara Nunes")).toBeVisible();
+    expect(within(list).getByText("To pedro.alves@example.com")).toBeVisible();
+    // Only the one someone answered carries the mark.
+    expect(within(list).getAllByText("Replied")).toHaveLength(1);
+    // The snippet of a message you wrote keeps its "You:" prefix.
+    expect(
+      within(list).getByText("You: Here is the quote for the two-day workshop."),
+    ).toBeVisible();
+  });
+
+  it("shows an empty Sent plainly", async () => {
+    inbox({
+      [`GET ${W}/conversations`]: { body: { conversations: [], next_cursor: null } },
+    });
+    renderAt(`/w/${DUARTE.id}/inbox/sent`);
+
+    expect(await screen.findByText("Nothing sent yet")).toBeVisible();
   });
 
   it("goes to Primary from an unknown stream", async () => {

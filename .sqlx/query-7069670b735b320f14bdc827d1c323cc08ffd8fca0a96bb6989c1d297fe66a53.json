@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n        SELECT c.id AS \"id: ConversationId\", c.inbox_id AS \"inbox_id: InboxId\", c.subject,\n               c.stream, c.stream_source, c.last_message_at, c.message_count, c.unread_count,\n               c.starred, c.archived_at IS NOT NULL AS \"archived!\",\n               m.sender AS \"sender?\", m.snippet AS \"snippet?\",\n               coalesce(m.direction = 'outbound', false) AS \"latest_from_you!\",\n               coalesce((SELECT jsonb_agg(jsonb_build_object('id', l.id, 'name', l.name)\n                                          ORDER BY l.name)\n                           FROM conversations.conversation_labels cl\n                           JOIN conversations.labels l ON l.id = cl.label_id\n                          WHERE cl.conversation_id = c.id), '[]') AS \"labels!\"\n          FROM conversations.conversations c\n          LEFT JOIN LATERAL (\n              SELECT sender, snippet, direction FROM conversations.messages\n               WHERE conversation_id = c.id ORDER BY sent_at DESC, id DESC LIMIT 1\n          ) m ON true\n         WHERE c.inbox_id = ANY($1) AND c.id = ANY($2)\n         ORDER BY c.last_message_at DESC, c.id DESC\n        ",
+  "query": "\n            SELECT c.id AS \"id: ConversationId\", c.inbox_id AS \"inbox_id: InboxId\", c.subject,\n                   c.stream, c.stream_source, c.last_message_at, c.message_count, c.unread_count,\n                   c.starred, c.archived_at IS NOT NULL AS \"archived!\",\n                   m.sender AS \"sender?\", m.snippet AS \"snippet?\",\n                   coalesce(m.direction = 'outbound', false) AS \"latest_from_you!\",\n                   coalesce((SELECT jsonb_agg(jsonb_build_object('id', l.id, 'name', l.name)\n                                              ORDER BY l.name)\n                               FROM conversations.conversation_labels cl\n                               JOIN conversations.labels l ON l.id = cl.label_id\n                              WHERE cl.conversation_id = c.id), '[]') AS \"labels!\",\n                   c.last_sent_at,\n                   coalesce(o.recipients -> 'to' -> 0, o.recipients -> 'cc' -> 0) AS \\\"sent_to?\\\"\n              FROM conversations.conversations c\n              LEFT JOIN LATERAL (\n                  SELECT sender, snippet, direction FROM conversations.messages\n                   WHERE conversation_id = c.id ORDER BY sent_at DESC, id DESC LIMIT 1\n              ) m ON true\n              LEFT JOIN LATERAL (\n                  SELECT recipients FROM conversations.messages\n                   WHERE conversation_id = c.id AND c.last_sent_at IS NOT NULL AND direction = 'outbound'\n                     AND NOT in_trash AND NOT in_spam\n                   ORDER BY sent_at DESC, id DESC LIMIT 1\n              ) o ON true\n             WHERE c.inbox_id = ANY($1) AND c.archived_at IS NULL AND NOT c.trashed\n               AND ($2::text IS NULL OR c.stream = $2)\n               AND ($3::timestamptz IS NULL\n                    OR (c.starred, c.last_message_at, c.id) < ($6::bool, $3, $4))\n             ORDER BY c.starred DESC, c.last_message_at DESC, c.id DESC\n             LIMIT $5\n            ",
   "describe": {
     "columns": [
       {
@@ -141,12 +141,33 @@
         "name": "labels!",
         "type_info": "Jsonb",
         "origin": "Expression"
+      },
+      {
+        "ordinal": 14,
+        "name": "last_sent_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "conversations.conversations",
+            "name": "last_sent_at"
+          }
+        }
+      },
+      {
+        "ordinal": 15,
+        "name": "sent_to?",
+        "type_info": "Jsonb",
+        "origin": "Expression"
       }
     ],
     "parameters": {
       "Left": [
         "UuidArray",
-        "UuidArray"
+        "Text",
+        "Timestamptz",
+        "Uuid",
+        "Int8",
+        "Bool"
       ]
     },
     "nullable": [
@@ -163,8 +184,10 @@
       false,
       false,
       null,
+      null,
+      true,
       null
     ]
   },
-  "hash": "4a8b0cb6b4c0c96c34020a10e135976c41b017ec604de8c2d12ea31caec7f961"
+  "hash": "7069670b735b320f14bdc827d1c323cc08ffd8fca0a96bb6989c1d297fe66a53"
 }

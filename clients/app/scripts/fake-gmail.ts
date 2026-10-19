@@ -351,6 +351,37 @@ function demoMessages(me: string, images: string): DemoMessage[] {
       labels: ["SENT"],
       text: "Got them, thanks Leo. I'll pick three by Monday.\n\nSam",
     },
+    // Mail the member started (campbooks-cloud#240): it has no Inbox label, so
+    // it is archived on arrival and only Sent lists it, until someone answers.
+    {
+      from: `Sam Rivera <${me}>`,
+      to: "Clara Nunes <clara@casa-nunes.example>",
+      subject: "Quote for the harbour workshop",
+      hoursAgo: 20,
+      thread: "workshop",
+      labels: ["SENT"],
+      text: "Hi Clara,\n\nHere is the quote for the two-day workshop. It covers materials and the venue.\n\nSam",
+    },
+    // One they answered: back in the inbox, and marked Replied in Sent.
+    {
+      from: `Sam Rivera <${me}>`,
+      to: "Pedro Alves <pedro@harbour-studio.example>",
+      subject: "Can we move Thursday's call?",
+      hoursAgo: 30,
+      thread: "thursday",
+      labels: ["SENT"],
+      text: "Hi Pedro,\n\nCan we move Thursday's call to the afternoon?\n\nSam",
+    },
+    {
+      from: "Pedro Alves <pedro@harbour-studio.example>",
+      to: me,
+      subject: "Re: Can we move Thursday's call?",
+      hoursAgo: 10,
+      thread: "thursday",
+      replyTo: "thursday",
+      labels: ["INBOX", "CATEGORY_PERSONAL"],
+      text: "Thursday afternoon is fine, same time as before.\n\nPedro",
+    },
     {
       from: "Maya Okafor <maya@northwind-studio.example>",
       to: me,

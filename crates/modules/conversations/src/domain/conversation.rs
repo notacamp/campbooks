@@ -63,6 +63,12 @@ pub struct ConversationSummary {
     pub latest_from_you: bool,
     /// The start of the newest message's text.
     pub snippet: String,
+    /// When the newest message you sent in it was sent (not trashed);
+    /// `None` when you wrote none.
+    pub last_sent_at: Option<DateTime<Utc>>,
+    /// Who the newest message you sent went to: its first recipient.
+    /// `None` when you wrote none.
+    pub sent_to: Option<Address>,
     /// Its labels, by name.
     pub labels: Vec<LabelView>,
     /// Where the decide pass would put it instead, when it would: a
@@ -95,6 +101,8 @@ pub struct SummaryRow {
     pub snippet: Option<String>,
     pub latest_from_you: bool,
     pub labels: serde_json::Value,
+    pub last_sent_at: Option<DateTime<Utc>>,
+    pub sent_to: Option<serde_json::Value>,
 }
 
 impl TryFrom<SummaryRow> for ConversationSummary {
@@ -119,6 +127,12 @@ impl TryFrom<SummaryRow> for ConversationSummary {
                 .map_err(|e| Error::internal(crate::domain::redact::json(&e)))?,
             latest_from_you: row.latest_from_you,
             snippet: row.snippet.unwrap_or_default(),
+            last_sent_at: row.last_sent_at,
+            sent_to: row
+                .sent_to
+                .map(serde_json::from_value)
+                .transpose()
+                .map_err(|e| Error::internal(crate::domain::redact::json(&e)))?,
             labels: serde_json::from_value(row.labels)
                 .map_err(|e| Error::internal(crate::domain::redact::json(&e)))?,
             suggestion: None,
@@ -151,12 +165,20 @@ pub async fn summary(
                                           ORDER BY l.name)
                            FROM conversations.conversation_labels cl
                            JOIN conversations.labels l ON l.id = cl.label_id
-                          WHERE cl.conversation_id = c.id), '[]') AS "labels!"
+                          WHERE cl.conversation_id = c.id), '[]') AS "labels!",
+               c.last_sent_at,
+               coalesce(o.recipients -> 'to' -> 0, o.recipients -> 'cc' -> 0) AS "sent_to?"
           FROM conversations.conversations c
           LEFT JOIN LATERAL (
               SELECT sender, snippet, direction FROM conversations.messages
                WHERE conversation_id = c.id ORDER BY sent_at DESC, id DESC LIMIT 1
           ) m ON true
+          LEFT JOIN LATERAL (
+              SELECT recipients FROM conversations.messages
+               WHERE conversation_id = c.id AND c.last_sent_at IS NOT NULL AND direction = 'outbound'
+                 AND NOT in_trash AND NOT in_spam
+               ORDER BY sent_at DESC, id DESC LIMIT 1
+          ) o ON true
          WHERE c.id = $1
         "#,
         id as ConversationId,
@@ -185,6 +207,8 @@ pub async fn recount(
                    count(*) FILTER (WHERE direction = 'inbound' AND NOT read)::int AS unread,
                    coalesce(bool_or(starred), false) AS starred,
                    max(sent_at) AS last,
+                   max(sent_at) FILTER (WHERE direction = 'outbound' AND NOT in_trash
+                                          AND NOT in_spam) AS last_sent,
                    coalesce(bool_or(in_inbox), false) AS in_inbox,
                    coalesce(bool_and(in_trash OR in_spam), false) AS trashed
               FROM conversations.messages WHERE conversation_id = $1
@@ -192,6 +216,7 @@ pub async fn recount(
         UPDATE conversations.conversations c
            SET message_count = s.n, unread_count = s.unread, starred = s.starred,
                last_message_at = coalesce(s.last, c.last_message_at),
+               last_sent_at = s.last_sent,
                archived_at = CASE WHEN s.in_inbox THEN NULL ELSE coalesce(c.archived_at, now()) END,
                trashed = s.trashed, updated_at = now()
           FROM s

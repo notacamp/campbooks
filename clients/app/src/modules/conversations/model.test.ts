@@ -1,6 +1,13 @@
 import { describe, expect, it } from "vitest";
 
-import { LEDGER, NOW, Q4, Q4_DETAIL } from "../../../test/demo/conversations";
+import {
+  LEDGER,
+  NOW,
+  Q4,
+  Q4_DETAIL,
+  SENT_REPLIED,
+  SENT_WAITING,
+} from "../../../test/demo/conversations";
 
 import type { MessageView } from "./api/queries";
 import {
@@ -14,7 +21,9 @@ import {
   placementLine,
   previewType,
   reasonText,
+  repliedSince,
   replyName,
+  sentToLabel,
   splitQuoted,
   threadLayout,
   type ThreadEntry,
@@ -32,6 +41,19 @@ describe("inbox model", () => {
     expect(listTime("2026-10-10T09:05:00Z", "en-GB", NOW)).toBe("Sat");
     expect(listTime("2026-09-02T09:05:00Z", "en-GB", NOW)).toBe("2 Sept");
     expect(listTime("2025-09-02T09:05:00Z", "en-GB", NOW)).toBe("2 Sept 2025");
+  });
+
+  it("leads a Sent row with who it went to, by name else address", () => {
+    expect(sentToLabel(t, SENT_WAITING)).toBe('list.to{"name":"Clara Nunes"}');
+    expect(sentToLabel(t, SENT_REPLIED)).toBe('list.to{"name":"pedro.alves@example.com"}');
+    expect(sentToLabel(t, { ...SENT_WAITING, sent_to: null })).toBe("list.toNobody");
+  });
+
+  it("says a Sent row was replied to only when the newest message is not yours", () => {
+    expect(repliedSince(SENT_WAITING)).toBe(false);
+    expect(repliedSince(SENT_REPLIED)).toBe(true);
+    // A conversation you never wrote in has no reply to mark.
+    expect(repliedSince(Q4)).toBe(false);
   });
 
   it("names a sender by display name, else by address", () => {

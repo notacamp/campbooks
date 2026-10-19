@@ -5,7 +5,8 @@
     "primary": "Principal",
     "updates": "Novedades",
     "receipts": "Recibos",
-    "newsletters": "Boletines"
+    "newsletters": "Boletines",
+    "sent": "Enviados"
   },
   "list": {
     "label": "Conversaciones",
@@ -14,7 +15,10 @@
     "unread": "No leídas",
     "more": "Mostrar más",
     "loadingMore": "Cargando más conversaciones",
-    "youPrefix": "Yo: {{snippet}}"
+    "youPrefix": "Yo: {{snippet}}",
+    "to": "Para {{name}}",
+    "toNobody": "Sin destinatario",
+    "replied": "Respondió"
   },
   "empty": {
     "streamTitle": "Nada en {{stream}}",
@@ -24,7 +28,9 @@
     "noInboxTitle": "Aún no hay buzón",
     "noInboxBody": "Conecta un buzón y su correo aparecerá aquí, ordenado en flujos.",
     "readerTitle": "Elige una conversación",
-    "readerBody": "Elige una de la lista o usa el teclado:"
+    "readerBody": "Elige una de la lista o usa el teclado:",
+    "sentTitle": "Todavía no has enviado nada",
+    "sentBody": "Las conversaciones en las que escribas aparecen aquí, con su destinatario."
   },
   "error": {
     "listTitle": "No se ha podido cargar {{stream}}",
@@ -195,7 +201,8 @@
     "undoAll": "Deshacer todo lo que hizo una regla",
     "allPaid": "Todas las facturas ya pagadas",
     "saveRule": "Guardar la regla inteligente",
-    "trustImages": "Mostrar siempre las imágenes de este remitente"
+    "trustImages": "Mostrar siempre las imágenes de este remitente",
+    "sent": "Ir a Enviados"
   },
   "compose": {
     "title": {

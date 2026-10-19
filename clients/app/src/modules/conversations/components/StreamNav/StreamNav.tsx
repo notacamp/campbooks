@@ -5,11 +5,11 @@ import { useTranslation } from "react-i18next";
 import { useShortcut } from "~/lib/shortcuts";
 import { Chip, ChipRow, NavItem } from "~/lib/ui";
 
-import { STREAMS, useStreams, type Stream } from "../../api/queries";
+import { STREAMS, useStreams, type ListView, type Stream } from "../../api/queries";
 import { streamName, type Translate } from "../../model";
 
-export const streamPath = (workspaceId: string, stream: Stream) =>
-  `/w/${workspaceId}/inbox/${stream}`;
+export const streamPath = (workspaceId: string, view: ListView) =>
+  `/w/${workspaceId}/inbox/${view}`;
 
 /** Unread conversations per stream (0 until the counts load). */
 function useUnread(workspaceId: string): Record<Stream, number> {
@@ -21,27 +21,29 @@ function useUnread(workspaceId: string): Record<Stream, number> {
   return unread;
 }
 
-/** G then 1–4 opens a stream, from anywhere in the workspace. */
+/** G then 1–4 opens a stream and G then 5 opens Sent, from anywhere in the workspace. */
 function useStreamShortcuts(workspaceId: string) {
   const navigate = useNavigate();
-  const go = (stream: Stream) => () => {
-    void navigate({ to: streamPath(workspaceId, stream) });
+  const go = (view: ListView) => () => {
+    void navigate({ to: streamPath(workspaceId, view) });
   };
   useShortcut("inbox.stream.primary", go("primary"));
   useShortcut("inbox.stream.updates", go("updates"));
   useShortcut("inbox.stream.receipts", go("receipts"));
   useShortcut("inbox.stream.newsletters", go("newsletters"));
+  useShortcut("inbox.sent", go("sent"));
 }
 
 export interface StreamNavProps {
   workspaceId: string;
-  /** The stream on screen, if any. */
-  current?: Stream | undefined;
+  /** The stream (or Sent) on screen, if any. */
+  current?: ListView | undefined;
 }
 
 /**
  * The streams under Inbox in the sidebar, with their unread counts and
- * shortcuts (G then 1–4, bound here so they work from every page).
+ * shortcuts (G then 1–4, bound here so they work from every page), and Sent
+ * after them, set apart (G then 5).
  */
 export function StreamNav({ workspaceId, current }: StreamNavProps) {
   const { t: typed } = useTranslation("conversations");
@@ -72,6 +74,21 @@ export function StreamNav({ workspaceId, current }: StreamNavProps) {
           />
         );
       })}
+      <NavItem
+        sub
+        apart
+        label={streamName(t, "sent")}
+        shortcut="inbox.sent"
+        current={current === "sent"}
+        href={streamPath(workspaceId, "sent")}
+        onClick={(event: MouseEvent<HTMLElement>) => {
+          if (event.metaKey || event.ctrlKey || event.shiftKey || event.button !== 0) {
+            return;
+          }
+          event.preventDefault();
+          void navigate({ to: streamPath(workspaceId, "sent") });
+        }}
+      />
     </>
   );
 }
@@ -96,6 +113,14 @@ export function StreamChips({ workspaceId, current }: StreamNavProps) {
           {unread[stream] > 0 ? <span>{unread[stream]}</span> : null}
         </Chip>
       ))}
+      <Chip
+        pressed={current === "sent"}
+        onClick={() => {
+          void navigate({ to: streamPath(workspaceId, "sent") });
+        }}
+      >
+        {streamName(t, "sent")}
+      </Chip>
     </ChipRow>
   );
 }

@@ -36,6 +36,10 @@
   font-size: var(--text-sm);
 }
 
+.nav[data-apart] {
+  margin-top: var(--space-2);
+}
+
 .label {
   min-width: 0;
   overflow: hidden;

@@ -43,8 +43,15 @@ pub struct ListQuery {
     /// Only this inbox; every inbox you can read when absent.
     pub inbox: Option<InboxId>,
     /// `true` for archived conversations instead of those in the inbox.
+    /// Ignored with `sent`.
     #[serde(default)]
     pub archived: bool,
+    /// `true` for the conversations you have written in, in any stream,
+    /// archived or not (trash and spam left out), newest message of yours
+    /// first. Nothing is pinned first. `stream` and `inbox` still narrow it.
+    /// A cursor from a list that was not `sent` is refused.
+    #[serde(default)]
+    pub sent: bool,
     /// `next_cursor` of the previous page.
     pub cursor: Option<String>,
     /// Page size, 1 to 100 (default 50).
@@ -58,7 +65,8 @@ pub struct ListQuery {
 /// A page of conversations.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 pub struct ConversationList {
-    /// Pinned first, then newest first (archived lists and `ids`: newest first).
+    /// Pinned first, then newest first (archived lists and `ids`: newest
+    /// first; `sent`: your latest message first).
     pub conversations: Vec<ConversationSummary>,
     /// Pass it as `cursor` for the next page; `None` on the last page.
     pub next_cursor: Option<String>,
@@ -101,6 +109,9 @@ pub async fn handler(
     }
     let ids = query.ids.as_deref().map(parse_ids).transpose()?;
     let after = query.cursor.as_deref().map(decode_cursor).transpose()?;
+    if after.is_some_and(|cursor| cursor.sent != query.sent) {
+        return Err(Error::BadRequest(crate::MESSAGES.reason("invalid_cursor")));
+    }
     let access = &workspace.access;
     resources::authorize_type(&state, access, Action::Read, CONVERSATION_RECORD)?;
     let mut tx = state.db.begin_for(access.workspace).await?;
@@ -140,12 +151,17 @@ pub async fn handler(
     let next_cursor = if conversations.len() > limit as usize {
         conversations.truncate(limit as usize);
         conversations.last().map(|last| {
-            // Archived lists ignore pins, so their cursor never carries one.
-            encode_cursor(
-                last.starred && !query.archived,
-                last.last_message_at,
-                last.id,
-            )
+            if query.sent {
+                // Ordered by your latest message, with no pins.
+                encode_sent_cursor(last.last_sent_at.unwrap_or(last.last_message_at), last.id)
+            } else {
+                // Archived lists ignore pins, so their cursor never carries one.
+                encode_cursor(
+                    last.starred && !query.archived,
+                    last.last_message_at,
+                    last.id,
+                )
+            }
         })
     } else {
         None
@@ -168,7 +184,7 @@ async fn fetch_page(
     let after_pinned = after.is_some_and(|cursor| cursor.pinned);
     let (after_at, after_id) = after.map(|cursor| (cursor.at, cursor.id)).unzip();
     let fetch = i64::from(limit) + 1;
-    let rows = if query.archived {
+    let rows = if query.sent {
         sqlx::query_as!(
             SummaryRow,
             r#"
@@ -181,12 +197,61 @@ async fn fetch_page(
                                               ORDER BY l.name)
                                FROM conversations.conversation_labels cl
                                JOIN conversations.labels l ON l.id = cl.label_id
-                              WHERE cl.conversation_id = c.id), '[]') AS "labels!"
+                              WHERE cl.conversation_id = c.id), '[]') AS "labels!",
+                   c.last_sent_at,
+                   coalesce(o.recipients -> 'to' -> 0, o.recipients -> 'cc' -> 0) AS "sent_to?"
               FROM conversations.conversations c
               LEFT JOIN LATERAL (
                   SELECT sender, snippet, direction FROM conversations.messages
                    WHERE conversation_id = c.id ORDER BY sent_at DESC, id DESC LIMIT 1
               ) m ON true
+              LEFT JOIN LATERAL (
+                  SELECT recipients FROM conversations.messages
+                   WHERE conversation_id = c.id AND c.last_sent_at IS NOT NULL AND direction = 'outbound'
+                     AND NOT in_trash AND NOT in_spam
+                   ORDER BY sent_at DESC, id DESC LIMIT 1
+              ) o ON true
+             WHERE c.inbox_id = ANY($1) AND c.last_sent_at IS NOT NULL AND NOT c.trashed
+               AND ($2::text IS NULL OR c.stream = $2)
+               AND ($3::timestamptz IS NULL OR (c.last_sent_at, c.id) < ($3, $4))
+             ORDER BY c.last_sent_at DESC, c.id DESC
+             LIMIT $5
+            "#,
+            inboxes as &[InboxId],
+            stream,
+            after_at,
+            after_id as Option<ConversationId>,
+            fetch,
+        )
+        .fetch_all(&mut *conn)
+        .await?
+    } else if query.archived {
+        sqlx::query_as!(
+            SummaryRow,
+            r#"
+            SELECT c.id AS "id: ConversationId", c.inbox_id AS "inbox_id: InboxId", c.subject,
+                   c.stream, c.stream_source, c.last_message_at, c.message_count, c.unread_count,
+                   c.starred, c.archived_at IS NOT NULL AS "archived!",
+                   m.sender AS "sender?", m.snippet AS "snippet?",
+                   coalesce(m.direction = 'outbound', false) AS "latest_from_you!",
+                   coalesce((SELECT jsonb_agg(jsonb_build_object('id', l.id, 'name', l.name)
+                                              ORDER BY l.name)
+                               FROM conversations.conversation_labels cl
+                               JOIN conversations.labels l ON l.id = cl.label_id
+                              WHERE cl.conversation_id = c.id), '[]') AS "labels!",
+                   c.last_sent_at,
+                   coalesce(o.recipients -> 'to' -> 0, o.recipients -> 'cc' -> 0) AS "sent_to?"
+              FROM conversations.conversations c
+              LEFT JOIN LATERAL (
+                  SELECT sender, snippet, direction FROM conversations.messages
+                   WHERE conversation_id = c.id ORDER BY sent_at DESC, id DESC LIMIT 1
+              ) m ON true
+              LEFT JOIN LATERAL (
+                  SELECT recipients FROM conversations.messages
+                   WHERE conversation_id = c.id AND c.last_sent_at IS NOT NULL AND direction = 'outbound'
+                     AND NOT in_trash AND NOT in_spam
+                   ORDER BY sent_at DESC, id DESC LIMIT 1
+              ) o ON true
              WHERE c.inbox_id = ANY($1) AND c.archived_at IS NOT NULL AND NOT c.trashed
                AND ($2::text IS NULL OR c.stream = $2)
                AND ($3::timestamptz IS NULL OR (c.last_message_at, c.id) < ($3, $4))
@@ -214,12 +279,20 @@ async fn fetch_page(
                                               ORDER BY l.name)
                                FROM conversations.conversation_labels cl
                                JOIN conversations.labels l ON l.id = cl.label_id
-                              WHERE cl.conversation_id = c.id), '[]') AS "labels!"
+                              WHERE cl.conversation_id = c.id), '[]') AS "labels!",
+                   c.last_sent_at,
+                   coalesce(o.recipients -> 'to' -> 0, o.recipients -> 'cc' -> 0) AS "sent_to?"
               FROM conversations.conversations c
               LEFT JOIN LATERAL (
                   SELECT sender, snippet, direction FROM conversations.messages
                    WHERE conversation_id = c.id ORDER BY sent_at DESC, id DESC LIMIT 1
               ) m ON true
+              LEFT JOIN LATERAL (
+                  SELECT recipients FROM conversations.messages
+                   WHERE conversation_id = c.id AND c.last_sent_at IS NOT NULL AND direction = 'outbound'
+                     AND NOT in_trash AND NOT in_spam
+                   ORDER BY sent_at DESC, id DESC LIMIT 1
+              ) o ON true
              WHERE c.inbox_id = ANY($1) AND c.archived_at IS NULL AND NOT c.trashed
                AND ($2::text IS NULL OR c.stream = $2)
                AND ($3::timestamptz IS NULL
@@ -271,12 +344,20 @@ async fn fetch_ids(
                                           ORDER BY l.name)
                            FROM conversations.conversation_labels cl
                            JOIN conversations.labels l ON l.id = cl.label_id
-                          WHERE cl.conversation_id = c.id), '[]') AS "labels!"
+                          WHERE cl.conversation_id = c.id), '[]') AS "labels!",
+               c.last_sent_at,
+               coalesce(o.recipients -> 'to' -> 0, o.recipients -> 'cc' -> 0) AS "sent_to?"
           FROM conversations.conversations c
           LEFT JOIN LATERAL (
               SELECT sender, snippet, direction FROM conversations.messages
                WHERE conversation_id = c.id ORDER BY sent_at DESC, id DESC LIMIT 1
           ) m ON true
+          LEFT JOIN LATERAL (
+              SELECT recipients FROM conversations.messages
+               WHERE conversation_id = c.id AND c.last_sent_at IS NOT NULL AND direction = 'outbound'
+                 AND NOT in_trash AND NOT in_spam
+               ORDER BY sent_at DESC, id DESC LIMIT 1
+          ) o ON true
          WHERE c.inbox_id = ANY($1) AND c.id = ANY($2)
          ORDER BY c.last_message_at DESC, c.id DESC
         "#,
@@ -292,6 +373,8 @@ async fn fetch_ids(
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 struct Cursor {
     pinned: bool,
+    /// Whether it pages a `sent` list: `at` is then `last_sent_at`.
+    sent: bool,
     at: DateTime<Utc>,
     id: ConversationId,
 }
@@ -305,6 +388,15 @@ fn encode_cursor(pinned: bool, at: DateTime<Utc>, id: ConversationId) -> String 
     ))
 }
 
+/// `(last_sent_at, id)` of the last row of a `sent` page, opaque, marked `s`
+/// so a list of another kind refuses it.
+fn encode_sent_cursor(at: DateTime<Utc>, id: ConversationId) -> String {
+    URL_SAFE_NO_PAD.encode(format!(
+        "s|{}|{id}",
+        at.to_rfc3339_opts(chrono::SecondsFormat::Nanos, true)
+    ))
+}
+
 /// A cursor from before pins (`at|id`) reads as not pinned: a list paged
 /// across the upgrade goes on among the unpinned conversations.
 fn decode_cursor(cursor: &str) -> Result<Cursor> {
@@ -312,14 +404,16 @@ fn decode_cursor(cursor: &str) -> Result<Cursor> {
     let bytes = URL_SAFE_NO_PAD.decode(cursor).map_err(|_| bad())?;
     let text = String::from_utf8(bytes).map_err(|_| bad())?;
     let parts: Vec<&str> = text.split('|').collect();
-    let (pinned, at, id) = match parts.as_slice() {
-        [at, id] | ["0", at, id] => (false, *at, *id),
-        ["1", at, id] => (true, *at, *id),
+    let (pinned, sent, at, id) = match parts.as_slice() {
+        [at, id] | ["0", at, id] => (false, false, *at, *id),
+        ["1", at, id] => (true, false, *at, *id),
+        ["s", at, id] => (false, true, *at, *id),
         _ => return Err(bad()),
     };
     let at = DateTime::parse_from_rfc3339(at).map_err(|_| bad())?;
     Ok(Cursor {
         pinned,
+        sent,
         at: at.with_timezone(&Utc),
         id: id.parse().map_err(|_| bad())?,
     })
@@ -336,12 +430,32 @@ mod tests {
         for pinned in [false, true] {
             assert_eq!(
                 decode_cursor(&encode_cursor(pinned, at, id)).unwrap(),
-                Cursor { pinned, at, id }
+                Cursor {
+                    pinned,
+                    sent: false,
+                    at,
+                    id
+                }
             );
         }
         assert!(decode_cursor("not-a-cursor").is_err());
         assert!(decode_cursor(&URL_SAFE_NO_PAD.encode("2026-01-01|nope")).is_err());
         assert!(decode_cursor(&URL_SAFE_NO_PAD.encode("2|2026-01-01T00:00:00Z|x")).is_err());
+    }
+
+    #[test]
+    fn a_sent_cursor_is_marked() {
+        let at = Utc::now();
+        let id = ConversationId::new();
+        assert_eq!(
+            decode_cursor(&encode_sent_cursor(at, id)).unwrap(),
+            Cursor {
+                pinned: false,
+                sent: true,
+                at,
+                id
+            }
+        );
     }
 
     #[test]
@@ -356,6 +470,7 @@ mod tests {
             decode_cursor(&legacy).unwrap(),
             Cursor {
                 pinned: false,
+                sent: false,
                 at,
                 id
             }
@@ -516,5 +631,305 @@ mod http_tests {
         );
         let filtered = kit.get(&ana, &format!("{base}?inbox={inbox}")).await;
         assert_eq!(filtered.status, StatusCode::NOT_FOUND);
+    }
+
+    /// A message in a recorded batch.
+    fn message(
+        id: &str,
+        thread: &str,
+        direction: &str,
+        other: (&str, &str),
+        sent_at: &str,
+        in_inbox: bool,
+    ) -> serde_json::Value {
+        let sam = serde_json::json!({"name": "Sam Rivers", "address": "sam@example.com"});
+        let them = serde_json::json!({"name": other.0, "address": other.1});
+        let (from, to) = if direction == "outbound" {
+            (sam, them)
+        } else {
+            (them, sam)
+        };
+        serde_json::json!({"op": "upsert", "message": {
+            "provider_message_id": id,
+            "thread_key": thread,
+            "from": from,
+            "to": [to],
+            "subject": format!("Subject of {thread}"),
+            "sent_at": sent_at,
+            "direction": direction,
+            "text": "Example text.",
+            "mailbox": {"in_inbox": in_inbox},
+            "read": true, "starred": false
+        }})
+    }
+
+    fn batch(messages: Vec<serde_json::Value>) -> serde_json::Value {
+        serde_json::json!({"changes": messages})
+    }
+
+    fn ids(json: &serde_json::Value) -> Vec<String> {
+        json["conversations"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|c| c["id"].as_str().unwrap().to_owned())
+            .collect()
+    }
+
+    #[sqlx::test(migrations = "../../../migrations")]
+    async fn sent_lists_what_you_started_even_archived_ordered_by_your_latest(db: PgPool) {
+        let kit = Kit::new(db).await;
+        let (workspace, inbox, sam) = kit.sams_inbox().await;
+        let base = format!("/api/v1/w/{workspace}/conversations");
+        // You start two conversations; neither is in the inbox.
+        kit.ingest_value(
+            workspace,
+            inbox,
+            &batch(vec![
+                message(
+                    "s-1",
+                    "thr-s-1",
+                    "outbound",
+                    ("Clara Nunes", "clara@example.com"),
+                    "2026-10-10T09:00:00Z",
+                    false,
+                ),
+                message(
+                    "s-2",
+                    "thr-s-2",
+                    "outbound",
+                    ("Pedro Alves", "pedro@example.com"),
+                    "2026-10-12T09:00:00Z",
+                    false,
+                ),
+            ]),
+        )
+        .await;
+        let started = kit.conversation_of("s-1").await;
+        let other = kit.conversation_of("s-2").await;
+
+        // They are not in the inbox.
+        let inbox_list = kit.get(&sam, &base).await;
+        assert!(!ids(&inbox_list.json).contains(&started));
+        assert!(!ids(&inbox_list.json).contains(&other));
+
+        // They are in Sent, your latest first; the Q4 thread (replied on
+        // 5 October) comes after them.
+        let sent = kit.get(&sam, &format!("{base}?sent=true")).await;
+        assert_eq!(sent.status, StatusCode::OK, "{:?}", sent.json);
+        let q4 = kit.conversation_of("en-1").await;
+        assert_eq!(ids(&sent.json), [other.clone(), started.clone(), q4]);
+        let first = &sent.json["conversations"][0];
+        assert_eq!(first["archived"], true);
+        assert_eq!(first["last_sent_at"], "2026-10-12T09:00:00Z");
+        assert_eq!(first["sent_to"]["name"], "Pedro Alves");
+        assert_eq!(first["sent_to"]["address"], "pedro@example.com");
+        assert_eq!(first["latest_from_you"], true);
+
+        // Their reply brings the started conversation into the inbox, and
+        // Sent still orders by your message, not theirs.
+        kit.ingest_value(
+            workspace,
+            inbox,
+            &batch(vec![message(
+                "s-1-reply",
+                "thr-s-1",
+                "inbound",
+                ("Clara Nunes", "clara@example.com"),
+                "2026-10-20T09:00:00Z",
+                true,
+            )]),
+        )
+        .await;
+        let inbox_list = kit.get(&sam, &base).await;
+        assert!(ids(&inbox_list.json).contains(&started));
+        let sent = kit.get(&sam, &format!("{base}?sent=true")).await;
+        assert_eq!(ids(&sent.json)[..2], [other, started]);
+        let replied = &sent.json["conversations"][1];
+        assert_eq!(replied["latest_from_you"], false);
+        assert_eq!(replied["last_sent_at"], "2026-10-10T09:00:00Z");
+        assert_eq!(replied["last_message_at"], "2026-10-20T09:00:00Z");
+        assert_eq!(replied["archived"], false);
+    }
+
+    #[sqlx::test(migrations = "../../../migrations")]
+    async fn sent_leaves_out_trash_and_spam_and_follows_streams_and_inboxes(db: PgPool) {
+        let kit = Kit::new(db).await;
+        let (workspace, inbox, sam) = kit.sams_inbox().await;
+        let base = format!("/api/v1/w/{workspace}/conversations");
+        kit.ingest_value(
+            workspace,
+            inbox,
+            &batch(vec![
+                message(
+                    "t-1",
+                    "thr-t-1",
+                    "outbound",
+                    ("Clara Nunes", "clara@example.com"),
+                    "2026-10-10T09:00:00Z",
+                    false,
+                ),
+                message(
+                    "t-2",
+                    "thr-t-2",
+                    "outbound",
+                    ("Pedro Alves", "pedro@example.com"),
+                    "2026-10-11T09:00:00Z",
+                    false,
+                ),
+            ]),
+        )
+        .await;
+        let trashed = kit.conversation_of("t-1").await;
+        let spammed = kit.conversation_of("t-2").await;
+        let q4 = kit.conversation_of("en-1").await;
+        let sent = format!("{base}?sent=true");
+
+        assert_eq!(ids(&kit.get(&sam, &sent).await.json).len(), 3);
+        kit.post(&sam, &format!("{base}/{trashed}/trash"), None)
+            .await;
+        kit.post(&sam, &format!("{base}/{spammed}/spam"), None)
+            .await;
+        assert_eq!(ids(&kit.get(&sam, &sent).await.json), [q4]);
+
+        // Back from the trash, it is listed again.
+        kit.post(&sam, &format!("{base}/{trashed}/untrash"), None)
+            .await;
+        assert!(ids(&kit.get(&sam, &sent).await.json).contains(&trashed));
+
+        // Streams and inboxes narrow it.
+        let news = kit.get(&sam, &format!("{sent}&stream=newsletters")).await;
+        assert!(ids(&news.json).is_empty());
+        let primary = kit.get(&sam, &format!("{sent}&stream=primary")).await;
+        assert_eq!(ids(&primary.json).len(), 2);
+        let mine = kit.get(&sam, &format!("{sent}&inbox={inbox}")).await;
+        assert_eq!(ids(&mine.json).len(), 2);
+        let unknown = kit
+            .get(&sam, &format!("{sent}&inbox={}", InboxId::new()))
+            .await;
+        assert_eq!(unknown.status, StatusCode::NOT_FOUND);
+
+        // `archived` is ignored.
+        let both = kit.get(&sam, &format!("{sent}&archived=true")).await;
+        assert_eq!(ids(&both.json).len(), 2);
+    }
+
+    #[sqlx::test(migrations = "../../../migrations")]
+    async fn sent_pages_with_its_own_cursor(db: PgPool) {
+        let kit = Kit::new(db).await;
+        let (workspace, inbox, sam) = kit.sams_inbox().await;
+        let base = format!("/api/v1/w/{workspace}/conversations");
+        kit.ingest_value(
+            workspace,
+            inbox,
+            &batch(vec![
+                message(
+                    "p-1",
+                    "thr-p-1",
+                    "outbound",
+                    ("Clara Nunes", "clara@example.com"),
+                    "2026-10-10T09:00:00Z",
+                    false,
+                ),
+                message(
+                    "p-2",
+                    "thr-p-2",
+                    "outbound",
+                    ("Pedro Alves", "pedro@example.com"),
+                    "2026-10-11T09:00:00Z",
+                    false,
+                ),
+            ]),
+        )
+        .await;
+        let mut seen = Vec::new();
+        let mut cursor: Option<String> = None;
+        let mut pages = 0;
+        loop {
+            let uri = match &cursor {
+                Some(c) => format!("{base}?sent=true&limit=1&cursor={c}"),
+                None => format!("{base}?sent=true&limit=1"),
+            };
+            let page = kit.get(&sam, &uri).await;
+            assert_eq!(page.status, StatusCode::OK, "{:?}", page.json);
+            seen.extend(ids(&page.json));
+            pages += 1;
+            cursor = page.json["next_cursor"].as_str().map(str::to_owned);
+            if cursor.is_none() {
+                break;
+            }
+        }
+        assert_eq!(pages, 3);
+        let all = kit.get(&sam, &format!("{base}?sent=true")).await;
+        assert_eq!(seen, ids(&all.json));
+
+        // A cursor only pages the kind of list it came from.
+        let first = kit.get(&sam, &format!("{base}?sent=true&limit=1")).await;
+        let sent_cursor = first.json["next_cursor"].as_str().unwrap().to_owned();
+        let wrong = kit.get(&sam, &format!("{base}?cursor={sent_cursor}")).await;
+        assert_eq!(wrong.status, StatusCode::BAD_REQUEST);
+        assert_eq!(wrong.json["code"], "invalid_cursor");
+        let stream_page = kit.get(&sam, &format!("{base}?limit=1")).await;
+        let stream_cursor = stream_page.json["next_cursor"].as_str().unwrap().to_owned();
+        let wrong = kit
+            .get(&sam, &format!("{base}?sent=true&cursor={stream_cursor}"))
+            .await;
+        assert_eq!(wrong.status, StatusCode::BAD_REQUEST);
+    }
+
+    #[sqlx::test(migrations = "../../../migrations")]
+    async fn sent_stays_out_of_an_inbox_you_cannot_read(db: PgPool) {
+        let kit = Kit::new(db).await;
+        let (workspace, _, _) = kit.sams_inbox().await;
+        let (ana, _) = kit.member("ana", workspace);
+        let base = format!("/api/v1/w/{workspace}/conversations?sent=true");
+        let response = kit.get(&ana, &base).await;
+        assert_eq!(response.status, StatusCode::OK);
+        assert!(ids(&response.json).is_empty());
+    }
+
+    #[sqlx::test(migrations = "../../../migrations")]
+    async fn the_recount_restores_last_sent_at_as_the_backfill_computes_it(db: PgPool) {
+        let kit = Kit::new(db.clone()).await;
+        let (workspace, _, sam) = kit.sams_inbox().await;
+        let base = format!("/api/v1/w/{workspace}/conversations");
+        let q4 = kit.conversation_of("en-1").await;
+        let stored: Option<chrono::DateTime<chrono::Utc>> = sqlx::query_scalar(
+            "SELECT last_sent_at FROM conversations.conversations WHERE id = $1::uuid",
+        )
+        .bind(&q4)
+        .fetch_one(&db)
+        .await
+        .unwrap();
+        // Sam's only message in it is en-2, sent 5 October at 10:02.
+        assert_eq!(stored.unwrap().to_rfc3339(), "2026-10-05T10:02:00+00:00");
+        // The newsletter has none.
+        let news = kit.conversation_of("en-3").await;
+        let none: Option<chrono::DateTime<chrono::Utc>> = sqlx::query_scalar(
+            "SELECT last_sent_at FROM conversations.conversations WHERE id = $1::uuid",
+        )
+        .bind(&news)
+        .fetch_one(&db)
+        .await
+        .unwrap();
+        assert!(none.is_none());
+
+        // Lose it, then touch the conversation: the recount derives it again.
+        sqlx::query(
+            "UPDATE conversations.conversations SET last_sent_at = NULL WHERE id = $1::uuid",
+        )
+        .bind(&q4)
+        .execute(&db)
+        .await
+        .unwrap();
+        kit.post(&sam, &format!("{base}/{q4}/star"), None).await;
+        let again: Option<chrono::DateTime<chrono::Utc>> = sqlx::query_scalar(
+            "SELECT last_sent_at FROM conversations.conversations WHERE id = $1::uuid",
+        )
+        .bind(&q4)
+        .fetch_one(&db)
+        .await
+        .unwrap();
+        assert_eq!(again, stored);
     }
 }

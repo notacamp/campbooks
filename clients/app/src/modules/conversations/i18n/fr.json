@@ -5,7 +5,8 @@
     "primary": "Principal",
     "updates": "Notifications",
     "receipts": "Reçus",
-    "newsletters": "Newsletters"
+    "newsletters": "Newsletters",
+    "sent": "Envoyés"
   },
   "list": {
     "label": "Conversations",
@@ -14,7 +15,10 @@
     "unread": "Non lues",
     "more": "Afficher plus",
     "loadingMore": "Chargement d’autres conversations",
-    "youPrefix": "Moi : {{snippet}}"
+    "youPrefix": "Moi : {{snippet}}",
+    "to": "À {{name}}",
+    "toNobody": "Aucun destinataire",
+    "replied": "A répondu"
   },
   "empty": {
     "streamTitle": "Rien dans {{stream}}",
@@ -24,7 +28,9 @@
     "noInboxTitle": "Pas encore de boîte mail",
     "noInboxBody": "Connectez une boîte mail : son courrier apparaîtra ici, rangé en flux.",
     "readerTitle": "Choisissez une conversation",
-    "readerBody": "Choisissez-en une dans la liste, ou utilisez le clavier :"
+    "readerBody": "Choisissez-en une dans la liste, ou utilisez le clavier :",
+    "sentTitle": "Rien d’envoyé pour l’instant",
+    "sentBody": "Les conversations où vous écrivez apparaissent ici, avec leur destinataire."
   },
   "error": {
     "listTitle": "Impossible de charger {{stream}}",
@@ -195,7 +201,8 @@
     "undoAll": "Annuler tout ce qu’a fait une règle",
     "allPaid": "Toutes les factures déjà payées",
     "saveRule": "Enregistrer la règle intelligente",
-    "trustImages": "Toujours afficher les images de cet expéditeur"
+    "trustImages": "Toujours afficher les images de cet expéditeur",
+    "sent": "Aller à Envoyés"
   },
   "compose": {
     "title": {
