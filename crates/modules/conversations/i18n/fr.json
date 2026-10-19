@@ -2,6 +2,7 @@
   "errors": {
     "reply_unavailable": "Ce serveur n’a pas de modèle de langage autorisé à lire le courrier, Scout ne peut donc pas écrire de réponses ici. Écrivez celle-ci vous-même.",
     "reply_failed": "Scout n’a pas pu écrire la réponse pour l’instant. Réessayez dans un moment ou écrivez-la vous-même.",
+    "reply_timed_out": "Scout a mis trop de temps à écrire la réponse. Réessayez ou écrivez-la vous-même.",
     "reply_ask_invalid": "Dites ce que la réponse doit dire, en 1 à {{max}} caractères.",
     "invalid_limit": "La limite doit être comprise entre 1 et {{max}}.",
     "invalid_cursor": "Ce lien de page n’est pas valide. Recommencez à la première page.",

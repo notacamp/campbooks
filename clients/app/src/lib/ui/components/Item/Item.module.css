@@ -53,11 +53,9 @@
 .what {
   grid-column: 2 / 3;
   min-width: 0;
-  overflow: hidden;
   font-size: var(--text-md);
   color: var(--text-secondary);
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
 }
 
 .excerpt {

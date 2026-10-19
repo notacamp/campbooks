@@ -55,6 +55,10 @@ pub struct Cursor {
     /// The current resync pass; index rows listed in it carry it.
     #[serde(default)]
     pub generation: i32,
+    /// When the first sync (the backfill) completed: mail received before
+    /// is never mirrored (set by the run, `sync_stream`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub synced_at: Option<DateTime<Utc>>,
 }
 
 impl Cursor {

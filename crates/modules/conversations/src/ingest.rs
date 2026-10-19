@@ -20,7 +20,7 @@ use campbooks_kernel::blobs::BlobRef;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
-use crate::model::{Address, Direction, InboxId};
+use crate::model::{Address, Direction, InboxId, Stream};
 
 /// The batch document's media type.
 pub const BATCH_CONTENT_TYPE: &str = "application/vnd.campbooks.message-changes+json; version=1";
@@ -44,8 +44,28 @@ pub struct MessageChangeBatch {
     pub version: u16,
     /// The inbox; must match the job's.
     pub inbox: InboxId,
+    /// Read by the inbox's first sync (its backfill): mail it held before
+    /// it was connected, whose streams are never mirrored to the provider.
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub backfill: bool,
     /// The changes, applied in this order.
     pub changes: Vec<MessageChange>,
+}
+
+/// Whether `value` is false (left out of the document).
+#[allow(clippy::trivially_copy_pass_by_ref, reason = "serde's signature")]
+const fn is_false(value: &bool) -> bool {
+    !*value
+}
+
+/// A present value, as `Some` (absent stays `None`): an optional field that
+/// may also be `null`.
+fn present<'de, D, T>(deserializer: D) -> Result<Option<T>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+    T: Deserialize<'de>,
+{
+    T::deserialize(deserializer).map(Some)
 }
 
 /// One change.
@@ -130,6 +150,24 @@ pub struct NormalizedMessage {
     /// Starred (flagged) at the provider.
     #[serde(default)]
     pub starred: bool,
+    /// The stream a received message is in at the provider (its stream
+    /// mark, else its native place): `Some(None)` (`null`) when it is in
+    /// none of the four, `None` (absent) when the connector cannot tell, which
+    /// leaves the stored one as it is.
+    #[allow(
+        clippy::option_option,
+        reason = "absent, null or a stream: the contract's three cases"
+    )]
+    #[serde(
+        default,
+        deserialize_with = "present",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub provider_stream: Option<Option<Stream>>,
+    /// Its category changed at the provider while it kept a stream mark:
+    /// `provider_stream` is the category's, and the mark is to come off.
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub stream_mark_stale: bool,
 }
 
 /// The headers subset sorting reads (email). Values as sent, unfolded.
@@ -247,5 +285,28 @@ mod tests {
         };
         assert!(!message.read && message.labels.is_empty() && message.text.is_none());
         assert_eq!(message.headers, Headers::default());
+        // No provider stream said: none to store or follow.
+        assert_eq!(message.provider_stream, None);
+        assert!(!message.stream_mark_stale && !batch.backfill);
+    }
+
+    #[test]
+    fn a_provider_stream_may_be_null() {
+        let message = |stream: serde_json::Value| -> NormalizedMessage {
+            serde_json::from_value(serde_json::json!({
+                "provider_message_id": "m1",
+                "from": {"address": "ana@example.com"},
+                "sent_at": "2026-10-01T09:00:00Z",
+                "direction": "inbound",
+                "mailbox": {"in_inbox": true},
+                "provider_stream": stream,
+                "stream_mark_stale": true
+            }))
+            .unwrap()
+        };
+        let receipts = message(serde_json::json!("receipts"));
+        assert_eq!(receipts.provider_stream, Some(Some(Stream::Receipts)));
+        assert!(receipts.stream_mark_stale);
+        assert_eq!(message(serde_json::Value::Null).provider_stream, Some(None));
     }
 }

@@ -10,13 +10,23 @@ import {
   type QueryClient,
 } from "@tanstack/react-query";
 
-import { api, operationKey, unwrap, type OperationQuery, type Schema } from "~/lib/api";
+import {
+  api,
+  followsChangesLive,
+  operationKey,
+  unwrap,
+  type OperationQuery,
+  type Schema,
+} from "~/lib/api";
+
+import { bodyRefetchInterval, bodyStaleTime, refetchBodyOnFocus } from "./body-freshness";
 
 export type Stream = Schema<"Stream">;
 export type ConversationSummary = Schema<"ConversationSummary">;
 export type ConversationDetail = Schema<"ConversationDetail">;
 type ConversationList = Schema<"ConversationList">;
 export type MessageView = Schema<"MessageView">;
+type MessageBody = Schema<"MessageBody">;
 export type DecisionView = Schema<"DecisionView">;
 export type ReasonView = Schema<"ReasonView">;
 export type NeedView = Schema<"NeedView">;
@@ -36,23 +46,43 @@ export function isStream(value: string): value is Stream {
 /** A view beside the streams (`conversations.list` with `view`): never a stream. */
 export type View = Exclude<NonNullable<OperationQuery<"conversations.list">["view"]>, "inbox">;
 
-/** The views, in display order, after the streams. */
-export const VIEWS: readonly View[] = ["sent", "archive", "spam", "trash"];
+/** The views listed by `conversations.list`, in display order. */
+export const VIEWS: readonly View[] = ["sent", "starred", "archive", "spam", "trash"];
+
+/** Drafts: a place beside the views whose list is `conversations.list_drafts`, not conversations. */
+export const DRAFTS = "drafts";
+export type Drafts = typeof DRAFTS;
+
+/** The places after the streams, in the order the sidebar and the chips show them. */
+export const SIDE_PLACES: readonly (View | Drafts)[] = [
+  "sent",
+  "starred",
+  DRAFTS,
+  "archive",
+  "spam",
+  "trash",
+];
 
 export function isView(value: string): value is View {
   return (VIEWS as readonly string[]).includes(value);
 }
 
-/** Where a list is: one of the streams (the inbox), or a view beside them. */
-export type Place = Stream | View;
+/** A place that lists conversations: one of the streams (the inbox), or a view beside them. */
+export type ConversationPlace = Stream | View;
+
+/** Where the member is in the inbox: a list of conversations, or Drafts. */
+export type Place = ConversationPlace | Drafts;
 
 export function isPlace(value: string): value is Place {
-  return isStream(value) || isView(value);
+  return isStream(value) || isView(value) || value === DRAFTS;
 }
 
 /** Whether `summary` is listed in `place`, as the server lists it. */
-export function belongsIn(place: Place, summary: ConversationSummary): boolean {
+export function belongsIn(place: ConversationPlace, summary: ConversationSummary): boolean {
   switch (place) {
+    case "starred": {
+      return summary.starred && !summary.trashed;
+    }
     case "sent": {
       return typeof summary.last_sent_at === "string" && !summary.trashed;
     }
@@ -78,7 +108,7 @@ const keys = {
     operationKey("conversations.list_inboxes", { workspace_id: workspaceId }),
   streams: (workspaceId: string) =>
     operationKey("conversations.list_streams", { workspace_id: workspaceId }),
-  list: (workspaceId: string, place: Place) =>
+  list: (workspaceId: string, place: ConversationPlace) =>
     operationKey(
       "conversations.list",
       isView(place)
@@ -153,7 +183,7 @@ export function useStreams(workspaceId: string) {
   });
 }
 
-const conversationsQuery = (workspaceId: string, place: Place) =>
+const conversationsQuery = (workspaceId: string, place: ConversationPlace) =>
   infiniteQueryOptions({
     queryKey: keys.list(workspaceId, place),
     initialPageParam: undefined as string | undefined,
@@ -175,7 +205,7 @@ const conversationsQuery = (workspaceId: string, place: Place) =>
   });
 
 /** `conversations.list` for one stream or view, a page at a time. */
-export function useConversations(workspaceId: string, place: Place) {
+export function useConversations(workspaceId: string, place: ConversationPlace) {
   return useInfiniteQuery(conversationsQuery(workspaceId, place));
 }
 
@@ -208,11 +238,15 @@ export function useMessageBody(
   enabled: boolean,
   spam = false,
 ) {
-  return useQuery({
+  return useQuery<MessageBody>({
     queryKey: keys.body(workspaceId, conversationId, messageId, showImages, spam),
     enabled,
-    // A body never changes once stored.
-    staleTime: Number.POSITIVE_INFINITY,
+    // Fresh until a rule changes, live; without a live feed (the desktop and
+    // mobile shells), a body whose images depend on rules is read again
+    // (campbooks-cloud#236, `body-freshness.ts`).
+    staleTime: (query) => bodyStaleTime(query.state.data, followsChangesLive()),
+    refetchInterval: (query) => bodyRefetchInterval(query.state.data, followsChangesLive()),
+    refetchOnWindowFocus: (query) => refetchBodyOnFocus(query.state.data, followsChangesLive()),
     // "Show images" refetches it: keep the blocked version up meanwhile. Never
     // in spam: the version before may have had its images.
     ...(spam ? {} : { placeholderData: keepPreviousData }),

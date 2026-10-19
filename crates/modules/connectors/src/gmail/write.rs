@@ -15,10 +15,16 @@
 //!   `messages.untrash` (Gmail puts back the labels the message had), only
 //!   for a message the index has in the trash (or does not carry); reporting
 //!   spam and "not spam" are label changes (`outbound::map`), so a report on
-//!   mail that is not in the trash is batched like any other.
+//!   mail that is not in the trash is batched like any other;
+//! - a stream mark a change puts on is created first when Gmail has no
+//!   label of its name (`labels.create`), and every mark's token becomes
+//!   its label id (`domain/marks.rs`);
+//! - a change whose labels the message already shows, with no Gmail change
+//!   to them since the index was read, is `skipped` (`already_set`) without
+//!   a call.
 
 use std::{
-    collections::{BTreeMap, HashMap},
+    collections::{BTreeMap, HashMap, HashSet},
     sync::atomic::{AtomicU32, Ordering},
 };
 
@@ -26,11 +32,13 @@ use futures_util::{StreamExt as _, stream::FuturesOrdered};
 
 use super::FETCH_CONCURRENCY;
 use crate::{
+    contract::ProviderStream,
     domain::{
+        marks::{self, MarkIds},
         outbound::{Backlog, LabelChange, apply_labels},
-        push::{Fate, Fates, Plan, Push, Results, Wants, retry_or_give_up},
+        push::{Fate, Fates, Plan, Push, Results, Wants, retry_or_give_up, without_marks},
     },
-    google::Gmail,
+    google::{Gmail, LabelInfo},
     provider::ProviderError,
 };
 
@@ -50,8 +58,10 @@ const PROFILE_UNITS: u32 = 1;
 const HISTORY_UNITS: u32 = 2;
 /// Of `batchModify`.
 const BATCH_UNITS: u32 = 50;
-/// Of `modify`, `trash` and `untrash` each.
+/// Of `modify`, `trash` and `untrash` each, and of `labels.create`.
 const CALL_UNITS: u32 = 5;
+/// Of `labels.list`.
+const LIST_UNITS: u32 = 1;
 
 /// Gmail quota units pushing `backlog` is planned to spend: the profile
 /// before and after, the history pages, and the writes it plans (a batch per
@@ -61,11 +71,14 @@ const CALL_UNITS: u32 = 5;
 /// took writes away, history was short) is given back, more (Gmail refused a
 /// batch, a group split) is owed, and later runs wait it out
 /// (campbooks-cloud#252).
-pub fn units(backlog: &Backlog) -> u32 {
-    let writes = Writes::plan(&Plan::merge(backlog).groups(), &backlog.labels);
+pub fn units(backlog: &Backlog, marks: &MarkIds) -> u32 {
+    let missing = count(marks::missing(backlog, marks).len());
+    let backlog = marks::resolve(backlog, marks, str::to_owned);
+    let writes = Writes::plan(&Plan::merge(&backlog).groups(), &backlog.labels);
     let pages = count(HISTORY_PAGES);
     (2 * PROFILE_UNITS)
         .saturating_add(pages.saturating_mul(HISTORY_UNITS))
+        .saturating_add(missing.saturating_mul(CALL_UNITS + LIST_UNITS))
         .saturating_add(writes.planned())
 }
 
@@ -89,38 +102,102 @@ fn count(n: usize) -> u32 {
     u32::try_from(n).unwrap_or(u32::MAX)
 }
 
-/// Push `backlog` through `gmail`.
-pub async fn push(gmail: &Gmail<'_>, backlog: &Backlog) -> Push {
+/// Push `backlog` through `gmail`. `marks` are the stream marks Gmail is
+/// known to have; `read_from` is the history id the index was read up to
+/// (the stream's cursor).
+pub async fn push(
+    gmail: &Gmail<'_>,
+    backlog: &Backlog,
+    marks: &MarkIds,
+    read_from: Option<i64>,
+) -> Push {
     let gmail = Metered {
         gmail,
         spent: AtomicU32::new(0),
     };
-    let mut push = pushed(&gmail, backlog).await;
+    let mut push = pushed(&gmail, backlog, marks, read_from).await;
     push.spent = gmail.spent.into_inner();
     push
 }
 
+/// Every change of `backlog` pending again (or given up), after `trouble`.
+fn stopped(backlog: &Backlog, trouble: ProviderError, push: &mut Push) {
+    for change in &backlog.pending {
+        let end = retry_or_give_up(
+            change.id,
+            change.attempts,
+            &mut push.outcome.reemit,
+            &change.provider_message_id,
+        );
+        push.outcome.ends.push(end);
+    }
+    push.trouble = Some(trouble);
+}
+
+/// `stream`'s mark at Gmail, created: or found, when Gmail already has a
+/// label of its name the cache did not know.
+async fn create_mark(
+    gmail: &Metered<'_, '_>,
+    stream: ProviderStream,
+) -> Result<LabelInfo, ProviderError> {
+    let name = marks::name(stream);
+    match gmail.charge(CALL_UNITS).create_label(name).await {
+        Ok(label) => Ok(label),
+        Err(ProviderError::Unexpected(refused)) => gmail
+            .charge(LIST_UNITS)
+            .labels()
+            .await?
+            .into_iter()
+            .find(|label| marks::of_name(&label.name) == Some(stream))
+            .ok_or(ProviderError::Unexpected(refused)),
+        Err(other) => Err(other),
+    }
+}
+
 /// [`push`], through the metered API.
-async fn pushed(gmail: &Metered<'_, '_>, backlog: &Backlog) -> Push {
+async fn pushed(
+    gmail: &Metered<'_, '_>,
+    backlog: &Backlog,
+    marks: &MarkIds,
+    read_from: Option<i64>,
+) -> Push {
     let mut push = Push::default();
-    let mut plan = Plan::merge(backlog);
-    // Later writers at Gmail.
-    let before = match overtaken(gmail, backlog, &plan.wants, &mut plan.fates).await {
-        Ok(before) => before,
-        Err(trouble) => {
-            for change in &backlog.pending {
-                let end = retry_or_give_up(
-                    change.id,
-                    change.attempts,
-                    &mut push.outcome.reemit,
-                    &change.provider_message_id,
-                );
-                push.outcome.ends.push(end);
+    // The marks the changes put on, created where Gmail has none yet.
+    let mut marks = marks.clone();
+    let mut unmade = BTreeMap::new();
+    for stream in marks::missing(backlog, &marks) {
+        match create_mark(gmail, stream).await {
+            Ok(label) => {
+                marks.insert(stream, label.id.clone());
+                push.created.push((label.id, label.name));
             }
-            push.trouble = Some(trouble);
-            return push;
+            // Gmail refused that label: the changes needing it are not made.
+            Err(ProviderError::Unexpected(_) | ProviderError::NotFound) => {
+                unmade.insert(stream, "refused");
+            }
+            Err(trouble) => {
+                stopped(backlog, trouble, &mut push);
+                return push;
+            }
         }
-    };
+    }
+    let backlog = &marks::resolve(
+        &without_marks(backlog, &unmade, &mut push.outcome),
+        &marks,
+        str::to_owned,
+    );
+    let mut plan = Plan::merge(backlog);
+    // Later writers at Gmail, and what Gmail changed since the index was
+    // read.
+    let (before, fresh) =
+        match overtaken(gmail, backlog, &plan.wants, &mut plan.fates, read_from).await {
+            Ok(read) => read,
+            Err(trouble) => {
+                stopped(backlog, trouble, &mut push);
+                return push;
+            }
+        };
+    plan.in_place(backlog, fresh.as_ref());
     plan.atomic();
     let mut done = Results::default();
     let writes = Writes::plan(&plan.groups(), &backlog.labels);
@@ -308,25 +385,39 @@ async fn write_one(gmail: &Metered<'_, '_>, single: &Single) -> Result<(), Provi
     Ok(())
 }
 
-/// Read Gmail's history from the oldest stamp and mark the (message, label)
-/// pairs a later Gmail change overtook, and the messages Gmail deleted.
-/// Returns Gmail's history id before any write (the start of our write
-/// window), when it could be read.
+/// What Gmail changed since the index was read: the (message, label) pairs
+/// of the changes, when the whole of that history was read.
+type Fresh = Option<HashSet<(String, String)>>;
+
+/// Read Gmail's history from the oldest stamp (or from `read_from`, the
+/// history id the index was read up to, when that is earlier) and mark the
+/// (message, label) pairs a later Gmail change overtook, and the messages
+/// Gmail deleted. Returns Gmail's history id before any write (the start of
+/// our write window), when it could be read, and the pairs Gmail changed
+/// since `read_from` other than by our own writes ([`Fresh`]).
 async fn overtaken(
     gmail: &Metered<'_, '_>,
     backlog: &Backlog,
     wants: &Wants,
     fates: &mut Fates,
-) -> Result<Option<i64>, ProviderError> {
+    read_from: Option<i64>,
+) -> Result<(Option<i64>, Fresh), ProviderError> {
     let oldest = wants
         .values()
         .flat_map(BTreeMap::values)
         .filter_map(|w| w.stamp)
         .min();
-    let Some(oldest) = oldest else {
-        return profile_id(gmail).await;
+    let from = match (oldest, read_from) {
+        (Some(stamp), Some(read)) => Some(stamp.min(read)),
+        (stamp, read) => stamp.or(read),
     };
-    let start = oldest.to_string();
+    let Some(from) = from else {
+        return Ok((profile_id(gmail).await?, None));
+    };
+    // What happened since the index was read is known only when history
+    // starts no later than that.
+    let mut since_read = read_from.map(|_| HashSet::new());
+    let start = from.to_string();
     let mut token: Option<String> = None;
     let mut latest = None;
     for _ in 0..HISTORY_PAGES {
@@ -337,7 +428,7 @@ async fn overtaken(
         {
             Ok(page) => page,
             // Gmail no longer has that far back: arrival order.
-            Err(ProviderError::NotFound) => return profile_id(gmail).await,
+            Err(ProviderError::NotFound) => return Ok((profile_id(gmail).await?, None)),
             Err(other) => return Err(other),
         };
         latest = page.history_id.parse::<i64>().ok();
@@ -370,6 +461,12 @@ async fn overtaken(
                         .get(message)
                         .is_some_and(|own| own.iter().any(|w| w.covers(label, at)));
                     let key = (message.clone(), label.clone());
+                    if let Some(since_read) = since_read.as_mut()
+                        && !ours
+                        && read_from.is_some_and(|read| at > read)
+                    {
+                        since_read.insert(key.clone());
+                    }
                     if later && !ours && fates[&key] == Fate::Write {
                         fates.insert(key, Fate::Overtaken);
                     }
@@ -378,12 +475,12 @@ async fn overtaken(
         }
         token = page.next_page_token;
         if token.is_none() {
-            return Ok(latest);
+            return Ok((latest, since_read));
         }
     }
     // More history than we read: what was read stands, the rest is
     // arrival order. Our window starts no earlier than now.
-    Ok(profile_id(gmail).await?.or(latest))
+    Ok((profile_id(gmail).await?.or(latest), None))
 }
 
 /// Gmail's current history id.

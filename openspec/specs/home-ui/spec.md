@@ -236,11 +236,21 @@ SHALL say who the reply goes to, name and address, as the server will send
 it (the message's Reply-To first), and SHALL warn when that Reply-To differs
 from the sender's address. It SHALL quote the message being answered. While
 the suggestions load the dialog SHALL say Scout is reading the conversation.
-Picking an intent, or submitting your own words, SHALL call
-`conversations.write_reply` and show the draft in an editable text area,
-with "Shorter" and "Change…" (a plain-words instruction), both marked with
-the visor and rewriting the text as it stands, "Send" (⌘↵), "Open in
-composer" and "Back to the choices". No draft SHALL be written before such
+Picking an intent, or submitting your own words, SHALL ask for the reply,
+sending the likely replies shown with it, and show the draft in an editable
+text area, with "Shorter" and "Change…" (a plain-words instruction), both
+marked with the visor and rewriting the text as it stands, "Send" (⌘↵),
+"Open in composer" and "Back to the choices". On the web the reply SHALL be
+asked from `conversations.stream_reply`: while Scout thinks, the dialog
+SHALL show a short muted trace of its thinking as it arrives (about five
+lines, following the newest, its label announced politely and the text
+itself not read aloud), and from the first word it SHALL show the draft
+typing in, marked busy, until the whole reply replaces it and the text area
+takes focus; the trace SHALL then fold into a closed disclosure. A rewrite
+SHALL keep the member's text until its first word arrives and put it back
+if the rewrite fails. A new ask, Back, or closing the dialog SHALL stop the
+request in flight. The desktop app SHALL ask `conversations.write_reply`
+and show the draft when it arrives. No draft SHALL be written before such
 a click, and nothing SHALL be sent before Send. Send SHALL create a reply
 draft with the text and the quoted history and send it with the existing
 undo window: the dialog SHALL show "Sending to <name>" for about a second
@@ -254,9 +264,11 @@ and the text and say so. "Open in composer" SHALL create the reply draft
 with the text and open the composer on it. Esc or a click outside SHALL
 close the dialog with nothing created. When the server answers
 `reply_unavailable`, the dialog SHALL offer only "Write my own" with a line
-saying Scout can't write replies on this server; on any other failure it
-SHALL say so in one line and keep the text the member had. The model's
-text SHALL be shown only as text. Below 48rem the dialog SHALL be a bottom
+saying Scout can't write replies on this server; when Scout took too long
+(`reply_timed_out`, `request_timed_out`) it SHALL say so and suggest trying
+again or writing it yourself; on any other failure it SHALL say so in one
+line and keep the text the member had. The model's text and its thinking
+SHALL be shown only as text. Below 48rem the dialog SHALL be a bottom
 sheet with no horizontal scrolling, in light and dark, in en, pt-PT, es-ES
 and fr.
 
@@ -264,9 +276,29 @@ and fr.
 - **WHEN** the user presses R on Marta's question, then 1
 - **THEN** Scout writes "Yes, Thursday 10:00 works" as a reply signed with the user's name, shown editable in the dialog
 
+#### Scenario: Watch Scout write
+- **WHEN** the user picks a likely reply on the web and the model thinks before it writes
+- **THEN** the dialog shows Scout's thinking in a muted trace, then the reply typing into the draft, and the text area takes focus once the reply is whole
+
+#### Scenario: Combine the suggestions
+- **WHEN** the user types "1 and 3, warmer" in the line for their own words
+- **THEN** the request carries the three likely replies shown, in order, with that intent
+
 #### Scenario: Make it shorter, then send
 - **WHEN** the user chooses Shorter, then presses ⌘↵
 - **THEN** the shorter text is sent as a reply to Marta, the dialog says "Sending to Marta", the item folds away, and the toast offers Undo
+
+#### Scenario: A rewrite that fails
+- **WHEN** the user chooses Change… and the rewrite fails
+- **THEN** the dialog says so and the text is what the user had before
+
+#### Scenario: Close while Scout writes
+- **WHEN** the user presses Esc while the reply is still streaming
+- **THEN** the dialog closes and the request is stopped
+
+#### Scenario: Scout took too long
+- **WHEN** the reply ends with `reply_timed_out`
+- **THEN** the dialog says Scout took too long and suggests trying again or writing it yourself
 
 #### Scenario: Undo the send
 - **WHEN** the user presses Z before the send leaves
@@ -554,8 +586,9 @@ line, put the focus back on it, announce "Saved" in a live region, and say
 so in a toast with Undo that puts back what was there before. Forget this
 SHALL call `conversations.delete_person_note`, with Undo. Once a note is
 saved while a draft shows, the dialog SHALL offer "Rewrite with this", which
-calls `conversations.write_reply` again with the same intent; it SHALL never
-rewrite on its own. A note that can't be kept SHALL say why under the field
+asks for the reply again with the same intent, as a pick does
+(`conversations.stream_reply` on the web, `conversations.write_reply` on the
+desktop); it SHALL never rewrite on its own. A note that can't be kept SHALL say why under the field
 (`person_notes_full`, `person_note_invalid`, or that it failed) and keep the
 words. In en, pt-PT, es-ES and fr, and at 375px with no horizontal
 scrolling.

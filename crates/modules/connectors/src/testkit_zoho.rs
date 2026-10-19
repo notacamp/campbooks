@@ -3,6 +3,10 @@
 //! mailboxes of fictional mail. Like Zoho, listings hide archived messages,
 //! metadata is HTML-escaped, ids are 64-bit numbers, and a send sets its own
 //! `Message-ID` (a reply's `In-Reply-To` names the message replied to).
+//! Labels are listed and made through `labels`, put on and taken off with
+//! `applyLabel` / `removeLabel`, and, as at Zoho, a listing names no labels:
+//! a label's messages are listed with `labelid`. A grant without the labels
+//! scope is refused the labels API.
 //!
 //! No test talks to Zoho.
 
@@ -30,6 +34,8 @@ pub struct ZohoMessage {
     pub archived: bool,
     pub received: DateTime<Utc>,
     pub raw: Vec<u8>,
+    /// Its labels' ids.
+    pub labels: Vec<String>,
 }
 
 /// One mail account of the login.
@@ -38,6 +44,8 @@ struct Account {
     id: String,
     address: String,
     messages: BTreeMap<String, ZohoMessage>,
+    /// Its labels: (id, name).
+    labels: Vec<(String, String)>,
 }
 
 /// What goes wrong with the next send.
@@ -56,6 +64,10 @@ enum SendFault {
 }
 
 #[derive(Debug)]
+#[allow(
+    clippy::struct_excessive_bools,
+    reason = "independent switches of the fake, one per fault"
+)]
 struct State {
     /// The time sends are stamped with (the module's clock).
     clock: Arc<FixedClock>,
@@ -76,6 +88,14 @@ struct State {
     trash_hidden: bool,
     /// Messages whose download answers 500.
     failing: Vec<String>,
+    /// The labels API refuses the grant (no labels scope).
+    labels_refused: bool,
+    /// The labels listing answers an empty list.
+    labels_emptied: bool,
+    /// Labels whose `labelid` listing answers 404.
+    unlisted_labels: Vec<String>,
+    /// Messages `labelid` listings leave out (a listing that lags behind).
+    hidden_from_labels: Vec<String>,
 }
 
 /// Folder ids of every fake account: Inbox, Drafts, Sent, Spam, Trash,
@@ -107,6 +127,7 @@ impl FakeZoho {
                 id: "2560636000000008002".to_owned(),
                 address: LOGIN.to_owned(),
                 messages: BTreeMap::new(),
+                labels: Vec::new(),
             }],
             next_id: 1,
             access_tokens: Vec::new(),
@@ -121,6 +142,10 @@ impl FakeZoho {
             sent_hidden: false,
             trash_hidden: false,
             failing: Vec::new(),
+            labels_refused: false,
+            labels_emptied: false,
+            unlisted_labels: Vec::new(),
+            hidden_from_labels: Vec::new(),
         }));
         Mock::given(any())
             .respond_with(Responder(state.clone()))
@@ -167,6 +192,7 @@ impl FakeZoho {
             id: id.clone(),
             address: address.to_owned(),
             messages: BTreeMap::new(),
+            labels: Vec::new(),
         });
         id
     }
@@ -198,9 +224,27 @@ impl FakeZoho {
                 archived: false,
                 received: at,
                 raw: raw.to_vec(),
+                labels: Vec::new(),
             },
         );
         id
+    }
+
+    /// A member makes the label `name` in the first account; its id.
+    pub fn add_label(&self, name: &str) -> String {
+        let mut state = self.lock();
+        let id = format!("90000000140{:02}", state.accounts[0].labels.len());
+        state.accounts[0].labels.push((id.clone(), name.to_owned()));
+        id
+    }
+
+    /// The id of the first account's label named `name`, if it has one.
+    pub fn label_named(&self, name: &str) -> Option<String> {
+        self.lock().accounts[0]
+            .labels
+            .iter()
+            .find(|(_, n)| n == name)
+            .map(|(id, _)| id.clone())
     }
 
     /// Change message `id` at Zoho.
@@ -294,6 +338,40 @@ impl FakeZoho {
         if failing {
             state.failing.push(id.to_owned());
         }
+    }
+
+    /// Listing label `id`'s messages answers 404, while the label is still
+    /// listed.
+    pub fn fail_label_listing(&self, id: &str) {
+        self.lock().unlisted_labels.push(id.to_owned());
+    }
+
+    /// The labels listing answers an empty list (a glitch).
+    pub fn empty_label_listing(&self) {
+        self.lock().labels_emptied = true;
+    }
+
+    /// `labelid` listings leave message `id` out.
+    pub fn hide_from_label_listings(&self, id: &str) {
+        self.lock().hidden_from_labels.push(id.to_owned());
+    }
+
+    /// The member deletes label `id` in Zoho: gone from the labels and
+    /// from every message.
+    pub fn delete_label(&self, id: &str) {
+        let mut state = self.lock();
+        for account in &mut state.accounts {
+            account.labels.retain(|(label, _)| label != id);
+            for message in account.messages.values_mut() {
+                message.labels.retain(|label| label != id);
+            }
+        }
+    }
+
+    /// The labels API refuses the grant, as for one without the labels
+    /// scope.
+    pub fn refuse_labels(&self) {
+        self.lock().labels_refused = true;
     }
 
     /// Zoho refuses every change to message `id` (400).
@@ -474,6 +552,12 @@ impl Respond for Responder {
         if !token.is_some_and(|t| state.access_tokens.iter().any(|a| a == t)) {
             return error(401, "INVALID_OAUTHTOKEN");
         }
+        let labelling = path.ends_with("/labels")
+            || query.contains_key("labelid")
+            || matches!(body["mode"].as_str(), Some("applyLabel" | "removeLabel"));
+        if labelling && state.labels_refused {
+            return error(401, "INVALID_OAUTHSCOPE");
+        }
         if let Some(seconds) = state.rate_limit_next.take() {
             return error(429, "TOO_MANY_REQUESTS")
                 .insert_header("retry-after", seconds.to_string().as_str());
@@ -549,6 +633,72 @@ fn mail(
     let parts: Vec<&str> = path.split('/').collect();
     match (method, parts.as_slice()) {
         ("GET", ["folders"]) => ok(&folders(state.sent_hidden, state.trash_hidden)),
+        ("GET", ["labels"]) if state.labels_emptied => ok(&serde_json::json!([])),
+        ("GET", ["labels"]) => {
+            let labels: Vec<_> = state.accounts[index]
+                .labels
+                .iter()
+                .enumerate()
+                .map(|(n, (id, name))| {
+                    serde_json::json!({"sequence": n + 1, "labelId": id, "tagId": id,
+                                       "color": "#96ccf5", "displayName": escape(name),
+                                       "URI": format!("/api/accounts/x/labels/{id}")})
+                })
+                .collect();
+            ok(&labels.into())
+        }
+        ("POST", ["labels"]) => {
+            let name = body["displayName"].as_str().unwrap_or_default().to_owned();
+            let account = &mut state.accounts[index];
+            if name.is_empty()
+                || account
+                    .labels
+                    .iter()
+                    .any(|(_, n)| n.eq_ignore_ascii_case(&name))
+            {
+                return error(400, "LABEL_ALREADY_EXISTS");
+            }
+            let id = format!("90000000140{:02}", account.labels.len());
+            account.labels.push((id.clone(), name.clone()));
+            json(
+                201,
+                &serde_json::json!({"status": {"code": 201, "description": "Created"},
+                                    "data": {"labelId": id, "tagId": id, "displayName": escape(&name),
+                                             "color": "#ffd700", "sequence": account.labels.len()}}),
+            )
+        }
+        // Like Zoho's listing, it names no labels: a label's messages are
+        // listed with `labelid`, in every folder.
+        ("GET", ["messages", "view"]) if query.contains_key("labelid") => {
+            let label = query.get("labelid").cloned().unwrap_or_default();
+            let known = state.accounts[index]
+                .labels
+                .iter()
+                .any(|(id, _)| *id == label);
+            if !known || state.unlisted_labels.contains(&label) {
+                return error(404, "LABEL_NOT_FOUND");
+            }
+            let start: usize = query.get("start").and_then(|s| s.parse().ok()).unwrap_or(1);
+            let limit: usize = query
+                .get("limit")
+                .and_then(|s| s.parse().ok())
+                .unwrap_or(10);
+            let archived = query.get("includearchive").map(String::as_str) == Some("true");
+            let mut messages: Vec<&ZohoMessage> = state.accounts[index]
+                .messages
+                .values()
+                .filter(|m| m.labels.contains(&label) && (archived || !m.archived))
+                .filter(|m| !state.hidden_from_labels.contains(&m.id))
+                .collect();
+            messages.sort_by(|a, b| b.received.cmp(&a.received).then(b.id.cmp(&a.id)));
+            let page: Vec<_> = messages
+                .into_iter()
+                .skip(start.saturating_sub(1))
+                .take(limit)
+                .map(listed)
+                .collect();
+            ok(&page.into())
+        }
         ("GET", ["messages", "view"]) => {
             let folder = query.get("folderId").cloned().unwrap_or_default();
             let start: usize = query.get("start").and_then(|s| s.parse().ok()).unwrap_or(1);
@@ -627,6 +777,22 @@ fn update(state: &mut State, index: usize, body: &serde_json::Value) -> Response
     }
     let account = &mut state.accounts[index];
     let mode = body["mode"].as_str().unwrap_or_default();
+    let labels: Vec<String> = body["labelId"]
+        .as_array()
+        .map(|list| {
+            list.iter()
+                .filter_map(|v| v.as_u64().map(|n| n.to_string()))
+                .collect()
+        })
+        .unwrap_or_default();
+    if matches!(mode, "applyLabel" | "removeLabel")
+        && (labels.is_empty()
+            || labels
+                .iter()
+                .any(|l| !account.labels.iter().any(|(id, _)| id == l)))
+    {
+        return error(400, "LABEL_NOT_FOUND");
+    }
     for id in &ids {
         let Some(message) = account.messages.get_mut(id) else {
             continue;
@@ -645,6 +811,14 @@ fn update(state: &mut State, index: usize, body: &serde_json::Value) -> Response
                     .map(|n| n.to_string())
                     .unwrap_or_default();
             }
+            "applyLabel" => {
+                for label in &labels {
+                    if !message.labels.contains(label) {
+                        message.labels.push(label.clone());
+                    }
+                }
+            }
+            "removeLabel" => message.labels.retain(|l| !labels.contains(l)),
             _ => return error(400, "INVALID_MODE"),
         }
     }
@@ -716,6 +890,7 @@ fn send(
             archived: false,
             received: state.clock.now(),
             raw: raw.into_bytes(),
+            labels: Vec::new(),
         },
     );
     state.sends.push((parent, body.clone()));

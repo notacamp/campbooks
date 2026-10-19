@@ -11,6 +11,9 @@
 //!   `moveToSpam`, Zoho's report (it moves the message to Spam). Either
 //!   remembers where the message was (its folder, and whether it was
 //!   archived there).
+//! - `label:<id>` on: `applyLabel`; off: `removeLabel`. A stream mark's
+//!   token is its label, created first (`POST labels`) when the account has
+//!   none of its name (`domain/marks.rs`).
 //! - `TRASH` or `SPAM` off: `moveMessage` back to the folder it was in
 //!   (archived again if it was). Zoho's own "not spam" mode is documented
 //!   two ways (`moveNotSpam`, `markNotSpam`) and is not used. A folder the
@@ -23,11 +26,13 @@
 
 use std::collections::{BTreeMap, HashSet};
 
-use super::{ZohoMail, state};
+use super::{ZohoLabel, ZohoMail, state};
 use crate::{
+    contract::ProviderStream,
     domain::{
+        marks::{self, MarkIds},
         outbound::{Backlog, LabelChange, apply_labels},
-        push::{Plan, Push, Results, retry_or_give_up},
+        push::{Plan, Push, Results, retry_or_give_up, without_marks},
     },
     provider::ProviderError,
 };
@@ -46,6 +51,10 @@ enum Op {
     MoveTo(String),
     /// Report as spam (Zoho moves it to Spam).
     Spam,
+    /// Put label `0` on.
+    ApplyLabel(String),
+    /// Take label `0` off.
+    RemoveLabel(String),
     /// Archive again where it was put back (after [`Op::MoveTo`]: calls go
     /// in this order).
     Rearchive,
@@ -61,6 +70,8 @@ impl Op {
             Self::Unarchive => "unArchiveMails",
             Self::MoveTo(_) => "moveMessage",
             Self::Spam => "moveToSpam",
+            Self::ApplyLabel(_) => "applyLabel",
+            Self::RemoveLabel(_) => "removeLabel",
         }
     }
 
@@ -77,6 +88,16 @@ impl Op {
                 extra.insert("destfolderId".into(), id);
                 // Archived messages move too.
                 extra.insert("isArchive".into(), true.into());
+            }
+            Self::ApplyLabel(label) | Self::RemoveLabel(label) => {
+                let id = label
+                    .parse::<u64>()
+                    .map_or_else(|_| label.clone().into(), serde_json::Value::from);
+                extra.insert("labelId".into(), vec![id].into());
+                if matches!(self, Self::ApplyLabel(_)) {
+                    // Archived messages are labelled too.
+                    extra.insert("isArchive".into(), true.into());
+                }
             }
             _ => {}
         }
@@ -195,6 +216,20 @@ fn ops(
     if removes("STARRED") {
         ops.push(Op::Flag("flag_not_set"));
     }
+    for label in add
+        .iter()
+        .filter(|l| !has(l.as_str()))
+        .filter_map(|l| state::label_of(l))
+    {
+        ops.push(Op::ApplyLabel(label.to_owned()));
+    }
+    for label in remove
+        .iter()
+        .filter(|l| has(l.as_str()))
+        .filter_map(|l| state::label_of(l))
+    {
+        ops.push(Op::RemoveLabel(label.to_owned()));
+    }
     let moved = bin(change, current);
     match moved {
         Some(Bin::Trash) => match folders.trash {
@@ -266,8 +301,10 @@ pub fn after(
     let inbox = folders.inbox;
     let moved = bin(change, current);
     let mut tokens = apply_labels(current, std::slice::from_ref(change));
+    // The flags and labels a move between folders keeps.
     let flags = |tokens: &mut Vec<String>| {
-        tokens.retain(|t| matches!(t.as_str(), "UNREAD" | "STARRED"));
+        tokens
+            .retain(|t| matches!(t.as_str(), "UNREAD" | "STARRED") || state::label_of(t).is_some());
     };
     match moved {
         Some(Bin::Trash | Bin::Spam) => {
@@ -306,11 +343,107 @@ pub fn after(
     tokens
 }
 
+/// `stream`'s mark at Zoho, created: or found, when the account already
+/// has a label of its name the cache did not know.
+async fn create_mark(
+    mail: &ZohoMail<'_>,
+    stream: ProviderStream,
+) -> Result<ZohoLabel, ProviderError> {
+    let name = marks::name(stream);
+    match mail.create_label(name).await {
+        Ok(label) => Ok(label),
+        Err(ProviderError::Unexpected(refused)) => mail
+            .labels()
+            .await?
+            .into_iter()
+            .find(|label| marks::of_name(&label.name()) == Some(stream))
+            .ok_or(ProviderError::Unexpected(refused)),
+        Err(other) => Err(other),
+    }
+}
+
+/// Every change of `backlog` pending again (or given up), after `trouble`.
+fn stopped(backlog: &Backlog, trouble: ProviderError, push: &mut Push) {
+    for change in &backlog.pending {
+        let end = retry_or_give_up(
+            change.id,
+            change.attempts,
+            &mut push.outcome.reemit,
+            &change.provider_message_id,
+        );
+        push.outcome.ends.push(end);
+    }
+    push.trouble = Some(trouble);
+}
+
+/// `backlog` with its marks' tokens as Zoho's labels, the marks the changes
+/// put on created first where Zoho has none yet (into `push`). The changes
+/// needing a mark Zoho would not make end `skipped`. `None` when trouble
+/// stopped it (every change then pending again, in `push`).
+async fn make_marks(
+    mail: &ZohoMail<'_>,
+    backlog: &Backlog,
+    marks: &MarkIds,
+    push: &mut Push,
+) -> Option<Backlog> {
+    let mut marks = marks.clone();
+    let mut unmade = BTreeMap::new();
+    for stream in marks::missing(backlog, &marks) {
+        match create_mark(mail, stream).await {
+            Ok(label) => {
+                let name = label.name();
+                marks.insert(stream, label.label_id.clone());
+                push.created.push((label.label_id, name));
+            }
+            // The grant may not make labels (no labels scope), or Zoho
+            // refused that one: the changes needing it are not made.
+            Err(ProviderError::Unauthorized) => {
+                unmade.insert(stream, "scope_missing");
+            }
+            Err(ProviderError::Unexpected(_) | ProviderError::NotFound) => {
+                unmade.insert(stream, "refused");
+            }
+            Err(trouble) => {
+                stopped(backlog, trouble, push);
+                return None;
+            }
+        }
+    }
+    Some(marks::resolve(
+        &without_marks(backlog, &unmade, &mut push.outcome),
+        &marks,
+        state::label_token,
+    ))
+}
+
 /// Push `backlog` through the mail account `mail`, whose Inbox, Trash and
-/// Spam folders are `folders`.
-pub async fn push(mail: &ZohoMail<'_>, backlog: &Backlog, folders: &Folders<'_>) -> Push {
+/// Spam folders are `folders` and whose stream marks are `marks` (as the
+/// cache knows them).
+pub async fn push(
+    mail: &ZohoMail<'_>,
+    backlog: &Backlog,
+    folders: &Folders<'_>,
+    marks: &MarkIds,
+) -> Push {
     let mut push = Push::default();
+    let Some(resolved) = make_marks(mail, backlog, marks, &mut push).await else {
+        return push;
+    };
+    let backlog = &resolved;
     let mut plan = Plan::merge(backlog);
+    // Zoho keeps no history: the index is what is known, but for labels,
+    // which are read only through listings and can be behind.
+    let unsure: HashSet<(String, String)> = plan
+        .wants
+        .iter()
+        .flat_map(|(message, labels)| {
+            labels
+                .keys()
+                .filter(|label| state::label_of(label).is_some())
+                .map(move |label| (message.clone(), label.clone()))
+        })
+        .collect();
+    plan.in_place(backlog, Some(&unsure));
     plan.atomic();
     let mut calls: BTreeMap<Op, Vec<String>> = BTreeMap::new();
     let mut nothing_to_do = Vec::new();
@@ -359,16 +492,8 @@ pub async fn push(mail: &ZohoMail<'_>, backlog: &Backlog, folders: &Folders<'_>)
         }
         done.written.extend(nothing_to_do);
     }
-    if push.trouble.is_some() {
-        for change in &backlog.pending {
-            let end = retry_or_give_up(
-                change.id,
-                change.attempts,
-                &mut push.outcome.reemit,
-                &change.provider_message_id,
-            );
-            push.outcome.ends.push(end);
-        }
+    if let Some(trouble) = push.trouble.take() {
+        stopped(backlog, trouble, &mut push);
         return push;
     }
     plan.ends(backlog, &done, &mut push.outcome);
@@ -401,7 +526,7 @@ async fn call(
 ) -> Option<ProviderError> {
     let extra = op.extra();
     for chunk in messages.chunks(UPDATE_MAX) {
-        match mail.update(op.mode(), chunk, &extra).await {
+        match refusal(op, mail.update(op.mode(), chunk, &extra).await) {
             Ok(()) => {}
             Err(ProviderError::NotFound | ProviderError::Unexpected(_)) if chunk.len() > 1 => {
                 for message in chunk {
@@ -425,6 +550,19 @@ async fn call(
     None
 }
 
+/// A label change Zoho refuses the grant (it may lack the labels scope) is
+/// a refusal of that change, never trouble with the grant.
+fn refusal(op: &Op, result: Result<(), ProviderError>) -> Result<(), ProviderError> {
+    match result {
+        Err(ProviderError::Unauthorized)
+            if matches!(op, Op::ApplyLabel(_) | Op::RemoveLabel(_)) =>
+        {
+            Err(ProviderError::Unexpected("labels refused".into()))
+        }
+        other => other,
+    }
+}
+
 async fn call_one(
     mail: &ZohoMail<'_>,
     op: &Op,
@@ -433,10 +571,11 @@ async fn call_one(
     failed: &mut HashSet<String>,
     done: &mut Results,
 ) -> Option<ProviderError> {
-    match mail
-        .update(op.mode(), std::slice::from_ref(&message.to_owned()), extra)
-        .await
-    {
+    match refusal(
+        op,
+        mail.update(op.mode(), std::slice::from_ref(&message.to_owned()), extra)
+            .await,
+    ) {
         Ok(()) => None,
         Err(ProviderError::NotFound) => {
             failed.insert(message.to_owned());

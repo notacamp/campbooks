@@ -1,6 +1,13 @@
 import { useMutation, useQuery, useQueryClient, type QueryClient } from "@tanstack/react-query";
 
-import { api, operationKey, unwrap, unwrapEmpty, type Schema } from "~/lib/api";
+import {
+  api,
+  operationKey,
+  refreshBodiesAfterRules,
+  unwrap,
+  unwrapEmpty,
+  type Schema,
+} from "~/lib/api";
 
 import type { Stream } from "./queries";
 
@@ -252,10 +259,10 @@ export function useRuleMutations(workspaceId: string) {
         queryKey: operationKey("conversations.get_rule", { workspace_id: workspaceId }),
       }),
       refreshConversations(queryClient, workspaceId),
-      // A rule that trusts a sender's images shows or hides them at once.
-      queryClient.invalidateQueries({
-        queryKey: operationKey("conversations.get_message_body", { workspace_id: workspaceId }),
-      }),
+      // A rule that trusts a sender's images shows or hides them at once; a
+      // body it trusted is dropped, never shown again from the cache
+      // (campbooks-cloud#236).
+      refreshBodiesAfterRules(queryClient, workspaceId),
     ]);
   };
   const create = useMutation({

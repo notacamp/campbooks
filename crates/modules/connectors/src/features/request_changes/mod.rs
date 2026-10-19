@@ -21,7 +21,7 @@ use uuid::Uuid;
 use crate::{
     deps::Deps,
     domain::{
-        credentials,
+        credentials, marks,
         model::{ConnectionId, Health, InboxId, Provider, StreamId},
         outbound::{self, Mapped, State},
         schedule,
@@ -97,7 +97,10 @@ impl EventConsumer for RequestChanges {
             paused: row.paused,
             health: Health::parse(&row.health)?,
         };
-        let known = user_labels(&mut tx, target.stream).await?;
+        let known = match target.provider {
+            Provider::Google => Some(user_labels(&mut tx, target.stream).await?),
+            Provider::Zoho => zoho_labels(&mut tx, target.connection, target.stream).await?,
+        };
         tx.commit().await?;
 
         let stamp = self.stamp(ctx, workspace, &target).await;
@@ -114,7 +117,8 @@ impl EventConsumer for RequestChanges {
         let mut pending = 0;
         let mut recorded = Vec::new();
         for item in items {
-            let (state, reason, add, remove) = outcome(target.provider, &item.change, &known);
+            let (state, reason, add, remove) =
+                outcome(target.provider, &item.change, known.as_ref());
             let id = Uuid::now_v7();
             let inserted = sqlx::query!(
                 r#"INSERT INTO connectors.outbound_changes
@@ -158,22 +162,24 @@ impl EventConsumer for RequestChanges {
     }
 }
 
-/// How `change` is recorded for `provider` (`known`: Gmail's user labels):
-/// its state, the reason when it is not pending, and the labels to add and
-/// remove. Defence in depth: only the flag labels, categories and user
-/// labels (Gmail), or read, flag and inbox (Zoho), are ever written.
+/// How `change` is recorded for `provider` (`known`: the provider's user
+/// labels other than stream marks; `None` for a Zoho grant without the
+/// labels scope): its state, the reason when it is not pending, and the
+/// labels to add and remove. Defence in depth: only the flag labels,
+/// categories, stream marks and user labels (Gmail), or read, flag, inbox,
+/// labels and stream marks (Zoho), are ever written.
 fn outcome(
     provider: Provider,
     change: &crate::events::RequestedChange,
-    known: &HashSet<String>,
+    known: Option<&HashSet<String>>,
 ) -> (State, Option<&'static str>, Vec<String>, Vec<String>) {
     let writable = |label: &str| match provider {
         Provider::Google => outbound::writable(label),
         Provider::Zoho => zoho::state::writable(label),
     };
     let mapped = match provider {
-        Provider::Google => outbound::map(change, known),
-        Provider::Zoho => outbound::map_zoho(change),
+        Provider::Google => outbound::map(change, known.unwrap_or(&HashSet::new())),
+        Provider::Zoho => outbound::map_zoho(change, known),
     };
     match mapped {
         Mapped::Labels { add, remove } if !add.iter().chain(&remove).all(|l| writable(l)) => {
@@ -184,11 +190,29 @@ fn outcome(
     }
 }
 
-/// The user labels Gmail has for `stream`, by key.
+/// The labels named like stream marks among `labels` (id, name): never a
+/// label change's.
+fn mark_ids(labels: &[(String, String)]) -> HashSet<&str> {
+    labels
+        .iter()
+        .filter(|(_, name)| marks::of_name(name).is_some())
+        .map(|(id, _)| id.as_str())
+        .collect()
+}
+
+/// The user labels Gmail has for `stream`, by key, stream marks left out.
 async fn user_labels(
     conn: &mut PgConnection,
     stream: StreamId,
 ) -> Result<HashSet<String>, JobError> {
+    let named: Vec<(String, String)> = sqlx::query_as(
+        "SELECT label_id, name FROM connectors.gmail_labels
+          WHERE stream_id = $1 AND kind = 'user'",
+    )
+    .bind(stream)
+    .fetch_all(&mut *conn)
+    .await?;
+    let marks = mark_ids(&named);
     Ok(sqlx::query_scalar!(
         "SELECT label_id FROM connectors.gmail_labels WHERE stream_id = $1 AND kind = 'user'",
         stream as StreamId
@@ -196,7 +220,40 @@ async fn user_labels(
     .fetch_all(conn)
     .await?
     .into_iter()
+    .filter(|id| !marks.contains(id.as_str()))
     .collect())
+}
+
+/// The labels Zoho has for `stream`, by id, stream marks left out; `None`
+/// when `connection`'s grant has no labels scope (granted before it was
+/// asked for).
+async fn zoho_labels(
+    conn: &mut PgConnection,
+    connection: ConnectionId,
+    stream: StreamId,
+) -> Result<Option<HashSet<String>>, JobError> {
+    let scopes: String =
+        sqlx::query_scalar("SELECT scopes FROM connectors.connections WHERE id = $1")
+            .bind(connection)
+            .fetch_one(&mut *conn)
+            .await?;
+    if !zoho::labels_granted(&scopes) {
+        return Ok(None);
+    }
+    let named: Vec<(String, String)> =
+        sqlx::query_as("SELECT label_id, name FROM connectors.zoho_labels WHERE stream_id = $1")
+            .bind(stream)
+            .fetch_all(conn)
+            .await?;
+    let marks = mark_ids(&named);
+    Ok(Some(
+        named
+            .iter()
+            .map(|(id, _)| id.as_str())
+            .filter(|id| !marks.contains(id))
+            .map(ToOwned::to_owned)
+            .collect(),
+    ))
 }
 
 /// The items of `request` (event `id`) the conversations module recorded

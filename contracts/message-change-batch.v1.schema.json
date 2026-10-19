@@ -9,6 +9,7 @@
   "properties": {
     "version": { "const": 1 },
     "inbox": { "$ref": "#/$defs/uuid", "description": "The conversations inbox the batch is for." },
+    "backfill": { "type": "boolean", "description": "Read by the stream's first sync (its backfill): mail the inbox held before it was connected. The streams of its messages are never mirrored to the provider. Absent means false." },
     "changes": {
       "type": "array",
       "description": "Applied in this order.",
@@ -144,7 +145,15 @@
           "items": { "enum": ["updates", "promotions", "social", "forums"] }
         },
         "read": { "type": "boolean" },
-        "starred": { "type": "boolean" }
+        "starred": { "type": "boolean" },
+        "provider_stream": {
+          "enum": ["primary", "updates", "receipts", "newsletters", null],
+          "description": "The stream a received message is in at the provider: its stream mark (a provider label named Campbooks/<Stream>), else its native place. null when it is in none of the four (Gmail's Social and Forums tabs, marks of several streams). Absent when the adapter cannot tell (sent mail, a grant without labels): the stored value is then left as it is."
+        },
+        "stream_mark_stale": {
+          "type": "boolean",
+          "description": "The message's category changed at the provider while it kept a stream mark: provider_stream is the category's, and the mark is to be taken off. Absent means false."
+        }
       }
     }
   }

@@ -185,6 +185,10 @@ function Confirm({
   const { create, remove, restore, wasRemoved } = useRuleMutations(workspaceId);
   const [choice, setChoice] = useState(draft.choices?.[0]?.id);
   const chosen = draft.choices?.find((each) => each.id === choice);
+  // The one choice (a shared platform's sender, whose domain is not offered)
+  // still says what it means: for images, what the checks vouch for
+  // (campbooks-cloud#236).
+  const onlyChoice = draft.choices?.length === 1 ? draft.choices[0]?.description : undefined;
   const conditions = chosen?.conditions ?? draft.conditions;
   // "Scout noticed": what should happen comes first, and everything below
   // (the sentence, what it matches, the existing mail) follows the answer.
@@ -340,6 +344,11 @@ function Confirm({
               setGoal("words");
             }}
           />
+        )}
+        {onlyChoice === undefined ? null : (
+          <Text tone="secondary" size="sm">
+            {onlyChoice}
+          </Text>
         )}
         {draft.choices === undefined || draft.choices.length < 2 ? null : (
           <ChoiceCards

@@ -15,7 +15,7 @@ use url::Url;
 use tracing::Instrument as _;
 
 use crate::{
-    AiConfig, Error, Protocol, ProviderConfig, Role,
+    AiConfig, Error, Protocol, ProviderConfig, ReasoningEffort, Role,
     decide::{self, Answers, DecisionContext, DecisionState, Question},
     telemetry::{Call, Instruments},
     usage::{self, Meter},
@@ -183,6 +183,9 @@ pub struct ChatRequest {
     pub max_tokens: Option<u32>,
     /// Required answer shape.
     pub response_format: Option<ResponseFormat>,
+    /// Longest the whole call may take, its answer read to the end (a
+    /// streamed answer included); the gateway's own timeout when `None`.
+    pub timeout: Option<Duration>,
 }
 
 impl ChatRequest {
@@ -233,14 +236,7 @@ impl ChatResponse {
     /// never whatever string the provider sent.
     #[must_use]
     pub fn finish_kind(&self) -> &'static str {
-        match self.finish_reason.as_deref() {
-            None => "none",
-            Some("stop") => "stop",
-            Some("length") => "length",
-            Some("content_filter") => "content_filter",
-            Some("tool_calls") => "tool_calls",
-            Some(_) => "other",
-        }
+        finish_kind(self.finish_reason.as_deref())
     }
 
     /// Parse structured output. Some models wrap the JSON in one Markdown
@@ -255,6 +251,19 @@ impl ChatResponse {
                 campbooks_kernel::redact::json(&e)
             ))
         })
+    }
+}
+
+/// Why a model stopped, as one of a few known words, never whatever string
+/// the provider sent.
+pub(crate) fn finish_kind(reason: Option<&str>) -> &'static str {
+    match reason {
+        None => "none",
+        Some("stop") => "stop",
+        Some("length") => "length",
+        Some("content_filter") => "content_filter",
+        Some("tool_calls") => "tool_calls",
+        Some(_) => "other",
     }
 }
 
@@ -282,16 +291,54 @@ fn unfenced(content: &str) -> &str {
 }
 
 #[derive(Serialize)]
-struct WireChatRequest<'a> {
-    model: &'a str,
-    messages: &'a [Message],
+pub(crate) struct WireChatRequest<'a> {
+    pub(crate) model: &'a str,
+    pub(crate) messages: &'a [Message],
     #[serde(skip_serializing_if = "Option::is_none")]
-    temperature: Option<f32>,
+    pub(crate) temperature: Option<f32>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    max_tokens: Option<u32>,
+    pub(crate) max_tokens: Option<u32>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    response_format: Option<&'a ResponseFormat>,
-    stream: bool,
+    pub(crate) response_format: Option<&'a ResponseFormat>,
+    pub(crate) stream: bool,
+    /// Streamed calls ask for the token counts in a last chunk.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub(crate) stream_options: Option<StreamOptions>,
+    /// The role's reasoning effort, when it sets one.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub(crate) reasoning: Option<WireReasoning>,
+}
+
+impl<'a> WireChatRequest<'a> {
+    /// `request` for `provider`, streamed or not.
+    pub(crate) fn of(provider: &'a ProviderConfig, request: &'a ChatRequest, stream: bool) -> Self {
+        Self {
+            model: &provider.model,
+            messages: &request.messages,
+            temperature: request.temperature,
+            max_tokens: request.max_tokens,
+            response_format: request.response_format.as_ref(),
+            stream,
+            stream_options: stream.then_some(StreamOptions {
+                include_usage: true,
+            }),
+            reasoning: provider
+                .reasoning_effort
+                .map(|effort| WireReasoning { effort }),
+        }
+    }
+}
+
+/// `stream_options` of a streamed chat request.
+#[derive(Serialize)]
+pub(crate) struct StreamOptions {
+    pub(crate) include_usage: bool,
+}
+
+/// `reasoning` of a chat request.
+#[derive(Serialize)]
+pub(crate) struct WireReasoning {
+    pub(crate) effort: ReasoningEffort,
 }
 
 /// A chat request that also asks for token log-probabilities (`decide`).
@@ -306,22 +353,22 @@ struct WireDecideChatRequest<'a> {
 }
 
 #[derive(Deserialize)]
-struct WireChatResponse {
+pub(crate) struct WireChatResponse {
     #[serde(default)]
-    model: String,
-    choices: Vec<WireChoice>,
-    usage: Option<Usage>,
+    pub(crate) model: String,
+    pub(crate) choices: Vec<WireChoice>,
+    pub(crate) usage: Option<Usage>,
 }
 
 #[derive(Deserialize)]
-struct WireChoice {
-    message: WireAssistantMessage,
-    finish_reason: Option<String>,
+pub(crate) struct WireChoice {
+    pub(crate) message: WireAssistantMessage,
+    pub(crate) finish_reason: Option<String>,
 }
 
 #[derive(Deserialize)]
-struct WireAssistantMessage {
-    content: Option<String>,
+pub(crate) struct WireAssistantMessage {
+    pub(crate) content: Option<String>,
 }
 
 #[derive(Serialize)]
@@ -422,6 +469,11 @@ impl Gateway {
         &self.http
     }
 
+    /// The span and metric instruments every call records into.
+    pub(crate) fn instruments(&self) -> &Instruments {
+        &self.instruments
+    }
+
     /// The configuration in use.
     pub fn config(&self) -> &AiConfig {
         &self.config
@@ -449,15 +501,12 @@ impl Gateway {
         provider: &ProviderConfig,
         request: ChatRequest,
     ) -> Result<ChatResponse, Error> {
-        let body = WireChatRequest {
-            model: &provider.model,
-            messages: &request.messages,
-            temperature: request.temperature,
-            max_tokens: request.max_tokens,
-            response_format: request.response_format.as_ref(),
-            stream: false,
-        };
-        let request = self.post(provider, "chat/completions")?.json(&body);
+        let body = WireChatRequest::of(provider, &request, false);
+        let mut http = self.post(provider, "chat/completions")?.json(&body);
+        if let Some(timeout) = request.timeout {
+            http = http.timeout(timeout);
+        }
+        let request = http;
         tracing::debug!(%role, model = %provider.model, "ai chat request");
         let wire: WireChatResponse = send(request).await?;
         let choice = wire
@@ -589,6 +638,8 @@ impl Gateway {
                         max_tokens: Some(decide::openai::MAX_TOKENS),
                         response_format: Some(&format),
                         stream: false,
+                        stream_options: None,
+                        reasoning: None,
                     },
                     logprobs: provider.logprobs.then_some(true),
                     top_logprobs: provider.logprobs.then_some(decide::openai::TOP_LOGPROBS),
@@ -667,7 +718,11 @@ impl Gateway {
     }
 
     /// A POST to `provider`, carrying the current trace on (`traceparent`).
-    fn post(&self, provider: &ProviderConfig, path: &str) -> Result<RequestBuilder, Error> {
+    pub(crate) fn post(
+        &self,
+        provider: &ProviderConfig,
+        path: &str,
+    ) -> Result<RequestBuilder, Error> {
         let url = endpoint(&provider.base_url, path)?;
         let mut trace = reqwest::header::HeaderMap::new();
         campbooks_kernel::telemetry::inject(&mut trace);

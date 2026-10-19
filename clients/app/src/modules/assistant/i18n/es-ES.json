@@ -155,7 +155,7 @@
     "teach": {
       "title": "Enséñale algo a Scout",
       "label": "¿Qué debe hacer Scout?",
-      "placeholder": "Por ejemplo: todo lo que venga de mi gestor siempre importa",
+      "placeholder": "Ej.: todo lo que venga de mi gestor importa",
       "privacy": "Solo se envía tu frase, nunca tu correo.",
       "submit": "Enseñar",
       "reading": "Leyendo tu frase",

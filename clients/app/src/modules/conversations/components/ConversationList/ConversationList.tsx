@@ -11,7 +11,7 @@ import {
   type RowLeaving,
 } from "~/lib/ui";
 
-import { isView, type ConversationSummary, type Place } from "../../api/queries";
+import { isView, type ConversationPlace, type ConversationSummary } from "../../api/queries";
 import {
   avatarKind,
   displayName,
@@ -26,7 +26,7 @@ import { ExpiredChip, NeedChips } from "../Needs/NeedChips";
 
 export interface ConversationListProps {
   /** The stream or view listed: Sent rows say who they went to. */
-  place: Place;
+  place: ConversationPlace;
   /** `undefined` while the first page loads. */
   conversations: readonly ConversationSummary[] | undefined;
   /** Only the unread ones are asked for. */
@@ -136,10 +136,15 @@ export function ConversationList({
             time={listTime(at, i18n.language, now)}
             dateTime={at}
             subject={conversation.subject === "" ? t("reader.noSubject") : conversation.subject}
+            // "You:" is our copy and its own text, kept whole; only the mail's words truncate.
             snippet={
-              conversation.latest_from_you
-                ? t("list.youPrefix", { snippet: conversation.snippet })
-                : conversation.snippet
+              conversation.latest_from_you ? (
+                <>
+                  {t("list.youPrefix")} {conversation.snippet}
+                </>
+              ) : (
+                conversation.snippet
+              )
             }
             unread={conversation.unread_count > 0}
             starred={conversation.starred}

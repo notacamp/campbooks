@@ -24,12 +24,15 @@ use campbooks_kernel::{
 use chrono::{DateTime, TimeDelta, Utc};
 use sqlx::{Postgres, Transaction};
 
+use std::collections::HashMap;
+
 use crate::{
-    contract::{BATCH_CONTENT_TYPE, MessageChange, MessageChangeBatch},
+    contract::{BATCH_CONTENT_TYPE, MessageChange, MessageChangeBatch, ProviderStream},
     deps::Deps,
     domain::{
         credentials::{self, TokenError},
         emit, health,
+        marks::MarkIds,
         model::{ConnectionId, Health, InboxId, Phase, Provider, StreamId},
         outbound::{self, Backlog},
         push::Push,
@@ -74,6 +77,8 @@ struct Target {
     paused: bool,
     consecutive_failures: i32,
     throttled_until: Option<DateTime<Utc>>,
+    /// The grant has Zoho's labels scope (Zoho only).
+    labels_granted: bool,
 }
 
 impl JobHandler for SyncStream {
@@ -175,6 +180,8 @@ struct RunPage {
     index: Vec<IndexOp>,
     /// A fresh Gmail `labels.list`.
     labels: Option<Vec<LabelInfo>>,
+    /// A fresh listing of the Zoho account's labels.
+    zoho_labels: Option<Vec<zoho::ZohoLabel>>,
     /// The cursor after the page, as stored.
     cursor: serde_json::Value,
     /// The cursor as the event carries it.
@@ -197,16 +204,41 @@ impl SyncStream {
     }
 
     /// Record a push's outcome on its own (the writes happened, whatever
-    /// the read does next). Returns the trouble that stopped it.
+    /// the read does next), with the stream marks it created in `provider`'s
+    /// label cache. Returns the trouble that stopped it.
     async fn record_push(
         ctx: &JobContext,
         workspace: WorkspaceId,
         stream: StreamId,
+        provider: Provider,
         pushed: Push,
         now: DateTime<Utc>,
     ) -> Result<Option<ProviderError>, JobError> {
         let mut tx = ctx.pool().begin_for(workspace).await?;
         outbound::record_outcome(&mut tx, stream, &pushed.outcome, now).await?;
+        for (id, name) in &pushed.created {
+            let insert = match provider {
+                // Gmail's own record (`kind`) says what it is.
+                Provider::Google => sqlx::query(
+                    "INSERT INTO connectors.gmail_labels (workspace_id, stream_id, label_id, name, kind)
+                     VALUES ($1, $2, $3, $4, 'user')
+                     ON CONFLICT (stream_id, label_id) DO UPDATE SET name = EXCLUDED.name",
+                ),
+                Provider::Zoho => sqlx::query(
+                    "INSERT INTO connectors.zoho_labels
+                         (workspace_id, stream_id, label_id, name, refreshed_at)
+                     VALUES ($1, $2, $3, $4, now())
+                     ON CONFLICT (stream_id, label_id) DO UPDATE SET name = EXCLUDED.name",
+                ),
+            };
+            insert
+                .bind(workspace)
+                .bind(stream)
+                .bind(id)
+                .bind(name)
+                .execute(&mut *tx)
+                .await?;
+        }
         tx.commit().await?;
         Ok(pushed.trouble)
     }
@@ -226,6 +258,10 @@ impl SyncStream {
 
     /// A Gmail run: budget, push, read. `None` once the run has ended
     /// without a page (waiting, trouble recorded).
+    #[allow(
+        clippy::too_many_lines,
+        reason = "one run read top to bottom: budget, push, report, read"
+    )]
     async fn run_gmail(
         &self,
         ctx: &mut JobContext,
@@ -238,12 +274,27 @@ impl SyncStream {
         let Some(google) = self.deps.google.clone() else {
             return Ok(None);
         };
+        let cursor: gmail::Cursor = serde_json::from_value(target.cursor.clone()).map_err(|e| {
+            JobError::fatal(format!(
+                "stream {} has an unreadable cursor: {}",
+                target.stream,
+                redact::json(&e)
+            ))
+        })?;
+        let labels = if backlog.pending.is_empty() {
+            Vec::new()
+        } else {
+            label_rows(ctx, workspace, target.stream, Provider::Google).await?
+        };
+        let marks =
+            MarkIds::from_labels(labels.iter().map(|(id, name)| (id.as_str(), name.as_str())));
+        let mut reported = Vec::new();
         // The push's planned units are taken now and settled with what it
         // spent once it is done (campbooks-cloud#252).
         let writes = if backlog.pending.is_empty() {
             0
         } else {
-            gmail::write::units(backlog)
+            gmail::write::units(backlog, &marks)
         };
         let cost = gmail::UNITS_PER_RUN + writes;
         let rate = self.deps.config.google.units_per_second;
@@ -253,13 +304,24 @@ impl SyncStream {
             return Ok(None);
         }
         if backlog.last().is_some() {
-            let pushed = gmail::write::push(&google.gmail(token), backlog).await;
+            // The index holds what was read up to the cursor's history id.
+            let read_from = cursor
+                .history_id
+                .as_deref()
+                .and_then(|h| h.parse::<i64>().ok());
+            let pushed = gmail::write::push(&google.gmail(token), backlog, &marks, read_from).await;
+            let names = named(&labels, &pushed);
+            reported = stream_changed(backlog, &pushed, |labels| {
+                gmail::normalize::flags(labels, &names).provider_stream
+            });
             // The read keeps the units it reserved; the writes pay what
             // they spent.
             let spent = gmail::UNITS_PER_RUN.saturating_add(pushed.spent);
             // What Gmail now holds is recorded first; settling the budget
             // after is best effort (a miss only leaves the budget as taken).
-            let trouble = Self::record_push(ctx, workspace, target.stream, pushed, now).await?;
+            let trouble =
+                Self::record_push(ctx, workspace, target.stream, Provider::Google, pushed, now)
+                    .await?;
             if let Err(err) =
                 schedule::settle_budget(ctx.pool(), target.provider, cost, spent, rate).await
             {
@@ -275,13 +337,6 @@ impl SyncStream {
                 return Ok(None);
             }
         }
-        let cursor: gmail::Cursor = serde_json::from_value(target.cursor.clone()).map_err(|e| {
-            JobError::fatal(format!(
-                "stream {} has an unreadable cursor: {}",
-                target.stream,
-                redact::json(&e)
-            ))
-        })?;
         let state = ctx.state().clone();
         let reader = Reader {
             gmail: google.gmail(token),
@@ -296,7 +351,7 @@ impl SyncStream {
             max_message_bytes: self.deps.config.gmail.max_message_bytes,
             run_budget_bytes: self.deps.config.gmail.run_budget_bytes,
         };
-        let page = match reader.read().await {
+        let mut page = match reader.read().await {
             Ok(page) => page,
             Err(ReadError::Provider(err)) => {
                 self.trouble(ctx, workspace, target, &err, now).await?;
@@ -304,6 +359,23 @@ impl SyncStream {
             }
             Err(other) => return Err(JobError::retry(other.to_string())),
         };
+        if !reported.is_empty() {
+            let names = gmail_names(ctx, workspace, target.stream).await?;
+            let reporting = Reporting {
+                ids: &reported,
+                marks: MarkIds::from_labels(names.iter().map(|(id, n)| (id.as_str(), n.as_str()))),
+                label: str::to_owned,
+            };
+            report(
+                ctx,
+                workspace,
+                target.stream,
+                &reporting,
+                &mut page.changes,
+                |labels| gmail::normalize::flags(labels, &names),
+            )
+            .await?;
+        }
         Ok(Some(RunPage {
             cursor: serde_json::to_value(&page.cursor)
                 .map_err(|e| JobError::fatal(format!("encoding a cursor: {}", redact::json(&e))))?,
@@ -316,6 +388,7 @@ impl SyncStream {
             changes: page.changes,
             index: page.index,
             labels: page.labels,
+            zoho_labels: None,
             phase: page.phase,
             more: page.more,
         }))
@@ -323,6 +396,10 @@ impl SyncStream {
 
     /// A Zoho run: the data centre, the login's budget, push, read. `None`
     /// once the run has ended without a page.
+    #[allow(
+        clippy::too_many_lines,
+        reason = "one run read top to bottom: budget, push, report, read"
+    )]
     async fn run_zoho(
         &self,
         ctx: &mut JobContext,
@@ -353,7 +430,16 @@ impl SyncStream {
                 ))
             })?;
         let config = &self.deps.config.zoho;
+        // Labels and stream marks only for a grant with the labels scope.
+        let rows = if target.labels_granted {
+            label_rows(ctx, workspace, target.stream, Provider::Zoho).await?
+        } else {
+            Vec::new()
+        };
+        // Label reads are reserved as expected and settled as made.
+        let label_calls = zoho::read::label_requests(target.labels_granted, target.phase, &rows);
         let cost = zoho::read::requests_per_run(cursor.folders.len())
+            + label_calls
             + zoho::write::requests(Self::messages(backlog));
         let key = schedule::connection_budget(target.connection);
         let rate = Rate::per_minute(config.requests_per_minute);
@@ -363,6 +449,10 @@ impl SyncStream {
             return Ok(None);
         }
         let mail = zoho.mail(&centre, token, &target.mailbox_key);
+        let labels = target
+            .labels_granted
+            .then(|| zoho::read::LabelCache::new(rows.iter().cloned().collect()));
+        let mut reported = Vec::new();
         if backlog.last().is_some() {
             let listed: Vec<&str> = cursor.folders.iter().map(|f| f.id.as_str()).collect();
             let folders = zoho::write::Folders {
@@ -371,8 +461,18 @@ impl SyncStream {
                 spam: cursor.folder_of_kind(zoho::state::FolderKind::Spam),
                 listed: &listed,
             };
-            let pushed = zoho::write::push(&mail, backlog, &folders).await;
-            if let Some(err) = Self::record_push(ctx, workspace, target.stream, pushed, now).await?
+            let marks =
+                MarkIds::from_labels(rows.iter().map(|(id, name)| (id.as_str(), name.as_str())));
+            let pushed = zoho::write::push(&mail, backlog, &folders, &marks).await;
+            if target.labels_granted {
+                let names = named(&rows, &pushed);
+                reported = stream_changed(backlog, &pushed, |tokens| {
+                    zoho::state::flags_with(tokens, &names).provider_stream
+                });
+            }
+            if let Some(err) =
+                Self::record_push(ctx, workspace, target.stream, Provider::Zoho, pushed, now)
+                    .await?
             {
                 self.trouble(ctx, workspace, target, &err, now).await?;
                 return Ok(None);
@@ -389,8 +489,9 @@ impl SyncStream {
             cursor,
             now,
             config,
+            labels: labels.as_ref(),
         };
-        let page = match reader.read().await {
+        let mut page = match reader.read().await {
             Ok(page) => page,
             Err(ReadError::Provider(err)) => {
                 self.trouble(ctx, workspace, target, &err, now).await?;
@@ -398,6 +499,34 @@ impl SyncStream {
             }
             Err(other) => return Err(JobError::retry(other.to_string())),
         };
+        if let Some(cache) = labels.as_ref()
+            && let Err(err) =
+                schedule::settle(ctx.pool(), &key, label_calls, cache.calls(), rate).await
+        {
+            tracing::warn!(
+                %workspace,
+                stream = %target.stream,
+                error = %campbooks_kernel::redact::error(&err),
+                "could not settle the Zoho budget for label reads"
+            );
+        }
+        if let Some(cache) = labels.as_ref().filter(|_| !reported.is_empty()) {
+            let names = cache.names();
+            let reporting = Reporting {
+                ids: &reported,
+                marks: MarkIds::from_labels(names.iter().map(|(id, n)| (id.as_str(), n.as_str()))),
+                label: zoho::state::label_token,
+            };
+            report(
+                ctx,
+                workspace,
+                target.stream,
+                &reporting,
+                &mut page.changes,
+                |tokens| zoho::state::flags_with(tokens, &names),
+            )
+            .await?;
+        }
         Ok(Some(RunPage {
             cursor: serde_json::to_value(&page.cursor)
                 .map_err(|e| JobError::fatal(format!("encoding a cursor: {}", redact::json(&e))))?,
@@ -406,6 +535,7 @@ impl SyncStream {
             changes: page.changes,
             index: page.index,
             labels: None,
+            zoho_labels: labels.as_ref().and_then(zoho::read::LabelCache::fresh),
             phase: page.phase,
             more: page.more,
         }))
@@ -455,17 +585,21 @@ impl SyncStream {
     ) -> Result<(), JobError> {
         let state = ctx.state().clone();
         let key = workspace.to_string();
-        let changed = !page.changes.is_empty();
-        let change_count = page.changes.len();
+        // Mail the first sync read, or received before it completed, is
+        // never mirrored: it goes in a batch of its own, marked `backfill`.
+        let synced = synced_at(&mut page.cursor, page.phase, now);
+        let first_sync = target.phase == Phase::Backfill;
+        let documents = split(inbox, page.changes, &page.index, first_sync, synced);
+        let changed = !documents.is_empty();
+        let change_count: usize = documents.iter().map(|d| d.changes.len()).sum();
         // Blobs are stored before the transaction that references them.
-        let batch = if changed {
-            let document = MessageChangeBatch::new(inbox, page.changes);
-            let bytes = serde_json::to_vec(&document)
+        let mut batches = Vec::new();
+        for document in &documents {
+            let bytes = serde_json::to_vec(document)
                 .map_err(|e| JobError::fatal(format!("encoding a batch: {}", redact::json(&e))))?;
-            Some(state.blobs.put(&key, bytes, BATCH_CONTENT_TYPE).await?)
-        } else {
-            None
-        };
+            let blob = state.blobs.put(&key, bytes, BATCH_CONTENT_TYPE).await?;
+            batches.push((blob, document.changes.len()));
+        }
         let cursor_json = page.cursor;
         let interval =
             schedule::next_interval(target.interval_seconds, changed, &self.deps.config.poll);
@@ -477,9 +611,12 @@ impl SyncStream {
         if let Some(labels) = &page.labels {
             replace_labels(tx, workspace, target.stream, labels).await?;
         }
+        if let Some(labels) = &page.zoho_labels {
+            replace_zoho_labels(tx, workspace, target.stream, labels, now).await?;
+        }
         emit::apply_index(tx, &state, workspace, target.stream, page.index).await?;
         outbound::forget_left_trash(tx, target.stream).await?;
-        if let Some(batch) = &batch {
+        for (batch, count) in &batches {
             emit::store_batch(
                 tx,
                 &state,
@@ -488,7 +625,7 @@ impl SyncStream {
                 inbox,
                 batch,
                 &page.token,
-                change_count,
+                *count,
                 now,
             )
             .await?;
@@ -706,6 +843,71 @@ impl SyncStream {
     }
 }
 
+/// When the stream's first sync completed, as its `cursor` keeps it
+/// (`synced_at`), set to `now` once the stream is past it (`phase`, after
+/// the page): a stream connected before this was kept counts from its next
+/// run.
+fn synced_at(
+    cursor: &mut serde_json::Value,
+    phase: Phase,
+    now: DateTime<Utc>,
+) -> Option<DateTime<Utc>> {
+    if let Some(at) = cursor
+        .get("synced_at")
+        .and_then(|at| serde_json::from_value::<DateTime<Utc>>(at.clone()).ok())
+    {
+        return Some(at);
+    }
+    if phase == Phase::Backfill || !cursor.is_object() {
+        return None;
+    }
+    cursor["synced_at"] = serde_json::json!(now);
+    Some(now)
+}
+
+/// `changes` for `inbox` as batches: the messages the stream's first sync
+/// read (all of them, `first_sync`), and those it indexes now that were
+/// received before that sync completed (`synced`; all, when it has not),
+/// in a `backfill` batch first; the rest in another.
+fn split(
+    inbox: InboxId,
+    changes: Vec<MessageChange>,
+    index: &[IndexOp],
+    first_sync: bool,
+    synced: Option<DateTime<Utc>>,
+) -> Vec<MessageChangeBatch> {
+    let old: std::collections::HashSet<&str> = index
+        .iter()
+        .filter_map(|op| match op {
+            IndexOp::Insert {
+                provider_message_id,
+                internal_date,
+                ..
+            } if first_sync || synced.is_none_or(|at| *internal_date < at) => {
+                Some(provider_message_id.as_str())
+            }
+            _ => None,
+        })
+        .collect();
+    let (backfill, rest): (Vec<MessageChange>, Vec<MessageChange>) =
+        changes.into_iter().partition(|change| match change {
+            MessageChange::Upsert { message } => {
+                first_sync || old.contains(message.provider_message_id.as_str())
+            }
+            MessageChange::Remove { .. } => first_sync,
+        });
+    let mut batches = Vec::new();
+    if !backfill.is_empty() {
+        let mut batch = MessageChangeBatch::new(inbox, backfill);
+        batch.backfill = true;
+        batches.push(batch);
+    }
+    if !rest.is_empty() {
+        batches.push(MessageChangeBatch::new(inbox, rest));
+    }
+    batches
+}
+
 /// Replace the cached Gmail label names of `stream` with `labels`.
 async fn replace_labels(
     tx: &mut Transaction<'static, Postgres>,
@@ -731,6 +933,190 @@ async fn replace_labels(
         )
         .execute(&mut **tx)
         .await?;
+    }
+    Ok(())
+}
+
+/// Replace the cached Zoho label names of `stream` with `labels`.
+async fn replace_zoho_labels(
+    tx: &mut Transaction<'static, Postgres>,
+    workspace: WorkspaceId,
+    stream: StreamId,
+    labels: &[zoho::ZohoLabel],
+    now: DateTime<Utc>,
+) -> Result<(), JobError> {
+    sqlx::query("DELETE FROM connectors.zoho_labels WHERE stream_id = $1")
+        .bind(stream)
+        .execute(&mut **tx)
+        .await?;
+    for label in labels {
+        sqlx::query(
+            "INSERT INTO connectors.zoho_labels
+                 (workspace_id, stream_id, label_id, name, refreshed_at)
+             VALUES ($1, $2, $3, $4, $5)
+             ON CONFLICT (stream_id, label_id) DO UPDATE SET name = EXCLUDED.name",
+        )
+        .bind(workspace)
+        .bind(stream)
+        .bind(&label.label_id)
+        .bind(label.name())
+        .bind(now)
+        .execute(&mut **tx)
+        .await?;
+    }
+    Ok(())
+}
+
+/// The cached labels of `stream`'s provider (id, name): Gmail's user labels,
+/// or the Zoho account's labels.
+async fn label_rows(
+    ctx: &JobContext,
+    workspace: WorkspaceId,
+    stream: StreamId,
+    provider: Provider,
+) -> Result<Vec<(String, String)>, JobError> {
+    let query = match provider {
+        Provider::Google => {
+            "SELECT label_id, name FROM connectors.gmail_labels
+              WHERE stream_id = $1 AND kind = 'user'"
+        }
+        Provider::Zoho => "SELECT label_id, name FROM connectors.zoho_labels WHERE stream_id = $1",
+    };
+    let mut tx = ctx.pool().begin_for(workspace).await?;
+    let rows: Vec<(String, String)> = sqlx::query_as(query)
+        .bind(stream)
+        .fetch_all(&mut *tx)
+        .await?;
+    tx.commit().await?;
+    Ok(rows)
+}
+
+/// The cached names of `stream`'s Gmail user labels (id → name), as the
+/// run's read left them.
+async fn gmail_names(
+    ctx: &JobContext,
+    workspace: WorkspaceId,
+    stream: StreamId,
+) -> Result<HashMap<String, String>, JobError> {
+    Ok(label_rows(ctx, workspace, stream, Provider::Google)
+        .await?
+        .into_iter()
+        .collect())
+}
+
+/// The names of `labels` (id, name) and of the marks `pushed` created.
+fn named(labels: &[(String, String)], pushed: &Push) -> HashMap<String, String> {
+    labels.iter().chain(&pushed.created).cloned().collect()
+}
+
+/// The messages whose provider stream (`stream_of` their labels) the
+/// writes of `pushed` changed.
+fn stream_changed(
+    backlog: &Backlog,
+    pushed: &Push,
+    stream_of: impl Fn(&[String]) -> Option<Option<ProviderStream>>,
+) -> Vec<String> {
+    pushed
+        .outcome
+        .index
+        .iter()
+        .filter(|(message, after)| {
+            let before = backlog
+                .labels
+                .get(message)
+                .map(Vec::as_slice)
+                .unwrap_or_default();
+            stream_of(before) != stream_of(after)
+        })
+        .map(|(message, _)| message.clone())
+        .collect()
+}
+
+/// The messages a run reports ([`report`]), and how the provider names
+/// the stream marks of their pending changes.
+struct Reporting<'a> {
+    /// The messages.
+    ids: &'a [String],
+    /// The stream marks the provider has.
+    marks: MarkIds,
+    /// A label's token from its id.
+    label: fn(&str) -> String,
+}
+
+/// Report once, from the index, where the messages of `reporting` are now
+/// that a write changed their provider stream (no download, no provider
+/// call), so the conversations module stores it; a message the page carries
+/// already is not repeated. A member's change still waiting to be made
+/// shows as they left it, as in every emission. `flags` reads a message's
+/// state from its labels. A message whose stored document cannot be read
+/// is left out (logged).
+async fn report(
+    ctx: &JobContext,
+    workspace: WorkspaceId,
+    stream: StreamId,
+    reporting: &Reporting<'_>,
+    changes: &mut Vec<MessageChange>,
+    flags: impl Fn(&[String]) -> crate::mail::Flags,
+) -> Result<(), JobError> {
+    let carried: std::collections::HashSet<&str> = changes
+        .iter()
+        .filter_map(|change| match change {
+            MessageChange::Upsert { message } => Some(message.provider_message_id.as_str()),
+            MessageChange::Remove { .. } => None,
+        })
+        .collect();
+    let ids: Vec<&str> = reporting
+        .ids
+        .iter()
+        .map(String::as_str)
+        .filter(|id| !carried.contains(id))
+        .collect();
+    if ids.is_empty() {
+        return Ok(());
+    }
+    let mut tx = ctx.pool().begin_for(workspace).await?;
+    let rows: Vec<(String, Vec<String>, String, i64)> = sqlx::query_as(
+        "SELECT provider_message_id, label_ids, document_hash, document_size
+           FROM connectors.messages
+          WHERE stream_id = $1 AND provider_message_id = ANY($2)
+          ORDER BY internal_date",
+    )
+    .bind(stream)
+    .bind(&ids)
+    .fetch_all(&mut *tx)
+    .await?;
+    tx.commit().await?;
+    let pending: Vec<String> = rows.iter().map(|(id, ..)| id.clone()).collect();
+    let overlay = outbound::overlay(ctx.pool(), workspace, stream, &pending).await?;
+    let key = workspace.to_string();
+    let blobs = &ctx.state().blobs;
+    for (id, labels, hash, size) in rows {
+        let labels = overlay.get(&id).map_or_else(
+            || labels.clone(),
+            |changes| {
+                let changes = crate::domain::marks::resolve_changes(
+                    changes,
+                    &reporting.marks,
+                    reporting.label,
+                );
+                outbound::apply_labels(&labels, &changes)
+            },
+        );
+        let document = match crate::mail::document_ref(&hash, size) {
+            Ok(blob) => crate::mail::document(blobs, &key, &blob).await,
+            Err(err) => Err(err),
+        };
+        let mut message = match document {
+            Ok(message) => message,
+            Err(err) => {
+                tracing::warn!(%workspace, %stream, error = %err, "a stream write could not be reported");
+                continue;
+            }
+        };
+        crate::mail::apply_flags(&mut message, &flags(&labels));
+        changes.push(MessageChange::Upsert {
+            message: Box::new(message),
+        });
     }
     Ok(())
 }
@@ -771,11 +1157,18 @@ async fn load(
     )
     .fetch_optional(&mut *tx)
     .await?;
-    tx.commit().await?;
     let Some(row) = row else {
+        tx.commit().await?;
         return Ok(None);
     };
+    let scopes: String =
+        sqlx::query_scalar("SELECT scopes FROM connectors.connections WHERE id = $1")
+            .bind(row.connection)
+            .fetch_one(&mut *tx)
+            .await?;
+    tx.commit().await?;
     Ok(Some(Target {
+        labels_granted: zoho::labels_granted(&scopes),
         stream: row.stream,
         connection: row.connection,
         provider: Provider::parse(&row.provider)?,

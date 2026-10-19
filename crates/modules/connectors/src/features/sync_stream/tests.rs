@@ -152,6 +152,8 @@ async fn backfill_in_pages_then_incremental(db: PgPool) {
         .map(|b| b["changes"].as_array().unwrap().len())
         .collect();
     assert_eq!(sizes, [50, 50, 20]);
+    // The first sync's batches say so: their streams are never mirrored.
+    assert!(batches.iter().all(|b| b["backfill"] == true));
     // Oldest first within a batch.
     let first = &batches[0]["changes"];
     assert!(first[0]["message"]["sent_at"].as_str() < first[49]["message"]["sent_at"].as_str());
@@ -176,6 +178,7 @@ async fn backfill_in_pages_then_incremental(db: PgPool) {
         .map(|c| c["message"]["provider_message_id"].as_str().unwrap())
         .collect();
     assert_eq!(ids, [a.as_str(), b.as_str()]);
+    assert!(batches.last().unwrap().get("backfill").is_none());
     let events = kit.payloads(ws, "connectors.messages_changed").await;
     assert_eq!(
         events.last().unwrap()["inbox_id"],
@@ -276,6 +279,25 @@ async fn expired_history_resyncs_the_window(db: PgPool) {
         fresh
     );
     assert_eq!(upsert_of(after_backfill, &keep)["starred"], true);
+    // Mail the resync found that was received before the first sync
+    // completed counts as the backfill's; the rest does not.
+    let batches = kit.batches(ws).await;
+    let carrying = |id: &str| {
+        batches
+            .iter()
+            .rev()
+            .find(|b| {
+                b["changes"]
+                    .as_array()
+                    .unwrap()
+                    .iter()
+                    .any(|c| c["message"]["provider_message_id"] == id)
+            })
+            .unwrap()
+            .clone()
+    };
+    assert_eq!(carrying(&fresh)["backfill"], true);
+    assert!(carrying(&keep).get("backfill").is_none());
     assert_eq!(kit.google.raw_fetches(&keep), 1);
     assert_eq!(kit.stream().await["phase"], "incremental");
 
@@ -287,6 +309,14 @@ async fn expired_history_resyncs_the_window(db: PgPool) {
     assert_eq!(
         upsert_of(&changes(&kit, ws).await, &next)["provider_message_id"],
         next
+    );
+    assert!(
+        kit.batches(ws)
+            .await
+            .last()
+            .unwrap()
+            .get("backfill")
+            .is_none()
     );
 }
 

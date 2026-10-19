@@ -5,16 +5,43 @@
 //!
 //! `folder:<id>`, `INBOX` (in the Inbox folder and not archived), `SENT`,
 //! `SPAM`, `TRASH`, `OWN` (one of the member's own folders), `UNREAD`,
-//! `STARRED` (any flag), `ARCHIVED`. A message in a folder the adapter does
-//! not read (Snoozed, Outbox, a folder made since the last sweep) carries
-//! its folder token only.
+//! `STARRED` (any flag), `ARCHIVED`, and `label:<id>` per Zoho label (a
+//! stream mark too) when the grant has the labels scope. A message in a
+//! folder the adapter does not read (Snoozed, Outbox, a folder made since
+//! the last sweep) carries its folder token and labels only.
+
+use std::collections::HashMap;
 
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    contract::{Direction, Mailbox},
+    contract::{Direction, Label, Mailbox, ProviderStream},
+    domain::marks::{self, Marked},
     mail::Flags,
 };
+
+/// The prefix of a Zoho label's token.
+const LABEL: &str = "label:";
+
+/// The token of Zoho label `id`.
+pub fn label_token(id: &str) -> String {
+    format!("{LABEL}{id}")
+}
+
+/// The Zoho label a token names.
+pub fn label_of(token: &str) -> Option<&str> {
+    token.strip_prefix(LABEL)
+}
+
+/// `tokens` with the label tokens of `known` (the message's tokens as the
+/// index holds them): what a run starts from before it reads the labels
+/// (`zoho/read.rs`). Sorted.
+pub fn with_labels(mut tokens: Vec<String>, known: &[String]) -> Vec<String> {
+    tokens.extend(known.iter().filter(|t| label_of(t).is_some()).cloned());
+    tokens.sort();
+    tokens.dedup();
+    tokens
+}
 
 /// What a folder is to the adapter.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -97,10 +124,12 @@ pub fn archived(tokens: &[String]) -> Vec<String> {
     out
 }
 
-/// The tokens Zoho can be asked to change: the flags of the intents, and
-/// the trash and spam (moves between folders).
+/// The tokens Zoho can be asked to change: the flags of the intents, the
+/// trash and spam (moves between folders), a label and a stream mark.
 pub fn writable(token: &str) -> bool {
     matches!(token, "UNREAD" | "STARRED" | "INBOX" | "TRASH" | "SPAM")
+        || label_of(token).is_some_and(|id| !id.is_empty())
+        || marks::of_token(token).is_some()
 }
 
 /// Where a message with `tokens` is: its folder and the tokens that say
@@ -118,8 +147,44 @@ pub fn location(tokens: &[String]) -> Vec<String> {
     out
 }
 
-/// The contract's state of a message with `tokens`. Zoho has no categories,
-/// and its labels are not carried.
+/// The contract's state of a message with `tokens`, its labels named by
+/// `names` (id → name): its labels other than stream marks, and for mail
+/// the inbox received, its provider stream (its stream mark; Primary
+/// without one; none with several). A label `names` does not know is not
+/// carried.
+pub fn flags_with(tokens: &[String], names: &HashMap<String, String>) -> Flags {
+    let mut flags = flags(tokens);
+    let name_of = |token: &str| {
+        label_of(token)
+            .and_then(|id| names.get(id))
+            .map(String::as_str)
+    };
+    let mut labels: Vec<Label> = tokens
+        .iter()
+        .filter_map(|token| {
+            let id = label_of(token)?;
+            let name = names.get(id)?;
+            marks::of_name(name).is_none().then(|| Label {
+                key: id.to_owned(),
+                name: name.clone(),
+            })
+        })
+        .collect();
+    labels.sort_by(|a, b| a.key.cmp(&b.key));
+    flags.labels = labels;
+    flags.provider_stream = (flags.direction == Direction::Inbound).then(|| {
+        match marks::marked(&marks::marks_in(tokens, name_of)) {
+            Marked::One(stream) => Some(stream),
+            Marked::Several => None,
+            Marked::Unmarked => Some(ProviderStream::Primary),
+        }
+    });
+    flags
+}
+
+/// The contract's state of a message with `tokens`, without its labels or
+/// stream (a grant without the labels scope, or the member's sent mail).
+/// Zoho has no categories.
 pub fn flags(tokens: &[String]) -> Flags {
     let has = |token: &str| tokens.iter().any(|t| t == token);
     let in_inbox = has("INBOX");
@@ -138,6 +203,8 @@ pub fn flags(tokens: &[String]) -> Flags {
         },
         categories: Vec::new(),
         labels: Vec::new(),
+        provider_stream: None,
+        stream_mark_stale: false,
     }
 }
 
@@ -186,5 +253,53 @@ mod tests {
             location(&tokens("11", FolderKind::Other, false, true, true)),
             ["ARCHIVED", "OWN", "folder:11"]
         );
+    }
+
+    #[test]
+    fn labels_and_marks_are_read_by_name() {
+        let names = HashMap::from([
+            ("71".to_owned(), "Clients".to_owned()),
+            ("72".to_owned(), "Campbooks/Newsletters".to_owned()),
+            ("73".to_owned(), "Campbooks/Updates".to_owned()),
+        ]);
+        let inbox = tokens("11", FolderKind::Inbox, true, false, false);
+        let labelled = |mut tokens: Vec<String>, ids: &[&str]| {
+            tokens.extend(ids.iter().map(|id| label_token(id)));
+            tokens.sort();
+            tokens
+        };
+        let listed = |ids: &[&str]| labelled(inbox.clone(), ids);
+        let plain = flags_with(&listed(&["71"]), &names);
+        assert_eq!(
+            plain.labels,
+            [Label {
+                key: "71".into(),
+                name: "Clients".into()
+            }]
+        );
+        assert_eq!(plain.provider_stream, Some(Some(ProviderStream::Primary)));
+        let marked = flags_with(&listed(&["71", "72"]), &names);
+        assert_eq!(marked.labels.len(), 1);
+        assert_eq!(
+            marked.provider_stream,
+            Some(Some(ProviderStream::Newsletters))
+        );
+        assert_eq!(
+            flags_with(&listed(&["72", "73"]), &names).provider_stream,
+            Some(None)
+        );
+        // A label not known by name is not carried.
+        assert!(flags_with(&listed(&["99"]), &names).labels.is_empty());
+        // Sent mail has no stream; without names (no scope) nothing is.
+        let sent = labelled(tokens("12", FolderKind::Sent, true, false, false), &["72"]);
+        assert_eq!(flags_with(&sent, &names).provider_stream, None);
+        assert_eq!(flags(&listed(&["72"])).provider_stream, None);
+        // A run starts from the index's labels.
+        let known = listed(&["71"]);
+        let mut moved = tokens("14", FolderKind::Other, true, false, false);
+        moved = with_labels(moved, &known);
+        assert_eq!(moved, ["OWN", "folder:14", "label:71"]);
+        assert!(writable("label:71") && writable("mark:receipts"));
+        assert!(!writable("label:") && !writable("mark:someday"));
     }
 }

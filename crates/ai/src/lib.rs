@@ -19,12 +19,16 @@ pub mod decide;
 mod error;
 mod gateway;
 mod health;
+mod stream;
 mod telemetry;
 pub mod usage;
 
-pub use config::{AiConfig, ExternalContent, Location, Protocol, ProviderConfig, Role};
+pub use config::{
+    AiConfig, ExternalContent, Location, Protocol, ProviderConfig, ReasoningEffort, Role,
+};
 pub use error::Error;
 pub use health::{PROBE_CACHE, PROBE_TIMEOUT, RoleHealth, unconfigured};
+pub use stream::{ChatEvent, ChatStream, ChatSummary};
 
 /// The gateway's messages (`i18n/<locale>.json`): the reasons of the errors
 /// it hands to modules.
