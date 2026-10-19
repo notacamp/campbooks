@@ -18,3 +18,12 @@ export function NeedChips({ need, now }: { need: NeedView; now?: Date | undefine
     </>
   );
 }
+
+/**
+ * An ask that lapsed (its link expired, its offer closed,
+ * campbooks-cloud#275): "Expired", in a neutral tone, with nothing to act on.
+ */
+export function ExpiredChip() {
+  const { t } = useTranslation("conversations");
+  return <Tag tone="neutral">{t("needs.chip.expired")}</Tag>;
+}

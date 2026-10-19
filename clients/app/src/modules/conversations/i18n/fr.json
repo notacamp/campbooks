@@ -136,6 +136,15 @@
     "spam": "Signalée comme spam · {{subject}}",
     "notSpam": "Pas un spam · {{subject}}"
   },
+  "leaving": {
+    "done": "Terminé",
+    "toInbox": "Remise dans la boîte de réception",
+    "deleted": "Supprimée",
+    "restored": "Restaurée",
+    "spam": "Signalée comme spam",
+    "notSpam": "Pas un spam",
+    "moved": "Déplacée vers {{stream}}"
+  },
   "scout": {
     "label": "Où en sont les choses",
     "suggestion": "Suggère {{stream}}",
@@ -302,8 +311,11 @@
       "checkReply": "Faut-il répondre à {{name}} ?",
       "checkDo": "Y a-t-il quelque chose à faire pour {{name}} ?",
       "checkPay": "{{name}} a envoyé une facture. Est-elle payée ?",
+      "stillDo": "{{name}} l’a demandé {{ago}}. Toujours à faire ?",
+      "stillReply": "{{name}} a écrit {{ago}}. Faut-il encore répondre ?",
       "taughtReply": "{{name}} : à répondre, selon une règle",
-      "taughtDo": "{{name}} : à faire, selon une règle"
+      "taughtDo": "{{name}} : à faire, selon une règle",
+      "worthALook": "Vous avez demandé à voir les e-mails de {{name}}"
     },
     "chip": {
       "reply": "À répondre",
@@ -311,7 +323,9 @@
       "pay": "À payer",
       "review": "À vérifier",
       "suspicious": "Semble suspect",
-      "check": "À confirmer"
+      "check": "À confirmer",
+      "expired": "Expiré",
+      "worth_a_look": "À voir"
     },
     "due": {
       "today": "Pour aujourd’hui",
@@ -354,11 +368,13 @@
       "stillToPay": "Reste à payer",
       "markPaid": "Marquer comme payée",
       "billPrompt": "Campbooks n’a pas accès à votre banque.",
-      "report": "Signaler et supprimer"
+      "report": "Signaler et supprimer",
+      "seen": "Vu"
     },
     "toast": {
       "done": "Fait · {{name}}",
       "notNeeded": "Pas nécessaire · {{name}}. Campbooks en tiendra compte",
+      "noLongerNeeded": "Plus nécessaire · {{name}}",
       "safe": "Marqué comme sûr · {{name}}. Campbooks en tiendra compte",
       "confirmed": "Merci · {{name}} reste dans votre liste",
       "failed": "Impossible de modifier {{name}} : rien n’a changé. Réessayez.",
@@ -406,7 +422,8 @@
       "trash": "va à la corbeille",
       "spam": "signalé comme spam",
       "paid": "ses factures sont déjà payées",
-      "images": "ses images s’affichent toujours"
+      "images": "ses images s’affichent toujours",
+      "worthALook": "reste sur l’Accueil jusqu’à ce que vous l’ouvriez"
     },
     "likeness": {
       "sender": "Tout ce qui vient de {{address}}",
@@ -533,7 +550,8 @@
       "trash": "Campbooks l’a mis à la corbeille",
       "spam": "Campbooks l’a signalé comme spam",
       "paid": "Campbooks dit que c’est déjà payé",
-      "images": "Campbooks affiche les images de cet expéditeur"
+      "images": "Campbooks affiche les images de cet expéditeur",
+      "worthALook": "Campbooks garde celui-ci sur l’Accueil jusqu’à ce que vous l’ouvriez"
     },
     "reader": {
       "stop": "Arrêter de faire ça"
@@ -692,7 +710,31 @@
     "imagesMatches_other": "{{n}} conversations de cet expéditeur sont déjà ici. Ses images s’affichent chaque fois que son courrier réussit ses vérifications.",
     "imagesNew": "Ses images s’afficheront dans le nouveau courrier de cet expéditeur qui réussit ses vérifications.",
     "imagesHow": "Seulement pour le courrier qui réussit les vérifications de l’expéditeur et dans lequel Scout n’a rien trouvé de suspect : tant que Scout est désactivé ou a atteint sa limite quotidienne, elles restent retenues. Jamais pour celui qui se fait passer pour lui. Les pixels de suivi restent supprimés.",
-    "imagesAlready": "Une règle intelligente couvre déjà les images de cet expéditeur, même si elle est en pause ou attend un oui. Vous la trouverez dans la mémoire de Scout."
+    "imagesAlready": "Une règle intelligente couvre déjà les images de cet expéditeur, même si elle est en pause ou attend un oui. Vous la trouverez dans la mémoire de Scout.",
+    "goal": {
+      "question": "Que faire des e-mails de {{sender}} ?",
+      "guess": "Idée de Scout",
+      "archive": "Les archiver dès leur arrivée",
+      "archiveDetail": "Ils évitent l’Accueil et quittent la boîte de réception dès qu’ils arrivent. Vous les retrouvez dans les archives.",
+      "fileOffHome": "Les garder hors de l’Accueil, dans {{stream}}",
+      "fileOffHomeDetail": "Ils restent dans la boîte de réception, dans {{stream}}, et n’apparaissent jamais sur l’Accueil.",
+      "highlight": "Les mettre en avant",
+      "highlightTag": "J’aime ceux-ci",
+      "highlightDetail": "Scout veille à ce que vous voyiez chaque nouveau : il attend sur l’Accueil, sous « À voir », jusqu’à ce que vous l’ayez ouvert une fois. Rien n’est épinglé.",
+      "newsletters": "Les classer dans {{stream}}",
+      "newslettersDetail": "Hors de l’Accueil, mais toujours dans la boîte de réception.",
+      "read": "Les marquer comme lus",
+      "readDetail": "Rien d’autre ne change.",
+      "words": "Comme vous l’avez dit",
+      "wordsLabel": "Ou dites-le à Scout avec vos mots",
+      "wordsPlaceholder": "Par exemple : les garder, mais ne pas les marquer comme lus",
+      "wordsAsk": "Demander à Scout",
+      "wordsUnclear": "Scout n’a pas pu en faire une règle. Choisissez l’une des options ci-dessus ou essayez d’autres mots.",
+      "wordsNoModel": "Scout ne peut pas lire de phrases sur ce serveur. Choisissez l’une des options ci-dessus.",
+      "wordsBusy": "Scout est occupé en ce moment. Réessayez dans un instant.",
+      "wordsFailed": "Scout n’a pas pu lire cela. Rien n’a changé.",
+      "pick": "Choisissez ce qui doit se passer pour voir ce qui correspond."
+    }
   },
   "ahead": {
     "reportTitle": "Ne plus jamais voir d’e-mails comme celui-ci ?",
@@ -717,13 +759,15 @@
       "weekly": "Ils arrivent chaque semaine.",
       "monthly": "Ils arrivent chaque mois."
     },
-    "setUp": "Créer une règle intelligente…",
     "notNow": "Pas maintenant",
     "never": "Ne plus le proposer",
     "notNowDone": "Scout redemandera plus tard",
     "neverDone": "Scout ne le proposera plus",
     "failed": "Campbooks n’a pas pu l’enregistrer. Réessayez.",
-    "shared": "Pour tout le monde dans {{inbox}}."
+    "shared": "Pour tout le monde dans {{inbox}}.",
+    "verbArchive": "Les archiver…",
+    "verbFile": "Classer dans {{stream}}…",
+    "other": "Autre chose…"
   },
   "forward": {
     "title": "Transférer l’e-mail de {{name}} à…",

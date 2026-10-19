@@ -170,6 +170,10 @@ reason = "The needs backfill's dispatcher starts pending backfills across worksp
 path = "crates/modules/conversations/src/features/resign_rules/mod.rs"
 reason = "Binding the rules kept from before rules were bound (campbooks-cloud#242): the dispatcher reads which workspaces still have rows in `conversations.rule_resigns` (its maintenance policy: read only, ids and hashes) and enqueues each workspace's signing job in that workspace; it signs nothing itself."
 
+[[access.maintenance_scope]]
+path = "crates/modules/conversations/src/features/wake_needs/mod.rs"
+reason = "Needs that change with time alone (campbooks-cloud#275): the one-minute dispatcher reads which workspaces have a due row in `conversations.need_clocks` (its maintenance policy: read only, ids and times) and enqueues each workspace's wake job in that workspace; it reads and writes nothing else."
+
 # Published events nothing consumes yet, and why they exist.
 [[access.unconsumed_events]]
 name = "connectors.connection_needs_reauth"

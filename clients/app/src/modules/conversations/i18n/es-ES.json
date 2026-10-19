@@ -136,6 +136,15 @@
     "spam": "Marcada como spam · {{subject}}",
     "notSpam": "No es spam · {{subject}}"
   },
+  "leaving": {
+    "done": "Hecho",
+    "toInbox": "Movida a la bandeja de entrada",
+    "deleted": "Eliminada",
+    "restored": "Restaurada",
+    "spam": "Marcada como spam",
+    "notSpam": "No es spam",
+    "moved": "Movida a {{stream}}"
+  },
   "scout": {
     "label": "Cómo está la cosa",
     "suggestion": "Sugiere {{stream}}",
@@ -302,8 +311,11 @@
       "checkReply": "¿{{name}} necesita respuesta?",
       "checkDo": "¿{{name}} te ha pedido que hagas algo?",
       "checkPay": "{{name}} ha enviado una factura. ¿Ya está pagada?",
+      "stillDo": "{{name}} lo pidió {{ago}}. ¿Sigue pendiente?",
+      "stillReply": "{{name}} escribió {{ago}}. ¿Sigue necesitando respuesta?",
       "taughtReply": "{{name}}: responder, por una regla",
-      "taughtDo": "{{name}}: por hacer, por una regla"
+      "taughtDo": "{{name}}: por hacer, por una regla",
+      "worthALook": "Pediste ver los correos de {{name}}"
     },
     "chip": {
       "reply": "Necesita respuesta",
@@ -311,7 +323,9 @@
       "pay": "Pagar",
       "review": "Revisar",
       "suspicious": "Parece sospechoso",
-      "check": "Confirmar"
+      "check": "Confirmar",
+      "expired": "Caducado",
+      "worth_a_look": "Merece un vistazo"
     },
     "due": {
       "today": "Vence hoy",
@@ -354,11 +368,13 @@
       "stillToPay": "Pendiente de pago",
       "markPaid": "Marcar como pagada",
       "billPrompt": "Campbooks no tiene acceso a tu banco.",
-      "report": "Denunciar y eliminar"
+      "report": "Denunciar y eliminar",
+      "seen": "Visto"
     },
     "toast": {
       "done": "Hecho · {{name}}",
       "notNeeded": "No hace falta · {{name}}. Campbooks aprenderá de esto",
+      "noLongerNeeded": "Ya no hace falta · {{name}}",
       "safe": "Marcado como seguro · {{name}}. Campbooks aprenderá de esto",
       "confirmed": "Gracias · {{name}} sigue en tu lista",
       "failed": "No se ha podido cambiar {{name}}: no ha cambiado nada. Vuelve a intentarlo.",
@@ -406,7 +422,8 @@
       "trash": "va a la papelera",
       "spam": "denunciado como spam",
       "paid": "sus facturas ya están pagadas",
-      "images": "sus imágenes se muestran siempre"
+      "images": "sus imágenes se muestran siempre",
+      "worthALook": "se queda en Inicio hasta que lo abras"
     },
     "likeness": {
       "sender": "Todo de {{address}}",
@@ -533,7 +550,8 @@
       "trash": "Campbooks lo puso en la papelera",
       "spam": "Campbooks lo denunció como spam",
       "paid": "Campbooks dice que esto ya está pagado",
-      "images": "Campbooks muestra las imágenes de este remitente"
+      "images": "Campbooks muestra las imágenes de este remitente",
+      "worthALook": "Campbooks mantiene este en Inicio hasta que lo abras"
     },
     "reader": {
       "stop": "Dejar de hacerlo"
@@ -692,7 +710,31 @@
     "imagesMatches_other": "Ya hay {{n}} conversaciones de este remitente. Sus imágenes se muestran siempre que su correo pasa las comprobaciones.",
     "imagesNew": "Sus imágenes se mostrarán en el correo nuevo de este remitente que pase las comprobaciones.",
     "imagesHow": "Solo para el correo que pasa las comprobaciones del remitente y en el que Scout no ha encontrado nada sospechoso; por eso, mientras Scout esté desactivado o haya superado su límite diario, siguen retenidas. Nunca para el que se hace pasar por él. Los píxeles de seguimiento siguen eliminados.",
-    "imagesAlready": "Ya hay una regla inteligente para las imágenes de este remitente, aunque esté en pausa o esperando un sí. La encontrarás en la memoria de Scout."
+    "imagesAlready": "Ya hay una regla inteligente para las imágenes de este remitente, aunque esté en pausa o esperando un sí. La encontrarás en la memoria de Scout.",
+    "goal": {
+      "question": "¿Qué debe pasar con los correos de {{sender}}?",
+      "guess": "Lo que propone Scout",
+      "archive": "Archivarlos al llegar",
+      "archiveDetail": "No pasan por Inicio y salen de la bandeja de entrada en cuanto llegan. Los seguirás encontrando en Archivados.",
+      "fileOffHome": "Sacarlos de Inicio, en {{stream}}",
+      "fileOffHomeDetail": "Se quedan en la bandeja de entrada en {{stream}} y nunca aparecen en Inicio.",
+      "highlight": "Destacarlos",
+      "highlightTag": "Me gustan",
+      "highlightDetail": "Scout se asegura de que veas cada uno nuevo: espera en Inicio, en «Merece un vistazo», hasta que lo abras una vez. No se fija nada.",
+      "newsletters": "Guardarlos en {{stream}}",
+      "newslettersDetail": "Fuera de Inicio, pero aún en la bandeja de entrada.",
+      "read": "Marcarlos como leídos",
+      "readDetail": "No cambia nada más.",
+      "words": "Como dijiste",
+      "wordsLabel": "O díselo a Scout con tus palabras",
+      "wordsPlaceholder": "Por ejemplo: mantenlos, pero no los marques como leídos",
+      "wordsAsk": "Preguntar a Scout",
+      "wordsUnclear": "Scout no pudo convertir eso en una regla. Elige una de las opciones de arriba o prueba con otras palabras.",
+      "wordsNoModel": "Scout no puede leer frases en este servidor. Elige una de las opciones de arriba.",
+      "wordsBusy": "Scout está ocupado ahora mismo. Inténtalo de nuevo en un momento.",
+      "wordsFailed": "Scout no pudo leer eso. No ha cambiado nada.",
+      "pick": "Elige qué debe pasar para ver con qué coincide."
+    }
   },
   "ahead": {
     "reportTitle": "¿No volver a ver correos como este?",
@@ -717,13 +759,15 @@
       "weekly": "Llegan cada semana.",
       "monthly": "Llegan cada mes."
     },
-    "setUp": "Crear una regla inteligente…",
     "notNow": "Ahora no",
     "never": "No sugerir esto",
     "notNowDone": "Scout te lo preguntará en otro momento",
     "neverDone": "Scout no volverá a sugerirlo",
     "failed": "Campbooks no pudo guardarlo. Inténtalo de nuevo.",
-    "shared": "Para todos en {{inbox}}."
+    "shared": "Para todos en {{inbox}}.",
+    "verbArchive": "Archivarlos…",
+    "verbFile": "Guardar en {{stream}}…",
+    "other": "Otra cosa…"
   },
   "forward": {
     "title": "Reenviar el correo de {{name}} a…",

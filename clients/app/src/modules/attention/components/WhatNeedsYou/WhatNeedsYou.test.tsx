@@ -13,6 +13,8 @@ import {
   ACME,
   CLEARED,
   COUNTS,
+  DIGEST,
+  DIGEST_ITEM,
   ITEMS,
   MARTA,
   MARTA_DETAIL,
@@ -52,13 +54,21 @@ function renderHome() {
   return { router, ...renderWithProviders(<RouterProvider router={router} />) };
 }
 
-function api(items = ITEMS, live?: { items: typeof ITEMS }) {
+function api(
+  items = ITEMS,
+  live?: { items: typeof ITEMS },
+  more: Parameters<typeof mockApi>[0] = {},
+) {
   return mockApi({
+    ...more,
     [`GET ${W}/attention`]: (request) =>
       new URL(request.url).searchParams.get("state") === "cleared"
         ? { body: { items: CLEARED, counts: [] } }
         : { body: { items: live?.items ?? items, counts: COUNTS } },
-    [`GET ${W}/conversations`]: { body: { conversations: [...NEEDS, SOFIA], next_cursor: null } },
+    [`GET ${W}/conversations`]: {
+      body: { conversations: [...NEEDS, SOFIA, DIGEST], next_cursor: null },
+    },
+    [`POST ${W}/conversations/${DIGEST.id}/need/resolve`]: { body: { ...DIGEST, need: null } },
     [`GET ${W}/conversations/${MARTA.id}`]: { body: MARTA_DETAIL },
     [`GET ${W}/conversations/${PHISH.id}`]: { body: PHISH_DETAIL },
     [`POST ${W}/conversations/${PHISH.id}/need/resolve`]: { body: { ...PHISH, need: null } },
@@ -364,6 +374,60 @@ describe("What needs you", () => {
         outcome: "not_needed",
       });
     });
+  });
+
+  it("asks again about an old ask, Still to do?, and No says it is no longer needed", async () => {
+    // Pedro's undated lease, three weeks on (campbooks-cloud#275).
+    const stale = {
+      ...PEDRO,
+      need:
+        PEDRO.need === null || PEDRO.need === undefined
+          ? null
+          : {
+              ...PEDRO.need,
+              reason: "review" as const,
+              trust: "check" as const,
+              question: "still_to_do" as const,
+              due_on: null,
+              sent_at: "2026-09-22T10:12:00Z",
+            },
+    };
+    const items = ITEMS.map((item) =>
+      item.record.id === PEDRO.id
+        ? { ...item, reason: "review" as const, trust: "check" as const, due_on: null }
+        : item,
+    );
+    const calls = mockApi({
+      [`GET ${W}/attention`]: (request) =>
+        new URL(request.url).searchParams.get("state") === "cleared"
+          ? { body: { items: [], counts: [] } }
+          : { body: { items, counts: COUNTS } },
+      [`GET ${W}/conversations`]: {
+        body: {
+          conversations: NEEDS.map((c) => (c.id === PEDRO.id ? stale : c)),
+          next_cursor: null,
+        },
+      },
+      [`POST ${W}/conversations/${PEDRO.id}/need/resolve`]: { body: { ...PEDRO, need: null } },
+    });
+    renderHome();
+    const line = await screen.findByText("Pedro Alves asked 3 weeks ago. Still to do?");
+    fireEvent.click(line);
+    const actions = screen.getByRole("group", { name: "Actions for Pedro Alves" });
+    expect(
+      within(actions)
+        .getAllByRole("button")
+        .map((b) => b.textContent),
+    ).toEqual(["Yes1", "No2", "Snooze…S"]);
+    fireEvent.keyDown(document, { key: "2" });
+    await waitFor(() => {
+      expect(calls.calls.find((c) => c.route.endsWith("/need/resolve"))?.body).toMatchObject({
+        outcome: "not_needed",
+      });
+    });
+    // Nothing is learned from it, so the toast says only that.
+    expect(await screen.findByText("No longer needed · Pedro Alves")).toBeVisible();
+    expect(screen.queryByText(/Campbooks will learn/u)).toBeNull();
   });
 
   it("asks whether a bill is paid, and takes Already paid on 1", async () => {
@@ -675,6 +739,76 @@ describe("What needs you", () => {
     fireEvent.keyDown(document, { key: "e" });
     expect(await screen.findByText(/changed while you looked/u)).toBeVisible();
     expect(screen.getByText("This may be phishing. Don’t use its links.")).toBeVisible();
+  });
+
+  it("shows mail a rule keeps in front of you last, as Worth a look, with Seen and Snooze", async () => {
+    const calls = api([...ITEMS, DIGEST_ITEM]);
+    renderHome();
+    await screen.findByText("You asked to see mail from Design Notes");
+    const groups = screen.getAllByRole("heading", { level: 2 }).map((h) => h.textContent);
+    expect(groups.slice(0, 5)).toEqual(["Review 1", "Reply 2", "Do 1", "Pay 2", "Worth a look 1"]);
+    // Nothing is asked of you: no Reply, and no "Not needed" about your own rule.
+    fireEvent.click(screen.getByText("You asked to see mail from Design Notes"));
+    const row = screen.getByRole("group", { name: "Actions for Design Notes" });
+    expect(
+      within(row)
+        .getAllByRole("button")
+        .map((b) => b.textContent),
+    ).toEqual(["SeenE", "Snooze…S"]);
+    fireEvent.click(within(row).getByRole("button", { name: /^Seen/u }));
+    await waitFor(() => {
+      expect(
+        calls.calls.find((c) => c.route === `POST ${W}/conversations/${DIGEST.id}/need/resolve`)
+          ?.body,
+      ).toEqual({ outcome: "done", message_id: DIGEST.need?.message_id });
+    });
+    expect(await screen.findByText("Seen · Design Notes")).toBeVisible();
+  });
+
+  describe("Scout noticed", () => {
+    const NOTICE = {
+      id: "0192f1a0-0000-7000-8000-0000000000e1",
+      inbox_id: "0192f1a0-0000-7000-8000-000000000001",
+      kind: "archive_on_arrival",
+      sender: "digest@design-notes.example",
+      sender_name: "Design Notes",
+      conditions: [{ field: "sender_address", value: "digest@design-notes.example" }],
+      actions: [{ action: "archive" }],
+      evidence: {
+        received: 88,
+        opened: 0,
+        archived_unread: 88,
+        last_week: 7,
+        window_days: 60,
+        cadence: "daily",
+      },
+      shared: false,
+    };
+    const notices = { [`GET ${W}/rule-notices`]: { body: { notices: [NOTICE] } } };
+
+    it("sits right after the first group, not after all of them", async () => {
+      api(ITEMS, undefined, notices);
+      renderHome();
+      const note = await screen.findByRole("region", { name: "Scout noticed" });
+      const heading = (name: string) =>
+        screen.getAllByRole("heading", { level: 2 }).find((h) => h.textContent === name);
+      const review = heading("Review 1");
+      const reply = heading("Reply 2");
+      const pay = heading("Pay 2");
+      const follows = (a: Node | undefined, b: Node) =>
+        a !== undefined && (a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0;
+      expect(follows(review, note)).toBe(true);
+      expect(follows(note, reply as Node)).toBe(true);
+      expect(follows(note, pay as Node)).toBe(true);
+      expect(screen.getAllByRole("region", { name: "Scout noticed" })).toHaveLength(1);
+    });
+
+    it("keeps its place when nothing needs you", async () => {
+      api([], undefined, notices);
+      renderHome();
+      expect(await screen.findByRole("region", { name: "Scout noticed" })).toBeVisible();
+      expect(screen.getByRole("heading", { level: 1, name: "Nothing needs you" })).toBeVisible();
+    });
   });
 
   it("says when nothing needs you", async () => {

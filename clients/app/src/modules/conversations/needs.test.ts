@@ -1,11 +1,20 @@
 import { describe, expect, it } from "vitest";
 
-import { ACME, JONAS, LUZ, MARTA, MARTA_DETAIL, PHISH } from "../../../test/demo/attention";
+import { ACME, JONAS, LUZ, MARTA, MARTA_DETAIL, PEDRO, PHISH } from "../../../test/demo/attention";
 import { NOW } from "../../../test/demo/conversations";
 
 import type { NeedView } from "./api/queries";
 import type { Translate } from "./model";
-import { dueLabel, howRows, needChip, needSender, needSentence, quoteAttribution } from "./needs";
+import {
+  dueLabel,
+  howRows,
+  isStillNeeded,
+  needChip,
+  needSender,
+  needSentence,
+  needSignal,
+  quoteAttribution,
+} from "./needs";
 
 /** A `t` that shows the key and its options, to test what is asked for. */
 const t: Translate = (key, options) =>
@@ -33,6 +42,40 @@ describe("needs in words", () => {
       'needs.line.checkReply{"name":"Inês"}',
     );
     expect(needSentence(t, need(PHISH), "x")).toBe("needs.line.warning");
+  });
+
+  it("asks again about an old ask, saying how long ago it came", () => {
+    // Pedro's undated lease, three weeks on (campbooks-cloud#275).
+    const old: NeedView = {
+      ...need(PEDRO),
+      reason: "review",
+      trust: "check",
+      question: "still_to_do",
+      due_on: null,
+      sent_at: "2026-09-22T10:12:00Z",
+    };
+    expect(needSentence(t, old, "Pedro Alves", { locale: "en", now: NOW })).toBe(
+      'needs.line.stillDo{"name":"Pedro Alves","ago":"3 weeks ago"}',
+    );
+    expect(needSentence(t, old, "Pedro Alves", { locale: "pt-PT", now: NOW })).toBe(
+      'needs.line.stillDo{"name":"Pedro Alves","ago":"há 3 semanas"}',
+    );
+    const reply: NeedView = { ...old, question: "still_needs_reply" };
+    expect(needSentence(t, reply, "Marta Ferreira", { locale: "fr", now: NOW })).toBe(
+      'needs.line.stillReply{"name":"Marta Ferreira","ago":"il y a 3 semaines"}',
+    );
+    // Without its time, the plain question.
+    expect(needSentence(t, { ...old, sent_at: null }, "Pedro Alves")).toBe(
+      'needs.line.checkDo{"name":"Pedro Alves"}',
+    );
+    expect(needSentence(t, reply, "Marta Ferreira")).toBe(
+      'needs.line.checkReply{"name":"Marta Ferreira"}',
+    );
+    // A question, in Review's colour.
+    expect(needChip(t, old)).toBe("needs.chip.check");
+    expect(needSignal(old)).toBe("review");
+    expect(isStillNeeded(old) && isStillNeeded(reply)).toBe(true);
+    expect(isStillNeeded(need(PEDRO))).toBe(false);
   });
 
   it("asks whether a bill is paid, in Pay's colour", () => {

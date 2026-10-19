@@ -215,7 +215,12 @@ pub fn module(deps: ConversationsDeps) -> Module {
                 deps.config.notices,
             ))
             .handler(features::refresh_need::RefreshNeed::new(needs.clone()))
-            .handler(features::summarize_need::SummarizeNeed::new(summaries))
+            .handler(features::summarize_need::SummarizeNeed::new(
+                summaries,
+                needs.clone(),
+            ))
+            .handler(features::wake_needs::WakeNeeds::new(needs.clone()))
+            .schedule::<features::wake_needs::DispatchNeedClocks>(features::wake_needs::EVERY)
             .handler(features::apply_changes::ApplyChanges::new(
                 deps.rules,
                 deps.policy.clone(),
@@ -381,12 +386,15 @@ mod tests {
             "conversations.dispatch_rule_resigns",
             "conversations.resign_rules",
             "conversations.retag_bindings",
+            "conversations.wake_needs",
+            "conversations.dispatch_need_clocks",
         ] {
             assert!(kinds.contains(&kind), "{kind}");
         }
         let schedules = registry.schedule_names();
         assert!(schedules.contains(&"conversations.dispatch_needs_backfills"));
         assert!(schedules.contains(&"conversations.dispatch_rule_resigns"));
+        assert!(schedules.contains(&"conversations.dispatch_need_clocks"));
     }
 
     // A runtime query rather than `query!`, so this test needs no entry in
