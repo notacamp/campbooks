@@ -130,7 +130,7 @@ describe("the inbox", () => {
     // The two older ones are folded until opened.
     const folded = within(reader).getAllByRole("button", { expanded: false });
     expect(folded.length).toBeGreaterThanOrEqual(2);
-    fireEvent.click(within(reader).getByRole("button", { name: /Sam Rivera/u }));
+    fireEvent.click(within(reader).getByRole("button", { name: /^You\s*→ Maya Okafor/u }));
     expect(await within(reader).findByText(/Is the timeline fixed\?/u)).toBeVisible();
     // The note says what the decide pass thinks, as suggestions; how it
     // decided (the only place with numbers) is folded away.

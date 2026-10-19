@@ -5,7 +5,8 @@
 //! here (`domain::sanitize`: style sheets inlined into filtered `style`
 //! attributes; no scripts, forms or frames; links open in a new tab; remote
 //! images held back unless asked for or a smart rule trusts the sender;
-//! tracking pixels removed), then reaches
+//! tracking pixels removed; a reply's trailing quoted history wrapped in
+//! `<div data-cb-quoted="1">` for the reader to fold), then reaches
 //! the client as a string that the client renders only in its sandboxed
 //! frame (`lib/ui/safe-html`, AGENTS.md), with the message's filtered
 //! `@media` rules beside it.

@@ -8,6 +8,7 @@ import {
   ListPane,
   PaneHeader,
   ReaderBody,
+  ReaderFooter,
   ReaderPane,
   SearchButton,
   Shell,
@@ -64,6 +65,41 @@ describe("Shell", () => {
       "aria-keyshortcuts",
       "Control+K",
     );
+  });
+
+  it("pins a reader's footer after its body: the composer, or else the prompt", () => {
+    const { rerender } = renderUi(
+      <ReaderPane label="Conversation">
+        <ReaderBody>
+          <p>Thread</p>
+        </ReaderBody>
+        <ReaderFooter
+          slot={null}
+          prompt={<button type="button">Reply to Marta</button>}
+          phoneBar={<button type="button">Done</button>}
+        />
+      </ReaderPane>,
+    );
+    const reader = screen.getByRole("main", { name: "Conversation" });
+    const prompt = screen.getByRole("button", { name: "Reply to Marta" });
+
+    // After the thread, never inside it.
+    expect(reader.lastElementChild).toContainElement(prompt);
+    expect(screen.getByText("Thread").compareDocumentPosition(prompt)).toBe(
+      Node.DOCUMENT_POSITION_FOLLOWING,
+    );
+    expect(screen.getByRole("button", { name: "Done" })).toBeInTheDocument();
+
+    rerender(
+      <ReaderPane label="Conversation">
+        <ReaderBody>
+          <p>Thread</p>
+        </ReaderBody>
+        <ReaderFooter slot={<form aria-label="Reply to Marta Silva" />} />
+      </ReaderPane>,
+    );
+    expect(screen.getByRole("form", { name: "Reply to Marta Silva" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Reply to Marta" })).toBeNull();
   });
 
   it("shows only the mark when compact", () => {

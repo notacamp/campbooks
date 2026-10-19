@@ -176,6 +176,7 @@ async fn fetch_page(
                    c.stream, c.stream_source, c.last_message_at, c.message_count, c.unread_count,
                    c.starred, c.archived_at IS NOT NULL AS "archived!",
                    m.sender AS "sender?", m.snippet AS "snippet?",
+                   coalesce(m.direction = 'outbound', false) AS "latest_from_you!",
                    coalesce((SELECT jsonb_agg(jsonb_build_object('id', l.id, 'name', l.name)
                                               ORDER BY l.name)
                                FROM conversations.conversation_labels cl
@@ -183,7 +184,7 @@ async fn fetch_page(
                               WHERE cl.conversation_id = c.id), '[]') AS "labels!"
               FROM conversations.conversations c
               LEFT JOIN LATERAL (
-                  SELECT sender, snippet FROM conversations.messages
+                  SELECT sender, snippet, direction FROM conversations.messages
                    WHERE conversation_id = c.id ORDER BY sent_at DESC, id DESC LIMIT 1
               ) m ON true
              WHERE c.inbox_id = ANY($1) AND c.archived_at IS NOT NULL AND NOT c.trashed
@@ -208,6 +209,7 @@ async fn fetch_page(
                    c.stream, c.stream_source, c.last_message_at, c.message_count, c.unread_count,
                    c.starred, c.archived_at IS NOT NULL AS "archived!",
                    m.sender AS "sender?", m.snippet AS "snippet?",
+                   coalesce(m.direction = 'outbound', false) AS "latest_from_you!",
                    coalesce((SELECT jsonb_agg(jsonb_build_object('id', l.id, 'name', l.name)
                                               ORDER BY l.name)
                                FROM conversations.conversation_labels cl
@@ -215,7 +217,7 @@ async fn fetch_page(
                               WHERE cl.conversation_id = c.id), '[]') AS "labels!"
               FROM conversations.conversations c
               LEFT JOIN LATERAL (
-                  SELECT sender, snippet FROM conversations.messages
+                  SELECT sender, snippet, direction FROM conversations.messages
                    WHERE conversation_id = c.id ORDER BY sent_at DESC, id DESC LIMIT 1
               ) m ON true
              WHERE c.inbox_id = ANY($1) AND c.archived_at IS NULL AND NOT c.trashed
@@ -264,6 +266,7 @@ async fn fetch_ids(
                c.stream, c.stream_source, c.last_message_at, c.message_count, c.unread_count,
                c.starred, c.archived_at IS NOT NULL AS "archived!",
                m.sender AS "sender?", m.snippet AS "snippet?",
+               coalesce(m.direction = 'outbound', false) AS "latest_from_you!",
                coalesce((SELECT jsonb_agg(jsonb_build_object('id', l.id, 'name', l.name)
                                           ORDER BY l.name)
                            FROM conversations.conversation_labels cl
@@ -271,7 +274,7 @@ async fn fetch_ids(
                           WHERE cl.conversation_id = c.id), '[]') AS "labels!"
           FROM conversations.conversations c
           LEFT JOIN LATERAL (
-              SELECT sender, snippet FROM conversations.messages
+              SELECT sender, snippet, direction FROM conversations.messages
                WHERE conversation_id = c.id ORDER BY sent_at DESC, id DESC LIMIT 1
           ) m ON true
          WHERE c.inbox_id = ANY($1) AND c.id = ANY($2)
@@ -392,6 +395,9 @@ mod http_tests {
         let q4 = &all.json["conversations"][2];
         assert_eq!(q4["message_count"], 2);
         assert_eq!(q4["latest_from"]["address"], "sam@example.com");
+        // Sam wrote last; the newsletter's newest message is theirs.
+        assert_eq!(q4["latest_from_you"], true);
+        assert_eq!(all.json["conversations"][1]["latest_from_you"], false);
         assert_eq!(q4["labels"][0]["name"], "Clients");
         assert!(all.json["next_cursor"].is_null());
 

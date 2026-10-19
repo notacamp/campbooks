@@ -21,6 +21,14 @@ All notable changes to Campbooks Next are documented here. The format follows
   when you open it, here or on your phone. It hides nothing and pins nothing, so the mail can
   still be archived like any other. Opening a conversation (or marking it read or unread)
   now updates its Home item straight away.
+- **Threads read as a back and forth.** Your own messages in a thread read "You → Marta
+  Silva" and sit in from the left, while theirs stay flush left. A long thread keeps its
+  newest two messages, its first and anything unread, and folds the middle into "N more
+  messages", which opens in place. A reply's quoted history folds behind "Show quoted
+  text", found from how the mail is built, never from its words. The reply box stays pinned
+  at the bottom of the reader while the thread scrolls under it (phones keep the Reply and
+  Done bar). In the list, a conversation where you wrote last starts its snippet with
+  "You:".
 - **Usage analytics, without a tracking script (off by default).** An instance can count
   which screens people use in its own Matomo (`CAMPBOOKS_ANALYTICS__MATOMO_URL`,
   `__MATOMO_SITE_ID` and `__MATOMO_VISITOR_KEY`, all three or nothing). The app loads no
@@ -106,6 +114,11 @@ All notable changes to Campbooks Next are documented here. The format follows
 
 ### Fixed
 
+- **An email you are only copied on no longer reads as "needs a reply".** Scout is now told
+  who was addressed and who was copied, and that someone copied on an email is usually being
+  kept informed: it asks for a reply from them only when the email asks them something
+  directly. Mail you are only copied on that was already flagged is looked at again after
+  the upgrade (recent mail only), and the need goes away at once; nothing is deleted.
 - **A reply or forward never quotes nothing.** When an email's words were too slow to read
   in time (a very large or heavy HTML email), the conversation arrives without them; Reply,
   Reply all, Forward and Home's Forward picker now read them first, saying "Reading the email
