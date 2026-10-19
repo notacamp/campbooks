@@ -231,6 +231,9 @@ jobs:
       - name: Storybook stories (render, interactions, axe in light and dark)
         if: always()
         run: pnpm test-storybook
+      - name: Copy fits in every language (longest translations, phone and desktop)
+        if: always()
+        run: pnpm --filter @campbooks/app test:fit
       - name: WebKit for the mail frame policy test
         if: always()
         run: pnpm --filter @campbooks/app exec playwright install --with-deps webkit

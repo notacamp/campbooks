@@ -23,6 +23,8 @@ import {
   type ThemeSettings,
 } from "../src/lib/ui";
 
+import { LONGEST, longestMessages } from "./longest";
+
 // Module namespaces are bundled eagerly here, so screen stories never suspend.
 const moduleFiles = import.meta.glob<Messages>("../src/modules/*/i18n/*.json", {
   import: "default",
@@ -40,17 +42,43 @@ for (const [path, messages] of Object.entries(moduleFiles)) {
   }
 }
 
-const instances = new Map<Locale, I18n>();
+/** A shipped locale, or the fit check's pseudo-locale (`.storybook/longest.ts`). */
+type StoryLocale = Locale | typeof LONGEST;
 
-function i18nFor(locale: Locale): I18n {
+const shell: Record<Locale, Messages> = { en, "pt-PT": pt, "es-ES": es, fr };
+const bundled: Record<string, Record<Locale, Messages>> = {
+  ...UI_NAMESPACES,
+  ...moduleNamespaces,
+};
+
+/**
+ * The pseudo-locale renders as French (its dates, numbers and plural rules)
+ * with every string replaced by its longest translation.
+ */
+const asLongest = (messages: Record<Locale, Messages>): Record<Locale, Messages> => ({
+  ...messages,
+  fr: longestMessages(messages),
+});
+
+const instances = new Map<StoryLocale, I18n>();
+
+function i18nFor(locale: StoryLocale): I18n {
   let instance = instances.get(locale);
   if (instance === undefined) {
-    instance = createI18n({
-      locale,
-      shell: { en, "pt-PT": pt, "es-ES": es, fr },
-      bundled: { ...UI_NAMESPACES, ...moduleNamespaces },
-      loaders: {},
-    });
+    instance =
+      locale === LONGEST
+        ? createI18n({
+            locale: "fr",
+            shell: asLongest(shell),
+            bundled: Object.fromEntries(
+              Object.entries(bundled).map(([namespace, messages]) => [
+                namespace,
+                asLongest(messages),
+              ]),
+            ),
+            loaders: {},
+          })
+        : createI18n({ locale, shell, bundled, loaders: {} });
     instances.set(locale, instance);
   }
   return instance;
@@ -74,16 +102,16 @@ const withTheme: Decorator = (Story, { globals }) => (
   </ThemeFrame>
 );
 
-function LocaleFrame({ locale, children }: { locale: Locale; children: ReactNode }) {
+function LocaleFrame({ locale, children }: { locale: StoryLocale; children: ReactNode }) {
   useLayoutEffect(() => {
-    document.documentElement.lang = locale;
+    document.documentElement.lang = locale === LONGEST ? "fr" : locale;
   }, [locale]);
   return <I18nextProvider i18n={i18nFor(locale)}>{children}</I18nextProvider>;
 }
 
 /** The story in the toolbar's language, with the app's real catalogues. */
 const withI18n: Decorator = (Story, { globals }) => (
-  <LocaleFrame locale={globals["locale"] as Locale}>
+  <LocaleFrame locale={globals["locale"] as StoryLocale}>
     <Story />
   </LocaleFrame>
 );
@@ -112,7 +140,8 @@ const preview: Preview = {
     theme: toolbar("Theme", "mirror", THEME_MODES),
     accent: toolbar("Accent", "paintbrush", ACCENTS),
     density: toolbar("Density", "component", DENSITIES),
-    locale: toolbar("Locale", "globe", SUPPORTED_LOCALES),
+    // "longest": every string in its longest translation, as `pnpm test:fit` renders it.
+    locale: toolbar("Locale", "globe", [...SUPPORTED_LOCALES, LONGEST]),
   },
   initialGlobals: {
     // `pnpm test-storybook` runs every story in light and again in dark.
