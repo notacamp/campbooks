@@ -233,9 +233,11 @@ impl Envelope {
     pub fn decision_state(&self) -> DecisionState {
         let mut out = super::inbox::preamble(self);
         let _ = writeln!(out, "From: {}", party(&self.from));
-        let to: Vec<String> = self.to.iter().chain(&self.cc).map(party).collect();
-        if !to.is_empty() {
-            let _ = writeln!(out, "To: {}", to.join(", "));
+        for (label, parties) in [("To", &self.to), ("Cc", &self.cc)] {
+            if !parties.is_empty() {
+                let list: Vec<String> = parties.iter().map(party).collect();
+                let _ = writeln!(out, "{label}: {}", list.join(", "));
+            }
         }
         let _ = writeln!(out, "Subject: {}", self.subject);
         for name in STATE_HEADERS {
