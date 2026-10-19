@@ -111,7 +111,10 @@ pub async fn record(
             }
         }
     }
-    let batch = json!({ "version": BATCH_VERSION, "inbox": inbox, "changes": changes });
+    let mut batch = json!({ "version": BATCH_VERSION, "inbox": inbox, "changes": changes });
+    if let Some(backfill) = recorded.get("backfill") {
+        batch["backfill"] = backfill.clone();
+    }
     serde_json::from_value(batch).map_err(|e| bad(&crate::domain::redact::json(&e)))
 }
 

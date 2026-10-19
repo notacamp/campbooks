@@ -805,6 +805,9 @@ struct Mailbox {
     profile_unavailable_next: u32,
     /// How long the token endpoint takes to answer a refresh.
     slow_refresh: Option<std::time::Duration>,
+    /// User labels made since the start (`labels.create`, or by the
+    /// member): (id, name).
+    user_labels: Vec<(String, String)>,
 }
 
 /// What goes wrong with a send.
@@ -965,6 +968,23 @@ impl FakeGoogle {
     /// The next `getProfile` answers 503.
     pub fn profile_unavailable_next(&self) {
         self.lock().profile_unavailable_next = 1;
+    }
+
+    /// A member makes the user label `name` in Gmail; its id.
+    pub fn add_label(&self, name: &str) -> String {
+        let mut mailbox = self.lock();
+        let id = format!("Label_{}", 100 + mailbox.user_labels.len());
+        mailbox.user_labels.push((id.clone(), name.to_owned()));
+        id
+    }
+
+    /// The id of the user label named `name`, if Gmail has one.
+    pub fn label_named(&self, name: &str) -> Option<String> {
+        self.lock()
+            .user_labels
+            .iter()
+            .find(|(_, n)| n == name)
+            .map(|(id, _)| id.clone())
     }
 
     /// Gmail refuses every change to message `id` (400).
@@ -1259,25 +1279,37 @@ fn has_message_id(raw: &[u8], id: &str) -> bool {
         .contains(&needle)
 }
 
+/// `labels.list`: Gmail's system labels and the user labels.
+fn labels_list(mailbox: &Mailbox) -> ResponseTemplate {
+    let mut labels = vec![
+        serde_json::json!({"id": "INBOX", "name": "INBOX", "type": "system"}),
+        serde_json::json!({"id": "UNREAD", "name": "UNREAD", "type": "system"}),
+        serde_json::json!({"id": "STARRED", "name": "STARRED", "type": "system"}),
+        serde_json::json!({"id": "SENT", "name": "SENT", "type": "system"}),
+        serde_json::json!({"id": "CATEGORY_PERSONAL", "name": "CATEGORY_PERSONAL", "type": "system"}),
+        serde_json::json!({"id": "CATEGORY_UPDATES", "name": "CATEGORY_UPDATES", "type": "system"}),
+        serde_json::json!({"id": "CATEGORY_PROMOTIONS", "name": "CATEGORY_PROMOTIONS", "type": "system"}),
+        serde_json::json!({"id": "CATEGORY_SOCIAL", "name": "CATEGORY_SOCIAL", "type": "system"}),
+        serde_json::json!({"id": "CATEGORY_FORUMS", "name": "CATEGORY_FORUMS", "type": "system"}),
+        serde_json::json!({"id": "Label_7", "name": "Clients", "type": "user"}),
+        serde_json::json!({"id": "Label_9", "name": "Receipts", "type": "user"}),
+    ];
+    labels.extend(
+        mailbox
+            .user_labels
+            .iter()
+            .map(|(id, name)| serde_json::json!({"id": id, "name": name, "type": "user"})),
+    );
+    json(200, &serde_json::json!({ "labels": labels }))
+}
+
 fn gmail_api(mailbox: &Mailbox, path: &str, query: &HashMap<String, String>) -> ResponseTemplate {
     match path {
         "profile" => json(
             200,
             &serde_json::json!({"emailAddress": ACCOUNT_EMAIL, "historyId": mailbox.history_id.to_string()}),
         ),
-        "labels" => json(
-            200,
-            &serde_json::json!({"labels": [
-                {"id": "INBOX", "name": "INBOX", "type": "system"},
-                {"id": "UNREAD", "name": "UNREAD", "type": "system"},
-                {"id": "STARRED", "name": "STARRED", "type": "system"},
-                {"id": "SENT", "name": "SENT", "type": "system"},
-                {"id": "CATEGORY_UPDATES", "name": "CATEGORY_UPDATES", "type": "system"},
-                {"id": "CATEGORY_PROMOTIONS", "name": "CATEGORY_PROMOTIONS", "type": "system"},
-                {"id": "Label_7", "name": "Clients", "type": "user"},
-                {"id": "Label_9", "name": "Receipts", "type": "user"}
-            ]}),
-        ),
+        "labels" => labels_list(mailbox),
         "messages" => {
             let after = query
                 .get("q")
@@ -1416,6 +1448,27 @@ fn gmail_write(mailbox: &mut Mailbox, path: &str, body: &serde_json::Value) -> R
             &serde_json::json!({"error": {"code": 400, "errors": [{"reason": "failedPrecondition"}]}}),
         )
     };
+    if path == "labels" {
+        // `labels.create`: a name Gmail has already is refused (409).
+        let name = body["name"].as_str().unwrap_or_default().to_owned();
+        let taken = ["Clients", "Receipts"].contains(&name.as_str())
+            || mailbox
+                .user_labels
+                .iter()
+                .any(|(_, n)| n.eq_ignore_ascii_case(&name));
+        if name.is_empty() || taken {
+            return json(
+                409,
+                &serde_json::json!({"error": {"code": 409, "status": "ALREADY_EXISTS"}}),
+            );
+        }
+        let id = format!("Label_{}", 100 + mailbox.user_labels.len());
+        mailbox.user_labels.push((id.clone(), name.clone()));
+        return json(
+            200,
+            &serde_json::json!({"id": id, "name": name, "type": "user"}),
+        );
+    }
     let add = strings(body, "addLabelIds");
     let remove = strings(body, "removeLabelIds");
     if path == "messages/batchModify" {

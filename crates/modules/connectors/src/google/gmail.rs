@@ -273,6 +273,18 @@ impl<'a> Gmail<'a> {
         Ok(labels.labels)
     }
 
+    /// `users.labels.create`: a user label named `name`, shown in the label
+    /// list and on messages. Returns it.
+    pub async fn create_label(&self, name: &str) -> Result<LabelInfo, ProviderError> {
+        let body = serde_json::json!({
+            "name": name,
+            "labelListVisibility": "labelShow",
+            "messageListVisibility": "show",
+        });
+        let response = self.post("users/me/labels", &body).await?;
+        json(response).await
+    }
+
     /// One page of `users.messages.list` for `query`, spam and trash
     /// included.
     pub async fn list(

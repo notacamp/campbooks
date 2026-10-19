@@ -131,6 +131,25 @@ pub struct Listed {
     pub sent_time: Option<i64>,
 }
 
+/// One of the account's labels (`GET accounts/{a}/labels`).
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ZohoLabel {
+    /// Its id.
+    #[serde(deserialize_with = "id")]
+    pub label_id: String,
+    /// Its name.
+    #[serde(default)]
+    pub display_name: String,
+}
+
+impl ZohoLabel {
+    /// Its name, decoded.
+    pub fn name(&self) -> String {
+        html::unescape(&self.display_name).trim().to_owned()
+    }
+}
+
 impl Listed {
     /// Whether it has been read.
     pub fn read(&self) -> bool {
@@ -299,6 +318,27 @@ impl<'a> ZohoMail<'a> {
         self.call(self.request(reqwest::Method::GET, url)).await
     }
 
+    /// Up to `limit` (≤ 200) messages carrying label `label`, from position
+    /// `start` (1-based), newest first, in every folder, archived and sent
+    /// mail included (`labelid`: Zoho's listing names no labels, so this is
+    /// how a message's labels are read).
+    pub async fn labelled(
+        &self,
+        label: &str,
+        start: u32,
+        limit: u32,
+    ) -> Result<Vec<Listed>, ProviderError> {
+        let mut url = self.url("messages/view")?;
+        url.query_pairs_mut()
+            .append_pair("labelid", label)
+            .append_pair("start", &start.to_string())
+            .append_pair("limit", &limit.min(200).to_string())
+            .append_pair("sortorder", "false")
+            .append_pair("includearchive", "true")
+            .append_pair("includesent", "true");
+        self.call(self.request(reqwest::Method::GET, url)).await
+    }
+
     /// Message `message` of folder `folder` (where it is, read, flag).
     pub async fn details(&self, folder: &str, message: &str) -> Result<Listed, ProviderError> {
         let url = self.url(&format!("folders/{folder}/messages/{message}/details"))?;
@@ -344,6 +384,20 @@ impl<'a> ZohoMail<'a> {
             return Ok(OriginalFetch::TooLarge);
         }
         Ok(OriginalFetch::Message { raw, fetched_bytes })
+    }
+
+    /// The account's labels (`GET labels`, scope `ZohoMail.tags`).
+    pub async fn labels(&self) -> Result<Vec<ZohoLabel>, ProviderError> {
+        let url = self.url("labels")?;
+        self.call(self.request(reqwest::Method::GET, url)).await
+    }
+
+    /// A new label named `name` (`POST labels`, scope `ZohoMail.tags`).
+    pub async fn create_label(&self, name: &str) -> Result<ZohoLabel, ProviderError> {
+        let url = self.url("labels")?;
+        let body = serde_json::json!({ "displayName": name });
+        self.call(self.request(reqwest::Method::POST, url).json(&body))
+            .await
     }
 
     /// `PUT updatemessage` with `mode` for `messages`, plus `extra` fields.
@@ -547,6 +601,17 @@ mod tests {
             id_value("1711540357880100000"),
             serde_json::json!(1_711_540_357_880_100_000_u64)
         );
+    }
+
+    #[test]
+    fn labels_read_as_zoho_writes_them() {
+        let labels: Vec<ZohoLabel> = serde_json::from_value(serde_json::json!([
+            {"sequence": 1, "labelId": "9000000014002", "color": "#96ccf5",
+             "tagId": "9000000014002", "displayName": "Campbooks/Receipts", "URI": "x"}
+        ]))
+        .unwrap();
+        assert_eq!(labels[0].label_id, "9000000014002");
+        assert_eq!(labels[0].name(), "Campbooks/Receipts");
     }
 
     #[test]

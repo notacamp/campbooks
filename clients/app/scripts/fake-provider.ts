@@ -25,7 +25,8 @@
 // message into every mailbox, to show mail arriving live (`?reply=q4`: an
 // answer in the Q4 thread instead), and
 // `GET /fake/mailbox` lists what each holds (subjects and state), to show
-// write-backs landing. `POST /fake/expire` withdraws every grant so far, to
+// write-backs landing; `POST /fake/relabel` changes a Gmail message's labels as
+// the member would in Gmail itself. `POST /fake/expire` withdraws every grant so far, to
 // show a mailbox that needs reconnecting. `--html-mail` adds the sanitiser's
 // fixture emails (newsletter, receipt, Outlook, Gmail, wide layouts and a
 // hostile one) to the Gmail mailbox, for showing the reader. `--stale-asks`
@@ -45,6 +46,7 @@ import {
   describeMailbox,
   handleGmail,
   htmlMailDemos,
+  relabelDemo,
   sendMessage,
   staleAskDemos,
   type Mailbox,
@@ -233,6 +235,7 @@ function consentPage(query: URLSearchParams): string {
     "ZohoMail.accounts.READ": "See your mail accounts",
     "ZohoMail.folders.READ": "See your folders",
     "ZohoMail.messages.ALL": "Read, send and organise your mail",
+    "ZohoMail.tags.ALL": "See, create and apply your labels",
   };
   const items = scopes.map((s) => `<li>${escape(wording[s] ?? s)}</li>`).join("");
   const allow = new URLSearchParams(query);
@@ -423,6 +426,23 @@ const server = createServer((request, response) => {
       if (url.pathname === "/fake/mailbox" && request.method === "GET") {
         // What the demo mailboxes hold (subjects and labels), for recordings.
         json(response, 200, { mailboxes: [...mailboxes.values()].map(describeMailbox) });
+        return;
+      }
+      if (url.pathname === "/fake/relabel" && request.method === "POST") {
+        // `{subject, add, remove}`: label names, as the member moves a
+        // message between tabs or labels it in Gmail itself.
+        let text = "";
+        for await (const chunk of request) text += String(chunk);
+        const body = (text === "" ? {} : JSON.parse(text)) as Record<string, unknown>;
+        const names = (value: unknown): string[] =>
+          Array.isArray(value)
+            ? value.filter((item): item is string => typeof item === "string")
+            : [];
+        const subject = typeof body["subject"] === "string" ? body["subject"] : "";
+        const relabelled = [...mailboxes.values()].map((mailbox) =>
+          relabelDemo(mailbox, subject, names(body["add"]), names(body["remove"])),
+        );
+        json(response, 200, { relabelled });
         return;
       }
       if (url.pathname === "/fake/deliver" && request.method === "POST") {
