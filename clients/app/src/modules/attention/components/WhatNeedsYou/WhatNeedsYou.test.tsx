@@ -249,7 +249,7 @@ describe("What needs you", () => {
     expect(age?.getAttribute("dateTime")).toBe(new Date(MARTA.last_message_at).toISOString());
     expect(age?.getAttribute("title")).toMatch(/2026/u);
     // Every row says it, not only the dated ones.
-    const rows = [...document.querySelectorAll("button[aria-expanded]")];
+    const rows = [...document.querySelectorAll("button[id^='attention-']")];
     expect(rows).toHaveLength(NEEDS.length);
     expect(rows.every((r) => r.querySelector("time") !== null)).toBe(true);
   });
