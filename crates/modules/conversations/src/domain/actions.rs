@@ -319,8 +319,10 @@ mod tests {
             rule: None,
             due_on: None,
             overdue: false,
+            lapses_at: None,
             urgent: false,
             message_id: MessageId::new(),
+            sent_at: None,
             quote: None,
             actions: None,
         };
@@ -331,18 +333,21 @@ mod tests {
             .keys()
             .map(String::as_str)
             .collect();
-        // The fields every need had before the catalogue, and no other.
+        // The fields every need had before the catalogue (and the dates of
+        // campbooks-cloud#275), and no other.
         assert_eq!(
             keys,
             [
                 "basis",
                 "due_on",
+                "lapses_at",
                 "message_id",
                 "overdue",
                 "question",
                 "quote",
                 "reason",
                 "rule",
+                "sent_at",
                 "trust",
                 "urgent"
             ]

@@ -302,6 +302,8 @@
       "checkReply": "{{name}} precisa de resposta?",
       "checkDo": "{{name}} pediu-lhe para fazer algo?",
       "checkPay": "{{name}} enviou uma fatura. Já está paga?",
+      "stillDo": "{{name}} pediu {{ago}}. Ainda por fazer?",
+      "stillReply": "{{name}} escreveu {{ago}}. Ainda precisa de resposta?",
       "taughtReply": "{{name}}: responder, por uma regra",
       "taughtDo": "{{name}}: a fazer, por uma regra",
       "worthALook": "Pediu para ver os emails de {{name}}"
@@ -313,6 +315,7 @@
       "review": "Rever",
       "suspicious": "Parece suspeito",
       "check": "Confirmar",
+      "expired": "Expirado",
       "worth_a_look": "Vale a pena ver"
     },
     "due": {
@@ -362,6 +365,7 @@
     "toast": {
       "done": "Feito · {{name}}",
       "notNeeded": "Não é preciso · {{name}}. O Campbooks vai aprender com isto",
+      "noLongerNeeded": "Já não é preciso · {{name}}",
       "safe": "Marcado como seguro · {{name}}. O Campbooks vai aprender com isto",
       "confirmed": "Obrigado · {{name}} fica na sua lista",
       "failed": "Não foi possível alterar {{name}}: nada mudou. Tente de novo.",

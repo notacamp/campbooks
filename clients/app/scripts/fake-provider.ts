@@ -28,7 +28,9 @@
 // write-backs landing. `POST /fake/expire` withdraws every grant so far, to
 // show a mailbox that needs reconnecting. `--html-mail` adds the sanitiser's
 // fixture emails (newsletter, receipt, Outlook, Gmail, wide layouts and a
-// hostile one) to the Gmail mailbox, for showing the reader.
+// hostile one) to the Gmail mailbox, for showing the reader. `--stale-asks`
+// adds a sign-in link valid for ten minutes and a request about to leave the
+// needs window (campbooks-cloud#275).
 import { createHash, generateKeyPairSync, randomBytes, sign } from "node:crypto";
 import { readdirSync, readFileSync } from "node:fs";
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
@@ -44,6 +46,7 @@ import {
   handleGmail,
   htmlMailDemos,
   sendMessage,
+  staleAskDemos,
   type Mailbox,
   writeGmail,
 } from "./fake-gmail.ts";
@@ -65,6 +68,8 @@ const { values } = parseArgs({
     lookalikes: { type: "string", default: "0" },
     // The sanitiser's fixture emails, for showing the reader.
     "html-mail": { type: "boolean", default: false },
+    // Asks that lapse or go stale (campbooks-cloud#275).
+    "stale-asks": { type: "boolean", default: false },
   },
 });
 
@@ -163,12 +168,10 @@ function zohoMailboxOf(sub: string): ZohoMailbox {
 function mailboxOf(sub: string): Mailbox {
   let mailbox = mailboxes.get(sub);
   if (mailbox === undefined) {
-    mailbox = createMailbox(
-      person.email,
-      `${base}/images`,
-      Number(values.lookalikes),
-      htmlMailDemos(person.email, `${base}/images`, htmlFixtures()),
-    );
+    mailbox = createMailbox(person.email, `${base}/images`, Number(values.lookalikes), [
+      ...htmlMailDemos(person.email, `${base}/images`, htmlFixtures()),
+      ...(values["stale-asks"] ? staleAskDemos(person.email) : []),
+    ]);
     mailboxes.set(sub, mailbox);
   }
   return mailbox;

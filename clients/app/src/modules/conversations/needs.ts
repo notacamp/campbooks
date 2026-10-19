@@ -19,6 +19,34 @@ export function billKind(need: NeedView): "ask" | "toPay" | undefined {
   return need.trust === "check" ? "ask" : "toPay";
 }
 
+/**
+ * "Still needed?": an old ask with no date of its own, asked again because
+ * time passed (campbooks-cloud#275). Its answers teach Campbooks nothing.
+ */
+export function isStillNeeded(need: NeedView): boolean {
+  return need.question === "still_to_do" || need.question === "still_needs_reply";
+}
+
+/**
+ * How long ago `iso` was, in the user's words: "3 weeks ago", "há 3
+ * semanas". Days under two weeks, weeks under two months, then months and
+ * years.
+ */
+function agoLabel(iso: string, locale: string, now: Date = new Date()): string {
+  const days = Math.max(0, Math.floor((now.getTime() - new Date(iso).getTime()) / DAY_MS));
+  const words = new Intl.RelativeTimeFormat(locale, { numeric: "auto" });
+  if (days < 14) {
+    return words.format(-days, "day");
+  }
+  if (days < 60) {
+    return words.format(-Math.floor(days / 7), "week");
+  }
+  if (days < 365) {
+    return words.format(-Math.floor(days / 30), "month");
+  }
+  return words.format(-Math.floor(days / 365), "year");
+}
+
 /** Who a need is from: the sender's name; for a warning, their address (a name is free to fake). */
 export function needSender(need: NeedView, conversation: ConversationSummary): string {
   const from = need.quote?.from ?? conversation.latest_from ?? null;
@@ -28,8 +56,17 @@ export function needSender(need: NeedView, conversation: ConversationSummary): s
   return displayName(from);
 }
 
-/** The need's sentence, chosen by reason and by the rule that decided it. */
-export function needSentence(t: Translate, need: NeedView, name: string): string {
+/**
+ * The need's sentence, chosen by reason and by the rule that decided it. An
+ * old ask asked again says how long ago it came, in `when.locale` as of
+ * `when.now`.
+ */
+export function needSentence(
+  t: Translate,
+  need: NeedView,
+  name: string,
+  when?: { locale: string; now?: Date | undefined },
+): string {
   if (need.question === "suspicious") {
     return t("needs.line.warning");
   }
@@ -43,9 +80,15 @@ export function needSentence(t: Translate, need: NeedView, name: string): string
       // (Already paid / Still to pay).
       return t("needs.line.checkPay", { name });
     }
-    return t(need.question === "asks_action" ? "needs.line.checkDo" : "needs.line.checkReply", {
-      name,
-    });
+    const doing = need.question === "asks_action" || need.question === "still_to_do";
+    const sent = need.sent_at;
+    if (isStillNeeded(need) && sent !== null && sent !== undefined && when !== undefined) {
+      return t(doing ? "needs.line.stillDo" : "needs.line.stillReply", {
+        name,
+        ago: agoLabel(sent, when.locale, when.now),
+      });
+    }
+    return t(doing ? "needs.line.checkDo" : "needs.line.checkReply", { name });
   }
   // A rule a member taught raised it: say so, never that the sender asked.
   if (need.basis === "taught") {

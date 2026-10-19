@@ -47,3 +47,4 @@ pub mod summarize_need;
 pub mod suspended_authors;
 pub mod trash;
 pub mod update_draft;
+pub mod wake_needs;
