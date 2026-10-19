@@ -158,6 +158,12 @@ suspicious, however alarming. A suspicious message is labelled with the
   surgery's secretary confirming an appointment the recipient asked for) is
   `primary`.
 - A question waiting for an answer is urgency 1 even without a date.
+- The recipient only copied (their address is in `cc`, not in `to`) is being
+  kept informed: `needs_reply` is false, and so is `asks_action` unless the
+  message asks something of them. If it asks them something directly, by
+  name or by role ("Daniel, can you confirm the figures?"), that ask is
+  theirs and the labels follow it as for any other message. A question put to
+  the people in `to` is not theirs.
 
 ## Agreement (v1)
 

@@ -202,7 +202,7 @@ export const ThreadUnfolded: Story = {
   args: { path: `${PATH}/primary/${Q4.id}`, api: inbox() },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
-    await userEvent.click(await canvas.findByRole("button", { name: /Sam Rivera/u }));
+    await userEvent.click(await canvas.findByRole("button", { name: /^You\s*→ Maya Okafor/u }));
     await expect(await canvas.findByText(/Is the timeline fixed\?/u)).toBeVisible();
   },
 };

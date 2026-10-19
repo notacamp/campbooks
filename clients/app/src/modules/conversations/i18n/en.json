@@ -13,7 +13,8 @@
     "all": "All",
     "unread": "Unread",
     "more": "Show more",
-    "loadingMore": "Loading more conversations"
+    "loadingMore": "Loading more conversations",
+    "youPrefix": "You: {{snippet}}"
   },
   "empty": {
     "streamTitle": "Nothing in {{stream}}",
@@ -56,6 +57,14 @@
       "title": "Kept as history",
       "lead": "{{address}} was disconnected and its mail kept here, read-only: nothing new arrives, and nothing can be sent or changed from it."
     },
+    "you": "You",
+    "toName": "→ {{name}}",
+    "toNameOthers_one": "→ {{name}} and {{count}} other",
+    "toNameOthers_other": "→ {{name}} and {{count}} others",
+    "more_one": "{{count}} more message",
+    "more_other": "{{count}} more messages",
+    "showQuoted": "Show quoted text",
+    "hideQuoted": "Hide quoted text",
     "readingText": "Reading…",
     "textFailed": "Couldn’t read this email’s text."
   },

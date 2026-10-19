@@ -1,6 +1,13 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 
-import { Attachment, FoldedMessage, MessageCard, MetaLine } from "./Message";
+import {
+  Attachment,
+  FoldedMessage,
+  MessageCard,
+  MetaLine,
+  MoreMessages,
+  QuotedText,
+} from "./Message";
 
 const meta = {
   title: "Components/Message",
@@ -68,4 +75,72 @@ export const Folded: Story = {
       }}
     />
   ),
+};
+
+/** A message you sent: "You → <recipient>", set in from the left on the sunken surface. */
+export const Yours: Story = {
+  args: {
+    from: "You",
+    addressee: "→ Marta Silva",
+    side: "yours",
+    avatar: { initials: "SR" },
+    time: "Thu 17:40",
+    recipients: "To Marta Silva",
+    children: "Revised quote attached: €2,340 incl. VAT, two extra brackets included.",
+    attachment: "quote-0412.pdf",
+  },
+};
+
+/** Theirs and yours folded, as a thread shows them. */
+export const FoldedSides: Story = {
+  render: () => (
+    <div className="flex flex-col">
+      <FoldedMessage
+        from="You"
+        addressee="→ Marta Silva and 2 others"
+        side="yours"
+        avatar={{ initials: "SR" }}
+        time="Thu"
+        snippet="Revised quote attached: €2,340 incl. VAT, two extra brackets included."
+        onOpen={() => {
+          // Demo only.
+        }}
+      />
+      <FoldedMessage
+        from="Marta Silva"
+        side="theirs"
+        time="Tue"
+        snippet="Could you send the revised quote for the kitchen shelving?"
+        onOpen={() => {
+          // Demo only.
+        }}
+      />
+    </div>
+  ),
+};
+
+/** The middle of a long thread, folded into one line. */
+export const More: Story = {
+  render: () => (
+    <MoreMessages
+      label="2 more messages"
+      onOpen={() => {
+        // Demo only.
+      }}
+    />
+  ),
+};
+
+/** A plain-text reply with its quoted history folded under it. */
+export const WithQuotedText: Story = {
+  args: {
+    from: "Marta Silva",
+    time: "Fri 09:12",
+    children: "Perfect, approved. When can you start?\n\nOn Thu, Sam Rivera wrote:",
+    quoted: (
+      <QuotedText showLabel="Show quoted text" hideLabel="Hide quoted text">
+        {"> Revised quote attached: €2,340 incl. VAT.\n> Two extra brackets included."}
+      </QuotedText>
+    ),
+  },
 };

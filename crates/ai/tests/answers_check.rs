@@ -268,7 +268,7 @@ async fn a_model_that_gets_them_right_passes_and_its_answers_are_stamped() {
     let model = Model::new("decide", gateway.clone(), "test.check").checked();
     let decided = model.decide(&sample(), &triage_questions()).await.unwrap();
     for answer in decided.answers.iter().flatten() {
-        assert_eq!(answer.answer.model_version.as_deref(), Some("checked:ctx2"));
+        assert_eq!(answer.answer.model_version.as_deref(), Some("checked:ctx3"));
     }
 
     // An unchecked strategy (the eval harness) leaves the version alone.
