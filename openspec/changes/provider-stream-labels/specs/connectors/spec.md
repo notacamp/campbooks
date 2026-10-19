@@ -14,6 +14,12 @@ none for `CATEGORY_SOCIAL` or `CATEGORY_FORUMS`, otherwise `primary`; at
 Zoho `primary`; and none when it carries more than one mark. At Gmail, a
 category change on a message that keeps its mark SHALL win over the mark:
 the upsert carries the category's stream and `stream_mark_stale` true.
+Zoho's message listing names no labels, so the Zoho adapter SHALL read
+them through the listing's `labelid` filter: each run, the newest page for
+every stream mark; each sweep, every label's messages in the window, a
+message missing from a label's listing having lost it. Until a label has
+been read this way, the adapter SHALL not take its own index as the
+message's labels.
 
 #### Scenario: The mark is created on first use
 - **WHEN** a member moves a Gmail conversation to Receipts and the mailbox has no `Campbooks/Receipts` label
@@ -26,13 +32,6 @@ the upsert carries the category's stream and `stream_mark_stale` true.
 #### Scenario: A tab change on a marked message
 - **WHEN** a member drags a message carrying `Campbooks/Receipts` to Gmail's Promotions tab
 - **THEN** the next batch carries it with `provider_stream` `newsletters` and `stream_mark_stale` true
-
-Zoho's message listing names no labels, so the Zoho adapter SHALL read
-them through the listing's `labelid` filter: each run, the newest page for
-every stream mark; each sweep, every label's messages in the window, a
-message missing from a label's listing having lost it. Until a label has
-been read this way, the adapter SHALL not take its own index as the
-message's labels.
 
 #### Scenario: Zoho stream from a mark
 - **WHEN** a member adds `Campbooks/Newsletters` to a recent message in Zoho
