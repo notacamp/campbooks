@@ -1,5 +1,7 @@
 import type { Query, QueryClient } from "@tanstack/react-query";
 
+import { isTauri } from "~/lib/platform";
+
 import { recordReaders } from "./records.gen";
 import type { operations } from "./schema.gen";
 
@@ -148,6 +150,101 @@ function readsAny(query: Query, operationIds: ReadonlySet<string>): boolean {
   return typeof id === "string" && operationIds.has(id);
 }
 
+/**
+ * Whether a message body's remote images depend on the rules: a rule trusts
+ * its sender (`images_trusted`), keeps them back (`images_held`), or could
+ * (`images_offer`). The bodies a rule's change can change (campbooks-cloud#236).
+ */
+export function holdsImageState(data: unknown): boolean {
+  if (typeof data !== "object" || data === null) {
+    return false;
+  }
+  const body = data as { images_trusted?: unknown; images_held?: unknown; images_offer?: unknown };
+  return (
+    body.images_trusted === true ||
+    (body.images_held !== undefined && body.images_held !== null) ||
+    body.images_offer === true
+  );
+}
+
+/**
+ * Whether a message body's remote images show because a rule trusts its
+ * sender: the bodies a rule's change must drop, not merely mark stale
+ * (campbooks-cloud#236, {@link refreshBodiesAfterRules}).
+ */
+export function trustsImages(data: unknown): boolean {
+  return (
+    typeof data === "object" &&
+    data !== null &&
+    (data as { images_trusted?: unknown }).images_trusted === true
+  );
+}
+
+const RULE_RECORD = "conversations.rule";
+const BODY_READER = "conversations.get_message_body";
+
+/** Whether `query` reads a message body of `workspace`. */
+function readsBodyOf(query: Query, workspace: string): boolean {
+  return query.queryKey[0] === BODY_READER && keyParams(query)["workspace_id"] === workspace;
+}
+
+/**
+ * Drop the cached bodies of `workspace` that a rule trusted: each goes back
+ * to having no data, so no reader can show its HTML, remote images and all,
+ * from the cache before a fresh read says whether the rule still trusts the
+ * sender. An open one shows its skeleton while it is read again; any other
+ * is read when it is next opened. A first read still on its way is dropped
+ * too (resetting cancels it): it was asked before the change and may answer
+ * with a trust that is gone, and a plain re-read would only wait for it.
+ */
+function dropTrustedBodies(queryClient: QueryClient, workspace: string): Promise<void> {
+  return queryClient.resetQueries({
+    predicate: (query) =>
+      readsBodyOf(query, workspace) &&
+      (trustsImages(query.state.data) ||
+        (query.state.data === undefined && query.state.fetchStatus === "fetching")),
+  });
+}
+
+/**
+ * After rules changed, here or anywhere else (campbooks-cloud#236): the
+ * message bodies a rule trusted are dropped ({@link trustsImages}): marked
+ * stale only, a folded message or a conversation opened again would show
+ * the cached body, its remote images loading and telling a sender who is no
+ * longer trusted that the mail was opened, before the re-read answered. The
+ * other cached bodies `only` keeps are re-read in the background, showing
+ * what they showed meanwhile (their images held back, or none).
+ */
+export async function refreshBodiesAfterRules(
+  queryClient: QueryClient,
+  workspace: string,
+  only: (data: unknown) => boolean = () => true,
+): Promise<void> {
+  // Dropped first (synchronously), so the re-read below skips them.
+  const dropped = dropTrustedBodies(queryClient, workspace);
+  await Promise.all([
+    dropped,
+    queryClient.invalidateQueries({
+      predicate: (query) =>
+        readsBodyOf(query, workspace) && query.state.data !== undefined && only(query.state.data),
+    }),
+  ]);
+}
+
+/**
+ * Whether this client follows its workspaces' change feeds live: the web,
+ * through `EventSource`. The desktop and mobile shells (Tauri) have none yet,
+ * so what must follow other devices is read again when shown, on a timer or
+ * on focus there (a message body: `body-freshness.ts` in conversations).
+ *
+ * TODO(native change source): a Tauri change source (`ChangeSource` over the
+ * shell's own streaming HTTP client, with the session's token) so desktop and
+ * mobile follow changes live too; then drop the timers keyed on this.
+ */
+export function followsChangesLive(): boolean {
+  return !isTauri() && typeof EventSource !== "undefined";
+}
+
 /** How long changes are gathered before the cache is touched. */
 const BATCH_MS = 50;
 
@@ -164,7 +261,21 @@ export function createCacheBinding(queryClient: QueryClient, workspace: string) 
 
   const flush = () => {
     timer = undefined;
-    const readers = new Set([...pending].flatMap((type) => recordReaders[type] ?? []));
+    // Every reader of a changed type, except the message bodies on a rule's
+    // change: those are dropped or re-read by what their images depend on
+    // (`refreshBodiesAfterRules`); a message's own change still re-reads
+    // every body of it.
+    const readers = new Set<string>();
+    let rules = false;
+    for (const type of pending) {
+      for (const operation of recordReaders[type] ?? []) {
+        if (type === RULE_RECORD && operation === BODY_READER) {
+          rules = true;
+        } else {
+          readers.add(operation);
+        }
+      }
+    }
     const gone = deleted;
     pending = new Set();
     deleted = [];
@@ -176,6 +287,9 @@ export function createCacheBinding(queryClient: QueryClient, workspace: string) 
           inWorkspace(query, workspace) &&
           Object.values(keyParams(query)).includes(record.id),
       });
+    }
+    if (rules) {
+      void refreshBodiesAfterRules(queryClient, workspace, holdsImageState);
     }
     if (readers.size > 0) {
       void queryClient.invalidateQueries({
@@ -193,6 +307,8 @@ export function createCacheBinding(queryClient: QueryClient, workspace: string) 
       timer ??= setTimeout(flush, BATCH_MS);
     },
     reset() {
+      // Anything may have changed since, rules too: no trusted body is kept.
+      void dropTrustedBodies(queryClient, workspace);
       void queryClient.invalidateQueries({
         predicate: (query) => keyParams(query)["workspace_id"] === workspace,
       });
