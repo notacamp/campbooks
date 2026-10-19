@@ -186,8 +186,19 @@ pub fn check_authorize_calls(
             continue;
         }
         let declaration = format!("operation_id = \"{id}\"");
+        // A comment quoting a declaration (the kernel's docs show one) is
+        // not one: which file is read first must not decide the check.
+        let declares = |text: &str| text.contains(&declaration) || declares_by_macro(text, id);
         let declaring = sources.iter().find(|(path, text)| {
-            !is_test_file(path) && (text.contains(&declaration) || declares_by_macro(text, id))
+            if is_test_file(path) || !declares(text) {
+                return false;
+            }
+            let uncommented: String = text
+                .lines()
+                .filter(|line| !line.trim_start().starts_with("//"))
+                .flat_map(|line| [line, "\n"])
+                .collect();
+            declares(&uncommented)
         });
         let Some((path, text)) = declaring else {
             violations.push(format!(
@@ -1158,6 +1169,15 @@ mod tests {
             check_authorize_calls(&s, &c, &src(&in_tests), &file).len(),
             1
         );
+        // A file whose docs quote the declaration is not its handler,
+        // whichever is read first.
+        let quoted = (
+            "crates/kernel/src/operations.rs".to_owned(),
+            "//! ```\n//!     operation_id = \"mail.list\",\n//! ```\n".to_owned(),
+        );
+        let real = ("crates/modules/mail/src/list.rs".to_owned(), asking.clone());
+        assert!(check_authorize_calls(&s, &c, &[quoted.clone(), real.clone()], &file).is_empty());
+        assert!(check_authorize_calls(&s, &c, &[real, quoted], &file).is_empty());
         let helper = format!("{declared}fn h() {{ lock_thread(&state); }}\n");
         let with_helper = AccessFile {
             helpers: vec![Helper {
