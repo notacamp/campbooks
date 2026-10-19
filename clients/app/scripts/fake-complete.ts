@@ -11,11 +11,14 @@
 //   CAMPBOOKS_AI__COMPLETE__MODEL=fake-complete … cargo run -p campbooks-server -- all
 //
 // It reads only the request's schema name and the JSON the server sends (the
-// other person's name, the intent, `shorter`, `change`; a summary's sender,
-// subject and sent time), never the mail's words, and keeps nothing. Any other
-// request gets 404. A summary's dates (campbooks-cloud#275) are null, except
-// for the demo mailbox's sign-in link (`SIGN_IN_SUBJECT`), which lapses ten
-// minutes after it was sent, as a real model would read it.
+// other person's name, the intent, the suggestions shown, `shorter`,
+// `change`; a summary's sender, subject and sent time), never the mail's
+// words, and keeps nothing. Any other request gets 404. A summary's dates
+// (campbooks-cloud#275) are null, except for the demo mailbox's sign-in link
+// (`SIGN_IN_SUBJECT`), which lapses ten minutes after it was sent, as a real
+// model would read it. A written reply has no schema (it is plain text);
+// asked with `stream: true` it streams like a reasoning model
+// (campbooks-cloud#288): a few lines of thinking, then the reply word by word.
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { parseArgs } from "node:util";
 
@@ -34,6 +37,7 @@ interface ReplyInput {
   draft?: string;
   change?: string;
   shorter?: boolean;
+  suggestions?: { number: number; says: string }[];
 }
 
 /** A nudge to the person a conversation waits on (campbooks-cloud#293). */
@@ -89,6 +93,7 @@ function summary(input: SummaryInput): Record<string, string | null> {
 interface ChatRequest {
   messages?: { role: string; content: string }[];
   response_format?: { json_schema?: { name?: string } };
+  stream?: boolean;
 }
 
 function firstName(input: ReplyInput): string {
@@ -102,17 +107,26 @@ function sentence(intent: string): string {
   return /[.!?]$/u.test(text) ? text : `${text}.`;
 }
 
+/** What the intent asks for: the suggestions it names by number, joined, or the intent. */
+function asked(input: ReplyInput): string {
+  const intent = input.intent ?? "Thanks";
+  const numbers = new Set((intent.match(/\d/gu) ?? []).map(Number));
+  const picked = (input.suggestions ?? []).filter((s) => numbers.has(s.number));
+  return picked.length === 0 ? intent : picked.map((s) => s.says).join(", and ");
+}
+
 function reply(input: ReplyInput): string {
   const name = firstName(input);
+  const intent = asked(input);
   const signature = input.my_name ?? "";
   const sign = signature === "" ? "" : `\n\n${signature}`;
   if (input.draft !== undefined && input.shorter === true) {
-    return `Hi ${name},\n\n${sentence(input.intent ?? "Thanks")}${sign}`;
+    return `Hi ${name},\n\n${sentence(intent)}${sign}`;
   }
   if (input.draft !== undefined && input.change !== undefined) {
-    return `Hi ${name},\n\nThank you so much for this. ${sentence(input.intent ?? "Thanks")} (${input.change})\n\nBest,${sign}`;
+    return `Hi ${name},\n\nThank you so much for this. ${sentence(intent)} (${input.change})\n\nBest,${sign}`;
   }
-  return `Hi ${name},\n\nThanks for your message. ${sentence(input.intent ?? "Thanks")} Let me know if anything changes.\n\nBest,${sign}`;
+  return `Hi ${name},\n\nThanks for your message. ${sentence(intent)} Let me know if anything changes.\n\nBest,${sign}`;
 }
 
 function nudge(input: NudgeInput): string {
@@ -129,29 +143,76 @@ function nudge(input: NudgeInput): string {
   return `Hi ${name},\n\nJust following up on the note below: could you send it when you have a moment?\n\nThanks,${sign}`;
 }
 
-function answer(request: ChatRequest): unknown {
+/** The answer's content: likely replies and summaries as JSON, a written reply as text. */
+function answer(request: ChatRequest): string | undefined {
   const schema = request.response_format?.json_schema?.name;
   const content = request.messages?.find((m) => m.role === "user")?.content ?? "{}";
   const input = JSON.parse(content) as ReplyInput;
   if (schema === "reply_intents") {
-    return {
+    return JSON.stringify({
       intents: [
         "Say yes, that works",
         "Ask to move it to the afternoon",
         "Say you'll confirm by tomorrow",
       ],
-    };
-  }
-  if (schema === "reply_draft") {
-    return { reply: reply(input) };
+    });
   }
   if (schema === "nudge_draft") {
-    return { reply: nudge(JSON.parse(content) as NudgeInput) };
+    return JSON.stringify({ reply: nudge(JSON.parse(content) as NudgeInput) });
   }
   if (schema === "need_summary") {
-    return summary((JSON.parse(content) as { email?: SummaryInput }).email ?? {});
+    return JSON.stringify(summary((JSON.parse(content) as { email?: SummaryInput }).email ?? {}));
+  }
+  if (schema === undefined && input.intent !== undefined) {
+    return reply(input);
   }
   return undefined;
+}
+
+/** What the fake model "thinks" before a reply: fictional, from the request's own fields. */
+function thinking(input: ReplyInput): string[] {
+  return [
+    `${firstName(input)} is waiting for an answer. `,
+    "The account holder wants to ",
+    `${asked(input).toLowerCase()}. `,
+    "Match how they usually write: ",
+    "short, warm, first names. ",
+    "Say only what was asked, ",
+    "no dates or amounts beyond the conversation. ",
+    "Sign with their name.",
+  ];
+}
+
+/** Stream `text` as a reasoning model would: thinking, then the words, then the usage. */
+function stream(response: ServerResponse, input: ReplyInput, text: string): void {
+  response.writeHead(200, { "content-type": "text/event-stream", "cache-control": "no-cache" });
+  const chunk = (delta: object, finish: string | null = null) =>
+    `data: ${JSON.stringify({ model: "fake-complete", choices: [{ delta, finish_reason: finish }] })}\n\n`;
+  const steps: string[] = [": OPENROUTER PROCESSING\n\n"];
+  for (const line of thinking(input)) {
+    steps.push(chunk({ reasoning: line }));
+  }
+  for (const word of text.split(/(?<=\s)/u)) {
+    steps.push(chunk({ content: word }));
+  }
+  steps.push(
+    chunk({}, "stop"),
+    `data: ${JSON.stringify({ choices: [], usage: { prompt_tokens: 0, completion_tokens: 0 } })}\n\n`,
+    "data: [DONE]\n\n",
+  );
+  let at = 0;
+  const next = () => {
+    const step = steps[at];
+    if (step === undefined) {
+      response.end();
+      return;
+    }
+    response.write(step);
+    at += 1;
+    // Thinking comes in slower than the words.
+    setTimeout(next, at <= thinking(input).length ? 260 : 40);
+  };
+  setTimeout(next, 500);
 }
 
 function send(response: ServerResponse, status: number, body: unknown): void {
@@ -174,13 +235,20 @@ const server = createServer((request: IncomingMessage, response: ServerResponse)
         send(response, 404, { error: "only Scout's reply and summary requests are answered" });
         return;
       }
+      if (body.stream === true) {
+        const input = JSON.parse(
+          body.messages?.find((m) => m.role === "user")?.content ?? "{}",
+        ) as ReplyInput;
+        stream(response, input, content);
+        return;
+      }
       // A moment, as a model would take.
       setTimeout(() => {
         send(response, 200, {
           model: "fake-complete",
           choices: [
             {
-              message: { role: "assistant", content: JSON.stringify(content) },
+              message: { role: "assistant", content },
               finish_reason: "stop",
             },
           ],

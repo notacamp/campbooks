@@ -22,5 +22,7 @@ it superseded. Disagree? Write a new ADR that supersedes the old one.
 | [0015](0015-instance-admin-profiles-and-admin-api.md) | Instance administration: admin profiles (CLI only) and a separate admin API | Accepted |
 | [0016](0016-search-in-postgres.md) | Search runs inside Postgres, as a projection that pulls through source ports | Accepted |
 | [0017](0017-resource-ownership-and-access.md) | Resource ownership and access: one catalogue, one central check, RLS underneath | Accepted |
+| [0018](0018-a-model-reads-email-content-facts-only-say-no.md) | A decision model reads email content; facts only say no | Accepted |
+| [0019](0019-scout-streams-its-drafts.md) | Scout streams its drafts: SSE over POST, plain-text replies, per-route deadlines | Accepted |
 
 Template: Context → Decision → Consequences → Alternatives considered.

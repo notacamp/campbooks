@@ -5,7 +5,11 @@
 
 use std::{collections::HashMap, time::Duration};
 
-use campbooks_ai::{AiConfig, ChatRequest, Error, Gateway, Message, ProviderConfig, Role};
+use campbooks_ai::{
+    AiConfig, ChatEvent,
+    ChatEvent::{Done, Reasoning, Text},
+    ChatRequest, Error, Gateway, Message, ProviderConfig, Role,
+};
 use serde::Deserialize;
 use serde_json::json;
 use wiremock::{
@@ -254,5 +258,157 @@ async fn chat_and_embed_never_follow_a_redirect_off_the_box() {
     assert!(
         elsewhere.received_requests().await.unwrap().is_empty(),
         "the mail went to the redirect target"
+    );
+}
+
+// --- streamed chat (campbooks-cloud#288) -----------------------------------
+
+const STREAM: &str = "\
+data: {\"model\":\"m-1\",\"choices\":[{\"delta\":{\"reasoning\":\"Thinking.\"}}]}\n\n\
+data: {\"choices\":[{\"delta\":{\"content\":\"Hi\"}}]}\n\n\
+data: {\"choices\":[{\"delta\":{\"content\":\" Maya.\"},\"finish_reason\":\"stop\"}]}\n\n\
+data: {\"choices\":[],\"usage\":{\"prompt_tokens\":12,\"completion_tokens\":5}}\n\n\
+data: [DONE]\n\n";
+
+async fn stream_server(body: &str) -> MockServer {
+    let server = MockServer::start().await;
+    Mock::given(method("POST"))
+        .and(path("/v1/chat/completions"))
+        .respond_with(ResponseTemplate::new(200).set_body_raw(body.to_owned(), "text/event-stream"))
+        .mount(&server)
+        .await;
+    server
+}
+
+async fn all(gw: &Gateway, request: ChatRequest) -> Result<Vec<Result<ChatEvent, Error>>, Error> {
+    use futures_util::StreamExt as _;
+    Ok(gw
+        .chat_stream(Role::Complete, request)
+        .await?
+        .collect()
+        .await)
+}
+
+#[tokio::test]
+async fn chat_stream_yields_reasoning_text_and_usage() {
+    let server = stream_server(STREAM).await;
+    let gw = gateway([(Role::Complete, provider(&server, "m", None))]);
+    let events = all(&gw, ChatRequest::new(vec![Message::user("hi")]))
+        .await
+        .unwrap();
+    let events: Vec<ChatEvent> = events.into_iter().map(Result::unwrap).collect();
+    assert_eq!(events[0], Reasoning("Thinking.".into()));
+    assert_eq!(events[1], Text("Hi".into()));
+    assert_eq!(events[2], Text(" Maya.".into()));
+    let Done(summary) = &events[3] else {
+        panic!("{:?}", events[3]);
+    };
+    assert_eq!(summary.model, "m-1");
+    assert_eq!(summary.finish_kind(), "stop");
+    assert_eq!(summary.usage.unwrap().prompt_tokens, 12);
+    assert!(summary.ttft.is_some());
+
+    let sent: serde_json::Value =
+        serde_json::from_slice(&server.received_requests().await.unwrap()[0].body).unwrap();
+    assert_eq!(sent["stream"], true);
+    assert_eq!(sent["stream_options"]["include_usage"], true);
+    assert!(sent.get("reasoning").is_none(), "no effort set, none sent");
+}
+
+#[tokio::test]
+async fn a_reasoning_effort_is_sent_when_set() {
+    let server = stream_server(STREAM).await;
+    let gw = gateway([(
+        Role::Complete,
+        provider(&server, "m", None).with_reasoning_effort(campbooks_ai::ReasoningEffort::Low),
+    )]);
+    all(&gw, ChatRequest::new(vec![Message::user("hi")]))
+        .await
+        .unwrap();
+    // And on a plain chat call, which this server answers with a stream it
+    // cannot read: only the request matters here.
+    let _ = gw
+        .chat(Role::Complete, ChatRequest::new(vec![Message::user("hi")]))
+        .await;
+    for request in server.received_requests().await.unwrap() {
+        let sent: serde_json::Value = serde_json::from_slice(&request.body).unwrap();
+        assert_eq!(sent["reasoning"], json!({"effort": "low"}));
+    }
+}
+
+#[tokio::test]
+async fn a_refused_stream_fails_before_any_event_without_the_body() {
+    let server = MockServer::start().await;
+    Mock::given(method("POST"))
+        .respond_with(ResponseTemplate::new(500).set_body_string("Subject: Q4 plan"))
+        .mount(&server)
+        .await;
+    let gw = gateway([(Role::Complete, provider(&server, "m", None))]);
+    let err = gw
+        .chat_stream(Role::Complete, ChatRequest::new(vec![Message::user("hi")]))
+        .await
+        .unwrap_err();
+    assert!(matches!(err, Error::Status { status: 500 }), "{err:?}");
+    assert!(!err.to_string().contains("Q4 plan"));
+}
+
+#[tokio::test]
+async fn a_server_that_ignores_stream_is_read_whole() {
+    let server = MockServer::start().await;
+    Mock::given(method("POST"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+            "model": "m",
+            "choices": [{"message": {"role": "assistant", "content": "<think>Hm.</think>Hi Maya."},
+                         "finish_reason": "stop"}],
+            "usage": {"prompt_tokens": 3, "completion_tokens": 4}
+        })))
+        .mount(&server)
+        .await;
+    let gw = gateway([(Role::Complete, provider(&server, "m", None))]);
+    let events: Vec<_> = all(&gw, ChatRequest::new(vec![Message::user("hi")]))
+        .await
+        .unwrap()
+        .into_iter()
+        .map(Result::unwrap)
+        .collect();
+    assert_eq!(events[0], Reasoning("Hm.".into()));
+    assert_eq!(events[1], Text("Hi Maya.".into()));
+    assert!(matches!(&events[2], Done(s) if s.usage.unwrap().completion_tokens == 4));
+}
+
+#[tokio::test]
+async fn streaming_needs_the_openai_protocol() {
+    let server = stream_server(STREAM).await;
+    let gw = gateway([(
+        Role::Complete,
+        provider(&server, "m", None).with_protocol(campbooks_ai::Protocol::Laya),
+    )]);
+    let err = gw
+        .chat_stream(Role::Complete, ChatRequest::new(vec![Message::user("hi")]))
+        .await
+        .unwrap_err();
+    assert!(matches!(err, Error::Config(_)), "{err:?}");
+    assert!(server.received_requests().await.unwrap().is_empty());
+}
+
+#[tokio::test]
+async fn a_request_timeout_bounds_one_call() {
+    let server = MockServer::start().await;
+    Mock::given(method("POST"))
+        .respond_with(ResponseTemplate::new(200).set_delay(Duration::from_secs(5)))
+        .mount(&server)
+        .await;
+    let gw = gateway([(Role::Complete, provider(&server, "m", None))]);
+    let mut request = ChatRequest::new(vec![Message::user("hi")]);
+    request.timeout = Some(Duration::from_millis(200));
+    let err = gw.chat(Role::Complete, request.clone()).await;
+    assert!(
+        matches!(err, Err(Error::Transport(ref e)) if e.is_timeout()),
+        "{err:?}"
+    );
+    let err = gw.chat_stream(Role::Complete, request).await;
+    assert!(
+        matches!(err, Err(Error::Transport(ref e)) if e.is_timeout()),
+        "{err:?}"
     );
 }

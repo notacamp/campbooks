@@ -795,6 +795,37 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/w/{workspace_id}/conversations/{conversation_id}/reply/draft/stream": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Scout's reply for an intent, or your draft rewritten, as it is written.
+         * @description The same request as `conversations.write_reply`, answered as a
+         *     Server-Sent Events stream once every check passed (a refusal is an
+         *     ordinary problem answer). Events, each `data` a JSON object:
+         *     `thinking` (`{"delta"}`: Scout's reasoning as it arrives, when the model
+         *     shows it, at most 8,000 characters in all), `text` (`{"delta"}`: the
+         *     reply's words as they arrive, at most 4,000 characters), then exactly one
+         *     of `done` (a `ReplyText`: the whole reply, as `write_reply` answers it)
+         *     or `error` (a problem: `reply_failed` or `reply_timed_out`), after which
+         *     the stream ends. A comment every 10 seconds keeps the connection open.
+         *     The stream ends with `reply_timed_out` after 30 seconds without a sign
+         *     from the model or 2 minutes in all. Nothing is saved or sent, and an
+         *     `Idempotency-Key` does not make the answer replayable.
+         */
+        post: operations["conversations.stream_reply"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/w/{workspace_id}/conversations/{conversation_id}/reply/suggestions": {
         parameters: {
             query?: never;
@@ -5161,6 +5192,11 @@ export interface components {
             message_id?: components["schemas"]["MessageId"] | null;
             /** @description Make the draft shorter. */
             shorter?: boolean;
+            /**
+             * @description The likely replies shown, in order (at most 3, each at most 80
+             *     characters), so `intent` may pick or combine them ("1 and 3").
+             */
+            suggestions?: string[];
         };
     };
     responses: never;
@@ -7939,7 +7975,7 @@ export interface operations {
                     "application/json": components["schemas"]["ReplyText"];
                 };
             };
-            /** @description No intent, or an intent, change or draft too long (`reply_ask_invalid`). */
+            /** @description No intent, or an intent, change, draft or suggestion too long, or more than three suggestions (`reply_ask_invalid`). */
             400: {
                 headers: {
                     [name: string]: unknown;
@@ -7993,7 +8029,99 @@ export interface operations {
                     "application/problem+json": components["schemas"]["Problem"];
                 };
             };
-            /** @description The language model failed (`reply_failed`), or the workspace used its whole daily AI limit (`ai_daily_limit_reached`). */
+            /** @description The language model failed (`reply_failed`), took too long (`reply_timed_out`), or the workspace used its whole daily AI limit (`ai_daily_limit_reached`). */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "conversations.stream_reply": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The workspace. */
+                workspace_id: components["schemas"]["WorkspaceId"];
+                /** @description The conversation. */
+                conversation_id: components["schemas"]["ConversationId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WriteReply"];
+            };
+        };
+        responses: {
+            /** @description The reply as it is written: `thinking`, `text`, then `done` or `error`. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/event-stream": string;
+                };
+            };
+            /** @description No intent, or an intent, change, draft or suggestion too long, or more than three suggestions (`reply_ask_invalid`). */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No valid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Missing scope, or you may only read this inbox (`inbox_read_only`). */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No such conversation or message, or you cannot see it. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No language model may read mail here (`reply_unavailable`): write the reply yourself. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Too many replies asked for this hour. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description The language model failed (`reply_failed`), sent nothing in time (`reply_timed_out`), or the workspace used its whole daily AI limit (`ai_daily_limit_reached`). */
             503: {
                 headers: {
                     [name: string]: unknown;
@@ -8076,7 +8204,7 @@ export interface operations {
                     "application/problem+json": components["schemas"]["Problem"];
                 };
             };
-            /** @description The language model failed (`reply_failed`), or the workspace used its whole daily AI limit (`ai_daily_limit_reached`). */
+            /** @description The language model failed (`reply_failed`), took too long (`reply_timed_out`), or the workspace used its whole daily AI limit (`ai_daily_limit_reached`). */
             503: {
                 headers: {
                     [name: string]: unknown;

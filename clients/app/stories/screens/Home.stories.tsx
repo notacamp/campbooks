@@ -147,6 +147,11 @@ export const SnoozeDialog: Story = {
   },
 };
 
+/** One Server-Sent Events frame, as the API sends it. */
+function frame(event: string, data: unknown): string {
+  return `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
+}
+
 const REPLY_ROUTES: Record<string, MockRoute> = {
   [`POST ${W}/conversations/${MARTA.id}/reply/suggestions`]: {
     body: {
@@ -158,11 +163,17 @@ const REPLY_ROUTES: Record<string, MockRoute> = {
       ],
     },
   },
-  [`POST ${W}/conversations/${MARTA.id}/reply/draft`]: {
-    body: {
-      message_id: MARTA_DETAIL.messages.at(-1)?.id,
-      text: "Hi Marta,\n\nThursday works for me. See you at the walkthrough.\n\nBest,\nSam Rivera",
-    },
+  // The draft streams on the web: Scout's thinking, then the words.
+  [`POST ${W}/conversations/${MARTA.id}/reply/draft/stream`]: {
+    stream: [
+      frame("thinking", { delta: "Marta asks whether Thursday works for the walkthrough." }),
+      frame("text", { delta: "Hi Marta,\n\nThursday works for me. " }),
+      frame("text", { delta: "See you at the walkthrough.\n\nBest,\nSam Rivera" }),
+      frame("done", {
+        message_id: MARTA_DETAIL.messages.at(-1)?.id,
+        text: "Hi Marta,\n\nThursday works for me. See you at the walkthrough.\n\nBest,\nSam Rivera",
+      }),
+    ],
   },
 };
 

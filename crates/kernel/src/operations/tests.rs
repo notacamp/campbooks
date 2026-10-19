@@ -188,6 +188,28 @@ async fn slow(_: Scoped<TestWrite>) -> (StatusCode, Json<Value>) {
     )
 }
 
+/// Answer an event stream that sends one frame and then never ends (a
+/// streamed reply still being written).
+#[utoipa::path(
+    post,
+    path = "/api/v1/test/events",
+    operation_id = "test.events",
+    security(("bearer" = ["test:write"])),
+    extensions(("x-campbooks" = json!(Operation::command(Risk::Low).records(["test.note"])))),
+    responses((status = OK, content_type = "text/event-stream", body = String)),
+)]
+async fn events(_: Scoped<TestWrite>) -> axum::response::Response {
+    use futures_util::StreamExt as _;
+    let frames = futures_util::stream::once(async {
+        Ok::<_, std::convert::Infallible>(bytes::Bytes::from_static(b"data: one\n\n"))
+    })
+    .chain(futures_util::stream::pending());
+    axum::response::Response::builder()
+        .header(header::CONTENT_TYPE, "text/event-stream")
+        .body(Body::from_stream(frames))
+        .unwrap()
+}
+
 /// Reasons of the test operations.
 static TEST_MESSAGES: crate::i18n::Catalogue =
     crate::i18n::Catalogue::new("test", [r#"{"errors": {"flaky": "Busy ({{run}})"}}"#; 4]);
@@ -249,6 +271,7 @@ fn api() -> OpenApiRouter<AppState> {
         .routes(routes!(issue_secret))
         .routes(routes!(issue_link))
         .routes(routes!(slow))
+        .routes(routes!(events))
 }
 
 /// The test API over `state`: the HTTP router and the state that invokes
@@ -288,7 +311,7 @@ fn status(error: &InvokeError) -> Option<StatusCode> {
 fn catalogue_reads_ids_metadata_and_routes() {
     let (_, spec) = api().split_for_parts();
     let catalogue = Catalogue::from_openapi(&spec);
-    assert_eq!(catalogue.len(), 9);
+    assert_eq!(catalogue.len(), 10);
     assert!(catalogue.get("test.issue_secret").unwrap().secret_once());
     assert!(!catalogue.get("test.archive").unwrap().secret_once());
 
@@ -851,6 +874,47 @@ async fn server_errors_release_the_key(db: PgPool) {
         .await
         .unwrap();
     assert_eq!(rows, 0);
+}
+
+/// An event stream is never buffered to be stored: its head arrives while
+/// its body is still being written, its key is released, and a retry runs
+/// again (campbooks-cloud#288).
+#[sqlx::test(migrations = "../../migrations")]
+async fn an_event_stream_is_never_stored(db: PgPool) {
+    use http_body_util::BodyExt as _;
+    let http = http(db.clone()).await;
+    for _ in 0..2 {
+        let request = Request::post("/api/v1/test/events")
+            .header(header::AUTHORIZATION, format!("Bearer {}", http.token))
+            .header(idempotency::HEADER, "stream-1")
+            .body(Body::empty())
+            .unwrap();
+        let response = tokio::time::timeout(
+            std::time::Duration::from_secs(5),
+            http.app.clone().oneshot(request),
+        )
+        .await
+        .expect("the head comes before the stream ends")
+        .unwrap();
+        assert_eq!(response.status(), StatusCode::OK, "ran, not 409");
+        assert_eq!(
+            response.headers()[header::CONTENT_TYPE],
+            "text/event-stream"
+        );
+        assert!(
+            !response
+                .headers()
+                .contains_key(idempotency::REPLAYED_HEADER)
+        );
+        let mut body = response.into_body();
+        let frame = body.frame().await.unwrap().unwrap();
+        assert_eq!(frame.into_data().unwrap(), "data: one\n\n");
+        let rows: i64 = sqlx::query_scalar("SELECT count(*) FROM kernel.idempotency")
+            .fetch_one(&db)
+            .await
+            .unwrap();
+        assert_eq!(rows, 0, "the key is released");
+    }
 }
 
 #[sqlx::test(migrations = "../../migrations")]

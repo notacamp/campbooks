@@ -10,13 +10,23 @@ import {
   type QueryClient,
 } from "@tanstack/react-query";
 
-import { api, operationKey, unwrap, type OperationQuery, type Schema } from "~/lib/api";
+import {
+  api,
+  followsChangesLive,
+  operationKey,
+  unwrap,
+  type OperationQuery,
+  type Schema,
+} from "~/lib/api";
+
+import { bodyRefetchInterval, bodyStaleTime, refetchBodyOnFocus } from "./body-freshness";
 
 export type Stream = Schema<"Stream">;
 export type ConversationSummary = Schema<"ConversationSummary">;
 export type ConversationDetail = Schema<"ConversationDetail">;
 type ConversationList = Schema<"ConversationList">;
 export type MessageView = Schema<"MessageView">;
+type MessageBody = Schema<"MessageBody">;
 export type DecisionView = Schema<"DecisionView">;
 export type ReasonView = Schema<"ReasonView">;
 export type NeedView = Schema<"NeedView">;
@@ -208,11 +218,15 @@ export function useMessageBody(
   enabled: boolean,
   spam = false,
 ) {
-  return useQuery({
+  return useQuery<MessageBody>({
     queryKey: keys.body(workspaceId, conversationId, messageId, showImages, spam),
     enabled,
-    // A body never changes once stored.
-    staleTime: Number.POSITIVE_INFINITY,
+    // Fresh until a rule changes, live; without a live feed (the desktop and
+    // mobile shells), a body whose images depend on rules is read again
+    // (campbooks-cloud#236, `body-freshness.ts`).
+    staleTime: (query) => bodyStaleTime(query.state.data, followsChangesLive()),
+    refetchInterval: (query) => bodyRefetchInterval(query.state.data, followsChangesLive()),
+    refetchOnWindowFocus: (query) => refetchBodyOnFocus(query.state.data, followsChangesLive()),
     // "Show images" refetches it: keep the blocked version up meanwhile. Never
     // in spam: the version before may have had its images.
     ...(spam ? {} : { placeholderData: keepPreviousData }),

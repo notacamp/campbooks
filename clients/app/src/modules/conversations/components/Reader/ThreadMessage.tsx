@@ -16,6 +16,7 @@ import {
 } from "~/lib/ui";
 
 import { downloadAttachment, imageUrl, openPdf, type AttachmentRef } from "../../api/attachments";
+import { useRemoteImagesAllowed } from "../../api/body-freshness";
 import { useMessageBody, useMessageWords, type MessageView } from "../../api/queries";
 import {
   addresseeLine,
@@ -93,6 +94,10 @@ export function ThreadMessage({
     open && message.has_html,
     spam,
   );
+  // Without a live feed, a trusted sender's images wait for a fresh read
+  // (campbooks-cloud#236): the cached body shows with them held back.
+  const imagesAllowed = useRemoteImagesAllowed(body, open, showImages);
+  const imagesChecking = body.data?.images_shown === true && !imagesAllowed;
   const sender = displayName(message.from);
   const yours = message.direction === "outbound";
   const from = yours ? t("reader.you") : sender;
@@ -172,7 +177,8 @@ export function ThreadMessage({
       <SafeHtml
         html={html}
         title={t("reader.frameTitle", { name: sender })}
-        remoteImages={body.data?.images_shown ?? false}
+        remoteImages={imagesAllowed}
+        holdRemoteImages={imagesChecking}
         css={body.data?.css}
         inertLinks={inertLinks}
         showQuoted={t("reader.showQuoted")}
@@ -235,7 +241,7 @@ export function ThreadMessage({
                     shortcut={shortcuts && trustKey ? "inbox.trust_images" : undefined}
                     onClick={trust}
                   >
-                    {t("actions.trustImages", { name: sender })}
+                    {t("actions.trustImages")}
                   </Button>
                 )}
                 {body.data?.images_held === undefined || body.data.images_held === null ? null : (
@@ -245,7 +251,7 @@ export function ThreadMessage({
                 )}
               </>
             ) : null}
-            {remote > 0 && body.data?.images_trusted === true ? (
+            {remote > 0 && body.data?.images_trusted === true && !imagesChecking ? (
               <Text tone="tertiary" size="sm">
                 {t(sharedInbox ? "actions.imagesTrustedInbox" : "actions.imagesTrusted", {
                   name: sender,

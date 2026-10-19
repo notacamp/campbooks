@@ -113,6 +113,9 @@ pub struct MessageBody {
     pub css: Option<String>,
 }
 
+// It reads `conversations.rule` too: a rule that trusts a sender shows or
+// hides its images, so a client re-reads the bodies it holds on every live
+// rule change, on every device and for every member (campbooks-cloud#236).
 /// Read one message's text and HTML bodies.
 #[utoipa::path(
     get,
@@ -120,7 +123,7 @@ pub struct MessageBody {
     operation_id = "conversations.get_message_body",
     tag = "conversations",
     security(("bearer" = ["conversations:read"])),
-    extensions(("x-campbooks" = json!(Operation::query().records(["conversations.message"]).access("conversations.message", campbooks_kernel::authz::Action::Read)))),
+    extensions(("x-campbooks" = json!(Operation::query().records(["conversations.message", "conversations.rule"]).access("conversations.message", campbooks_kernel::authz::Action::Read)))),
     params(
         ("workspace_id" = WorkspaceId, Path, description = "The workspace."),
         ("conversation_id" = ConversationId, Path, description = "The conversation."),

@@ -196,6 +196,9 @@ export function NudgeDialog({
       case "not_waiting": {
         return "notWaiting";
       }
+      case "reply_timed_out": {
+        return "errors.timeout";
+      }
       case "rate_limited": {
         return "errors.limit";
       }

@@ -265,16 +265,24 @@ impl Ticket {
         result: &Result<T, Error>,
         usage: impl FnOnce(&T) -> Option<Usage>,
     ) {
-        let outcome = match result {
-            Ok(value) => usage(value).map_or_else(Outcome::default, |u| Outcome {
+        match result {
+            Ok(value) => self.settle_as(false, usage(value)).await,
+            Err(_) => self.settle_as(true, None).await,
+        }
+    }
+
+    /// Record how the call went: `failed`, or the tokens of `usage`.
+    pub(crate) async fn settle_as(self, failed: bool, usage: Option<Usage>) {
+        let outcome = match (failed, usage) {
+            (true, _) => Outcome {
+                failed: true,
+                ..Outcome::default()
+            },
+            (false, usage) => usage.map_or_else(Outcome::default, |u| Outcome {
                 failed: false,
                 prompt_tokens: u64::from(u.prompt_tokens),
                 completion_tokens: u64::from(u.completion_tokens),
             }),
-            Err(_) => Outcome {
-                failed: true,
-                ..Outcome::default()
-            },
         };
         if outcome.is_empty() {
             return;

@@ -13,6 +13,8 @@ campbooks-kernel.workspace = true
 # When the answers check ran (`decide::check`).
 chrono.workspace = true
 figment.workspace = true
+# Streamed chat completions (`Gateway::chat_stream`).
+futures-util.workspace = true
 opentelemetry.workspace = true
 psl.workspace = true
 regex.workspace = true

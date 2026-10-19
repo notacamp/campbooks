@@ -27,6 +27,13 @@ const transport = selectTransport();
 export const api: ApiClient = createApiClient(transport);
 
 /**
+ * Whether a response can be read as it arrives: on the web, through the
+ * BFF. The native bridge hands back whole answers, so the desktop app asks
+ * the JSON form of a streamed operation instead.
+ */
+export const canStream = transport.kind === "web";
+
+/**
  * The address the browser itself can open for an API `path` (a top-level
  * navigation through the BFF, its session cookie attached), or `undefined`
  * where there is none: the native client's API is reached only through its

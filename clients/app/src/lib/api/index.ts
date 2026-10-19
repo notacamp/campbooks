@@ -1,7 +1,11 @@
 export {
   createWebChangeSource,
+  followsChangesLive,
+  holdsImageState,
   operationKey,
+  refreshBodiesAfterRules,
   subscribeToChanges,
+  trustsImages,
   type ChangeFrame,
   type ChangeSource,
   type ChangeSourceHandlers,
@@ -12,10 +16,12 @@ export {
   api,
   backgroundApi,
   browserUrl,
+  canStream,
   createAdminClient,
   createApiClient,
 } from "./client";
 export { ApiError, errorStatus, problemCode, unwrap, unwrapEmpty } from "./errors";
+export { readEventStream } from "./event-stream";
 export { signOut, signOutAndLeave, useSession } from "./session";
 export { ADMIN_REAUTH_REQUIRED, loginUrl, type Transport } from "./transport";
 export { webRoutes } from "./web";
