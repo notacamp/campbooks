@@ -9,7 +9,8 @@ import { FIT_MARK } from "../../.storybook/longest";
 export interface Misfit {
   /** The copy, without the marks. */
   text: string;
-  problem: "cut off" | "off screen" | "placeholder cut off" | "page scrolls sideways";
+  problem:
+    "cut off" | "spills out" | "off screen" | "placeholder cut off" | "page scrolls sideways";
   /** Where: the element that cuts it, as `tag.class`. */
   at: string;
   /** Width (or height) the text needs, and what it gets, in px. */
@@ -133,6 +134,39 @@ function checkText(node: Text, found: Misfit[]): void {
         has: element.clientHeight,
       });
       return;
+    }
+  }
+
+  // Copy that runs out of a box that does not clip it (a label wrapping out
+  // of a fixed-height button), up to the box that positions it: past an
+  // absolutely positioned element (a tooltip, a badge) or a scroller,
+  // landing outside is on purpose.
+  for (let element: Element | null = box; element !== null; element = element.parentElement) {
+    const style = getComputedStyle(element);
+    if (scrolls(style.overflowX) || scrolls(style.overflowY)) {
+      break;
+    }
+    if (style.display !== "inline" && style.display !== "contents" && !collapsed(element)) {
+      const outer = element.getBoundingClientRect();
+      const outside =
+        rect.left < outer.left - SLACK ||
+        rect.right > outer.right + SLACK ||
+        rect.top < outer.top - ySlack ||
+        rect.bottom > outer.bottom + ySlack;
+      if (outside) {
+        const tall = rect.bottom > outer.bottom + ySlack || rect.top < outer.top - ySlack;
+        found.push({
+          text,
+          problem: "spills out",
+          at: nameOf(element),
+          needs: Math.ceil(tall ? rect.height : rect.width),
+          has: Math.floor(tall ? outer.height : outer.width),
+        });
+        return;
+      }
+    }
+    if (style.position === "absolute" || style.position === "fixed") {
+      break;
     }
   }
 

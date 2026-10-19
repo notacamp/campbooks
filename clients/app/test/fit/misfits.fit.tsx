@@ -53,6 +53,16 @@ describe("misfits", () => {
     ]);
   });
 
+  it("reports a label that wraps out of a fixed-height button", async () => {
+    await page.viewport(800, 600);
+    mount(
+      `<button style="display: flex; width: 100px; height: 20px; padding: 0"><span style="flex: 1 1 0; min-width: 0">${copy("Rechercher ou demander")}</span></button>`,
+    );
+    expect(misfits()).toEqual([
+      expect.objectContaining({ text: "Rechercher ou demander", problem: "spills out" }),
+    ]);
+  });
+
   it("reports a placeholder wider than its field", async () => {
     await page.viewport(800, 600);
     mount(

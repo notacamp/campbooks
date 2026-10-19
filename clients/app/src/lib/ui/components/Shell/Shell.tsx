@@ -80,7 +80,11 @@ export function WorkspaceSwitcher({
   );
 }
 
-/** The sidebar's "Search or ask" field: opens the command menu (⌘K, or / in a workspace). */
+/**
+ * The sidebar's "Search or ask" field: opens the command menu (⌘K, or / in a
+ * workspace). It hints ⌘K only, so the label has room in every language; /
+ * is in `aria-keyshortcuts` and the shortcut sheet.
+ */
 export function SearchButton({ onClick }: { onClick: () => void }) {
   const { t } = useTranslation("ui");
   const { platform } = useShortcuts();
@@ -101,7 +105,6 @@ export function SearchButton({ onClick }: { onClick: () => void }) {
       <Visor />
       <span className={styles["searchLabel"]}>{t("search.label")}</span>
       <KbdHint shortcut="command.open" />
-      <KbdHint shortcut="search.open" />
     </button>
   );
 }
