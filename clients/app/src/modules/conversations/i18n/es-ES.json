@@ -136,6 +136,15 @@
     "spam": "Marcada como spam · {{subject}}",
     "notSpam": "No es spam · {{subject}}"
   },
+  "leaving": {
+    "done": "Hecho",
+    "toInbox": "Movida a la bandeja de entrada",
+    "deleted": "Eliminada",
+    "restored": "Restaurada",
+    "spam": "Marcada como spam",
+    "notSpam": "No es spam",
+    "moved": "Movida a {{stream}}"
+  },
   "scout": {
     "label": "Cómo está la cosa",
     "suggestion": "Sugiere {{stream}}",
@@ -306,6 +315,8 @@
       "checkReply": "¿{{name}} necesita respuesta?",
       "checkDo": "¿{{name}} te ha pedido que hagas algo?",
       "checkPay": "{{name}} ha enviado una factura. ¿Ya está pagada?",
+      "stillDo": "{{name}} lo pidió {{ago}}. ¿Sigue pendiente?",
+      "stillReply": "{{name}} escribió {{ago}}. ¿Sigue necesitando respuesta?",
       "taughtReply": "{{name}}: responder, por una regla",
       "taughtDo": "{{name}}: por hacer, por una regla",
       "worthALook": "Pediste ver los correos de {{name}}"
@@ -317,6 +328,7 @@
       "review": "Revisar",
       "suspicious": "Parece sospechoso",
       "check": "Confirmar",
+      "expired": "Caducado",
       "worth_a_look": "Merece un vistazo"
     },
     "due": {
@@ -366,6 +378,7 @@
     "toast": {
       "done": "Hecho · {{name}}",
       "notNeeded": "No hace falta · {{name}}. Campbooks aprenderá de esto",
+      "noLongerNeeded": "Ya no hace falta · {{name}}",
       "safe": "Marcado como seguro · {{name}}. Campbooks aprenderá de esto",
       "confirmed": "Gracias · {{name}} sigue en tu lista",
       "failed": "No se ha podido cambiar {{name}}: no ha cambiado nada. Vuelve a intentarlo.",

@@ -52,6 +52,22 @@ export const Service: Story = {
   },
 };
 
+/** Done: what happened wipes in over the row, then it folds away. */
+export const Leaving: Story = {
+  args: { unread: true, leaving: { label: "Done", icon: "archive" }, onLeft: fn() },
+  play: async ({ canvasElement }) => {
+    await expect(within(canvasElement).queryByRole("button")).toBeNull();
+  },
+};
+
+/** Report spam (and Delete) say it in the danger colour. */
+export const LeavingAsSpam: Story = {
+  args: {
+    leaving: { label: "Reported as spam", icon: "warning", tone: "danger" },
+    onLeft: fn(),
+  },
+};
+
 /** Long names and subjects (and Portuguese lengths) truncate cleanly. */
 export const LongContent: Story = {
   args: {

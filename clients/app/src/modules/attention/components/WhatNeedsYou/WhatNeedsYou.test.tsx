@@ -375,6 +375,60 @@ describe("What needs you", () => {
     });
   });
 
+  it("asks again about an old ask, Still to do?, and No says it is no longer needed", async () => {
+    // Pedro's undated lease, three weeks on (campbooks-cloud#275).
+    const stale = {
+      ...PEDRO,
+      need:
+        PEDRO.need === null || PEDRO.need === undefined
+          ? null
+          : {
+              ...PEDRO.need,
+              reason: "review" as const,
+              trust: "check" as const,
+              question: "still_to_do" as const,
+              due_on: null,
+              sent_at: "2026-09-22T10:12:00Z",
+            },
+    };
+    const items = ITEMS.map((item) =>
+      item.record.id === PEDRO.id
+        ? { ...item, reason: "review" as const, trust: "check" as const, due_on: null }
+        : item,
+    );
+    const calls = mockApi({
+      [`GET ${W}/attention`]: (request) =>
+        new URL(request.url).searchParams.get("state") === "cleared"
+          ? { body: { items: [], counts: [] } }
+          : { body: { items, counts: COUNTS } },
+      [`GET ${W}/conversations`]: {
+        body: {
+          conversations: NEEDS.map((c) => (c.id === PEDRO.id ? stale : c)),
+          next_cursor: null,
+        },
+      },
+      [`POST ${W}/conversations/${PEDRO.id}/need/resolve`]: { body: { ...PEDRO, need: null } },
+    });
+    renderHome();
+    const line = await screen.findByText("Pedro Alves asked 3 weeks ago. Still to do?");
+    fireEvent.click(line);
+    const actions = screen.getByRole("group", { name: "Actions for Pedro Alves" });
+    expect(
+      within(actions)
+        .getAllByRole("button")
+        .map((b) => b.textContent),
+    ).toEqual(["Yes1", "No2", "Snooze…S"]);
+    fireEvent.keyDown(document, { key: "2" });
+    await waitFor(() => {
+      expect(calls.calls.find((c) => c.route.endsWith("/need/resolve"))?.body).toMatchObject({
+        outcome: "not_needed",
+      });
+    });
+    // Nothing is learned from it, so the toast says only that.
+    expect(await screen.findByText("No longer needed · Pedro Alves")).toBeVisible();
+    expect(screen.queryByText(/Campbooks will learn/u)).toBeNull();
+  });
+
   it("asks whether a bill is paid, and takes Already paid on 1", async () => {
     const calls = mockApi({
       [`GET ${W}/attention`]: (request) =>

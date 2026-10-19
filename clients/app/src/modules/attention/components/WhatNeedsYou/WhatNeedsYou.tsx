@@ -925,7 +925,7 @@ export function WhatNeedsYou({ workspaceId, now, offer }: WhatNeedsYouProps) {
                       key={row.item.id}
                       id={itemId(row.item.id)}
                       who={row.name}
-                      what={needSentence(tc, row.need, row.name)}
+                      what={needSentence(tc, row.need, row.name, { locale: i18n.language, now })}
                       excerpt={row.need.quote?.text}
                       avatar={{
                         name: row.name,

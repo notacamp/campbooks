@@ -35,7 +35,12 @@
 //!   of those conversations whose email Scout has not summarised is queued
 //!   for `conversations.summarize_need` (campbooks-cloud#204): one job per
 //!   message, never on a request path, and a message already summarised is
-//!   not asked again.
+//!   not asked again, but once for its dates when its summary was written
+//!   before they were read (campbooks-cloud#275).
+//!
+//! Each refresh also settles the need against the time now and writes when
+//! it next changes with time alone (`conversations.need_clocks`): an old
+//! undated ask becomes "Still needed?" here, at once.
 //!
 //! Running it again changes nothing: `refresh` publishes only when a need
 //! changed, and a message a checked model answered every question about is
@@ -63,12 +68,14 @@ use crate::{
 };
 
 /// The messages behind the open needs of some conversations that Scout has
-/// not summarised (or whose one failure may be tried again).
+/// not summarised (or whose one failure may be tried again), or whose
+/// summary was written before its dates were read (campbooks-cloud#275).
 const NEEDING_SUMMARY: &str = "SELECT n.message_id FROM conversations.needs n \
        LEFT JOIN conversations.need_summaries s ON s.message_id = n.message_id \
       WHERE n.conversation_id = ANY($1) AND n.state = 'open' \
         AND n.question <> 'suspicious' \
-        AND (s.message_id IS NULL OR (s.state = 'failed' AND s.attempts < 2))";
+        AND (s.message_id IS NULL OR (s.state = 'failed' AND s.attempts < 2) \
+             OR (s.state = 'written' AND s.dates_read_at IS NULL))";
 
 /// How often pending backfills are started.
 pub const EVERY: Duration = Duration::from_mins(1);

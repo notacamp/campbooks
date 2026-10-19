@@ -1,8 +1,8 @@
-import type { ReactNode } from "react";
+import { useEffect, useRef, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 
 import { Avatar, type AvatarProps } from "../Avatar/Avatar";
-import { Icon } from "../Icon/Icon";
+import { Icon, type IconName } from "../Icon/Icon";
 import { VisuallyHidden } from "../Typography/Typography";
 
 import styles from "./ConversationRow.module.css";
@@ -38,8 +38,29 @@ export interface ConversationRowProps {
    * so the row leaves the tab order and `selected` becomes `aria-selected`.
    */
   option?: boolean | undefined;
+  /**
+   * The row is leaving the list (Done, Delete, Report spam, a move): what
+   * happened wipes in over it ("Done", "Reported as spam"), then it folds
+   * away and `onLeft` runs (under a second; an instant fold under reduced
+   * motion). It is no longer a button, and hidden from assistive tech: the
+   * toast says the same.
+   */
+  leaving?: RowLeaving | undefined;
+  onLeft?: (() => void) | undefined;
   onSelect: () => void;
 }
+
+/** What happened to a row leaving the list. */
+export interface RowLeaving {
+  /** "Done", "Reported as spam", "Moved to Newsletters": no subject, the row has it. */
+  label: string;
+  icon: IconName;
+  /** Report spam and Delete say it in the danger colour. */
+  tone?: "done" | "danger" | undefined;
+}
+
+/** How long a leaving row takes to fold away (`--duration-confirm`). */
+const ROW_LEAVE_MS = 900;
 
 /** A row of a stream's conversation list. */
 export function ConversationRow({
@@ -59,22 +80,13 @@ export function ConversationRow({
   selected = false,
   id,
   option = false,
+  leaving,
+  onLeft,
   onSelect,
 }: ConversationRowProps) {
   const { t } = useTranslation("ui");
-  return (
-    <button
-      type="button"
-      id={id}
-      role={option ? "option" : undefined}
-      tabIndex={option ? -1 : undefined}
-      aria-selected={option ? selected : undefined}
-      className={styles["row"]}
-      data-unread={unread || undefined}
-      data-selected={selected || undefined}
-      aria-current={current ? "true" : undefined}
-      onClick={onSelect}
-    >
+  const content = (
+    <>
       <Avatar name={from} {...avatar} />
       <span className={styles["from"]}>
         <span className={styles["fromName"]}>{from}</span>
@@ -102,6 +114,81 @@ export function ConversationRow({
       <span className={styles["snippet"]}>{snippet}</span>
       {chips === undefined ? null : <span className={styles["chips"]}>{chips}</span>}
       {suggestion === undefined ? null : <span className={styles["suggestion"]}>{suggestion}</span>}
+    </>
+  );
+  if (leaving !== undefined) {
+    return (
+      <LeavingRow id={id} leaving={leaving} subject={subject} unread={unread} onLeft={onLeft}>
+        {content}
+      </LeavingRow>
+    );
+  }
+  return (
+    <button
+      type="button"
+      id={id}
+      role={option ? "option" : undefined}
+      tabIndex={option ? -1 : undefined}
+      aria-selected={option ? selected : undefined}
+      className={styles["row"]}
+      data-unread={unread || undefined}
+      data-selected={selected || undefined}
+      aria-current={current ? "true" : undefined}
+      onClick={onSelect}
+    >
+      {content}
     </button>
+  );
+}
+
+/** The row as it leaves: what happened wipes in over it, then it folds away. */
+function LeavingRow({
+  id,
+  leaving,
+  subject,
+  unread,
+  onLeft,
+  children,
+}: {
+  id: string | undefined;
+  leaving: RowLeaving;
+  subject: ReactNode;
+  unread: boolean;
+  onLeft: (() => void) | undefined;
+  children: ReactNode;
+}) {
+  const left = useRef(onLeft);
+  useEffect(() => {
+    left.current = onLeft;
+  });
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      left.current?.();
+    }, ROW_LEAVE_MS);
+    return () => {
+      clearTimeout(timer);
+    };
+  }, []);
+  return (
+    <div
+      id={id}
+      className={styles["leaving"]}
+      data-tone={leaving.tone ?? "done"}
+      aria-hidden="true"
+      inert
+    >
+      <div className={styles["leavingClip"]}>
+        <div className={styles["row"]} data-unread={unread || undefined} data-gone="">
+          {children}
+        </div>
+        <div className={styles["confirmation"]}>
+          <span className={styles["confirmationIcon"]}>
+            <Icon name={leaving.icon} />
+          </span>
+          <span className={styles["confirmationLabel"]}>{leaving.label}</span>
+          <span className={styles["confirmationSubject"]}>{subject}</span>
+        </div>
+      </div>
+    </div>
   );
 }

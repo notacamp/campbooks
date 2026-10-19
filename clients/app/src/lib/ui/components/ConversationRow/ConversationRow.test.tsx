@@ -1,4 +1,4 @@
-import { fireEvent, screen } from "@testing-library/react";
+import { act, fireEvent, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 import { renderUi } from "../../../../../test/render";
@@ -43,6 +43,39 @@ describe("ConversationRow", () => {
     );
 
     expect(screen.getByRole("button")).not.toHaveAttribute("aria-current");
+  });
+
+  it("says what happened as it leaves, then is gone under a second", () => {
+    vi.useFakeTimers();
+    const onLeft = vi.fn();
+    const { container } = renderUi(
+      <ConversationRow
+        id="row-1"
+        from="Rui Matos"
+        time="Mon"
+        subject="VAT"
+        snippet="Receipts"
+        leaving={{ label: "Reported as spam", icon: "warning", tone: "danger" }}
+        onLeft={onLeft}
+        onSelect={vi.fn()}
+      />,
+    );
+    const row = container.querySelector("#row-1");
+
+    // No longer a button, and the toast says it to assistive tech.
+    expect(screen.queryByRole("button")).not.toBeInTheDocument();
+    expect(row).toHaveAttribute("aria-hidden", "true");
+    expect(row).toHaveAttribute("data-tone", "danger");
+    expect(row).toHaveTextContent("Reported as spam");
+    act(() => {
+      vi.advanceTimersByTime(899);
+    });
+    expect(onLeft).not.toHaveBeenCalled();
+    act(() => {
+      vi.advanceTimersByTime(1);
+    });
+    expect(onLeft).toHaveBeenCalledOnce();
+    vi.useRealTimers();
   });
 });
 
