@@ -860,18 +860,58 @@ impl Strategy for Recording {
     }
 }
 
+/// Fail with what failed: each failed job's kind and error.
+async fn failed_jobs(db: &PgPool) {
+    let failed: Vec<(String, Option<String>)> =
+        sqlx::query_as("SELECT kind, last_error FROM kernel.jobs WHERE state = 'failed'")
+            .fetch_all(db)
+            .await
+            .unwrap();
+    assert!(failed.is_empty(), "{failed:?}");
+}
+
+/// [`tick`], saying which job failed, if one did.
+async fn tick_reporting(kit: &Kit) {
+    let mut tx = kit.state.db.begin().await.unwrap();
+    jobs::enqueue(&mut tx, &DispatchNeedsBackfills, EnqueueOptions::default())
+        .await
+        .unwrap();
+    tx.commit().await.unwrap();
+    campbooks_kernel::jobs::Worker::new(kit.state.clone())
+        .run_until_idle()
+        .await;
+    failed_jobs(&kit.db).await;
+}
+
 /// campbooks-cloud#293: mail stored before whose move it is was asked, with
 /// no open need, is asked only the move questions once on upgrade, and may
 /// then wait on someone; running it again asks nothing more.
 #[sqlx::test(migrations = "../../../migrations")]
 async fn the_upgrade_asks_recent_mail_whose_move_it_is_once(db: PgPool) {
-    use crate::testkit::{joao_asks_ana, waiting_deps};
+    use crate::testkit::{ANA, JOAO, SAM, mail, waiting_deps};
 
     // Before the upgrade: the catalogue was off, so only triage was asked.
     let mut before = waiting_deps();
     before.config.actions.enabled = false;
     let old = Kit::with_deps(db.clone(), before).await;
-    let (workspace, _, _) = joao_asks_ana(&old).await;
+    let workspace = WorkspaceId::new();
+    let (_, sam) = old.member("sam", workspace);
+    let inbox = old
+        .inbox(workspace, SAM.1, &[(sam, InboxRole::Manager)])
+        .await;
+    let batch = dev::record(
+        &old.state,
+        workspace,
+        inbox,
+        &mail("joao-1", "thr-floor-plan", JOAO, &[ANA], &[SAM], 60),
+    )
+    .await
+    .unwrap();
+    dev::submit(&old.state, workspace, &batch).await.unwrap();
+    campbooks_kernel::jobs::Worker::new(old.state.clone())
+        .run_until_idle()
+        .await;
+    failed_jobs(&db).await;
     assert!(needs_of(&db, workspace).await.is_empty());
     let moves: i64 = sqlx::query_scalar(
         "SELECT count(*) FROM conversations.decisions WHERE question = 'next_move'",
@@ -890,7 +930,7 @@ async fn the_upgrade_asks_recent_mail_whose_move_it_is_once(db: PgPool) {
     ));
     joao.push(("awaited", AnswerValue::Choice("p1".to_owned()), 0.9));
     let recording = Arc::new(Recording {
-        inner: Scripted::model([(crate::testkit::JOAO.1, joao)]),
+        inner: Scripted::model([(JOAO.1, joao)]),
         asked: std::sync::Mutex::new(Vec::new()),
     });
     let upgraded = Kit::with_deps(db.clone(), waiting_deps().with_model(recording.clone())).await;
@@ -906,7 +946,7 @@ async fn the_upgrade_asks_recent_mail_whose_move_it_is_once(db: PgPool) {
         .execute(&db)
         .await
         .unwrap();
-    tick(&upgraded).await;
+    tick_reporting(&upgraded).await;
 
     // Asked once, the move questions only.
     let asked = recording.asked.lock().unwrap().clone();
@@ -935,6 +975,6 @@ async fn the_upgrade_asks_recent_mail_whose_move_it_is_once(db: PgPool) {
         .execute(&db)
         .await
         .unwrap();
-    tick(&upgraded).await;
+    tick_reporting(&upgraded).await;
     assert_eq!(recording.asked.lock().unwrap().len(), 1);
 }
