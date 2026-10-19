@@ -174,15 +174,36 @@ describe("the inbox", () => {
     expect(router.state.location.search).toEqual({ draft: TO_MARTA.id });
   });
 
-  it("opens a reply draft under its thread, on the message it answers", async () => {
+  it("opens a reply draft in its thread, beside the Drafts list", async () => {
     inbox({ [`GET ${W}/drafts`]: { body: { drafts: [REPLY_WRITTEN] } } });
     const { router } = renderAt(`/w/${DUARTE.id}/inbox/drafts`);
 
     fireEvent.click(await screen.findByRole("button", { name: /Draft · Maya Okafor/u }));
     await waitFor(() => {
-      expect(router.state.location.pathname).toBe(`/w/${DUARTE.id}/inbox/primary/${Q4.id}`);
+      expect(router.state.location.pathname).toBe(`/w/${DUARTE.id}/inbox/drafts/${Q4.id}`);
     });
-    expect(router.state.location.search).toEqual({ reply: true, to: REPLY_WRITTEN.message_id });
+    expect(router.state.location.search).toEqual({ draft: REPLY_WRITTEN.id });
+    expect(await screen.findByDisplayValue(/^Thanks, Maya\./u)).toBeVisible();
+    expect(screen.getByRole("heading", { level: 1, name: "Drafts" })).toBeVisible();
+  });
+
+  it("opens the draft of the row pressed when a conversation holds several", async () => {
+    const forward = {
+      ...REPLY_WRITTEN,
+      id: "0192f1a0-0000-7000-8000-000000000105",
+      kind: "forward" as const,
+      to: [],
+      subject: `Fwd: ${Q4.subject}`,
+      body: "Forwarding this to the team.",
+      updated_at: "2026-10-13T14:10:00Z",
+    };
+    inbox({ [`GET ${W}/drafts`]: { body: { drafts: [REPLY_WRITTEN, forward] } } });
+    const { router } = renderAt(`/w/${DUARTE.id}/inbox/drafts`);
+
+    fireEvent.click(await screen.findByRole("button", { name: /Draft · No recipients/u }));
+    expect(await screen.findByDisplayValue("Forwarding this to the team.")).toBeVisible();
+    expect(screen.queryByDisplayValue(/^Thanks, Maya\./u)).toBeNull();
+    expect(router.state.location.search).toEqual({ draft: forward.id });
   });
 
   it("deletes a draft from the list, and Undo brings it back", async () => {

@@ -49,12 +49,12 @@ list says "Your 50 newest drafts." only when it got exactly 50, which is the
 only time older ones may be hidden. Drafts already on their way (scheduled or
 sending) are left out: they can no longer be edited.
 
-**Opening a draft reuses the existing paths.** A new message opens
-`/compose?draft=` (`NewMessage`). An answer opens its thread with
-`?reply=true&to=<message>` (Home's R), where the reply slot reopens the
-draft already saved for that message. A reply-all or forward draft opens the
-thread, whose composer reopens the conversation's newest open draft. Delete
-and Undo are `useDeleteDraft`'s, unchanged.
+**Opening a draft opens exactly that draft.** A new message opens
+`/compose?draft=` (`NewMessage`). An answer opens `/inbox/drafts/<conversation>?draft=<id>`:
+the Drafts list stays on the left, Back and Escape return to it, and the
+reader's reply slot opens its composer on that draft id, whatever its kind (the
+same way the saved-draft chips pick a draft). `?reply=true&to=` keeps working
+for Home's R. Delete and Undo are `useDeleteDraft`'s, unchanged.
 
 **Live updates need nothing new.** The list is keyed by the
 `conversations.list_drafts` operation, which the `conversations.draft`

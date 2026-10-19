@@ -32,7 +32,7 @@ function InboxPage() {
   const params: { workspaceId?: string; stream?: string; conversationId?: string } = useParams({
     strict: false,
   });
-  const search: { reply?: boolean; to?: string } = useSearch({ strict: false });
+  const search: { reply?: boolean; to?: string; draft?: string } = useSearch({ strict: false });
   const workspaceId = params.workspaceId ?? "";
   const stream = params.stream ?? "";
   const { t } = useTranslation("conversations");
@@ -115,16 +115,20 @@ export function buildConversationsRoutes<TParent extends AnyRoute>(parent: TPare
   const conversation = createRoute({
     getParentRoute: () => parent,
     path: "/inbox/$stream/$conversationId",
-    // `?reply=true` (Home's R) opens the reply composer.
-    // `reply`: open the composer on arrival; `to`: the message it answers
-    // (a draft written for it), else the newest.
-    validateSearch: (search: Record<string, unknown>): { reply?: boolean; to?: string } => {
+    // `?reply=true` (Home's R) opens the reply composer; `reply`: open the
+    // composer on arrival; `to`: the message it answers (a draft written for
+    // it), else the newest. `?draft=` (Drafts) opens exactly that draft.
+    validateSearch: (
+      search: Record<string, unknown>,
+    ): { reply?: boolean; to?: string; draft?: string } => {
       const reply = search["reply"] === true || search["reply"] === "true";
       const to = search["to"];
-      if (!reply) {
-        return {};
-      }
-      return typeof to === "string" && MESSAGE_ID.test(to) ? { reply, to } : { reply };
+      const draft = search["draft"];
+      return {
+        ...(reply ? { reply } : {}),
+        ...(reply && typeof to === "string" && MESSAGE_ID.test(to) ? { to } : {}),
+        ...(typeof draft === "string" && MESSAGE_ID.test(draft) ? { draft } : {}),
+      };
     },
     component: InboxPage,
   });
