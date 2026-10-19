@@ -47,13 +47,46 @@ function agoLabel(iso: string, locale: string, now: Date = new Date()): string {
   return words.format(-Math.floor(days / 365), "year");
 }
 
+/** Who wrote the email a need comes from, as far as the summary says. */
+function needFrom(need: NeedView, conversation: ConversationSummary) {
+  return need.quote?.from ?? conversation.latest_from ?? null;
+}
+
 /** Who a need is from: the sender's name; for a warning, their address (a name is free to fake). */
 export function needSender(need: NeedView, conversation: ConversationSummary): string {
-  const from = need.quote?.from ?? conversation.latest_from ?? null;
+  const from = needFrom(need, conversation);
   if (need.question === "suspicious") {
     return from?.address ?? "";
   }
   return displayName(from);
+}
+
+/** Whether Scout waits on someone to write (`waiting`), or it is time to nudge them (`nudge`). */
+export function isWait(need: NeedView): boolean {
+  return need.reason === "waiting" || need.reason === "nudge";
+}
+
+/**
+ * Who a wait is on (campbooks-cloud#293): their name and address as the
+ * email's headers gave them, and whether they are the one who wrote it (the
+ * sender promised something) rather than someone else on it. None for any
+ * other need.
+ */
+export function awaitedOf(
+  need: NeedView,
+  conversation: ConversationSummary,
+): { name: string; address: string; sender: boolean } | undefined {
+  const awaited = need.waiting_on;
+  if (!isWait(need) || awaited === null || awaited === undefined) {
+    return undefined;
+  }
+  const from = needFrom(need, conversation);
+  return {
+    name: displayName(awaited),
+    address: awaited.address,
+    sender:
+      from !== null && from.address.trim().toLowerCase() === awaited.address.trim().toLowerCase(),
+  };
 }
 
 /**
@@ -66,7 +99,21 @@ export function needSentence(
   need: NeedView,
   name: string,
   when?: { locale: string; now?: Date | undefined },
+  conversation?: ConversationSummary,
 ): string {
+  // A wait says who has not written yet: the sender ("No word from Rui
+  // Matos yet") or someone else on the email ("Ana Costa hasn't written
+  // yet").
+  if (isWait(need)) {
+    const awaited = conversation === undefined ? undefined : awaitedOf(need, conversation);
+    const person = awaited?.name ?? displayName(need.waiting_on);
+    if (need.reason === "waiting") {
+      return t("needs.line.waiting", { name: person });
+    }
+    return t(awaited?.sender === true ? "needs.line.nudgeSender" : "needs.line.nudge", {
+      name: person,
+    });
+  }
   if (need.question === "suspicious") {
     return t("needs.line.warning");
   }
@@ -112,6 +159,11 @@ export function needSentence(
     case "worth_a_look": {
       return t("needs.line.worthALook", { name });
     }
+    // Said above; here so every reason has its sentence.
+    case "waiting":
+    case "nudge": {
+      return t("needs.line.nudge", { name });
+    }
   }
 }
 
@@ -120,6 +172,9 @@ export function needChip(t: Translate, need: NeedView): string {
   if (need.question === "suspicious") {
     return t("needs.chip.suspicious");
   }
+  if (isWait(need)) {
+    return t(`needs.chip.${need.reason}`, { name: displayName(need.waiting_on) });
+  }
   if (need.trust === "check" && billKind(need) === undefined) {
     return t("needs.chip.check");
   }
@@ -127,7 +182,11 @@ export function needChip(t: Translate, need: NeedView): string {
 }
 
 /** The signal colour of a need's chip. */
-export function needSignal(need: NeedView): "reply" | "do" | "pay" | "review" | "look" {
+export function needSignal(need: NeedView): "reply" | "do" | "pay" | "review" | "look" | "nudge" {
+  // A wait is never a question to the member, whatever its trust.
+  if (isWait(need)) {
+    return "nudge";
+  }
   if (need.trust === "check" && billKind(need) === undefined) {
     return "review";
   }
@@ -159,7 +218,8 @@ export function dueLabel(
   today: Date = new Date(),
 ): { text: string; overdue: boolean; soon: boolean } | undefined {
   const due = need.due_on;
-  if (due === null || due === undefined) {
+  // A wait's date is when Scout checks again, not something due.
+  if (due === null || due === undefined || isWait(need)) {
     return undefined;
   }
   const days = daysUntil(due, today);

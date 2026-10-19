@@ -37,6 +37,7 @@ export const SEMANTIC_TOKENS = {
     "signal-review",
     "signal-sort",
     "signal-look",
+    "signal-nudge",
   ],
   visor: [
     "visor-glass-top",
@@ -123,5 +124,5 @@ export const DENSITIES = ["comfortable", "compact"] as const;
 export type Density = (typeof DENSITIES)[number];
 
 /** Signals: what a queue item asks of you. Colour carries meaning only. */
-export const SIGNALS = ["review", "reply", "decide", "do", "pay", "sort", "look"] as const;
+export const SIGNALS = ["review", "reply", "decide", "do", "pay", "nudge", "sort", "look"] as const;
 export type Signal = (typeof SIGNALS)[number];

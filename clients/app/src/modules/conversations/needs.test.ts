@@ -1,11 +1,22 @@
 import { describe, expect, it } from "vitest";
 
-import { ACME, JONAS, LUZ, MARTA, MARTA_DETAIL, PEDRO, PHISH } from "../../../test/demo/attention";
+import {
+  ACME,
+  ANA,
+  JONAS,
+  LUZ,
+  MARTA,
+  MARTA_DETAIL,
+  PEDRO,
+  PHISH,
+  RUI,
+} from "../../../test/demo/attention";
 import { NOW } from "../../../test/demo/conversations";
 
 import type { NeedView } from "./api/queries";
 import type { Translate } from "./model";
 import {
+  awaitedOf,
   dueLabel,
   howRows,
   isStillNeeded,
@@ -143,6 +154,32 @@ describe("needs in words", () => {
       "Marta Ferreira, Mon 12 Oct",
     );
     expect(NOW.getUTCFullYear()).toBe(2026);
+  });
+
+  it("says who has not written yet: someone else on the email, or the sender", () => {
+    // João asked Ana: Ana Costa hasn't written yet.
+    expect(needSentence(t, need(ANA), "Ana Costa", undefined, ANA)).toBe(
+      'needs.line.nudge{"name":"Ana Costa"}',
+    );
+    expect(awaitedOf(need(ANA), ANA)).toEqual({
+      name: "Ana Costa",
+      address: "ana@costa-arquitetos.example",
+      sender: false,
+    });
+    // Rui promised it: no word from Rui Matos yet, once it is time to nudge.
+    const ruiNudge = { ...RUI, need: { ...need(RUI), reason: "nudge" as const } };
+    expect(needSentence(t, need(ruiNudge), "Rui Matos", undefined, ruiNudge)).toBe(
+      'needs.line.nudgeSender{"name":"Rui Matos"}',
+    );
+    // While Scout only waits, it says so.
+    expect(needSentence(t, need(RUI), "Rui Matos", undefined, RUI)).toBe(
+      'needs.line.waiting{"name":"Rui Matos"}',
+    );
+    expect(needSignal(need(ANA))).toBe("nudge");
+    expect(needChip(t, need(RUI))).toBe('needs.chip.waiting{"name":"Rui Matos"}');
+    // A wait's date is when Scout checks, never something due.
+    expect(dueLabel(t, need(RUI), "en-GB", NOW)).toBeUndefined();
+    expect(awaitedOf(need(MARTA), MARTA)).toBeUndefined();
   });
 
   it("keeps the numbers to How Campbooks decided, in words first", () => {

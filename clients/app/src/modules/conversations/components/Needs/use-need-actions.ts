@@ -9,7 +9,7 @@ import {
   type NeedVerdict,
 } from "../../api/queries";
 import type { Translate } from "../../model";
-import { isStillNeeded, needSender } from "../../needs";
+import { awaitedOf, isStillNeeded, isWait, needSender } from "../../needs";
 import { useTeachOnce } from "../TeachOnce/TeachOnce";
 
 const TOASTS: Record<Exclude<NeedVerdict, "reopen">, string> = {
@@ -41,6 +41,14 @@ export interface NeedActionOptions {
    * campbooks-cloud#169).
    */
   onReported?: (conversation: ConversationSummary) => void;
+}
+
+/** Who a toast names: the person a wait is on, else the need's sender. */
+function personOf(
+  need: NonNullable<ConversationSummary["need"]>,
+  conversation: ConversationSummary,
+) {
+  return awaitedOf(need, conversation)?.name ?? needSender(need, conversation);
 }
 
 /**
@@ -76,12 +84,14 @@ export function useNeedActions(
           // Not needed on a need (not a warning) can teach: "these never need me".
           // Not on "Still needed?": the mail did need something, time passed.
           const need = conversation.need;
+          // Nor on a wait: Not waiting corrects Scout's read of whose move it is.
           if (
             verdict === "not_needed" &&
             need !== null &&
             need !== undefined &&
             need.question !== "suspicious" &&
-            !isStillNeeded(need)
+            !isStillNeeded(need) &&
+            !isWait(need)
           ) {
             teach?.after(conversation, { kind: "not_needed" });
           }
@@ -101,7 +111,7 @@ export function useNeedActions(
             onFailed?.(conversation);
           }
           const need = conversation.need;
-          const name = need === null || need === undefined ? "" : needSender(need, conversation);
+          const name = need === null || need === undefined ? "" : personOf(need, conversation);
           // A failure stays until Retry or dismiss. A need that changed
           // meanwhile is not retried: the member should look again.
           if (problemCode(error) === "need_changed") {
@@ -135,15 +145,19 @@ export function useNeedActions(
     if (need === null || need === undefined) {
       return;
     }
-    const name = needSender(need, conversation);
+    const name = personOf(need, conversation);
     const safe = verdict === "not_needed" && need.question === "suspicious";
     // "Still needed?" answered No: nothing is learned from it, so say only that.
     const stale = verdict === "not_needed" && isStillNeeded(need);
-    const label = safe
-      ? "needs.toast.safe"
-      : stale
-        ? "needs.toast.noLongerNeeded"
-        : TOASTS[verdict];
+    let label = TOASTS[verdict];
+    if (safe) {
+      label = "needs.toast.safe";
+    } else if (stale) {
+      label = "needs.toast.noLongerNeeded";
+    } else if (isWait(need) && (verdict === "done" || verdict === "not_needed")) {
+      // A wait: they wrote back, or there was nothing to wait for.
+      label = verdict === "done" ? "needs.toast.heardBack" : "needs.toast.notWaiting";
+    }
     const undone = { current: false };
     const entry = undo.push({
       label: t(label, { name }),
