@@ -30,19 +30,27 @@ const STILL = "Pedro Alves asked 2 weeks ago. Still to do?";
  * change feed, so a need that changes (the clock waking it) arrives without
  * a reload. One reload at the end covers a feed that dropped.
  */
-async function homeShows(page: Page, workspace: string, text: string, seconds = 420): Promise<void> {
+async function homeShows(
+  page: Page,
+  workspace: string,
+  text: string,
+  seconds = 420,
+): Promise<void> {
   const home = `/w/${workspace}`;
   if (!page.url().endsWith(home)) {
     await page.goto(home);
   }
   await page.getByRole("heading", { level: 1 }).waitFor();
   try {
-    await page.getByText(text).first().waitFor({ timeout: seconds * 1000 });
+    await page
+      .getByText(text)
+      .first()
+      .waitFor({ timeout: seconds * 1000 });
   } catch {
     await page.goto(home);
     await page.getByRole("heading", { level: 1 }).waitFor();
     if ((await page.getByText(text).count()) === 0) {
-      const shown = await page.locator("main").innerText();
+      const shown = (await page.locator("main").textContent()) ?? "";
       throw new Error(`Home never showed “${text}”. It showed:\n${shown}`);
     }
   }
