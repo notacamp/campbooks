@@ -1484,3 +1484,42 @@ async fn an_expired_key_taken_again_records_its_new_workspace(db: PgPool) {
         [("k".to_owned(), Some(second.to_string()))]
     );
 }
+
+/// A replay of a request whose `{workspace_id}` segment is percent-encoded
+/// checks the access to the workspace the router decoded: it is served while
+/// the caller may work there, and refused (404) once they may not
+/// (campbooks-cloud#267).
+#[sqlx::test(migrations = "../../migrations")]
+async fn a_replay_with_a_percent_encoded_workspace_checks_its_access(db: PgPool) {
+    let idp = TestIdp::start().await;
+    let switches = SwitchPorts(std::sync::Arc::default());
+    let state = idp
+        .state(db)
+        .with_membership(std::sync::Arc::new(switches.clone()))
+        .with_visibility(std::sync::Arc::new(switches.clone()));
+    let (app, _) = app(state);
+    let http = Http {
+        app,
+        token: idp.token(&idp.claims("test:write")),
+        idp: idp.clone(),
+    };
+    let id = crate::tenancy::WorkspaceId::new().to_string();
+    let uri = format!(
+        "/api/v1/w/%{:02X}{}/boxes/b1/edit",
+        id.as_bytes()[0],
+        &id[1..]
+    );
+    let (status, _, first) = http.send("POST", &uri, Some("k-enc"), None).await;
+    assert_eq!(status, StatusCode::OK, "{first}");
+    let (status, headers, again) = http.send("POST", &uri, Some("k-enc"), None).await;
+    assert_eq!((status, again), (StatusCode::OK, first));
+    assert_eq!(headers[idempotency::REPLAYED_HEADER], "true");
+
+    switches
+        .0
+        .left
+        .store(true, std::sync::atomic::Ordering::SeqCst);
+    let (status, headers, _) = http.send("POST", &uri, Some("k-enc"), None).await;
+    assert_eq!(status, StatusCode::NOT_FOUND);
+    assert!(!headers.contains_key(idempotency::REPLAYED_HEADER));
+}
