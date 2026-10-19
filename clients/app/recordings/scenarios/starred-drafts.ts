@@ -347,7 +347,7 @@ export default async function starredDrafts({ page }: ScenarioContext): Promise<
   await caption(page, "Drafts (G then 0): a new message, a reply and a forward", 3000);
 
   // 3. The forward's row opens the forward, not the reply.
-  await page.getByRole("button", { name: /^Draft · Joana Reis.*Fwd:/u }).click();
+  await page.getByRole("button", { name: /Joana Reis.*Fwd:/u }).click();
   const composer = page.getByRole("textbox", { name: "Message" });
   await composer.waitFor();
   for (let attempt = 0; attempt < 50; attempt += 1) {
