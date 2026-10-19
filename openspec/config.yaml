@@ -32,7 +32,7 @@ rules:
   tasks:
     - Keep each task small enough for one focused session.
     - "Last tasks are always: OpenAPI regenerated, client types regenerated,
-      CHANGELOG updated, gates green, UI verified at 375px and desktop (if UI)."
+      changelog entry file (changelog/unreleased/), gates green, UI verified at 375px and desktop (if UI)."
 
 operations:
   apply:
