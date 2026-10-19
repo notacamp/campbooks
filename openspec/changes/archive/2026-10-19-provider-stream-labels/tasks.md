@@ -34,6 +34,6 @@
 
 ## 5. Finish
 
-- [ ] 5.1 `.sqlx` regenerated, OpenAPI and events catalogue regenerated if they change
-- [ ] 5.2 Changelog entry file; terminal recording (vhs) against the server with the fake providers
-- [ ] 5.3 CI green; `openspec archive provider-stream-labels --yes` before merge
+- [x] 5.1 `.sqlx` regenerated, OpenAPI and events catalogue regenerated if they change
+- [x] 5.2 Changelog entry file; terminal recording (vhs) against the server with the fake providers
+- [x] 5.3 CI green; `openspec archive provider-stream-labels --yes` before merge
