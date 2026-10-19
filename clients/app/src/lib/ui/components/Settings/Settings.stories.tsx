@@ -28,7 +28,7 @@ export const Page: Story = {
           <TextField
             label="What should Scout do?"
             hideLabel
-            placeholder="For example: anything from my accountant always matters"
+            placeholder="E.g. anything from my accountant matters"
           />
           <PrivacyLine>Only your sentence goes to the AI, never your mail.</PrivacyLine>
         </SettingsSection>

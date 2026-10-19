@@ -22,6 +22,7 @@
     "test": "vitest run --coverage",
     "test:watch": "vitest",
     "test:csp": "vitest run --config vitest.webkit.config.ts",
+    "test:fit": "vitest run --config vitest.fit.config.ts",
     "test:tauri": "vitest run --config vitest.tauri.config.ts",
     "test-storybook": "vitest run --config vitest.storybook.config.ts && VITE_STORYBOOK_THEME=dark vitest run --config vitest.storybook.config.ts",
     "deps:check": "depcruise src --config .dependency-cruiser.cjs",

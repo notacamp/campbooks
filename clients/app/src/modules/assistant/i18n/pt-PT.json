@@ -155,7 +155,7 @@
     "teach": {
       "title": "Ensine algo ao Scout",
       "label": "O que deve o Scout fazer?",
-      "placeholder": "Por exemplo: tudo o que vem do meu contabilista é importante",
+      "placeholder": "Ex.: tudo o que vem do meu contabilista importa",
       "privacy": "Só a sua frase é enviada, nunca o seu correio.",
       "submit": "Ensinar",
       "reading": "A ler a sua frase",

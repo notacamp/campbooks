@@ -64,7 +64,7 @@ export default async function trustedImages({ page }: ScenarioContext): Promise<
     .waitFor();
   await caption(page, "Remote images are held back until you choose Show images", 2400);
 
-  await reader.getByRole("button", { name: /^Always show images from The Weekly Ledger/u }).click();
+  await reader.getByRole("button", { name: /^Always from this sender/u }).click();
   const dialog = page.getByRole("dialog", {
     name: "Always show images from hello@weekly-ledger.example",
   });

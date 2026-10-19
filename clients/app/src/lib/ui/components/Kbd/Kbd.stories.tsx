@@ -39,7 +39,7 @@ export const OneOffKeys: Story = { args: { keys: "1" } };
 /** Every default binding. */
 export const AllDefaults: Story = {
   render: () => (
-    <dl className="grid grid-cols-2 gap-2">
+    <dl className="grid grid-cols-1 gap-2 sm:grid-cols-2">
       {DEFAULT_SHORTCUTS.map((definition) => (
         <div key={definition.id} className="flex items-center justify-between gap-3">
           <dt>{definition.id}</dt>
