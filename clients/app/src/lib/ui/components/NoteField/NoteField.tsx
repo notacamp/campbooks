@@ -77,7 +77,7 @@ export function NoteField({
     };
   }, []);
 
-  const left = maxLength - [...value].length;
+  const left = maxLength - value.length;
   const near = left <= NEAR_THE_LIMIT;
   const described = [near ? counterId : null, error === undefined ? null : errorId]
     .filter((part) => part !== null)

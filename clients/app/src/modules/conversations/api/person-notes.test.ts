@@ -27,13 +27,12 @@ describe("answeredPerson", () => {
       "@clientes.example",
       "a@b@c.example",
       'x"@y.example',
-      "x\\y@z.example",
+      String.raw`x\y@z.example`,
       "marta @clientes.example",
       "marta@clientes.example\u0007",
     ]) {
       expect(
         answeredPerson({ direction: "inbound", from: { address }, to: [SAM] }),
-        address,
       ).toBeUndefined();
     }
   });

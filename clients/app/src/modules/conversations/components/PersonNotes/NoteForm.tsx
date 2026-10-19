@@ -68,9 +68,9 @@ export function NoteForm({ workspaceId, address, name, note, onEnd }: NoteFormPr
               : "personNotes.form.failed",
         ),
       );
-      return undefined;
+      return null;
     });
-    if (kept === undefined) {
+    if (kept === null) {
       return;
     }
     onEnd("saved");

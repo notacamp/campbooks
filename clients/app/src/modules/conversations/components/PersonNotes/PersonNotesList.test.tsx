@@ -102,7 +102,10 @@ describe("PersonNotesList", () => {
     expect(field).toHaveValue(MARTA.note);
     fireEvent.change(field, { target: { value: "My landlord. Você, never tu." } });
     fireEvent.keyDown(field, { key: "Enter", ctrlKey: true });
-    expect(await screen.findByText("My landlord. Você, never tu.")).toBeVisible();
+    await waitFor(() => {
+      expect(screen.queryByRole("textbox")).toBeNull();
+    });
+    expect(screen.getByText("My landlord. Você, never tu.")).toBeVisible();
     expect(api.calls.find((c) => c.route === `PUT ${P}`)?.body).toEqual({
       address: MARTA.address,
       note: "My landlord. Você, never tu.",

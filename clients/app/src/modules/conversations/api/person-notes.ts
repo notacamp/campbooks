@@ -87,7 +87,7 @@ function plainAddress(address: string): boolean {
   if (parts.length !== 2 || parts[0] === "" || parts[1] === "") {
     return false;
   }
-  return ![...address].some((c) => c === '"' || c === "\\" || /\s/u.test(c) || /\p{Cc}/u.test(c));
+  return !/["\\\s\p{Cc}]/u.test(address);
 }
 
 /** A party of a message: its name and address. */

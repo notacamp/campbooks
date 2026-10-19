@@ -933,9 +933,7 @@ describe("ReplyDialog: telling Scout about the person", () => {
         screen.getByRole("button", { name: "Edit what Scout knows about Maya" }),
       ).toHaveFocus();
     });
-    expect(
-      screen.getAllByRole("status").some((s) => s.textContent?.includes("Saved.") === true),
-    ).toBe(true);
+    expect(screen.getAllByRole("status").some((s) => s.textContent.includes("Saved."))).toBe(true);
     expect(await screen.findByRole("button", { name: /^Undo/u })).toBeInTheDocument();
 
     // Nothing is written again on its own: only on Rewrite with this.
