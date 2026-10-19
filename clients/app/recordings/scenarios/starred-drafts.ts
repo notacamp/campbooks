@@ -358,7 +358,7 @@ export default async function starredDrafts({ page }: ScenarioContext): Promise<
   }
   await caption(page, "The forward's row opens that draft, beside the Drafts list", 3000);
   await page.keyboard.press("Escape");
-  await composer.waitFor({ state: "detached" }).catch(() => undefined);
+  await pause(600);
   await page.keyboard.press("Escape");
   await page.getByRole("heading", { level: 1, name: "Drafts" }).waitFor();
   await caption(page, "Escape goes back to Drafts. Nothing was sent", 2200);
