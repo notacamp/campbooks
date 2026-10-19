@@ -72,7 +72,7 @@ describe("the drafts list", () => {
   });
 
   it("shows the loading and the error states", () => {
-    const { unmount } = show();
+    const { unmount } = show(undefined, {}, false);
     expect(screen.queryByRole("heading")).toBeNull();
     unmount();
     show(undefined, {}, true);

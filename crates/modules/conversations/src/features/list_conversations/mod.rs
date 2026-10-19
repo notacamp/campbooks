@@ -1058,7 +1058,7 @@ mod http_tests {
         let kit = Kit::new(db).await;
         let (workspace, _, sam) = kit.sams_inbox().await;
         let base = format!("/api/v1/w/{workspace}/conversations");
-        for view in ["inbox", "sent", "spam", "trash"] {
+        for view in ["inbox", "sent", "starred", "spam", "trash"] {
             let refused = kit
                 .get(&sam, &format!("{base}?archived=true&view={view}"))
                 .await;
@@ -1066,7 +1066,7 @@ mod http_tests {
             assert_eq!(refused.json["code"], "invalid_view", "{view}");
         }
         assert_eq!(
-            kit.get(&sam, &format!("{base}?view=starred")).await.status,
+            kit.get(&sam, &format!("{base}?view=pinned")).await.status,
             StatusCode::BAD_REQUEST
         );
     }
