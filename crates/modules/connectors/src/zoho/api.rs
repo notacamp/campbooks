@@ -129,16 +129,6 @@ pub struct Listed {
     /// When it was sent, epoch milliseconds.
     #[serde(default, deserialize_with = "number", rename = "sentDateInGMT")]
     pub sent_time: Option<i64>,
-    /// Its labels' ids, as a listing names them (`tagId`): `None` when the
-    /// listing does not say. Zoho's docs show no listing field for a
-    /// message's labels; `tagId` (and `labelId`, read the same) is taken
-    /// as the label ids' field, as label answers name a label by both.
-    /// TODO(campbooks-cloud#292): confirm against a recorded Zoho listing.
-    #[serde(default, deserialize_with = "ids", rename = "tagId")]
-    tag_ids: Option<Vec<String>>,
-    /// The same, under the other name.
-    #[serde(default, deserialize_with = "ids", rename = "labelId")]
-    label_ids: Option<Vec<String>>,
 }
 
 /// One of the account's labels (`GET accounts/{a}/labels`).
@@ -199,11 +189,6 @@ impl Listed {
     /// When it was received (else sent), epoch milliseconds.
     pub fn time(&self) -> Option<i64> {
         self.received_time.or(self.sent_time)
-    }
-
-    /// Its labels' ids, when the listing says them.
-    pub fn labels(&self) -> Option<&[String]> {
-        self.tag_ids.as_deref().or(self.label_ids.as_deref())
     }
 }
 
@@ -330,6 +315,27 @@ impl<'a> ZohoMail<'a> {
             .append_pair("limit", &limit.min(200).to_string())
             .append_pair("sortorder", "false")
             .append_pair("includeto", "true");
+        self.call(self.request(reqwest::Method::GET, url)).await
+    }
+
+    /// Up to `limit` (≤ 200) messages carrying label `label`, from position
+    /// `start` (1-based), newest first, in every folder, archived and sent
+    /// mail included (`labelid`: Zoho's listing names no labels, so this is
+    /// how a message's labels are read).
+    pub async fn labelled(
+        &self,
+        label: &str,
+        start: u32,
+        limit: u32,
+    ) -> Result<Vec<Listed>, ProviderError> {
+        let mut url = self.url("messages/view")?;
+        url.query_pairs_mut()
+            .append_pair("labelid", label)
+            .append_pair("start", &start.to_string())
+            .append_pair("limit", &limit.min(200).to_string())
+            .append_pair("sortorder", "false")
+            .append_pair("includearchive", "true")
+            .append_pair("includesent", "true");
         self.call(self.request(reqwest::Method::GET, url)).await
     }
 
@@ -559,25 +565,6 @@ fn optional_id<'de, D: Deserializer<'de>>(deserializer: D) -> Result<Option<Stri
     })
 }
 
-/// Ids as a listing may give them: a list of numbers or strings, one id, or
-/// a comma-separated string; `null` for none.
-fn ids<'de, D: Deserializer<'de>>(deserializer: D) -> Result<Option<Vec<String>>, D::Error> {
-    let one = |value: &serde_json::Value| match value {
-        serde_json::Value::String(s) => s
-            .split(',')
-            .map(str::trim)
-            .filter(|s| !s.is_empty())
-            .map(ToOwned::to_owned)
-            .collect(),
-        serde_json::Value::Number(n) => vec![n.to_string()],
-        _ => Vec::new(),
-    };
-    Ok(Some(match serde_json::Value::deserialize(deserializer)? {
-        serde_json::Value::Array(list) => list.iter().flat_map(one).collect(),
-        other => one(&other),
-    }))
-}
-
 /// A JSON string or number, as text (empty for anything else).
 fn text<'de, D: Deserializer<'de>>(deserializer: D) -> Result<String, D::Error> {
     Ok(optional_id(deserializer)?.unwrap_or_default())
@@ -607,7 +594,6 @@ mod tests {
         assert!(listed[0].read() && !listed[0].flagged());
         assert_eq!(listed[0].subject(), "Re: Orçamento");
         assert_eq!(listed[0].recipients(), ["sam@example.com"]);
-        assert_eq!(listed[0].labels(), None);
         assert_eq!(listed[1].message_id, "1711540357880100000");
         assert_eq!(listed[1].received_time, Some(1_425_388_373_920));
         assert!(!listed[1].read() && listed[1].flagged());
@@ -618,22 +604,7 @@ mod tests {
     }
 
     #[test]
-    fn a_listing_names_its_labels() {
-        let listed: Vec<Listed> = serde_json::from_value(serde_json::json!([
-            {"messageId": "1", "folderId": "2", "tagId": ["9000000014002", 9_000_000_014_003_u64]},
-            {"messageId": "3", "folderId": "2", "labelId": "9000000014002,9000000014004"},
-            {"messageId": "4", "folderId": "2", "tagId": []}
-        ]))
-        .unwrap();
-        assert_eq!(
-            listed[0].labels(),
-            Some(["9000000014002".to_owned(), "9000000014003".to_owned()].as_slice())
-        );
-        assert_eq!(
-            listed[1].labels(),
-            Some(["9000000014002".to_owned(), "9000000014004".to_owned()].as_slice())
-        );
-        assert_eq!(listed[2].labels(), Some([].as_slice()));
+    fn labels_read_as_zoho_writes_them() {
         let labels: Vec<ZohoLabel> = serde_json::from_value(serde_json::json!([
             {"sequence": 1, "labelId": "9000000014002", "color": "#96ccf5",
              "tagId": "9000000014002", "displayName": "Campbooks/Receipts", "URI": "x"}

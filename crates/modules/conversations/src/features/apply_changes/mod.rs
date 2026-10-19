@@ -214,6 +214,7 @@ impl JobHandler for ApplyChanges {
             needs: &self.needs,
             inbox: batch.inbox,
             backfill: batch.backfill,
+            mirroring: BTreeMap::new(),
             touched: BTreeMap::new(),
             new_in: BTreeSet::new(),
             taught: None,
@@ -420,6 +421,10 @@ struct Apply<'a> {
     /// The batch was read by the inbox's first sync: its messages' streams
     /// are never mirrored.
     backfill: bool,
+    /// Conversations whose received messages are to follow them at the
+    /// provider, each once at the end of the batch, with the messages asked
+    /// whatever they hold (a stale stream mark).
+    mirroring: BTreeMap<ConversationId, BTreeSet<String>>,
     /// Conversations whose existing messages changed or went: what changed
     /// and which messages, announced at the end.
     touched: BTreeMap<ConversationId, (BTreeSet<Change>, BTreeSet<String>)>,
@@ -567,7 +572,7 @@ impl Apply<'_> {
     /// messages are asked to follow at the provider, and so is this one when
     /// its stream mark is stale. Returns whether the conversation moved.
     async fn provider_stream(
-        &self,
+        &mut self,
         tx: &mut Transaction<'static, Postgres>,
         message: &NormalizedMessage,
         id: MessageId,
@@ -611,18 +616,10 @@ impl Apply<'_> {
         .rows_affected()
             > 0;
         if moved || message.stream_mark_stale {
-            let stale = message
-                .stream_mark_stale
-                .then_some(message.provider_message_id.as_str());
-            streams::mirror(
-                &self.state.binding,
-                self.events,
-                tx,
-                self.ws,
-                conversation,
-                stale,
-            )
-            .await?;
+            let also = self.mirroring.entry(conversation).or_default();
+            if message.stream_mark_stale {
+                also.insert(message.provider_message_id.clone());
+            }
         }
         Ok(moved)
     }
@@ -986,7 +983,7 @@ impl Apply<'_> {
     /// asks for itself: a taught rule's on arrival, the model pass's after
     /// it.)
     async fn follow_joined(
-        &self,
+        &mut self,
         tx: &mut Transaction<'static, Postgres>,
         message: &NormalizedMessage,
         conversation: ConversationId,
@@ -1001,15 +998,7 @@ impl Apply<'_> {
         .fetch_one(&mut **tx)
         .await?;
         if placed {
-            streams::mirror(
-                &self.state.binding,
-                self.events,
-                tx,
-                self.ws,
-                conversation,
-                None,
-            )
-            .await?;
+            self.mirroring.entry(conversation).or_default();
         }
         Ok(())
     }
@@ -1134,6 +1123,20 @@ impl Apply<'_> {
     /// Recount every conversation the batch touched and announce the
     /// changes to existing ones.
     async fn finish(self, tx: &mut Transaction<'static, Postgres>) -> Result<(), JobError> {
+        // Each conversation's messages asked to follow it once, whatever
+        // number of its messages the batch carried.
+        for (conversation, also) in &self.mirroring {
+            let also: Vec<String> = also.iter().cloned().collect();
+            streams::mirror(
+                &self.state.binding,
+                self.events,
+                tx,
+                self.ws,
+                *conversation,
+                &also,
+            )
+            .await?;
+        }
         for conversation in &self.new_in {
             if !self.touched.contains_key(conversation) {
                 recount(tx, *conversation).await?;

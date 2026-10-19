@@ -423,3 +423,55 @@ async fn a_stale_stream_mark_is_taken_off(db: PgPool) {
     // The message itself is asked to Newsletters: the stale mark comes off.
     assert_eq!(moves(&kit).await, [pair("r1", "newsletters")]);
 }
+
+/// Scout's sort of a message from `from` (arrived at the provider in
+/// `arrived`, placed in `placed`) is mirrored; the connector reports the
+/// write once; then the member undoes it in their mail client. The batches
+/// each connector sends in that order (`connectors` tests the same sequence
+/// from its side).
+async fn mirrored_then_reverted(db: PgPool, from: &str, arrived: &str, placed: &str) {
+    let kit = kit(db).await;
+    let (workspace, inbox) = inbox(&kit).await;
+    let at = |stream: &str| batch(&[upsert("m1", "t-m", from, 0, Some(json!(stream)))]);
+    kit.ingest_value(workspace, inbox, &at(arrived)).await;
+    assert_eq!(
+        kit.stream_of("m1").await,
+        (placed.to_owned(), "model".to_owned())
+    );
+    assert_eq!(moves(&kit).await, [pair("m1", placed)]);
+    let changed = kit.events("conversations.conversation_changed").await.len();
+
+    // The write, reported once: stored, nothing published.
+    kit.ingest_value(workspace, inbox, &at(placed)).await;
+    assert_eq!(stored(&kit, "m1").await.0.as_deref(), Some(placed));
+    assert_eq!(
+        kit.events("conversations.conversation_changed").await.len(),
+        changed
+    );
+
+    // The member puts it back where it arrived: the conversation follows,
+    // as a member's move, and nothing is asked of the provider again.
+    kit.ingest_value(workspace, inbox, &at(arrived)).await;
+    assert_eq!(
+        kit.stream_of("m1").await,
+        (arrived.to_owned(), "member".to_owned())
+    );
+    assert_eq!(moves(&kit).await, [pair("m1", placed)]);
+    // A later message of the conversation joins it there.
+    let next = batch(&[upsert("m2", "t-m", from, 30, Some(json!(arrived)))]);
+    kit.ingest_value(workspace, inbox, &next).await;
+    assert_eq!(moves(&kit).await, [pair("m1", placed)]);
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_tab_put_back_in_gmail_undoes_scouts_sort(db: PgPool) {
+    // Promotions, placed in Primary, dragged back to Promotions.
+    mirrored_then_reverted(db, "promo@shop.example", "newsletters", "primary").await;
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_mark_taken_off_in_zoho_undoes_scouts_sort(db: PgPool) {
+    // Zoho's mark-free inbox, placed in Receipts (a mark), the mark taken
+    // off.
+    mirrored_then_reverted(db, "receipts@shop.example", "primary", "receipts").await;
+}

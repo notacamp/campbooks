@@ -233,6 +233,7 @@ function consentPage(query: URLSearchParams): string {
     "ZohoMail.accounts.READ": "See your mail accounts",
     "ZohoMail.folders.READ": "See your folders",
     "ZohoMail.messages.ALL": "Read, send and organise your mail",
+    "ZohoMail.tags.ALL": "See, create and apply your labels",
   };
   const items = scopes.map((s) => `<li>${escape(wording[s] ?? s)}</li>`).join("");
   const allow = new URLSearchParams(query);

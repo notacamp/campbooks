@@ -157,6 +157,7 @@ impl Reader<'_> {
                         page_token: None,
                         window_start: None,
                         generation: cursor.generation + 1,
+                        synced_at: cursor.synced_at,
                     };
                     return Ok(Self::empty_page(next, Phase::Resync, true));
                 }

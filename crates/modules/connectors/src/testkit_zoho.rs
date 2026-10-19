@@ -4,9 +4,9 @@
 //! metadata is HTML-escaped, ids are 64-bit numbers, and a send sets its own
 //! `Message-ID` (a reply's `In-Reply-To` names the message replied to).
 //! Labels are listed and made through `labels`, put on and taken off with
-//! `applyLabel` / `removeLabel`, and listed with each message (`tagId`), as
-//! the adapter reads them; a grant without the labels scope is refused the
-//! labels API.
+//! `applyLabel` / `removeLabel`, and, as at Zoho, a listing names no labels:
+//! a label's messages are listed with `labelid`. A grant without the labels
+//! scope is refused the labels API.
 //!
 //! No test talks to Zoho.
 
@@ -452,7 +452,6 @@ fn listed(message: &ZohoMessage) -> serde_json::Value {
         "hasAttachment": "0",
         "summary": escape(&summary(&message.raw)),
         "sender": "Someone",
-        "tagId": message.labels,
     })
 }
 
@@ -517,6 +516,7 @@ impl Respond for Responder {
             return error(401, "INVALID_OAUTHTOKEN");
         }
         let labelling = path.ends_with("/labels")
+            || query.contains_key("labelid")
             || matches!(body["mode"].as_str(), Some("applyLabel" | "removeLabel"));
         if labelling && state.labels_refused {
             return error(401, "INVALID_OAUTHSCOPE");
@@ -628,6 +628,30 @@ fn mail(
                                     "data": {"labelId": id, "tagId": id, "displayName": escape(&name),
                                              "color": "#ffd700", "sequence": account.labels.len()}}),
             )
+        }
+        // Like Zoho's listing, it names no labels: a label's messages are
+        // listed with `labelid`, in every folder.
+        ("GET", ["messages", "view"]) if query.contains_key("labelid") => {
+            let label = query.get("labelid").cloned().unwrap_or_default();
+            let start: usize = query.get("start").and_then(|s| s.parse().ok()).unwrap_or(1);
+            let limit: usize = query
+                .get("limit")
+                .and_then(|s| s.parse().ok())
+                .unwrap_or(10);
+            let archived = query.get("includearchive").map(String::as_str) == Some("true");
+            let mut messages: Vec<&ZohoMessage> = state.accounts[index]
+                .messages
+                .values()
+                .filter(|m| m.labels.contains(&label) && (archived || !m.archived))
+                .collect();
+            messages.sort_by(|a, b| b.received.cmp(&a.received).then(b.id.cmp(&a.id)));
+            let page: Vec<_> = messages
+                .into_iter()
+                .skip(start.saturating_sub(1))
+                .take(limit)
+                .map(listed)
+                .collect();
+            ok(&page.into())
         }
         ("GET", ["messages", "view"]) => {
             let folder = query.get("folderId").cloned().unwrap_or_default();

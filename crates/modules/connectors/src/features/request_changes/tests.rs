@@ -1188,12 +1188,21 @@ fn creations(kit: &Kit) -> usize {
         .count()
 }
 
+/// The provider streams the batches since the `from`th carry for `id`.
+async fn reported(kit: &Kit, ws: WorkspaceId, from: usize, id: &str) -> Vec<Value> {
+    changes(kit, ws).await[from..]
+        .iter()
+        .filter(|c| c["message"]["provider_message_id"] == id)
+        .map(|c| c["message"]["provider_stream"].clone())
+        .collect()
+}
+
 #[sqlx::test(migrations = "../../../migrations")]
 async fn receipts_reach_gmail_through_its_mark(db: PgPool) {
     let kit = Kit::new(db).await;
     let m = mailbox(&kit, &[&["INBOX", "CATEGORY_PROMOTIONS"]]).await;
     let id = m.ids[0].as_str();
-    let batches = kit.batches(m.ws).await.len();
+    let start = changes(&kit, m.ws).await.len();
     kit.google.clear_calls();
     assert!(kit.google.label_named("Campbooks/Receipts").is_none());
 
@@ -1209,12 +1218,14 @@ async fn receipts_reach_gmail_through_its_mark(db: PgPool) {
         labels(&["CATEGORY_UPDATES", "Campbooks/Receipts", "INBOX"])
     );
     assert_eq!(ends(&kit).await, [end("applied", None)]);
-
-    // The write comes back as nothing: no batch, no change recorded.
+    // Reported once, from the index; then nothing: no batch, no change.
+    assert_eq!(reported(&kit, m.ws, start, id).await, [json!("receipts")]);
+    let after = changes(&kit, m.ws).await.len();
     m.run(&kit).await;
     m.run(&kit).await;
-    assert_eq!(kit.batches(m.ws).await.len(), batches);
+    assert_eq!(changes(&kit, m.ws).await.len(), after);
     assert_eq!(outbound(&kit).await.len(), 1);
+    assert_eq!(kit.google.raw_fetches(id), 1, "never downloaded again");
 
     // Out of Receipts: the mark and the Updates tab off, Primary on.
     m.request(
@@ -1236,7 +1247,63 @@ async fn receipts_reach_gmail_through_its_mark(db: PgPool) {
         labels(&["CATEGORY_UPDATES", "Campbooks/Receipts", "INBOX"])
     );
     assert!(ends(&kit).await.iter().all(|e| *e == end("applied", None)));
-    assert_eq!(kit.batches(m.ws).await.len(), batches);
+    assert_eq!(
+        reported(&kit, m.ws, start, id).await,
+        [json!("receipts"), json!("primary"), json!("receipts")]
+    );
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_stream_write_is_reported_once(db: PgPool) {
+    let kit = Kit::new(db).await;
+    let m = mailbox(&kit, &[&["INBOX", "CATEGORY_PROMOTIONS"], &["INBOX"]]).await;
+    let start = changes(&kit, m.ws).await.len();
+    m.request(
+        &kit,
+        &[(
+            m.ids[0].as_str(),
+            json!({"kind": "move_to_stream", "stream": "primary"}),
+        )],
+    )
+    .await;
+    // A write that changes no stream is never reported.
+    m.request(&kit, &[(m.ids[1].as_str(), json!({"kind": "star"}))])
+        .await;
+    let all = changes(&kit, m.ws).await;
+    assert_eq!(all.len(), start + 1, "{:#?}", &all[start..]);
+    let message = &all[start]["message"];
+    assert_eq!(message["provider_message_id"], m.ids[0].as_str());
+    assert_eq!(message["provider_stream"], "primary");
+    assert!(message.get("stream_mark_stale").is_none());
+    m.run(&kit).await;
+    assert_eq!(changes(&kit, m.ws).await.len(), start + 1);
+    assert_eq!(kit.google.raw_fetches(&m.ids[0]), 1);
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_revert_in_gmail_after_a_stream_write_comes_back(db: PgPool) {
+    // Scout's sort is written (Promotions to Primary), then the member
+    // drags the message back to Promotions in Gmail: the batches say
+    // `primary`, then `newsletters`, the second with no stale mark.
+    let kit = Kit::new(db).await;
+    let m = mailbox(&kit, &[&["INBOX", "CATEGORY_PROMOTIONS"]]).await;
+    let id = m.ids[0].as_str();
+    let start = changes(&kit, m.ws).await.len();
+    m.request(
+        &kit,
+        &[(id, json!({"kind": "move_to_stream", "stream": "primary"}))],
+    )
+    .await;
+    kit.google
+        .relabel(id, &["CATEGORY_PROMOTIONS"], &["CATEGORY_PERSONAL"]);
+    m.run(&kit).await;
+    assert_eq!(
+        reported(&kit, m.ws, start, id).await,
+        [json!("primary"), json!("newsletters")]
+    );
+    let last = changes(&kit, m.ws).await.pop().unwrap();
+    assert!(last["message"].get("stream_mark_stale").is_none());
+    assert_eq!(outbound(&kit).await.len(), 1, "nothing written back");
 }
 
 #[sqlx::test(migrations = "../../../migrations")]

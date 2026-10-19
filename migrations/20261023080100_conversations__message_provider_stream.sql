@@ -16,8 +16,8 @@
 -- existing mail is never relabelled.
 --
 -- Both are added without a default that rewrites the table. The check is
--- added NOT VALID: every existing row is NULL, which passes it, and new rows
--- are checked.
+-- added NOT VALID, so the swap holds the table's lock only for a moment; it is
+-- validated by `…080200_conversations__message_provider_stream_validate`.
 --
 -- Wait at most 5 s for a lock: a busy instance fails this migration fast,
 -- and the next start retries it, rather than stalling.

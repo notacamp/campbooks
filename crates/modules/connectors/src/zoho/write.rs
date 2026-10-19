@@ -401,7 +401,7 @@ pub async fn push(
             Err(ProviderError::Unauthorized) => {
                 unmade.insert(stream, "scope_missing");
             }
-            Err(ProviderError::Unexpected(_)) => {
+            Err(ProviderError::Unexpected(_) | ProviderError::NotFound) => {
                 unmade.insert(stream, "refused");
             }
             Err(trouble) => {
@@ -416,8 +416,19 @@ pub async fn push(
         state::label_token,
     );
     let mut plan = Plan::merge(backlog);
-    // Zoho keeps no history: the index is what is known.
-    plan.in_place(backlog, Some(&HashSet::new()));
+    // Zoho keeps no history: the index is what is known, but for labels,
+    // which are read only through listings and can be behind.
+    let unsure: HashSet<(String, String)> = plan
+        .wants
+        .iter()
+        .flat_map(|(message, labels)| {
+            labels
+                .keys()
+                .filter(|label| state::label_of(label).is_some())
+                .map(move |label| (message.clone(), label.clone()))
+        })
+        .collect();
+    plan.in_place(backlog, Some(&unsure));
     plan.atomic();
     let mut calls: BTreeMap<Op, Vec<String>> = BTreeMap::new();
     let mut nothing_to_do = Vec::new();

@@ -330,7 +330,7 @@ impl Pass {
             // Placed, whether or not the stream changed (a placement in
             // Primary takes Gmail's Updates tab off too): its received
             // messages go to the stream at the provider as well.
-            streams::mirror(&binding, &events, tx, &ws, loaded.conversation, None).await?;
+            streams::mirror(&binding, &events, tx, &ws, loaded.conversation, &[]).await?;
         }
         needs::refresh(tx, &events, &ws, loaded.conversation, &self.needs).await?;
         Ok(Passed::Done)

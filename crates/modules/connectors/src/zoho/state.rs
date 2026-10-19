@@ -33,24 +33,11 @@ pub fn label_of(token: &str) -> Option<&str> {
     token.strip_prefix(LABEL)
 }
 
-/// `tokens` with the labels a listing says (`listed`), or, when it says
-/// none, with the labels `known` (the index's tokens) had: a listing that
-/// does not name labels changes none. Sorted.
-pub fn with_labels(
-    mut tokens: Vec<String>,
-    listed: Option<&[String]>,
-    known: Option<&[String]>,
-) -> Vec<String> {
-    match listed {
-        Some(ids) => tokens.extend(ids.iter().map(|id| label_token(id))),
-        None => tokens.extend(
-            known
-                .unwrap_or_default()
-                .iter()
-                .filter(|t| label_of(t).is_some())
-                .cloned(),
-        ),
-    }
+/// `tokens` with the label tokens of `known` (the message's tokens as the
+/// index holds them): what a run starts from before it reads the labels
+/// (`zoho/read.rs`). Sorted.
+pub fn with_labels(mut tokens: Vec<String>, known: &[String]) -> Vec<String> {
+    tokens.extend(known.iter().filter(|t| label_of(t).is_some()).cloned());
     tokens.sort();
     tokens.dedup();
     tokens
@@ -276,10 +263,12 @@ mod tests {
             ("73".to_owned(), "Campbooks/Updates".to_owned()),
         ]);
         let inbox = tokens("11", FolderKind::Inbox, true, false, false);
-        let listed = |ids: &[&str]| {
-            let ids: Vec<String> = ids.iter().map(|&s| s.to_owned()).collect();
-            with_labels(inbox.clone(), Some(ids.as_slice()), None)
+        let labelled = |mut tokens: Vec<String>, ids: &[&str]| {
+            tokens.extend(ids.iter().map(|id| label_token(id)));
+            tokens.sort();
+            tokens
         };
+        let listed = |ids: &[&str]| labelled(inbox.clone(), ids);
         let plain = flags_with(&listed(&["71"]), &names);
         assert_eq!(
             plain.labels,
@@ -302,19 +291,14 @@ mod tests {
         // A label not known by name is not carried.
         assert!(flags_with(&listed(&["99"]), &names).labels.is_empty());
         // Sent mail has no stream; without names (no scope) nothing is.
-        let sent = with_labels(
-            tokens("12", FolderKind::Sent, true, false, false),
-            Some(["72".to_owned()].as_slice()),
-            None,
-        );
+        let sent = labelled(tokens("12", FolderKind::Sent, true, false, false), &["72"]);
         assert_eq!(flags_with(&sent, &names).provider_stream, None);
         assert_eq!(flags(&listed(&["72"])).provider_stream, None);
-        // A listing that names no labels keeps the index's.
+        // A run starts from the index's labels.
         let known = listed(&["71"]);
-        assert_eq!(
-            with_labels(inbox.clone(), None, Some(known.as_slice())),
-            known
-        );
+        let mut moved = tokens("14", FolderKind::Other, true, false, false);
+        moved = with_labels(moved, &known);
+        assert_eq!(moved, ["OWN", "folder:14", "label:71"]);
         assert!(writable("label:71") && writable("mark:receipts"));
         assert!(!writable("label:") && !writable("mark:someday"));
     }

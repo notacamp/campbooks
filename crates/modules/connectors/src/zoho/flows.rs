@@ -380,9 +380,14 @@ async fn members_changes_reach_zoho_and_never_echo(db: PgPool) {
         "{writes:?}"
     );
 
-    // The write comes back as nothing.
+    // The stream write is reported once, from the index; the rest come
+    // back as nothing.
+    let now = changes(&kit, mailbox.ws).await;
+    assert_eq!(now.len(), before + 1, "{:#?}", &now[before..]);
+    assert_eq!(now[before]["message"]["provider_message_id"], two.as_str());
+    assert_eq!(now[before]["message"]["provider_stream"], "newsletters");
     mailbox.run(&kit).await;
-    assert_eq!(changes(&kit, mailbox.ws).await.len(), before);
+    assert_eq!(changes(&kit, mailbox.ws).await.len(), before + 1);
 }
 
 /// The change for `kind`, with the direction conversations sends for
@@ -990,6 +995,19 @@ async fn outbound_ends(kit: &Kit) -> Vec<(String, String, Option<String>)> {
         .unwrap()
 }
 
+/// The provider streams the upserts since the `from`th carry for `id`.
+async fn streams_of(kit: &Kit, ws: WorkspaceId, from: usize, id: &str) -> Vec<Value> {
+    upsert_of(&changes(kit, ws).await[from..], id)
+        .iter()
+        .map(|c| c["message"]["provider_stream"].clone())
+        .collect()
+}
+
+/// Past the sweep interval: the next run walks the mailbox again.
+async fn sweep(kit: &Kit) {
+    kit.tick(TimeDelta::minutes(361)).await;
+}
+
 #[sqlx::test(migrations = "../../../migrations")]
 async fn zoho_labels_and_stream_marks_are_read_without_a_download(db: PgPool) {
     let kit = Kit::new(db).await;
@@ -1007,11 +1025,11 @@ async fn zoho_labels_and_stream_marks_are_read_without_a_download(db: PgPool) {
     // No mark: Zoho's mark-free inbox is Primary.
     assert_eq!(first["provider_stream"], "primary");
 
-    // Labelled in Zoho.
+    // Labelled in Zoho: read with every label at the next sweep.
     kit.zoho
         .change(&message, |m| m.labels.push(clients.clone()));
     let start = changes(&kit, mailbox.ws).await.len();
-    mailbox.run(&kit).await;
+    sweep(&kit).await;
     let now = changes(&kit, mailbox.ws).await;
     let labelled = &upsert_of(&now[start..], &message)[0]["message"];
     assert_eq!(
@@ -1020,18 +1038,37 @@ async fn zoho_labels_and_stream_marks_are_read_without_a_download(db: PgPool) {
     );
 
     // A member adds `Campbooks/Newsletters` in Zoho (a label made after the
-    // last listing of the account's labels).
+    // last listing of the account's labels): the next run says so.
     let mark = kit.zoho.add_label("Campbooks/Newsletters");
     kit.zoho.change(&message, |m| m.labels.push(mark.clone()));
     let start = changes(&kit, mailbox.ws).await.len();
     mailbox.run(&kit).await;
-    let now = changes(&kit, mailbox.ws).await;
-    let marked = &upsert_of(&now[start..], &message)[0]["message"];
-    assert_eq!(marked["provider_stream"], "newsletters");
     assert_eq!(
-        marked["labels"],
+        streams_of(&kit, mailbox.ws, start, &message).await,
+        [json!("newsletters")]
+    );
+    let now = changes(&kit, mailbox.ws).await;
+    assert_eq!(
+        upsert_of(&now[start..], &message)[0]["message"]["labels"],
         json!([{"key": clients, "name": "Clients"}]),
         "a mark is never a label"
+    );
+
+    // Taken off again: a run only ever adds a mark; the next sweep reads
+    // the mark's whole listing and says Primary.
+    kit.zoho
+        .change(&message, |m| m.labels.retain(|l| *l != mark));
+    let start = changes(&kit, mailbox.ws).await.len();
+    mailbox.run(&kit).await;
+    assert!(
+        streams_of(&kit, mailbox.ws, start, &message)
+            .await
+            .is_empty()
+    );
+    sweep(&kit).await;
+    assert_eq!(
+        streams_of(&kit, mailbox.ws, start, &message).await,
+        [json!("primary")]
     );
     for batch in kit.batches(mailbox.ws).await {
         assert_contract("message-change-batch.v1.schema.json", &batch);
@@ -1111,21 +1148,59 @@ async fn stream_moves_and_labels_reach_zoho_and_never_echo(db: PgPool) {
         .into_iter()
         .map(|(_, state, reason)| (state, reason))
         .collect();
-    assert_eq!(
-        ends,
-        [
-            ("applied".to_owned(), None),
-            ("applied".to_owned(), None),
-            ("skipped".to_owned(), Some("already_set".to_owned())),
-            ("applied".to_owned(), None),
-            ("applied".to_owned(), None),
-        ]
+    assert!(
+        ends.iter().all(|end| *end == ("applied".to_owned(), None)),
+        "{ends:?}"
     );
 
-    // The writes come back as nothing.
+    // Each stream write is reported once, from the index; nothing else
+    // comes back, then or later (a sweep included).
+    let reports = [json!("updates"), json!("receipts"), json!("primary")];
+    assert_eq!(
+        streams_of(&kit, mailbox.ws, before, &message).await,
+        reports
+    );
     mailbox.run(&kit).await;
-    mailbox.run(&kit).await;
-    assert_eq!(changes(&kit, mailbox.ws).await.len(), before);
+    sweep(&kit).await;
+    assert_eq!(
+        streams_of(&kit, mailbox.ws, before, &message).await,
+        reports
+    );
+    assert_eq!(kit.zoho.raw_fetches(&message), 1);
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_revert_in_zoho_after_a_stream_write_comes_back(db: PgPool) {
+    // Scout's sort is written (a Receipts mark), then the member takes the
+    // mark off in Zoho: the batches say `receipts`, then (at the sweep)
+    // `primary`, and nothing is written back.
+    let kit = Kit::new(db).await;
+    let message = kit.zoho.deliver(
+        &synthetic(1),
+        INBOX,
+        true,
+        kit.clock.now() - TimeDelta::hours(1),
+    );
+    let mailbox = connected(&kit).await;
+    let before = changes(&kit, mailbox.ws).await.len();
+    mailbox
+        .request(
+            &kit,
+            &[(
+                message.as_str(),
+                json!({"kind": "move_to_stream", "stream": "receipts"}),
+            )],
+        )
+        .await;
+    let mark = kit.zoho.label_named("Campbooks/Receipts").unwrap();
+    kit.zoho
+        .change(&message, |m| m.labels.retain(|l| *l != mark));
+    sweep(&kit).await;
+    assert_eq!(
+        streams_of(&kit, mailbox.ws, before, &message).await,
+        [json!("receipts"), json!("primary")]
+    );
+    assert_eq!(outbound_ends(&kit).await.len(), 1, "nothing written back");
 }
 
 #[sqlx::test(migrations = "../../../migrations")]
@@ -1207,4 +1282,51 @@ async fn a_zoho_grant_without_the_labels_scope_syncs_the_rest(db: PgPool) {
         kit.zoho.calls()
     );
     assert_eq!(kit.stream().await["consecutive_failures"], 0);
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn mail_from_before_the_first_sync_is_never_new_mail(db: PgPool) {
+    let kit = Kit::new(db).await;
+    kit.zoho.deliver(
+        &synthetic(1),
+        INBOX,
+        true,
+        kit.clock.now() - TimeDelta::hours(3),
+    );
+    let mailbox = connected(&kit).await;
+    let batches = kit.batches(mailbox.ws).await;
+    assert!(!batches.is_empty());
+    assert!(batches.iter().all(|b| b["backfill"] == true));
+    // Turning up only now, received before the first sync completed (moved
+    // from a folder the adapter does not read): the backfill's.
+    let late = kit.zoho.deliver(
+        &synthetic(2),
+        INBOX,
+        true,
+        kit.clock.now() - TimeDelta::hours(2),
+    );
+    let fresh = kit
+        .zoho
+        .deliver(&synthetic(3), INBOX, false, kit.clock.now());
+    let from = batches.len();
+    mailbox.run(&kit).await;
+    let batches = kit.batches(mailbox.ws).await;
+    let carrying = |id: &str| {
+        batches[from..]
+            .iter()
+            .find(|b| !upsert_of(b["changes"].as_array().unwrap(), id).is_empty())
+            .unwrap()
+            .clone()
+    };
+    assert_eq!(carrying(&late)["backfill"], true);
+    assert!(carrying(&fresh).get("backfill").is_none());
+    // The sweep finds nothing new and says so of nothing.
+    sweep(&kit).await;
+    assert!(
+        kit.batches(mailbox.ws)
+            .await
+            .iter()
+            .skip(from + 2)
+            .all(|b| b.get("backfill").is_none())
+    );
 }

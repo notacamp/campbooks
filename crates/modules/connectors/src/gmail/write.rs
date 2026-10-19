@@ -172,7 +172,7 @@ async fn pushed(
                 push.created.push((label.id, label.name));
             }
             // Gmail refused that label: the changes needing it are not made.
-            Err(ProviderError::Unexpected(_)) => {
+            Err(ProviderError::Unexpected(_) | ProviderError::NotFound) => {
                 unmade.insert(stream, "refused");
             }
             Err(trouble) => {
