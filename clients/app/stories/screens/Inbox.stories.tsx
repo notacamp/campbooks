@@ -13,7 +13,7 @@ import {
   isPlace,
   type ConversationAction,
   type ConversationSummary,
-  type Stream,
+  type Stream as StreamId,
 } from "../../src/modules/conversations/api/queries";
 import {
   INBOX,
@@ -635,7 +635,7 @@ function keptMailbox(): Record<string, MockRoute> {
       routes[`POST ${W}/conversations/${id}/${path}`] = act(id, action);
     }
     routes[`POST ${W}/conversations/${id}/stream`] = (body) =>
-      act(id, { stream: (body as { stream: Stream }).stream })();
+      act(id, { stream: (body as { stream: StreamId }).stream })();
   }
   return inbox(routes);
 }
