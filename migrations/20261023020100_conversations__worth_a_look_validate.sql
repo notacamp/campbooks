@@ -1,4 +1,4 @@
--- Validate the checks `…000000_conversations__worth_a_look` widened NOT VALID
+-- Validate the checks `…020000_conversations__worth_a_look` widened NOT VALID
 -- (campbooks-cloud#274). A migration of its own, so it runs in a transaction
 -- of its own: VALIDATE CONSTRAINT takes only SHARE UPDATE EXCLUSIVE, so
 -- reads and writes go on while it scans the rows.
