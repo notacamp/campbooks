@@ -12,6 +12,14 @@ All notable changes to Campbooks Next are documented here. The format follows
   end of the line, above its due date: "12 minutes ago", "5 hours ago", "Yesterday", "4
   days ago", then the date once it is a week old ("2 Oct"). Hover it for the full date and
   time.
+- **Sent, Archive, Spam and Trash under the streams** (G then 5 to 8), and **Delete (#)
+  and Report spam (!)** with Undo. Sent lists every conversation you wrote in, by your
+  latest message, with whom it went to and whether they replied since. The key that sent a
+  conversation somewhere brings it back: E moves it from Archive to the inbox, # restores it
+  from Trash and ! says it is not spam. In Spam, images never load (not even from a sender
+  you trust), and there is no reply box and nothing from Scout. The API's
+  `conversations.list` takes `view=inbox|sent|archive|spam|trash`; `archived=true` still
+  works and is deprecated.
 - **Threads read as a back and forth.** Your own messages in a thread read "You → Marta
   Silva" and sit in from the left, while theirs stay flush left. A long thread keeps its
   newest two messages, its first and anything unread, and folds the middle into "N more

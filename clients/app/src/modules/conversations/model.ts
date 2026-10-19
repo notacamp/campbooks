@@ -1,11 +1,13 @@
 // Pure helpers of the inbox screens: what a row, a message and the
 // assistant's note say, from the API's records. No React, no fetching.
-import type {
-  ConversationSummary,
-  DecisionView,
-  MessageView,
-  ReasonView,
-  Stream,
+import {
+  isView,
+  type ConversationSummary,
+  type DecisionView,
+  type MessageView,
+  type Place,
+  type ReasonView,
+  type Stream,
 } from "./api/queries";
 
 /** `t` for keys only known at runtime (stream names, reason ids). */
@@ -99,6 +101,86 @@ export function replyName(message: MessageView): string {
 
 export function streamName(t: Translate, stream: Stream): string {
   return t(`streams.${stream}`);
+}
+
+/** A stream's name, or a view's ("Sent", "Trash"). */
+export function placeName(t: Translate, place: Place): string {
+  return isView(place) ? t(`views.${place}`) : streamName(t, place);
+}
+
+/**
+ * A Sent row's lead: who the inbox's latest message went to. "To Marta
+ * Ferreira", "To Marta Ferreira and 2 others".
+ */
+export function sentToLine(t: Translate, summary: ConversationSummary): string {
+  const [first, ...others] = summary.sent_to;
+  if (first === undefined) {
+    return t("list.toHidden");
+  }
+  const name = displayName(first);
+  return others.length === 0
+    ? t("list.to", { name })
+    : t("list.toOthers", { name, count: others.length });
+}
+
+/**
+ * A move between places, each with its Undo: Done and Move to Inbox, Delete
+ * and Restore, Report spam and Not spam.
+ */
+export type Move = "archive" | "unarchive" | "trash" | "untrash" | "spam" | "not_spam";
+
+/** Each move's inverse. */
+const INVERSE: Record<Move, Move> = {
+  archive: "unarchive",
+  unarchive: "archive",
+  trash: "untrash",
+  untrash: "trash",
+  spam: "not_spam",
+  not_spam: "spam",
+};
+
+/**
+ * What Undo runs after `move` on `summary`, in order, to put it back exactly
+ * where it was. Not spam always puts received mail in the inbox, so undoing
+ * Report spam on an archived conversation archives it again.
+ */
+export function undoMoves(summary: ConversationSummary, move: Move): Move[] {
+  if (move === "spam" && summary.archived && !summary.trashed) {
+    return ["not_spam", "archive"];
+  }
+  // The trash clears the spam mark: Restore alone would leave it out of spam.
+  if (move === "trash" && summary.spam) {
+    return ["untrash", "spam"];
+  }
+  return [INVERSE[move]];
+}
+
+/** E: Done while in the inbox, Move to Inbox once archived; nothing in spam or the trash. */
+export function archiveMove(summary: ConversationSummary): Move | undefined {
+  if (summary.trashed) {
+    return undefined;
+  }
+  return summary.archived ? "unarchive" : "archive";
+}
+
+/**
+ * #: Delete, or Restore what is in the trash (back where it was); nothing in
+ * spam, whose only way out is Not spam (moving it to the trash would clear
+ * its spam mark, and its Undo with it).
+ */
+export function trashMove(summary: ConversationSummary): Move | undefined {
+  if (summary.spam) {
+    return undefined;
+  }
+  return summary.trashed ? "untrash" : "trash";
+}
+
+/** !: Report spam, or Not spam for what is in spam; nothing in the trash. */
+export function spamMove(summary: ConversationSummary): Move | undefined {
+  if (summary.spam) {
+    return "not_spam";
+  }
+  return summary.trashed ? undefined : "spam";
 }
 
 /** One stored reason, as a sentence in the reader's language. */

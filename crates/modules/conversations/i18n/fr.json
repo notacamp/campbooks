@@ -20,6 +20,7 @@
     "attachments_too_large": "Les pièces jointes peuvent totaliser au plus {{max}} Mo.",
     "too_late": "Il est trop tard pour annuler : le message est déjà parti.",
     "invalid_ids": "Demandez entre 1 et {{max}} identifiants de conversation, séparés par des virgules.",
+    "invalid_view": "Demandez les conversations archivées avec view=archive seul : archived=true ne se combine pas avec une autre vue.",
     "no_open_need": "Plus rien ici n’a besoin de vous.",
     "not_a_payment": "Ce n’est pas un paiement à faire.",
     "nothing_to_reopen": "Il n’y a rien à rétablir ici.",

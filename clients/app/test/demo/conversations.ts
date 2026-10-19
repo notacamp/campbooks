@@ -20,9 +20,26 @@ export const INBOX = {
 /** The clock the demo is set at: Tuesday 13 October 2026, 15:00 UTC. */
 export const NOW = new Date("2026-10-13T15:00:00Z");
 
-const base: Pick<Summary, "inbox_id" | "archived" | "labels" | "suggestion" | "latest_from_you"> = {
+const base: Pick<
+  Summary,
+  | "inbox_id"
+  | "archived"
+  | "trashed"
+  | "spam"
+  | "last_sent_at"
+  | "sent_to"
+  | "replied_since_sent"
+  | "labels"
+  | "suggestion"
+  | "latest_from_you"
+> = {
   inbox_id: INBOX.id,
   archived: false,
+  trashed: false,
+  spam: false,
+  last_sent_at: null,
+  sent_to: [],
+  replied_since_sent: false,
   labels: [],
   suggestion: null,
   latest_from_you: false,
@@ -41,6 +58,10 @@ export const Q4: Summary = {
   latest_from: { name: "Maya Okafor", address: "maya@northwind-studio.example" },
   snippet: "The timeline can move by two weeks; the price stays the same.",
   labels: [{ id: "0192f1a0-0000-7000-8000-0000000000d1", name: "Clients" }],
+  // Sam wrote on Sunday; Maya answered since.
+  last_sent_at: "2026-10-11T14:00:00Z",
+  sent_to: [{ name: "Maya Okafor", address: "maya@northwind-studio.example" }],
+  replied_since_sent: true,
 };
 
 export const LEDGER: Summary = {
@@ -114,6 +135,45 @@ const LONG: Summary = {
 };
 
 export const PRIMARY = [Q4, NDA, LEDGER, LONG];
+
+/** A conversation Sam started, to three people: archived on arrival, no answer yet. */
+export const FIGURES: Summary = {
+  ...base,
+  id: "0192f1a0-0000-7000-8000-0000000000c6",
+  subject: "Figures for the board",
+  stream: "primary",
+  stream_source: "default",
+  last_message_at: "2026-10-12T17:30:00Z",
+  message_count: 1,
+  unread_count: 0,
+  starred: false,
+  archived: true,
+  latest_from: { name: "Sam Rivera", address: "sam.rivera@example.com" },
+  latest_from_you: true,
+  snippet: "Here are the figures for Thursday, with last year’s for comparison.",
+  last_sent_at: "2026-10-12T17:30:00Z",
+  sent_to: [
+    { name: "Marta Ferreira", address: "marta@atelier-norte.example" },
+    { name: "Leo Brandt", address: "leo@northwind-studio.example" },
+    { address: "accounts@atelier-norte.example" },
+  ],
+};
+
+/** Sent: by Sam's latest message. */
+export const SENT = [FIGURES, Q4];
+
+/** Reported as spam: binned, in Spam rather than in Trash. */
+export const SPAMMED: Summary = {
+  ...LEDGER,
+  id: "0192f1a0-0000-7000-8000-0000000000c7",
+  subject: "You have won a cruise",
+  latest_from: { name: "Prize Desk", address: "win@prize-desk.example" },
+  snippet: "Claim your cruise before midnight.",
+  suggestion: null,
+  archived: true,
+  trashed: true,
+  spam: true,
+};
 
 const SAM = { name: "Sam Rivera", address: "sam.rivera@example.com" };
 const MAYA = { name: "Maya Okafor", address: "maya@northwind-studio.example" };

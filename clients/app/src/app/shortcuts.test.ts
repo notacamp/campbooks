@@ -41,4 +41,16 @@ describe("the app's shortcuts", () => {
       "3",
     ]);
   });
+
+  it("put Delete on # and Report spam on !, and Sent, Archive, Spam and Trash on G 5 to 8", () => {
+    expect(byId("conversations.trash")).toMatchObject({ keys: "#", scope: "item" });
+    expect(byId("conversations.report_spam")).toMatchObject({ keys: "!", scope: "item" });
+    expect(onKey("#")).toEqual(["conversations.trash (item)"]);
+    expect(onKey("!")).toEqual(["conversations.report_spam (item)"]);
+    expect(
+      ["inbox.view.sent", "inbox.view.archive", "inbox.view.spam", "inbox.view.trash"].map(
+        (id) => byId(id)?.keys,
+      ),
+    ).toEqual(["g 5", "g 6", "g 7", "g 8"]);
+  });
 });

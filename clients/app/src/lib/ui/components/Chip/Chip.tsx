@@ -46,3 +46,8 @@ export function ChipRow({ label, children }: { label: string; children: ReactNod
     </div>
   );
 }
+
+/** A quiet line between groups of chips in a {@link ChipRow} (the streams, then the views). */
+export function ChipDivider() {
+  return <span className={styles["divider"]} aria-hidden="true" />;
+}

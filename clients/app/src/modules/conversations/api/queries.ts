@@ -10,7 +10,7 @@ import {
   type QueryClient,
 } from "@tanstack/react-query";
 
-import { api, operationKey, unwrap, type Schema } from "~/lib/api";
+import { api, operationKey, unwrap, type OperationQuery, type Schema } from "~/lib/api";
 
 export type Stream = Schema<"Stream">;
 export type ConversationSummary = Schema<"ConversationSummary">;
@@ -33,6 +33,44 @@ export function isStream(value: string): value is Stream {
   return (STREAMS as readonly string[]).includes(value);
 }
 
+/** A view beside the streams (`conversations.list` with `view`): never a stream. */
+export type View = Exclude<NonNullable<OperationQuery<"conversations.list">["view"]>, "inbox">;
+
+/** The views, in display order, after the streams. */
+export const VIEWS: readonly View[] = ["sent", "archive", "spam", "trash"];
+
+export function isView(value: string): value is View {
+  return (VIEWS as readonly string[]).includes(value);
+}
+
+/** Where a list is: one of the streams (the inbox), or a view beside them. */
+export type Place = Stream | View;
+
+export function isPlace(value: string): value is Place {
+  return isStream(value) || isView(value);
+}
+
+/** Whether `summary` is listed in `place`, as the server lists it. */
+export function belongsIn(place: Place, summary: ConversationSummary): boolean {
+  switch (place) {
+    case "sent": {
+      return typeof summary.last_sent_at === "string" && !summary.trashed;
+    }
+    case "archive": {
+      return summary.archived && !summary.trashed;
+    }
+    case "spam": {
+      return summary.trashed && summary.spam;
+    }
+    case "trash": {
+      return summary.trashed && !summary.spam;
+    }
+    default: {
+      return place === summary.stream && !summary.archived && !summary.trashed;
+    }
+  }
+}
+
 // Keyed by operationId (`operationKey`), so the change feed refetches them
 // when a conversation or message changes.
 const keys = {
@@ -40,8 +78,13 @@ const keys = {
     operationKey("conversations.list_inboxes", { workspace_id: workspaceId }),
   streams: (workspaceId: string) =>
     operationKey("conversations.list_streams", { workspace_id: workspaceId }),
-  list: (workspaceId: string, stream: Stream) =>
-    operationKey("conversations.list", { workspace_id: workspaceId, stream }),
+  list: (workspaceId: string, place: Place) =>
+    operationKey(
+      "conversations.list",
+      isView(place)
+        ? { workspace_id: workspaceId, view: place }
+        : { workspace_id: workspaceId, stream: place },
+    ),
   /** Every list of the workspace, whatever the stream. */
   lists: (workspaceId: string) => operationKey("conversations.list", { workspace_id: workspaceId }),
   conversation: (workspaceId: string, conversationId: string) =>
@@ -55,12 +98,20 @@ const keys = {
       q,
       ...(reachable ? { reachable: "true" } : {}),
     }),
-  body: (workspaceId: string, conversationId: string, messageId: string, showImages: boolean) =>
+  body: (
+    workspaceId: string,
+    conversationId: string,
+    messageId: string,
+    showImages: boolean,
+    spam: boolean,
+  ) =>
     operationKey("conversations.get_message_body", {
       workspace_id: workspaceId,
       conversation_id: conversationId,
       message_id: messageId,
       show_images: String(showImages),
+      // In spam the server holds images back: a body read before is not that one.
+      ...(spam ? { spam: "true" } : {}),
     }),
   words: (workspaceId: string, conversationId: string, messageId: string) =>
     operationKey("conversations.get_message_body", {
@@ -102,9 +153,9 @@ export function useStreams(workspaceId: string) {
   });
 }
 
-const conversationsQuery = (workspaceId: string, stream: Stream) =>
+const conversationsQuery = (workspaceId: string, place: Place) =>
   infiniteQueryOptions({
-    queryKey: keys.list(workspaceId, stream),
+    queryKey: keys.list(workspaceId, place),
     initialPageParam: undefined as string | undefined,
     queryFn: async ({ pageParam, signal }) =>
       unwrap(
@@ -112,7 +163,7 @@ const conversationsQuery = (workspaceId: string, stream: Stream) =>
           params: {
             path: { workspace_id: workspaceId },
             query: {
-              stream,
+              ...(isView(place) ? { view: place } : { stream: place }),
               limit: PAGE,
               ...(pageParam === undefined ? {} : { cursor: pageParam }),
             },
@@ -123,9 +174,9 @@ const conversationsQuery = (workspaceId: string, stream: Stream) =>
     getNextPageParam: (page) => page.next_cursor ?? undefined,
   });
 
-/** `conversations.list` for one stream, newest first, a page at a time. */
-export function useConversations(workspaceId: string, stream: Stream) {
-  return useInfiniteQuery(conversationsQuery(workspaceId, stream));
+/** `conversations.list` for one stream or view, a page at a time. */
+export function useConversations(workspaceId: string, place: Place) {
+  return useInfiniteQuery(conversationsQuery(workspaceId, place));
 }
 
 /** `conversations.get`: the conversation, its messages (oldest first) and the decide answers. */
@@ -145,21 +196,26 @@ export function useConversation(workspaceId: string, conversationId: string | un
   });
 }
 
-/** `conversations.get_message_body`: sanitised HTML (and text), remote images on request. */
+/**
+ * `conversations.get_message_body`: sanitised HTML (and text), remote images
+ * on request; `spam` while its conversation is in spam (asked for again then).
+ */
 export function useMessageBody(
   workspaceId: string,
   conversationId: string,
   messageId: string,
   showImages: boolean,
   enabled: boolean,
+  spam = false,
 ) {
   return useQuery({
-    queryKey: keys.body(workspaceId, conversationId, messageId, showImages),
+    queryKey: keys.body(workspaceId, conversationId, messageId, showImages, spam),
     enabled,
     // A body never changes once stored.
     staleTime: Number.POSITIVE_INFINITY,
-    // "Show images" refetches it: keep the blocked version up meanwhile.
-    placeholderData: keepPreviousData,
+    // "Show images" refetches it: keep the blocked version up meanwhile. Never
+    // in spam: the version before may have had its images.
+    ...(spam ? {} : { placeholderData: keepPreviousData }),
     queryFn: async ({ signal }) =>
       unwrap(
         await api.GET(
@@ -272,8 +328,11 @@ const PATHS = {
   untrash: "/api/v1/w/{workspace_id}/conversations/{conversation_id}/untrash",
 } as const;
 
-/** How an action changes a summary, for the optimistic update. */
-function applied(summary: ConversationSummary, action: ConversationAction): ConversationSummary {
+/** How an action changes a summary, for the optimistic update (and where it is listed after). */
+export function applied(
+  summary: ConversationSummary,
+  action: ConversationAction,
+): ConversationSummary {
   if (typeof action === "object") {
     if ("need" in action) {
       switch (action.need) {
@@ -314,15 +373,21 @@ function applied(summary: ConversationSummary, action: ConversationAction): Conv
     case "unstar": {
       return { ...summary, starred: false };
     }
-    // In spam or the trash, it needs nothing; the server's summary says the
-    // rest.
-    case "spam":
-    case "trash": {
-      return { ...summary, need: null };
+    // In spam or the trash, it needs nothing. Spam takes every message out
+    // of the inbox; the trash leaves that as it was, for Restore.
+    case "spam": {
+      return { ...summary, need: null, trashed: true, spam: true, archived: true };
     }
-    case "not_spam":
+    case "trash": {
+      return { ...summary, need: null, trashed: true, spam: false };
+    }
+    // Not spam puts received mail back in the inbox; the server's summary
+    // says the rest.
+    case "not_spam": {
+      return { ...summary, trashed: false, spam: false, archived: false };
+    }
     case "untrash": {
-      return summary;
+      return { ...summary, trashed: false, spam: false };
     }
   }
 }
@@ -434,17 +499,18 @@ export function useConversationSummaries(
 }
 
 /**
- * Put `next` in every cached list it belongs to (its stream, not archived),
- * and out of the others. Optimistic: the server's answer and the change feed
- * settle it.
+ * Put `next` in every cached list it belongs to (its stream while in the
+ * inbox, and the views it is in), and out of the others. Optimistic: the
+ * lists it may enter are refetched when the action settles, and the server's
+ * answer and the change feed settle the rest.
  */
 function placeInLists(queryClient: QueryClient, workspaceId: string, next: ConversationSummary) {
-  for (const stream of STREAMS) {
-    queryClient.setQueryData<ListData>(keys.list(workspaceId, stream), (data) => {
+  for (const place of [...STREAMS, ...VIEWS]) {
+    queryClient.setQueryData<ListData>(keys.list(workspaceId, place), (data) => {
       if (data === undefined) {
         return data;
       }
-      const belongs = stream === next.stream && !next.archived;
+      const belongs = belongsIn(place, next);
       const present = data.pages.some((page) =>
         page.conversations.some((conversation) => conversation.id === next.id),
       );
@@ -466,8 +532,8 @@ function placeInLists(queryClient: QueryClient, workspaceId: string, next: Conve
 
 /**
  * The conversation actions (`conversations.archive`, `.mark_read`, `.star`,
- * `.move_to_stream` and their undo pairs), applied to the cache at once and
- * reconciled with the server's summary.
+ * `.move_to_stream`, `.trash`, `.report_spam` and their undo pairs), applied
+ * to the cache at once and reconciled with the server's summary.
  */
 export function useConversationAction(workspaceId: string) {
   const queryClient = useQueryClient();

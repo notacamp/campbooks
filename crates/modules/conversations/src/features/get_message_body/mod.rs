@@ -197,8 +197,9 @@ pub async fn handler(
     };
     // CPU-bound (inlining, two ammonia passes): off the async workers.
     // Trust only flips what is held back by default: the same sanitiser,
-    // tracking pixels removed either way.
-    let show = query.show_images || trusted;
+    // tracking pixels removed either way. Mail in spam keeps them held back
+    // even when asked for.
+    let show = !assessed.spam && (query.show_images || trusted);
     let sanitized = match html {
         Some(html) => Some(
             tokio::task::spawn_blocking(move || sanitize(&html, show, &inline))
@@ -956,5 +957,80 @@ mod tests {
             )
             .await;
         assert_eq!(hidden.status, StatusCode::NOT_FOUND, "{}", hidden.json);
+    }
+
+    #[sqlx::test(migrations = "../../../migrations")]
+    async fn spam_never_loads_remote_images_not_when_asked_nor_trusted(db: PgPool) {
+        let kit = Kit::new(db.clone()).await;
+        let (workspace, inbox, sam) = kit.sams_inbox().await;
+        kit.ingest_value(
+            workspace,
+            inbox,
+            &json!({"changes": [newsletter("spam-1", "October at Brightloop", Some(
+                "mx.google.com; dkim=pass header.i=@brightloop.example header.s=s1; \
+                 dmarc=pass (p=REJECT sp=REJECT dis=NONE) header.from=brightloop.example"))]}),
+        )
+        .await;
+        let rules = format!("/api/v1/w/{workspace}/inboxes/{inbox}/rules");
+        let created = kit
+            .post(
+                &sam,
+                &rules,
+                Some(json!({
+                    "conditions": [{"field": "sender_address", "value": "news@brightloop.example"}],
+                    "actions": [{"action": "show_images"}],
+                })),
+            )
+            .await;
+        assert_eq!(created.status, StatusCode::CREATED, "{}", created.json);
+        judged_not_suspicious(&db).await;
+        assert_eq!(
+            body_of(&kit, &sam, workspace, "spam-1").await["images_trusted"],
+            true
+        );
+
+        let conversation = kit.conversation_of("spam-1").await;
+        let reported = kit
+            .post(
+                &sam,
+                &format!("/api/v1/w/{workspace}/conversations/{conversation}/spam"),
+                None,
+            )
+            .await;
+        assert_eq!(reported.status, StatusCode::OK);
+        let held = body_of(&kit, &sam, workspace, "spam-1").await;
+        assert_eq!(held["images_trusted"], false);
+        assert_eq!(held["images_shown"], false);
+        assert_eq!(held["images_offer"], false);
+        assert_eq!(held["images_held"], "spam");
+        // Asked for, still held back.
+        let message = kit.message_of("spam-1").await;
+        let asked = kit
+            .get(
+                &sam,
+                &format!(
+                    "/api/v1/w/{workspace}/conversations/{conversation}/messages/{message}/body?show_images=true"
+                ),
+            )
+            .await;
+        assert_eq!(asked.json["images_shown"], false);
+        assert!(
+            !asked.json["html"]
+                .as_str()
+                .unwrap()
+                .contains("cdn.brightloop.example")
+        );
+
+        // Not spam: trusted again.
+        kit.post(
+            &sam,
+            &format!("/api/v1/w/{workspace}/conversations/{conversation}/not-spam"),
+            None,
+        )
+        .await;
+        assert_eq!(
+            body_of(&kit, &sam, workspace, "spam-1").await["images_shown"],
+            true
+        );
     }
 }

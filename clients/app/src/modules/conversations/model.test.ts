@@ -1,22 +1,44 @@
 import { describe, expect, it } from "vitest";
 
-import { LEDGER, NOW, Q4, Q4_DETAIL } from "../../../test/demo/conversations";
+import {
+  FIGURES,
+  LEDGER,
+  NOW,
+  Q4,
+  Q4_DETAIL,
+  SENT,
+  SPAMMED,
+} from "../../../test/demo/conversations";
 
-import type { MessageView } from "./api/queries";
+import {
+  applied,
+  belongsIn,
+  isPlace,
+  isView,
+  STREAMS,
+  VIEWS,
+  type MessageView,
+} from "./api/queries";
 import {
   addresseeLine,
+  archiveMove,
   attachmentKind,
   cleanFileName,
   displayName,
   listTime,
   noteSentence,
   openByDefault,
+  placeName,
   placementLine,
   previewType,
   reasonText,
   replyName,
+  sentToLine,
+  spamMove,
   splitQuoted,
   threadLayout,
+  trashMove,
+  undoMoves,
   type ThreadEntry,
   type Translate,
 } from "./model";
@@ -184,5 +206,76 @@ describe("attachments", () => {
     expect(cleanFileName(" .hidden ")).toBe("hidden");
     expect(cleanFileName("\u0000⁦")).toBe("attachment");
     expect(cleanFileName("orçamento 2026.pdf")).toBe("orçamento 2026.pdf");
+  });
+
+  it("tells the views from the streams: a place is either, nothing else", () => {
+    expect(VIEWS.every((view) => isView(view) && isPlace(view))).toBe(true);
+    expect(STREAMS.some((stream) => isView(stream))).toBe(false);
+    expect(STREAMS.every((stream) => isPlace(stream))).toBe(true);
+    for (const junk of ["inbox", "starred", "drafts", "Sent", ""]) {
+      expect(isPlace(junk)).toBe(false);
+    }
+    expect(placeName(t, "trash")).toBe("views.trash");
+    expect(placeName(t, "primary")).toBe("streams.primary");
+  });
+
+  it("leads a Sent row with who the inbox wrote to", () => {
+    expect(sentToLine(t, FIGURES)).toBe('list.toOthers{"name":"Marta Ferreira","count":2}');
+    expect(sentToLine(t, Q4)).toBe('list.to{"name":"Maya Okafor"}');
+    expect(sentToLine(t, { ...Q4, sent_to: [] })).toBe("list.toHidden");
+    expect(SENT.map((summary) => summary.replied_since_sent)).toEqual([false, true]);
+  });
+
+  it("lists a conversation where the server does, before and after each move", () => {
+    const where = (summary: typeof Q4) =>
+      [...STREAMS, ...VIEWS].filter((place) => belongsIn(place, summary));
+    expect(where(Q4)).toEqual(["primary", "sent"]);
+    expect(where(FIGURES)).toEqual(["sent", "archive"]);
+    expect(where(SPAMMED)).toEqual(["spam"]);
+    // Delete leaves every list but Trash; Restore puts it back where it was.
+    expect(where(applied(Q4, "trash"))).toEqual(["trash"]);
+    expect(where(applied(applied(Q4, "trash"), "untrash"))).toEqual(["primary", "sent"]);
+    expect(where(applied(FIGURES, "trash"))).toEqual(["trash"]);
+    expect(where(applied(applied(FIGURES, "trash"), "untrash"))).toEqual(["sent", "archive"]);
+    // Report spam: Spam only; Not spam: back in the inbox.
+    expect(where(applied(Q4, "spam"))).toEqual(["spam"]);
+    expect(where(applied(SPAMMED, "not_spam"))).toEqual(["primary"]);
+    // Done and Move to Inbox.
+    expect(where(applied(Q4, "archive"))).toEqual(["sent", "archive"]);
+    expect(where(applied(FIGURES, "unarchive"))).toEqual(["primary", "sent"]);
+  });
+
+  it("gives each key the move that fits where the conversation is", () => {
+    const binned = { ...Q4, trashed: true, spam: false };
+    expect([archiveMove(Q4), trashMove(Q4), spamMove(Q4)]).toEqual(["archive", "trash", "spam"]);
+    expect(archiveMove(FIGURES)).toBe("unarchive");
+    // In spam: ! says it is not; # and E do nothing (Delete would clear the spam mark).
+    expect([archiveMove(SPAMMED), trashMove(SPAMMED), spamMove(SPAMMED)]).toEqual([
+      undefined,
+      undefined,
+      "not_spam",
+    ]);
+    // In the trash: # restores it; nothing else.
+    expect([archiveMove(binned), trashMove(binned), spamMove(binned)]).toEqual([
+      undefined,
+      "untrash",
+      undefined,
+    ]);
+  });
+
+  it("undoes Report spam back where it was: archived again when it was archived", () => {
+    expect(undoMoves(FIGURES, "spam")).toEqual(["not_spam", "archive"]);
+    expect(undoMoves(Q4, "spam")).toEqual(["not_spam"]);
+    // The plain Not spam stays one step, back to the inbox.
+    expect(undoMoves(SPAMMED, "not_spam")).toEqual(["spam"]);
+    expect(undoMoves(Q4, "trash")).toEqual(["untrash"]);
+    expect(undoMoves(FIGURES, "unarchive")).toEqual(["archive"]);
+    let undone = applied(FIGURES, "spam");
+    for (const move of undoMoves(FIGURES, "spam")) {
+      undone = applied(undone, move);
+    }
+    expect([undone.archived, undone.trashed, undone.spam]).toEqual([true, false, false]);
+    // Were spam ever deleted, Undo marks it spam again.
+    expect(undoMoves(SPAMMED, "trash")).toEqual(["untrash", "spam"]);
   });
 });

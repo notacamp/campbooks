@@ -7,6 +7,12 @@
     "receipts": "Receipts",
     "newsletters": "Newsletters"
   },
+  "views": {
+    "sent": "Sent",
+    "archive": "Archive",
+    "spam": "Spam",
+    "trash": "Trash"
+  },
   "list": {
     "label": "Conversations",
     "show": "Show",
@@ -14,7 +20,12 @@
     "unread": "Unread",
     "more": "Show more",
     "loadingMore": "Loading more conversations",
-    "youPrefix": "You: {{snippet}}"
+    "youPrefix": "You: {{snippet}}",
+    "to": "To {{name}}",
+    "toOthers_one": "To {{name}} and {{count}} other",
+    "toOthers_other": "To {{name}} and {{count}} others",
+    "toHidden": "To undisclosed recipients",
+    "replied": "Replied"
   },
   "empty": {
     "streamTitle": "Nothing in {{stream}}",
@@ -24,7 +35,11 @@
     "noInboxTitle": "No mailbox yet",
     "noInboxBody": "Connect a mailbox and its mail appears here, sorted into streams.",
     "readerTitle": "Pick a conversation",
-    "readerBody": "Choose one from the list, or use the keyboard:"
+    "readerBody": "Choose one from the list, or use the keyboard:",
+    "sent": "Nothing in Sent.",
+    "archive": "Nothing in Archive.",
+    "spam": "Nothing in Spam.",
+    "trash": "Nothing in Trash."
   },
   "error": {
     "listTitle": "Could not load {{stream}}",
@@ -66,7 +81,15 @@
     "showQuoted": "Show quoted text",
     "hideQuoted": "Hide quoted text",
     "readingText": "Reading…",
-    "textFailed": "Couldn’t read this email’s text."
+    "textFailed": "Couldn’t read this email’s text.",
+    "spam": {
+      "title": "This conversation is in Spam.",
+      "lead": "Its images never load, and Scout leaves it alone."
+    },
+    "trash": {
+      "title": "This conversation is in Trash.",
+      "lead": "Your mail provider empties the trash on its own schedule."
+    }
   },
   "actions": {
     "star": "Pin",
@@ -91,8 +114,14 @@
       "cannot_authenticate": "Images stay held back: this mail provider doesn’t share sender checks, so no sender can be trusted here.",
       "not_checked": "Images wait for Scout to check this email. While Scout is off or past its daily limit, they stay held back.",
       "rule_paused": "Images stay held back: the smart rule that trusts this sender is paused or waiting for a yes.",
-      "rule_too_broad": "Images stay held back: the smart rule for this sender’s whole domain would trust strangers (anyone can send from it), so it doesn’t act. You can still trust this address."
-    }
+      "rule_too_broad": "Images stay held back: the smart rule for this sender’s whole domain would trust strangers (anyone can send from it), so it doesn’t act. You can still trust this address.",
+      "spam": "Images never load in Spam."
+    },
+    "delete": "Delete",
+    "restore": "Restore",
+    "reportSpam": "Report spam",
+    "notSpam": "Not spam",
+    "toInbox": "Move to Inbox"
   },
   "toast": {
     "done": "Done · {{subject}}",
@@ -100,7 +129,12 @@
     "unstarred": "Unpinned · {{subject}}",
     "read": "Marked read · {{subject}}",
     "unread": "Marked unread · {{subject}}",
-    "moved": "Moved to {{stream}} · {{subject}}"
+    "moved": "Moved to {{stream}} · {{subject}}",
+    "toInbox": "Moved to Inbox · {{subject}}",
+    "deleted": "Deleted · {{subject}}",
+    "restored": "Restored · {{subject}}",
+    "spam": "Reported as spam · {{subject}}",
+    "notSpam": "Not spam · {{subject}}"
   },
   "scout": {
     "label": "Where things stand",
@@ -195,7 +229,13 @@
     "undoAll": "Undo all a rule did",
     "allPaid": "All bills already paid",
     "saveRule": "Save the smart rule",
-    "trustImages": "Always show images from this sender"
+    "trustImages": "Always show images from this sender",
+    "sent": "Go to Sent",
+    "archive": "Go to Archive",
+    "spam": "Go to Spam",
+    "trash": "Go to Trash",
+    "delete": "Delete, or restore from Trash",
+    "reportSpam": "Report spam, or not spam"
   },
   "compose": {
     "title": {
