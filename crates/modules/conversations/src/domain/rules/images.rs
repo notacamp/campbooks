@@ -45,6 +45,9 @@ pub enum ImagesHeld {
     /// send from (a free mail provider's or a shared platform's), so it never
     /// acts; one address there may still be trusted.
     RuleTooBroad,
+    /// The conversation is in spam: its remote images never load, whoever
+    /// asks and whatever a rule trusts (campbooks-cloud#240).
+    Spam,
 }
 
 /// What a message's sender is trusted with, and what the reader may offer.
@@ -63,11 +66,17 @@ pub struct Images {
     /// Why the images stay held back when a rule trusts the sender, or why
     /// trusting it could not take effect.
     pub held: Option<ImagesHeld>,
+    /// The message or its conversation is in spam: remote images are never
+    /// kept, not even when the member asks, and nothing is offered.
+    pub spam: bool,
 }
 
 /// The images of `message`, one of `inboxes` (those the member may see), as
 /// the rules of its inbox decide them. An outbound message, or one not in
-/// `inboxes`, is trusted with nothing and offers nothing.
+/// `inboxes`, is trusted with nothing and offers nothing. Mail in spam
+/// (the message, or its conversation reported) is never trusted, offers
+/// nothing and keeps its images held back even when asked for: this is the
+/// one place that says so.
 ///
 /// Trust fails closed: until the message has been judged not suspicious (a
 /// stored `suspicious` answer of `false`), while anything in its
@@ -82,6 +91,23 @@ pub async fn images(
     inboxes: &[InboxId],
     message: MessageId,
 ) -> Result<Images> {
+    let spam: Option<bool> = sqlx::query_scalar(
+        "SELECT m.in_spam OR c.spam
+           FROM conversations.messages m
+           JOIN conversations.conversations c ON c.id = m.conversation_id
+          WHERE m.id = $1 AND m.inbox_id = ANY($2)",
+    )
+    .bind(message)
+    .bind(inboxes)
+    .fetch_optional(&mut *conn)
+    .await?;
+    if spam == Some(true) {
+        return Ok(Images {
+            held: Some(ImagesHeld::Spam),
+            spam: true,
+            ..Images::default()
+        });
+    }
     let row: Option<(InboxId, String, serde_json::Value, bool, bool, bool)> = sqlx::query_as(
         "SELECT m.inbox_id, m.sender_address, m.headers,
                 EXISTS (SELECT 1 FROM conversations.decisions d
@@ -218,6 +244,7 @@ fn assess(f: &Seen<'_>) -> Images {
         offer,
         domain,
         held,
+        spam: false,
     }
 }
 

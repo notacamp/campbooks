@@ -13,9 +13,11 @@ import {
   HowDecided,
   IconButton,
   MetaLine,
+  MoreMessages,
   Note,
   PaneHeader,
   ReaderBody,
+  ReaderFooter,
   SkeletonList,
   Spacer,
 } from "~/lib/ui";
@@ -25,15 +27,22 @@ import {
   useInboxes,
   type ConversationSummary,
   type MessageView,
-  type Stream,
+  type Place,
 } from "../../api/queries";
 import {
+  archiveMove,
   avatarKind,
   displayName,
   noteSentence,
   openByDefault,
+  placeName,
   placementLine,
+  replyName,
+  spamMove,
   streamName,
+  threadLayout,
+  trashMove,
+  type Move,
   type Translate,
 } from "../../model";
 import {
@@ -61,16 +70,19 @@ import { ThreadMessage } from "./ThreadMessage";
 export interface ConversationReaderProps {
   workspaceId: string;
   conversationId: string;
-  /** The stream the list shows (Back goes there). */
-  stream: Stream;
+  /** The stream or view the list shows (Back goes there). */
+  stream: Place;
   /** What Back says when the list is not a stream (search results). */
   backLabel?: string | undefined;
   actions: InboxActions;
   onBack: () => void;
   onPrevious: () => void;
   onNext: () => void;
-  /** Done: archive, then whatever the screen opens next. */
-  onDone: (conversation: ConversationSummary) => void;
+  /**
+   * Move it to another place (Done, Move to Inbox, Delete, Restore, Report
+   * spam, Not spam), then whatever the screen opens next.
+   */
+  onMove: (conversation: ConversationSummary, move: Move) => void;
   /** The send slice's composer; Reply, Reply all and Forward are hidden without it. */
   renderReplySlot?: RenderReplySlot | undefined;
   /** Open the reply composer once the conversation is loaded (Home's R). */
@@ -82,8 +94,9 @@ export interface ConversationReaderProps {
 
 /**
  * A conversation: its actions (with their shortcuts), the assistant's note
- * (suggestions with their reasons), the thread newest last with older
- * messages folded, and the reply slot.
+ * (suggestions with their reasons), the thread newest first with older
+ * messages folded (the middle of a long one into "N more messages"), and
+ * the reply slot pinned at the bottom.
  */
 export function ConversationReader({
   workspaceId,
@@ -94,7 +107,7 @@ export function ConversationReader({
   onBack,
   onPrevious,
   onNext,
-  onDone,
+  onMove,
   renderReplySlot: replySlot,
   startReply = false,
   replyTo,
@@ -116,8 +129,12 @@ export function ConversationReader({
   const kept = inbox?.read_only === true;
   // Until the inbox is known (or if it can't be), nothing is offered.
   const writable = inbox !== undefined && !kept && inbox.role !== "reader";
-  const renderReplySlot = writable ? replySlot : undefined;
-  const need = writable ? (conversation?.need ?? undefined) : undefined;
+  // In spam or the trash: no reply, no Scout, no images (spam); the banner
+  // says where it is and brings it back.
+  const binned = conversation?.trashed === true;
+  const inSpam = conversation?.trashed === true && conversation.spam;
+  const renderReplySlot = writable && !binned ? replySlot : undefined;
+  const need = writable && !binned ? (conversation?.need ?? undefined) : undefined;
   const ruleActions = useRuleActions(workspaceId);
   // While a teach-once offer or question is up, it holds the choice keys:
   // the reader's own choices stay clickable but unbound and unhinted.
@@ -147,6 +164,8 @@ export function ConversationReader({
   const toPay = need !== undefined && billKind(need) === "toPay";
 
   const [opened, setOpened] = useState<Set<string>>(new Set());
+  // Messages "N more messages" showed (folded) in its place.
+  const [revealed, setRevealed] = useState<Set<string>>(new Set());
   const [images, setImages] = useState<Set<string>>(new Set());
   const [moving, setMoving] = useState(false);
   const [reply, setReply] = useState<ReplyRequest | null>(null);
@@ -172,8 +191,9 @@ export function ConversationReader({
 
   const messages = detail?.messages ?? [];
   const open = new Set([...openByDefault(messages), ...opened]);
+  const thread = threadLayout(messages, new Set([...opened, ...revealed]));
   const newest = messages.at(-1);
-  const suggestion = writable ? (conversation?.suggestion ?? undefined) : undefined;
+  const suggestion = writable && !binned ? (conversation?.suggestion ?? undefined) : undefined;
   const active = conversation !== undefined && writable;
 
   /** The composer on `messageId` (a draft written for it), else the newest message. */
@@ -249,20 +269,25 @@ export function ConversationReader({
       choices: byDomain === undefined ? [byAddress] : [byAddress, byDomain],
     });
   };
-  // Never offered on mail that may be phishing: trust is not the question.
-  const trustable = writable && conversation?.need?.question !== "suspicious";
+  // Never offered on mail that may be phishing, nor in spam: trust is not the question.
+  const trustable = writable && !inSpam && conversation?.need?.question !== "suspicious";
   // The newest message from someone else: the one the key trusts.
   const newestInbound = messages.findLast((message) => message.direction === "inbound");
 
-  useShortcut(
-    "item.done",
-    () => {
-      if (conversation !== undefined) {
-        onDone(conversation);
-      }
-    },
-    { enabled: active },
-  );
+  /** `move` on this conversation, when there is one. */
+  const moveBy = (move: Move | undefined) => () => {
+    if (conversation !== undefined && move !== undefined) {
+      onMove(conversation, move);
+    }
+  };
+  const archiveTo = conversation === undefined ? undefined : archiveMove(conversation);
+  const trashTo = conversation === undefined ? undefined : trashMove(conversation);
+  const spamTo = conversation === undefined ? undefined : spamMove(conversation);
+  useShortcut("item.done", moveBy(archiveTo), { enabled: active && archiveTo !== undefined });
+  useShortcut("conversations.trash", moveBy(trashTo), { enabled: active && trashTo !== undefined });
+  useShortcut("conversations.report_spam", moveBy(spamTo), {
+    enabled: active && spamTo !== undefined,
+  });
   useShortcut(
     "conversations.star",
     () => {
@@ -289,7 +314,8 @@ export function ConversationReader({
     { enabled: active },
   );
   const viewing = conversation !== undefined;
-  useShortcut("inbox.show_images", showAllImages, { enabled: viewing });
+  // Remote images never load in spam.
+  useShortcut("inbox.show_images", showAllImages, { enabled: viewing && !inSpam });
   useShortcut(
     "inbox.next_attachment",
     () => {
@@ -369,7 +395,7 @@ export function ConversationReader({
   const back = (
     <span className="flex lg:hidden">
       <Button variant="ghost" icon="chevron-left" onClick={onBack} shortcut="overlay.close">
-        {backLabel ?? t("reader.back", { stream: streamName(t, stream) })}
+        {backLabel ?? t("reader.back", { stream: placeName(t, stream) })}
       </Button>
     </span>
   );
@@ -414,17 +440,8 @@ export function ConversationReader({
   const unread = conversation.unread_count > 0;
   const replyButtons =
     renderReplySlot === undefined ? null : (
+      // Reply is the pinned footer's (the floating bar's on phones).
       <span className="flex flex-wrap gap-1 max-md:hidden">
-        <Button
-          variant="ghost"
-          icon="reply"
-          shortcut="item.reply"
-          onClick={() => {
-            openReply();
-          }}
-        >
-          {tShortcuts("item.reply")}
-        </Button>
         <Button
           variant="ghost"
           icon="reply-all"
@@ -465,17 +482,33 @@ export function ConversationReader({
         {back}
         {writable ? (
           <>
-            <span className="flex max-md:hidden">
-              <Button
-                icon="archive"
-                shortcut="item.done"
-                onClick={() => {
-                  onDone(conversation);
-                }}
-              >
-                {tShortcuts("item.done")}
-              </Button>
-            </span>
+            {archiveTo === undefined ? null : (
+              <span className="flex max-md:hidden">
+                <Button
+                  icon={archiveTo === "archive" ? "archive" : "inbox"}
+                  shortcut="item.done"
+                  onClick={moveBy(archiveTo)}
+                >
+                  {archiveTo === "archive" ? tShortcuts("item.done") : t("actions.toInbox")}
+                </Button>
+              </span>
+            )}
+            {trashTo === "trash" ? (
+              <IconButton
+                label={t("actions.delete")}
+                icon="trash"
+                shortcut="conversations.trash"
+                onClick={moveBy(trashTo)}
+              />
+            ) : null}
+            {spamTo === "spam" ? (
+              <IconButton
+                label={t("actions.reportSpam")}
+                icon="warning"
+                shortcut="conversations.report_spam"
+                onClick={moveBy(spamTo)}
+              />
+            ) : null}
             <IconButton
               label={conversation.starred ? t("actions.unstar") : t("actions.star")}
               icon={conversation.starred ? "pin-filled" : "pin"}
@@ -556,6 +589,27 @@ export function ConversationReader({
         {kept ? (
           <Banner icon="archive" role="status" title={t("reader.kept.title")}>
             {t("reader.kept.lead", { address: inbox.address })}
+          </Banner>
+        ) : binned ? (
+          // Where it is, and the way back (the key that sent it there).
+          <Banner
+            icon={inSpam ? "warning" : "trash"}
+            role="status"
+            title={t(inSpam ? "reader.spam.title" : "reader.trash.title")}
+            action={
+              writable ? (
+                <Button
+                  variant="secondary"
+                  icon="inbox"
+                  shortcut={inSpam ? "conversations.report_spam" : "conversations.trash"}
+                  onClick={moveBy(inSpam ? spamTo : trashTo)}
+                >
+                  {t(inSpam ? "actions.notSpam" : "actions.restore")}
+                </Button>
+              ) : undefined
+            }
+          >
+            {t(inSpam ? "reader.spam.lead" : "reader.trash.lead")}
           </Banner>
         ) : need === undefined ? (
           <Note
@@ -714,64 +768,94 @@ export function ConversationReader({
             {needSentence(t, need, needSender(need, conversation))}
           </Note>
         )}
-        {messages.toReversed().map((message) => (
-          <ThreadMessage
-            key={message.id}
-            workspaceId={workspaceId}
-            conversationId={conversationId}
-            message={message}
-            open={open.has(message.id)}
-            onOpen={() => {
-              setOpened((current) => new Set([...current, message.id]));
-            }}
-            showImages={images.has(message.id)}
-            onShowImages={() => {
-              setImages((current) => new Set([...current, message.id]));
-            }}
-            onTrustImages={
-              trustable && message.direction === "inbound"
-                ? (domain) => {
-                    trustImages(message, domain);
-                  }
-                : undefined
-            }
-            trustKey={active && trusting === null && message.id === newestInbound?.id}
-            sharedInbox={inbox?.shared === true}
-            kind={message.direction === "outbound" ? "person" : kind}
-            inertLinks={conversation.need?.question === "suspicious"}
-            now={now}
-          />
-        ))}
-        {renderReplySlot?.(replyContext)}
+        {thread.map((entry) =>
+          entry.kind === "more" ? (
+            <MoreMessages
+              key={entry.ids.join(",")}
+              label={t("reader.more", { count: entry.ids.length })}
+              onOpen={() => {
+                setRevealed((current) => new Set([...current, ...entry.ids]));
+              }}
+            />
+          ) : (
+            <ThreadMessage
+              key={entry.message.id}
+              workspaceId={workspaceId}
+              conversationId={conversationId}
+              message={entry.message}
+              open={open.has(entry.message.id)}
+              onOpen={() => {
+                setOpened((current) => new Set([...current, entry.message.id]));
+              }}
+              showImages={!inSpam && images.has(entry.message.id)}
+              onShowImages={() => {
+                setImages((current) => new Set([...current, entry.message.id]));
+              }}
+              onTrustImages={
+                trustable && entry.message.direction === "inbound"
+                  ? (domain) => {
+                      trustImages(entry.message, domain);
+                    }
+                  : undefined
+              }
+              trustKey={active && trusting === null && entry.message.id === newestInbound?.id}
+              sharedInbox={inbox?.shared === true}
+              kind={entry.message.direction === "outbound" ? "person" : kind}
+              inertLinks={inSpam || conversation.need?.question === "suspicious"}
+              spam={inSpam}
+              now={now}
+            />
+          ),
+        )}
       </ReaderBody>
-      {/* While the composer is open it owns the bottom of the screen. */}
-      {reply === null && writable ? (
-        <ActionBar label={t("reader.actions")} phoneOnly aboveTabBar>
-          {renderReplySlot === undefined ? null : (
+      <ReaderFooter
+        slot={renderReplySlot?.(replyContext)}
+        prompt={
+          renderReplySlot === undefined || newest === undefined ? undefined : (
             <Button
-              variant="primary"
-              size="lg"
               icon="reply"
+              shortcut="item.reply"
               grow
               onClick={() => {
                 openReply();
               }}
             >
-              {tShortcuts("item.reply")}
+              {replyName(newest) === ""
+                ? tShortcuts("item.reply")
+                : t("compose.title.reply", { name: replyName(newest) })}
             </Button>
-          )}
-          <Button
-            size="lg"
-            icon="archive"
-            grow
-            onClick={() => {
-              onDone(conversation);
-            }}
-          >
-            {tShortcuts("item.done")}
-          </Button>
-        </ActionBar>
-      ) : null}
+          )
+        }
+        // While the composer is open it owns the bottom of the screen; in
+        // spam or the trash the banner holds the way back.
+        phoneBar={
+          reply === null && writable && archiveTo !== undefined ? (
+            <ActionBar label={t("reader.actions")} phoneOnly aboveTabBar>
+              {renderReplySlot === undefined ? null : (
+                <Button
+                  variant="primary"
+                  size="lg"
+                  icon="reply"
+                  grow
+                  onClick={() => {
+                    openReply();
+                  }}
+                >
+                  {tShortcuts("item.reply")}
+                </Button>
+              )}
+              <Button
+                size="lg"
+                icon={archiveTo === "archive" ? "archive" : "inbox"}
+                grow
+                onClick={moveBy(archiveTo)}
+              >
+                {archiveTo === "archive" ? tShortcuts("item.done") : t("actions.toInbox")}
+              </Button>
+            </ActionBar>
+          ) : undefined
+        }
+      />
       {replying === undefined || renderReplySlot === undefined ? null : (
         <ReplyDialog
           key={replying.opened}

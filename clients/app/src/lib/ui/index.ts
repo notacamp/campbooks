@@ -62,6 +62,7 @@ export {
 } from "./components/Highlight/Highlight";
 export {
   Chip,
+  ChipDivider,
   ChipLink,
   ChipRow,
   type ChipLinkProps,
@@ -149,15 +150,20 @@ export {
   FoldedMessage,
   MessageCard,
   MetaLine,
+  MoreMessages,
+  QuotedText,
   type FoldedMessageProps,
   type MessageCardProps,
+  type MessageSide,
+  type MoreMessagesProps,
+  type QuotedTextProps,
 } from "./components/Message/Message";
 export {
   MessageComposer,
   type ComposerAttachment,
   type MessageComposerProps,
 } from "./components/MessageComposer/MessageComposer";
-export { NavItem, type NavItemProps } from "./components/NavItem/NavItem";
+export { NavDivider, NavItem, type NavItemProps } from "./components/NavItem/NavItem";
 export { Offer, type OfferProps } from "./components/Offer/Offer";
 export {
   Note,
@@ -208,6 +214,7 @@ export {
   PhoneHeader,
   PhoneSubnav,
   ReaderBody,
+  ReaderFooter,
   ReaderPane,
   SearchButton,
   Shell,
@@ -218,6 +225,7 @@ export {
   WorkspaceMark,
   WorkspaceSwitcher,
   type AccountButtonProps,
+  type ReaderFooterProps,
   type WorkspaceSwitcherProps,
 } from "./components/Shell/Shell";
 export {

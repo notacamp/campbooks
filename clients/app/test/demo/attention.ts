@@ -12,15 +12,33 @@ type Detail = Schema<"ConversationDetail">;
 
 const base: Pick<
   Summary,
-  "inbox_id" | "archived" | "labels" | "suggestion" | "stream" | "stream_source" | "starred"
+  | "inbox_id"
+  | "archived"
+  | "trashed"
+  | "spam"
+  | "last_sent_at"
+  | "sent_to"
+  | "replied_since_sent"
+  | "labels"
+  | "suggestion"
+  | "stream"
+  | "stream_source"
+  | "starred"
+  | "latest_from_you"
 > = {
   inbox_id: INBOX.id,
   archived: false,
+  trashed: false,
+  spam: false,
+  last_sent_at: null,
+  sent_to: [],
+  replied_since_sent: false,
   labels: [],
   suggestion: null,
   stream: "primary",
   stream_source: "default",
   starred: false,
+  latest_from_you: false,
 };
 
 interface Spec {
@@ -160,6 +178,7 @@ export const SOFIA: Summary = {
   message_count: 2,
   unread_count: 0,
   latest_from: { name: "Sam Rivera", address: "sam.rivera@example.com" },
+  latest_from_you: true,
   snippet: "Perfect, thank you!",
   need: null,
 };

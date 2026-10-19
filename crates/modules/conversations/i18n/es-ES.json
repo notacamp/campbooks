@@ -20,6 +20,7 @@
     "attachments_too_large": "Los archivos adjuntos pueden sumar como máximo {{max}} MB.",
     "too_late": "Ya es tarde para deshacer: el mensaje ya ha salido.",
     "invalid_ids": "Pide entre 1 y {{max}} identificadores de conversación, separados por comas.",
+    "invalid_view": "Pide las conversaciones archivadas solo con view=archive: archived=true no se puede combinar con otra vista.",
     "no_open_need": "Aquí ya no hay nada que te necesite.",
     "not_a_payment": "Esto no es un pago pendiente.",
     "nothing_to_reopen": "Aquí no hay nada que recuperar.",

@@ -7,6 +7,7 @@ import {
   fitZoom,
   framePolicy,
   MIN_ZOOM,
+  prepareHtml,
   SafeHtml,
   SANDBOX,
   SANDBOX_INERT_LINKS,
@@ -61,6 +62,33 @@ describe("SafeHtml", () => {
     expect(withoutLinks(html)).toBe('<p>Hi <a data-href="https://evil.example">verify</a></p>');
     const { container } = renderUi(<SafeHtml html={html} title="Message" inertLinks />);
     expect(frame(container).getAttribute("srcdoc")).not.toMatch(/\shref=/u);
+  });
+
+  it("folds the quoted history the server marked behind a details element", () => {
+    const html =
+      '<p>Approved.</p><div data-cb-quoted="1"><blockquote type="cite">Old text</blockquote></div>';
+    const doc = new DOMParser().parseFromString(
+      prepareHtml(html, { inertLinks: false, quoted: { show: "Show quoted text", hide: "Hide" } }),
+      "text/html",
+    );
+    const details = doc.querySelector<HTMLDetailsElement>("details[data-cb-quoted]");
+
+    expect(details?.open).toBe(false);
+    expect(details?.querySelector("summary")?.textContent).toBe("Show quoted textHide");
+    expect(details?.querySelector("blockquote")?.textContent).toBe("Old text");
+    expect(doc.querySelector("p")?.textContent).toBe("Approved.");
+    expect(doc.querySelector("script")).toBeNull();
+  });
+
+  it("folds nothing without the mark or the labels", () => {
+    const html = '<p>Approved.</p><blockquote class="gmail_quote">Old text</blockquote>';
+    expect(prepareHtml(html, { inertLinks: false, quoted: { show: "S", hide: "H" } })).toBe(html);
+    const marked = '<div data-cb-quoted="1">Old text</div>';
+    expect(prepareHtml(marked, { inertLinks: false })).toBe(marked);
+    const { container } = renderUi(
+      <SafeHtml html={marked} title="M" showQuoted="Show quoted text" hideQuoted="Hide" />,
+    );
+    expect(frame(container).getAttribute("srcdoc")).toContain("<details data-cb-quoted");
   });
 
   it("blocks remote images with its own policy until they are asked for", () => {

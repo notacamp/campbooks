@@ -2996,7 +2996,7 @@
         "tags": [
           "conversations"
         ],
-        "summary": "List conversations: pinned first, then newest first.",
+        "summary": "List conversations: the inbox pinned first, then newest first, or another view.",
         "operationId": "conversations.list",
         "parameters": [
           {
@@ -3027,9 +3027,26 @@
             }
           },
           {
+            "name": "view",
+            "in": "query",
+            "description": "Which place: the inbox (default), Sent, Archive, Spam or Trash.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "description": "Which of the inbox's places a list shows. The streams are the inbox;\nthe other views sit beside them and are not streams.",
+              "enum": [
+                "inbox",
+                "sent",
+                "archive",
+                "spam",
+                "trash"
+              ]
+            }
+          },
+          {
             "name": "archived",
             "in": "query",
-            "description": "`true` for archived conversations instead of those in the inbox.",
+            "description": "Deprecated: use `view=archive`. `true` lists the archive, as\n`view=archive` does; with another `view` it is a bad request.",
             "required": false,
             "schema": {
               "type": "boolean"
@@ -3058,7 +3075,7 @@
           {
             "name": "ids",
             "in": "query",
-            "description": "These conversations only (1 to 100 ids, comma-separated), whatever\ntheir stream or whether archived; those you cannot see are left\nout. Other filters and the cursor are ignored.",
+            "description": "These conversations only (1 to 100 ids, comma-separated), whatever\ntheir stream, view or whether archived; those you cannot see are\nleft out. Other filters and the cursor are ignored.",
             "required": false,
             "schema": {
               "type": "string"
@@ -3077,7 +3094,7 @@
             }
           },
           "400": {
-            "description": "A malformed cursor or limit.",
+            "description": "A malformed cursor or limit, or `archived=true` with another view.",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -4123,7 +4140,7 @@
         "tags": [
           "conversations"
         ],
-        "summary": "Take a conversation out of spam, back where it was.",
+        "summary": "Take a conversation out of spam: received mail goes back in the inbox.",
         "operationId": "conversations.not_spam",
         "parameters": [
           {
@@ -13254,7 +13271,7 @@
             "items": {
               "$ref": "#/components/schemas/ConversationSummary"
             },
-            "description": "Pinned first, then newest first (archived lists and `ids`: newest first)."
+            "description": "The inbox: pinned first, then newest first. Sent: by the inbox's\nlatest message. Archive, Spam, Trash and `ids`: newest first."
           },
           "next_cursor": {
             "type": [
@@ -13279,6 +13296,11 @@
           "unread_count",
           "starred",
           "archived",
+          "trashed",
+          "spam",
+          "sent_to",
+          "replied_since_sent",
+          "latest_from_you",
           "snippet",
           "labels"
         ],
@@ -13307,6 +13329,14 @@
             "format": "date-time",
             "description": "When its newest message was sent."
           },
+          "last_sent_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "When the inbox last wrote in it, outside spam and the trash; none\nwhen it wrote nothing there. Sent lists it by this."
+          },
           "latest_from": {
             "oneOf": [
               {
@@ -13317,6 +13347,10 @@
                 "type": "null"
               }
             ]
+          },
+          "latest_from_you": {
+            "type": "boolean",
+            "description": "Whether the newest message is one the inbox sent (outbound)."
           },
           "message_count": {
             "type": "integer",
@@ -13334,6 +13368,10 @@
                 "type": "null"
               }
             ]
+          },
+          "replied_since_sent": {
+            "type": "boolean",
+            "description": "Whether someone wrote back after the inbox's latest message (an\ninbound message newer than `last_sent_at`, outside spam and the trash)."
           },
           "rule": {
             "oneOf": [
@@ -13357,9 +13395,20 @@
               }
             ]
           },
+          "sent_to": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Address"
+            },
+            "description": "Who the inbox's latest message there went to (to, then cc); empty\nwhen it wrote nothing there."
+          },
           "snippet": {
             "type": "string",
             "description": "The start of the newest message's text."
+          },
+          "spam": {
+            "type": "boolean",
+            "description": "Whether it is binned as spam (in Spam rather than in Trash); only\never true when `trashed`."
           },
           "starred": {
             "type": "boolean",
@@ -13387,6 +13436,10 @@
                 "type": "null"
               }
             ]
+          },
+          "trashed": {
+            "type": "boolean",
+            "description": "Whether every message is in spam or the trash."
           },
           "unread_count": {
             "type": "integer",
@@ -14342,7 +14395,8 @@
           "cannot_authenticate",
           "not_checked",
           "rule_paused",
-          "rule_too_broad"
+          "rule_too_broad",
+          "spam"
         ]
       },
       "InboxId": {

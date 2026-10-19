@@ -3,9 +3,10 @@ import type { ShortcutDefinition } from "~/lib/shortcuts";
 /**
  * Shortcuts for `conversations` operations, keyed by their OpenAPI
  * operationId (ADR 0013), plus the client-only commands of the inbox
- * screens (ids outside the module namespace). Done (E), Reply (R), J/K,
- * Enter, Z and Escape are the app's defaults; the choices of a suggestion
- * use the defaults' 1 and 2.
+ * screens (ids outside the module namespace). Done (E, which moves an
+ * archived conversation back to the inbox), Reply (R), J/K, Enter, Z and
+ * Escape are the app's defaults; the choices of a suggestion use the
+ * defaults' 1 and 2.
  */
 export const CONVERSATIONS_SHORTCUTS = [
   {
@@ -35,6 +36,51 @@ export const CONVERSATIONS_SHORTCUTS = [
     scope: "global",
     group: "navigation",
     label: "conversations:shortcuts.newsletters",
+  },
+  // The views beside the streams (campbooks-cloud#240): not streams.
+  {
+    id: "inbox.view.sent",
+    keys: "g 5",
+    scope: "global",
+    group: "navigation",
+    label: "conversations:shortcuts.sent",
+  },
+  {
+    id: "inbox.view.archive",
+    keys: "g 6",
+    scope: "global",
+    group: "navigation",
+    label: "conversations:shortcuts.archive",
+  },
+  {
+    id: "inbox.view.spam",
+    keys: "g 7",
+    scope: "global",
+    group: "navigation",
+    label: "conversations:shortcuts.spam",
+  },
+  {
+    id: "inbox.view.trash",
+    keys: "g 8",
+    scope: "global",
+    group: "navigation",
+    label: "conversations:shortcuts.trash",
+  },
+  {
+    // Delete; in the trash the same key restores it, back where it was.
+    id: "conversations.trash",
+    keys: "#",
+    scope: "item",
+    group: "item",
+    label: "conversations:shortcuts.delete",
+  },
+  {
+    // Report spam; in spam the same key says it is not.
+    id: "conversations.report_spam",
+    keys: "!",
+    scope: "item",
+    group: "item",
+    label: "conversations:shortcuts.reportSpam",
   },
   {
     // Pin: the provider's star (Gmail STARRED), named Pin in the UI.

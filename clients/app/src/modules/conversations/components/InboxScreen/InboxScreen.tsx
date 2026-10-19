@@ -18,12 +18,21 @@ import {
 } from "~/lib/ui";
 
 import {
+  applied,
+  belongsIn,
   useConversations,
   useInboxes,
   type ConversationSummary,
-  type Stream,
+  type Place,
 } from "../../api/queries";
-import { streamName, type Translate } from "../../model";
+import {
+  archiveMove,
+  placeName,
+  spamMove,
+  trashMove,
+  type Move,
+  type Translate,
+} from "../../model";
 import { ConversationList, rowId } from "../ConversationList/ConversationList";
 import { ConversationReader } from "../Reader/ConversationReader";
 import type { RenderReplySlot } from "../Reader/ReplySlot";
@@ -43,7 +52,8 @@ function isNarrow(): boolean {
 
 export interface InboxScreenProps {
   workspaceId: string;
-  stream: Stream;
+  /** The stream listed, or a view beside them (Sent, Archive, Spam, Trash). */
+  stream: Place;
   /** The conversation open in the reader, if any. */
   conversationId?: string | undefined;
   /**
@@ -62,10 +72,10 @@ export interface InboxScreenProps {
 }
 
 /**
- * The inbox (keyed by workspace and stream: a new stream starts at its top,
- * showing everything): a stream's conversations and the reader side by side, or as
- * two screens below the large breakpoint. Every action has its shortcut,
- * and every change can be undone.
+ * The inbox (keyed by workspace and place: a new stream or view starts at
+ * its top, showing everything): a stream's or a view's conversations and the
+ * reader side by side, or as two screens below the large breakpoint. Every
+ * action has its shortcut, and every change can be undone.
  */
 export function InboxScreen({
   workspaceId,
@@ -131,11 +141,17 @@ export function InboxScreen({
     }
   };
 
-  /** Done: archive, then the next conversation (or the list, on phones). */
-  const done = (conversation: ConversationSummary) => {
+  /**
+   * Move it to another place (Done, Delete, Report spam, or back); once it
+   * leaves this list, the next conversation (or the list, on phones).
+   */
+  const leave = (conversation: ConversationSummary, move: Move) => {
+    actions.moveTo(conversation, move);
+    if (belongsIn(stream, applied(conversation, move))) {
+      return;
+    }
     const index = ids.indexOf(conversation.id);
     const following = ids[index + 1] ?? ids[index - 1];
-    actions.done(conversation);
     if (conversationId === conversation.id) {
       if (following === undefined || isNarrow()) {
         toList();
@@ -176,16 +192,17 @@ export function InboxScreen({
     },
     { enabled: listActive },
   );
-  useShortcut(
-    "item.done",
-    () => {
-      const conversation = listConversation(current);
-      if (conversation !== undefined) {
-        done(conversation);
-      }
-    },
-    { enabled: listActive },
-  );
+  /** The row under the cursor and `pick`'s move for it, when it has one. */
+  const onCursor = (pick: (conversation: ConversationSummary) => Move | undefined) => () => {
+    const conversation = listConversation(current);
+    const move = conversation === undefined ? undefined : pick(conversation);
+    if (conversation !== undefined && move !== undefined) {
+      leave(conversation, move);
+    }
+  };
+  useShortcut("item.done", onCursor(archiveMove), { enabled: listActive });
+  useShortcut("conversations.trash", onCursor(trashMove), { enabled: listActive });
+  useShortcut("conversations.report_spam", onCursor(spamMove), { enabled: listActive });
   useShortcut(
     "conversations.star",
     () => {
@@ -207,7 +224,7 @@ export function InboxScreen({
     { enabled: listActive },
   );
 
-  const name = streamName(t, stream);
+  const name = placeName(t, stream);
   const noInbox = inboxes.data?.length === 0;
 
   return (
@@ -250,7 +267,7 @@ export function InboxScreen({
           </EmptyState>
         ) : (
           <ConversationList
-            stream={stream}
+            place={stream}
             conversations={conversations}
             unreadOnly={show === "unread"}
             failed={list.isError}
@@ -303,7 +320,7 @@ export function InboxScreen({
             onNext={() => {
               step(1);
             }}
-            onDone={done}
+            onMove={leave}
             renderReplySlot={renderReplySlot}
             startReply={startReply}
             replyTo={replyTo}
