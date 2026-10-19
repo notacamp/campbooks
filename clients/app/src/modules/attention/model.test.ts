@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import type { ItemView } from "./api/queries";
 import {
+  ageLabel,
   doneTodayKind,
   groupByReason,
   remindTime,
@@ -196,5 +197,43 @@ describe("a reminder for a bill still to pay", () => {
     const remind = remindTime(null, now);
     expect(remind.kind).toBe("monday");
     expect(remind.until.getTime()).toBe(at(10, 19));
+  });
+});
+
+describe("ageLabel", () => {
+  // Local times, so the test reads the same in every time zone.
+  const now = new Date(2026, 9, 16, 15, 0);
+  const at = (...parts: [number, number, number, number, number]) =>
+    new Date(...parts).toISOString();
+
+  it("says minutes, then hours, the same day", () => {
+    expect(ageLabel(at(2026, 9, 16, 14, 48), now, "en-GB").text).toBe("12 minutes ago");
+    expect(ageLabel(at(2026, 9, 16, 9, 30), now, "en-GB").text).toBe("5 hours ago");
+  });
+
+  it("says now for what just arrived, even from a clock ahead", () => {
+    expect(ageLabel(at(2026, 9, 16, 15, 1), now, "en-GB").text).toBe("Now");
+  });
+
+  it("counts calendar days in the week after", () => {
+    expect(ageLabel(at(2026, 9, 15, 23, 50), now, "en-GB").text).toBe("Yesterday");
+    expect(ageLabel(at(2026, 9, 12, 8, 0), now, "en-GB").text).toBe("4 days ago");
+  });
+
+  it("gives the date from a week on, with the year when it is another's", () => {
+    expect(ageLabel(at(2026, 9, 2, 8, 0), now, "en-GB").text).toBe("2 Oct");
+    expect(ageLabel(at(2025, 11, 20, 8, 0), now, "en-GB").text).toBe("20 Dec 2025");
+  });
+
+  it("speaks the member's language, capitalised at the start", () => {
+    expect(ageLabel(at(2026, 9, 15, 10, 0), now, "pt-PT").text).toBe("Ontem");
+    expect(ageLabel(at(2026, 9, 15, 10, 0), now, "fr").text).toBe("Hier");
+  });
+
+  it("keeps the instant and the full date for the tooltip", () => {
+    const since = at(2026, 9, 12, 8, 0);
+    const age = ageLabel(since, now, "en-GB");
+    expect(age.dateTime).toBe(since);
+    expect(age.label).toMatch(/Monday,? 12 October 2026/u);
   });
 });

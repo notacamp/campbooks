@@ -72,7 +72,8 @@
   quotes: auto;
 }
 
-.due {
+/* When: how long it has waited, then its due date, at the row's end. */
+.when {
   display: flex;
   grid-row: span 2;
   flex-direction: column;
@@ -81,6 +82,7 @@
   font-size: var(--text-xs);
   color: var(--text-tertiary);
   font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }
 
 .due[data-soon] {

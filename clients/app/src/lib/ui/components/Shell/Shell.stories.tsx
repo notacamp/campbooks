@@ -1,6 +1,7 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { fn } from "storybook/test";
 
+import { ActionBar } from "../ActionBar/ActionBar";
 import { Button } from "../Button/Button";
 import { ChipLink, ChipRow } from "../Chip/Chip";
 import { IconButton } from "../IconButton/IconButton";
@@ -12,6 +13,8 @@ import {
   AccountButton,
   ListPane,
   PaneHeader,
+  ReaderBody,
+  ReaderFooter,
   ReaderPane,
   SearchButton,
   Shell,
@@ -190,6 +193,70 @@ export const PhoneSections: Story = {
           <ChipLink href="#sign-in">Ways to sign in</ChipLink>
         </ChipRow>
       </PhoneSubnav>
+    </Shell>
+  ),
+};
+
+/**
+ * A reader's footer, pinned while the thread scrolls under it: the way to
+ * reply from 48rem, the floating bar below (view it at a phone width).
+ */
+export const ReaderWithFooter: Story = {
+  args: { children: null },
+  render: () => (
+    <Shell>
+      <ReaderPane label="Conversation">
+        <ReaderBody>
+          <Heading level={2} size="page">
+            Kitchen shelving quote
+          </Heading>
+          {Array.from({ length: 12 }, (_, index) => (
+            <p key={index}>Perfect, approved. When can you start?</p>
+          ))}
+        </ReaderBody>
+        <ReaderFooter
+          prompt={
+            <Button icon="reply" shortcut="item.reply" grow>
+              Reply to Marta Silva
+            </Button>
+          }
+          phoneBar={
+            <ActionBar label="Conversation actions" phoneOnly aboveTabBar>
+              <Button variant="primary" size="lg" icon="reply" grow>
+                Reply
+              </Button>
+              <Button size="lg" icon="archive" grow>
+                Done
+              </Button>
+            </ActionBar>
+          }
+        />
+      </ReaderPane>
+    </Shell>
+  ),
+};
+
+/** With the composer open, it takes the footer and grows up to its limit. */
+export const ReaderWithComposer: Story = {
+  args: { children: null },
+  render: () => (
+    <Shell>
+      <ReaderPane label="Conversation">
+        <ReaderBody>
+          <p>Perfect, approved. When can you start?</p>
+        </ReaderBody>
+        <ReaderFooter
+          slot={
+            <section aria-label="Reply to Marta Silva" className="flex flex-col gap-2 p-3">
+              <textarea aria-label="Your reply" rows={4} defaultValue="Monday works." />
+              {Array.from({ length: 30 }, (_, index) => (
+                <p key={index}>Monday works. I will bring the brackets.</p>
+              ))}
+            </section>
+          }
+          prompt={<Button grow>Reply to Marta Silva</Button>}
+        />
+      </ReaderPane>
     </Shell>
   ),
 };

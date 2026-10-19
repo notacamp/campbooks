@@ -19,6 +19,12 @@ export interface ItemProps {
   due?: string | undefined;
   /** Due soon: drawn in the danger colour. */
   soon?: boolean | undefined;
+  /**
+   * How long it has waited, above the due date: "3 hours ago", "Yesterday",
+   * "12 Oct". `dateTime` is the machine-readable instant and `label` the full
+   * date, shown on hover.
+   */
+  age?: { text: string; dateTime: string; label: string } | undefined;
   /** Facts shown as tags under the line. */
   tags?: string[] | undefined;
   /** The keyboard cursor is here (J/K). */
@@ -58,6 +64,7 @@ export function Item({
   avatar,
   due,
   soon = false,
+  age,
   tags = [],
   selected = false,
   expanded = false,
@@ -77,8 +84,17 @@ export function Item({
     <>
       <Avatar {...avatar} />
       <span className={styles["who"]}>{who}</span>{" "}
-      <span className={styles["due"]} data-soon={soon || undefined}>
-        {due}
+      <span className={styles["when"]}>
+        {age === undefined ? null : (
+          <time className={styles["age"]} dateTime={age.dateTime} title={age.label}>
+            {age.text}
+          </time>
+        )}
+        {due === undefined ? null : (
+          <span className={styles["due"]} data-soon={soon || undefined}>
+            {due}
+          </span>
+        )}
       </span>{" "}
       <span className={styles["what"]}>{what}</span>
       {excerpt === undefined || expanded ? null : <q className={styles["excerpt"]}>{excerpt}</q>}

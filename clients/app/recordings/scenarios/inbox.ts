@@ -192,10 +192,7 @@ export default async function inbox({ page }: ScenarioContext): Promise<void> {
   await page.getByRole("heading", { name: "Q4 plan: can you review by Friday?" }).waitFor();
   await caption(page, "A thread: newest first, older messages folded, attachments listed", 2200);
   await shot("06-thread");
-  await page
-    .getByRole("button", { name: /Sam Rivera/u })
-    .first()
-    .click();
+  await page.getByRole("button", { name: /^You/u }).first().click();
   await pause(900);
 
   // Done (archive) with Undo.
