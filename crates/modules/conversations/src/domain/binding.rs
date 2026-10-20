@@ -11,6 +11,15 @@
 //!   workspace, send id, inbox, author and the outgoing document's blob
 //!   (hash, size, type). Stored as `drafts.send_mac`; the outbound-requests
 //!   port verifies it before it hands the send to the connector.
+//! - **Where it goes** (campbooks-cloud#242). Both send bindings name the
+//!   inbox's [`Destination`] as the connector resolved it when they were
+//!   signed (the connection, stream and mailbox it goes out through): the
+//!   author's request when they asked, the stored send at its release.
+//!   `release_send` and the port verify each against the destination as it
+//!   is resolved again then, so a stream repointed by SQL after the member
+//!   asked does not verify, and nothing goes out. A binding signed before
+//!   destinations were bound (`…/v1`) verifies only while the destination
+//!   is still the one recorded at that deploy ([`Resolved::as_at_deploy`]).
 //! - **A change request.** `conversation::request` signs what it records:
 //!   workspace, request (the event's id), inbox, conversation and the items.
 //!   Stored as `change_requests.mac`; the port verifies it before it says
@@ -34,6 +43,7 @@ use campbooks_kernel::{
     Error, Result,
     binding::{Binding, Fields},
     blobs::BlobRef,
+    outbound::{Destination, Resolved},
     tenancy::{Access, UserId, WorkspaceId},
 };
 use sqlx::types::Uuid;
@@ -47,10 +57,15 @@ use crate::{
 /// The encoding of a draft's outgoing content. A new field takes a new
 /// version.
 const DRAFT_CONTENT: &str = "campbooks/conversations.draft-content/v1";
-/// The author's request to send a draft.
+/// The author's request to send a draft, as signed before destinations were
+/// bound: still verified for the destination recorded at that deploy.
 const SEND_REQUEST: &str = "campbooks/conversations.send-request/v1";
-/// A released send, as stored.
+/// The author's request to send a draft, with its destination.
+const SEND_REQUEST_V2: &str = "campbooks/conversations.send-request/v2";
+/// A released send, as stored before destinations were bound.
 const STORED_SEND: &str = "campbooks/conversations.stored-send/v1";
+/// A released send, as stored, with its destination.
+const STORED_SEND_V2: &str = "campbooks/conversations.stored-send/v2";
 /// A change request, as recorded.
 const CHANGE_REQUEST: &str = "campbooks/conversations.change-request/v1";
 /// What a member was shown: a draft or a rule, as a response showed it.
@@ -106,6 +121,67 @@ fn addresses(fields: &mut Fields, list: &[Address]) {
     }
 }
 
+/// Which destination a send's binding names (campbooks-cloud#242).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Bound<'a> {
+    /// Signed before destinations were bound (`…/v1`): it names none.
+    Before,
+    /// Signed for this destination (`None`: no connection fed the inbox).
+    To(Option<&'a Destination>),
+}
+
+impl<'a> Bound<'a> {
+    /// Bound to `at`, the destination resolved now.
+    pub fn at(at: Option<&'a Resolved>) -> Self {
+        Self::To(at.map(|resolved| &resolved.destination))
+    }
+}
+
+/// Append `destination`: a presence byte, then its connection, stream and
+/// mailbox.
+fn destination(fields: &mut Fields, destination: Option<&Destination>) {
+    match destination {
+        None => {
+            fields.bytes(&[0]);
+        }
+        Some(to) => {
+            fields
+                .bytes(&[1])
+                .uuid(&to.connection)
+                .uuid(&to.stream)
+                .str(&to.mailbox);
+        }
+    }
+}
+
+/// Whether `tag` holds for `at`, the destination resolved now: it is the
+/// tag of `now` (the binding for `at`, `…/v2`), or of `before` (the same
+/// binding as signed before destinations were bound) while `at` is still
+/// the destination recorded then.
+fn holds_at(
+    binding: &Binding,
+    now: &Fields,
+    before: &Fields,
+    tag: Option<&[u8]>,
+    at: Option<&Resolved>,
+) -> bool {
+    binding.verify(now, tag)
+        || (at.is_some_and(|at| at.as_at_deploy) && binding.verify(before, tag))
+}
+
+/// The tag under the current key of `now` or `before`, whichever `tag`
+/// verifies under the previous key only (campbooks-cloud#191).
+fn retag_at(
+    binding: &Binding,
+    now: &Fields,
+    before: &Fields,
+    tag: Option<&[u8]>,
+) -> Option<Vec<u8>> {
+    binding
+        .retag(now, tag)
+        .or_else(|| binding.retag(before, tag))
+}
+
 fn blob(fields: &mut Fields, blob: &BlobRef) {
     fields
         .bytes(blob.hash.as_bytes())
@@ -114,7 +190,8 @@ fn blob(fields: &mut Fields, blob: &BlobRef) {
 }
 
 /// The author's request to send `draft` at `generation`, from `inbox`,
-/// with content `content` ([`content_hash`]).
+/// with content `content` ([`content_hash`]), to `destination`.
+#[derive(Debug, Clone, Copy)]
 pub struct SendRequest<'a> {
     /// The workspace.
     pub workspace: WorkspaceId,
@@ -128,11 +205,17 @@ pub struct SendRequest<'a> {
     pub inbox: InboxId,
     /// What goes out.
     pub content: &'a [u8; 32],
+    /// Where it goes.
+    pub destination: Bound<'a>,
 }
 
 impl SendRequest<'_> {
     fn fields(&self) -> Fields {
-        let mut fields = Fields::new(SEND_REQUEST);
+        let label = match self.destination {
+            Bound::Before => SEND_REQUEST,
+            Bound::To(_) => SEND_REQUEST_V2,
+        };
+        let mut fields = Fields::new(label);
         fields
             .uuid(self.workspace.as_uuid())
             .uuid(self.draft.as_uuid())
@@ -140,7 +223,42 @@ impl SendRequest<'_> {
             .opt_uuid(self.author.as_ref().map(UserId::as_uuid))
             .uuid(self.inbox.as_uuid())
             .bytes(self.content);
+        if let Bound::To(to) = self.destination {
+            destination(&mut fields, to);
+        }
         fields
+    }
+
+    /// Whether `tag` is this request's, sent to `at` (the destination
+    /// resolved now); `self.destination` is not read.
+    pub fn holds_at(&self, binding: &Binding, tag: Option<&[u8]>, at: Option<&Resolved>) -> bool {
+        let now = SendRequest {
+            destination: Bound::at(at),
+            ..*self
+        };
+        let before = SendRequest {
+            destination: Bound::Before,
+            ..*self
+        };
+        holds_at(binding, &now.fields(), &before.fields(), tag, at)
+    }
+
+    /// [`retag`](Self::retag) for `at`, whichever encoding `tag` is in.
+    pub fn retag_at(
+        &self,
+        binding: &Binding,
+        tag: Option<&[u8]>,
+        at: Option<&Resolved>,
+    ) -> Option<Vec<u8>> {
+        let now = SendRequest {
+            destination: Bound::at(at),
+            ..*self
+        };
+        let before = SendRequest {
+            destination: Bound::Before,
+            ..*self
+        };
+        retag_at(binding, &now.fields(), &before.fields(), tag)
     }
 
     /// The tag to store with the scheduled draft; `None` without a key.
@@ -161,7 +279,8 @@ impl SendRequest<'_> {
 }
 
 /// A released send as stored: `send` from `inbox`, asked for by `author`,
-/// written as `document`.
+/// written as `document`, going to `destination`.
+#[derive(Debug, Clone, Copy)]
 pub struct StoredSend<'a> {
     /// The workspace.
     pub workspace: WorkspaceId,
@@ -173,18 +292,59 @@ pub struct StoredSend<'a> {
     pub author: Option<UserId>,
     /// The outgoing document.
     pub document: &'a BlobRef,
+    /// Where it goes.
+    pub destination: Bound<'a>,
 }
 
 impl StoredSend<'_> {
     fn fields(&self) -> Fields {
-        let mut fields = Fields::new(STORED_SEND);
+        let label = match self.destination {
+            Bound::Before => STORED_SEND,
+            Bound::To(_) => STORED_SEND_V2,
+        };
+        let mut fields = Fields::new(label);
         fields
             .uuid(self.workspace.as_uuid())
             .uuid(self.send.as_uuid())
             .uuid(self.inbox.as_uuid())
             .opt_uuid(self.author.as_ref().map(UserId::as_uuid));
         blob(&mut fields, self.document);
+        if let Bound::To(to) = self.destination {
+            destination(&mut fields, to);
+        }
         fields
+    }
+
+    /// Whether `tag` is this send's, going to `at` (the destination the
+    /// sender resolved); `self.destination` is not read.
+    pub fn holds_at(&self, binding: &Binding, tag: Option<&[u8]>, at: Option<&Resolved>) -> bool {
+        let now = StoredSend {
+            destination: Bound::at(at),
+            ..*self
+        };
+        let before = StoredSend {
+            destination: Bound::Before,
+            ..*self
+        };
+        holds_at(binding, &now.fields(), &before.fields(), tag, at)
+    }
+
+    /// [`retag`](Self::retag) for `at`, whichever encoding `tag` is in.
+    pub fn retag_at(
+        &self,
+        binding: &Binding,
+        tag: Option<&[u8]>,
+        at: Option<&Resolved>,
+    ) -> Option<Vec<u8>> {
+        let now = StoredSend {
+            destination: Bound::at(at),
+            ..*self
+        };
+        let before = StoredSend {
+            destination: Bound::Before,
+            ..*self
+        };
+        retag_at(binding, &now.fields(), &before.fields(), tag)
     }
 
     /// The tag to store with the send; `None` without a key.
@@ -401,6 +561,7 @@ mod tests {
             author: Some(UserId::new()),
             inbox: InboxId::new(),
             content: &content,
+            destination: Bound::To(None),
         };
         let tag = request.sign(&binding()).unwrap();
         assert!(request.holds(&binding(), Some(&tag)));
@@ -454,6 +615,7 @@ mod tests {
             inbox: InboxId::new(),
             author: Some(UserId::new()),
             document: &document,
+            destination: Bound::To(None),
         };
         let tag = send.sign(&binding()).unwrap();
         assert!(send.holds(&binding(), Some(&tag)));
@@ -476,6 +638,109 @@ mod tests {
             }
             .holds(&binding(), Some(&tag))
         );
+    }
+
+    fn resolved(as_at_deploy: bool) -> Resolved {
+        Resolved {
+            destination: Destination {
+                connection: Uuid::now_v7(),
+                stream: Uuid::now_v7(),
+                mailbox: "mailbox-1".into(),
+            },
+            as_at_deploy,
+        }
+    }
+
+    /// campbooks-cloud#242: a send's bindings name where it goes. Signed
+    /// for one destination, they hold for it only: another connection,
+    /// stream or mailbox (a stream repointed by SQL), or none, does not
+    /// verify.
+    #[test]
+    fn a_send_holds_only_for_the_destination_it_was_signed_for() {
+        let content = [3_u8; 32];
+        let at = resolved(false);
+        let request = SendRequest {
+            workspace: WorkspaceId::new(),
+            draft: DraftId::new(),
+            generation: 1,
+            author: Some(UserId::new()),
+            inbox: InboxId::new(),
+            content: &content,
+            destination: Bound::at(Some(&at)),
+        };
+        let tag = request.sign(&binding()).unwrap();
+        assert!(request.holds_at(&binding(), Some(&tag), Some(&at)));
+        let elsewhere = |change: fn(&mut Destination)| {
+            let mut other = at.clone();
+            change(&mut other.destination);
+            other
+        };
+        for other in [
+            elsewhere(|d| d.connection = Uuid::now_v7()),
+            elsewhere(|d| d.stream = Uuid::now_v7()),
+            elsewhere(|d| d.mailbox = "mailbox-2".into()),
+        ] {
+            assert!(!request.holds_at(&binding(), Some(&tag), Some(&other)));
+        }
+        assert!(!request.holds_at(&binding(), Some(&tag), None));
+        // Recorded at the deploy changes nothing for a v2 binding.
+        let pinned = Resolved {
+            as_at_deploy: true,
+            ..elsewhere(|d| d.stream = Uuid::now_v7())
+        };
+        assert!(!request.holds_at(&binding(), Some(&tag), Some(&pinned)));
+
+        let document = BlobRef {
+            hash: campbooks_kernel::blobs::BlobHash::of(b"{}"),
+            size: 2,
+            content_type: "application/json".into(),
+        };
+        let send = StoredSend {
+            workspace: request.workspace,
+            send: SendId::new(),
+            inbox: request.inbox,
+            author: request.author,
+            document: &document,
+            destination: Bound::at(Some(&at)),
+        };
+        let tag = send.sign(&binding()).unwrap();
+        assert!(send.holds_at(&binding(), Some(&tag), Some(&at)));
+        assert!(!send.holds_at(
+            &binding(),
+            Some(&tag),
+            Some(&elsewhere(|d| d.connection = Uuid::now_v7()))
+        ));
+        assert!(!send.holds_at(&binding(), Some(&tag), None));
+    }
+
+    /// A binding signed before destinations were (`…/v1`) holds only while
+    /// the destination is still the one recorded at the deploy; a v2 tag
+    /// never verifies as a v1 one, so SQL cannot choose the encoding.
+    #[test]
+    fn a_send_signed_before_destinations_holds_only_as_at_the_deploy() {
+        let content = [3_u8; 32];
+        let request = SendRequest {
+            workspace: WorkspaceId::new(),
+            draft: DraftId::new(),
+            generation: 1,
+            author: Some(UserId::new()),
+            inbox: InboxId::new(),
+            content: &content,
+            destination: Bound::Before,
+        };
+        let tag = request.sign(&binding()).unwrap();
+        assert!(request.holds_at(&binding(), Some(&tag), Some(&resolved(true))));
+        assert!(!request.holds_at(&binding(), Some(&tag), Some(&resolved(false))));
+        assert!(!request.holds_at(&binding(), Some(&tag), None));
+        // A v2 tag for no destination is not a v1 tag.
+        let v2 = SendRequest {
+            destination: Bound::To(None),
+            ..request
+        }
+        .sign(&binding())
+        .unwrap();
+        assert_ne!(v2, tag);
+        assert!(!request.holds_at(&binding(), Some(&v2), Some(&resolved(true))));
     }
 
     #[test]

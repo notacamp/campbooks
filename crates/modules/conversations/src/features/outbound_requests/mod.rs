@@ -9,7 +9,8 @@
 //!   send it (a member, allowed to send from the inbox). The connector sends
 //!   that document, never one an event names.
 //! - Both are bound (campbooks-cloud#227): the stored send by the MAC
-//!   `release_send` wrote with it, a recorded change request by the MAC
+//!   `release_send` wrote with it (which names where it goes: it stands only
+//!   for the destination the connector resolved, campbooks-cloud#242), a recorded change request by the MAC
 //!   `conversation::request` wrote with it, under a key the database never
 //!   holds. One that does not verify (planted or edited by SQL, or written
 //!   by an older version) does not stand.
@@ -23,7 +24,9 @@ use std::sync::Arc;
 use campbooks_kernel::{
     AppState,
     blobs::BlobRef,
-    outbound::{OutboundPort, OutboundRequests, StandingFuture, StoredSend, StoredSendFuture},
+    outbound::{
+        OutboundPort, OutboundRequests, Resolved, StandingFuture, StoredSend, StoredSendFuture,
+    },
     tenancy::{UserId, WorkspaceId},
 };
 use serde::Deserialize as _;
@@ -51,6 +54,7 @@ impl OutboundRequests for StoredRequests {
         conn: &'a mut PgConnection,
         workspace: WorkspaceId,
         send: Uuid,
+        at: Option<&'a Resolved>,
     ) -> StoredSendFuture<'a> {
         Box::pin(async move {
             // Held until the asking transaction ends: the send's outcome
@@ -78,7 +82,9 @@ impl OutboundRequests for StoredRequests {
                 return Ok(None);
             };
             // Bound by the release that wrote it (campbooks-cloud#227): a
-            // send planted or edited by SQL does not verify.
+            // send planted or edited by SQL does not verify; nor one bound
+            // to another destination than the connector resolved for it
+            // (campbooks-cloud#242).
             let mac: Option<Vec<u8>> =
                 sqlx::query_scalar("SELECT send_mac FROM conversations.drafts WHERE id = $1")
                     .bind(draft.id)
@@ -90,12 +96,14 @@ impl OutboundRequests for StoredRequests {
                 inbox: draft.inbox,
                 author: draft.author,
                 document: &message,
+                destination: binding::Bound::Before,
             };
-            if !stored.holds(&state.binding, mac.as_deref()) {
+            if !stored.holds_at(&state.binding, mac.as_deref(), at) {
                 tracing::warn!(
                     %workspace,
                     %send,
-                    "a stored send is not bound to the release that wrote it; it is not sent"
+                    "a stored send is not bound to the release that wrote it, or not to where \
+                     the connector would send it; it is not sent"
                 );
                 return Ok(None);
             }

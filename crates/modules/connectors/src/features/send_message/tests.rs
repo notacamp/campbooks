@@ -902,3 +902,102 @@ async fn a_rotated_secret_key_opens_and_seals_the_credentials_again(db: PgPool) 
             .is_err()
     );
 }
+
+/// Where `inbox`'s mail goes out now: its stream, the stream's connection
+/// and mailbox.
+async fn destination_of(kit: &Kit, inbox: InboxId) -> campbooks_kernel::outbound::Destination {
+    let (stream, connection, mailbox): (uuid::Uuid, uuid::Uuid, String) = sqlx::query_as(
+        "SELECT id, connection_id, mailbox_key FROM connectors.streams WHERE inbox_id = $1",
+    )
+    .bind(uuid::Uuid::from(inbox))
+    .fetch_one(&kit.db)
+    .await
+    .unwrap();
+    campbooks_kernel::outbound::Destination {
+        connection,
+        stream,
+        mailbox,
+    }
+}
+
+/// A reply released to go out through `destination` (campbooks-cloud#242).
+async fn request_to(
+    kit: &Kit,
+    ws: WorkspaceId,
+    inbox: InboxId,
+    thread: &str,
+    destination: campbooks_kernel::outbound::Destination,
+) -> SendId {
+    let send_id = SendId::new();
+    let blob = document(kit, ws, inbox, send_id, Some(thread), "Thanks").await;
+    kit.outbound
+        .release_to(send_id, inbox, blob.clone(), destination);
+    publish(kit, ws, inbox, send_id, blob).await;
+    send_id
+}
+
+/// campbooks-cloud#242: the connector asks whether a send stands for the
+/// stream, connection and mailbox it would send it through. Released to go
+/// out where the inbox's stream points, it is sent.
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_send_goes_out_where_it_was_released_to(db: PgPool) {
+    let kit = Kit::new(db).await;
+    let (ws, inbox, thread) = connected(&kit).await;
+    let to = destination_of(&kit, inbox).await;
+    request_to(&kit, ws, inbox, &thread, to).await;
+    settle(&kit).await;
+    assert_eq!(kit.google.send_calls(), 1);
+    assert_eq!(completed(&kit, ws).await[0]["outcome"], "sent");
+}
+
+/// The stream pointed at another mailbox by SQL after the send was
+/// released: the send no longer stands for where it would go, so nothing
+/// reaches the provider and it fails (`unavailable`) without retrying.
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_send_whose_stream_was_repointed_after_its_release_is_never_sent(db: PgPool) {
+    let kit = Kit::new(db).await;
+    let (ws, inbox, thread) = connected(&kit).await;
+    drain(&kit).await;
+    let to = destination_of(&kit, inbox).await;
+    request_to(&kit, ws, inbox, &thread, to.clone()).await;
+    kit.run_jobs().await;
+    assert_eq!(recorded(&kit).await, 1, "recorded where it was released to");
+    sqlx::query("UPDATE connectors.streams SET mailbox_key = 'another-mailbox' WHERE id = $1")
+        .bind(to.stream)
+        .execute(&kit.db)
+        .await
+        .unwrap();
+    refill(&kit).await;
+    settle(&kit).await;
+    assert_eq!(kit.google.send_calls(), 0);
+    let done = completed(&kit, ws).await;
+    assert_eq!(done.len(), 1);
+    assert_eq!(done[0]["outcome"], "failed");
+    assert_eq!(done[0]["reason"], "unavailable");
+    let pending: i64 = sqlx::query_scalar(
+        "SELECT count(*) FROM kernel.jobs
+          WHERE kind = 'connectors.send_message' AND state = 'pending'
+            AND payload->>'give_up' = 'false'",
+    )
+    .fetch_one(&kit.db)
+    .await
+    .unwrap();
+    assert_eq!(pending, 0, "no job retries it");
+}
+
+/// Repointed before the connector recorded it: never recorded.
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_send_whose_stream_was_repointed_before_it_was_recorded_is_never_sent(db: PgPool) {
+    let kit = Kit::new(db).await;
+    let (ws, inbox, thread) = connected(&kit).await;
+    let to = destination_of(&kit, inbox).await;
+    sqlx::query("UPDATE connectors.streams SET mailbox_key = 'another-mailbox' WHERE id = $1")
+        .bind(to.stream)
+        .execute(&kit.db)
+        .await
+        .unwrap();
+    request_to(&kit, ws, inbox, &thread, to).await;
+    settle(&kit).await;
+    assert_eq!(kit.google.send_calls(), 0);
+    assert_eq!(recorded(&kit).await, 0);
+}

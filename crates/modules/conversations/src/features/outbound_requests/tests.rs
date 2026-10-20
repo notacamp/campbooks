@@ -5,7 +5,10 @@
 
 use axum::http::StatusCode;
 use campbooks_kernel::{
-    blobs::BlobRef, db::BeginFor as _, outbound::StoredSend, tenancy::WorkspaceId,
+    blobs::BlobRef,
+    db::BeginFor as _,
+    outbound::{Destination, Resolved, StoredSend},
+    tenancy::WorkspaceId,
 };
 use serde_json::{Value, json};
 use sqlx::{PgPool, types::Uuid};
@@ -52,11 +55,108 @@ async fn released(kit: &Kit, workspace: WorkspaceId, sam: &str) -> Value {
 async fn stored(kit: &Kit, workspace: WorkspaceId, send: &str) -> Option<StoredSend> {
     let mut tx = kit.state.db.begin_for(workspace).await.unwrap();
     let stored = outbound_requests()
-        .stored_send(&kit.state, &mut tx, workspace, send.parse().unwrap())
+        .stored_send(&kit.state, &mut tx, workspace, send.parse().unwrap(), None)
         .await
         .unwrap();
     tx.commit().await.unwrap();
     stored
+}
+
+/// What the port answers for send `send` of `workspace`, going to `at`.
+async fn stored_at(
+    kit: &Kit,
+    workspace: WorkspaceId,
+    send: &str,
+    at: Option<&Resolved>,
+) -> Option<StoredSend> {
+    let mut tx = kit.state.db.begin_for(workspace).await.unwrap();
+    let stored = outbound_requests()
+        .stored_send(&kit.state, &mut tx, workspace, send.parse().unwrap(), at)
+        .await
+        .unwrap();
+    tx.commit().await.unwrap();
+    stored
+}
+
+/// A destination, recorded at the deploy or not.
+fn destination(as_at_deploy: bool) -> Resolved {
+    Resolved {
+        destination: Destination {
+            connection: Uuid::now_v7(),
+            stream: Uuid::now_v7(),
+            mailbox: String::new(),
+        },
+        as_at_deploy,
+    }
+}
+
+/// campbooks-cloud#242: a stored send names where it goes (here none: no
+/// connector feeds the kit's inbox). It stands only for the destination it
+/// was released to; asked for any other (a stream repointed by SQL), it does
+/// not, recorded at the deploy or not.
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_stored_send_stands_only_for_the_destination_it_was_released_to(db: PgPool) {
+    let kit = Kit::new(db).await;
+    let (workspace, _, sam) = kit.sams_inbox().await;
+    let event = released(&kit, workspace, &sam).await;
+    let send = event["send_id"].as_str().unwrap().to_owned();
+    assert!(stored_at(&kit, workspace, &send, None).await.is_some());
+    for elsewhere in [destination(false), destination(true)] {
+        assert_eq!(
+            stored_at(&kit, workspace, &send, Some(&elsewhere)).await,
+            None
+        );
+    }
+}
+
+/// A send released before destinations were bound (its MAC the `…/v1`
+/// encoding) stands only while the connector says its destination is the
+/// one recorded at the deploy.
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_send_released_before_destinations_stands_only_as_at_the_deploy(db: PgPool) {
+    use crate::{
+        domain::binding::{self, Bound},
+        model::SendId,
+    };
+    use campbooks_kernel::tenancy::UserId;
+
+    let kit = Kit::new(db).await;
+    let (workspace, inbox, sam) = kit.sams_inbox().await;
+    let event = released(&kit, workspace, &sam).await;
+    let send = event["send_id"].as_str().unwrap().to_owned();
+    let message: BlobRef = serde_json::from_value(event["message"].clone()).unwrap();
+    let author: Option<Uuid> =
+        sqlx::query_scalar("SELECT author FROM conversations.drafts WHERE send_id = $1::uuid")
+            .bind(&send)
+            .fetch_one(&kit.db)
+            .await
+            .unwrap();
+    let before = binding::StoredSend {
+        workspace,
+        send: send.parse::<SendId>().unwrap(),
+        inbox,
+        author: author.map(UserId::from),
+        document: &message,
+        destination: Bound::Before,
+    }
+    .sign(&kit.state.binding)
+    .unwrap();
+    sqlx::query("UPDATE conversations.drafts SET send_mac = $2 WHERE send_id = $1::uuid")
+        .bind(&send)
+        .bind(before)
+        .execute(&kit.db)
+        .await
+        .unwrap();
+    assert_eq!(stored_at(&kit, workspace, &send, None).await, None);
+    assert_eq!(
+        stored_at(&kit, workspace, &send, Some(&destination(false))).await,
+        None
+    );
+    assert!(
+        stored_at(&kit, workspace, &send, Some(&destination(true)))
+            .await
+            .is_some()
+    );
 }
 
 #[sqlx::test(migrations = "../../../migrations")]
@@ -580,9 +680,14 @@ async fn rotated(kit: Kit, workspace: WorkspaceId) -> Kit {
     let rotating = Binding::new(&new_key().with_previous(&old_key()));
     let kit = kit.with_binding(rotating.clone());
     let mut tx = kit.state.db.begin_for(workspace).await.unwrap();
-    let tally = crate::features::retag_bindings::retag(&mut tx, &rotating, workspace)
-        .await
-        .unwrap();
+    let tally = crate::features::retag_bindings::retag(
+        &mut tx,
+        &rotating,
+        &kit.state.destinations,
+        workspace,
+    )
+    .await
+    .unwrap();
     tx.commit().await.unwrap();
     assert!(tally.retagged > 0 && tally.left == 0, "{tally:?}");
     kit.with_binding(Binding::new(&new_key()))

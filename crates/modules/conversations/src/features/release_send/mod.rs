@@ -14,12 +14,18 @@
 //! WARN, and is not retried. The send it releases is signed in turn
 //! (`drafts.send_mac`), and the outbound-requests port verifies that before
 //! the connector sends.
+//!
+//! Both name where the send goes (campbooks-cloud#242): the connection,
+//! stream and mailbox the inbox resolved to when the author asked. The job
+//! resolves it again and releases only when it is the same; a stream
+//! repointed by SQL meanwhile leaves the draft as it is, with a WARN.
 
 use campbooks_kernel::{
     JobContext, JobError, JobHandler,
     blobs::BlobOwner,
     db::BeginFor as _,
     jobs::EnqueueOptions,
+    outbound::Resolved,
     tenancy::{Access, UserId, WorkspaceId},
 };
 use chrono::Utc;
@@ -62,7 +68,7 @@ impl JobHandler for ReleaseSend {
         let mut read = state.db.begin_for(workspace).await?;
         let released = releasable(&state, &mut read, workspace, &payload).await?;
         read.commit().await?;
-        let Some((row, author)) = released else {
+        let Some((row, author, at)) = released else {
             return Ok(());
         };
 
@@ -78,6 +84,9 @@ impl JobHandler for ReleaseSend {
             inbox: row.inbox_id,
             author,
             document: &blob,
+            // Where the author's request was verified to go
+            // (campbooks-cloud#242): the connector checks it again.
+            destination: binding::Bound::at(at.as_ref()),
         };
         let Some(send_mac) = stored.sign(&state.binding) else {
             return Ok(()); // No key: `releasable` already refused.
@@ -134,10 +143,11 @@ impl JobHandler for ReleaseSend {
     }
 }
 
-/// The draft of `payload` and its author, read in `read` as whoever wrote
-/// it, when it may be released: still scheduled at the payload's
-/// generation, bound to its author's request (campbooks-cloud#227), and its
-/// author may still send it. It cannot change while scheduled, so the
+/// The draft of `payload`, its author and its inbox's destination, read in
+/// `read` as whoever wrote it, when it may be released: still scheduled at
+/// the payload's generation, bound to its author's request
+/// (campbooks-cloud#227) for the destination its inbox resolves to now
+/// (campbooks-cloud#242), and its author may still send it. It cannot change while scheduled, so the
 /// document built from it stays true. `None` otherwise; nothing is written
 /// before the binding is verified, and a draft whose binding does not
 /// verify is left as it is.
@@ -146,7 +156,7 @@ async fn releasable(
     read: &mut sqlx::Transaction<'static, sqlx::Postgres>,
     workspace: WorkspaceId,
     payload: &ReleaseSendPayload,
-) -> Result<Option<(drafts::DraftRow, Option<UserId>)>, JobError> {
+) -> Result<Option<Released>, JobError> {
     let author = sqlx::query_scalar!(
         "SELECT author FROM conversations.drafts WHERE id = $1",
         payload.draft as DraftId
@@ -175,6 +185,12 @@ async fn releasable(
             .await?;
     // A row that does not even decode was not written by `send_draft`.
     let mac = mac.flatten();
+    // Where the inbox's mail goes out now: the request holds only for the
+    // destination it was signed for (campbooks-cloud#242).
+    let at = state
+        .destinations
+        .destination(&mut **read, row.inbox_id.into())
+        .await?;
     let holds = binding::content_hash(&row).is_ok_and(|content| {
         binding::SendRequest {
             workspace,
@@ -183,22 +199,28 @@ async fn releasable(
             author,
             inbox: row.inbox_id,
             content: &content,
+            destination: binding::Bound::Before,
         }
-        .holds(&state.binding, mac.as_deref())
+        .holds_at(&state.binding, mac.as_deref(), at.as_ref())
     });
     if !holds {
         tracing::warn!(
             %workspace,
             draft = %payload.draft,
-            "a scheduled send is not bound to its author's request; it is not released"
+            "a scheduled send is not bound to its author's request, or not to where its inbox \
+             sends from now; it is not released"
         );
         return Ok(None);
     }
     if !still_may_send(state, read, workspace, author, payload).await? {
         return Ok(None);
     }
-    Ok(Some((row, author)))
+    Ok(Some((row, author, at)))
 }
+
+/// A draft that may be released: its row, its author and where its inbox
+/// sends from.
+type Released = (drafts::DraftRow, Option<UserId>, Option<Resolved>);
 
 /// Whether the author may still send the draft: still a member of the
 /// workspace (held until `tx` ends) and allowed to send it (they may have

@@ -9,6 +9,10 @@
 //! is asked through the kernel's outbound-requests port which of the
 //! changes its conversation still shows. Only those are recorded; a request
 //! none of whose changes stand records nothing.
+//!
+//! Each change recorded is bound to where it is made (campbooks-cloud#242):
+//! the stream, its connection and its mailbox, as resolved here. A run made
+//! anywhere else (the stream repointed by SQL since) does not make it.
 
 use std::collections::HashSet;
 
@@ -21,7 +25,7 @@ use uuid::Uuid;
 use crate::{
     deps::Deps,
     domain::{
-        credentials, marks,
+        credentials, destinations, marks,
         model::{ConnectionId, Health, InboxId, Provider, StreamId},
         outbound::{self, Mapped, State},
         schedule,
@@ -47,6 +51,9 @@ impl RequestChanges {
 struct Target {
     stream: StreamId,
     connection: ConnectionId,
+    /// The stream's mailbox at the provider: with the connection, where the
+    /// changes are bound to be made (campbooks-cloud#242).
+    mailbox: String,
     provider: Provider,
     paused: bool,
     health: Health,
@@ -84,6 +91,20 @@ impl EventConsumer for RequestChanges {
             tx.commit().await?;
             return Ok(());
         };
+        // Where the inbox's changes go, which they are bound to: one stream
+        // only (two claiming the inbox are SQL's), the one found above.
+        let Some(at) = destinations::of_inbox(&mut tx, event.payload.inbox_id)
+            .await?
+            .filter(|at| at.destination.stream == *row.stream.as_uuid())
+        else {
+            tracing::warn!(
+                %workspace,
+                inbox = %event.payload.inbox_id,
+                "the inbox's stream could not be told apart; its changes are not recorded"
+            );
+            tx.commit().await?;
+            return Ok(());
+        };
         let request = *event.id.as_uuid();
         let items = standing(ctx.state(), &mut tx, workspace, request, &event.payload).await?;
         if items.is_empty() {
@@ -93,6 +114,7 @@ impl EventConsumer for RequestChanges {
         let target = Target {
             stream: row.stream,
             connection: row.connection,
+            mailbox: at.destination.mailbox,
             provider: Provider::parse(&row.provider)?,
             paused: row.paused,
             health: Health::parse(&row.health)?,
@@ -153,7 +175,11 @@ impl EventConsumer for RequestChanges {
         }
         // Each row as written, bound for the run that makes it
         // (campbooks-cloud#227): only rows recorded here, never one found.
-        outbound::bind(tx, &binding, workspace, &recorded).await?;
+        let made_at = outbound::At {
+            connection: target.connection,
+            mailbox: &target.mailbox,
+        };
+        outbound::bind(tx, &binding, workspace, made_at, &recorded).await?;
         if pending > 0 && !target.paused {
             schedule::run_now(tx, workspace, target.stream, now).await?;
         }

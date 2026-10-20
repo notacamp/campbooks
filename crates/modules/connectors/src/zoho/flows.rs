@@ -479,6 +479,52 @@ async fn untrash_forgets_a_place_once_the_message_left_the_trash(db: PgPool) {
     assert_eq!(kit.zoho.message(&filed).folder, INBOX);
 }
 
+/// campbooks-cloud#242: where a message goes back to out of the trash is
+/// bound into the MAC of the change that trashed it. Edited by SQL, it does
+/// not verify: the untrash is refused (`skipped`, `unverified`) and the
+/// message stays in the trash, never moved where SQL chose.
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_place_to_restore_to_edited_by_sql_is_never_used(db: PgPool) {
+    let kit = Kit::new(db).await;
+    let at = |hours: i64| kit.clock.now() - TimeDelta::hours(hours);
+    let filed = kit.zoho.deliver(&synthetic(2), CLIENTS, true, at(4));
+    let mailbox = connected(&kit).await;
+    mailbox
+        .request(&kit, &[(filed.as_str(), bin_change("trash"))])
+        .await;
+    assert_eq!(kit.zoho.message(&filed).folder, TRASH);
+    let edited = sqlx::query(
+        "UPDATE connectors.outbound_changes SET restore_to = array_append(restore_to, 'x')
+          WHERE kind = 'trash' AND restore_to IS NOT NULL",
+    )
+    .execute(&kit.db)
+    .await
+    .unwrap();
+    assert_eq!(
+        edited.rows_affected(),
+        1,
+        "the trash change kept where it was"
+    );
+    kit.zoho.clear();
+    mailbox
+        .request(&kit, &[(filed.as_str(), bin_change("untrash"))])
+        .await;
+    assert_eq!(kit.zoho.message(&filed).folder, TRASH);
+    assert!(
+        !kit.zoho.calls().iter().any(|c| c.ends_with("moveMessage")),
+        "{:?}",
+        kit.zoho.calls()
+    );
+    assert_eq!(
+        outbound_ends(&kit).await.last(),
+        Some(&(
+            "untrash".to_owned(),
+            "skipped".to_owned(),
+            Some("unverified".to_owned())
+        ))
+    );
+}
+
 #[sqlx::test(migrations = "../../../migrations")]
 async fn sent_mail_out_of_spam_is_never_put_in_the_inbox(db: PgPool) {
     let kit = Kit::new(db).await;

@@ -51,6 +51,7 @@ mod testkit_zoho;
 mod zoho;
 
 pub use deps::{CREDENTIALS_PURPOSE, Deps};
+pub use domain::destinations::outbound_destinations;
 pub use domain::intake::grant_intake;
 pub use domain::model::{
     AuthorizationId, Capability, ConnectionId, ConnectionView, Health, InboxId, MailChoice, Phase,

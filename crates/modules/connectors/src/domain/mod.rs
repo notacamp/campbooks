@@ -2,6 +2,7 @@
 
 pub mod connections;
 pub mod credentials;
+pub mod destinations;
 pub mod emit;
 pub mod grants;
 pub mod health;
