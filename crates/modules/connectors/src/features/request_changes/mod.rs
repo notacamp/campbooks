@@ -59,6 +59,16 @@ struct Target {
     health: Health,
 }
 
+impl Target {
+    /// Where its changes are made: the connection and mailbox resolved.
+    fn at(&self) -> outbound::At<'_> {
+        outbound::At {
+            connection: self.connection,
+            mailbox: &self.mailbox,
+        }
+    }
+}
+
 impl EventConsumer for RequestChanges {
     type Event = ChangesRequested;
     const NAME: &'static str = "connectors.request_changes";
@@ -91,17 +101,9 @@ impl EventConsumer for RequestChanges {
             tx.commit().await?;
             return Ok(());
         };
-        // Where the inbox's changes go, which they are bound to: one stream
-        // only (two claiming the inbox are SQL's), the one found above.
-        let Some(at) = destinations::of_inbox(&mut tx, event.payload.inbox_id)
-            .await?
-            .filter(|at| at.destination.stream == *row.stream.as_uuid())
+        let Some(mailbox) =
+            mailbox_of(&mut tx, workspace, event.payload.inbox_id, row.stream).await?
         else {
-            tracing::warn!(
-                %workspace,
-                inbox = %event.payload.inbox_id,
-                "the inbox's stream could not be told apart; its changes are not recorded"
-            );
             tx.commit().await?;
             return Ok(());
         };
@@ -114,15 +116,12 @@ impl EventConsumer for RequestChanges {
         let target = Target {
             stream: row.stream,
             connection: row.connection,
-            mailbox: at.destination.mailbox,
+            mailbox,
             provider: Provider::parse(&row.provider)?,
             paused: row.paused,
             health: Health::parse(&row.health)?,
         };
-        let known = match target.provider {
-            Provider::Google => Some(user_labels(&mut tx, target.stream).await?),
-            Provider::Zoho => zoho_labels(&mut tx, target.connection, target.stream).await?,
-        };
+        let known = known_labels(&mut tx, &target).await?;
         tx.commit().await?;
 
         let stamp = self.stamp(ctx, workspace, &target).await;
@@ -175,17 +174,47 @@ impl EventConsumer for RequestChanges {
         }
         // Each row as written, bound for the run that makes it
         // (campbooks-cloud#227): only rows recorded here, never one found.
-        let made_at = outbound::At {
-            connection: target.connection,
-            mailbox: &target.mailbox,
-        };
-        outbound::bind(tx, &binding, workspace, made_at, &recorded).await?;
+        outbound::bind(tx, &binding, workspace, target.at(), &recorded).await?;
         if pending > 0 && !target.paused {
             schedule::run_now(tx, workspace, target.stream, now).await?;
         }
         tracing::info!(%workspace, stream = %target.stream, pending, "outbound changes recorded");
         Ok(())
     }
+}
+
+/// The provider's labels `target`'s changes may name (see [`outcome`]).
+async fn known_labels(
+    conn: &mut PgConnection,
+    target: &Target,
+) -> Result<Option<HashSet<String>>, JobError> {
+    Ok(match target.provider {
+        Provider::Google => Some(user_labels(conn, target.stream).await?),
+        Provider::Zoho => zoho_labels(conn, target.connection, target.stream).await?,
+    })
+}
+
+/// The mailbox of `stream`, the stream that feeds `inbox`, which the
+/// changes are bound to be made in with its connection
+/// (campbooks-cloud#242): `None` (a WARN) when the inbox does not resolve to
+/// that one stream only (two claiming it are SQL's).
+async fn mailbox_of(
+    conn: &mut PgConnection,
+    workspace: WorkspaceId,
+    inbox: InboxId,
+    stream: StreamId,
+) -> Result<Option<String>, JobError> {
+    let at = destinations::of_inbox(conn, inbox)
+        .await?
+        .filter(|at| at.destination.stream == *stream.as_uuid());
+    if at.is_none() {
+        tracing::warn!(
+            %workspace,
+            %inbox,
+            "the inbox's stream could not be told apart; its changes are not recorded"
+        );
+    }
+    Ok(at.map(|at| at.destination.mailbox))
 }
 
 /// How `change` is recorded for `provider` (`known`: the provider's user

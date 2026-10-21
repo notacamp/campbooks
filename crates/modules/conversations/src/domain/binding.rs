@@ -243,7 +243,9 @@ impl SendRequest<'_> {
         holds_at(binding, &now.fields(), &before.fields(), tag, at)
     }
 
-    /// [`retag`](Self::retag) for `at`, whichever encoding `tag` is in.
+    /// The tag under the current key, when `tag` is this one's under the
+    /// previous key only (campbooks-cloud#191), for `at`, whichever
+    /// encoding it is in.
     pub fn retag_at(
         &self,
         binding: &Binding,
@@ -266,15 +268,10 @@ impl SendRequest<'_> {
         binding.tag(&self.fields())
     }
 
-    /// Whether `tag` is this request's.
+    /// Whether `tag` is this request's, as signed (for `self.destination`).
+    #[cfg(test)]
     pub fn holds(&self, binding: &Binding, tag: Option<&[u8]>) -> bool {
         binding.verify(&self.fields(), tag)
-    }
-
-    /// The tag under the current key, when `tag` is this request's under
-    /// the previous key only (campbooks-cloud#191).
-    pub fn retag(&self, binding: &Binding, tag: Option<&[u8]>) -> Option<Vec<u8>> {
-        binding.retag(&self.fields(), tag)
     }
 }
 
@@ -329,7 +326,9 @@ impl StoredSend<'_> {
         holds_at(binding, &now.fields(), &before.fields(), tag, at)
     }
 
-    /// [`retag`](Self::retag) for `at`, whichever encoding `tag` is in.
+    /// The tag under the current key, when `tag` is this one's under the
+    /// previous key only (campbooks-cloud#191), for `at`, whichever
+    /// encoding it is in.
     pub fn retag_at(
         &self,
         binding: &Binding,
@@ -352,15 +351,10 @@ impl StoredSend<'_> {
         binding.tag(&self.fields())
     }
 
-    /// Whether `tag` is this send's.
+    /// Whether `tag` is this send's, as signed (for `self.destination`).
+    #[cfg(test)]
     pub fn holds(&self, binding: &Binding, tag: Option<&[u8]>) -> bool {
         binding.verify(&self.fields(), tag)
-    }
-
-    /// The tag under the current key, when `tag` is this send's under the
-    /// previous key only (campbooks-cloud#191).
-    pub fn retag(&self, binding: &Binding, tag: Option<&[u8]>) -> Option<Vec<u8>> {
-        binding.retag(&self.fields(), tag)
     }
 }
 

@@ -189,7 +189,7 @@ async fn releasable(
     // destination it was signed for (campbooks-cloud#242).
     let at = state
         .destinations
-        .destination(&mut **read, row.inbox_id.into())
+        .destination(read, row.inbox_id.into())
         .await?;
     let holds = binding::content_hash(&row).is_ok_and(|content| {
         binding::SendRequest {

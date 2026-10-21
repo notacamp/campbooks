@@ -685,32 +685,8 @@ pub async fn backlog(
     })
     .collect();
     let pending = verified(&mut tx, binding, workspace, (stream, at), pending, now).await?;
-    let messages: Vec<String> = pending
-        .iter()
-        .map(|p| p.provider_message_id.clone())
-        .collect::<HashSet<_>>()
-        .into_iter()
-        .collect();
-    let (restore, unbound) =
-        restore_of(&mut tx, binding, workspace, (stream, at), &messages).await?;
-    // Out of the trash or spam, and into neither: where it goes is the
-    // record's.
-    let bin = |l: &String| l == "TRASH" || l == "SPAM";
-    let (refused, pending): (Vec<Pending>, Vec<Pending>) = pending.into_iter().partition(|p| {
-        unbound.contains(&p.provider_message_id)
-            && p.remove.iter().any(bin)
-            && !p.add.iter().any(bin)
-    });
-    if !refused.is_empty() {
-        refuse(&mut tx, stream, &refused, now).await?;
-        tracing::warn!(
-            %workspace,
-            %stream,
-            refused = refused.len(),
-            "where a message goes back to out of the trash is not bound to the change that \
-             trashed it; it is not put back"
-        );
-    }
+    let (pending, restore) =
+        with_restores(&mut tx, binding, workspace, (stream, at), pending, now).await?;
     if pending.is_empty() {
         tx.commit().await?;
         return Ok(Backlog::default());
@@ -772,6 +748,46 @@ pub async fn backlog(
         own,
         restore,
     })
+}
+
+/// `pending` without the changes taking a message out of the trash or spam
+/// whose place to go back to does not verify ([`restore_of`]): those end
+/// `skipped` (`unverified`). With the places that verify.
+async fn with_restores(
+    conn: &mut PgConnection,
+    binding: &Binding,
+    workspace: WorkspaceId,
+    (stream, at): (StreamId, At<'_>),
+    pending: Vec<Pending>,
+    now: DateTime<Utc>,
+) -> Result<(Vec<Pending>, HashMap<String, Vec<String>>)> {
+    let messages: Vec<String> = pending
+        .iter()
+        .map(|p| p.provider_message_id.clone())
+        .collect::<HashSet<_>>()
+        .into_iter()
+        .collect();
+    let (restore, unbound) =
+        restore_of(&mut *conn, binding, workspace, (stream, at), &messages).await?;
+    // Out of the trash or spam, and into neither: where it goes is the
+    // record's.
+    let bin = |l: &String| l == "TRASH" || l == "SPAM";
+    let (refused, pending): (Vec<Pending>, Vec<Pending>) = pending.into_iter().partition(|p| {
+        unbound.contains(&p.provider_message_id)
+            && p.remove.iter().any(bin)
+            && !p.add.iter().any(bin)
+    });
+    if !refused.is_empty() {
+        refuse(conn, stream, &refused, now).await?;
+        tracing::warn!(
+            %workspace,
+            %stream,
+            refused = refused.len(),
+            "where a message goes back to out of the trash is not bound to the change that \
+             trashed it; it is not put back"
+        );
+    }
+    Ok((pending, restore))
 }
 
 /// Where each of `ids` (messages of `stream`) was before Campbooks put it in
