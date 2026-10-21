@@ -105,7 +105,12 @@ Two options were weighed (the brief's):
 
 SQL never chooses which version is verified: a v2 tag never verifies as v1
 (different label), SQL cannot mint tags, and it cannot add or change a row
-of the records. The worst it can do is delete a stream or a change, which
+of the records. A v1 send MAC names its inbox but no stream, so the record
+must match the inbox too: the stream's recorded inbox SHALL be the one it
+feeds now and the send's own (`destinations::as_at_deploy`). Otherwise SQL
+could point another inbox's recorded stream at the send's inbox, and the
+send row at that stream, and the send would go out through the other
+mailbox (the review of #622). The worst it can do is delete a stream or a change, which
 removes its record with it (cascade) and makes the v1 row refuse. Rows
 written by the old version during a rolling deploy, after the migration, are
 v1 for destinations that are recorded, so they still work while nothing is
@@ -117,8 +122,15 @@ changes expire with `batch_retention_days`).
 
 ### The restore place is signed into the trash change after it is made
 
-`restore_to` is learned from Zoho when the trash is made, after the change
-was signed. `record_outcome` re-signs the trash change with the place
+The place is where the index says the message is (`connectors.messages`),
+which SQL can edit too, so before the move the run asks Zoho for the message
+in that folder (`details`, the read the sync already uses; Zoho finds a
+message only in the folder it is in). Only a folder Zoho confirms is kept;
+otherwise no place is kept and nothing is guessed. One more Zoho call per
+trashed message (`write::requests` reserves three per message).
+
+`restore_to` is learned when the trash is made, after the change was
+signed. `record_outcome` re-signs the trash change with the place
 (`OUTBOUND_CHANGE_V2` with the place present), only while the change still
 verifies as recorded under its row (a compare-and-set on the old MAC), so an
 edit between the run's check and its record is not laundered into a valid
@@ -151,7 +163,13 @@ existing MAC mismatches do), and a skipped change is never pending again.
 - **Zoho, not fixed here (follow-up):** the Inbox, Trash and Spam folder ids
   and the list of folders a remembered place must be in come from the
   stream's cursor (`streams.cursor`), which SQL can edit between runs. Its
-  impact is a move into another folder of the same account.
+  impact is a move into another folder of the same account. In the same
+  class: the kind tokens kept with a confirmed folder (archived there, own
+  mail) come from the index; and an untrash whose place SQL removed (nulled
+  `restore_to`, or a later trash change hidden) falls back as for a place
+  that no longer holds: received mail to the Inbox folder, a fixed place,
+  never one SQL names. A removed place cannot be told from one a sync
+  forgot, so it is not refused.
 - **Zoho `provider_server`:** only a configured data centre is used
   (`Zoho::centre`), so SQL cannot point calls at another host.
 - **Before binding (follow-up):** which labels are stream marks, the label

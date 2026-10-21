@@ -106,9 +106,10 @@ impl Op {
 }
 
 /// Zoho's calls a push of `messages` messages may make: about one per
-/// message and mode, at most.
+/// message and mode, and one more to ask Zoho where a message going to the
+/// trash is, at most.
 pub fn requests(messages: usize) -> u32 {
-    u32::try_from(messages.saturating_mul(2)).unwrap_or(u32::MAX)
+    u32::try_from(messages.saturating_mul(3)).unwrap_or(u32::MAX)
 }
 
 /// The folders a push may move messages to, from the account's listing.
@@ -448,15 +449,16 @@ pub async fn push(
     let mut calls: BTreeMap<Op, Vec<String>> = BTreeMap::new();
     let mut nothing_to_do = Vec::new();
     let mut done = Results::default();
+    let mut to_trash: Vec<(String, Vec<String>)> = Vec::new();
     for (change, messages) in plan.groups() {
         for message in messages {
             let current = backlog.labels.get(&message).cloned().unwrap_or_default();
             let restore = backlog.restore.get(&message).map(Vec::as_slice);
             let (wanted, unmovable) = ops(&change, &current, folders, restore);
             if bin(&change, &current) == Some(Bin::Trash) && !unmovable {
-                // Where it was, so untrash puts it back there.
-                done.restore
-                    .insert(message.clone(), state::location(&current));
+                // Where it was, so untrash puts it back there: once Zoho
+                // says it is there (below).
+                to_trash.push((message.clone(), state::location(&current)));
             }
             if unmovable {
                 done.unmovable.insert(message.clone());
@@ -472,6 +474,20 @@ pub async fn push(
             }
             for op in wanted {
                 calls.entry(op).or_default().push(message.clone());
+            }
+        }
+    }
+    // The place a trash change records (and binds) is where Zoho says the
+    // message is, never only what the index holds (campbooks-cloud#242).
+    for (message, place) in to_trash {
+        match confirmed(mail, &message, place).await {
+            Ok(Some(place)) => {
+                done.restore.insert(message, place);
+            }
+            Ok(None) => {}
+            Err(trouble) => {
+                stopped(backlog, trouble, &mut push);
+                return push;
             }
         }
     }
@@ -512,6 +528,31 @@ pub async fn push(
     push.outcome.reemit.sort();
     push.outcome.reemit.dedup();
     push
+}
+
+/// `place` (where the index says `message` is) when Zoho finds the message
+/// in that folder; `None` when it does not (the index is behind, or the row
+/// was edited): no place is remembered then, and nothing is guessed. Trouble
+/// with the grant or the provider stops the push.
+async fn confirmed(
+    mail: &ZohoMail<'_>,
+    message: &str,
+    place: Vec<String>,
+) -> Result<Option<Vec<String>>, ProviderError> {
+    let Some(folder) = state::folder_of(&place).map(ToOwned::to_owned) else {
+        return Ok(None);
+    };
+    match mail.details(&folder, message).await {
+        Ok(found) if found.folder_id == folder => Ok(Some(place)),
+        Ok(_) | Err(ProviderError::NotFound | ProviderError::Unexpected(_)) => {
+            tracing::warn!(
+                "Zoho does not find a message going to the trash where the index has it; \
+                 no place to put it back is kept"
+            );
+            Ok(None)
+        }
+        Err(trouble) => Err(trouble),
+    }
 }
 
 /// Make `op` for `messages`, in chunks; a chunk Zoho refuses as a whole is

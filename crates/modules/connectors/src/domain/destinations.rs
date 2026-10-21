@@ -72,35 +72,45 @@ pub async fn of_inbox(conn: &mut PgConnection, inbox: InboxId) -> Result<Option<
     }))
 }
 
-/// `stream`, its connection `connection` and its mailbox `mailbox` as a
-/// destination, read as recorded at the deploy or not (in `conn`).
+/// `stream`, its connection `connection` and its mailbox `mailbox` as the
+/// destination of a send from `inbox`, read as recorded at the deploy or not
+/// (in `conn`).
 pub async fn resolved(
     conn: &mut PgConnection,
+    inbox: InboxId,
     stream: StreamId,
     connection: ConnectionId,
     mailbox: &str,
 ) -> Result<Resolved> {
     Ok(Resolved {
-        as_at_deploy: as_at_deploy(conn, stream, connection, mailbox).await?,
+        as_at_deploy: as_at_deploy(conn, Some(inbox), stream, connection, mailbox).await?,
         destination: destination(stream, connection, mailbox.to_owned()),
     })
 }
 
-/// Whether `stream` went through `connection` and `mailbox` when
-/// destinations were first bound (`connectors.destinations_at_deploy`).
+/// Whether `stream` fed the inbox it feeds now (and `inbox`, when given)
+/// through `connection` and `mailbox` when destinations were first bound
+/// (`connectors.destinations_at_deploy`). The inbox is part of it: a
+/// binding from before names the inbox but not the stream, so another
+/// inbox's stream pointed at it never counts as recorded.
 pub async fn as_at_deploy(
     conn: &mut PgConnection,
+    inbox: Option<InboxId>,
     stream: StreamId,
     connection: ConnectionId,
     mailbox: &str,
 ) -> Result<bool> {
     Ok(sqlx::query_scalar(
-        "SELECT EXISTS (SELECT 1 FROM connectors.destinations_at_deploy
-                         WHERE stream_id = $1 AND connection_id = $2 AND mailbox_key = $3)",
+        "SELECT EXISTS (SELECT 1 FROM connectors.destinations_at_deploy d
+                          JOIN connectors.streams s ON s.id = d.stream_id
+                         WHERE d.stream_id = $1 AND d.connection_id = $2 AND d.mailbox_key = $3
+                           AND d.inbox_id = s.inbox_id
+                           AND ($4::uuid IS NULL OR d.inbox_id = $4))",
     )
     .bind(stream)
     .bind(connection)
     .bind(mailbox)
+    .bind(inbox)
     .fetch_one(conn)
     .await?)
 }

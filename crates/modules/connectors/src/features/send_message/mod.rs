@@ -642,7 +642,7 @@ async fn standing_document(
     let state = ctx.state().clone();
     let mut tx = ctx.pool().begin_for(workspace).await?;
     let mailbox = target.mailbox_key.as_deref().unwrap_or_default();
-    let at = destinations::resolved(&mut tx, stream, connection, mailbox).await?;
+    let at = destinations::resolved(&mut tx, target.inbox, stream, connection, mailbox).await?;
     let stored = state
         .outbound
         .stored_send(&state, &mut tx, workspace, send.into(), Some(&at))

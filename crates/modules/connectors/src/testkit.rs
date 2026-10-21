@@ -183,6 +183,9 @@ pub struct FakeOutbound {
     sends: Mutex<HashMap<uuid::Uuid, StoredSend>>,
     /// The destination each send released with one is bound to.
     bound: Mutex<HashMap<uuid::Uuid, Destination>>,
+    /// Sends released before destinations were bound: they name none, and
+    /// stand only for a destination recorded at the deploy.
+    before: Mutex<HashSet<uuid::Uuid>>,
     /// Per conversation, the messages whose requested changes stand.
     changes: Mutex<HashMap<uuid::Uuid, HashSet<String>>>,
 }
@@ -216,6 +219,17 @@ impl FakeOutbound {
             .lock()
             .unwrap_or_else(PoisonError::into_inner)
             .insert(send.into(), destination);
+    }
+
+    /// Send `send` was released from `inbox` as `message` before
+    /// destinations were bound: it stands only for a destination the
+    /// connector says was recorded at the deploy.
+    pub fn release_before_destinations(&self, send: SendId, inbox: InboxId, message: BlobRef) {
+        self.release(send, inbox, message);
+        self.before
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .insert(send.into());
     }
 
     /// Send `send` no longer waits for the provider (sent, failed, its
@@ -253,7 +267,13 @@ impl OutboundRequests for FakeOutbound {
             .unwrap_or_else(PoisonError::into_inner)
             .get(&send)
             .cloned();
-        let elsewhere = bound.is_some_and(|bound| at.map(|at| &at.destination) != Some(&bound));
+        let before = self
+            .before
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .contains(&send);
+        let elsewhere = bound.is_some_and(|bound| at.map(|at| &at.destination) != Some(&bound))
+            || (before && !at.is_some_and(|at| at.as_at_deploy));
         let stored = self
             .sends
             .lock()

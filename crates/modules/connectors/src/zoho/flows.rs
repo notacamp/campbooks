@@ -525,6 +525,46 @@ async fn a_place_to_restore_to_edited_by_sql_is_never_used(db: PgPool) {
     );
 }
 
+/// campbooks-cloud#242 review: the place a trash change binds is where Zoho
+/// says the message is, not only what the index holds. SQL plants another
+/// folder in the index before the trash runs: Zoho does not find the
+/// message there, so no place is kept, and the untrash puts the received
+/// message in the Inbox folder, never in the planted one.
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_place_planted_in_the_index_before_the_trash_is_never_bound(db: PgPool) {
+    let kit = Kit::new(db).await;
+    let at = |hours: i64| kit.clock.now() - TimeDelta::hours(hours);
+    let one = kit.zoho.deliver(&synthetic(1), INBOX, false, at(3));
+    let mailbox = connected(&kit).await;
+    let planted = sqlx::query(
+        "UPDATE connectors.messages
+            SET label_ids = array_replace(label_ids, $2, $3)
+          WHERE provider_message_id = $1",
+    )
+    .bind(&one)
+    .bind(format!("folder:{INBOX}"))
+    .bind(format!("folder:{CLIENTS}"))
+    .execute(&kit.db)
+    .await
+    .unwrap();
+    assert_eq!(planted.rows_affected(), 1);
+    mailbox
+        .request(&kit, &[(one.as_str(), bin_change("trash"))])
+        .await;
+    assert_eq!(kit.zoho.message(&one).folder, TRASH);
+    let kept: Option<Vec<String>> = sqlx::query_scalar(
+        "SELECT restore_to FROM connectors.outbound_changes WHERE kind = 'trash'",
+    )
+    .fetch_one(&kit.db)
+    .await
+    .unwrap();
+    assert_eq!(kept, None, "no place Zoho did not confirm");
+    mailbox
+        .request(&kit, &[(one.as_str(), bin_change("untrash"))])
+        .await;
+    assert_eq!(kit.zoho.message(&one).folder, INBOX);
+}
+
 #[sqlx::test(migrations = "../../../migrations")]
 async fn sent_mail_out_of_spam_is_never_put_in_the_inbox(db: PgPool) {
     let kit = Kit::new(db).await;

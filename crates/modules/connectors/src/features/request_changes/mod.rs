@@ -86,24 +86,9 @@ impl EventConsumer for RequestChanges {
             .map_err(|_| JobError::fatal("changes_requested without a workspace id"))?;
         let now = self.deps.clock.now();
         let mut tx = ctx.pool().begin_for(workspace).await?;
-        let target = sqlx::query!(
-            r#"SELECT s.id AS "stream: StreamId", s.connection_id AS "connection: ConnectionId",
-                      c.provider, s.paused, c.health
-                 FROM connectors.streams s
-                 JOIN connectors.connections c ON c.id = s.connection_id
-                WHERE s.inbox_id = $1 AND s.capability = 'messages'"#,
-            event.payload.inbox_id as InboxId,
-        )
-        .fetch_optional(&mut *tx)
-        .await?;
-        let Some(row) = target else {
-            // Not a connector's inbox, or disconnected meanwhile.
-            tx.commit().await?;
-            return Ok(());
-        };
-        let Some(mailbox) =
-            mailbox_of(&mut tx, workspace, event.payload.inbox_id, row.stream).await?
-        else {
+        // Not a connector's inbox, disconnected meanwhile, or its stream
+        // not told apart: nothing to record.
+        let Some(target) = target_of(&mut tx, workspace, event.payload.inbox_id).await? else {
             tx.commit().await?;
             return Ok(());
         };
@@ -113,14 +98,6 @@ impl EventConsumer for RequestChanges {
             tx.commit().await?;
             return Ok(());
         }
-        let target = Target {
-            stream: row.stream,
-            connection: row.connection,
-            mailbox,
-            provider: Provider::parse(&row.provider)?,
-            paused: row.paused,
-            health: Health::parse(&row.health)?,
-        };
         let known = known_labels(&mut tx, &target).await?;
         tx.commit().await?;
 
@@ -194,19 +171,57 @@ async fn known_labels(
     })
 }
 
-/// The mailbox of `stream`, the stream that feeds `inbox`, which the
-/// changes are bound to be made in with its connection
-/// (campbooks-cloud#242): `None` (a WARN) when the inbox does not resolve to
-/// that one stream only (two claiming it are SQL's).
-async fn mailbox_of(
+/// The stream that feeds `inbox` and where its changes are made, read in
+/// `conn`: `None` when no stream feeds it, or [`destination_of`] does not
+/// agree.
+async fn target_of(
     conn: &mut PgConnection,
     workspace: WorkspaceId,
     inbox: InboxId,
-    stream: StreamId,
-) -> Result<Option<String>, JobError> {
-    let at = destinations::of_inbox(conn, inbox)
-        .await?
-        .filter(|at| at.destination.stream == *stream.as_uuid());
+) -> Result<Option<Target>, JobError> {
+    let target = sqlx::query!(
+        r#"SELECT s.id AS "stream: StreamId", s.connection_id AS "connection: ConnectionId",
+                      c.provider, s.paused, c.health
+                 FROM connectors.streams s
+                 JOIN connectors.connections c ON c.id = s.connection_id
+                WHERE s.inbox_id = $1 AND s.capability = 'messages'"#,
+        inbox as InboxId,
+    )
+    .fetch_optional(&mut *conn)
+    .await?;
+    let Some(row) = target else {
+        return Ok(None);
+    };
+    let Some((connection, mailbox)) =
+        destination_of(conn, workspace, inbox, (row.stream, row.connection)).await?
+    else {
+        return Ok(None);
+    };
+    Ok(Some(Target {
+        stream: row.stream,
+        connection,
+        mailbox,
+        provider: Provider::parse(&row.provider)?,
+        paused: row.paused,
+        health: Health::parse(&row.health)?,
+    }))
+}
+
+/// Where `inbox`'s changes are made, which they are bound to
+/// (campbooks-cloud#242): its one stream's connection and mailbox, as
+/// [`destinations::of_inbox`] resolves them. `None` (a WARN) when that is
+/// not `stream` with `connection` (what the target was read as), or the
+/// inbox does not resolve to one stream only (two claiming it are SQL's).
+async fn destination_of(
+    conn: &mut PgConnection,
+    workspace: WorkspaceId,
+    inbox: InboxId,
+    (stream, connection): (StreamId, ConnectionId),
+) -> Result<Option<(ConnectionId, String)>, JobError> {
+    let at = destinations::of_inbox(conn, inbox).await?.filter(|at| {
+        at.destination.stream == *stream.as_uuid()
+            && at.destination.connection == *connection.as_uuid()
+    });
     if at.is_none() {
         tracing::warn!(
             %workspace,
@@ -214,7 +229,12 @@ async fn mailbox_of(
             "the inbox's stream could not be told apart; its changes are not recorded"
         );
     }
-    Ok(at.map(|at| at.destination.mailbox))
+    Ok(at.map(|at| {
+        (
+            ConnectionId::from_uuid(at.destination.connection),
+            at.destination.mailbox,
+        )
+    }))
 }
 
 /// How `change` is recorded for `provider` (`known`: the provider's user

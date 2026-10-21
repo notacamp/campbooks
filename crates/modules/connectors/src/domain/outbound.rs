@@ -587,7 +587,7 @@ async fn verified(
     if pending.is_empty() {
         return Ok(pending);
     }
-    let pinned = destinations::as_at_deploy(conn, stream, at.connection, at.mailbox).await?;
+    let pinned = destinations::as_at_deploy(conn, None, stream, at.connection, at.mailbox).await?;
     let ids: Vec<Uuid> = pending.iter().map(|p| p.id).collect();
     let bound: HashSet<Uuid> = recorded(conn, &ids)
         .await?
@@ -828,7 +828,7 @@ async fn restore_of(
     if rows.is_empty() {
         return Ok((restore, unbound));
     }
-    let pinned = destinations::as_at_deploy(conn, stream, at.connection, at.mailbox).await?;
+    let pinned = destinations::as_at_deploy(conn, None, stream, at.connection, at.mailbox).await?;
     let changes: Vec<Uuid> = rows.iter().map(|row| row.id).collect();
     let at_deploy: HashMap<Uuid, Vec<String>> = sqlx::query_as::<_, (Uuid, Vec<String>)>(
         "SELECT change_id, restore_to FROM connectors.restores_at_deploy
@@ -962,7 +962,7 @@ async fn bind_restores(
     if restores.is_empty() {
         return Ok(());
     }
-    let pinned = destinations::as_at_deploy(conn, stream, at.connection, at.mailbox).await?;
+    let pinned = destinations::as_at_deploy(conn, None, stream, at.connection, at.mailbox).await?;
     let ids: Vec<Uuid> = restores.iter().map(|(id, _)| *id).collect();
     let rows: HashMap<Uuid, Recorded> = recorded(conn, &ids)
         .await?

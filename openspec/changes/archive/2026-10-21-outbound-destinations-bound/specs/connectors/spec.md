@@ -36,8 +36,10 @@ retried.
 
 ### Requirement: Where a trashed message goes back to is bound
 When a run puts a message in the trash at Zoho and records where it was
-(`restore_to`), it SHALL bind that place into the change's MAC, only while
-the change still verifies as recorded. Before an untrash or a not-spam (out
+(`restore_to`), the folder SHALL be one Zoho finds the message in when asked
+just before the move (a message Zoho does not find there keeps no place),
+and the run SHALL bind that place into the change's MAC, only while the
+change still verifies as recorded. Before an untrash or a not-spam (out
 of the trash or spam and into neither) uses a recorded place, the run SHALL
 verify it; when it does not verify, the change SHALL NOT be made: it SHALL
 end `skipped` (`unverified`), the message SHALL be re-read, and a WARN line
@@ -46,6 +48,10 @@ carrying ids and counts only SHALL be logged.
 #### Scenario: A place edited with SQL
 - **WHEN** a member trashes a Zoho message filed in one of their folders, SQL edits where it goes back to, and the member untrashes it
 - **THEN** Zoho receives no move, the message stays in the trash and the untrash ends `skipped` (`unverified`)
+
+#### Scenario: A place planted in the index
+- **WHEN** SQL puts another folder in a Zoho message's indexed state before the member trashes it, and the member then untrashes it
+- **THEN** Zoho does not find the message in that folder, no place is kept, and the received message goes to the Inbox folder, never to the planted one
 
 #### Scenario: Trash and back
 - **WHEN** nothing edits the place and the member untrashes the message
@@ -57,7 +63,8 @@ stream's inbox, connection and mailbox, and each outbound change's
 `restore_to`, in tables the runtime role may read and never write; a stream
 or a change removed takes its record with it. A send or change MAC of the
 earlier encoding (`…/v1`) SHALL verify only while the destination resolved
-now is the one recorded for its stream, and a place of the earlier encoding
+now is the one recorded for its stream and that record's inbox is the one
+the stream feeds now and the send's own, and a place of the earlier encoding
 only while it is also the one recorded for its change. A MAC of the new
 encoding SHALL never verify as one of the earlier.
 
@@ -68,6 +75,10 @@ encoding SHALL never verify as one of the earlier.
 #### Scenario: A change in flight, repointed
 - **WHEN** such a change's stream was pointed at another mailbox since the deploy, or the stream has no record
 - **THEN** the run makes nothing and the change ends `skipped` (`unverified`)
+
+#### Scenario: A send in flight, pointed at another inbox's stream
+- **WHEN** a send released before the deploy is pointed by SQL at a stream the deploy recorded for another inbox (that stream made to claim the send's inbox, the send row naming it)
+- **THEN** the send does not stand there: nothing is sent and it fails `unavailable`
 
 #### Scenario: Writing the record
 - **WHEN** a transaction of the runtime role inserts or updates a row of the record
