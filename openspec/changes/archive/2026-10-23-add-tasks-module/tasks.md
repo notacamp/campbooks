@@ -45,5 +45,5 @@
 - [x] 6.2 Client types regenerated (`pnpm --dir clients api:generate`) — from CI's `generated-api-types` artifact
 - [x] 6.3 Changelog entry `changelog/unreleased/added/43-tasks.md`
 - [x] 6.4 Gates green in CI
-- [ ] 6.5 UI verified and recorded at 375 px and desktop (Storybook screen stories)
+- [x] 6.5 UI verified and recorded at 375 px and desktop (Storybook screen stories)
 - [x] 6.6 `openspec archive add-tasks-module --yes` before merge
