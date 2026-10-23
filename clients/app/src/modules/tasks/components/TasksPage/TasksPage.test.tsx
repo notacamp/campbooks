@@ -14,6 +14,7 @@ import { MARTA } from "../../../../../test/demo/attention";
 import { W } from "../../../../../test/demo/conversations";
 import {
   ACCOUNTANT,
+  ASK_LEASE,
   BILL,
   INSPECTION,
   LEASE,
@@ -219,6 +220,20 @@ describe("Tasks", () => {
         later_until: new Date(2026, 9, 14, 9).toISOString(),
       });
     });
+  });
+
+  it("says Scout found a task in the email, and says nothing for the member's own", async () => {
+    api([ASK_LEASE, BILL, PROPOSAL, { ...LEASE, title: "Return Marta’s lease copy" }]);
+    renderTasks();
+    fireEvent.click(await rowOf(ASK_LEASE.title));
+    expect(await screen.findByText("Scout found this in the email")).toBeVisible();
+    expect(screen.getByText("Where it came from")).toBeVisible();
+
+    fireEvent.click(await rowOf("Return Marta’s lease copy"));
+    await waitFor(() => {
+      expect(screen.queryByText("Scout found this in the email")).toBeNull();
+    });
+    expect(screen.getByText(/Walkthrough on Thursday/u)).toBeVisible();
   });
 
   it("takes back a task handed to a teammate from its row, and it stays as mine at once", async () => {

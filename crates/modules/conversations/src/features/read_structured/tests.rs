@@ -398,6 +398,24 @@ async fn an_invoice_with_a_due_date_gives_the_pay_need_its_date(db: PgPool) {
     assert_eq!(events[0]["asks"][0]["has_amount"], true);
     assert_eq!(events[0]["asks"][0]["due"], due);
     assert!(!events[0].to_string().contains("4730"));
+    // The ask's words are in the texts blob (no item has any), not the event.
+    let texts: campbooks_kernel::blobs::BlobRef =
+        serde_json::from_value(events[0]["texts"].clone()).unwrap();
+    assert!(texts.content_type.contains("read-texts"));
+    let mut stream = kit
+        .state
+        .blobs
+        .get(&workspace.to_string(), &texts)
+        .await
+        .unwrap();
+    let mut bytes = Vec::new();
+    while let Some(chunk) = futures_util::StreamExt::next(&mut stream).await {
+        bytes.extend_from_slice(&chunk.unwrap());
+    }
+    let document: Value = serde_json::from_slice(&bytes).unwrap();
+    assert_eq!(document["asks"][0]["title"], "Águas do Vale");
+    assert_eq!(document["asks"][0]["amount"]["minor"], 4730);
+    assert_eq!(document["asks"][0]["key"], ask["key"]);
     // Its date is the Pay need's, with no model.
     let need: (String, Option<chrono::NaiveDate>) =
         sqlx::query_as("SELECT reason, due_on FROM conversations.needs WHERE state = 'open'")
