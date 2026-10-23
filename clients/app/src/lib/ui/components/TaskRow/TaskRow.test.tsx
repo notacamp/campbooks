@@ -24,7 +24,7 @@ describe("TaskRow", () => {
     expect(onCheck).toHaveBeenCalledTimes(1);
     expect(onOpen).not.toHaveBeenCalled();
 
-    fireEvent.click(screen.getByRole("button", { name: /Send the signed lease/u }));
+    fireEvent.click(screen.getByRole("button", { name: /^Do Send the signed lease/u }));
     expect(onOpen).toHaveBeenCalledTimes(1);
   });
 
@@ -42,7 +42,7 @@ describe("TaskRow", () => {
       />,
     );
 
-    expect(screen.getByRole("button", { name: /EDP bill/u })).toHaveAttribute(
+    expect(screen.getByRole("button", { name: /^Pay EDP bill/u })).toHaveAttribute(
       "aria-current",
       "true",
     );

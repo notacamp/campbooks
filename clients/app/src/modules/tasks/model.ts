@@ -167,11 +167,11 @@ export function laterOnDay(day: string): Date {
 
 /** A day ("2026-10-30") as "Fri 30" in `locale`. */
 export function dayLabel(day: string, locale: string): string {
-  return new Intl.DateTimeFormat(locale, {
-    timeZone: "UTC",
-    weekday: "short",
-    day: "numeric",
-  }).format(utcDay(day));
+  const date = utcDay(day);
+  const weekday = new Intl.DateTimeFormat(locale, { timeZone: "UTC", weekday: "short" }).format(
+    date,
+  );
+  return `${weekday} ${String(date.getUTCDate())}`;
 }
 
 /** A time as "Mon 2 Nov" in `locale`. */

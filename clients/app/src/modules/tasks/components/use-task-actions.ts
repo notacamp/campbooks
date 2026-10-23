@@ -90,7 +90,7 @@ export function useTaskActions(
           latest = view;
           return view;
         });
-      queue = result.catch(() => undefined);
+      queue = result.catch(() => null);
       return result;
     };
     const show = (next: (current: TaskView) => TaskView) => {

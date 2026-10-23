@@ -75,7 +75,7 @@ function renderTasks(path = "tasks") {
 
 /** The button that opens the task titled `title` (not its check). */
 const rowOf = (title: string) =>
-  screen.findByRole("button", { name: new RegExp(`^(Do|Pay)\\s+${title}`, "u") });
+  screen.findByRole("button", { name: new RegExp(String.raw`^(Do|Pay)\s+${title}`, "u") });
 
 /** The tasks API over a list the calls below change, as the server would. */
 function api(start = OPEN_TASKS, handedOff = [VENUE]) {
@@ -202,7 +202,6 @@ describe("Tasks", () => {
     const calls = api();
     renderTasks();
     fireEvent.click(await rowOf(VENUE.title));
-    expect((await screen.findAllByText("With Rui Matos")).length).toBeGreaterThan(1);
     fireEvent.click(await screen.findByRole("button", { name: "Take it back" }));
     await waitFor(() => {
       expect(

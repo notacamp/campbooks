@@ -73,7 +73,7 @@ export const Interaction: Story = {
     const canvas = within(canvasElement);
     await userEvent.click(canvas.getByRole("button", { name: /Mark done/u }));
     await expect(args.onCheck).toHaveBeenCalledTimes(1);
-    await userEvent.click(canvas.getByRole("button", { name: /Send the signed lease/u }));
+    await userEvent.click(canvas.getByRole("button", { name: /^Do Send the signed lease/u }));
     await expect(args.onOpen).toHaveBeenCalledTimes(1);
   },
 };

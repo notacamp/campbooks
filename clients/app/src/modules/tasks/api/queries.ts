@@ -18,7 +18,7 @@ const keys = {
   handedOff: (workspaceId: string) =>
     operationKey(LIST, { workspace_id: workspaceId, state: "open", whose: "handed_off" }),
   ids: (workspaceId: string, ids: readonly string[]) =>
-    operationKey(LIST, { workspace_id: workspaceId, ids: [...ids].sort().join(",") }),
+    operationKey(LIST, { workspace_id: workspaceId, ids: [...ids].toSorted().join(",") }),
 };
 
 /** The member's offset from UTC in minutes: where their day starts. */

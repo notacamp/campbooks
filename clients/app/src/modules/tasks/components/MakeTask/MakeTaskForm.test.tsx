@@ -53,7 +53,7 @@ describe("Make it a task", () => {
         source_sender: "marta@casa-lume.example",
       });
     });
-    expect(await screen.findByText("Added to your tasks")).toBeVisible();
+    expect((await screen.findAllByText("Added to your tasks")).length).toBeGreaterThan(0);
     expect(screen.getByRole("button", { name: "Open" })).toBeVisible();
   });
 

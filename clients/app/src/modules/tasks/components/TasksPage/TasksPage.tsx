@@ -154,8 +154,10 @@ export function TasksPage({ workspaceId, taskId, addRequest, useSources, now }: 
     neighbour(task);
     actions.notNeeded(task);
   };
+  // Whether the task is the caller's to change (not one handed to someone else).
+  const isMine = (task: TaskView) => me === undefined || task.assignee === me;
   const holdable = (task: TaskView | undefined): task is TaskView =>
-    task !== undefined && (me === undefined || task.assignee === me);
+    task !== undefined && isMine(task);
 
   const move = (step: number) => {
     const index = order.findIndex((task) => task.id === selected?.id);
@@ -187,10 +189,12 @@ export function TasksPage({ workspaceId, taskId, addRequest, useSources, now }: 
     (event) => {
       // Enter on a control is that control's own.
       const target = event?.target;
-      if (target instanceof HTMLElement && target !== document.body) {
-        if (target.matches("button, a[href], input, select, textarea")) {
-          return;
-        }
+      if (
+        target instanceof HTMLElement &&
+        target !== document.body &&
+        target.matches("button, a[href], input, select, textarea")
+      ) {
+        return;
       }
       if (selected !== undefined) {
         openTask(selected);
@@ -245,7 +249,7 @@ export function TasksPage({ workspaceId, taskId, addRequest, useSources, now }: 
     const chips = [
       dueChip(task),
       planChip(task),
-      holdable(task) ? undefined : { text: t("row.with", { name: nameOf(task.assignee) }) },
+      isMine(task) ? undefined : { text: t("row.with", { name: nameOf(task.assignee) }) },
     ].filter((chip): chip is TaskRowChip => chip !== undefined);
     return (
       <TaskRow
@@ -258,7 +262,7 @@ export function TasksPage({ workspaceId, taskId, addRequest, useSources, now }: 
         selected={task.id === selected?.id}
         current={task.id === taskId}
         checkLabel={t(task.verb === "pay" ? "row.markPaid" : "row.markDone", { title: task.title })}
-        {...(holdable(task)
+        {...(isMine(task)
           ? {
               onCheck: () => {
                 done(task);

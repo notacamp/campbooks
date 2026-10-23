@@ -1,5 +1,5 @@
 import { useNavigate } from "@tanstack/react-router";
-import { useEffect, useRef, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type SyntheticEvent } from "react";
 import { useTranslation } from "react-i18next";
 
 import { useShortcut } from "~/lib/shortcuts";
@@ -51,7 +51,7 @@ export function MakeTaskForm({
   }, []);
   useShortcut("overlay.close", onClose);
 
-  const submit = (event: FormEvent) => {
+  const submit = (event: SyntheticEvent) => {
     event.preventDefault();
     if (title.trim() === "" || adding) {
       return;

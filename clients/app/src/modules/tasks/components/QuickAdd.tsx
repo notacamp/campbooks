@@ -1,4 +1,4 @@
-import { useState, type FormEvent, type RefObject } from "react";
+import { useState, type RefObject, type SyntheticEvent } from "react";
 import { useTranslation } from "react-i18next";
 
 import { Button, Segmented, TextField } from "~/lib/ui";
@@ -25,11 +25,11 @@ export function QuickAdd({ inputRef, onAdd, now }: QuickAddProps) {
   const [title, setTitle] = useState("");
   const [due, setDue] = useState<string | undefined>();
   const [verb, setVerb] = useState<TaskVerb>("do");
-  const [focused, setFocused] = useState(false);
-  // The chips show once there is something to give a date to.
-  const open = focused || title !== "" || due !== undefined;
+  const [touched, setTouched] = useState(false);
+  // The chips show once the field has been used: there is something to give a date to.
+  const open = touched || title !== "" || due !== undefined;
 
-  const submit = (event: FormEvent) => {
+  const submit = (event: SyntheticEvent) => {
     event.preventDefault();
     if (title.trim() === "") {
       return;
@@ -47,24 +47,16 @@ export function QuickAdd({ inputRef, onAdd, now }: QuickAddProps) {
   };
 
   return (
-    <form
-      className="flex flex-col gap-2 px-3 pb-2"
-      onSubmit={submit}
-      onFocus={() => {
-        setFocused(true);
-      }}
-      onBlur={(event) => {
-        if (!event.currentTarget.contains(event.relatedTarget)) {
-          setFocused(false);
-        }
-      }}
-    >
+    <form className="flex flex-col gap-2 px-3 pb-2" onSubmit={submit}>
       <TextField
         ref={inputRef}
         label={t("add.label")}
         hideLabel
         placeholder={t("add.placeholder")}
         autoComplete="off"
+        onFocus={() => {
+          setTouched(true);
+        }}
         value={title}
         onChange={(event) => {
           setTitle(event.target.value);

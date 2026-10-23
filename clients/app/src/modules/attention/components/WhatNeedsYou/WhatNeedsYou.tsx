@@ -292,7 +292,7 @@ export function WhatNeedsYou({ workspaceId, now, offer }: WhatNeedsYouProps) {
     }
     if (item.record.type === TASK) {
       const task = taskById.get(item.record.id);
-      if (task === undefined || task.state !== "open") {
+      if (task?.state !== "open") {
         return [];
       }
       const origin = task.source?.type === CONVERSATION ? byId.get(task.source.id) : undefined;
@@ -885,14 +885,23 @@ export function WhatNeedsYou({ workspaceId, now, offer }: WhatNeedsYouProps) {
    */
   const run = (entry: Entry, id: string) => {
     if (isTask(entry)) {
-      if (id === "done") {
-        doneTask(entry);
-      } else if (id === "snooze") {
-        startSnooze(entry);
-      } else if (id === "not_needed") {
-        notNeededTask(entry);
+      switch (id) {
+        case "done": {
+          doneTask(entry);
+          return;
+        }
+        case "snooze": {
+          startSnooze(entry);
+          return;
+        }
+        case "not_needed": {
+          notNeededTask(entry);
+          return;
+        }
+        default: {
+          return;
+        }
       }
-      return;
     }
     const row = entry;
     const choice = actionsOf(row).choices.find((c) => c.id === id);
