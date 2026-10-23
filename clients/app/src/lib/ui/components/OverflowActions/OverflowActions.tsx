@@ -72,9 +72,11 @@ export function OverflowActions({ label, actions, end = [] }: OverflowActionsPro
 
   // Different actions take a different width: show them and measure again.
   const count = actions.length + end.length;
-  useLayoutEffect(() => {
+  const [measuredCount, setMeasuredCount] = useState(count);
+  if (measuredCount !== count) {
+    setMeasuredCount(count);
     setFolded(false);
-  }, [count]);
+  }
   useLayoutEffect(() => {
     check.current();
   });
@@ -88,13 +90,14 @@ export function OverflowActions({ label, actions, end = [] }: OverflowActionsPro
           renderTrigger={(trigger) => <IconButton {...trigger} label={label} icon="more" />}
         >
           {(close) => (
-            <div className={styles["menu"]} onKeyDown={moveFocus}>
+            <div className={styles["menu"]}>
               {[...actions, ...end].map((action) => (
                 <Button
                   key={action.id}
                   variant="ghost"
                   icon={action.icon}
                   shortcut={action.shortcut}
+                  onKeyDown={moveFocus}
                   onClick={() => {
                     close();
                     action.onSelect();
@@ -129,13 +132,16 @@ export function OverflowActions({ label, actions, end = [] }: OverflowActionsPro
   );
 }
 
-/** ↑/↓ move between the menu's rows. */
-function moveFocus(event: KeyboardEvent<HTMLDivElement>) {
+/** ↑/↓ move between the menu's rows (the row's siblings). */
+function moveFocus(event: KeyboardEvent<HTMLButtonElement>) {
   if (event.key !== "ArrowDown" && event.key !== "ArrowUp") {
     return;
   }
-  const rows = [...event.currentTarget.querySelectorAll<HTMLButtonElement>("button")];
-  const at = rows.findIndex((button) => button === document.activeElement);
+  const row = event.currentTarget;
+  const rows = [
+    ...(row.parentElement?.querySelectorAll<HTMLButtonElement>(":scope > button") ?? []),
+  ];
+  const at = rows.indexOf(row);
   const next = rows[(at + (event.key === "ArrowDown" ? 1 : rows.length - 1)) % rows.length];
   event.preventDefault();
   event.stopPropagation();
