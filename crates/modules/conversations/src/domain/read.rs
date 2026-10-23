@@ -161,13 +161,6 @@ pub struct ReadItem {
     pub cancels: Option<String>,
 }
 
-impl ReadItem {
-    /// When it starts, if it parses.
-    pub fn when(&self) -> Option<When> {
-        When::parse(&self.starts)
-    }
-}
-
 /// An obligation of the reader, dated or not.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 pub struct ReadAsk {
@@ -190,13 +183,6 @@ pub struct ReadAsk {
     /// The reference of an open task this ask repeats.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub same_as: Option<String>,
-}
-
-impl ReadAsk {
-    /// The day it is due, in the offset it was written in.
-    pub fn due_on(&self) -> Option<NaiveDate> {
-        self.due.as_deref().and_then(When::parse).map(When::date)
-    }
 }
 
 /// The key of item or ask number `position` (from 1) of `message`'s `layer`.

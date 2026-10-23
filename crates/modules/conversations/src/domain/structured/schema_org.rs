@@ -307,12 +307,11 @@ fn iso(text: &str) -> Option<When> {
         return Some(when);
     }
     let split = text.find('T')?;
-    let (local_time, offset) = match text.strip_suffix(['Z', 'z']) {
-        Some(local_time) => (local_time, "+00:00".to_owned()),
-        None => {
-            let sign = text[split..].rfind(['+', '-'])? + split;
-            (&text[..sign], text[sign..].to_owned())
-        }
+    let (local_time, offset) = if let Some(local_time) = text.strip_suffix(['Z', 'z']) {
+        (local_time, "+00:00".to_owned())
+    } else {
+        let sign = text[split..].rfind(['+', '-'])? + split;
+        (&text[..sign], text[sign..].to_owned())
     };
     let naive = NaiveDateTime::parse_from_str(local_time, "%Y-%m-%dT%H:%M:%S%.f")
         .or_else(|_| NaiveDateTime::parse_from_str(local_time, "%Y-%m-%dT%H:%M"))
@@ -660,7 +659,7 @@ mod tests {
         assert!(items.is_empty());
         assert_eq!(asks.len(), 1);
         assert_eq!(asks[0].title, "Águas do Vale");
-        assert_eq!(asks[0].due.to_text(), "2026-11-30");
+        assert_eq!(asks[0].by.to_text(), "2026-11-30");
         assert_eq!(
             asks[0].amount,
             Some(Amount {
@@ -719,7 +718,7 @@ mod tests {
           <script type="application/ld+json">{ not json</script>"#;
         let (_, asks) = read(html);
         assert_eq!(asks.len(), 1);
-        assert_eq!(asks[0].due.to_text(), "2026-11-20");
+        assert_eq!(asks[0].by.to_text(), "2026-11-20");
         // Properties of a nested item are the nested item's, not the outer's.
         let nested = r#"<div itemscope itemtype="https://schema.org/EventReservation">
           <div itemprop="reservationFor" itemscope itemtype="https://schema.org/Event">

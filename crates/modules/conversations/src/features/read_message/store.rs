@@ -80,16 +80,12 @@ pub struct StoredRead {
     pub state: String,
     /// Calls made for it.
     pub attempts: i16,
-    /// The summary, by locale tag.
-    pub texts: Value,
     /// Its items.
     pub items: Value,
     /// Its asks.
     pub asks: Value,
     /// When it was read in full; none for one made before items and asks.
     pub read_at: Option<DateTime<Utc>>,
-    /// Why it was asked for.
-    pub triggered_by: Option<String>,
 }
 
 /// The reads `message` has, structured first.
@@ -98,7 +94,7 @@ pub async fn reads_of(
     message: MessageId,
 ) -> Result<Vec<StoredRead>, sqlx::Error> {
     sqlx::query_as(
-        "SELECT layer, state, attempts, texts, items, asks, read_at, triggered_by
+        "SELECT layer, state, attempts, items, asks, read_at
            FROM conversations.message_reads WHERE message_id = $1
           ORDER BY layer DESC",
     )

@@ -311,7 +311,7 @@ struct Plan {
 /// already, asked for by something that still stands, and with something left
 /// to ask (`covered`: the sender's own data holds its dates, so only the
 /// summary of an open need is left).
-fn plan(row: &Loaded, flagged: bool, covered: bool, dated: DatedSettings) -> Result<Plan, Skip> {
+fn plan(row: &Loaded, flagged: bool, covered: bool, settings: DatedSettings) -> Result<Plan, Skip> {
     if row.need_question.as_deref() == Some("suspicious") {
         return Err(Skip::Phishing);
     }
@@ -332,7 +332,7 @@ fn plan(row: &Loaded, flagged: bool, covered: bool, dated: DatedSettings) -> Res
     };
     let stands = match trigger {
         Trigger::Need => need_open,
-        Trigger::Open => dated.enabled,
+        Trigger::Open => settings.enabled,
     };
     let dates = !covered;
     // A read made before is read again for its need's summary only.
@@ -348,12 +348,15 @@ fn plan(row: &Loaded, flagged: bool, covered: bool, dated: DatedSettings) -> Res
 }
 
 /// The message as the model reads it, when it is worth a call.
+#[allow(clippy::too_many_lines)]
 async fn load(
     ctx: &JobContext,
     workspace: WorkspaceId,
     message: MessageId,
     settings: &NeedSettings,
 ) -> Result<Option<Read>, JobError> {
+    let decode =
+        |e: serde_json::Error| JobError::fatal(format!("stored message: {}", redact::json(&e)));
     let state = ctx.state();
     let mut tx = state.db.begin_for(workspace).await?;
     let row: Option<Loaded> = sqlx::query_as(LOAD)
@@ -495,10 +498,6 @@ async fn load(
         trigger: plan.trigger,
         veto,
     }))
-}
-
-fn decode(e: serde_json::Error) -> JobError {
-    JobError::fatal(format!("stored message: {}", redact::json(&e)))
 }
 
 /// Whether the sender's own data (`structured`: its items and asks, when it

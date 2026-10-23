@@ -139,11 +139,11 @@ pub(crate) async fn view_of(
     let reads = store::reads_of(conn, message).await?;
     let model = reads.iter().find(|read| read.layer == "model");
     let status = match model.map(|read| (read.state.as_str(), read.read_at.is_some())) {
-        None => ReadStatus::None,
         Some(("queued", _)) => ReadStatus::Queued,
         Some(("failed", _)) => ReadStatus::Failed,
-        // A read made before items and asks were read is not yet read in full.
-        Some((_, false)) => ReadStatus::None,
+        // Not asked for, or made before items and asks were read, so not yet
+        // read in full.
+        None | Some((_, false)) => ReadStatus::None,
         Some(_) => ReadStatus::Done,
     };
     let mut layers = Vec::new();

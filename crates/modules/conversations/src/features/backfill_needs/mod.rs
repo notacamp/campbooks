@@ -441,7 +441,7 @@ impl BackfillNeeds {
             .fetch_all(&mut **tx)
             .await?;
         for message in unread {
-            let stored = needs::answers(&mut **tx, message).await?;
+            let stored = needs::answers(tx, message).await?;
             if dated::flag(&stored, &self.needs.dated).is_some() {
                 read_message::enqueue(tx, workspace, message, Trigger::Need).await?;
             }

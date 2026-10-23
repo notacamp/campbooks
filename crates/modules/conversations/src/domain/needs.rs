@@ -1060,18 +1060,22 @@ async fn current(conn: &mut PgConnection, conversation: ConversationId) -> Resul
     .await?)
 }
 
+/// A row of `message_reads` as [`dates`] reads it: layer, lapse time, due date
+/// and asks.
+type ReadDates = (
+    String,
+    Option<DateTime<Utc>>,
+    Option<NaiveDate>,
+    serde_json::Value,
+);
+
 /// What Scout read about `message`'s dates, if it has read them, for a need
 /// of `reason`: the lapse time and the due date its read gave, except that a
 /// `do` or `pay` need takes its due date from the first ask of the read with
 /// the same verb that has one (campbooks-cloud#42), and the other reasons
 /// from the read's own `due_on`.
 async fn dates(conn: &mut PgConnection, message: MessageId, reason: NeedReason) -> Result<Dates> {
-    let rows: Vec<(
-        String,
-        Option<DateTime<Utc>>,
-        Option<NaiveDate>,
-        serde_json::Value,
-    )> = sqlx::query_as(
+    let rows: Vec<ReadDates> = sqlx::query_as(
         "SELECT layer, lapses_at, due_on, asks FROM conversations.message_reads
               WHERE message_id = $1 AND state = 'read' ORDER BY layer DESC",
     )
@@ -1906,7 +1910,7 @@ async fn refresh_pass(
     // Only a message the decide pass flagged is read: a plain question gets
     // no read on arrival, and its summary comes when a member opens it.
     if settings.summaries && opened && need.question != NeedQuestion::Suspicious {
-        let stored = answers(&mut **tx, need.message).await?;
+        let stored = answers(tx, need.message).await?;
         if super::dated::flag(&stored, &settings.dated).is_some() {
             crate::features::read_message::enqueue(
                 tx,

@@ -422,8 +422,8 @@ impl Veto {
     fn has_amount(&self, minor: i64) -> bool {
         let numbers = numbers(&self.words);
         let whole = minor.to_string();
-        numbers.iter().any(|n| *n == whole)
-            || (minor % 100 == 0 && numbers.iter().any(|n| *n == (minor / 100).to_string()))
+        numbers.contains(&whole)
+            || (minor % 100 == 0 && numbers.contains(&(minor / 100).to_string()))
     }
 }
 

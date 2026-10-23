@@ -189,6 +189,8 @@ async fn load(
     workspace: WorkspaceId,
     message: MessageId,
 ) -> Result<Option<(Loaded, Parts)>, JobError> {
+    let decode =
+        |e: serde_json::Error| JobError::fatal(format!("stored message: {}", redact::json(&e)));
     let mut tx = state.db.begin_for(workspace).await?;
     let row: Option<Loaded> = sqlx::query_as(LOAD)
         .bind(message)
@@ -240,10 +242,6 @@ async fn load(
     Ok(Some((row, Parts { calendars, html })))
 }
 
-fn decode(e: serde_json::Error) -> JobError {
-    JobError::fatal(format!("stored message: {}", redact::json(&e)))
-}
-
 /// Whether `message` is still stored.
 async fn still_there(
     state: &AppState,
@@ -270,7 +268,7 @@ async fn keep(
     loaded: &Loaded,
     found: structured::Found,
 ) -> Result<(), JobError> {
-    let known: Vec<Known> = store::known_items(&mut **tx, loaded.conversation_id)
+    let known: Vec<Known> = store::known_items(tx, loaded.conversation_id)
         .await?
         .iter()
         .map(known)
@@ -296,7 +294,7 @@ async fn keep(
     if stored == 0 {
         return Ok(());
     }
-    let owner = store::owner(&mut **tx, loaded.inbox_id).await?;
+    let owner = store::owner(tx, loaded.inbox_id).await?;
     let ws = workspace.to_string();
     events
         .publish(

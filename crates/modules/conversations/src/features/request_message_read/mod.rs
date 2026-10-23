@@ -147,7 +147,7 @@ async fn request(
     if !settings.summaries || !settings.dated.enabled || kept {
         return Ok(Outcome::Unavailable);
     }
-    let answers = needs::answers(&mut **tx, message).await?;
+    let answers = needs::answers(tx, message).await?;
     let flag = dated::flag(&answers, &settings.dated);
     // A warning on the message (a suggestion the pass raised too) is not read
     // either: a read would retell the scam.
@@ -161,7 +161,7 @@ async fn request(
     if flag.is_none() || warned {
         return Ok(Outcome::NotFlagged);
     }
-    let reads = store::reads_of(&mut **tx, message).await?;
+    let reads = store::reads_of(tx, message).await?;
     let structured: Option<(Value, Value)> = reads
         .iter()
         .find(|read| read.layer == "structured" && read.state == "read")

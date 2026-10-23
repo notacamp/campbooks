@@ -62,7 +62,7 @@ pub struct Due {
     /// Whom, or what.
     pub title: String,
     /// By when.
-    pub due: When,
+    pub by: When,
     /// How much, when it says.
     pub amount: Option<Amount>,
 }
@@ -152,13 +152,12 @@ pub fn resolve(
         });
         let (updates, cancels) = match (same_event, candidate.cancelled) {
             (Some(earlier), true) => (None, Some(earlier.key.clone())),
-            // A cancellation of something this conversation never held.
-            (None, true) => continue,
             (Some(earlier), false) if candidate.sequence > earlier.sequence.unwrap_or(0) => {
                 (Some(earlier.key.clone()), None)
             }
-            // The same invitation again, or an older version of it.
-            (Some(_), false) => continue,
+            // A cancellation of something this conversation never held, or
+            // the same invitation again (or an older version of it).
+            (None, true) | (Some(_), false) => continue,
             (None, false) => (None, None),
         };
         let starts = candidate.starts.to_text();
@@ -197,10 +196,10 @@ pub fn resolve(
         if asks.len() >= MAX_ASKS {
             break;
         }
-        if !due.due.in_window(sent_at) {
+        if !due.by.in_window(sent_at) {
             continue;
         }
-        let due_text = due.due.to_text();
+        let due_text = due.by.to_text();
         if asks
             .iter()
             .any(|a| a.title == due.title && a.due.as_deref() == Some(due_text.as_str()))
@@ -285,8 +284,6 @@ mod tests {
             )]),
             &[],
             message,
-            SENT,
-            NOW,
         );
         assert!(asks.is_empty());
         assert_eq!(items[0].key, format!("{message}:structured:item:1"));
@@ -370,7 +367,7 @@ mod tests {
                 items: Vec::new(),
                 asks: vec![Due {
                     title: "Old bill".into(),
-                    due: When::parse("2026-01-31").unwrap(),
+                    by: When::parse("2026-01-31").unwrap(),
                     amount: None,
                 }],
             },
@@ -401,7 +398,7 @@ mod tests {
         let dues: Vec<Due> = (0..5)
             .map(|n| Due {
                 title: format!("Bill {n}"),
-                due: When::parse("2026-11-30").unwrap(),
+                by: When::parse("2026-11-30").unwrap(),
                 amount: None,
             })
             .collect();
