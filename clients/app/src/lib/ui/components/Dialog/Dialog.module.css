@@ -9,6 +9,14 @@
   animation: fade var(--duration-fast) var(--ease-out);
 }
 
+/* Scout's chat opened from the dialog stands at the page's edge: the dialog
+   moves aside for it (ChatPanel's `over`). */
+@media (width >= 64rem) {
+  :global(:root[data-chat-beside]) .scrim {
+    padding-inline-end: calc(var(--chat-width) + var(--space-4));
+  }
+}
+
 .dialog {
   display: flex;
   flex-direction: column;

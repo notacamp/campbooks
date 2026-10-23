@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { errorStatus, problemCode } from "~/lib/api";
+import { ruleRef, useScoutChat } from "~/lib/scout-chat";
 import { Banner, Button, Note, PrivacyLine, Text, TextField } from "~/lib/ui";
 
 import { useCompile, type CompileResult, type Proposal, type RuleShape } from "../../api/queries";
@@ -28,8 +29,8 @@ export interface TeachScoutProps {
    * field and read at once, then checked and saved as any other.
    */
   initial?: string | undefined;
-  /** A rule was saved, by the member's own Save. */
-  onSaved?: (() => void) | undefined;
+  /** A rule was saved, by the member's own Save, with its ids (one per inbox). */
+  onSaved?: ((ruleIds: readonly string[]) => void) | undefined;
 }
 
 /** Why the builder is shown instead of the sentence. */
@@ -41,7 +42,8 @@ type BuilderReason = "chosen" | "failed";
  * who someone is rather than guessing, says plainly what rules can't do, and
  * shows each rule with what it matches before Save. "Build a rule yourself"
  * opens a rule builder at any time, with no model call; without a language
- * model here, the builder is all there is.
+ * model here, the builder is all there is. Once a rule is saved, Scout's chat
+ * can be asked about it, where one is mounted.
  */
 export function TeachScout({ workspaceId, initial, onSaved }: TeachScoutProps) {
   const { t: typed } = useTranslation("assistant");
@@ -50,6 +52,34 @@ export function TeachScout({ workspaceId, initial, onSaved }: TeachScoutProps) {
   const [text, setText] = useState(initial ?? "");
   const [result, setResult] = useState<CompileResult | undefined>();
   const [builder, setBuilder] = useState<BuilderReason | undefined>();
+  // The rule just saved, until the next sentence: Scout's chat can be asked
+  // about it (campbooks-cloud#305).
+  const [saved, setSaved] = useState<string | undefined>();
+  const scout = useScoutChat();
+  const saving = (ruleIds: readonly string[]) => {
+    setSaved(ruleIds[0]);
+    onSaved?.(ruleIds);
+  };
+  const savedNote =
+    saved === undefined || scout === undefined ? null : (
+      <Note
+        visor="happy"
+        label={t("memory.teach.savedNote")}
+        actions={
+          <Button
+            variant="secondary"
+            ai
+            onClick={(event) => {
+              scout(ruleRef(saved), { from: event.currentTarget });
+            }}
+          >
+            {t("memory.teach.askAbout")}
+          </Button>
+        }
+      >
+        {t("memory.teach.savedNote")}
+      </Note>
+    );
   // A sentence handed over is read once, as if the member pressed Teach.
   const started = useRef(false);
   const { mutate } = compile;
@@ -81,7 +111,7 @@ export function TeachScout({ workspaceId, initial, onSaved }: TeachScoutProps) {
         <Note visor={noModel || builder === "failed" ? "unsure" : "idle"} label={lead}>
           {lead}
         </Note>
-        <RuleBuilder workspaceId={workspaceId} onSaved={onSaved} />
+        <RuleBuilder workspaceId={workspaceId} onSaved={saving} />
         {noModel ? null : (
           <div className="flex flex-wrap gap-2">
             <Button
@@ -95,6 +125,7 @@ export function TeachScout({ workspaceId, initial, onSaved }: TeachScoutProps) {
             </Button>
           </div>
         )}
+        {savedNote}
       </div>
     );
   }
@@ -109,6 +140,7 @@ export function TeachScout({ workspaceId, initial, onSaved }: TeachScoutProps) {
             return;
           }
           setResult(undefined);
+          setSaved(undefined);
           compile.mutate(text, { onSuccess: setResult });
         }}
       >
@@ -168,9 +200,10 @@ export function TeachScout({ workspaceId, initial, onSaved }: TeachScoutProps) {
           result={result}
           onDone={reset}
           onBuild={build}
-          onSaved={onSaved}
+          onSaved={saving}
         />
       )}
+      {result === undefined ? savedNote : null}
     </div>
   );
 }
@@ -192,7 +225,7 @@ function Understood({
   onDone: () => void;
   /** Open the rule builder instead. */
   onBuild: () => void;
-  onSaved?: (() => void) | undefined;
+  onSaved?: ((ruleIds: readonly string[]) => void) | undefined;
 }) {
   const { t: typed } = useTranslation("assistant");
   const t = typed as unknown as Translate;
@@ -261,7 +294,7 @@ function ProposalCard({
   text: string;
   first: boolean;
   onDone: () => void;
-  onSaved?: (() => void) | undefined;
+  onSaved?: ((ruleIds: readonly string[]) => void) | undefined;
 }) {
   const { t: typed } = useTranslation("assistant");
   const t = typed as unknown as Translate;

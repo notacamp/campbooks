@@ -24,6 +24,8 @@ export interface WaitingOnOthersProps {
   t: Translate;
   onNudge: (row: WaitingRow) => void;
   onNotWaiting: (row: WaitingRow) => void;
+  /** Ask Scout about the conversation (where a chat is mounted); `from` takes the focus back. */
+  onAsk?: ((row: WaitingRow, from: HTMLElement) => void) | undefined;
 }
 
 /** Most words of a subject shown in a row. */
@@ -39,10 +41,10 @@ function fewWords(subject: string): string {
 
 /**
  * "Waiting on others" (campbooks-cloud#293): who Scout waits on for the
- * member, soonest check first, each with Nudge now and Not waiting, both in
- * the row's one button style.
+ * member, soonest check first, each with Nudge now, Not waiting and Ask
+ * Scout (the chat about the conversation), all in the row's one button style.
  */
-export function WaitingOnOthers({ rows, t, onNudge, onNotWaiting }: WaitingOnOthersProps) {
+export function WaitingOnOthers({ rows, t, onNudge, onNotWaiting, onAsk }: WaitingOnOthersProps) {
   return (
     <ul className="flex flex-col gap-3">
       {rows.map((row) => (
@@ -90,6 +92,17 @@ export function WaitingOnOthers({ rows, t, onNudge, onNotWaiting }: WaitingOnOth
             >
               {t("waiting.notWaiting")}
             </Button>
+            {onAsk === undefined ? null : (
+              <Button
+                variant="link"
+                ai
+                onClick={(event) => {
+                  onAsk(row, event.currentTarget);
+                }}
+              >
+                {t("waiting.ask")}
+              </Button>
+            )}
           </div>
         </li>
       ))}

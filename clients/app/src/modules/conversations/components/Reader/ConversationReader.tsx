@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { errorStatus } from "~/lib/api";
-import { useScoutChat } from "~/lib/scout-chat";
+import { conversationRef, useScoutChat } from "~/lib/scout-chat";
 import { useShortcut } from "~/lib/shortcuts";
 import {
   ActionBar,
@@ -330,10 +330,9 @@ export function ConversationReader({
       return;
     }
     const active = document.activeElement;
-    scout?.(
-      conversation.id,
-      active instanceof HTMLElement && active !== document.body ? active : null,
-    );
+    scout?.(conversationRef(conversation.id), {
+      from: active instanceof HTMLElement && active !== document.body ? active : null,
+    });
   };
   useShortcut(
     "scout.ask",

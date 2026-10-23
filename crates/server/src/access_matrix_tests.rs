@@ -1064,6 +1064,7 @@ fn acts_in_the_inbox(id: &str) -> bool {
             | "conversations.write_reply"
             | "conversations.write_nudge"
             | "conversations.stream_reply"
+            | "conversations.get_rule_notice"
             | "conversations.answer_rule_notice"
             | "conversations.clear_rule_notice_answer"
     )
@@ -1079,7 +1080,9 @@ fn in_the_inbox(resource_type: &str) -> bool {
 fn answers_a_notice(id: &str) -> bool {
     matches!(
         id,
-        "conversations.answer_rule_notice" | "conversations.clear_rule_notice_answer"
+        "conversations.get_rule_notice"
+            | "conversations.answer_rule_notice"
+            | "conversations.clear_rule_notice_answer"
     )
 }
 
@@ -1137,7 +1140,7 @@ fn expected(
             Decision::Allow
         };
     }
-    match instance {
+    let decision = match instance {
         Some(_) => authz::decide(
             &world.state.resources,
             &access,
@@ -1146,7 +1149,13 @@ fn expected(
             Some(&world.truth(resource, who)),
         ),
         None => authz::authorize_type(&world.state.resources, &access, action, resource),
+    };
+    // One of Scout's suggestions reads as the list shows it: a member who
+    // only reads its inbox is never shown it, so it is not there for them.
+    if id == "conversations.get_rule_notice" && decision == Decision::Forbidden {
+        return Decision::NotFound;
     }
+    decision
 }
 
 #[sqlx::test(migrations = "../../migrations")]

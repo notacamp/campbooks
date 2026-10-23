@@ -26,8 +26,11 @@ export interface RuleSaveProps {
   names?: Names | undefined;
   /** After saving (or Cancel). */
   onDone: () => void;
-  /** Saved in every inbox chosen (before {@link onDone}); not on Cancel. */
-  onSaved?: (() => void) | undefined;
+  /**
+   * Saved in every inbox chosen (before {@link onDone}), with the new rules'
+   * ids, one per inbox; not on Cancel.
+   */
+  onSaved?: ((ruleIds: readonly string[]) => void) | undefined;
   /**
    * The one shown first: ⌘↵ saves it while the focus stays where the member
    * was typing, and it is announced. Several rules shown at once each get a
@@ -129,7 +132,7 @@ export function RuleSave({
               });
             },
           });
-          onSaved?.();
+          onSaved?.(ids);
           onDone();
         },
         onError: () => {

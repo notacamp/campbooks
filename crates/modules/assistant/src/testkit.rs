@@ -88,6 +88,11 @@ pub struct Mail {
     pub conversations: HashMap<String, Value>,
     /// `conversations.get_history`'s answers, by conversation id.
     pub histories: HashMap<String, Value>,
+    /// `conversations.get_rule`'s answers, by rule id; any other id is 404.
+    pub rules: HashMap<String, Value>,
+    /// `conversations.get_rule_notice`'s answers, by suggestion id; any
+    /// other id is 404.
+    pub notices: HashMap<String, Value>,
     /// `conversations.list`'s `conversations` (filtered by `ids` when asked).
     pub list: Vec<Value>,
     /// `search.query`'s `hits`.
@@ -164,6 +169,46 @@ async fn get_history(
     Ok(Json(mail.histories.get(&path.1).cloned().unwrap_or_else(
         || json!({ "events": [], "truncated": false }),
     )))
+}
+
+#[utoipa::path(get, path = "/api/v1/w/{workspace_id}/rules/{rule_id}",
+    operation_id = "conversations.get_rule",
+    params(("workspace_id" = String, Path), ("rule_id" = String, Path)),
+    security(("bearer" = ["conversations:read"])),
+    extensions(("x-campbooks" = json!(Operation::query().assistant().records(["conversations.rule"])))),
+    responses((status = OK, body = Value)))]
+async fn get_rule(
+    _: Workspace<ConversationsRead>,
+    Extension(mail): Extension<Shared>,
+    extract::Path(path): extract::Path<(String, String)>,
+) -> Result<Json<Value>, Error> {
+    let mut mail = mail.lock().unwrap();
+    mail.called.push("conversations.get_rule".into());
+    mail.rules
+        .get(&path.1)
+        .cloned()
+        .map(Json)
+        .ok_or(Error::NotFound)
+}
+
+#[utoipa::path(get, path = "/api/v1/w/{workspace_id}/rule-notices/{notice_id}",
+    operation_id = "conversations.get_rule_notice",
+    params(("workspace_id" = String, Path), ("notice_id" = String, Path)),
+    security(("bearer" = ["conversations:read"])),
+    extensions(("x-campbooks" = json!(Operation::query().assistant().records(["conversations.rule"])))),
+    responses((status = OK, body = Value)))]
+async fn get_rule_notice(
+    _: Workspace<ConversationsRead>,
+    Extension(mail): Extension<Shared>,
+    extract::Path(path): extract::Path<(String, String)>,
+) -> Result<Json<Value>, Error> {
+    let mut mail = mail.lock().unwrap();
+    mail.called.push("conversations.get_rule_notice".into());
+    mail.notices
+        .get(&path.1)
+        .cloned()
+        .map(Json)
+        .ok_or(Error::NotFound)
 }
 
 #[derive(Deserialize)]
@@ -506,6 +551,8 @@ impl Kit {
             .routes(routes!(list_senders))
             .routes(routes!(get_conversation))
             .routes(routes!(get_history))
+            .routes(routes!(get_rule))
+            .routes(routes!(get_rule_notice))
             .routes(routes!(list_conversations))
             .routes(routes!(list_streams))
             .routes(routes!(search))

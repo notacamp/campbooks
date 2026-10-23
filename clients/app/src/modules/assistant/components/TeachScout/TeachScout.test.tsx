@@ -1,5 +1,7 @@
 import { fireEvent, screen, waitFor, within } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+
+import { ScoutChatProvider } from "~/lib/scout-chat";
 
 import {
   mockApi,
@@ -108,6 +110,34 @@ describe("TeachScout", () => {
       origin_text: SENTENCE,
       state: "active",
     });
+  });
+
+  it("offers to ask Scout about the rule once it is saved, until the next sentence", async () => {
+    mockApi({
+      [`POST ${W}/assistant/compile`]: {
+        body: { ...ACCOUNTANT, proposals: [{ ...ACCOUNTANT.proposals[0], who: null }] },
+      },
+      [`POST ${W}/inboxes/inbox-own/rules/preview`]: { body: PREVIEW },
+      [`POST ${W}/inboxes/inbox-own/rules`]: {
+        status: 201,
+        body: { rule: { id: "rule-1" }, acted_without_asking: false },
+      },
+    });
+    const scout = vi.fn();
+    renderWithProviders(
+      <ScoutChatProvider open={scout}>
+        <TeachScout workspaceId={WS} />
+      </ScoutChatProvider>,
+    );
+
+    teach();
+    fireEvent.click(await screen.findByRole("button", { name: /Save rule/u }));
+    const ask = await screen.findByRole("button", { name: /Ask Scout about this rule/u });
+    fireEvent.click(ask);
+    expect(scout).toHaveBeenCalledWith({ type: "conversations.rule", id: "rule-1" }, { from: ask });
+
+    teach("newsletters never need me");
+    expect(screen.queryByRole("button", { name: /Ask Scout about this rule/u })).toBeNull();
   });
 
   it("says plainly what rules can't do", async () => {

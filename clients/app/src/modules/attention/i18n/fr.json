@@ -104,6 +104,7 @@
     "nudgeNow": "Relancer maintenant",
     "notWaiting": "Je n’attends plus",
     "label": "En attente de {{name}}",
-    "fold": "En attente d’autres personnes · {{count}}"
+    "fold": "En attente d’autres personnes · {{count}}",
+    "ask": "Demander à Scout"
   }
 }

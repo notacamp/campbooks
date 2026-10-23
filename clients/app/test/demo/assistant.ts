@@ -4,6 +4,7 @@
 import type { Schema } from "~/lib/api";
 
 import { MARTA, PEDRO } from "./attention";
+import { BUILDS_NOTICE, LEDGER_RULE } from "./conversations";
 
 type Chat = Schema<"ChatView">;
 type Message = Schema<"ChatMessageView">;
@@ -189,3 +190,110 @@ export const MARTA_RULE = {
     },
   ],
 };
+
+// Scout's chat from anywhere (campbooks-cloud#305, phase 3): about one of
+// Scout's suggestions, about a rule, about nothing (⌘K), and Recent.
+
+export const NOTICE_WHY = "Why do you suggest this?";
+export const WAITING_QUESTION = "What am I waiting on?";
+
+/** Sam's new chat about the build robot's suggestion. */
+export const NOTICE_CHAT: Chat = {
+  ...MARTA_CHAT,
+  id: "0192f1a0-0000-7000-8000-000000003201",
+  about: { type: "conversations.rule_notice", id: BUILDS_NOTICE.id },
+};
+
+/** Scout's answer to {@link NOTICE_WHY}, as stored. */
+export const NOTICE_ANSWER: Message = {
+  id: "0192f1a0-0000-7000-8000-000000003212",
+  author: "scout",
+  text:
+    "CI sent you 34 build reports in the last 60 days and you opened 2 of them.\n\n" +
+    "- They come most days, so they keep landing on Home.\n" +
+    "- Filed under Updates, they would stay out of your way and still be there.",
+  steps: [
+    {
+      tool: "find_conversations",
+      records: [],
+      count: 34,
+    },
+  ],
+  finish: "done",
+  proposals: [],
+  created_at: "2026-10-13T15:01:10Z",
+};
+
+/** Sam's new chat about the Ledger rule. */
+export const RULE_CHAT: Chat = {
+  ...MARTA_CHAT,
+  id: "0192f1a0-0000-7000-8000-000000003301",
+  about: { type: "conversations.rule", id: LEDGER_RULE.id },
+};
+
+/** Sam's new chat about nothing in particular, asked from ⌘K. */
+export const NOTHING_CHAT: Chat = {
+  ...MARTA_CHAT,
+  id: "0192f1a0-0000-7000-8000-000000003401",
+  about: null,
+};
+
+/** Scout's answer to {@link WAITING_QUESTION}, as stored. */
+export const WAITING_ANSWER: Message = {
+  id: "0192f1a0-0000-7000-8000-000000003412",
+  author: "scout",
+  text:
+    "You’re waiting on two people:\n\n" +
+    "- Rui Matos, for the signed contract for the kitchen units, which he said he’d send by Friday.\n" +
+    "- Inês Cardoso, for the revised quote for the bathroom and the hall. You nudged her once.",
+  steps: [{ tool: "what_needs_me", records: [], count: 2 }],
+  finish: "done",
+  proposals: [],
+  created_at: "2026-10-13T15:02:10Z",
+};
+
+/** A chat in {@link NOTHING_CHAT}'s shape once `answer` answered `question`. */
+export function answered(chat: Chat, question: string, answer: Message): Chat {
+  return {
+    ...chat,
+    questions: 1,
+    last_message_at: answer.created_at,
+    messages: [
+      {
+        id: `${answer.id.slice(0, -1)}1`,
+        author: "member",
+        text: question,
+        steps: [],
+        finish: null,
+        proposals: [],
+        created_at: answer.created_at,
+      },
+      answer,
+    ],
+  };
+}
+
+/** Sam's chats as Recent lists them, newest first. */
+export const RECENT: Schema<"ChatSummary">[] = [
+  {
+    id: NOTHING_CHAT.id,
+    about: null,
+    first_question: WAITING_QUESTION,
+    questions: 1,
+    last_message_at: WAITING_ANSWER.created_at,
+  },
+  {
+    id: MARTA_CHAT.id,
+    about: MARTA_CHAT.about ?? null,
+    first_question: WHY,
+    questions: 1,
+    last_message_at: "2026-10-12T09:40:00Z",
+  },
+  {
+    id: RULE_CHAT.id,
+    about: RULE_CHAT.about ?? null,
+    first_question: "What has it changed?",
+    questions: 2,
+    last_message_at: "2026-10-09T17:05:00Z",
+  },
+];

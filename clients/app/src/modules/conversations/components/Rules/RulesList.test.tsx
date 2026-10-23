@@ -1,5 +1,7 @@
 import { fireEvent, screen, waitFor, within } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+
+import { ScoutChatProvider } from "~/lib/scout-chat";
 
 import { INBOX, LEDGER_RULE, W } from "../../../../../test/demo/conversations";
 import { ANA, DUARTE, SESSION, SOFIA } from "../../../../../test/demo/workspaces";
@@ -303,5 +305,32 @@ describe("the rules list", () => {
         "Rule kept, paused for now · Mail from billing@hosting.example → never needs you",
       ),
     ).toBeVisible();
+  });
+  it("asks Scout about a rule from the row's More menu, only where a chat is mounted", async () => {
+    mockApi({
+      ...people,
+      [`GET ${W}/rules`]: { body: { rules: [LEDGER_RULE] } },
+      [`GET ${W}/inboxes`]: { body: { inboxes: [INBOX] } },
+    });
+    const scout = vi.fn();
+    const { unmount } = renderWithProviders(
+      <ScoutChatProvider open={scout}>
+        <RulesList workspaceId={DUARTE.id} />
+      </ScoutChatProvider>,
+    );
+    const mine = await screen.findByRole("list", { name: INBOX.address });
+    const more = within(mine).getByRole("button", { name: "More actions" });
+
+    fireEvent.click(more);
+    fireEvent.click(await screen.findByRole("button", { name: /Ask Scout about this rule/u }));
+    expect(scout).toHaveBeenCalledWith(
+      { type: "conversations.rule", id: LEDGER_RULE.id },
+      { from: more },
+    );
+    unmount();
+
+    renderWithProviders(<RulesList workspaceId={DUARTE.id} />);
+    await screen.findByRole("list", { name: INBOX.address });
+    expect(screen.queryByRole("button", { name: "More actions" })).toBeNull();
   });
 });

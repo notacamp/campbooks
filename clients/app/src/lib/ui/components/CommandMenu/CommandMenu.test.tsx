@@ -109,7 +109,7 @@ describe("CommandMenu", () => {
         "Lease renewal",
         "Lease inspection",
         "All results for “lease”",
-        "Ask Campbooks: lease",
+        "Ask Scout: lease",
       ]);
       expect(options[0]).toHaveAttribute("aria-selected", "true");
       fireEvent.keyDown(input, { key: "ArrowDown" });
@@ -228,10 +228,20 @@ describe("CommandMenu", () => {
     fireEvent.change(screen.getByRole("combobox"), {
       target: { value: "What do I owe Brightloop?" },
     });
-    fireEvent.click(
-      screen.getByRole("option", { name: "Ask Campbooks: What do I owe Brightloop?" }),
-    );
+    fireEvent.click(screen.getByRole("option", { name: "Ask Scout: What do I owe Brightloop?" }));
     expect(onAsk).toHaveBeenCalledWith("What do I owe Brightloop?");
+  });
+
+  it("offers Ask Scout alone with nothing typed, opening the assistant with no question", () => {
+    const onAsk = vi.fn();
+    renderUi(<Screen onInbox={vi.fn()} onAsk={onAsk} />);
+    open();
+
+    const ask = screen.getByRole("option", { name: "Ask Scout" });
+    expect(screen.getByRole("group", { name: "Ask" })).toContainElement(ask);
+    fireEvent.click(ask);
+    expect(onAsk).toHaveBeenCalledWith("");
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });
 
   it("says when nothing matches, and closes on Escape and on the scrim", () => {

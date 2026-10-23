@@ -104,6 +104,7 @@
     "nudgeNow": "Nudge now",
     "notWaiting": "Not waiting",
     "label": "Waiting on {{name}}",
-    "fold": "Waiting on others · {{count}}"
+    "fold": "Waiting on others · {{count}}",
+    "ask": "Ask Scout"
   }
 }
