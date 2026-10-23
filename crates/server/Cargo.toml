@@ -23,6 +23,7 @@ campbooks-connectors.workspace = true
 campbooks-identity.workspace = true
 campbooks-conversations.workspace = true
 campbooks-kernel.workspace = true
+campbooks-schedule.workspace = true
 campbooks-search.workspace = true
 campbooks-system.workspace = true
 campbooks-workspaces.workspace = true

@@ -28,6 +28,7 @@ campbooks-admin = { path = "crates/modules/admin" }
 campbooks-attention = { path = "crates/modules/attention" }
 campbooks-search = { path = "crates/modules/search" }
 campbooks-assistant = { path = "crates/modules/assistant" }
+campbooks-schedule = { path = "crates/modules/schedule" }
 
 # HTTP / async
 axum = { version = "0.8.9", default-features = false, features = ["http1", "http2", "json", "query", "form", "tokio", "tower-log", "tracing", "matched-path"] }

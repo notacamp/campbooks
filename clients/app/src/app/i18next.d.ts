@@ -12,6 +12,7 @@ import type identity from "~/modules/identity/i18n/en.json";
 import type attention from "~/modules/attention/i18n/en.json";
 import type assistant from "~/modules/assistant/i18n/en.json";
 import type search from "~/modules/search/i18n/en.json";
+import type schedule from "~/modules/schedule/i18n/en.json";
 
 declare module "i18next" {
   interface CustomTypeOptions {
@@ -28,6 +29,7 @@ declare module "i18next" {
       attention: typeof attention;
       assistant: typeof assistant;
       search: typeof search;
+      schedule: typeof schedule;
       // `cargo xtask new-module` inserts above this line.
     };
   }

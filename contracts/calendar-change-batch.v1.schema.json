@@ -1,0 +1,106 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://campbooks.example.com/contracts/calendar-change-batch.v1.schema.json",
+  "title": "calendar-change-batch v1 (blob)",
+  "description": "A batch of changes to one provider calendar: events upserted and events removed, as the connectors module read them, in order. A blob (`application/vnd.campbooks.calendar-changes+json; version=1`) that `connectors.calendar_changed` v1 points at; the schedule module applies it to the calendar it keeps for `provider_calendar_id` on that connection. A recurring series arrives once, with the provider's own recurrence lines, and each exception as its own event naming its series and the occurrence it replaces. The text of events is here and nowhere in the event log. Deleted with the workspace.",
+  "type": "object",
+  "required": ["version", "provider_calendar_id", "upserts", "removals"],
+  "additionalProperties": false,
+  "properties": {
+    "version": { "const": 1 },
+    "provider_calendar_id": { "type": "string", "minLength": 1, "maxLength": 512 },
+    "full": {
+      "type": "boolean",
+      "description": "True for a full read of the calendar (the first, or after the provider dropped its sync token): events the calendar holds that are not in `upserts` are gone."
+    },
+    "upserts": { "type": "array", "maxItems": 2500, "items": { "$ref": "#/$defs/event" } },
+    "removals": {
+      "type": "array",
+      "maxItems": 2500,
+      "items": {
+        "type": "object",
+        "required": ["provider_id"],
+        "additionalProperties": false,
+        "properties": { "provider_id": { "type": "string", "minLength": 1, "maxLength": 1024 } }
+      }
+    }
+  },
+  "$defs": {
+    "uuid": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+    },
+    "start": {
+      "description": "When an event starts or ends: a date (all-day), or a time with an offset and, when the provider gave one, the zone it was written in.",
+      "oneOf": [
+        {
+          "type": "object",
+          "required": ["date"],
+          "additionalProperties": false,
+          "properties": { "date": { "type": "string", "format": "date" } }
+        },
+        {
+          "type": "object",
+          "required": ["date_time"],
+          "additionalProperties": false,
+          "properties": {
+            "date_time": { "type": "string", "format": "date-time" },
+            "time_zone": { "type": "string", "maxLength": 64 }
+          }
+        }
+      ]
+    },
+    "event": {
+      "type": "object",
+      "required": ["provider_id", "status", "start"],
+      "additionalProperties": false,
+      "properties": {
+        "provider_id": { "type": "string", "minLength": 1, "maxLength": 1024 },
+        "etag": { "type": "string", "maxLength": 256 },
+        "status": { "enum": ["confirmed", "tentative", "cancelled"] },
+        "title": { "type": "string", "maxLength": 1000 },
+        "place": { "type": "string", "maxLength": 1000 },
+        "description": { "type": "string", "maxLength": 20000 },
+        "start": { "$ref": "#/$defs/start" },
+        "end": { "$ref": "#/$defs/start" },
+        "recurrence": {
+          "type": "array",
+          "maxItems": 20,
+          "items": { "type": "string", "maxLength": 1000 },
+          "description": "The provider's own RRULE, RDATE and EXDATE lines, as given."
+        },
+        "series": { "type": "string", "maxLength": 1024, "description": "An exception: the provider id of its series." },
+        "original_start": { "$ref": "#/$defs/start", "description": "An exception: the start of the occurrence it replaces." },
+        "ical_uid": { "type": "string", "maxLength": 1024, "description": "The event's iCalendar UID, which an invitation in email carries too." },
+        "organizer": { "$ref": "#/$defs/person" },
+        "attendees": { "type": "array", "maxItems": 200, "items": { "$ref": "#/$defs/person" } },
+        "response": {
+          "enum": ["needs_action", "accepted", "tentative", "declined"],
+          "description": "The member's own answer to an invitation."
+        },
+        "private": {
+          "type": "object",
+          "additionalProperties": false,
+          "description": "What Campbooks wrote on the event when it created it (Google's private extended properties).",
+          "properties": {
+            "campbooks_event": { "$ref": "#/$defs/uuid" },
+            "campbooks_kind": {
+              "enum": ["charge", "appointment", "meeting", "travel", "stay", "show", "reservation", "delivery", "expiry", "hold", "none"]
+            },
+            "campbooks_source": { "type": "string", "maxLength": 200 }
+          }
+        }
+      }
+    },
+    "person": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "name": { "type": "string", "maxLength": 200 },
+        "email": { "type": "string", "maxLength": 320 },
+        "response": { "enum": ["needs_action", "accepted", "tentative", "declined"] },
+        "self": { "type": "boolean", "description": "The member." }
+      }
+    }
+  }
+}

@@ -254,6 +254,7 @@ pub fn modules_with(composition: &Composition) -> Vec<Module> {
         campbooks_attention::module(),
         campbooks_search::module(),
         campbooks_assistant::module(composition.assistant.clone()),
+        campbooks_schedule::module(),
         // `cargo xtask new-module` inserts above this line.
     ]
 }
@@ -435,6 +436,10 @@ fn security_scheme() -> SecurityScheme {
             a sentence you type into rules to check. Compiling uses the `complete` AI role only \
             when you ask, and sends it your sentence and your own addresses and label names, never \
             your mail; nothing is saved until you save a rule through the conversations module."),
+        (name = "schedule", description = "Your calendars and their events: the provider \
+            calendars you connect and your own Campbooks calendar, where Scout puts the dated \
+            things it reads in your email. Events have a kind; free time is answered from your \
+            working hours."),
         // `cargo xtask new-module` inserts above this line.
         (name = "changes", description = "The change feed: a Server-Sent Events stream per \
             workspace of the records that changed (ids only), so clients refetch only what \

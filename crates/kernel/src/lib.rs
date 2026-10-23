@@ -32,9 +32,11 @@ pub mod purge;
 pub mod rate_limit;
 pub mod records;
 pub mod redact;
+pub mod schedule;
 pub mod search;
 pub mod signup;
 pub mod state;
+pub mod tasks;
 pub mod telemetry;
 pub mod tenancy;
 #[cfg(any(test, feature = "test-util"))]

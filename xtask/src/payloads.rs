@@ -151,6 +151,18 @@ pub const EVENT_FIELDS_ALLOWED: &[(&str, &str, &str)] = &[
         "reason",
         "why the consent ended, a code from the code (`revoked`, `member_left`, `workspace_deleting`, `client_removed`)",
     ),
+    ("schedule.event_created", "starts", EVENT_TIME),
+    ("schedule.event_created", "ends", EVENT_TIME),
+    ("schedule.event_created", "source.type", RECORD_TYPE),
+    ("schedule.event_created", "source.id", RECORD_ID),
+    ("schedule.event_changed", "starts", EVENT_TIME),
+    ("schedule.event_changed", "ends", EVENT_TIME),
+    ("schedule.event_changed", "source.type", RECORD_TYPE),
+    ("schedule.event_changed", "source.id", RECORD_ID),
+    ("schedule.event_cancelled", "starts", EVENT_TIME),
+    ("schedule.event_cancelled", "ends", EVENT_TIME),
+    ("schedule.event_cancelled", "source.type", RECORD_TYPE),
+    ("schedule.event_cancelled", "source.id", RECORD_ID),
     ("identity.client_registered", "client", CLIENT_ID),
     ("identity.client_removed", "client", CLIENT_ID),
     ("identity.consent_granted", "client", CLIENT_ID),
@@ -164,6 +176,13 @@ pub const EVENT_FIELDS_ALLOWED: &[(&str, &str, &str)] = &[
     ("identity.way_in_added", "method", METHOD_NAME),
     ("identity.way_in_removed", "method", METHOD_NAME),
 ];
+
+const EVENT_TIME: &str = "when an event starts or ends: an RFC 3339 time with an offset or a \
+     `YYYY-MM-DD` date, parsed before it is kept, never a word of the event";
+
+const RECORD_TYPE: &str = "a record type, from the code (`<module>.<record>`)";
+
+const RECORD_ID: &str = "a record's id (a UUID as text)";
 
 const CLIENT_ID: &str = "an app's OAuth client id: an app identifier (a first-party id, a \
      generated id, or the app's own HTTPS metadata-document URL), not personal data";

@@ -593,6 +593,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "campbooks-schedule"
+version = "0.1.0"
+dependencies = [
+ "boon",
+ "campbooks-kernel",
+ "serde",
+ "serde_json",
+ "sqlx",
+ "tokio",
+ "utoipa",
+ "utoipa-axum",
+]
+
+[[package]]
 name = "campbooks-search"
 version = "0.1.0"
 dependencies = [
@@ -625,6 +639,7 @@ dependencies = [
  "campbooks-conversations",
  "campbooks-identity",
  "campbooks-kernel",
+ "campbooks-schedule",
  "campbooks-search",
  "campbooks-system",
  "campbooks-workspaces",

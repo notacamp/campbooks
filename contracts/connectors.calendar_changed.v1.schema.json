@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://campbooks.example.com/contracts/connectors.calendar_changed.v1.schema.json",
+  "title": "connectors.calendar_changed v1 (event payload)",
+  "description": "Published by the connectors module, in the transaction that moves a calendar stream's cursor, with one batch of changes to one provider calendar. Ids and a blob reference only: the calendar's provider id and the events are in the calendar-change-batch v1 blob. Workspace-scoped.",
+  "type": "object",
+  "required": ["workspace", "connection", "batch"],
+  "additionalProperties": false,
+  "properties": {
+    "workspace": { "type": "string" },
+    "connection": { "$ref": "#/$defs/uuid", "description": "The connection (an id of the connectors module)." },
+    "batch": {
+      "description": "The calendar-change-batch v1 document, a blob of the workspace.",
+      "$ref": "#/$defs/blob"
+    }
+  },
+  "$defs": {
+    "uuid": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+    },
+    "blob": {
+      "type": "object",
+      "required": ["hash", "size", "content_type"],
+      "additionalProperties": false,
+      "properties": {
+        "hash": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "size": { "type": "integer", "minimum": 0 },
+        "content_type": { "type": "string" }
+      }
+    }
+  }
+}

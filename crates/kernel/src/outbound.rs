@@ -176,3 +176,61 @@ impl OutboundRequests for NoOutboundRequests {
 
 /// Shared handle to the registered [`OutboundRequests`] port.
 pub type OutboundPort = Arc<dyn OutboundRequests>;
+
+/// A calendar change as the schedule module stored it.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct StoredCalendarChange {
+    /// The calendar the event is on (an id of the schedule module).
+    pub calendar: Uuid,
+    /// The event.
+    pub event: Uuid,
+    /// The connection whose grant makes the change.
+    pub connection: Uuid,
+    /// The `calendar-change` document, as the schedule module wrote it. The
+    /// connector writes this, never a document an event names.
+    pub body: BlobRef,
+}
+
+/// A future returned by [`CalendarRequests::stored_change`].
+pub type StoredCalendarChangeFuture<'a> =
+    Pin<Box<dyn Future<Output = Result<Option<StoredCalendarChange>, Error>> + Send + 'a>>;
+
+/// Answers whether a change to an event on a provider calendar was really
+/// asked for, before the connector makes it: the schedule module's side of
+/// the outbound-requests port, as [`OutboundRequests`] is the conversations
+/// module's. Any transaction working in a workspace can append that
+/// workspace's events, so `schedule.outbound_requested` alone proves nothing.
+pub trait CalendarRequests: std::fmt::Debug + Send + Sync + 'static {
+    /// The change of request `request` in `workspace`, read in `conn` (a
+    /// transaction working in that workspace): `Some` only while it waits for
+    /// the provider, its stored binding verifies
+    /// ([`state.binding`](crate::binding)), and the member who asked may
+    /// still change that calendar. `None` otherwise, or when there is no such
+    /// request.
+    fn stored_change<'a>(
+        &'a self,
+        state: &'a AppState,
+        conn: &'a mut PgConnection,
+        workspace: WorkspaceId,
+        request: Uuid,
+    ) -> StoredCalendarChangeFuture<'a>;
+}
+
+/// The port before a module provides one: no calendar change was asked for.
+#[derive(Debug, Clone, Copy, Default)]
+pub struct NoCalendarRequests;
+
+impl CalendarRequests for NoCalendarRequests {
+    fn stored_change<'a>(
+        &'a self,
+        _state: &'a AppState,
+        _conn: &'a mut PgConnection,
+        _workspace: WorkspaceId,
+        _request: Uuid,
+    ) -> StoredCalendarChangeFuture<'a> {
+        Box::pin(async { Ok(None) })
+    }
+}
+
+/// Shared handle to the registered [`CalendarRequests`] port.
+pub type CalendarPort = Arc<dyn CalendarRequests>;

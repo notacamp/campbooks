@@ -5,18 +5,18 @@ time.
 
 ## 1. Scaffold
 
-- [ ] 1.1 `schedule` module from the module template, written by hand: crate `campbooks-schedule`, `scopes.rs` (`schedule:read`/`write`), `events.rs`, `features/`, migration `<ts>_schedule__init.sql` (schema `schedule`, RLS on `workspace_id`), client module `clients/app/src/modules/schedule` with 4 locale files
-- [ ] 1.2 Register the module in `crates/server` and `clients/app/src/app/modules.ts`; `architecture.toml` needs no entry
-- [ ] 1.3 `openspec validate add-schedule-module --strict` passes
+- [x] 1.1 `schedule` module from the module template, written by hand: crate `campbooks-schedule`, `scopes.rs` (`schedule:read`/`write`), `events.rs`, `features/`, migration `<ts>_schedule__init.sql` (schema `schedule`, RLS on `workspace_id`), client module `clients/app/src/modules/schedule` with 4 locale files
+- [x] 1.2 Register the module in `crates/server` and `clients/app/src/app/modules.ts`; `architecture.toml` needs no entry
+- [x] 1.3 `openspec validate add-schedule-module --strict` passes
 
 ## 2. Contracts and ports
 
-- [ ] 2.1 `contracts/conversations.message_read.v1.schema.json` (ids and enums only; tasks session reviews)
-- [ ] 2.2 `contracts/connectors.calendar_changed.v1.schema.json` + the calendar event blob schema
-- [ ] 2.3 `contracts/schedule.event_created|event_changed|event_cancelled.v1.schema.json`
-- [ ] 2.4 `contracts/schedule.outbound_requested.v1.schema.json` + its blob; the outcome event for calendar changes
-- [ ] 2.5 `capability_granted` calendar blob (calendar list)
-- [ ] 2.6 Kernel ports: `OpenTasks::open_tasks(workspace, inbox_id, conversation_id, sender_address)` (no implementation; empty list), `TimeZones`, `Availability::free_slots(member, window, duration)`, the outbound-requests port for schedule
+- [x] 2.1 `contracts/conversations.message_read.v1.schema.json` (ids and enums only; tasks session reviews)
+- [x] 2.2 `contracts/connectors.calendar_changed.v1.schema.json` + the calendar event blob schema
+- [x] 2.3 `contracts/schedule.event_created|event_changed|event_cancelled.v1.schema.json`
+- [x] 2.4 `contracts/schedule.outbound_requested.v1.schema.json` + its blob; the outcome event for calendar changes
+- [x] 2.5 `capability_granted` calendar blob (calendar list)
+- [x] 2.6 Kernel ports: `OpenTasks::open_tasks(workspace, inbox_id, conversation_id, sender_address)` (no implementation; empty list), `TimeZones`, `Availability::free_slots(member, window, duration)`, the outbound-requests port for schedule
 - [ ] 2.7 `openapi/events.json` lists the new events (`cargo xtask events` runs in CI)
 
 ## 3. Decide pass (L1)

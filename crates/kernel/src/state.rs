@@ -18,11 +18,16 @@ use crate::{
     i18n::{LocalePreferencePort, NoLocalePreference},
     jobs::Registry,
     operations::Operations,
-    outbound::{DestinationsPort, NoDestinations, NoOutboundRequests, OutboundPort},
+    outbound::{
+        CalendarPort, DestinationsPort, NoCalendarRequests, NoDestinations, NoOutboundRequests,
+        OutboundPort,
+    },
     preferences::{AskFirst, MemberPreferencesPort},
     rate_limit::{RateLimits, api::ApiLimits},
+    schedule::{AvailabilityPort, NoAvailability, NoTimeZones, TimeZonesPort},
     search::SearchSources,
     signup::{InvitationsPort, NoInvitations},
+    tasks::{NoOpenTasks, OpenTasksPort},
     telemetry::{self, Metrics},
     tenancy::{
         ClientDirectoryPort, KeptMailPort, MembershipPort, NoClientDirectory, NoKeptMail,
@@ -64,6 +69,21 @@ pub struct AppState {
     /// campbooks-cloud#242). The server registers the `connectors` module's;
     /// until then no inbox goes anywhere.
     pub destinations: DestinationsPort,
+    /// Answers whether a change to an event on a provider calendar still
+    /// stands in the schedule module's records, before it is made
+    /// ([`outbound`](crate::outbound)). The server registers the `schedule`
+    /// module's; until then nothing stands, so no calendar is changed.
+    pub calendar_requests: CalendarPort,
+    /// Answers a member's time zone ([`schedule`](crate::schedule)). The
+    /// server registers the `schedule` module's; until then nobody has one
+    /// and readers use UTC.
+    pub time_zones: TimeZonesPort,
+    /// Answers when a member is free ([`schedule`](crate::schedule)). The
+    /// server registers the `schedule` module's; until then nobody is.
+    pub availability: AvailabilityPort,
+    /// Answers which tasks are open for an email ([`tasks`](crate::tasks)).
+    /// The server registers the owner of tasks'; until then none is.
+    pub open_tasks: OpenTasksPort,
     /// Answers which language a user chose, for the
     /// [`Locale`](crate::i18n::Locale) of their requests. The server
     /// registers the `workspaces` module's implementation; until then
@@ -157,6 +177,10 @@ impl AppState {
             kept_mail: Arc::new(NoKeptMail),
             outbound: Arc::new(NoOutboundRequests),
             destinations: Arc::new(NoDestinations),
+            calendar_requests: Arc::new(NoCalendarRequests),
+            time_zones: Arc::new(NoTimeZones),
+            availability: Arc::new(NoAvailability),
+            open_tasks: Arc::new(NoOpenTasks),
             grants: Arc::new(NoGrantIntake),
             consent: Arc::new(NoConsentDoor),
             invitations: Arc::new(NoInvitations),
@@ -217,6 +241,35 @@ impl AppState {
     #[must_use]
     pub fn with_destinations(mut self, destinations: DestinationsPort) -> Self {
         self.destinations = destinations;
+        self
+    }
+
+    /// The same state, re-checking calendar changes through
+    /// `calendar_requests`.
+    #[must_use]
+    pub fn with_calendar_requests(mut self, calendar_requests: CalendarPort) -> Self {
+        self.calendar_requests = calendar_requests;
+        self
+    }
+
+    /// The same state, reading members' time zones through `time_zones`.
+    #[must_use]
+    pub fn with_time_zones(mut self, time_zones: TimeZonesPort) -> Self {
+        self.time_zones = time_zones;
+        self
+    }
+
+    /// The same state, asking `availability` when a member is free.
+    #[must_use]
+    pub fn with_availability(mut self, availability: AvailabilityPort) -> Self {
+        self.availability = availability;
+        self
+    }
+
+    /// The same state, asking `open_tasks` which tasks are open for an email.
+    #[must_use]
+    pub fn with_open_tasks(mut self, open_tasks: OpenTasksPort) -> Self {
+        self.open_tasks = open_tasks;
         self
     }
 
