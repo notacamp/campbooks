@@ -24,16 +24,23 @@ runs:
     - shell: bash
       working-directory: clients
       run: pnpm install --frozen-lockfile
-    # The browser builds are keyed by the lockfile (which pins Playwright);
-    # their system libraries come from the apt cache.
+    # The browser builds are cached by Playwright version. Their system
+    # libraries go through the apt cache: on an exact hit they install from it
+    # and the browser installs without `--with-deps`, whose own `apt-get
+    # update` reaches the mirror (10-20 minutes on a slow day).
+    - if: inputs.playwright != ''
+      id: pw
+      shell: bash
+      run: echo "version=$(node -p "require('./clients/app/package.json').devDependencies.playwright")" >> "$GITHUB_OUTPUT"
     - if: inputs.playwright != ''
       uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
       with:
         path: ~/.cache/ms-playwright
-        key: playwright-${{ runner.os }}-${{ runner.arch }}-${{ inputs.playwright }}-${{ hashFiles('clients/pnpm-lock.yaml') }}
+        key: playwright-${{ runner.os }}-${{ runner.arch }}-${{ inputs.playwright }}-${{ steps.pw.outputs.version }}
     - if: inputs.playwright != ''
       uses: ./.github/actions/apt-packages
       with:
-        key: playwright-${{ inputs.playwright }}
+        key: playwright-${{ inputs.playwright }}-${{ steps.pw.outputs.version }}
         working-directory: clients
         run: pnpm --filter @campbooks/app exec playwright install --with-deps ${{ inputs.playwright }}
+        run-cached: pnpm --filter @campbooks/app exec playwright install ${{ inputs.playwright }}

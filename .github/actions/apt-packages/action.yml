@@ -16,7 +16,14 @@ inputs:
   run:
     description: >-
       Optional command that installs through apt itself, e.g. `playwright install --with-deps`.
-      It runs with apt already pointed at the cache.
+      It runs with apt already pointed at the cache, unless `run-cached` replaces it.
+    required: false
+    default: ""
+  run-cached:
+    description: >-
+      With `run`: on an exact cache hit, install every cached package without the
+      network and run this instead (e.g. `playwright install` without `--with-deps`,
+      whose own `apt-get update` would reach the mirror). Falls back to `run`.
     required: false
     default: ""
   working-directory:
@@ -79,7 +86,22 @@ runs:
       if: inputs.run != ''
       shell: bash
       working-directory: ${{ inputs.working-directory }}
-      run: ${{ inputs.run }}
+      env:
+        DIR: ${{ steps.setup.outputs.dir }}
+        EXACT: ${{ steps.restore.outputs.cache-hit }}
+        RUN: ${{ inputs.run }}
+        RUN_CACHED: ${{ inputs.run-cached }}
+      run: |
+        if [ "$EXACT" = true ] && [ -n "$RUN_CACHED" ]; then
+          names=$(find "$DIR/archives" -maxdepth 1 -name '*.deb' -printf '%f\n' | cut -d_ -f1 | sort -u)
+          if [ -n "$names" ] && sudo apt-get install -y --no-download $names; then
+            echo "installed $(wc -w <<<"$names") packages from the cache"
+            eval "$RUN_CACHED"
+            exit 0
+          fi
+          echo "the cache fell short; installing through the mirror"
+        fi
+        eval "$RUN"
 
     - id: tidy
       if: steps.restore.outputs.cache-hit != 'true'
