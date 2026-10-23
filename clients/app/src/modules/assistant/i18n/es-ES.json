@@ -297,7 +297,9 @@
       "find_people_one": "He buscado personas: {{count}} encontrada",
       "find_people_other": "He buscado personas: {{count}} encontradas",
       "what_needs_me": "He leído lo que te necesita",
-      "my_inboxes": "He leído tus bandejas de entrada y flujos"
+      "my_inboxes": "He leído tus bandejas de entrada y flujos",
+      "my_tasks": "He leído tus tareas",
+      "read_task": "He leído una tarea"
     },
     "working": {
       "find_conversations": "Buscando conversaciones…",
@@ -305,7 +307,9 @@
       "conversation_history": "Leyendo qué ha pasado con este correo…",
       "find_people": "Buscando personas…",
       "what_needs_me": "Leyendo lo que te necesita…",
-      "my_inboxes": "Leyendo tus bandejas de entrada…"
+      "my_inboxes": "Leyendo tus bandejas de entrada…",
+      "my_tasks": "Leyendo tus tareas…",
+      "read_task": "Leyendo la tarea…"
     }
   }
 }

@@ -29,6 +29,11 @@ pub const NAME: &str = "tasks";
 /// The module's messages (`i18n/<locale>.json`): the reasons of its errors.
 pub static MESSAGES: Catalogue = campbooks_kernel::catalogue!(NAME);
 
+/// This module's section of Scout's handbook (campbooks-cloud#305): what a
+/// task is, its plan and Later, hand-off, and that Scout only reads tasks. The
+/// server composes it into the assistant's handbook; at most 8 KiB.
+pub const HANDBOOK: &str = include_str!("../handbook.md");
+
 /// The `tasks` module, ready for the server to mount.
 pub fn module() -> Module {
     Module {

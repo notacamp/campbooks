@@ -29,6 +29,10 @@ const HISTORY_EVENTS: usize = 60;
 const CONVERSATION: &str = "conversations.conversation";
 /// Record type of an inbox (the conversations module's).
 const INBOX: &str = "conversations.inbox";
+/// Record type of a task (the tasks module's).
+const TASK: &str = "tasks.task";
+/// Most tasks `my_tasks` answers.
+const TASKS: usize = 30;
 
 /// The catalogue operations each tool may invoke: the test checks that each
 /// is in the catalogue, may be called by the assistant and changes nothing.
@@ -52,17 +56,21 @@ pub const OPERATIONS: &[(ChatTool, &[&str])] = &[
         ChatTool::MyInboxes,
         &["conversations.list_inboxes", "conversations.list_streams"],
     ),
+    (ChatTool::MyTasks, &["tasks.list"]),
+    (ChatTool::ReadTask, &["tasks.get"]),
 ];
 
 impl ChatTool {
     /// Every tool, in the order they are offered.
-    pub const ALL: [Self; 6] = [
+    pub const ALL: [Self; 8] = [
         Self::FindConversations,
         Self::ReadConversation,
         Self::ConversationHistory,
         Self::FindPeople,
         Self::WhatNeedsMe,
         Self::MyInboxes,
+        Self::MyTasks,
+        Self::ReadTask,
     ];
 
     /// The name the model calls it by.
@@ -74,6 +82,8 @@ impl ChatTool {
             Self::FindPeople => "find_people",
             Self::WhatNeedsMe => "what_needs_me",
             Self::MyInboxes => "my_inboxes",
+            Self::MyTasks => "my_tasks",
+            Self::ReadTask => "read_task",
         }
     }
 
@@ -158,6 +168,34 @@ pub fn definitions() -> Vec<ToolDefinition> {
                     "The member's inboxes (addresses, roles) and how many conversations each \
                      stream holds.",
                     object(json!({}), &[]),
+                ),
+                ChatTool::MyTasks => (
+                    "The member's open tasks, overdue first, then by due date, undated last. \
+                     Narrow them by due day (`YYYY-MM-DD`, in the member's days), only the \
+                     overdue or only the undated, or the ones the member handed to a teammate. \
+                     Up to 30.",
+                    object(
+                        json!({
+                            "due_from": {"type": "string", "minLength": 10, "maxLength": 10,
+                                         "description": "Due on or after this day, YYYY-MM-DD."},
+                            "due_to": {"type": "string", "minLength": 10, "maxLength": 10,
+                                       "description": "Due on or before this day, YYYY-MM-DD."},
+                            "overdue": {"type": "boolean"},
+                            "undated": {"type": "boolean"},
+                            "handed_off": {"type": "boolean",
+                                           "description": "True for the open tasks the member handed to someone else."},
+                        }),
+                        &[],
+                    ),
+                ),
+                ChatTool::ReadTask => (
+                    "Read one task of the member's: its title, dates, plan, where it came from \
+                     and what changed in it.",
+                    object(
+                        json!({"task_id": {"type": "string", "minLength": 1, "maxLength": 64,
+                                           "description": "The task's id, as `about` or another tool gave it."}}),
+                        &["task_id"],
+                    ),
                 ),
             };
             ToolDefinition::new(tool.name(), description, parameters)
@@ -298,7 +336,51 @@ impl Toolbox {
                 self.what_needs_me(waiting).await
             }
             ChatTool::MyInboxes => self.my_inboxes().await,
+            ChatTool::MyTasks => self.my_tasks(arguments).await,
+            ChatTool::ReadTask => {
+                let id = text("task_id").unwrap_or_default();
+                let detail = self
+                    .member
+                    .read("tasks.get", json!({ "task_id": id }))
+                    .await?;
+                Ok((
+                    project::task_detail(&detail),
+                    vec![RecordRef::new(TASK, id)],
+                    1,
+                ))
+            }
         }
+    }
+
+    /// The member's open tasks, narrowed by the model's arguments.
+    async fn my_tasks(
+        &self,
+        arguments: &Map<String, Value>,
+    ) -> Result<(Value, Vec<RecordRef>, u32), Unread> {
+        let mut input = json!({ "utc_offset": self.utc_offset });
+        for key in ["due_from", "due_to", "overdue", "undated"] {
+            if let Some(value) = arguments.get(key) {
+                input[key] = value.clone();
+            }
+        }
+        if arguments.get("handed_off").and_then(Value::as_bool) == Some(true) {
+            input["whose"] = "handed_off".into();
+        }
+        let list = self.member.read("tasks.list", input).await?;
+        let found: Vec<&Value> = list["tasks"]
+            .as_array()
+            .into_iter()
+            .flatten()
+            .take(TASKS)
+            .collect();
+        let records = found
+            .iter()
+            .filter_map(|task| task["id"].as_str())
+            .map(|id| RecordRef::new(TASK, id))
+            .collect();
+        let tasks: Vec<Value> = found.iter().map(|task| project::task(task)).collect();
+        let count = count(tasks.len());
+        Ok((json!({ "tasks": tasks }), records, count))
     }
 
     /// Conversations by words (search, then their own facts), or the newest
@@ -537,6 +619,19 @@ fn arguments(tool: ChatTool, raw: &str) -> Option<Map<String, Value>> {
             .as_str()
             .is_some_and(|s| (min..=max).contains(&s.chars().count()))
     };
+    // A day written YYYY-MM-DD.
+    let day = |value: &Value| {
+        value.as_str().is_some_and(|s| {
+            s.len() == 10
+                && s.char_indices().all(|(at, c)| {
+                    if at == 4 || at == 7 {
+                        c == '-'
+                    } else {
+                        c.is_ascii_digit()
+                    }
+                })
+        })
+    };
     let one_of =
         |value: &Value, options: &[&str]| value.as_str().is_some_and(|s| options.contains(&s));
     let fits = |key: &str, value: &Value| match (tool, key) {
@@ -553,6 +648,9 @@ fn arguments(tool: ChatTool, raw: &str) -> Option<Map<String, Value>> {
         }
         (ChatTool::FindPeople, "query") => string(value, 2, 100),
         (ChatTool::WhatNeedsMe, "waiting") => value.is_boolean(),
+        (ChatTool::MyTasks, "due_from" | "due_to") => day(value),
+        (ChatTool::MyTasks, "overdue" | "undated" | "handed_off") => value.is_boolean(),
+        (ChatTool::ReadTask, "task_id") => string(value, 1, 64),
         _ => false,
     };
     // A null optional argument is as if it were absent.
@@ -565,6 +663,9 @@ fn arguments(tool: ChatTool, raw: &str) -> Option<Map<String, Value>> {
         ChatTool::ReadConversation | ChatTool::ConversationHistory
     );
     if needs_id && !object.contains_key("conversation_id") {
+        return None;
+    }
+    if tool == ChatTool::ReadTask && !object.contains_key("task_id") {
         return None;
     }
     Some(object)
@@ -609,5 +710,30 @@ mod tests {
         }
         assert!(arguments(ChatTool::ReadConversation, "{}").is_none());
         assert!(arguments(ChatTool::MyInboxes, "{\"all\": true}").is_none());
+    }
+
+    #[test]
+    fn the_task_tools_take_days_and_an_id_only() {
+        let mine = ChatTool::MyTasks;
+        assert!(arguments(mine, "").is_some());
+        assert!(
+            arguments(
+                mine,
+                "{\"due_from\": \"2026-10-19\", \"due_to\": \"2026-10-25\", \"overdue\": true}"
+            )
+            .is_some()
+        );
+        for bad in [
+            "{\"due_to\": \"next friday\"}",
+            "{\"due_to\": \"2026-1-25\"}",
+            "{\"overdue\": \"yes\"}",
+            "{\"state\": \"done\"}",
+            "{\"task_id\": \"1\"}",
+        ] {
+            assert!(arguments(mine, bad).is_none(), "{bad}");
+        }
+        assert!(arguments(ChatTool::ReadTask, "{}").is_none());
+        assert!(arguments(ChatTool::ReadTask, "{\"task_id\": \"0192f0c4\"}").is_some());
+        assert!(arguments(ChatTool::ReadTask, "{\"task_id\": \"0192f0c4\", \"x\": 1}").is_none());
     }
 }

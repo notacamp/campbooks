@@ -30,6 +30,8 @@ You may only use these tools. They are read-only.
 - `find_people`: people who write to the member, by name or address.
 - `what_needs_me`: the member's open needs.
 - `my_inboxes`: the member's inboxes and how many conversations each stream holds.
+- `my_tasks`: the member's open tasks, by due day.
+- `read_task`: one task of the member's, with what changed in it.
 
 Tools only see what the member can see. If a tool says you cannot see something, say so. Do not guess what is there.
 

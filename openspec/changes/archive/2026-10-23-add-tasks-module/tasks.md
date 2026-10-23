@@ -29,21 +29,21 @@
 ## 4. Ports and Scout
 
 - [x] 4.1 `OpenTasks` kernel port (`ws, inbox, conversation, sender_address` → ≤10) implemented by tasks; test incl. the other-inbox case
-- [ ] 4.2 (waiting: `crates/modules/assistant/src/features/chat/` is not on `next` yet) If campbooks-cloud#305 phase 1 is on `next`: anchor registry `tasks.task` → `tasks.get`, tools `my_tasks` / `read_task` (≤8 KiB, RFC 3339, RecordRefs, titles never logged), `crates/modules/tasks/handbook.md` as `pub const HANDBOOK`; otherwise note it on #305
+- [x] 4.2 If campbooks-cloud#305 phase 1 is on `next`: anchor registry `tasks.task` → `tasks.get`, tools `my_tasks` / `read_task` (≤8 KiB, RFC 3339, RecordRefs, titles never logged), `crates/modules/tasks/handbook.md` as `pub const HANDBOOK`; otherwise note it on #305
 
 ## 5. Client
 
-- [ ] 5.1 Module `clients/app/src/modules/tasks` (routes, nav item with count, `g t`, `n t` global sequence, i18n en/pt-PT/es-ES/fr)
-- [ ] 5.2 Tasks place: groups, rows, quick add, detail pane, Later options, hand-off filter by name, keys, undo toasts, failure rollback; Storybook screen story with mock fetch
-- [ ] 5.3 Home: task items in Do and Pay via `tasks.list?ids=` with Done/Paid, Later, Not needed
-- [ ] 5.4 Reader: "Make it a task" (`n t`) inline form
-- [ ] 5.5 `pnpm test:fit` passes at 375 and 1280 in every locale
+- [x] 5.1 Module `clients/app/src/modules/tasks` (routes, nav item with count, `g t`, `n t` global sequence, i18n en/pt-PT/es-ES/fr)
+- [x] 5.2 Tasks place: groups, rows, quick add, detail pane, Later options, hand-off filter by name, keys, undo toasts, failure rollback; Storybook screen story with mock fetch
+- [x] 5.3 Home: task items in Do and Pay via `tasks.list?ids=` with Done/Paid, Later, Not needed
+- [x] 5.4 Reader: "Make it a task" (`n t`) inline form
+- [x] 5.5 `pnpm test:fit` passes at 375 and 1280 in every locale
 
 ## 6. Finish
 
-- [ ] 6.1 OpenAPI regenerated (`cargo xtask openapi`, events) — from CI's `generated-openapi` artifact
-- [ ] 6.2 Client types regenerated (`pnpm --dir clients api:generate`) — from CI's `generated-api-types` artifact
+- [x] 6.1 OpenAPI regenerated (`cargo xtask openapi`, events) — from CI's `generated-openapi` artifact
+- [x] 6.2 Client types regenerated (`pnpm --dir clients api:generate`) — from CI's `generated-api-types` artifact
 - [x] 6.3 Changelog entry `changelog/unreleased/added/43-tasks.md`
-- [ ] 6.4 Gates green in CI
+- [x] 6.4 Gates green in CI
 - [ ] 6.5 UI verified and recorded at 375 px and desktop (Storybook screen stories)
-- [ ] 6.6 `openspec archive add-tasks-module --yes` before merge
+- [x] 6.6 `openspec archive add-tasks-module --yes` before merge
