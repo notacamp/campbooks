@@ -7,7 +7,7 @@
 //! that embeds them (`crates/modules/connectors/src/imap/ispdb_files.rs`).
 //! The files are used unmodified; commit them with the index.
 
-use std::{fs, path::Path, process::Command};
+use std::{fmt::Write as _, fs, path::Path, process::Command};
 
 use anyhow::{Context as _, Result, bail};
 
@@ -100,9 +100,10 @@ fn index(commit: &str, names: &[String]) -> String {
          pub static FILES: &[(&str, &str)] = &[\n"
     );
     for name in names {
-        out.push_str(&format!(
-            "    (\"{name}\", include_str!(\"../../ispdb/{name}.xml\")),\n"
-        ));
+        let _ = writeln!(
+            out,
+            "    (\"{name}\", include_str!(\"../../ispdb/{name}.xml\")),"
+        );
     }
     out.push_str("];\n");
     out
