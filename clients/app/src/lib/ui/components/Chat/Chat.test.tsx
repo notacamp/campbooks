@@ -238,7 +238,8 @@ describe("ChatProposal", () => {
     const quote = within(card).getByText("<b>Accountant</b>");
     expect(quote.tagName).toBe("Q");
     expect(card.querySelector("b")).toBeNull();
-    expect(within(card).getByRole("status")).toBeEmptyDOMElement();
+    // Nothing to say yet: the status line is empty.
+    expect(within(card).queryByRole("status")).not.toBeInTheDocument();
     fireEvent.click(within(card).getByRole("button", { name: "Confirm" }));
     expect(confirm).toHaveBeenCalledOnce();
   });

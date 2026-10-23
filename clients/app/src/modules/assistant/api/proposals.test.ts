@@ -74,7 +74,7 @@ describe("the client's own actions", () => {
       { ...archive, path: `conversations/${C}%2F..%2Fx/archive` },
       { ...archive, path: `/api/v1/w/ws-2/conversations/${C}/archive` },
     ]) {
-      expect(runnable(odd), JSON.stringify(odd)).toBeUndefined();
+      expect(runnable(odd)).toBeUndefined();
     }
   });
 

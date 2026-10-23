@@ -2,7 +2,6 @@ import { ApiError, api, unwrap, type Schema } from "~/lib/api";
 
 export type Proposal = Schema<"ChatProposal">;
 export type ProposalRequest = Schema<"ProposalRequest">;
-export type ProposalAction = Schema<"ProposalAction">;
 export type Settlement = Schema<"Settlement">;
 
 const CONVERSATION = "conversations.conversation";
