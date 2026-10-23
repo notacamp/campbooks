@@ -5,6 +5,8 @@ import { Chip, ChipRow, TextField } from "~/lib/ui";
 
 import { dayLabel, dueChoices } from "../model";
 
+import { DateCommitField } from "./DateCommitField";
+
 export interface DueChipsProps {
   /** The group's name for assistive tech ("Due"). */
   label: string;
@@ -16,6 +18,11 @@ export interface DueChipsProps {
   now?: Date | undefined;
   /** Prefix for element ids, so two sets on a page stay apart. */
   idPrefix: string;
+  /**
+   * When a typed date counts: `change` at once (a form still to be sent), or
+   * `settled` once the field is left or Enter is pressed (a task already saved).
+   */
+  commit?: "change" | "settled";
 }
 
 /**
@@ -23,7 +30,14 @@ export interface DueChipsProps {
  * Today, Tomorrow, the next weekday and Pick a date. Never a date typed in
  * words: a chip is faster and cannot guess wrong.
  */
-export function DueChips({ label, value, onChange, now, idPrefix }: DueChipsProps) {
+export function DueChips({
+  label,
+  value,
+  onChange,
+  now,
+  idPrefix,
+  commit = "change",
+}: DueChipsProps) {
   const { t: typed, i18n } = useTranslation("tasks");
   const t = typed as unknown as (key: string) => string;
   const choices = dueChoices(now ?? new Date());
@@ -55,7 +69,15 @@ export function DueChips({ label, value, onChange, now, idPrefix }: DueChipsProp
           {picked ? dayLabel(value, i18n.language) : t("add.pick")}
         </Chip>
       </ChipRow>
-      {picking || picked ? (
+      {(picking || picked) && commit === "settled" ? (
+        <DateCommitField
+          id={`${idPrefix}-date`}
+          label={t("add.date")}
+          value={value ?? ""}
+          onCommit={onChange}
+        />
+      ) : null}
+      {(picking || picked) && commit === "change" ? (
         <TextField
           id={`${idPrefix}-date`}
           type="date"

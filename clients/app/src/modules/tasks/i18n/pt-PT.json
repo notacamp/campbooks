@@ -109,8 +109,7 @@
     "submit": "Adicionar tarefa",
     "cancel": "Cancelar",
     "added": "Adicionada às suas tarefas",
-    "open": "Abrir",
-    "close": "Fechar"
+    "open": "Abrir"
   },
   "laterDialog": {
     "title": "Adiar até…",

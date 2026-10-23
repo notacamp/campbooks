@@ -12535,7 +12535,13 @@ export interface operations {
     };
     "tasks.create": {
         parameters: {
-            query?: never;
+            query?: {
+                /**
+                 * @description The caller's offset from UTC, in minutes (-840 to 840; default 0):
+                 *     where their day starts, for what is overdue.
+                 */
+                utc_offset?: number;
+            };
             header?: never;
             path: {
                 /** @description The workspace. */
@@ -12598,7 +12604,13 @@ export interface operations {
     };
     "tasks.get": {
         parameters: {
-            query?: never;
+            query?: {
+                /**
+                 * @description The caller's offset from UTC, in minutes (-840 to 840; default 0):
+                 *     where their day starts, for what is overdue.
+                 */
+                utc_offset?: number;
+            };
             header?: never;
             path: {
                 /** @description The workspace. */
@@ -12650,7 +12662,13 @@ export interface operations {
     };
     "tasks.update": {
         parameters: {
-            query?: never;
+            query?: {
+                /**
+                 * @description The caller's offset from UTC, in minutes (-840 to 840; default 0):
+                 *     where their day starts, for what is overdue.
+                 */
+                utc_offset?: number;
+            };
             header?: never;
             path: {
                 /** @description The workspace. */
@@ -12724,7 +12742,13 @@ export interface operations {
     };
     "tasks.done": {
         parameters: {
-            query?: never;
+            query?: {
+                /**
+                 * @description The caller's offset from UTC, in minutes (-840 to 840; default 0):
+                 *     where their day starts, for what is overdue.
+                 */
+                utc_offset?: number;
+            };
             header?: never;
             path: {
                 /** @description The workspace. */
@@ -12789,7 +12813,13 @@ export interface operations {
     };
     "tasks.hand_off": {
         parameters: {
-            query?: never;
+            query?: {
+                /**
+                 * @description The caller's offset from UTC, in minutes (-840 to 840; default 0):
+                 *     where their day starts, for what is overdue.
+                 */
+                utc_offset?: number;
+            };
             header?: never;
             path: {
                 /** @description The workspace. */
@@ -12863,7 +12893,13 @@ export interface operations {
     };
     "tasks.not_needed": {
         parameters: {
-            query?: never;
+            query?: {
+                /**
+                 * @description The caller's offset from UTC, in minutes (-840 to 840; default 0):
+                 *     where their day starts, for what is overdue.
+                 */
+                utc_offset?: number;
+            };
             header?: never;
             path: {
                 /** @description The workspace. */
@@ -12928,7 +12964,13 @@ export interface operations {
     };
     "tasks.plan": {
         parameters: {
-            query?: never;
+            query?: {
+                /**
+                 * @description The caller's offset from UTC, in minutes (-840 to 840; default 0):
+                 *     where their day starts, for what is overdue.
+                 */
+                utc_offset?: number;
+            };
             header?: never;
             path: {
                 /** @description The workspace. */
@@ -13002,7 +13044,13 @@ export interface operations {
     };
     "tasks.reopen": {
         parameters: {
-            query?: never;
+            query?: {
+                /**
+                 * @description The caller's offset from UTC, in minutes (-840 to 840; default 0):
+                 *     where their day starts, for what is overdue.
+                 */
+                utc_offset?: number;
+            };
             header?: never;
             path: {
                 /** @description The workspace. */
@@ -13067,7 +13115,13 @@ export interface operations {
     };
     "tasks.take_back": {
         parameters: {
-            query?: never;
+            query?: {
+                /**
+                 * @description The caller's offset from UTC, in minutes (-840 to 840; default 0):
+                 *     where their day starts, for what is overdue.
+                 */
+                utc_offset?: number;
+            };
             header?: never;
             path: {
                 /** @description The workspace. */

@@ -95,18 +95,52 @@ export function useTaskCount(workspaceId: string): number | undefined {
   return useTasks(workspaceId).data?.length;
 }
 
-/** Replace task `id` in every cached list of the workspace with `next(task)`. */
+/** Whether a cached list is one of the page's own open lists (mine or handed off). */
+function isPageList(key: readonly unknown[]): boolean {
+  const params = key[1];
+  return (
+    typeof params === "object" &&
+    params !== null &&
+    "whose" in params &&
+    (params.whose === "mine" || params.whose === "handed_off")
+  );
+}
+
+/**
+ * Replace task `id` in every cached list of the workspace with `next(task)`.
+ * A task that is open afterwards and is missing from one of the page's open
+ * lists (a task taken back is mine again, one handed off is the handed-off
+ * list's) is put there at once; each list's own filter decides whose it is,
+ * and the refetch that follows has the last word.
+ */
 export function patchTask(
   queryClient: QueryClient,
   workspaceId: string,
   id: string,
   next: (task: TaskView) => TaskView,
 ): void {
-  queryClient.setQueriesData<TaskList>({ queryKey: keys.all(workspaceId) }, (list) =>
-    list === undefined
-      ? list
-      : { ...list, tasks: list.tasks.map((task) => (task.id === id ? next(task) : task)) },
-  );
+  const lists = queryClient.getQueryCache().findAll({ queryKey: keys.all(workspaceId) });
+  const known = lists
+    .flatMap((query) => (query.state.data as TaskList | undefined)?.tasks ?? [])
+    .find((task) => task.id === id);
+  const after = known === undefined ? undefined : next(known);
+  for (const query of lists) {
+    const list = query.state.data as TaskList | undefined;
+    if (list === undefined) {
+      continue;
+    }
+    if (list.tasks.some((task) => task.id === id)) {
+      queryClient.setQueryData<TaskList>(query.queryKey, {
+        ...list,
+        tasks: list.tasks.map((task) => (task.id === id ? next(task) : task)),
+      });
+    } else if (after?.state === "open" && isPageList(query.queryKey)) {
+      queryClient.setQueryData<TaskList>(query.queryKey, {
+        ...list,
+        tasks: [...list.tasks, after],
+      });
+    }
+  }
 }
 
 /** Refetch every task list of the workspace, and Home (which lists the same tasks as items). */
@@ -122,7 +156,10 @@ export function useRefreshTasks(workspaceId: string) {
 
 /** Task `id`'s path parameters. */
 const at = (workspaceId: string, id: string) => ({
-  params: { path: { workspace_id: workspaceId, task_id: id } },
+  params: {
+    path: { workspace_id: workspaceId, task_id: id },
+    query: { utc_offset: utcOffset() },
+  },
 });
 
 /** What a plan change sends. */
@@ -157,7 +194,7 @@ export function useTaskCalls(workspaceId: string) {
       keep(
         unwrap(
           await api.POST("/api/v1/w/{workspace_id}/tasks", {
-            params: { path: { workspace_id: workspaceId } },
+            params: { path: { workspace_id: workspaceId }, query: { utc_offset: utcOffset() } },
             body,
           }),
         ),

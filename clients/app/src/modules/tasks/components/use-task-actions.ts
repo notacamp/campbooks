@@ -48,6 +48,50 @@ const planned = (change: PlanChange) => (task: TaskView) =>
     later_until: change.plan === "later" ? change.later_until : null,
   }) satisfies TaskView;
 
+/** The calls waiting on one task, and the task as the last one answered it. */
+interface TaskLine {
+  queue: Promise<unknown>;
+  latest: TaskView;
+  waiting: number;
+}
+
+const lines = new Map<string, TaskLine>();
+
+/**
+ * Send `call` for `task` after every call already on its way for that task
+ * (from any action), with the revision the last of them answered, so two quick
+ * changes never send the same stale revision.
+ */
+function sendOnTask(
+  workspaceId: string,
+  task: TaskView,
+  call: (seen: TaskView) => Promise<TaskView>,
+): Promise<TaskView> {
+  const key = `${workspaceId}/${task.id}`;
+  let line = lines.get(key);
+  if (line === undefined) {
+    line = { queue: Promise.resolve(), latest: task, waiting: 0 };
+    lines.set(key, line);
+  }
+  const own = line;
+  own.waiting += 1;
+  const result = own.queue
+    .then(() => call(own.latest))
+    .then((view) => {
+      own.latest = view;
+      return view;
+    });
+  own.queue = result.catch(() => null);
+  const done = () => {
+    own.waiting -= 1;
+    if (own.waiting === 0 && lines.get(key) === own) {
+      lines.delete(key);
+    }
+  };
+  result.then(done, done);
+  return result;
+}
+
 export interface TaskActionOptions {
   /** After every call settles (the page refetches). */
   onChanged?: (() => void) | undefined;
@@ -79,20 +123,10 @@ export function useTaskActions(
   const clock = () => now ?? new Date();
 
   const act = (task: TaskView, change: Change) => {
-    let latest = task;
-    let queue: Promise<unknown> = Promise.resolve();
-    // Calls on one task go one after the other, each with the revision the
-    // one before answered.
-    const send = (call: (seen: TaskView) => Promise<TaskView>) => {
-      const result = queue
-        .then(() => call(latest))
-        .then((view) => {
-          latest = view;
-          return view;
-        });
-      queue = result.catch(() => null);
-      return result;
-    };
+    // Calls on one task go one after the other, whichever action made them,
+    // each with the revision the one before answered.
+    const send = (call: (seen: TaskView) => Promise<TaskView>) =>
+      sendOnTask(workspaceId, task, call);
     const show = (next: (current: TaskView) => TaskView) => {
       patchTask(queryClient, workspaceId, task.id, next);
     };
@@ -113,34 +147,47 @@ export function useTaskActions(
         undo.fail({ label: t("toast.failed", { title: task.title }), retry });
       }
     };
-    const run = (call: (seen: TaskView) => Promise<TaskView>, entry?: number) => {
-      void send(call).then(settled, (error: unknown) => {
-        failed(
-          error,
-          () => {
-            onRedo?.(task);
-            show(change.optimistic);
-            run(call);
-          },
-          entry,
-        );
-      });
+    // What each way shows at once and tells the page about.
+    const showing = {
+      forward: () => {
+        onRedo?.(task);
+        show(change.optimistic);
+      },
+      backward: () => {
+        onUndo?.(task);
+        show(() => task);
+      },
+    };
+    // Send the change forward or backward; a Retry sends the same way again
+    // (an undo that failed is retried as an undo, not as the change).
+    const run = (way: "forward" | "backward", entry?: number) => {
+      void send(way === "forward" ? change.forward : change.backward).then(
+        settled,
+        (error: unknown) => {
+          failed(
+            error,
+            () => {
+              showing[way]();
+              run(way);
+            },
+            entry,
+          );
+        },
+      );
     };
     show(change.optimistic);
     const entry = undo.push({
       label: change.label,
       undo: () => {
-        onUndo?.(task);
-        show(() => task);
-        run(change.backward);
+        showing.backward();
+        run("backward");
       },
       redo: () => {
-        onRedo?.(task);
-        show(change.optimistic);
-        run(change.forward);
+        showing.forward();
+        run("forward");
       },
     });
-    run(change.forward, entry);
+    run("forward", entry);
   };
 
   const dayText = (day: string) => whenLabel(`${day}T12:00:00`, i18n.language);
@@ -224,7 +271,11 @@ export function useTaskActions(
       });
     },
     /** Add a task; Undo marks it not needed. */
-    add: async (body: NewTask, label?: string): Promise<TaskView | undefined> => {
+    add: async (
+      body: NewTask,
+      label?: string,
+      open?: { label: string; run: (task: TaskView) => void },
+    ): Promise<TaskView | undefined> => {
       const create = async (): Promise<TaskView | undefined> => {
         try {
           const made = await calls.create(body);
@@ -233,17 +284,25 @@ export function useTaskActions(
           let latest = made;
           undo.push({
             label: label ?? t("add.added"),
+            ...(open === undefined
+              ? {}
+              : {
+                  open: {
+                    label: open.label,
+                    run: () => {
+                      open.run(latest);
+                    },
+                  },
+                }),
             undo: () => {
-              void calls
-                .notNeeded(latest)
+              void sendOnTask(workspaceId, latest, calls.notNeeded)
                 .then((view) => {
                   latest = view;
                 })
                 .finally(refresh);
             },
             redo: () => {
-              void calls
-                .reopen(latest)
+              void sendOnTask(workspaceId, latest, calls.reopen)
                 .then((view) => {
                   latest = view;
                 })

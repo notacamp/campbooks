@@ -109,8 +109,7 @@
     "submit": "Ajouter la tâche",
     "cancel": "Annuler",
     "added": "Ajoutée à vos tâches",
-    "open": "Ouvrir",
-    "close": "Fermer"
+    "open": "Ouvrir"
   },
   "laterDialog": {
     "title": "Reporter jusqu’à…",

@@ -1,3 +1,5 @@
+import type { ReactNode } from "react";
+
 import { Icon } from "../Icon/Icon";
 import { Tag } from "../Tag/Tag";
 
@@ -29,6 +31,8 @@ export interface TaskRowProps {
   onOpen: () => void;
   /** Mark it done (paid, for a bill); without it the row has no check (a task someone else holds). */
   onCheck?: (() => void) | undefined;
+  /** After the row, on its end: the one thing to do with a task someone holds ("Take it back"). */
+  action?: ReactNode | undefined;
 }
 
 /**
@@ -47,9 +51,15 @@ export function TaskRow({
   id,
   onOpen,
   onCheck,
+  action,
 }: TaskRowProps) {
   return (
-    <div id={id} className={styles["row"]} data-selected={selected || undefined}>
+    <div
+      id={id}
+      className={styles["row"]}
+      data-selected={selected || undefined}
+      data-action={action === undefined ? undefined : ""}
+    >
       {onCheck === undefined ? (
         <span className={styles["check"]} data-absent="" aria-hidden="true" />
       ) : (
@@ -78,6 +88,7 @@ export function TaskRow({
           </span>
         )}
       </button>
+      {action === undefined ? null : <span className={styles["action"]}>{action}</span>}
     </div>
   );
 }

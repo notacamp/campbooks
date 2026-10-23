@@ -1,6 +1,8 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { expect, fn, userEvent, within } from "storybook/test";
 
+import { Button } from "../Button/Button";
+
 import { TaskRow } from "./TaskRow";
 
 const meta = {
@@ -53,6 +55,20 @@ export const OwnWithPlan: Story = {
 /** A task someone else holds has no check: only its assignee can close it. */
 export const WithSomeoneElse: Story = {
   args: { meta: "You wrote this", chips: [{ text: "With João" }] },
+  render: (args) => <TaskRow {...args} onCheck={undefined} />,
+};
+
+/** A task you handed over: who has it, and the way back, on the row. */
+export const HandedOff: Story = {
+  args: {
+    meta: "You wrote this",
+    chips: [{ text: "With João" }],
+    action: (
+      <Button variant="link" onClick={fn()}>
+        Take it back
+      </Button>
+    ),
+  },
   render: (args) => <TaskRow {...args} onCheck={undefined} />,
 };
 

@@ -7,6 +7,16 @@
   border-radius: var(--row-radius);
 }
 
+.row[data-action] {
+  grid-template-columns: auto minmax(0, 1fr) auto;
+}
+
+.action {
+  display: inline-flex;
+  align-items: center;
+  align-self: center;
+}
+
 .row:hover {
   background: var(--surface-hover);
 }

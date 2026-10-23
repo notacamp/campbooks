@@ -18,9 +18,10 @@ import {
 } from "~/lib/ui";
 
 import type { TaskView } from "../api/queries";
-import { dayLabel, isLater, laterChoices, laterOnDay, whenLabel } from "../model";
+import { dayLabel, isLater, isoDay, laterChoices, laterOnDay, whenLabel } from "../model";
 import type { TaskSource } from "../source";
 
+import { DateCommitField } from "./DateCommitField";
 import { DueChips } from "./DueChips";
 import { HandOff } from "./HandOff";
 import type { useTaskActions } from "./use-task-actions";
@@ -149,6 +150,7 @@ export function TaskDetail({
                 value={task.due_on ?? undefined}
                 now={now}
                 idPrefix="detail-due"
+                commit="settled"
                 onChange={(day) => {
                   actions.setDue(task, day ?? null);
                   setChangingDue(false);
@@ -204,16 +206,13 @@ export function TaskDetail({
               </Button>
             </div>
             {pickingDay ? (
-              <TextField
-                type="date"
+              <DateCommitField
                 label={t("add.date")}
-                hideLabel
                 value={task.plan_on ?? ""}
-                onChange={(event) => {
-                  if (event.target.value !== "") {
-                    actions.planDay(task, event.target.value);
-                    setPickingDay(false);
-                  }
+                min={isoDay(clock)}
+                onCommit={(day) => {
+                  actions.planDay(task, day);
+                  setPickingDay(false);
                 }}
               />
             ) : null}
@@ -241,17 +240,14 @@ export function TaskDetail({
                   </Chip>
                 </ChipRow>
                 {pickingLater ? (
-                  <TextField
-                    type="date"
+                  <DateCommitField
                     label={t("add.date")}
-                    hideLabel
                     value=""
-                    onChange={(event) => {
-                      if (event.target.value !== "") {
-                        actions.later(task, laterOnDay(event.target.value));
-                        setPickingLater(false);
-                        onLaterOpen(false);
-                      }
+                    min={isoDay(clock)}
+                    onCommit={(day) => {
+                      actions.later(task, laterOnDay(day));
+                      setPickingLater(false);
+                      onLaterOpen(false);
                     }}
                   />
                 ) : null}
@@ -303,7 +299,7 @@ export function TaskDetail({
           <div className="flex flex-col gap-2">
             <div className="flex flex-wrap gap-2">
               <Button
-                variant="primary"
+                variant="secondary"
                 shortcut="item.done"
                 onClick={() => {
                   actions.done(task);
@@ -312,6 +308,7 @@ export function TaskDetail({
                 {t(pay ? "detail.paid" : "detail.done")}
               </Button>
               <Button
+                variant="secondary"
                 shortcut="conversations.resolve_need"
                 onClick={() => {
                   actions.notNeeded(task);

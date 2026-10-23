@@ -97,6 +97,9 @@ export function TasksPage({ workspaceId, taskId, addRequest, useSources, now }: 
   const order = listOrder(groups, laterOpen);
   const open = taskId === undefined ? undefined : all.find((task) => task.id === taskId);
   const selected = order.find((task) => task.id === cursor) ?? open ?? order[0];
+  // E, X and S act on the task that is open (its buttons carry the key hints);
+  // with none open, on the one the cursor is on.
+  const subject = open ?? selected;
 
   // Sources of the tasks that came from a conversation.
   const sourceIds = [
@@ -205,32 +208,32 @@ export function TasksPage({ workspaceId, taskId, addRequest, useSources, now }: 
   useShortcut(
     "item.done",
     () => {
-      if (holdable(selected)) {
-        done(selected);
+      if (holdable(subject)) {
+        done(subject);
       }
     },
-    { enabled: holdable(selected) },
+    { enabled: holdable(subject) },
   );
   useShortcut(
     "conversations.resolve_need",
     () => {
-      if (holdable(selected)) {
-        notNeeded(selected);
+      if (holdable(subject)) {
+        notNeeded(subject);
       }
     },
-    { enabled: holdable(selected) },
+    { enabled: holdable(subject) },
   );
   useShortcut(
     "item.snooze",
     () => {
-      if (holdable(selected)) {
-        if (taskId !== selected.id) {
-          openTask(selected);
+      if (holdable(subject)) {
+        if (taskId !== subject.id) {
+          openTask(subject);
         }
         setOfferLater(true);
       }
     },
-    { enabled: holdable(selected) },
+    { enabled: holdable(subject) },
   );
   useShortcut("overlay.close", closeDetail, { enabled: taskId !== undefined });
 
@@ -267,6 +270,20 @@ export function TasksPage({ workspaceId, taskId, addRequest, useSources, now }: 
               onCheck: () => {
                 done(task);
               },
+            }
+          : {})}
+        {...(me !== undefined && task.handed_by === me && !isMine(task)
+          ? {
+              action: (
+                <Button
+                  variant="link"
+                  onClick={() => {
+                    actions.takeBack(task, me);
+                  }}
+                >
+                  {t("detail.takeBack")}
+                </Button>
+              ),
             }
           : {})}
         onOpen={() => {

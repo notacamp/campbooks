@@ -3,9 +3,9 @@ import { useEffect, useRef, useState, type SyntheticEvent } from "react";
 import { useTranslation } from "react-i18next";
 
 import { useShortcut } from "~/lib/shortcuts";
-import { Button, Segmented, Text, TextField } from "~/lib/ui";
+import { Button, Segmented, TextField } from "~/lib/ui";
 
-import type { NewTask, TaskVerb, TaskView } from "../../api/queries";
+import type { NewTask, TaskVerb } from "../../api/queries";
 import { CONVERSATION } from "../../source";
 import { DueChips } from "../DueChips";
 import { useTaskActions } from "../use-task-actions";
@@ -42,7 +42,6 @@ export function MakeTaskForm({
   const [title, setTitle] = useState(subject);
   const [due, setDue] = useState<string | undefined>();
   const [verb, setVerb] = useState<TaskVerb>("do");
-  const [added, setAdded] = useState<TaskView | undefined>();
   const [adding, setAdding] = useState(false);
   const field = useRef<HTMLInputElement>(null);
   useEffect(() => {
@@ -64,30 +63,23 @@ export function MakeTaskForm({
       ...(senderAddress === undefined ? {} : { source_sender: senderAddress }),
     };
     setAdding(true);
-    void actions.add(body, t("make.added")).then((made) => {
-      setAdding(false);
-      setAdded(made);
-    });
+    // The form closes once the task is made; the toast says so, with Undo
+    // and Open. A failure keeps the form, with the toast's Retry.
+    void actions
+      .add(body, t("make.added"), {
+        label: t("make.open"),
+        run: (made) => {
+          void navigate({ to: `/w/${workspaceId}/tasks/${made.id}` });
+        },
+      })
+      .then((made) => {
+        setAdding(false);
+        if (made !== undefined) {
+          onClose();
+        }
+      });
   };
 
-  if (added !== undefined) {
-    return (
-      <div className="flex flex-wrap items-center gap-2" role="status">
-        <Text>{t("make.added")}</Text>
-        <Button
-          variant="link"
-          onClick={() => {
-            void navigate({ to: `/w/${workspaceId}/tasks/${added.id}` });
-          }}
-        >
-          {t("make.open")}
-        </Button>
-        <Button variant="link" onClick={onClose}>
-          {t("make.close")}
-        </Button>
-      </div>
-    );
-  }
   return (
     <form className="flex flex-col gap-3" onSubmit={submit} aria-label={t("make.button")}>
       <TextField
@@ -112,13 +104,13 @@ export function MakeTaskForm({
         />
         <Button
           type="submit"
-          variant="primary"
+          variant="secondary"
           keys="enter"
           disabled={title.trim() === "" || adding}
         >
           {t("make.submit")}
         </Button>
-        <Button variant="ghost" shortcut="overlay.close" onClick={onClose}>
+        <Button variant="secondary" shortcut="overlay.close" onClick={onClose}>
           {t("make.cancel")}
         </Button>
       </div>

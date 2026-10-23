@@ -109,8 +109,7 @@
     "submit": "Add task",
     "cancel": "Cancel",
     "added": "Added to your tasks",
-    "open": "Open",
-    "close": "Close"
+    "open": "Open"
   },
   "laterDialog": {
     "title": "Put it off until…",

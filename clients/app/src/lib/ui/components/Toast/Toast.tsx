@@ -67,6 +67,8 @@ export interface UndoableAction {
   redo?: (() => void) | undefined;
   /** How long its toast stays up, when the action has a window of its own (a send). */
   durationMs?: number | undefined;
+  /** A second way on from the toast, beside Undo ("Open" the task just made). */
+  open?: { label: string; run: () => void } | undefined;
 }
 
 export interface PendingAction {
@@ -128,13 +130,15 @@ interface ToastState {
   kind: "done" | "undoable" | "pending" | "failed";
   /** Its own duration, if not the provider's. */
   ms?: number | undefined;
+  /** Undoable: a second action beside Undo. */
+  open?: UndoableAction["open"];
   /** Pending: take it back. */
   cancel?: (() => void) | undefined;
   /** Failed: try again. */
   retry?: (() => void) | undefined;
 }
 
-type ShowOptions = Pick<ToastState, "ms" | "cancel" | "retry">;
+type ShowOptions = Pick<ToastState, "ms" | "open" | "cancel" | "retry">;
 
 export interface UndoProviderProps {
   children: ReactNode;
@@ -191,7 +195,7 @@ export function UndoProvider({ children, toastMs = 6000 }: UndoProviderProps) {
       const entry: UndoEntry = { ...action, id: nextId.current, undone: false };
       nextId.current += 1;
       commit([entry, ...historyRef.current]);
-      show(action.label, "undoable", { ms: action.durationMs });
+      show(action.label, "undoable", { ms: action.durationMs, open: action.open });
       return entry.id;
     },
     [commit, show],
@@ -307,9 +311,22 @@ export function UndoProvider({ children, toastMs = 6000 }: UndoProviderProps) {
             action={
               toast.kind === "undoable" ||
               (toast.kind === "pending" && toast.cancel !== undefined) ? (
-                <Button variant="primary" shortcut="undo" onClick={api.undo}>
-                  {t("undo")}
-                </Button>
+                <>
+                  <Button variant="primary" shortcut="undo" onClick={api.undo}>
+                    {t("undo")}
+                  </Button>
+                  {toast.kind === "undoable" && toast.open !== undefined ? (
+                    <Button
+                      variant="primary"
+                      onClick={() => {
+                        hide();
+                        toast.open?.run();
+                      }}
+                    >
+                      {toast.open.label}
+                    </Button>
+                  ) : null}
+                </>
               ) : toast.kind === "failed" && toast.retry !== undefined ? (
                 <Button
                   variant="primary"

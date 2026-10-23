@@ -204,7 +204,8 @@ export const HandedOff: Story = {
   args: { path: `${PATH}/${VENUE.id}`, api: tasks() },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
-    await expect(await canvas.findByRole("button", { name: "Take it back" })).toBeVisible();
+    // On the row and in the detail.
+    await expect((await canvas.findAllByRole("button", { name: "Take it back" })).length).toBe(2);
   },
 };
 
@@ -272,3 +273,15 @@ export const MakeItATask: Story = {
     await expect(await canvas.findByRole("textbox", { name: "Title" })).toBeVisible();
   },
 };
+
+// Twins without a `play`, for the screen recordings: a story's play runs on
+// load and would act before the recording starts.
+
+/** The list, idle. */
+export const ListIdle: Story = { args: { path: PATH, api: tasks() } };
+
+/** Home with a task in Do and one in Pay, idle. */
+export const HomeIdle: Story = { args: OnHome.args };
+
+/** The reader on an email, idle. */
+export const ReaderIdle: Story = { args: MakeItATask.args };

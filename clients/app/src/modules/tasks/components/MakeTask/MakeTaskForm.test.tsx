@@ -40,7 +40,8 @@ describe("Make it a task", () => {
     const calls = mockApi({
       [`POST ${W}/tasks`]: { status: 201, body: { ...LEASE, title: "Walkthrough on Thursday" } },
     });
-    renderForm();
+    const onClose = vi.fn();
+    renderForm(onClose);
     const title = await screen.findByRole("textbox", { name: "Title" });
     expect(title).toHaveValue("Walkthrough on Thursday");
     fireEvent.click(screen.getByRole("button", { name: "Tomorrow" }));
@@ -53,8 +54,13 @@ describe("Make it a task", () => {
         source_sender: "marta@casa-lume.example",
       });
     });
+    // The form closes; the toast says so, with Undo and Open.
+    await waitFor(() => {
+      expect(onClose).toHaveBeenCalledTimes(1);
+    });
     expect((await screen.findAllByText("Added to your tasks")).length).toBeGreaterThan(0);
     expect(screen.getByRole("button", { name: "Open" })).toBeVisible();
+    expect(screen.getByRole("button", { name: /^Undo/ })).toBeVisible();
   });
 
   it("closes without making anything on Cancel", async () => {

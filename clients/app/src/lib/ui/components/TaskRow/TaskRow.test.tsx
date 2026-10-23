@@ -48,4 +48,27 @@ describe("TaskRow", () => {
     );
     expect(screen.getByText("Overdue · 2 days")).toBeInTheDocument();
   });
+
+  it("puts one action at the end of the row, a button of its own", () => {
+    const onOpen = vi.fn();
+    const onAction = vi.fn();
+    renderUi(
+      <TaskRow
+        title="Book the venue"
+        kind="Do"
+        meta="You wrote this"
+        chips={[{ text: "With João" }]}
+        action={
+          <button type="button" onClick={onAction}>
+            Take it back
+          </button>
+        }
+        onOpen={onOpen}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Take it back" }));
+    expect(onAction).toHaveBeenCalledTimes(1);
+    expect(onOpen).not.toHaveBeenCalled();
+  });
 });

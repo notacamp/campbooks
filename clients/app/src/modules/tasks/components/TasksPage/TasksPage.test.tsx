@@ -103,7 +103,11 @@ function api(start = OPEN_TASKS, handedOff = [VENUE]) {
       tasks = [BILL, ...tasks];
       return { body: { ...BILL, revision: 3 } };
     },
-    [`POST ${W}/tasks/${LEASE.id}/plan`]: { body: { ...LEASE, plan: "later", revision: 2 } },
+    [`POST ${W}/tasks/${LEASE.id}/plan`]: { body: { ...LEASE, plan: "date", revision: 2 } },
+    [`PATCH ${W}/tasks/${LEASE.id}`]: (_request, body) => ({
+      body: { ...LEASE, title: (body as { title: string }).title, revision: 2 },
+    }),
+    [`POST ${W}/tasks/${LEASE.id}/done`]: { body: { ...LEASE, state: "done", revision: 3 } },
     [`POST ${W}/tasks/${VENUE.id}/take_back`]: {
       body: { ...VENUE, assignee: ANA.user_id, handed_by: null, revision: 2 },
     },
@@ -198,11 +202,14 @@ describe("Tasks", () => {
     });
   });
 
-  it("takes back a task handed to a teammate", async () => {
+  it("takes back a task handed to a teammate from its row, and it stays as mine at once", async () => {
     const calls = api();
     renderTasks();
-    fireEvent.click(await rowOf(VENUE.title));
-    fireEvent.click(await screen.findByRole("button", { name: "Take it back" }));
+    await screen.findByText(VENUE.title);
+    fireEvent.click(screen.getByRole("button", { name: "Take it back" }));
+    // Before the server answers it is already in my list, with a check.
+    expect(screen.getByRole("button", { name: `Mark done: ${VENUE.title}` })).toBeVisible();
+    expect(screen.queryByText("With Rui Matos")).toBeNull();
     await waitFor(() => {
       expect(
         calls.calls.find((c) => c.route.endsWith(`/tasks/${VENUE.id}/take_back`))?.body,
@@ -210,6 +217,92 @@ describe("Tasks", () => {
         revision: 1,
       });
     });
+  });
+
+  it("sends the revision the last answer gave when two changes come quickly", async () => {
+    const calls = api();
+    renderTasks();
+    fireEvent.click(await rowOf(LEASE.title));
+    const title = await screen.findByRole("textbox", { name: "Task title" });
+    fireEvent.change(title, { target: { value: "Send the lease today" } });
+    fireEvent.blur(title);
+    fireEvent.click(screen.getByRole("button", { name: /^Done/ }));
+    await waitFor(() => {
+      expect(calls.calls.find((c) => c.route.endsWith(`/tasks/${LEASE.id}/done`))?.body).toEqual({
+        revision: 2,
+      });
+    });
+  });
+
+  it("retries an undo that failed as an undo, not as the change", async () => {
+    let reopened = 0;
+    const handlers = mockApi({
+      [`GET ${W}/members`]: { body: { members: TEAM } },
+      [`GET ${W}/tasks`]: (request) =>
+        new URL(request.url).searchParams.get("whose") === "handed_off"
+          ? { body: { tasks: [] } }
+          : { body: { tasks: [BILL] } },
+      [`POST ${W}/tasks/${BILL.id}/done`]: { body: { ...BILL, state: "done", revision: 2 } },
+      [`POST ${W}/tasks/${BILL.id}/reopen`]: () => {
+        reopened += 1;
+        return reopened === 1
+          ? { status: 500, body: { code: "internal" } }
+          : { body: { ...BILL, revision: 3 } };
+      },
+    });
+    renderTasks();
+    await screen.findByText(BILL.title);
+    fireEvent.keyDown(document, { key: "e" });
+    await waitFor(() => {
+      expect(screen.queryByText(BILL.title)).toBeNull();
+    });
+    fireEvent.keyDown(document, { key: "z" });
+    fireEvent.click(await screen.findByRole("button", { name: "Retry" }));
+    await waitFor(() => {
+      expect(handlers.calls.filter((c) => c.route.endsWith("/reopen"))).toHaveLength(2);
+    });
+    // The retry did not close it again.
+    expect(handlers.calls.filter((c) => c.route.endsWith("/done"))).toHaveLength(1);
+    expect(await screen.findByText(BILL.title)).toBeVisible();
+  });
+
+  it("settles a typed date when the field is left, never on the way, and not in the past", async () => {
+    const calls = api();
+    renderTasks();
+    fireEvent.click(await rowOf(LEASE.title));
+    fireEvent.click(await screen.findByRole("button", { name: "Pick a day" }));
+    const date = await screen.findByLabelText("Date");
+    // Typing the year passes through 0002-…: nothing is sent.
+    fireEvent.change(date, { target: { value: "0002-10-20" } });
+    expect(calls.calls.some((c) => c.route.endsWith("/plan"))).toBe(false);
+    // A day before today is dropped on leaving.
+    fireEvent.change(date, { target: { value: "2026-10-01" } });
+    fireEvent.blur(date);
+    expect(calls.calls.some((c) => c.route.endsWith("/plan"))).toBe(false);
+    fireEvent.change(screen.getByLabelText("Date"), { target: { value: "2026-10-20" } });
+    fireEvent.keyDown(screen.getByLabelText("Date"), { key: "Enter" });
+    await waitFor(() => {
+      expect(calls.calls.find((c) => c.route.endsWith(`/tasks/${LEASE.id}/plan`))?.body).toEqual({
+        revision: 1,
+        plan: "date",
+        plan_on: "2026-10-20",
+      });
+    });
+  });
+
+  it("acts on the open task with E, not on the row the cursor is on", async () => {
+    const calls = api();
+    renderTasks();
+    fireEvent.click(await rowOf(LEASE.title));
+    await screen.findByText("Where it came from");
+    fireEvent.keyDown(document, { key: "j" });
+    fireEvent.keyDown(document, { key: "e" });
+    await waitFor(() => {
+      expect(calls.calls.some((c) => c.route.endsWith("/done"))).toBe(true);
+    });
+    expect(calls.calls.filter((c) => c.route.endsWith("/done")).map((c) => c.route)).toEqual([
+      `POST ${W}/tasks/${LEASE.id}/done`,
+    ]);
   });
 
   it("says so when nothing is left, and offers to add a task", async () => {

@@ -109,8 +109,7 @@
     "submit": "Añadir tarea",
     "cancel": "Cancelar",
     "added": "Añadida a tus tareas",
-    "open": "Abrir",
-    "close": "Cerrar"
+    "open": "Abrir"
   },
   "laterDialog": {
     "title": "Aplazar hasta…",
