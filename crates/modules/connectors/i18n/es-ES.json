@@ -13,6 +13,25 @@
     "needs_reauth": "Esta conexión necesita que vuelvas a conectar la cuenta antes de poder sincronizar.",
     "unknown_data_centre": "Campbooks no reconoce el centro de datos de Zoho de esta cuenta. Consulta a tu administrador.",
     "no_mailbox": "Esta cuenta no tiene ningún buzón que Campbooks pueda leer.",
-    "disconnect_owner_only": "Solo el miembro que conectó esta cuenta puede desconectarla."
+    "disconnect_owner_only": "Solo el miembro que conectó esta cuenta puede desconectarla.",
+    "step_up_required": "Por seguridad, vuelve a iniciar sesión antes de conectar un buzón con su contraseña.",
+    "imap_connects_with_a_password": "Un buzón IMAP se conecta con su contraseña, no desde una página de inicio de sesión.",
+    "imap_address_invalid": "Introduce una dirección de correo electrónico válida.",
+    "imap_username_invalid": "Introduce un nombre de usuario válido para este buzón.",
+    "imap_password_invalid": "Introduce la contraseña del buzón (como máximo 1024 caracteres, en una sola línea).",
+    "imap_servers_required": "Campbooks no ha encontrado los servidores de este buzón. Introduce sus servidores IMAP y SMTP.",
+    "use_native_provider": "Este buzón está en {{provider}}: conéctalo con {{provider}} en lugar de con una contraseña.",
+    "too_many_attempts": "Demasiados inicios de sesión fallidos en este buzón. Espera una hora y vuelve a intentarlo.",
+    "imap_login_refused_one": "El servidor de correo ha rechazado el inicio de sesión. Este proveedor exige una contraseña de aplicación: crea una en los ajustes de seguridad de tu cuenta y úsala aquí en lugar de tu contraseña habitual.",
+    "imap_login_refused_other": "El servidor de correo ha rechazado el inicio de sesión. Comprueba el nombre de usuario y la contraseña. Si tu proveedor ofrece contraseñas de aplicación, usa una.",
+    "smtp_login_refused_one": "El servidor de envío ha rechazado el inicio de sesión. Este proveedor exige una contraseña de aplicación: crea una en los ajustes de seguridad de tu cuenta y úsala aquí.",
+    "smtp_login_refused_other": "El servidor de envío (SMTP) ha rechazado el inicio de sesión. Comprueba el nombre de usuario y la contraseña, y que el servidor te permita enviar.",
+    "imap_unreachable": "No se ha podido contactar con el servidor de correo (IMAP). Comprueba su nombre y su puerto, y vuelve a intentarlo.",
+    "smtp_unreachable": "No se ha podido contactar con el servidor de envío (SMTP). Comprueba su nombre y su puerto, y vuelve a intentarlo.",
+    "imap_tls_failed": "El certificado del servidor de correo no es válido para su nombre, así que Campbooks no se ha conectado. Comprueba el nombre del servidor.",
+    "smtp_tls_failed": "El certificado del servidor de envío no es válido para su nombre, así que Campbooks no se ha conectado. Comprueba el nombre del servidor.",
+    "imap_not_an_imap_server": "El servidor de esta dirección y puerto no es un servidor de correo IMAP. Comprueba el servidor y el puerto.",
+    "host_refused": "Campbooks no puede conectarse a este servidor: está en una red privada o el puerto no es de correo (993, 143, 465 o 587).",
+    "starttls_missing": "El servidor no ofrece una conexión cifrada, así que Campbooks no ha enviado tu contraseña. Usa el puerto cifrado del servidor (993 para IMAP, 465 para SMTP)."
   }
 }

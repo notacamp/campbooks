@@ -13,6 +13,25 @@
     "needs_reauth": "Esta ligação precisa que volte a ligar a conta antes de poder sincronizar.",
     "unknown_data_centre": "O Campbooks não reconhece o centro de dados Zoho desta conta. Fale com o administrador.",
     "no_mailbox": "Esta conta não tem nenhuma caixa de correio que o Campbooks consiga ler.",
-    "disconnect_owner_only": "Só o membro que ligou esta conta a pode desligar."
+    "disconnect_owner_only": "Só o membro que ligou esta conta a pode desligar.",
+    "step_up_required": "Por segurança, inicie sessão de novo antes de ligar uma caixa de correio com a palavra-passe.",
+    "imap_connects_with_a_password": "Uma caixa de correio IMAP liga-se com a palavra-passe, não através de uma página de início de sessão.",
+    "imap_address_invalid": "Introduza um endereço de email válido.",
+    "imap_username_invalid": "Introduza um nome de utilizador válido para esta caixa de correio.",
+    "imap_password_invalid": "Introduza a palavra-passe da caixa de correio (no máximo 1024 caracteres, numa só linha).",
+    "imap_servers_required": "O Campbooks não encontrou os servidores desta caixa de correio. Introduza os servidores IMAP e SMTP.",
+    "use_native_provider": "Esta caixa de correio está no {{provider}}: ligue-a com o {{provider}} em vez de uma palavra-passe.",
+    "too_many_attempts": "Demasiadas tentativas falhadas de iniciar sessão nesta caixa de correio. Aguarde uma hora e tente de novo.",
+    "imap_login_refused_one": "O servidor de correio recusou o início de sessão. Este fornecedor exige uma palavra-passe de aplicação: crie uma nas definições de segurança da sua conta e use-a aqui em vez da palavra-passe habitual.",
+    "imap_login_refused_other": "O servidor de correio recusou o início de sessão. Verifique o nome de utilizador e a palavra-passe. Se o seu fornecedor tiver palavras-passe de aplicação, use uma.",
+    "smtp_login_refused_one": "O servidor de envio recusou o início de sessão. Este fornecedor exige uma palavra-passe de aplicação: crie uma nas definições de segurança da sua conta e use-a aqui.",
+    "smtp_login_refused_other": "O servidor de envio (SMTP) recusou o início de sessão. Verifique o nome de utilizador e a palavra-passe, e se o servidor lhe permite enviar.",
+    "imap_unreachable": "Não foi possível contactar o servidor de correio (IMAP). Verifique o nome e a porta e tente de novo.",
+    "smtp_unreachable": "Não foi possível contactar o servidor de envio (SMTP). Verifique o nome e a porta e tente de novo.",
+    "imap_tls_failed": "O certificado do servidor de correio não é válido para o seu nome, por isso o Campbooks não se ligou. Verifique o nome do servidor.",
+    "smtp_tls_failed": "O certificado do servidor de envio não é válido para o seu nome, por isso o Campbooks não se ligou. Verifique o nome do servidor.",
+    "imap_not_an_imap_server": "O servidor neste endereço e porta não é um servidor de correio IMAP. Verifique o servidor e a porta.",
+    "host_refused": "O Campbooks não se pode ligar a este servidor: está numa rede privada ou a porta não é de correio (993, 143, 465 ou 587).",
+    "starttls_missing": "O servidor não oferece uma ligação cifrada, por isso o Campbooks não enviou a sua palavra-passe. Use a porta cifrada do servidor (993 para IMAP, 465 para SMTP)."
   }
 }

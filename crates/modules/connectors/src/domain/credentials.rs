@@ -3,6 +3,7 @@
 
 use campbooks_kernel::{Result, crypto::Cipher, db::BeginFor as _, tenancy::WorkspaceId};
 use chrono::{DateTime, TimeDelta, Utc};
+use secrecy::{ExposeSecret as _, SecretString};
 use sqlx::{PgConnection, PgPool};
 
 use super::model::{ConnectionId, Provider};
@@ -84,18 +85,29 @@ impl From<sqlx::Error> for TokenError {
     }
 }
 
-/// The refresh token of connection `id`, opened.
+/// The sealed refresh token of connection `id`: `None` without a row, or
+/// for an IMAP mailbox (which keeps a password instead).
+async fn sealed_refresh_token(
+    conn: &mut PgConnection,
+    id: ConnectionId,
+) -> Result<Option<Vec<u8>>, sqlx::Error> {
+    let sealed: Option<Option<Vec<u8>>> = sqlx::query_scalar(
+        "SELECT refresh_token FROM connectors.credentials WHERE connection_id = $1",
+    )
+    .bind(id)
+    .fetch_optional(conn)
+    .await?;
+    Ok(sealed.flatten())
+}
+
+/// The refresh token of connection `id`, opened; `None` when it has none
+/// (an IMAP mailbox).
 pub async fn refresh_token(
     conn: &mut PgConnection,
     cipher: &Cipher,
     id: ConnectionId,
 ) -> Result<Option<String>, TokenError> {
-    let sealed = sqlx::query_scalar!(
-        "SELECT refresh_token FROM connectors.credentials WHERE connection_id = $1",
-        id as ConnectionId
-    )
-    .fetch_optional(conn)
-    .await?;
+    let sealed = sealed_refresh_token(conn, id).await?;
     sealed
         .map(|sealed| {
             cipher
@@ -174,13 +186,9 @@ async fn refresh_locked(
         tx.commit().await?;
         return Ok(token);
     }
-    let sealed = sqlx::query_scalar!(
-        "SELECT refresh_token FROM connectors.credentials WHERE connection_id = $1",
-        id as ConnectionId
-    )
-    .fetch_optional(&mut *tx)
-    .await?
-    .ok_or(TokenError::NeedsReauth("credentials_unreadable"))?;
+    let sealed = sealed_refresh_token(&mut tx, id)
+        .await?
+        .ok_or(TokenError::NeedsReauth("credentials_unreadable"))?;
     let refresh = cipher
         .open_checked(&sealed, &context("refresh_token", id))
         .map_err(|_| TokenError::NeedsReauth("credentials_unreadable"))?;
@@ -228,6 +236,8 @@ async fn refresh_at_provider(
             let google = deps.google.as_ref().ok_or_else(not_configured)?;
             Ok(google.refresh(refresh).await)
         }
+        // An IMAP mailbox's password is not refreshed (`password`).
+        Provider::Imap => Err(TokenError::NeedsReauth("credentials_unreadable")),
         Provider::Zoho => {
             let zoho = deps.zoho.as_ref().ok_or_else(not_configured)?;
             let centre = row
@@ -282,6 +292,67 @@ async fn stored_access(
     Ok(Some(opened.value))
 }
 
+/// Store the password of IMAP connection `id`, replacing what it had.
+pub async fn store_password(
+    conn: &mut PgConnection,
+    cipher: &Cipher,
+    workspace: WorkspaceId,
+    id: ConnectionId,
+    password: &SecretString,
+    now: DateTime<Utc>,
+) -> Result<()> {
+    let sealed = cipher.seal(password.expose_secret(), &context("password", id));
+    sqlx::query(
+        "INSERT INTO connectors.credentials (connection_id, workspace_id, password, updated_at)
+         VALUES ($1, $2, $3, $4)
+         ON CONFLICT (connection_id) DO UPDATE
+            SET password = $3, refresh_token = NULL, access_token = NULL,
+                access_expires_at = NULL, updated_at = $4",
+    )
+    .bind(id)
+    .bind(workspace)
+    .bind(sealed)
+    .bind(now)
+    .execute(conn)
+    .await?;
+    Ok(())
+}
+
+/// The password of IMAP connection `id`, opened: the only reader of it.
+/// One sealed with the previous instance secret is sealed again with the
+/// current one (campbooks-cloud#191); one that does not open (moved from
+/// another row, or sealed under a lost secret) is `credentials_unreadable`.
+pub async fn password(
+    conn: &mut PgConnection,
+    cipher: &Cipher,
+    id: ConnectionId,
+) -> Result<SecretString, TokenError> {
+    let sealed: Option<Option<Vec<u8>>> =
+        sqlx::query_scalar("SELECT password FROM connectors.credentials WHERE connection_id = $1")
+            .bind(id)
+            .fetch_optional(&mut *conn)
+            .await?;
+    let sealed = sealed
+        .flatten()
+        .ok_or(TokenError::NeedsReauth("credentials_unreadable"))?;
+    let opened = cipher
+        .open_checked(&sealed, &context("password", id))
+        .map_err(|_| TokenError::NeedsReauth("credentials_unreadable"))?;
+    if opened.by_previous {
+        // Compare-and-set: a reconnect that stored a new password wins.
+        sqlx::query(
+            "UPDATE connectors.credentials SET password = $2
+              WHERE connection_id = $1 AND password = $3",
+        )
+        .bind(id)
+        .bind(cipher.seal(&opened.value, &context("password", id)))
+        .bind(&sealed)
+        .execute(&mut *conn)
+        .await?;
+    }
+    Ok(SecretString::from(opened.value))
+}
+
 /// Forget connection `id`'s access token, so the next run refreshes it
 /// (after the provider refused it).
 pub async fn forget_access_token(conn: &mut PgConnection, id: ConnectionId) -> Result<()> {
@@ -318,5 +389,14 @@ mod tests {
         );
         assert!(cipher.open(&sealed, &context("refresh_token", b)).is_err());
         assert!(cipher.open(&sealed, &context("access_token", a)).is_err());
+        // A password is bound the same way, and never opens as a token.
+        let password = cipher.seal("an-app-password", &context("password", a));
+        assert!(cipher.open(&password, &context("password", a)).is_ok());
+        assert!(cipher.open(&password, &context("password", b)).is_err());
+        assert!(
+            cipher
+                .open(&password, &context("refresh_token", a))
+                .is_err()
+        );
     }
 }

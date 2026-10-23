@@ -3209,7 +3209,7 @@
             }
           },
           "400": {
-            "description": "No capability, or one that is not offered (`capabilities_required`, `capability_not_offered`).",
+            "description": "No capability, or one that is not offered (`capabilities_required`, `capability_not_offered`), or an IMAP mailbox, which is connected with its password instead (`imap_connects_with_a_password`).",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -3279,6 +3279,252 @@
           ],
           "risk": "low",
           "secret_once": true
+        }
+      }
+    },
+    "/api/v1/w/{workspace_id}/connections/imap": {
+      "post": {
+        "tags": [
+          "connectors"
+        ],
+        "summary": "Connect a mailbox with its password.",
+        "operationId": "connectors.connect_imap",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "description": "The workspace.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConnectImap"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Connected (or connected again): the connection, never its password.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConnectionView"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The servers refused or could not be reached (`imap_login_refused`, `smtp_login_refused`, `imap_unreachable`, `smtp_unreachable`, `imap_tls_failed`, `smtp_tls_failed`, `imap_not_an_imap_server`, `host_refused`, `starttls_missing`), no servers were found (`imap_servers_required`), the mailbox is connected natively instead (`use_native_provider`), or the input is not valid (`imap_address_invalid`, `imap_username_invalid`, `imap_password_invalid`).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid access token.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing scope, a client token (`connection_needs_user`), or a sign-in more than ten minutes old (`step_up_required`).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such workspace, or no such IMAP connection of yours.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "IMAP is not turned on on this instance (`provider_not_configured`), another member connected this mailbox (`account_connected_by_another_member`), or the mailbox is not the one being connected again (`account_mismatch`).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many attempts by you or this workspace (`rate_limited`), or too many failed sign-ins to this mailbox (`too_many_attempts`).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [
+              "connectors:write"
+            ]
+          }
+        ],
+        "x-campbooks": {
+          "access": {
+            "action": "create",
+            "resource": "connectors.connection"
+          },
+          "assistant": false,
+          "automation": false,
+          "mutates": true,
+          "records": [
+            "connectors.connection"
+          ],
+          "risk": "low",
+          "secret_once": true
+        }
+      }
+    },
+    "/api/v1/w/{workspace_id}/connections/imap/discover": {
+      "post": {
+        "tags": [
+          "connectors"
+        ],
+        "summary": "Find a mailbox's servers.",
+        "operationId": "connectors.discover_imap",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "description": "The workspace.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DiscoverImap"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "What was found: servers, a native provider to connect instead, or nothing.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DiscoveredImap"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Not an email address (`imap_address_invalid`).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid access token.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing scope, a client token (`connection_needs_user`), or a sign-in more than ten minutes old (`step_up_required`).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such workspace.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "IMAP is not turned on on this instance (`provider_not_configured`).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "More than 30 in an hour (`rate_limited`).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [
+              "connectors:write"
+            ]
+          }
+        ],
+        "x-campbooks": {
+          "access": {
+            "action": "create",
+            "resource": "connectors.connection"
+          },
+          "assistant": false,
+          "automation": false,
+          "mutates": false,
+          "query_in": "body",
+          "records": [
+            "connectors.connection"
+          ],
+          "risk": "low"
         }
       }
     },
@@ -14422,6 +14668,55 @@
         },
         "additionalProperties": false
       },
+      "ConnectImap": {
+        "type": "object",
+        "description": "A mailbox to connect.",
+        "required": [
+          "address",
+          "password"
+        ],
+        "properties": {
+          "address": {
+            "type": "string",
+            "description": "The mailbox's email address."
+          },
+          "connection": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/ConnectionId",
+                "description": "An IMAP connection of yours to connect again (a new password, or\nother ports): the same username and IMAP host."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "password": {
+            "type": "string",
+            "format": "password",
+            "description": "Its password: an app password where the provider has them. Kept\nsealed, never shown again."
+          },
+          "servers": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Servers",
+                "description": "Its servers, when the member enters them; else they are found from\nthe address."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "username": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "What it signs in with, when not what the servers are found to want\n(usually the address)."
+          }
+        },
+        "additionalProperties": false
+      },
       "ConnectedApp": {
         "type": "object",
         "description": "An app the caller let in.",
@@ -15435,6 +15730,112 @@
         "enum": [
           "inbound",
           "outbound"
+        ]
+      },
+      "DiscoverImap": {
+        "type": "object",
+        "description": "The address to find servers for.",
+        "required": [
+          "address"
+        ],
+        "properties": {
+          "address": {
+            "type": "string",
+            "description": "The mailbox's email address."
+          }
+        },
+        "additionalProperties": false
+      },
+      "DiscoveredImap": {
+        "type": "object",
+        "description": "The answer.",
+        "required": [
+          "kind"
+        ],
+        "properties": {
+          "imap": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Server",
+                "description": "The IMAP server (`settings`)."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "kind": {
+            "$ref": "#/components/schemas/DiscoveryKind",
+            "description": "What was found."
+          },
+          "password": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/PasswordKind",
+                "description": "Which password the provider takes (`settings`)."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "provider": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Native",
+                "description": "The native provider (`use_provider`, `not_supported_yet`)."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "provider_hint": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The provider database's id of the provider, for its app-password\nguide (`settings`, when known)."
+          },
+          "smtp": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Server",
+                "description": "The SMTP server (`settings`)."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "source": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Source",
+                "description": "Where the settings came from (`settings`)."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "username_hint": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The username the servers most likely want (`settings`)."
+          }
+        }
+      },
+      "DiscoveryKind": {
+        "type": "string",
+        "description": "What was found.",
+        "enum": [
+          "settings",
+          "use_provider",
+          "not_supported_yet",
+          "not_found"
         ]
       },
       "DismissSuggestion": {
@@ -17104,6 +17505,15 @@
         },
         "additionalProperties": false
       },
+      "Native": {
+        "type": "string",
+        "description": "A provider Campbooks connects natively, with OAuth, rather than over\nIMAP with a password.",
+        "enum": [
+          "google",
+          "zoho",
+          "microsoft"
+        ]
+      },
       "NeedAction": {
         "type": "string",
         "description": "One action of the catalogue a need may offer (campbooks-cloud#166),\nas `campbooks_ai::decide::signals::actions::ActionId` names it.",
@@ -17578,6 +17988,15 @@
             "description": "Oldest first."
           }
         }
+      },
+      "PasswordKind": {
+        "type": "string",
+        "description": "Which password a provider takes over IMAP: what the connect screen's\nguide says. It never changes what Campbooks does.",
+        "enum": [
+          "app_password",
+          "account_password",
+          "unknown"
+        ]
       },
       "PausedReason": {
         "type": "string",
@@ -18151,7 +18570,8 @@
         "description": "An outside provider.",
         "enum": [
           "google",
-          "zoho"
+          "zoho",
+          "imap"
         ]
       },
       "QueryWarning": {
@@ -19796,6 +20216,14 @@
           }
         }
       },
+      "Security": {
+        "type": "string",
+        "description": "How a connection to a mail server is encrypted. Never in the clear.",
+        "enum": [
+          "tls",
+          "starttls"
+        ]
+      },
       "SecurityEventId": {
         "type": "string",
         "format": "uuid",
@@ -19948,6 +20376,51 @@
             "minimum": 0
           }
         }
+      },
+      "Server": {
+        "type": "object",
+        "description": "A mail server.",
+        "required": [
+          "host",
+          "port",
+          "security"
+        ],
+        "properties": {
+          "host": {
+            "type": "string",
+            "description": "Its host name (or IP address)."
+          },
+          "port": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Its port.",
+            "minimum": 0
+          },
+          "security": {
+            "$ref": "#/components/schemas/Security",
+            "description": "How the connection is encrypted."
+          }
+        },
+        "additionalProperties": false
+      },
+      "Servers": {
+        "type": "object",
+        "description": "A mailbox's two servers: where its mail is read, and where it sends.",
+        "required": [
+          "imap",
+          "smtp"
+        ],
+        "properties": {
+          "imap": {
+            "$ref": "#/components/schemas/Server",
+            "description": "The IMAP server."
+          },
+          "smtp": {
+            "$ref": "#/components/schemas/Server",
+            "description": "The SMTP submission server."
+          }
+        },
+        "additionalProperties": false
       },
       "SessionInfo": {
         "type": "object",
@@ -20142,6 +20615,17 @@
           }
         },
         "additionalProperties": false
+      },
+      "Source": {
+        "type": "string",
+        "description": "Where a mailbox's settings came from.",
+        "enum": [
+          "ispdb",
+          "autoconfig",
+          "srv",
+          "mx",
+          "manual"
+        ]
       },
       "StartChat": {
         "type": "object",
