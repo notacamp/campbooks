@@ -23,14 +23,12 @@ export default async function calendar({ page }: ScenarioContext): Promise<void>
     ["3", "Month", "Month"],
     ["1", "Agenda", "Back to Agenda"],
   ] as const) {
-    if (phone) {
-      await page
-        .getByRole("group", { name: "View" })
-        .getByRole("button", { name: new RegExp(`^${name}`, "u") })
-        .click();
-    } else {
-      await page.keyboard.press(key);
-    }
+    await (phone
+      ? page
+          .getByRole("group", { name: "View" })
+          .getByRole("button", { name: new RegExp(`^${name}`, "u") })
+          .click()
+      : page.keyboard.press(key));
     await caption(page, phone ? label : `${label} (${key})`, 1500);
   }
 
@@ -49,7 +47,10 @@ export default async function calendar({ page }: ScenarioContext): Promise<void>
   await caption(page, "Undo brings it back", 1500);
 
   // A task due today.
-  await page.getByText(/Pay · Costa Obras invoice/u).first().click();
+  await page
+    .getByText(/Pay · Costa Obras invoice/u)
+    .first()
+    .click();
   await page.getByRole("complementary", { name: /Pay · Costa Obras invoice/u }).waitFor();
   await caption(page, "A task: pay, hold time, later or open it", 2200);
 
