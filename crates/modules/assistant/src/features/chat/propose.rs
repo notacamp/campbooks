@@ -904,16 +904,17 @@ impl Proposer {
                 task,
                 day,
                 until,
-                member,
+                member: _,
             } => {
+                // Only a rough match, to spare a full answer a refusal it
+                // does not deserve: the exact check is `same_card`, in
+                // `checked`, after the proposal is built.
                 let until = until.as_deref().and_then(|u| until_within(u).ok());
                 p.action == Some(*action)
                     && p.record.as_ref().is_some_and(|r| r.id == *task)
-                    && p.detail.as_ref().is_some_and(|d| {
-                        d.day == *day
-                            && d.until == until
-                            && (member.is_none() || d.member_id.is_some())
-                    })
+                    && p.detail
+                        .as_ref()
+                        .is_some_and(|d| d.day == *day && d.until == until)
             }
         })
     }

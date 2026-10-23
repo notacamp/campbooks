@@ -2240,3 +2240,42 @@ async fn tasks_share_the_cap_and_the_dedupe_with_every_other_card(db: PgPool) {
     assert!(told[5].contains("already in this answer"), "{told:?}");
     only_reads(&kit);
 }
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_second_hand_off_of_the_same_task_is_not_a_fourth_card(db: PgPool) {
+    let server = MockServer::start().await;
+    let kit = kit_with_errand(db, &server).await;
+    {
+        let mut mail = kit.mail.lock().unwrap();
+        mail.members
+            .push(json!({"user_id": "0192f0c4-7d4e-7b39-a7f1-3a8f0e2b0003",
+            "display_name": "Sofia Pessoa", "email": "sofia@example.com",
+            "role": "admin", "you": false}));
+    }
+    let workspace = WorkspaceId::new();
+    let (sam, _) = kit.member("sam", workspace);
+    let id = started(&kit, &sam, workspace).await;
+    let answer = ask_proposing(
+        &kit,
+        &server,
+        &sam,
+        workspace,
+        &id,
+        &[
+            task_change("hand_off", &json!({ "member_id": "Sofia Pessoa" })),
+            change("archive", &json!({})),
+            (
+                "propose_rule",
+                json!({"sentence": "Keep newsletters from The Weekly off Home"}),
+            ),
+            task_change("hand_off", &json!({ "member_id": RUI })),
+        ],
+    )
+    .await;
+    let proposals = answer["proposals"].as_array().unwrap();
+    assert_eq!(proposals.len(), 3, "{answer}");
+    assert_eq!(proposals[0]["detail"]["member_name"], "Sofia Pessoa");
+    let told = results(&server).await;
+    assert!(told[3].contains("too_many"), "{told:?}");
+    only_reads(&kit);
+}
