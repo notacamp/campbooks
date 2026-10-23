@@ -332,13 +332,12 @@ export function ConversationReader({
   // J/K step between conversations; the arrows keep scrolling this one.
   useShortcut("list.next", onNext, { alternates: false });
   useShortcut("list.previous", onPrevious, { alternates: false });
-  // The note offers Reply whenever it says a reply is needed (campbooks-cloud#306).
+  // The note offers Reply whenever it says a reply is needed (campbooks-cloud#306). No `shortcut` hint: one hint per key.
   const noteReply =
     renderReplySlot === undefined || newest === undefined ? null : (
       <Button
         variant="secondary"
         icon="reply"
-        shortcut="item.reply"
         onClick={() => {
           openReply();
         }}

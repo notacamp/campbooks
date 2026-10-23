@@ -65,7 +65,7 @@ percentage. "How Campbooks decided" (closed by default) SHALL list, for each
 question, the answer in words, the stored reasons in the user's language, the
 source (rules or model), the confidence and the threshold the answer was held
 to, and whether it acted. A stream suggestion SHALL offer "Move to <stream>"
-(1), which the user can undo. The note SHALL offer Reply (R), opening the same
+(1), which the user can undo. The note SHALL offer Reply, opening the same
 reply dialog as the reader's footer, whenever it says a reply is needed (a
 needs_reply suggestion or an open Reply need) and the user can reply.
 
@@ -244,7 +244,7 @@ reply", "To do", "Pay", "Looks suspicious", or "Check" for a question) and,
 when it has one, its due date ("Due Thu", "Overdue"). The reader's note SHALL
 lead with the need's sentence, in the user's language, naming the sender (by
 address for a `review` need), then the sender's sentence quoted as plain text
-with who wrote it and when, then the chips, then Reply (R, for a `reply` need), Done and Not needed (X)
+with who wrote it and when, then the chips, then Reply (for a `reply` need), Done and Not needed (X)
 (E stays the inbox's Done, which archives); a `check` need SHALL ask its
 question with Yes (1) and No (2). Every action
 SHALL push an entry Undo (Z) takes back. The quote SHALL never be rendered as
