@@ -17,7 +17,7 @@ time.
 - [x] 2.4 `contracts/schedule.outbound_requested.v1.schema.json` + its blob; the outcome event for calendar changes
 - [x] 2.5 `capability_granted` calendar blob (calendar list)
 - [x] 2.6 Kernel ports: `OpenTasks::open_tasks(workspace, inbox_id, conversation_id, sender_address)` (no implementation; empty list), `TimeZones`, `Availability::free_slots(member, window, duration)`, the outbound-requests port for schedule
-- [ ] 2.7 `openapi/events.json` lists the new events (`cargo xtask events` runs in CI)
+- [x] 2.7 `openapi/events.json` lists the new events (`cargo xtask events` runs in CI)
 
 ## 3. Decide pass (L1)
 

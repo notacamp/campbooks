@@ -676,6 +676,24 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/w/{workspace_id}/conversations/{conversation_id}/messages/{message_id}/read": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** What Scout read in a message. */
+        get: operations["conversations.get_message_read"];
+        put?: never;
+        /** Queue Scout's read of a message, when it has none. */
+        post: operations["conversations.request_message_read"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/w/{workspace_id}/conversations/{conversation_id}/need/confirm": {
         parameters: {
             query?: never;
@@ -2129,6 +2147,16 @@ export interface components {
             /** @description The connection's id (a `connectors.connection`). */
             connection: string;
         };
+        /** @description An amount of money, in minor units. */
+        Amount: {
+            /** @description The ISO 4217 currency code. */
+            currency: string;
+            /**
+             * Format: int64
+             * @description Minor units (cents).
+             */
+            minor: number;
+        };
         /** @description The person's answer. */
         Answer: {
             /** @description Allow or deny. */
@@ -3227,6 +3255,12 @@ export interface components {
          */
         ItemId: string;
         /**
+         * @description What kind of thing that happens at a time a read of a message found
+         *     (campbooks-cloud#42). Obligations are not items: they are asks.
+         * @enum {string}
+         */
+        ItemKind: "charge" | "appointment" | "meeting" | "travel" | "stay" | "show" | "reservation" | "delivery" | "expiry";
+        /**
          * @description Whether an item still needs someone.
          * @enum {string}
          */
@@ -3412,6 +3446,33 @@ export interface components {
          * @description MessageId (UUIDv7)
          */
         MessageId: string;
+        /** @description What Scout read in a message. */
+        MessageReadView: {
+            /** @description The obligations found. */
+            asks: components["schemas"]["ReadAsk"][];
+            /**
+             * @description Whether Scout can read this message for dates: the pass said it tells
+             *     of something dated and the sender's own data did not cover it.
+             */
+            can_read: boolean;
+            /**
+             * @description The kind of dated thing the pass named, when it flagged the message
+             *     and no `complete` role may read mail here (the reader offers to add it
+             *     by hand).
+             */
+            dated_kind?: string | null;
+            /** @description Whether the decide pass flagged the message for a read. */
+            flagged: boolean;
+            /** @description The things that happen at a time found, the sender's data first. */
+            items: components["schemas"]["ReadItem"][];
+            /**
+             * @description The readers that produced a read: the sender's own data
+             *     (`structured`), and Scout's call (`model`).
+             */
+            layers: components["schemas"]["ReadLayer"][];
+            /** @description Where the model's read is. */
+            status: components["schemas"]["ReadStatus"];
+        };
         /** @description A message's plain-text body. */
         MessageText: {
             /** @description The text, up to 256 KiB. */
@@ -3920,6 +3981,79 @@ export interface components {
             /** @description The sentence, at most 240 characters. */
             text: string;
         };
+        /** @description An obligation of the reader, dated or not. */
+        ReadAsk: {
+            amount?: components["schemas"]["Amount"] | null;
+            /** @description By when: a date, or an RFC 3339 time with an offset. */
+            due?: string | null;
+            /**
+             * @description Stable for the same message, layer and position
+             *     (`<message>:<layer>:ask:<n>`).
+             */
+            key: string;
+            /** @description The sentence that asks, as written (a model read only). */
+            quote?: string | null;
+            /** @description The reference of an open task this ask repeats. */
+            same_as?: string | null;
+            /** @description What to do, at most 80 characters. */
+            title: string;
+            /** @description Do something, or pay something. */
+            verb: components["schemas"]["Verb"];
+        };
+        /** @description Something of the reader's that happens at a time. */
+        ReadItem: {
+            /** @description Whether it lasts whole days. */
+            all_day: boolean;
+            /** @description The key of an earlier item of the conversation that this one cancels. */
+            cancels?: string | null;
+            /** @description When it ends, if the message says. */
+            ends?: string | null;
+            /**
+             * @description Stable for the same message, layer and position
+             *     (`<message>:<layer>:item:<n>`).
+             */
+            key: string;
+            /** @description What kind of thing it is. */
+            kind: components["schemas"]["ItemKind"];
+            /** @description Where, at most 120 characters. */
+            place?: string | null;
+            /** @description The sentence that gives its date, as written (a model read only). */
+            quote?: string | null;
+            /**
+             * Format: int64
+             * @description That event's `SEQUENCE`.
+             */
+            sequence?: number | null;
+            /**
+             * @description When it starts: an RFC 3339 time with an offset, or a date when
+             *     all-day.
+             */
+            starts: string;
+            /** @description The IANA time zone it is in, when the message says. */
+            time_zone?: string | null;
+            /** @description What it is, at most 80 characters; never the subject. */
+            title: string;
+            /** @description The `UID` of the iCalendar event it came from, if it came from one. */
+            uid?: string | null;
+            /** @description The key of an earlier item of the conversation that this one changes. */
+            updates?: string | null;
+        };
+        /**
+         * @description Which reader produced a read: the sender's own machine-readable data,
+         *     or Scout's one `complete` call.
+         * @enum {string}
+         */
+        ReadLayer: "structured" | "model";
+        /** @description What asking for the read did. */
+        ReadRequested: {
+            /** @description The outcome. */
+            outcome: components["schemas"]["Outcome"];
+        };
+        /**
+         * @description Where the model's read of a message is.
+         * @enum {string}
+         */
+        ReadStatus: "none" | "queued" | "failed" | "done";
         /**
          * @description Why an item needs someone, in the order Home shows the groups.
          * @enum {string}
@@ -5006,6 +5140,11 @@ export interface components {
          * @description UserId (UUIDv7)
          */
         UserId: string;
+        /**
+         * @description What an ask of the reader is: do something, or pay something.
+         * @enum {string}
+         */
+        Verb: "do" | "pay";
         /** @description The running build. */
         VersionResponse: {
             /**
@@ -7512,6 +7651,114 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["MessageBody"];
+                };
+            };
+            /** @description No valid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Missing scope. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No such message, or you cannot see it. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "conversations.get_message_read": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The workspace. */
+                workspace_id: components["schemas"]["WorkspaceId"];
+                /** @description The conversation. */
+                conversation_id: components["schemas"]["ConversationId"];
+                /** @description The message. */
+                message_id: components["schemas"]["MessageId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The read. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MessageReadView"];
+                };
+            };
+            /** @description No valid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Missing scope. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No such message, or you cannot see it. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "conversations.request_message_read": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The workspace. */
+                workspace_id: components["schemas"]["WorkspaceId"];
+                /** @description The conversation. */
+                conversation_id: components["schemas"]["ConversationId"];
+                /** @description The message. */
+                message_id: components["schemas"]["MessageId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description What was done. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReadRequested"];
                 };
             };
             /** @description No valid access token. */

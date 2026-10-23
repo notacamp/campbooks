@@ -1206,7 +1206,7 @@ mod tests {
         .fetch_one(db)
         .await
         .unwrap();
-        assert_eq!(model, 7, "the model pass ran");
+        assert_eq!(model, 8, "the model pass ran");
         let request = &server.received_requests().await.unwrap()[0];
         let body: Value = serde_json::from_slice(&request.body).unwrap();
         let state = body["state"].as_str().unwrap().to_owned();
