@@ -148,7 +148,7 @@ pub enum HistoryEvent {
     },
     /// The conversation's need, raised by one of its messages.
     NeedOpened {
-        /// When it was raised: Scout's answer raising it, else its message.
+        /// When it was raised: Scout's answer raising it, else its last change.
         at: DateTime<Utc>,
         /// `reply`, `do`, `pay`, `review`, `worth_a_look`, `waiting` or
         /// `nudge`.
@@ -245,14 +245,13 @@ const APPLICATIONS: &str = "SELECT r.id, r.conditions, r.actions, a.applied_at, 
       ORDER BY a.applied_at DESC LIMIT $2";
 
 /// The conversation's need; when it was raised (the answer that raised it,
-/// else its message), its clock, and when its verdict was given.
+/// else its last change), its clock, and when its verdict was given.
 const NEED: &str = "SELECT n.reason, n.basis, n.due_on, n.lapses_at, n.state, n.cleared_because, \
             n.cleared_by, n.cleared_at, n.verdict, n.verdict_by, n.updated_at, \
-            coalesce(d.created_at, m.sent_at) AS raised_at, k.wake_at, \
+            coalesce(d.created_at, n.updated_at) AS raised_at, k.wake_at, \
             v.created_at AS verdict_at \
        FROM conversations.needs n \
        LEFT JOIN conversations.decisions d ON d.id = n.decision_id \
-       LEFT JOIN conversations.messages m ON m.id = n.message_id \
        LEFT JOIN conversations.need_clocks k ON k.conversation_id = n.conversation_id \
        LEFT JOIN conversations.corrections v ON v.id = n.verdict_correction_id \
       WHERE n.conversation_id = $1";
