@@ -1124,7 +1124,7 @@ mod tests {
     fn pay() -> Value {
         serde_json::json!({
             "title": "Pay the invoice", "quote": "pay the invoice of €120,00 by 30 November",
-            "due": "2026-11-30", "verb": "pay", "amount_minor": 12000,
+            "due": "2026-11-30", "verb": "pay", "amount_minor": 12_000,
             "amount_currency": "eur", "same_as": "task-17"
         })
     }
@@ -1141,7 +1141,7 @@ mod tests {
         assert_eq!(
             ask.amount,
             Some(Amount {
-                minor: 12000,
+                minor: 12_000,
                 currency: "EUR".into()
             })
         );
@@ -1150,14 +1150,14 @@ mod tests {
     #[test]
     fn an_amount_that_is_not_in_the_email_is_dropped_but_not_the_ask() {
         let mut invented = pay();
-        invented["amount_minor"] = serde_json::json!(35000);
+        invented["amount_minor"] = serde_json::json!(35_000);
         let vetted = vet(&with(Vec::new(), vec![invented]), &veto());
         assert_eq!(vetted.asks.len(), 1);
         assert_eq!(vetted.asks[0].amount, None);
         assert_eq!(vetted.dropped, [("ask", Dropped::Amount)]);
         // 120 appears nowhere: not as 12000, not as 120.
         let mut nowhere = pay();
-        nowhere["amount_minor"] = serde_json::json!(15000);
+        nowhere["amount_minor"] = serde_json::json!(15_000);
         let vetted = vet(&with(Vec::new(), vec![nowhere]), &veto());
         assert_eq!(vetted.asks[0].amount, None);
         // The cents of a price in words are in the message too (9.99).
@@ -1178,7 +1178,7 @@ mod tests {
         let ask = serde_json::json!({
             "title": "Send the signed contract",
             "quote": "Please send the signed contract by 20 November", "due": null,
-            "verb": "do", "amount_minor": 12000, "amount_currency": "EUR", "same_as": null
+            "verb": "do", "amount_minor": 12_000, "amount_currency": "EUR", "same_as": null
         });
         let vetted = vet(&with(Vec::new(), vec![ask]), &veto());
         assert_eq!(vetted.asks.len(), 1);
