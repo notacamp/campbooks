@@ -67,6 +67,10 @@ pub struct ZohoMailConfig {
 
 /// `CAMPBOOKS_CONNECTORS__IMAP__*`: connecting any mailbox with its
 /// password (usually an app password).
+#[allow(
+    clippy::struct_excessive_bools,
+    reason = "each is one independent setting an operator turns on"
+)]
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct ImapConfig {

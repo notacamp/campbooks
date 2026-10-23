@@ -99,7 +99,7 @@ pub async fn offer(
             .bind(stream)
             .fetch_optional(&mut *conn)
             .await?;
-    if !changed.flatten().is_some_and(|at| at >= quiet_since) {
+    if changed.flatten().is_none_or(|at| at < quiet_since) {
         withdraw(conn, connection).await?;
         return Ok(false);
     }

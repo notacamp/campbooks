@@ -937,23 +937,9 @@ impl SyncStream {
         if matches!(target.health, Health::Throttled | Health::Failing) {
             health::set(tx, target.connection, Health::Ok, None, now).await?;
         }
-        // An IMAP stream offers itself for IDLE, or withdraws: held in IDLE,
-        // it is polled less often (a safety poll).
-        let idle_held = match &page.idle {
-            Some(offer) => {
-                let quiet = TimeDelta::days(i64::from(self.deps.imap.config.idle_quiet_days));
-                lease::offer(
-                    tx,
-                    workspace,
-                    target.connection,
-                    target.stream,
-                    offer,
-                    now - quiet,
-                )
-                .await?
-            }
-            None => false,
-        };
+        let least_wait = self
+            .offer_idle(tx, workspace, target, page.idle.as_ref(), now)
+            .await?;
         if settle_outbound(
             tx,
             target.stream,
@@ -981,13 +967,7 @@ impl SyncStream {
             )
             .await?;
         } else {
-            let wait = if idle_held {
-                interval
-                    .max(i32::try_from(self.deps.imap.config.idle_poll_seconds).unwrap_or(i32::MAX))
-            } else {
-                interval
-            };
-            let next = now + TimeDelta::seconds(i64::from(wait));
+            let next = now + TimeDelta::seconds(i64::from(interval.max(least_wait)));
             schedule::set_due(tx, workspace, target.stream, next).await?;
         }
         tracing::info!(
@@ -995,6 +975,38 @@ impl SyncStream {
             phase = page.phase.as_str(), more = page.more, "stream synced"
         );
         Ok(())
+    }
+
+    /// An IMAP stream offers itself for IDLE (`offer`), or withdraws, in the
+    /// run's transaction. The least wait before its next poll: held in
+    /// IDLE, the safety poll's; none otherwise.
+    async fn offer_idle(
+        &self,
+        tx: &mut Transaction<'static, Postgres>,
+        workspace: WorkspaceId,
+        target: &Target,
+        offer: Option<&lease::Offer>,
+        now: DateTime<Utc>,
+    ) -> Result<i32, JobError> {
+        let Some(offer) = offer else {
+            return Ok(0);
+        };
+        let config = &self.deps.imap.config;
+        let quiet = TimeDelta::days(i64::from(config.idle_quiet_days));
+        let held = lease::offer(
+            tx,
+            workspace,
+            target.connection,
+            target.stream,
+            offer,
+            now - quiet,
+        )
+        .await?;
+        Ok(if held {
+            i32::try_from(config.idle_poll_seconds).unwrap_or(i32::MAX)
+        } else {
+            0
+        })
     }
 
     /// The provider refused the access token: drop it so the next run
