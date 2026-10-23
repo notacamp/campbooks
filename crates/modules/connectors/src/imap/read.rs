@@ -540,6 +540,7 @@ impl Reader<'_> {
         let limits = self.small();
         let capabilities = self.session.capabilities(limits).await?;
         run.caps = Caps::of(&capabilities);
+        run.cursor.idle = Some(capabilities.iter().any(|c| c == "IDLE"));
         if run.caps.qresync {
             let enabled = self
                 .session

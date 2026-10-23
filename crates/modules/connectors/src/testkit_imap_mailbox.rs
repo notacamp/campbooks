@@ -5,7 +5,8 @@
 //! `UID FETCH` with CONDSTORE and QRESYNC), answered as a server would.
 //!
 //! What the fake saw (folders opened, bodies sent, any change asked of it)
-//! is recorded for the tests to check. It can also misbehave: say it is
+//! is recorded for the tests to check. In IDLE, it reports the selected
+//! folder's changes as a server does (`EXISTS`, `EXPUNGE`, `FETCH`). It can also misbehave: say it is
 //! busy, lie about a message's size, announce a literal larger than any
 //! memory, or never stop answering.
 
@@ -207,6 +208,15 @@ impl Store {
         folder.uidnext = uid + 1;
     }
 
+    /// What IDLE reports of folder `name` when it changes: its message
+    /// count and its highest MODSEQ (none when it is gone).
+    pub fn idle_state(&self, name: &str) -> Option<(usize, u64)> {
+        self.folders
+            .iter()
+            .find(|f| f.name == name)
+            .map(|f| (f.mails.len(), f.highest_modseq()))
+    }
+
     /// Remove folder `name` and its messages.
     pub fn remove_folder(&mut self, name: &str) {
         self.folders.retain(|f| f.name != name);
@@ -252,6 +262,11 @@ pub struct Offers {
     /// Every `CHANGEDSINCE … VANISHED` is answered with more vanished
     /// ranges than anything holds (QRESYNC).
     pub vanish_flood: bool,
+    /// It offers IDLE (RFC 2177), and reports its selected folder's changes
+    /// while a session is in it.
+    pub idle: bool,
+    /// In IDLE, it repeats `EXISTS` without end.
+    pub idle_flood: bool,
 }
 
 /// The answer to one signed-in command (`verb` and its `args`), on a

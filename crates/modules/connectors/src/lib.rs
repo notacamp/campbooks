@@ -19,7 +19,10 @@
 //!
 //! Any other mailbox is connected over IMAP and SMTP with its password
 //! (`imap/`: finding its servers and checking the password before it is
-//! kept, then reading it, each message once wherever it is filed).
+//! kept, then reading it, each message once wherever it is filed). Where
+//! the server offers it, its Inbox is held in IDLE by a pool of sessions in
+//! the processes that run sync ([`IdlePool`]), which asks for runs as mail
+//! arrives.
 //!
 //! `lib.rs` assembles [`module`]; each use case is a slice under
 //! `features/`, shared rules live in `domain/`, what the mail adapters share
@@ -66,6 +69,7 @@ pub use domain::model::{
     AuthorizationId, Capability, ConnectionId, ConnectionView, Health, InboxId, MailChoice, Phase,
     Provider, StreamId, StreamView,
 };
+pub use features::imap_idle::IdlePool;
 pub use google::{Endpoints, Google};
 pub use provider::ClientSecret;
 pub use zoho::{ACCOUNTS_SERVERS as ZOHO_ACCOUNTS_SERVERS, Centres, Zoho};

@@ -234,6 +234,26 @@ pub fn by_domain(domain: &str) -> Option<&'static ProviderConfig> {
         .and_then(|&index| database.providers.get(index))
 }
 
+/// The fixed IMAP host names of the bundled database, lower-cased: hosts
+/// written with a placeholder (`imap.%EMAILDOMAIN%`) name a customer's own
+/// domain and are left out.
+static PROVIDER_HOSTS: LazyLock<std::collections::HashSet<String>> = LazyLock::new(|| {
+    DATABASE
+        .providers
+        .iter()
+        .flat_map(|provider| provider.imap.iter())
+        .filter(|entry| !entry.host.contains('%'))
+        .map(|entry| entry.host.trim_end_matches('.').to_ascii_lowercase())
+        .filter(|host| guard::is_host_name(host))
+        .collect()
+});
+
+/// Whether `host` is a fixed IMAP host of the bundled database: a known
+/// provider's shared server, not a small or self-hosted one.
+pub fn is_provider_host(host: &str) -> bool {
+    PROVIDER_HOSTS.contains(&host.trim_end_matches('.').to_ascii_lowercase())
+}
+
 /// The bundled configuration of the provider whose domain `host` (an MX
 /// host) is in, or under: `mx01.mail.icloud.com` is looked up as itself,
 /// then `mail.icloud.com`, then `icloud.com`.
@@ -288,6 +308,16 @@ mod tests {
         // An MX host finds its provider by its domain.
         assert_eq!(by_host("mta5.am0.yahoodns.net").unwrap().id, "yahoo.com");
         assert!(by_host("mx.unknown.example").is_none());
+    }
+
+    #[test]
+    fn known_provider_hosts_are_the_databases_fixed_imap_hosts() {
+        assert!(is_provider_host("imap.mail.yahoo.com"));
+        assert!(is_provider_host("IMAP.mail.me.com."));
+        assert!(!is_provider_host("smtp.mail.yahoo.com"));
+        assert!(!is_provider_host("imap.example.com"));
+        assert!(!is_provider_host("mail.bakery.example"));
+        assert!(PROVIDER_HOSTS.iter().all(|host| !host.contains('%')));
     }
 
     #[test]

@@ -106,6 +106,35 @@ pub struct ImapConfig {
     pub workspace_sessions_per_host: u32,
     /// Most folders of one mailbox read (default 200).
     pub max_folders: u32,
+    /// Sessions open at once to the IMAP host of a known provider (a fixed
+    /// IMAP host of the bundled provider database), across every process,
+    /// runs and IDLE together (default 200): the small hosts' cap
+    /// ([`sessions_per_host`](Self::sessions_per_host)) would starve a big
+    /// provider's customers.
+    pub provider_sessions_per_host: u32,
+    /// Hold mailboxes' Inboxes in IDLE (RFC 2177), so new mail is read as
+    /// it arrives (default false). Needs [`enabled`](Self::enabled).
+    pub idle_enabled: bool,
+    /// IDLE sessions one process holds at most (default 50).
+    pub idle_sessions: u32,
+    /// A mailbox's IDLE asks for at most one run per this many seconds
+    /// (default 30), however often its server reports a change.
+    pub idle_debounce_seconds: u32,
+    /// Minutes between two renewals of IDLE (`DONE`, `NOOP`, `IDLE`;
+    /// default 25, at most 29 as RFC 2177 asks).
+    pub idle_refresh_minutes: u32,
+    /// A mailbox with no change for this many days drops IDLE and is polled
+    /// (default 14).
+    pub idle_quiet_days: u32,
+    /// While a mailbox is held in IDLE, its next poll is at least this many
+    /// seconds away (default 900): a safety poll, which also reads the
+    /// folders IDLE does not watch.
+    pub idle_poll_seconds: u32,
+    /// IDLE sessions one workspace holds at most on one IMAP host (default
+    /// 10); on a host that is not a known provider, at most half its
+    /// [`workspace_sessions_per_host`](Self::workspace_sessions_per_host)
+    /// too.
+    pub workspace_idle_sessions_per_host: u32,
 }
 
 /// `CAMPBOOKS_CONNECTORS__POLL__*`.
@@ -181,6 +210,14 @@ impl Default for ImapConfig {
             sessions_per_host: 4,
             workspace_sessions_per_host: 2,
             max_folders: 200,
+            provider_sessions_per_host: 200,
+            idle_enabled: false,
+            idle_sessions: 50,
+            idle_debounce_seconds: 30,
+            idle_refresh_minutes: 25,
+            idle_quiet_days: 14,
+            idle_poll_seconds: 900,
+            workspace_idle_sessions_per_host: 10,
         }
     }
 }
@@ -295,11 +332,61 @@ impl ConnectorsConfig {
                     .to_owned(),
             );
         }
+        self.check_idle()?;
         if self.failing_after == 0 {
             return Err("CAMPBOOKS_CONNECTORS__FAILING_AFTER must be positive".to_owned());
         }
         if self.batch_retention_days == 0 {
             return Err("CAMPBOOKS_CONNECTORS__BATCH_RETENTION_DAYS must be positive".to_owned());
+        }
+        Ok(())
+    }
+}
+
+impl ConnectorsConfig {
+    /// The IDLE settings, and the known providers' session cap.
+    fn check_idle(&self) -> Result<(), String> {
+        let imap = &self.imap;
+        if imap.provider_sessions_per_host < imap.sessions_per_host
+            || imap.provider_sessions_per_host > 100_000
+        {
+            return Err(
+                "CAMPBOOKS_CONNECTORS__IMAP__PROVIDER_SESSIONS_PER_HOST must be at least \
+                 …__SESSIONS_PER_HOST and at most 100000"
+                    .to_owned(),
+            );
+        }
+        if imap.idle_sessions == 0 || imap.idle_sessions > 10_000 {
+            return Err("CAMPBOOKS_CONNECTORS__IMAP__IDLE_SESSIONS must be 1 to 10000".to_owned());
+        }
+        if imap.idle_debounce_seconds == 0 || imap.idle_debounce_seconds > 3_600 {
+            return Err(
+                "CAMPBOOKS_CONNECTORS__IMAP__IDLE_DEBOUNCE_SECONDS must be 1 to 3600".to_owned(),
+            );
+        }
+        if imap.idle_refresh_minutes == 0 || imap.idle_refresh_minutes > 29 {
+            return Err(
+                "CAMPBOOKS_CONNECTORS__IMAP__IDLE_REFRESH_MINUTES must be 1 to 29 (RFC 2177)"
+                    .to_owned(),
+            );
+        }
+        if imap.idle_quiet_days == 0 || imap.idle_quiet_days > 365 {
+            return Err("CAMPBOOKS_CONNECTORS__IMAP__IDLE_QUIET_DAYS must be 1 to 365".to_owned());
+        }
+        if imap.idle_poll_seconds < self.poll.min_seconds
+            || imap.idle_poll_seconds > self.poll.max_seconds
+        {
+            return Err(
+                "CAMPBOOKS_CONNECTORS__IMAP__IDLE_POLL_SECONDS must be at least \
+                 CAMPBOOKS_CONNECTORS__POLL__MIN_SECONDS and at most …__POLL__MAX_SECONDS"
+                    .to_owned(),
+            );
+        }
+        if imap.workspace_idle_sessions_per_host == 0 {
+            return Err(
+                "CAMPBOOKS_CONNECTORS__IMAP__WORKSPACE_IDLE_SESSIONS_PER_HOST must be positive"
+                    .to_owned(),
+            );
         }
         Ok(())
     }
@@ -440,6 +527,61 @@ mod tests {
                     .unwrap_err()
                     .contains("CAMPBOOKS_CONNECTORS__IMAP__")
             );
+        }
+    }
+
+    #[test]
+    fn idle_is_off_by_default_and_its_settings_are_checked() {
+        let config = ConnectorsConfig::from_figment(&Figment::new()).unwrap();
+        let imap = &config.imap;
+        assert!(!imap.idle_enabled);
+        assert_eq!(
+            (
+                imap.idle_sessions,
+                imap.idle_debounce_seconds,
+                imap.idle_refresh_minutes,
+                imap.idle_quiet_days,
+                imap.idle_poll_seconds,
+                imap.provider_sessions_per_host,
+                imap.workspace_idle_sessions_per_host,
+            ),
+            (50, 30, 25, 14, 900, 200, 10)
+        );
+        let on = ConnectorsConfig::from_figment(&figment(serde_json::json!({
+            "connectors": {"imap": {"enabled": true, "idle_enabled": true, "idle_sessions": 5}}
+        })))
+        .unwrap();
+        assert!(on.imap.idle_enabled);
+        assert_eq!(on.imap.idle_sessions, 5);
+        for (bad, setting) in [
+            (serde_json::json!({"idle_sessions": 0}), "IDLE_SESSIONS"),
+            (
+                serde_json::json!({"idle_debounce_seconds": 0}),
+                "IDLE_DEBOUNCE_SECONDS",
+            ),
+            (
+                serde_json::json!({"idle_refresh_minutes": 30}),
+                "IDLE_REFRESH_MINUTES",
+            ),
+            (serde_json::json!({"idle_quiet_days": 0}), "IDLE_QUIET_DAYS"),
+            (
+                serde_json::json!({"idle_poll_seconds": 10}),
+                "IDLE_POLL_SECONDS",
+            ),
+            (
+                serde_json::json!({"provider_sessions_per_host": 3}),
+                "PROVIDER_SESSIONS_PER_HOST",
+            ),
+            (
+                serde_json::json!({"workspace_idle_sessions_per_host": 0}),
+                "WORKSPACE_IDLE_SESSIONS_PER_HOST",
+            ),
+        ] {
+            let refused = ConnectorsConfig::from_figment(&figment(
+                serde_json::json!({"connectors": {"imap": bad}}),
+            ))
+            .unwrap_err();
+            assert!(refused.contains(setting), "{refused}");
         }
     }
 

@@ -47,6 +47,34 @@ pub async fn lock(conn: &mut PgConnection, connection: ConnectionId) -> Result<(
     Ok(())
 }
 
+/// Sign-ins an IMAP server refuses in a row, by sync runs and IDLE sessions
+/// alike, before the connection needs the member.
+pub const LOGIN_REFUSALS: u32 = 3;
+
+/// Count one more refused IMAP sign-in on `stream`'s cursor
+/// (`login_refusals`, which a run that signs in resets), after locking
+/// `connection` (removal's order: the connection, then its streams). The
+/// count now; zero when the stream is gone.
+pub async fn count_login_refusal(
+    conn: &mut PgConnection,
+    connection: ConnectionId,
+    stream: StreamId,
+) -> Result<u32> {
+    lock(&mut *conn, connection).await?;
+    let refusals: Option<i32> = sqlx::query_scalar(
+        "UPDATE connectors.streams
+            SET cursor = jsonb_set(
+                    cursor, '{login_refusals}',
+                    to_jsonb(coalesce((cursor->>'login_refusals')::int, 0) + 1))
+          WHERE id = $1
+        RETURNING (cursor->>'login_refusals')::int",
+    )
+    .bind(stream)
+    .fetch_optional(&mut *conn)
+    .await?;
+    Ok(refusals.map_or(0, |n| u32::try_from(n).unwrap_or(0)))
+}
+
 /// The grant stopped working: `needs_reauth`, every stream paused and off
 /// the schedule, and [`ConnectionNeedsReauth`] published once.
 pub async fn needs_reauth(

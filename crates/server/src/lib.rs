@@ -1013,12 +1013,25 @@ mod tests {
                 "ALL".to_owned()
             )]
         );
-        // The maintenance scope: these seven, on module tables.
+        // The maintenance scope: these nine, on module tables.
         let policies = mentioning(testing::maintenance_scope_setting());
         let expected = [
             // The chats' expiry (assistant, campbooks-cloud#305): which
             // workspaces hold a chat to expire, read only.
             ("assistant.chats", "maintenance_reads_chats", "SELECT"),
+            // The IMAP IDLE pools (connectors, campbooks-cloud#318): claim,
+            // renew and release leases (holders and times only, a trigger
+            // keeps the rest), never insert or delete.
+            (
+                "connectors.imap_idle_leases",
+                "maintenance_claims_idle_leases",
+                "UPDATE",
+            ),
+            (
+                "connectors.imap_idle_leases",
+                "maintenance_reads_idle_leases",
+                "SELECT",
+            ),
             // The stream dispatcher (connectors): reads and leases.
             (
                 "connectors.sync_due",

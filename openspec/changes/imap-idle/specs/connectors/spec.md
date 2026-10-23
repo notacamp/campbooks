@@ -21,7 +21,7 @@ most 29).
 
 #### Scenario: A burst of new mail
 - **WHEN** the server sends many `EXISTS` within one debounce interval
-- **THEN** one run is asked for and one run is pending
+- **THEN** one run is asked for within the interval and one run is pending
 
 #### Scenario: IDLE is renewed
 - **WHEN** a session has been in IDLE for the refresh window

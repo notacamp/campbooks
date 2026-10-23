@@ -284,6 +284,13 @@ impl Imap {
     }
 }
 
+/// Whether `host` is a known provider's IMAP host (a fixed IMAP host of the
+/// bundled provider database), whose sessions are capped as a provider's
+/// rather than as a small server's.
+pub fn is_provider_host(host: &str) -> bool {
+    ispdb::is_provider_host(host)
+}
+
 /// Sign in to `servers` as `username` with `password`: the IMAP server (and
 /// its inbox listed), then the SMTP server (authenticated, nothing sent).
 /// The first refusal stops it.

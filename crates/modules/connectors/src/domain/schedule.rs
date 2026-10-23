@@ -235,7 +235,20 @@ pub async fn take_budget(
 /// process, refilled at `rate`). `Err` holds how long until there is
 /// enough.
 pub async fn take(pool: &PgPool, key: &str, cost: u32, rate: Rate) -> Result<Result<(), Duration>> {
+    take_leaving(pool, key, cost, rate, 0).await
+}
+
+/// [`take`], granted only when `reserve` units are left in the bucket
+/// after it (what long-lived sessions hold of a session budget).
+pub async fn take_leaving(
+    pool: &PgPool,
+    key: &str,
+    cost: u32,
+    rate: Rate,
+    reserve: u32,
+) -> Result<Result<(), Duration>> {
     let burst = rate.per_second * rate.burst_seconds;
+    let reserve = f64::from(reserve);
     let rate = rate.per_second;
     let cost = f64::from(cost).min(burst);
     let mut tx = pool.begin().await?;
@@ -258,7 +271,7 @@ pub async fn take(pool: &PgPool, key: &str, cost: u32, rate: Rate) -> Result<Res
     )
     .fetch_one(&mut *tx)
     .await?;
-    let granted = available >= cost;
+    let granted = available - reserve >= cost;
     sqlx::query!(
         "UPDATE connectors.provider_budgets SET tokens = $2, refilled_at = clock_timestamp()
           WHERE provider = $1",
@@ -272,7 +285,7 @@ pub async fn take(pool: &PgPool, key: &str, cost: u32, rate: Rate) -> Result<Res
         Ok(Ok(()))
     } else {
         Ok(Err(Duration::from_secs_f64(
-            ((cost - available) / rate).max(0.1),
+            ((cost + reserve - available) / rate).clamp(0.1, 86_400.0),
         )))
     }
 }

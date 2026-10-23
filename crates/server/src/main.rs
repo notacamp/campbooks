@@ -538,6 +538,7 @@ async fn run(
     }
     if role.worker() {
         spawn_relay(&mut parts, &state, &stop);
+        spawn_imap_idle(&mut parts, &state, &composition, &stop);
         spawn_worker(&mut parts, state, !role.api(), &stop).await?;
     }
 
@@ -1119,6 +1120,27 @@ fn spawn_relay(
         let stopped = stopped(stop);
         parts.spawn(async move {
             relay.run(stopped).await;
+            Ok(())
+        });
+    }
+}
+
+/// Hold IMAP mailboxes in IDLE until `stop` (campbooks-cloud#318), in the
+/// processes that run sync jobs: only with IMAP and IDLE on
+/// (`CAMPBOOKS_CONNECTORS__IMAP__ENABLED`, `…__IDLE_ENABLED`). On `stop` the
+/// sessions end and their leases are released.
+fn spawn_imap_idle(
+    parts: &mut JoinSet<Result<(), String>>,
+    state: &AppState,
+    composition: &campbooks_server::Composition,
+    stop: &watch::Sender<bool>,
+) {
+    if let Some(pool) =
+        campbooks_connectors::IdlePool::new(composition.connectors.clone(), state.clone())
+    {
+        let stopped = stopped(stop);
+        parts.spawn(async move {
+            pool.run(stopped).await;
             Ok(())
         });
     }
