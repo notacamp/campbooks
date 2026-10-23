@@ -247,6 +247,104 @@ impl DomainEvent for MessagesChanged {
     }
 }
 
+/// A calendar stream produced a `calendar-change-batch` for one provider
+/// calendar (`contracts/connectors.calendar_changed.v1.schema.json`).
+/// Published in the transaction that advances the stream's cursor; the
+/// schedule module applies it. Declared with the contract, published by the
+/// Google Calendar adapter (campbooks-cloud#42).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+pub struct CalendarChanged {
+    /// The workspace.
+    pub workspace: String,
+    /// The connection.
+    pub connection: ConnectionId,
+    /// The `calendar-change-batch` v1 document, a blob of the workspace.
+    #[schema(value_type = BlobSchema)]
+    pub batch: BlobRef,
+}
+
+impl DomainEvent for CalendarChanged {
+    const NAME: &'static str = "connectors.calendar_changed";
+    const VERSION: u16 = 1;
+
+    fn workspace(&self) -> Option<&str> {
+        Some(&self.workspace)
+    }
+}
+
+/// How a calendar change asked for by `schedule.outbound_requested` ended.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum CalendarOutcome {
+    /// Written at the provider.
+    Applied,
+    /// The event had changed at the provider (412).
+    Superseded,
+    /// Nothing was written.
+    Skipped,
+    /// It failed.
+    Failed,
+}
+
+/// Why a calendar change did not apply: a closed set, never the provider's
+/// words.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum CalendarReason {
+    /// The event changed at the provider.
+    ChangedAtProvider,
+    /// The schedule module's records did not confirm the request.
+    Unverified,
+    /// The connection is gone.
+    NotConnected,
+    /// The grant needs the member again.
+    NeedsReauth,
+    /// The provider refused it.
+    Rejected,
+    /// The event is not at the provider.
+    NotFound,
+    /// The provider could not be reached.
+    Unavailable,
+    /// The calendar API is not enabled for the app.
+    ApiNotEnabled,
+    /// It was tried the most times allowed.
+    TooManyAttempts,
+}
+
+/// A calendar change ended
+/// (`contracts/connectors.calendar_change_completed.v1.schema.json`).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+pub struct CalendarChangeCompleted {
+    /// The workspace.
+    pub workspace: String,
+    /// The request (an id of the schedule module).
+    pub request: uuid::Uuid,
+    /// The calendar (an id of the schedule module).
+    pub calendar: uuid::Uuid,
+    /// The event (an id of the schedule module).
+    pub event: uuid::Uuid,
+    /// How it ended.
+    pub outcome: CalendarOutcome,
+    /// The event's id at the provider (applied only; opaque).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub provider_event_id: Option<String>,
+    /// The new etag (applied only; opaque).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub etag: Option<String>,
+    /// Why it did not apply.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub reason: Option<CalendarReason>,
+}
+
+impl DomainEvent for CalendarChangeCompleted {
+    const NAME: &'static str = "connectors.calendar_change_completed";
+    const VERSION: u16 = 1;
+
+    fn workspace(&self) -> Option<&str> {
+        Some(&self.workspace)
+    }
+}
+
 /// How a send ended.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "snake_case")]

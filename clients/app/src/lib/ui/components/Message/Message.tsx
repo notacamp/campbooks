@@ -39,6 +39,8 @@ export interface MessageCardProps {
   files?: ReactNode | undefined;
   /** Quoted history folded under the text (a {@link QuotedText}). */
   quoted?: ReactNode | undefined;
+  /** What was read from it (the calendar's "Scout noticed" strip), under the header. */
+  found?: ReactNode | undefined;
 }
 
 /** One message of a conversation. */
@@ -57,6 +59,7 @@ export function MessageCard({
   actions,
   files: fileList,
   quoted,
+  found,
 }: MessageCardProps) {
   const files = attachment === undefined ? attachments : [attachment, ...attachments];
   return (
@@ -78,6 +81,7 @@ export function MessageCard({
           </time>
         </div>
         {recipients === undefined ? null : <p className={styles["recipients"]}>{recipients}</p>}
+        {found}
         {rich ? (
           <div className={styles["rich"]}>{children}</div>
         ) : (

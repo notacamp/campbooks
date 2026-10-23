@@ -15,18 +15,23 @@ ammonia.workspace = true
 css-inline.workspace = true
 cssparser.workspace = true
 html5ever.workspace = true
+# The sender's own calendar data (`domain::structured`, ADR 0021).
+icalendar.workspace = true
 axum.workspace = true
 # Opaque list cursors.
 base64.workspace = true
 campbooks-ai.workspace = true
 campbooks-kernel.workspace = true
 chrono.workspace = true
+# The zones of an invitation (`domain::structured`).
+chrono-tz.workspace = true
 # The module's settings section (`CAMPBOOKS_CONVERSATIONS__*`).
 figment.workspace = true
 # Reading blob streams.
 futures-util.workspace = true
 # The image policy over ammonia's canonical output (`domain::sanitize`).
 regex.workspace = true
+scraper.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 sqlx.workspace = true

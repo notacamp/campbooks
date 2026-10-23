@@ -153,6 +153,26 @@ impl Kit {
         self
     }
 
+    /// The same kit, reading the tasks open for an email through
+    /// `open_tasks` (campbooks-cloud#42).
+    #[must_use]
+    pub fn with_open_tasks(mut self, open_tasks: campbooks_kernel::tasks::OpenTasksPort) -> Self {
+        self.state = self.state.with_open_tasks(open_tasks);
+        self.app = testing::app(crate::module(self.deps.clone()), self.state.clone());
+        self
+    }
+
+    /// The same kit, reading members' time zones through `time_zones`.
+    #[must_use]
+    pub fn with_time_zones(
+        mut self,
+        time_zones: campbooks_kernel::schedule::TimeZonesPort,
+    ) -> Self {
+        self.state = self.state.with_time_zones(time_zones);
+        self.app = testing::app(crate::module(self.deps.clone()), self.state.clone());
+        self
+    }
+
     /// The same kit, writing tracked events to the outbox (ADR 0020), read
     /// back with [`testing::tracked_events`].
     #[must_use]
@@ -731,8 +751,9 @@ impl Scripted {
 }
 
 /// `answers` for one sender: stream, needs reply, asks action, has a
-/// deadline, urgency level, suspicious, and money "neither"
-/// ([`money`] says otherwise); all at 0.97.
+/// deadline, urgency level, suspicious, money "neither"
+/// ([`money`] says otherwise) and nothing dated ([`dated`] says otherwise);
+/// all at 0.97.
 // One flag per yes/no question, in the questions' order: a table row.
 #[allow(clippy::fn_params_excessive_bools)]
 pub fn script(
@@ -756,7 +777,23 @@ pub fn script(
             AnswerValue::Choice(triage::NEITHER.to_owned()),
             at,
         ),
+        // Nothing dated in it, unless [`dated`] says otherwise.
+        (triage::HAS_DATED_THING, AnswerValue::Noul(false), at),
     ]
+}
+
+/// `script` with the model's answer that the email tells of something dated
+/// of `kind` (campbooks-cloud#42), at `confidence`, in place of "nothing
+/// dated".
+pub fn dated(mut script: Script, kind: &str, confidence: f64) -> Script {
+    script.retain(|(id, ..)| *id != triage::HAS_DATED_THING && *id != triage::DATED_KIND);
+    script.push((triage::HAS_DATED_THING, AnswerValue::Noul(true), confidence));
+    script.push((
+        triage::DATED_KIND,
+        AnswerValue::Choice(kind.to_owned()),
+        confidence,
+    ));
+    script
 }
 
 /// `script` with `label` (`owed`, `paid`) as its money answer.

@@ -39,6 +39,20 @@ export const SEMANTIC_TOKENS = {
     "signal-look",
     "signal-nudge",
   ],
+  kind: [
+    "kind-charge",
+    "kind-appointment",
+    "kind-meeting",
+    "kind-travel",
+    "kind-stay",
+    "kind-show",
+    "kind-reservation",
+    "kind-delivery",
+    "kind-expiry",
+    "kind-due",
+    "kind-hold",
+    "kind-none",
+  ],
   visor: [
     "visor-glass-top",
     "visor-glass-bottom",
@@ -90,6 +104,12 @@ export const COMPONENT_TOKENS = [
   "message-yours-indent",
   "message-yours-bg",
   "reader-footer-max",
+  "calendar-hour",
+  "calendar-minute",
+  "calendar-gutter",
+  "calendar-grid-min",
+  "calendar-sheet-width",
+  "calendar-when-width",
 ] as const;
 
 export type SemanticToken = (typeof SEMANTIC_TOKENS)[keyof typeof SEMANTIC_TOKENS][number];
@@ -127,3 +147,20 @@ export type Density = (typeof DENSITIES)[number];
 /** Signals: what a queue item asks of you. Colour carries meaning only. */
 export const SIGNALS = ["review", "reply", "decide", "do", "pay", "nudge", "sort", "look"] as const;
 export type Signal = (typeof SIGNALS)[number];
+
+/** The kinds of dated thing the calendar draws (colour = kind). `due` is a task, `hold` time held for one. */
+export const CALENDAR_KINDS = [
+  "charge",
+  "appointment",
+  "meeting",
+  "travel",
+  "stay",
+  "show",
+  "reservation",
+  "delivery",
+  "expiry",
+  "due",
+  "hold",
+  "none",
+] as const;
+export type CalendarKind = (typeof CALENDAR_KINDS)[number];

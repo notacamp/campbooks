@@ -12,6 +12,17 @@
     "capability": { "enum": ["messages", "calendar", "files", "bank"] },
     "granted_by": { "$ref": "#/$defs/uuid", "description": "The member (user id) whose consent it is." },
     "inbox_id": { "$ref": "#/$defs/uuid", "description": "The conversations inbox the stream feeds; present for `messages` only." },
+    "calendars": {
+      "description": "The calendar-list v1 document, a blob of the workspace: the account's calendars at the provider (id, name, colour, time zone, primary, may be written). Present for `calendar` only; the schedule module creates one calendar for each, the primary one syncing. The provider's calendar ids can be addresses, so they are in the blob, never in this event.",
+      "type": "object",
+      "required": ["hash", "size", "content_type"],
+      "additionalProperties": false,
+      "properties": {
+        "hash": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "size": { "type": "integer", "minimum": 0 },
+        "content_type": { "type": "string" }
+      }
+    },
     "account": {
       "description": "The connection-account v1 document, a blob of the workspace (campbooks_kernel::blobs::BlobRef), held by the connection.",
       "type": "object",
@@ -24,8 +35,16 @@
       }
     }
   },
-  "if": { "properties": { "capability": { "const": "messages" } } },
-  "then": { "required": ["inbox_id"] },
+  "allOf": [
+    {
+      "if": { "properties": { "capability": { "const": "messages" } } },
+      "then": { "required": ["inbox_id"] }
+    },
+    {
+      "if": { "properties": { "capability": { "const": "calendar" } } },
+      "then": { "required": ["calendars"] }
+    }
+  ],
   "$defs": {
     "uuid": {
       "type": "string",

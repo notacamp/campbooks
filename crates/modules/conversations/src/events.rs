@@ -20,9 +20,9 @@ use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
 use crate::model::{
-    BlobPointer, Channel, ClearCause, ConnectionId, ConversationId, DraftId, InboxId, LabelId,
-    MessageId, NeedReason, NeedTrust, RuleId, RuleRunId, RuleState, RunKind, RunState, SendId,
-    Stream,
+    BlobPointer, Channel, ClearCause, ConnectionId, ConversationId, DraftId, InboxId, ItemKind,
+    LabelId, MessageId, NeedReason, NeedTrust, ReadLayer, RuleId, RuleRunId, RuleState, RunKind,
+    RunState, SendId, Stream, Verb,
 };
 
 /// Record type of an inbox: the container a conversation's changes are
@@ -302,6 +302,103 @@ pub struct NeedSummarised {
 
 impl DomainEvent for NeedSummarised {
     const NAME: &'static str = "conversations.need_summarised";
+    const VERSION: u16 = 1;
+
+    fn workspace(&self) -> Option<&str> {
+        Some(&self.workspace)
+    }
+
+    fn changes(&self) -> Vec<FeedChange> {
+        vec![
+            FeedChange::upsert(RecordRef::new(CONVERSATION_RECORD, &self.conversation))
+                .within(inbox_record(self.inbox)),
+        ]
+    }
+}
+
+/// An item of a stored read, as `message_read` carries it: its key, kind and
+/// times, never its title, place or quote.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+pub struct ReadItemFacts {
+    /// Stable for the same message, layer and position.
+    pub key: String,
+    /// What kind of thing it is.
+    pub kind: ItemKind,
+    /// When it starts: an RFC 3339 time with an offset, or a date when
+    /// all-day.
+    pub starts: String,
+    /// When it ends, in the same form.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub ends: Option<String>,
+    /// Whether it lasts whole days.
+    pub all_day: bool,
+    /// Its IANA time zone, when the message gave one.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub time_zone: Option<String>,
+    /// The key of an earlier item of the conversation that it changes.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub updates: Option<String>,
+    /// The key of an earlier item of the conversation that it cancels.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cancels: Option<String>,
+}
+
+/// An ask of a stored read, as `message_read` carries it: its key, verb and
+/// due, never its title, quote or amount.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+pub struct ReadAskFacts {
+    /// Stable for the same message, layer and position.
+    pub key: String,
+    /// Do something, or pay something.
+    pub verb: Verb,
+    /// By when: a date, or an RFC 3339 time with an offset.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub due: Option<String>,
+    /// Whether the read holds an amount (the amount itself is not here).
+    pub has_amount: bool,
+    /// The reference of an open task it repeats.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub same_as: Option<String>,
+}
+
+/// A read of a message was stored, of either layer
+/// (`contracts/conversations.message_read.v1.schema.json`). The schedule
+/// module turns its items into events and the tasks module its asks into
+/// tasks. Ids, enums, keys and times only: no title, place, quote or amount
+/// (a reader fetches them through `conversations.get_message_read`).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+pub struct MessageRead {
+    /// The workspace.
+    pub workspace: String,
+    /// The message read.
+    pub message: MessageId,
+    /// Its conversation.
+    pub conversation: ConversationId,
+    /// Its inbox.
+    pub inbox: InboxId,
+    /// The inbox's personal owner: the one member who reads it. None for a
+    /// shared inbox.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub owner: Option<UserId>,
+    /// Which reader produced it.
+    pub layer: ReadLayer,
+    /// The things that happen at a time, at most five.
+    pub items: Vec<ReadItemFacts>,
+    /// The obligations of the reader, at most three.
+    pub asks: Vec<ReadAskFacts>,
+    /// Whether the read holds a summary of the message.
+    pub summary_ready: bool,
+    /// The titles, places and calendar `UID`s of the items, by key: a
+    /// `read-texts` v1 document, a blob of the workspace that the message
+    /// holds (deleted with it). The schedule module reads it to name the
+    /// events it makes; the event log never holds the text.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schema(value_type = Option<BlobPointer>)]
+    pub texts: Option<BlobRef>,
+}
+
+impl DomainEvent for MessageRead {
+    const NAME: &'static str = "conversations.message_read";
     const VERSION: u16 = 1;
 
     fn workspace(&self) -> Option<&str> {

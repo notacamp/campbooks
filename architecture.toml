@@ -43,6 +43,22 @@ call = "resources::require_own("
 resource = "assistant.profile"
 
 [[access.helpers]]
+call = "ops::require_event("
+resource = "schedule.event"
+
+[[access.helpers]]
+call = "ops::require_events_type("
+resource = "schedule.event"
+
+[[access.helpers]]
+call = "ops::require_calendar("
+resource = "schedule.calendar"
+
+[[access.helpers]]
+call = "ops::require_calendars_type("
+resource = "schedule.calendar"
+
+[[access.helpers]]
 call = "access::require_task("
 resource = "tasks.task"
 
@@ -266,3 +282,23 @@ reason = "Connected-app notices to come (campbooks-cloud#117 batch 3)."
 [[access.unconsumed_events]]
 name = "attention.item_changed"
 reason = "The change feed: Home and the inbox's need chips refresh from it."
+
+[[access.unconsumed_events]]
+name = "schedule.event_created"
+reason = "Nothing consumes it in-process yet: the change feed and the tasks module's holds follow (campbooks-cloud#42)."
+
+[[access.unconsumed_events]]
+name = "schedule.event_changed"
+reason = "Nothing consumes it in-process yet: the change feed and the tasks module's holds follow (campbooks-cloud#42)."
+
+[[access.unconsumed_events]]
+name = "schedule.event_cancelled"
+reason = "Nothing consumes it in-process yet: the change feed and the tasks module's holds follow (campbooks-cloud#42)."
+
+[[access.unconsumed_events]]
+name = "schedule.outbound_requested"
+reason = "The connectors module's calendar write-backs, in the next phase of campbooks-cloud#42; remove this entry when it consumes the event."
+
+[[access.unconsumed_events]]
+name = "schedule.calendar_sync_changed"
+reason = "The connectors module's calendar reads (a calendar turned on is read from the start), in the next phase of campbooks-cloud#42; remove this entry when it consumes the event."

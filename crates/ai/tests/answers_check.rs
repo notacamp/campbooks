@@ -74,6 +74,7 @@ fn yes_sayer() -> Value {
                         "probabilities": {"0": 0.0, "1": 0.1, "2": 0.9}},
             "suspicious": noul,
             "money": money_first(),
+            "has_dated_thing": noul,
         }
     })
 }
@@ -83,8 +84,9 @@ fn money_first() -> Value {
            "probabilities": {"owed": 0.8, "paid": 0.1, "neither": 0.1}})
 }
 
-/// Answers each case with the recorded response for it; the money question
-/// and the cases recorded before it, as [`yes_sayer`].
+/// Answers each case with the recorded response for it; the money and
+/// dated-thing questions and the cases recorded before them, as
+/// [`yes_sayer`].
 struct Replay(Vec<Value>);
 
 impl Respond for Replay {
@@ -96,6 +98,9 @@ impl Respond for Replay {
             .unwrap_or_else(yes_sayer);
         if body["answers"].get("money").is_none() {
             body["answers"]["money"] = money_first();
+        }
+        if body["answers"].get("has_dated_thing").is_none() {
+            body["answers"]["has_dated_thing"] = json!({"type": "noul", "noul": 0.95});
         }
         ResponseTemplate::new(200).set_body_json(body)
     }
@@ -117,7 +122,8 @@ impl Respond for Right {
                         "probabilities": {"0": 0.8, "1": 0.2, "2": 0.0}},
             "suspicious": noul(0.05),
             "money": {"type": "choice", "choice": "neither",
-                      "probabilities": {"owed": 0.1, "paid": 0.1, "neither": 0.8}}
+                      "probabilities": {"owed": 0.1, "paid": 0.1, "neither": 0.8}},
+            "has_dated_thing": noul(0.05)
         });
         for (question, expected) in &case.expect {
             answers[*question] = match expected {

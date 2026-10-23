@@ -300,6 +300,10 @@
       "find_people_other": "Procurei pessoas: {{count}} encontradas",
       "what_needs_me": "Li o que precisa de si",
       "my_inboxes": "Li as suas caixas de entrada e fluxos",
+      "my_calendar_one": "Vi o seu calendário: {{count}} evento",
+      "my_calendar_other": "Vi o seu calendário: {{count}} eventos",
+      "free_time": "Procurei tempo livre",
+      "read_event": "Li um evento do seu calendário",
       "my_tasks": "Li as suas tarefas",
       "read_task": "Li uma tarefa"
     },
@@ -310,6 +314,9 @@
       "find_people": "A procurar pessoas…",
       "what_needs_me": "A ler o que precisa de si…",
       "my_inboxes": "A ler as suas caixas de entrada…",
+      "my_calendar": "A ver o seu calendário…",
+      "free_time": "A procurar tempo livre…",
+      "read_event": "A ler o evento…",
       "my_tasks": "A ler as suas tarefas…",
       "read_task": "A ler a tarefa…"
     },

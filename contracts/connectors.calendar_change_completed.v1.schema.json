@@ -1,0 +1,49 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://campbooks.example.com/contracts/connectors.calendar_change_completed.v1.schema.json",
+  "title": "connectors.calendar_change_completed v1 (event payload)",
+  "description": "Published by the connectors module when a change asked for by `schedule.outbound_requested` ends: `applied` (with the provider's id and new etag), `superseded` (the event had changed at the provider: `changed_at_provider`, and the provider's version arrives in the next batch), `skipped` (nothing was written) or `failed`. Ids, a closed reason code and the provider's opaque id and etag; never event text. Workspace-scoped.",
+  "type": "object",
+  "required": ["workspace", "request", "calendar", "event", "outcome"],
+  "additionalProperties": false,
+  "properties": {
+    "workspace": { "type": "string" },
+    "request": { "$ref": "#/$defs/uuid" },
+    "calendar": { "$ref": "#/$defs/uuid" },
+    "event": { "$ref": "#/$defs/uuid" },
+    "outcome": { "enum": ["applied", "superseded", "skipped", "failed"] },
+    "provider_event_id": { "type": "string", "minLength": 1, "maxLength": 1024, "description": "The event's id at the provider (applied only; opaque)." },
+    "etag": { "type": "string", "maxLength": 256, "description": "The new etag (applied only; opaque)." },
+    "reason": {
+      "enum": [
+        "changed_at_provider",
+        "unverified",
+        "not_connected",
+        "needs_reauth",
+        "rejected",
+        "not_found",
+        "unavailable",
+        "api_not_enabled",
+        "too_many_attempts"
+      ],
+      "description": "Why it did not apply (superseded, skipped and failed)."
+    }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "outcome": { "const": "applied" } } },
+      "then": { "required": ["provider_event_id"], "not": { "required": ["reason"] } },
+      "else": { "required": ["reason"], "not": { "required": ["provider_event_id"] } }
+    },
+    {
+      "if": { "properties": { "outcome": { "const": "superseded" } } },
+      "then": { "properties": { "reason": { "const": "changed_at_provider" } } }
+    }
+  ],
+  "$defs": {
+    "uuid": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+    }
+  }
+}

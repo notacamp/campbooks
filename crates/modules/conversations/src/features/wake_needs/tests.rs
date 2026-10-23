@@ -174,12 +174,12 @@ async fn a_lapsed_ask_is_cleared_and_shows_as_expired(db: PgPool) {
     let message = kit.message_of("needs-1").await;
     // Scout read a lapse time; time went by since the need took it.
     sqlx::query(
-        "INSERT INTO conversations.need_summaries
-             (message_id, workspace_id, state, texts, lapses_at, dates_read_at)
-         SELECT m.id, m.workspace_id, 'written', '{\"en\": \"Marta sent a link.\"}',
-                now() - interval '5 minutes', now()
+        "INSERT INTO conversations.message_reads
+             (message_id, workspace_id, layer, state, texts, lapses_at, dates_read_at, read_at)
+         SELECT m.id, m.workspace_id, 'model', 'read', '{\"en\": \"Marta sent a link.\"}',
+                now() - interval '5 minutes', now(), now()
            FROM conversations.messages m WHERE m.id = $1::uuid
-         ON CONFLICT (message_id) DO UPDATE
+         ON CONFLICT (message_id, layer) DO UPDATE
             SET lapses_at = EXCLUDED.lapses_at, dates_read_at = EXCLUDED.dates_read_at",
     )
     .bind(&message)

@@ -1,0 +1,20 @@
+{
+  "errors": {
+    "calendar_read_only": "That calendar cannot be written. Choose one of your calendars that can.",
+    "change_pending": "An earlier change to this event has not reached the calendar yet. Try again in a moment.",
+    "invalid_calendar": "Choose one of your own calendars that is on and can be written, or leave this out.",
+    "invalid_color": "A colour is written as #rrggbb, for example #0b8043.",
+    "invalid_hours": "Working hours need a known weekday (mon to sun), times as HH:MM, and an end after the start.",
+    "invalid_kind": "That is not a kind of event Scout can add. Choose from charge, appointment, meeting, travel, stay, show, reservation, delivery or expiry.",
+    "invalid_minutes": "Ask for a slot of 5 to 1,440 minutes.",
+    "invalid_text": "A title is needed, and the title, place and notes must not be too long.",
+    "invalid_time_zone": "Use an IANA time zone name, such as Europe/Lisbon.",
+    "invalid_undo": "That undo does not match this deleted event.",
+    "invalid_when": "Times are an RFC 3339 time with an offset or a YYYY-MM-DD date, both of the same kind, with the end after the start.",
+    "invalid_window": "Ask for a window that ends after it starts and is at most the longest allowed (a year for events, 62 days for free time).",
+    "not_on_campbooks": "Only an event on your Campbooks calendar can be added to a provider calendar, and only to a different one.",
+    "not_pushed": "This event was not added from your Campbooks calendar.",
+    "nothing_to_change": "Say what to change.",
+    "series_not_editable": "A series is changed one occurrence at a time. Name the occurrence."
+  }
+}

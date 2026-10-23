@@ -1,0 +1,243 @@
+{
+  "title": "Calendario",
+  "loadError": "No se pudo cargar tu calendario.",
+  "retry": "Reintentar",
+  "period": {
+    "zone": "Hora de {{city}}"
+  },
+  "views": {
+    "label": "Vista",
+    "agenda": "Agenda",
+    "week": "Semana",
+    "month": "Mes"
+  },
+  "toolbar": {
+    "label": "Acciones del calendario",
+    "previousWeek": "Semana anterior",
+    "nextWeek": "Semana siguiente",
+    "previousMonth": "Mes anterior",
+    "nextMonth": "Mes siguiente",
+    "today": "Hoy",
+    "newEvent": "Nuevo evento"
+  },
+  "agenda": {
+    "today": "Hoy",
+    "empty": "Nada en tu calendario.",
+    "week": "Esta semana"
+  },
+  "week": {
+    "label": "Semana",
+    "due": "Vencen",
+    "allDay": "Todo el día"
+  },
+  "month": {
+    "label": "Mes",
+    "more": "+{{count}} más"
+  },
+  "when": {
+    "allDay": "Todo el día",
+    "from": "Desde las {{time}}",
+    "range": "{{start}} – {{end}}"
+  },
+  "kind": {
+    "charge": "Cargo",
+    "appointment": "Cita",
+    "meeting": "Reunión",
+    "travel": "Viaje",
+    "stay": "Estancia",
+    "show": "Espectáculo",
+    "reservation": "Reserva",
+    "delivery": "Entrega",
+    "expiry": "Caducidad",
+    "hold": "Reservado",
+    "none": "Evento",
+    "due": "Vencimiento"
+  },
+  "from": {
+    "email": "De un correo"
+  },
+  "sheet": {
+    "close": "Cerrar",
+    "kind": "Tipo: {{kind}}. Cambiar",
+    "kindMenu": "Tipo",
+    "inZone": "{{time}}, hora de {{city}}",
+    "onlyYou": "Solo tú lo ves hasta que lo añadas a un calendario",
+    "synced": "Sincronizado en ambos sentidos",
+    "source": {
+      "label": "De un correo",
+      "meta": "{{sender}} · {{when}}",
+      "open": "Abrir el correo"
+    },
+    "how": {
+      "label": "Cómo lo supo Scout",
+      "structured": "Leído de los datos que el remitente adjuntó para máquinas. No se usó IA.",
+      "model": "Scout leyó el correo y encontró la fecha en esta frase:"
+    },
+    "edit": "Editar",
+    "remove": "Quitar",
+    "addToMine": "Añadir a mi calendario",
+    "alsoIn": "También en {{calendar}}",
+    "pick": "¿A qué calendario?",
+    "always": "Añadir siempre {{kind}} a este calendario",
+    "rsvp": "¿Vas?",
+    "series": "Se repite",
+    "release": "Liberar el tiempo",
+    "pushed": "También en tu calendario"
+  },
+  "rsvp": {
+    "needs_action": "Sin responder",
+    "accepted": "Aceptar",
+    "tentative": "Quizá",
+    "declined": "Rechazar"
+  },
+  "notice": {
+    "keptTheirs": "Cambiado en {{where}} mientras tanto; nos quedamos con su versión",
+    "notSaved": "No pudimos guardar tu último cambio.",
+    "pending": "Tu cambio va de camino a {{where}}."
+  },
+  "due": {
+    "label": "Vence",
+    "pay": "Pagar · {{title}}",
+    "payAmount": "Pagar · {{title}} · {{amount}}",
+    "do": "Hacer · {{title}}",
+    "today": "Vence hoy",
+    "at": "Vence a las {{time}}",
+    "overdue_one": "Vencida · {{count}} día",
+    "overdue_other": "Vencida · {{count}} días",
+    "meta": "Tarea",
+    "wasDue": "Vencía el {{day}}",
+    "dueOn": "Vence el {{day}}",
+    "note": "Una tarea: vive en tus tareas y aparece aquí el día de su vencimiento",
+    "calendar": "Tareas",
+    "markPaid": "Márcala como pagada desde la tarea",
+    "markDone": "Márcala como hecha desde la tarea",
+    "paid": "Pagada",
+    "done": "Hecha",
+    "hold": "Reservar tiempo",
+    "later": "Más tarde",
+    "open": "Abrir tarea",
+    "failed": "No se pudo. Inténtalo de nuevo."
+  },
+  "form": {
+    "newTitle": "Nuevo evento",
+    "editTitle": "Editar evento",
+    "name": "Título",
+    "kind": "Tipo",
+    "day": "Fecha",
+    "allDay": "Todo el día",
+    "starts": "Empieza",
+    "ends": "Termina",
+    "place": "Lugar",
+    "save": "Guardar",
+    "add": "Añadir evento",
+    "cancel": "Cancelar",
+    "error": "No se pudo guardar. Revisa la fecha y la hora.",
+    "fromEmail": "Del correo «{{subject}}»"
+  },
+  "toast": {
+    "removed": "{{title}} quitado. Scout no volverá a añadirlo.",
+    "created": "{{title}} añadido",
+    "kindChanged": "{{title}} ahora es {{kind}}",
+    "pushed": "Añadido a {{calendar}}",
+    "answered": "{{title}}: {{response}}",
+    "saved": "{{title}} guardado"
+  },
+  "found": {
+    "label": "Scout se ha fijado",
+    "reading": "Scout está leyendo esto…",
+    "failed": "Scout no pudo leer este correo.",
+    "added": "En tu calendario de Campbooks",
+    "alsoIn": "También en {{calendar}}",
+    "undo": "Deshacer",
+    "removed": "Quitado de tu calendario. Scout no volverá a añadirlo.",
+    "putBack": "Volver a ponerlo",
+    "add": "Añadir",
+    "cantRead": "Scout no puede leer los detalles en este servidor. Añádelo y completa la hora.",
+    "has": {
+      "charge": "Este correo tiene un cargo",
+      "appointment": "Este correo tiene una cita",
+      "meeting": "Este correo tiene una reunión",
+      "travel": "Este correo tiene un viaje",
+      "stay": "Este correo tiene una estancia",
+      "show": "Este correo tiene un espectáculo",
+      "reservation": "Este correo tiene una reserva",
+      "delivery": "Este correo tiene una entrega",
+      "expiry": "Este correo tiene una caducidad"
+    }
+  },
+  "settings": {
+    "label": "Ajustes del calendario",
+    "title": "Calendario",
+    "lead": "De dónde vienen tus eventos, cuándo trabajas y qué añade Scout a partir de tu correo.",
+    "calendars": {
+      "title": "Calendarios",
+      "description": "Campbooks lee y escribe en estos calendarios en ambos sentidos. Tu calendario de Campbooks guarda lo que Scout encuentra en tu correo; solo tú lo ves hasta que añades un evento a otro.",
+      "campbooks": "Lo que Scout encuentra en tu correo · solo tú",
+      "alwaysOn": "Siempre activo",
+      "primary": "principal",
+      "readOnly": "solo lectura",
+      "show": "Mostrar {{name}}",
+      "colour": "Color de {{name}}",
+      "access": "Dar acceso al calendario",
+      "accessHint": "Solo correo. Da acceso al calendario para ver aquí los calendarios de esta cuenta.",
+      "refused": "No se pudo empezar. Inténtalo de nuevo."
+    },
+    "kinds": {
+      "title": "Qué añade Scout a partir de tu correo",
+      "description": "Scout lo pone en tu calendario de Campbooks, cada cosa enlazada a su correo. Elige un calendario para añadirlo también allí sin preguntar. Las fechas de pagar y de hacer pasan a ser tareas, no eventos.",
+      "add": "Scout añade {{kind}}",
+      "alsoAdd": "Añadir también a",
+      "nowhere": "A ningún otro",
+      "travel": "Vuelos, trenes, autobuses, alquiler de coche",
+      "stay": "Hoteles y alquileres, de la entrada a la salida",
+      "show": "Conciertos, teatro, cine, partidos",
+      "reservation": "Restaurantes y mesas",
+      "appointment": "Médicos, servicios, visitas",
+      "meeting": "Invitaciones enviadas como archivo de calendario",
+      "delivery": "Paquetes y sus franjas de entrega",
+      "charge": "Renovaciones y domiciliaciones que se cobran solas",
+      "expiry": "Cosas que terminan sin nada que hacer"
+    },
+    "kindNames": {
+      "travel": "Viajes",
+      "stay": "Estancias",
+      "show": "Espectáculos y entradas",
+      "reservation": "Reservas",
+      "appointment": "Citas",
+      "meeting": "Reuniones",
+      "delivery": "Entregas",
+      "charge": "Cargos",
+      "expiry": "Caducidades"
+    },
+    "time": {
+      "title": "Zona horaria y horario de trabajo",
+      "description": "Las horas se muestran en tu zona. El horario de trabajo es donde Scout busca tiempo libre cuando reservas tiempo para una tarea.",
+      "zone": "Zona horaria",
+      "zoneHint": "Fijada desde este dispositivo hasta que la cambies",
+      "days": "Días laborables",
+      "hours": "Horario de trabajo",
+      "from": "De",
+      "to": "a",
+      "weekdays": {
+        "mon": "Lun",
+        "tue": "Mar",
+        "wed": "Mié",
+        "thu": "Jue",
+        "fri": "Vie",
+        "sat": "Sáb",
+        "sun": "Dom"
+      }
+    }
+  },
+  "shortcuts": {
+    "agenda": "Agenda",
+    "week": "Semana",
+    "month": "Mes",
+    "today": "Ir a hoy",
+    "create": "Nuevo evento",
+    "edit": "Editar evento",
+    "remove": "Quitar evento",
+    "push": "Añadir a mi calendario",
+    "openEmail": "Abrir el correo"
+  }
+}

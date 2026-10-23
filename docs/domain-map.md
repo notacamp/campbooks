@@ -307,13 +307,20 @@ source module's `SearchSource` port (ADR 0016); `WorkspaceDeleting`.
 **Language**
 - **Calendar** — a provider calendar the workspace syncs, shared as `reader`,
   `writer`, `manager`.
+- **Campbooks calendar** — a member's own calendar, which no provider sees:
+  where Scout puts the dated things it reads in their email.
 - **Event** — something at a time on a calendar; **occurrence** — one
-  instance of a recurring event. **Event type** — the workspace's own kinds.
+  instance of a recurring event. **Kind** — from a fixed set (`charge`,
+  `appointment`, `meeting`, `travel`, `stay`, `show`, `reservation`,
+  `delivery`, `expiry`, `hold`, `none`); obligations are never events.
 - **Availability** — a member's free time within working hours.
 
-**Publishes** `EventCreated`, `EventChanged`, `EventCancelled`.
-**Consumes** its change streams; `TimeHeld`. **AI** event type (`choice`) in
-the event's pass; `complete` to propose an event from a message.
+**Publishes** `schedule.event_created`, `schedule.event_changed`,
+`schedule.event_cancelled`, `schedule.outbound_requested` (ids and times only).
+**Consumes** `connectors.calendar_changed`, `conversations.message_read` (its
+items), `TimeHeld`. **AI** none of its own: the dated things in mail are read
+once per email by `conversations` (the decide pass's `has_dated_thing` and
+`dated_kind`, then one `complete` read).
 
 ### tasks
 
