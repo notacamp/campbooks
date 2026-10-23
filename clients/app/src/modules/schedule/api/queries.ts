@@ -14,7 +14,6 @@ import { sameMoment, type Period } from "../model";
 
 import type {
   CalendarView,
-  EventKind,
   EventPatch,
   EventView,
   MessageRead,

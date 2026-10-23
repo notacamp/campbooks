@@ -135,7 +135,7 @@ export function scheduleApi(
     routes[`POST ${path}/response`] = (body) => {
       const before = find(event.id) ?? event;
       const { response } = body as { response: Event["response"] };
-      const after = replace({ ...before, response });
+      const after = replace({ ...before, response: response ?? null });
       return { body: { event: after, previous_response: before.response ?? "needs_action" } };
     };
   }

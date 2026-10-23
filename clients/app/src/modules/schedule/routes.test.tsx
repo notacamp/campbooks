@@ -33,7 +33,7 @@ import { buildScheduleRoutes } from "./index";
 
 const S = `${W}/schedule`;
 
-const consent = (start = vi.fn()): MailboxConsent => ({
+const consent = (start: MailboxConsent["start"] = vi.fn()): MailboxConsent => ({
   providers: ["google", "zoho"],
   providersFailed: false,
   start,
@@ -45,7 +45,7 @@ const consent = (start = vi.fn()): MailboxConsent => ({
 
 function renderAt(
   path: string,
-  { locale = "en", start }: { locale?: "en" | "pt-PT"; start?: ReturnType<typeof vi.fn> } = {},
+  { locale = "en", start }: { locale?: "en" | "pt-PT"; start?: MailboxConsent["start"] } = {},
 ) {
   const root = createRootRoute({ component: Outlet });
   const workspace = createRoute({
@@ -302,7 +302,7 @@ describe("the Due layer", () => {
 
   it("marks it paid with E, and offers Undo", async () => {
     const view = withDue();
-    const done = vi.fn(() => Promise.resolve({ label: "EDP bill marked paid", undo: vi.fn() }));
+    const done = vi.fn((_input: unknown) => Promise.resolve({ label: "EDP bill marked paid", undo: vi.fn() }));
     view.queryClient.setMutationDefaults(DUE_ACTION_KEY, { mutationFn: done });
 
     fireEvent.click(await screen.findByRole("button", { name: /Pay · EDP bill/u }));
