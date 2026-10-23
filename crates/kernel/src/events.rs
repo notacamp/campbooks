@@ -254,28 +254,26 @@ impl EventBus {
                 .await?
             }
         };
-        let id = match event.workspace() {
-            // An instance-wide event's id is chosen here and nothing is read
-            // back: a workspace transaction may read no instance-wide row
-            // (campbooks-cloud#211), and row-level security checks a
-            // `RETURNING` against the read policies.
-            None => {
-                append_instance_wide(
-                    tx,
-                    E::NAME,
-                    E::VERSION,
-                    &payload,
-                    &kinds,
-                    &queues,
-                    &max_attempts,
-                )
-                .await?
-            }
-            Some(_) => {
-                // Each delivery remembers who caused it (`origin`), so the
-                // events its handler tracks name them (ADR 0020).
-                let id: uuid::Uuid = sqlx::query_scalar(
-                    r"
+        // An instance-wide event's id is chosen here and nothing is read
+        // back: a workspace transaction may read no instance-wide row
+        // (campbooks-cloud#211), and row-level security checks a
+        // `RETURNING` against the read policies.
+        let id = if event.workspace().is_none() {
+            append_instance_wide(
+                tx,
+                E::NAME,
+                E::VERSION,
+                &payload,
+                &kinds,
+                &queues,
+                &max_attempts,
+            )
+            .await?
+        } else {
+            // Each delivery remembers who caused it (`origin`), so the
+            // events its handler tracks name them (ADR 0020).
+            let id: uuid::Uuid = sqlx::query_scalar(
+                r"
             WITH event AS (
                 INSERT INTO kernel.events (name, version, workspace_id, payload)
                 VALUES ($1, $2, $3, $4)
@@ -291,20 +289,19 @@ impl EventBus {
             )
             SELECT id FROM event
             ",
-                )
-                .bind(E::NAME)
-                .bind(i32::from(E::VERSION))
-                .bind(event.workspace())
-                .bind(payload)
-                .bind(&kinds)
-                .bind(&queues)
-                .bind(&max_attempts)
-                .bind(crate::telemetry::current_traceparent())
-                .bind(crate::tracking::origin())
-                .fetch_one(&mut **tx)
-                .await?;
-                EventId::from_uuid(id)
-            }
+            )
+            .bind(E::NAME)
+            .bind(i32::from(E::VERSION))
+            .bind(event.workspace())
+            .bind(payload)
+            .bind(&kinds)
+            .bind(&queues)
+            .bind(&max_attempts)
+            .bind(crate::telemetry::current_traceparent())
+            .bind(crate::tracking::origin())
+            .fetch_one(&mut **tx)
+            .await?;
+            EventId::from_uuid(id)
         };
         crate::db::lower(tx, lifted).await?;
 

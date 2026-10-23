@@ -1221,6 +1221,10 @@ pub const ADMIN_EXTENSION: &str = "x-campbooks-admin";
 /// kernel may name it.
 pub const ADMIN_READS_SETTING: &str = "campbooks.admin_reads";
 
+/// The tooling crate (`campbooks-tracking-plan`): repository tooling with
+/// no database access.
+const TOOLING_DIR: &str = "crates/tracking-plan/";
+
 /// Files besides the admin module allowed to name schema `admin`: the
 /// server's CLI.
 pub const ADMIN_CLI_FILES: [&str; 2] = [
@@ -1444,7 +1448,10 @@ pub fn check_admin_sources(files: &[(String, String)]) -> Vec<String> {
     for (path, text) in files {
         let in_admin = path.starts_with(&format!("crates/modules/{ADMIN_MODULE}/"));
         let in_cli = ADMIN_CLI_FILES.contains(&path.as_str());
-        if !in_admin && !in_cli {
+        // The tooling crate reads no database (it has no sqlx); it names the
+        // admin API's OpenAPI file, `openapi/admin.json`.
+        let in_tooling = path.starts_with(TOOLING_DIR);
+        if !in_admin && !in_cli && !in_tooling {
             for literal in string_literals(text) {
                 if names_schema(&literal, ADMIN_MODULE) {
                     violations.push(format!(
