@@ -118,7 +118,9 @@ describe("ScoutChat", () => {
     expect(asked?.body).toMatchObject({ text: WHY });
     // The answer is plain text: its list is a list, nothing is a link.
     const answer = screen.getByRole("article", { name: "Scout answered" });
-    expect(within(answer).getAllByRole("listitem")).toHaveLength(2);
+    expect(within(answer).getByText("Scout read that it needs a reply, 90% sure.").tagName).toBe(
+      "LI",
+    );
     expect(within(answer).queryByRole("link")).not.toBeInTheDocument();
   });
 
