@@ -32,6 +32,102 @@
       }
     },
     {
+      "name": "connectors.calendar_change_completed",
+      "module": "connectors",
+      "version": 1,
+      "workspaceScoped": true,
+      "payload": {
+        "type": "object",
+        "description": "A calendar change ended\n(`contracts/connectors.calendar_change_completed.v1.schema.json`).",
+        "required": [
+          "workspace",
+          "request",
+          "calendar",
+          "event",
+          "outcome"
+        ],
+        "properties": {
+          "calendar": {
+            "type": "string",
+            "format": "uuid",
+            "description": "The calendar (an id of the schedule module)."
+          },
+          "etag": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The new etag (applied only; opaque)."
+          },
+          "event": {
+            "type": "string",
+            "format": "uuid",
+            "description": "The event (an id of the schedule module)."
+          },
+          "outcome": {
+            "$ref": "#/components/schemas/CalendarOutcome",
+            "description": "How it ended."
+          },
+          "provider_event_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The event's id at the provider (applied only; opaque)."
+          },
+          "reason": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/CalendarReason",
+                "description": "Why it did not apply."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "request": {
+            "type": "string",
+            "format": "uuid",
+            "description": "The request (an id of the schedule module)."
+          },
+          "workspace": {
+            "type": "string",
+            "description": "The workspace."
+          }
+        }
+      }
+    },
+    {
+      "name": "connectors.calendar_changed",
+      "module": "connectors",
+      "version": 1,
+      "workspaceScoped": true,
+      "payload": {
+        "type": "object",
+        "description": "A calendar stream produced a `calendar-change-batch` for one provider\ncalendar (`contracts/connectors.calendar_changed.v1.schema.json`).\nPublished in the transaction that advances the stream's cursor; the\nschedule module applies it. Declared with the contract, published by the\nGoogle Calendar adapter (campbooks-cloud#42).",
+        "required": [
+          "workspace",
+          "connection",
+          "batch"
+        ],
+        "properties": {
+          "batch": {
+            "$ref": "#/components/schemas/BlobRef",
+            "description": "The `calendar-change-batch` v1 document, a blob of the workspace."
+          },
+          "connection": {
+            "$ref": "#/components/schemas/ConnectionId",
+            "description": "The connection."
+          },
+          "workspace": {
+            "type": "string",
+            "description": "The workspace."
+          }
+        }
+      }
+    },
+    {
       "name": "connectors.capability_granted",
       "module": "connectors",
       "version": 1,
@@ -579,6 +675,17 @@
           "summary_ready": {
             "type": "boolean",
             "description": "Whether the read holds a summary of the message."
+          },
+          "texts": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/BlobPointer",
+                "description": "The titles, places and calendar `UID`s of the items, by key: a\n`read-texts` v1 document, a blob of the workspace that the message\nholds (deleted with it). The schedule module reads it to name the\nevents it makes; the event log never holds the text."
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "workspace": {
             "type": "string",
@@ -1253,6 +1360,40 @@
       }
     },
     {
+      "name": "schedule.calendar_sync_changed",
+      "module": "schedule",
+      "version": 1,
+      "workspaceScoped": true,
+      "payload": {
+        "type": "object",
+        "description": "A provider calendar was turned on or off for the member. Connectors reads\na calendar turned on again from the start, and stops reading one turned\noff (`contracts/schedule.calendar_sync_changed.v1.schema.json`).",
+        "required": [
+          "workspace",
+          "calendar",
+          "connection",
+          "syncing"
+        ],
+        "properties": {
+          "calendar": {
+            "$ref": "#/components/schemas/CalendarId",
+            "description": "The calendar."
+          },
+          "connection": {
+            "$ref": "#/components/schemas/ConnectionId",
+            "description": "The connection whose calendar it is."
+          },
+          "syncing": {
+            "type": "boolean",
+            "description": "Whether it syncs now."
+          },
+          "workspace": {
+            "type": "string",
+            "description": "The workspace."
+          }
+        }
+      }
+    },
+    {
       "name": "schedule.event_cancelled",
       "module": "schedule",
       "version": 1,
@@ -1866,6 +2007,31 @@
         "type": "string",
         "format": "uuid",
         "description": "CalendarId (UUIDv7)"
+      },
+      "CalendarOutcome": {
+        "type": "string",
+        "description": "How a calendar change asked for by `schedule.outbound_requested` ended.",
+        "enum": [
+          "applied",
+          "superseded",
+          "skipped",
+          "failed"
+        ]
+      },
+      "CalendarReason": {
+        "type": "string",
+        "description": "Why a calendar change did not apply: a closed set, never the provider's\nwords.",
+        "enum": [
+          "changed_at_provider",
+          "unverified",
+          "not_connected",
+          "needs_reauth",
+          "rejected",
+          "not_found",
+          "unavailable",
+          "api_not_enabled",
+          "too_many_attempts"
+        ]
       },
       "Capability": {
         "type": "string",
