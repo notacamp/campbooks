@@ -67,7 +67,7 @@ impl Timing {
     fn of(deps: &Deps) -> Self {
         let imap = &deps.imap.config;
         Self {
-            refresh: Duration::from_secs(u64::from(imap.idle_refresh_minutes) * 60),
+            refresh: Duration::from_mins(u64::from(imap.idle_refresh_minutes)),
             debounce: Duration::from_secs(u64::from(imap.idle_debounce_seconds)),
             renew: RENEW_EVERY,
             lease: Duration::from_secs(lease::LEASE_SECONDS.unsigned_abs().into()),

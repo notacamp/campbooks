@@ -105,14 +105,14 @@ async fn mailbox(db: PgPool, idle: bool, config: impl FnOnce(&mut ImapConfig)) -
 /// three failures; a debounce longer than any test.
 fn timing() -> Timing {
     Timing {
-        refresh: Duration::from_secs(60),
-        debounce: Duration::from_secs(600),
-        renew: Duration::from_secs(60),
-        lease: Duration::from_secs(180),
+        refresh: Duration::from_mins(1),
+        debounce: Duration::from_mins(10),
+        renew: Duration::from_mins(1),
+        lease: Duration::from_mins(3),
         backoff: Duration::from_millis(10),
         backoff_max: Duration::from_millis(40),
         give_up_after: 3,
-        cooldown: Duration::from_secs(1_800),
+        cooldown: Duration::from_mins(30),
     }
 }
 

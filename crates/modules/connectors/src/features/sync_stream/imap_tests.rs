@@ -1033,14 +1033,14 @@ async fn idle_sessions_count_against_a_small_hosts_sessions(db: PgPool) {
         m.kit.deps.clone(),
         m.kit.state.clone(),
         crate::features::imap_idle::Timing {
-            refresh: std::time::Duration::from_secs(60),
-            debounce: std::time::Duration::from_secs(600),
-            renew: std::time::Duration::from_secs(60),
-            lease: std::time::Duration::from_secs(180),
+            refresh: std::time::Duration::from_mins(1),
+            debounce: std::time::Duration::from_mins(10),
+            renew: std::time::Duration::from_mins(1),
+            lease: std::time::Duration::from_mins(3),
             backoff: std::time::Duration::from_millis(10),
             backoff_max: std::time::Duration::from_millis(40),
             give_up_after: 3,
-            cooldown: std::time::Duration::from_secs(1_800),
+            cooldown: std::time::Duration::from_mins(30),
         },
     );
     let mut held = crate::features::imap_idle::IdlePool::held();
