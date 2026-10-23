@@ -41,7 +41,7 @@
       "change": "The first plan: conversations.conversation_archived and conversations.conversation_unarchived, with a conversations.conversation snapshot (the reference flow of ADR 0020).",
       "date": "2026-10-23",
       "plan_version": 1,
-      "pr": ""
+      "pr": "#632"
     }
   ],
   "coverage": [
