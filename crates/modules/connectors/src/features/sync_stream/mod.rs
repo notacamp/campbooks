@@ -710,7 +710,9 @@ impl SyncStream {
                 self.trouble(ctx, workspace, target, &err, now).await?;
                 Ok(None)
             }
-            Err(ImapTrouble::Failed(Failure::Read(err))) => Err(JobError::retry(err.to_string())),
+            Err(ImapTrouble::Failed(Failure::Read(other))) => {
+                Err(JobError::retry(other.to_string()))
+            }
         }
     }
 
@@ -1117,7 +1119,7 @@ impl SyncStream {
 const LOGIN_REFUSALS: u32 = 3;
 
 /// The longest an IMAP run may take in all, well within a lease.
-const IMAP_RUN_LIMIT: Duration = Duration::from_secs(600);
+const IMAP_RUN_LIMIT: Duration = Duration::from_mins(10);
 
 /// Seconds an IMAP host's session slots take to refill whole: a slot a
 /// process died holding comes back within a lease.

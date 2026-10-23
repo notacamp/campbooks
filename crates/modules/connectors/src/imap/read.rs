@@ -75,7 +75,7 @@ const LOOKUP_HITS: usize = 200;
 pub const LIST_EVERY: TimeDelta = TimeDelta::minutes(30);
 
 /// A run starts nothing new after this long.
-pub const SOFT_DEADLINE: Duration = Duration::from_secs(120);
+pub const SOFT_DEADLINE: Duration = Duration::from_mins(2);
 
 /// The header fields a message is identified by.
 const HEADER_FIELDS: &str = "BODY.PEEK[HEADER.FIELDS (MESSAGE-ID DATE FROM TO SUBJECT)]";
@@ -221,6 +221,18 @@ struct Known {
     rfc_message_id: Option<String>,
     internal_date: DateTime<Utc>,
 }
+
+/// An index row as [`Known`] is read from it: provider message id, row,
+/// labels, document hash and size, `Message-ID`, internal date.
+type KnownRow = (
+    String,
+    Uuid,
+    Vec<String>,
+    String,
+    i64,
+    Option<String>,
+    DateTime<Utc>,
+);
 
 /// A message this run downloaded: where its change and index row are.
 #[derive(Debug, Clone, Copy)]
@@ -672,7 +684,7 @@ impl Reader<'_> {
         let top = *folder.uidnext.get_or_insert(uidnext);
         let below = folder.backfill_low_uid.unwrap_or(top);
         if below > 1 {
-            let since = self.window().format("%-d-%b-%Y");
+            let since = self.window().format("%d-%b-%Y");
             let mut uids = self
                 .search(&format!("UID 1:{} SINCE {since}", below - 1))
                 .await?;
@@ -1274,15 +1286,7 @@ impl Reader<'_> {
             return Ok(());
         }
         let mut tx = self.pool.begin_for(self.workspace).await?;
-        let rows: Vec<(
-            String,
-            Uuid,
-            Vec<String>,
-            String,
-            i64,
-            Option<String>,
-            DateTime<Utc>,
-        )> = sqlx::query_as(
+        let rows: Vec<KnownRow> = sqlx::query_as(
             "SELECT provider_message_id, id, label_ids, document_hash, document_size,
                         rfc_message_id, internal_date
                    FROM connectors.messages
