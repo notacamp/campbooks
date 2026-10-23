@@ -91,14 +91,6 @@ export function addresseeLine(t: Translate, message: MessageView): string {
     : t("reader.toNameOthers", { name, count: others });
 }
 
-/** Who Reply answers: the sender, or for a message of yours, its first recipient. */
-export function replyName(message: MessageView): string {
-  if (message.direction === "outbound") {
-    return displayName(message.to[0] ?? message.cc[0]);
-  }
-  return displayName(message.from);
-}
-
 export function streamName(t: Translate, stream: Stream): string {
   return t(`streams.${stream}`);
 }

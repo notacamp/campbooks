@@ -37,7 +37,6 @@ import {
   openByDefault,
   placeName,
   placementLine,
-  replyName,
   spamMove,
   streamName,
   threadLayout,
@@ -442,8 +441,18 @@ export function ConversationReader({
   const unread = conversation.unread_count > 0;
   const replyButtons =
     renderReplySlot === undefined ? null : (
-      // Reply is the pinned footer's (the floating bar's on phones).
+      // Phones: Reply is the floating bar's.
       <span className="flex flex-wrap gap-1 max-md:hidden">
+        <Button
+          variant="ghost"
+          icon="reply"
+          shortcut="item.reply"
+          onClick={() => {
+            openReply();
+          }}
+        >
+          {tShortcuts("item.reply")}
+        </Button>
         <Button
           variant="ghost"
           icon="reply-all"
@@ -819,22 +828,6 @@ export function ConversationReader({
       </ReaderBody>
       <ReaderFooter
         slot={renderReplySlot?.(replyContext)}
-        prompt={
-          renderReplySlot === undefined || newest === undefined ? undefined : (
-            <Button
-              icon="reply"
-              shortcut="item.reply"
-              grow
-              onClick={() => {
-                openReply();
-              }}
-            >
-              {replyName(newest) === ""
-                ? tShortcuts("item.reply")
-                : t("compose.title.reply", { name: replyName(newest) })}
-            </Button>
-          )
-        }
         // While the composer is open it owns the bottom of the screen; in
         // spam or the trash the banner holds the way back.
         phoneBar={

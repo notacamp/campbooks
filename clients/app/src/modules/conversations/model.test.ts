@@ -32,7 +32,6 @@ import {
   placementLine,
   previewType,
   reasonText,
-  replyName,
   sentToLine,
   spamMove,
   splitQuoted,
@@ -150,7 +149,7 @@ describe("thread layout", () => {
 });
 
 describe("your messages", () => {
-  const [maya, sams] = Q4_DETAIL.messages;
+  const [, sams] = Q4_DETAIL.messages;
 
   it("say who they went to", () => {
     if (sams === undefined) {
@@ -161,14 +160,6 @@ describe("your messages", () => {
       addresseeLine(t, { ...sams, cc: [{ name: "Leo Brandt", address: "leo@example.com" }] }),
     ).toBe('reader.toNameOthers{"name":"Maya Okafor","count":1}');
     expect(addresseeLine(t, { ...sams, to: [] })).toBe("");
-  });
-
-  it("answer their recipient; anyone else's answer the sender", () => {
-    if (maya === undefined || sams === undefined) {
-      throw new Error("no fixture message");
-    }
-    expect(replyName(sams)).toBe("Maya Okafor");
-    expect(replyName(maya)).toBe("Maya Okafor");
   });
 });
 
