@@ -909,6 +909,16 @@ device, a sync) SHALL go at once.
 - **WHEN** the user presses # on a row, then Z before the row has gone
 - **THEN** the conversation is back in the list as a normal row
 
+### Requirement: Make it a task
+The reader SHALL offer "Make it a task" with `n t` (the same "new task" key, here with the email as its source), which opens an inline form
+(not a dialog) with the subject as the title, the due chips and Do/Pay. Add
+SHALL call `tasks.create` with the conversation as the source, close the form,
+and show "Added to your tasks" with Undo and Open.
+
+#### Scenario: From the lease email
+- **WHEN** Ana presses `n t` on "Lease for Rua das Flores 12", edits the title to "Send the signed lease to Ana", picks Fri and adds it
+- **THEN** a task due Friday with that conversation as its source is created, and Tasks shows "From Ana Ribeiro · email" on it
+
 ### Requirement: Suggesting people in To, Cc and Bcc
 In the composer (New message, Reply, Reply all and Forward's composer), To,
 Cc and Bcc SHALL each suggest people as the member types: from two
