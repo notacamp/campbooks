@@ -10,7 +10,6 @@ use crate::{
 };
 
 const MESSAGE: &str = "0192f0c4-7d4e-7b39-a7f1-3a8f0e2b9e01";
-const OTHER_CONVERSATION: &str = "0192f0c4-7d4e-7b39-a7f1-3a8f0e2b9c33";
 
 fn ask(key: &str, verb: &str, due: Option<&str>, same_as: Option<&str>) -> ReadAsk {
     ReadAsk {

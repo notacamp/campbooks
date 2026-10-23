@@ -680,7 +680,7 @@
             "oneOf": [
               {
                 "$ref": "#/components/schemas/BlobPointer",
-                "description": "The titles, places and calendar `UID`s of the items, by key: a\n`read-texts` v1 document, a blob of the workspace that the message\nholds (deleted with it). The schedule module reads it to name the\nevents it makes; the event log never holds the text."
+                "description": "The words of the read, by key (the items' titles, places and calendar\n`UID`s; the asks' titles and amounts): a `read-texts` v1 document,\na blob of the workspace that the message holds (deleted with it). The\nschedule module reads it to name the events it makes and the tasks\nmodule to name its tasks; the event log never holds the text."
               },
               {
                 "type": "null"
