@@ -133,8 +133,13 @@ regex = "1.13.1"
 # The tracking plan workbook (`campbooks-tracking-plan`, ADR 0020): read it
 # (calamine), write it in canonical form (rust_xlsxwriter), and read the YAML
 # patches agents apply to it (serde-saphyr, a pure-Rust YAML parser).
-calamine = { version = "0.36.1", default-features = false }
-rust_xlsxwriter = { version = "0.99.1", default-features = false }
+# Pinned: calamine 0.37.0 and rust_xlsxwriter 0.100.0 are newer than the
+# two-week rule because they are the first to take zip 9, which fixes
+# RUSTSEC-2026-0367, -0368 and -0369 (zip 8's extraction; neither crate
+# extracts to disk, but cargo deny fails on the advisories). Relax to caret
+# requirements after 2026-11-03.
+calamine = { version = "=0.37.0", default-features = false }
+rust_xlsxwriter = { version = "=0.100.0", default-features = false }
 serde-saphyr = { version = "1.3.0", default-features = false, features = ["deserialize"] }
 
 # Email: sanitising untrusted HTML bodies before they reach the client's
