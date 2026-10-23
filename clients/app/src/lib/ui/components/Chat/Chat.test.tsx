@@ -103,15 +103,16 @@ describe("ChatPanel", () => {
 });
 
 describe("ChatField", () => {
-  it("asks on Enter, keeps Shift+Enter for a new line, and waits while busy", () => {
+  it("asks on Enter and keeps Shift+Enter for a new line", () => {
     const onAsk = vi.fn();
-    const { rerender } = renderUi(
+    renderUi(
       <ChatField
         label="Ask about this"
         value="Why?"
         onChange={vi.fn()}
         onAsk={onAsk}
         askLabel="Ask"
+        note="Scout looks things up and explains."
       />,
     );
     const box = screen.getByRole("textbox", { name: "Ask about this" });
@@ -124,8 +125,12 @@ describe("ChatField", () => {
       "aria-keyshortcuts",
       "Enter",
     );
+    expect(box).toHaveAccessibleDescription("Scout looks things up and explains.");
+  });
 
-    rerender(
+  it("stays usable while Scout answers, and Ask waits", () => {
+    const onAsk = vi.fn();
+    renderUi(
       <ChatField
         label="Ask about this"
         value="Why?"
@@ -133,14 +138,14 @@ describe("ChatField", () => {
         onAsk={onAsk}
         askLabel="Ask"
         busy
-        note="Scout looks things up and explains."
       />,
     );
+    const box = screen.getByRole("textbox", { name: "Ask about this" });
+
     fireEvent.keyDown(box, { key: "Enter" });
-    expect(onAsk).toHaveBeenCalledOnce();
+    expect(onAsk).not.toHaveBeenCalled();
     expect(screen.getByRole("button", { name: /Ask/ })).toBeDisabled();
     expect(box).toBeEnabled();
-    expect(box).toHaveAccessibleDescription("Scout looks things up and explains.");
   });
 
   it("asks nothing empty", () => {

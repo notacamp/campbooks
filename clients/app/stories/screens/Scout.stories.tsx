@@ -150,7 +150,10 @@ export const ContinueFromHome: Story = {
         timeout: 8000,
       }),
     ).toBeVisible();
-    await userEvent.click(await page.findByText("What I looked at"));
+    // The whole answer is written (as a model would), then stored.
+    await userEvent.click(
+      await page.findByText("What I looked at", undefined, { timeout: 15_000 }),
+    );
     await expect(page.getByText("Read what happened to this email")).toBeVisible();
   },
 };

@@ -808,10 +808,9 @@ export function WhatNeedsYou({ workspaceId, now, offer }: WhatNeedsYouProps) {
   // Continue with Scout: the panel opens on the need's conversation; the
   // need stays selected, and the focus comes back to the button on close.
   const continueWithScout = (row: Row) => {
+    // Only the selected row shows its actions: its button is the one.
     const button =
-      document
-        .getElementById(itemId(row.item.id))
-        ?.querySelector<HTMLElement>(`[data-action="${CSS.escape(SCOUT)}"]`) ?? null;
+      list.current?.querySelector<HTMLElement>(`[data-action="${CSS.escape(SCOUT)}"]`) ?? null;
     scout?.(row.conversation.id, button);
   };
   const selectedActions = selected === undefined ? undefined : actionsOf(selected);

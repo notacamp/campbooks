@@ -88,9 +88,8 @@ describe("ScoutChat", () => {
     expect(
       screen.getByText("Scout looks things up and explains. In this version it changes nothing."),
     ).toBeInTheDocument();
-    expect(mocked.calls[0]).toEqual({
-      route: `POST ${CHATS}`,
-      body: { about: { type: "conversations.conversation", id: MARTA.id } },
+    expect(mocked.calls.find((call) => call.route === `POST ${CHATS}`)?.body).toEqual({
+      about: { type: "conversations.conversation", id: MARTA.id },
     });
   });
 
@@ -102,9 +101,10 @@ describe("ScoutChat", () => {
 
     fireEvent.click(await screen.findByRole("button", { name: WHY }));
 
+    // The answer, and its announcement once it is done.
     expect(
-      await screen.findByText(/It is under Reply because Marta asks you/u),
-    ).toBeInTheDocument();
+      await screen.findAllByText(/It is under Reply because Marta asks you/u),
+    ).not.toHaveLength(0);
     await waitFor(() => {
       expect(screen.queryByRole("button", { name: WHY })).not.toBeInTheDocument();
     });
