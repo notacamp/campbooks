@@ -119,7 +119,7 @@ export function RuleBuilder({
 }: {
   workspaceId: string;
   /** A rule was saved (Teach Scout opened from Scout's chat settles its card). */
-  onSaved?: (() => void) | undefined;
+  onSaved?: ((ruleIds: readonly string[]) => void) | undefined;
 }) {
   const { t: typed } = useTranslation("assistant");
   const t = typed as unknown as Translate;

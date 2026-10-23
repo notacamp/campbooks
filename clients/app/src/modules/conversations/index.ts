@@ -42,6 +42,9 @@ export { NudgeDialog, type NudgeResume } from "./components/NudgeDialog/NudgeDia
 // finish the forward in the composer.
 export { ForwardDialog } from "./components/ForwardDialog/ForwardDialog";
 export { displayName, listTime, type Move } from "./model";
+// What Scout's chat names when it is about a rule or one of Scout's
+// suggestions (campbooks-cloud#305).
+export { useRuleNoticeSubject, useRuleSubject } from "./scout-subjects";
 export { isPlace, isStream, type Place, type Stream } from "./api/queries";
 /**
  * The rules slot of Scout's memory: the assistant module's page fills it

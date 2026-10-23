@@ -3,9 +3,14 @@ import { Outlet, useLocation, useNavigate, useParams } from "@tanstack/react-rou
 import { useCallback, useEffect, useState, type MouseEvent } from "react";
 import { useTranslation } from "react-i18next";
 
-import { createWebChangeSource, followsChangesLive, subscribeToChanges } from "~/lib/api";
+import {
+  createWebChangeSource,
+  followsChangesLive,
+  subscribeToChanges,
+  type RecordRef,
+} from "~/lib/api";
 import { ReplyOpenerProvider, type ReplyToOpen } from "~/lib/reply-opener";
-import { ScoutChatProvider } from "~/lib/scout-chat";
+import { ScoutChatProvider, type OpenScoutChat } from "~/lib/scout-chat";
 import { useShortcut, useShortcuts } from "~/lib/shortcuts";
 import {
   Button,
@@ -143,14 +148,25 @@ function WorkspaceFrame({ workspace, all }: { workspace: Workspace; all: Workspa
   const theme = useTheme();
   const link = useInAppLink();
   const [switching, setSwitching] = useState(false);
-  // Scout's chat: one panel, about one conversation at a time; the focus
-  // goes back to what opened it when it closes.
+  // Scout's chat: one panel, about one thing at a time (or nothing in
+  // particular); the focus goes back to what opened it when it closes. From
+  // a dialog, the dialog stays as it is.
   const [chat, setChat] = useState<{
-    conversationId: string;
+    about: RecordRef | null;
+    ask: string | undefined;
     from: HTMLElement | null | undefined;
+    over: boolean;
+    opening: number;
   }>();
-  const openChat = useCallback((conversationId: string, from?: HTMLElement | null) => {
-    setChat({ conversationId, from });
+  const openChat = useCallback<OpenScoutChat>((about, options = {}) => {
+    const { from, ask } = options;
+    setChat({
+      about,
+      ask,
+      from,
+      over: from instanceof HTMLElement && from.closest('[aria-modal="true"]') !== null,
+      opening: Date.now(),
+    });
   }, []);
   const closeChat = () => {
     const from = chat?.from;
@@ -339,9 +355,17 @@ function WorkspaceFrame({ workspace, all }: { workspace: Workspace; all: Workspa
           <Outlet />
           {chat === undefined ? null : (
             <ScoutChat
-              key={chat.conversationId}
+              // One chat per record; one about nothing per opening.
+              key={
+                chat.about === null
+                  ? `nothing:${String(chat.opening)}`
+                  : `${chat.about.type}:${chat.about.id}`
+              }
               workspaceId={workspace.id}
-              conversationId={chat.conversationId}
+              about={chat.about}
+              opening={chat.opening}
+              ask={chat.ask}
+              over={chat.over}
               onClose={closeChat}
             />
           )}

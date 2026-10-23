@@ -21,6 +21,22 @@
   outline: 0;
 }
 
+/* Opened from a dialog, from the large breakpoint: at the page's edge, over it. */
+.floating {
+  position: fixed;
+  inset-block: 0;
+  inset-inline-end: 0;
+  z-index: var(--z-overlay);
+  width: var(--chat-width);
+  max-width: 100%;
+  border-left: var(--border-width) solid var(--border-subtle);
+  box-shadow: var(--shadow-overlay);
+}
+
+.floating:focus-visible {
+  outline: 0;
+}
+
 /* From the large breakpoint: beside the page, which keeps the rest. */
 .aside {
   flex: none;
@@ -370,4 +386,66 @@
   .chevron {
     transition: none;
   }
+}
+
+/* Recent, in the header: the member's chats, newest first. */
+.recent {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-0-5);
+  padding: var(--space-2);
+}
+
+.recentNote {
+  margin: 0;
+  padding: var(--space-2);
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+}
+
+.recentItem {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-0-5);
+  width: 100%;
+  min-width: 0;
+  padding: var(--space-2);
+  border: 0;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--text-primary);
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
+}
+
+.recentItem:hover {
+  background: var(--surface-hover);
+}
+
+.recentItem:focus-visible {
+  outline: var(--focus-width) solid var(--focus-ring);
+  outline-offset: calc(var(--focus-offset) * -1);
+}
+
+.recentItem[aria-current="true"] {
+  background: var(--surface-selected);
+}
+
+.recentText {
+  display: -webkit-box;
+  max-width: 100%;
+  overflow: hidden;
+  font-size: var(--text-sm);
+  line-height: var(--leading-normal);
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  unicode-bidi: isolate;
+}
+
+.recentTime {
+  font-size: var(--text-xs);
+  color: var(--text-tertiary);
+  font-variant-numeric: tabular-nums;
 }

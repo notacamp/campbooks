@@ -1,5 +1,5 @@
 import { fireEvent, screen, within } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { renderUi } from "../../../../../test/render";
 
@@ -10,6 +10,7 @@ import {
   ChatNotice,
   ChatPanel,
   ChatProposal,
+  ChatRecent,
   ChatSteps,
   ChatSuggestions,
   ChatText,
@@ -100,6 +101,116 @@ describe("ChatPanel", () => {
     );
 
     expect(container.querySelector('[aria-live="polite"]')).toHaveTextContent("It is a bill.");
+  });
+});
+
+describe("ChatPanel over a dialog", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("stands at the page's edge on a wide screen, takes the focus, and the dialog moves aside", () => {
+    vi.stubGlobal("matchMedia", (query: string) => ({
+      matches: query.includes("64rem"),
+      media: query,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+    }));
+    const onClose = vi.fn();
+    const { unmount } = renderUi(
+      <ChatPanel
+        over
+        title="Scout"
+        closeLabel="Close"
+        onClose={onClose}
+        footer={
+          <ChatField
+            label="Ask about this"
+            value=""
+            onChange={vi.fn()}
+            onAsk={vi.fn()}
+            askLabel="Ask"
+          />
+        }
+      >
+        {null}
+      </ChatPanel>,
+    );
+    const panel = screen.getByRole("dialog", { name: "Scout" });
+
+    expect(panel).toHaveAttribute("aria-modal", "true");
+    expect(screen.getByRole("textbox", { name: "Ask about this" })).toHaveFocus();
+    expect(document.documentElement).toHaveAttribute("data-chat-beside");
+    fireEvent.keyDown(screen.getByRole("textbox", { name: "Ask about this" }), {
+      key: "Escape",
+    });
+    expect(onClose).toHaveBeenCalledOnce();
+    unmount();
+    expect(document.documentElement).not.toHaveAttribute("data-chat-beside");
+  });
+});
+
+describe("ChatRecent", () => {
+  const items = [
+    { id: "c-2", text: "What am I waiting on?", time: "15:02", dateTime: "2026-10-13T15:02:00Z" },
+    { id: "c-1", text: "Why is this here?", time: "Yesterday", dateTime: "2026-10-12T09:40:00Z" },
+  ];
+
+  it("lists the chats by their first question and time, and opens one", () => {
+    const onPick = vi.fn();
+    const onOpen = vi.fn();
+    renderUi(
+      <ChatRecent
+        label="Recent"
+        items={items}
+        empty="No chats yet"
+        loading="Loading…"
+        current="c-2"
+        onOpen={onOpen}
+        onPick={onPick}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Recent" }));
+    expect(onOpen).toHaveBeenCalledOnce();
+    const menu = screen.getByRole("dialog", { name: "Recent" });
+    const [first, second] = within(menu).getAllByRole("button");
+    expect(first).toHaveTextContent("What am I waiting on?15:02");
+    expect(first).toHaveAttribute("aria-current", "true");
+    expect(first).toHaveFocus();
+    expect(within(menu).getByText("Yesterday")).toHaveAttribute("datetime", "2026-10-12T09:40:00Z");
+
+    fireEvent.keyDown(first as HTMLElement, { key: "ArrowDown" });
+    expect(second).toHaveFocus();
+    fireEvent.click(second as HTMLElement);
+    expect(onPick).toHaveBeenCalledWith("c-1");
+    expect(screen.queryByText("Why is this here?")).not.toBeInTheDocument();
+  });
+
+  it.each([
+    { items: undefined, failed: undefined, says: "Loading…" },
+    { items: [], failed: undefined, says: "No chats yet" },
+    {
+      items: undefined,
+      failed: "Your chats couldn’t be listed.",
+      says: "Your chats couldn’t be listed.",
+    },
+  ])("says $says", ({ items: listed, failed, says }) => {
+    renderUi(
+      <ChatRecent
+        label="Recent"
+        items={listed}
+        empty="No chats yet"
+        loading="Loading…"
+        failed={failed}
+        onPick={vi.fn()}
+      />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Recent" }));
+
+    const menu = screen.getByRole("dialog", { name: "Recent" });
+    expect(menu).toHaveTextContent(says);
+    expect(within(menu).queryAllByRole("button")).toHaveLength(0);
   });
 });
 

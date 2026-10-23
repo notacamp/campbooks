@@ -3,6 +3,7 @@ import { useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { problemCode } from "~/lib/api";
+import { conversationRef } from "~/lib/scout-chat";
 import { useShortcut } from "~/lib/shortcuts";
 import {
   AskLine,
@@ -16,6 +17,7 @@ import {
   type DialogResult,
 } from "~/lib/ui";
 
+import { AskScoutIcon } from "../AskScout/AskScoutIcon";
 import {
   cancelSend,
   changedElsewhere,
@@ -538,6 +540,9 @@ export function NudgeDialog({
       visor={writing ? "thinking" : "idle"}
       result={result}
       onResultEnd={onClose}
+      headerAction={
+        <AskScoutIcon about={conversationRef(conversationId)} label={t("nudge.askScout")} />
+      }
       footer={
         drafting ? (
           <>

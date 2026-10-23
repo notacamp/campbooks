@@ -92,7 +92,7 @@ describe("the conversations in the command menu", () => {
     const labels = screen.getAllByRole("option").map((each) => each.textContent);
     expect(labels[0]).toContain("Cloudhost Billing");
     expect(labels[2]).toContain("All results for “invoice”");
-    expect(labels.at(-1)).toContain("Ask Campbooks: invoice");
+    expect(labels.at(-1)).toContain("Ask Scout: invoice");
     expect(screen.getByRole("group", { name: "Conversations" })).toBeInTheDocument();
   });
 
@@ -214,7 +214,7 @@ describe("the conversations in the command menu", () => {
       await screen.findByRole("heading", { name: "No conversations match “zzz”" }),
     ).toBeVisible();
     // The commands and Ask stay reachable.
-    expect(screen.getByRole("option", { name: "Ask Campbooks: zzz" })).toBeVisible();
+    expect(screen.getByRole("option", { name: "Ask Scout: zzz" })).toBeVisible();
   });
 
   it("says plainly when the search is too long", async () => {
@@ -259,7 +259,7 @@ describe("the conversations in the command menu", () => {
     type(await field(), "invoice");
 
     expect(screen.queryByRole("group", { name: "Conversations" })).not.toBeInTheDocument();
-    expect(screen.getByRole("option", { name: "Ask Campbooks: invoice" })).toBeVisible();
+    expect(screen.getByRole("option", { name: "Ask Scout: invoice" })).toBeVisible();
     expect(screen.queryByText("All results")).not.toBeInTheDocument();
   });
 

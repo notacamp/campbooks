@@ -43,6 +43,11 @@ const keys = {
     operationKey("conversations.list_rules", { workspace_id: workspaceId }),
   notices: (workspaceId: string) =>
     operationKey("conversations.list_rule_notices", { workspace_id: workspaceId }),
+  notice: (workspaceId: string, noticeId: string) =>
+    operationKey("conversations.get_rule_notice", {
+      workspace_id: workspaceId,
+      notice_id: noticeId,
+    }),
   preview: (workspaceId: string, inboxId: string, rule: unknown) => [
     ...operationKey("conversations.preview_rule", { workspace_id: workspaceId }),
     inboxId,
@@ -86,6 +91,26 @@ export function useRuleNotices(workspaceId: string) {
           signal,
         }),
       ).notices,
+  });
+}
+
+/**
+ * `conversations.get_rule_notice`: one of Scout's suggestions, as the list
+ * shows it, while it is still offered to you (404 once answered or gone).
+ * Starts no look at the inbox.
+ */
+export function useRuleNotice(workspaceId: string, noticeId: string | undefined) {
+  return useQuery({
+    queryKey: keys.notice(workspaceId, noticeId ?? ""),
+    enabled: noticeId !== undefined,
+    retry: false,
+    queryFn: async ({ signal }) =>
+      unwrap(
+        await api.GET("/api/v1/w/{workspace_id}/rule-notices/{notice_id}", {
+          params: { path: { workspace_id: workspaceId, notice_id: noticeId ?? "" } },
+          signal,
+        }),
+      ),
   });
 }
 

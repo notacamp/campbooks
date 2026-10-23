@@ -582,7 +582,8 @@ async fn one_suggestion_reads_as_the_list_shows_it_and_starts_no_pass(db: PgPool
     let elsewhere = WorkspaceId::new();
     let (eve, _) = kit.member("eve", elsewhere);
     assert_eq!(kit.get(&leo, &one).await.status, StatusCode::NOT_FOUND);
-    assert_eq!(kit.get(&rita, &one).await.status, StatusCode::FORBIDDEN);
+    // Rita only reads the inbox: the list never shows her its suggestions.
+    assert_eq!(kit.get(&rita, &one).await.status, StatusCode::NOT_FOUND);
     // An app is given no inbox, so it sees no suggestion in one.
     assert_eq!(kit.get(&app, &one).await.status, StatusCode::NOT_FOUND);
     assert_eq!(

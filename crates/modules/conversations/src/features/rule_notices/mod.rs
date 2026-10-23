@@ -564,10 +564,10 @@ fn notice_of(row: NoticeRow, shared: bool) -> Result<RuleNotice> {
         (status = OK, description = "The suggestion.", body = RuleNotice),
         (status = UNAUTHORIZED, description = "No valid access token.", body = Problem,
             content_type = "application/problem+json"),
-        (status = FORBIDDEN, description = "Missing scope, you may only read this inbox, or an app asked.",
+        (status = FORBIDDEN, description = "Missing scope, or an app asked.",
             body = Problem, content_type = "application/problem+json"),
         (status = NOT_FOUND, description = "No such suggestion, it is no longer offered, \
-            you answered it, or you cannot see it.",
+            you answered it, or you cannot teach in its inbox.",
             body = Problem, content_type = "application/problem+json"),
     )
 )]
@@ -579,9 +579,15 @@ pub async fn get(
     let access = &workspace.access;
     let mut tx = state.db.begin_for(access.workspace).await?;
     let (inbox, _, _) = target(&mut tx, path.notice_id).await?;
-    // As for an answer: 404 unless the caller sees its inbox, 403 when they
-    // only read it; an app gets 403 too: suggestions are a member's own.
-    may_teach(&state, &mut tx, access, inbox).await?;
+    // As the list: only an inbox the caller may teach in. One they only read
+    // answers as one they cannot see (404), since the list never shows them
+    // its suggestions; an app gets 403: suggestions are a member's own.
+    may_teach(&state, &mut tx, access, inbox)
+        .await
+        .map_err(|error| match error {
+            Error::Denied(_) => Error::NotFound,
+            other => other,
+        })?;
     member_only(&workspace.principal)?;
     let user = access.user.ok_or(Error::NotFound)?;
     let row: NoticeRow = sqlx::query_as(

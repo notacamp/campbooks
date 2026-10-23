@@ -10,7 +10,7 @@ import {
 } from "react";
 import { useTranslation } from "react-i18next";
 
-import { useScoutChat } from "~/lib/scout-chat";
+import { conversationRef, useScoutChat } from "~/lib/scout-chat";
 import { useShortcut } from "~/lib/shortcuts";
 import {
   AsideSection,
@@ -811,7 +811,7 @@ export function WhatNeedsYou({ workspaceId, now, offer }: WhatNeedsYouProps) {
     // Only the selected row shows its actions: its button is the one.
     const button =
       list.current?.querySelector<HTMLElement>(`[data-action="${CSS.escape(SCOUT)}"]`) ?? null;
-    scout?.(row.conversation.id, button);
+    scout?.(conversationRef(row.conversation.id), { from: button });
   };
   const selectedActions = selected === undefined ? undefined : actionsOf(selected);
   // Offered alone or within a pair (R presses Reply wherever it sits).
@@ -1060,6 +1060,16 @@ export function WhatNeedsYou({ workspaceId, now, offer }: WhatNeedsYouProps) {
             needActions.notNeeded(wait.target.conversation);
           }
         }}
+        onAsk={
+          scout === undefined
+            ? undefined
+            : (row, from) => {
+                const wait = waiting.find((each) => each.row.id === row.id);
+                if (wait !== undefined) {
+                  scout(conversationRef(wait.target.conversation.id), { from });
+                }
+              }
+        }
       />
     );
 

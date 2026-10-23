@@ -198,7 +198,9 @@
       "saveFailed": "Scout n’a pas pu enregistrer la règle. Réessayez.",
       "savePartial": "Enregistrée dans {{saved}} boîtes sur {{total}}, puis Scout s’est arrêté. Réessayer l’enregistre dans les autres.",
       "retry": "Réessayer",
-      "description": "Dites-le en une phrase. Scout vous montre la règle, et ce qu’elle concerne, avant d’enregistrer quoi que ce soit."
+      "description": "Dites-le en une phrase. Scout vous montre la règle, et ce qu’elle concerne, avant d’enregistrer quoi que ce soit.",
+      "savedNote": "Règle enregistrée. Scout peut vous dire ce qu’elle fait et ce qu’elle change.",
+      "askAbout": "Demander à Scout à propos de cette règle"
     },
     "builder": {
       "noModel": "Ce serveur n’a pas de modèle de langage pour lire des phrases, alors créez la règle ici.",
@@ -361,6 +363,26 @@
         "write": "Rédiger le brouillon",
         "done": "Brouillon ouvert. C’est vous qui l’envoyez, ou pas."
       }
-    }
+    },
+    "recent": "Récentes",
+    "recentEmpty": "Aucune discussion pour l’instant. Posez une question à Scout pour en commencer une.",
+    "recentLoading": "Chargement de vos discussions…",
+    "recentFailed": "Impossible d’afficher vos discussions. Réessayez dans un moment.",
+    "noticeLine": "Suggestion de Scout pour {{sender}}",
+    "aboutNothing": "vos e-mails",
+    "ruleIntro": "Posez-moi vos questions sur cette règle.",
+    "ruleDoes": "Que fait cette règle ?",
+    "ruleChanged": "Qu’a-t-elle changé ?",
+    "noticeIntro": "Posez-moi vos questions sur ce que j’ai remarqué.",
+    "noticeWhy": "Pourquoi cette suggestion ?",
+    "noticeChange": "Qu’est-ce que cela changerait ?",
+    "nothingIntro": "Posez-moi vos questions sur vos e-mails : ce qui vous attend, qui vous attendez, ce que quelqu’un a envoyé.",
+    "nothingToday": "Qu’est-ce qui m’attend aujourd’hui ?",
+    "nothingWaiting": "Qu’est-ce que j’attends ?",
+    "fieldNothing": "Posez une question sur vos e-mails",
+    "unreadableRule": "Scout ne peut pas ouvrir de discussion sur cette règle.",
+    "unreadableNotice": "Cette suggestion ne vous est plus proposée.",
+    "unreadableNothing": "Scout ne peut pas commencer de discussion pour le moment. Réessayez dans un moment.",
+    "gone": "Cette discussion n’existe plus."
   }
 }

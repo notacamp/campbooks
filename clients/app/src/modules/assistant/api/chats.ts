@@ -7,55 +7,118 @@ import {
   readEventStream,
   unwrap,
   unwrapEmpty,
+  type RecordRef,
   type Schema,
 } from "~/lib/api";
 
 export type ChatMessage = Schema<"ChatMessageView">;
 export type ChatStep = Schema<"ChatStep">;
 export type ChatTool = Schema<"ChatTool">;
+type ChatView = Schema<"ChatView">;
 
-/** The record type a chat about a conversation names. */
-const CONVERSATION = "conversations.conversation";
+/**
+ * Which chat the panel shows: the member's chat about a record (started, or
+ * continued), a new one about nothing (once per opening), or one chosen
+ * from Recent, by its id.
+ */
+export type ChatSource =
+  | { kind: "about"; about: RecordRef }
+  | { kind: "nothing"; opening: number }
+  | { kind: "chat"; id: string };
 
-// Not an operation key: no event touches a chat, and starting one is a
-// request of the member's, never refetched behind their back.
+// Not operation keys: no event touches a chat, and starting one is a request
+// of the member's, never refetched behind their back.
 const chatKeys = {
-  about: (workspaceId: string, conversationId: string) =>
-    ["scout-chat", workspaceId, conversationId] as const,
+  source: (workspaceId: string, source: ChatSource) =>
+    source.kind === "about"
+      ? (["scout-chat", workspaceId, "about", source.about.type, source.about.id] as const)
+      : source.kind === "nothing"
+        ? (["scout-chat", workspaceId, "nothing", source.opening] as const)
+        : chatKeys.one(workspaceId, source.id),
+  one: (workspaceId: string, chatId: string) =>
+    ["scout-chat", workspaceId, "chat", chatId] as const,
+  recent: (workspaceId: string) => ["scout-chat", workspaceId, "recent"] as const,
 };
 
 /**
- * `assistant.start_chat` for a conversation: the member's chat about it,
- * continued when they have one (no model is called). Once per opening; the
- * panel puts each answer in it as it comes.
+ * The chat the panel shows, from `source`: `assistant.start_chat` about a
+ * record (the member's chat about it, continued when they have one), or
+ * about nothing (a new one, once per opening); `assistant.get_chat` for one
+ * chosen from Recent. No model is called. The panel asks again after each
+ * answer ({@link useChatCache}).
  */
-export function useChatAbout(workspaceId: string, conversationId: string) {
+export function useScoutChatOf(workspaceId: string, source: ChatSource) {
   return useQuery({
-    queryKey: chatKeys.about(workspaceId, conversationId),
+    queryKey: chatKeys.source(workspaceId, source),
     staleTime: Infinity,
     gcTime: 0,
     retry: false,
     refetchOnWindowFocus: false,
     refetchOnReconnect: false,
-    queryFn: async ({ signal }) =>
-      unwrap(
+    queryFn: async ({ signal }): Promise<ChatView> => {
+      if (source.kind === "chat") {
+        return unwrap(
+          await api.GET("/api/v1/w/{workspace_id}/assistant/chats/{chat_id}", {
+            params: { path: { workspace_id: workspaceId, chat_id: source.id } },
+            signal,
+          }),
+        );
+      }
+      return unwrap(
         await api.POST("/api/v1/w/{workspace_id}/assistant/chats", {
           params: { path: { workspace_id: workspaceId } },
-          body: { about: { type: CONVERSATION, id: conversationId } },
+          body: source.kind === "about" ? { about: source.about } : {},
           signal,
         }),
-      ),
+      );
+    },
   });
 }
 
-/** Keeping the panel's chat current as questions are asked. */
-export function useChatCache(workspaceId: string, conversationId: string) {
+/** Keeping the panel's chat, and Recent, current as questions are asked. */
+export function useChatCache(workspaceId: string, source: ChatSource) {
   const queryClient = useQueryClient();
-  const key = chatKeys.about(workspaceId, conversationId);
+  const key = chatKeys.source(workspaceId, source);
   return {
-    /** Ask for the chat again (after an answer is stored, or Start over). */
-    refresh: () => queryClient.invalidateQueries({ queryKey: key }),
+    /**
+     * Ask for the chat again (after an answer is stored, or Start over). A
+     * chat about nothing is asked for by its id: starting again would make
+     * another.
+     */
+    refresh: async (chatId: string | undefined) => {
+      if (source.kind === "nothing" && chatId !== undefined) {
+        const view = unwrap(
+          await api.GET("/api/v1/w/{workspace_id}/assistant/chats/{chat_id}", {
+            params: { path: { workspace_id: workspaceId, chat_id: chatId } },
+          }),
+        );
+        queryClient.setQueryData(key, view);
+      } else {
+        await queryClient.invalidateQueries({ queryKey: key });
+      }
+      await queryClient.invalidateQueries({ queryKey: chatKeys.recent(workspaceId) });
+    },
   };
+}
+
+/**
+ * `assistant.list_chats`: the member's chats with a question, newest first,
+ * by their first question. Only while Recent is open, and afresh each time.
+ */
+export function useRecentChats(workspaceId: string, enabled: boolean) {
+  return useQuery({
+    queryKey: chatKeys.recent(workspaceId),
+    enabled,
+    staleTime: 0,
+    retry: false,
+    queryFn: async ({ signal }) =>
+      unwrap(
+        await api.GET("/api/v1/w/{workspace_id}/assistant/chats", {
+          params: { path: { workspace_id: workspaceId } },
+          signal,
+        }),
+      ).chats,
+  });
 }
 
 /** `assistant.delete_chat`: Start over. There is no undo. */

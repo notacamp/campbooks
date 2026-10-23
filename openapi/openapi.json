@@ -1764,11 +1764,91 @@
       }
     },
     "/api/v1/w/{workspace_id}/assistant/chats": {
+      "get": {
+        "tags": [
+          "assistant"
+        ],
+        "summary": "Your chats with Scout, the newest message first: at most 30, each with\nyour first question and when its last message was written. A chat with\nno question yet is not listed. What a chat is about is never read again\nhere: open it to see whether Scout still can.",
+        "operationId": "assistant.list_chats",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "description": "The workspace.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Your chats.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChatList"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid access token.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing scope, or not a member (`chat_needs_member`).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such workspace.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [
+              "assistant:read"
+            ]
+          }
+        ],
+        "x-campbooks": {
+          "access": {
+            "action": "read",
+            "resource": "assistant.chat"
+          },
+          "assistant": false,
+          "automation": false,
+          "mutates": false,
+          "records": [
+            "assistant.chat"
+          ],
+          "risk": "low"
+        }
+      },
       "post": {
         "tags": [
           "assistant"
         ],
-        "summary": "Start a chat with Scout, or continue yours about the same record.",
+        "summary": "Start a chat with Scout, or continue yours about the same record.\nWithout `about`, a new chat about nothing in particular, every time.",
         "operationId": "assistant.start_chat",
         "parameters": [
           {
@@ -9550,6 +9630,97 @@
         }
       }
     },
+    "/api/v1/w/{workspace_id}/rule-notices/{notice_id}": {
+      "get": {
+        "tags": [
+          "conversations"
+        ],
+        "summary": "Read one of Scout's suggestions, as `conversations.list_rule_notices`\nlists it: an open one, in an inbox you may teach in, that you did not\nanswer \"Not now\" (for a while) or \"Don't suggest this\". It starts no\npass over the inbox.",
+        "operationId": "conversations.get_rule_notice",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "description": "The workspace.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId"
+            }
+          },
+          {
+            "name": "notice_id",
+            "in": "path",
+            "description": "The suggestion.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/RuleNoticeId"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The suggestion.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RuleNotice"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid access token.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing scope, or an app asked.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such suggestion, it is no longer offered, you answered it, or you cannot teach in its inbox.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [
+              "conversations:read"
+            ]
+          }
+        ],
+        "x-campbooks": {
+          "access": {
+            "action": "write",
+            "resource": "conversations.inbox"
+          },
+          "assistant": true,
+          "automation": false,
+          "mutates": false,
+          "records": [
+            "conversations.rule"
+          ],
+          "risk": "low"
+        }
+      }
+    },
     "/api/v1/w/{workspace_id}/rule-notices/{notice_id}/answer": {
       "post": {
         "tags": [
@@ -14308,6 +14479,22 @@
         "format": "uuid",
         "description": "ChatId (UUIDv7)"
       },
+      "ChatList": {
+        "type": "object",
+        "description": "Your chats with Scout, the newest message first.",
+        "required": [
+          "chats"
+        ],
+        "properties": {
+          "chats": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ChatSummary"
+            },
+            "description": "At most 30, each with at least one question."
+          }
+        }
+      },
       "ChatMessageId": {
         "type": "string",
         "format": "uuid",
@@ -14497,6 +14684,48 @@
           "tool": {
             "$ref": "#/components/schemas/ChatTool",
             "description": "The tool."
+          }
+        }
+      },
+      "ChatSummary": {
+        "type": "object",
+        "description": "One of your chats, as the list shows it: never what it is about read\nagain, only what you asked.",
+        "required": [
+          "id",
+          "first_question",
+          "questions",
+          "last_message_at"
+        ],
+        "properties": {
+          "about": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/RecordRef",
+                "description": "What it is about; none for a chat about nothing in particular."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "first_question": {
+            "type": "string",
+            "description": "Your first question in it, your own words, at most 120 characters:\nshow it as text only."
+          },
+          "id": {
+            "$ref": "#/components/schemas/ChatId",
+            "description": "The chat."
+          },
+          "last_message_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When its last message was written."
+          },
+          "questions": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Questions asked so far.",
+            "minimum": 0
           }
         }
       },
@@ -21043,7 +21272,7 @@
             "oneOf": [
               {
                 "$ref": "#/components/schemas/RecordRef",
-                "description": "What the chat is about: a record of a type Scout can read\n(`conversations.conversation`); nothing when absent."
+                "description": "What the chat is about: a record of a type Scout can read\n(`conversations.conversation`, `conversations.rule`,\n`conversations.rule_notice`). When absent, a new chat about nothing\nin particular, every time."
               },
               {
                 "type": "null"
