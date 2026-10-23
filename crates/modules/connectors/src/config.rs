@@ -1,6 +1,6 @@
-//! The module's settings: `CAMPBOOKS_CONNECTORS__*` (the sync engine),
-//! `CAMPBOOKS_GOOGLE__*` and `CAMPBOOKS_ZOHO__*` (the OAuth clients, shared
-//! with sign-in).
+//! The module's settings: `CAMPBOOKS_CONNECTORS__*` (the sync engine and
+//! the IMAP adapter), `CAMPBOOKS_GOOGLE__*` and `CAMPBOOKS_ZOHO__*` (the
+//! OAuth clients, shared with sign-in).
 
 use std::path::PathBuf;
 
@@ -20,6 +20,8 @@ pub struct ConnectorsConfig {
     pub google: BudgetConfig,
     /// The Zoho Mail adapter (`CAMPBOOKS_CONNECTORS__ZOHO__*`).
     pub zoho: ZohoMailConfig,
+    /// Any mailbox over IMAP and SMTP (`CAMPBOOKS_CONNECTORS__IMAP__*`).
+    pub imap: ImapConfig,
     /// Consecutive failed runs before a connection's health is `failing`
     /// (`CAMPBOOKS_CONNECTORS__FAILING_AFTER`, default 5).
     pub failing_after: u32,
@@ -63,6 +65,28 @@ pub struct ZohoMailConfig {
     pub sweep_minutes: u32,
 }
 
+/// `CAMPBOOKS_CONNECTORS__IMAP__*`: connecting any mailbox with its
+/// password (usually an app password).
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[serde(default, deny_unknown_fields)]
+pub struct ImapConfig {
+    /// Offer IMAP connections (default false, until reading them lands).
+    pub enabled: bool,
+    /// Also reach mail servers on private, loopback and CGNAT addresses: a
+    /// self-hosted instance's own network (default false). Never link-local
+    /// or cloud metadata addresses.
+    pub allow_private_hosts: bool,
+    /// Reach mail servers on any port, not only 993, 143, 465 and 587
+    /// (default false).
+    pub allow_any_port: bool,
+    /// How long opening a connection to a mail server may take, in seconds
+    /// (default 10).
+    pub connect_timeout_seconds: u32,
+    /// How long talking to one mail server may take in all, in seconds
+    /// (default 30).
+    pub timeout_seconds: u32,
+}
+
 /// `CAMPBOOKS_CONNECTORS__POLL__*`.
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
 #[serde(default, deny_unknown_fields)]
@@ -92,6 +116,7 @@ impl Default for ConnectorsConfig {
             poll: PollConfig::default(),
             google: BudgetConfig::default(),
             zoho: ZohoMailConfig::default(),
+            imap: ImapConfig::default(),
             failing_after: 5,
             batch_retention_days: 7,
         }
@@ -116,6 +141,18 @@ impl Default for ZohoMailConfig {
             run_budget_bytes: 64 * 1024 * 1024,
             requests_per_minute: 60,
             sweep_minutes: 360,
+        }
+    }
+}
+
+impl Default for ImapConfig {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            allow_private_hosts: false,
+            allow_any_port: false,
+            connect_timeout_seconds: 10,
+            timeout_seconds: 30,
         }
     }
 }
@@ -184,6 +221,18 @@ impl ConnectorsConfig {
             return Err(
                 "CAMPBOOKS_CONNECTORS__ZOHO__MAX_MESSAGE_BYTES, …__RUN_BUDGET_BYTES, \
                  …__REQUESTS_PER_MINUTE and …__SWEEP_MINUTES must be positive"
+                    .to_owned(),
+            );
+        }
+        let imap = &self.imap;
+        if imap.connect_timeout_seconds == 0
+            || imap.timeout_seconds == 0
+            || imap.connect_timeout_seconds > imap.timeout_seconds
+            || imap.timeout_seconds > 300
+        {
+            return Err(
+                "CAMPBOOKS_CONNECTORS__IMAP__CONNECT_TIMEOUT_SECONDS must be at least 1 and at \
+                 most CAMPBOOKS_CONNECTORS__IMAP__TIMEOUT_SECONDS, itself at most 300"
                     .to_owned(),
             );
         }
@@ -274,6 +323,29 @@ mod tests {
             let client = OAuthClientConfig::from_figment(&Figment::new(), section).unwrap();
             assert!(client.client_id.is_none() && client.client_secret_file.is_none());
         }
+    }
+
+    #[test]
+    fn imap_is_off_by_default_and_its_settings_are_checked() {
+        let config = ConnectorsConfig::from_figment(&Figment::new()).unwrap();
+        assert!(!config.imap.enabled);
+        assert!(!config.imap.allow_private_hosts && !config.imap.allow_any_port);
+        assert_eq!(
+            (
+                config.imap.connect_timeout_seconds,
+                config.imap.timeout_seconds
+            ),
+            (10, 30)
+        );
+        let on = ConnectorsConfig::from_figment(&figment(serde_json::json!({
+            "connectors": {"imap": {"enabled": true, "allow_private_hosts": true}}
+        })))
+        .unwrap();
+        assert!(on.imap.enabled && on.imap.allow_private_hosts);
+        let bad = ConnectorsConfig::from_figment(&figment(serde_json::json!({
+            "connectors": {"imap": {"connect_timeout_seconds": 60, "timeout_seconds": 30}}
+        })));
+        assert!(bad.unwrap_err().contains("CONNECT_TIMEOUT_SECONDS"));
     }
 
     #[test]

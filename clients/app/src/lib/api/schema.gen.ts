@@ -630,6 +630,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/w/{workspace_id}/connections/imap": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Connect a mailbox with its password. */
+        post: operations["connectors.connect_imap"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/w/{workspace_id}/connections/imap/discover": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Find a mailbox's servers. */
+        post: operations["connectors.discover_imap"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/w/{workspace_id}/connections/{connection_id}": {
         parameters: {
             query?: never;
@@ -2724,6 +2758,24 @@ export interface components {
              */
             content_token?: string | null;
         };
+        /** @description A mailbox to connect. */
+        ConnectImap: {
+            /** @description The mailbox's email address. */
+            address: string;
+            connection?: components["schemas"]["ConnectionId"] | null;
+            /**
+             * Format: password
+             * @description Its password: an app password where the provider has them. Kept
+             *     sealed, never shown again.
+             */
+            password: string;
+            servers?: components["schemas"]["Servers"] | null;
+            /**
+             * @description What it signs in with, when not what the servers are found to want
+             *     (usually the address).
+             */
+            username?: string | null;
+        };
         /** @description An app the caller let in. */
         ConnectedApp: {
             /** @description The app's client id. */
@@ -3177,6 +3229,33 @@ export interface components {
          * @enum {string}
          */
         Direction: "inbound" | "outbound";
+        /** @description The address to find servers for. */
+        DiscoverImap: {
+            /** @description The mailbox's email address. */
+            address: string;
+        };
+        /** @description The answer. */
+        DiscoveredImap: {
+            imap?: components["schemas"]["Server"] | null;
+            /** @description What was found. */
+            kind: components["schemas"]["DiscoveryKind"];
+            password?: components["schemas"]["PasswordKind"] | null;
+            provider?: components["schemas"]["Native"] | null;
+            /**
+             * @description The provider database's id of the provider, for its app-password
+             *     guide (`settings`, when known).
+             */
+            provider_hint?: string | null;
+            smtp?: components["schemas"]["Server"] | null;
+            source?: components["schemas"]["Source"] | null;
+            /** @description The username the servers most likely want (`settings`). */
+            username_hint?: string | null;
+        };
+        /**
+         * @description What was found.
+         * @enum {string}
+         */
+        DiscoveryKind: "settings" | "use_provider" | "not_supported_yet" | "not_found";
         /** @description The suggestion turned down. */
         DismissSuggestion: {
             /** @description Its `key`. */
@@ -3947,6 +4026,12 @@ export interface components {
             stream: components["schemas"]["Stream"];
         };
         /**
+         * @description A provider Campbooks connects natively, with OAuth, rather than over
+         *     IMAP with a password.
+         * @enum {string}
+         */
+        Native: "google" | "zoho" | "microsoft";
+        /**
          * @description One action of the catalogue a need may offer (campbooks-cloud#166),
          *     as `campbooks_ai::decide::signals::actions::ActionId` names it.
          * @enum {string}
@@ -4161,6 +4246,12 @@ export interface components {
             /** @description Oldest first. */
             items: components["schemas"]["PasskeyView"][];
         };
+        /**
+         * @description Which password a provider takes over IMAP: what the connect screen's
+         *     guide says. It never changes what Campbooks does.
+         * @enum {string}
+         */
+        PasswordKind: "app_password" | "account_password" | "unknown";
         /**
          * @description Why a taught rule is paused: the one that would still hold once the
          *     most passing one clears.
@@ -4451,7 +4542,7 @@ export interface components {
          * @description An outside provider.
          * @enum {string}
          */
-        Provider: "google" | "zoho";
+        Provider: "google" | "zoho" | "imap";
         /** @description Something in the query that was not understood. */
         QueryWarning: {
             /** @description `unknown_operator`, `empty_value` or `invalid_value`. */
@@ -5128,6 +5219,11 @@ export interface components {
             query: components["schemas"]["ParsedQuery"];
         };
         /**
+         * @description How a connection to a mail server is encrypted. Never in the clear.
+         * @enum {string}
+         */
+        Security: "tls" | "starttls";
+        /**
          * Format: uuid
          * @description SecurityEventId (UUIDv7)
          */
@@ -5210,6 +5306,25 @@ export interface components {
              * @description Of those, their conversations the caller's inboxes replied to.
              */
             replied: number;
+        };
+        /** @description A mail server. */
+        Server: {
+            /** @description Its host name (or IP address). */
+            host: string;
+            /**
+             * Format: int32
+             * @description Its port.
+             */
+            port: number;
+            /** @description How the connection is encrypted. */
+            security: components["schemas"]["Security"];
+        };
+        /** @description A mailbox's two servers: where its mail is read, and where it sends. */
+        Servers: {
+            /** @description The IMAP server. */
+            imap: components["schemas"]["Server"];
+            /** @description The SMTP submission server. */
+            smtp: components["schemas"]["Server"];
         };
         /** @description Who is signed in. Never contains a token. */
         SessionInfo: {
@@ -5309,6 +5424,11 @@ export interface components {
              */
             until: string;
         };
+        /**
+         * @description Where a mailbox's settings came from.
+         * @enum {string}
+         */
+        Source: "ispdb" | "autoconfig" | "srv" | "mx" | "manual";
         /** @description Start a chat, or continue the one you have about the same record. */
         StartChat: {
             about?: components["schemas"]["RecordRef"] | null;
@@ -7920,7 +8040,7 @@ export interface operations {
                     "application/json": components["schemas"]["StartedConnection"];
                 };
             };
-            /** @description No capability, or one that is not offered (`capabilities_required`, `capability_not_offered`). */
+            /** @description No capability, or one that is not offered (`capabilities_required`, `capability_not_offered`), or an IMAP mailbox, which is connected with its password instead (`imap_connects_with_a_password`). */
             400: {
                 headers: {
                     [name: string]: unknown;
@@ -7958,6 +8078,168 @@ export interface operations {
             };
             /** @description The provider is not configured on this instance (`provider_not_configured`), or this instance has no front door for consents (`mailbox_unsupported`). */
             409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "connectors.connect_imap": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The workspace. */
+                workspace_id: components["schemas"]["WorkspaceId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ConnectImap"];
+            };
+        };
+        responses: {
+            /** @description Connected (or connected again): the connection, never its password. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConnectionView"];
+                };
+            };
+            /** @description The servers refused or could not be reached (`imap_login_refused`, `smtp_login_refused`, `imap_unreachable`, `smtp_unreachable`, `imap_tls_failed`, `smtp_tls_failed`, `imap_not_an_imap_server`, `host_refused`, `starttls_missing`), no servers were found (`imap_servers_required`), the mailbox is connected natively instead (`use_native_provider`), or the input is not valid (`imap_address_invalid`, `imap_username_invalid`, `imap_password_invalid`). */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No valid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Missing scope, a client token (`connection_needs_user`), or a sign-in more than ten minutes old (`step_up_required`). */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No such workspace, or no such IMAP connection of yours. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description IMAP is not turned on on this instance (`provider_not_configured`), another member connected this mailbox (`account_connected_by_another_member`), or the mailbox is not the one being connected again (`account_mismatch`). */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Too many attempts by you or this workspace (`rate_limited`), or too many failed sign-ins to this mailbox (`too_many_attempts`). */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "connectors.discover_imap": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The workspace. */
+                workspace_id: components["schemas"]["WorkspaceId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DiscoverImap"];
+            };
+        };
+        responses: {
+            /** @description What was found: servers, a native provider to connect instead, or nothing. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DiscoveredImap"];
+                };
+            };
+            /** @description Not an email address (`imap_address_invalid`). */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No valid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Missing scope, a client token (`connection_needs_user`), or a sign-in more than ten minutes old (`step_up_required`). */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No such workspace. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description IMAP is not turned on on this instance (`provider_not_configured`). */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description More than 30 in an hour (`rate_limited`). */
+            429: {
                 headers: {
                     [name: string]: unknown;
                 };

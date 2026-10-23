@@ -372,6 +372,31 @@ impl Kit {
                 )
                 .unwrap(),
             )),
+            imap: Arc::new(crate::imap::Imap::default()),
+            cipher: Some(Arc::new(Cipher::new(
+                &SecretKey::from_bytes([3; 32]),
+                CREDENTIALS_PURPOSE,
+            ))),
+            clock: clock.clone(),
+        };
+        Self::assemble(db, deps, clock, google, zoho).await
+    }
+
+    /// The module as [`new`](Self::new), with the IMAP adapter `imap`.
+    pub async fn with_imap(db: PgPool, imap: crate::imap::Imap) -> Self {
+        let mut config = ConnectorsConfig::default();
+        config.zoho.requests_per_minute = 1_000_000;
+        config.imap = imap.config.clone();
+        let google = FakeGoogle::start().await;
+        let clock = Arc::new(FixedClock::new(
+            DateTime::from_timestamp(Utc::now().timestamp(), 0).unwrap(),
+        ));
+        let zoho = FakeZoho::start(clock.clone()).await;
+        let deps = Deps {
+            config: Arc::new(config),
+            google: None,
+            zoho: None,
+            imap: Arc::new(imap),
             cipher: Some(Arc::new(Cipher::new(
                 &SecretKey::from_bytes([3; 32]),
                 CREDENTIALS_PURPOSE,
@@ -435,6 +460,22 @@ impl Kit {
         claims["sub"] = sub.into();
         claims["email"] = format!("{sub}@example.com").into();
         claims["email_verified"] = true.into();
+        Caller {
+            token: self.idp.token(&claims),
+            subject: sub.to_owned(),
+        }
+    }
+
+    /// A user `sub` with every scope, who signed in `minutes` ago (by the
+    /// module's clock).
+    pub fn user_signed_in(&self, sub: &str, minutes: i64) -> Caller {
+        let mut claims = self.idp.claims(ALL_SCOPES);
+        claims["sub"] = sub.into();
+        claims["email"] = format!("{sub}@example.com").into();
+        claims["email_verified"] = true.into();
+        claims["auth_time"] = (self.clock.now() - TimeDelta::minutes(minutes))
+            .timestamp()
+            .into();
         Caller {
             token: self.idp.token(&claims),
             subject: sub.to_owned(),

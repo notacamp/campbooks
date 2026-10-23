@@ -930,6 +930,10 @@ fn body(world: &World, id: &str) -> Option<Value> {
         "connectors.start_connection" => {
             json!({"provider": "google", "capabilities": ["messages"]})
         }
+        "connectors.discover_imap" => json!({"address": "matrix@example.com"}),
+        "connectors.connect_imap" => {
+            json!({"address": "matrix@example.com", "password": "not-a-real-password"})
+        }
         "conversations.add_label" => json!({"name": "Matrix"}),
         "conversations.move_to_stream" => json!({"stream": "updates"}),
         "conversations.create_draft" => json!({"kind": "new", "inbox_id": inbox}),

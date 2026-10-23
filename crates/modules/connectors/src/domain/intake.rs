@@ -17,7 +17,7 @@ use campbooks_kernel::{
 use secrecy::ExposeSecret as _;
 
 use super::{
-    grants::{Mailbox, ProviderGrant, create_or_refresh_connection},
+    grants::{Mailbox, ProviderGrant, Secret, create_or_refresh_connection},
     model::{Capability, ConnectionId, Health, Provider},
 };
 use crate::{MESSAGES, deps::Deps, google, provider::TokenGrant, zoho};
@@ -99,7 +99,7 @@ impl GrantIntake for Intake {
                     address_verified: grant.address_verified,
                     display_name: grant.display_name,
                     capabilities,
-                    tokens: TokenGrant {
+                    secret: Secret::Tokens(TokenGrant {
                         access_token: grant.access_token.expose_secret().to_owned(),
                         expires_in: grant.expires_in.and_then(|s| i64::try_from(s).ok()),
                         refresh_token: grant
@@ -107,7 +107,8 @@ impl GrantIntake for Intake {
                             .as_ref()
                             .map(|t| t.expose_secret().to_owned()),
                         scope: Some(grant.scopes.join(" ")),
-                    },
+                    }),
+                    imap: None,
                     grantor_subject: Some(grant.subject.clone()),
                     extending: grant
                         .extending
