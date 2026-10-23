@@ -50,8 +50,8 @@
 ## 7. Close
 
 - [x] 7.1 OpenAPI regenerated
-- [ ] 7.2 Client types regenerated
+- [x] 7.2 Client types regenerated
 - [x] 7.3 Changelog entry file (`changelog/unreleased/added/305-continue-with-scout.md`)
-- [ ] 7.4 Gates green
-- [ ] 7.5 UI verified at 375px and desktop (the lead records it)
-- [ ] 7.6 `openspec archive continue-with-scout --yes` before merge
+- [x] 7.4 Gates green
+- [x] 7.5 UI verified at 375px and desktop (the lead records it)
+- [x] 7.6 `openspec archive continue-with-scout --yes` before merge
