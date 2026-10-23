@@ -1,7 +1,9 @@
 // A reader without the send slice's composer offers no Reply: none that
 // would do nothing (campbooks-cloud#220).
-import { fireEvent, screen } from "@testing-library/react";
+import { fireEvent, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
+
+import { ScoutChatProvider } from "~/lib/scout-chat";
 
 import { INBOX, Q4, Q4_BODY, Q4_DETAIL, W } from "../../../../../test/demo/conversations";
 import { DUARTE } from "../../../../../test/demo/workspaces";
@@ -49,6 +51,38 @@ function routes(conversation: ConversationSummary = Q4) {
 }
 
 describe("ConversationReader", () => {
+  it("offers Ask Scout on ., opening the chat about this conversation", async () => {
+    routes();
+    const scout = vi.fn();
+    renderWithProviders(
+      <ScoutChatProvider open={scout}>
+        <Reader />
+      </ScoutChatProvider>,
+    );
+    await screen.findByRole("heading", { name: Q4.subject });
+    const [ask] = screen.getAllByRole("button", { name: /Ask Scout/u });
+    if (ask === undefined) {
+      throw new Error("no Ask Scout");
+    }
+    expect(ask).toHaveAttribute("aria-keyshortcuts", ".");
+
+    // The focus comes back to the button it was asked from.
+    ask.focus();
+    fireEvent.click(ask);
+    expect(scout).toHaveBeenCalledWith(Q4.id, ask);
+    fireEvent.keyDown(document.body, { key: "." });
+    expect(scout).toHaveBeenCalledTimes(2);
+    expect(scout.mock.calls[1]?.[0]).toBe(Q4.id);
+  });
+
+  it("offers no Ask Scout where no chat is mounted", async () => {
+    routes();
+    renderWithProviders(<Reader />);
+    await screen.findByRole("heading", { name: Q4.subject });
+
+    expect(screen.queryByRole("button", { name: /Ask Scout/u })).toBeNull();
+  });
+
   it("offers no Reply, Reply all or Forward without a composer, and R does nothing", async () => {
     routes();
     renderWithProviders(<Reader />);
@@ -71,6 +105,53 @@ describe("ConversationReader", () => {
     }
     fireEvent.click(reply);
     expect(await screen.findByRole("dialog")).toBeVisible();
+  });
+
+  it("puts Reply in the header beside Reply all and Forward, not at the bottom", async () => {
+    routes();
+    const slot = vi.fn<RenderReplySlot>(() => null);
+    renderWithProviders(<Reader slot={slot} />);
+    await screen.findByRole("heading", { name: Q4.subject });
+    // The header's actions are icons named by aria-label; the phone bar's Reply is not.
+    const icons = screen
+      .getAllByRole("button")
+      .map((button) => button.getAttribute("aria-label"))
+      .filter((label) => label !== null);
+    const at = icons.indexOf("Reply");
+    expect(icons.slice(at, at + 3)).toEqual(["Reply", "Reply all", "Forward"]);
+    expect(screen.queryByRole("button", { name: /^Reply to/u })).toBeNull();
+  });
+
+  it("offers Reply in the note when it says a reply is needed, opening the same dialog", async () => {
+    routes();
+    const slot = vi.fn<RenderReplySlot>(() => null);
+    renderWithProviders(<Reader slot={slot} />);
+    await screen.findByRole("heading", { name: Q4.subject });
+    const note = await screen.findByRole("region", { name: "Where things stand" });
+    expect(note).toHaveTextContent("it needs a reply");
+    fireEvent.click(within(note).getByRole("button", { name: "Reply" }));
+    expect(await screen.findByRole("dialog")).toBeVisible();
+  });
+
+  it("offers no Reply in the note when it does not say a reply is needed", async () => {
+    const detail = {
+      ...Q4_DETAIL,
+      conversation: Q4,
+      decisions: Q4_DETAIL.decisions.map((d) =>
+        d.question === "needs_reply" ? { ...d, value: false } : d,
+      ),
+    };
+    mockApi({
+      [`GET ${W}/inboxes`]: { body: { inboxes: [INBOX] } },
+      [`GET ${W}/conversations/${Q4.id}`]: { body: detail },
+      [`GET ${W}/conversations/${Q4.id}/messages/${NEWEST}/body`]: { body: Q4_BODY },
+      [`POST ${W}/conversations/${Q4.id}/read`]: { body: { ...Q4, unread_count: 0 } },
+      [`GET ${W}/drafts`]: { body: { drafts: [] } },
+    });
+    renderWithProviders(<Reader slot={vi.fn<RenderReplySlot>(() => null)} />);
+    await screen.findByRole("heading", { name: Q4.subject });
+    const note = await screen.findByRole("region", { name: "Where things stand" });
+    expect(within(note).queryByRole("button", { name: "Reply" })).toBeNull();
   });
 
   it("says an ask that lapsed has expired, and offers nothing to resolve", async () => {

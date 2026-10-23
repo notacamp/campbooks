@@ -35,6 +35,8 @@ object_store.workspace = true
 opentelemetry.workspace = true
 # The W3C trace-context propagator (`telemetry`).
 opentelemetry_sdk.workspace = true
+# A message's own words without its quoted history (`text`).
+regex.workspace = true
 reqwest.workspace = true
 secrecy.workspace = true
 serde.workspace = true

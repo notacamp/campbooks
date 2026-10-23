@@ -1,7 +1,7 @@
 import type { KeyboardEvent } from "react";
 import { useTranslation } from "react-i18next";
 
-import { Button, Popover, PopoverSection } from "~/lib/ui";
+import { Button, IconButton, Popover, PopoverSection } from "~/lib/ui";
 
 import { STREAMS, type Stream } from "../../api/queries";
 import { streamName, type Translate } from "../../model";
@@ -27,10 +27,12 @@ export function MovePicker({ current, open, onOpenChange, onMove }: MovePickerPr
       open={open}
       onOpenChange={onOpenChange}
       renderTrigger={(trigger) => (
-        <Button {...trigger} variant="ghost" icon="move" shortcut="conversations.move_to_stream">
-          {/* Icon-only on phones, still named for screen readers. */}
-          <span className="max-md:sr-only">{t("actions.move")}</span>
-        </Button>
+        <IconButton
+          {...trigger}
+          label={t("actions.move")}
+          icon="move"
+          shortcut="conversations.move_to_stream"
+        />
       )}
     >
       {(close) => (

@@ -1763,6 +1763,584 @@
         }
       }
     },
+    "/api/v1/w/{workspace_id}/assistant/chats": {
+      "post": {
+        "tags": [
+          "assistant"
+        ],
+        "summary": "Start a chat with Scout, or continue yours about the same record.",
+        "operationId": "assistant.start_chat",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "description": "The workspace.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StartChat"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Your chat about that record, continued.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChatView"
+                }
+              }
+            }
+          },
+          "201": {
+            "description": "A new chat.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChatView"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Scout cannot chat about that type of record (`about_unsupported`).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid access token.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing scope, or not a member (`chat_needs_member`).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such workspace or record, or you cannot see it.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "No language model may read mail here (`chat_unavailable`).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [
+              "assistant:write"
+            ]
+          }
+        ],
+        "x-campbooks": {
+          "access": {
+            "action": "create",
+            "resource": "assistant.chat"
+          },
+          "assistant": false,
+          "automation": false,
+          "mutates": true,
+          "records": [
+            "assistant.chat"
+          ],
+          "risk": "low"
+        }
+      }
+    },
+    "/api/v1/w/{workspace_id}/assistant/chats/{chat_id}": {
+      "get": {
+        "tags": [
+          "assistant"
+        ],
+        "summary": "Your chat, what it is about, and its messages, oldest first.",
+        "operationId": "assistant.get_chat",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "description": "The workspace.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId"
+            }
+          },
+          {
+            "name": "chat_id",
+            "in": "path",
+            "description": "The chat.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ChatId"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The chat.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChatView"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid access token.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing scope.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such chat, or it is not yours.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [
+              "assistant:read"
+            ]
+          }
+        ],
+        "x-campbooks": {
+          "access": {
+            "action": "read",
+            "resource": "assistant.chat"
+          },
+          "assistant": false,
+          "automation": false,
+          "mutates": false,
+          "records": [
+            "assistant.chat"
+          ],
+          "risk": "low"
+        }
+      },
+      "delete": {
+        "tags": [
+          "assistant"
+        ],
+        "summary": "Delete your chat and its messages. There is no undo.",
+        "operationId": "assistant.delete_chat",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "description": "The workspace.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId"
+            }
+          },
+          {
+            "name": "chat_id",
+            "in": "path",
+            "description": "The chat.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ChatId"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Deleted."
+          },
+          "401": {
+            "description": "No valid access token.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing scope.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such chat, or it is not yours.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [
+              "assistant:write"
+            ]
+          }
+        ],
+        "x-campbooks": {
+          "access": {
+            "action": "delete",
+            "resource": "assistant.chat"
+          },
+          "assistant": false,
+          "automation": false,
+          "mutates": true,
+          "records": [
+            "assistant.chat"
+          ],
+          "risk": "low"
+        }
+      }
+    },
+    "/api/v1/w/{workspace_id}/assistant/chats/{chat_id}/questions": {
+      "post": {
+        "tags": [
+          "assistant"
+        ],
+        "summary": "Ask Scout, and get its answer whole (the desktop app, where answers\ndon't stream).",
+        "operationId": "assistant.ask_chat",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "description": "The workspace.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId"
+            }
+          },
+          {
+            "name": "chat_id",
+            "in": "path",
+            "description": "The chat.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ChatId"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AskChat"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Scout's answer, as stored.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChatMessageView"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "An empty question (`question_empty`) or one over 2,000 characters (`question_too_long`).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid access token.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing scope.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such chat, or it is not yours.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The chat holds 40 questions already (`chat_full`): start over; or no language model may read mail here (`chat_unavailable`).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many questions this hour.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Scout couldn't answer (`chat_failed`), or the workspace used its whole daily AI limit (`ai_daily_limit_reached`).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [
+              "assistant:write"
+            ]
+          }
+        ],
+        "x-campbooks": {
+          "access": {
+            "action": "write",
+            "resource": "assistant.chat"
+          },
+          "assistant": false,
+          "automation": false,
+          "mutates": true,
+          "records": [
+            "assistant.chat"
+          ],
+          "risk": "low"
+        }
+      }
+    },
+    "/api/v1/w/{workspace_id}/assistant/chats/{chat_id}/questions/stream": {
+      "post": {
+        "tags": [
+          "assistant"
+        ],
+        "summary": "Ask Scout, and get its answer as it is written.",
+        "description": "The same request as `assistant.ask_chat`, answered as Server-Sent\nEvents once every check passed (a refusal is an ordinary problem\nanswer). Events, each `data` a JSON object: `thinking` (`{\"delta\"}`:\nScout's reasoning as it arrives, at most 8,000 characters in all),\n`step` (`{\"tool\"}`: a tool starting), `text` (`{\"delta\"}`: the answer's\nwords as they arrive; words before a `step` are not part of the answer),\nthen exactly one of `done` (the stored Scout message, as `ask_chat`\nanswers it) or `error` (a problem: `chat_failed` or\n`ai_daily_limit_reached`). A comment every 10 seconds keeps the\nconnection open. The question is stored when the stream opens; a\nstream that ends before `done` leaves Scout's message stored as\n`failed`, with no text.",
+        "operationId": "assistant.stream_chat",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "description": "The workspace.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId"
+            }
+          },
+          {
+            "name": "chat_id",
+            "in": "path",
+            "description": "The chat.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ChatId"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AskChat"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "The answer as it is written: `thinking`, `step`, `text`, then `done` or `error`.",
+            "content": {
+              "text/event-stream": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "An empty question (`question_empty`) or one over 2,000 characters (`question_too_long`).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid access token.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing scope.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such chat, or it is not yours.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The chat holds 40 questions already (`chat_full`): start over; or no language model may read mail here (`chat_unavailable`).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many questions this hour.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Scout couldn't answer (`chat_failed`), or the workspace used its whole daily AI limit (`ai_daily_limit_reached`).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [
+              "assistant:write"
+            ]
+          }
+        ],
+        "x-campbooks": {
+          "access": {
+            "action": "write",
+            "resource": "assistant.chat"
+          },
+          "assistant": false,
+          "automation": false,
+          "mutates": true,
+          "records": [
+            "assistant.chat"
+          ],
+          "risk": "low"
+        }
+      }
+    },
     "/api/v1/w/{workspace_id}/assistant/compile": {
       "post": {
         "tags": [
@@ -3587,6 +4165,99 @@
           ],
           "risk": "low",
           "undo": "conversations.unarchive"
+        }
+      }
+    },
+    "/api/v1/w/{workspace_id}/conversations/{conversation_id}/history": {
+      "get": {
+        "tags": [
+          "conversations"
+        ],
+        "summary": "What happened to a conversation, and who did it.",
+        "operationId": "conversations.get_history",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "description": "The workspace.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId"
+            }
+          },
+          {
+            "name": "conversation_id",
+            "in": "path",
+            "description": "The conversation.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ConversationId"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "What happened to it, oldest first; no message text.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConversationHistory"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid access token.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing scope.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such conversation, or you cannot see it.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [
+              "conversations:read"
+            ]
+          }
+        ],
+        "x-campbooks": {
+          "access": {
+            "action": "read",
+            "resource": "conversations.conversation"
+          },
+          "assistant": true,
+          "automation": false,
+          "mutates": false,
+          "records": [
+            "conversations.conversation",
+            "conversations.message",
+            "conversations.rule"
+          ],
+          "risk": "low"
         }
       }
     },
@@ -6098,6 +6769,118 @@
           ],
           "risk": "low",
           "undo": "conversations.trash"
+        }
+      }
+    },
+    "/api/v1/w/{workspace_id}/correspondents": {
+      "get": {
+        "tags": [
+          "conversations"
+        ],
+        "summary": "Suggest the people you exchange mail with, as you type an address.",
+        "operationId": "conversations.list_correspondents",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "description": "The workspace.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId"
+            }
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "description": "Words (2 to 100 characters) every listed person's address or display\nname contains, ignoring case and accents: what is typed in To, Cc or\nBcc.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "How many, 1 to 10 (default 10).",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "minimum": 0
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The people.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CorrespondentList"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "No `q` (`invalid_query`), or a `q` or `limit` out of range (`invalid_correspondents_query`).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid access token.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing scope.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such workspace, or you are not a member.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [
+              "conversations:read"
+            ]
+          }
+        ],
+        "x-campbooks": {
+          "access": {
+            "action": "read",
+            "resource": "conversations.inbox"
+          },
+          "assistant": false,
+          "automation": false,
+          "mutates": false,
+          "records": [
+            "conversations.inbox"
+          ],
+          "risk": "low"
         }
       }
     },
@@ -13085,6 +13868,27 @@
           }
         }
       },
+      "AskChat": {
+        "type": "object",
+        "description": "A question.",
+        "required": [
+          "text"
+        ],
+        "properties": {
+          "text": {
+            "type": "string",
+            "description": "What you ask, 1 to 2,000 characters (line breaks kept)."
+          },
+          "time_zone": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Your time zone, an IANA name (`Europe/Lisbon`), for \"today\" and\n\"Thursday afternoon\"; UTC when absent or unknown."
+          }
+        },
+        "additionalProperties": false
+      },
       "AssertionResponse": {
         "type": "object",
         "description": "`AuthenticatorAssertionResponseJSON`: the authenticator's signature.",
@@ -13350,6 +14154,179 @@
         "enum": [
           "email"
         ]
+      },
+      "ChatAuthor": {
+        "type": "string",
+        "description": "Who wrote a chat message.",
+        "enum": [
+          "member",
+          "scout"
+        ]
+      },
+      "ChatFinish": {
+        "type": "string",
+        "description": "How Scout's answer ended.",
+        "enum": [
+          "done",
+          "failed",
+          "cut_short"
+        ]
+      },
+      "ChatId": {
+        "type": "string",
+        "format": "uuid",
+        "description": "ChatId (UUIDv7)"
+      },
+      "ChatMessageId": {
+        "type": "string",
+        "format": "uuid",
+        "description": "ChatMessageId (UUIDv7)"
+      },
+      "ChatMessageView": {
+        "type": "object",
+        "description": "A question or an answer.",
+        "required": [
+          "id",
+          "author",
+          "text",
+          "steps",
+          "created_at"
+        ],
+        "properties": {
+          "author": {
+            "$ref": "#/components/schemas/ChatAuthor",
+            "description": "Who wrote it."
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When."
+          },
+          "finish": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/ChatFinish",
+                "description": "How Scout's answer ended (Scout's answers only)."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "id": {
+            "$ref": "#/components/schemas/ChatMessageId",
+            "description": "The message."
+          },
+          "steps": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ChatStep"
+            },
+            "description": "What Scout looked at to answer (Scout's answers only)."
+          },
+          "text": {
+            "type": "string",
+            "description": "What was asked or answered, as plain text: show it as text only,\nnever as HTML and never with links made of it."
+          }
+        }
+      },
+      "ChatStep": {
+        "type": "object",
+        "description": "One thing Scout looked at, built by the server from the tool that ran,\nnever from the model's words.",
+        "required": [
+          "tool",
+          "records",
+          "count"
+        ],
+        "properties": {
+          "count": {
+            "type": "integer",
+            "format": "int32",
+            "description": "How many it found.",
+            "minimum": 0
+          },
+          "records": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RecordRef"
+            },
+            "description": "The records it returned, at most 10."
+          },
+          "tool": {
+            "$ref": "#/components/schemas/ChatTool",
+            "description": "The tool."
+          }
+        }
+      },
+      "ChatTool": {
+        "type": "string",
+        "description": "A tool Scout used. Each reads as the member, and changes nothing.",
+        "enum": [
+          "find_conversations",
+          "read_conversation",
+          "conversation_history",
+          "find_people",
+          "what_needs_me",
+          "my_inboxes"
+        ]
+      },
+      "ChatView": {
+        "type": "object",
+        "description": "A chat and its messages, oldest first.",
+        "required": [
+          "id",
+          "questions",
+          "max_questions",
+          "created_at",
+          "last_message_at",
+          "messages"
+        ],
+        "properties": {
+          "about": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/RecordRef",
+                "description": "What it is about."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When it was started."
+          },
+          "id": {
+            "$ref": "#/components/schemas/ChatId",
+            "description": "The chat."
+          },
+          "last_message_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When its last message was written; it is deleted 30 days after."
+          },
+          "max_questions": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Questions it may hold; past them, start over.",
+            "minimum": 0
+          },
+          "messages": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ChatMessageView"
+            },
+            "description": "Its messages, oldest first."
+          },
+          "questions": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Questions asked so far.",
+            "minimum": 0
+          }
+        }
       },
       "ClientBrowser": {
         "type": "object",
@@ -14121,6 +15098,32 @@
           }
         }
       },
+      "ConversationHistory": {
+        "type": "object",
+        "description": "What happened to a conversation, oldest first.",
+        "required": [
+          "conversation_id",
+          "events",
+          "truncated"
+        ],
+        "properties": {
+          "conversation_id": {
+            "$ref": "#/components/schemas/ConversationId",
+            "description": "The conversation."
+          },
+          "events": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/HistoryEvent"
+            },
+            "description": "At most the 200 newest events, oldest first."
+          },
+          "truncated": {
+            "type": "boolean",
+            "description": "Older events were left out."
+          }
+        }
+      },
       "ConversationId": {
         "type": "string",
         "format": "uuid",
@@ -14323,6 +15326,58 @@
             "type": "integer",
             "format": "int32",
             "description": "Unread inbound messages.",
+            "minimum": 0
+          }
+        }
+      },
+      "CorrespondentList": {
+        "type": "object",
+        "description": "People, written to most first.",
+        "required": [
+          "correspondents"
+        ],
+        "properties": {
+          "correspondents": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CorrespondentView"
+            },
+            "description": "Written to most first, then written by most, then by address."
+          }
+        }
+      },
+      "CorrespondentView": {
+        "type": "object",
+        "description": "Someone the caller's inboxes exchange mail with.",
+        "required": [
+          "address",
+          "wrote",
+          "received"
+        ],
+        "properties": {
+          "address": {
+            "type": "string",
+            "description": "Their address, lower-cased.",
+            "example": "marta@ferreira-studio.example"
+          },
+          "name": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The newest display name seen for them, sent or received, when there\nwas one.",
+            "example": "Marta Ferreira"
+          },
+          "received": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Messages from them in the caller's inboxes, among the newest (the\nlast year, at most 5,000 received messages).",
+            "minimum": 0
+          },
+          "wrote": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Messages the caller's inboxes sent with them in To or Cc, among the\nnewest (the last year, at most 5,000 sent messages).",
             "minimum": 0
           }
         }
@@ -15251,6 +16306,384 @@
             "description": "Oldest first."
           }
         }
+      },
+      "HistoryActor": {
+        "type": "string",
+        "description": "Who did something.",
+        "enum": [
+          "you",
+          "member",
+          "rule",
+          "scout"
+        ]
+      },
+      "HistoryEvent": {
+        "oneOf": [
+          {
+            "type": "object",
+            "description": "A message arrived.",
+            "required": [
+              "at",
+              "message_id",
+              "from",
+              "kind"
+            ],
+            "properties": {
+              "at": {
+                "type": "string",
+                "format": "date-time",
+                "description": "When it was sent."
+              },
+              "from": {
+                "$ref": "#/components/schemas/Address",
+                "description": "Who wrote it."
+              },
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "received"
+                ]
+              },
+              "message_id": {
+                "$ref": "#/components/schemas/MessageId",
+                "description": "The message."
+              }
+            }
+          },
+          {
+            "type": "object",
+            "description": "The inbox sent a message.",
+            "required": [
+              "at",
+              "message_id",
+              "from",
+              "kind"
+            ],
+            "properties": {
+              "at": {
+                "type": "string",
+                "format": "date-time",
+                "description": "When it was sent."
+              },
+              "from": {
+                "$ref": "#/components/schemas/Address",
+                "description": "Who wrote it."
+              },
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "sent"
+                ]
+              },
+              "message_id": {
+                "$ref": "#/components/schemas/MessageId",
+                "description": "The message."
+              }
+            }
+          },
+          {
+            "type": "object",
+            "description": "One of Scout's answers about a message.",
+            "required": [
+              "at",
+              "message_id",
+              "question",
+              "value",
+              "source",
+              "acted",
+              "kind"
+            ],
+            "properties": {
+              "acted": {
+                "type": "boolean",
+                "description": "Whether it changed anything; otherwise it was a suggestion."
+              },
+              "at": {
+                "type": "string",
+                "format": "date-time",
+                "description": "When it was given."
+              },
+              "confidence": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "format": "int32",
+                "description": "How sure, 0 to 100, when the source says.",
+                "minimum": 0
+              },
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "scout_read"
+                ]
+              },
+              "message_id": {
+                "$ref": "#/components/schemas/MessageId",
+                "description": "The message it is about."
+              },
+              "question": {
+                "type": "string",
+                "description": "The question (`stream`, `needs_reply`, `money`, …)."
+              },
+              "source": {
+                "$ref": "#/components/schemas/DecisionSource",
+                "description": "Who answered."
+              },
+              "value": {
+                "$ref": "#/components/schemas/AnswerView",
+                "description": "The answer."
+              }
+            }
+          },
+          {
+            "type": "object",
+            "description": "A member changed an answer.",
+            "required": [
+              "at",
+              "question",
+              "from",
+              "to",
+              "by",
+              "kind"
+            ],
+            "properties": {
+              "at": {
+                "type": "string",
+                "format": "date-time",
+                "description": "When."
+              },
+              "by": {
+                "$ref": "#/components/schemas/HistoryActor",
+                "description": "`you` or `member`."
+              },
+              "from": {
+                "type": "string",
+                "description": "The answer before."
+              },
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "corrected"
+                ]
+              },
+              "question": {
+                "type": "string",
+                "description": "The question."
+              },
+              "to": {
+                "type": "string",
+                "description": "The answer after."
+              }
+            }
+          },
+          {
+            "type": "object",
+            "description": "A taught rule changed the conversation.",
+            "required": [
+              "at",
+              "rule",
+              "kind"
+            ],
+            "properties": {
+              "at": {
+                "type": "string",
+                "format": "date-time",
+                "description": "When."
+              },
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "rule_applied"
+                ]
+              },
+              "rule": {
+                "$ref": "#/components/schemas/RuleRef",
+                "description": "The rule."
+              }
+            }
+          },
+          {
+            "type": "object",
+            "description": "What a rule did was put back (the rule was undone).",
+            "required": [
+              "at",
+              "rule",
+              "kind"
+            ],
+            "properties": {
+              "at": {
+                "type": "string",
+                "format": "date-time",
+                "description": "When."
+              },
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "rule_reverted"
+                ]
+              },
+              "rule": {
+                "$ref": "#/components/schemas/RuleRef",
+                "description": "The rule."
+              }
+            }
+          },
+          {
+            "type": "object",
+            "description": "A member changed back what a rule did: the rule leaves the\nconversation alone.",
+            "required": [
+              "at",
+              "rule",
+              "by",
+              "kind"
+            ],
+            "properties": {
+              "at": {
+                "type": "string",
+                "format": "date-time",
+                "description": "When."
+              },
+              "by": {
+                "$ref": "#/components/schemas/HistoryActor",
+                "description": "`you` or `member`."
+              },
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "rule_excepted"
+                ]
+              },
+              "rule": {
+                "$ref": "#/components/schemas/RuleRef",
+                "description": "The rule."
+              }
+            }
+          },
+          {
+            "type": "object",
+            "description": "The conversation's need, raised by one of its messages.",
+            "required": [
+              "at",
+              "reason",
+              "basis",
+              "open",
+              "kind"
+            ],
+            "properties": {
+              "at": {
+                "type": "string",
+                "format": "date-time",
+                "description": "When it was raised: Scout's answer raising it, else its last change."
+              },
+              "basis": {
+                "type": "string",
+                "description": "What raised it: `rules`, `model`, `taught` or `member`."
+              },
+              "due_on": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "format": "date",
+                "description": "When it is due, when known."
+              },
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "need_opened"
+                ]
+              },
+              "lapses_at": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "format": "date-time",
+                "description": "When it lapses on its own, when it does."
+              },
+              "open": {
+                "type": "boolean",
+                "description": "Whether it is still open."
+              },
+              "reason": {
+                "type": "string",
+                "description": "`reply`, `do`, `pay`, `review`, `worth_a_look`, `waiting` or\n`nudge`."
+              },
+              "wakes_at": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "format": "date-time",
+                "description": "When it next changes with time alone, when it does."
+              }
+            }
+          },
+          {
+            "type": "object",
+            "description": "The need left the list.",
+            "required": [
+              "at",
+              "because",
+              "by",
+              "kind"
+            ],
+            "properties": {
+              "at": {
+                "type": "string",
+                "format": "date-time",
+                "description": "When."
+              },
+              "because": {
+                "type": "string",
+                "description": "Why: `replied`, `archived`, `trashed`, `done`, `not_needed`,\n`superseded`, `rule`, `opened`, `lapsed` or `heard_back`."
+              },
+              "by": {
+                "$ref": "#/components/schemas/HistoryActor",
+                "description": "Who."
+              },
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "need_cleared"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "description": "A member's verdict on the need.",
+            "required": [
+              "at",
+              "verdict",
+              "by",
+              "kind"
+            ],
+            "properties": {
+              "at": {
+                "type": "string",
+                "format": "date-time",
+                "description": "When."
+              },
+              "by": {
+                "$ref": "#/components/schemas/HistoryActor",
+                "description": "`you` or `member`."
+              },
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "need_verdict"
+                ]
+              },
+              "verdict": {
+                "type": "string",
+                "description": "`done`, `not_needed`, `confirmed`, `already_paid` or\n`still_to_pay`."
+              }
+            }
+          }
+        ],
+        "description": "One thing that happened, by kind."
       },
       "Hit": {
         "type": "object",
@@ -18350,6 +19783,35 @@
           }
         }
       },
+      "RuleRef": {
+        "type": "object",
+        "description": "A taught rule, as an event names it: its id, and its conditions and\nactions, which clients read as its sentence.",
+        "required": [
+          "id",
+          "conditions",
+          "actions"
+        ],
+        "properties": {
+          "actions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RuleAction"
+            },
+            "description": "What it does."
+          },
+          "conditions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RuleCondition"
+            },
+            "description": "When it applies."
+          },
+          "id": {
+            "$ref": "#/components/schemas/RuleId",
+            "description": "The rule."
+          }
+        }
+      },
       "RuleRunId": {
         "type": "string",
         "format": "uuid",
@@ -19164,6 +20626,24 @@
           "mx",
           "manual"
         ]
+      },
+      "StartChat": {
+        "type": "object",
+        "description": "Start a chat, or continue the one you have about the same record.",
+        "properties": {
+          "about": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/RecordRef",
+                "description": "What the chat is about: a record of a type Scout can read\n(`conversations.conversation`); nothing when absent."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "additionalProperties": false
       },
       "StartConnection": {
         "type": "object",

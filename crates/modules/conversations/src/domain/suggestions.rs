@@ -32,7 +32,7 @@ pub enum DecisionSource {
 }
 
 impl DecisionSource {
-    fn parse(source: &str) -> Result<Self> {
+    pub(crate) fn parse(source: &str) -> Result<Self> {
         match source {
             "rules" => Ok(Self::Rules),
             "model" => Ok(Self::Model),

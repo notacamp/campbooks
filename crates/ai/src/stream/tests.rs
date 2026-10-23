@@ -288,3 +288,82 @@ async fn a_failure_ends_the_stream() {
     assert_eq!(events.len(), 2, "{events:?}");
     assert!(matches!(events[1], Err(Error::InvalidResponse(_))));
 }
+
+fn tool_call(id: &str, name: &str, arguments: &str) -> ChatEvent {
+    ChatEvent::ToolCall(ToolCall {
+        id: id.to_owned(),
+        name: name.to_owned(),
+        arguments: arguments.to_owned(),
+    })
+}
+
+#[tokio::test]
+async fn a_tool_call_in_three_pieces_is_yielded_once_whole_before_done() {
+    let body = "\
+data: {\"choices\":[{\"delta\":{\"role\":\"assistant\",\"tool_calls\":[{\"index\":0,\"id\":\"call_1\",\"type\":\"function\",\"function\":{\"name\":\"find_conversations\",\"arguments\":\"{\\\"que\"}}]}}]}\n\n\
+data: {\"choices\":[{\"delta\":{\"tool_calls\":[{\"index\":0,\"function\":{\"arguments\":\"ry\\\": \\\"inv\"}}]}}]}\n\n\
+data: {\"choices\":[{\"delta\":{\"tool_calls\":[{\"index\":0,\"function\":{\"arguments\":\"oice\\\"}\"}}]},\"finish_reason\":\"tool_calls\"}]}\n\n\
+data: [DONE]\n\n";
+    let events = collect(vec![Ok(body.as_bytes().to_vec())]).await;
+    let events: Vec<ChatEvent> = events.into_iter().map(Result::unwrap).collect();
+    // Each piece is a sign of life; the call comes once, whole, then the end.
+    assert_eq!(
+        events[..3],
+        [ChatEvent::Alive, ChatEvent::Alive, ChatEvent::Alive]
+    );
+    assert_eq!(
+        events[3],
+        tool_call("call_1", "find_conversations", "{\"query\": \"invoice\"}")
+    );
+    let ChatEvent::Done(summary) = &events[4] else {
+        panic!("{events:?}");
+    };
+    assert_eq!(summary.finish_kind(), "tool_calls");
+    assert_eq!(events.len(), 5);
+}
+
+#[test]
+fn several_calls_in_one_turn_keep_their_order_and_text_comes_first() {
+    let body = "\
+data: {\"choices\":[{\"delta\":{\"content\":\"Let me look.\",\"tool_calls\":[{\"index\":0,\"id\":\"a\",\"function\":{\"name\":\"what_needs_me\",\"arguments\":\"\"}}]}}]}\n\n\
+data: {\"choices\":[{\"delta\":{\"tool_calls\":[{\"index\":1,\"id\":\"b\",\"function\":{\"name\":\"my_inboxes\",\"arguments\":\"{}\"}}]}}]}\n\n\
+data: {\"choices\":[{\"delta\":{\"tool_calls\":[{\"index\":0,\"function\":{\"arguments\":\"{}\"}}]},\"finish_reason\":\"tool_calls\"}]}\n\n\
+data: [DONE]\n\n";
+    let events = parse(&[body.as_bytes()]).unwrap();
+    let events: Vec<ChatEvent> = events
+        .into_iter()
+        .filter(|event| *event != ChatEvent::Alive)
+        .collect();
+    assert_eq!(
+        events,
+        [
+            text("Let me look."),
+            tool_call("a", "what_needs_me", "{}"),
+            tool_call("b", "my_inboxes", "{}"),
+        ]
+    );
+}
+
+#[test]
+fn arguments_that_are_not_json_are_handed_over_as_they_came() {
+    let body = "\
+data: {\"choices\":[{\"delta\":{\"tool_calls\":[{\"index\":0,\"id\":\"a\",\"function\":{\"name\":\"find_people\",\"arguments\":\"marta, please\"}}]},\"finish_reason\":\"tool_calls\"}]}\n\n\
+data: [DONE]\n\n";
+    let events = parse(&[body.as_bytes()]).unwrap();
+    assert!(
+        events.contains(&tool_call("a", "find_people", "marta, please")),
+        "{events:?}"
+    );
+}
+
+#[test]
+fn tool_call_arguments_are_bounded() {
+    let long = "x".repeat(70 * 1024);
+    let body = format!(
+        "data: {{\"choices\":[{{\"delta\":{{\"tool_calls\":[{{\"index\":0,\"id\":\"a\",\"function\":{{\"name\":\"find_people\",\"arguments\":\"{long}\"}}}}]}}}}]}}\n\n"
+    );
+    assert!(matches!(
+        parse(&[body.as_bytes()]),
+        Err(Error::InvalidResponse(_))
+    ));
+}

@@ -1,0 +1,1 @@
+- **Scout's sorting model no longer trusts the compromised emSign roots.** The image it runs in now ships certifi 2026.10.19 (GHSA-6q48-6c7w-9gw2), which drops the emSign root certificates whose intermediate keys were compromised.
