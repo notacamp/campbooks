@@ -264,6 +264,11 @@ function flagsOf(decisions: readonly DecisionView[]) {
   });
 }
 
+/** Whether the decide pass thinks the conversation needs a reply (the note then offers Reply). */
+export function suggestsReply(decisions: readonly DecisionView[]): boolean {
+  return flagsOf(decisions).some((flag) => flag.question === "needs_reply");
+}
+
 /** The note's sentence: what the decide pass thinks, said as suggestions. */
 export function noteSentence(
   t: Translate,

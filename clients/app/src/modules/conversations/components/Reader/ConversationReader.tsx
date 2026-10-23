@@ -34,6 +34,7 @@ import {
   avatarKind,
   displayName,
   noteSentence,
+  suggestsReply,
   openByDefault,
   placeName,
   placementLine,
@@ -331,6 +332,21 @@ export function ConversationReader({
   // J/K step between conversations; the arrows keep scrolling this one.
   useShortcut("list.next", onNext, { alternates: false });
   useShortcut("list.previous", onPrevious, { alternates: false });
+  // The note offers Reply whenever it says a reply is needed (campbooks-cloud#306).
+  const noteReply =
+    renderReplySlot === undefined || newest === undefined ? null : (
+      <Button
+        variant="secondary"
+        icon="reply"
+        shortcut="item.reply"
+        onClick={() => {
+          openReply();
+        }}
+      >
+        {tShortcuts("item.reply")}
+      </Button>
+    );
+
   const canReply = active && renderReplySlot !== undefined;
   useShortcut(
     "item.reply",
@@ -623,7 +639,16 @@ export function ConversationReader({
               ? {}
               : { chips: <ExpiredChip /> })}
             footer={footerLine(conversation)}
-            {...(stopButton === null ? {} : { actions: stopButton })}
+            {...(stopButton === null && !(noteReply !== null && suggestsReply(decisions))
+              ? {}
+              : {
+                  actions: (
+                    <>
+                      {suggestsReply(decisions) ? noteReply : null}
+                      {stopButton}
+                    </>
+                  ),
+                })}
             how={
               <HowDecided rows={howRows(t, exists, decisions)} footnote={t("needs.how.footnote")} />
             }
@@ -737,6 +762,7 @@ export function ConversationReader({
               : {
                   actions: (
                     <>
+                      {need.reason === "reply" ? noteReply : null}
                       <Button
                         variant="secondary"
                         onClick={() => {
