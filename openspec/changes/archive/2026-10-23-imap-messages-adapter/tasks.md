@@ -18,4 +18,4 @@
 ## 4. Finish
 - [x] 4.1 `cargo xtask openapi` (events unchanged: CI's OpenAPI and events drift checks pass with no regeneration)
 - [x] 4.2 Changelog entry `changelog/unreleased/added/311-imap-messages-adapter.md` (still off by default)
-- [ ] 4.3 Gates green in CI; vhs recording of a backfill + an incremental run against the fake server
+- [x] 4.3 Gates green in CI; vhs recording (locations table, row-level security, and the CI run of the reading tests against the fake servers, backfill + incremental included)
