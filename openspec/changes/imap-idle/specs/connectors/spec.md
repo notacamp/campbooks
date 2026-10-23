@@ -72,14 +72,14 @@ their caps never keep the others from being claimed.
 An IDLE session SHALL end, with `DONE` and `LOGOUT`, within a renewal of
 its lease once its connection needs the member, its stream is paused, its
 password is replaced or its connection is removed. A connection that needs
-the member, a replaced password and a removal SHALL withdraw its lease in
-the same transaction; a session SHALL check at every refresh of IDLE, and
+the member, a paused stream, a replaced password and a removal SHALL
+withdraw its lease in the same transaction; a session SHALL check at every refresh of IDLE, and
 whenever it asks for a run, that its stream is not paused, its connection
 does not need the member, its lease is still offered and still its own.
 
 #### Scenario: Paused during IDLE
-- **WHEN** a mailbox's stream is paused while its session is in IDLE
-- **THEN** the session ends at its next refresh and its lease is withdrawn
+- **WHEN** a quiet mailbox's stream is paused while its session is in IDLE
+- **THEN** its lease is withdrawn with the pause and the session ends at its holder's next renewal, before any refresh
 
 #### Scenario: Needs the member during IDLE
 - **WHEN** a sync run sets the connection to `needs_reauth` while its session is in IDLE

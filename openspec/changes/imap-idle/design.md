@@ -149,12 +149,16 @@ period, not when the server next drops it:
   offers the row again (claimable once the old lease's time is up);
 - **removal** deletes the row with the connection (the foreign keys
   cascade);
-- **pausing** (today only `needs_reauth` pauses) is caught by the session
-  itself: at every refresh, and whenever it asks for a run, it checks under
-  `begin_for` that the stream is not paused, the connection does not need
-  the member, the server still offers IDLE, the row is still offered and
-  this process still holds it. If not, it ends IDLE (`DONE`), logs out, and
-  withdraws the row (or, when only the lease was lost, leaves it).
+- **pausing** a stream, by any path (today only `needs_reauth` pauses), withdraws
+  the row in the same transaction through a trigger on `connectors.streams`
+  (`streams_paused_withdraw_idle`), so a future pause endpoint cannot forget
+  it;
+- and the session checks for itself: at every refresh, and whenever it asks
+  for a run, it checks under `begin_for` that the stream is not paused, the
+  connection does not need the member, the server still offers IDLE, the row
+  is still offered and this process still holds it. If not, it ends IDLE
+  (`DONE`), logs out, and withdraws the row (or, when only the lease was
+  lost, leaves it).
 
 The pool also withdraws a row itself when the server, once signed in, does
 not offer `IDLE` or refuses the command.

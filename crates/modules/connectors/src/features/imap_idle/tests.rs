@@ -577,6 +577,32 @@ async fn pausing_a_mailbox_ends_its_session_at_the_next_refresh(db: PgPool) {
 }
 
 #[sqlx::test(migrations = "../../../migrations")]
+async fn pausing_a_quiet_mailbox_ends_its_session_within_a_renewal(db: PgPool) {
+    // Nothing arrives and IDLE is not due for a refresh: the renewal alone
+    // ends the session.
+    let m = mailbox(db, true, |_| {}).await;
+    let (pool, mut held) = m.idling(timing()).await;
+    let idles = m.imap.seen().idles;
+    let app = testing::app_role_pool(&m.kit.db).await;
+    let mut tx = app.begin_for(m.ws).await.unwrap();
+    sqlx::query("UPDATE connectors.streams SET paused = true")
+        .execute(&mut *tx)
+        .await
+        .unwrap();
+    tx.commit().await.unwrap();
+    assert!(m.leases().await.is_empty(), "withdrawn with the pause");
+    let logouts = m.imap.seen().logouts;
+    pool.tick(&mut held).await;
+    assert!(held.connections().is_empty(), "the lease is lost");
+    until("the session to leave", async || {
+        m.imap.seen().logouts > logouts
+    })
+    .await;
+    assert_eq!(m.imap.seen().idles, idles, "no refresh came first");
+    pool.shutdown(held).await;
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
 async fn a_connection_that_needs_the_member_ends_its_session(db: PgPool) {
     let m = mailbox(db, true, |_| {}).await;
     let (pool, mut held) = m.idling(timing()).await;

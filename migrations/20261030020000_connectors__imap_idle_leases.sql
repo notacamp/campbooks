@@ -100,4 +100,20 @@ $$;
 CREATE TRIGGER imap_idle_leases_keep_owner BEFORE UPDATE ON connectors.imap_idle_leases
     FOR EACH ROW EXECUTE FUNCTION connectors.imap_idle_leases_keep_owner();
 
+-- Pausing a stream, by whatever path, withdraws its connection's lease in the
+-- same transaction (its holder's next renewal loses it): a paused mailbox is
+-- never left signed in until the session's next refresh. The row is kept,
+-- unheld, with its times. Runs as the caller, in the caller's workspace.
+CREATE FUNCTION connectors.streams_paused_withdraw_idle() RETURNS trigger
+    LANGUAGE plpgsql AS $$
+BEGIN
+    UPDATE connectors.imap_idle_leases SET offered = false, holder = NULL
+     WHERE connection_id = NEW.connection_id AND offered;
+    RETURN NULL;
+END
+$$;
+CREATE TRIGGER streams_paused_withdraw_idle AFTER UPDATE OF paused ON connectors.streams
+    FOR EACH ROW WHEN (NEW.paused AND NOT OLD.paused)
+    EXECUTE FUNCTION connectors.streams_paused_withdraw_idle();
+
 GRANT SELECT, INSERT, UPDATE, DELETE ON connectors.imap_idle_leases TO campbooks_app;
