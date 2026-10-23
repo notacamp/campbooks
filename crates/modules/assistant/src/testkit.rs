@@ -16,7 +16,7 @@ use axum::{
 };
 use campbooks_ai::{AiConfig, ExternalContent, Gateway, ProviderConfig, Role};
 use campbooks_kernel::{
-    AppState, Error, Operation,
+    AppState, Error, Operation, Risk,
     auth::{Principal, PrincipalKind, ScopeName},
     extract,
     jobs::{Registry, Worker, WorkerStats},
@@ -98,6 +98,8 @@ pub struct Mail {
     pub streams: Vec<Value>,
     /// Every stand-in operation called, in order.
     pub called: Vec<String>,
+    /// Every change a chat invoked: always empty (each panics).
+    pub mutated: Vec<String>,
 }
 
 struct ConversationsRead;
@@ -293,6 +295,183 @@ async fn list_senders(
     Json(json!({ "senders": senders }))
 }
 
+/// A change Scout's chat must never make: recorded, then a panic, so a test
+/// fails at once if a chat ever invokes one (campbooks-cloud#305). The
+/// stand-ins below carry the real operations' ids, methods, paths and
+/// metadata, so proposals are built from their catalogue entries; they take
+/// no scope, so nothing but this handler would stop a call reaching here.
+fn never(mail: &Shared, operation: &str) -> Json<Value> {
+    mail.lock().unwrap().mutated.push(operation.to_owned());
+    panic!("a chat invoked {operation}: it must only ever propose it");
+}
+
+#[utoipa::path(post, path = "/api/v1/w/{workspace_id}/conversations/{conversation_id}/archive",
+    operation_id = "conversations.archive",
+    params(("workspace_id" = String, Path), ("conversation_id" = String, Path)),
+    extensions(("x-campbooks" = json!(Operation::command(Risk::Low).assistant().automation().undo("conversations.unarchive").records(["conversations.conversation"])))),
+    responses((status = OK, body = Value)))]
+async fn never_archive(Extension(mail): Extension<Shared>) -> Json<Value> {
+    never(&mail, "conversations.archive")
+}
+
+#[utoipa::path(post, path = "/api/v1/w/{workspace_id}/conversations/{conversation_id}/unarchive",
+    operation_id = "conversations.unarchive",
+    params(("workspace_id" = String, Path), ("conversation_id" = String, Path)),
+    extensions(("x-campbooks" = json!(Operation::command(Risk::Low).assistant().automation().undo("conversations.archive").records(["conversations.conversation"])))),
+    responses((status = OK, body = Value)))]
+async fn never_unarchive(Extension(mail): Extension<Shared>) -> Json<Value> {
+    never(&mail, "conversations.unarchive")
+}
+
+#[utoipa::path(post, path = "/api/v1/w/{workspace_id}/conversations/{conversation_id}/read",
+    operation_id = "conversations.mark_read",
+    params(("workspace_id" = String, Path), ("conversation_id" = String, Path)),
+    extensions(("x-campbooks" = json!(Operation::command(Risk::Low).assistant().automation().undo("conversations.mark_unread").records(["conversations.conversation"])))),
+    responses((status = OK, body = Value)))]
+async fn never_mark_read(Extension(mail): Extension<Shared>) -> Json<Value> {
+    never(&mail, "conversations.mark_read")
+}
+
+#[utoipa::path(post, path = "/api/v1/w/{workspace_id}/conversations/{conversation_id}/unread",
+    operation_id = "conversations.mark_unread",
+    params(("workspace_id" = String, Path), ("conversation_id" = String, Path)),
+    extensions(("x-campbooks" = json!(Operation::command(Risk::Low).assistant().automation().undo("conversations.mark_read").records(["conversations.conversation"])))),
+    responses((status = OK, body = Value)))]
+async fn never_mark_unread(Extension(mail): Extension<Shared>) -> Json<Value> {
+    never(&mail, "conversations.mark_unread")
+}
+
+#[utoipa::path(post, path = "/api/v1/w/{workspace_id}/conversations/{conversation_id}/star",
+    operation_id = "conversations.star",
+    params(("workspace_id" = String, Path), ("conversation_id" = String, Path)),
+    extensions(("x-campbooks" = json!(Operation::command(Risk::Low).assistant().automation().undo("conversations.unstar").records(["conversations.conversation"])))),
+    responses((status = OK, body = Value)))]
+async fn never_star(Extension(mail): Extension<Shared>) -> Json<Value> {
+    never(&mail, "conversations.star")
+}
+
+#[utoipa::path(post, path = "/api/v1/w/{workspace_id}/conversations/{conversation_id}/unstar",
+    operation_id = "conversations.unstar",
+    params(("workspace_id" = String, Path), ("conversation_id" = String, Path)),
+    extensions(("x-campbooks" = json!(Operation::command(Risk::Low).assistant().automation().undo("conversations.star").records(["conversations.conversation"])))),
+    responses((status = OK, body = Value)))]
+async fn never_unstar(Extension(mail): Extension<Shared>) -> Json<Value> {
+    never(&mail, "conversations.unstar")
+}
+
+#[utoipa::path(post, path = "/api/v1/w/{workspace_id}/conversations/{conversation_id}/labels",
+    operation_id = "conversations.add_label",
+    params(("workspace_id" = String, Path), ("conversation_id" = String, Path)),
+    request_body = Value,
+    extensions(("x-campbooks" = json!(Operation::command(Risk::Low).assistant().automation().undo("conversations.remove_label").records(["conversations.conversation"])))),
+    responses((status = OK, body = Value)))]
+async fn never_add_label(Extension(mail): Extension<Shared>) -> Json<Value> {
+    never(&mail, "conversations.add_label")
+}
+
+#[utoipa::path(delete, path = "/api/v1/w/{workspace_id}/conversations/{conversation_id}/labels/{label_id}",
+    operation_id = "conversations.remove_label",
+    params(("workspace_id" = String, Path), ("conversation_id" = String, Path), ("label_id" = String, Path)),
+    extensions(("x-campbooks" = json!(Operation::command(Risk::Low).assistant().automation().undo("conversations.add_label").records(["conversations.conversation"])))),
+    responses((status = OK, body = Value)))]
+async fn never_remove_label(Extension(mail): Extension<Shared>) -> Json<Value> {
+    never(&mail, "conversations.remove_label")
+}
+
+#[utoipa::path(post, path = "/api/v1/w/{workspace_id}/conversations/{conversation_id}/stream",
+    operation_id = "conversations.move_to_stream",
+    params(("workspace_id" = String, Path), ("conversation_id" = String, Path)),
+    request_body = Value,
+    extensions(("x-campbooks" = json!(Operation::command(Risk::Low).assistant().automation().records(["conversations.conversation"])))),
+    responses((status = OK, body = Value)))]
+async fn never_move_to_stream(Extension(mail): Extension<Shared>) -> Json<Value> {
+    never(&mail, "conversations.move_to_stream")
+}
+
+#[utoipa::path(post, path = "/api/v1/w/{workspace_id}/conversations/{conversation_id}/trash",
+    operation_id = "conversations.trash",
+    params(("workspace_id" = String, Path), ("conversation_id" = String, Path)),
+    extensions(("x-campbooks" = json!(Operation::command(Risk::Low).assistant().automation().undo("conversations.untrash").records(["conversations.conversation"])))),
+    responses((status = OK, body = Value)))]
+async fn never_trash(Extension(mail): Extension<Shared>) -> Json<Value> {
+    never(&mail, "conversations.trash")
+}
+
+#[utoipa::path(post, path = "/api/v1/w/{workspace_id}/conversations/{conversation_id}/untrash",
+    operation_id = "conversations.untrash",
+    params(("workspace_id" = String, Path), ("conversation_id" = String, Path)),
+    extensions(("x-campbooks" = json!(Operation::command(Risk::Low).assistant().automation().undo("conversations.trash").records(["conversations.conversation"])))),
+    responses((status = OK, body = Value)))]
+async fn never_untrash(Extension(mail): Extension<Shared>) -> Json<Value> {
+    never(&mail, "conversations.untrash")
+}
+
+#[utoipa::path(post, path = "/api/v1/w/{workspace_id}/conversations/{conversation_id}/spam",
+    operation_id = "conversations.report_spam",
+    params(("workspace_id" = String, Path), ("conversation_id" = String, Path)),
+    extensions(("x-campbooks" = json!(Operation::command(Risk::Low).assistant().automation().undo("conversations.not_spam").records(["conversations.conversation"])))),
+    responses((status = OK, body = Value)))]
+async fn never_report_spam(Extension(mail): Extension<Shared>) -> Json<Value> {
+    never(&mail, "conversations.report_spam")
+}
+
+#[utoipa::path(post, path = "/api/v1/w/{workspace_id}/conversations/{conversation_id}/not-spam",
+    operation_id = "conversations.not_spam",
+    params(("workspace_id" = String, Path), ("conversation_id" = String, Path)),
+    extensions(("x-campbooks" = json!(Operation::command(Risk::Low).assistant().automation().undo("conversations.report_spam").records(["conversations.conversation"])))),
+    responses((status = OK, body = Value)))]
+async fn never_not_spam(Extension(mail): Extension<Shared>) -> Json<Value> {
+    never(&mail, "conversations.not_spam")
+}
+
+#[utoipa::path(post, path = "/api/v1/w/{workspace_id}/conversations/{conversation_id}/need/resolve",
+    operation_id = "conversations.resolve_need",
+    params(("workspace_id" = String, Path), ("conversation_id" = String, Path)),
+    request_body = Value,
+    extensions(("x-campbooks" = json!(Operation::command(Risk::Low).assistant().automation().undo("conversations.reopen_need").records(["conversations.conversation"])))),
+    responses((status = OK, body = Value)))]
+async fn never_resolve_need(Extension(mail): Extension<Shared>) -> Json<Value> {
+    never(&mail, "conversations.resolve_need")
+}
+
+#[utoipa::path(post, path = "/api/v1/w/{workspace_id}/conversations/{conversation_id}/need/confirm",
+    operation_id = "conversations.confirm_need",
+    params(("workspace_id" = String, Path), ("conversation_id" = String, Path)),
+    request_body = Value,
+    extensions(("x-campbooks" = json!(Operation::command(Risk::Low).assistant().automation().undo("conversations.reopen_need").records(["conversations.conversation"])))),
+    responses((status = OK, body = Value)))]
+async fn never_confirm_need(Extension(mail): Extension<Shared>) -> Json<Value> {
+    never(&mail, "conversations.confirm_need")
+}
+
+#[utoipa::path(post, path = "/api/v1/w/{workspace_id}/conversations/{conversation_id}/need/reopen",
+    operation_id = "conversations.reopen_need",
+    params(("workspace_id" = String, Path), ("conversation_id" = String, Path)),
+    extensions(("x-campbooks" = json!(Operation::command(Risk::Low).assistant().automation().records(["conversations.conversation"])))),
+    responses((status = OK, body = Value)))]
+async fn never_reopen_need(Extension(mail): Extension<Shared>) -> Json<Value> {
+    never(&mail, "conversations.reopen_need")
+}
+
+#[utoipa::path(post, path = "/api/v1/w/{workspace_id}/attention/{item_id}/snooze",
+    operation_id = "attention.snooze",
+    params(("workspace_id" = String, Path), ("item_id" = String, Path)),
+    request_body = Value,
+    extensions(("x-campbooks" = json!(Operation::command(Risk::Low).assistant().automation().undo("attention.unsnooze").records(["attention.item"])))),
+    responses((status = OK, body = Value)))]
+async fn never_snooze(Extension(mail): Extension<Shared>) -> Json<Value> {
+    never(&mail, "attention.snooze")
+}
+
+#[utoipa::path(post, path = "/api/v1/w/{workspace_id}/attention/{item_id}/unsnooze",
+    operation_id = "attention.unsnooze",
+    params(("workspace_id" = String, Path), ("item_id" = String, Path)),
+    extensions(("x-campbooks" = json!(Operation::command(Risk::Low).assistant().automation().records(["attention.item"])))),
+    responses((status = OK, body = Value)))]
+async fn never_unsnooze(Extension(mail): Extension<Shared>) -> Json<Value> {
+    never(&mail, "attention.unsnooze")
+}
+
 /// The module over a fresh database.
 pub struct Kit {
     /// The test database as its owner (no row-level security).
@@ -331,6 +510,24 @@ impl Kit {
             .routes(routes!(list_streams))
             .routes(routes!(search))
             .routes(routes!(attention))
+            .routes(routes!(never_archive))
+            .routes(routes!(never_unarchive))
+            .routes(routes!(never_mark_read))
+            .routes(routes!(never_mark_unread))
+            .routes(routes!(never_star))
+            .routes(routes!(never_unstar))
+            .routes(routes!(never_add_label))
+            .routes(routes!(never_remove_label))
+            .routes(routes!(never_move_to_stream))
+            .routes(routes!(never_trash))
+            .routes(routes!(never_untrash))
+            .routes(routes!(never_report_spam))
+            .routes(routes!(never_not_spam))
+            .routes(routes!(never_resolve_need))
+            .routes(routes!(never_confirm_need))
+            .routes(routes!(never_reopen_need))
+            .routes(routes!(never_snooze))
+            .routes(routes!(never_unsnooze))
             .layer(Extension(mail.clone()));
         let state = idp
             .state(pool)
