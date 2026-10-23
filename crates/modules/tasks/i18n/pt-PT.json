@@ -1,0 +1,18 @@
+{
+  "errors": {
+    "invalid_title": "Uma tarefa precisa de um título com 1 a 200 caracteres.",
+    "invalid_source_sender": "O endereço do remetente não é válido.",
+    "due_time_needs_day": "Uma hora limite precisa de um dia limite.",
+    "invalid_ids": "Peça de 1 a 100 identificadores de tarefas, separados por vírgulas.",
+    "invalid_offset": "A diferença para UTC tem de estar dentro de 14 horas.",
+    "task_changed": "Esta tarefa mudou desde que a viu. Volte a carregá-la e tente de novo.",
+    "task_closed": "Esta tarefa já está fechada.",
+    "task_open": "Esta tarefa ainda está aberta.",
+    "task_not_yours": "Esta tarefa está agora com outra pessoa.",
+    "plan_needs_day": "Escolha um dia para a planear.",
+    "invalid_later": "Escolha uma hora posterior a agora e a menos de um ano.",
+    "not_a_member": "Só pode passar uma tarefa a um membro deste espaço de trabalho.",
+    "hand_off_to_other": "Escolha outra pessoa para lhe passar a tarefa.",
+    "not_handed_off": "Esta tarefa não foi passada a ninguém."
+  }
+}

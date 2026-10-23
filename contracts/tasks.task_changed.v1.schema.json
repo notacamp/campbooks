@@ -1,0 +1,83 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://campbooks.example.com/contracts/tasks.task_changed.v1.schema.json",
+  "title": "tasks.task_changed v1 (event payload)",
+  "description": "Published by the tasks module when a task is made or changed; the attention module projects it into its assignee's queue, and the calendar's Due layer will read it. Ids, enums, dates and times only, never a title, an address or an amount. `revision` grows with every change of one task: apply only newer ones. Workspace-scoped; also listed in openapi/events.json.",
+  "type": "object",
+  "required": [
+    "workspace",
+    "task",
+    "revision",
+    "change",
+    "state",
+    "verb",
+    "origin",
+    "plan",
+    "assignee"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "workspace": { "type": "string" },
+    "task": { "$ref": "#/$defs/uuid" },
+    "revision": { "type": "integer", "minimum": 1 },
+    "change": {
+      "enum": [
+        "created",
+        "edited",
+        "due_changed",
+        "planned",
+        "done",
+        "not_needed",
+        "reopened",
+        "handed_off",
+        "taken_back"
+      ]
+    },
+    "state": { "enum": ["open", "done", "not_needed"] },
+    "verb": { "enum": ["do", "pay"] },
+    "origin": { "enum": ["own", "ask", "deadline"] },
+    "due_on": { "type": ["string", "null"], "format": "date" },
+    "due_at": {
+      "description": "The time it is due, when it has one; `due_on` is its local day.",
+      "type": ["string", "null"],
+      "format": "date-time"
+    },
+    "plan": { "enum": ["none", "date", "later"] },
+    "plan_on": { "type": ["string", "null"], "format": "date" },
+    "later_until": {
+      "description": "When Later ends, for a `later` plan.",
+      "type": ["string", "null"],
+      "format": "date-time"
+    },
+    "assignee": { "$ref": "#/$defs/uuid" },
+    "handed_by": {
+      "description": "The member who handed it to the assignee, while it is handed off.",
+      "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/uuid" }]
+    },
+    "previous_assignee": {
+      "description": "For a hand-off or a take-back, the member who had it before.",
+      "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/uuid" }]
+    },
+    "source": {
+      "description": "The record it came from, or null.",
+      "oneOf": [
+        { "type": "null" },
+        {
+          "type": "object",
+          "required": ["type", "id"],
+          "additionalProperties": false,
+          "properties": {
+            "type": { "type": "string" },
+            "id": { "type": "string" }
+          }
+        }
+      ]
+    }
+  },
+  "$defs": {
+    "uuid": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+    }
+  }
+}

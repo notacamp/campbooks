@@ -25,6 +25,7 @@ campbooks-conversations.workspace = true
 campbooks-kernel.workspace = true
 campbooks-search.workspace = true
 campbooks-system.workspace = true
+campbooks-tasks.workspace = true
 campbooks-workspaces.workspace = true
 chrono.workspace = true
 clap.workspace = true

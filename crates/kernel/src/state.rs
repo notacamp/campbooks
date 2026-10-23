@@ -23,6 +23,7 @@ use crate::{
     rate_limit::{RateLimits, api::ApiLimits},
     search::SearchSources,
     signup::{InvitationsPort, NoInvitations},
+    tasks::{NoOpenTasks, OpenTasksPort},
     telemetry::{self, Metrics},
     tenancy::{
         ClientDirectoryPort, KeptMailPort, MembershipPort, NoClientDirectory, NoKeptMail,
@@ -131,6 +132,9 @@ pub struct AppState {
     /// Appends to the admin audit trail. The server registers the `admin`
     /// module's implementation; until then no admin request is answered.
     pub admin_audit: AdminAuditPort,
+    /// Answers which tasks are open about a message ([`tasks`](crate::tasks)).
+    /// The server registers the `tasks` module's; until then none are.
+    pub open_tasks: OpenTasksPort,
     /// Sends the instance's own mail ([`mail`](crate::mail)). The server
     /// installs the configured one; until then nothing is sent.
     pub mailer: crate::mail::MailerPort,
@@ -170,8 +174,16 @@ impl AppState {
             signer: Signer::default(),
             binding: Binding::disabled(),
             resources: authz::Catalogue::default(),
+            open_tasks: Arc::new(NoOpenTasks),
             mailer: Arc::new(crate::mail::NoMailer),
         }
+    }
+
+    /// The same state, reading open tasks through `open_tasks`.
+    #[must_use]
+    pub fn with_open_tasks(mut self, open_tasks: OpenTasksPort) -> Self {
+        self.open_tasks = open_tasks;
+        self
     }
 
     /// The same state, sending the instance's mail through `mailer`.

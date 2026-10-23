@@ -35,6 +35,7 @@ pub mod redact;
 pub mod search;
 pub mod signup;
 pub mod state;
+pub mod tasks;
 pub mod telemetry;
 pub mod tenancy;
 #[cfg(any(test, feature = "test-util"))]

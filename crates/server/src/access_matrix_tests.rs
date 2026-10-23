@@ -500,6 +500,22 @@ impl World {
         note
     }
 
+    /// A task of `member`'s, from no conversation (campbooks-cloud#43).
+    async fn seed_task(&self, member: UserId) -> Uuid {
+        let task = Uuid::now_v7();
+        sqlx::query(
+            "INSERT INTO tasks.tasks (id, workspace_id, title, verb, origin, assignee, created_by)
+             VALUES ($1, $2, 'Call the accountant', 'do', 'own', $3, $3)",
+        )
+        .bind(task)
+        .bind(self.a.as_uuid())
+        .bind(member.as_uuid())
+        .execute(&self.db)
+        .await
+        .unwrap();
+        task
+    }
+
     /// Something Scout noticed in the inbox (campbooks-cloud#169).
     async fn seed_notice(&self, inbox: campbooks_conversations::model::InboxId) -> Uuid {
         let notice = Uuid::now_v7();
@@ -559,6 +575,7 @@ impl World {
         let rule = self.seed_rule(inbox, sender).await;
         let notice = self.seed_notice(inbox).await;
         let note = self.seed_note(u(Who::Member)).await;
+        let task = self.seed_task(u(Who::Member)).await;
         let invitation = Uuid::now_v7();
         sqlx::query(
             "INSERT INTO workspaces.invitations
@@ -608,6 +625,8 @@ impl World {
             // What a member told Scout about a person: theirs alone, in no
             // inbox (campbooks-cloud#272).
             ("conversations.person_note", note.to_string()),
+            // A member's own, in no inbox (campbooks-cloud#43).
+            ("tasks.task", task.to_string()),
         ]);
         let mut ids: Vec<String> = sqlx::query_scalar(
             "SELECT id::text FROM conversations.conversations WHERE inbox_id = $1
@@ -651,9 +670,10 @@ impl World {
         match resource_type {
             // A profile is addressed by its member, like a membership; a
             // person note is the member's, in no inbox.
-            "workspaces.member" | "assistant.profile" | "conversations.person_note" => {
-                Facts::owned_by(OwnerFact::User(u(Who::Member)))
-            }
+            "workspaces.member"
+            | "assistant.profile"
+            | "conversations.person_note"
+            | "tasks.task" => Facts::owned_by(OwnerFact::User(u(Who::Member))),
             "connectors.connection" => Facts::owned_by(OwnerFact::User(u(Who::Connector))),
             "conversations.inbox" => {
                 Facts::owned_by(OwnerFact::User(u(Who::Connector))).within(inbox, role)
@@ -927,6 +947,13 @@ fn body(world: &World, id: &str) -> Option<Value> {
         "conversations.answer_rule_notice" => json!({"answer": "not_now"}),
         "assistant.update_profile" => json!({"proactivity": "ask_first", "asked": true}),
         "assistant.compile_instruction" => json!({"text": "newsletters never need me"}),
+        "tasks.create" => json!({"title": "Call the accountant"}),
+        "tasks.update" => json!({"revision": 1, "title": "Call the accountant", "verb": "do"}),
+        "tasks.plan" => json!({"revision": 1, "plan": "none"}),
+        "tasks.done" | "tasks.not_needed" | "tasks.reopen" | "tasks.take_back" => {
+            json!({"revision": 1})
+        }
+        "tasks.hand_off" => json!({"revision": 1, "to": world.users[&Who::Owner]}),
         "conversations.write_reply" | "conversations.stream_reply" => {
             json!({"intent": "Say yes"})
         }
@@ -949,6 +976,7 @@ fn instance_of(world: &World, id: &str, path: &str, resource: &str) -> Option<St
         "conversations.rule" => "{rule_id}",
         "conversations.person_note" => "{note_id}",
         "attention.item" => "{item_id}",
+        "tasks.task" => "{task_id}",
         "conversations.inbox" if acts_in_the_inbox(id) => {
             return world.instances.get(resource).cloned();
         }
@@ -1020,6 +1048,7 @@ fn fill(world: &World, path: &str) -> String {
         .replace("{label_id}", &world.instances["conversations.label"])
         .replace("{user_id}", &world.instances["workspaces.member"])
         .replace("{item_id}", &world.instances["attention.item"])
+        .replace("{task_id}", &world.instances["tasks.task"])
         .replace("{inbox_id}", &world.instances["conversations.inbox"])
         .replace("{rule_id}", &world.instances["conversations.rule"])
         .replace("{notice_id}", &world.instances["conversations.rule_notice"])

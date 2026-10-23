@@ -42,6 +42,10 @@ resource = "identity.client"
 call = "resources::require_own("
 resource = "assistant.profile"
 
+[[access.helpers]]
+call = "access::require_task("
+resource = "tasks.task"
+
 # Functions that build the reference an `authorize` call is given: a handler
 # calling `authorize` with one names that resource type.
 [[access.references]]

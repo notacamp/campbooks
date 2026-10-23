@@ -36,6 +36,7 @@ pub fn module() -> Module {
         background: Background::new()
             .publishes::<events::ItemChanged>()
             .on_event::<features::project_need::ProjectConversationNeed>()
+            .on_event::<features::project_task::ProjectTask>()
             .on_event::<features::purge_workspace::ScheduleWorkspacePurge>()
             .on_event::<features::purge_workspace::ForgetMember>()
             .on_event::<features::purge_workspace::ForgetInbox>()
@@ -78,6 +79,7 @@ mod tests {
         let kinds = registry.kind_names();
         for kind in [
             "attention.project_conversation_need",
+            "attention.project_task",
             "attention.schedule_workspace_purge",
             "attention.forget_member",
             "attention.purge_workspace",

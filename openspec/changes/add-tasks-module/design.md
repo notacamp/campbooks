@@ -110,7 +110,7 @@ Resource type `tasks.task`:
 
 Everyone else gets `NotFound`. Creating a task with a source requires `read`
 on that source through `authz::authorize`; otherwise it is `NotFound`. Hand-off
-targets must be members of the workspace; anything else is 422
+targets must be members of the workspace; anything else is 400
 `not_a_member`. No client-token grants beyond the member's own.
 
 ## Operations
@@ -204,3 +204,29 @@ or whose `source_sender` is that address **in that inbox**. Each comes with
 its RecordRef, title and due date. It is for the email read's prompt only:
 titles never go into an event. If campbooks-cloud#42 has already defined the
 trait on `next`, implement that one. Otherwise, define it here.
+
+## Deviations while building
+
+- **400, not 422.** The kernel has no 422 error, so a blank title, a due time
+  without a day and `not_a_member` answer 400 `invalid_title` /
+  `due_time_needs_day` / `not_a_member` (problem+json `code`).
+- **History kinds** use the event's `change` names: `edited` stands for the
+  design's `renamed`.
+- **`tasks.update` is a full replacement** of title, verb and due (a missing
+  due clears it), so its undo is the same call with the old values.
+- **`tasks.list` source filter** is `source_type` + `source_id` query
+  parameters, and `ids` is comma separated.
+- **`source_sender`** is sent by the caller on `tasks.create` (the kernel
+  facts of a source carry its inbox but not its sender); it is stored for
+  `OpenTasks` only and never in an event.
+- **`previous_assignee`** is an extra optional id on `tasks.task_changed`, so
+  the change feed can tell the member a task left, and the member it left on
+  Home refreshes.
+- **Hand-off access.** `tasks.task` places a handed-off task in the giver's
+  `tasks.assignee:<member>` container, which only they see
+  (`ContainerViewers`: `read`, and `share` for `tasks.take_back`). This
+  needs one `Visibility` port per module, so the kernel gained
+  `changes::Visibilities` (dispatch by container type), `authz::facts_of` and
+  `OpenTasks`/`AppState::open_tasks`.
+- **No contract test** against `contracts/tasks.task_changed.v1.schema.json`
+  yet: neither side depends on a JSON Schema validator.

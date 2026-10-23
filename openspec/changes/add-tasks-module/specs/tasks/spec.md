@@ -27,7 +27,7 @@ per workspace by forced row-level security.
 
 #### Scenario: A blank title
 - **WHEN** a client creates a task whose title is only spaces
-- **THEN** the response is 422 and no task is stored
+- **THEN** the response is 400 and no task is stored
 
 ### Requirement: Who sees a task
 A task SHALL be readable and changeable by its assignee only, and readable by
@@ -65,7 +65,7 @@ caller's UTC offset.
 SHALL take the revision the caller saw and answer 409 `task_changed` when the
 task changed since. Each SHALL declare its undo in `x-campbooks`, append one
 history entry, and publish `tasks.task_changed` in the same transaction.
-`tasks.hand_off` SHALL accept only a member of the workspace (else 422
+`tasks.hand_off` SHALL accept only a member of the workspace (else 400
 `not_a_member`) and record the caller in `handed_by`.
 
 #### Scenario: Done, then undo

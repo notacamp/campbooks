@@ -55,6 +55,16 @@ pub const EVENT_FIELDS_ALLOWED: &[(&str, &str, &str)] = &[
         "a record's id (a UUID as text)",
     ),
     (
+        "tasks.task_changed",
+        "source.type",
+        "a record type, from the code (`<module>.<record>`)",
+    ),
+    (
+        "tasks.task_changed",
+        "source.id",
+        "a record's id (a UUID as text)",
+    ),
+    (
         "connectors.connection_added",
         "account_subject",
         PROVIDER_SUBJECT,

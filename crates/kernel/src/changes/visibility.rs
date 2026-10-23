@@ -79,6 +79,75 @@ impl Visibility for NoContainers {
     }
 }
 
+/// Several modules' [`Visibility`] ports as one: a container is answered by
+/// the port that declares its type in
+/// [`container_types`](Visibility::container_types); a container of a type
+/// none declares is shown to nobody.
+#[derive(Debug, Clone)]
+pub struct Visibilities {
+    ports: Vec<VisibilityPort>,
+    access_records: &'static [&'static str],
+    container_types: &'static [&'static str],
+}
+
+impl Visibilities {
+    /// The ports as one. Built once, at start: the record and container
+    /// types they declare are kept for the life of the process.
+    pub fn new(ports: Vec<VisibilityPort>) -> Self {
+        let mut access_records: Vec<&'static str> = Vec::new();
+        let mut container_types: Vec<&'static str> = Vec::new();
+        for port in &ports {
+            access_records.extend(port.access_records());
+            container_types.extend(port.container_types());
+        }
+        Self {
+            ports,
+            access_records: Box::leak(access_records.into_boxed_slice()),
+            container_types: Box::leak(container_types.into_boxed_slice()),
+        }
+    }
+
+    fn answering(&self, container_type: &str) -> Option<&VisibilityPort> {
+        self.ports
+            .iter()
+            .find(|port| port.container_types().contains(&container_type))
+    }
+}
+
+impl Visibility for Visibilities {
+    fn container_visible<'a>(
+        &'a self,
+        db: &'a PgPool,
+        access: &'a Access,
+        container: &'a RecordRef,
+    ) -> VisibilityFuture<'a> {
+        match self.answering(&container.record_type) {
+            Some(port) => port.container_visible(db, access, container),
+            None => Box::pin(async { Ok(false) }),
+        }
+    }
+
+    fn access_records(&self) -> &'static [&'static str] {
+        self.access_records
+    }
+
+    fn container_types(&self) -> &'static [&'static str] {
+        self.container_types
+    }
+
+    fn visible_containers<'a>(
+        &'a self,
+        db: &'a PgPool,
+        access: &'a Access,
+        container_type: &'a str,
+    ) -> ContainersFuture<'a> {
+        match self.answering(container_type) {
+            Some(port) => port.visible_containers(db, access, container_type),
+            None => Box::pin(async { Ok(Vec::new()) }),
+        }
+    }
+}
+
 /// Shared handle to the registered [`Visibility`] port.
 pub type VisibilityPort = Arc<dyn Visibility>;
 
