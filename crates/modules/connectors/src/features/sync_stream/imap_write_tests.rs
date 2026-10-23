@@ -244,11 +244,10 @@ async fn read_and_starred_round_trip_without_echo(db: PgPool) {
     let key = m.key("Hello").await;
     let batches = m.batches().await;
 
-    m.request(&[
-        (key.as_str(), json!({"kind": "mark_read"})),
-        (key.as_str(), json!({"kind": "star"})),
-    ])
-    .await;
+    // One change per message and request (the recorder's key).
+    m.request(&[(key.as_str(), json!({"kind": "mark_read"}))])
+        .await;
+    m.request(&[(key.as_str(), json!({"kind": "star"}))]).await;
     let mail = m.imap.mailbox(|store| store.mail("INBOX", uid).clone());
     assert!(mail.seen && mail.flagged);
     assert_eq!(
@@ -259,14 +258,17 @@ async fn read_and_starred_round_trip_without_echo(db: PgPool) {
         ]
     );
     let seen = m.imap.seen();
-    assert_eq!(seen.count("UID STORE"), 1, "one command for both flags");
-    assert!(
-        seen.lines
-            .iter()
-            .any(|l| l.contains("UNCHANGEDSINCE") && l.contains("+FLAGS.SILENT (\\Seen \\Flagged)")),
-        "{:?}",
-        seen.lines
-    );
+    assert_eq!(seen.count("UID STORE"), 2);
+    for flag in ["\\Seen", "\\Flagged"] {
+        let written = format!("+FLAGS.SILENT ({flag})");
+        assert!(
+            seen.lines
+                .iter()
+                .any(|l| l.contains("UNCHANGEDSINCE") && l.contains(&written)),
+            "{:?}",
+            seen.lines
+        );
+    }
     assert!(seen.selected, "opened read-write to write");
     // Neither the run that wrote nor the next announces it.
     assert_eq!(m.batches().await, batches);
@@ -295,11 +297,10 @@ async fn unread_and_unstarred_clear_every_copy(db: PgPool) {
     let key = m.key("Hello").await;
     assert_eq!(m.locations(&key).await.len(), 2);
 
-    m.request(&[
-        (key.as_str(), json!({"kind": "mark_unread"})),
-        (key.as_str(), json!({"kind": "unstar"})),
-    ])
-    .await;
+    m.request(&[(key.as_str(), json!({"kind": "mark_unread"}))])
+        .await;
+    m.request(&[(key.as_str(), json!({"kind": "unstar"}))])
+        .await;
     for (folder, uid) in [("INBOX", inbox), ("Bakery", copy)] {
         let mail = m.imap.mailbox(|store| store.mail(folder, uid).clone());
         assert!(!mail.seen && !mail.flagged, "{folder}");
