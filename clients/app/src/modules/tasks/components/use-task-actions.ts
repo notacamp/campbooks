@@ -1,4 +1,4 @@
-import { useQueryClient } from "@tanstack/react-query";
+import { useQueryClient, type QueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 
 import { problemCode } from "~/lib/api";
@@ -52,29 +52,38 @@ const planned = (change: PlanChange) => (task: TaskView) =>
 interface TaskLine {
   queue: Promise<unknown>;
   latest: TaskView;
-  waiting: number;
 }
 
-const lines = new Map<string, TaskLine>();
+/** Each app's lines, so one app's tasks never leak into another's. */
+const lines = new WeakMap<QueryClient, Map<string, TaskLine>>();
 
 /**
  * Send `call` for `task` after every call already on its way for that task
  * (from any action), with the revision the last of them answered, so two quick
- * changes never send the same stale revision.
+ * changes never send the same stale revision, and an undo sends the revision
+ * its change was answered with.
  */
 function sendOnTask(
+  queryClient: QueryClient,
   workspaceId: string,
   task: TaskView,
   call: (seen: TaskView) => Promise<TaskView>,
 ): Promise<TaskView> {
+  let mine = lines.get(queryClient);
+  if (mine === undefined) {
+    mine = new Map();
+    lines.set(queryClient, mine);
+  }
   const key = `${workspaceId}/${task.id}`;
-  let line = lines.get(key);
+  let line = mine.get(key);
   if (line === undefined) {
-    line = { queue: Promise.resolve(), latest: task, waiting: 0 };
-    lines.set(key, line);
+    line = { queue: Promise.resolve(), latest: task };
+    mine.set(key, line);
+  } else if (task.revision > line.latest.revision) {
+    // Something else (another page, the change feed) moved it on.
+    line.latest = task;
   }
   const own = line;
-  own.waiting += 1;
   const result = own.queue
     .then(() => call(own.latest))
     .then((view) => {
@@ -82,13 +91,6 @@ function sendOnTask(
       return view;
     });
   own.queue = result.catch(() => null);
-  const done = () => {
-    own.waiting -= 1;
-    if (own.waiting === 0 && lines.get(key) === own) {
-      lines.delete(key);
-    }
-  };
-  result.then(done, done);
   return result;
 }
 
@@ -126,7 +128,7 @@ export function useTaskActions(
     // Calls on one task go one after the other, whichever action made them,
     // each with the revision the one before answered.
     const send = (call: (seen: TaskView) => Promise<TaskView>) =>
-      sendOnTask(workspaceId, task, call);
+      sendOnTask(queryClient, workspaceId, task, call);
     const show = (next: (current: TaskView) => TaskView) => {
       patchTask(queryClient, workspaceId, task.id, next);
     };
@@ -295,14 +297,14 @@ export function useTaskActions(
                   },
                 }),
             undo: () => {
-              void sendOnTask(workspaceId, latest, calls.notNeeded)
+              void sendOnTask(queryClient, workspaceId, latest, calls.notNeeded)
                 .then((view) => {
                   latest = view;
                 })
                 .finally(refresh);
             },
             redo: () => {
-              void sendOnTask(workspaceId, latest, calls.reopen)
+              void sendOnTask(queryClient, workspaceId, latest, calls.reopen)
                 .then((view) => {
                   latest = view;
                 })
