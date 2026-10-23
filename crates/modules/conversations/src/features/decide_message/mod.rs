@@ -443,16 +443,23 @@ impl EventConsumer for DecideMessage {
         event: Event<MessageReceived>,
     ) -> Result<(), JobError> {
         let facts = event.payload.message;
-        if self.0.model.is_none() || facts.sent_at < Utc::now() - self.0.backfill {
+        if facts.sent_at < Utc::now() - self.0.backfill {
             return Ok(());
         }
         let workspace: WorkspaceId = facts
             .workspace
             .parse()
             .map_err(|_| JobError::fatal("message_received names an invalid workspace"))?;
-        self.0
-            .run(ctx, workspace, facts.message, Answered::Any)
-            .await?;
+        if self.0.model.is_some() {
+            self.0
+                .run(ctx, workspace, facts.message, Answered::Any)
+                .await?;
+        }
+        // The sender's own machine-readable dates are read after the pass,
+        // whatever it did, so its answer about phishing is on record when it
+        // does answer (ADR 0020).
+        let tx = ctx.tx().await?;
+        crate::features::read_structured::enqueue(tx, &facts.workspace, facts.message).await?;
         Ok(())
     }
 }

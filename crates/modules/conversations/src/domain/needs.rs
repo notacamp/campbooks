@@ -37,8 +37,8 @@
 //!   (`conversations.need_clocks`), which `conversations.wake_needs` acts on.
 //!
 //! Mail text is never an instruction here. A need's due date and lapse time
-//! are what Scout read from its message's email (`summarize_need`, the
-//! `complete` role), kept with the message in `need_summaries` and copied
+//! are what Scout read from its message's email (`read_message`, the
+//! `complete` role), kept with the message in `message_reads` and copied
 //! onto the need; answers stored before ADR 0018 may carry the sender's
 //! sentence, only ever shown, quoted.
 
@@ -64,7 +64,7 @@ use crate::{
     ingest::Headers,
     model::{
         Address, ClearCause, ConversationId, DecisionId, InboxId, MessageId, NeedBasis,
-        NeedQuestion, NeedReason, NeedTrust, NeedVerdict,
+        NeedQuestion, NeedReason, NeedTrust, NeedVerdict, Verb,
     },
 };
 
@@ -98,8 +98,8 @@ pub struct NeedSettings {
     pub window: TimeDelta,
     /// Which answers may act.
     pub policy: Policy,
-    /// Whether a need that opens queues Scout's summary of its email
-    /// (`conversations.summarize_need`): only when the `complete` role may
+    /// Whether a need that opens on a flagged message queues Scout's read of
+    /// its email (`conversations.read_message`): only when the `complete` role may
     /// receive mail on this server.
     pub summaries: bool,
     /// Working days a wait lasts before Scout nudges, when its email gives
@@ -262,7 +262,7 @@ impl Awaited {
     }
 }
 
-/// What Scout read about a message's dates (`need_summaries`).
+/// What Scout read about a message's dates (`message_reads`).
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct Dates {
     /// By when the recipient is asked to act.
@@ -1060,20 +1060,56 @@ async fn current(conn: &mut PgConnection, conversation: ConversationId) -> Resul
     .await?)
 }
 
-/// What Scout read about `message`'s dates, if it has read them.
-async fn dates(conn: &mut PgConnection, message: MessageId) -> Result<Dates> {
-    let row: Option<(Option<DateTime<Utc>>, Option<NaiveDate>)> = sqlx::query_as(
-        "SELECT lapses_at, due_on FROM conversations.need_summaries WHERE message_id = $1",
+/// What Scout read about `message`'s dates, if it has read them, for a need
+/// of `reason`: the lapse time and the due date its read gave, except that a
+/// `do` or `pay` need takes its due date from the first ask of the read with
+/// the same verb that has one (campbooks-cloud#42), and the other reasons
+/// from the read's own `due_on`.
+async fn dates(conn: &mut PgConnection, message: MessageId, reason: NeedReason) -> Result<Dates> {
+    let rows: Vec<(
+        String,
+        Option<DateTime<Utc>>,
+        Option<NaiveDate>,
+        serde_json::Value,
+    )> = sqlx::query_as(
+        "SELECT layer, lapses_at, due_on, asks FROM conversations.message_reads
+              WHERE message_id = $1 AND state = 'read' ORDER BY layer DESC",
     )
     .bind(message)
-    .fetch_optional(conn)
+    .fetch_all(conn)
     .await?;
-    Ok(
-        row.map_or_else(Dates::default, |(lapses_at, due_on)| Dates {
-            due_on,
-            lapses_at,
-        }),
-    )
+    // The model's read gave the need its lapse time and, for a reply, a
+    // review or a wait, its due date.
+    let model = rows.iter().find(|(layer, ..)| layer == "model");
+    let verb = match reason {
+        NeedReason::Do => Some(Verb::Do),
+        NeedReason::Pay => Some(Verb::Pay),
+        _ => None,
+    };
+    let due_on = match verb {
+        // The model's asks first, then the sender's own data's.
+        Some(verb) => rows
+            .iter()
+            .filter(|(layer, ..)| layer == "model")
+            .chain(rows.iter().filter(|(layer, ..)| layer != "model"))
+            .find_map(|(.., asks)| first_due(asks, verb)),
+        None => model.and_then(|(_, _, due_on, _)| *due_on),
+    };
+    Ok(Dates {
+        due_on,
+        lapses_at: model.and_then(|(_, lapses_at, ..)| *lapses_at),
+    })
+}
+
+/// The date the first ask of `asks` with `verb` and a due is due.
+fn first_due(asks: &serde_json::Value, verb: Verb) -> Option<NaiveDate> {
+    asks.as_array()?
+        .iter()
+        .filter(|ask| ask.get("verb").and_then(serde_json::Value::as_str) == Some(verb.as_str()))
+        .find_map(|ask| {
+            let due = ask.get("due")?.as_str()?;
+            super::read::When::parse(due).map(super::read::When::date)
+        })
 }
 
 /// Write when conversation `id`'s open need next changes with time alone,
@@ -1765,7 +1801,7 @@ async fn refresh_pass(
         return Ok(Pass::Done(Refreshed::Settled));
     };
     // Its dates, as Scout read them from its message's email.
-    let read = dates(tx, need.message).await?;
+    let read = dates(tx, need.message, need.reason).await?;
     let need = need.dated(read);
 
     let clock = Clock::now(settings);
@@ -1859,7 +1895,7 @@ async fn refresh_pass(
     .await?;
     set_clock(tx, conversation.workspace_id, id, wake).await?;
     // A need that opens for a message (new, or back after being cleared)
-    // gets Scout's summary of the email, through a job: never here, and
+    // gets Scout's read of the email, through a job: never here, and
     // once per message however often the need is worked out again. Mail
     // that may be phishing gets none: a summary would retell the scam in
     // Scout's voice, and the warning is what matters there.
@@ -1867,8 +1903,19 @@ async fn refresh_pass(
         && row
             .as_ref()
             .is_none_or(|r| r.state != "open" || r.message_id != need.message);
+    // Only a message the decide pass flagged is read: a plain question gets
+    // no read on arrival, and its summary comes when a member opens it.
     if settings.summaries && opened && need.question != NeedQuestion::Suspicious {
-        crate::features::summarize_need::enqueue(tx, workspace, need.message).await?;
+        let stored = answers(&mut **tx, need.message).await?;
+        if super::dated::flag(&stored, &settings.dated).is_some() {
+            crate::features::read_message::enqueue(
+                tx,
+                conversation.workspace_id.into(),
+                need.message,
+                crate::features::read_message::store::Trigger::Need,
+            )
+            .await?;
+        }
     }
     events
         .publish(

@@ -149,6 +149,19 @@ whatlang = "0.18.0"
 mail-builder = { version = "1.0.0", default-features = false }
 mail-parser = { version = "0.11.9", default-features = false }
 
+# Email: the dates a sender structured for machines (conversations, ADR 0020,
+# campbooks-cloud#42), read with proper parsers and never with patterns.
+# `icalendar`: RFC 5545 content lines for `text/calendar` parts (parser only,
+# no builder features). `scraper`: the parsed HTML tree JSON-LD and microdata
+# are read from, on the html5ever, cssparser and selectors versions already
+# in the graph through ammonia. Pinned: 0.29.0 is newer than the two-week rule
+# but is the first release on html5ever 0.40; older ones would bring a second
+# copy of html5ever, cssparser and selectors. Relax to a caret requirement
+# after 2026-11-04. `chrono-tz`: the IANA zones of an invitation's `TZID`.
+icalendar = { version = "=0.17.13", default-features = false, features = ["parser"] }
+scraper = { version = "=0.29.0", default-features = false, features = ["errors"] }
+chrono-tz = "0.10.4"
+
 # Passkeys (identity, ADR 0014): COSE_Key parsing and the CBOR of WebAuthn
 # attestation objects. Signatures are verified with aws-lc-rs.
 coset = "0.4.2"

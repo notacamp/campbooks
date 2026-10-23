@@ -163,6 +163,19 @@ pub const EVENT_FIELDS_ALLOWED: &[(&str, &str, &str)] = &[
     ("schedule.event_cancelled", "ends", EVENT_TIME),
     ("schedule.event_cancelled", "source.type", RECORD_TYPE),
     ("schedule.event_cancelled", "source.id", RECORD_ID),
+    ("conversations.message_read", "items[].key", READ_KEY),
+    ("conversations.message_read", "items[].starts", EVENT_TIME),
+    ("conversations.message_read", "items[].ends", EVENT_TIME),
+    ("conversations.message_read", "items[].time_zone", ZONE_NAME),
+    ("conversations.message_read", "items[].updates", READ_KEY),
+    ("conversations.message_read", "items[].cancels", READ_KEY),
+    ("conversations.message_read", "asks[].key", READ_KEY),
+    ("conversations.message_read", "asks[].due", EVENT_TIME),
+    (
+        "conversations.message_read",
+        "asks[].same_as",
+        TASK_REFERENCE,
+    ),
     ("identity.client_registered", "client", CLIENT_ID),
     ("identity.client_removed", "client", CLIENT_ID),
     ("identity.consent_granted", "client", CLIENT_ID),
@@ -179,6 +192,15 @@ pub const EVENT_FIELDS_ALLOWED: &[(&str, &str, &str)] = &[
 
 const EVENT_TIME: &str = "when an event starts or ends: an RFC 3339 time with an offset or a \
      `YYYY-MM-DD` date, parsed before it is kept, never a word of the event";
+
+const READ_KEY: &str = "the key of an item or an ask of a read: `<message id>:<layer>:item|ask:<n>`, \
+     built by the code from ids and a position";
+
+const ZONE_NAME: &str =
+    "an IANA time zone name, checked against the zone database before it is kept";
+
+const TASK_REFERENCE: &str = "the reference of an open task, as the module that owns tasks gave it \
+     (an opaque id); never its title";
 
 const RECORD_TYPE: &str = "a record type, from the code (`<module>.<record>`)";
 
@@ -268,7 +290,8 @@ pub const JOB_PAYLOAD_FIELDS: &[(&str, &str, &str)] = &[
         "a counter of the draft's sends",
     ),
     ("conversations.notice_rules", "inbox", INBOX_ID),
-    ("conversations.summarize_need", "message", MESSAGE_ID),
+    ("conversations.read_message", "message", MESSAGE_ID),
+    ("conversations.read_structured", "message", MESSAGE_ID),
 ];
 
 const WORKSPACE_ID: &str = "the workspace's id (a UUID)";
@@ -517,7 +540,13 @@ pub const JOB_ERROR_VALUES: &[(&str, &str, usize, &str)] = &[
         REDACTED_JSON,
     ),
     (
-        "crates/modules/conversations/src/features/summarize_need/mod.rs",
+        "crates/modules/conversations/src/features/read_message/mod.rs",
+        "redact::json(&e)",
+        1,
+        REDACTED_JSON,
+    ),
+    (
+        "crates/modules/conversations/src/features/read_structured/mod.rs",
         "redact::json(&e)",
         1,
         REDACTED_JSON,

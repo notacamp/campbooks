@@ -266,3 +266,7 @@ reason = "Nothing consumes it in-process yet: the change feed and the tasks modu
 [[access.unconsumed_events]]
 name = "schedule.outbound_requested"
 reason = "The connectors module's calendar write-backs, in the next phase of campbooks-cloud#42; remove this entry when it consumes the event."
+
+[[access.unconsumed_events]]
+name = "conversations.message_read"
+reason = "The schedule and tasks modules' events and tasks from what a message says, in the next phases of campbooks-cloud#42 and #43; remove this entry when one consumes it."

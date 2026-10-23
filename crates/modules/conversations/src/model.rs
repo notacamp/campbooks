@@ -667,6 +667,52 @@ vocabulary!(
     }
 );
 
+vocabulary!(
+    /// What kind of thing that happens at a time a read of a message found
+    /// (campbooks-cloud#42). Obligations are not items: they are asks.
+    ItemKind {
+        /// Money is taken automatically on a date: a renewal, a direct debit.
+        Charge => "charge",
+        /// A booked slot with a provider.
+        Appointment => "appointment",
+        /// A meeting with other people.
+        Meeting => "meeting",
+        /// A trip: a flight, a train, a bus, a rental car.
+        Travel => "travel",
+        /// A hotel or a rental stay.
+        Stay => "stay",
+        /// A ticketed event.
+        Show => "show",
+        /// A table or a visit booked.
+        Reservation => "reservation",
+        /// A parcel arriving.
+        Delivery => "delivery",
+        /// Something expiring, with nothing to do before it.
+        Expiry => "expiry",
+    }
+);
+
+vocabulary!(
+    /// What an ask of the reader is: do something, or pay something.
+    Verb {
+        /// Do something (sign, submit, renew, reply).
+        Do => "do",
+        /// Pay something.
+        Pay => "pay",
+    }
+);
+
+vocabulary!(
+    /// Which reader produced a read: the sender's own machine-readable data,
+    /// or Scout's one `complete` call.
+    ReadLayer {
+        /// An iCalendar part or schema.org markup (ADR 0020), no model.
+        Structured => "structured",
+        /// The `complete` role.
+        Model => "model",
+    }
+);
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -721,6 +767,14 @@ mod tests {
                 serde_json::json!(cause.as_str())
             );
         }
+        for kind in ItemKind::ALL {
+            assert_eq!(kind.as_str().parse::<ItemKind>().unwrap(), *kind);
+        }
+        assert_eq!(ItemKind::ALL.len(), 9);
+        assert!("hold".parse::<ItemKind>().is_err());
+        assert!("deadline".parse::<ItemKind>().is_err());
+        assert_eq!("pay".parse::<Verb>().unwrap(), Verb::Pay);
+        assert_eq!("model".parse::<ReadLayer>().unwrap(), ReadLayer::Model);
         assert!("later".parse::<NeedVerdict>().is_err());
         assert_eq!("email".parse::<Channel>().unwrap(), Channel::Email);
         assert!("sms".parse::<Channel>().is_err());

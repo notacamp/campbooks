@@ -27,20 +27,20 @@ time.
 
 ## 4. Structured data (L0)
 
-- [ ] 4.1 iCalendar reader (a maintained crate, `cargo deny` clean): VEVENT → item, METHOD:CANCEL, SEQUENCE
-- [ ] 4.2 schema.org reader (JSON-LD and microdata) for the listed types only
-- [ ] 4.3 DMARC-aligned + not-suspicious gate; read stored with layer `structured`; `message_read` published
-- [ ] 4.4 Test: the structured reader never touches the text part or prose (source test like the facts one)
+- [x] 4.1 iCalendar reader (a maintained crate, `cargo deny` clean): VEVENT → item, METHOD:CANCEL, SEQUENCE
+- [x] 4.2 schema.org reader (JSON-LD and microdata) for the listed types only
+- [x] 4.3 DMARC-aligned + not-suspicious gate; read stored with layer `structured`; `message_read` published
+- [x] 4.4 Test: the structured reader never touches the text part or prose (source test like the facts one)
 
 ## 5. The message read (L2)
 
-- [ ] 5.1 Migration: rename `need_summaries` → `message_reads`, add items, asks, layer, trigger; keep every row
-- [ ] 5.2 `summarize_need` → `read_message`: one schema (summary + `lapses_at` + `due_on` for reply/review/waiting, items, asks), 4,096 tokens, instruction rules from the spec
-- [ ] 5.3 Triggers: need opened on a flagged message; `conversations.request_message_read` on open; never for unflagged, phishing, spam, trash, read-only
-- [ ] 5.4 Per-item and per-ask vetoes (quote, window, ended, kind, updates/cancels, same_as, amount digits), logged by reason
-- [ ] 5.5 `OpenTasks` and `TimeZones` read through the ports; known items of the conversation in the input
-- [ ] 5.6 `message_read` v1 published; `need_summarised` kept; Do/Pay due from the first ask with the verb
-- [ ] 5.7 `conversations.get_message_read` (404 rules); backfill change for needs that opened before
+- [x] 5.1 Migration: rename `need_summaries` → `message_reads`, add items, asks, layer, trigger; keep every row
+- [x] 5.2 `summarize_need` → `read_message`: one schema (summary + `lapses_at` + `due_on` for reply/review/waiting, items, asks), 4,096 tokens, instruction rules from the spec
+- [x] 5.3 Triggers: need opened on a flagged message; `conversations.request_message_read` on open; never for unflagged, phishing, spam, trash, read-only
+- [x] 5.4 Per-item and per-ask vetoes (quote, window, ended, kind, updates/cancels, same_as, amount digits), logged by reason
+- [x] 5.5 `OpenTasks` and `TimeZones` read through the ports; known items of the conversation in the input
+- [x] 5.6 `message_read` v1 published; `need_summarised` kept; Do/Pay due from the first ask with the verb
+- [x] 5.7 `conversations.get_message_read` (404 rules); backfill change for needs that opened before
 
 ## 6. schedule module
 

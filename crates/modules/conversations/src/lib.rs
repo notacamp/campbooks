@@ -162,12 +162,12 @@ impl ConversationsDeps {
 /// to mount.
 #[allow(clippy::too_many_lines)]
 pub fn module(deps: ConversationsDeps) -> Module {
-    // Scout's summary of a need's email: only while the `complete` role may
-    // receive mail here.
+    // Scout's read of a message: only while the `complete` role may receive
+    // mail here.
     let summaries = deps
         .ai
         .clone()
-        .filter(features::summarize_need::may_read_mail);
+        .filter(features::read_message::may_read_mail);
     // Scout's replies ask the `complete` role, when it may read mail.
     let writer = features::reply::ReplyWriter::new(deps.ai.clone());
     let model = match deps.model {
@@ -209,6 +209,7 @@ pub fn module(deps: ConversationsDeps) -> Module {
             .publishes::<events::InboxRemoved>()
             .publishes::<events::NeedChanged>()
             .publishes::<events::NeedSummarised>()
+            .publishes::<events::MessageRead>()
             .publishes::<events::RuleChanged>()
             .handler(features::release_send::ReleaseSend)
             .handler(features::check_send::CheckSend)
@@ -219,8 +220,11 @@ pub fn module(deps: ConversationsDeps) -> Module {
                 deps.config.notices,
             ))
             .handler(features::refresh_need::RefreshNeed::new(needs.clone()))
-            .handler(features::summarize_need::SummarizeNeed::new(
+            .handler(features::read_message::ReadMessage::new(
                 summaries,
+                needs.clone(),
+            ))
+            .handler(features::read_structured::ReadStructured::new(
                 needs.clone(),
             ))
             .handler(features::wake_needs::WakeNeeds::new(needs.clone()))
@@ -298,10 +302,11 @@ fn model_may_read_mail(gateway: &Gateway) -> bool {
 /// Every route of the module, one per feature.
 fn router() -> OpenApiRouter<AppState> {
     use features::{
-        archive, create_draft, get_attachment, get_conversation, get_message_body, labels,
-        list_conversations, list_drafts, list_inboxes, list_labels, list_senders, list_streams,
-        mark_read, move_to_stream, needs, person_notes, reply, rule_notices, rules, send_draft,
-        spam, star, suggest_rules, trash, update_draft,
+        archive, create_draft, get_attachment, get_conversation, get_message_body,
+        get_message_read, labels, list_conversations, list_drafts, list_inboxes, list_labels,
+        list_senders, list_streams, mark_read, move_to_stream, needs, person_notes, reply,
+        request_message_read, rule_notices, rules, send_draft, spam, star, suggest_rules, trash,
+        update_draft,
     };
     OpenApiRouter::new()
         .routes(routes!(list_inboxes::handler))
@@ -311,6 +316,10 @@ fn router() -> OpenApiRouter<AppState> {
         .routes(routes!(list_conversations::handler))
         .routes(routes!(get_conversation::handler))
         .routes(routes!(get_message_body::handler))
+        .routes(routes!(
+            get_message_read::handler,
+            request_message_read::handler
+        ))
         .routes(routes!(get_attachment::handler))
         .routes(routes!(mark_read::read))
         .routes(routes!(mark_read::unread))
@@ -390,7 +399,8 @@ mod tests {
             "conversations.fill_templates",
             "conversations.notice_rules",
             "conversations.refresh_need",
-            "conversations.summarize_need",
+            "conversations.read_message",
+            "conversations.read_structured",
             "conversations.backfill_needs",
             "conversations.dispatch_needs_backfills",
             "conversations.dispatch_rule_resigns",

@@ -722,8 +722,9 @@ impl Scripted {
 }
 
 /// `answers` for one sender: stream, needs reply, asks action, has a
-/// deadline, urgency level, suspicious, and money "neither"
-/// ([`money`] says otherwise); all at 0.97.
+/// deadline, urgency level, suspicious, money "neither"
+/// ([`money`] says otherwise) and nothing dated ([`dated`] says otherwise);
+/// all at 0.97.
 // One flag per yes/no question, in the questions' order: a table row.
 #[allow(clippy::fn_params_excessive_bools)]
 pub fn script(
@@ -747,7 +748,23 @@ pub fn script(
             AnswerValue::Choice(triage::NEITHER.to_owned()),
             at,
         ),
+        // Nothing dated in it, unless [`dated`] says otherwise.
+        (triage::HAS_DATED_THING, AnswerValue::Noul(false), at),
     ]
+}
+
+/// `script` with the model's answer that the email tells of something dated
+/// of `kind` (campbooks-cloud#42), at `confidence`, in place of "nothing
+/// dated".
+pub fn dated(mut script: Script, kind: &str, confidence: f64) -> Script {
+    script.retain(|(id, ..)| *id != triage::HAS_DATED_THING && *id != triage::DATED_KIND);
+    script.push((triage::HAS_DATED_THING, AnswerValue::Noul(true), confidence));
+    script.push((
+        triage::DATED_KIND,
+        AnswerValue::Choice(kind.to_owned()),
+        confidence,
+    ));
+    script
 }
 
 /// `script` with `label` (`owed`, `paid`) as its money answer.

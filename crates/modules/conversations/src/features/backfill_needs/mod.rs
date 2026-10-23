@@ -39,11 +39,13 @@
 //!   conversation may wait on someone.
 //!
 //! - When the `complete` role may receive mail on this server, each open need
-//!   of those conversations whose email Scout has not summarised is queued
-//!   for `conversations.summarize_need` (campbooks-cloud#204): one job per
-//!   message, never on a request path, and a message already summarised is
-//!   not asked again, but once for its dates when its summary was written
-//!   before they were read (campbooks-cloud#275).
+//!   of those conversations whose message the decide pass flagged
+//!   (`crate::domain::dated`) and whose email Scout has not read is queued
+//!   for `conversations.read_message` (campbooks-cloud#204): one job per
+//!   message, never on a request path, and a message already read is not
+//!   asked again, but once for its dates, items and asks when its summary was
+//!   written before they were read (campbooks-cloud#275, #42). A need on a
+//!   message that is not flagged is queued for nothing.
 //!
 //! Each refresh also settles the need against the time now and writes when
 //! it next changes with time alone (`conversations.need_clocks`): an old
@@ -67,23 +69,30 @@ use sqlx::{Postgres, Transaction};
 
 use crate::{
     config::ActionSettings,
-    domain::needs::{self, NeedSettings},
+    domain::{
+        dated,
+        needs::{self, NeedSettings},
+    },
     features::{
         decide_message::{Backlog, DecideBacklog, ModelPass},
-        summarize_need,
+        read_message::{self, store::Trigger},
     },
     model::{ConversationId, InboxId, MessageId},
 };
 
-/// The messages behind the open needs of some conversations that Scout has
-/// not summarised (or whose one failure may be tried again), or whose
-/// summary was written before its dates were read (campbooks-cloud#275).
-const NEEDING_SUMMARY: &str = "SELECT n.message_id FROM conversations.needs n \
-       LEFT JOIN conversations.need_summaries s ON s.message_id = n.message_id \
+/// The messages behind the open needs of some conversations whose read was
+/// never made: none stored, one only queued (its job may have been lost), one
+/// failure that may be tried again, or one made before items and asks were
+/// read (campbooks-cloud#275, #42). Whether the decide pass flagged them is
+/// asked of the stored answers afterwards.
+const NEEDING_READ: &str = "SELECT n.message_id FROM conversations.needs n \
+       LEFT JOIN conversations.message_reads r ON r.message_id = n.message_id \
+        AND r.layer = 'model' \
       WHERE n.conversation_id = ANY($1) AND n.state = 'open' \
         AND n.question <> 'suspicious' \
-        AND (s.message_id IS NULL OR (s.state = 'failed' AND s.attempts < 2) \
-             OR (s.state = 'written' AND s.dates_read_at IS NULL))";
+        AND (r.message_id IS NULL OR r.state = 'queued' \
+             OR (r.state = 'failed' AND r.attempts < 2) \
+             OR (r.state = 'read' AND r.read_at IS NULL))";
 
 /// The newest inbound message of some conversations (`$1`), sent since
 /// `$2`, whose conversation holds no open need and which no checked model
@@ -382,7 +391,7 @@ impl BackfillNeeds {
             self.queue_model_pass(tx, workspace, &ids).await?;
         }
         if self.needs.summaries {
-            Self::queue_summaries(tx, &ws, &ids).await?;
+            self.queue_reads(tx, workspace, &ids).await?;
         }
 
         let last = ids.last().copied().or(page.after);
@@ -416,21 +425,26 @@ impl BackfillNeeds {
         Ok(())
     }
 
-    /// Queue Scout's summary (`conversations.summarize_need`, ids only, one
-    /// pending job per message) for the email behind each open need of
-    /// `conversations` that has none, or only a first failure. A message
-    /// already summarised is not asked again.
-    async fn queue_summaries(
+    /// Queue Scout's read (`conversations.read_message`, ids only, one pending
+    /// job per message) for the email behind each open need of
+    /// `conversations` that has none, or only a first failure, or one made
+    /// before items and asks were read, when the decide pass flagged it. A
+    /// message already read is not asked again.
+    async fn queue_reads(
+        &self,
         tx: &mut Transaction<'_, Postgres>,
-        workspace: &str,
+        workspace: WorkspaceId,
         conversations: &[ConversationId],
     ) -> Result<(), JobError> {
-        let unsummarised: Vec<MessageId> = sqlx::query_scalar(NEEDING_SUMMARY)
+        let unread: Vec<MessageId> = sqlx::query_scalar(NEEDING_READ)
             .bind(conversations)
             .fetch_all(&mut **tx)
             .await?;
-        for message in unsummarised {
-            summarize_need::enqueue(tx, workspace, message).await?;
+        for message in unread {
+            let stored = needs::answers(&mut **tx, message).await?;
+            if dated::flag(&stored, &self.needs.dated).is_some() {
+                read_message::enqueue(tx, workspace, message, Trigger::Need).await?;
+            }
         }
         Ok(())
     }
