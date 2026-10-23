@@ -38,7 +38,10 @@ describe("DatePicker", () => {
     const grid = screen.getByRole("grid", { name: "October 2026" });
     expect(within(grid).getAllByRole("row")).toHaveLength(7);
     expect(dayButton("2026-10-26")).toHaveFocus();
-    expect(dayButton("2026-10-26").closest("td")).toHaveAttribute("aria-selected", "true");
+    expect(dayButton("2026-10-26").closest("[role='gridcell']")).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
     // Today is marked, and only today.
     expect(dayButton("2026-10-13")).toHaveAttribute("aria-current", "date");
     expect(dayButton("2026-10-14")).not.toHaveAttribute("aria-current");
@@ -66,8 +69,7 @@ describe("DatePicker", () => {
 
     fireEvent.click(dayButton("2027-10-04"));
 
-    expect(onChange).toHaveBeenCalledOnce();
-    expect(onChange).toHaveBeenCalledWith("2027-10-04");
+    expect(onChange).toHaveBeenCalledExactlyOnceWith("2027-10-04");
     expect(screen.queryByRole("dialog")).toBeNull();
     expect(field).toHaveFocus();
   });
@@ -124,7 +126,8 @@ describe("DatePicker", () => {
 
     fireEvent.click(screen.getByRole("button", { name: /^Expires/u }));
     fireEvent.click(screen.getByRole("button", { name: "Clear" }));
-    expect(onChange).toHaveBeenLastCalledWith(undefined);
+    expect(onChange).toHaveBeenCalledTimes(2);
+    expect(onChange.mock.lastCall?.[0]).toBeUndefined();
   });
 
   it("shows the grid in place when inline", () => {

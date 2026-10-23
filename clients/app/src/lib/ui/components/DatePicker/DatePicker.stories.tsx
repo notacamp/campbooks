@@ -79,7 +79,7 @@ export const Inline: Story = {
     const canvas = within(canvasElement);
     await userEvent.click(canvas.getByRole("button", { name: /October 20, 2026/u }));
     await expect(
-      canvas.getByRole("button", { name: /October 20, 2026/u }).closest("td"),
+      canvas.getByRole("button", { name: /October 20, 2026/u }).closest("[role='gridcell']"),
     ).toHaveAttribute("aria-selected", "true");
   },
 };

@@ -86,7 +86,7 @@ export function TimePicker({
   useEffect(() => {
     if (open && active >= 0) {
       const option: { scrollIntoView?: (options: ScrollIntoViewOptions) => void } | null =
-        list.current?.querySelector(`[data-index="${String(active)}"]`) ?? null;
+        list.current?.querySelector(`[data-index="${CSS.escape(String(active))}"]`) ?? null;
       option?.scrollIntoView?.({ block: "nearest" });
     }
   }, [open, active]);

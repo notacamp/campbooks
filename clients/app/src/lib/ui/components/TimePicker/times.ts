@@ -29,6 +29,26 @@ const CLOCK = /^(\d{1,2})(?:\s*[:.h]\s*(\d{2})?)?\s*([ap])?\.?\s*(?:m\.?)?$/u;
 // "930", "0930", "2115", with an optional am/pm.
 const DIGITS = /^(\d{3,4})\s*([ap])?\.?\s*(?:m\.?)?$/u;
 
+/** Hours, minutes and am/pm as typed, or nothing when the text is no clock. */
+function readClock(
+  text: string,
+): { hours: number; minutes: number; meridiem: string | undefined } | undefined {
+  const clock = CLOCK.exec(text);
+  if (clock !== null) {
+    return {
+      hours: Number(clock[1]),
+      minutes: clock[2] === undefined ? 0 : Number(clock[2]),
+      meridiem: clock[3],
+    };
+  }
+  const digits = DIGITS.exec(text);
+  if (digits === null) {
+    return undefined;
+  }
+  const all = digits[1] ?? "";
+  return { hours: Number(all.slice(0, -2)), minutes: Number(all.slice(-2)), meridiem: digits[2] };
+}
+
 /**
  * The time a member typed, or nothing when it is no time. Reads hours alone
  * ("9"), hours and minutes with `:`, `.` or `h`, three or four digits
@@ -40,23 +60,12 @@ export function parseTime(typed: string): Time | undefined {
     .trim()
     .toLowerCase()
     .replaceAll(/[\u00A0\u202F]/gu, " ");
-  let hours: number;
-  let minutes: number;
-  let meridiem: string | undefined;
-  const clock = CLOCK.exec(text);
-  const digits = clock === null ? DIGITS.exec(text) : null;
-  if (clock !== null) {
-    hours = Number(clock[1]);
-    minutes = clock[2] === undefined ? 0 : Number(clock[2]);
-    meridiem = clock[3];
-  } else if (digits !== null) {
-    const all = digits[1] ?? "";
-    hours = Number(all.slice(0, -2));
-    minutes = Number(all.slice(-2));
-    meridiem = digits[2];
-  } else {
+  const read = readClock(text);
+  if (read === undefined) {
     return undefined;
   }
+  let { hours } = read;
+  const { minutes, meridiem } = read;
   if (minutes > 59) {
     return undefined;
   }

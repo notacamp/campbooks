@@ -5,7 +5,7 @@
 export type Day = string;
 
 /** A weekday as `Intl.Locale` week info counts it: 1 is Monday, 7 is Sunday. */
-export type Weekday = 1 | 2 | 3 | 4 | 5 | 6 | 7;
+type Weekday = 1 | 2 | 3 | 4 | 5 | 6 | 7;
 
 const DAY = /^(\d{4})-(\d{2})-(\d{2})$/u;
 const MS_PER_DAY = 86_400_000;

@@ -31,12 +31,41 @@
 
 /* A titled note: the title in the display face, the sentence in the body
    face, which reads better over two or three lines. */
+.note[data-titled] {
+  grid-template-areas:
+    "visor title"
+    "visor body";
+  grid-template-rows: auto 1fr;
+  row-gap: var(--space-1-5);
+}
+
+.note[data-titled] > :first-child {
+  grid-area: visor;
+}
+
+.note[data-titled] > .body {
+  grid-area: body;
+}
+
 .title {
   display: flex;
   flex-wrap: wrap;
+  grid-area: title;
   align-items: baseline;
   gap: var(--space-1) var(--space-2);
-  margin-bottom: var(--space-1-5);
+  min-width: 0;
+}
+
+/* On a phone the visor sits beside the title, and what follows takes the
+   note's whole width, so a row of buttons fits on one line. */
+@media (width < 48rem) {
+  .note[data-titled] {
+    grid-template-areas:
+      "visor title"
+      "body body";
+    row-gap: var(--space-3);
+    align-items: center;
+  }
 }
 
 .titleText {

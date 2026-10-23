@@ -99,15 +99,16 @@ export function Note({
       className={styles["note"]}
       aria-label={label ?? t("note.label")}
       data-compact={compact || undefined}
+      data-titled={title === undefined ? undefined : ""}
     >
       <Visor state={visor} size={compact ? "md" : "lg"} />
+      {title === undefined ? null : (
+        <p className={styles["title"]}>
+          <span className={styles["titleText"]}>{title}</span>
+          {meta === undefined ? null : <span className={styles["meta"]}>{meta}</span>}
+        </p>
+      )}
       <div className={styles["body"]}>
-        {title === undefined ? null : (
-          <p className={styles["title"]}>
-            <span className={styles["titleText"]}>{title}</span>
-            {meta === undefined ? null : <span className={styles["meta"]}>{meta}</span>}
-          </p>
-        )}
         <p className={styles["text"]} data-body={title === undefined ? undefined : ""}>
           {children}
         </p>

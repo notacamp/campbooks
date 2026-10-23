@@ -30,7 +30,7 @@ describe("times", () => {
 
   it("reads nothing from what is no time", () => {
     for (const typed of ["", "noon", "25", "9:75", "13pm", "0am", "12345", "9:3"]) {
-      expect(parseTime(typed), typed).toBeUndefined();
+      expect(parseTime(typed)).toBeUndefined();
     }
   });
 

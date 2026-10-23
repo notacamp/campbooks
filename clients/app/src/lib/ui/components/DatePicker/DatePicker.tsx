@@ -17,6 +17,7 @@ import {
   monthMatrix,
   parseDay,
   sameMonth,
+  startOfMonth,
   startOfWeek,
   todayOf,
   weekStart,
@@ -163,7 +164,8 @@ interface MonthCalendarProps {
   max: Day | undefined;
   clearable: boolean;
   locale: string;
-  onPick: (day: Day | undefined) => void;
+  /** A day was picked; none when cleared. */
+  onPick: (day?: Day) => void;
 }
 
 /** The month grid: month and year, previous and next, the days, Today and Clear. */
@@ -186,7 +188,7 @@ function MonthCalendar({ value, today, min, max, clearable, locale, onPick }: Mo
   const moved = useRef(false);
   useEffect(() => {
     if (moved.current) {
-      grid.current?.querySelector<HTMLElement>(`[data-day="${cursor}"]`)?.focus();
+      grid.current?.querySelector<HTMLElement>(`[data-day="${CSS.escape(cursor)}"]`)?.focus();
     }
   }, [cursor]);
 
@@ -239,7 +241,7 @@ function MonthCalendar({ value, today, min, max, clearable, locale, onPick }: Mo
         <IconButton
           label={t("datePicker.previous")}
           icon="chevron-left"
-          disabled={min !== undefined && addDays(`${cursor.slice(0, 8)}01`, -1) < min}
+          disabled={min !== undefined && addDays(startOfMonth(cursor), -1) < min}
           onClick={() => {
             go(addMonths(cursor, -1), false);
           }}
@@ -250,7 +252,7 @@ function MonthCalendar({ value, today, min, max, clearable, locale, onPick }: Mo
         <IconButton
           label={t("datePicker.next")}
           icon="chevron-right"
-          disabled={max !== undefined && addMonths(`${cursor.slice(0, 8)}01`, 1) > max}
+          disabled={max !== undefined && addMonths(startOfMonth(cursor), 1) > max}
           onClick={() => {
             go(addMonths(cursor, 1), false);
           }}
@@ -313,7 +315,7 @@ function MonthCalendar({ value, today, min, max, clearable, locale, onPick }: Mo
           <Button
             variant="ghost"
             onClick={() => {
-              onPick(undefined);
+              onPick();
             }}
           >
             {t("datePicker.clear")}
