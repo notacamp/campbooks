@@ -54,4 +54,11 @@ describe("KbdHint", () => {
     const { container } = renderUi(<KbdHint shortcut="list.next" />);
     expect(container).toHaveTextContent(/^J$/);
   });
+
+  it("draws small, quiet keycaps when asked", () => {
+    const { container } = renderUi(<KbdHint shortcut="item.done" size="sm" />);
+
+    expect(container.querySelector("[data-size='sm']")).not.toBeNull();
+    expect(container.querySelector("kbd")).toHaveTextContent("E");
+  });
 });

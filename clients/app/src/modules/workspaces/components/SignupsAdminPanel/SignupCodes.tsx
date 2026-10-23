@@ -6,6 +6,7 @@ import {
   Banner,
   Button,
   CopyField,
+  DatePicker,
   SettingsEmpty,
   SettingsSection,
   InlineConfirm,
@@ -200,13 +201,13 @@ function MintForm() {
             setUses(event.target.value);
           }}
         />
-        <TextField
+        <DatePicker
           label={t("signups.codes.mint.expires")}
-          type="date"
-          value={expires}
+          value={expires === "" ? undefined : expires}
           error={errors.expires}
-          onChange={(event) => {
-            setExpires(event.target.value);
+          clearable
+          onChange={(day) => {
+            setExpires(day ?? "");
           }}
         />
         <div className="flex sm:pt-6">

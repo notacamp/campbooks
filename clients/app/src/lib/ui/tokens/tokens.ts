@@ -74,6 +74,7 @@ export const COMPONENT_TOKENS = [
   "row-radius",
   "pill-height",
   "kbd-size",
+  "kbd-size-sm",
   "kbd-bg",
   "kbd-fg",
   "kbd-border",

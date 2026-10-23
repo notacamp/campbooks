@@ -114,4 +114,41 @@ describe("OverflowActions", () => {
     fireEvent.keyDown(document.activeElement ?? first, { key: "ArrowUp" });
     expect(screen.getByRole("button", { name: /^Next/u })).toHaveFocus();
   });
+
+  it("shows labelled buttons while they fit, and keeps `more` in the menu", () => {
+    measuring(200, 400);
+    const later = vi.fn();
+    const ask = vi.fn();
+    renderUi(
+      <OverflowActions
+        label="More actions"
+        buttons
+        actions={[{ id: "later", label: "Not now", icon: "clock", onSelect: later }]}
+        more={[{ id: "ask", label: "Ask Scout", icon: <Visor size="xs" />, onSelect: ask }]}
+      />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Not now" }));
+    expect(later).toHaveBeenCalledOnce();
+    expect(screen.queryByRole("button", { name: /Ask Scout/u })).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: "More actions" }));
+    fireEvent.click(screen.getByRole("button", { name: /^Ask Scout/u }));
+    expect(ask).toHaveBeenCalledOnce();
+  });
+
+  it("folds labelled buttons into More with the rest when the row is too narrow", () => {
+    measuring(400, 100);
+    renderUi(
+      <OverflowActions
+        label="More actions"
+        buttons
+        actions={[{ id: "later", label: "Not now", icon: "clock", onSelect: vi.fn() }]}
+        more={[{ id: "ask", label: "Ask Scout", icon: "search", onSelect: vi.fn() }]}
+      />,
+    );
+    expect(screen.queryByRole("button", { name: "Not now" })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "More actions" }));
+    expect(screen.getByRole("button", { name: /^Not now/u })).toBeVisible();
+    expect(screen.getByRole("button", { name: /^Ask Scout/u })).toBeVisible();
+  });
 });

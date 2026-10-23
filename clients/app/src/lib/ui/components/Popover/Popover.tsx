@@ -18,7 +18,7 @@ export interface PopoverProps {
   /** The panel's content; a function gets `close`. */
   children: ReactNode | ((close: () => void) => ReactNode);
   /** Where the panel opens relative to the trigger. */
-  placement?: "top-start" | "bottom-end" | undefined;
+  placement?: "top-start" | "bottom-start" | "bottom-end" | undefined;
   /** Controlled open state (optional). */
   open?: boolean | undefined;
   onOpenChange?: ((open: boolean) => void) | undefined;
@@ -59,7 +59,12 @@ export function Popover({
     if (!open) {
       return;
     }
-    panel.current?.querySelector<HTMLElement>(FOCUSABLE)?.focus();
+    // A control marked `data-autofocus` (a date grid's chosen day) takes the
+    // focus; otherwise the first one.
+    (
+      panel.current?.querySelector<HTMLElement>("[data-autofocus]") ??
+      panel.current?.querySelector<HTMLElement>(FOCUSABLE)
+    )?.focus();
     const onPointerDown = (event: PointerEvent) => {
       if (event.target instanceof Node && anchor.current?.contains(event.target) !== true) {
         change.current(false);

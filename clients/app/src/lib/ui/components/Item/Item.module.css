@@ -11,6 +11,16 @@
   background: var(--accent-soft);
 }
 
+/* Opened in place, the item is a card: it keeps a group's breathing room
+   from the rows, notes and headings around it. */
+.wrapper[data-expanded]:not(:first-child) {
+  margin-top: var(--space-6);
+}
+
+.wrapper[data-expanded]:not(:last-child) {
+  margin-bottom: var(--space-6);
+}
+
 .item {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto;

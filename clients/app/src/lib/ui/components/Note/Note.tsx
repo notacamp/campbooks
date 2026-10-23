@@ -41,6 +41,16 @@ export interface NoteQuote {
 export interface NoteProps {
   /** The assistant's sentence about where things stand. */
   children: ReactNode;
+  /**
+   * A title line above the sentence ("Scout noticed"). With one, the
+   * sentence reads in the body font, for longer text; without, it stays the
+   * short display-face line of a conversation.
+   */
+  title?: ReactNode | undefined;
+  /** After the title, quieter ("1 of 5"). Shown only with a title. */
+  meta?: ReactNode | undefined;
+  /** Right under the sentence: a link to what it is about ("See the 34 emails"). */
+  after?: ReactNode | undefined;
   /** The visor's mood; `unsure` when confidence is low, `alert` for a warning. */
   visor?: VisorState | undefined;
   /** Compact text and visor, for phones. */
@@ -68,6 +78,9 @@ export interface NoteProps {
 /** The assistant's "where things stand" block: the hero of a conversation. */
 export function Note({
   children,
+  title,
+  meta,
+  after,
   visor = "idle",
   compact = false,
   reasons = [],
@@ -89,7 +102,16 @@ export function Note({
     >
       <Visor state={visor} size={compact ? "md" : "lg"} />
       <div className={styles["body"]}>
-        <p className={styles["text"]}>{children}</p>
+        {title === undefined ? null : (
+          <p className={styles["title"]}>
+            <span className={styles["titleText"]}>{title}</span>
+            {meta === undefined ? null : <span className={styles["meta"]}>{meta}</span>}
+          </p>
+        )}
+        <p className={styles["text"]} data-body={title === undefined ? undefined : ""}>
+          {children}
+        </p>
+        {after === undefined ? null : <div className={styles["after"]}>{after}</div>}
         {reasons.length === 0 ? null : (
           <ul className={styles["reasons"]}>
             {reasons.map((reason) => (

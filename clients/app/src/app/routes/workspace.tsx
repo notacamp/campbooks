@@ -245,9 +245,9 @@ function WorkspaceFrame({ workspace, all }: { workspace: Workspace; all: Workspa
   useShortcut("nav.tasks", () => {
     void navigate({ to: tasksPath });
   });
-  // N T, from anywhere: Tasks, with "Add a task…" focused.
+  // N T, from anywhere: Tasks, with the new-task form open.
   useShortcut("tasks.create", () => {
-    void navigate({ to: tasksPath, search: { add: Date.now() } });
+    void navigate({ to: tasksPath, search: { new: 1 } });
   });
   useShortcut("nav.schedule", () => {
     void navigate({ to: schedulePath });

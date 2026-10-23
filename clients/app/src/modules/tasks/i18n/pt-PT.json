@@ -17,8 +17,6 @@
     "later": "Mais tarde"
   },
   "add": {
-    "label": "Adicionar uma tarefa",
-    "placeholder": "Adicionar uma tarefa…",
     "due": "Prazo",
     "today": "Hoje",
     "tomorrow": "Amanhã",
@@ -27,9 +25,15 @@
     "kind": "Tipo",
     "do": "Fazer",
     "pay": "Pagar",
-    "submit": "Adicionar",
     "added": "Tarefa adicionada",
     "failed": "Não foi possível adicionar {{title}}. Nada foi guardado."
+  },
+  "form": {
+    "new": "Nova tarefa",
+    "label": "Nova tarefa",
+    "placeholder": "O que é preciso fazer?",
+    "due": "Prazo",
+    "close": "Fechar"
   },
   "row": {
     "own": "Escrita por si",

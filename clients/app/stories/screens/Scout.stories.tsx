@@ -502,7 +502,8 @@ export const AskFromScoutNoticed: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     const note = await canvas.findByRole("region", { name: "Scout noticed" });
-    await userEvent.click(within(note).getByRole("button", { name: /Ask Scout/u }));
+    await userEvent.click(within(note).getByRole("button", { name: "More" }));
+    await userEvent.click(within(note).getByRole("button", { name: /^Ask Scout/u }));
     const page = within(document.body);
     await expect(
       await page.findByText("Scout’s suggestion for CI (builds@ci.example.com)"),

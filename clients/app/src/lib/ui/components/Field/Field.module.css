@@ -53,6 +53,25 @@
   font-size: var(--text-md);
 }
 
+/* A page title edited in place: it reads as the heading, boxed on hover and focus. */
+.control[data-size="title"] {
+  height: auto;
+  min-height: var(--size-control-lg);
+  padding: var(--space-1) var(--space-2);
+  background: transparent;
+  box-shadow: none;
+  font: var(--weight-semibold) var(--text-xl) / var(--leading-tight) var(--font-display);
+  letter-spacing: var(--tracking-tight);
+}
+
+.control[data-size="title"]:hover {
+  box-shadow: inset 0 0 0 var(--border-width) var(--border-subtle);
+}
+
+.control[data-size="title"]:focus-visible {
+  background: var(--surface-sunken);
+}
+
 .control[aria-invalid="true"] {
   box-shadow: inset 0 0 0 var(--border-width) var(--danger);
 }

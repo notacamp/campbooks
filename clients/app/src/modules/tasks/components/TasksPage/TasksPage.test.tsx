@@ -6,8 +6,9 @@ import {
   Outlet,
   RouterProvider,
   useParams,
+  useSearch,
 } from "@tanstack/react-router";
-import { fireEvent, screen, waitFor } from "@testing-library/react";
+import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 import { MARTA } from "../../../../../test/demo/attention";
@@ -47,8 +48,15 @@ const SOURCES = new Map<string, TaskSource>([
 
 function Route() {
   const { taskId } = useParams({ strict: false });
+  const search: { new?: 1 } = useSearch({ strict: false });
   return (
-    <TasksPage workspaceId={DUARTE.id} taskId={taskId} useSources={() => SOURCES} now={TASKS_NOW} />
+    <TasksPage
+      workspaceId={DUARTE.id}
+      taskId={taskId}
+      creating={taskId === undefined && search.new === 1}
+      useSources={() => SOURCES}
+      now={TASKS_NOW}
+    />
   );
 }
 
@@ -57,6 +65,8 @@ function renderTasks(path = "tasks", openChat?: OpenScoutChat) {
   const list = createRoute({
     getParentRoute: () => root,
     path: "/w/$workspaceId/tasks",
+    validateSearch: (search: Record<string, unknown>): { new?: 1 } =>
+      search["new"] === 1 ? { new: 1 } : {},
     component: Route,
   });
   const open = createRoute({
@@ -81,6 +91,16 @@ function renderTasks(path = "tasks", openChat?: OpenScoutChat) {
     ),
   };
 }
+
+/** A day as the month grid names it ("Tuesday, October 20, 2026"). */
+const dayName = (day: string) =>
+  new Intl.DateTimeFormat("en", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+    timeZone: "UTC",
+  }).format(new Date(`${day}T12:00:00Z`));
 
 /** The button that opens the task titled `title` (not its check). */
 const rowOf = (title: string) =>
@@ -176,22 +196,62 @@ describe("Tasks", () => {
     expect(await screen.findByText(BILL.title)).toBeVisible();
   });
 
-  it("adds a task with a due chip and keeps the field for the next one", async () => {
+  it("opens the new-task form in the right pane, and adds one task after another", async () => {
     const calls = api();
-    renderTasks();
-    const field = await screen.findByRole("textbox", { name: "Add a task" });
+    const { router } = renderTasks();
+    fireEvent.click(await screen.findByRole("button", { name: /^New task/u }));
+    const field = await screen.findByRole("textbox", { name: "Task title" });
+    await waitFor(() => {
+      expect(field).toHaveFocus();
+    });
+    expect(router.state.location.search).toEqual({ new: 1 });
+    expect(screen.getByRole("form", { name: "New task" })).toBeVisible();
+
     fireEvent.change(field, { target: { value: "Renew the parking permit" } });
-    fireEvent.click(await screen.findByRole("button", { name: "Tomorrow" }));
+    fireEvent.click(screen.getByRole("button", { name: "Tomorrow" }));
+    fireEvent.click(screen.getByRole("button", { name: "Pay" }));
     fireEvent.submit(field.closest("form") ?? field);
     await waitFor(() => {
       expect(calls.calls.find((c) => c.route === `POST ${W}/tasks`)?.body).toEqual({
         title: "Renew the parking permit",
+        verb: "pay",
         due_on: "2026-10-14",
       });
     });
+    // The form stays, empty, ready for the next one.
     expect(field).toHaveValue("");
     expect(field).toHaveFocus();
+    expect(screen.getByRole("button", { name: "Do" })).toHaveAttribute("aria-pressed", "true");
     expect(await screen.findByText("Renew the parking permit")).toBeVisible();
+    expect(await screen.findByText("Task added")).toBeInTheDocument();
+  });
+
+  it("closes the form on Escape, and the focus goes back to New task", async () => {
+    api();
+    const { router } = renderTasks("tasks?new=1");
+    const field = await screen.findByRole("textbox", { name: "Task title" });
+
+    fireEvent.keyDown(field, { key: "Escape" });
+
+    await waitFor(() => {
+      expect(screen.queryByRole("form", { name: "New task" })).toBeNull();
+    });
+    expect(router.state.location.search).toEqual({});
+    expect(screen.getByRole("button", { name: /^New task/u })).toHaveFocus();
+  });
+
+  it("opens the form with N T, and opening a task closes it", async () => {
+    api();
+    renderTasks();
+    await screen.findByText(LEASE.title);
+    fireEvent.keyDown(document, { key: "n" });
+    fireEvent.keyDown(document, { key: "t" });
+    expect(await screen.findByRole("form", { name: "New task" })).toBeVisible();
+
+    fireEvent.click(await rowOf(LEASE.title));
+
+    expect(await screen.findByText("Where it came from")).toBeVisible();
+    expect(screen.queryByRole("form", { name: "New task" })).toBeNull();
   });
 
   it("asks Scout about the open task, from its detail", async () => {
@@ -300,21 +360,21 @@ describe("Tasks", () => {
     expect(await screen.findByText(BILL.title)).toBeVisible();
   });
 
-  it("settles a typed date when the field is left, never on the way, and not in the past", async () => {
+  it("plans the day picked in the month grid, never one browsed past or in the past", async () => {
     const calls = api();
     renderTasks();
     fireEvent.click(await rowOf(LEASE.title));
     fireEvent.click(await screen.findByRole("button", { name: "Pick a day" }));
-    const date = await screen.findByLabelText("Date");
-    // Typing the year passes through 0002-…: nothing is sent.
-    fireEvent.change(date, { target: { value: "0002-10-20" } });
+    const grid = await screen.findByRole("group", { name: "Date" });
+    // Days before today cannot be picked.
+    expect(within(grid).getByRole("button", { name: dayName("2026-10-12") })).toBeDisabled();
+    // Browsing the months sends nothing.
+    fireEvent.click(within(grid).getByRole("button", { name: "Next month" }));
+    fireEvent.click(within(grid).getByRole("button", { name: "Previous month" }));
     expect(calls.calls.some((c) => c.route.endsWith("/plan"))).toBe(false);
-    // A day before today is dropped on leaving.
-    fireEvent.change(date, { target: { value: "2026-10-01" } });
-    fireEvent.blur(date);
-    expect(calls.calls.some((c) => c.route.endsWith("/plan"))).toBe(false);
-    fireEvent.change(screen.getByLabelText("Date"), { target: { value: "2026-10-20" } });
-    fireEvent.keyDown(screen.getByLabelText("Date"), { key: "Enter" });
+
+    fireEvent.click(within(grid).getByRole("button", { name: dayName("2026-10-20") }));
+
     await waitFor(() => {
       expect(calls.calls.find((c) => c.route.endsWith(`/tasks/${LEASE.id}/plan`))?.body).toEqual({
         revision: 1,
@@ -322,6 +382,7 @@ describe("Tasks", () => {
         plan_on: "2026-10-20",
       });
     });
+    expect(calls.calls.filter((c) => c.route.endsWith("/plan"))).toHaveLength(1);
   });
 
   it("acts on the open task with E, not on the row the cursor is on", async () => {
@@ -343,6 +404,7 @@ describe("Tasks", () => {
     api([], []);
     renderTasks();
     expect(await screen.findByText("Nothing left to do")).toBeVisible();
-    expect(screen.getByRole("button", { name: /Add a task/ })).toBeVisible();
+    fireEvent.click(screen.getByRole("button", { name: /Add a task/ }));
+    expect(await screen.findByRole("form", { name: "New task" })).toBeVisible();
   });
 });

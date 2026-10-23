@@ -75,7 +75,7 @@ export interface ViewTabsProps<T extends string> {
   onChange: (value: T) => void;
 }
 
-/** Agenda, Week, Month: each with its key, one pressed. */
+/** Agenda, Week, Month: each with its key (small and quiet), one pressed; sized like Segmented. */
 export function ViewTabs<T extends string>({ label, options, value, onChange }: ViewTabsProps<T>) {
   return (
     <div className={styles["views"]} role="group" aria-label={label}>
@@ -90,7 +90,7 @@ export function ViewTabs<T extends string>({ label, options, value, onChange }: 
           }}
         >
           {option.label}
-          <KbdHint shortcut={option.shortcut} />
+          <KbdHint shortcut={option.shortcut} size="sm" />
         </button>
       ))}
     </div>

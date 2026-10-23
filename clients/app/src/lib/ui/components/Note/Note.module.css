@@ -29,6 +29,41 @@
   font-size: var(--text-md);
 }
 
+/* A titled note: the title in the display face, the sentence in the body
+   face, which reads better over two or three lines. */
+.title {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-1) var(--space-2);
+  margin-bottom: var(--space-1-5);
+}
+
+.titleText {
+  font: var(--weight-semibold) var(--text-md) / var(--leading-tight) var(--font-display);
+  letter-spacing: var(--tracking-tight);
+  color: var(--text-primary);
+}
+
+.meta {
+  font: var(--weight-regular) var(--text-sm) / var(--leading-tight) var(--font-sans);
+  color: var(--text-tertiary);
+}
+
+.text[data-body] {
+  font: var(--weight-regular) var(--text-md) / var(--leading-relaxed) var(--font-sans);
+  letter-spacing: initial;
+  color: var(--text-primary);
+}
+
+.after {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+}
+
 .choice,
 .links,
 .foot {

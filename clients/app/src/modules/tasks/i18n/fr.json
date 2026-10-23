@@ -17,8 +17,6 @@
     "later": "Plus tard"
   },
   "add": {
-    "label": "Ajouter une tâche",
-    "placeholder": "Ajouter une tâche…",
     "due": "Échéance",
     "today": "Aujourd’hui",
     "tomorrow": "Demain",
@@ -27,9 +25,15 @@
     "kind": "Type",
     "do": "À faire",
     "pay": "À payer",
-    "submit": "Ajouter",
     "added": "Tâche ajoutée",
     "failed": "Impossible d’ajouter {{title}}. Rien n’a été enregistré."
+  },
+  "form": {
+    "new": "Nouvelle tâche",
+    "label": "Nouvelle tâche",
+    "placeholder": "Qu’y a-t-il à faire ?",
+    "due": "Échéance",
+    "close": "Fermer"
   },
   "row": {
     "own": "Écrite par vous",

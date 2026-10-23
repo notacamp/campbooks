@@ -17,8 +17,6 @@
     "later": "Más tarde"
   },
   "add": {
-    "label": "Añadir una tarea",
-    "placeholder": "Añadir una tarea…",
     "due": "Fecha límite",
     "today": "Hoy",
     "tomorrow": "Mañana",
@@ -27,9 +25,15 @@
     "kind": "Tipo",
     "do": "Hacer",
     "pay": "Pagar",
-    "submit": "Añadir",
     "added": "Tarea añadida",
     "failed": "No se pudo añadir {{title}}. No se guardó nada."
+  },
+  "form": {
+    "new": "Nueva tarea",
+    "label": "Nueva tarea",
+    "placeholder": "¿Qué hay que hacer?",
+    "due": "Fecha límite",
+    "close": "Cerrar"
   },
   "row": {
     "own": "La escribiste tú",

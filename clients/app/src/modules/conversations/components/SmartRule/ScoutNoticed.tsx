@@ -1,9 +1,10 @@
-import { useRef, useState } from "react";
+import { useNavigate } from "@tanstack/react-router";
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { ruleNoticeRef, useScoutChat } from "~/lib/scout-chat";
 import { useShortcut } from "~/lib/shortcuts";
-import { Button, Note, Text, useUndoToast } from "~/lib/ui";
+import { Button, Note, OverflowActions, useUndoToast, Visor } from "~/lib/ui";
 
 import { useInboxes } from "../../api/queries";
 import { useNoticeAnswers, useRuleNotices, type RuleNotice } from "../../api/rules";
@@ -21,6 +22,15 @@ export interface ScoutNoticedProps {
 function nameOf(notice: RuleNotice): string {
   const name = notice.sender_name?.trim();
   return name === undefined || name === "" ? notice.sender : name;
+}
+
+/**
+ * The search for the mail a notice counts: the sender's, in the notice's
+ * window (`from:` and `newer_than:`, the search grammar's own operators).
+ */
+function noticeQuery(notice: RuleNotice): string {
+  const sender = /\s/u.test(notice.sender) ? `"${notice.sender}"` : notice.sender;
+  return `from:${sender} newer_than:${String(notice.evidence.window_days)}d`;
 }
 
 /** What Scout noticed, as one sentence and its question, in the reader's words. */
@@ -51,17 +61,20 @@ function sentence(t: Translate, locale: string, notice: RuleNotice): string {
 
 /**
  * "Scout noticed" on Home, right after the first group (campbooks-cloud#169,
- * #274): one suggestion at a time from `conversations.list_rule_notices`, with
- * "n of N", what Scout noticed in numbers, and buttons of one style: the
- * notice's own verb ("Archive them…"), Something else… (with the visor), Not
- * now and Don't suggest this (each with Undo), and Ask Scout (the chat about
- * the suggestion, where one is mounted). Both of the first two open the
- * confirmation, which asks what should happen to the sender's mail and alone
- * saves. Nothing while the list loads or fails, or when there is none.
+ * #274, #347): one suggestion at a time from `conversations.list_rule_notices`,
+ * titled with "n of N", what Scout noticed in numbers in the body font, "See
+ * the N emails" (the search for them), and one row of buttons of one style:
+ * the notice's own verb ("Archive them…"), Something else… (with the visor)
+ * and Not now (with Undo), then More: Don't suggest this (with Undo) and Ask
+ * Scout (the chat about the suggestion, where one is mounted). The row folds
+ * into More when it would wrap. Both of the first two open the confirmation,
+ * which asks what should happen to the sender's mail and alone saves.
+ * Nothing while the list loads or fails, or when there is none.
  */
 export function ScoutNoticed({ workspaceId }: ScoutNoticedProps) {
   const { t: typed, i18n } = useTranslation("conversations");
   const t = typed as unknown as Translate;
+  const navigate = useNavigate();
   const undo = useUndoToast();
   const notices = useRuleNotices(workspaceId);
   const inboxes = useInboxes(workspaceId);
@@ -72,12 +85,20 @@ export function ScoutNoticed({ workspaceId }: ScoutNoticedProps) {
   const shown = (notices.data ?? []).filter((notice) => !hidden.has(notice.id));
   const notice = shown[0];
   // Ask Scout (campbooks-cloud#305): the chat about this suggestion; the
-  // focus comes back to the button on close.
+  // focus comes back to where it was asked from on close.
   const scout = useScoutChat();
-  const askButton = useRef<HTMLButtonElement>(null);
   const ask = () => {
     if (notice !== undefined) {
-      scout?.(ruleNoticeRef(notice.id), { from: askButton.current });
+      const active = document.activeElement;
+      scout?.(ruleNoticeRef(notice.id), {
+        from: active instanceof HTMLElement && active !== document.body ? active : null,
+      });
+    }
+  };
+  // See the N emails: the search for the sender's mail in the window counted.
+  const seeEmails = () => {
+    if (notice !== undefined) {
+      void navigate({ to: `/w/${workspaceId}/search`, search: { q: noticeQuery(notice) } });
     }
   };
 
@@ -180,6 +201,7 @@ export function ScoutNoticed({ workspaceId }: ScoutNoticedProps) {
     { enabled: live },
   );
   useShortcut("inbox.noticed.ask", ask, { enabled: live && scout !== undefined });
+  useShortcut("inbox.noticed.see", seeEmails, { enabled: live });
   // The confirmation stays where it is when the suggestion it answers goes
   // (saved): its result shows to the end.
   if (notice === undefined) {
@@ -199,8 +221,20 @@ export function ScoutNoticed({ workspaceId }: ScoutNoticedProps) {
       <Note
         visor="happy"
         label={t("noticed.title")}
+        title={t("noticed.title")}
+        meta={t("noticed.position", { n: 1, total: shown.length })}
+        after={
+          <Button
+            variant="link"
+            icon="arrow-right"
+            shortcut="inbox.noticed.see"
+            onClick={seeEmails}
+          >
+            {t("noticed.see", { count: notice.evidence.received })}
+          </Button>
+        }
         actions={
-          <>
+          <div className="flex min-w-0 flex-1 items-center gap-2">
             <Button
               variant="secondary"
               shortcut="inbox.noticed.apply"
@@ -210,52 +244,55 @@ export function ScoutNoticed({ workspaceId }: ScoutNoticedProps) {
             >
               {verb}
             </Button>
-            <Button
-              variant="secondary"
-              shortcut="inbox.noticed.other"
-              ai
-              onClick={() => {
-                setUp("none");
-              }}
-            >
-              {t("noticed.other")}
-            </Button>
-            <Button
-              variant="secondary"
-              shortcut="inbox.noticed.not_now"
-              onClick={() => {
-                respond(notice, "not_now");
-              }}
-            >
-              {t("noticed.notNow")}
-            </Button>
-            <Button
-              variant="secondary"
-              shortcut="inbox.noticed.never"
-              onClick={() => {
-                respond(notice, "never");
-              }}
-            >
-              {t("noticed.never")}
-            </Button>
-            {scout === undefined ? null : (
-              <Button
-                ref={askButton}
-                variant="secondary"
-                shortcut="inbox.noticed.ask"
-                ai
-                onClick={ask}
-              >
-                {t("noticed.ask")}
-              </Button>
-            )}
-          </>
+            <OverflowActions
+              label={t("noticed.more")}
+              buttons
+              actions={[
+                {
+                  id: "other",
+                  label: t("noticed.other"),
+                  icon: <Visor size="xs" />,
+                  shortcut: "inbox.noticed.other",
+                  onSelect: () => {
+                    setUp("none");
+                  },
+                },
+                {
+                  id: "not-now",
+                  label: t("noticed.notNow"),
+                  icon: "clock",
+                  shortcut: "inbox.noticed.not_now",
+                  onSelect: () => {
+                    respond(notice, "not_now");
+                  },
+                },
+              ]}
+              more={[
+                {
+                  id: "never",
+                  label: t("noticed.never"),
+                  icon: "close",
+                  shortcut: "inbox.noticed.never",
+                  onSelect: () => {
+                    respond(notice, "never");
+                  },
+                },
+                ...(scout === undefined
+                  ? []
+                  : [
+                      {
+                        id: "ask",
+                        label: t("noticed.ask"),
+                        icon: <Visor size="xs" />,
+                        shortcut: "inbox.noticed.ask",
+                        onSelect: ask,
+                      },
+                    ]),
+              ]}
+            />
+          </div>
         }
       >
-        <strong>{t("noticed.title")}</strong>{" "}
-        <Text as="span" tone="tertiary" size="sm">
-          {t("noticed.position", { n: 1, total: shown.length })}
-        </Text>{" "}
         {sentence(t, i18n.language, notice)}
         {sharedInbox === undefined ? null : ` ${t("noticed.shared", { inbox: sharedInbox })}`}
       </Note>

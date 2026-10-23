@@ -14,17 +14,35 @@ interface FieldFrameProps {
   hint?: ReactNode | undefined;
   /** What is wrong with the value; marks the control invalid. */
   error?: ReactNode | undefined;
-  /** md follows density; lg is the 44px touch size, for one-question screens. */
-  size?: "md" | "lg" | undefined;
+  /**
+   * md follows density; lg is the 44px touch size, for one-question screens;
+   * title is a page's title edited in place (a task's), boxed only on hover
+   * and focus.
+   */
+  size?: "md" | "lg" | "title" | undefined;
 }
 
-function useFieldIds(id: string | undefined) {
+interface FieldIds {
+  controlId: string;
+  labelId: string;
+  hintId: string;
+  errorId: string;
+}
+
+/** Ids for a field's control, label, hint and error (the pickers share them). */
+export function useFieldIds(id: string | undefined): FieldIds {
   const generated = useId();
   const controlId = id ?? generated;
-  return { controlId, hintId: `${controlId}-hint`, errorId: `${controlId}-error` };
+  return {
+    controlId,
+    labelId: `${controlId}-label`,
+    hintId: `${controlId}-hint`,
+    errorId: `${controlId}-error`,
+  };
 }
 
-function describedBy(
+/** The control's `aria-describedby`: its hint and its error, when there are. */
+export function describedBy(
   hint: ReactNode | undefined,
   error: ReactNode | undefined,
   ids: { hintId: string; errorId: string },
@@ -34,7 +52,8 @@ function describedBy(
   return value === "" ? undefined : value;
 }
 
-function FieldFrame({
+/** A field's label, then its control, then its hint and error. */
+export function FieldFrame({
   label,
   hideLabel,
   hint,
@@ -42,12 +61,13 @@ function FieldFrame({
   ids,
   children,
 }: Omit<FieldFrameProps, "size"> & {
-  ids: { controlId: string; hintId: string; errorId: string };
+  ids: FieldIds;
   children: ReactNode;
 }) {
   return (
     <div className={styles["field"]}>
       <label
+        id={ids.labelId}
         className={styles["label"]}
         htmlFor={ids.controlId}
         data-hidden={hideLabel === true || undefined}

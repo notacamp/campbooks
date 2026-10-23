@@ -1,43 +1,28 @@
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
-import { Chip, ChipRow, TextField } from "~/lib/ui";
+import { Chip, ChipRow, DatePicker } from "~/lib/ui";
 
 import { dayLabel, dueChoices } from "../model";
-
-import { DateCommitField } from "./DateCommitField";
 
 export interface DueChipsProps {
   /** The group's name for assistive tech ("Due"). */
   label: string;
   /** The chosen day ("2026-10-26"), or none. */
   value: string | undefined;
-  /** A chip pressed again clears the day. */
+  /** A chip pressed again clears the day; a day picked in the grid is sent once. */
   onChange: (day: string | undefined) => void;
   /** Pins the clock (stories and tests). */
   now?: Date | undefined;
-  /** Prefix for element ids, so two sets on a page stay apart. */
-  idPrefix: string;
-  /**
-   * When a typed date counts: `change` at once (a form still to be sent), or
-   * `settled` once the field is left or Enter is pressed (a task already saved).
-   */
-  commit?: "change" | "settled";
 }
 
 /**
- * The due chips of the quick add, the reader's form and a task's detail:
- * Today, Tomorrow, the next weekday and Pick a date. Never a date typed in
- * words: a chip is faster and cannot guess wrong.
+ * The due chips of the new-task form, the reader's form and a task's detail:
+ * Today, Tomorrow, the next weekday and Pick a date, which shows the month
+ * grid in place. Never a date typed in words: a chip is faster and cannot
+ * guess wrong.
  */
-export function DueChips({
-  label,
-  value,
-  onChange,
-  now,
-  idPrefix,
-  commit = "change",
-}: DueChipsProps) {
+export function DueChips({ label, value, onChange, now }: DueChipsProps) {
   const { t: typed, i18n } = useTranslation("tasks");
   const t = typed as unknown as (key: string) => string;
   const choices = dueChoices(now ?? new Date());
@@ -62,6 +47,7 @@ export function DueChips({
         ))}
         <Chip
           pressed={picked || picking}
+          aria-expanded={picking}
           onClick={() => {
             setPicking((open) => !open);
           }}
@@ -69,23 +55,15 @@ export function DueChips({
           {picked ? dayLabel(value, i18n.language) : t("add.pick")}
         </Chip>
       </ChipRow>
-      {(picking || picked) && commit === "settled" ? (
-        <DateCommitField
-          id={`${idPrefix}-date`}
+      {picking ? (
+        <DatePicker
+          inline
           label={t("add.date")}
-          value={value ?? ""}
-          onCommit={onChange}
-        />
-      ) : null}
-      {(picking || picked) && commit === "change" ? (
-        <TextField
-          id={`${idPrefix}-date`}
-          type="date"
-          label={t("add.date")}
-          hideLabel
-          value={value ?? ""}
-          onChange={(event) => {
-            onChange(event.target.value === "" ? undefined : event.target.value);
+          value={value}
+          now={now}
+          onChange={(day) => {
+            setPicking(false);
+            onChange(day);
           }}
         />
       ) : null}

@@ -91,7 +91,7 @@ export function MakeTaskForm({
           setTitle(event.target.value);
         }}
       />
-      <DueChips label={t("add.due")} value={due} onChange={setDue} now={now} idPrefix="make-task" />
+      <DueChips label={t("add.due")} value={due} onChange={setDue} now={now} />
       <div className="flex flex-wrap items-center gap-2">
         <Segmented
           label={t("add.kind")}

@@ -1,3 +1,11 @@
+import {
+  createMemoryHistory,
+  createRootRoute,
+  createRoute,
+  createRouter,
+  Outlet,
+  RouterProvider,
+} from "@tanstack/react-router";
 import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { useState } from "react";
 import { describe, expect, it, vi } from "vitest";
@@ -190,17 +198,21 @@ describe("Scout noticed", () => {
       ),
     ).toBeVisible();
     expect(within(note).getByText("1 of 1")).toBeVisible();
+    expect(within(note).getByText("Scout noticed")).toBeVisible();
+    // The sentence reads in the body font, under its title.
+    expect(within(note).getByText(/^You got 34 emails/u)).toHaveAttribute("data-body");
 
-    // One style for the four buttons; the visor marks Something else….
-    for (const name of [
-      "File under Updates…",
-      "Something else…",
-      "Not now",
-      "Don’t suggest this",
-    ]) {
+    // One style for the three buttons; the visor marks Something else…. The
+    // rarer two wait in More, with their keys.
+    for (const name of ["File under Updates…", "Something else…", "Not now"]) {
       expect(within(note).getByRole("button", { name })).toBeVisible();
     }
     expect(within(note).queryByRole("button", { name: "Set up a smart rule…" })).toBeNull();
+    expect(within(note).queryByRole("button", { name: /Don’t suggest this/u })).toBeNull();
+    fireEvent.click(within(note).getByRole("button", { name: "More" }));
+    const never = within(note).getByRole("button", { name: /^Don’t suggest this/u });
+    expect(never).toHaveAttribute("aria-keyshortcuts", "Shift+D");
+    fireEvent.keyDown(never, { key: "Escape" });
 
     fireEvent.click(within(note).getByRole("button", { name: "File under Updates…" }));
     const dialog = await screen.findByRole("dialog", {
@@ -235,14 +247,13 @@ describe("Scout noticed", () => {
       </ScoutChatProvider>,
     );
     const note = await screen.findByRole("region", { name: "Scout noticed" });
-    const ask = within(note).getByRole("button", { name: /Ask Scout/u });
+    fireEvent.click(within(note).getByRole("button", { name: "More" }));
+    const ask = within(note).getByRole("button", { name: /^Ask Scout/u });
     expect(ask).toHaveAttribute("aria-keyshortcuts", "Shift+Q");
 
     fireEvent.click(ask);
-    expect(scout).toHaveBeenCalledWith(
-      { type: "conversations.rule_notice", id: NOTICE.id },
-      { from: ask },
-    );
+    expect(scout).toHaveBeenCalledOnce();
+    expect(scout.mock.calls[0]?.[0]).toEqual({ type: "conversations.rule_notice", id: NOTICE.id });
   });
 
   it("offers no Ask Scout where no chat is mounted", async () => {
@@ -252,8 +263,46 @@ describe("Scout noticed", () => {
     });
     renderWithProviders(<ScoutNoticed workspaceId={DUARTE.id} />);
     const note = await screen.findByRole("region", { name: "Scout noticed" });
+    fireEvent.click(within(note).getByRole("button", { name: "More" }));
 
+    expect(within(note).getByRole("button", { name: /^Don’t suggest this/u })).toBeVisible();
     expect(within(note).queryByRole("button", { name: /Ask Scout/u })).toBeNull();
+  });
+
+  it("shows the emails it counted: the sender's, in its window, on the search page", async () => {
+    mockApi({
+      [`GET ${W}/rule-notices`]: { body: { notices: [NOTICE] } },
+      [`GET ${W}/inboxes`]: { body: { inboxes: [INBOX] } },
+    });
+    const root = createRootRoute({ component: Outlet });
+    const home = createRoute({
+      getParentRoute: () => root,
+      path: "/",
+      component: () => <ScoutNoticed workspaceId={DUARTE.id} />,
+    });
+    const results = createRoute({
+      getParentRoute: () => root,
+      path: "/w/$workspaceId/search",
+      validateSearch: (search: Record<string, unknown>): { q?: string } =>
+        typeof search["q"] === "string" ? { q: search["q"] } : {},
+      component: () => <p>Search results</p>,
+    });
+    const router = createRouter({
+      routeTree: root.addChildren([home, results]),
+      history: createMemoryHistory({ initialEntries: ["/"] }),
+    });
+    renderWithProviders(<RouterProvider router={router} />);
+    const note = await screen.findByRole("region", { name: "Scout noticed" });
+    const see = within(note).getByRole("button", { name: "See the 34 emails" });
+    expect(see).toHaveAttribute("aria-keyshortcuts", "Shift+S");
+
+    fireEvent.click(see);
+
+    expect(await screen.findByText("Search results")).toBeVisible();
+    expect(router.state.location.pathname).toBe(`/w/${DUARTE.id}/search`);
+    expect(router.state.location.search).toEqual({
+      q: "from:builds@ci.example.com newer_than:60d",
+    });
   });
 
   it("asks what should happen first: the verb button starts on Scout's guess", async () => {

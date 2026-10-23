@@ -110,7 +110,7 @@ export function dueThisWeek(tasks: readonly TaskView[], now: Date): number {
   }).length;
 }
 
-/** The due chips of the quick add: Today, Tomorrow and the next weekday after that. */
+/** The due chips of the new-task form: Today, Tomorrow and the next weekday after that. */
 export interface DueChoice {
   id: "today" | "tomorrow" | "weekday";
   /** "2026-10-26". */

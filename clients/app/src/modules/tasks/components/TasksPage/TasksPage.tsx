@@ -23,9 +23,9 @@ import { useHandedOff, useTasks, type TaskView } from "../../api/queries";
 import { dueThisWeek, GROUPS, groupTasks, listOrder, type Group } from "../../model";
 import { CONVERSATION, type TaskSource, type UseTaskSources } from "../../source";
 import { dueText, planText } from "../../task-text";
-import { QuickAdd } from "../QuickAdd";
-import { TaskDetail } from "../TaskDetail";
 import { memberName } from "../HandOff";
+import { NewTaskForm } from "../NewTaskForm";
+import { TaskDetail } from "../TaskDetail";
 import { useTaskActions } from "../use-task-actions";
 
 /** `t` for keys only known at runtime. */
@@ -44,8 +44,8 @@ export interface TasksPageProps {
   workspaceId: string;
   /** The task open beside the list. */
   taskId?: string | undefined;
-  /** Changes whenever `n t` asks to add a task from another page. */
-  addRequest?: number | undefined;
+  /** The new-task form is open in the right pane (`?new=1`). */
+  creating?: boolean | undefined;
   /** Where tasks made from conversations came from. */
   useSources: UseTaskSources;
   /** Pins the clock (stories and tests). */
@@ -69,12 +69,18 @@ function byDue(a: TaskView, b: TaskView): number {
 
 /**
  * Tasks: the member's open tasks in Overdue, Today, Coming up and No date
- * yet, and a folded Later; quick add above them; a task's detail beside the
- * list from `lg`, replacing it below. Keys: `n t` adds, J/K move, Enter
- * opens, E marks done (paid), S offers Later, X marks not needed, Esc closes
- * the detail, Z undoes.
+ * yet, and a folded Later; a task's detail, or the new-task form, beside the
+ * list from `lg`, replacing it below. Keys: `n t` opens the form, J/K move,
+ * Enter opens, E marks done (paid), S offers Later, X marks not needed, Esc
+ * closes the detail or the form, Z undoes.
  */
-export function TasksPage({ workspaceId, taskId, addRequest, useSources, now }: TasksPageProps) {
+export function TasksPage({
+  workspaceId,
+  taskId,
+  creating = false,
+  useSources,
+  now,
+}: TasksPageProps) {
   const { t: typed, i18n } = useTranslation("tasks");
   const t = typed as unknown as Translate;
   const navigate = useNavigate();
@@ -85,7 +91,8 @@ export function TasksPage({ workspaceId, taskId, addRequest, useSources, now }: 
   const actions = useTaskActions(workspaceId, { now });
   const clock = now ?? new Date();
 
-  const input = useRef<HTMLInputElement>(null);
+  const titleField = useRef<HTMLInputElement>(null);
+  const newButton = useRef<HTMLButtonElement>(null);
   const [laterOpen, setLaterOpen] = useState(false);
   const [offerLater, setOfferLater] = useState(false);
   const [cursor, setCursor] = useState<string | undefined>();
@@ -98,8 +105,8 @@ export function TasksPage({ workspaceId, taskId, addRequest, useSources, now }: 
   const open = taskId === undefined ? undefined : all.find((task) => task.id === taskId);
   const selected = order.find((task) => task.id === cursor) ?? open ?? order[0];
   // E, X and S act on the task that is open (its buttons carry the key hints);
-  // with none open, on the one the cursor is on.
-  const subject = open ?? selected;
+  // with none open, on the one the cursor is on; never while a new one is written.
+  const subject = creating ? undefined : (open ?? selected);
 
   // Sources of the tasks that came from a conversation.
   const sourceIds = [
@@ -126,16 +133,29 @@ export function TasksPage({ workspaceId, taskId, addRequest, useSources, now }: 
     setOfferLater(false);
     goTo(base);
   };
-
-  // `n t` from another page: the field is focused once the page is here.
-  useEffect(() => {
-    if (addRequest !== undefined) {
-      input.current?.focus();
+  // The form lives in the URL (`?new=1`): the header's button, the empty
+  // list's and `n t` open it; opening a task or closing it drops it.
+  const openForm = () => {
+    if (creating) {
+      titleField.current?.focus();
+      return;
     }
-  }, [addRequest]);
-  useShortcut("tasks.create", () => {
-    input.current?.focus();
-  });
+    setOfferLater(false);
+    void navigate({ to: base, search: { new: 1 } });
+  };
+  // Closed, the focus goes back to the button that opens it.
+  const refocusNew = useRef(false);
+  const closeForm = () => {
+    refocusNew.current = true;
+    goTo(base);
+  };
+  useEffect(() => {
+    if (!creating && refocusNew.current) {
+      refocusNew.current = false;
+      newButton.current?.focus();
+    }
+  }, [creating]);
+  useShortcut("tasks.create", openForm);
 
   // A task that left the list (done, handed over) closes its detail.
   const loaded = mine.isSuccess && away.isSuccess;
@@ -236,6 +256,7 @@ export function TasksPage({ workspaceId, taskId, addRequest, useSources, now }: 
     { enabled: holdable(subject) },
   );
   useShortcut("overlay.close", closeDetail, { enabled: taskId !== undefined });
+  useShortcut("overlay.close", closeForm, { enabled: creating });
 
   const dueChip = (task: TaskView): TaskRowChip | undefined => {
     const due = dueText(task, t, i18n.language, clock);
@@ -299,7 +320,10 @@ export function TasksPage({ workspaceId, taskId, addRequest, useSources, now }: 
 
   return (
     <>
-      <ListPane label={t("list.label")} narrow={taskId === undefined ? "shown" : "hidden"}>
+      <ListPane
+        label={t("list.label")}
+        narrow={taskId === undefined && !creating ? "shown" : "hidden"}
+      >
         <PaneHeader>
           <Heading level={1} size="pane">
             {t("title")}
@@ -308,8 +332,10 @@ export function TasksPage({ workspaceId, taskId, addRequest, useSources, now }: 
           <Text tone="tertiary" size="sm">
             {t("subtitle", { open: count, week: dueThisWeek(own, clock) })}
           </Text>
+          <Button ref={newButton} icon="plus" shortcut="tasks.create" onClick={openForm}>
+            {t("form.new")}
+          </Button>
         </PaneHeader>
-        <QuickAdd inputRef={input} now={now} onAdd={(body) => actions.add(body)} />
         {loading ? <SkeletonList rows={4} /> : null}
         {mine.isError ? (
           <EmptyState
@@ -334,14 +360,7 @@ export function TasksPage({ workspaceId, taskId, addRequest, useSources, now }: 
             visor="happy"
             visorSize="lg"
             action={
-              <Button
-                variant="primary"
-                icon="plus"
-                shortcut="tasks.create"
-                onClick={() => {
-                  input.current?.focus();
-                }}
-              >
+              <Button variant="primary" icon="plus" shortcut="tasks.create" onClick={openForm}>
                 {t("empty.add")}
               </Button>
             }
@@ -349,7 +368,7 @@ export function TasksPage({ workspaceId, taskId, addRequest, useSources, now }: 
             {t("empty.body")}
           </EmptyState>
         ) : null}
-        <div className="flex flex-col">
+        <div className="flex flex-col gap-6">
           {GROUPS.map((group) => {
             const tasks = groups.get(group) ?? [];
             if (tasks.length === 0) {
@@ -382,8 +401,18 @@ export function TasksPage({ workspaceId, taskId, addRequest, useSources, now }: 
           })}
         </div>
       </ListPane>
-      <ReaderPane label={t("detail.label")} narrow={taskId === undefined ? "hidden" : "shown"}>
-        {open === undefined ? (
+      <ReaderPane
+        label={creating ? t("form.label") : t("detail.label")}
+        narrow={taskId === undefined && !creating ? "hidden" : "shown"}
+      >
+        {creating ? (
+          <NewTaskForm
+            titleRef={titleField}
+            now={now}
+            onAdd={(body) => actions.add(body)}
+            onClose={closeForm}
+          />
+        ) : open === undefined ? (
           <div className="flex flex-col items-center gap-2 p-6">
             <EmptyState title={t("detail.empty")} visor="idle" visorSize="lg">
               {t("detail.emptyBody")}

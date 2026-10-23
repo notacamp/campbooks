@@ -29,6 +29,11 @@
   left: 0;
 }
 
+.panel[data-placement="bottom-start"] {
+  top: calc(100% + var(--space-1));
+  left: 0;
+}
+
 .panel[data-placement="bottom-end"] {
   top: calc(100% + var(--space-1));
   right: 0;
