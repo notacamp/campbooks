@@ -205,7 +205,9 @@ describe("Tasks", () => {
     expect((await screen.findAllByText("With Rui Matos")).length).toBeGreaterThan(1);
     fireEvent.click(await screen.findByRole("button", { name: "Take it back" }));
     await waitFor(() => {
-      expect(calls.calls.find((c) => c.route.endsWith(`/tasks/${VENUE.id}/take_back`))?.body).toEqual({
+      expect(
+        calls.calls.find((c) => c.route.endsWith(`/tasks/${VENUE.id}/take_back`))?.body,
+      ).toEqual({
         revision: 1,
       });
     });

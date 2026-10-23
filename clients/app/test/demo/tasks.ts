@@ -83,10 +83,7 @@ export const OPEN_TASKS = [BILL, LEASE, ACCOUNTANT, PROPOSAL, PHOTOS, INSPECTION
 export const TEAM = [ANA, SOFIA, RUI];
 
 /** The attention item Home holds for a task, as `attention.list` answers. */
-export function taskItem(
-  from: Task,
-  extra: Partial<Schema<"ItemView">> = {},
-): Schema<"ItemView"> {
+export function taskItem(from: Task, extra: Partial<Schema<"ItemView">> = {}): Schema<"ItemView"> {
   return {
     id: from.id.replace("8000-00000000", "9000-00000000"),
     record: { type: "tasks.task", id: from.id },

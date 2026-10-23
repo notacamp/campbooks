@@ -40,7 +40,9 @@ export function useTasks(workspaceId: string, me?: string) {
       ),
     // A task closed or handed to someone while the list shows it leaves it at once.
     select: (list: TaskList) =>
-      list.tasks.filter((task) => task.state === "open" && (me === undefined || task.assignee === me)),
+      list.tasks.filter(
+        (task) => task.state === "open" && (me === undefined || task.assignee === me),
+      ),
   });
 }
 
@@ -59,7 +61,9 @@ export function useHandedOff(workspaceId: string, me?: string) {
         }),
       ),
     select: (list: TaskList) =>
-      list.tasks.filter((task) => task.state === "open" && (me === undefined || task.handed_by === me)),
+      list.tasks.filter(
+        (task) => task.state === "open" && (me === undefined || task.handed_by === me),
+      ),
   });
 }
 
@@ -123,9 +127,7 @@ const at = (workspaceId: string, id: string) => ({
 
 /** What a plan change sends. */
 export type PlanChange =
-  | { plan: "none" }
-  | { plan: "date"; plan_on: string }
-  | { plan: "later"; later_until: string };
+  { plan: "none" } | { plan: "date"; plan_on: string } | { plan: "later"; later_until: string };
 
 /** What `tasks.update` makes of a task: the whole editable set. */
 interface TaskEdit {

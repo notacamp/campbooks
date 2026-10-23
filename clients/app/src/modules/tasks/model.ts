@@ -79,9 +79,7 @@ export function groupTasks(tasks: readonly TaskView[], now: Date): Map<Group, Ta
   for (const task of tasks) {
     groups.get(groupOf(task, now))?.push(task);
   }
-  groups
-    .get("later")
-    ?.sort((a, b) => (a.later_until ?? "").localeCompare(b.later_until ?? ""));
+  groups.get("later")?.sort((a, b) => (a.later_until ?? "").localeCompare(b.later_until ?? ""));
   return groups;
 }
 
@@ -164,14 +162,18 @@ export function laterOnDay(day: string): Date {
 
 /** A day ("2026-10-30") as "Fri 30" in `locale`. */
 export function dayLabel(day: string, locale: string): string {
-  return new Intl.DateTimeFormat(locale, { timeZone: "UTC", weekday: "short", day: "numeric" }).format(
-    utcDay(day),
-  );
+  return new Intl.DateTimeFormat(locale, {
+    timeZone: "UTC",
+    weekday: "short",
+    day: "numeric",
+  }).format(utcDay(day));
 }
 
 /** A time as "Mon 2 Nov" in `locale`. */
 export function whenLabel(when: string | Date, locale: string): string {
-  return new Intl.DateTimeFormat(locale, { weekday: "short", day: "numeric", month: "short" }).format(
-    new Date(when),
-  );
+  return new Intl.DateTimeFormat(locale, {
+    weekday: "short",
+    day: "numeric",
+    month: "short",
+  }).format(new Date(when));
 }

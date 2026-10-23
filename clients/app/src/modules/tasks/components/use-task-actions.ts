@@ -175,7 +175,8 @@ export function useTaskActions(
     },
     /** Plan a day (`undefined` clears the plan). */
     planDay: (task: TaskView, day: string | undefined) => {
-      const change: PlanChange = day === undefined ? { plan: "none" } : { plan: "date", plan_on: day };
+      const change: PlanChange =
+        day === undefined ? { plan: "none" } : { plan: "date", plan_on: day };
       act(task, {
         label:
           day === undefined

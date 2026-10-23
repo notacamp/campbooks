@@ -58,13 +58,7 @@ import {
   type NudgeResume,
   type ReplyResume,
 } from "~/modules/conversations";
-import {
-  dueText,
-  planText,
-  useTaskActions,
-  useTasksByIds,
-  type TaskView,
-} from "~/modules/tasks";
+import { dueText, planText, useTaskActions, useTasksByIds, type TaskView } from "~/modules/tasks";
 
 import { useAttention, useRefreshAttention, useSnooze, type ItemView } from "../../api/queries";
 import {
@@ -269,16 +263,16 @@ export function WhatNeedsYou({ workspaceId, now, offer }: WhatNeedsYouProps) {
         if (item.record.type === CONVERSATION) {
           return [item.record.id];
         }
-        return item.record.type === TASK && item.cause.type === CONVERSATION
-          ? [item.cause.id]
-          : [];
+        return item.record.type === TASK && item.cause.type === CONVERSATION ? [item.cause.id] : [];
       }),
     ),
   ];
   const conversations = useConversationsByIds(workspaceId, ids);
   const byId = new Map((conversations.data ?? []).map((c) => [c.id, c] as const));
   // Tasks are their own records: read in one batch, as the member sees them.
-  const taskIds = openItems.filter((item) => item.record.type === TASK).map((item) => item.record.id);
+  const taskIds = openItems
+    .filter((item) => item.record.type === TASK)
+    .map((item) => item.record.id);
   const tasks = useTasksByIds(workspaceId, taskIds);
   const taskById = new Map((tasks.data ?? []).map((task) => [task.id, task] as const));
 
@@ -1060,9 +1054,7 @@ export function WhatNeedsYou({ workspaceId, now, offer }: WhatNeedsYouProps) {
     { enabled: offered("not_needed") || offered("no") || offered("safe") },
   );
   // Shift+E: every bill the Pay group asks about is already paid.
-  const askedBills = order.filter(
-    (row): row is Row => !isTask(row) && kindOf(row.need) === "bill",
-  );
+  const askedBills = order.filter((row): row is Row => !isTask(row) && kindOf(row.need) === "bill");
   useShortcut(
     "item.all_paid",
     () => {
@@ -1270,7 +1262,9 @@ export function WhatNeedsYou({ workspaceId, now, offer }: WhatNeedsYouProps) {
       <div ref={list} className="flex flex-col">
         {groups.map((group, position) => {
           const live = group.rows.filter((row) => row.confirmation === undefined);
-          const bills = live.filter((row): row is Row => !isTask(row) && kindOf(row.need) === "bill");
+          const bills = live.filter(
+            (row): row is Row => !isTask(row) && kindOf(row.need) === "bill",
+          );
           const items = group.rows.map((row) => {
             if (isTask(row)) {
               return renderTask(row);
@@ -1444,10 +1438,7 @@ export function WhatNeedsYou({ workspaceId, now, offer }: WhatNeedsYouProps) {
             const option = times.find((o) => o.key === key);
             setLaterFor(undefined);
             if (entry !== undefined && option !== undefined) {
-              hide(
-                entry,
-                tt("toast.later", { title: entry.task.title, when: when(option.until) }),
-              );
+              hide(entry, tt("toast.later", { title: entry.task.title, when: when(option.until) }));
               taskActions.later(entry.task, option.until);
             }
           }}

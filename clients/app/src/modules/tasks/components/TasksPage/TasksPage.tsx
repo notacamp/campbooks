@@ -60,7 +60,11 @@ function byDue(a: TaskView, b: TaskView): number {
   const key = (task: TaskView) => [task.due_on ?? "9999-99-99", task.due_at ?? ""] as const;
   const [dayA, timeA] = key(a);
   const [dayB, timeB] = key(b);
-  return dayA.localeCompare(dayB) || timeA.localeCompare(timeB) || a.created_at.localeCompare(b.created_at);
+  return (
+    dayA.localeCompare(dayB) ||
+    timeA.localeCompare(timeB) ||
+    a.created_at.localeCompare(b.created_at)
+  );
 }
 
 /**
@@ -96,11 +100,7 @@ export function TasksPage({ workspaceId, taskId, addRequest, useSources, now }: 
 
   // Sources of the tasks that came from a conversation.
   const sourceIds = [
-    ...new Set(
-      all.flatMap((task) =>
-        task.source?.type === CONVERSATION ? [task.source.id] : [],
-      ),
-    ),
+    ...new Set(all.flatMap((task) => (task.source?.type === CONVERSATION ? [task.source.id] : []))),
   ];
   const sources = useSources(workspaceId, sourceIds);
   const sourceOf = (task: TaskView): TaskSource | undefined =>
@@ -232,7 +232,9 @@ export function TasksPage({ workspaceId, taskId, addRequest, useSources, now }: 
 
   const dueChip = (task: TaskView): TaskRowChip | undefined => {
     const due = dueText(task, t, i18n.language, clock);
-    return due === undefined ? undefined : { text: due.text, tone: due.late ? "danger" : "neutral" };
+    return due === undefined
+      ? undefined
+      : { text: due.text, tone: due.late ? "danger" : "neutral" };
   };
   const planChip = (task: TaskView): TaskRowChip | undefined => {
     const plan = planText(task, t, i18n.language, clock);
@@ -286,11 +288,7 @@ export function TasksPage({ workspaceId, taskId, addRequest, useSources, now }: 
             {t("subtitle", { open: count, week: dueThisWeek(own, clock) })}
           </Text>
         </PaneHeader>
-        <QuickAdd
-          inputRef={input}
-          now={now}
-          onAdd={(body) => actions.add(body)}
-        />
+        <QuickAdd inputRef={input} now={now} onAdd={(body) => actions.add(body)} />
         {loading ? <SkeletonList rows={4} /> : null}
         {mine.isError ? (
           <EmptyState

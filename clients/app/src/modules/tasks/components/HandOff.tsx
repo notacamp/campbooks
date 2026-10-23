@@ -7,8 +7,7 @@ import { useMembers, type Member } from "~/modules/workspaces";
 import type { TaskView } from "../api/queries";
 
 /** A member's name as people see it: never typed, never an address if they have a name. */
-export const memberName = (member: Member): string =>
-  member.display_name ?? member.email ?? "";
+export const memberName = (member: Member): string => member.display_name ?? member.email ?? "";
 
 export interface HandOffProps {
   workspaceId: string;

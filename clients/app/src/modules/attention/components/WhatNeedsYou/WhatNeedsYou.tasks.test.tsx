@@ -59,7 +59,9 @@ function api() {
       return { body: { ...LEASE, revision: 3 } };
     },
     [`POST ${W}/tasks/${BILL.id}/plan`]: { body: { ...BILL, plan: "later", revision: 2 } },
-    [`POST ${W}/tasks/${BILL.id}/not_needed`]: { body: { ...BILL, state: "not_needed", revision: 2 } },
+    [`POST ${W}/tasks/${BILL.id}/not_needed`]: {
+      body: { ...BILL, state: "not_needed", revision: 2 },
+    },
   });
 }
 
