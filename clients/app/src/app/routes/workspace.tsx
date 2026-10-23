@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState, type MouseEvent } from "react";
 import { useTranslation } from "react-i18next";
 
 import { createWebChangeSource, followsChangesLive, subscribeToChanges } from "~/lib/api";
+import { ReplyOpenerProvider, type ReplyToOpen } from "~/lib/reply-opener";
 import { ScoutChatProvider } from "~/lib/scout-chat";
 import { useShortcut, useShortcuts } from "~/lib/shortcuts";
 import {
@@ -29,7 +30,14 @@ import {
 } from "~/lib/ui";
 import { ScoutChat } from "~/modules/assistant";
 import { useAttentionCount } from "~/modules/attention";
-import { StreamNav, isPlace, streamPath, type Place } from "~/modules/conversations";
+import {
+  ReplyDialog,
+  StreamNav,
+  isPlace,
+  streamPath,
+  type Place,
+  type ReplyResume,
+} from "~/modules/conversations";
 import { useTaskCount } from "~/modules/tasks";
 import { useWorkspaces, type Workspace } from "~/modules/workspaces";
 
@@ -155,6 +163,28 @@ function WorkspaceFrame({ workspace, all }: { workspace: Workspace; all: Workspa
       }
     });
   };
+  // A reply Scout proposed in its chat (campbooks-cloud#305): the Reply
+  // dialog drafting its intent, over the page; nothing is sent by Scout.
+  const [replying, setReplying] = useState<
+    (ReplyToOpen & { opened: number; resume?: ReplyResume | undefined }) | undefined
+  >();
+  const openReply = useCallback((reply: ReplyToOpen) => {
+    setReplying({ ...reply, opened: Date.now() });
+  }, []);
+  const openComposer = (reply: ReplyToOpen, messageId?: string | null) => {
+    void navigate({
+      to: "/w/$workspaceId/inbox/$stream/$conversationId",
+      params: {
+        workspaceId: workspace.id,
+        stream: reply.stream,
+        conversationId: reply.conversationId,
+      },
+      search:
+        messageId === undefined || messageId === null
+          ? { reply: true }
+          : { reply: true, to: messageId },
+    });
+  };
   useWorkspaceChanges(workspace.id);
 
   // The server's accent is the source of truth; the device remembers it so
@@ -224,167 +254,198 @@ function WorkspaceFrame({ workspace, all }: { workspace: Workspace; all: Workspa
 
   return (
     <ScoutChatProvider open={openChat}>
-      <Shell>
-        <PhoneHeader>
-          <WorkspaceSwitcher
-            compact
-            mark={mark}
-            name={workspace.name}
-            kind={kind}
-            onClick={openSwitcher}
-          />
-          <Spacer />
-          <IconButton
-            size="lg"
-            icon="search"
-            label={tSearch("shortcuts.open")}
-            shortcut="search.open"
-            onClick={() => {
-              void navigate({ to: searchPath });
-            }}
-          />
-          <AccountMenu compact waysIn={link(waysInPath)} apps={link(appsPath)} />
-        </PhoneHeader>
-        {inSettings ? (
-          <PhoneSubnav label={tNav("nav.settings")}>
-            <ChipRow label={t("settings.sections")}>
-              {sections.map((section) => (
-                <ChipLink key={section.id} current={section.current} {...link(section.href)}>
-                  {section.label}
-                </ChipLink>
-              ))}
-            </ChipRow>
-          </PhoneSubnav>
-        ) : null}
-        <Sidebar>
-          <WorkspaceSwitcher mark={mark} name={workspace.name} kind={kind} onClick={openSwitcher} />
-          <SearchButton
-            onClick={() => {
-              registry.run("command.open");
-            }}
-          />
-          <NavItem
-            label={tNav("nav.home")}
-            icon="home"
-            shortcut="nav.home"
-            current={atHome}
-            count={needsYou}
-            {...link(base)}
-          />
-          <NavItem
-            label={tNav("nav.inbox")}
-            icon="inbox"
-            shortcut="nav.inbox"
-            current={inInbox && openStream === undefined}
-            {...link(inboxPath)}
-          />
-          <StreamNav workspaceId={workspace.id} current={openStream} />
-          <NavItem
-            label={tNav("nav.tasks")}
-            icon="tasks"
-            shortcut="nav.tasks"
-            current={inTasks}
-            count={openTasks}
-            {...link(tasksPath)}
-          />
-          <NavItem
-            label={tNav("nav.settings")}
-            icon="settings"
-            shortcut="nav.settings"
-            current={inSettings && !sections.some((section) => section.current)}
-            {...link(membersPath)}
-          />
-          {inSettings
-            ? sections.map((section) => (
-                <NavItem
-                  key={section.id}
-                  sub
-                  label={section.label}
-                  current={section.current}
-                  {...link(section.href)}
-                />
-              ))
-            : null}
-          <SidebarFooter>
-            <Button
-              variant="ghost"
-              icon="keyboard"
-              shortcut="sheet.open"
+      <ReplyOpenerProvider open={openReply}>
+        <Shell>
+          <PhoneHeader>
+            <WorkspaceSwitcher
+              compact
+              mark={mark}
+              name={workspace.name}
+              kind={kind}
+              onClick={openSwitcher}
+            />
+            <Spacer />
+            <IconButton
+              size="lg"
+              icon="search"
+              label={tSearch("shortcuts.open")}
+              shortcut="search.open"
               onClick={() => {
-                registry.run("sheet.open");
+                void navigate({ to: searchPath });
               }}
-            >
-              {tNav("sheet.open")}
-            </Button>
-            <AccountMenu waysIn={link(waysInPath)} apps={link(appsPath)} />
-          </SidebarFooter>
-        </Sidebar>
-        <Outlet />
-        {chat === undefined ? null : (
-          <ScoutChat
-            key={chat.conversationId}
+            />
+            <AccountMenu compact waysIn={link(waysInPath)} apps={link(appsPath)} />
+          </PhoneHeader>
+          {inSettings ? (
+            <PhoneSubnav label={tNav("nav.settings")}>
+              <ChipRow label={t("settings.sections")}>
+                {sections.map((section) => (
+                  <ChipLink key={section.id} current={section.current} {...link(section.href)}>
+                    {section.label}
+                  </ChipLink>
+                ))}
+              </ChipRow>
+            </PhoneSubnav>
+          ) : null}
+          <Sidebar>
+            <WorkspaceSwitcher
+              mark={mark}
+              name={workspace.name}
+              kind={kind}
+              onClick={openSwitcher}
+            />
+            <SearchButton
+              onClick={() => {
+                registry.run("command.open");
+              }}
+            />
+            <NavItem
+              label={tNav("nav.home")}
+              icon="home"
+              shortcut="nav.home"
+              current={atHome}
+              count={needsYou}
+              {...link(base)}
+            />
+            <NavItem
+              label={tNav("nav.inbox")}
+              icon="inbox"
+              shortcut="nav.inbox"
+              current={inInbox && openStream === undefined}
+              {...link(inboxPath)}
+            />
+            <StreamNav workspaceId={workspace.id} current={openStream} />
+            <NavItem
+              label={tNav("nav.tasks")}
+              icon="tasks"
+              shortcut="nav.tasks"
+              current={inTasks}
+              count={openTasks}
+              {...link(tasksPath)}
+            />
+            <NavItem
+              label={tNav("nav.settings")}
+              icon="settings"
+              shortcut="nav.settings"
+              current={inSettings && !sections.some((section) => section.current)}
+              {...link(membersPath)}
+            />
+            {inSettings
+              ? sections.map((section) => (
+                  <NavItem
+                    key={section.id}
+                    sub
+                    label={section.label}
+                    current={section.current}
+                    {...link(section.href)}
+                  />
+                ))
+              : null}
+            <SidebarFooter>
+              <Button
+                variant="ghost"
+                icon="keyboard"
+                shortcut="sheet.open"
+                onClick={() => {
+                  registry.run("sheet.open");
+                }}
+              >
+                {tNav("sheet.open")}
+              </Button>
+              <AccountMenu waysIn={link(waysInPath)} apps={link(appsPath)} />
+            </SidebarFooter>
+          </Sidebar>
+          <Outlet />
+          {chat === undefined ? null : (
+            <ScoutChat
+              key={chat.conversationId}
+              workspaceId={workspace.id}
+              conversationId={chat.conversationId}
+              onClose={closeChat}
+            />
+          )}
+        </Shell>
+        {replying === undefined ? null : (
+          <ReplyDialog
+            key={replying.opened}
             workspaceId={workspace.id}
-            conversationId={chat.conversationId}
-            onClose={closeChat}
+            conversationId={replying.conversationId}
+            name={replying.name}
+            startWith={replying.resume === undefined ? replying.intent : undefined}
+            resume={replying.resume}
+            onClose={() => {
+              setReplying(undefined);
+            }}
+            onWriteOwn={() => {
+              setReplying(undefined);
+              openComposer(replying);
+            }}
+            onOpenDraft={(draft) => {
+              setReplying(undefined);
+              openComposer(replying, draft.message_id);
+            }}
+            onUndone={(resume) => {
+              setReplying({ ...replying, resume, opened: Date.now() });
+            }}
           />
         )}
-      </Shell>
-      <TabBar
-        phoneOnly
-        items={[
-          {
-            id: "home",
-            label: tNav("nav.home"),
-            icon: "home",
-            current: atHome,
-            ...(needsYou === undefined ? {} : { badge: needsYou }),
-            ...link(base),
-          },
-          {
-            id: "inbox",
-            label: tNav("nav.inbox"),
-            icon: "inbox",
-            current: inInbox,
-            ...link(inboxPath),
-          },
-          {
-            id: "tasks",
-            label: tNav("nav.tasks"),
-            icon: "tasks",
-            current: inTasks,
-            ...(openTasks === undefined ? {} : { badge: openTasks }),
-            ...link(tasksPath),
-          },
-          {
-            id: "settings",
-            label: tNav("nav.settings"),
-            icon: "settings",
-            current: inSettings,
-            ...link(membersPath),
-          },
-        ]}
-      />
-      <WorkspaceMenu
-        open={switching}
-        onClose={() => {
-          setSwitching(false);
-        }}
-        currentId={workspace.id}
-        workspaces={all.map((candidate) => ({
-          id: candidate.id,
-          name: candidate.name,
-          mark: initialsOf(candidate.name),
-          kind: tWorkspaces(`kind.${candidate.kind}`),
-          accent: candidate.accent,
-        }))}
-        onSelect={(id) => {
-          void navigate({ to: "/w/$workspaceId", params: { workspaceId: id } });
-        }}
-        onCreate={() => {
-          void navigate({ to: "/welcome" });
-        }}
-        createShortcut="workspaces.create"
-      />
+        <TabBar
+          phoneOnly
+          items={[
+            {
+              id: "home",
+              label: tNav("nav.home"),
+              icon: "home",
+              current: atHome,
+              ...(needsYou === undefined ? {} : { badge: needsYou }),
+              ...link(base),
+            },
+            {
+              id: "inbox",
+              label: tNav("nav.inbox"),
+              icon: "inbox",
+              current: inInbox,
+              ...link(inboxPath),
+            },
+            {
+              id: "tasks",
+              label: tNav("nav.tasks"),
+              icon: "tasks",
+              current: inTasks,
+              ...(openTasks === undefined ? {} : { badge: openTasks }),
+              ...link(tasksPath),
+            },
+            {
+              id: "settings",
+              label: tNav("nav.settings"),
+              icon: "settings",
+              current: inSettings,
+              ...link(membersPath),
+            },
+          ]}
+        />
+        <WorkspaceMenu
+          open={switching}
+          onClose={() => {
+            setSwitching(false);
+          }}
+          currentId={workspace.id}
+          workspaces={all.map((candidate) => ({
+            id: candidate.id,
+            name: candidate.name,
+            mark: initialsOf(candidate.name),
+            kind: tWorkspaces(`kind.${candidate.kind}`),
+            accent: candidate.accent,
+          }))}
+          onSelect={(id) => {
+            void navigate({ to: "/w/$workspaceId", params: { workspaceId: id } });
+          }}
+          onCreate={() => {
+            void navigate({ to: "/welcome" });
+          }}
+          createShortcut="workspaces.create"
+        />
+      </ReplyOpenerProvider>
     </ScoutChatProvider>
   );
 }

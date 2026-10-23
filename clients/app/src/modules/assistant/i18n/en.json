@@ -271,7 +271,7 @@
     "else": "What else has {{name}} sent?",
     "field": "Ask about this",
     "ask": "Ask",
-    "note": "Scout looks things up and explains. In this version it changes nothing.",
+    "note": "Scout asks before it changes anything.",
     "you": "You asked",
     "scout": "Scout answered",
     "writing": "Scout is answering",
@@ -310,6 +310,61 @@
       "my_inboxes": "Reading your inboxes…",
       "my_tasks": "Reading your tasks…",
       "read_task": "Reading the task…"
+    },
+    "proposal": {
+      "label": "Scout proposes",
+      "labelPast": "Scout proposed",
+      "scoutWords": "Scout’s words",
+      "confirm": "Confirm",
+      "notNow": "Not now",
+      "undo": "Undo",
+      "working": "Doing it…",
+      "done": "Done.",
+      "undone": "Undone.",
+      "declined": "Not now.",
+      "failed": "This couldn’t be done.",
+      "failedBecause": "This couldn’t be done: {{reason}}",
+      "undoFailed": "Done, but it couldn’t be undone.",
+      "blocked": "Scout can’t do this here.",
+      "action": {
+        "archive": "Archive",
+        "unarchive": "Move to Inbox",
+        "mark_read": "Mark read",
+        "mark_unread": "Mark unread",
+        "star": "Pin",
+        "unstar": "Unpin",
+        "add_label": "Add the label",
+        "remove_label": "Take the label off",
+        "move_to_stream": "Move to {{stream}}",
+        "trash": "Delete",
+        "untrash": "Restore",
+        "report_spam": "Report spam",
+        "not_spam": "Not spam",
+        "done": "Mark done",
+        "not_needed": "Not needed",
+        "already_paid": "Already paid",
+        "still_to_pay": "Still to pay",
+        "yes_to_question": "Answer yes",
+        "later": "Later, until {{until}}"
+      },
+      "streams": {
+        "primary": "Primary",
+        "updates": "Updates",
+        "receipts": "Receipts",
+        "newsletters": "Newsletters"
+      },
+      "rule": {
+        "title": "A rule to teach Scout",
+        "review": "Review the rule",
+        "done": "Rule saved.",
+        "dialog": "Teach Scout something",
+        "dialogLead": "Scout reads the sentence. Nothing is saved until you press Save rule."
+      },
+      "reply": {
+        "title": "A reply to {{sender}}",
+        "write": "Write the draft",
+        "done": "Draft opened. You send it, or not."
+      }
     }
   }
 }

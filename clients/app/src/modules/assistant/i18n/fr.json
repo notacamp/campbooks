@@ -271,7 +271,7 @@
     "else": "Qu’a envoyé {{name}} d’autre ?",
     "field": "Posez une question à ce sujet",
     "ask": "Demander",
-    "note": "Scout cherche et explique. Dans cette version, il ne change rien.",
+    "note": "Scout demande avant de changer quoi que ce soit.",
     "you": "Vous avez demandé",
     "scout": "Scout a répondu",
     "writing": "Scout répond",
@@ -310,6 +310,61 @@
       "my_inboxes": "Lecture de vos boîtes de réception…",
       "my_tasks": "Lecture de vos tâches…",
       "read_task": "Lecture de la tâche…"
+    },
+    "proposal": {
+      "label": "Scout propose",
+      "labelPast": "Scout a proposé",
+      "scoutWords": "Les mots de Scout",
+      "confirm": "Confirmer",
+      "notNow": "Pas maintenant",
+      "undo": "Annuler",
+      "working": "En cours…",
+      "done": "C’est fait.",
+      "undone": "Annulé.",
+      "declined": "Pas maintenant.",
+      "failed": "Impossible de le faire.",
+      "failedBecause": "Impossible de le faire : {{reason}}",
+      "undoFailed": "C’est fait, mais impossible de l’annuler.",
+      "blocked": "Scout ne peut pas faire cela ici.",
+      "action": {
+        "archive": "Archiver",
+        "unarchive": "Remettre dans la boîte de réception",
+        "mark_read": "Marquer comme lue",
+        "mark_unread": "Marquer comme non lue",
+        "star": "Épingler",
+        "unstar": "Désépingler",
+        "add_label": "Ajouter l’étiquette",
+        "remove_label": "Retirer l’étiquette",
+        "move_to_stream": "Déplacer vers {{stream}}",
+        "trash": "Supprimer",
+        "untrash": "Restaurer",
+        "report_spam": "Signaler comme spam",
+        "not_spam": "Pas un spam",
+        "done": "Marquer comme fait",
+        "not_needed": "Pas nécessaire",
+        "already_paid": "Déjà payée",
+        "still_to_pay": "Reste à payer",
+        "yes_to_question": "Répondre oui",
+        "later": "Plus tard, jusqu’à {{until}}"
+      },
+      "streams": {
+        "primary": "Principal",
+        "updates": "Notifications",
+        "receipts": "Reçus",
+        "newsletters": "Newsletters"
+      },
+      "rule": {
+        "title": "Une règle à apprendre à Scout",
+        "review": "Vérifier la règle",
+        "done": "Règle enregistrée.",
+        "dialog": "Apprendre quelque chose à Scout",
+        "dialogLead": "Scout lit la phrase. Rien n’est enregistré avant que vous appuyiez sur Enregistrer la règle."
+      },
+      "reply": {
+        "title": "Une réponse à {{sender}}",
+        "write": "Rédiger le brouillon",
+        "done": "Brouillon ouvert. C’est vous qui l’envoyez, ou pas."
+      }
     }
   }
 }

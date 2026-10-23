@@ -1,7 +1,9 @@
 //! Scout's read-only tools: each one or two catalogue operations the
 //! assistant may call, run as the member, with a narrow schema and a
 //! compact, bounded result. A call naming any other tool, or with arguments
-//! outside its schema, is never invoked: the model is told so.
+//! outside its schema, is never invoked: the model is told so. The
+//! proposing tools ([`super::propose`]) are offered with them and only
+//! checked and stored, never run.
 
 use campbooks_ai::{ToolCall, ToolDefinition};
 use campbooks_kernel::RecordRef;
@@ -10,6 +12,7 @@ use serde_json::{Map, Value, json};
 use super::{
     member::{Member, Unread},
     project,
+    propose::{self, Proposer, Proposing},
     types::{ChatStep, ChatTool},
 };
 
@@ -103,8 +106,16 @@ fn conversation_id() -> Value {
     })
 }
 
-/// Every tool's definition, for the model.
+/// Every tool's definition, for the model: the read-only tools, then the
+/// proposing ones.
 pub fn definitions() -> Vec<ToolDefinition> {
+    let mut all = read_definitions();
+    all.extend(propose::definitions());
+    all
+}
+
+/// The read-only tools' definitions.
+fn read_definitions() -> Vec<ToolDefinition> {
     let object = |properties: Value, required: &[&str]| {
         json!({
             "type": "object",
@@ -216,11 +227,13 @@ pub struct Outcome {
     pub kind: &'static str,
 }
 
-/// A question's tools: the member they act for, and how much room is left
-/// for their results.
+/// A question's tools: the member they act for, how much room is left for
+/// their results, and the answer's proposals.
 #[derive(Debug)]
 pub struct Toolbox {
     member: Member,
+    /// The answer's proposals, checked and kept.
+    pub proposer: Proposer,
     /// The caller's offset from UTC in minutes (what is overdue).
     utc_offset: i32,
     left: usize,
@@ -232,6 +245,7 @@ impl Toolbox {
     /// Tools acting for `member`.
     pub fn new(member: Member, utc_offset: i32) -> Self {
         Self {
+            proposer: Proposer::new(member.clone()),
             member,
             utc_offset,
             left: MAX_QUESTION_BYTES,
@@ -245,8 +259,17 @@ impl Toolbox {
         arguments(tool, &call.arguments).map(|_| tool)
     }
 
-    /// Run `call`, if it names a tool and its arguments fit its schema.
+    /// Run `call`, if it names a tool and its arguments fit its schema; a
+    /// proposing call is only checked and kept.
     pub async fn run(&mut self, call: &ToolCall) -> Outcome {
+        if let Some(proposing) = Proposing::named(&call.name) {
+            let proposed = self.proposer.propose(proposing, call).await;
+            return Outcome {
+                result: proposed.result,
+                step: None,
+                kind: proposed.kind,
+            };
+        }
         let Some(tool) = ChatTool::named(&call.name) else {
             return refusal(
                 "no_such_tool",
@@ -675,7 +698,7 @@ mod tests {
 
     #[test]
     fn every_tool_has_a_strict_schema_and_its_operations() {
-        for definition in definitions() {
+        for definition in read_definitions() {
             assert_eq!(definition.parameters["type"], "object");
             assert_eq!(definition.parameters["additionalProperties"], false);
             let tool = ChatTool::named(&definition.name).unwrap();
@@ -685,7 +708,11 @@ mod tests {
                     .any(|(t, ops)| *t == tool && !ops.is_empty())
             );
         }
-        assert_eq!(definitions().len(), ChatTool::ALL.len());
+        assert_eq!(read_definitions().len(), ChatTool::ALL.len());
+        assert_eq!(
+            definitions().len(),
+            ChatTool::ALL.len() + Proposing::ALL.len()
+        );
         assert_eq!(OPERATIONS.len(), ChatTool::ALL.len());
     }
 

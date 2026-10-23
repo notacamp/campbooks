@@ -7,8 +7,12 @@ use chrono::{DateTime, Utc};
 use serde_json::Value;
 use sqlx::PgConnection;
 
-use super::types::{
-    ChatAuthor, ChatFinish, ChatId, ChatMessageId, ChatMessageView, ChatStep, ChatView,
+use super::{
+    propose,
+    types::{
+        ChatAuthor, ChatFinish, ChatId, ChatMessageId, ChatMessageView, ChatProposal, ChatStep,
+        ChatView, ProposalId,
+    },
 };
 
 /// Questions a chat may hold.
@@ -47,6 +51,7 @@ struct MessageRow {
     text: String,
     steps: Value,
     finish: Option<String>,
+    proposals: Value,
     created_at: DateTime<Utc>,
 }
 
@@ -62,6 +67,7 @@ impl MessageRow {
             text: self.text,
             steps: serde_json::from_value(self.steps).unwrap_or_default(),
             finish: self.finish.as_deref().map(ChatFinish::from_db),
+            proposals: serde_json::from_value(self.proposals).unwrap_or_default(),
             created_at: self.created_at,
         }
     }
@@ -132,7 +138,8 @@ pub async fn create(
 /// The chat's messages, oldest first (a question before its answer).
 pub async fn messages(conn: &mut PgConnection, chat: ChatId) -> Result<Vec<ChatMessageView>> {
     let rows: Vec<MessageRow> = sqlx::query_as(
-        "SELECT id, author, text, steps, finish, created_at FROM assistant.chat_messages \
+        "SELECT id, author, text, steps, finish, proposals, created_at \
+           FROM assistant.chat_messages \
           WHERE chat_id = $1 ORDER BY created_at, author = 'scout', id",
     )
     .bind(chat)
@@ -195,26 +202,29 @@ pub async fn ask(
     Ok(answer)
 }
 
-/// Write Scout's answer: its text, steps and how it ended.
+/// Write Scout's answer: its text, steps, proposals and how it ended.
 pub async fn finish(
     conn: &mut PgConnection,
     chat: ChatId,
     answer: ChatMessageId,
     text: &str,
     steps: &[ChatStep],
+    proposals: &[ChatProposal],
     finish: ChatFinish,
 ) -> Result<Option<ChatMessageView>> {
     let steps = serde_json::to_value(steps).map_err(|e| Error::internal(e.to_string()))?;
+    let proposals = serde_json::to_value(proposals).map_err(|e| Error::internal(e.to_string()))?;
     let row: Option<MessageRow> = sqlx::query_as(
-        "UPDATE assistant.chat_messages SET text = $3, steps = $4, finish = $5 \
+        "UPDATE assistant.chat_messages SET text = $3, steps = $4, finish = $5, proposals = $6 \
           WHERE id = $1 AND chat_id = $2 AND author = 'scout' \
-         RETURNING id, author, text, steps, finish, created_at",
+         RETURNING id, author, text, steps, finish, proposals, created_at",
     )
     .bind(answer)
     .bind(chat)
     .bind(text)
     .bind(steps)
     .bind(finish.as_str())
+    .bind(proposals)
     .fetch_optional(&mut *conn)
     .await?;
     sqlx::query("UPDATE assistant.chats SET last_message_at = now() WHERE id = $1")
@@ -239,7 +249,8 @@ pub async fn delete(conn: &mut PgConnection, chat: ChatId) -> Result<()> {
 
 /// The chat's questions and answers so far, text only, oldest first: what
 /// the model reads as the chat so far. Failed answers are left out (they
-/// have no text).
+/// have no text). After an answer's text, a line the server writes for
+/// each of its proposals: what Scout proposed and what the member did.
 pub async fn transcript(
     conn: &mut PgConnection,
     chat: ChatId,
@@ -248,6 +259,51 @@ pub async fn transcript(
         .await?
         .into_iter()
         .filter(|message| !message.text.is_empty())
-        .map(|message| (message.author, message.text))
+        .map(|message| {
+            let mut text = message.text;
+            for proposal in &message.proposals {
+                text.push_str("\n\n");
+                text.push_str(&propose::line(proposal));
+            }
+            (message.author, text)
+        })
         .collect())
+}
+
+/// The Scout message of `chat` holding proposal `id`, and its proposals,
+/// locked until the transaction ends.
+pub async fn proposals_for_update(
+    conn: &mut PgConnection,
+    chat: ChatId,
+    id: ProposalId,
+) -> Result<Option<(ChatMessageId, Vec<ChatProposal>)>> {
+    let row: Option<(ChatMessageId, Value)> = sqlx::query_as(
+        "SELECT id, proposals FROM assistant.chat_messages \
+          WHERE chat_id = $1 AND author = 'scout' AND proposals @> $2 FOR UPDATE",
+    )
+    .bind(chat)
+    .bind(serde_json::json!([{ "id": id }]))
+    .fetch_optional(conn)
+    .await?;
+    Ok(row.map(|(message, proposals)| {
+        (
+            message,
+            serde_json::from_value(proposals).unwrap_or_default(),
+        )
+    }))
+}
+
+/// Replace message `message`'s proposals.
+pub async fn set_proposals(
+    conn: &mut PgConnection,
+    message: ChatMessageId,
+    proposals: &[ChatProposal],
+) -> Result<()> {
+    let proposals = serde_json::to_value(proposals).map_err(|e| Error::internal(e.to_string()))?;
+    sqlx::query("UPDATE assistant.chat_messages SET proposals = $2 WHERE id = $1")
+        .bind(message)
+        .bind(proposals)
+        .execute(conn)
+        .await?;
+    Ok(())
 }

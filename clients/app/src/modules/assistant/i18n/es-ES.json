@@ -271,7 +271,7 @@
     "else": "¿Qué más ha enviado {{name}}?",
     "field": "Pregunta sobre esto",
     "ask": "Preguntar",
-    "note": "Scout busca y explica. En esta versión no cambia nada.",
+    "note": "Scout pregunta antes de cambiar cualquier cosa.",
     "you": "Has preguntado",
     "scout": "Scout ha respondido",
     "writing": "Scout está respondiendo",
@@ -310,6 +310,61 @@
       "my_inboxes": "Leyendo tus bandejas de entrada…",
       "my_tasks": "Leyendo tus tareas…",
       "read_task": "Leyendo la tarea…"
+    },
+    "proposal": {
+      "label": "Scout propone",
+      "labelPast": "Scout propuso",
+      "scoutWords": "Palabras de Scout",
+      "confirm": "Confirmar",
+      "notNow": "Ahora no",
+      "undo": "Deshacer",
+      "working": "Haciéndolo…",
+      "done": "Hecho.",
+      "undone": "Deshecho.",
+      "declined": "Ahora no.",
+      "failed": "No se ha podido hacer.",
+      "failedBecause": "No se ha podido hacer: {{reason}}",
+      "undoFailed": "Hecho, pero no se ha podido deshacer.",
+      "blocked": "Scout no puede hacer esto aquí.",
+      "action": {
+        "archive": "Archivar",
+        "unarchive": "Mover a la bandeja de entrada",
+        "mark_read": "Marcar como leída",
+        "mark_unread": "Marcar como no leída",
+        "star": "Fijar",
+        "unstar": "Dejar de fijar",
+        "add_label": "Añadir la etiqueta",
+        "remove_label": "Quitar la etiqueta",
+        "move_to_stream": "Mover a {{stream}}",
+        "trash": "Eliminar",
+        "untrash": "Restaurar",
+        "report_spam": "Marcar como spam",
+        "not_spam": "No es spam",
+        "done": "Marcar como hecho",
+        "not_needed": "No hace falta",
+        "already_paid": "Ya está pagada",
+        "still_to_pay": "Pendiente de pago",
+        "yes_to_question": "Responder que sí",
+        "later": "Más tarde, hasta {{until}}"
+      },
+      "streams": {
+        "primary": "Principal",
+        "updates": "Novedades",
+        "receipts": "Recibos",
+        "newsletters": "Boletines"
+      },
+      "rule": {
+        "title": "Una regla para enseñar a Scout",
+        "review": "Revisar la regla",
+        "done": "Regla guardada.",
+        "dialog": "Enséñale algo a Scout",
+        "dialogLead": "Scout lee la frase. No se guarda nada hasta que pulses Guardar regla."
+      },
+      "reply": {
+        "title": "Una respuesta a {{sender}}",
+        "write": "Escribir el borrador",
+        "done": "Borrador abierto. Lo envías tú, o no."
+      }
     }
   }
 }

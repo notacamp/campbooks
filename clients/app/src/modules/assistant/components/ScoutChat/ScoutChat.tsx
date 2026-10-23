@@ -1,5 +1,5 @@
 import { useNavigate } from "@tanstack/react-router";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 
 import { errorStatus, problemCode } from "~/lib/api";
@@ -32,6 +32,8 @@ import {
   type ChatStep,
   type ChatTool,
 } from "../../api/chats";
+
+import { ProposalCards } from "./ProposalCards";
 
 /** `t` for keys only known at runtime. */
 type Translate = (key: string, options?: Record<string, unknown>) => string;
@@ -66,9 +68,10 @@ type Problem = "unavailable" | "limit" | "full" | "unreadable";
 /**
  * Scout's chat about a conversation (campbooks-cloud#305, "Ask about
  * this"): opening it starts the member's chat or continues theirs; Scout
- * explains and looks things up, as the member, and changes nothing. Its
- * answers come as they are written (whole on the desktop), with what Scout
- * looked at one click away. Closing it stops a question being answered.
+ * explains and looks things up, as the member, and may propose changes as
+ * cards the member confirms; it never makes one itself. Its answers come
+ * as they are written (whole on the desktop), with what Scout looked at one
+ * click away. Closing it stops a question being answered.
  */
 export function ScoutChat({ workspaceId, conversationId, onClose, modal }: ScoutChatProps) {
   const { t: typed, i18n } = useTranslation("assistant");
@@ -251,6 +254,18 @@ export function ScoutChat({ workspaceId, conversationId, onClose, modal }: Scout
           key={message.id}
           message={message}
           t={t}
+          cards={
+            chat.data === undefined ? null : (
+              <ProposalCards
+                workspaceId={workspaceId}
+                chatId={chat.data.id}
+                proposals={message.proposals}
+                onSettled={() => {
+                  void cache.refresh();
+                }}
+              />
+            )
+          }
           steps={stepLines(message.steps)}
           isLast={message === last && pending === undefined}
           onRetry={() => {
@@ -375,6 +390,8 @@ function stepText(t: Translate, step: ChatStep, aboutId: string): string {
 interface StoredProps {
   message: Message;
   t: Translate;
+  /** Scout's proposals in the answer, as cards. */
+  cards: ReactNode;
   steps: StepLine[];
   /** The chat's last message: a failure offers Try again. */
   isLast: boolean;
@@ -382,7 +399,7 @@ interface StoredProps {
 }
 
 /** A stored question or answer. */
-function Stored({ message, t, steps, isLast, onRetry }: StoredProps) {
+function Stored({ message, t, cards, steps, isLast, onRetry }: StoredProps) {
   if (message.author === "member") {
     return <ChatMessage from="member" label={t("chat.you")} text={message.text} />;
   }
@@ -412,6 +429,7 @@ function Stored({ message, t, steps, isLast, onRetry }: StoredProps) {
       after={
         <>
           {message.finish === "cut_short" ? <ChatNotice>{t("chat.cutShort")}</ChatNotice> : null}
+          {cards}
           <ChatSteps summary={t("chat.looked")} steps={steps} />
         </>
       }

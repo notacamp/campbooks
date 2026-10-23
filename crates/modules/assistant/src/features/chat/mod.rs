@@ -1,15 +1,19 @@
-//! `…/assistant/chats` — Scout's chat (campbooks-cloud#305, phase 1: "Ask
-//! about this"). A member asks Scout about what they are looking at; Scout
-//! explains and looks things up, as that member, and changes nothing.
+//! `…/assistant/chats` — Scout's chat (campbooks-cloud#305: "Ask about
+//! this"). A member asks Scout about what they are looking at; Scout
+//! explains and looks things up, as that member, and may propose changes
+//! the member confirms on a card ([`propose`]). The server never makes one:
+//! the member's own request does.
 //!
 //! A chat belongs to one member and is about one record of a registered
 //! type ([`about`]) or nothing. Each answer is written by the `complete`
 //! role, through the provider that may receive mail content, from a fixed
 //! instruction and the handbook ([`crate::handbook`]), the question's
 //! context and what the chat is about (read again as the member for every
-//! question), the chat so far, and read-only [`tools`] each backed by a
-//! catalogue operation the assistant may call. Every answer carries the
-//! steps Scout took, built by the server from the tools that ran.
+//! question), the chat so far, read-only [`tools`] each backed by a
+//! catalogue operation the assistant may call, and the proposing tools.
+//! Every answer carries the steps Scout took, built by the server from the
+//! tools that ran, and the proposals it made, each checked as the member
+//! and built from the catalogue and the record's own facts.
 //!
 //! Only on the member's own request: none of these operations is open to
 //! the assistant or automation, and a client token acting for nobody gets
@@ -21,6 +25,7 @@ mod answer;
 mod member;
 mod project;
 mod prompt;
+mod propose;
 mod store;
 mod tools;
 mod types;
@@ -59,7 +64,8 @@ use serde::Deserialize;
 use tokio::sync::mpsc;
 
 use self::types::{
-    AskChat, ChatFinish, ChatId, ChatMessageId, ChatMessageView, ChatTool, ChatView, StartChat,
+    AskChat, ChatFinish, ChatId, ChatMessageId, ChatMessageView, ChatProposal, ChatTool, ChatView,
+    ProposalId, SettleProposal, StartChat,
 };
 use self::{
     about::Seen,
@@ -127,6 +133,15 @@ pub struct ChatPath {
 
 fn needs_member() -> Error {
     Error::Denied(crate::MESSAGES.reason("chat_needs_member"))
+}
+
+/// `…/assistant/chats/{chat_id}/proposals/{proposal_id}`.
+#[derive(Debug, Clone, Copy, Deserialize)]
+pub struct ProposalPath {
+    /// The chat.
+    pub chat_id: ChatId,
+    /// The proposal.
+    pub proposal_id: ProposalId,
 }
 
 /// The member a chat operation acts for: a client token acting for nobody
@@ -304,6 +319,78 @@ pub async fn delete(
     store::delete(&mut tx, path.chat_id).await?;
     tx.commit().await?;
     Ok(StatusCode::NO_CONTENT)
+}
+
+/// Say what you did with one of Scout's proposals: `done`, `declined` or
+/// `failed` for a pending card, `undone` for a done one.
+///
+/// It records only: the change itself was your own request, sent by your
+/// app. Scout reads what you did in the chat's next answers.
+#[utoipa::path(
+    post,
+    path = "/api/v1/w/{workspace_id}/assistant/chats/{chat_id}/proposals/{proposal_id}",
+    operation_id = "assistant.settle_proposal",
+    tag = "assistant",
+    security(("bearer" = ["assistant:write"])),
+    extensions(("x-campbooks" = json!(Operation::command(Risk::Low).records(["assistant.chat"]).access("assistant.chat", campbooks_kernel::authz::Action::Write)))),
+    params(
+        ("workspace_id" = WorkspaceId, Path, description = "The workspace."),
+        ("chat_id" = ChatId, Path, description = "The chat."),
+        ("proposal_id" = ProposalId, Path, description = "The proposal."),
+    ),
+    request_body = SettleProposal,
+    responses(
+        (status = OK, description = "The proposal, settled.", body = ChatProposal),
+        (status = BAD_REQUEST, description = "Not a state a card is settled with.", body = Problem,
+            content_type = "application/problem+json"),
+        (status = UNAUTHORIZED, description = "No valid access token.", body = Problem,
+            content_type = "application/problem+json"),
+        (status = FORBIDDEN, description = "Missing scope.", body = Problem,
+            content_type = "application/problem+json"),
+        (status = NOT_FOUND, description = "No such chat or proposal, or it is not yours.",
+            body = Problem, content_type = "application/problem+json"),
+        (status = CONFLICT, description = "It cannot become that state (`proposal_settled`): \
+            only a pending card is settled, and only a done one undone.",
+            body = Problem, content_type = "application/problem+json"),
+    )
+)]
+pub async fn settle(
+    State(state): State<AppState>,
+    workspace: Workspace<AssistantWrite>,
+    extract::Path(path): extract::Path<ProposalPath>,
+    extract::Json(body): extract::Json<SettleProposal>,
+) -> Result<Json<ChatProposal>> {
+    let mut tx = state.db.begin_for(workspace.id).await?;
+    authz::require(
+        &state,
+        &mut tx,
+        &workspace.access,
+        Action::Write,
+        &resources::chat(&path.chat_id),
+        needs_member,
+    )
+    .await?;
+    let (message, mut proposals) =
+        store::proposals_for_update(&mut tx, path.chat_id, path.proposal_id)
+            .await?
+            .ok_or(Error::NotFound)?;
+    let proposal = proposals
+        .iter_mut()
+        .find(|proposal| proposal.id == path.proposal_id)
+        .ok_or(Error::NotFound)?;
+    if !proposal.state.may_become(body.state) {
+        return Err(Error::Conflict(crate::MESSAGES.reason("proposal_settled")));
+    }
+    proposal.state = body.state.into();
+    let settled = proposal.clone();
+    store::set_proposals(&mut tx, message, &proposals).await?;
+    tx.commit().await?;
+    tracing::info!(
+        kind = ?settled.kind,
+        state = ?settled.state,
+        "chat proposal settled"
+    );
+    Ok(Json(settled))
 }
 
 /// Ask Scout, and get its answer whole (the desktop app, where answers
@@ -735,6 +822,7 @@ impl Question {
             answer_id,
             &text,
             &answer.steps,
+            &self.asking.toolbox.proposer.proposals,
             answer.finish,
         )
         .await?
@@ -746,7 +834,16 @@ impl Question {
     /// Keep Scout's answer as failed, with no text.
     async fn store_failed(&self, answer_id: ChatMessageId) -> Result<()> {
         let mut tx = self.state.db.begin_for(self.workspace).await?;
-        store::finish(&mut tx, self.chat, answer_id, "", &[], ChatFinish::Failed).await?;
+        store::finish(
+            &mut tx,
+            self.chat,
+            answer_id,
+            "",
+            &[],
+            &[],
+            ChatFinish::Failed,
+        )
+        .await?;
         tx.commit().await?;
         Ok(())
     }
@@ -759,6 +856,8 @@ impl Question {
             streamed,
             model_calls = self.asking.calls,
             tools = %self.asking.tools.join(","),
+            proposals = self.asking.toolbox.proposer.proposals.len(),
+            refusals = %self.asking.toolbox.proposer.refusals.join(","),
             result_bytes = self.asking.toolbox.used,
             finish_reason = self.asking.finish,
             prompt_tokens = self.asking.prompt_tokens,

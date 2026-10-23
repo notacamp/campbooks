@@ -11,6 +11,7 @@ import {
   ChatMessage,
   ChatNotice,
   ChatPanel,
+  ChatProposal,
   ChatSteps,
   ChatSuggestions,
   ChatWorking,
@@ -20,7 +21,7 @@ const ANSWER =
   "It is under Pay because Marta asks for November's rent, due on the 1st.\n\n" +
   "- Scout read it as a bill, 91% sure.\n- You have not said it is paid.";
 
-const NOTE = "Scout looks things up and explains. In this version it changes nothing.";
+const NOTE = "Scout asks before it changes anything.";
 
 function Field({ busy = false }: { busy?: boolean }) {
   const [value, setValue] = useState("");
@@ -209,5 +210,79 @@ export const Phone: Story = {
   play: async () => {
     const dialog = within(document.body).getByRole("dialog", { name: "Scout" });
     await expect(within(dialog).getByRole("textbox", { name: "Ask about this" })).toHaveFocus();
+  },
+};
+
+/** Scout's proposals under its answer: pending, done with Undo, a rule quoted, and how cards end. */
+export const Proposals: Story = {
+  args: {
+    children: (
+      <>
+        <ChatMessage from="member" label="You asked" text="Can you get this out of my inbox?" />
+        <ChatMessage
+          from="scout"
+          label="Scout answered"
+          text="I proposed archiving it, and a rule for the next ones. Confirm on the cards."
+          after={
+            <>
+              <ChatProposal
+                label="Scout proposes"
+                title="Archive"
+                about="Marta Silva · Rent for November"
+                state="pending"
+                actions={
+                  <>
+                    <Button onClick={fn()}>Confirm</Button>
+                    <Button onClick={fn()}>Not now</Button>
+                  </>
+                }
+              />
+              <ChatProposal
+                label="Scout proposes"
+                title="A rule for Teach Scout"
+                quote="Keep newsletters from The Weekly off Home"
+                quoteLabel="Scout’s words"
+                state="pending"
+                actions={
+                  <>
+                    <Button onClick={fn()}>Review the rule</Button>
+                    <Button onClick={fn()}>Not now</Button>
+                  </>
+                }
+              />
+              <ChatProposal
+                label="Scout proposes"
+                title="Add the label"
+                about="Marta Silva · Rent for November"
+                quote="Accountant"
+                quoteLabel="Scout’s words"
+                state="done"
+                status="Done."
+                actions={<Button onClick={fn()}>Undo</Button>}
+              />
+              <ChatProposal
+                label="Scout proposed"
+                title="Mark done"
+                about="Marta Silva · Rent for November"
+                state="failed"
+                status="This couldn’t be done: the need changed since."
+              />
+              <ChatProposal
+                label="Scout proposed"
+                title="Pin"
+                about="Marta Silva · Rent for November"
+                state="declined"
+                status="Not now."
+              />
+            </>
+          }
+        />
+      </>
+    ),
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(canvas.getByRole("region", { name: "Archive" })).toBeVisible();
+    await expect(canvas.getByText("Keep newsletters from The Weekly off Home")).toBeVisible();
   },
 };

@@ -13,7 +13,8 @@
     "chat_full": "Cette discussion est pleine : elle compte {{max}} questions. Recommencez pour continuer à poser des questions.",
     "question_empty": "Écrivez une question pour Scout.",
     "question_too_long": "Limitez votre question à {{max}} caractères.",
-    "about_unsupported": "Scout ne peut pas encore discuter de ce type d’élément."
+    "about_unsupported": "Scout ne peut pas encore discuter de ce type d’élément.",
+    "proposal_settled": "On a déjà répondu à cette proposition de Scout : elle ne peut plus changer ainsi."
   },
   "chat": {
     "about_lost": "Je ne vois plus cette conversation, j’ai donc répondu sans elle."

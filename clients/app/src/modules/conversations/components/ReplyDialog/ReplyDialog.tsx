@@ -59,6 +59,12 @@ export interface ReplyDialogProps {
   name?: string | undefined;
   /** Start on this draft (its send was undone). */
   resume?: ReplyResume | undefined;
+  /**
+   * Start by drafting this intent (Scout proposed it in a chat,
+   * campbooks-cloud#305): asked for once the message answered is read.
+   * Nothing is sent: the member edits the draft and sends it, or not.
+   */
+  startWith?: string | undefined;
   /** Esc, a click outside, Close, or the result has shown: nothing more to do here. */
   onClose: () => void;
   /** "Write my own": the plain composer, as before. */
@@ -108,6 +114,7 @@ export function ReplyDialog({
   conversationId,
   name,
   resume,
+  startWith,
   onClose,
   onWriteOwn,
   onOpenDraft,
@@ -309,6 +316,28 @@ export function ReplyDialog({
         }
       });
   };
+
+  // An intent handed over is drafted once, when the message it answers is
+  // known (never over a draft handed back): asked for just after this
+  // render, as the member's own pick would be.
+  const started = useRef(false);
+  useEffect(() => {
+    if (started.current || startWith === undefined || resume !== undefined) {
+      return;
+    }
+    if (answered === undefined || startWith.trim() === "") {
+      return;
+    }
+    const timer = setTimeout(() => {
+      if (!started.current) {
+        started.current = true;
+        write(startWith.slice(0, MAX_ASK_CHARS));
+      }
+    }, 0);
+    return () => {
+      clearTimeout(timer);
+    };
+  });
 
   const back = () => {
     asking.current += 1;

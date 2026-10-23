@@ -517,7 +517,8 @@ impl World {
     }
 
     /// `member`'s chat with Scout, about nothing (campbooks-cloud#305), with
-    /// a question.
+    /// a question, and Scout's answer holding a pending proposal whose id is
+    /// the chat's (so one instance fills both).
     async fn seed_chat(&self, member: UserId) -> Uuid {
         let chat = Uuid::now_v7();
         sqlx::query(
@@ -537,6 +538,21 @@ impl World {
         .bind(Uuid::now_v7())
         .bind(self.a.as_uuid())
         .bind(chat)
+        .execute(&self.db)
+        .await
+        .unwrap();
+        sqlx::query(
+            "INSERT INTO assistant.chat_messages
+                 (id, workspace_id, chat_id, author, text, finish, proposals)
+             VALUES ($1, $2, $3, 'scout', 'I can propose a rule.', 'done', $4)",
+        )
+        .bind(Uuid::now_v7())
+        .bind(self.a.as_uuid())
+        .bind(chat)
+        .bind(
+            json!([{"id": chat.to_string(), "kind": "rule", "state": "pending",
+                      "sentence": "Keep newsletters off Home"}]),
+        )
         .execute(&self.db)
         .await
         .unwrap();
@@ -994,6 +1010,7 @@ fn body(world: &World, id: &str) -> Option<Value> {
         }
         "tasks.hand_off" => json!({"revision": 1, "to": world.users[&Who::Owner]}),
         "assistant.ask_chat" | "assistant.stream_chat" => json!({"text": "Why is this here?"}),
+        "assistant.settle_proposal" => json!({"state": "declined"}),
         "conversations.write_reply" | "conversations.stream_reply" => {
             json!({"intent": "Say yes"})
         }
@@ -1096,6 +1113,8 @@ fn fill(world: &World, path: &str) -> String {
         .replace("{notice_id}", &world.instances["conversations.rule_notice"])
         .replace("{note_id}", &world.instances["conversations.person_note"])
         .replace("{chat_id}", &world.instances["assistant.chat"])
+        // Scout's proposal in that chat shares its id (`seed_chat`).
+        .replace("{proposal_id}", &world.instances["assistant.chat"])
         .replace("{id}", &Uuid::now_v7().to_string())
 }
 
