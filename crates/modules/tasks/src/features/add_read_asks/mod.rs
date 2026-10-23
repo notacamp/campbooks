@@ -142,6 +142,57 @@ fn amount_of(words: Option<&AskText>) -> Option<&AskAmount> {
         })
 }
 
+/// The task of the owner that `ask` repeats: the open one `same_as` names
+/// (from the same conversation or inbox), or, for a `pay` ask of the model
+/// read, the `pay` task the structured read of the same message made.
+async fn repeated(
+    tx: &mut Transaction<'static, Postgres>,
+    workspace: WorkspaceId,
+    owner: UserId,
+    read: &MessageRead,
+    ask: &ReadAsk,
+    verb: TaskVerb,
+) -> Result<Option<Known>, JobError> {
+    if let Some(reference) = ask
+        .same_as
+        .as_deref()
+        .and_then(|r| r.parse::<TaskId>().ok())
+    {
+        let same: Option<Known> = sqlx::query_as(
+            "SELECT id, state, due_on FROM tasks.tasks
+              WHERE workspace_id = $1 AND id = $2 AND assignee = $3 AND state = 'open'
+                AND ((source_type = 'conversations.conversation' AND source_id = $4)
+                     OR source_container = $5)",
+        )
+        .bind(workspace.as_uuid())
+        .bind(reference)
+        .bind(owner.as_uuid())
+        .bind(&read.conversation)
+        .bind(&read.inbox)
+        .fetch_optional(&mut **tx)
+        .await?;
+        if same.is_some() {
+            return Ok(same);
+        }
+    }
+    // The structured read made the `pay` task of this message already.
+    if verb == TaskVerb::Pay && read.layer == "model" {
+        let made: Option<Known> = sqlx::query_as(
+            "SELECT id, state, due_on FROM tasks.tasks
+              WHERE workspace_id = $1 AND assignee = $2 AND verb = 'pay' AND origin = 'ask'
+                AND starts_with(ask_key, $3)
+              ORDER BY created_at LIMIT 1",
+        )
+        .bind(workspace.as_uuid())
+        .bind(owner.as_uuid())
+        .bind(format!("{}:structured:ask:", read.message))
+        .fetch_optional(&mut **tx)
+        .await?;
+        return Ok(made);
+    }
+    Ok(None)
+}
+
 async fn add_ask(
     state: &AppState,
     tx: &mut Transaction<'static, Postgres>,
@@ -170,47 +221,8 @@ async fn add_ask(
     }
     let due = parse_due(ask.due.as_deref());
 
-    // The open task of the owner it repeats, from the same conversation or
-    // inbox.
-    if let Some(reference) = ask
-        .same_as
-        .as_deref()
-        .and_then(|r| r.parse::<TaskId>().ok())
-    {
-        let same: Option<Known> = sqlx::query_as(
-            "SELECT id, state, due_on FROM tasks.tasks
-              WHERE workspace_id = $1 AND id = $2 AND assignee = $3 AND state = 'open'
-                AND ((source_type = 'conversations.conversation' AND source_id = $4)
-                     OR source_container = $5)",
-        )
-        .bind(workspace)
-        .bind(reference)
-        .bind(owner.as_uuid())
-        .bind(&read.conversation)
-        .bind(&read.inbox)
-        .fetch_optional(&mut **tx)
-        .await?;
-        if let Some(same) = same {
-            return fill_due(state, tx, access, &same, due).await;
-        }
-    }
-
-    // The structured read made the `pay` task of this message already.
-    if verb == TaskVerb::Pay && read.layer == "model" {
-        let made: Option<Known> = sqlx::query_as(
-            "SELECT id, state, due_on FROM tasks.tasks
-              WHERE workspace_id = $1 AND assignee = $2 AND verb = 'pay' AND origin = 'ask'
-                AND starts_with(ask_key, $3)
-              ORDER BY created_at LIMIT 1",
-        )
-        .bind(workspace)
-        .bind(owner.as_uuid())
-        .bind(format!("{}:structured:ask:", read.message))
-        .fetch_optional(&mut **tx)
-        .await?;
-        if let Some(made) = made {
-            return fill_due(state, tx, access, &made, due).await;
-        }
+    if let Some(task) = repeated(tx, access.workspace, owner, read, ask, verb).await? {
+        return fill_due(state, tx, access, &task, due).await;
     }
 
     let amount = amount_of(words);
