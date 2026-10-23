@@ -16,6 +16,7 @@ import {
   CONVERSATIONS_SHORTCUTS,
   PersonNotesList,
   RulesList,
+  useConversationSources,
 } from "~/modules/conversations";
 import {
   AccountAdminPanel,
@@ -32,6 +33,7 @@ import {
   JOBS_ADMIN_SECTION,
   SYSTEM_ADMIN_SECTION,
 } from "~/modules/system";
+import { buildTasksRoutes, TASKS_SHORTCUTS } from "~/modules/tasks";
 import {
   buildWorkspacesAdminRoutes,
   buildWorkspacesRoutes,
@@ -85,6 +87,8 @@ export function buildModuleRoutes<
       // `identity` is the front door for connecting a mailbox (as on the server).
       ...buildConnectorsRoutes(workspace, { useConsent: useMailboxConsent }),
       ...assistant.workspace,
+      // Tasks made from emails say where they came from: the conversations module knows.
+      ...buildTasksRoutes(workspace, { useSources: useConversationSources }),
       // `cargo xtask new-module` inserts above this line.
     ],
   } as const;
@@ -125,4 +129,5 @@ export const MODULE_SHORTCUTS: readonly ShortcutDefinition[] = [
   ...IDENTITY_SHORTCUTS,
   ...ASSISTANT_SHORTCUTS,
   ...CONNECTORS_SHORTCUTS,
+  ...TASKS_SHORTCUTS,
 ];

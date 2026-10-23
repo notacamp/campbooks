@@ -1,0 +1,120 @@
+{
+  "title": "Tasks",
+  "subtitle": "{{open}} open · {{week}} due this week",
+  "shortcuts": {
+    "create": "New task"
+  },
+  "list": {
+    "label": "Task list",
+    "showLater": "Show",
+    "hideLater": "Hide"
+  },
+  "groups": {
+    "overdue": "Overdue",
+    "today": "Today",
+    "coming": "Coming up",
+    "none": "No date yet",
+    "later": "Later"
+  },
+  "add": {
+    "label": "Add a task",
+    "placeholder": "Add a task…",
+    "due": "Due",
+    "today": "Today",
+    "tomorrow": "Tomorrow",
+    "pick": "Pick a date",
+    "date": "Date",
+    "kind": "Kind",
+    "do": "Do",
+    "pay": "Pay",
+    "submit": "Add",
+    "added": "Task added",
+    "failed": "Couldn’t add {{title}}. Nothing was saved."
+  },
+  "row": {
+    "own": "You wrote this",
+    "fromEmail": "From {{name}} · email",
+    "with": "With {{name}}",
+    "markDone": "Mark done: {{title}}",
+    "markPaid": "Mark paid: {{title}}"
+  },
+  "due": {
+    "overdue_one": "Overdue · {{count}} day",
+    "overdue_other": "Overdue · {{count}} days",
+    "today": "Due today",
+    "tomorrow": "Due tomorrow",
+    "on": "Due {{date}}"
+  },
+  "plan": {
+    "planned": "Planned {{date}}",
+    "later": "Later · {{date}}"
+  },
+  "empty": {
+    "title": "Nothing left to do",
+    "body": "Add a task, or make one from an email.",
+    "add": "Add a task"
+  },
+  "error": {
+    "title": "Couldn’t load your tasks",
+    "body": "Try again in a moment.",
+    "retry": "Try again"
+  },
+  "detail": {
+    "label": "Task",
+    "empty": "Choose a task",
+    "emptyBody": "Pick a task from the list to see it here.",
+    "back": "Back",
+    "titleLabel": "Task title",
+    "noDate": "No date",
+    "dueOn": "Due {{date}}",
+    "change": "Change",
+    "when": "When will you do it?",
+    "pickDay": "Pick a day",
+    "later": "Later",
+    "laterChoices": "Later until",
+    "tonight": "Tonight",
+    "tomorrow": "Tomorrow",
+    "nextWeek": "Next week",
+    "source": "Where it came from",
+    "sourceLine": "{{subject}} · {{date}}",
+    "openEmail": "Open the email",
+    "hand": "Hand it to someone",
+    "handFind": "Find a teammate by name",
+    "handNone": "No one by that name.",
+    "handedToYou": "{{name}} handed you this task.",
+    "takeBack": "Take it back",
+    "someone": "someone",
+    "done": "Done",
+    "paid": "Paid",
+    "notNeeded": "Not needed",
+    "payNote": "Campbooks never pays for you. This only marks it paid."
+  },
+  "toast": {
+    "done": "Done · {{title}}",
+    "paid": "Paid · {{title}}",
+    "notNeeded": "Not needed · {{title}}",
+    "later": "Later, until {{when}} · {{title}}",
+    "planCleared": "No plan · {{title}}",
+    "planned": "Planned for {{date}} · {{title}}",
+    "dueChanged": "Due date changed · {{title}}",
+    "renamed": "Renamed · {{title}}",
+    "handedOff": "Handed to {{name}} · {{title}}",
+    "takenBack": "Taken back · {{title}}",
+    "failed": "Couldn’t change {{title}}. It is as it was.",
+    "changed": "{{title}} changed in the meantime. Take another look."
+  },
+  "make": {
+    "button": "Make it a task",
+    "title": "Title",
+    "submit": "Add task",
+    "cancel": "Cancel",
+    "added": "Added to your tasks",
+    "open": "Open",
+    "close": "Close"
+  },
+  "laterDialog": {
+    "title": "Put it off until…",
+    "description": "It leaves Home until then, and comes back on its own.",
+    "choices": "When"
+  }
+}

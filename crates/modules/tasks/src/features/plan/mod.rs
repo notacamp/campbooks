@@ -125,7 +125,7 @@ pub async fn handler(
                 plan: Some(body.plan),
                 plan_on,
                 later_until,
-                ..HistoryDetail::default()
+                ..TaskHistoryDetail::default()
             },
             previous_assignee: None,
         },

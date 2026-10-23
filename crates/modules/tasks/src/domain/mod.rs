@@ -252,6 +252,8 @@ macro_rules! columns {
     };
 }
 
+pub(crate) use columns;
+
 /// One task by id.
 pub const SELECT_ONE: &str = concat!("SELECT ", columns!(), " FROM tasks.tasks WHERE id = $1");
 
@@ -261,9 +263,6 @@ pub const SELECT_LOCKED: &str = concat!(
     columns!(),
     " FROM tasks.tasks WHERE id = $1 FOR UPDATE"
 );
-
-/// The columns, for queries that filter their own way.
-pub const SELECT_COLUMNS: &str = columns!();
 
 /// A task row.
 #[derive(Debug, Clone, sqlx::FromRow)]

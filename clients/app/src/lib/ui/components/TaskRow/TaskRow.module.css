@@ -29,8 +29,12 @@
   cursor: pointer;
 }
 
-.check:hover,
-.check:focus-visible {
+.check[data-absent] {
+  border-color: transparent;
+}
+
+button.check:hover,
+button.check:focus-visible {
   border-color: var(--success);
   background: var(--success-soft);
   color: var(--success);

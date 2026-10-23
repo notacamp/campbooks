@@ -15,8 +15,7 @@ use utoipa::{IntoParams, ToSchema};
 
 use crate::{
     domain::{
-        MAX_OFFSET_MINUTES, SELECT_COLUMNS, TaskId, TaskRow, TaskState, TaskView,
-        resources::TASK_RECORD, today,
+        MAX_OFFSET_MINUTES, TaskId, TaskRow, TaskState, TaskView, resources::TASK_RECORD, today,
     },
     scopes::TasksRead,
 };
@@ -83,7 +82,10 @@ pub struct TaskList {
 /// Tasks by the filters: `$2` the caller; `$3` ids (or none); `$4` whose
 /// (`mine`, `handed_off` or `any`); `$5` state; `$6`/`$7` due window; `$8`
 /// overdue; `$9` the caller's today; `$10` undated; `$11`/`$12` source.
-const LIST_TAIL: &str = " FROM tasks.tasks
+const LIST: &str = concat!(
+    "SELECT ",
+    crate::domain::columns!(),
+    " FROM tasks.tasks
       WHERE workspace_id = $1
         AND ($3::uuid[] IS NULL OR id = ANY($3))
         AND (($4 = 'mine' AND assignee = $2)
@@ -98,7 +100,8 @@ const LIST_TAIL: &str = " FROM tasks.tasks
         AND ($12::text IS NULL OR source_id = $12)
       ORDER BY (state = 'open' AND due_on IS NOT NULL AND due_on < $9) DESC,
                due_on ASC NULLS LAST, due_at ASC NULLS LAST, created_at ASC, id
-      LIMIT 500";
+      LIMIT 500"
+);
 
 /// List your tasks.
 #[utoipa::path(
@@ -153,8 +156,7 @@ pub async fn handler(
         (None, false) => Some(TaskState::Open),
     };
     let mut tx = state.db.begin_for(access.workspace).await?;
-    let sql = format!("SELECT {SELECT_COLUMNS}{LIST_TAIL}");
-    let rows: Vec<TaskRow> = sqlx::query_as(&sql)
+    let rows: Vec<TaskRow> = sqlx::query_as(LIST)
         .bind(access.workspace.as_uuid())
         .bind(user.as_uuid())
         .bind(ids)

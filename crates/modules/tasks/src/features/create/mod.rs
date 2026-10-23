@@ -146,7 +146,7 @@ pub async fn handler(
             change: TaskChange::Created,
             detail: TaskHistoryDetail {
                 due_on: body.due_on,
-                ..HistoryDetail::default()
+                ..TaskHistoryDetail::default()
             },
             previous_assignee: None,
         },

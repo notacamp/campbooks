@@ -18,7 +18,7 @@ export interface TaskRowProps {
   meta: string;
   chips?: readonly TaskRowChip[] | undefined;
   /** The round check's name: "Mark done: Send the signed lease". */
-  checkLabel: string;
+  checkLabel?: string | undefined;
   /** The keyboard cursor (J/K) is on it. */
   selected?: boolean | undefined;
   /** It is open in the detail beside the list. */
@@ -27,8 +27,8 @@ export interface TaskRowProps {
   id?: string | undefined;
   /** Open it (a click, Enter). */
   onOpen: () => void;
-  /** Mark it done (paid, for a bill). */
-  onCheck: () => void;
+  /** Mark it done (paid, for a bill); without it the row has no check (a task someone else holds). */
+  onCheck?: (() => void) | undefined;
 }
 
 /**
@@ -50,9 +50,13 @@ export function TaskRow({
 }: TaskRowProps) {
   return (
     <div id={id} className={styles["row"]} data-selected={selected || undefined}>
-      <button type="button" className={styles["check"]} aria-label={checkLabel} onClick={onCheck}>
-        <Icon name="check" />
-      </button>
+      {onCheck === undefined ? (
+        <span className={styles["check"]} data-absent="" aria-hidden="true" />
+      ) : (
+        <button type="button" className={styles["check"]} aria-label={checkLabel} onClick={onCheck}>
+          <Icon name="check" />
+        </button>
+      )}
       <button
         type="button"
         className={styles["open"]}

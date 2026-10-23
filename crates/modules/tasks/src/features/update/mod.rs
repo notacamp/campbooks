@@ -134,7 +134,7 @@ pub async fn handler(
             detail: TaskHistoryDetail {
                 fields,
                 due_on: body.due_on,
-                ..HistoryDetail::default()
+                ..TaskHistoryDetail::default()
             },
             previous_assignee: None,
         },

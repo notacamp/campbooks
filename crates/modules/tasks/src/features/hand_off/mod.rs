@@ -112,7 +112,7 @@ pub async fn hand_off(
             change: TaskChange::HandedOff,
             detail: TaskHistoryDetail {
                 member: Some(body.to),
-                ..HistoryDetail::default()
+                ..TaskHistoryDetail::default()
             },
             previous_assignee: Some(row.assignee),
         },
@@ -191,7 +191,7 @@ pub async fn take_back(
             change: TaskChange::TakenBack,
             detail: TaskHistoryDetail {
                 member: Some(row.assignee),
-                ..HistoryDetail::default()
+                ..TaskHistoryDetail::default()
             },
             previous_assignee: Some(row.assignee),
         },

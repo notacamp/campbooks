@@ -1,0 +1,120 @@
+{
+  "title": "Tâches",
+  "subtitle": "{{open}} en cours · {{week}} à échéance cette semaine",
+  "shortcuts": {
+    "create": "Nouvelle tâche"
+  },
+  "list": {
+    "label": "Liste des tâches",
+    "showLater": "Afficher",
+    "hideLater": "Masquer"
+  },
+  "groups": {
+    "overdue": "En retard",
+    "today": "Aujourd’hui",
+    "coming": "À venir",
+    "none": "Sans date",
+    "later": "Plus tard"
+  },
+  "add": {
+    "label": "Ajouter une tâche",
+    "placeholder": "Ajouter une tâche…",
+    "due": "Échéance",
+    "today": "Aujourd’hui",
+    "tomorrow": "Demain",
+    "pick": "Choisir une date",
+    "date": "Date",
+    "kind": "Type",
+    "do": "À faire",
+    "pay": "À payer",
+    "submit": "Ajouter",
+    "added": "Tâche ajoutée",
+    "failed": "Impossible d’ajouter {{title}}. Rien n’a été enregistré."
+  },
+  "row": {
+    "own": "Écrite par vous",
+    "fromEmail": "De {{name}} · e-mail",
+    "with": "Avec {{name}}",
+    "markDone": "Marquer comme faite : {{title}}",
+    "markPaid": "Marquer comme payée : {{title}}"
+  },
+  "due": {
+    "overdue_one": "En retard · {{count}} jour",
+    "overdue_other": "En retard · {{count}} jours",
+    "today": "Pour aujourd’hui",
+    "tomorrow": "Pour demain",
+    "on": "Pour le {{date}}"
+  },
+  "plan": {
+    "planned": "Prévue le {{date}}",
+    "later": "Plus tard · {{date}}"
+  },
+  "empty": {
+    "title": "Rien à faire",
+    "body": "Ajoutez une tâche, ou créez-en une depuis un e-mail.",
+    "add": "Ajouter une tâche"
+  },
+  "error": {
+    "title": "Impossible de charger les tâches",
+    "body": "Réessayez dans un instant.",
+    "retry": "Réessayer"
+  },
+  "detail": {
+    "label": "Tâche",
+    "empty": "Choisissez une tâche",
+    "emptyBody": "Choisissez une tâche dans la liste pour la voir ici.",
+    "back": "Retour",
+    "titleLabel": "Titre de la tâche",
+    "noDate": "Sans date",
+    "dueOn": "Pour le {{date}}",
+    "change": "Modifier",
+    "when": "Quand la ferez-vous ?",
+    "pickDay": "Choisir un jour",
+    "later": "Plus tard",
+    "laterChoices": "Plus tard jusqu’à",
+    "tonight": "Ce soir",
+    "tomorrow": "Demain",
+    "nextWeek": "La semaine prochaine",
+    "source": "D’où elle vient",
+    "sourceLine": "{{subject}} · {{date}}",
+    "openEmail": "Ouvrir l’e-mail",
+    "hand": "La confier à quelqu’un",
+    "handFind": "Chercher un collègue par son nom",
+    "handNone": "Personne de ce nom.",
+    "handedToYou": "{{name}} vous a confié cette tâche.",
+    "takeBack": "La reprendre",
+    "someone": "quelqu’un",
+    "done": "Faite",
+    "paid": "Payée",
+    "notNeeded": "Plus nécessaire",
+    "payNote": "Campbooks ne paie jamais à votre place. Cela la marque seulement comme payée."
+  },
+  "toast": {
+    "done": "Faite · {{title}}",
+    "paid": "Payée · {{title}}",
+    "notNeeded": "Plus nécessaire · {{title}}",
+    "later": "Plus tard, jusqu’à {{when}} · {{title}}",
+    "planCleared": "Sans plan · {{title}}",
+    "planned": "Prévue le {{date}} · {{title}}",
+    "dueChanged": "Échéance modifiée · {{title}}",
+    "renamed": "Renommée · {{title}}",
+    "handedOff": "Confiée à {{name}} · {{title}}",
+    "takenBack": "Reprise · {{title}}",
+    "failed": "Impossible de modifier {{title}}. Elle reste comme avant.",
+    "changed": "{{title}} a changé entre-temps. Regardez à nouveau."
+  },
+  "make": {
+    "button": "En faire une tâche",
+    "title": "Titre",
+    "submit": "Ajouter la tâche",
+    "cancel": "Annuler",
+    "added": "Ajoutée à vos tâches",
+    "open": "Ouvrir",
+    "close": "Fermer"
+  },
+  "laterDialog": {
+    "title": "Reporter jusqu’à…",
+    "description": "Elle quitte l’accueil jusque-là, puis revient d’elle-même.",
+    "choices": "Quand"
+  }
+}

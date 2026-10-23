@@ -1,0 +1,120 @@
+{
+  "title": "Tarefas",
+  "subtitle": "{{open}} em aberto · {{week}} a vencer esta semana",
+  "shortcuts": {
+    "create": "Nova tarefa"
+  },
+  "list": {
+    "label": "Lista de tarefas",
+    "showLater": "Mostrar",
+    "hideLater": "Ocultar"
+  },
+  "groups": {
+    "overdue": "Em atraso",
+    "today": "Hoje",
+    "coming": "Em breve",
+    "none": "Sem data",
+    "later": "Mais tarde"
+  },
+  "add": {
+    "label": "Adicionar uma tarefa",
+    "placeholder": "Adicionar uma tarefa…",
+    "due": "Prazo",
+    "today": "Hoje",
+    "tomorrow": "Amanhã",
+    "pick": "Escolher data",
+    "date": "Data",
+    "kind": "Tipo",
+    "do": "Fazer",
+    "pay": "Pagar",
+    "submit": "Adicionar",
+    "added": "Tarefa adicionada",
+    "failed": "Não foi possível adicionar {{title}}. Nada foi guardado."
+  },
+  "row": {
+    "own": "Escrita por si",
+    "fromEmail": "De {{name}} · email",
+    "with": "Com {{name}}",
+    "markDone": "Marcar como feita: {{title}}",
+    "markPaid": "Marcar como paga: {{title}}"
+  },
+  "due": {
+    "overdue_one": "Em atraso · {{count}} dia",
+    "overdue_other": "Em atraso · {{count}} dias",
+    "today": "Para hoje",
+    "tomorrow": "Para amanhã",
+    "on": "Para {{date}}"
+  },
+  "plan": {
+    "planned": "Planeada para {{date}}",
+    "later": "Mais tarde · {{date}}"
+  },
+  "empty": {
+    "title": "Nada por fazer",
+    "body": "Adicione uma tarefa ou crie uma a partir de um email.",
+    "add": "Adicionar uma tarefa"
+  },
+  "error": {
+    "title": "Não foi possível carregar as tarefas",
+    "body": "Tente de novo daqui a pouco.",
+    "retry": "Tentar de novo"
+  },
+  "detail": {
+    "label": "Tarefa",
+    "empty": "Escolha uma tarefa",
+    "emptyBody": "Escolha uma tarefa da lista para a ver aqui.",
+    "back": "Voltar",
+    "titleLabel": "Título da tarefa",
+    "noDate": "Sem data",
+    "dueOn": "Para {{date}}",
+    "change": "Alterar",
+    "when": "Quando vai fazê-la?",
+    "pickDay": "Escolher um dia",
+    "later": "Mais tarde",
+    "laterChoices": "Mais tarde, até",
+    "tonight": "Esta noite",
+    "tomorrow": "Amanhã",
+    "nextWeek": "Na próxima semana",
+    "source": "De onde veio",
+    "sourceLine": "{{subject}} · {{date}}",
+    "openEmail": "Abrir o email",
+    "hand": "Passar a alguém",
+    "handFind": "Procurar um colega pelo nome",
+    "handNone": "Ninguém com esse nome.",
+    "handedToYou": "{{name}} passou-lhe esta tarefa.",
+    "takeBack": "Retomar",
+    "someone": "alguém",
+    "done": "Feita",
+    "paid": "Paga",
+    "notNeeded": "Não é preciso",
+    "payNote": "O Campbooks nunca paga por si. Isto só a marca como paga."
+  },
+  "toast": {
+    "done": "Feita · {{title}}",
+    "paid": "Paga · {{title}}",
+    "notNeeded": "Não é preciso · {{title}}",
+    "later": "Mais tarde, até {{when}} · {{title}}",
+    "planCleared": "Sem plano · {{title}}",
+    "planned": "Planeada para {{date}} · {{title}}",
+    "dueChanged": "Prazo alterado · {{title}}",
+    "renamed": "Renomeada · {{title}}",
+    "handedOff": "Passada a {{name}} · {{title}}",
+    "takenBack": "Retomada · {{title}}",
+    "failed": "Não foi possível alterar {{title}}. Ficou como estava.",
+    "changed": "{{title}} mudou entretanto. Veja de novo."
+  },
+  "make": {
+    "button": "Criar uma tarefa",
+    "title": "Título",
+    "submit": "Adicionar tarefa",
+    "cancel": "Cancelar",
+    "added": "Adicionada às suas tarefas",
+    "open": "Abrir",
+    "close": "Fechar"
+  },
+  "laterDialog": {
+    "title": "Adiar até…",
+    "description": "Sai do Início até lá e volta sozinha.",
+    "choices": "Quando"
+  }
+}
