@@ -345,8 +345,18 @@
         "already_paid": "Ya está pagada",
         "still_to_pay": "Pendiente de pago",
         "yes_to_question": "Responder que sí",
-        "later": "Más tarde, hasta {{until}}"
+        "later": "Más tarde, hasta {{until}}",
+        "task_done": "Marcar como hecha",
+        "task_paid": "Marcar como pagada",
+        "task_not_needed": "No hace falta",
+        "plan_day": "Planificar para {{day}}",
+        "task_later": "Más tarde, hasta {{until}}",
+        "due": "Vence el {{day}}",
+        "hand_off": "Pasar a {{name}}"
       },
+      "taskLine": "{{title}} · vence {{due}}",
+      "taskNoDue": "{{title}}",
+      "handOffNote": "Llega al Inicio de {{name}}.",
       "streams": {
         "primary": "Principal",
         "updates": "Novedades",

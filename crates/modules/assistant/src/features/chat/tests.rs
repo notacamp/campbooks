@@ -987,7 +987,9 @@ fn only_reads(kit: &Kit) {
                 "conversations.list",
                 "conversations.list_streams",
                 "search.query",
-                "attention.list"
+                "attention.list",
+                "tasks.get",
+                "workspaces.list_members"
             ]
             .contains(&called.as_str()),
             "{called}"
@@ -1468,8 +1470,10 @@ fn every_action_and_undo_is_a_low_risk_change_the_assistant_may_call() {
         assert!(meta.assistant, "{id}: the assistant may not call it");
         assert!(meta.mutates, "{id} changes nothing");
         assert_eq!(meta.risk, campbooks_kernel::Risk::Low, "{id}");
+        // PATCH is a task's edit alone (the client allows it for that entry).
         assert!(
-            ["POST", "DELETE"].contains(&operation.method.as_str()),
+            ["POST", "DELETE"].contains(&operation.method.as_str())
+                || (id == "tasks.update" && operation.method == "PATCH"),
             "{id}"
         );
         assert!(
@@ -1479,6 +1483,7 @@ fn every_action_and_undo_is_a_low_risk_change_the_assistant_may_call() {
                     ("conversation_id", "c-1".to_owned()),
                     ("label_id", "l-1".to_owned()),
                     ("item_id", "i-1".to_owned()),
+                    ("task_id", "t-1".to_owned()),
                 ]
             )
             .is_some(),
@@ -1489,7 +1494,14 @@ fn every_action_and_undo_is_a_low_risk_change_the_assistant_may_call() {
     for row in propose::ROWS {
         let meta = change(row.operation);
         match row.undo {
-            propose::Undo::Catalogue { operation, .. } => {
+            propose::Undo::Catalogue {
+                operation,
+                from_response,
+            } => {
+                if row.operation.starts_with("tasks.") {
+                    // Every task undo is conditional on the revision it left.
+                    assert_eq!(from_response, ["revision"], "{}", row.operation);
+                }
                 assert_eq!(
                     meta.undo.as_deref(),
                     Some(operation),
@@ -1500,9 +1512,438 @@ fn every_action_and_undo_is_a_low_risk_change_the_assistant_may_call() {
             }
             // The same operation with the values before: only where the
             // catalogue names no undo.
-            propose::Undo::Restoring => {
+            propose::Undo::Restoring { from_response } => {
                 assert_eq!(meta.undo, None, "{}", row.operation);
+                if row.operation.starts_with("tasks.") {
+                    assert_eq!(from_response, ["revision"], "{}", row.operation);
+                }
             }
         }
     }
+    // Every task action, as the model names it, has a row of its own.
+    for action in propose::ProposalAction::TASKS {
+        assert!(propose::ROWS.iter().any(|row| row.action == action));
+        assert!(
+            propose::ROWS
+                .iter()
+                .find(|row| row.action == action)
+                .is_some_and(|row| row.operation.starts_with("tasks."))
+        );
+    }
+    // The two reads a task proposal makes as the member.
+    for id in ["tasks.get", "workspaces.list_members"] {
+        let meta = catalogue.get(id).unwrap().meta.clone().unwrap();
+        assert!(meta.assistant && !meta.mutates, "{id}");
+    }
+}
+
+// Task proposals (campbooks-cloud#43): the same cards, for the member's own
+// tasks. The task and the members are read as the member; a change never
+// runs (each stand-in change panics).
+
+const ERRAND: &str = "0192f0c4-7d4e-7b39-a7f1-3a8f0e2b9c22";
+const SAM: &str = "0192f0c4-7d4e-7b39-a7f1-3a8f0e2b0001";
+const RUI: &str = "0192f0c4-7d4e-7b39-a7f1-3a8f0e2b0002";
+
+/// The member's task as `tasks.get` answers it.
+fn errand() -> Value {
+    json!({
+        "id": ERRAND, "title": "Renew the van insurance", "verb": "do", "origin": "manual",
+        "due_on": "2026-11-02", "due_at": null, "overdue": false,
+        "plan": "date", "plan_on": "2026-10-27", "later_until": null,
+        "state": "open", "closed_at": null, "assignee": SAM, "created_by": SAM,
+        "handed_by": null, "source": null, "revision": 7,
+        "created_at": "2026-10-20T09:00:00Z", "updated_at": "2026-10-21T09:00:00Z",
+    })
+}
+
+/// The workspace's members, Sam being the caller.
+fn team() -> Vec<Value> {
+    vec![
+        json!({"user_id": SAM, "display_name": "Sam Costa", "email": "sam@example.com",
+               "role": "owner", "you": true}),
+        json!({"user_id": RUI, "display_name": "Rui Matos", "email": "rui@example.com",
+               "role": "member", "you": false}),
+    ]
+}
+
+/// `propose_task_change` with `action` on the errand, and `extra`.
+fn task_change(action: &str, extra: &Value) -> (&'static str, Value) {
+    let mut arguments = json!({ "action": action, "task_id": ERRAND });
+    if let (Some(out), Some(more)) = (arguments.as_object_mut(), extra.as_object()) {
+        out.extend(more.clone());
+    }
+    ("propose_task_change", arguments)
+}
+
+/// A day `days` from today (UTC), `YYYY-MM-DD`.
+fn day_in(days: i64) -> String {
+    (Utc::now() + chrono::Duration::days(days))
+        .date_naive()
+        .to_string()
+}
+
+/// A kit whose member Sam has the errand and a teammate.
+async fn kit_with_errand(db: PgPool, server: &MockServer) -> Kit {
+    let kit = kit_with(db, Some(gateway(&server.uri()))).await;
+    {
+        let mut mail = kit.mail.lock().unwrap();
+        mail.tasks.insert(ERRAND.into(), errand());
+        mail.members = team();
+    }
+    kit
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+#[allow(clippy::too_many_lines)]
+async fn each_task_action_is_stored_with_its_request_and_undo(db: PgPool) {
+    let server = MockServer::start().await;
+    let kit = kit_with_errand(db, &server).await;
+    let workspace = WorkspaceId::new();
+    let (sam, _) = kit.member("sam", workspace);
+    let id = started(&kit, &sam, workspace).await;
+    let day = day_in(3);
+    let until = (Utc::now() + chrono::Duration::days(4)).to_rfc3339();
+    let path = |tail: &str| format!("tasks/{ERRAND}{tail}");
+    let revision = json!(["revision"]);
+    let cases: Vec<((&str, Value), &str, Value, Value, Value)> = vec![
+        (
+            task_change("done", &json!({})),
+            "task_done",
+            json!({"operation": "tasks.done", "method": "POST", "path": path("/done"),
+                   "body": {"revision": 7}}),
+            json!({"operation": "tasks.reopen", "method": "POST", "path": path("/reopen"),
+                   "body": null, "from_response": revision}),
+            json!({}),
+        ),
+        (
+            task_change("not_needed", &json!({})),
+            "task_not_needed",
+            json!({"operation": "tasks.not_needed", "method": "POST",
+                   "path": path("/not_needed"), "body": {"revision": 7}}),
+            json!({"operation": "tasks.reopen", "method": "POST", "path": path("/reopen"),
+                   "body": null, "from_response": revision}),
+            json!({}),
+        ),
+        (
+            task_change("plan_day", &json!({ "day": day })),
+            "plan_day",
+            json!({"operation": "tasks.plan", "method": "POST", "path": path("/plan"),
+                   "body": {"revision": 7, "plan": "date", "plan_on": day}}),
+            // Restoring: the plan it had.
+            json!({"operation": "tasks.plan", "method": "POST", "path": path("/plan"),
+                   "body": {"plan": "date", "plan_on": "2026-10-27"},
+                   "from_response": revision}),
+            json!({"day": day}),
+        ),
+        (
+            task_change("due", &json!({ "day": day })),
+            "due",
+            json!({"operation": "tasks.update", "method": "PATCH", "path": path(""),
+                   "body": {"revision": 7, "title": "Renew the van insurance", "verb": "do",
+                            "due_on": day}}),
+            // Restoring: the title, verb and due day it had.
+            json!({"operation": "tasks.update", "method": "PATCH", "path": path(""),
+                   "body": {"title": "Renew the van insurance", "verb": "do",
+                            "due_on": "2026-11-02", "due_at": null},
+                   "from_response": revision}),
+            json!({"day": day}),
+        ),
+        (
+            task_change("hand_off", &json!({ "member_id": RUI })),
+            "hand_off",
+            json!({"operation": "tasks.hand_off", "method": "POST", "path": path("/hand_off"),
+                   "body": {"revision": 7, "to": RUI}}),
+            json!({"operation": "tasks.take_back", "method": "POST", "path": path("/take_back"),
+                   "body": null, "from_response": revision}),
+            json!({"member_id": RUI, "member_name": "Rui Matos"}),
+        ),
+        // The teammate by the name the list gives, any case.
+        (
+            task_change("hand_off", &json!({ "member_id": "rui matos" })),
+            "hand_off",
+            json!({"operation": "tasks.hand_off", "method": "POST", "path": path("/hand_off"),
+                   "body": {"revision": 7, "to": RUI}}),
+            json!({"operation": "tasks.take_back", "method": "POST", "path": path("/take_back"),
+                   "body": null, "from_response": revision}),
+            json!({"member_id": RUI, "member_name": "Rui Matos"}),
+        ),
+    ];
+    for (call, action, request, undo, detail) in cases {
+        let what = call.1.to_string();
+        let answer = ask_proposing(&kit, &server, &sam, workspace, &id, &[call]).await;
+        let proposals = answer["proposals"].as_array().unwrap();
+        assert_eq!(proposals.len(), 1, "{what}: {answer}");
+        let proposal = &proposals[0];
+        assert_eq!(proposal["kind"], "change", "{what}");
+        assert_eq!(proposal["action"], action, "{what}");
+        assert_eq!(proposal["state"], "pending", "{what}");
+        assert_eq!(
+            proposal["record"],
+            json!({"type": "tasks.task", "id": ERRAND})
+        );
+        // The card's facts are the record's, never the model's words.
+        assert_eq!(
+            proposal["task"],
+            json!({"title": "Renew the van insurance", "verb": "do", "due_on": "2026-11-02"})
+        );
+        assert!(proposal.get("facts").is_none(), "{what}");
+        assert_eq!(proposal["request"], request, "{what}");
+        assert_eq!(proposal["undo"], undo, "{what}");
+        if detail != json!({}) {
+            assert_eq!(proposal["detail"], detail, "{what}");
+        }
+    }
+    // Later: its time, in the same plan call, the undo putting the plan back.
+    let answer = ask_proposing(
+        &kit,
+        &server,
+        &sam,
+        workspace,
+        &id,
+        &[task_change("later", &json!({ "until": until }))],
+    )
+    .await;
+    let later = &answer["proposals"][0];
+    assert_eq!(later["action"], "task_later");
+    assert_eq!(later["request"]["operation"], "tasks.plan");
+    assert_eq!(later["request"]["body"]["plan"], "later");
+    assert_eq!(later["request"]["body"]["revision"], 7);
+    assert!(later["request"]["body"]["later_until"].is_string());
+    assert!(later["detail"]["until"].is_string());
+    assert_eq!(
+        later["undo"]["body"],
+        json!({"plan": "date", "plan_on": "2026-10-27"})
+    );
+    assert_eq!(later["undo"]["from_response"], revision);
+    only_reads(&kit);
+    assert!(kit.mail.lock().unwrap().mutated.is_empty());
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_pay_task_and_a_task_with_no_plan_keep_their_own_values(db: PgPool) {
+    let server = MockServer::start().await;
+    let kit = kit_with_errand(db, &server).await;
+    let mut bill = errand();
+    bill["verb"] = "pay".into();
+    bill["plan"] = "none".into();
+    bill["plan_on"] = Value::Null;
+    bill["due_on"] = Value::Null;
+    kit.mail.lock().unwrap().tasks.insert(ERRAND.into(), bill);
+    let workspace = WorkspaceId::new();
+    let (sam, _) = kit.member("sam", workspace);
+    let id = started(&kit, &sam, workspace).await;
+    let day = day_in(1);
+    let answer = ask_proposing(
+        &kit,
+        &server,
+        &sam,
+        workspace,
+        &id,
+        &[
+            task_change("plan_day", &json!({ "day": day })),
+            task_change("due", &json!({ "day": day })),
+        ],
+    )
+    .await;
+    let proposals = answer["proposals"].as_array().unwrap();
+    assert_eq!(proposals.len(), 2, "{answer}");
+    assert_eq!(proposals[0]["task"]["verb"], "pay");
+    assert!(proposals[0]["task"].get("due_on").is_none());
+    // No plan before: the undo is no plan.
+    assert_eq!(proposals[0]["undo"]["body"], json!({"plan": "none"}));
+    // No due day before: the undo clears it, with the verb it had.
+    assert_eq!(
+        proposals[1]["undo"]["body"],
+        json!({"title": "Renew the van insurance", "verb": "pay", "due_on": null, "due_at": null})
+    );
+    only_reads(&kit);
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+#[allow(clippy::too_many_lines)]
+async fn a_refused_task_proposal_is_never_a_card(db: PgPool) {
+    let server = MockServer::start().await;
+    let kit = kit_with_errand(db, &server).await;
+    let workspace = WorkspaceId::new();
+    let (sam, _) = kit.member("sam", workspace);
+    let id = started(&kit, &sam, workspace).await;
+    let with = |key: &str, value: Value| {
+        let mut task = errand();
+        task[key] = value;
+        task
+    };
+    let past = (Utc::now() - chrono::Duration::hours(1)).to_rfc3339();
+    let far = (Utc::now() + chrono::Duration::days(400)).to_rfc3339();
+    let yesterday = day_in(-2);
+    let cases: Vec<(Value, (&str, Value), &str)> = vec![
+        // A task the member cannot see (a third member's): 404 to them.
+        (
+            errand(),
+            (
+                "propose_task_change",
+                json!({"action": "done", "task_id": "0192f0c4-0000-7000-8000-000000000000"}),
+            ),
+            "not_visible",
+        ),
+        // The giver may only read it and take it back.
+        (
+            with("assignee", RUI.into()),
+            task_change("done", &json!({})),
+            "read_only",
+        ),
+        (
+            with("state", "done".into()),
+            task_change("done", &json!({})),
+            "already_so",
+        ),
+        (
+            with("state", "not_needed".into()),
+            task_change("not_needed", &json!({})),
+            "already_so",
+        ),
+        (
+            with("state", "done".into()),
+            task_change("not_needed", &json!({})),
+            "task_closed",
+        ),
+        (
+            with("state", "done".into()),
+            task_change("plan_day", &json!({"day": day_in(2)})),
+            "task_closed",
+        ),
+        (
+            with("state", "not_needed".into()),
+            task_change("due", &json!({"day": day_in(2)})),
+            "task_closed",
+        ),
+        (
+            with("state", "done".into()),
+            task_change("hand_off", &json!({"member_id": RUI})),
+            "task_closed",
+        ),
+        (
+            with("plan_on", day_in(2).into()),
+            task_change("plan_day", &json!({"day": day_in(2)})),
+            "already_so",
+        ),
+        (
+            with("due_on", day_in(2).into()),
+            task_change("due", &json!({"day": day_in(2)})),
+            "already_so",
+        ),
+        (
+            errand(),
+            task_change("later", &json!({"until": past})),
+            "until_out_of_range",
+        ),
+        (
+            errand(),
+            task_change("later", &json!({"until": far})),
+            "until_out_of_range",
+        ),
+        (
+            errand(),
+            task_change("plan_day", &json!({"day": yesterday})),
+            "day_out_of_range",
+        ),
+        (
+            errand(),
+            task_change("due", &json!({"day": day_in(400)})),
+            "day_out_of_range",
+        ),
+        (
+            errand(),
+            task_change("hand_off", &json!({"member_id": SAM})),
+            "not_a_teammate",
+        ),
+        (
+            errand(),
+            task_change("hand_off", &json!({"member_id": "sam costa"})),
+            "not_a_teammate",
+        ),
+        (
+            errand(),
+            task_change(
+                "hand_off",
+                &json!({"member_id": "0192f0c4-7d4e-7b39-a7f1-3a8f0e2bffff"}),
+            ),
+            "not_a_teammate",
+        ),
+        (
+            errand(),
+            task_change("hand_off", &json!({"member_id": "Nobody Here"})),
+            "not_a_teammate",
+        ),
+        // Creating and renaming are not offered.
+        (
+            errand(),
+            task_change("create", &json!({})),
+            "invalid_arguments",
+        ),
+        (
+            errand(),
+            task_change("rename", &json!({"title": "Call Rui"})),
+            "invalid_arguments",
+        ),
+        (
+            errand(),
+            task_change("done", &json!({"title": "Call Rui"})),
+            "invalid_arguments",
+        ),
+    ];
+    for (task, call, code) in cases {
+        kit.mail.lock().unwrap().tasks.insert(ERRAND.into(), task);
+        let what = format!("{code}: {}", call.1);
+        let answer = ask_proposing(&kit, &server, &sam, workspace, &id, &[call]).await;
+        assert_eq!(answer["proposals"], json!([]), "{what}");
+        let told = results(&server).await;
+        assert!(
+            told[0].contains(&format!("\"error\":\"{code}\"")),
+            "{what}: {told:?}"
+        );
+    }
+    only_reads(&kit);
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn tasks_share_the_cap_and_the_dedupe_with_every_other_card(db: PgPool) {
+    let server = MockServer::start().await;
+    let kit = kit_with_errand(db, &server).await;
+    let workspace = WorkspaceId::new();
+    let (sam, _) = kit.member("sam", workspace);
+    let id = started(&kit, &sam, workspace).await;
+    let answer = ask_proposing(
+        &kit,
+        &server,
+        &sam,
+        workspace,
+        &id,
+        &[
+            task_change("done", &json!({})),
+            task_change("done", &json!({})),
+            change("archive", &json!({})),
+            (
+                "propose_rule",
+                json!({"sentence": "Keep newsletters from The Weekly off Home"}),
+            ),
+            task_change("plan_day", &json!({"day": day_in(2)})),
+            // The same card again is still just that card, not a refusal.
+            change("archive", &json!({})),
+        ],
+    )
+    .await;
+    let proposals = answer["proposals"].as_array().unwrap();
+    let kinds: Vec<&str> = proposals
+        .iter()
+        .map(|p| p["kind"].as_str().unwrap())
+        .collect();
+    assert_eq!(kinds, ["change", "change", "rule"], "{answer}");
+    assert_eq!(proposals[0]["action"], "task_done");
+    assert_eq!(proposals[1]["action"], "archive");
+    let told = results(&server).await;
+    assert!(told[1].contains("already in this answer"), "{told:?}");
+    assert!(told[4].contains("too_many"), "{told:?}");
+    assert!(told[5].contains("already in this answer"), "{told:?}");
+    only_reads(&kit);
 }

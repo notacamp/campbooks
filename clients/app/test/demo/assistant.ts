@@ -4,6 +4,8 @@
 import type { Schema } from "~/lib/api";
 
 import { MARTA, PEDRO } from "./attention";
+import { BILL, LEASE, PROPOSAL } from "./tasks";
+import { RUI } from "./workspaces";
 
 type Chat = Schema<"ChatView">;
 type Message = Schema<"ChatMessageView">;
@@ -189,3 +191,108 @@ export const MARTA_RULE = {
     },
   ],
 };
+
+// Scout proposes task changes (campbooks-cloud#43): Sam says what happened
+// to three of the list's tasks; Scout proposes each, as cards that name the
+// task from its record.
+
+export const TASKS_SAID =
+  "I paid the electricity bill, I will send Marta the lease on Friday, and Rui can take the proposal draft.";
+
+/** The request a task card sends: the revision read when it was proposed. */
+const taskRequest = (operation: string, tail: string, task: { id: string }, body: unknown) => ({
+  operation,
+  method: "POST" as const,
+  path: `tasks/${task.id}${tail}`,
+  body,
+});
+
+const taskUndo = (operation: string, tail: string, task: { id: string }, body: unknown = null) => ({
+  ...taskRequest(operation, tail, task, body),
+  from_response: ["revision"],
+});
+
+const taskFacts = (task: { title: string; verb: string; due_on?: string | null }) => ({
+  title: task.title,
+  verb: task.verb,
+  ...(task.due_on === null || task.due_on === undefined ? {} : { due_on: task.due_on }),
+});
+
+export const BILL_PROPOSAL: Proposal = {
+  id: "0192f1a0-0000-7000-8000-000000003061",
+  kind: "change",
+  state: "pending",
+  action: "task_done",
+  record: { type: "tasks.task", id: BILL.id },
+  task: taskFacts(BILL),
+  detail: {},
+  request: taskRequest("tasks.done", "/done", BILL, { revision: BILL.revision }),
+  undo: taskUndo("tasks.reopen", "/reopen", BILL),
+};
+
+export const LEASE_PROPOSAL: Proposal = {
+  id: "0192f1a0-0000-7000-8000-000000003062",
+  kind: "change",
+  state: "pending",
+  action: "plan_day",
+  record: { type: "tasks.task", id: LEASE.id },
+  task: taskFacts(LEASE),
+  detail: { day: "2026-10-16" },
+  request: taskRequest("tasks.plan", "/plan", LEASE, {
+    revision: LEASE.revision,
+    plan: "date",
+    plan_on: "2026-10-16",
+  }),
+  undo: taskUndo("tasks.plan", "/plan", LEASE, { plan: "none" }),
+};
+
+export const HAND_OFF_PROPOSAL: Proposal = {
+  id: "0192f1a0-0000-7000-8000-000000003063",
+  kind: "change",
+  state: "pending",
+  action: "hand_off",
+  record: { type: "tasks.task", id: PROPOSAL.id },
+  task: taskFacts(PROPOSAL),
+  detail: { member_id: RUI.user_id, member_name: RUI.display_name },
+  request: taskRequest("tasks.hand_off", "/hand_off", PROPOSAL, {
+    revision: PROPOSAL.revision,
+    to: RUI.user_id,
+  }),
+  undo: taskUndo("tasks.take_back", "/take_back", PROPOSAL),
+};
+
+/** Scout's answer to {@link TASKS_SAID}, with its three task cards. */
+export const TASKS_ANSWER: Message = {
+  id: "0192f1a0-0000-7000-8000-000000003052",
+  author: "scout",
+  text:
+    "I proposed marking the electricity bill paid, planning the lease for Friday and " +
+    "handing the proposal draft to Rui. Nothing changes until you confirm each card.",
+  steps: [],
+  finish: "done",
+  proposals: [BILL_PROPOSAL, LEASE_PROPOSAL, HAND_OFF_PROPOSAL],
+  created_at: "2026-10-13T14:59:40Z",
+};
+
+/** The chat once {@link TASKS_SAID} was answered, its cards in `proposals`' states. */
+export function chatWithTaskProposals(
+  proposals: readonly Proposal[] = TASKS_ANSWER.proposals,
+): Chat {
+  return {
+    ...MARTA_CHAT,
+    questions: 1,
+    last_message_at: TASKS_ANSWER.created_at,
+    messages: [
+      {
+        id: "0192f1a0-0000-7000-8000-000000003051",
+        author: "member",
+        text: TASKS_SAID,
+        steps: [],
+        finish: null,
+        proposals: [],
+        created_at: "2026-10-13T14:59:30Z",
+      },
+      { ...TASKS_ANSWER, proposals: [...proposals] },
+    ],
+  };
+}

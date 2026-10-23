@@ -245,7 +245,7 @@ impl Toolbox {
     /// Tools acting for `member`.
     pub fn new(member: Member, utc_offset: i32) -> Self {
         Self {
-            proposer: Proposer::new(member.clone()),
+            proposer: Proposer::new(member.clone(), utc_offset),
             member,
             utc_offset,
             left: MAX_QUESTION_BYTES,

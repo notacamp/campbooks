@@ -91,6 +91,36 @@ function untilText(iso: string, locale: string): string {
   return new Intl.DateTimeFormat(locale, options).format(at);
 }
 
+/** A calendar day (`YYYY-MM-DD`) as the member reads it: "Mon, 2 Nov". */
+function dayText(day: string, locale: string): string {
+  const [year, month, date] = day.split("-").map(Number);
+  const at = new Date(year ?? 0, (month ?? 1) - 1, date ?? 1);
+  return new Intl.DateTimeFormat(locale, {
+    weekday: "short",
+    day: "numeric",
+    month: "short",
+  }).format(at);
+}
+
+/**
+ * "Renew the van insurance · due Mon, 2 Nov", from the task's own record
+ * (and, for a hand-off, where it goes), never from the model's words.
+ */
+function taskLine(t: Translate, proposal: Proposal, locale: string): string | undefined {
+  const task = proposal.task;
+  if (task === undefined || task === null) {
+    return undefined;
+  }
+  const line =
+    task.due_on === undefined || task.due_on === null
+      ? t("chat.proposal.taskNoDue", { title: task.title })
+      : t("chat.proposal.taskLine", { title: task.title, due: dayText(task.due_on, locale) });
+  const name = proposal.detail?.member_name;
+  return name === undefined || name === null
+    ? line
+    : `${line}. ${t("chat.proposal.handOffNote", { name })}`;
+}
+
 /** "Marta Ferreira · Walkthrough on Thursday", from the record's facts. */
 function aboutLine(t: Translate, proposal: Proposal): string | undefined {
   const facts = proposal.facts;
@@ -187,7 +217,11 @@ function ChangeCard(props: CardProps) {
 
   const action = proposal.action ?? "archive";
   const detail: Partial<NonNullable<Proposal["detail"]>> = proposal.detail ?? {};
-  const title = t(`chat.proposal.action.${action}`, {
+  // A bill is paid, not done.
+  const key = action === "task_done" && proposal.task?.verb === "pay" ? "task_paid" : action;
+  const title = t(`chat.proposal.action.${key}`, {
+    day: detail.day === undefined || detail.day === null ? "" : dayText(detail.day, i18n.language),
+    name: detail.member_name ?? "",
     stream:
       detail.stream === undefined || detail.stream === null
         ? ""
@@ -251,7 +285,7 @@ function ChangeCard(props: CardProps) {
     <ChatProposal
       label={labelOf(t, state)}
       title={title}
-      about={aboutLine(t, proposal)}
+      about={taskLine(t, proposal, i18n.language) ?? aboutLine(t, proposal)}
       quote={label}
       quoteLabel={label === undefined ? undefined : t("chat.proposal.scoutWords")}
       state={state}

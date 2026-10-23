@@ -14,7 +14,10 @@ import { ReplyOpenerProvider, type OpenReply } from "~/lib/reply-opener";
 import {
   answerFrames,
   ARCHIVE_PROPOSAL,
+  BILL_PROPOSAL,
   chatWithProposals,
+  HAND_OFF_PROPOSAL,
+  LEASE_PROPOSAL,
   MARTA_RULE,
   REPLY_PROPOSAL,
   RULE_PROPOSAL,
@@ -27,6 +30,7 @@ import {
 } from "../../../../../test/demo/assistant";
 import { MARTA, MARTA_DETAIL, PEDRO } from "../../../../../test/demo/attention";
 import { W } from "../../../../../test/demo/conversations";
+import { BILL, LEASE, PROPOSAL } from "../../../../../test/demo/tasks";
 import { DUARTE } from "../../../../../test/demo/workspaces";
 import { mockApi, problem, renderWithProviders } from "../../../../../test/render";
 
@@ -269,6 +273,46 @@ describe("ScoutChat", () => {
         expect(states.get(ARCHIVE_PROPOSAL.id)).toBe("undone");
       });
       expect(mocked.calls.filter((call) => call.route === ARCHIVE)).toHaveLength(1);
+    });
+
+    it("shows a task card from the task's own record, and runs it with the revision it was read at", async () => {
+      const sent: { route: string; key: string | null; body: unknown }[] = [];
+      const task = (route: string, answer: object) => (request: Request, body: unknown) => {
+        sent.push({ route, key: request.headers.get("Idempotency-Key"), body });
+        return { body: answer };
+      };
+      const { states, mocked } = proposing([BILL_PROPOSAL, LEASE_PROPOSAL, HAND_OFF_PROPOSAL], {
+        [`POST ${W}/tasks/${BILL.id}/done`]: task("done", { ...BILL, state: "done", revision: 2 }),
+        [`POST ${W}/tasks/${BILL.id}/reopen`]: task("reopen", { ...BILL, revision: 3 }),
+      });
+      renderChat();
+
+      // A bill is paid, not done; the facts are the record's.
+      const bill = await screen.findByRole("region", { name: "Mark paid" });
+      expect(within(bill).getByText(/EDP electricity bill/u)).toBeVisible();
+      expect(within(bill).getByText(/due .*11/u)).toBeVisible();
+      const lease = screen.getByRole("region", { name: /^Plan it for .*16/u });
+      expect(within(lease).getByText(/Send the signed lease to Marta/u)).toBeVisible();
+      // The teammate is named by the server from the members list.
+      const hand = screen.getByRole("region", { name: "Hand to Rui Matos" });
+      expect(within(hand).getByText(/It goes to Rui Matos’s Home\./u)).toBeVisible();
+      expect(within(hand).getByText(new RegExp(PROPOSAL.title, "u"))).toBeVisible();
+      expect(within(lease).queryByText(/It goes to/u)).toBeNull();
+      expect(sent).toEqual([]);
+
+      fireEvent.click(within(bill).getByRole("button", { name: "Confirm" }));
+      expect(await within(bill).findByText("Done.")).toBeVisible();
+      await waitFor(() => {
+        expect(states.get(BILL_PROPOSAL.id)).toBe("done");
+      });
+      fireEvent.click(within(bill).getByRole("button", { name: "Undo" }));
+      expect(await within(bill).findByText("Undone.")).toBeVisible();
+      // The undo carries the revision the change left, and only that.
+      expect(sent).toEqual([
+        { route: "done", key: BILL_PROPOSAL.id, body: { revision: BILL.revision } },
+        { route: "reopen", key: `${BILL_PROPOSAL.id}:undo`, body: { revision: 2 } },
+      ]);
+      expect(mocked.calls.some((call) => call.route.includes(`tasks/${LEASE.id}`))).toBe(false);
     });
 
     it("says it could not be done, with the API's reason, when the request is refused", async () => {

@@ -1,7 +1,7 @@
 //! What the chat operations take and answer.
 
 use campbooks_kernel::{RecordRef, define_id};
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, NaiveDate, Utc};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
@@ -284,6 +284,31 @@ pub enum ProposalAction {
     YesToQuestion,
     /// Its need: Later, until `detail.until`.
     Later,
+    /// A task: done (paid, for a bill).
+    TaskDone,
+    /// A task: not needed after all.
+    TaskNotNeeded,
+    /// A task: planned for `detail.day`.
+    PlanDay,
+    /// A task: Later, until `detail.until`.
+    TaskLater,
+    /// A task: due on `detail.day`.
+    Due,
+    /// A task: handed to the teammate `detail.member_name`.
+    HandOff,
+}
+
+/// A task's own facts, read from its record when the proposal was made:
+/// what a card names, never the model's words.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+pub struct ProposalTask {
+    /// Its title, as the member wrote it.
+    pub title: String,
+    /// `do` or `pay`.
+    pub verb: String,
+    /// The day it is due then.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub due_on: Option<NaiveDate>,
 }
 
 /// A conversation's own facts, read from its record when the proposal was
@@ -311,6 +336,16 @@ pub struct ProposalDetail {
     /// Until when (`later`), RFC 3339, UTC.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub until: Option<DateTime<Utc>>,
+    /// The day (`plan_day`, `due`), `YYYY-MM-DD`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub day: Option<NaiveDate>,
+    /// The teammate's user id (`hand_off`), a member of the workspace.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub member_id: Option<String>,
+    /// The teammate's name, as the workspace's members list has it
+    /// (`hand_off`): read by the server, never the model's words.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub member_name: Option<String>,
 }
 
 /// An HTTP method a proposal's request may use.
@@ -319,6 +354,8 @@ pub struct ProposalDetail {
 pub enum ProposalMethod {
     /// `POST`.
     Post,
+    /// `PATCH` (a task's edit, and nothing else).
+    Patch,
     /// `DELETE`.
     Delete,
 }
@@ -357,12 +394,15 @@ pub struct ChatProposal {
     /// The change (a change only).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub action: Option<ProposalAction>,
-    /// The conversation it is about (a change or a reply).
+    /// The conversation or task it is about (a change or a reply).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub record: Option<RecordRef>,
     /// The conversation's own facts (a change or a reply).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub facts: Option<ProposalFacts>,
+    /// The task's own facts (a task change only); its `record` is the task.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub task: Option<ProposalTask>,
     /// What the change takes (a change only).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub detail: Option<ProposalDetail>,
