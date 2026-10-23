@@ -13,7 +13,8 @@
     "chat_full": "This chat is full: it holds {{max}} questions. Start over to keep asking.",
     "question_empty": "Write a question for Scout.",
     "question_too_long": "Keep your question to {{max}} characters.",
-    "about_unsupported": "Scout can't chat about this kind of record yet."
+    "about_unsupported": "Scout can't chat about this kind of record yet.",
+    "proposal_settled": "Scout's proposal was already answered, so it can't become that now."
   },
   "chat": {
     "about_lost": "I can no longer see this conversation, so I answered without it."

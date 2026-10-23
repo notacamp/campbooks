@@ -232,6 +232,23 @@ export async function refreshBodiesAfterRules(
 }
 
 /**
+ * Refresh what reads records of `types` in `workspace`: the queries of the
+ * read operations that return them (`records.gen.ts`), as a change frame
+ * for them would. For a change this client made itself, so what shows it
+ * need not wait for the feed (or follows it where there is none).
+ */
+export function refreshRecords(
+  queryClient: QueryClient,
+  workspace: string,
+  types: readonly string[],
+): Promise<void> {
+  const readers = new Set(types.flatMap((type) => recordReaders[type] ?? []));
+  return queryClient.invalidateQueries({
+    predicate: (query) => readsAny(query, readers) && inWorkspace(query, workspace),
+  });
+}
+
+/**
  * Whether this client follows its workspaces' change feeds live: the web,
  * through `EventSource`. The desktop and mobile shells (Tauri) have none yet,
  * so what must follow other devices is read again when shown, on a timer or

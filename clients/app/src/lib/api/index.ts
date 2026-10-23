@@ -4,6 +4,7 @@ export {
   holdsImageState,
   operationKey,
   refreshBodiesAfterRules,
+  refreshRecords,
   subscribeToChanges,
   trustsImages,
   type ChangeFrame,

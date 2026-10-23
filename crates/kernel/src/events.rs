@@ -254,26 +254,26 @@ impl EventBus {
                 .await?
             }
         };
-        let id = match event.workspace() {
-            // An instance-wide event's id is chosen here and nothing is read
-            // back: a workspace transaction may read no instance-wide row
-            // (campbooks-cloud#211), and row-level security checks a
-            // `RETURNING` against the read policies.
-            None => {
-                append_instance_wide(
-                    tx,
-                    E::NAME,
-                    E::VERSION,
-                    &payload,
-                    &kinds,
-                    &queues,
-                    &max_attempts,
-                )
-                .await?
-            }
-            Some(_) => {
-                sqlx::query_scalar!(
-                    r#"
+        // An instance-wide event's id is chosen here and nothing is read
+        // back: a workspace transaction may read no instance-wide row
+        // (campbooks-cloud#211), and row-level security checks a
+        // `RETURNING` against the read policies.
+        let id = if event.workspace().is_none() {
+            append_instance_wide(
+                tx,
+                E::NAME,
+                E::VERSION,
+                &payload,
+                &kinds,
+                &queues,
+                &max_attempts,
+            )
+            .await?
+        } else {
+            // Each delivery remembers who caused it (`origin`), so the
+            // events its handler tracks name them (ADR 0020).
+            let id: uuid::Uuid = sqlx::query_scalar(
+                r"
             WITH event AS (
                 INSERT INTO kernel.events (name, version, workspace_id, payload)
                 VALUES ($1, $2, $3, $4)
@@ -281,26 +281,27 @@ impl EventBus {
             ), deliveries AS (
                 INSERT INTO kernel.jobs
                     (queue, kind, payload, workspace_id, event_id, unique_key, max_attempts,
-                     trace_context)
+                     trace_context, origin)
                 SELECT c.queue, c.kind, '{}'::jsonb, event.workspace_id, event.id,
-                       event.id::text, c.max_attempts, $8
+                       event.id::text, c.max_attempts, $8, $9
                   FROM event,
                        unnest($5::text[], $6::text[], $7::int[]) AS c(kind, queue, max_attempts)
             )
-            SELECT id AS "id!: EventId" FROM event
-            "#,
-                    E::NAME,
-                    i32::from(E::VERSION),
-                    event.workspace(),
-                    payload,
-                    &kinds as &[&str],
-                    &queues as &[&str],
-                    &max_attempts,
-                    crate::telemetry::current_traceparent(),
-                )
-                .fetch_one(&mut **tx)
-                .await?
-            }
+            SELECT id FROM event
+            ",
+            )
+            .bind(E::NAME)
+            .bind(i32::from(E::VERSION))
+            .bind(event.workspace())
+            .bind(payload)
+            .bind(&kinds)
+            .bind(&queues)
+            .bind(&max_attempts)
+            .bind(crate::telemetry::current_traceparent())
+            .bind(crate::tracking::origin())
+            .fetch_one(&mut **tx)
+            .await?;
+            EventId::from_uuid(id)
         };
         crate::db::lower(tx, lifted).await?;
 
@@ -468,8 +469,8 @@ async fn append_instance_wide(
         )
         INSERT INTO kernel.jobs
             (queue, kind, payload, workspace_id, event_id, unique_key, max_attempts,
-             trace_context)
-        SELECT c.queue, c.kind, '{}'::jsonb, NULL, $1, $1::text, c.max_attempts, $8
+             trace_context, origin)
+        SELECT c.queue, c.kind, '{}'::jsonb, NULL, $1, $1::text, c.max_attempts, $8, $9
           FROM unnest($5::text[], $6::text[], $7::int[]) AS c(kind, queue, max_attempts)
         ",
     )
@@ -481,14 +482,16 @@ async fn append_instance_wide(
     .bind(queues)
     .bind(max_attempts)
     .bind(crate::telemetry::current_traceparent())
+    .bind(crate::tracking::origin())
     .execute(conn)
     .await?;
     Ok(id)
 }
 
 /// Refuse to publish `event` (of workspace `workspace`) in a transaction set
-/// to another workspace, or to none.
-async fn check_workspace(
+/// to another workspace, or to none. Tracked events are checked the same way
+/// ([`Tracker::track`](crate::tracking::Tracker::track)).
+pub(crate) async fn check_workspace(
     tx: &mut Transaction<'_, Postgres>,
     event: &str,
     workspace: Option<&str>,

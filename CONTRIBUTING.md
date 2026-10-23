@@ -19,6 +19,7 @@ The rules are in [`AGENTS.md`](AGENTS.md); this is the walkthrough.
    ```sh
    cargo fmt --all --check && cargo clippy --workspace --all-targets -- -D warnings
    cargo test --workspace && cargo xtask arch && cargo xtask openapi --check && cargo xtask events --check
+   cargo run -p campbooks-tracking-plan -- check
    cargo deny check && cargo machete
    pnpm --dir clients lint typecheck test deps:check deadcode format:check api:check i18n:check
    ```
@@ -27,14 +28,19 @@ The rules are in [`AGENTS.md`](AGENTS.md); this is the walkthrough.
    branch, `feat/` or `fix/`, or the title, `feat:` or `fix:`, says so). Never
    edit `CHANGELOG.md` itself, and never delete an entry: only a release does;
    see [`changelog/README.md`](changelog/README.md).
-7. **Open a PR into `next`.** Title = Conventional Commit (it becomes the
+7. **Tracked events:** every new mutating operation, job, schedule and event
+   handler gets a Coverage row in the tracking plan (the events it tracks, or
+   why it tracks none), and new events are added through the plan, never by
+   hand. CI runs `cargo run -p campbooks-tracking-plan -- check`. How:
+   [`docs/tracking.md`](docs/tracking.md).
+8. **Open a PR into `next`.** Title = Conventional Commit (it becomes the
    squash commit). Commits must be **signed** (SSH or GPG).
-8. **UI changes:** verify at 375px and desktop, and **attach a screen recording**
+9. **UI changes:** verify at 375px and desktop, and **attach a screen recording**
    (see below). CI fails a UI PR without one.
-9. **Any text a user sees** ships in English, Portuguese, Spanish and French
-   with the same keys (CI runs `pnpm i18n:check`): European Portuguese,
-   Spanish from Spain, full diacritics. Machine drafts are fine.
-   Full rule, including third-party screens: AGENTS.md → Internationalization.
+10. **Any text a user sees** ships in English, Portuguese, Spanish and French
+    with the same keys (CI runs `pnpm i18n:check`): European Portuguese,
+    Spanish from Spain, full diacritics. Machine drafts are fine.
+    Full rule, including third-party screens: AGENTS.md → Internationalization.
 
 ## Generators
 

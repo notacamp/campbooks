@@ -421,6 +421,8 @@ impl<P: AdminPermission> FromRequestParts<AppState> for Admin<P> {
         }
         let grant = AdminGrant::new(principal.subject.clone(), permissions);
         slot.fill(grant.clone());
+        // What the request tracks is the administrator's, by account id.
+        crate::tracking::administrator(&principal.subject);
         if !recently_authenticated(principal.auth_time, Utc::now()) {
             return Err(Error::Unauthorized(AuthFailure::AdminReauthRequired));
         }

@@ -485,35 +485,39 @@ async fn insert_row(
         .fetch_one(&mut **tx)
         .await?;
     }
-    let id = sqlx::query_scalar!(
-        r#"
+    // The job remembers who caused it (`origin`, the ambient tracking
+    // context's actor and correlation: ids only), so the events it tracks
+    // name them (ADR 0020).
+    let id: Option<uuid::Uuid> = sqlx::query_scalar(
+        "
         INSERT INTO kernel.jobs
             (queue, kind, payload, workspace_id, unique_key, ordering_key, priority,
-             run_at, max_attempts, trace_context)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, coalesce($8, now()), $9, $10)
+             run_at, max_attempts, trace_context, origin)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, coalesce($8, now()), $9, $10, $11)
         ON CONFLICT (kind, unique_key, workspace_id)
             WHERE unique_key IS NOT NULL AND state IN ('pending', 'running')
             DO NOTHING
-        RETURNING id AS "id: JobId"
-        "#,
-        job.queue,
-        job.kind,
-        job.payload,
-        options.workspace,
-        options.unique_key,
-        options.ordering_key,
-        options.priority,
-        options.run_at,
-        attempts_to_db(job.max_attempts),
-        crate::telemetry::current_traceparent(),
+        RETURNING id
+        ",
     )
+    .bind(job.queue)
+    .bind(job.kind)
+    .bind(job.payload)
+    .bind(options.workspace)
+    .bind(options.unique_key)
+    .bind(options.ordering_key)
+    .bind(options.priority)
+    .bind(options.run_at)
+    .bind(attempts_to_db(job.max_attempts))
+    .bind(crate::telemetry::current_traceparent())
+    .bind(crate::tracking::origin())
     .fetch_optional(&mut **tx)
     .await?;
     let Some(id) = id else {
         return Ok(Enqueued::Duplicate);
     };
     notify(tx, job.queue).await?;
-    Ok(Enqueued::Created(id))
+    Ok(Enqueued::Created(JobId::from_uuid(id)))
 }
 
 /// Wake idle workers once the surrounding transaction commits.

@@ -237,6 +237,9 @@ TODO(new-module): what exists today and what this module builds on.
   its `VERSION` and payload (ids, never secrets or message bodies).
 - Events consumed: none yet. TODO(new-module): each handler
   `demo_notes.<handler>` and the event it consumes.
+- Tracked events (ADR 0020): TODO(new-module): the events added or changed
+  in the tracking plan, and the Coverage rows of every new operation, job,
+  schedule and handler.
 
 ## Endpoints and scopes
 
@@ -271,9 +274,10 @@ TODO(new-module): what could go wrong and how it is contained.
 ## 3. Wrap-up
 
 - [ ] 3.1 OpenAPI regenerated (`cargo xtask openapi`) and client types regenerated (`pnpm --dir clients api:generate`)
-- [ ] 3.2 Changelog entry in `changelog/unreleased/`
-- [ ] 3.3 Gates green (AGENTS.md → Code quality)
-- [ ] 3.4 UI verified at 375px and desktop, recording in the PR
+- [ ] 3.2 Tracking plan regenerated (`cargo run -p campbooks-tracking-plan -- generate`), with Coverage rows for every new operation, job, schedule and handler
+- [ ] 3.3 Changelog entry in `changelog/unreleased/`
+- [ ] 3.4 Gates green (AGENTS.md → Code quality)
+- [ ] 3.5 UI verified at 375px and desktop, recording in the PR
 
 ==> openspec/changes/add-demo-notes-module/specs/demo_notes/spec.md <==
 ## Purpose
@@ -412,6 +416,15 @@ export function DemoNotesHome() {
 //! placeholder response. The feature owns its handler, request and response
 //! types, queries and tests; anything another feature of this module needs
 //! too moves to `domain/`.
+//!
+//! TODO(new-feature): tracked events (ADR 0020, `docs/tracking.md`). Give
+//! `demo_notes.overview` a Coverage row in the tracking plan: the events it tracks, or why
+//! it tracks none (a read tracks none). Change the plan with a patch under
+//! `tracking/patches/` and `cargo run -p campbooks-tracking-plan -- apply
+//! <patch>`. A write tracks its events with `state.tracker.track(&mut tx,
+//! &tracking::…)` in the transaction of the change, filled from this
+//! module's own rows: ids, enums, counts and times, never a name, an address
+//! or what someone wrote.
 
 use axum::{Json, extract::State};
 use campbooks_kernel::{
@@ -529,6 +542,15 @@ mod tests {
 //! placeholder response. The feature owns its handler, request and response
 //! types, queries and tests; anything another feature of this module needs
 //! too moves to `domain/`.
+//!
+//! TODO(new-feature): tracked events (ADR 0020, `docs/tracking.md`). Give
+//! `demo_notes.list_items` a Coverage row in the tracking plan: the events it tracks, or why
+//! it tracks none (a read tracks none). Change the plan with a patch under
+//! `tracking/patches/` and `cargo run -p campbooks-tracking-plan -- apply
+//! <patch>`. A write tracks its events with `state.tracker.track(&mut tx,
+//! &tracking::…)` in the transaction of the change, filled from this
+//! module's own rows: ids, enums, counts and times, never a name, an address
+//! or what someone wrote.
 
 use axum::{Json, extract::State};
 use campbooks_kernel::{
