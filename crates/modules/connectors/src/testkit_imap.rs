@@ -449,13 +449,13 @@ async fn imap_session<S: AsyncRead + AsyncWrite + Unpin>(
                     seen.password_in_clear |= !encrypted;
                 });
                 let initial = args.split_once(' ').map(|(_, response)| response.trim());
-                let response = match initial.filter(|r| !r.is_empty() && script.sasl_ir) {
-                    Some(response) => response.to_owned(),
-                    None => {
+                let response =
+                    if let Some(response) = initial.filter(|r| !r.is_empty() && script.sasl_ir) {
+                        response.to_owned()
+                    } else {
                         write(conn.get_mut(), "+ \r\n").await;
                         read(conn).await.unwrap_or_default()
-                    }
-                };
+                    };
                 match plain(&response) {
                     Some((username, password)) => login(&script, &tag, &username, &password),
                     None => format!("{tag} BAD not PLAIN\r\n"),
