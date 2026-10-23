@@ -209,6 +209,14 @@ impl Rate {
             burst_seconds: 60.0,
         }
     }
+
+    /// A per-hour allowance, an hour's worth at once.
+    pub fn per_hour(requests: u32) -> Self {
+        Self {
+            per_second: f64::from(requests) / 3600.0,
+            burst_seconds: 3600.0,
+        }
+    }
 }
 
 /// Take `cost` units of `provider`'s budget (a token bucket refilled at

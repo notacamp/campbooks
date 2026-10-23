@@ -1,6 +1,7 @@
 //! What the module is composed with (constructor injection): settings, the
 //! Google and Zoho clients (refresh, revoke, mail; the consent itself is the
-//! identity module's), the credentials cipher and the clock. Handlers reach it as
+//! identity module's), the IMAP adapter (its resolvers and trust), the
+//! credentials cipher and the clock. Handlers reach it as
 //! an axum extension; jobs and consumers own a copy.
 
 use std::sync::Arc;
@@ -16,6 +17,7 @@ use figment::Figment;
 use crate::{
     config::{ConnectorsConfig, OAuthClientConfig},
     google::{Endpoints, Google},
+    imap::Imap,
     provider::ClientSecret,
     zoho::{Centres, Zoho},
 };
@@ -34,6 +36,9 @@ pub struct Deps {
     pub google: Option<Arc<Google>>,
     /// The Zoho client, when `CAMPBOOKS_ZOHO__*` is set.
     pub zoho: Option<Arc<Zoho>>,
+    /// The IMAP adapter (`CAMPBOOKS_CONNECTORS__IMAP__*`); offered only
+    /// when enabled ([`imap_enabled`](Self::imap_enabled)).
+    pub imap: Arc<Imap>,
     /// Seals credentials; present whenever a provider is configured.
     pub cipher: Option<Arc<Cipher>>,
     /// The time.
@@ -46,6 +51,7 @@ impl std::fmt::Debug for Deps {
             .field("config", &self.config)
             .field("google", &self.google.is_some())
             .field("zoho", &self.zoho.is_some())
+            .field("imap", &self.imap_enabled())
             .finish_non_exhaustive()
     }
 }
@@ -56,6 +62,7 @@ impl Default for Deps {
             config: Arc::new(ConnectorsConfig::default()),
             google: None,
             zoho: None,
+            imap: Arc::new(Imap::default()),
             cipher: None,
             clock: Arc::new(SystemClock),
         }
@@ -63,6 +70,12 @@ impl Default for Deps {
 }
 
 impl Deps {
+    /// Whether IMAP mailboxes may be connected: turned on, and credentials
+    /// can be sealed.
+    pub fn imap_enabled(&self) -> bool {
+        self.imap.config.enabled && self.cipher.is_some()
+    }
+
     /// Read `CAMPBOOKS_CONNECTORS__*`, `CAMPBOOKS_GOOGLE__*` and the
     /// instance secret. A provider configured without the instance secret,
     /// or a broken setting, is an error naming the variable.
@@ -80,8 +93,10 @@ impl Deps {
         config: &Config,
         secret: Option<SecretKey>,
     ) -> Result<Self, String> {
+        let config = ConnectorsConfig::from_figment(figment)?;
         let mut deps = Self {
-            config: Arc::new(ConnectorsConfig::from_figment(figment)?),
+            imap: Arc::new(Imap::new(config.imap.clone())),
+            config: Arc::new(config),
             ..Self::default()
         };
         let development = config.env == Environment::Development;
@@ -104,17 +119,19 @@ impl Deps {
             let centres = base.map_or(Centres::Zoho, Centres::Fake);
             deps.zoho = Some(Arc::new(Zoho::new(client_id, client_secret, centres)?));
         }
-        if deps.google.is_none() && deps.zoho.is_none() {
+        if deps.google.is_none() && deps.zoho.is_none() && !deps.config.imap.enabled {
             return Ok(deps);
         }
         let Some(secret) = secret else {
-            let provider = if deps.google.is_some() {
-                "GOOGLE"
+            let setting = if deps.google.is_some() {
+                "CAMPBOOKS_GOOGLE__CLIENT_ID"
+            } else if deps.zoho.is_some() {
+                "CAMPBOOKS_ZOHO__CLIENT_ID"
             } else {
-                "ZOHO"
+                "CAMPBOOKS_CONNECTORS__IMAP__ENABLED"
             };
             return Err(format!(
-                "CAMPBOOKS_{provider}__CLIENT_ID is set, so connections need \
+                "{setting} is set, so connections need \
                  CAMPBOOKS_SECRET_KEY_FILE or CAMPBOOKS_SECRET_KEY (32 random bytes, base64; \
                  e.g. `openssl rand -base64 32`) to encrypt the credentials they keep"
             ));
@@ -232,6 +249,25 @@ mod tests {
             .unwrap();
         assert!(zoho.centre("http://127.0.0.1:9052").is_some());
         assert!(zoho.centre("https://accounts.zoho.eu").is_none());
+    }
+
+    #[test]
+    fn imap_is_offered_when_enabled_with_the_instance_secret() {
+        let off = Deps::from_figment(&Figment::new(), &kernel_config(), None).unwrap();
+        assert!(!off.imap_enabled());
+        let figment = Figment::from(Serialized::defaults(serde_json::json!({
+            "connectors": {"imap": {"enabled": true}}
+        })));
+        let err = Deps::from_figment(&figment, &kernel_config(), None).unwrap_err();
+        assert!(err.contains("CAMPBOOKS_CONNECTORS__IMAP__ENABLED"), "{err}");
+        let deps = Deps::from_figment(
+            &figment,
+            &kernel_config(),
+            Some(SecretKey::from_bytes([1; 32])),
+        )
+        .unwrap();
+        assert!(deps.imap_enabled());
+        assert!(deps.google.is_none() && deps.zoho.is_none());
     }
 
     #[test]

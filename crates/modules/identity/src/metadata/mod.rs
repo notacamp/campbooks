@@ -2,11 +2,12 @@
 //! recommended way for an agent to be a client without registering): a
 //! `client_id` that is an `https` URL with a path names a JSON document,
 //! served there, that describes the client. The issuer fetches it through
-//! the SSRF [`guard`], checks that its `client_id` is that very URL, and
+//! the SSRF [`guard`] (the kernel's, shared with the connectors module),
+//! checks that its `client_id` is that very URL, and
 //! keeps it in `identity.clients` (kind `metadata_document`) for as long as
 //! its `Cache-Control` allows, between [`MIN_CACHE`] and [`MAX_CACHE`].
 
-pub mod guard;
+pub use campbooks_kernel::net::guard;
 
 use std::{
     collections::HashMap,
