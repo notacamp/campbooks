@@ -11692,7 +11692,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/Answer"
+                "$ref": "#/components/schemas/EventAnswer"
               }
             }
           },
@@ -11704,7 +11704,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Answered"
+                  "$ref": "#/components/schemas/AnsweredEvent"
                 }
               }
             }
@@ -15629,17 +15629,27 @@
       },
       "Answer": {
         "type": "object",
-        "description": "Your answer.",
+        "description": "The person's answer.",
         "required": [
-          "response"
+          "decision"
         ],
         "properties": {
-          "response": {
-            "$ref": "#/components/schemas/Response",
-            "description": "`accepted`, `tentative` or `declined` (a provider is never told\n`needs_action`: it only takes an answer back to \"not answered\" on\nevents kept on Campbooks)."
+          "decision": {
+            "$ref": "#/components/schemas/Decision",
+            "description": "Allow or deny."
+          },
+          "workspace_id": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/WorkspaceId",
+                "description": "The workspace the app may use (required to allow an app that binds\none)."
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
-        },
-        "additionalProperties": false
+        }
       },
       "AnswerRuleNotice": {
         "type": "object",
@@ -15674,6 +15684,19 @@
         "description": "An answer's value: a label (choice), a level (score) or yes/no."
       },
       "Answered": {
+        "type": "object",
+        "description": "Where to go next.",
+        "required": [
+          "redirect"
+        ],
+        "properties": {
+          "redirect": {
+            "type": "string",
+            "description": "Navigate here: the app's redirect URI, with a code or\n`error=access_denied`."
+          }
+        }
+      },
+      "AnsweredEvent": {
         "type": "object",
         "description": "Your answer, and the one before it.",
         "required": [
@@ -18306,6 +18329,20 @@
             "description": "Returned unchanged."
           }
         }
+      },
+      "EventAnswer": {
+        "type": "object",
+        "description": "Your answer.",
+        "required": [
+          "response"
+        ],
+        "properties": {
+          "response": {
+            "$ref": "#/components/schemas/Response",
+            "description": "`accepted`, `tentative` or `declined` (a provider is never told\n`needs_action`: it only takes an answer back to \"not answered\" on\nevents kept on Campbooks)."
+          }
+        },
+        "additionalProperties": false
       },
       "EventId": {
         "type": "string",
