@@ -51,7 +51,7 @@ pub struct HandOffTo {
     request_body = HandOffTo,
     responses(
         (status = OK, description = "The task afterwards.", body = TaskView),
-        (status = BAD_REQUEST, description = "Not a member of the workspace (`not_a_member`), or yourself (`hand_off_to_other`).",
+        (status = BAD_REQUEST, description = "Not a member of the workspace (`not_a_member`), or yourself (`hand_off_yourself`).",
             body = Problem, content_type = "application/problem+json"),
         (status = UNAUTHORIZED, description = "No valid access token.", body = Problem,
             content_type = "application/problem+json"),
@@ -80,7 +80,7 @@ pub async fn hand_off(
     access::expect_open(&row)?;
     if body.to == me {
         return Err(Error::BadRequest(
-            crate::MESSAGES.reason("hand_off_to_other"),
+            crate::MESSAGES.reason("hand_off_yourself"),
         ));
     }
     // Only a member of this workspace; the check holds the membership until

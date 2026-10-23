@@ -22,7 +22,7 @@ pub async fn require_task(
 ) -> Result<TaskRow> {
     authz::require(
         state,
-        &mut **tx,
+        tx,
         access,
         action,
         &RecordRef::new(TASK_RECORD, &id),

@@ -12,7 +12,7 @@
     "plan_needs_day": "Choisissez un jour pour la planifier.",
     "invalid_later": "Choisissez une heure postérieure à maintenant et à moins d’un an.",
     "not_a_member": "Vous ne pouvez confier une tâche qu’à un membre de cet espace de travail.",
-    "hand_off_to_other": "Choisissez quelqu’un d’autre à qui la confier.",
+    "hand_off_yourself": "Choisissez quelqu’un d’autre à qui la confier.",
     "not_handed_off": "Cette tâche n’a été confiée à personne."
   }
 }

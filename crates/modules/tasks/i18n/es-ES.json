@@ -12,7 +12,7 @@
     "plan_needs_day": "Elige un día para planificarla.",
     "invalid_later": "Elige una hora posterior a ahora y a menos de un año.",
     "not_a_member": "Solo puedes pasar una tarea a un miembro de este espacio de trabajo.",
-    "hand_off_to_other": "Elige a otra persona para pasársela.",
+    "hand_off_yourself": "Elige a otra persona para pasársela.",
     "not_handed_off": "Esta tarea no se pasó a nadie."
   }
 }

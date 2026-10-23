@@ -104,7 +104,7 @@ async fn only_a_member_of_the_workspace_can_be_handed_a_task(db: PgPool) {
             Some(json!({"revision": 1, "to": ana_id})),
         )
         .await;
-    assert_eq!(myself.json["code"], "hand_off_to_other");
+    assert_eq!(myself.json["code"], "hand_off_yourself");
     let not_handed = kit
         .post(
             &ana,

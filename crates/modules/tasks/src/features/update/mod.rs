@@ -49,7 +49,6 @@ pub struct TaskUpdate {
     tag = "tasks",
     security(("bearer" = ["tasks:write"])),
     extensions(("x-campbooks" = json!(Operation::command(Risk::Low)
-        .undo("tasks.update")
         .automation()
         .assistant()
         .records(["tasks.task"]).access("tasks.task", campbooks_kernel::authz::Action::Write)))),

@@ -29,7 +29,7 @@ define_id!(
     HistoryId
 );
 
-/// A closed set of words kept as text in the database and as snake_case on
+/// A closed set of words kept as text in the database and as `snake_case` on
 /// the wire.
 macro_rules! words {
     ($(#[$meta:meta])* $name:ident { $($(#[$vmeta:meta])* $variant:ident => $text:literal),+ $(,)? }) => {

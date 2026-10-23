@@ -230,3 +230,8 @@ trait on `next`, implement that one. Otherwise, define it here.
   `OpenTasks`/`AppState::open_tasks`.
 - **No contract test** against `contracts/tasks.task_changed.v1.schema.json`
   yet: neither side depends on a JSON Schema validator.
+- **No self-undo in the catalogue.** `x-campbooks.undo` may not name the
+  operation itself, so `tasks.update` and `tasks.plan` declare none: their undo
+  is the same call with the previous values, which the client sends.
+- **Error code** `hand_off_yourself` (not `hand_off_to_other`: the catalogue
+  reads a trailing `_other` as a plural form).

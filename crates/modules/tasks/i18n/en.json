@@ -12,7 +12,7 @@
     "plan_needs_day": "Choose a day to plan it for.",
     "invalid_later": "Choose a time later than now and less than a year away.",
     "not_a_member": "You can only hand a task to a member of this workspace.",
-    "hand_off_to_other": "Choose someone else to hand it to.",
+    "hand_off_yourself": "Choose someone else to hand it to.",
     "not_handed_off": "This task was not handed to anyone."
   }
 }

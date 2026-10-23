@@ -52,7 +52,8 @@ export const OwnWithPlan: Story = {
 
 /** A task someone else holds has no check: only its assignee can close it. */
 export const WithSomeoneElse: Story = {
-  args: { meta: "You wrote this", chips: [{ text: "With João" }], onCheck: undefined },
+  args: { meta: "You wrote this", chips: [{ text: "With João" }] },
+  render: (args) => <TaskRow {...args} onCheck={undefined} />,
 };
 
 export const Selected: Story = { args: { selected: true } };
