@@ -34,13 +34,13 @@ import {
   avatarKind,
   displayName,
   noteSentence,
-  suggestsReply,
   openByDefault,
   placeName,
   placementLine,
   replyName,
   spamMove,
   streamName,
+  suggestsReply,
   threadLayout,
   trashMove,
   type Move,
@@ -332,7 +332,8 @@ export function ConversationReader({
   // J/K step between conversations; the arrows keep scrolling this one.
   useShortcut("list.next", onNext, { alternates: false });
   useShortcut("list.previous", onPrevious, { alternates: false });
-  // The note offers Reply whenever it says a reply is needed (campbooks-cloud#306). No `shortcut` hint: one hint per key.
+  // The note offers Reply whenever it says a reply is needed (campbooks-cloud#306).
+  // No key hint: the reader's own Reply carries R.
   const noteReply =
     renderReplySlot === undefined || newest === undefined ? null : (
       <Button
@@ -453,6 +454,7 @@ export function ConversationReader({
   const kind = avatarKind(conversation);
   const subject = conversation.subject === "" ? t("reader.noSubject") : conversation.subject;
   const decisions = detail?.decisions ?? [];
+  const suggestedReply = suggestsReply(decisions) ? noteReply : null;
   const exists = (key: string) => i18n.exists(`conversations:${key}`);
   const unread = conversation.unread_count > 0;
   const replyButtons =
@@ -638,12 +640,12 @@ export function ConversationReader({
               ? {}
               : { chips: <ExpiredChip /> })}
             footer={footerLine(conversation)}
-            {...(stopButton === null && !(noteReply !== null && suggestsReply(decisions))
+            {...(suggestedReply === null && stopButton === null
               ? {}
               : {
                   actions: (
                     <>
-                      {suggestsReply(decisions) ? noteReply : null}
+                      {suggestedReply}
                       {stopButton}
                     </>
                   ),

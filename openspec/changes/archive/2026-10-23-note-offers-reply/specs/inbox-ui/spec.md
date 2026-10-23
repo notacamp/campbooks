@@ -10,7 +10,7 @@ question, the answer in words, the stored reasons in the user's language, the
 source (rules or model), the confidence and the threshold the answer was held
 to, and whether it acted. A stream suggestion SHALL offer "Move to <stream>"
 (1), which the user can undo. The note SHALL offer Reply, opening the same
-reply dialog as the reader's footer, whenever it says a reply is needed (a
+reply dialog as the reader's own Reply, whenever it says a reply is needed (a
 needs_reply suggestion or an open Reply need) and the user can reply.
 
 #### Scenario: Taking a suggestion
