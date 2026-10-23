@@ -117,6 +117,7 @@ async fn world(db: PgPool, cap: u32) -> World {
         ),
         assistant: campbooks_assistant::AssistantDeps {
             ai: Some(gateway.clone()),
+            ..campbooks_assistant::AssistantDeps::default()
         },
         system: campbooks_system::Deps {
             ai: Some(gateway),

@@ -135,7 +135,8 @@
     "restore": "Restaurer",
     "reportSpam": "Signaler comme spam",
     "notSpam": "Pas un spam",
-    "toInbox": "Remettre dans la boîte de réception"
+    "toInbox": "Remettre dans la boîte de réception",
+    "askScout": "Demander à Scout"
   },
   "toast": {
     "done": "Terminé · {{subject}}",

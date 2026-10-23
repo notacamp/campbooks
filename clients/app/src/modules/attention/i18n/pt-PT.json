@@ -55,7 +55,8 @@
     "combo": "{{first}} e depois {{second}}",
     "picked": "O Scout escolheu estas para este email",
     "noAttachment": "Este email não tem nenhum ficheiro para abrir.",
-    "nudge": "Relembrar {{name}}…"
+    "nudge": "Relembrar {{name}}…",
+    "scout": "Continuar com o Scout"
   },
   "confirm": {
     "done": "Feito · {{name}}",

@@ -267,7 +267,10 @@ async fn who_candidates_come_only_from_the_members_own_inboxes(db: PgPool) {
     })
     .unwrap();
     let composition = Composition {
-        assistant: campbooks_assistant::AssistantDeps { ai: Some(gateway) },
+        assistant: campbooks_assistant::AssistantDeps {
+            ai: Some(gateway),
+            ..campbooks_assistant::AssistantDeps::default()
+        },
         ..Composition::default()
     };
     let server = Server::new(&db, &composition).await;
@@ -552,4 +555,162 @@ async fn scout_writes_drafts_but_only_the_member_sends_or_takes_one_back(db: PgP
     assert_eq!(status, StatusCode::OK, "{undone}");
     assert_eq!(undone["state"], "draft");
     assert_eq!(sends_requested(&db).await, 0);
+}
+
+/// A stand-in model answering each call in turn: `turns` whole answers, the
+/// last one repeated.
+async fn model_answering(turns: Vec<Value>) -> MockServer {
+    let model = MockServer::start().await;
+    let last = turns.len().saturating_sub(1);
+    for (n, turn) in turns.into_iter().enumerate() {
+        let mock = Mock::given(method("POST"))
+            .and(path("/v1/chat/completions"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(turn));
+        let mock = if n == last {
+            mock
+        } else {
+            mock.up_to_n_times(1)
+        };
+        mock.mount(&model).await;
+    }
+    model
+}
+
+fn tool_call(name: &str, arguments: &Value) -> Value {
+    json!({
+        "model": "test-model",
+        "choices": [{"finish_reason": "tool_calls", "message": {"content": null, "tool_calls": [
+            {"id": "call_1", "type": "function",
+             "function": {"name": name, "arguments": arguments.to_string()}}]}}],
+    })
+}
+
+fn said(text: &str) -> Value {
+    json!({
+        "model": "test-model",
+        "choices": [{"finish_reason": "stop", "message": {"content": text}}],
+    })
+}
+
+/// Scout's chat with the real conversations module (campbooks-cloud#305):
+/// what the chat is about and every tool are read as the member, so a
+/// conversation of an inbox they can't read is neither a chat's subject nor
+/// a tool's result.
+#[sqlx::test(migrations = "../../migrations")]
+async fn scouts_chat_reads_only_what_the_member_can(db: PgPool) {
+    let find = tool_call("find_conversations", &json!({ "stream": "primary" }));
+    let model = model_answering(vec![
+        find.clone(),
+        said("Maya asked you to review the Q4 plan."),
+        find,
+        said("Nothing came in."),
+    ])
+    .await;
+    let gateway = Gateway::new(AiConfig {
+        roles: [(
+            Role::Complete,
+            ProviderConfig::new(format!("{}/v1", model.uri()).parse().unwrap(), "test-model"),
+        )]
+        .into(),
+        ..AiConfig::default()
+    })
+    .unwrap();
+    let composition = Composition {
+        assistant: campbooks_assistant::AssistantDeps {
+            ai: Some(gateway),
+            ..campbooks_assistant::AssistantDeps::default()
+        },
+        ..Composition::default()
+    };
+    let server = Server::new(&db, &composition).await;
+    let (workspace, sam_id) = server.workspace(&db, "sam").await;
+    let sams = dev::create_inbox(
+        &server.state,
+        workspace,
+        "sam@example.com",
+        &[(sam_id, InboxRole::Manager)],
+    )
+    .await
+    .unwrap();
+    server.ingest(workspace, sams, EN).await;
+    let ana_id = add_member(&db, workspace, "ana").await;
+    dev::create_inbox(
+        &server.state,
+        workspace,
+        "ana@example.com",
+        &[(ana_id, InboxRole::Manager)],
+    )
+    .await
+    .unwrap();
+    let maya: String = sqlx::query_scalar(
+        "SELECT conversation_id::text FROM conversations.messages WHERE provider_message_id = 'en-1'",
+    )
+    .fetch_one(&db)
+    .await
+    .unwrap();
+    let chats = format!("/api/v1/w/{workspace}/assistant/chats");
+    let about = json!({ "about": { "type": "conversations.conversation", "id": maya } });
+
+    // Ana can't read Sam's inbox: no chat about its conversation.
+    let (status, _) = server
+        .call(&server.token("ana"), "POST", &chats, Some(about.clone()))
+        .await;
+    assert_eq!(status, StatusCode::NOT_FOUND);
+
+    // Sam's chat about Maya's email: the conversation and its history are
+    // read for the model, and the tool finds his conversations.
+    let (status, chat) = server
+        .call(&server.token("sam"), "POST", &chats, Some(about))
+        .await;
+    assert_eq!(status, StatusCode::CREATED, "{chat}");
+    let id = chat["id"].as_str().unwrap();
+    let (status, answer) = server
+        .call(
+            &server.token("sam"),
+            "POST",
+            &format!("{chats}/{id}/questions"),
+            Some(json!({ "text": "What does Maya want?" })),
+        )
+        .await;
+    assert_eq!(status, StatusCode::OK, "{answer}");
+    assert_eq!(answer["text"], "Maya asked you to review the Q4 plan.");
+    let step = &answer["steps"][0];
+    assert_eq!(step["tool"], "find_conversations");
+    assert!(step["count"].as_u64().unwrap() >= 1, "{step}");
+    let requests = model.received_requests().await.unwrap();
+    let first: Value = serde_json::from_slice(&requests[0].body).unwrap();
+    let context: Value =
+        serde_json::from_str(first["messages"][1]["content"].as_str().unwrap()).unwrap();
+    assert_eq!(context["about"]["id"], maya.as_str());
+    assert!(
+        context["about"]["history"]["events"]
+            .as_array()
+            .is_some_and(|events| !events.is_empty()),
+        "{context}"
+    );
+    let second = String::from_utf8_lossy(&requests[1].body).to_string();
+    assert!(second.contains("northwind-studio.example"), "Sam's results");
+
+    // Ana's own chat finds nothing of Sam's.
+    let (status, chat) = server
+        .call(&server.token("ana"), "POST", &chats, Some(json!({})))
+        .await;
+    assert_eq!(status, StatusCode::CREATED, "{chat}");
+    let id = chat["id"].as_str().unwrap();
+    let (status, answer) = server
+        .call(
+            &server.token("ana"),
+            "POST",
+            &format!("{chats}/{id}/questions"),
+            Some(json!({ "text": "What came in?" })),
+        )
+        .await;
+    assert_eq!(status, StatusCode::OK, "{answer}");
+    assert_eq!(answer["steps"][0]["count"], 0, "{answer}");
+    let requests = model.received_requests().await.unwrap();
+    for request in &requests[2..] {
+        let sent = String::from_utf8_lossy(&request.body).to_string();
+        assert!(!sent.contains("northwind"), "{sent}");
+        assert!(!sent.contains("Q4 plan"), "{sent}");
+    }
 }

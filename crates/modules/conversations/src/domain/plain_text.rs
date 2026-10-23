@@ -4,7 +4,6 @@
 
 use std::{
     cell::{Cell, RefCell},
-    sync::LazyLock,
     time::{Duration, Instant},
 };
 
@@ -15,30 +14,9 @@ use html5ever::{
         states::RawKind,
     },
 };
-use regex::Regex;
 
 /// The most text handed on per message, in bytes.
 pub const MAX_BYTES: usize = 32 * 1024;
-
-/// Where quoted history starts: an attribution line ("On Tue, Ana wrote:",
-/// possibly wrapped onto a second line) in the four languages, or an
-/// "original message" separator.
-static QUOTE_START: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(concat!(
-        r"(?mi)^[ \t]*(?:",
-        r"(?:On|Em|El|Le)\b[^\n]{0,200}\n?[^\n]{0,100}\b(?:wrote|escreveu|escribió|a écrit)[ \t]*:[ \t]*$",
-        r"|-{2,}[ \t]*(?:Original Message|Mensagem original|Mensaje original|Message d'origine)[ \t]*-{2,}",
-        r"|(?:From|De)[ \t]*:[^\n]*\n[ \t]*(?:Sent|Date|Enviado|Enviada|Data|Fecha|Envoyé)[ \t]*:",
-        r")"
-    ))
-    .unwrap_or_else(|e| unreachable!("static regex compiles: {e}"))
-});
-
-/// Three or more line breaks (with blanks between them).
-static BLANK_LINES: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r"\n[ \t]*(?:\n[ \t]*){2,}")
-        .unwrap_or_else(|e| unreachable!("static regex compiles: {e}"))
-});
 
 /// Whether `<blockquote>` text is kept by [`text_of`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -215,18 +193,8 @@ impl TokenSink for Reader {
 /// it, and lines starting with `>`), blank runs collapsed, at most
 /// [`MAX_BYTES`].
 pub fn own_words(text: &str) -> String {
-    let text = text.replace("\r\n", "\n");
-    let own = QUOTE_START
-        .find(&text)
-        .map_or(text.as_str(), |quote| &text[..quote.start()]);
-    let kept: Vec<&str> = own
-        .lines()
-        .filter(|line| !line.trim_start().starts_with('>'))
-        .map(str::trim_end)
-        .collect();
-    let joined = kept.join("\n");
-    let collapsed = BLANK_LINES.replace_all(joined.trim(), "\n\n");
-    truncate(&collapsed, MAX_BYTES).to_owned()
+    let own = campbooks_kernel::text::without_quoted_history(text);
+    truncate(&own, MAX_BYTES).to_owned()
 }
 
 /// `text` cut to at most `max` bytes, at a character boundary.

@@ -3,6 +3,8 @@
 import { fireEvent, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
+import { ScoutChatProvider } from "~/lib/scout-chat";
+
 import { INBOX, Q4, Q4_BODY, Q4_DETAIL, W } from "../../../../../test/demo/conversations";
 import { DUARTE } from "../../../../../test/demo/workspaces";
 import { mockApi, renderWithProviders } from "../../../../../test/render";
@@ -49,6 +51,38 @@ function routes(conversation: ConversationSummary = Q4) {
 }
 
 describe("ConversationReader", () => {
+  it("offers Ask Scout on ., opening the chat about this conversation", async () => {
+    routes();
+    const scout = vi.fn();
+    renderWithProviders(
+      <ScoutChatProvider open={scout}>
+        <Reader />
+      </ScoutChatProvider>,
+    );
+    await screen.findByRole("heading", { name: Q4.subject });
+    const [ask] = screen.getAllByRole("button", { name: /Ask Scout/u });
+    if (ask === undefined) {
+      throw new Error("no Ask Scout");
+    }
+    expect(ask).toHaveAttribute("aria-keyshortcuts", ".");
+
+    // The focus comes back to the button it was asked from.
+    ask.focus();
+    fireEvent.click(ask);
+    expect(scout).toHaveBeenCalledWith(Q4.id, ask);
+    fireEvent.keyDown(document.body, { key: "." });
+    expect(scout).toHaveBeenCalledTimes(2);
+    expect(scout.mock.calls[1]?.[0]).toBe(Q4.id);
+  });
+
+  it("offers no Ask Scout where no chat is mounted", async () => {
+    routes();
+    renderWithProviders(<Reader />);
+    await screen.findByRole("heading", { name: Q4.subject });
+
+    expect(screen.queryByRole("button", { name: /Ask Scout/u })).toBeNull();
+  });
+
   it("offers no Reply, Reply all or Forward without a composer, and R does nothing", async () => {
     routes();
     renderWithProviders(<Reader />);

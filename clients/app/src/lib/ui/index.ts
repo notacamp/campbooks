@@ -82,6 +82,27 @@ export {
   type MenuSection,
 } from "./components/CommandMenu/CommandMenu";
 export { CodeBlock, type CodeBlockProps } from "./components/CodeBlock/CodeBlock";
+export {
+  ChatAbout,
+  ChatField,
+  ChatMessage,
+  ChatNotice,
+  ChatPanel,
+  ChatSteps,
+  ChatSuggestions,
+  ChatText,
+  ChatWorking,
+  type ChatAboutProps,
+  type ChatFieldProps,
+  type ChatMessageProps,
+  type ChatNoticeProps,
+  type ChatPanelProps,
+  type ChatStep,
+  type ChatStepRecord,
+  type ChatStepsProps,
+  type ChatSuggestionsProps,
+  type ChatWorkingProps,
+} from "./components/Chat/Chat";
 export { Composer, type ComposerProps } from "./components/Composer/Composer";
 export { CopyField, type CopyFieldProps } from "./components/CopyField/CopyField";
 export {

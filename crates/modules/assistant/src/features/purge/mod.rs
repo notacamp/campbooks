@@ -1,5 +1,6 @@
-//! Deleting a workspace's profiles when the workspace is deleted, and a
-//! former member's profile when they leave (rejoining starts afresh).
+//! Deleting a workspace's profiles and chats when the workspace is deleted,
+//! and a former member's profile and chats when they leave (rejoining
+//! starts afresh).
 
 use campbooks_kernel::{
     Event, EventHandler, Job, JobContext, JobError, jobs::EnqueueOptions, tenancy::WorkspaceId,
@@ -47,15 +48,25 @@ impl Job for PurgeWorkspace {
         .execute(&mut **tx)
         .await?
         .rows_affected();
+        sqlx::query("DELETE FROM assistant.chat_messages WHERE workspace_id = $1")
+            .bind(workspace.as_uuid())
+            .execute(&mut **tx)
+            .await?;
+        let chats = sqlx::query("DELETE FROM assistant.chats WHERE workspace_id = $1")
+            .bind(workspace.as_uuid())
+            .execute(&mut **tx)
+            .await?
+            .rows_affected();
         tracing::info!(
             profiles = deleted,
+            chats,
             "assistant purged for a deleted workspace"
         );
         Ok(())
     }
 }
 
-/// Forgets a former member's profile.
+/// Forgets a former member's profile and their chats.
 pub struct ForgetMember;
 
 impl EventHandler for ForgetMember {
@@ -77,6 +88,20 @@ impl EventHandler for ForgetMember {
         )
         .execute(&mut **tx)
         .await?;
+        // Their chats with Scout, and the chats' messages.
+        sqlx::query(
+            "DELETE FROM assistant.chat_messages WHERE chat_id IN (
+                 SELECT id FROM assistant.chats WHERE workspace_id = $1 AND user_id = $2)",
+        )
+        .bind(workspace.as_uuid())
+        .bind(left.user.as_uuid())
+        .execute(&mut **tx)
+        .await?;
+        sqlx::query("DELETE FROM assistant.chats WHERE workspace_id = $1 AND user_id = $2")
+            .bind(workspace.as_uuid())
+            .bind(left.user.as_uuid())
+            .execute(&mut **tx)
+            .await?;
         Ok(())
     }
 }
