@@ -953,12 +953,12 @@ fn body(world: &World, id: &str) -> Option<Value> {
         "conversations.confirm_rule"
         | "conversations.restore_rule"
         | "conversations.suggest_replies"
-        | "conversations.write_nudge" => json!({}),
+        | "conversations.write_nudge"
+        | "assistant.start_chat" => json!({}),
         "conversations.dismiss_rule_suggestion" => json!({"key": "matrix"}),
         "conversations.answer_rule_notice" => json!({"answer": "not_now"}),
         "assistant.update_profile" => json!({"proactivity": "ask_first", "asked": true}),
         "assistant.compile_instruction" => json!({"text": "newsletters never need me"}),
-        "assistant.start_chat" => json!({}),
         "assistant.ask_chat" | "assistant.stream_chat" => json!({"text": "Why is this here?"}),
         "conversations.write_reply" | "conversations.stream_reply" => {
             json!({"intent": "Say yes"})

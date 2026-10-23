@@ -16009,7 +16009,7 @@
               "at": {
                 "type": "string",
                 "format": "date-time",
-                "description": "When it was raised: Scout's answer raising it, else its message."
+                "description": "When it was raised: Scout's answer raising it, else its last change."
               },
               "basis": {
                 "type": "string",

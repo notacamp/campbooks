@@ -18,6 +18,9 @@ use crate::handbook::Handbook;
 /// when kept.
 pub const MAX_TOKENS: u32 = 8192;
 
+// A reasoning model needs the room (campbooks-cloud#217): never less.
+const _: () = assert!(MAX_TOKENS >= 8192);
+
 const INSTRUCTION: &str = "\
 You are Scout, the assistant inside Campbooks, answering the member's \
 questions in a chat. In this version you explain and look things up; you \
@@ -235,7 +238,6 @@ mod tests {
         let with = request(&[Message::user("q")], true);
         assert_eq!(with.tool_choice, Some(ToolChoice::Auto));
         assert_eq!(with.max_tokens, Some(MAX_TOKENS));
-        assert!(MAX_TOKENS >= 8192);
         let without = request(&[Message::user("q")], false);
         assert_eq!(without.tool_choice, Some(ToolChoice::None));
     }
