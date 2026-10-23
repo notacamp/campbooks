@@ -340,8 +340,10 @@ jobs:
       - name: System libraries for Tauri (Linux)
         uses: ./.github/actions/apt-packages
         with:
-          key: tauri
-          packages: libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
+          # The same set (and cache) as tauri-shell, so one warm cache covers
+          # both; the driver and xvfb are small and unused here.
+          key: tauri-shell
+          packages: libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf webkit2gtk-driver xvfb
       - uses: actions-rust-lang/setup-rust-toolchain@v2
         with: { cache: false, components: "rustfmt,clippy" }
       - uses: Swatinem/rust-cache@v2
