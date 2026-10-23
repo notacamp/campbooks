@@ -15,7 +15,8 @@ use utoipa::ToSchema;
 
 use crate::{
     domain::{
-        Change, HistoryDetail, Outcome, TaskId, TaskRevision, TaskView, access, actor_of, finish,
+        Outcome, TaskChange, TaskHistoryDetail, TaskId, TaskRevision, TaskView, access, actor_of,
+        finish,
     },
     features::get::TaskPath,
     scopes::TasksWrite,
@@ -108,8 +109,8 @@ pub async fn hand_off(
         path.task_id,
         &Outcome {
             actor: actor_of(workspace.invoked_by),
-            change: Change::HandedOff,
-            detail: HistoryDetail {
+            change: TaskChange::HandedOff,
+            detail: TaskHistoryDetail {
                 member: Some(body.to),
                 ..HistoryDetail::default()
             },
@@ -187,8 +188,8 @@ pub async fn take_back(
         path.task_id,
         &Outcome {
             actor: actor_of(workspace.invoked_by),
-            change: Change::TakenBack,
-            detail: HistoryDetail {
+            change: TaskChange::TakenBack,
+            detail: TaskHistoryDetail {
                 member: Some(row.assignee),
                 ..HistoryDetail::default()
             },

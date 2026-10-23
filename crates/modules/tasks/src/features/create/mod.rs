@@ -16,7 +16,7 @@ use utoipa::ToSchema;
 
 use crate::{
     domain::{
-        Change, HistoryDetail, Outcome, TaskId, TaskView, Verb, actor_of, clean_sender,
+        Outcome, TaskChange, TaskHistoryDetail, TaskId, TaskVerb, TaskView, actor_of, clean_sender,
         clean_title, finish, resources::TASK_RECORD,
     },
     scopes::TasksWrite,
@@ -30,7 +30,7 @@ pub struct NewTask {
     pub title: String,
     /// Do (the default) or Pay.
     #[serde(default)]
-    pub verb: Option<Verb>,
+    pub verb: Option<TaskVerb>,
     /// The day it is due.
     #[serde(default)]
     pub due_on: Option<NaiveDate>,
@@ -115,7 +115,7 @@ pub async fn handler(
             crate::MESSAGES.reason("invalid_source_sender"),
         ));
     }
-    let verb = body.verb.unwrap_or(Verb::Do);
+    let verb = body.verb.unwrap_or(TaskVerb::Do);
     let id = TaskId::new();
     sqlx::query(
         "INSERT INTO tasks.tasks
@@ -143,8 +143,8 @@ pub async fn handler(
         id,
         &Outcome {
             actor: actor_of(workspace.invoked_by),
-            change: Change::Created,
-            detail: HistoryDetail {
+            change: TaskChange::Created,
+            detail: TaskHistoryDetail {
                 due_on: body.due_on,
                 ..HistoryDetail::default()
             },

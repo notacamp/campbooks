@@ -67,7 +67,7 @@ macro_rules! words {
 
 words!(
     /// What kind of thing it is: something to do, or a bill to pay.
-    Verb {
+    TaskVerb {
         /// Something to do.
         Do => "do",
         /// Money is owed. Campbooks never pays: this marks it paid.
@@ -77,7 +77,7 @@ words!(
 
 words!(
     /// How the task came to be.
-    Origin {
+    TaskOrigin {
         /// The member wrote it.
         Own => "own",
         /// Asked of the member in an email.
@@ -89,7 +89,7 @@ words!(
 
 words!(
     /// When the member will do it.
-    PlanKind {
+    TaskPlan {
         /// No plan.
         None => "none",
         /// A day.
@@ -101,7 +101,7 @@ words!(
 
 words!(
     /// Whether it still needs doing.
-    State {
+    TaskState {
         /// It does.
         Open => "open",
         /// It was done (or paid).
@@ -113,7 +113,7 @@ words!(
 
 words!(
     /// Who made a change.
-    Actor {
+    TaskActor {
         /// The member.
         Member => "member",
         /// Scout, for the member.
@@ -125,7 +125,7 @@ words!(
 
 words!(
     /// What changed: the event's `change` and the history's `what`.
-    Change {
+    TaskChange {
         /// The task was made.
         Created => "created",
         /// Its title or verb changed.
@@ -149,11 +149,11 @@ words!(
 
 words!(
     /// A field `tasks.update` changed.
-    EditedField {
+    TaskEditedField {
         /// The title.
         Title => "title",
         /// The verb.
-        Verb => "verb",
+        TaskVerb => "verb",
         /// The due date or time.
         Due => "due",
     }
@@ -162,16 +162,16 @@ words!(
 /// What a history entry holds besides its kind: ids, enums and dates only,
 /// never a title.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
-pub struct HistoryDetail {
+pub struct TaskHistoryDetail {
     /// The fields an edit changed.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub fields: Vec<EditedField>,
+    pub fields: Vec<TaskEditedField>,
     /// The due day afterwards.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub due_on: Option<NaiveDate>,
     /// The plan afterwards.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub plan: Option<PlanKind>,
+    pub plan: Option<TaskPlan>,
     /// The planned day.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub plan_on: Option<NaiveDate>,
@@ -191,9 +191,9 @@ pub struct TaskView {
     /// What to do, in the member's words.
     pub title: String,
     /// Do or Pay.
-    pub verb: Verb,
+    pub verb: TaskVerb,
     /// How it came to be.
-    pub origin: Origin,
+    pub origin: TaskOrigin,
     /// The day it is due.
     pub due_on: Option<NaiveDate>,
     /// The time it is due, when it has one (`due_on` is its local day).
@@ -201,13 +201,13 @@ pub struct TaskView {
     /// Whether it is open and its due day has passed (the caller's today).
     pub overdue: bool,
     /// The plan. A Later that has ended reads as `none`.
-    pub plan: PlanKind,
+    pub plan: TaskPlan,
     /// The planned day, for `date`.
     pub plan_on: Option<NaiveDate>,
     /// When Later ends, for `later`.
     pub later_until: Option<DateTime<Utc>>,
     /// Open, done or not needed.
-    pub state: State,
+    pub state: TaskState,
     /// When it was closed.
     pub closed_at: Option<DateTime<Utc>>,
     /// The member it is with.
@@ -228,19 +228,19 @@ pub struct TaskView {
 
 /// One entry of a task's history.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
-pub struct HistoryEntry {
+pub struct TaskHistoryEntry {
     /// The entry.
     pub id: HistoryId,
     /// When.
     pub at: DateTime<Utc>,
     /// Who: the member, Scout or the calendar.
-    pub actor: Actor,
+    pub actor: TaskActor,
     /// The member Scout or the calendar acted for, or who acted.
     pub actor_member: Option<UserId>,
     /// What changed.
-    pub what: Change,
+    pub what: TaskChange,
     /// Ids, enums and dates of the change.
-    pub detail: HistoryDetail,
+    pub detail: TaskHistoryDetail,
 }
 
 /// The columns of a task row, in [`TaskRow`] order.
@@ -301,18 +301,18 @@ impl TaskRow {
 
     /// Whether it is open.
     pub fn is_open(&self) -> bool {
-        self.state == State::Open.as_str()
+        self.state == TaskState::Open.as_str()
     }
 
     /// The view at `now`, with `today` (the caller's) deciding whether it is
     /// overdue.
     pub fn view(&self, now: DateTime<Utc>, today: NaiveDate) -> Result<TaskView> {
-        let state: State = self.state.parse()?;
-        let mut plan: PlanKind = self.plan.parse()?;
+        let state: TaskState = self.state.parse()?;
+        let mut plan: TaskPlan = self.plan.parse()?;
         let (mut plan_on, mut later_until) = (self.plan_on, self.later_until);
         // Later ends by itself: from then on it reads as no plan.
-        if plan == PlanKind::Later && self.later_until.is_none_or(|until| until <= now) {
-            plan = PlanKind::None;
+        if plan == TaskPlan::Later && self.later_until.is_none_or(|until| until <= now) {
+            plan = TaskPlan::None;
             plan_on = None;
             later_until = None;
         }
@@ -323,7 +323,7 @@ impl TaskRow {
             origin: self.origin.parse()?,
             due_on: self.due_on,
             due_at: self.due_at,
-            overdue: state == State::Open && self.due_on.is_some_and(|due| due < today),
+            overdue: state == TaskState::Open && self.due_on.is_some_and(|due| due < today),
             plan,
             plan_on,
             later_until,
@@ -357,13 +357,13 @@ pub struct HistoryRow {
     pub actor: String,
     pub actor_member: Option<UserId>,
     pub what: String,
-    pub detail: sqlx::types::Json<HistoryDetail>,
+    pub detail: sqlx::types::Json<TaskHistoryDetail>,
 }
 
 impl HistoryRow {
     /// The entry.
-    pub fn entry(self) -> Result<HistoryEntry> {
-        Ok(HistoryEntry {
+    pub fn entry(self) -> Result<TaskHistoryEntry> {
+        Ok(TaskHistoryEntry {
             id: self.id,
             at: self.at,
             actor: self.actor.parse()?,
@@ -420,22 +420,22 @@ pub const MAX_OFFSET_MINUTES: i32 = 14 * 60;
 
 /// Who is acting: the member, or Scout when the assistant or an automation
 /// runs the call for them.
-pub fn actor_of(invoked_by: Option<campbooks_kernel::operations::Caller>) -> Actor {
+pub fn actor_of(invoked_by: Option<campbooks_kernel::operations::Caller>) -> TaskActor {
     if invoked_by.is_some() {
-        Actor::Scout
+        TaskActor::Scout
     } else {
-        Actor::Member
+        TaskActor::Member
     }
 }
 
 /// What a finished change needs besides the row.
 pub struct Outcome {
     /// Who made it.
-    pub actor: Actor,
+    pub actor: TaskActor,
     /// What it was.
-    pub change: Change,
+    pub change: TaskChange,
     /// What to keep in the history.
-    pub detail: HistoryDetail,
+    pub detail: TaskHistoryDetail,
     /// The assignee before a hand-off or a take-back.
     pub previous_assignee: Option<UserId>,
 }

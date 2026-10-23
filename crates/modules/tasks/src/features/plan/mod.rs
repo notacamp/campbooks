@@ -15,7 +15,8 @@ use utoipa::ToSchema;
 
 use crate::{
     domain::{
-        Change, HistoryDetail, Outcome, PlanKind, TaskId, TaskView, access, actor_of, finish,
+        Outcome, TaskChange, TaskHistoryDetail, TaskId, TaskPlan, TaskView, access, actor_of,
+        finish,
     },
     features::get::TaskPath,
     scopes::TasksWrite,
@@ -28,7 +29,7 @@ pub struct PlanTask {
     /// The revision you saw.
     pub revision: i64,
     /// `none`, `date` or `later`.
-    pub plan: PlanKind,
+    pub plan: TaskPlan,
     /// The day, for `date`.
     #[serde(default)]
     pub plan_on: Option<NaiveDate>,
@@ -80,15 +81,15 @@ pub async fn handler(
     let access = &workspace.access;
     let now = Utc::now();
     let (plan_on, later_until) = match body.plan {
-        PlanKind::None => (None, None),
-        PlanKind::Date => (
+        TaskPlan::None => (None, None),
+        TaskPlan::Date => (
             Some(
                 body.plan_on
                     .ok_or_else(|| Error::BadRequest(crate::MESSAGES.reason("plan_needs_day")))?,
             ),
             None,
         ),
-        PlanKind::Later => {
+        TaskPlan::Later => {
             let until = body
                 .later_until
                 .filter(|until| *until > now && *until <= now + LONGEST)
@@ -119,8 +120,8 @@ pub async fn handler(
         path.task_id,
         &Outcome {
             actor: actor_of(workspace.invoked_by),
-            change: Change::Planned,
-            detail: HistoryDetail {
+            change: TaskChange::Planned,
+            detail: TaskHistoryDetail {
                 plan: Some(body.plan),
                 plan_on,
                 later_until,

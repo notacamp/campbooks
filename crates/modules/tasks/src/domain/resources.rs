@@ -20,7 +20,7 @@ use campbooks_kernel::{
 };
 use sqlx::{PgConnection, PgPool};
 
-use super::{State, TaskId};
+use super::{TaskId, TaskState};
 
 /// The record type of a task.
 pub const TASK_RECORD: &str = "tasks.task";
@@ -74,7 +74,7 @@ impl ResourceFacts for TaskFacts {
             Ok(found.map(|(assignee, handed_by, state)| {
                 let facts = Facts::owned_by(OwnerFact::User(assignee));
                 match handed_by {
-                    Some(by) if state == State::Open.as_str() => {
+                    Some(by) if state == TaskState::Open.as_str() => {
                         facts.within(RecordRef::new(ASSIGNEE_RECORD, &by), None)
                     }
                     _ => facts,

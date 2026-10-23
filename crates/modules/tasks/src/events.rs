@@ -11,7 +11,7 @@ use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
 use crate::domain::{
-    Change, Origin, PlanKind, State, TaskId, Verb,
+    TaskChange, TaskId, TaskOrigin, TaskPlan, TaskState, TaskVerb,
     resources::{ASSIGNEE_RECORD, TASK_RECORD},
 };
 
@@ -27,19 +27,19 @@ pub struct TaskChanged {
     /// Grows with every change of this task.
     pub revision: i64,
     /// What changed.
-    pub change: Change,
+    pub change: TaskChange,
     /// Open, done or not needed.
-    pub state: State,
+    pub state: TaskState,
     /// Do or Pay.
-    pub verb: Verb,
+    pub verb: TaskVerb,
     /// How it came to be.
-    pub origin: Origin,
+    pub origin: TaskOrigin,
     /// The day it is due.
     pub due_on: Option<NaiveDate>,
     /// The time it is due.
     pub due_at: Option<DateTime<Utc>>,
     /// The plan.
-    pub plan: PlanKind,
+    pub plan: TaskPlan,
     /// The planned day.
     pub plan_on: Option<NaiveDate>,
     /// When Later ends.

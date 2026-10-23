@@ -16,8 +16,8 @@ use utoipa::ToSchema;
 
 use crate::{
     domain::{
-        Change, EditedField, HistoryDetail, Outcome, TaskId, TaskView, Verb, access, actor_of,
-        clean_title, finish,
+        Outcome, TaskChange, TaskEditedField, TaskHistoryDetail, TaskId, TaskVerb, TaskView,
+        access, actor_of, clean_title, finish,
     },
     features::get::TaskPath,
     scopes::TasksWrite,
@@ -32,7 +32,7 @@ pub struct TaskUpdate {
     /// What to do: 1 to 200 characters.
     pub title: String,
     /// Do or Pay.
-    pub verb: Verb,
+    pub verb: TaskVerb,
     /// The day it is due; none clears it.
     #[serde(default)]
     pub due_on: Option<NaiveDate>,
@@ -92,14 +92,14 @@ pub async fn handler(
     access::expect_open(&row)?;
     let mut fields = Vec::new();
     if row.title != title {
-        fields.push(EditedField::Title);
+        fields.push(TaskEditedField::Title);
     }
     if row.verb != body.verb.as_str() {
-        fields.push(EditedField::Verb);
+        fields.push(TaskEditedField::TaskVerb);
     }
     let due_changed = row.due_on != body.due_on || row.due_at != body.due_at;
     if due_changed {
-        fields.push(EditedField::Due);
+        fields.push(TaskEditedField::Due);
     }
     if fields.is_empty() {
         tx.commit().await?;
@@ -118,10 +118,10 @@ pub async fn handler(
     .bind(body.due_at)
     .execute(&mut *tx)
     .await?;
-    let change = if fields == [EditedField::Due] {
-        Change::DueChanged
+    let change = if fields == [TaskEditedField::Due] {
+        TaskChange::DueChanged
     } else {
-        Change::Edited
+        TaskChange::Edited
     };
     let view = finish(
         &state,
@@ -131,7 +131,7 @@ pub async fn handler(
         &Outcome {
             actor: actor_of(workspace.invoked_by),
             change,
-            detail: HistoryDetail {
+            detail: TaskHistoryDetail {
                 fields,
                 due_on: body.due_on,
                 ..HistoryDetail::default()

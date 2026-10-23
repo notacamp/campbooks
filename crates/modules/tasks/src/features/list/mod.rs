@@ -15,7 +15,7 @@ use utoipa::{IntoParams, ToSchema};
 
 use crate::{
     domain::{
-        MAX_OFFSET_MINUTES, SELECT_COLUMNS, State as TaskState, TaskId, TaskRow, TaskView,
+        MAX_OFFSET_MINUTES, SELECT_COLUMNS, TaskId, TaskRow, TaskState, TaskView,
         resources::TASK_RECORD, today,
     },
     scopes::TasksRead,
@@ -24,7 +24,7 @@ use crate::{
 /// Whose tasks.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Deserialize, ToSchema)]
 #[serde(rename_all = "snake_case")]
-pub enum Whose {
+pub enum TaskWhose {
     /// Assigned to the caller (the default).
     #[default]
     Mine,
@@ -62,7 +62,7 @@ pub struct ListQuery {
     /// `mine` (default) or `handed_off`.
     #[serde(default)]
     #[param(inline)]
-    pub whose: Option<Whose>,
+    pub whose: Option<TaskWhose>,
     /// 1 to 100 task ids, separated by commas: Home's batch read. Tasks the
     /// caller cannot see are left out.
     #[serde(default)]
@@ -143,7 +143,7 @@ pub async fn handler(
     // state; otherwise the open tasks assigned to them.
     let by_ids = ids.is_some();
     let whose = match (query.whose, by_ids) {
-        (Some(Whose::HandedOff), _) => "handed_off",
+        (Some(TaskWhose::HandedOff), _) => "handed_off",
         (_, true) => "any",
         _ => "mine",
     };

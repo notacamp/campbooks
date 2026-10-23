@@ -14,7 +14,7 @@ use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
 use crate::{
-    domain::{HistoryEntry, HistoryRow, TaskId, TaskView, access},
+    domain::{HistoryRow, TaskHistoryEntry, TaskId, TaskView, access},
     scopes::TasksRead,
 };
 
@@ -31,7 +31,7 @@ pub struct TaskDetail {
     /// The task.
     pub task: TaskView,
     /// What changed in it, oldest first.
-    pub history: Vec<HistoryEntry>,
+    pub history: Vec<TaskHistoryEntry>,
 }
 
 /// Read a task.

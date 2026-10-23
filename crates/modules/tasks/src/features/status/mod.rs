@@ -3,7 +3,7 @@
 
 use crate::{
     domain::{
-        Change, HistoryDetail, Outcome, State as TaskState, TaskId, TaskRevision, TaskView, access,
+        Outcome, TaskChange, TaskHistoryDetail, TaskId, TaskRevision, TaskState, TaskView, access,
         actor_of, finish,
     },
     features::get::TaskPath,
@@ -167,9 +167,9 @@ async fn set_state(
     .execute(&mut *tx)
     .await?;
     let change = match to {
-        TaskState::Open => Change::Reopened,
-        TaskState::Done => Change::Done,
-        TaskState::NotNeeded => Change::NotNeeded,
+        TaskState::Open => TaskChange::Reopened,
+        TaskState::Done => TaskChange::Done,
+        TaskState::NotNeeded => TaskChange::NotNeeded,
     };
     let view = finish(
         state,
@@ -179,7 +179,7 @@ async fn set_state(
         &Outcome {
             actor: actor_of(workspace.invoked_by),
             change,
-            detail: HistoryDetail::default(),
+            detail: TaskHistoryDetail::default(),
             previous_assignee: None,
         },
     )
