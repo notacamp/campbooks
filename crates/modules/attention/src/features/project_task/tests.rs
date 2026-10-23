@@ -182,11 +182,79 @@ async fn a_task_replaces_its_conversations_do_item(db: PgPool) {
     assert_eq!(listed.len(), 1, "{listed:?}");
     assert_eq!(listed[0]["record"]["type"], "tasks.task");
 
-    // Not needed: the conversation's own item is back.
+    // Not needed: the task's line is gone and the conversation's own does not
+    // come back, because it is the one the task came from.
     task.revision = 2;
     task.state = TaskState::NotNeeded;
     kit.task(workspace, &task).await;
+    assert!(items(&kit, &ana, workspace).await.is_empty());
+}
+
+fn need_of(reason: Reason, revision: i64, sent_at: chrono::DateTime<Utc>) -> Need {
+    Need {
+        conversation: CONVERSATION.into(),
+        inbox: INBOX.into(),
+        message: "0192f0c4-7d4e-7b39-a7f1-3a8f0e2b9c33".into(),
+        revision,
+        reason,
+        due_on: None,
+        sent_at,
+        latest: None,
+        lapses_at: None,
+    }
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn paying_the_task_finishes_the_conversations_pay_item_too(db: PgPool) {
+    let kit = Kit::new(db).await;
+    let workspace = WorkspaceId::new();
+    let (ana, ana_id) = kit.member("ana", workspace);
+    kit.let_see(INBOX, ana_id);
+    kit.need(
+        workspace,
+        &need_of(Reason::Pay, 1, Utc::now() - TimeDelta::hours(1)),
+    )
+    .await;
+    let mut task = Task::open(TASK, 1, ana_id);
+    task.verb = TaskVerb::Pay;
+    task.source = Some(CONVERSATION.into());
+    kit.task(workspace, &task).await;
+    assert_eq!(items(&kit, &ana, workspace).await.len(), 1);
+
+    task.revision = 2;
+    task.state = TaskState::Done;
+    kit.task(workspace, &task).await;
+    assert!(items(&kit, &ana, workspace).await.is_empty());
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_new_bill_in_the_same_thread_shows_again(db: PgPool) {
+    let kit = Kit::new(db).await;
+    let workspace = WorkspaceId::new();
+    let (ana, ana_id) = kit.member("ana", workspace);
+    kit.let_see(INBOX, ana_id);
+    kit.need(
+        workspace,
+        &need_of(Reason::Pay, 1, Utc::now() - TimeDelta::hours(1)),
+    )
+    .await;
+    let mut task = Task::open(TASK, 1, ana_id);
+    task.verb = TaskVerb::Pay;
+    task.source = Some(CONVERSATION.into());
+    kit.task(workspace, &task).await;
+    task.revision = 2;
+    task.state = TaskState::Done;
+    kit.task(workspace, &task).await;
+    assert!(items(&kit, &ana, workspace).await.is_empty());
+
+    // A newer message in the thread opens a newer Pay item.
+    kit.need(
+        workspace,
+        &need_of(Reason::Pay, 2, Utc::now() + TimeDelta::hours(1)),
+    )
+    .await;
     let listed = items(&kit, &ana, workspace).await;
-    assert_eq!(listed.len(), 1);
+    assert_eq!(listed.len(), 1, "{listed:?}");
     assert_eq!(listed[0]["record"]["type"], "conversations.conversation");
+    assert_eq!(listed[0]["reason"], "pay");
 }

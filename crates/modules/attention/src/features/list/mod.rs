@@ -57,7 +57,10 @@ const MAX_OFFSET_MINUTES: i32 = 14 * 60;
 /// reason, then overdue (before `$6`, the caller's today), due date, urgent
 /// and age. A task (campbooks-cloud#43) stays until done however late, is left
 /// out while planned Later (`hidden_until`) and replaces its conversation's
-/// `do` or `pay` item for its assignee (`$7`, the caller as text).
+/// `do` or `pay` item for its assignee (`$7`, the caller as text) while it is
+/// open, and once closed for as long as that item is the one it came from
+/// (cleared at or after the item's `since`): finishing the task finishes the
+/// item.
 const OPEN: &str = "SELECT i.id, i.record_type, i.record_id, i.container_type, i.container_id, \
             i.cause_type, i.cause_id, i.reason, i.trust, i.due_on, i.urgent, i.since, i.state, \
             i.cleared_because, i.cleared_by, i.cleared_at, NULL::timestamptz AS snoozed_until \
@@ -70,7 +73,8 @@ const OPEN: &str = "SELECT i.id, i.record_type, i.record_id, i.container_type, i
         AND NOT (i.record_type = 'conversations.conversation' AND i.reason IN ('do', 'pay') \
                  AND EXISTS (SELECT 1 FROM attention.items t \
                               WHERE t.workspace_id = i.workspace_id \
-                                AND t.record_type = 'tasks.task' AND t.state = 'open' \
+                                AND t.record_type = 'tasks.task' \
+                                AND (t.state = 'open' OR t.cleared_at >= i.since) \
                                 AND t.cause_type = i.record_type AND t.cause_id = i.record_id \
                                 AND t.container_type = 'tasks.assignee' \
                                 AND t.container_id = $7)) \

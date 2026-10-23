@@ -2,7 +2,7 @@
 // list on Tuesday 13 October 2026, as the tasks API returns it.
 import type { Schema } from "~/lib/api";
 
-import { MARTA } from "./attention";
+import { LUZ, MARTA } from "./attention";
 import { ANA, RUI, SOFIA } from "./workspaces";
 
 type Task = Schema<"TaskView">;
@@ -75,6 +75,24 @@ export const VENUE = task(7, {
   due_on: "2026-10-20",
   assignee: RUI.user_id,
   handed_by: ANA.user_id,
+});
+
+/** Scout found it in Marta's email: the signed lease, due Friday. */
+export const ASK_LEASE = task(8, {
+  title: "Send the signed lease",
+  origin: "ask",
+  due_on: "2026-10-16",
+  source: { type: "conversations.conversation", id: MARTA.id },
+});
+
+/** Scout found it in the energy company's invoice, late. */
+export const ASK_BILL = task(9, {
+  title: "Pay invoice 7781 · €84.20",
+  verb: "pay",
+  origin: "ask",
+  due_on: "2026-10-12",
+  overdue: true,
+  source: { type: "conversations.conversation", id: LUZ.id },
 });
 
 /** Ana's open list, as `tasks.list` answers it. */

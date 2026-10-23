@@ -18,6 +18,7 @@ use utoipa_axum::{router::OpenApiRouter, routes};
 pub mod domain;
 pub mod events;
 mod features;
+pub mod inbound;
 pub mod scopes;
 
 pub use domain::resources::visibility;
@@ -43,6 +44,7 @@ pub fn module() -> Module {
         admin_router: None,
         background: Background::new()
             .publishes::<events::TaskChanged>()
+            .on_event::<features::add_read_asks::AddReadAsks>()
             .on_event::<features::purge_workspace::ScheduleWorkspacePurge>()
             .job::<features::purge_workspace::PurgeWorkspace>(),
         resources: domain::resources::resources(),

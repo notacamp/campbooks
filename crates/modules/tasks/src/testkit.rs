@@ -20,7 +20,9 @@ use campbooks_kernel::{
         Catalogue, Facts, FactsFuture, Owner, OwnerFact, ResourceFacts, ResourceType, Resources,
         Tenancy,
     },
+    blobs::BlobStore,
     changes::{Visibilities, Visibility, VisibilityFuture},
+    config::BlobsConfig,
     db::BeginFor as _,
     jobs::{Registry, Worker, WorkerStats},
     tenancy::{Access, Membership, MembershipFuture, Role, RoleFuture, UserId, WorkspaceId},
@@ -169,8 +171,10 @@ impl Kit {
             &Resources::new(&CONVERSATION_TYPES, Arc::new(ConversationFacts)),
         ])
         .unwrap();
+        let blobs = BlobStore::memory(&BlobsConfig::default(), pool.clone());
         let state = idp
             .state(pool)
+            .with_blobs(blobs)
             .with_membership(membership.clone())
             .with_visibility(Arc::new(Visibilities::new(vec![
                 inboxes.clone(),

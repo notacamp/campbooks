@@ -77,6 +77,7 @@
     "tomorrow": "Mañana",
     "nextWeek": "La semana que viene",
     "source": "De dónde viene",
+    "foundByScout": "Scout encontró esto en el correo",
     "sourceLine": "{{subject}} · {{date}}",
     "openEmail": "Abrir el correo",
     "hand": "Pasársela a alguien",

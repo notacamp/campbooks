@@ -9,6 +9,7 @@ Tasks are what the member has to do or pay. The Tasks place lists them, and Home
 - It may have a due day, and a due time on that day. A task with no due day is allowed.
 - A task is open, done, or not needed. A done or not needed task can be opened again.
 - It may come from an email. The task then names that conversation.
+- Scout can add a task itself from what it read in an email in the member's own inbox (an ask). Its detail then says Scout found it in the email; the member can edit, plan, hand off or close it like any other.
 - It is personal: it belongs to one member, its assignee.
 
 ### Plan and Later

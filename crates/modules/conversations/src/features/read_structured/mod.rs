@@ -288,7 +288,8 @@ async fn keep(
     let owner = store::owner(tx, loaded.inbox_id).await?;
     let ws = workspace.to_string();
     let texts =
-        crate::features::read_message::put_texts(&state.blobs, tx, &ws, message, &items).await?;
+        crate::features::read_message::put_texts(&state.blobs, tx, &ws, message, &items, &asks)
+            .await?;
     state
         .events
         .publish(

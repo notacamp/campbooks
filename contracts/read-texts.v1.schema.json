@@ -22,6 +22,29 @@
           "ical_uid": { "type": ["string", "null"], "maxLength": 1024, "description": "The `UID` of the sender's own iCalendar event, when the item came from one." }
         }
       }
+    },
+    "asks": {
+      "type": "array",
+      "maxItems": 10,
+      "description": "The words of the read's asks. Optional: absent when the read has none. The tasks module reads it to title the tasks it makes.",
+      "items": {
+        "type": "object",
+        "required": ["key"],
+        "additionalProperties": false,
+        "properties": {
+          "key": { "type": "string", "description": "The ask's key, as in `message_read`." },
+          "title": { "type": "string", "maxLength": 200 },
+          "amount": {
+            "type": ["object", "null"],
+            "required": ["minor", "currency"],
+            "additionalProperties": false,
+            "properties": {
+              "minor": { "type": "integer" },
+              "currency": { "type": "string" }
+            }
+          }
+        }
+      }
     }
   }
 }
