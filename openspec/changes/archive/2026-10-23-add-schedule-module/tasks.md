@@ -60,12 +60,8 @@ time.
 
 ## 7. Connectors
 
-- [ ] 7.1 Offer `calendar` for Google (two scopes) through the extend path; calendar list on grant; `capability_granted`
-- [ ] 7.2 Google Calendar adapter: first read, sync token, 410 resync, normalisation, blobs, budget
-- [ ] 7.3 `calendar_changed` v1 published with the cursor in one transaction
-- [ ] 7.4 Outbound calendar changes: port confirmation, MAC binding, If-Match, 412 → superseded + re-read, private properties, outcomes, no echo
-- [ ] 7.5 Zoho Calendar adapter behind `CAMPBOOKS_CONNECTORS__ZOHO_CALENDAR` (off); 409 `capability_not_offered` while off
-- [ ] 7.6 `accessNotConfigured` → calendar stream health reason, mail untouched
+Moved to `add-calendar-sync` (tasks §1–§2): Google and Zoho calendar sync is
+a separate change. Nothing here is outstanding for this change.
 
 ## 8. Client
 
@@ -75,14 +71,18 @@ time.
 - [x] 8.4 Reader strip: found items, "Scout is reading this…", request read on open, L1-only "This email has a <kind> · Add"
 - [x] 8.5 Settings → Calendar: time zone, working hours, calendars, kinds, also-add-to, Add calendar access
 - [x] 8.6 Kind icons and colour tokens in the design system; Storybook stories for each screen
-- [ ] 8.7 i18n en/pt-PT/es-ES/fr, `pnpm test:fit` passes at 375 and 1280
+- [x] 8.7 i18n en/pt-PT/es-ES/fr, `pnpm test:fit` passes at 375 and 1280
 
 ## 9. Evaluation and measurement
+
+Outside this change: these are follow-ups, tracked on campbooks-cloud#42, not archive blockers.
 
 - [ ] 9.1 Ask the owner for 30–50 labelled emails (bookings, bills, renewals, newsletters with dates) for `has_dated_thing` / `dated_kind`; agent-written items don't count
 - [ ] 9.2 On staging, measure the share of mail flagged, reads per 1,000 emails, and drops by reason; set the `__DATED__FLAG` default from it and record it in the eval report
 
 ## 10. Follow-ups to open (campbooks-cloud, label `next`, on project 1)
+
+Outside this change; sync's follow-ups are in `add-calendar-sync`.
 
 - [ ] 10.1 Due layer from `tasks.task_changed.v1` (latest revision per task, open with a due date) + `TaskSource` port, drawn as the calendar-ui "What is due" rows (Pay/Do, amount only when `has_amount`, Due 17:00, Overdue in danger colour, done drops off, held-on-due-day shows only Held, Week's Due lane above All day)
 - [ ] 10.2 `TimeHeld` / `TimeReleased` → hold events; hold `event_changed` / `event_cancelled` back to tasks
@@ -90,8 +90,8 @@ time.
 
 ## 11. Wrap-up
 
-- [ ] 11.1 OpenAPI regenerated (`cargo xtask openapi`) and client types regenerated (`pnpm --dir clients api:generate`), committed from CI's output if needed
-- [ ] 11.2 Changelog entry files in `changelog/unreleased/<kind>/`
-- [ ] 11.3 Gates green in CI (AGENTS.md → Code quality)
-- [ ] 11.4 UI verified at 375px and desktop, recording in the PR (`## Recording`)
-- [ ] 11.5 `openspec archive add-schedule-module --yes` before merge; baseline specs reflect the change
+- [x] 11.1 OpenAPI regenerated (`cargo xtask openapi`) and client types regenerated (`pnpm --dir clients api:generate`), committed from CI's output if needed
+- [x] 11.2 Changelog entry files in `changelog/unreleased/<kind>/`
+- [x] 11.3 Gates green in CI (AGENTS.md → Code quality)
+- [x] 11.4 UI verified at 375px and desktop, recording in the PR (`## Recording`)
+- [x] 11.5 `openspec archive add-schedule-module --yes` before merge; baseline specs reflect the change

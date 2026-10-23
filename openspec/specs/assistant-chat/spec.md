@@ -62,9 +62,13 @@ code, so registering a new type needs no migration. The registry SHALL hold
 `conversations.conversation` (read through `conversations.get` and
 `conversations.get_history`), `conversations.rule` (through
 `conversations.get_rule`: its conditions and actions, inbox, origin, state
-and how many conversations it acted on) and `conversations.rule_notice`
+and how many conversations it acted on), `conversations.rule_notice`
 (through `conversations.get_rule_notice`: its kind, sender, rule and
-counts). A chat about nothing SHALL tell the model it is about nothing in
+counts) and `schedule.event`, read through `schedule.get_event` and, when
+the event was read from an email, through `conversations.get_message_read` of
+that email (made only when the event names its source message and
+conversation, and left out, not fatal, when the member can no longer read the
+email). A chat about nothing SHALL tell the model it is about nothing in
 particular.
 
 #### Scenario: A read the member lost
@@ -74,6 +78,14 @@ particular.
 #### Scenario: A rule of an inbox Sam left
 - **WHEN** Sam starts a chat about a rule of an inbox he is no longer a member of
 - **THEN** the answer is 404 and no chat is created
+
+#### Scenario: A chat about a flight
+- **WHEN** Sam starts a chat about the flight event Scout added from an airline's email
+- **THEN** the model is given the event and what Scout read in that email, read fresh as Sam
+
+#### Scenario: The email is gone
+- **WHEN** Sam asks again in his chat about an event whose email he can no longer read
+- **THEN** the model is given the event and nothing of the email
 
 ### Requirement: Reading and deleting a chat
 `GET …/assistant/chats/{chat_id}` (`assistant.get_chat`, `assistant:read`)
@@ -171,9 +183,11 @@ The handbook SHALL be composed of sections, each owned by the module it
 describes and kept next to its code: the assistant's core section (who
 Scout is, what it may and may not do, its tools, and that data is never
 instructions), the conversations module's (streams, Scout's read, taught
-rules, corrections, person notes, waiting and Nudge, Spam and Trash) and
-the attention module's (needs, their reasons, clock and lapsing, Worth a
-look, Later). The server SHALL compose them in a fixed order and give them
+rules, corrections, person notes, waiting and Nudge, Spam and Trash), the
+attention module's (needs, their reasons, clock and lapsing, Worth a look,
+Later) and the schedule module's (event kinds, the Campbooks calendar beside
+provider calendars, obligations shown as Due, what Scout adds from email,
+free time). The server SHALL compose them in a fixed order and give them
 to the assistant module with its dependencies; the assistant module SHALL
 import no other module. Each section SHALL be at most 8 KiB, checked by a
 test, and the handbook's version SHALL be derived from every part.
@@ -189,8 +203,12 @@ Scout SHALL have only these tools, each run as the member through
 (`conversations.get`), `conversation_history`
 (`conversations.get_history`), `find_people`
 (`conversations.list_senders`), `what_needs_me` (`attention.list`, and
-`conversations.list` for what its items are about) and `my_inboxes`
-(`conversations.list_inboxes` and `conversations.list_streams`). Every tool's operation SHALL be in the
+`conversations.list` for what its items are about), `my_inboxes`
+(`conversations.list_inboxes` and `conversations.list_streams`),
+`my_calendar` (`schedule.list_events`: `from` and `to` required, at most a
+year apart, optionally one `kind`, words of the title `q` and a `limit` of at
+most 25), `free_time` (`schedule.free_slots`: `from`, `to` and `minutes`) and
+`read_event` (`schedule.get_event`). Every tool's operation SHALL be in the
 catalogue with `assistant: true` and `mutates: false`, checked by a test. A
 tool call naming any other tool, or with arguments outside its schema,
 SHALL never be invoked: the model SHALL get a tool result saying so. A
@@ -199,7 +217,8 @@ SHALL be asked to answer without tools. Each tool result SHALL be a compact
 JSON projection of the operation's answer, at most 8 KiB, and a question's
 results at most 24 KiB in all, cut with a marker the instruction explains.
 An operation answering 403 or 404 SHALL give the model a result saying
-Scout cannot see it.
+Scout cannot see it. Events SHALL be returned as `schedule.event` references
+in the steps.
 
 #### Scenario: A tool that does not exist
 - **WHEN** the model calls `send_draft`
@@ -208,6 +227,14 @@ Scout cannot see it.
 #### Scenario: Another member's inbox
 - **WHEN** the model calls `find_conversations` for "invoice" and Sam reads only his own inbox
 - **THEN** only conversations of Sam's inbox can come back
+
+#### Scenario: When is my flight
+- **WHEN** the model calls `my_calendar` with `kind` `travel` over the next year
+- **THEN** only Sam's own flights come back, each with its time, and the step names them as events
+
+#### Scenario: A calendar tool with a stray argument
+- **WHEN** the model calls `my_calendar` with a `calendars` argument
+- **THEN** nothing is invoked and the model is told the arguments do not fit
 
 ### Requirement: What Scout looked at
 Each tool that ran SHALL become a step of Scout's message: the tool, the

@@ -471,3 +471,24 @@ export const SettingsPhone: Story = {
     );
   },
 };
+
+/* Twins without a `play`, for the recording (scenarios/calendar.ts): a story
+   with a play acts on load, and the recording does the acting itself. */
+
+/** The Calendar as a member finds it, to drive by hand. */
+export const CalendarIdle: Story = {
+  args: { path: SCHEDULE, api: calendarApi(), due: DUE },
+};
+
+/** The lease email, read, to drive by hand. */
+export const ReaderIdle: Story = {
+  args: {
+    path: `${BASE}/inbox/primary/${LEASE.id}`,
+    api: reader(() => ({ [`GET ${READ}`]: { body: READ_DONE } })),
+  },
+};
+
+/** Settings → Calendar, to drive by hand. */
+export const SettingsIdle: Story = {
+  args: { path: `${BASE}/settings/calendar`, api: settingsApi },
+};

@@ -8,17 +8,26 @@ its type, invoked as the member through `kernel::operations::invoke` with
 their answers within the bounds of a tool's result. Every operation of the
 registry SHALL be in the catalogue with `assistant: true` and
 `mutates: false`, checked by a test. The stored type SHALL be checked in
-code, so registering a new type needs no migration. It registers
-`conversations.conversation`, read through `conversations.get` and
-`conversations.get_history`, and `schedule.event`, read through
-`schedule.get_event` and, when the event was read from an email, through
-`conversations.get_message_read` of that email (made only when the event
-names its source message and conversation, and left out, not fatal, when the
-member can no longer read the email).
+code, so registering a new type needs no migration. The registry SHALL hold
+`conversations.conversation` (read through `conversations.get` and
+`conversations.get_history`), `conversations.rule` (through
+`conversations.get_rule`: its conditions and actions, inbox, origin, state
+and how many conversations it acted on), `conversations.rule_notice`
+(through `conversations.get_rule_notice`: its kind, sender, rule and
+counts) and `schedule.event`, read through `schedule.get_event` and, when
+the event was read from an email, through `conversations.get_message_read` of
+that email (made only when the event names its source message and
+conversation, and left out, not fatal, when the member can no longer read the
+email). A chat about nothing SHALL tell the model it is about nothing in
+particular.
 
 #### Scenario: A read the member lost
 - **WHEN** a registered read answers 403 or 404 on a later question
 - **THEN** that question is answered without the record and Scout says it can no longer see it
+
+#### Scenario: A rule of an inbox Sam left
+- **WHEN** Sam starts a chat about a rule of an inbox he is no longer a member of
+- **THEN** the answer is 404 and no chat is created
 
 #### Scenario: A chat about a flight
 - **WHEN** Sam starts a chat about the flight event Scout added from an airline's email

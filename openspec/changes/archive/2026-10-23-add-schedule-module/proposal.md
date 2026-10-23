@@ -1,9 +1,7 @@
-# Calendar: the schedule module, two-way calendar sync, and dated things read from email
+# Calendar: the schedule module and dated things read from email
 
 Modules: new `schedule` (crate `campbooks-schedule`, schema `schedule`,
-client module `schedule` with the Calendar place), `connectors` (Google
-Calendar and Zoho Calendar adapters, the `calendar` capability offered),
-`conversations` (the one message read: dated items, asks and the need
+client module `schedule` with the Calendar place), `conversations` (the one message read: dated items, asks and the need
 summary in a single `complete` call, published as
 `conversations.message_read`; it replaces `summarize_need`), `campbooks-ai` (two triage questions in
 the existing decide pass). Tracking:
@@ -11,7 +9,10 @@ https://github.com/notacamp/campbooks-cloud/issues/42. Entry in
 `docs/domain-map.md` → *schedule*. New ADR 0021 (machine-readable dates
 may assert). Seams with `tasks` (campbooks-cloud#43, built in parallel) are
 agreed and listed in design.md; the parts that need `tasks` contracts land
-with that module, not here.
+with that module, not here. **Shipped in two changes:** this one is the server
+side, the reading of dates from email and the Calendar screens; Google and
+Zoho calendar sync, and everything that needs a provider calendar, is
+`add-calendar-sync`.
 
 ## Why
 
@@ -19,7 +20,7 @@ Email is where most of a person's dates arrive: a flight confirmation, a
 dentist's booking, a concert ticket, "your plan renews on 3 November", "pay
 by the 30th", a parcel arriving Thursday. Today Next reads every message
 and does nothing with any of those dates. There is no calendar either: the
-member's Google or Zoho calendar is invisible, so Scout cannot say what the
+member's calendar is nowhere in Next, so Scout cannot say what the
 day looks like or what is coming.
 
 The Rails app had a calendar, and its event-from-email was senseless: the
@@ -38,10 +39,10 @@ The owner's requirements for this change:
   the owner through the tasks session: each email gets one Jev pass and at
   most one chat read, covering everything in it, and most mail never
   reaches the chat model.
-- One change: two-way provider sync and the extraction together.
+- Two changes: this one ships the Campbooks calendar, the extraction and the screens; two-way provider sync follows as `add-calendar-sync`.
 - An event Scout finds lands on the Campbooks calendar at once, marked "from
   email", with Undo; nothing is written to Google or Zoho until the member
-  says so ("Add to my calendar", or a per-kind rule).
+  says so ("Add to my calendar", or a per-kind rule, both in `add-calendar-sync`).
 
 ## What Changes
 
@@ -78,13 +79,10 @@ The owner's requirements for this change:
   only. `schedule` turns its items into events on the member's Campbooks
   calendar; `tasks` (its own change) turns its asks into tasks. Neither
   calls a model on mail.
-- **Two-way sync** through `connectors`: Google Calendar and Zoho Calendar
-  adapters on the existing connection (incremental consent, no second
-  connection), a calendar change stream, recurrence, outbound create, edit,
-  delete and RSVP with etag checks, and write-backs that never echo.
-- **"Add to my calendar"**: copies a Campbooks event to a provider calendar
-  the member picks (or by a per-kind rule) and keeps the source link, kind
-  and Campbooks id on the provider event.
+- **Two-way sync is `add-calendar-sync`**, not this change. Here the
+  `schedule` module already holds the code for it (applying provider
+  batches, `outbound_requested`, `push_event`) but nothing publishes the
+  provider side yet, so members have only the Campbooks calendar.
 - **Calendar place** in the app (Home · Inbox · **Calendar**): agenda, week
   and month views, an event sheet with its kind, time, place and "From
   <email>" link, the reader's dated-things strip, settings for time zone,
@@ -106,32 +104,24 @@ The owner's requirements for this change:
 - `conversations`: two questions in the decide pass; L0; the message read
   replacing the need summary (narrower trigger, items and asks); publishing
   `message_read`; the `OpenTasks` port it reads.
-- `connectors`: the `calendar` capability offered for Google and Zoho;
-  calendar adapters, change stream and outbound changes.
 - `ai-decide-facts`: "No content rules" names machine-readable calendar
   data as structured data, not content (ADR 0021).
 
 ## Impact
 
 - Adds a module (`docs/domain-map.md` → *schedule*). No module imports
-  another: `schedule` consumes `connectors.calendar_changed` and
-  `conversations.message_read`, and asks connectors for write-backs
+  another: `schedule` consumes `conversations.message_read` (and, with
+  `add-calendar-sync`, `connectors.calendar_changed`), and asks connectors
+  for write-backs
   through an outbound-requests event, the way `conversations` does.
 - **Cost**: L1 adds two questions to a call that already happens (Jev:
   about $0.04 per 1,000 emails for the whole pass). L2 replaces the summary
   call and runs on fewer emails than it does today. design.md → *Cost*.
-- **Members reconnect once** to add calendar access (Google
-  `calendar.events` + `calendar.calendarlist.readonly`; Zoho
-  `ZohoCalendar.calendar.READ`, `ZohoCalendar.event.ALL`). Google's
-  calendar scopes are *sensitive*, not restricted: they join the
-  verification already tracked in campbooks-cloud#53.
-- Self-hosters: enable the Google Calendar API on their Google project, add
-  the scopes to their Zoho app. With neither, the Campbooks calendar and
-  extraction still work.
+
 
 ## Non-goals
 
-- Microsoft 365 / Graph and CalDAV calendars (no Microsoft mail adapter
+- Google and Zoho calendar sync (`add-calendar-sync`), Microsoft 365 / Graph and CalDAV calendars (no Microsoft mail adapter
   exists yet; CalDAV follows IMAP).
 - Push notifications from providers (Google `events.watch`): adaptive
   polling covers it, as for mail today.

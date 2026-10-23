@@ -1,10 +1,9 @@
 ## Purpose
 
-The `schedule` module keeps each member's calendars and their events: the
-provider calendars a calendar grant brings and the member's own Campbooks
-calendar, which holds the things Scout read from email. It owns event kinds,
-recurrence, the member's time zone and working hours, free time, and the
-intents that write a member's changes back to their provider.
+The `schedule` module keeps each member's Campbooks calendar and its events,
+which hold the things Scout read from email. It owns event kinds, recurrence,
+the member's time zone and working hours, and free time. Provider calendars
+(Google, Zoho) and writing changes back to them arrive with `add-calendar-sync`.
 
 ## ADDED Requirements
 
@@ -27,47 +26,22 @@ and pushing events and changing calendars and settings SHALL require
 Every calendar SHALL belong to one member of one workspace, and only that
 member SHALL list it, read its events or change it; for anyone else it SHALL
 not exist (404). Each member SHALL have exactly one Campbooks calendar,
-created the first time anything needs it, which no provider sees. When
-`connectors.capability_granted` is published for the `calendar` capability,
-the module SHALL create one calendar per provider calendar the grant lists,
-owned by the granting member, with the provider's name, colour, time zone
-and whether it may be written; the provider's primary calendar SHALL sync
-and the others SHALL not until the member turns them on. A repeated grant
-SHALL add only calendars the module does not have yet. Turning a calendar's
-sync off SHALL hide its events and stop applying its changes; turning it on
-SHALL ask connectors to read it again from the start.
+created the first time anything needs it, which no provider sees.
 
-#### Scenario: A calendar grant
-- **WHEN** Inês grants calendar access on her Google connection, which lists "Inês" (primary), "Family" and "Holidays in Portugal"
-- **THEN** she has four calendars: her Campbooks calendar, "Inês" syncing, and "Family" and "Holidays in Portugal" not syncing
+#### Scenario: The first event
+- **WHEN** Inês's first event is added and she has no calendar yet
+- **THEN** she has one Campbooks calendar, and it holds the event
 
 #### Scenario: Someone else's calendar
 - **WHEN** Rui asks for one of Inês's calendars or events by id
 - **THEN** the answer is 404
 
-#### Scenario: The same grant again
-- **WHEN** the same calendar grant is published again
-- **THEN** no calendar is added or changed
-
-#### Scenario: Turning a calendar on
-- **WHEN** Inês turns "Family" on
-- **THEN** connectors reads "Family" from the start and its events appear once the batch is applied
-
 ### Requirement: Event kinds
 Every event SHALL have one kind from a fixed set: `charge`, `appointment`,
 `meeting`, `travel`, `stay`, `show`, `reservation`, `delivery`, `expiry`,
-`hold` or `none`. An event read from a provider SHALL be `none` unless
-Campbooks wrote it with a kind, in which case it SHALL keep that kind. A
-member SHALL be able to change an event's kind. Obligations (pay by, submit
-by, renew by) SHALL never be events: they are asks owned by `tasks`.
-
-#### Scenario: A meeting from Google
-- **WHEN** a meeting Ana created in Google Calendar is applied
-- **THEN** its kind is `none`
-
-#### Scenario: A kind that round-trips
-- **WHEN** Inês adds Scout's `travel` event to her Google calendar and Google sends it back on the next run
-- **THEN** the event is still `travel` and still links its email
+`hold` or `none`. A member SHALL be able to change an event's kind.
+Obligations (pay by, submit by, renew by) SHALL never be events: they are
+asks owned by `tasks`.
 
 #### Scenario: The member sets a kind
 - **WHEN** Inês sets "Dentist" from `none` to `appointment`
@@ -85,11 +59,7 @@ changes nothing. An item that `updates` an earlier item SHALL change that
 item's event; an item that `cancels` one SHALL cancel it. The module SHALL
 add nothing when the read names no personal owner (a shared inbox), when the
 member turned that kind off, when the member removed the event for that
-item before, or when the read's `asks` are all it carries. When the member
-set an "also add to" calendar for the kind, the event SHALL be pushed there
-as by "Add to my calendar". When an item came from an iCalendar part whose
-`UID` an event on one of the member's syncing calendars already has, the
-module SHALL link that event to the message instead of adding one.
+item before, or when the read's `asks` are all it carries.
 
 #### Scenario: A flight confirmation
 - **WHEN** a read of Inês's flight confirmation carries a `travel` item "Flight LIS → AMS" on Friday 6 November from 07:40 to 11:55 Lisbon time
@@ -119,38 +89,6 @@ module SHALL link that event to the message instead of adding one.
 - **WHEN** a booking arrives in the shared inbox geral@costaobras.example
 - **THEN** no event is added to anyone's calendar
 
-#### Scenario: Also added to Google
-- **WHEN** Inês set `travel` to also go to her Google calendar "Inês" and a flight is read
-- **THEN** the event is on her Campbooks calendar and a create is requested for "Inês"
-
-#### Scenario: An invite already in Google
-- **WHEN** an invitation's iCalendar part has the `UID` of an event Google already put on Inês's primary calendar
-- **THEN** that event links the email and no second event is added
-
-### Requirement: Applying calendar changes
-The module SHALL consume `connectors.calendar_changed` v1 and apply each
-batch to its calendar in order: an upsert creates or changes the event with
-the provider's id and etag, a removal cancels it. A recurring series SHALL
-be stored once with its recurrence rules as the provider gave them, and an
-exception (one occurrence moved, changed or cancelled) as its own event
-pointing at the series and the occurrence it replaces. Occurrences SHALL be
-expanded when events are listed, within the asked window, and an exception
-SHALL replace its occurrence. A batch for a calendar that does not sync
-SHALL be ignored. A change to an event with a member's change still pending
-SHALL keep the pending change.
-
-#### Scenario: A weekly series
-- **WHEN** a batch brings "Team call", every Monday 10:00 Lisbon time with no end
-- **THEN** one event is stored, and listing 2–29 November shows four occurrences
-
-#### Scenario: One occurrence moved
-- **WHEN** the next batch brings an exception moving the 16 November occurrence to Tuesday 17 November 11:00
-- **THEN** listing that week shows the call on Tuesday at 11:00 and not on Monday
-
-#### Scenario: Deleted in Google
-- **WHEN** a batch removes "Dentist"
-- **THEN** the event is cancelled and `schedule.event_cancelled` is published
-
 ### Requirement: Member settings
 Each member SHALL have settings: a time zone (an IANA name), working hours
 per weekday, the kinds Scout adds (all by default) and, per kind, an "also
@@ -160,8 +98,7 @@ has none and ignores after; from then on only the member changes it
 (`time_zone`).
 Until a member has a time zone, UTC SHALL be used. The module SHALL implement
 the kernel port `TimeZones`, which tells another module a member's time
-zone, and SHALL refuse a time zone that is not an IANA name, an "also add
-to" calendar that is not the member's or cannot be written, and working
+zone, and SHALL refuse a time zone that is not an IANA name and working
 hours that end before they start.
 
 #### Scenario: First open on a phone in Lisbon
@@ -183,7 +120,7 @@ available to other modules through the kernel port
 
 #### Scenario: A free hour on Tuesday
 - **WHEN** Inês works 09:00–18:00 and on Tuesday has events 09:00–12:30 and 14:00–18:00, and asks for an hour that day
-- **THEN** the answer is 12:30–14:00, naming "Inês" and her Campbooks calendar as the calendars counted
+- **THEN** the answer is 12:30–14:00, naming her Campbooks calendar as the calendar counted
 
 #### Scenario: A weekend
 - **WHEN** Inês has no working hours on Saturday and asks for an hour on Saturday
@@ -217,12 +154,10 @@ The read operations (`schedule.list_events`, `schedule.get_event`,
 `schedule.free_slots`, `schedule.list_calendars`) SHALL be in the operation
 catalogue with `assistant: true` and `mutates: false`. The write operations
 that change events (`create_event`, `update_event`, `delete_event`,
-`restore_event`, `respond_event`, `push_event`, `unpush_event`) SHALL be
+`restore_event`, `respond_event`) SHALL be
 `assistant: true`, `mutates: true`, `risk: low`, scope `schedule:write`, and
 `update_calendar` and `update_settings` SHALL be `assistant: false`.
-`schedule.push_event`, which writes to a provider, SHALL be `low` and its
-confirmation SHALL name the calendar it writes to from `list_calendars`,
-never from the model's words. Scout SHALL have the tools `my_calendar` (list
+Scout SHALL have the tools `my_calendar` (list
 events), `free_time` (free slots) and `read_event` (one event), each with an
 argument schema that allows no other property and an answer of at most 8 KiB,
 records returned as references and never logged, and the about entry
@@ -238,10 +173,6 @@ writes to a provider without the member.
 - **WHEN** a member asks Scout what is on Friday
 - **THEN** Scout calls `my_calendar` for Friday and answers from at most 8 KiB of events, without asking to confirm
 
-#### Scenario: Adding to Google from the chat
-- **WHEN** Scout proposes adding the concert to Google
-- **THEN** the confirmation says it will be written to the calendar "Inês"
-
 #### Scenario: An event from an email the member cannot read
 - **WHEN** a chat is about an event whose source email is in an inbox the member no longer reads
 - **THEN** Scout is given the event and nothing of the email
@@ -249,17 +180,14 @@ writes to a provider without the member.
 ### Requirement: Writes answer with what undoes them
 Each write that changes events SHALL declare its undo in `x-campbooks.undo`:
 `create_event` ↔ `delete_event`, `delete_event` ↔ `restore_event`,
-`update_event` ↔ `update_event`, `respond_event` ↔ `respond_event`,
-`push_event` ↔ `unpush_event`. Each answer SHALL carry, at its top level,
+`update_event` ↔ `update_event`, `respond_event` ↔ `respond_event`. Each answer SHALL carry, at its top level,
 what the inverse call needs: `delete_event` the `undo_token` that
 `restore_event` takes as `{undo_token}`; `update_event` the `id` of the event
 changed and, named exactly like the fields of its request, the previous
 values of the fields it changed (`title`, `kind`, `starts`, `ends`,
 `time_zone`, `place`, `notes`, `busy`; empty text for none), so that sending
 them back as the body of the same operation undoes the change;
-`respond_event` the answer before as `previous_response`; `push_event` the
-`id` of the copy, to take away with `unpush_event`; `unpush_event` the `id` of
-the Campbooks event and the `calendar_id` it was removed from, to push again.
+`respond_event` the answer before as `previous_response`.
 
 #### Scenario: Undo a move
 - **WHEN** Inês moves "Dentist" from 15:00 to 16:00 and sends the `starts` and `ends` of the answer back as a `PATCH` to the same event
@@ -269,81 +197,26 @@ the Campbooks event and the `calendar_id` it was removed from, to push again.
 - **WHEN** Inês deletes "Dinner at Taberna" and sends the answer's `undo_token` to `restore_event`
 - **THEN** the event is back, and `restore_event`'s own undo is `delete_event`
 
-#### Scenario: Undo adding to Google
-- **WHEN** Inês adds a concert to her Google calendar and then calls `unpush_event` on the copy
-- **THEN** the copy is deleted at Google, the Campbooks event is on her Campbooks calendar again, and the answer names the Google calendar to push to again
-
 ### Requirement: Changing events
-A member SHALL be able to create an event on one of their calendars that can
-be written, change a single event or one occurrence of a series (never the
-whole series), delete an event with an undo, and answer an invitation
-(accept, tentative, decline). A change to an event on a provider calendar
-SHALL be stored at once, marked pending, and published as
-`schedule.outbound_requested` v1 in the same transaction, carrying the
-connection, the provider's ids, the kind of change and the etag the member's
-version was based on; the event's text SHALL travel as a blob. A change to
-an event on the Campbooks calendar SHALL never be sent to a provider. A delete
-SHALL hide the event at once and, for a provider event, reach the provider
-only when the undo window (10 seconds) has passed. `restore_event`, with the
-delete's `undo_token`, SHALL bring the event back: within the window nothing
-was asked of the provider and nothing is; after it, a provider event SHALL be
-asked to be made again. Changing the whole of a series SHALL be refused
-(`series_not_editable`); an occurrence is changed by naming it.
+A member SHALL be able to create an event on their Campbooks calendar, change
+a single event or one occurrence of a series (never the whole series), and
+delete an event with an undo. A change to an event on the Campbooks calendar
+SHALL never be sent to a provider. A delete SHALL hide the event at once and
+keep it for the undo window (10 seconds); `restore_event`, with the delete's
+`undo_token`, SHALL bring it back. Changing the whole of a series SHALL be
+refused (`series_not_editable`); an occurrence is changed by naming it.
 
 #### Scenario: Moving the dentist
-- **WHEN** Inês moves "Dentist" on her Google calendar from 15:00 to 16:00
-- **THEN** the event shows 16:00, pending, and an update is requested with the etag she saw
-
-#### Scenario: One occurrence of a series
-- **WHEN** Inês moves only the 23 November occurrence of "Team call"
-- **THEN** an exception is requested for that occurrence and the other Mondays are unchanged
-
-#### Scenario: Read-only calendar
-- **WHEN** Inês tries to create an event on "Holidays in Portugal", which cannot be written
-- **THEN** the answer is 400 and nothing is requested
+- **WHEN** Inês moves "Dentist" on her Campbooks calendar from 15:00 to 16:00
+- **THEN** the event shows 16:00 and `schedule.event_changed` is published
 
 #### Scenario: Deleted and undone
 - **WHEN** Inês deletes "Dinner at Taberna" and presses Undo
-- **THEN** the event is back as it was and no delete reaches Google
+- **THEN** the event is back as it was
 
-#### Scenario: Accepting an invitation
-- **WHEN** Inês accepts Pedro's invitation to "Site visit, Rua das Flores"
-- **THEN** her response is stored and requested for Google
-
-### Requirement: Add to my calendar
-A member SHALL be able to push an event of their Campbooks calendar to one of
-their provider calendars that can be written. The module SHALL request its
-creation there and, once created, keep one event: on the provider calendar,
-with its kind, its source link and `pushed_from` naming the Campbooks event,
-which leaves the Campbooks calendar. The last calendar a member pushed to
-SHALL be offered first next time. `schedule.unpush_event` SHALL remove the
-provider copy (asked of connectors) and keep the Campbooks event, which is
-back on the Campbooks calendar; it is the undo of `push_event`, and its own
-undo is `push_event` with the same calendar. Deleting a pushed event SHALL
-delete it at the provider, with Undo. A copy the provider does not take SHALL
-go away and the Campbooks event SHALL be back, with a notice that it was not
-saved.
-
-#### Scenario: A concert to Google
-- **WHEN** Inês adds Scout's `show` event "Mariza at Coliseu" to her Google calendar "Inês"
-- **THEN** one event remains, on "Inês", still a `show`, still linking the ticket email
-
-#### Scenario: Changed her mind
-- **WHEN** Inês takes the concert off her Google calendar with `unpush_event`
-- **THEN** it is deleted at Google and "Mariza at Coliseu" is on her Campbooks calendar again
-
-### Requirement: The outcome of a change at the provider
-When connectors reports a calendar change `applied`, the module SHALL store
-the provider's new id and etag and clear the pending mark. When the provider
-refused it because the event had changed there (412), the module SHALL keep
-the provider's version, clear the pending mark, and mark the event so the
-member is told their change was not kept. Any other failure SHALL clear the
-pending mark, restore the event's last provider version and mark it the same
-way. A failure SHALL be recorded by kind only.
-
-#### Scenario: Changed in Google meanwhile
-- **WHEN** Inês moves "Dentist" to 16:00 while the clinic moved it to 17:00 in Google
-- **THEN** the event shows 17:00 and says her change was not kept because it changed in Google
+#### Scenario: A whole series
+- **WHEN** a caller changes a recurring event without naming an occurrence
+- **THEN** the answer is 400 `series_not_editable`
 
 ### Requirement: Published events carry no personal data
 The module SHALL publish `schedule.event_created`, `schedule.event_changed`
@@ -369,19 +242,13 @@ wrong or unwanted read. Undoing the removal SHALL forget it.
 
 ### Requirement: Leaving and deleting
 On `workspaces.member_left` the module SHALL delete the member's calendars,
-events, removed items and settings. On `connectors.connection_removed` it
-SHALL delete the calendars of that connection and their events, keeping the
-member's Campbooks calendar. When `workspaces.workspace_deleting` is
+events, removed items and settings. When `workspaces.workspace_deleting` is
 published, the module SHALL delete the workspace's rows when its grace
 period ends.
 
-#### Scenario: Calendar access removed
-- **WHEN** Inês disconnects her Google connection
-- **THEN** her Google calendars and their events are gone and her Campbooks calendar is kept
-
 #### Scenario: Back in the workspace
 - **WHEN** a member who left is invited back
-- **THEN** they have an empty Campbooks calendar and no provider calendars
+- **THEN** they have an empty Campbooks calendar
 
 #### Scenario: Purge
 - **WHEN** a workspace is deleted with its grace period over

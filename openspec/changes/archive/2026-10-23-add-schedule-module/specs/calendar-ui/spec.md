@@ -47,12 +47,8 @@ Opening an event SHALL show a sheet with its kind as a chip the member can
 change, the title, when (with the event's own time zone when it differs from
 the member's), the place, the calendar, and, for an event Scout read, "From
 <subject> · <sender>", which opens that message in the reader, and the
-sentence Scout read the date from. It SHALL offer Edit, Remove (with Undo in
-a toast), Accept / Maybe / Decline for an invitation, and, for an event on
-the Campbooks calendar, Add to my calendar with a list of the member's
-calendars that can be written, the last used first. An event whose change
-was not kept SHALL say so ("Changed in Google meanwhile; we kept theirs").
-A pending change SHALL show as pending. On phones the sheet SHALL fill the
+sentence Scout read the date from. It SHALL offer Edit and Remove (with Undo in
+a toast). On phones the sheet SHALL fill the
 screen.
 
 #### Scenario: Back to the email
@@ -63,14 +59,10 @@ screen.
 - **WHEN** the user removes Scout's parcel event
 - **THEN** it leaves the calendar and a toast offers Undo for 10 seconds
 
-#### Scenario: A change not kept
-- **WHEN** Google refused the user's move because the event changed there
-- **THEN** the sheet shows the provider's time and "Changed in Google meanwhile; we kept theirs"
-
 ### Requirement: What Scout found, in the reader
 Under a message's header the reader SHALL show what was read from it: each
 item with its kind's icon, title and time, and "Added to your calendar" with
-Undo for an event Scout added, or the calendar it was pushed to. While a read
+Undo for an event Scout added. While a read
 is queued or running it SHALL say "Scout is reading this…". When the message
 is flagged and has not been read, opening it SHALL request the read, once.
 When no `complete` role may read mail and the decide pass flagged a dated
@@ -116,14 +108,8 @@ wired, no Due row SHALL show.
 
 ### Requirement: Settings → Calendar
 Settings SHALL have a Calendar section with the time zone, working hours per
-weekday, the member's calendars with sync on or off and colour, the kinds
-Scout adds (each on or off), "Also add to" per kind, and, for each mail
-connection without calendar access, "Add calendar access", which starts the
-connection's consent for the `calendar` capability.
-
-#### Scenario: Adding calendar access
-- **WHEN** the user presses "Add calendar access" next to their Gmail connection
-- **THEN** the provider's consent opens for calendar access on that connection, and after it the Google calendars are listed
+weekday, the member's calendars with colour, and the kinds Scout adds (each
+on or off).
 
 #### Scenario: Turning off deliveries
 - **WHEN** the user turns off Deliveries under "Scout adds these"

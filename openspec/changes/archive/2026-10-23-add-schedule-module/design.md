@@ -422,6 +422,11 @@ deletes it at the provider too, with Undo.
 
 ## Two-way sync
 
+> **Not in this change.** The `schedule` side of what follows is built and
+> inert (no connector publishes or consumes it yet); the connectors side, the
+> requirements and the tasks are `add-calendar-sync`. This section stays here
+> as the design that change builds on.
+
 - **Scopes**: Google `https://www.googleapis.com/auth/calendar.events` and
   `…/calendar.calendarlist.readonly`; Zoho `ZohoCalendar.calendar.READ`,
   `ZohoCalendar.event.ALL`. Added to an existing connection through the
@@ -505,8 +510,8 @@ design-system tokens:
   provider without the member.
 - **Forged markup.** L0 only for aligned DMARC passes and never for mail
   Jev calls suspicious.
-- **Scope creep in one PR.** The owner chose one change; the tasks list is
-  ordered so each slice is reviewable on its own commit range.
+- **Scope creep in one PR.** The owner first chose one change, then split
+  it in two: this one and `add-calendar-sync`.
 - **Zoho Calendar is unverified** against a live grant (as it was in
   Rails). The adapter ships behind `CAMPBOOKS_CONNECTORS__ZOHO_CALENDAR`
   (default off) until a hand test passes.
