@@ -13,6 +13,7 @@ pub mod forget_connection;
 pub mod forget_member;
 pub mod get_attachment;
 pub mod get_conversation;
+pub mod get_history;
 pub mod get_message_body;
 pub mod inbox_visibility;
 pub mod ingest_messages;

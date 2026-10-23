@@ -297,10 +297,10 @@ fn model_may_read_mail(gateway: &Gateway) -> bool {
 /// Every route of the module, one per feature.
 fn router() -> OpenApiRouter<AppState> {
     use features::{
-        archive, create_draft, get_attachment, get_conversation, get_message_body, labels,
-        list_conversations, list_drafts, list_inboxes, list_labels, list_senders, list_streams,
-        mark_read, move_to_stream, needs, person_notes, reply, rule_notices, rules, send_draft,
-        spam, star, suggest_rules, trash, update_draft,
+        archive, create_draft, get_attachment, get_conversation, get_history, get_message_body,
+        labels, list_conversations, list_drafts, list_inboxes, list_labels, list_senders,
+        list_streams, mark_read, move_to_stream, needs, person_notes, reply, rule_notices, rules,
+        send_draft, spam, star, suggest_rules, trash, update_draft,
     };
     OpenApiRouter::new()
         .routes(routes!(list_inboxes::handler))
@@ -309,6 +309,7 @@ fn router() -> OpenApiRouter<AppState> {
         .routes(routes!(list_streams::handler))
         .routes(routes!(list_conversations::handler))
         .routes(routes!(get_conversation::handler))
+        .routes(routes!(get_history::handler))
         .routes(routes!(get_message_body::handler))
         .routes(routes!(get_attachment::handler))
         .routes(routes!(mark_read::read))
