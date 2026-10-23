@@ -102,6 +102,10 @@ impl Script {
 
 /// What a fake saw.
 #[derive(Debug, Default, Clone)]
+#[allow(
+    clippy::struct_excessive_bools,
+    reason = "each is one independent thing a test checks it saw"
+)]
 pub struct Seen {
     /// Connections accepted.
     pub connections: usize,
