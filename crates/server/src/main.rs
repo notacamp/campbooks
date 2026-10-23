@@ -658,7 +658,7 @@ async fn migrate_locked(conn: &mut PgConnection) -> Result<(), String> {
 
 /// The schemas the migrations create and own (`<schema>__<name>.sql`): the
 /// only ones whose invalid indexes [`drop_invalid_indexes`] touches.
-const MIGRATED_SCHEMAS: [&str; 11] = [
+const MIGRATED_SCHEMAS: [&str; 12] = [
     "admin",
     "assistant",
     "attention",
@@ -667,6 +667,7 @@ const MIGRATED_SCHEMAS: [&str; 11] = [
     "conversations",
     "identity",
     "kernel",
+    "schedule",
     "search",
     "system",
     "workspaces",
