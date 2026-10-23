@@ -26,7 +26,7 @@
 - [x] 4.5 i18n reasons in en, pt-PT, es-ES, fr
 
 ## 5. Finish
-- [ ] 5.1 `cargo xtask openapi` regenerated; client types regenerated
+- [x] 5.1 `cargo xtask openapi` regenerated; client types regenerated
 - [x] 5.2 `docs/self-hosting` note: the IMAP settings and the password-at-rest trade-off
 - [x] 5.3 Changelog entry `changelog/unreleased/added/310-imap-connection.md`
 - [ ] 5.4 Gates green in CI; vhs terminal recording of discover + connect against the fake servers in the PR
