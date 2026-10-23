@@ -16,6 +16,6 @@
 - [x] 3.2 One test per scenario in the spec delta, plus: Message-ID missing, the same message in two folders, a folder renamed/removed, a run stopping at its byte budget and continuing
 
 ## 4. Finish
-- [ ] 4.1 `cargo xtask openapi` (events unchanged; regenerate to prove it)
+- [x] 4.1 `cargo xtask openapi` (events unchanged: CI's OpenAPI and events drift checks pass with no regeneration)
 - [x] 4.2 Changelog entry `changelog/unreleased/added/311-imap-messages-adapter.md` (still off by default)
 - [ ] 4.3 Gates green in CI; vhs recording of a backfill + an incremental run against the fake server
