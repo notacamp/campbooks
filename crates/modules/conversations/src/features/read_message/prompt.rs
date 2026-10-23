@@ -349,7 +349,8 @@ pub enum Dropped {
     Window,
     /// It had already ended when it was read.
     Ended,
-    /// An `updates` or `cancels` that names no item of the conversation.
+    /// A `cancels` that names no item of the conversation (the whole item
+    /// goes), or an `updates` that names none (the reference only).
     Reference,
     /// A `same_as` that was not among the tasks shown.
     SameAs,
@@ -552,6 +553,13 @@ fn vet_item(
         }
         None => None,
     };
+    // A cancellation of something never held adds nothing: the whole item
+    // goes (the structured layer does the same).
+    if let Some(named) = string(raw, "cancels") {
+        if !veto.known.iter().any(|known| known == named) {
+            return Err(Dropped::Reference);
+        }
+    }
     let mut reference = |name: &str| {
         let named = string(raw, name)?;
         if veto.known.iter().any(|known| known == named) {
@@ -1093,16 +1101,24 @@ mod tests {
     }
 
     #[test]
-    fn a_reference_that_is_not_in_the_conversation_is_dropped_from_the_item() {
+    fn an_unknown_update_loses_the_reference_and_an_unknown_cancel_loses_the_item() {
         let mut changes = flight();
         changes["updates"] = serde_json::json!("k1");
         let mut guessed = flight();
-        guessed["cancels"] = serde_json::json!("somebody-elses");
-        let vetted = vet(&with(vec![changes, guessed], Vec::new()), &veto());
+        guessed["updates"] = serde_json::json!("somebody-elses");
+        let mut cancelled = flight();
+        cancelled["cancels"] = serde_json::json!("somebody-elses");
+        let vetted = vet(
+            &with(vec![changes, guessed, cancelled], Vec::new()),
+            &veto(),
+        );
         assert_eq!(vetted.items.len(), 2);
         assert_eq!(vetted.items[0].updates.as_deref(), Some("k1"));
-        assert_eq!(vetted.items[1].cancels, None);
-        assert_eq!(vetted.dropped, [("item", Dropped::Reference)]);
+        assert_eq!(vetted.items[1].updates, None);
+        assert_eq!(
+            vetted.dropped,
+            [("item", Dropped::Reference), ("item", Dropped::Reference)]
+        );
         // A zone that is not an IANA name is dropped from the item too.
         let mut zone = flight();
         zone["time_zone"] = serde_json::json!("GMT+1");

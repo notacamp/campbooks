@@ -315,8 +315,10 @@ ask, never add or correct: one whose quote is not in the message's words
 (ignoring case and runs of whitespace); one whose start or due does not
 parse or lies outside one day before to 731 days after the message was sent;
 an item that has already ended when it is read; an item whose kind is not
-in the set; an `updates` or `cancels` id that is not an item of the same
-conversation (the reference only); a `same_as` that was not in the list
+in the set; an item whose `cancels` id is not an item of the same
+conversation (the whole item: a cancellation of something never held adds
+nothing); an `updates` id that is not an item of the same conversation (the
+reference only, the item is kept as a new one); a `same_as` that was not in the list
 sent (the reference only); an amount whose digits are not in the quote or
 the message's words (the amount only). Each drop SHALL be logged by reason
 only.
@@ -328,6 +330,10 @@ only.
 #### Scenario: A made-up quote
 - **WHEN** the model returns an item whose quote is not in the email
 - **THEN** that item is dropped and the others are kept
+
+#### Scenario: A cancellation of something never held
+- **WHEN** the model returns an item whose `cancels` id is not an item of the conversation
+- **THEN** that item is dropped; an unknown `updates` id only loses the reference and the item is kept as a new one
 
 #### Scenario: A plan renewing
 - **WHEN** a streaming service writes "Your plan renews on 3 November and €9.99 will be charged to your card"
