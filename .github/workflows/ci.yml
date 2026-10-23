@@ -76,6 +76,9 @@ jobs:
         id: events
         if: always()
         run: cargo xtask events --check
+      - name: Tracking plan (workbook rules, generated events, coverage)
+        if: always()
+        run: cargo run -p campbooks-tracking-plan -- check
       # On drift, write the documents the server generates and upload them,
       # so a change can commit them without compiling the server locally.
       # The checks above still fail the job.

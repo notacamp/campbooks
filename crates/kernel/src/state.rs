@@ -28,6 +28,7 @@ use crate::{
         ClientDirectoryPort, KeptMailPort, MembershipPort, NoClientDirectory, NoKeptMail,
         NoMembership,
     },
+    tracking::Tracker,
 };
 
 /// What every handler can reach. Cheap to clone.
@@ -134,6 +135,9 @@ pub struct AppState {
     /// Sends the instance's own mail ([`mail`](crate::mail)). The server
     /// installs the configured one; until then nothing is sent.
     pub mailer: crate::mail::MailerPort,
+    /// Writes tracked events ([`tracking`](crate::tracking), ADR 0020), as
+    /// `CAMPBOOKS_TRACKING__SINK` says: nowhere by default.
+    pub tracker: Tracker,
 }
 
 impl AppState {
@@ -150,6 +154,7 @@ impl AppState {
             db,
             auth: TokenVerifier::new(&config.auth),
             api_limits: ApiLimits::new(&config.rate_limits),
+            tracker: Tracker::new(&config.tracking),
             config: Arc::new(config),
             events: EventBus::default(),
             membership: Arc::new(NoMembership),
@@ -172,6 +177,15 @@ impl AppState {
             resources: authz::Catalogue::default(),
             mailer: Arc::new(crate::mail::NoMailer),
         }
+    }
+
+    /// The same state, tracking events with `tracker` (the server names its
+    /// role on it; tests write the outbox with
+    /// [`testing::tracking_outbox`](crate::testing::tracking_outbox)).
+    #[must_use]
+    pub fn with_tracker(mut self, tracker: Tracker) -> Self {
+        self.tracker = tracker;
+        self
     }
 
     /// The same state, sending the instance's mail through `mailer`.

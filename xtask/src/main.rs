@@ -9,6 +9,8 @@
 //! - `cargo xtask migrations --base <ref>` checks that new migrations sort after
 //!   every migration on the base branch.
 //! - `cargo xtask i18n` checks that every server message catalogue is at parity.
+//! - `cargo xtask tracking [--check | generate | fmt | apply <patch> | init]` runs
+//!   the tracking plan's tooling (`campbooks-tracking-plan`, ADR 0020).
 //! - `cargo xtask new-module <name>` and `cargo xtask new-feature <module> <feature>`
 //!   scaffold a module or a feature slice; `cargo xtask scaffold-check` proves
 //!   their output passes the gates.
@@ -24,6 +26,7 @@ mod migrations;
 mod openapi;
 mod payloads;
 mod scaffold;
+mod tracking;
 
 use std::{
     collections::BTreeSet,
@@ -78,6 +81,17 @@ enum Command {
         /// The base to compare with, e.g. `origin/next`.
         #[arg(long)]
         base: String,
+    },
+    /// The tracking plan (ADR 0020): generate its typed events and mirror
+    /// from `tracking/tracking-plan.xlsx` (the default), check it, format it
+    /// or apply a YAML patch to it.
+    Tracking {
+        /// Check the plan and that everything generated from it is current,
+        /// instead of generating.
+        #[arg(long)]
+        check: bool,
+        #[command(subcommand)]
+        command: Option<tracking::TrackingCommand>,
     },
     /// Check that every server message catalogue (`crates/**/i18n/`) has
     /// `en`, `pt-PT`, `es-ES` and `fr` with the same messages, plural forms
@@ -138,6 +152,7 @@ fn main() -> ExitCode {
         } => eval::run_actions(&args),
         Command::Migrations { base } => migrations::run(&root, &base),
         Command::I18n => i18n::run(&root),
+        Command::Tracking { check, command } => tracking::run(&root, check, command),
         Command::NewModule { name, issue } => run_new_module(&root, &name, issue),
         Command::NewFeature { module, feature } => run_new_feature(&root, &module, &feature),
         Command::ScaffoldCheck { full } => scaffold::check::run(&root, full),
@@ -314,6 +329,11 @@ fn check_payloads(root: &Path) -> Result<Vec<String>> {
     violations.extend(payloads::check_job_errors(
         &payloads::job_error_values(&sources),
         payloads::JOB_ERROR_VALUES,
+    ));
+    violations.extend(payloads::check_job_origin(
+        &sources,
+        payloads::JOB_ORIGIN_SOURCE,
+        payloads::JOB_ORIGIN_FIELDS,
     ));
     Ok(violations)
 }

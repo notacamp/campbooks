@@ -63,6 +63,9 @@ where
             crate::telemetry::field::PRINCIPAL_KIND,
             principal.kind.as_str(),
         );
+        // What the request tracks is now the principal's (or the assistant's
+        // or an automation's, on its behalf).
+        crate::tracking::authenticated(&principal);
         if !principal.has_scope(S::NAME) {
             return Err(Error::InsufficientScope(S::NAME));
         }

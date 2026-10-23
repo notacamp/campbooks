@@ -97,6 +97,24 @@ struct Claimed {
     payload: Value,
     /// The `traceparent` of whoever enqueued it.
     trace_context: Option<String>,
+    /// Who caused it (`kernel.jobs.origin`), for its tracking context.
+    origin: Option<Value>,
+}
+
+/// A row the claim returns.
+#[derive(sqlx::FromRow)]
+struct ClaimRow {
+    id: uuid::Uuid,
+    kind: String,
+    queue: String,
+    payload: Value,
+    workspace_id: Option<String>,
+    event_id: Option<uuid::Uuid>,
+    attempts: i32,
+    max_attempts: i32,
+    trace_context: Option<String>,
+    origin: Option<Value>,
+    waited_seconds: f64,
 }
 
 /// How often a running worker checks that the database answers, and marks
@@ -428,8 +446,8 @@ impl Shared {
         limit: usize,
     ) -> Result<Vec<Claimed>, sqlx::Error> {
         let limit = i64::try_from(limit).unwrap_or(i64::MAX);
-        let rows = sqlx::query!(
-            r#"
+        let rows: Vec<ClaimRow> = sqlx::query_as(
+            "
             WITH RECURSIVE ready(key) AS (
                 (SELECT j.workspace_key FROM kernel.jobs j
                   WHERE j.state = 'pending' AND j.queue = $1 AND j.run_at <= now()
@@ -493,17 +511,16 @@ impl Shared {
                    updated_at = now()
               FROM picked
              WHERE j.id = picked.id
-            RETURNING j.id AS "id: JobId", j.kind, j.queue, j.payload, j.workspace_id,
-                      j.event_id AS "event_id: EventId", j.attempts, j.max_attempts,
-                      j.trace_context,
-                      extract(epoch FROM now() - j.run_at)::float8 AS "waited_seconds!"
-            "#,
-            queue,
-            limit,
-            i64::from(self.config.per_workspace),
-            self.id,
-            self.lease().as_secs_f64(),
+            RETURNING j.id, j.kind, j.queue, j.payload, j.workspace_id, j.event_id,
+                      j.attempts, j.max_attempts, j.trace_context, j.origin,
+                      extract(epoch FROM now() - j.run_at)::float8 AS waited_seconds
+            ",
         )
+        .bind(queue)
+        .bind(limit)
+        .bind(i64::from(self.config.per_workspace))
+        .bind(&self.id)
+        .bind(self.lease().as_secs_f64())
         .fetch_all(conn)
         .await?;
 
@@ -514,16 +531,17 @@ impl Shared {
             .inspect(|row| metrics.job_claimed(&row.kind, &row.queue, row.waited_seconds))
             .map(|row| Claimed {
                 info: JobInfo {
-                    id: row.id,
+                    id: JobId::from_uuid(row.id),
                     kind: row.kind,
                     queue: row.queue,
                     attempt: u32::try_from(row.attempts).unwrap_or(0),
                     max_attempts: u32::try_from(row.max_attempts).unwrap_or(1),
                     workspace: row.workspace_id,
-                    event_id: row.event_id,
+                    event_id: row.event_id.map(EventId::from_uuid),
                 },
                 payload: row.payload,
                 trace_context: row.trace_context,
+                origin: row.origin,
             })
             .collect())
     }
@@ -1073,7 +1091,15 @@ async fn execute(shared: Arc<Shared>, job: Claimed) {
             return;
         }
         let mut ctx = JobContext::new(shared.state.clone(), info.clone());
-        let result = with_heartbeat(&shared, &info, (kind.run)(&mut ctx, job.payload)).await;
+        // The events the job tracks are `system` (its kind), on behalf of
+        // whoever caused it, with that request's correlation (ADR 0020).
+        let tracking =
+            crate::tracking::for_job(&info.kind, info.id, info.event_id, job.origin.as_ref());
+        let result = crate::tracking::scope(
+            tracking,
+            with_heartbeat(&shared, &info, (kind.run)(&mut ctx, job.payload)),
+        )
+        .await;
         let tx = ctx.take_tx();
         let outcome = match result {
             Ok(()) => shared.complete(&info, tx, started.elapsed()).await,

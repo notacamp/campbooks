@@ -153,6 +153,10 @@ pub struct Config {
     /// instance (`CAMPBOOKS_ANALYTICS__*`); off by default.
     #[serde(default)]
     pub analytics: AnalyticsConfig,
+
+    /// Tracked events (`CAMPBOOKS_TRACKING__*`, ADR 0020); off by default.
+    #[serde(default)]
+    pub tracking: TrackingConfig,
 }
 
 impl Config {
@@ -966,6 +970,27 @@ impl JobsConfig {
             None => Ok(()),
         }
     }
+}
+
+/// Where tracked events go (`CAMPBOOKS_TRACKING__SINK`, ADR 0020).
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum TrackingSink {
+    /// Nowhere: `track` returns at once and nothing else runs (the default).
+    #[default]
+    None,
+    /// The outbox `kernel.tracked_events`, in the transaction of the change;
+    /// nothing publishes it yet (campbooks-cloud#321 adds `amqp`).
+    Outbox,
+}
+
+/// Tracked events settings (`CAMPBOOKS_TRACKING__*`, ADR 0020).
+#[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize)]
+#[serde(default)]
+pub struct TrackingConfig {
+    /// Where tracked events go (`CAMPBOOKS_TRACKING__SINK`: `none`, the
+    /// default, or `outbox`).
+    pub sink: TrackingSink,
 }
 
 /// Event log settings (`CAMPBOOKS_EVENTS__*`, ADR 0012).

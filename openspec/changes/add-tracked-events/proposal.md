@@ -19,10 +19,12 @@ reference. Publishing to RabbitMQ is the next change (#321).
 
 Modules touched: the kernel (new `tracking` module; job origin), `server`
 (the HTTP layer that sets the context, the composition, the tracking config),
-`xtask` (new `tracking` command), `conversations` (the reference flow:
-archiving a conversation). New dependencies: `calamine` (read the workbook)
-and `rust_xlsxwriter` (write it), both in `xtask` only. Two kernel
-migrations. No new endpoint, scope or secret.
+a new tooling crate `crates/tracking-plan` (the workbook's tooling, which
+`cargo xtask tracking` wraps), `conversations` (the reference flow:
+archiving a conversation). New dependencies: `calamine` (read the workbook),
+`rust_xlsxwriter` (write it) and `serde-saphyr` (YAML patches), in the
+tooling crate only. Three kernel migrations. No new endpoint, scope or
+secret.
 
 ## What Changes
 
@@ -31,7 +33,9 @@ migrations. No new endpoint, scope or secret.
   envelope and actor types it describes.
 - `tracking/tracking-plan.json`: the generated, canonical mirror with a
   JSON Schema per event.
-- `cargo xtask tracking [--check | fmt | apply <patch.yaml>]`.
+- `crates/tracking-plan` (`cargo run -p campbooks-tracking-plan -- check |
+  generate | fmt | apply <patch.yaml> | init`), wrapped by
+  `cargo xtask tracking [--check | generate | fmt | apply <patch.yaml>]`.
 - Kernel `tracking`: the `TrackedEvent` trait (implemented only by generated
   code), `Tracker::track(&mut tx, &event)`, the ambient `TrackingContext`
   (actor, on behalf of, operation, correlation, causation, role), the
@@ -45,7 +49,8 @@ migrations. No new endpoint, scope or secret.
   `conversations.conversation_archived` with a conversation snapshot.
 - ADR 0020; AGENTS.md "Tracked events (enforced)"; `docs/tracking.md`;
   CONTRIBUTING; the PR template; OpenSpec config rules; scaffold templates.
-- CI: `cargo xtask tracking --check` in the Rust job.
+- CI: `cargo run -p campbooks-tracking-plan -- check` in the Rust job, and a
+  server test checking Coverage against the real registry.
 
 ## Non-goals
 

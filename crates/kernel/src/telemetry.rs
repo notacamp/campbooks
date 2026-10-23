@@ -102,6 +102,16 @@ pub fn current_traceparent() -> Option<String> {
     carrier.remove("traceparent")
 }
 
+/// The current span's trace id (32 hex digits), when it is traced: the
+/// correlation of tracked events (`tracking`).
+pub fn current_trace_id() -> Option<String> {
+    let context = Span::current().context();
+    let span_context = context.span().span_context().clone();
+    span_context
+        .is_valid()
+        .then(|| span_context.trace_id().to_string())
+}
+
 /// Link `span` to the span a stored `traceparent` names (the one that
 /// enqueued a job). Ignored when it does not parse. Call it before
 /// [`record_trace_id`].
