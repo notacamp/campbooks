@@ -143,8 +143,8 @@ fn amount_of(words: Option<&AskText>) -> Option<&AskAmount> {
 }
 
 /// The task of the owner that `ask` repeats: the open one `same_as` names
-/// (from the same conversation or inbox), or, for a `pay` ask of the model
-/// read, the `pay` task the structured read of the same message made.
+/// (from the same conversation or inbox), or, for a `pay` ask, the `pay` task the
+/// other layer's read of the same message made.
 async fn repeated(
     tx: &mut Transaction<'static, Postgres>,
     workspace: WorkspaceId,
@@ -175,8 +175,13 @@ async fn repeated(
             return Ok(same);
         }
     }
-    // The structured read made the `pay` task of this message already.
-    if verb == TaskVerb::Pay && read.layer == "model" {
+    // The other layer's read of this message made the `pay` task already.
+    if verb == TaskVerb::Pay {
+        let other = if read.layer == "structured" {
+            "model"
+        } else {
+            "structured"
+        };
         let made: Option<Known> = sqlx::query_as(
             "SELECT id, state, due_on FROM tasks.tasks
               WHERE workspace_id = $1 AND assignee = $2 AND verb = 'pay' AND origin = 'ask'
@@ -185,7 +190,7 @@ async fn repeated(
         )
         .bind(workspace.as_uuid())
         .bind(owner.as_uuid())
-        .bind(format!("{}:structured:ask:", read.message))
+        .bind(format!("{}:{other}:ask:", read.message))
         .fetch_optional(&mut **tx)
         .await?;
         return Ok(made);

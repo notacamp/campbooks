@@ -26,11 +26,11 @@ SHALL never be reopened or changed by the read.
 
 ### Requirement: An ask that is an open task
 An ask whose `same_as` names an open task of the inbox's owner from the same
-conversation or the same sender in that inbox SHALL create nothing, and
+conversation or the same inbox SHALL create nothing, and
 SHALL only give that task the ask's due date when it has none. A `same_as`
-that names anything else SHALL be ignored. A `pay` ask from the model read
-of a message whose structured read already made a `pay` task for the owner
-SHALL be that task.
+that names anything else SHALL be ignored. A `pay` ask of one read of a
+message whose other read already made a `pay` task for the owner SHALL be
+that task.
 
 #### Scenario: The reminder
 - **WHEN** EDP's reminder is read with a `pay` ask due 30 October that is the same as Ana's undated EDP task

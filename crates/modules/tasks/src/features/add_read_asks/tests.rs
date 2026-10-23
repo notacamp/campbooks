@@ -414,3 +414,37 @@ async fn the_two_layers_of_one_invoice_make_one_pay_task(db: PgPool) {
     assert_eq!(found[0].0, "Pay invoice 2026-114");
     assert_eq!(found[0].3.as_deref(), Some("2026-10-30"));
 }
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_model_read_that_lands_first_is_not_doubled_by_the_structured_read(db: PgPool) {
+    let kit = Kit::new(db).await;
+    let workspace = WorkspaceId::new();
+    let (_, ana) = kit.member("ana", workspace);
+    deliver(
+        &kit,
+        workspace,
+        Some(ana),
+        "model",
+        vec![ask("model:ask:1", "pay", Some("2026-10-30"), None)],
+        Some(json!({"asks": [
+            {"key": format!("{MESSAGE}:model:ask:1"), "title": "Pay EDP by 30 October"},
+        ]})),
+    )
+    .await;
+    deliver(
+        &kit,
+        workspace,
+        Some(ana),
+        "structured",
+        vec![ask("structured:ask:1", "pay", Some("2026-11-05"), None)],
+        Some(json!({"asks": [
+            {"key": format!("{MESSAGE}:structured:ask:1"), "title": "Pay invoice 2026-114"},
+        ]})),
+    )
+    .await;
+    let found = rows(&kit, workspace).await;
+    assert_eq!(found.len(), 1);
+    assert_eq!(found[0].0, "Pay EDP by 30 October");
+    // The date it had stays.
+    assert_eq!(found[0].3.as_deref(), Some("2026-10-30"));
+}
