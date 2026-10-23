@@ -264,7 +264,8 @@ pub fn modules_with(composition: &Composition) -> Vec<Module> {
 /// change feed's records inside an inbox and search's results, and how
 /// search reads its conversations (ADR 0016); the `admin` module, who is an
 /// administrator, and keeps the trail of what they do; the `assistant`
-/// module, whether a member lets Scout act on its own proposals.
+/// module, whether a member lets Scout act on its own proposals; the
+/// `connectors` module, where each inbox's sends go (campbooks-cloud#242).
 pub fn with_ports(state: AppState) -> AppState {
     state
         .with_resources(resource_catalogue())
@@ -276,6 +277,7 @@ pub fn with_ports(state: AppState) -> AppState {
         .with_preferences(campbooks_assistant::preferences())
         .with_kept_mail(campbooks_conversations::kept_mail())
         .with_outbound(campbooks_conversations::outbound_requests())
+        .with_destinations(campbooks_connectors::outbound_destinations())
         .with_search_sources(SearchSources::new(vec![
             campbooks_conversations::search_source(),
         ]))
@@ -1069,12 +1071,20 @@ mod tests {
         // (campbooks-cloud#242): read only; its rows leave through
         // `conversations.take_rule_resign` alone.
         let snapshot = "conversations.rule_resigns";
+        // Where each inbox's sends went, and where each trashed message went
+        // back to, when destinations were bound (campbooks-cloud#242): read
+        // only, written by that migration alone.
+        let at_deploy = [
+            "connectors.destinations_at_deploy",
+            "connectors.restores_at_deploy",
+        ];
         let missing: Vec<String> = missing
             .into_iter()
             .filter(|t| {
                 t != read_only
                     && t != functions_only
                     && t != snapshot
+                    && !at_deploy.contains(&t.as_str())
                     && !BFF_TABLES.contains(&t.as_str())
             })
             .collect();
@@ -1096,6 +1106,23 @@ mod tests {
             (true, false, false, false),
             "`{role}` only reads {read_only}"
         );
+        for table in at_deploy {
+            let privileges: (bool, bool, bool, bool, bool) = sqlx::query_as(
+                "SELECT has_table_privilege($1, $2, 'SELECT'), has_table_privilege($1, $2, 'INSERT'),
+                        has_table_privilege($1, $2, 'UPDATE'), has_table_privilege($1, $2, 'DELETE'),
+                        has_any_column_privilege($1, $2, 'INSERT, UPDATE')",
+            )
+            .bind(role)
+            .bind(table)
+            .fetch_one(&db)
+            .await
+            .unwrap();
+            assert_eq!(
+                privileges,
+                (true, false, false, false, false),
+                "`{role}` only reads {table}"
+            );
+        }
         let privileges: (bool, bool, bool, bool, bool) = sqlx::query_as(
             "SELECT has_table_privilege($1, $2, 'SELECT'), has_table_privilege($1, $2, 'INSERT'),
                     has_table_privilege($1, $2, 'UPDATE'), has_table_privilege($1, $2, 'DELETE'),

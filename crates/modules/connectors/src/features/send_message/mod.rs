@@ -14,7 +14,10 @@
 //! stands (campbooks-cloud#226): its draft is still being sent as this
 //! send, from this inbox, by an author who may still send from it. The
 //! document sent is the one that module stored, never one an event names,
-//! and this module's row must name that same one. A send that no longer
+//! and this module's row must name that same one. The send's binding must
+//! name where this attempt sends it, its stream, connection and mailbox
+//! (campbooks-cloud#242): a stream repointed by SQL after the member asked
+//! makes the send not stand. A send that no longer
 //! stands is settled as failed (`unavailable`, or `unknown_outcome` after an
 //! attempt that may have gone) without calling the provider.
 //!
@@ -44,7 +47,7 @@ use crate::{
     deps::Deps,
     domain::{
         credentials::{self, TokenError},
-        emit, health,
+        destinations, emit, health,
         model::{ConnectionId, Health, InboxId, Provider, SendId, StreamId},
         schedule,
     },
@@ -204,7 +207,7 @@ impl SendMessage {
         // (`queue_send`): one that differs was not written by it. A send
         // that does not stand is never sent; an unclear one is still looked
         // up (a read), so one that went out is recorded as sent.
-        let port = standing_document(ctx, workspace, send, target.inbox).await?;
+        let port = standing_document(ctx, workspace, send, &target, stream, connection).await?;
         let stands = port.as_ref() == Some(&target.document);
         if !stands && !target.unclear {
             return not_standing(ctx, workspace, send, &target).await;
@@ -623,23 +626,30 @@ async fn load(
 }
 
 /// The document of send `send` as the conversations module stored it,
-/// while the send stands and is sent from `inbox` (the outbound-requests
-/// port, in a short transaction of its own); `None` otherwise.
+/// while the send stands, is sent from the target's inbox and is bound to
+/// where this attempt would send it: `stream`, its connection `connection`
+/// and the target's mailbox (campbooks-cloud#242). Asked through the
+/// outbound-requests port, in a short transaction of its own; `None`
+/// otherwise.
 async fn standing_document(
     ctx: &JobContext,
     workspace: WorkspaceId,
     send: SendId,
-    inbox: InboxId,
+    target: &Target,
+    stream: StreamId,
+    connection: ConnectionId,
 ) -> Result<Option<BlobRef>, JobError> {
     let state = ctx.state().clone();
     let mut tx = ctx.pool().begin_for(workspace).await?;
+    let mailbox = target.mailbox_key.as_deref().unwrap_or_default();
+    let at = destinations::resolved(&mut tx, target.inbox, stream, connection, mailbox).await?;
     let stored = state
         .outbound
-        .stored_send(&state, &mut tx, workspace, send.into())
+        .stored_send(&state, &mut tx, workspace, send.into(), Some(&at))
         .await?;
     tx.commit().await?;
     Ok(stored
-        .filter(|stored| stored.inbox == uuid::Uuid::from(inbox))
+        .filter(|stored| stored.inbox == uuid::Uuid::from(target.inbox))
         .map(|stored| stored.message))
 }
 

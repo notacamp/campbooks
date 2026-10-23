@@ -18,7 +18,7 @@ use crate::{
     i18n::{LocalePreferencePort, NoLocalePreference},
     jobs::Registry,
     operations::Operations,
-    outbound::{NoOutboundRequests, OutboundPort},
+    outbound::{DestinationsPort, NoDestinations, NoOutboundRequests, OutboundPort},
     preferences::{AskFirst, MemberPreferencesPort},
     rate_limit::{RateLimits, api::ApiLimits},
     search::SearchSources,
@@ -59,6 +59,11 @@ pub struct AppState {
     /// `conversations` module's; until then nothing stands, so nothing is
     /// sent or changed.
     pub outbound: OutboundPort,
+    /// Answers where an inbox's sends go: its connection, stream and
+    /// mailbox at the provider ([`outbound`](crate::outbound),
+    /// campbooks-cloud#242). The server registers the `connectors` module's;
+    /// until then no inbox goes anywhere.
+    pub destinations: DestinationsPort,
     /// Answers which language a user chose, for the
     /// [`Locale`](crate::i18n::Locale) of their requests. The server
     /// registers the `workspaces` module's implementation; until then
@@ -151,6 +156,7 @@ impl AppState {
             clients: Arc::new(NoClientDirectory),
             kept_mail: Arc::new(NoKeptMail),
             outbound: Arc::new(NoOutboundRequests),
+            destinations: Arc::new(NoDestinations),
             grants: Arc::new(NoGrantIntake),
             consent: Arc::new(NoConsentDoor),
             invitations: Arc::new(NoInvitations),
@@ -203,6 +209,14 @@ impl AppState {
     #[must_use]
     pub fn with_outbound(mut self, outbound: OutboundPort) -> Self {
         self.outbound = outbound;
+        self
+    }
+
+    /// The same state, resolving where inboxes' sends go through
+    /// `destinations`.
+    #[must_use]
+    pub fn with_destinations(mut self, destinations: DestinationsPort) -> Self {
+        self.destinations = destinations;
         self
     }
 

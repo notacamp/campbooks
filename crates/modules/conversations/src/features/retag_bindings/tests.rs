@@ -113,7 +113,9 @@ async fn a_rotated_key_retags_rules_and_their_changes_which_keep_working_without
     // Idempotent: nothing left to re-tag.
     let mut tx = kit.state.db.begin_for(workspace).await.unwrap();
     assert_eq!(
-        retag(&mut tx, &rotated, workspace).await.unwrap(),
+        retag(&mut tx, &rotated, &kit.state.destinations, workspace)
+            .await
+            .unwrap(),
         Tally::default()
     );
     tx.commit().await.unwrap();
@@ -169,7 +171,9 @@ async fn a_running_run_retagged_after_a_rotation_finishes_under_the_new_key(db: 
     let rotated = Binding::new(&new().with_previous(&old()));
     let kit = kit.with_binding(rotated.clone());
     let mut tx = kit.state.db.begin_for(workspace).await.unwrap();
-    let tally = retag(&mut tx, &rotated, workspace).await.unwrap();
+    let tally = retag(&mut tx, &rotated, &kit.state.destinations, workspace)
+        .await
+        .unwrap();
     tx.commit().await.unwrap();
     assert_eq!(
         tally,

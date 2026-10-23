@@ -27,7 +27,9 @@ use campbooks_kernel::{
     connections::{ConsentDoor, ConsentFuture, ConsentRequest, ProviderGrant, StartedConsent},
     crypto::{Cipher, SecretKey},
     jobs::{Registry, Worker},
-    outbound::{OutboundRequests, StandingFuture, StoredSend, StoredSendFuture},
+    outbound::{
+        Destination, OutboundRequests, Resolved, StandingFuture, StoredSend, StoredSendFuture,
+    },
     tenancy::{Access, Membership, MembershipFuture, Role, UserId, WorkspaceId},
     testing::{self, TestIdp, TestResponse},
 };
@@ -173,10 +175,17 @@ impl Membership for FakeMembership {
 
 /// What the conversations module stored: the sends it released and the
 /// changes its conversations show (the outbound-requests port, faked).
-/// Nothing stands until a test says so, as for a forged event.
+/// Nothing stands until a test says so, as for a forged event. A send
+/// released to a destination stands only when the connector asks for that
+/// one (campbooks-cloud#242).
 #[derive(Debug, Default)]
 pub struct FakeOutbound {
     sends: Mutex<HashMap<uuid::Uuid, StoredSend>>,
+    /// The destination each send released with one is bound to.
+    bound: Mutex<HashMap<uuid::Uuid, Destination>>,
+    /// Sends released before destinations were bound: they name none, and
+    /// stand only for a destination recorded at the deploy.
+    before: Mutex<HashSet<uuid::Uuid>>,
     /// Per conversation, the messages whose requested changes stand.
     changes: Mutex<HashMap<uuid::Uuid, HashSet<String>>>,
 }
@@ -194,6 +203,33 @@ impl FakeOutbound {
                     message,
                 },
             );
+    }
+
+    /// Send `send` was released from `inbox` as `message`, bound to go
+    /// through `destination`: it stands only when asked for that one.
+    pub fn release_to(
+        &self,
+        send: SendId,
+        inbox: InboxId,
+        message: BlobRef,
+        destination: Destination,
+    ) {
+        self.release(send, inbox, message);
+        self.bound
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .insert(send.into(), destination);
+    }
+
+    /// Send `send` was released from `inbox` as `message` before
+    /// destinations were bound: it stands only for a destination the
+    /// connector says was recorded at the deploy.
+    pub fn release_before_destinations(&self, send: SendId, inbox: InboxId, message: BlobRef) {
+        self.release(send, inbox, message);
+        self.before
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .insert(send.into());
     }
 
     /// Send `send` no longer waits for the provider (sent, failed, its
@@ -223,13 +259,28 @@ impl OutboundRequests for FakeOutbound {
         _conn: &'a mut sqlx::PgConnection,
         _workspace: WorkspaceId,
         send: uuid::Uuid,
+        at: Option<&'a Resolved>,
     ) -> StoredSendFuture<'a> {
+        let bound = self
+            .bound
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .get(&send)
+            .cloned();
+        let before = self
+            .before
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .contains(&send);
+        let elsewhere = bound.is_some_and(|bound| at.map(|at| &at.destination) != Some(&bound))
+            || (before && !at.is_some_and(|at| at.as_at_deploy));
         let stored = self
             .sends
             .lock()
             .unwrap_or_else(PoisonError::into_inner)
             .get(&send)
-            .cloned();
+            .cloned()
+            .filter(|_| !elsewhere);
         Box::pin(async move { Ok(stored) })
     }
 
@@ -600,16 +651,36 @@ impl Kit {
     /// rows to set up a state, not to forge one (campbooks-cloud#227).
     pub async fn bind_planted_changes(&self, workspace: WorkspaceId) {
         use campbooks_kernel::db::BeginFor as _;
-        let ids: Vec<uuid::Uuid> =
-            sqlx::query_scalar("SELECT id FROM connectors.outbound_changes WHERE mac IS NULL")
-                .fetch_all(&self.db)
+        let rows: Vec<(uuid::Uuid, crate::domain::model::StreamId)> = sqlx::query_as(
+            "SELECT id, stream_id FROM connectors.outbound_changes WHERE mac IS NULL",
+        )
+        .fetch_all(&self.db)
+        .await
+        .unwrap();
+        let mut tx = self.state.db.begin_for(workspace).await.unwrap();
+        for (id, stream) in rows {
+            let (connection, mailbox) = self.at_of(stream).await;
+            let at = crate::domain::outbound::At {
+                connection,
+                mailbox: &mailbox,
+            };
+            crate::domain::outbound::bind(&mut tx, &self.state.binding, workspace, at, &[id])
                 .await
                 .unwrap();
-        let mut tx = self.state.db.begin_for(workspace).await.unwrap();
-        crate::domain::outbound::bind(&mut tx, &self.state.binding, workspace, &ids)
-            .await
-            .unwrap();
+        }
         tx.commit().await.unwrap();
+    }
+
+    /// Where `stream`'s changes are made now: its connection and mailbox.
+    pub async fn at_of(
+        &self,
+        stream: crate::domain::model::StreamId,
+    ) -> (crate::domain::model::ConnectionId, String) {
+        sqlx::query_as("SELECT connection_id, mailbox_key FROM connectors.streams WHERE id = $1")
+            .bind(stream)
+            .fetch_one(&self.db)
+            .await
+            .unwrap()
     }
 
     /// Run every ready job.
