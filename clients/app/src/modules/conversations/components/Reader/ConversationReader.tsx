@@ -15,11 +15,12 @@ import {
   MetaLine,
   MoreMessages,
   Note,
+  OverflowActions,
   PaneHeader,
   ReaderBody,
   ReaderFooter,
   SkeletonList,
-  Spacer,
+  type OverflowAction,
 } from "~/lib/ui";
 
 import {
@@ -37,7 +38,6 @@ import {
   openByDefault,
   placeName,
   placementLine,
-  replyName,
   spamMove,
   streamName,
   suggestsReply,
@@ -459,30 +459,100 @@ export function ConversationReader({
   const unread = conversation.unread_count > 0;
   const replyButtons =
     renderReplySlot === undefined ? null : (
-      // Reply is the pinned footer's (the floating bar's on phones).
-      <span className="flex flex-wrap gap-1 max-md:hidden">
-        <Button
-          variant="ghost"
+      // Done's neighbours. Icons, named in their tooltips, so the header
+      // stays one row; on phones Reply is the floating bar's.
+      <span className="flex gap-1">
+        <span className="flex max-md:hidden">
+          <IconButton
+            label={tShortcuts("item.reply")}
+            icon="reply"
+            shortcut="item.reply"
+            onClick={() => {
+              openReply();
+            }}
+          />
+        </span>
+        <IconButton
+          label={t("actions.replyAll")}
           icon="reply-all"
           shortcut="item.reply_all"
           onClick={() => {
             askReply("reply_all");
           }}
-        >
-          {t("actions.replyAll")}
-        </Button>
-        <Button
-          variant="ghost"
+        />
+        <IconButton
+          label={t("actions.forward")}
           icon="forward"
           shortcut="item.forward"
           onClick={() => {
             askReply("forward");
           }}
-        >
-          {t("actions.forward")}
-        </Button>
+        />
       </span>
     );
+
+  // After Done, Reply and Move: icons while they fit, else one More menu.
+  const moreActions: OverflowAction[] = writable
+    ? [
+        ...(trashTo === "trash"
+          ? [
+              {
+                id: "trash",
+                label: t("actions.delete"),
+                icon: "trash" as const,
+                shortcut: "conversations.trash" as const,
+                onSelect: moveBy(trashTo),
+              },
+            ]
+          : []),
+        ...(spamTo === "spam"
+          ? [
+              {
+                id: "spam",
+                label: t("actions.reportSpam"),
+                icon: "warning" as const,
+                shortcut: "conversations.report_spam" as const,
+                onSelect: moveBy(spamTo),
+              },
+            ]
+          : []),
+        {
+          id: "star",
+          label: conversation.starred ? t("actions.unstar") : t("actions.star"),
+          icon: conversation.starred ? "pin-filled" : "pin",
+          shortcut: "conversations.star",
+          pressed: conversation.starred,
+          onSelect: () => {
+            actions.toggleStar(conversation);
+          },
+        },
+        {
+          id: "read",
+          label: unread ? t("actions.read") : t("actions.unread"),
+          icon: unread ? "check" : "unread",
+          shortcut: "conversations.mark_unread",
+          onSelect: () => {
+            actions.toggleRead(conversation);
+          },
+        },
+      ]
+    : [];
+  const listActions: OverflowAction[] = [
+    {
+      id: "previous",
+      label: tShortcuts("list.previous"),
+      icon: "chevron-up",
+      shortcut: "list.previous",
+      onSelect: onPrevious,
+    },
+    {
+      id: "next",
+      label: tShortcuts("list.next"),
+      icon: "chevron-down",
+      shortcut: "list.next",
+      onSelect: onNext,
+    },
+  ];
 
   const replyContext: ReplySlotContext = {
     workspaceId,
@@ -513,39 +583,7 @@ export function ConversationReader({
                 </Button>
               </span>
             )}
-            {trashTo === "trash" ? (
-              <IconButton
-                label={t("actions.delete")}
-                icon="trash"
-                shortcut="conversations.trash"
-                onClick={moveBy(trashTo)}
-              />
-            ) : null}
-            {spamTo === "spam" ? (
-              <IconButton
-                label={t("actions.reportSpam")}
-                icon="warning"
-                shortcut="conversations.report_spam"
-                onClick={moveBy(spamTo)}
-              />
-            ) : null}
-            <IconButton
-              label={conversation.starred ? t("actions.unstar") : t("actions.star")}
-              icon={conversation.starred ? "pin-filled" : "pin"}
-              shortcut="conversations.star"
-              aria-pressed={conversation.starred}
-              onClick={() => {
-                actions.toggleStar(conversation);
-              }}
-            />
-            <IconButton
-              label={unread ? t("actions.read") : t("actions.unread")}
-              icon={unread ? "check" : "unread"}
-              shortcut="conversations.mark_unread"
-              onClick={() => {
-                actions.toggleRead(conversation);
-              }}
-            />
+            {replyButtons}
             <MovePicker
               current={conversation.stream}
               open={moving}
@@ -556,43 +594,7 @@ export function ConversationReader({
             />
           </>
         ) : null}
-        {replyButtons}
-        {renderReplySlot === undefined ? null : (
-          // Phones: Reply is in the floating bar; these two stay in the header.
-          <span className="flex gap-1 md:hidden">
-            <IconButton
-              label={t("actions.replyAll")}
-              icon="reply-all"
-              shortcut="item.reply_all"
-              onClick={() => {
-                askReply("reply_all");
-              }}
-            />
-            <IconButton
-              label={t("actions.forward")}
-              icon="forward"
-              shortcut="item.forward"
-              onClick={() => {
-                askReply("forward");
-              }}
-            />
-          </span>
-        )}
-        <Spacer />
-        <span className="flex gap-1 max-md:hidden">
-          <IconButton
-            label={tShortcuts("list.previous")}
-            icon="chevron-up"
-            shortcut="list.previous"
-            onClick={onPrevious}
-          />
-          <IconButton
-            label={tShortcuts("list.next")}
-            icon="chevron-down"
-            shortcut="list.next"
-            onClick={onNext}
-          />
-        </span>
+        <OverflowActions label={t("actions.more")} actions={moreActions} end={listActions} />
       </PaneHeader>
       <ReaderBody>
         <div className="flex flex-col gap-1">
@@ -846,22 +848,6 @@ export function ConversationReader({
       </ReaderBody>
       <ReaderFooter
         slot={renderReplySlot?.(replyContext)}
-        prompt={
-          renderReplySlot === undefined || newest === undefined ? undefined : (
-            <Button
-              icon="reply"
-              shortcut="item.reply"
-              grow
-              onClick={() => {
-                openReply();
-              }}
-            >
-              {replyName(newest) === ""
-                ? tShortcuts("item.reply")
-                : t("compose.title.reply", { name: replyName(newest) })}
-            </Button>
-          )
-        }
         // While the composer is open it owns the bottom of the screen; in
         // spam or the trash the banner holds the way back.
         phoneBar={
