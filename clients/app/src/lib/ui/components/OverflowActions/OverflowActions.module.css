@@ -1,0 +1,21 @@
+/* Grows into the row's free space; never wider than the room it has, so a
+   row holding it does not wrap. At least the More button's width. */
+.row {
+  display: flex;
+  flex: 1 1 0%;
+  align-items: center;
+  gap: var(--space-1);
+  min-width: var(--btn-height);
+}
+
+.spacer {
+  flex: 1 1 auto;
+}
+
+.menu {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--space-0-5);
+  padding: var(--space-2);
+}

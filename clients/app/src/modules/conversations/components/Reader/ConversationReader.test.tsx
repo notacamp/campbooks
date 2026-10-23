@@ -1,6 +1,6 @@
 // A reader without the send slice's composer offers no Reply: none that
 // would do nothing (campbooks-cloud#220).
-import { fireEvent, screen, within } from "@testing-library/react";
+import { fireEvent, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 import { INBOX, Q4, Q4_BODY, Q4_DETAIL, W } from "../../../../../test/demo/conversations";
@@ -78,15 +78,13 @@ describe("ConversationReader", () => {
     const slot = vi.fn<RenderReplySlot>(() => null);
     renderWithProviders(<Reader slot={slot} />);
     await screen.findByRole("heading", { name: Q4.subject });
-    // The phone bar's Reply has no key; the header's shows R.
-    const group = screen
-      .getAllByRole("button", { name: /^Reply(?! all)/u })
-      .find((button) => button.getAttribute("aria-keyshortcuts") !== null)?.parentElement;
-    if (group === null || group === undefined) {
-      throw new Error("no Reply in the header");
-    }
-    expect(within(group).getByRole("button", { name: /^Reply all/u })).toBeInTheDocument();
-    expect(within(group).getByRole("button", { name: /^Forward/u })).toBeInTheDocument();
+    // The header's actions are icons named by aria-label; the phone bar's Reply is not.
+    const icons = screen
+      .getAllByRole("button")
+      .map((button) => button.getAttribute("aria-label"))
+      .filter((label) => label !== null);
+    const at = icons.indexOf("Reply");
+    expect(icons.slice(at, at + 3)).toEqual(["Reply", "Reply all", "Forward"]);
     expect(screen.queryByRole("button", { name: /^Reply to/u })).toBeNull();
   });
 
