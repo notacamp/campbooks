@@ -653,7 +653,6 @@ impl World {
             // What a member told Scout about a person: theirs alone, in no
             // inbox (campbooks-cloud#272).
             ("conversations.person_note", note.to_string()),
-            // A member's own, in no inbox (campbooks-cloud#43).
             ("tasks.task", task.to_string()),
             // A member's chat with Scout: theirs alone (campbooks-cloud#305).
             ("assistant.chat", chat.to_string()),
