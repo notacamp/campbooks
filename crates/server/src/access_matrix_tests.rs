@@ -579,6 +579,7 @@ impl World {
     }
 
     /// One record of every other type, and what the inbox holds.
+    #[allow(clippy::too_many_lines)]
     async fn seed_records(
         &mut self,
         inbox: campbooks_conversations::model::InboxId,
