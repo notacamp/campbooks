@@ -32,6 +32,7 @@ const INBOX: &str = "conversations.inbox";
 
 /// The catalogue operations each tool may invoke: the test checks that each
 /// is in the catalogue, may be called by the assistant and changes nothing.
+#[cfg(test)]
 pub const OPERATIONS: &[(ChatTool, &[&str])] = &[
     (
         ChatTool::FindConversations,

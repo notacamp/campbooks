@@ -88,6 +88,16 @@ pub enum Failure {
     Failed(&'static str),
 }
 
+impl Failure {
+    /// For the log: a fixed word.
+    pub const fn kind(&self) -> &'static str {
+        match self {
+            Self::OverCap(_) => "over_cap",
+            Self::Failed(kind) => kind,
+        }
+    }
+}
+
 /// One model call's answer.
 #[derive(Debug, Default)]
 struct Turn {

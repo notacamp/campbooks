@@ -28,7 +28,8 @@
     "draft": "Draft it for me",
     "send": "Send",
     "bold": "Bold",
-    "italic": "Italic"
+    "italic": "Italic",
+    "ask": "Ask"
   },
   "command": {
     "open": "Search or ask"

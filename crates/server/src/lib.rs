@@ -161,6 +161,7 @@ impl Composition {
         let identity = campbooks_identity::Deps::from_env(config, &scope_catalogue())?;
         let assistant = campbooks_assistant::AssistantDeps {
             ai: gateway.clone(),
+            handbook: handbook(),
         };
         let system = campbooks_system::Deps {
             ai: gateway.clone(),

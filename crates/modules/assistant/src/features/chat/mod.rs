@@ -362,7 +362,7 @@ pub async fn ask(
     let outcome = match outcome {
         // Past the cap before anything was answered: nothing is stored.
         Err(Failure::OverCap(error)) if question.asking.calls <= 1 => {
-            question.report("over_cap", false);
+            question.report("over_cap", "over_cap", false);
             return Err(error.into());
         }
         other => other,
@@ -371,11 +371,11 @@ pub async fn ask(
     match outcome {
         Ok(answer) => {
             let view = question.store_answer(answer_id, &answer).await?;
-            question.report(answer.finish.as_str(), false);
+            question.report(answer.finish.as_str(), "none", false);
             Ok(Json(view))
         }
         Err(failure) => {
-            question.report("failed", false);
+            question.report("failed", failure.kind(), false);
             question.store_failed(answer_id).await?;
             Err(problem_of(failure))
         }
@@ -446,11 +446,11 @@ pub async fn stream(
     let opened = match question.asking.open().await {
         Ok(opened) => opened,
         Err(Failure::OverCap(error)) => {
-            question.report("over_cap", true);
+            question.report("over_cap", "over_cap", true);
             return Err(error.into());
         }
         Err(failure) => {
-            question.report("failed", true);
+            question.report("failed", failure.kind(), true);
             let answer_id = question.store_question().await?;
             question.store_failed(answer_id).await?;
             return Err(problem_of(failure));
@@ -470,14 +470,14 @@ pub async fn stream(
         let last = match outcome {
             Ok(answer) => match question.store_answer(answer_id, &answer).await {
                 Ok(view) => {
-                    question.report(answer.finish.as_str(), true);
+                    question.report(answer.finish.as_str(), "none", true);
                     Event::default()
                         .event("done")
                         .data(serde_json::to_string(&view).unwrap_or_default())
                 }
                 Err(error) => {
                     tracing::warn!(error = error.code(), "chat: the answer could not be stored");
-                    question.report("failed", true);
+                    question.report("failed", "store", true);
                     error_event(
                         &Error::Unavailable(crate::MESSAGES.reason("chat_failed")),
                         locale,
@@ -485,7 +485,7 @@ pub async fn stream(
                 }
             },
             Err(failure) => {
-                question.report("failed", true);
+                question.report("failed", failure.kind(), true);
                 if let Err(error) = question.store_failed(answer_id).await {
                     tracing::warn!(
                         error = error.code(),
@@ -752,9 +752,10 @@ impl Question {
     }
 
     /// One log line per question: how it went, in sizes and names only.
-    fn report(&self, outcome: &'static str, streamed: bool) {
+    fn report(&self, outcome: &'static str, reason: &'static str, streamed: bool) {
         tracing::info!(
             outcome,
+            reason,
             streamed,
             model_calls = self.asking.calls,
             tools = %self.asking.tools.join(","),
