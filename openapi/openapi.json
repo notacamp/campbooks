@@ -4837,6 +4837,204 @@
         }
       }
     },
+    "/api/v1/w/{workspace_id}/conversations/{conversation_id}/messages/{message_id}/read": {
+      "get": {
+        "tags": [
+          "conversations"
+        ],
+        "summary": "What Scout read in a message.",
+        "operationId": "conversations.get_message_read",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "description": "The workspace.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId"
+            }
+          },
+          {
+            "name": "conversation_id",
+            "in": "path",
+            "description": "The conversation.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ConversationId"
+            }
+          },
+          {
+            "name": "message_id",
+            "in": "path",
+            "description": "The message.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/MessageId"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The read.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MessageReadView"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid access token.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing scope.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such message, or you cannot see it.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [
+              "conversations:read"
+            ]
+          }
+        ],
+        "x-campbooks": {
+          "access": {
+            "action": "read",
+            "resource": "conversations.message"
+          },
+          "assistant": true,
+          "automation": false,
+          "mutates": false,
+          "records": [
+            "conversations.message"
+          ],
+          "risk": "low"
+        }
+      },
+      "post": {
+        "tags": [
+          "conversations"
+        ],
+        "summary": "Queue Scout's read of a message, when it has none.",
+        "operationId": "conversations.request_message_read",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "description": "The workspace.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId"
+            }
+          },
+          {
+            "name": "conversation_id",
+            "in": "path",
+            "description": "The conversation.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ConversationId"
+            }
+          },
+          {
+            "name": "message_id",
+            "in": "path",
+            "description": "The message.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/MessageId"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "What was done.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReadRequested"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid access token.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing scope.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such message, or you cannot see it.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [
+              "conversations:read"
+            ]
+          }
+        ],
+        "x-campbooks": {
+          "access": {
+            "action": "read",
+            "resource": "conversations.message"
+          },
+          "assistant": false,
+          "automation": false,
+          "mutates": true,
+          "records": [
+            "conversations.message"
+          ],
+          "risk": "low"
+        }
+      }
+    },
     "/api/v1/w/{workspace_id}/conversations/{conversation_id}/need/confirm": {
       "post": {
         "tags": [
@@ -10475,6 +10673,1504 @@
         }
       }
     },
+    "/api/v1/w/{workspace_id}/schedule/calendars": {
+      "get": {
+        "tags": [
+          "schedule"
+        ],
+        "summary": "List your calendars.",
+        "operationId": "schedule.list_calendars",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "description": "The workspace.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Your calendars.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CalendarList"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid access token.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing scope.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [
+              "schedule:read"
+            ]
+          }
+        ],
+        "x-campbooks": {
+          "access": {
+            "action": "read",
+            "resource": "schedule.calendar"
+          },
+          "assistant": true,
+          "automation": false,
+          "mutates": false,
+          "records": [
+            "schedule.calendar"
+          ],
+          "risk": "low"
+        }
+      }
+    },
+    "/api/v1/w/{workspace_id}/schedule/calendars/{calendar_id}": {
+      "patch": {
+        "tags": [
+          "schedule"
+        ],
+        "summary": "Turn a calendar on or off, or colour it.",
+        "operationId": "schedule.update_calendar",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "description": "The workspace.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId"
+            }
+          },
+          {
+            "name": "calendar_id",
+            "in": "path",
+            "description": "The calendar.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/CalendarId"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CalendarPatch"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "The calendar afterwards.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CalendarView"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "A colour that is not `#rrggbb` (`invalid_color`), or your Campbooks calendar turned off (`invalid_calendar`).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid access token.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing scope.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such calendar, or it is not yours.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [
+              "schedule:write"
+            ]
+          }
+        ],
+        "x-campbooks": {
+          "access": {
+            "action": "write",
+            "resource": "schedule.calendar"
+          },
+          "assistant": false,
+          "automation": false,
+          "mutates": true,
+          "records": [
+            "schedule.calendar"
+          ],
+          "risk": "low"
+        }
+      }
+    },
+    "/api/v1/w/{workspace_id}/schedule/events": {
+      "get": {
+        "tags": [
+          "schedule"
+        ],
+        "summary": "List your events and occurrences in a window.",
+        "operationId": "schedule.list_events",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "description": "The workspace.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId"
+            }
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "description": "Start of the window: an RFC 3339 time with an offset, or a date (the\nstart of that day in your time zone).",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "example": "2026-11-01"
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "description": "End of the window, in the same form, after `from` and at most 365\ndays later.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "example": "2026-11-08"
+          },
+          {
+            "name": "calendars",
+            "in": "query",
+            "description": "Only these calendars: ids separated by commas.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "kind",
+            "in": "query",
+            "description": "Only these kinds: kinds separated by commas (`travel,stay`).",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "description": "Only events whose title contains this text, ignoring case and\naccents.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "At most this many, earliest first (1 to 500, default 200).",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "minimum": 0
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The events.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EventList"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "A window that is not valid or longer than 365 days (`invalid_window`), or a kind that does not exist (`invalid_kind`).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid access token.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing scope.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "A calendar that is not yours.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [
+              "schedule:read"
+            ]
+          }
+        ],
+        "x-campbooks": {
+          "access": {
+            "action": "read",
+            "resource": "schedule.event"
+          },
+          "assistant": true,
+          "automation": false,
+          "mutates": false,
+          "records": [
+            "schedule.event"
+          ],
+          "risk": "low"
+        }
+      },
+      "post": {
+        "tags": [
+          "schedule"
+        ],
+        "summary": "Make an event.",
+        "operationId": "schedule.create_event",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "description": "The workspace.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NewEvent"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "The event.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EventView"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Times that do not read or do not follow each other (`invalid_when`), a title that is empty or too long (`invalid_text`), a time zone that is not an IANA name (`invalid_time_zone`), or a calendar that cannot be written (`calendar_read_only`).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid access token.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing scope.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such calendar, or it is not yours.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [
+              "schedule:write"
+            ]
+          }
+        ],
+        "x-campbooks": {
+          "access": {
+            "action": "create",
+            "resource": "schedule.event"
+          },
+          "assistant": true,
+          "automation": true,
+          "mutates": true,
+          "records": [
+            "schedule.event"
+          ],
+          "risk": "low",
+          "undo": "schedule.delete_event"
+        }
+      }
+    },
+    "/api/v1/w/{workspace_id}/schedule/events/{event_id}": {
+      "get": {
+        "tags": [
+          "schedule"
+        ],
+        "summary": "Read one event.",
+        "operationId": "schedule.get_event",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "description": "The workspace.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId"
+            }
+          },
+          {
+            "name": "event_id",
+            "in": "path",
+            "description": "The event.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/EventId"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The event.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EventView"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid access token.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing scope.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such event, or it is not yours.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [
+              "schedule:read"
+            ]
+          }
+        ],
+        "x-campbooks": {
+          "access": {
+            "action": "read",
+            "resource": "schedule.event"
+          },
+          "assistant": true,
+          "automation": false,
+          "mutates": false,
+          "records": [
+            "schedule.event"
+          ],
+          "risk": "low"
+        }
+      },
+      "delete": {
+        "tags": [
+          "schedule"
+        ],
+        "summary": "Delete an event (a series is deleted whole), with an undo.",
+        "operationId": "schedule.delete_event",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "description": "The workspace.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId"
+            }
+          },
+          {
+            "name": "event_id",
+            "in": "path",
+            "description": "The event.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/EventId"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The event is deleted; the token undoes it.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeletedEvent"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid access token.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing scope.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such event, or it is not yours.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "An earlier change still waits for the provider (`change_pending`).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [
+              "schedule:write"
+            ]
+          }
+        ],
+        "x-campbooks": {
+          "access": {
+            "action": "delete",
+            "resource": "schedule.event"
+          },
+          "assistant": true,
+          "automation": true,
+          "mutates": true,
+          "records": [
+            "schedule.event"
+          ],
+          "risk": "low",
+          "undo": "schedule.restore_event"
+        }
+      },
+      "patch": {
+        "tags": [
+          "schedule"
+        ],
+        "summary": "Change an event or one occurrence of a series.",
+        "operationId": "schedule.update_event",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "description": "The workspace.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId"
+            }
+          },
+          {
+            "name": "event_id",
+            "in": "path",
+            "description": "The event.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/EventId"
+            }
+          },
+          {
+            "name": "occurrence",
+            "in": "query",
+            "description": "For an event of a series: the name of the occurrence (its `occurrence`\nin a list). A series is never changed as a whole.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EventPatch"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "The event afterwards, and what changed as it was.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UpdatedEvent"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Nothing to change (`nothing_to_change`), times that do not read or follow each other (`invalid_when`), a text that is empty or too long (`invalid_text`), a time zone that is not an IANA name (`invalid_time_zone`), a whole series (`series_not_editable`) or a calendar that cannot be written (`calendar_read_only`).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid access token.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing scope.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such event or occurrence, or it is not yours.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "An earlier change still waits for the provider (`change_pending`).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [
+              "schedule:write"
+            ]
+          }
+        ],
+        "x-campbooks": {
+          "access": {
+            "action": "write",
+            "resource": "schedule.event"
+          },
+          "assistant": true,
+          "automation": true,
+          "mutates": true,
+          "records": [
+            "schedule.event"
+          ],
+          "risk": "low",
+          "undo": "schedule.update_event"
+        }
+      }
+    },
+    "/api/v1/w/{workspace_id}/schedule/events/{event_id}/push": {
+      "post": {
+        "tags": [
+          "schedule"
+        ],
+        "summary": "Add an event of your Campbooks calendar to one of your provider calendars.",
+        "operationId": "schedule.push_event",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "description": "The workspace.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId"
+            }
+          },
+          {
+            "name": "event_id",
+            "in": "path",
+            "description": "The event on your Campbooks calendar.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/EventId"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PushTo"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "The event on the provider calendar.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EventView"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The event is not on your Campbooks calendar (`not_on_campbooks`), or the calendar cannot be written (`calendar_read_only`).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid access token.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing scope.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such event or calendar, or not yours.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "An earlier change still waits (`change_pending`).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [
+              "schedule:write"
+            ]
+          }
+        ],
+        "x-campbooks": {
+          "access": {
+            "action": "write",
+            "resource": "schedule.event"
+          },
+          "assistant": true,
+          "automation": true,
+          "mutates": true,
+          "records": [
+            "schedule.event",
+            "schedule.calendar"
+          ],
+          "risk": "low",
+          "undo": "schedule.unpush_event"
+        }
+      },
+      "delete": {
+        "tags": [
+          "schedule"
+        ],
+        "summary": "Take an event added to a provider calendar away again.",
+        "operationId": "schedule.unpush_event",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "description": "The workspace.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId"
+            }
+          },
+          {
+            "name": "event_id",
+            "in": "path",
+            "description": "The event on the provider calendar.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/EventId"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The event, back on your Campbooks calendar.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Unpushed"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The event was not added from your Campbooks calendar (`not_pushed`).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid access token.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing scope.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such event, or it is not yours.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The event has not reached the provider yet (`change_pending`).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [
+              "schedule:write"
+            ]
+          }
+        ],
+        "x-campbooks": {
+          "access": {
+            "action": "write",
+            "resource": "schedule.event"
+          },
+          "assistant": true,
+          "automation": true,
+          "mutates": true,
+          "records": [
+            "schedule.event",
+            "schedule.calendar"
+          ],
+          "risk": "low",
+          "undo": "schedule.push_event"
+        }
+      }
+    },
+    "/api/v1/w/{workspace_id}/schedule/events/{event_id}/response": {
+      "post": {
+        "tags": [
+          "schedule"
+        ],
+        "summary": "Answer an invitation.",
+        "operationId": "schedule.respond_event",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "description": "The workspace.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId"
+            }
+          },
+          {
+            "name": "event_id",
+            "in": "path",
+            "description": "The event.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/EventId"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EventAnswer"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "The event afterwards, and your earlier answer.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AnsweredEvent"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid access token.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing scope.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such event, or it is not yours.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "An earlier change still waits for the provider (`change_pending`).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [
+              "schedule:write"
+            ]
+          }
+        ],
+        "x-campbooks": {
+          "access": {
+            "action": "write",
+            "resource": "schedule.event"
+          },
+          "assistant": true,
+          "automation": true,
+          "mutates": true,
+          "records": [
+            "schedule.event"
+          ],
+          "risk": "low",
+          "undo": "schedule.respond_event"
+        }
+      }
+    },
+    "/api/v1/w/{workspace_id}/schedule/events/{event_id}/restore": {
+      "post": {
+        "tags": [
+          "schedule"
+        ],
+        "summary": "Bring a deleted event back.",
+        "operationId": "schedule.restore_event",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "description": "The workspace.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId"
+            }
+          },
+          {
+            "name": "event_id",
+            "in": "path",
+            "description": "The event.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/EventId"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Restore"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "The event, back.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EventView"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The token is not the one of the delete (`invalid_undo`), or the event is not deleted.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid access token.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing scope.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such event, or it is not yours.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The delete is on its way to the provider (`change_pending`): try again in a moment.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [
+              "schedule:write"
+            ]
+          }
+        ],
+        "x-campbooks": {
+          "access": {
+            "action": "write",
+            "resource": "schedule.event"
+          },
+          "assistant": true,
+          "automation": true,
+          "mutates": true,
+          "records": [
+            "schedule.event"
+          ],
+          "risk": "low",
+          "undo": "schedule.delete_event"
+        }
+      }
+    },
+    "/api/v1/w/{workspace_id}/schedule/free-slots": {
+      "get": {
+        "tags": [
+          "schedule"
+        ],
+        "summary": "When you are free.",
+        "operationId": "schedule.free_slots",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "description": "The workspace.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId"
+            }
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "description": "Start of the window: an RFC 3339 time with an offset, or a date (the\nstart of that day in your time zone).",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "example": "2026-11-03"
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "description": "End of the window, in the same form, after `from`, at most 62 days\nlater.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "example": "2026-11-04"
+          },
+          {
+            "name": "minutes",
+            "in": "query",
+            "description": "The length of slot to look for, 5 to 1,440 minutes.",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "minimum": 0
+            },
+            "example": 60
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The free slots.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FreeSlotList"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "A window that is not valid or longer than 62 days (`invalid_window`), or minutes out of range (`invalid_minutes`).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid access token.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing scope.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [
+              "schedule:read"
+            ]
+          }
+        ],
+        "x-campbooks": {
+          "access": {
+            "action": "read",
+            "resource": "schedule.event"
+          },
+          "assistant": true,
+          "automation": false,
+          "mutates": false,
+          "records": [
+            "schedule.event"
+          ],
+          "risk": "low"
+        }
+      }
+    },
+    "/api/v1/w/{workspace_id}/schedule/settings": {
+      "get": {
+        "tags": [
+          "schedule"
+        ],
+        "summary": "Your calendar settings.",
+        "operationId": "schedule.get_settings",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "description": "The workspace.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Your settings.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SettingsView"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid access token.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing scope.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [
+              "schedule:read"
+            ]
+          }
+        ],
+        "x-campbooks": {
+          "access": {
+            "action": "read",
+            "resource": "schedule.calendar"
+          },
+          "assistant": false,
+          "automation": false,
+          "mutates": false,
+          "records": [
+            "schedule.calendar"
+          ],
+          "risk": "low"
+        }
+      },
+      "patch": {
+        "tags": [
+          "schedule"
+        ],
+        "summary": "Change your calendar settings.",
+        "operationId": "schedule.update_settings",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "description": "The workspace.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SettingsPatch"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Your settings afterwards.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SettingsView"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "A time zone that is not an IANA name (`invalid_time_zone`), working hours that end before they start (`invalid_hours`), a kind Scout does not add (`invalid_kind`), or a calendar that is not one of yours or cannot be written (`invalid_calendar`).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid access token.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing scope.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [
+              "schedule:write"
+            ]
+          }
+        ],
+        "x-campbooks": {
+          "access": {
+            "action": "write",
+            "resource": "schedule.calendar"
+          },
+          "assistant": false,
+          "automation": false,
+          "mutates": true,
+          "records": [
+            "schedule.calendar"
+          ],
+          "risk": "low"
+        }
+      }
+    },
     "/api/v1/w/{workspace_id}/search": {
       "get": {
         "tags": [
@@ -15198,6 +16894,25 @@
           }
         }
       },
+      "Amount": {
+        "type": "object",
+        "description": "An amount of money, in minor units.",
+        "required": [
+          "minor",
+          "currency"
+        ],
+        "properties": {
+          "currency": {
+            "type": "string",
+            "description": "The ISO 4217 currency code."
+          },
+          "minor": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Minor units (cents)."
+          }
+        }
+      },
       "Answer": {
         "type": "object",
         "description": "The person's answer.",
@@ -15264,6 +16979,24 @@
           "redirect": {
             "type": "string",
             "description": "Navigate here: the app's redirect URI, with a code or\n`error=access_denied`."
+          }
+        }
+      },
+      "AnsweredEvent": {
+        "type": "object",
+        "description": "Your answer, and the one before it.",
+        "required": [
+          "event",
+          "previous_response"
+        ],
+        "properties": {
+          "event": {
+            "$ref": "#/components/schemas/EventView",
+            "description": "The event afterwards."
+          },
+          "previous_response": {
+            "$ref": "#/components/schemas/Response",
+            "description": "The answer before this one: send it back as `response` to undo."
           }
         }
       },
@@ -15486,6 +17219,35 @@
           }
         }
       },
+      "BTreeMap": {
+        "type": "object",
+        "additionalProperties": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "description": "One stretch of a working day.",
+            "required": [
+              "start",
+              "end"
+            ],
+            "properties": {
+              "end": {
+                "type": "string",
+                "description": "`HH:MM`, after the start.",
+                "example": "18:00"
+              },
+              "start": {
+                "type": "string",
+                "description": "`HH:MM`, 24 hours.",
+                "example": "09:00"
+              }
+            }
+          }
+        },
+        "propertyNames": {
+          "type": "string"
+        }
+      },
       "BackchannelLogout": {
         "type": "object",
         "required": [
@@ -15506,6 +17268,109 @@
           "weekly",
           "monthly"
         ]
+      },
+      "CalendarId": {
+        "type": "string",
+        "format": "uuid",
+        "description": "CalendarId (UUIDv7)"
+      },
+      "CalendarList": {
+        "type": "object",
+        "description": "The member's calendars.",
+        "required": [
+          "calendars"
+        ],
+        "properties": {
+          "calendars": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CalendarView"
+            },
+            "description": "Their Campbooks calendar first, then the others by name."
+          }
+        }
+      },
+      "CalendarPatch": {
+        "type": "object",
+        "description": "What to change of a calendar.",
+        "properties": {
+          "color": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Its colour as `#rrggbb`; empty goes back to the provider's."
+          },
+          "syncing": {
+            "type": [
+              "boolean",
+              "null"
+            ],
+            "description": "Show its events (a provider calendar only). Turning it on asks\nconnectors to read it again from the start."
+          }
+        },
+        "additionalProperties": false
+      },
+      "CalendarSource": {
+        "type": "string",
+        "description": "Where a calendar lives.",
+        "enum": [
+          "campbooks",
+          "provider"
+        ]
+      },
+      "CalendarView": {
+        "type": "object",
+        "description": "A calendar of the member.",
+        "required": [
+          "id",
+          "source",
+          "name",
+          "syncing",
+          "writable",
+          "primary"
+        ],
+        "properties": {
+          "color": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Its colour, `#rrggbb`, when the provider gave one."
+          },
+          "id": {
+            "$ref": "#/components/schemas/CalendarId",
+            "description": "The calendar."
+          },
+          "name": {
+            "type": "string",
+            "description": "Its name.",
+            "example": "Family"
+          },
+          "primary": {
+            "type": "boolean",
+            "description": "Whether it is the account's primary calendar."
+          },
+          "source": {
+            "$ref": "#/components/schemas/CalendarSource",
+            "description": "Their Campbooks calendar, or one of a connected provider account."
+          },
+          "syncing": {
+            "type": "boolean",
+            "description": "Whether its events are shown (the Campbooks calendar always is)."
+          },
+          "time_zone": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Its IANA time zone, when known."
+          },
+          "writable": {
+            "type": "boolean",
+            "description": "Whether events may be created and changed on it."
+          }
+        }
       },
       "Candidate": {
         "type": "object",
@@ -15797,7 +17662,10 @@
           "what_needs_me",
           "my_inboxes",
           "my_tasks",
-          "read_task"
+          "read_task",
+          "my_calendar",
+          "free_time",
+          "read_event"
         ]
       },
       "ChatView": {
@@ -16912,6 +18780,24 @@
           }
         }
       },
+      "CountedCalendar": {
+        "type": "object",
+        "description": "A calendar whose events were counted.",
+        "required": [
+          "id",
+          "name"
+        ],
+        "properties": {
+          "id": {
+            "$ref": "#/components/schemas/CalendarId",
+            "description": "The calendar."
+          },
+          "name": {
+            "type": "string",
+            "description": "Its name."
+          }
+        }
+      },
       "CreateRule": {
         "type": "object",
         "description": "A rule to create.",
@@ -17251,6 +19137,24 @@
           "value": {
             "$ref": "#/components/schemas/AnswerView",
             "description": "The answer."
+          }
+        }
+      },
+      "DeletedEvent": {
+        "type": "object",
+        "description": "A deleted event.",
+        "required": [
+          "id",
+          "undo_token"
+        ],
+        "properties": {
+          "id": {
+            "$ref": "#/components/schemas/EventId",
+            "description": "The event."
+          },
+          "undo_token": {
+            "type": "string",
+            "description": "Sent to `schedule.restore_event` to bring it back."
           }
         }
       },
@@ -17711,6 +19615,336 @@
               "null"
             ],
             "description": "Returned unchanged."
+          }
+        }
+      },
+      "EventAnswer": {
+        "type": "object",
+        "description": "Your answer.",
+        "required": [
+          "response"
+        ],
+        "properties": {
+          "response": {
+            "$ref": "#/components/schemas/Response",
+            "description": "`accepted`, `tentative` or `declined` (a provider is never told\n`needs_action`: it only takes an answer back to \"not answered\" on\nevents kept on Campbooks)."
+          }
+        },
+        "additionalProperties": false
+      },
+      "EventId": {
+        "type": "string",
+        "format": "uuid",
+        "description": "EventId (UUIDv7)"
+      },
+      "EventKind": {
+        "type": "string",
+        "description": "What kind of dated thing an event is. A fixed set: obligations (pay by,\nsubmit by, renew by) are never events, they are asks owned by `tasks`.",
+        "enum": [
+          "charge",
+          "appointment",
+          "meeting",
+          "travel",
+          "stay",
+          "show",
+          "reservation",
+          "delivery",
+          "expiry",
+          "hold",
+          "none"
+        ]
+      },
+      "EventList": {
+        "type": "object",
+        "description": "Events, earliest first.",
+        "required": [
+          "events",
+          "truncated"
+        ],
+        "properties": {
+          "events": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/EventView"
+            },
+            "description": "The events and occurrences."
+          },
+          "truncated": {
+            "type": "boolean",
+            "description": "Whether more matched than `limit` allowed."
+          }
+        }
+      },
+      "EventNotice": {
+        "type": "string",
+        "description": "Why an event does not show what its member last asked for.",
+        "enum": [
+          "kept_theirs",
+          "not_saved"
+        ]
+      },
+      "EventOrigin": {
+        "type": "string",
+        "description": "Who made an event.",
+        "enum": [
+          "provider",
+          "member",
+          "scout"
+        ]
+      },
+      "EventPatch": {
+        "type": "object",
+        "description": "What to change. Leave out what stays; an empty string clears `place`,\n`notes` and `time_zone`.",
+        "properties": {
+          "busy": {
+            "type": [
+              "boolean",
+              "null"
+            ],
+            "description": "Whether it counts when free time is worked out."
+          },
+          "ends": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "A new end, in the same form."
+          },
+          "kind": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/EventKind",
+                "description": "A new kind."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "notes": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "New notes."
+          },
+          "place": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "A new place."
+          },
+          "starts": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "A new start (an RFC 3339 time with an offset, or a date for an all-day\nevent). The event keeps its length unless `ends` is given too."
+          },
+          "time_zone": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "A new IANA time zone."
+          },
+          "title": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "A new title."
+          }
+        },
+        "additionalProperties": false
+      },
+      "EventStatus": {
+        "type": "string",
+        "description": "Whether an event stands.",
+        "enum": [
+          "confirmed",
+          "tentative",
+          "cancelled"
+        ]
+      },
+      "EventView": {
+        "type": "object",
+        "description": "An event, or one occurrence of a series.",
+        "required": [
+          "id",
+          "calendar_id",
+          "kind",
+          "title",
+          "all_day",
+          "starts",
+          "ends",
+          "status",
+          "recurring",
+          "origin",
+          "pending",
+          "on_provider",
+          "busy"
+        ],
+        "properties": {
+          "all_day": {
+            "type": "boolean",
+            "description": "Whether it lasts whole days."
+          },
+          "busy": {
+            "type": "boolean",
+            "description": "Whether it counts when free time is worked out."
+          },
+          "calendar_id": {
+            "$ref": "#/components/schemas/CalendarId",
+            "description": "Its calendar."
+          },
+          "ends": {
+            "type": "string",
+            "description": "When it ends, in the same form (exclusive for an all-day event).",
+            "example": "2026-11-06T11:55:00+00:00"
+          },
+          "found_by": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "How Scout found it, when Scout added it: `structured` or `model`."
+          },
+          "id": {
+            "$ref": "#/components/schemas/EventId",
+            "description": "The event (a series and its occurrences share it)."
+          },
+          "kind": {
+            "$ref": "#/components/schemas/EventKind",
+            "description": "What kind of dated thing it is."
+          },
+          "notes": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Notes."
+          },
+          "notice": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/EventNotice",
+                "description": "Why it does not show what you last asked for."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "occurrence": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "For an occurrence, the name to change it by (`?occurrence=`)."
+          },
+          "on_provider": {
+            "type": "boolean",
+            "description": "Whether it is on a provider calendar and exists there."
+          },
+          "origin": {
+            "$ref": "#/components/schemas/EventOrigin",
+            "description": "Who made it."
+          },
+          "pending": {
+            "type": "boolean",
+            "description": "Whether your last change still waits to reach the provider."
+          },
+          "place": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Where it is."
+          },
+          "recurring": {
+            "type": "boolean",
+            "description": "Whether it is an occurrence of a series."
+          },
+          "response": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Response",
+                "description": "Your answer to the invitation, if it is one."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "source": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/RecordRef",
+                "description": "The email it was read from, if any."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "source_conversation": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The conversation of that email, when known."
+          },
+          "starts": {
+            "type": "string",
+            "description": "When it starts: an RFC 3339 time with the offset of the member's time\nzone, or a `YYYY-MM-DD` date when it is all-day.",
+            "example": "2026-11-06T07:40:00+00:00"
+          },
+          "status": {
+            "$ref": "#/components/schemas/EventStatus",
+            "description": "Whether it stands."
+          },
+          "time_zone": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The IANA zone it was written in, when it has one."
+          },
+          "title": {
+            "type": "string",
+            "description": "Its title.",
+            "example": "Flight LIS → AMS"
+          }
+        }
+      },
+      "FreeSlotList": {
+        "type": "object",
+        "description": "When you are free.",
+        "required": [
+          "slots",
+          "calendars",
+          "time_zone"
+        ],
+        "properties": {
+          "calendars": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CountedCalendar"
+            },
+            "description": "The calendars whose events were counted as busy."
+          },
+          "slots": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SlotView"
+            },
+            "description": "Earliest first."
+          },
+          "time_zone": {
+            "type": "string",
+            "description": "The time zone the working hours and the times are in."
           }
         }
       },
@@ -18571,6 +20805,21 @@
         "format": "uuid",
         "description": "ItemId (UUIDv7)"
       },
+      "ItemKind": {
+        "type": "string",
+        "description": "What kind of thing that happens at a time a read of a message found\n(campbooks-cloud#42). Obligations are not items: they are asks.",
+        "enum": [
+          "charge",
+          "appointment",
+          "meeting",
+          "travel",
+          "stay",
+          "show",
+          "reservation",
+          "delivery",
+          "expiry"
+        ]
+      },
       "ItemState": {
         "type": "string",
         "description": "Whether an item still needs someone.",
@@ -18927,6 +21176,60 @@
         "type": "string",
         "format": "uuid",
         "description": "MessageId (UUIDv7)"
+      },
+      "MessageReadView": {
+        "type": "object",
+        "description": "What Scout read in a message.",
+        "required": [
+          "status",
+          "layers",
+          "items",
+          "asks",
+          "flagged",
+          "can_read"
+        ],
+        "properties": {
+          "asks": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReadAsk"
+            },
+            "description": "The obligations found."
+          },
+          "can_read": {
+            "type": "boolean",
+            "description": "Whether Scout can read this message for dates: the pass said it tells\nof something dated and the sender's own data did not cover it."
+          },
+          "dated_kind": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The kind of dated thing the pass named, when it flagged the message\nand no `complete` role may read mail here (the reader offers to add it\nby hand)."
+          },
+          "flagged": {
+            "type": "boolean",
+            "description": "Whether the decide pass flagged the message for a read."
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReadItem"
+            },
+            "description": "The things that happen at a time found, the sender's data first."
+          },
+          "layers": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReadLayer"
+            },
+            "description": "The readers that produced a read: the sender's own data\n(`structured`), and Scout's call (`model`)."
+          },
+          "status": {
+            "$ref": "#/components/schemas/ReadStatus",
+            "description": "Where the model's read is."
+          }
+        }
       },
       "MessageText": {
         "type": "object",
@@ -19356,6 +21659,84 @@
             "description": "Recipients, instead of the filled ones."
           }
         }
+      },
+      "NewEvent": {
+        "type": "object",
+        "description": "An event to make.",
+        "required": [
+          "title",
+          "starts"
+        ],
+        "properties": {
+          "busy": {
+            "type": [
+              "boolean",
+              "null"
+            ],
+            "description": "Whether it counts when free time is worked out (default yes)."
+          },
+          "calendar_id": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/CalendarId",
+                "description": "The calendar; your Campbooks calendar when left out."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "ends": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "When it ends, in the same form (exclusive for a date). An hour (or a\nday) after the start when left out."
+          },
+          "kind": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/EventKind",
+                "description": "Its kind (default `none`)."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "notes": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Notes."
+          },
+          "place": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Where it is."
+          },
+          "starts": {
+            "type": "string",
+            "description": "When it starts: an RFC 3339 time with an offset, or a `YYYY-MM-DD`\ndate for an all-day event.",
+            "example": "2026-11-12T15:00:00+00:00"
+          },
+          "time_zone": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The IANA time zone it is written in (default: yours)."
+          },
+          "title": {
+            "type": "string",
+            "description": "What to call it.",
+            "example": "Dentist"
+          }
+        },
+        "additionalProperties": false
       },
       "NewRuleState": {
         "type": "string",
@@ -20366,6 +22747,20 @@
           "imap"
         ]
       },
+      "PushTo": {
+        "type": "object",
+        "description": "Where to add it.",
+        "required": [
+          "calendar_id"
+        ],
+        "properties": {
+          "calendar_id": {
+            "$ref": "#/components/schemas/CalendarId",
+            "description": "One of your provider calendars that can be written."
+          }
+        },
+        "additionalProperties": false
+      },
       "QueryWarning": {
         "type": "object",
         "description": "Something in the query that was not understood.",
@@ -20407,6 +22802,182 @@
             "description": "The sentence, at most 240 characters."
           }
         }
+      },
+      "ReadAsk": {
+        "type": "object",
+        "description": "An obligation of the reader, dated or not.",
+        "required": [
+          "key",
+          "title",
+          "verb"
+        ],
+        "properties": {
+          "amount": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Amount",
+                "description": "How much, for a payment, when the message says."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "due": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "By when: a date, or an RFC 3339 time with an offset."
+          },
+          "key": {
+            "type": "string",
+            "description": "Stable for the same message, layer and position\n(`<message>:<layer>:ask:<n>`)."
+          },
+          "quote": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The sentence that asks, as written (a model read only)."
+          },
+          "same_as": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The reference of an open task this ask repeats."
+          },
+          "title": {
+            "type": "string",
+            "description": "What to do, at most 80 characters."
+          },
+          "verb": {
+            "$ref": "#/components/schemas/Verb",
+            "description": "Do something, or pay something."
+          }
+        }
+      },
+      "ReadItem": {
+        "type": "object",
+        "description": "Something of the reader's that happens at a time.",
+        "required": [
+          "key",
+          "kind",
+          "title",
+          "starts",
+          "all_day"
+        ],
+        "properties": {
+          "all_day": {
+            "type": "boolean",
+            "description": "Whether it lasts whole days."
+          },
+          "cancels": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The key of an earlier item of the conversation that this one cancels."
+          },
+          "ends": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "When it ends, if the message says."
+          },
+          "key": {
+            "type": "string",
+            "description": "Stable for the same message, layer and position\n(`<message>:<layer>:item:<n>`)."
+          },
+          "kind": {
+            "$ref": "#/components/schemas/ItemKind",
+            "description": "What kind of thing it is."
+          },
+          "place": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Where, at most 120 characters."
+          },
+          "quote": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The sentence that gives its date, as written (a model read only)."
+          },
+          "sequence": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "That event's `SEQUENCE`."
+          },
+          "starts": {
+            "type": "string",
+            "description": "When it starts: an RFC 3339 time with an offset, or a date when\nall-day."
+          },
+          "time_zone": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The IANA time zone it is in, when the message says."
+          },
+          "title": {
+            "type": "string",
+            "description": "What it is, at most 80 characters; never the subject."
+          },
+          "uid": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The `UID` of the iCalendar event it came from, if it came from one."
+          },
+          "updates": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The key of an earlier item of the conversation that this one changes."
+          }
+        }
+      },
+      "ReadLayer": {
+        "type": "string",
+        "description": "Which reader produced a read: the sender's own machine-readable data,\nor Scout's one `complete` call.",
+        "enum": [
+          "structured",
+          "model"
+        ]
+      },
+      "ReadRequested": {
+        "type": "object",
+        "description": "What asking for the read did.",
+        "required": [
+          "outcome"
+        ],
+        "properties": {
+          "outcome": {
+            "$ref": "#/components/schemas/Outcome",
+            "description": "The outcome."
+          }
+        }
+      },
+      "ReadStatus": {
+        "type": "string",
+        "description": "Where the model's read of a message is.",
+        "enum": [
+          "none",
+          "queued",
+          "failed",
+          "done"
+        ]
       },
       "Reason": {
         "type": "string",
@@ -20859,6 +23430,30 @@
           "outcome": {
             "$ref": "#/components/schemas/Outcome",
             "description": "Done, Not needed, or for a Pay need Already paid or Still to pay."
+          }
+        },
+        "additionalProperties": false
+      },
+      "Response": {
+        "type": "string",
+        "description": "The member's answer to an invitation.",
+        "enum": [
+          "needs_action",
+          "accepted",
+          "tentative",
+          "declined"
+        ]
+      },
+      "Restore": {
+        "type": "object",
+        "description": "The token a delete gave.",
+        "required": [
+          "undo_token"
+        ],
+        "properties": {
+          "undo_token": {
+            "type": "string",
+            "description": "The `undo_token` of `schedule.delete_event`."
           }
         },
         "additionalProperties": false
@@ -22294,6 +24889,116 @@
         },
         "additionalProperties": false
       },
+      "SettingsPatch": {
+        "type": "object",
+        "description": "What to change of the settings. Leave out what stays.",
+        "properties": {
+          "also_add_to": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "description": "Per kind, the provider calendar an event is also added to, replacing\nthe old map: a kind left out is taken off.",
+            "additionalProperties": {
+              "$ref": "#/components/schemas/CalendarId"
+            },
+            "propertyNames": {
+              "type": "string"
+            }
+          },
+          "device_time_zone": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The time zone of the device, sent once: it is taken only when the\nmember has no time zone yet, and ignored after."
+          },
+          "scout_kinds": {
+            "type": [
+              "array",
+              "null"
+            ],
+            "items": {
+              "$ref": "#/components/schemas/EventKind"
+            },
+            "description": "The kinds Scout adds."
+          },
+          "time_zone": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "A new time zone (an IANA name)."
+          },
+          "working_hours": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/BTreeMap",
+                "description": "New working hours, replacing the old; an empty map is a week off."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "additionalProperties": false
+      },
+      "SettingsView": {
+        "type": "object",
+        "description": "A member's settings.",
+        "required": [
+          "effective_time_zone",
+          "working_hours",
+          "scout_kinds",
+          "also_add_to"
+        ],
+        "properties": {
+          "also_add_to": {
+            "type": "object",
+            "description": "Per kind, the provider calendar an event is also added to.",
+            "additionalProperties": {
+              "$ref": "#/components/schemas/CalendarId"
+            },
+            "propertyNames": {
+              "type": "string"
+            }
+          },
+          "effective_time_zone": {
+            "type": "string",
+            "description": "The zone times are shown in: theirs, or UTC."
+          },
+          "last_push_calendar": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/CalendarId",
+                "description": "The provider calendar they last added an event to, offered first."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "scout_kinds": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/EventKind"
+            },
+            "description": "The kinds Scout adds to their Campbooks calendar."
+          },
+          "time_zone": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Their IANA time zone; empty until they or their device set it."
+          },
+          "working_hours": {
+            "$ref": "#/components/schemas/BTreeMap",
+            "description": "Working hours by weekday (`mon` … `sun`), a missing day being a day\noff. Monday to Friday 09:00–18:00 until they set some."
+          }
+        }
+      },
       "SettleProposal": {
         "type": "object",
         "description": "What the member did with a card.",
@@ -22414,6 +25119,24 @@
           "restricted": {
             "type": "boolean",
             "description": "Whether the policy holds the caller back from creating a workspace:\n`false` for members of a workspace, the instance's first user and\nevery user of an `open` instance."
+          }
+        }
+      },
+      "SlotView": {
+        "type": "object",
+        "description": "A free stretch.",
+        "required": [
+          "starts",
+          "ends"
+        ],
+        "properties": {
+          "ends": {
+            "type": "string",
+            "description": "When it ends."
+          },
+          "starts": {
+            "type": "string",
+            "description": "When it starts: RFC 3339 with the offset of your time zone."
           }
         }
       },
@@ -23359,6 +26082,29 @@
           "check"
         ]
       },
+      "Unpushed": {
+        "type": "object",
+        "description": "The event, back on the Campbooks calendar, and where it was removed from.",
+        "required": [
+          "id",
+          "calendar_id",
+          "event"
+        ],
+        "properties": {
+          "calendar_id": {
+            "$ref": "#/components/schemas/CalendarId",
+            "description": "The provider calendar the copy was removed from: send it back as\n`calendar_id` to `schedule.push_event` to undo."
+          },
+          "event": {
+            "$ref": "#/components/schemas/EventView",
+            "description": "The event afterwards."
+          },
+          "id": {
+            "$ref": "#/components/schemas/EventId",
+            "description": "The Campbooks event: the one to push again to undo this."
+          }
+        }
+      },
       "UnsupportedReason": {
         "type": "string",
         "description": "Why a sentence can't be a rule.",
@@ -23439,6 +26185,84 @@
         },
         "additionalProperties": false
       },
+      "UpdatedEvent": {
+        "type": "object",
+        "description": "The event after the change, and what changed as it was before.",
+        "required": [
+          "id",
+          "event"
+        ],
+        "properties": {
+          "busy": {
+            "type": [
+              "boolean",
+              "null"
+            ],
+            "description": "The previous value of `busy`, if it changed."
+          },
+          "ends": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The previous end, if it changed."
+          },
+          "event": {
+            "$ref": "#/components/schemas/EventView",
+            "description": "The event afterwards."
+          },
+          "id": {
+            "$ref": "#/components/schemas/EventId",
+            "description": "The event that was changed: the one to `PATCH` to undo it (changing\none occurrence of a series makes an exception with an id of its own)."
+          },
+          "kind": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/EventKind",
+                "description": "The previous kind, if it changed."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "notes": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The previous notes (empty: none), if they changed."
+          },
+          "place": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The previous place (empty: none), if it changed."
+          },
+          "starts": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The previous start, if it changed."
+          },
+          "time_zone": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The previous time zone (empty: none), if it changed."
+          },
+          "title": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The previous title, if it changed."
+          }
+        }
+      },
       "UserEntity": {
         "type": "object",
         "description": "The account the credential is for.",
@@ -23466,6 +26290,14 @@
         "type": "string",
         "format": "uuid",
         "description": "UserId (UUIDv7)"
+      },
+      "Verb": {
+        "type": "string",
+        "description": "What an ask of the reader is: do something, or pay something.",
+        "enum": [
+          "do",
+          "pay"
+        ]
       },
       "VersionResponse": {
         "type": "object",
@@ -23860,7 +26692,7 @@
         "type": "http",
         "scheme": "bearer",
         "bearerFormat": "JWT",
-        "description": "An OAuth 2.1 access token (a JWT) issued by this instance's identity provider, the issuer configured as `CAMPBOOKS_AUTH__ISSUER`. Each operation lists the scope it requires; operations with an empty requirement are public. Scopes:\n\n- `admin:access`: Reach the instance administration API, if your account has an admin profile. Granted to Campbooks' own apps only.\n- `assistant:read`: See what you told Scout about how it should act.\n- `assistant:write`: Tell Scout how it should act, and turn your sentences into rules to check.\n- `attention:read`: See what needs you: the items on your Home.\n- `attention:write`: Put items on your Home off until later, and bring them back.\n- `connectors:read`: See the outside accounts connected to your workspaces and how their sync is doing.\n- `connectors:write`: Connect outside accounts (such as Gmail), sync them now and disconnect them.\n- `conversations:read`: Read your inboxes, conversations and messages.\n- `conversations:send`: Write drafts and send messages, replies and forwards from your inboxes.\n- `conversations:write`: Mark conversations read or unread, star, archive, label and move them between streams.\n- `identity:clients`: Register, rotate and remove a workspace's own apps and their secrets.\n- `identity:read`: See your account, its ways in and the mailboxes waiting to be connected.\n- `identity:write`: Change your account and connect or discard the mailboxes waiting on it.\n- `search:read`: Search the records you may read (conversations need conversations:read too).\n- `system:read`: Read operational status, and report the app's own errors and timings.\n- `tasks:read`: See your tasks and the ones you handed to someone.\n- `tasks:write`: Add tasks, change them, mark them done and hand them to a teammate.\n- `workspaces:admin`: Manage workspaces you own or administer: settings, members, invitations, deletion and the security log.\n- `workspaces:read`: See your workspaces and who belongs to them.\n- `workspaces:write`: Create workspaces, accept invitations and leave workspaces."
+        "description": "An OAuth 2.1 access token (a JWT) issued by this instance's identity provider, the issuer configured as `CAMPBOOKS_AUTH__ISSUER`. Each operation lists the scope it requires; operations with an empty requirement are public. Scopes:\n\n- `admin:access`: Reach the instance administration API, if your account has an admin profile. Granted to Campbooks' own apps only.\n- `assistant:read`: See what you told Scout about how it should act.\n- `assistant:write`: Tell Scout how it should act, and turn your sentences into rules to check.\n- `attention:read`: See what needs you: the items on your Home.\n- `attention:write`: Put items on your Home off until later, and bring them back.\n- `connectors:read`: See the outside accounts connected to your workspaces and how their sync is doing.\n- `connectors:write`: Connect outside accounts (such as Gmail), sync them now and disconnect them.\n- `conversations:read`: Read your inboxes, conversations and messages.\n- `conversations:send`: Write drafts and send messages, replies and forwards from your inboxes.\n- `conversations:write`: Mark conversations read or unread, star, archive, label and move them between streams.\n- `identity:clients`: Register, rotate and remove a workspace's own apps and their secrets.\n- `identity:read`: See your account, its ways in and the mailboxes waiting to be connected.\n- `identity:write`: Change your account and connect or discard the mailboxes waiting on it.\n- `schedule:read`: See your calendars and events, your calendar settings, and when you are free.\n- `schedule:write`: Create, change, delete and answer events, add them to your provider calendars, and change your calendars and calendar settings.\n- `search:read`: Search the records you may read (conversations need conversations:read too).\n- `system:read`: Read operational status, and report the app's own errors and timings.\n- `tasks:read`: See your tasks and the ones you handed to someone.\n- `tasks:write`: Add tasks, change them, mark them done and hand them to a teammate.\n- `workspaces:admin`: Manage workspaces you own or administer: settings, members, invitations, deletion and the security log.\n- `workspaces:read`: See your workspaces and who belongs to them.\n- `workspaces:write`: Create workspaces, accept invitations and leave workspaces."
       },
       "session": {
         "type": "apiKey",
@@ -23902,6 +26734,10 @@
     {
       "name": "assistant",
       "description": "What you told Scout about how to act, and turning a sentence you type into rules to check. Compiling uses the `complete` AI role only when you ask, and sends it your sentence and your own addresses and label names, never your mail; nothing is saved until you save a rule through the conversations module."
+    },
+    {
+      "name": "schedule",
+      "description": "Your calendars and their events: the provider calendars you connect and your own Campbooks calendar, where Scout puts the dated things it reads in your email. Events have a kind; free time is answered from your working hours."
     },
     {
       "name": "tasks",
