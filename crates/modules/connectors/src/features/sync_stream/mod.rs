@@ -1301,6 +1301,7 @@ fn imap_page(page: Page) -> Result<RunPage, JobError> {
         labels: None,
         zoho_labels: None,
         imap: page.locations,
+        idle: None,
         phase: page.phase,
         more: page.more,
     })
