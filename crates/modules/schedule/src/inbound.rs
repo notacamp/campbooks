@@ -250,6 +250,9 @@ impl DomainEvent for WorkspaceDeleting {
 /// `calendar-list` v1.
 #[derive(Debug, Clone, Deserialize)]
 pub struct CalendarList {
+    /// Whose calendars they are: `google` or `zoho`.
+    #[serde(default)]
+    pub provider: Option<String>,
     /// The account's calendars.
     pub calendars: Vec<ListedCalendar>,
 }

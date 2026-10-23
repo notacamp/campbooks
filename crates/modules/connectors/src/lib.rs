@@ -37,6 +37,7 @@ use axum::Extension;
 use campbooks_kernel::{Background, Module, i18n::Catalogue};
 use utoipa_axum::{router::OpenApiRouter, routes};
 
+mod calendar;
 pub mod config;
 pub mod contract;
 mod deps;
@@ -118,6 +119,12 @@ pub fn module(deps: Deps) -> Module {
                 deps.clone(),
             ))
             .consumer(features::request_changes::RequestChanges::new(deps.clone()))
+            .consumer(features::record_calendar_change::RecordCalendarChange::new(
+                deps.clone(),
+            ))
+            .consumer(features::apply_calendar_sync::ApplyCalendarSync::new(
+                deps.clone(),
+            ))
             .consumer(features::workspace_deleting::RevokeWorkspaceGrants::new(
                 deps,
             )),

@@ -328,6 +328,34 @@ pub enum ProposalAction {
     Due,
     /// A task: handed to the teammate `detail.member_name`.
     HandOff,
+    /// A new calendar event (`detail.title`, `detail.starts`).
+    CreateEvent,
+    /// Change an event (`detail.title`, `starts`, `ends`, `place`).
+    UpdateEvent,
+    /// Delete an event.
+    DeleteEvent,
+    /// Answer an invitation (`detail.response`).
+    RespondEvent,
+    /// Add an event to a provider calendar (`detail.calendar_name`).
+    PushEvent,
+    /// Take an event off a provider calendar (`event.calendar`).
+    UnpushEvent,
+}
+
+/// A calendar event's own facts, read from its record when the proposal was
+/// made: what a card names, never the model's words.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+pub struct ProposalEvent {
+    /// Its title, as the calendar has it.
+    pub title: String,
+    /// When it starts: an RFC 3339 time with an offset, or a `YYYY-MM-DD`
+    /// date when it is all-day.
+    pub starts: String,
+    /// Whether it lasts whole days.
+    pub all_day: bool,
+    /// The name of the calendar it is on.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub calendar: Option<String>,
 }
 
 /// A task's own facts, read from its record when the proposal was made:
@@ -378,6 +406,27 @@ pub struct ProposalDetail {
     /// (`hand_off`): read by the server, never the model's words.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub member_name: Option<String>,
+    /// The title in Scout's words (`create_event`, `update_event`): show it
+    /// quoted.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub title: Option<String>,
+    /// The new start (`create_event`, `update_event`), as Scout wrote it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub starts: Option<String>,
+    /// The new end (`create_event`, `update_event`), as Scout wrote it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub ends: Option<String>,
+    /// The new place (`create_event`, `update_event`), Scout's words.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub place: Option<String>,
+    /// The answer to an invitation (`respond_event`): `accepted`,
+    /// `tentative` or `declined`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub response: Option<String>,
+    /// The calendar an event is added to (`push_event`), as the calendars
+    /// list names it: read by the server, never the model's words.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub calendar_name: Option<String>,
 }
 
 /// An HTTP method a proposal's request may use.
@@ -386,7 +435,7 @@ pub struct ProposalDetail {
 pub enum ProposalMethod {
     /// `POST`.
     Post,
-    /// `PATCH` (a task's edit, and nothing else).
+    /// `PATCH` (a task's edit or an event's, and nothing else).
     Patch,
     /// `DELETE`.
     Delete,
@@ -435,6 +484,10 @@ pub struct ChatProposal {
     /// The task's own facts (a task change only); its `record` is the task.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub task: Option<ProposalTask>,
+    /// The event's own facts (an event change, except a new one); its
+    /// `record` is the event.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub event: Option<ProposalEvent>,
     /// What the change takes (a change only).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub detail: Option<ProposalDetail>,

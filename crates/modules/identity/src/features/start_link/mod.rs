@@ -140,6 +140,20 @@ pub async fn execute(
     principal: &Principal,
     input: StartLink,
 ) -> Result<StartedLink> {
+    execute_asking(state, deps, principal, input, &[]).await
+}
+
+/// [`execute`], asking besides for the scopes of `capabilities` other than
+/// the mailbox (`calendar`), which another module's consent request names.
+/// A reconnect also asks for those the connection already has, so the new
+/// grant loses none.
+pub async fn execute_asking(
+    state: &AppState,
+    deps: &Deps,
+    principal: &Principal,
+    input: StartLink,
+    capabilities: &[String],
+) -> Result<StartedLink> {
     let (issuer, account) = super::account(deps, principal)?;
     let now = issuer.now();
     let return_to = web::return_to(input.return_to.as_deref())
@@ -164,6 +178,7 @@ pub async fn execute(
                 login_hint: None,
                 return_to,
                 adds_way_in: true,
+                capabilities: Vec::new(),
             }
         }
         LinkPurpose::Connect => {
@@ -188,6 +203,7 @@ pub async fn execute(
                 login_hint: None,
                 return_to,
                 adds_way_in: input.sign_in.unwrap_or(true),
+                capabilities: extra_capabilities(capabilities, &[]),
             }
         }
         LinkPurpose::Reconnect => {
@@ -212,6 +228,7 @@ pub async fn execute(
                 login_hint: Some(target.address),
                 return_to,
                 adds_way_in: false,
+                capabilities: extra_capabilities(capabilities, &target.capabilities),
             }
         }
     };
@@ -237,4 +254,17 @@ pub async fn execute(
         ),
         expires_at,
     })
+}
+
+/// The capabilities of `asked` and `held` other than the mailbox, once each:
+/// what a consent asks for besides it.
+fn extra_capabilities(asked: &[String], held: &[String]) -> Vec<String> {
+    let mut all: Vec<String> = Vec::new();
+    for name in asked.iter().chain(held) {
+        if name != "messages" && !all.contains(name) {
+            all.push(name.clone());
+        }
+    }
+    all.sort();
+    all
 }

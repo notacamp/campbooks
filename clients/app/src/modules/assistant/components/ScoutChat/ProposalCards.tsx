@@ -13,6 +13,7 @@ import {
   runRequest,
   settleProposal,
   undoBody,
+  withAnswer,
   type Proposal,
   type Settlement,
 } from "../../api/proposals";
@@ -100,6 +101,67 @@ function dayText(day: string, locale: string): string {
     day: "numeric",
     month: "short",
   }).format(at);
+}
+
+/** A start as the member reads it: "Thu, 12 Nov, 15:00", or the day alone when all-day. */
+function whenText(start: string, locale: string): string {
+  if (/^\d{4}-\d{2}-\d{2}$/u.test(start)) {
+    return dayText(start, locale);
+  }
+  const at = new Date(start);
+  if (Number.isNaN(at.getTime())) {
+    return start;
+  }
+  return new Intl.DateTimeFormat(locale, {
+    weekday: "short",
+    day: "numeric",
+    month: "short",
+    hour: "numeric",
+    minute: "2-digit",
+  }).format(at);
+}
+
+type Detail = Partial<NonNullable<Proposal["detail"]>>;
+
+const present = (value: string | null | undefined): value is string =>
+  value !== undefined && value !== null && value !== "";
+
+/**
+ * Which wording an event's edit takes, from the fields it actually sends:
+ * a new start moves it, a new end alone ends it there, a new title alone
+ * renames it.
+ */
+function eventUpdateKey(action: string, detail: Detail): string | undefined {
+  if (action !== "update_event") {
+    return undefined;
+  }
+  if (present(detail.starts)) {
+    return "update_event_moved";
+  }
+  if (present(detail.ends)) {
+    return "update_event_ends";
+  }
+  return present(detail.title) && !present(detail.place) ? "update_event_renamed" : undefined;
+}
+
+/** The time a card names: the new start, or for an edit that only ends it, the new end. */
+function whenOf(action: string, detail: Detail, locale: string): string {
+  if (present(detail.starts)) {
+    return whenText(detail.starts, locale);
+  }
+  return action === "update_event" && present(detail.ends) ? whenText(detail.ends, locale) : "";
+}
+
+/**
+ * "Dentist · Thu, 12 Nov, 15:00", from the event's own record, never from
+ * the model's words.
+ */
+function eventLine(t: Translate, proposal: Proposal, locale: string): string | undefined {
+  const event = proposal.event;
+  if (event === undefined || event === null) {
+    return undefined;
+  }
+  return t("chat.proposal.eventLine", { title: event.title, when: whenText(event.starts, locale) });
 }
 
 /**
@@ -195,7 +257,12 @@ function ChangeCard(props: CardProps) {
     setUndoFailed(false);
     setPhase("working");
     try {
-      await runRequest(workspaceId, undo, `${proposal.id}:undo`, undoBody(undo, answer.value));
+      // An undo may name the id the change's answer gave (a new event).
+      const target = withAnswer(undo, answer.value);
+      if (target === undefined) {
+        throw new NotRunnable();
+      }
+      await runRequest(workspaceId, target, `${proposal.id}:undo`, undoBody(undo, answer.value));
       setPhase("undone");
       void refreshRecords(queryClient, workspaceId, undoReady?.entry.records ?? []);
       await settle("undone");
@@ -216,10 +283,19 @@ function ChangeCard(props: CardProps) {
   };
 
   const action = proposal.action ?? "archive";
-  const detail: Partial<NonNullable<Proposal["detail"]>> = proposal.detail ?? {};
+  const detail: Detail = proposal.detail ?? {};
   // A bill is paid, not done.
-  const key = action === "task_done" && proposal.task?.verb === "pay" ? "task_paid" : action;
+  const key =
+    action === "task_done" && proposal.task?.verb === "pay"
+      ? "task_paid"
+      : (eventUpdateKey(action, detail) ?? action);
   const title = t(`chat.proposal.action.${key}`, {
+    calendar: detail.calendar_name ?? proposal.event?.calendar ?? "",
+    response:
+      detail.response === undefined || detail.response === null
+        ? ""
+        : t(`chat.proposal.responses.${detail.response}`),
+    when: whenOf(action, detail, i18n.language),
     day: detail.day === undefined || detail.day === null ? "" : dayText(detail.day, i18n.language),
     name: detail.member_name ?? "",
     stream:
@@ -231,7 +307,11 @@ function ChangeCard(props: CardProps) {
         ? ""
         : untilText(detail.until, i18n.language),
   });
-  const label = detail.label ?? undefined;
+  // The model's own words for an event (its new title and place), quoted.
+  const eventWords = [detail.title, detail.place]
+    .filter((part): part is string => typeof part === "string" && part !== "")
+    .join(" · ");
+  const label = detail.label ?? (eventWords === "" ? undefined : eventWords);
   const status = {
     pending: undefined,
     working: t("chat.proposal.working"),
@@ -285,7 +365,11 @@ function ChangeCard(props: CardProps) {
     <ChatProposal
       label={labelOf(t, state)}
       title={title}
-      about={taskLine(t, proposal, i18n.language) ?? aboutLine(t, proposal)}
+      about={
+        taskLine(t, proposal, i18n.language) ??
+        eventLine(t, proposal, i18n.language) ??
+        aboutLine(t, proposal)
+      }
       quote={label}
       quoteLabel={label === undefined ? undefined : t("chat.proposal.scoutWords")}
       state={state}

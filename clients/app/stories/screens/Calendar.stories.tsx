@@ -11,6 +11,7 @@ import { DUE_ACTION_KEY, dueKey, type DueItem } from "../../src/modules/schedule
 import { INBOX, LEDGER, NDA, PRIMARY, Q4, STREAM_COUNTS, W } from "../../test/demo/conversations";
 import { CONNECTION, ZOHO_CONNECTION } from "../../test/demo/identity";
 import {
+  CALENDARS,
   CAMPBOOKS,
   DENTIST,
   DENTIST_READ,
@@ -246,7 +247,7 @@ export const InvitationSheet: Story = {
     const canvas = within(canvasElement);
     const sheet = await canvas.findByRole("complementary", { name: REVIEW.title });
     await expect(
-      within(sheet).getByText(/Changed in Work meanwhile; we kept theirs/u),
+      within(sheet).getByText(/Changed in Google meanwhile; we kept theirs/u),
     ).toBeVisible();
     await userEvent.click(within(sheet).getByRole("button", { name: "Accept" }));
     await waitFor(() =>
@@ -327,7 +328,10 @@ export const NewEvent: Story = {
 /* What Scout noticed, in the reader. */
 
 /** The inbox around the lease email, with its read in `read`. */
-function reader(read: () => Record<string, MockRoute>) {
+function reader(
+  read: () => Record<string, MockRoute>,
+  calendars: readonly (typeof CAMPBOOKS)[] = [CAMPBOOKS],
+) {
   return () => {
     const conversationRoutes: Record<string, MockRoute> = {
       [`GET ${W}/inboxes`]: { body: { inboxes: [INBOX] } },
@@ -340,7 +344,7 @@ function reader(read: () => Record<string, MockRoute>) {
     };
     return {
       // No provider calendar is connected yet: no "Add to my calendar" here.
-      ...scheduleApi([...WEEK_EVENTS, HANDOVER], { calendars: [CAMPBOOKS] }).routes,
+      ...scheduleApi([...WEEK_EVENTS, HANDOVER], { calendars }).routes,
       ...conversationRoutes,
       ...read(),
     };
@@ -423,6 +427,8 @@ const CALENDAR_ACCESS = {
   ...CONNECTION,
   capabilities: ["messages", "calendar"],
 } as const;
+/** A Google mailbox signed in for mail only: Settings offers it calendar access. */
+const GOOGLE_MAIL_ONLY = { ...CONNECTION, capabilities: ["messages"] } as const;
 const MAIL_ONLY = {
   ...ZOHO_CONNECTION,
   address: "ana@lopesimoveis.example",
@@ -461,6 +467,23 @@ export const Settings: Story = {
   },
 };
 
+function addAccessApi() {
+  return {
+    ...settingsApi(),
+    [`GET ${W}/connections`]: { body: { connections: [GOOGLE_MAIL_ONLY, MAIL_ONLY] } },
+  } satisfies Record<string, MockRoute>;
+}
+
+/** A Google mailbox without calendar access: Add calendar access, and not for the Zoho one. */
+export const SettingsAddAccess: Story = {
+  args: { path: `${BASE}/settings/calendar`, api: addAccessApi },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(await canvas.findByRole("button", { name: "Add calendar access" })).toBeVisible();
+    await expect(canvas.getAllByRole("button", { name: "Add calendar access" })).toHaveLength(1);
+  },
+};
+
 export const SettingsPhone: Story = {
   args: { path: `${BASE}/settings/calendar`, api: settingsApi },
   ...at("phone", 375, 812),
@@ -491,4 +514,22 @@ export const ReaderIdle: Story = {
 /** Settings → Calendar, to drive by hand. */
 export const SettingsIdle: Story = {
   args: { path: `${BASE}/settings/calendar`, api: settingsApi },
+};
+
+/** Settings with Add calendar access, to drive by hand. */
+export const SettingsAddAccessIdle: Story = {
+  args: { path: `${BASE}/settings/calendar`, api: addAccessApi },
+};
+
+/** The invitation Google refused a change to, to drive by hand. */
+export const InvitationSheetIdle: Story = {
+  args: { path: `${SCHEDULE}?event=${REVIEW.id}`, api: calendarApi(), due: DUE },
+};
+
+/** The lease email, read, with Google calendars connected: Add to my calendar. */
+export const ReaderGoogleIdle: Story = {
+  args: {
+    path: `${BASE}/inbox/primary/${LEASE.id}`,
+    api: reader(() => ({ [`GET ${READ}`]: { body: READ_DONE } }), CALENDARS),
+  },
 };

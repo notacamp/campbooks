@@ -1287,7 +1287,9 @@ fn only_reads(kit: &Kit) {
                 "search.query",
                 "attention.list",
                 "tasks.get",
-                "workspaces.list_members"
+                "workspaces.list_members",
+                "schedule.get_event",
+                "schedule.list_calendars"
             ]
             .contains(&called.as_str()),
             "{called}"
@@ -1756,6 +1758,7 @@ async fn an_email_asking_for_a_change_is_at_most_a_card(db: PgPool) {
 }
 
 #[test]
+#[allow(clippy::too_many_lines)]
 fn every_action_and_undo_is_a_low_risk_change_the_assistant_may_call() {
     let spec: Value =
         serde_json::from_str(include_str!("../../../../../../openapi/openapi.json")).unwrap();
@@ -1768,10 +1771,12 @@ fn every_action_and_undo_is_a_low_risk_change_the_assistant_may_call() {
         assert!(meta.assistant, "{id}: the assistant may not call it");
         assert!(meta.mutates, "{id} changes nothing");
         assert_eq!(meta.risk, campbooks_kernel::Risk::Low, "{id}");
-        // PATCH is a task's edit alone (the client allows it for that entry).
+        // PATCH is a task's edit or an event's alone (the client allows it
+        // for those entries).
         assert!(
             ["POST", "DELETE"].contains(&operation.method.as_str())
-                || (id == "tasks.update" && operation.method == "PATCH"),
+                || (["tasks.update", "schedule.update_event"].contains(&id)
+                    && operation.method == "PATCH"),
             "{id}"
         );
         assert!(
@@ -1782,6 +1787,7 @@ fn every_action_and_undo_is_a_low_risk_change_the_assistant_may_call() {
                     ("label_id", "l-1".to_owned()),
                     ("item_id", "i-1".to_owned()),
                     ("task_id", "t-1".to_owned()),
+                    ("event_id", "e-1".to_owned()),
                 ]
             )
             .is_some(),
@@ -1811,7 +1817,14 @@ fn every_action_and_undo_is_a_low_risk_change_the_assistant_may_call() {
             // The same operation with the values before: only where the
             // catalogue names no undo.
             propose::Undo::Restoring { from_response } => {
-                assert_eq!(meta.undo, None, "{}", row.operation);
+                if row.operation.starts_with("schedule.") {
+                    // An event's edit and its answer are their own undo, with
+                    // the values read before (events have no revision).
+                    assert_eq!(meta.undo.as_deref(), Some(row.operation));
+                    assert!(from_response.is_empty(), "{}", row.operation);
+                } else {
+                    assert_eq!(meta.undo, None, "{}", row.operation);
+                }
                 if row.operation.starts_with("tasks.") {
                     assert_eq!(from_response, ["revision"], "{}", row.operation);
                 }
@@ -1828,8 +1841,35 @@ fn every_action_and_undo_is_a_low_risk_change_the_assistant_may_call() {
                 .is_some_and(|row| row.operation.starts_with("tasks."))
         );
     }
-    // The two reads a task proposal makes as the member.
-    for id in ["tasks.get", "workspaces.list_members"] {
+    // Every event action has a row of its own, undone by what its answer
+    // gives: the token of a delete, the id of a new event or a copy.
+    for action in super::types::ProposalAction::EVENTS {
+        let row = propose::ROWS
+            .iter()
+            .find(|row| row.action == action)
+            .unwrap();
+        assert!(row.operation.starts_with("schedule."), "{}", action.name());
+        let expected: Option<&[&str]> = match row.operation {
+            "schedule.create_event" | "schedule.push_event" => Some(&["@event_id:id"]),
+            "schedule.delete_event" => Some(&["undo_token"]),
+            "schedule.unpush_event" => Some(&["@event_id:id", "calendar_id"]),
+            _ => None,
+        };
+        match (row.undo, expected) {
+            (propose::Undo::Catalogue { from_response, .. }, Some(expected)) => {
+                assert_eq!(from_response, expected, "{}", row.operation);
+            }
+            (propose::Undo::Restoring { .. }, None) => {}
+            _ => panic!("{}: unexpected undo", row.operation),
+        }
+    }
+    // The reads a proposal makes as the member.
+    for id in [
+        "tasks.get",
+        "workspaces.list_members",
+        "schedule.get_event",
+        "schedule.list_calendars",
+    ] {
         let meta = catalogue.get(id).unwrap().meta.clone().unwrap();
         assert!(meta.assistant && !meta.mutates, "{id}");
     }
@@ -2285,5 +2325,416 @@ async fn a_second_hand_off_of_the_same_task_is_not_a_fourth_card(db: PgPool) {
     assert_eq!(proposals[0]["detail"]["member_name"], "Sofia Pessoa");
     let told = results(&server).await;
     assert!(told[3].contains("too_many"), "{told:?}");
+    only_reads(&kit);
+}
+
+// Event proposals (campbooks-cloud#42): the same cards, for the member's own
+// calendar. The event and the calendars are read as the member; a change
+// never runs (each stand-in change panics).
+
+const MEETING: &str = "0192f0c4-7d4e-7b39-a7f1-3a8f0e2c0001";
+const INVITE: &str = "0192f0c4-7d4e-7b39-a7f1-3a8f0e2c0002";
+const COPY: &str = "0192f0c4-7d4e-7b39-a7f1-3a8f0e2c0003";
+const HOME: &str = "0192f0c4-7d4e-7b39-a7f1-3a8f0e2c00a1";
+const WORK: &str = "0192f0c4-7d4e-7b39-a7f1-3a8f0e2c00a2";
+const HOLIDAYS: &str = "0192f0c4-7d4e-7b39-a7f1-3a8f0e2c00a3";
+
+/// An event as `schedule.get_event` answers it, on `calendar`.
+fn event_on(id: &str, calendar: &str) -> Value {
+    json!({
+        "id": id, "calendar_id": calendar, "kind": "none", "title": "Dentist",
+        "place": null, "notes": null, "all_day": false,
+        "starts": "2026-11-12T15:00:00+00:00", "ends": "2026-11-12T16:00:00+00:00",
+        "time_zone": null, "status": "confirmed", "recurring": false, "occurrence": null,
+        "origin": "member", "found_by": null, "source": null, "source_conversation": null,
+        "quote": null, "response": null, "pending": false, "notice": null,
+        "on_provider": false, "busy": true,
+    })
+}
+
+/// The member's calendars as `schedule.list_calendars` answers them.
+fn calendars() -> Vec<Value> {
+    vec![
+        json!({"id": HOME, "source": "campbooks", "name": "Campbooks", "color": null,
+               "time_zone": null, "syncing": true, "writable": true, "primary": false,
+               "provider": null}),
+        json!({"id": WORK, "source": "provider", "name": "Work", "color": null,
+               "time_zone": null, "syncing": true, "writable": true, "primary": true,
+               "provider": "google"}),
+        json!({"id": HOLIDAYS, "source": "provider", "name": "Holidays", "color": null,
+               "time_zone": null, "syncing": true, "writable": false, "primary": false,
+               "provider": "google"}),
+    ]
+}
+
+/// A kit whose member Sam has a meeting, an invitation and a copy of an
+/// event on her work calendar.
+async fn kit_with_events(db: PgPool, server: &MockServer) -> Kit {
+    let kit = kit_with(db, Some(gateway(&server.uri()))).await;
+    {
+        let mut mail = kit.mail.lock().unwrap();
+        mail.events.insert(MEETING.into(), event_on(MEETING, HOME));
+        let mut invite = event_on(INVITE, WORK);
+        invite["response"] = "needs_action".into();
+        mail.events.insert(INVITE.into(), invite);
+        let mut copy = event_on(COPY, WORK);
+        copy["on_provider"] = true.into();
+        mail.events.insert(COPY.into(), copy);
+        mail.calendars = calendars();
+        mail.members = team();
+    }
+    kit
+}
+
+/// `propose_event_change` with `action` on `event`, and `extra`.
+fn event_change(action: &str, event: &str, extra: &Value) -> (&'static str, Value) {
+    let mut arguments = json!({ "action": action, "event_id": event });
+    if let (Some(out), Some(more)) = (arguments.as_object_mut(), extra.as_object()) {
+        out.extend(more.clone());
+    }
+    ("propose_event_change", arguments)
+}
+
+/// A call, the action it stores, and the request and undo expected.
+type EventCase = ((&'static str, Value), &'static str, Value, Value);
+
+#[sqlx::test(migrations = "../../../migrations")]
+#[allow(clippy::too_many_lines)]
+async fn each_event_action_is_stored_with_its_request_and_undo(db: PgPool) {
+    let server = MockServer::start().await;
+    let kit = kit_with_events(db, &server).await;
+    let workspace = WorkspaceId::new();
+    let (sam, _) = kit.member("sam", workspace);
+    let id = started(&kit, &sam, workspace).await;
+    let path = |event: &str, tail: &str| format!("schedule/events/{event}{tail}");
+    // A month ahead, whatever today is: a new event starts within a year.
+    let starts = (Utc::now() + chrono::Duration::days(30))
+        .date_naive()
+        .and_hms_opt(10, 0, 0)
+        .unwrap()
+        .and_utc()
+        .to_rfc3339();
+    let starts = starts.as_str();
+    let moved = "2026-11-12T17:00:00+00:00";
+    let cases: Vec<EventCase> = vec![
+        (
+            (
+                "propose_event_change",
+                json!({"action": "create", "title": "Dentist check", "starts": starts}),
+            ),
+            "create_event",
+            json!({"operation": "schedule.create_event", "method": "POST",
+                   "path": "schedule/events",
+                   "body": {"title": "Dentist check", "starts": starts}}),
+            // Its undo waits for the id the new event gets.
+            json!({"operation": "schedule.delete_event", "method": "DELETE",
+                   "path": "schedule/events/{event_id}", "body": null,
+                   "from_response": ["@event_id:id"]}),
+        ),
+        (
+            event_change(
+                "update",
+                MEETING,
+                &json!({"starts": moved, "place": "Clinic"}),
+            ),
+            "update_event",
+            json!({"operation": "schedule.update_event", "method": "PATCH",
+                   "path": path(MEETING, ""), "body": {"starts": moved, "place": "Clinic"}}),
+            // Restoring: the record's own start, end and place.
+            json!({"operation": "schedule.update_event", "method": "PATCH",
+                   "path": path(MEETING, ""),
+                   "body": {"starts": "2026-11-12T15:00:00+00:00",
+                            "ends": "2026-11-12T16:00:00+00:00", "place": ""}}),
+        ),
+        (
+            event_change("delete", MEETING, &json!({})),
+            "delete_event",
+            json!({"operation": "schedule.delete_event", "method": "DELETE",
+                   "path": path(MEETING, ""), "body": null}),
+            json!({"operation": "schedule.restore_event", "method": "POST",
+                   "path": path(MEETING, "/restore"), "body": null,
+                   "from_response": ["undo_token"]}),
+        ),
+        (
+            event_change("respond", INVITE, &json!({"response": "accepted"})),
+            "respond_event",
+            json!({"operation": "schedule.respond_event", "method": "POST",
+                   "path": path(INVITE, "/response"), "body": {"response": "accepted"}}),
+            // Restoring: the answer it has now.
+            json!({"operation": "schedule.respond_event", "method": "POST",
+                   "path": path(INVITE, "/response"), "body": {"response": "needs_action"}}),
+        ),
+        (
+            // The calendar by the name the list gives, any case.
+            event_change("push", MEETING, &json!({"calendar": "work"})),
+            "push_event",
+            json!({"operation": "schedule.push_event", "method": "POST",
+                   "path": path(MEETING, "/push"), "body": {"calendar_id": WORK}}),
+            json!({"operation": "schedule.unpush_event", "method": "DELETE",
+                   "path": "schedule/events/{event_id}/push", "body": null,
+                   "from_response": ["@event_id:id"]}),
+        ),
+        (
+            event_change("unpush", COPY, &json!({})),
+            "unpush_event",
+            json!({"operation": "schedule.unpush_event", "method": "DELETE",
+                   "path": path(COPY, "/push"), "body": null}),
+            json!({"operation": "schedule.push_event", "method": "POST",
+                   "path": "schedule/events/{event_id}/push", "body": null,
+                   "from_response": ["@event_id:id", "calendar_id"]}),
+        ),
+    ];
+    for (call, action, request, undo) in cases {
+        let what = call.1.to_string();
+        let answer = ask_proposing(&kit, &server, &sam, workspace, &id, &[call]).await;
+        let proposals = answer["proposals"].as_array().unwrap();
+        assert_eq!(proposals.len(), 1, "{what}: {answer}");
+        let proposal = &proposals[0];
+        assert_eq!(proposal["kind"], "change", "{what}");
+        assert_eq!(proposal["action"], action, "{what}");
+        assert_eq!(proposal["state"], "pending", "{what}");
+        assert_eq!(proposal["request"], request, "{what}");
+        assert_eq!(proposal["undo"], undo, "{what}");
+        assert!(proposal.get("facts").is_none(), "{what}");
+        assert!(proposal.get("task").is_none(), "{what}");
+        if action == "create_event" {
+            // A new event has no record yet; its words are Scout's.
+            assert!(proposal.get("record").is_none(), "{what}");
+            assert!(proposal.get("event").is_none(), "{what}");
+            assert_eq!(proposal["detail"]["title"], "Dentist check");
+        } else {
+            // The card's facts are the record's, never the model's words.
+            let event = proposal["record"]["id"].as_str().unwrap();
+            assert_eq!(proposal["record"]["type"], "schedule.event", "{what}");
+            assert_eq!(proposal["event"]["title"], "Dentist", "{what}");
+            assert_eq!(
+                proposal["event"]["starts"], "2026-11-12T15:00:00+00:00",
+                "{what}"
+            );
+            assert!([MEETING, INVITE, COPY].contains(&event), "{what}");
+        }
+        if action == "push_event" {
+            // Named by the calendars list, not by the model.
+            assert_eq!(proposal["detail"]["calendar_name"], "Work");
+            assert_eq!(proposal["event"]["calendar"], "Campbooks");
+        }
+        if action == "unpush_event" {
+            assert_eq!(proposal["event"]["calendar"], "Work");
+        }
+    }
+    only_reads(&kit);
+    assert!(kit.mail.lock().unwrap().mutated.is_empty());
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+#[allow(clippy::too_many_lines)]
+async fn a_refused_event_proposal_is_never_a_card(db: PgPool) {
+    let server = MockServer::start().await;
+    let kit = kit_with_events(db, &server).await;
+    let workspace = WorkspaceId::new();
+    let (sam, _) = kit.member("sam", workspace);
+    let id = started(&kit, &sam, workspace).await;
+    let with = |key: &str, value: Value| {
+        let mut event = event_on(MEETING, HOME);
+        event[key] = value;
+        event
+    };
+    let on = |calendar: &str| event_on(MEETING, calendar);
+    let cases: Vec<(Value, (&str, Value), &str)> = vec![
+        // An event the member cannot see: 404 to them.
+        (
+            on(HOME),
+            event_change("delete", "0192f0c4-0000-7000-8000-000000000000", &json!({})),
+            "not_visible",
+        ),
+        // A change still on its way to the provider is never stacked on.
+        (
+            with("pending", true.into()),
+            event_change("delete", MEETING, &json!({})),
+            "event_not_changeable",
+        ),
+        // A series is changed or deleted whole elsewhere, not from a card.
+        (
+            with("recurring", true.into()),
+            event_change("update", MEETING, &json!({"place": "Clinic"})),
+            "event_not_changeable",
+        ),
+        (
+            with("recurring", true.into()),
+            event_change("delete", MEETING, &json!({})),
+            "event_not_changeable",
+        ),
+        // A calendar that cannot be written.
+        (
+            on(HOLIDAYS),
+            event_change("update", MEETING, &json!({"place": "Clinic"})),
+            "event_not_changeable",
+        ),
+        (
+            on(HOLIDAYS),
+            event_change("delete", MEETING, &json!({})),
+            "event_not_changeable",
+        ),
+        (
+            on("0192f0c4-7d4e-7b39-a7f1-3a8f0e2cffff"),
+            event_change("delete", MEETING, &json!({})),
+            "unavailable",
+        ),
+        // Only an invitation the member answers, with a different answer.
+        (
+            on(HOME),
+            event_change("respond", MEETING, &json!({"response": "accepted"})),
+            "not_an_invitation",
+        ),
+        (
+            with("response", "accepted".into()),
+            event_change("respond", MEETING, &json!({"response": "accepted"})),
+            "already_so",
+        ),
+        // Nothing to change.
+        (
+            on(HOME),
+            event_change("update", MEETING, &json!({"title": "Dentist"})),
+            "already_so",
+        ),
+        // Times that can only fail when written: a day on a timed event, a
+        // moment on an all-day one, an end before the start.
+        (
+            on(HOME),
+            event_change("update", MEETING, &json!({"starts": "2026-11-14"})),
+            "invalid_when",
+        ),
+        (
+            with("all_day", true.into()),
+            event_change(
+                "update",
+                MEETING,
+                &json!({"starts": "2026-11-14T10:00:00+00:00"}),
+            ),
+            "invalid_when",
+        ),
+        (
+            on(HOME),
+            event_change(
+                "update",
+                MEETING,
+                &json!({"ends": "2026-11-12T14:00:00+00:00"}),
+            ),
+            "invalid_when",
+        ),
+        // A new event starts between now and a year ahead.
+        (
+            on(HOME),
+            (
+                "propose_event_change",
+                json!({"action": "create", "title": "Dentist check",
+                       "starts": "2020-01-01T10:00:00+00:00"}),
+            ),
+            "start_out_of_range",
+        ),
+        (
+            on(HOME),
+            (
+                "propose_event_change",
+                json!({"action": "create", "title": "Dentist check", "starts": "2099-01-01"}),
+            ),
+            "start_out_of_range",
+        ),
+        // Only a calendar of theirs that an event can be added to.
+        (
+            on(HOME),
+            event_change("push", MEETING, &json!({"calendar": "Holidays"})),
+            "no_such_calendar",
+        ),
+        (
+            on(HOME),
+            event_change("push", MEETING, &json!({"calendar": "Campbooks"})),
+            "no_such_calendar",
+        ),
+        (
+            on(HOME),
+            event_change("push", MEETING, &json!({"calendar": "Nobody"})),
+            "no_such_calendar",
+        ),
+        (
+            on(WORK),
+            event_change("push", MEETING, &json!({"calendar": "Work"})),
+            "event_not_changeable",
+        ),
+        // Only a copy on a provider calendar is taken off.
+        (
+            on(HOME),
+            event_change("unpush", MEETING, &json!({})),
+            "event_not_changeable",
+        ),
+        // Restoring needs the token of a delete: not an action Scout has.
+        (
+            on(HOME),
+            event_change("restore", MEETING, &json!({})),
+            "invalid_arguments",
+        ),
+        (
+            on(HOME),
+            event_change("delete", MEETING, &json!({"title": "x"})),
+            "invalid_arguments",
+        ),
+    ];
+    for (event, call, code) in cases {
+        kit.mail
+            .lock()
+            .unwrap()
+            .events
+            .insert(MEETING.into(), event);
+        let what = format!("{code}: {}", call.1);
+        let answer = ask_proposing(&kit, &server, &sam, workspace, &id, &[call]).await;
+        assert_eq!(answer["proposals"], json!([]), "{what}");
+        let told = results(&server).await;
+        assert!(
+            told[0].contains(&format!("\"error\":\"{code}\"")),
+            "{what}: {told:?}"
+        );
+    }
+    only_reads(&kit);
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn events_share_the_cap_and_the_dedupe_with_every_other_card(db: PgPool) {
+    let server = MockServer::start().await;
+    let kit = kit_with_events(db, &server).await;
+    let workspace = WorkspaceId::new();
+    let (sam, _) = kit.member("sam", workspace);
+    let id = started(&kit, &sam, workspace).await;
+    let answer = ask_proposing(
+        &kit,
+        &server,
+        &sam,
+        workspace,
+        &id,
+        &[
+            event_change("delete", MEETING, &json!({})),
+            event_change("delete", MEETING, &json!({})),
+            change("archive", &json!({})),
+            (
+                "propose_rule",
+                json!({"sentence": "Keep newsletters from The Weekly off Home"}),
+            ),
+            event_change("update", MEETING, &json!({"place": "Clinic"})),
+            // The same card again is still just that card, not a refusal.
+            change("archive", &json!({})),
+        ],
+    )
+    .await;
+    let proposals = answer["proposals"].as_array().unwrap();
+    let kinds: Vec<&str> = proposals
+        .iter()
+        .map(|p| p["kind"].as_str().unwrap())
+        .collect();
+    assert_eq!(kinds, ["change", "change", "rule"], "{answer}");
+    assert_eq!(proposals[0]["action"], "delete_event");
+    assert_eq!(proposals[1]["action"], "archive");
+    let told = results(&server).await;
+    assert!(told[1].contains("already in this answer"), "{told:?}");
+    assert!(told[4].contains("too_many"), "{told:?}");
+    assert!(told[5].contains("already in this answer"), "{told:?}");
     only_reads(&kit);
 }

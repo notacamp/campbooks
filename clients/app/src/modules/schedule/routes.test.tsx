@@ -138,7 +138,8 @@ describe("the Calendar place", () => {
     renderAt(`${WEEK}&event=${REVIEW.id}`);
 
     const sheet = await screen.findByRole("complementary", { name: REVIEW.title });
-    expect(within(sheet).getByText("Changed in Work meanwhile; we kept theirs")).toBeVisible();
+    expect(within(sheet).getByText("Changed in Google meanwhile; we kept theirs")).toBeVisible();
+    expect(within(sheet).getByText("Synced both ways with Google")).toBeVisible();
     fireEvent.click(within(sheet).getByRole("button", { name: "Maybe" }));
 
     await waitFor(() => {
@@ -333,6 +334,12 @@ describe("Settings → Calendar", () => {
       health: "ok",
       capabilities: ["messages"],
     },
+    {
+      ...CONNECTION,
+      id: "0192f1a0-0000-7000-8000-0000000000c9",
+      address: "ana.work@example.com",
+      capabilities: ["messages"],
+    },
   ];
 
   function settings(extra: Parameters<typeof mockApi>[0] = {}) {
@@ -342,7 +349,7 @@ describe("Settings → Calendar", () => {
     });
   }
 
-  it("lists the calendars, turns one on, and does not offer calendar access yet", async () => {
+  it("lists the calendars and turns one on", async () => {
     const calls = settings({
       [`PATCH ${S}/calendars/${HOLIDAYS.id}`]: { body: { ...HOLIDAYS, syncing: true } },
     });
@@ -356,8 +363,22 @@ describe("Settings → Calendar", () => {
         calls.calls.find((call) => call.route === `PATCH ${S}/calendars/${HOLIDAYS.id}`)?.body,
       ).toEqual({ syncing: true });
     });
+  });
 
-    expect(screen.queryByRole("button", { name: "Add calendar access" })).toBeNull();
+  it("offers calendar access to a Google mailbox without it, and starts its consent", async () => {
+    const start = vi.fn();
+    settings();
+    renderAt(`/w/${DUARTE.id}/settings/calendar`, { start });
+
+    // Only the Google mailbox without calendar access: not the one that has it, not Zoho.
+    const add = await screen.findByRole("button", { name: "Add calendar access" });
+    expect(screen.getAllByRole("button", { name: "Add calendar access" })).toHaveLength(1);
+    fireEvent.click(add);
+
+    expect(start).toHaveBeenCalledWith({
+      purpose: "reconnect",
+      connection: "0192f1a0-0000-7000-8000-0000000000c9",
+    });
   });
 
   it("turns off a kind Scout adds, keeping the others", async () => {

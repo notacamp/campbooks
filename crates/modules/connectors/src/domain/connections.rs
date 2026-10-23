@@ -83,8 +83,19 @@ pub async fn view(
             ORDER BY s.capability, s.created_at, s.id"#,
         connection.id as ConnectionId,
     )
-    .fetch_all(conn)
+    .fetch_all(&mut *conn)
     .await?;
+    // Why a stream does not work (not part of the query above, which the
+    // offline cache holds).
+    let reasons: std::collections::HashMap<StreamId, Option<String>> =
+        sqlx::query_as::<_, (StreamId, Option<String>)>(
+            "SELECT id, health_reason FROM connectors.streams WHERE connection_id = $1",
+        )
+        .bind(connection.id)
+        .fetch_all(&mut *conn)
+        .await?
+        .into_iter()
+        .collect();
     let streams = rows
         .into_iter()
         .map(|row| {
@@ -92,6 +103,7 @@ pub async fn view(
                 capability: Capability::parse(&row.capability)?,
                 inbox_id: row.inbox_id,
                 address: row.address,
+                health_reason: reasons.get(&row.id).cloned().flatten(),
                 phase: Phase::parse(&row.phase)?,
                 paused: row.paused,
                 last_synced_at: row.last_synced_at,
