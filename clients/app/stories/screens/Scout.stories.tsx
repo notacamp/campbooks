@@ -387,6 +387,15 @@ function everywhere(): Record<string, MockRoute> {
         }
       }
     },
+    // ⌘K searches the mail as you type: nothing matches a question.
+    [`GET ${W}/search`]: (_body, url) => ({
+      body: {
+        hits: [],
+        indexing: false,
+        next_cursor: null,
+        query: { filters: [], text: url.searchParams.get("q") ?? "", warnings: [] },
+      },
+    }),
     [`GET ${CHATS}`]: { body: { chats: RECENT } },
     [`GET ${CHATS}/${MARTA_CHAT.id}`]: { body: MARTA_CHAT_ANSWERED },
     [`GET ${CHATS}/${RULE_CHAT.id}`]: {

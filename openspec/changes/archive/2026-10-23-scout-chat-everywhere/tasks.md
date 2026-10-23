@@ -22,5 +22,5 @@
 - [x] 3.1 OpenAPI and client types regenerated (CI artifacts)
 - [x] 3.2 Changelog entry file
 - [x] 3.3 Gates green
-- [ ] 3.4 UI recorded at 375px and desktop
-- [ ] 3.5 `openspec archive scout-chat-everywhere --yes` before merge
+- [x] 3.4 UI recorded at 375px and desktop
+- [x] 3.5 `openspec archive scout-chat-everywhere --yes` before merge

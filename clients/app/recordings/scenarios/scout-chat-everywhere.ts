@@ -34,7 +34,7 @@ export default async function scoutChatEverywhere({ page }: ScenarioContext): Pr
   await recent.getByText("Why is this here?").waitFor();
   await caption(page, "Recent: your chats, by your first question", 2200);
   await recent.getByText("Why is this here?").click();
-  await page.getByText("Marta Ferreira · Walkthrough on Thursday").waitFor();
+  await page.getByText("Marta Ferreira · Walkthrough on Thursday").first().waitFor();
   await caption(page, "It reopens with its messages", 2200);
   await page.keyboard.press("Escape");
   await pause(600);
