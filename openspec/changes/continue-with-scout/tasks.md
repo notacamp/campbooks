@@ -17,13 +17,14 @@
 
 - [ ] 3.1 Migration `<slot>_assistant__chats`: `assistant.chats`, `assistant.chat_messages`, checks, the partial unique key, RLS enabled and forced, grants
 - [ ] 3.2 `assistant.chat` in the access catalogue, owned by its member
-- [ ] 3.3 Purge and `member_left` delete chats; daily recurring job `assistant.expire_chats` (30 days after the last message)
+- [ ] 3.3 Purge and `member_left` delete chats; daily schedule `assistant.dispatch_expire_chats` (maintenance scope, read-only policy, `architecture.toml` entry) enqueuing `assistant.expire_chats` per workspace (30 days after the last message)
 
 ## 4. Chat operations (`assistant`)
 
-- [ ] 4.1 `start_chat`, `get_chat`, `delete_chat`
-- [ ] 4.2 The handbook (`handbook.md`, `HANDBOOK_VERSION`) and the fixed instruction
-- [ ] 4.3 `about`: the conversation read as the member (`get_conversation`, `get_history`), bounded own words
+- [ ] 4.1 `start_chat` (`about` a `RecordRef` of a registered type, else 400 `about_unsupported`), `get_chat`, `delete_chat`
+- [ ] 4.2 The handbook: the assistant's core section, `conversations` and `attention` sections in their crates (`HANDBOOK`), composed by the server in a fixed order, version derived from every part, each section at most 8 KiB (server test); the fixed instruction
+- [ ] 4.3 The about registry: `conversations.conversation` read as the member (`conversations.get`, `conversations.get_history`), bounded own words; registry ops checked against the catalogue
+- [ ] 4.3a The context: `now` (UTC), the member's `time_zone` (question body, checked against `pg_timezone_names`, else UTC) with the local date, time and weekday, and their language
 - [ ] 4.4 The tool registry: six tools, narrow schemas, compact projections, 8 KiB / 24 KiB bounds, unknown tools refused without invoking
 - [ ] 4.5 The question loop: up to 6 tool rounds then an answer without tools; steps; storing the question and the answer (`done`, `failed`, `cut_short`)
 - [ ] 4.6 `ask_chat` (whole) and `stream_chat` (SSE: `thinking`, `step`, `text`, `done`, `error`); a dropped stream stores `failed`
@@ -33,7 +34,7 @@
 
 ## 5. Server tests
 
-- [ ] 5.1 Tool registry against the catalogue (`assistant: true`, `mutates: false`)
+- [ ] 5.1 Tool and about registries against the catalogue (`assistant: true`, `mutates: false`)
 - [ ] 5.2 HTTP tests with a fake provider: start and continue, another member's chat 404, an app acting for nobody 403, a streamed answer with steps, the desktop answer, a tool that does not exist, a hostile message stays data, access lost, limits and the cap, a full chat, a failed and a dropped answer, nothing personal in logs
 - [ ] 5.3 The access matrix seeds a chat; the BFF passes the stream through
 

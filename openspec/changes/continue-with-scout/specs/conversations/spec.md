@@ -16,13 +16,14 @@ with its time and kind:
 - `corrected`: a member changed an answer (question, from, to), by `you`
   when it was the caller, else `member`;
 - `rule_applied`, `rule_reverted` and `rule_excepted`: a taught rule, by
-  its id and its sentence;
+  its id, with its conditions and actions (what the clients read as its
+  sentence);
 - `need_opened`: the current need (reason, basis, due date); `need_cleared`
   (why, and by `you`, `member`, `rule` or `scout`) and `need_verdict`
   (the verdict, and by whom).
 
 It SHALL answer 404 for a conversation the caller cannot read, as
-`conversations.get_conversation` does, and hold no message text.
+`conversations.get` does, and hold no message text.
 
 #### Scenario: A bill
 - **WHEN** Marta's rent email arrived, Scout read it as money (91, acted) and needs_reply no (78, acted), and the Pay need opened
