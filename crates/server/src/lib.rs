@@ -31,6 +31,8 @@ mod rate_limit_tests;
 mod revocation_tests;
 #[cfg(test)]
 mod search_tests;
+#[cfg(test)]
+mod tracking_tests;
 
 use std::{fmt::Write as _, sync::Arc, time::Duration};
 
@@ -544,10 +546,12 @@ fn admin_security_scheme() -> SecurityScheme {
 /// operation catalogue, so [`invoke`](operations::invoke) and the
 /// idempotency layer never see it; every route behind the audit middleware
 /// and the admin class of the per-caller rate limits, problems in the
-/// caller's language.
+/// caller's language, all inside the request's tracking context (the
+/// administrator, by account id, once `Admin` admits them; ADR 0020).
 fn admin_routes(state: &AppState, composition: &Composition) -> Router<AppState> {
     let (routes, spec) = admin_api_with(composition).split_for_parts();
-    routes
+    let tracking = campbooks_kernel::tracking::http::HttpTracking::from_spec(&spec);
+    let routes = routes
         .route_layer(middleware::from_fn_with_state(
             campbooks_kernel::admin::AuditLayer::new(state, &spec),
             campbooks_kernel::admin::audit,
@@ -561,7 +565,8 @@ fn admin_routes(state: &AppState, composition: &Composition) -> Router<AppState>
         .route_layer(middleware::from_fn_with_state(
             state.clone(),
             i18n::localize,
-        ))
+        ));
+    campbooks_kernel::tracking::http::around(routes, tracking)
 }
 
 /// The admin API's document: every module's admin operations
@@ -680,6 +685,10 @@ fn compose(
     // problems) are localized before compression wraps the body.
     let localize = axum::middleware::from_fn_with_state(state.clone(), i18n::localize);
     let metrics = state.metrics.clone();
+    // The web BFF's and the issuer's own routes (sign-in, sign-up) run in a
+    // tracking context too: anonymous until a token names the caller
+    // (ADR 0020). The module routes have theirs from `operations::compose`.
+    let tracking = campbooks_kernel::tracking::http::HttpTracking::from_spec(&spec);
 
     let routes = routes
         .route(
@@ -689,8 +698,11 @@ fn compose(
         // The health check again, for probes: same handler, so same answer.
         .route(UP_PATH, get(campbooks_system::health))
         .with_state(state)
-        .merge(bff.router())
-        .merge(identity);
+        .merge(campbooks_kernel::tracking::http::around(
+            bff.router(),
+            tracking.clone(),
+        ))
+        .merge(campbooks_kernel::tracking::http::around(identity, tracking));
     let routes = match web_client {
         Some(client) => {
             routes.fallback(move |request: AxumRequest| client.clone().respond(request))
@@ -1136,10 +1148,14 @@ mod tests {
             "connectors.destinations_at_deploy",
             "connectors.restores_at_deploy",
         ];
+        // The tracked events outbox (ADR 0020): append only; nothing in the
+        // application reads, changes or deletes a row back.
+        let append_only = "kernel.tracked_events";
         let missing: Vec<String> = missing
             .into_iter()
             .filter(|t| {
                 t != read_only
+                    && t != append_only
                     && t != functions_only
                     && t != snapshot
                     && !at_deploy.contains(&t.as_str())
@@ -1163,6 +1179,21 @@ mod tests {
             privileges,
             (true, false, false, false),
             "`{role}` only reads {read_only}"
+        );
+        let privileges: (bool, bool, bool, bool, bool) = sqlx::query_as(
+            "SELECT has_table_privilege($1, $2, 'SELECT'), has_table_privilege($1, $2, 'INSERT'),
+                    has_table_privilege($1, $2, 'UPDATE'), has_table_privilege($1, $2, 'DELETE'),
+                    has_any_column_privilege($1, $2, 'SELECT, UPDATE')",
+        )
+        .bind(role)
+        .bind(append_only)
+        .fetch_one(&db)
+        .await
+        .unwrap();
+        assert_eq!(
+            privileges,
+            (false, true, false, false, false),
+            "`{role}` only appends to {append_only}"
         );
         for table in at_deploy {
             let privileges: (bool, bool, bool, bool, bool) = sqlx::query_as(

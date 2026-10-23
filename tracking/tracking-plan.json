@@ -1,0 +1,659 @@
+{
+  "actors": [
+    {
+      "description": "A person, through one of Campbooks' apps or an app they allowed.",
+      "id_is": "the person's Campbooks account id",
+      "type": "user"
+    },
+    {
+      "description": "An app acting on its own behalf (client credentials).",
+      "id_is": "the OAuth client id",
+      "type": "client"
+    },
+    {
+      "description": "Scout, running an operation for a person.",
+      "id_is": "none; on behalf of names the person",
+      "type": "assistant"
+    },
+    {
+      "description": "A rule or workflow, running an operation for a person.",
+      "id_is": "none; on behalf of names the person",
+      "type": "automation"
+    },
+    {
+      "description": "Background work or a command; on behalf of names whoever caused it, when someone did.",
+      "id_is": "the job, handler or schedule kind, or the command's name",
+      "type": "system"
+    },
+    {
+      "description": "An instance administrator, through the admin API.",
+      "id_is": "the administrator's Campbooks account id",
+      "type": "admin"
+    },
+    {
+      "description": "Nobody signed in yet (sign-up, sign-in).",
+      "id_is": "none",
+      "type": "anonymous"
+    }
+  ],
+  "changelog": [
+    {
+      "change": "The first plan: conversations.conversation_archived and conversations.conversation_unarchived, with a conversations.conversation snapshot (the reference flow of ADR 0020).",
+      "date": "2026-10-23",
+      "plan_version": 1,
+      "pr": "#632"
+    }
+  ],
+  "coverage": [
+    {
+      "events": [
+        "conversations.conversation_archived"
+      ],
+      "exemption": "",
+      "kind": "operation",
+      "name": "conversations.archive"
+    },
+    {
+      "events": [
+        "conversations.conversation_unarchived"
+      ],
+      "exemption": "",
+      "kind": "operation",
+      "name": "conversations.unarchive"
+    }
+  ],
+  "description": "The tracking plan (ADR 0020), generated from tracking/tracking-plan.xlsx by campbooks-tracking-plan. Do not edit: change the workbook and regenerate. Every event's `schema` is the JSON Schema of its body; `envelope` is the schema of what the kernel adds around it.",
+  "enums": [
+    {
+      "description": "No message is in the inbox, and it is not binned.",
+      "enum": "conversations.conversation_status",
+      "value": "archived"
+    },
+    {
+      "description": "At least one message is in the inbox.",
+      "enum": "conversations.conversation_status",
+      "value": "inbox"
+    },
+    {
+      "description": "Binned as spam.",
+      "enum": "conversations.conversation_status",
+      "value": "spam"
+    },
+    {
+      "description": "Every message is in the trash or spam, at least one in the trash.",
+      "enum": "conversations.conversation_status",
+      "value": "trash"
+    },
+    {
+      "description": "Newsletters, mailing lists and marketing.",
+      "enum": "conversations.stream",
+      "value": "newsletters"
+    },
+    {
+      "description": "Mail from people.",
+      "enum": "conversations.stream",
+      "value": "primary"
+    },
+    {
+      "description": "Receipts, invoices and bills.",
+      "enum": "conversations.stream",
+      "value": "receipts"
+    },
+    {
+      "description": "Notifications, alerts and automatic messages.",
+      "enum": "conversations.stream",
+      "value": "updates"
+    },
+    {
+      "description": "Nobody: no accepted answer, so Primary.",
+      "enum": "conversations.stream_source",
+      "value": "default"
+    },
+    {
+      "description": "A member moved it.",
+      "enum": "conversations.stream_source",
+      "value": "member"
+    },
+    {
+      "description": "An accepted model answer.",
+      "enum": "conversations.stream_source",
+      "value": "model"
+    },
+    {
+      "description": "An accepted rules answer.",
+      "enum": "conversations.stream_source",
+      "value": "rules"
+    },
+    {
+      "description": "A rule a member taught.",
+      "enum": "conversations.stream_source",
+      "value": "taught"
+    }
+  ],
+  "envelope": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "additionalProperties": false,
+    "properties": {
+      "actor": {
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "description": "See the Actors sheet: an account id, a client id, a job kind or a command's name; never a name or an address.",
+            "type": "string"
+          },
+          "type": {
+            "enum": [
+              "user",
+              "client",
+              "assistant",
+              "automation",
+              "system",
+              "admin",
+              "anonymous"
+            ]
+          }
+        },
+        "required": [
+          "type"
+        ],
+        "type": "object"
+      },
+      "app_version": {
+        "type": "string"
+      },
+      "causation": {
+        "anyOf": [
+          {
+            "additionalProperties": false,
+            "properties": {
+              "id": {
+                "format": "uuid",
+                "type": "string"
+              },
+              "type": {
+                "enum": [
+                  "job",
+                  "event"
+                ]
+              }
+            },
+            "required": [
+              "type",
+              "id"
+            ],
+            "type": "object"
+          },
+          {
+            "type": "null"
+          }
+        ]
+      },
+      "correlation": {
+        "description": "The request's trace id, carried into every job and delivery it causes.",
+        "type": "string"
+      },
+      "id": {
+        "description": "The event's id (UUIDv7); subscribers deduplicate on it.",
+        "format": "uuid",
+        "type": "string"
+      },
+      "name": {
+        "type": "string"
+      },
+      "occurred_at": {
+        "format": "date-time",
+        "type": "string"
+      },
+      "on_behalf_of": {
+        "anyOf": [
+          {
+            "additionalProperties": false,
+            "properties": {
+              "id": {
+                "description": "See the Actors sheet: an account id, a client id, a job kind or a command's name; never a name or an address.",
+                "type": "string"
+              },
+              "type": {
+                "enum": [
+                  "user",
+                  "client",
+                  "assistant",
+                  "automation",
+                  "system",
+                  "admin",
+                  "anonymous"
+                ]
+              }
+            },
+            "required": [
+              "type"
+            ],
+            "type": "object"
+          },
+          {
+            "type": "null"
+          }
+        ]
+      },
+      "operation": {
+        "description": "The operationId being served, when inside an operation.",
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "plan_version": {
+        "minimum": 1,
+        "type": "integer"
+      },
+      "role": {
+        "enum": [
+          "all",
+          "api",
+          "worker",
+          "cli"
+        ]
+      },
+      "version": {
+        "minimum": 1,
+        "type": "integer"
+      },
+      "workspace_id": {
+        "format": "uuid",
+        "type": [
+          "string",
+          "null"
+        ]
+      }
+    },
+    "required": [
+      "id",
+      "name",
+      "version",
+      "occurred_at",
+      "actor",
+      "correlation",
+      "role",
+      "app_version",
+      "plan_version"
+    ],
+    "title": "Tracked event envelope",
+    "type": "object"
+  },
+  "events": [
+    {
+      "action": "archived",
+      "actor_types": [
+        "user",
+        "client",
+        "assistant",
+        "automation",
+        "system"
+      ],
+      "added_in": 1,
+      "description": "A conversation left the inbox. The snapshot is the conversation as it is after archiving.",
+      "fires_when": "Archiving changes at least one of the conversation's messages (conversations.archive), in the transaction of that change. Archiving a conversation that is already archived tracks nothing.",
+      "module": "conversations",
+      "name": "conversations.conversation_archived",
+      "object": "conversation",
+      "openspec_change": "add-tracked-events",
+      "rust_type": "ConversationArchived",
+      "schema": {
+        "$id": "urn:campbooks:tracking:conversations.conversation_archived:v1",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "additionalProperties": false,
+        "description": "A conversation left the inbox. The snapshot is the conversation as it is after archiving.",
+        "properties": {
+          "conversation": {
+            "additionalProperties": false,
+            "description": "The conversation after archiving.",
+            "properties": {
+              "id": {
+                "description": "The conversation's id.",
+                "format": "uuid",
+                "type": "string",
+                "x-classification": "id"
+              },
+              "inbox_id": {
+                "description": "The inbox it belongs to.",
+                "format": "uuid",
+                "type": "string",
+                "x-classification": "id"
+              },
+              "last_message_at": {
+                "description": "When its newest message was sent: its last activity.",
+                "format": "date-time",
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "message_count": {
+                "description": "How many messages it holds.",
+                "type": "integer",
+                "x-classification": "operational"
+              },
+              "starred": {
+                "description": "Whether any of its messages is starred.",
+                "type": "boolean",
+                "x-classification": "operational"
+              },
+              "status": {
+                "description": "Where it is: the inbox, the archive, the trash or spam.",
+                "enum": [
+                  "archived",
+                  "inbox",
+                  "spam",
+                  "trash"
+                ],
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "stream": {
+                "description": "The stream it is in.",
+                "enum": [
+                  "newsletters",
+                  "primary",
+                  "receipts",
+                  "updates"
+                ],
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "stream_source": {
+                "description": "Who put it in that stream.",
+                "enum": [
+                  "default",
+                  "member",
+                  "model",
+                  "rules",
+                  "taught"
+                ],
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "unread_count": {
+                "description": "How many of its inbound messages are unread.",
+                "type": "integer",
+                "x-classification": "operational"
+              }
+            },
+            "required": [
+              "id",
+              "inbox_id",
+              "last_message_at",
+              "message_count",
+              "starred",
+              "status",
+              "stream",
+              "stream_source",
+              "unread_count"
+            ],
+            "title": "conversations.conversation",
+            "type": "object",
+            "x-classification": "operational"
+          }
+        },
+        "required": [
+          "conversation"
+        ],
+        "title": "conversations.conversation_archived",
+        "type": "object"
+      },
+      "scope": "workspace",
+      "status": "live",
+      "version": 1
+    },
+    {
+      "action": "unarchived",
+      "actor_types": [
+        "user",
+        "client",
+        "assistant",
+        "automation",
+        "system"
+      ],
+      "added_in": 1,
+      "description": "A conversation went back to the inbox. The snapshot is the conversation as it is afterwards.",
+      "fires_when": "Moving it back changes at least one of the conversation's messages (conversations.unarchive, the undo of conversations.archive), in the transaction of that change.",
+      "module": "conversations",
+      "name": "conversations.conversation_unarchived",
+      "object": "conversation",
+      "openspec_change": "add-tracked-events",
+      "rust_type": "ConversationUnarchived",
+      "schema": {
+        "$id": "urn:campbooks:tracking:conversations.conversation_unarchived:v1",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "additionalProperties": false,
+        "description": "A conversation went back to the inbox. The snapshot is the conversation as it is afterwards.",
+        "properties": {
+          "conversation": {
+            "additionalProperties": false,
+            "description": "The conversation after it went back to the inbox.",
+            "properties": {
+              "id": {
+                "description": "The conversation's id.",
+                "format": "uuid",
+                "type": "string",
+                "x-classification": "id"
+              },
+              "inbox_id": {
+                "description": "The inbox it belongs to.",
+                "format": "uuid",
+                "type": "string",
+                "x-classification": "id"
+              },
+              "last_message_at": {
+                "description": "When its newest message was sent: its last activity.",
+                "format": "date-time",
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "message_count": {
+                "description": "How many messages it holds.",
+                "type": "integer",
+                "x-classification": "operational"
+              },
+              "starred": {
+                "description": "Whether any of its messages is starred.",
+                "type": "boolean",
+                "x-classification": "operational"
+              },
+              "status": {
+                "description": "Where it is: the inbox, the archive, the trash or spam.",
+                "enum": [
+                  "archived",
+                  "inbox",
+                  "spam",
+                  "trash"
+                ],
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "stream": {
+                "description": "The stream it is in.",
+                "enum": [
+                  "newsletters",
+                  "primary",
+                  "receipts",
+                  "updates"
+                ],
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "stream_source": {
+                "description": "Who put it in that stream.",
+                "enum": [
+                  "default",
+                  "member",
+                  "model",
+                  "rules",
+                  "taught"
+                ],
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "unread_count": {
+                "description": "How many of its inbound messages are unread.",
+                "type": "integer",
+                "x-classification": "operational"
+              }
+            },
+            "required": [
+              "id",
+              "inbox_id",
+              "last_message_at",
+              "message_count",
+              "starred",
+              "status",
+              "stream",
+              "stream_source",
+              "unread_count"
+            ],
+            "title": "conversations.conversation",
+            "type": "object",
+            "x-classification": "operational"
+          }
+        },
+        "required": [
+          "conversation"
+        ],
+        "title": "conversations.conversation_unarchived",
+        "type": "object"
+      },
+      "scope": "workspace",
+      "status": "live",
+      "version": 1
+    }
+  ],
+  "generated_by": "campbooks-tracking-plan",
+  "plan_date": "2026-10-23",
+  "plan_version": 1,
+  "properties": [
+    {
+      "classification": "operational",
+      "description": "The conversation after archiving.",
+      "event": "conversations.conversation_archived",
+      "example": "",
+      "list": false,
+      "of": "conversations.conversation",
+      "pattern": "",
+      "property": "conversation",
+      "required": true,
+      "type": "record",
+      "version": 1
+    },
+    {
+      "classification": "operational",
+      "description": "The conversation after it went back to the inbox.",
+      "event": "conversations.conversation_unarchived",
+      "example": "",
+      "list": false,
+      "of": "conversations.conversation",
+      "pattern": "",
+      "property": "conversation",
+      "required": true,
+      "type": "record",
+      "version": 1
+    }
+  ],
+  "records": [
+    {
+      "classification": "id",
+      "description": "The conversation's id.",
+      "enum": "",
+      "field": "id",
+      "list": false,
+      "pattern": "",
+      "record": "conversations.conversation",
+      "required": true,
+      "type": "id"
+    },
+    {
+      "classification": "id",
+      "description": "The inbox it belongs to.",
+      "enum": "",
+      "field": "inbox_id",
+      "list": false,
+      "pattern": "",
+      "record": "conversations.conversation",
+      "required": true,
+      "type": "id"
+    },
+    {
+      "classification": "operational",
+      "description": "When its newest message was sent: its last activity.",
+      "enum": "",
+      "field": "last_message_at",
+      "list": false,
+      "pattern": "",
+      "record": "conversations.conversation",
+      "required": true,
+      "type": "timestamp"
+    },
+    {
+      "classification": "operational",
+      "description": "How many messages it holds.",
+      "enum": "",
+      "field": "message_count",
+      "list": false,
+      "pattern": "",
+      "record": "conversations.conversation",
+      "required": true,
+      "type": "int"
+    },
+    {
+      "classification": "operational",
+      "description": "Whether any of its messages is starred.",
+      "enum": "",
+      "field": "starred",
+      "list": false,
+      "pattern": "",
+      "record": "conversations.conversation",
+      "required": true,
+      "type": "bool"
+    },
+    {
+      "classification": "operational",
+      "description": "Where it is: the inbox, the archive, the trash or spam.",
+      "enum": "conversations.conversation_status",
+      "field": "status",
+      "list": false,
+      "pattern": "",
+      "record": "conversations.conversation",
+      "required": true,
+      "type": "enum"
+    },
+    {
+      "classification": "operational",
+      "description": "The stream it is in.",
+      "enum": "conversations.stream",
+      "field": "stream",
+      "list": false,
+      "pattern": "",
+      "record": "conversations.conversation",
+      "required": true,
+      "type": "enum"
+    },
+    {
+      "classification": "operational",
+      "description": "Who put it in that stream.",
+      "enum": "conversations.stream_source",
+      "field": "stream_source",
+      "list": false,
+      "pattern": "",
+      "record": "conversations.conversation",
+      "required": true,
+      "type": "enum"
+    },
+    {
+      "classification": "operational",
+      "description": "How many of its inbound messages are unread.",
+      "enum": "",
+      "field": "unread_count",
+      "list": false,
+      "pattern": "",
+      "record": "conversations.conversation",
+      "required": true,
+      "type": "int"
+    }
+  ]
+}

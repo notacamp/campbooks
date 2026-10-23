@@ -153,6 +153,15 @@ impl Kit {
         self
     }
 
+    /// The same kit, writing tracked events to the outbox (ADR 0020), read
+    /// back with [`testing::tracked_events`].
+    #[must_use]
+    pub fn tracking(mut self) -> Self {
+        self.state = testing::tracking_outbox(self.state);
+        self.app = testing::app(crate::module(self.deps.clone()), self.state.clone());
+        self
+    }
+
     /// The same kit with no binding key (an instance with no secret): sends
     /// are neither scheduled nor released (campbooks-cloud#227).
     #[must_use]

@@ -212,9 +212,30 @@ impl Role {
     }
 }
 
+/// The command's name: the actor id of what it tracks outside any request
+/// or job (ADR 0020).
+fn command_name(command: &Command) -> &'static str {
+    match command {
+        Command::All | Command::Serve => "serve",
+        Command::Api => "api",
+        Command::Worker => "worker",
+        Command::Events { .. } => "events",
+        Command::Admin { .. } => "admin",
+        Command::Labelling { .. } => "labelling",
+        Command::Workspaces { .. } => "workspaces",
+        Command::Search { .. } => "search",
+        Command::Telemetry { .. } => "telemetry",
+        Command::Openapi => "openapi",
+        Command::Scopes => "scopes",
+        Command::Healthcheck { .. } => "healthcheck",
+    }
+}
+
 fn main() -> ExitCode {
     campbooks_server::telemetry::install_panic_hook();
-    match Cli::parse().command.unwrap_or(Command::All) {
+    let command = Cli::parse().command.unwrap_or(Command::All);
+    campbooks_kernel::tracking::set_command(command_name(&command));
+    match command {
         Command::All | Command::Serve => serve(Role::All),
         Command::Api => serve(Role::Api),
         Command::Worker => serve(Role::Worker),
@@ -462,6 +483,9 @@ async fn run(
             .with_mailer(mailer),
         &composition,
     );
+    // Envelopes say which part of the server tracked an event.
+    let tracker = state.tracker.clone().with_role(role.as_str());
+    let state = state.with_tracker(tracker);
     // Flipped to `true` on Ctrl-C/SIGTERM, or when one part stops, so the
     // other parts stop too.
     let stop = Arc::new(watch::channel(false).0);

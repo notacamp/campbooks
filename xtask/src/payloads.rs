@@ -22,6 +22,11 @@
 //!   reported. `redact::job_error` masks quotes, addresses, links and tokens
 //!   as well, but only as a backstop.
 //!
+//! - **Job origins**: what a job remembers of who caused it
+//!   (`kernel.jobs.origin`, ADR 0020): every field of the origin and of the
+//!   actor it holds is listed in [`JOB_ORIGIN_FIELDS`] with the reason it
+//!   is no personal data.
+//!
 //! Each list's entries must still match something: a stale entry is
 //! reported, so the lists stay an accurate audit.
 
@@ -261,6 +266,89 @@ pub const JOB_PAYLOAD_FIELDS: &[(&str, &str, &str)] = &[
     ("conversations.notice_rules", "inbox", INBOX_ID),
     ("conversations.summarize_need", "message", MESSAGE_ID),
 ];
+
+/// Where the structs a job's origin is made of are defined.
+pub const JOB_ORIGIN_SOURCE: &str = "crates/kernel/src/tracking/context.rs";
+
+/// Every field of a job's origin (`kernel.jobs.origin`, ADR 0020) and of
+/// the actor it holds, each with the reason it is no personal data:
+/// `(struct, field, reason)`.
+pub const JOB_ORIGIN_FIELDS: &[(&str, &str, &str)] = &[
+    (
+        "JobOrigin",
+        "actor",
+        "who the job works for: an `Actor` (its fields below), never a name or an address",
+    ),
+    (
+        "JobOrigin",
+        "correlation",
+        "the causing request's trace id (32 hex digits), opaque",
+    ),
+    (
+        "Actor",
+        "kind",
+        "the actor's type, from the code (`user`, `client`, `assistant`, `automation`, \
+         `system`, `admin`, `anonymous`)",
+    ),
+    (
+        "Actor",
+        "id",
+        "a Campbooks account id, an OAuth client id or a job kind: ids, never a name or an \
+         address",
+    ),
+];
+
+/// Every field of the origin's structs is listed in `audit` with a reason,
+/// and every entry still names a field.
+pub fn check_job_origin(
+    sources: &[(String, String)],
+    path: &str,
+    audit: &[(&str, &str, &str)],
+) -> Vec<String> {
+    let code: Vec<(String, String)> = sources
+        .iter()
+        .map(|(p, text)| (p.clone(), without_comments(without_tests(text))))
+        .collect();
+    let mut violations = duplicates(
+        "JOB_ORIGIN_FIELDS",
+        audit
+            .iter()
+            .map(|(s, field, _)| format!("`{field}` of `{s}`")),
+    );
+    let structs: BTreeSet<&str> = audit.iter().map(|(s, ..)| *s).collect();
+    for name in structs {
+        let fields = match struct_fields(&code, path, name) {
+            Ok(fields) => fields,
+            Err(why) => {
+                violations.push(format!("{path}: the job origin's `{name}`: {why}"));
+                continue;
+            }
+        };
+        for field in &fields {
+            if !audit.iter().any(|(s, f, _)| *s == name && f == field) {
+                violations.push(format!(
+                    "{path}: a job's origin stores `{field}` of `{name}`, which no audit \
+                     lists: add it to `JOB_ORIGIN_FIELDS` with the reason it is no personal \
+                     data (ids and enums only)"
+                ));
+            }
+        }
+        for (_, field, reason) in audit.iter().filter(|(s, ..)| *s == name) {
+            if reason.trim().is_empty() {
+                violations.push(format!(
+                    "`JOB_ORIGIN_FIELDS` lists `{field}` of `{name}` without a reason"
+                ));
+            }
+            if !fields.iter().any(|f| f == field) {
+                violations.push(format!(
+                    "`JOB_ORIGIN_FIELDS` lists `{field}` of `{name}`, which it no longer has: \
+                     remove the entry"
+                ));
+            }
+        }
+    }
+    violations
+}
 
 const WORKSPACE_ID: &str = "the workspace's id (a UUID)";
 const INBOX_ID: &str = "the inbox's id (a UUID)";
@@ -1475,6 +1563,46 @@ mod tests {
                     "label": { "$ref": "#/components/schemas/UserId" } } }
             } }
         })
+    }
+
+    #[test]
+    fn every_field_of_a_jobs_origin_is_audited() {
+        let path = "crates/kernel/src/tracking/context.rs";
+        let code = |extra: &str| {
+            vec![(
+                path.to_owned(),
+                format!(
+                    "pub struct JobOrigin {{ pub actor: Option<Actor>, pub correlation: String,{extra} }}\n\
+                     pub struct Actor {{ #[serde(rename = \"type\")] pub kind: ActorType, pub id: Option<String> }}"
+                ),
+            )]
+        };
+        assert_eq!(
+            check_job_origin(&code(""), path, JOB_ORIGIN_FIELDS),
+            Vec::<String>::new()
+        );
+        let added = check_job_origin(&code(" pub email: String,"), path, JOB_ORIGIN_FIELDS);
+        assert_eq!(added.len(), 1, "{added:?}");
+        assert!(added[0].contains("`email` of `JobOrigin`"));
+        let stale = [("JobOrigin", "trace", "a trace")];
+        let mut audit = JOB_ORIGIN_FIELDS.to_vec();
+        audit.extend(stale);
+        let violations = check_job_origin(&code(""), path, &audit);
+        assert!(
+            violations.iter().any(|v| v.contains("no longer has")),
+            "{violations:?}"
+        );
+    }
+
+    #[test]
+    fn the_real_origin_is_audited() {
+        let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
+        let text = std::fs::read_to_string(root.join(JOB_ORIGIN_SOURCE)).unwrap();
+        let sources = vec![(JOB_ORIGIN_SOURCE.to_owned(), text)];
+        assert_eq!(
+            check_job_origin(&sources, JOB_ORIGIN_SOURCE, JOB_ORIGIN_FIELDS),
+            Vec::<String>::new()
+        );
     }
 
     #[test]

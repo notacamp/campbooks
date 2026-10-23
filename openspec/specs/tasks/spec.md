@@ -53,10 +53,8 @@ be 404.
 `tasks.list` SHALL return the caller's tasks, filtered by state, due window,
 overdue, undated, source, `mine` or `handed_off`, or by `ids` (1–100; any other
 count is 400; unseen ids are left out), with each task's title, verb, due,
-plan, state, assignee, source and revision. Overdue and today SHALL use the
-caller's UTC offset, and so SHALL `overdue` in `tasks.get` and in every write's
-answer (the same optional `utc_offset` query parameter). A handed-off task
-SHALL be visible to its giver only while it is open, in a list by `ids` too.
+plan, state, assignee, source and revision. A handed-off task SHALL be
+visible to its giver only while it is open, in a list by `ids` too.
 
 #### Scenario: What is open for me
 - **WHEN** Ana lists her open tasks
@@ -65,6 +63,14 @@ SHALL be visible to its giver only while it is open, in a list by `ids` too.
 #### Scenario: Handed off
 - **WHEN** Ana lists `handed_off`
 - **THEN** she gets the open tasks she handed to someone else, with the assignee
+
+### Requirement: The caller's day
+Overdue and today SHALL use the caller's UTC offset (the optional `utc_offset`
+query parameter) in `tasks.list`, in `tasks.get` and in every write's answer.
+
+#### Scenario: Late evening in Lisbon
+- **WHEN** Ana, at UTC+1, reads a task due today at 23:30 her time
+- **THEN** it is not overdue in the list, in `tasks.get` or in the answer to a change
 
 ### Requirement: Changing a task
 `tasks.update` (title, verb, due), `tasks.plan`, `tasks.done`,
@@ -109,14 +115,21 @@ Each task SHALL keep a history of what changed, when, and by whom (`member`,
 Every change SHALL publish `tasks.task_changed` v1 holding the workspace, the
 task, a growing revision, what changed, the state, verb, origin, due date and
 time, plan, the Later time, the assignee, who handed it off, and the source
-record. A hand-off or take-back SHALL also name the member who had it before
-and the one who had handed it off before, so the change feed removes the task
-from their lists, and closing a handed-off task SHALL remove it from the
-giver's. It SHALL hold no title, address or amount.
+record. It SHALL hold no title, address or amount.
 
 #### Scenario: Planned for Thursday
 - **WHEN** Ana plans a task for Thursday
 - **THEN** one `task_changed` event with `change: planned`, `plan: date`, Thursday and the next revision is published, and it contains no title
+
+### Requirement: Who a task left
+A hand-off or take-back event SHALL also name the member who had the task
+before and the one who had handed it off before, so the change feed removes
+it from their lists, and closing a handed-off task SHALL remove it from the
+giver's.
+
+#### Scenario: Handed on
+- **WHEN** João hands the task Ana gave him to Maria
+- **THEN** the event names João and Ana as before, and the task leaves Ana's "with João" list
 
 ### Requirement: Open tasks for the email read
 The kernel port `OpenTasks` SHALL return, for an inbox, a conversation and a

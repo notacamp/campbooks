@@ -132,6 +132,10 @@ path = "crates/modules/workspaces/src/features/invitations_port/mod.rs"
 reason = "Whether an address has a pending invitation, before any workspace: admitted by the `campbooks.invitee_email` policy."
 
 [[access.pool_access]]
+path = "crates/kernel/src/testing.rs"
+reason = "Test helpers only (the `test-util` feature): `tracked_events` reads the tracked events outbox back with the test database's owner pool, since the runtime role may only append to it (ADR 0020)."
+
+[[access.pool_access]]
 path = "crates/modules/connectors/src/domain/schedule.rs"
 reason = "Provider budgets are instance-wide (no workspace); the dispatcher itself works in the maintenance scope (`[[access.maintenance_scope]]`)."
 

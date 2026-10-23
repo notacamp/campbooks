@@ -141,6 +141,35 @@ Use `ENV` with neutral `example.com` defaults. *(gitleaks in CI.)*
 - Untrusted HTML (email bodies) is rendered only in a sandboxed iframe with a
   strict CSP; never `dangerouslySetInnerHTML` outside `lib/ui/safe-html`.
 
+## Tracked events (enforced)
+
+The record of every action (ADR 0020): who did it, in what context, and what
+the records it touched looked like. Defined in the tracking plan,
+`tracking/tracking-plan.xlsx`; how to work with it: `docs/tracking.md`.
+
+- **Every new mutating operation, job, schedule and event handler gets a
+  Coverage row**: the events it tracks, or an exemption with its reason.
+  *(CI: `cargo run -p campbooks-tracking-plan -- check` fails on a row
+  naming an unknown operation, on rows with both or neither; the server's
+  coverage test fails on an unknown job, schedule or handler and lists what
+  has no row, which campbooks-cloud#332 makes a failure.)*
+- **Events are added through the plan**, in the workbook or with a YAML
+  patch (`cargo run -p campbooks-tracking-plan -- apply <patch>`), then
+  generated; never write a `TrackedEvent` or edit `tracking.gen.rs` or
+  `tracking/tracking-plan.json` by hand. A `live` event is tracked outside
+  tests. *(CI: the check fails on stale generated files, a hand-written
+  `TrackedEvent`, and a live event nothing tracks.)*
+- **No personal data.** Properties have a type from a closed list (no free
+  text; a `code` declares its pattern) and a classification; `personal` and
+  `content` are rejected. Names, addresses, subjects and bodies never appear,
+  in the body or the envelope. *(CI: the plan check; `cargo xtask arch`
+  audits `kernel.jobs.origin`, `JOB_ORIGIN_FIELDS`.)*
+- **Snapshots come from the module's own rows in the same transaction**:
+  `state.tracker.track(&mut tx, &event)` (a job's `ctx.track`) in the
+  transaction of the change, so a rollback leaves no event. The kernel adds
+  the envelope (actor, on behalf of, operation, correlation); callers never
+  set it. *(Review; the kernel refuses an event of another workspace.)*
+
 ## Internationalization (enforced)
 
 Campbooks ships in **English, European Portuguese, Spanish from Spain and

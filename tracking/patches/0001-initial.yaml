@@ -1,0 +1,82 @@
+# The first plan (campbooks-cloud#320): the reference flow, archiving a
+# conversation and putting it back, with a snapshot of the conversation.
+# Applied with `cargo run -p campbooks-tracking-plan -- apply tracking/patches/0001-initial.yaml`.
+changelog:
+  - date: "2026-10-23"
+    plan_version: 1
+    change: "The first plan: conversations.conversation_archived and conversations.conversation_unarchived, with a conversations.conversation snapshot (the reference flow of ADR 0020)."
+    pr: "#632"
+
+events:
+  - name: conversations.conversation_archived
+    version: 1
+    module: conversations
+    object: conversation
+    action: archived
+    scope: workspace
+    status: live
+    actor_types: [user, client, assistant, automation, system]
+    description: A conversation left the inbox. The snapshot is the conversation as it is after archiving.
+    fires_when: Archiving changes at least one of the conversation's messages (conversations.archive), in the transaction of that change. Archiving a conversation that is already archived tracks nothing.
+    added_in: 1
+    openspec_change: add-tracked-events
+  - name: conversations.conversation_unarchived
+    version: 1
+    module: conversations
+    object: conversation
+    action: unarchived
+    scope: workspace
+    status: live
+    actor_types: [user, client, assistant, automation, system]
+    description: A conversation went back to the inbox. The snapshot is the conversation as it is afterwards.
+    fires_when: Moving it back changes at least one of the conversation's messages (conversations.unarchive, the undo of conversations.archive), in the transaction of that change.
+    added_in: 1
+    openspec_change: add-tracked-events
+
+properties:
+  - event: conversations.conversation_archived
+    version: 1
+    property: conversation
+    type: record
+    of: conversations.conversation
+    required: true
+    classification: operational
+    description: The conversation after archiving.
+  - event: conversations.conversation_unarchived
+    version: 1
+    property: conversation
+    type: record
+    of: conversations.conversation
+    required: true
+    classification: operational
+    description: The conversation after it went back to the inbox.
+
+records:
+  - { record: conversations.conversation, field: id, type: id, required: true, classification: id, description: "The conversation's id." }
+  - { record: conversations.conversation, field: inbox_id, type: id, required: true, classification: id, description: "The inbox it belongs to." }
+  - { record: conversations.conversation, field: stream, type: enum, enum: conversations.stream, required: true, classification: operational, description: "The stream it is in." }
+  - { record: conversations.conversation, field: stream_source, type: enum, enum: conversations.stream_source, required: true, classification: operational, description: "Who put it in that stream." }
+  - { record: conversations.conversation, field: status, type: enum, enum: conversations.conversation_status, required: true, classification: operational, description: "Where it is: the inbox, the archive, the trash or spam." }
+  - { record: conversations.conversation, field: message_count, type: int, required: true, classification: operational, description: "How many messages it holds." }
+  - { record: conversations.conversation, field: unread_count, type: int, required: true, classification: operational, description: "How many of its inbound messages are unread." }
+  - { record: conversations.conversation, field: starred, type: bool, required: true, classification: operational, description: "Whether any of its messages is starred." }
+  - { record: conversations.conversation, field: last_message_at, type: timestamp, required: true, classification: operational, description: "When its newest message was sent: its last activity." }
+
+enums:
+  - { enum: conversations.stream, value: primary, description: "Mail from people." }
+  - { enum: conversations.stream, value: updates, description: "Notifications, alerts and automatic messages." }
+  - { enum: conversations.stream, value: receipts, description: "Receipts, invoices and bills." }
+  - { enum: conversations.stream, value: newsletters, description: "Newsletters, mailing lists and marketing." }
+  - { enum: conversations.stream_source, value: default, description: "Nobody: no accepted answer, so Primary." }
+  - { enum: conversations.stream_source, value: rules, description: "An accepted rules answer." }
+  - { enum: conversations.stream_source, value: model, description: "An accepted model answer." }
+  - { enum: conversations.stream_source, value: taught, description: "A rule a member taught." }
+  - { enum: conversations.stream_source, value: member, description: "A member moved it." }
+  - { enum: conversations.conversation_status, value: inbox, description: "At least one message is in the inbox." }
+  - { enum: conversations.conversation_status, value: archived, description: "No message is in the inbox, and it is not binned." }
+  - { enum: conversations.conversation_status, value: trash, description: "Every message is in the trash or spam, at least one in the trash." }
+  - { enum: conversations.conversation_status, value: spam, description: "Binned as spam." }
+
+coverage:
+  - { kind: operation, name: conversations.archive, events: [conversations.conversation_archived] }
+  - { kind: operation, name: conversations.unarchive, events: [conversations.conversation_unarchived] }
