@@ -29,10 +29,14 @@ rules:
     - For any endpoint, state the OAuth scope it requires.
     - For any AI use, state the role (decide/embed/complete/vision), the
       fallback when the role is not configured, and how the user can undo it.
+    - List the tracked events added or changed and the Coverage rows for
+      every new operation, job, schedule or handler (ADR 0020,
+      docs/tracking.md).
   tasks:
     - Keep each task small enough for one focused session.
     - "Last tasks are always: OpenAPI regenerated, client types regenerated,
-      changelog entry file (changelog/unreleased/), gates green, UI verified at 375px and desktop (if UI)."
+      tracking plan regenerated, changelog entry file (changelog/unreleased/),
+      gates green, UI verified at 375px and desktop (if UI)."
 
 operations:
   apply:

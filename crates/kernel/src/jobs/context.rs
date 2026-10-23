@@ -165,6 +165,18 @@ impl JobContext {
         Ok(events.publish(tx, event).await?)
     }
 
+    /// Track `event` in the job's transaction
+    /// ([`Tracker::track`](crate::tracking::Tracker::track)): `system` (the
+    /// job's kind), on behalf of whoever caused the job.
+    pub async fn track<E: crate::tracking::TrackedEvent>(
+        &mut self,
+        event: &E,
+    ) -> Result<(), JobError> {
+        let tracker = self.state.tracker.clone();
+        let tx = self.tx().await?;
+        Ok(tracker.track(tx, event).await?)
+    }
+
     /// Enqueue a job in the job's transaction. Unless `options` says
     /// otherwise, it belongs to this job's workspace.
     pub async fn enqueue<J: Job>(

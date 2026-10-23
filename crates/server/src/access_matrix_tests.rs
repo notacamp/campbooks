@@ -1914,7 +1914,8 @@ async fn a_transaction_that_sets_nothing_sees_no_row_of_any_table(db: PgPool) {
     // With whether the runtime role may read the table at all: one it may
     // not (the rate-limit counters, reached through the kernel's functions
     // only, campbooks-cloud#210; the web sign-in's tables, reached through
-    // the BFF's, campbooks-cloud#212) must refuse the read outright.
+    // the BFF's, campbooks-cloud#212; the tracked events outbox, appended
+    // to only, ADR 0020) must refuse the read outright.
     let listed: Vec<(String, bool)> = sqlx::query_as(
         "SELECT format('%I.%I', n.nspname, c.relname),
                 has_table_privilege($1, c.oid, 'SELECT')
@@ -1939,6 +1940,7 @@ async fn a_transaction_that_sets_nothing_sees_no_row_of_any_table(db: PgPool) {
             "bff.retired_tokens",
             "bff.sessions",
             "kernel.rate_limits",
+            "kernel.tracked_events",
         ]),
         "tables the runtime role may not read at all"
     );
@@ -2003,13 +2005,17 @@ async fn a_transaction_that_sets_nothing_sees_no_row_of_any_table(db: PgPool) {
         populated.len()
     );
 
-    // Nor can it write an instance-wide row straight into the event log or
-    // the queue: only the kernel's own insert, lifted, may.
+    // Nor can it write an instance-wide row straight into the event log, the
+    // queue or the tracked events outbox: only the kernel's own insert,
+    // lifted, may.
     for insert in [
         "INSERT INTO kernel.jobs (queue, kind, payload, workspace_id, max_attempts)
          VALUES ('default', 'test.forged', '{}', NULL, 1)",
         "INSERT INTO kernel.events (name, version, workspace_id, payload)
          VALUES ('test.forged', 1, NULL, '{}')",
+        "INSERT INTO kernel.tracked_events (id, workspace_id, name, version, occurred_at,
+                                            envelope, body)
+         VALUES (gen_random_uuid(), NULL, 'test.forged', 1, now(), '{}', '{}')",
     ] {
         let mut tx = pool.begin().await.unwrap();
         let forged = sqlx::query(insert).execute(&mut *tx).await;

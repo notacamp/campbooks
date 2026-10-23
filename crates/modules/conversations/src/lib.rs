@@ -52,6 +52,9 @@ pub mod outgoing;
 pub mod scopes;
 #[cfg(test)]
 mod testkit;
+/// The module's tracked events, generated from the tracking plan (ADR 0020).
+#[path = "tracking.gen.rs"]
+pub mod tracking;
 
 pub use config::{
     ActionSettings, ConversationsConfig, DEFAULT_DECIDE_BACKFILL_DAYS, DEFAULT_NEEDS_WINDOW_DAYS,

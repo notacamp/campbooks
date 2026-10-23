@@ -24,7 +24,7 @@ Tauri. This page is the map; the *why* lives in `docs/adr/`.
 ## Repository layout
 
 ```
-Cargo.toml                 workspace (kernel, ai, server, crates/modules/*, xtask)
+Cargo.toml                 workspace (kernel, ai, server, tracking-plan, crates/modules/*, xtask)
 architecture.toml          module dependency allowlist, read by `cargo xtask arch`
 crates/
   kernel/                  campbooks-kernel — config, errors (problem+json), db pool,
@@ -39,6 +39,9 @@ crates/
                            serves OpenAPI, the web BFF (`/bff/*`, sessions in schema
                            `bff`) and, when CAMPBOOKS_WEB_DIR is set, the built web
                            client; runs as `all`, `api` or `worker`.
+  tracking-plan/           campbooks-tracking-plan — the tracking plan's tooling (ADR 0020):
+                           checks tracking/tracking-plan.xlsx and generates the typed
+                           events and their JSON mirror. Depends on no internal crate.
   modules/
     system/                campbooks-system — health, version. The reference slice:
                            copy its shape for every new module.
@@ -65,6 +68,9 @@ openapi/openapi.json       generated, committed; the operation catalogue and the
 openapi/admin.json         generated, committed; the admin API (ADR 0015), outside the
                            operation catalogue
 openapi/events.json        generated, committed; the events catalogue
+tracking/                  the tracking plan (tracking-plan.xlsx, the source of truth), its
+                           generated mirror (tracking-plan.json) and the patches applied
+                           to it (ADR 0020, docs/tracking.md)
 xtask/                     `cargo xtask arch | openapi [--check] | events [--check] |
                            new-module | new-feature`
 clients/                   pnpm workspace

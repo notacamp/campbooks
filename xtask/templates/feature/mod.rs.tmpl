@@ -4,6 +4,15 @@
 //! placeholder response. The feature owns its handler, request and response
 //! types, queries and tests; anything another feature of this module needs
 //! too moves to `domain/`.
+//!
+//! TODO(new-feature): tracked events (ADR 0020, `docs/tracking.md`). Give
+//! `{{name}}.{{feature}}` a Coverage row in the tracking plan: the events it tracks, or why
+//! it tracks none (a read tracks none). Change the plan with a patch under
+//! `tracking/patches/` and `cargo run -p campbooks-tracking-plan -- apply
+//! <patch>`. A write tracks its events with `state.tracker.track(&mut tx,
+//! &tracking::…)` in the transaction of the change, filled from this
+//! module's own rows: ids, enums, counts and times, never a name, an address
+//! or what someone wrote.
 
 use axum::{Json, extract::State};
 use campbooks_kernel::{

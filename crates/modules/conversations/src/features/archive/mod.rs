@@ -97,9 +97,102 @@ pub async fn unarchive(
 #[cfg(test)]
 mod tests {
     use axum::http::StatusCode;
+    use campbooks_kernel::testing;
+    use serde_json::json;
     use sqlx::PgPool;
 
     use crate::testkit::Kit;
+
+    const ARCHIVED: &str = "conversations.conversation_archived";
+    const UNARCHIVED: &str = "conversations.conversation_unarchived";
+
+    #[sqlx::test(migrations = "../../../migrations")]
+    async fn archiving_tracks_the_conversation_as_it_is_afterwards(db: PgPool) {
+        let kit = Kit::new(db).await.tracking();
+        let (workspace, inbox, sam) = kit.sams_inbox().await;
+        let id = kit.conversation_of("en-1").await;
+        let base = format!("/api/v1/w/{workspace}/conversations/{id}");
+
+        kit.post(&sam, &format!("{base}/archive"), None).await;
+        // Already archived: nothing changes, nothing more is tracked.
+        kit.post(&sam, &format!("{base}/archive"), None).await;
+
+        let tracked = testing::tracked_events(&kit.db, ARCHIVED).await;
+        assert_eq!(tracked.len(), 1);
+        let event = &tracked[0];
+        assert_eq!(event.version, 1);
+        assert_eq!(event.workspace_id, Some(*workspace.as_uuid()));
+        let envelope = &event.envelope;
+        assert_eq!(envelope["name"], ARCHIVED);
+        assert_eq!(envelope["actor"], json!({"type": "user", "id": "sam"}));
+        assert_eq!(envelope["on_behalf_of"], serde_json::Value::Null);
+        assert_eq!(envelope["operation"], "conversations.archive");
+        assert_eq!(envelope["workspace_id"], workspace.to_string());
+        let correlation = envelope["correlation"].as_str().unwrap();
+        assert_eq!(correlation.len(), 32, "{correlation}");
+        assert_eq!(
+            envelope["plan_version"],
+            campbooks_kernel::tracking::PLAN_VERSION
+        );
+        let conversation = &event.body["conversation"];
+        assert_eq!(conversation["id"], id);
+        assert_eq!(conversation["inbox_id"], inbox.to_string());
+        assert_eq!(conversation["status"], "archived");
+        assert!(conversation["stream"].is_string());
+        assert!(conversation["message_count"].as_i64().unwrap() >= 1);
+        // Ids, enums, counts and times only: never what someone wrote.
+        assert!(conversation.get("subject").is_none());
+        assert!(conversation.get("snippet").is_none());
+
+        kit.post(&sam, &format!("{base}/unarchive"), None).await;
+        let back = testing::tracked_events(&kit.db, UNARCHIVED).await;
+        assert_eq!(back.len(), 1);
+        assert_eq!(back[0].body["conversation"]["status"], "inbox");
+        assert_eq!(back[0].envelope["operation"], "conversations.unarchive");
+        assert_ne!(back[0].envelope["correlation"], envelope["correlation"]);
+    }
+
+    #[sqlx::test(migrations = "../../../migrations")]
+    async fn the_assistant_archiving_tracks_it_on_the_members_behalf(db: PgPool) {
+        let kit = Kit::new(db).await.tracking();
+        let (workspace, _, _) = kit.sams_inbox().await;
+        let id = kit.conversation_of("en-1").await;
+
+        kit.as_assistant(
+            "sam",
+            workspace,
+            ("conversations.archive", json!({"conversation_id": id})),
+            false,
+        )
+        .await
+        .unwrap();
+
+        let tracked = testing::tracked_events(&kit.db, ARCHIVED).await;
+        assert_eq!(tracked.len(), 1);
+        let envelope = &tracked[0].envelope;
+        assert_eq!(envelope["actor"], json!({"type": "assistant"}));
+        assert_eq!(
+            envelope["on_behalf_of"],
+            json!({"type": "user", "id": "sam"})
+        );
+        assert_eq!(envelope["operation"], "conversations.archive");
+    }
+
+    #[sqlx::test(migrations = "../../../migrations")]
+    async fn with_tracking_off_nothing_is_written(db: PgPool) {
+        let kit = Kit::new(db).await;
+        let (workspace, _, sam) = kit.sams_inbox().await;
+        let id = kit.conversation_of("en-1").await;
+        let archived = kit
+            .post(
+                &sam,
+                &format!("/api/v1/w/{workspace}/conversations/{id}/archive"),
+                None,
+            )
+            .await;
+        assert_eq!(archived.json["archived"], true);
+        assert!(testing::tracked_events(&kit.db, ARCHIVED).await.is_empty());
+    }
 
     #[sqlx::test(migrations = "../../../migrations")]
     async fn archive_moves_it_out_of_the_inbox_and_unarchive_back(db: PgPool) {
