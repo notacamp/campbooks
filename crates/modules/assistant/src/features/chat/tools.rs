@@ -643,14 +643,12 @@ fn arguments(tool: ChatTool, raw: &str) -> Option<Map<String, Value>> {
             value,
             &["inbox", "sent", "starred", "archive", "spam", "trash"],
         ),
-        (ChatTool::ReadConversation | ChatTool::ConversationHistory, "conversation_id") => {
-            string(value, 1, 64)
-        }
+        (ChatTool::ReadConversation | ChatTool::ConversationHistory, "conversation_id")
+        | (ChatTool::ReadTask, "task_id") => string(value, 1, 64),
         (ChatTool::FindPeople, "query") => string(value, 2, 100),
-        (ChatTool::WhatNeedsMe, "waiting") => value.is_boolean(),
         (ChatTool::MyTasks, "due_from" | "due_to") => day(value),
-        (ChatTool::MyTasks, "overdue" | "undated" | "handed_off") => value.is_boolean(),
-        (ChatTool::ReadTask, "task_id") => string(value, 1, 64),
+        (ChatTool::WhatNeedsMe, "waiting")
+        | (ChatTool::MyTasks, "overdue" | "undated" | "handed_off") => value.is_boolean(),
         _ => false,
     };
     // A null optional argument is as if it were absent.
