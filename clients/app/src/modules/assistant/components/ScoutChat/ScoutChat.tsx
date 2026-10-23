@@ -113,7 +113,7 @@ export function ScoutChat({ workspaceId, conversationId, onClose, modal }: Scout
   const sender = displayName(inbound?.from ?? head?.latest_from);
   const subject =
     head === undefined ? "" : head.subject === "" ? t("chat.noSubject") : head.subject;
-  const firstName = inbound?.from.name?.trim().split(/\s+/u)[0] ?? "";
+  const firstName = inbound?.from.name?.trim().split(/\s+/u, 1)[0] ?? "";
 
   const openConversation = (summary: Pick<ConversationSummary, "id" | "stream">) => {
     const wide = typeof globalThis.matchMedia === "function" && globalThis.matchMedia(WIDE).matches;
@@ -157,21 +157,31 @@ export function ScoutChat({ workspaceId, conversationId, onClose, modal }: Scout
       if (controller.signal.aborted) {
         return;
       }
-      const code = problemCode(error);
       if (errorStatus(error) === 429) {
         // Nothing was asked: the words stay in the field.
         setRateLimited(true);
         setDraft(question);
-      } else if (code === "chat_full") {
-        setAnswerProblem("full");
-        setDraft(question);
-      } else if (code === "ai_daily_limit_reached") {
-        setAnswerProblem("limit");
-      } else if (code === "chat_unavailable") {
-        setAnswerProblem("unavailable");
       }
-      // Anything else failed after the question was kept: the stored answer
-      // says so, with Try again.
+      switch (problemCode(error)) {
+        case "chat_full": {
+          setAnswerProblem("full");
+          setDraft(question);
+          break;
+        }
+        case "ai_daily_limit_reached": {
+          setAnswerProblem("limit");
+          break;
+        }
+        case "chat_unavailable": {
+          setAnswerProblem("unavailable");
+          break;
+        }
+        default: {
+          // Anything else failed after the question was kept: the stored
+          // answer says so, with Try again.
+          break;
+        }
+      }
     }
     if (!controller.signal.aborted) {
       await cache.refresh();

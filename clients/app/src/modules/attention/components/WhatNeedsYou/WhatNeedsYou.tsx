@@ -811,7 +811,7 @@ export function WhatNeedsYou({ workspaceId, now, offer }: WhatNeedsYouProps) {
     const button =
       document
         .getElementById(itemId(row.item.id))
-        ?.querySelector<HTMLElement>(`[data-action="${SCOUT}"]`) ?? null;
+        ?.querySelector<HTMLElement>(`[data-action="${CSS.escape(SCOUT)}"]`) ?? null;
     scout?.(row.conversation.id, button);
   };
   const selectedActions = selected === undefined ? undefined : actionsOf(selected);

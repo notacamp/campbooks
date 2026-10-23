@@ -92,17 +92,17 @@ function frameOf(data: string): Record<string, unknown> {
   return {};
 }
 
-const TOOLS: readonly string[] = [
+const TOOLS: ReadonlySet<string> = new Set<ChatTool>([
   "find_conversations",
   "read_conversation",
   "conversation_history",
   "find_people",
   "what_needs_me",
   "my_inboxes",
-];
+]);
 
 function isTool(value: unknown): value is ChatTool {
-  return typeof value === "string" && TOOLS.includes(value);
+  return typeof value === "string" && TOOLS.has(value);
 }
 
 /** The member's IANA time zone, for "today" and "Thursday afternoon". */
