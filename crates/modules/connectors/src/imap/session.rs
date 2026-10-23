@@ -750,11 +750,57 @@ fn line(parts: &[&str]) -> Zeroizing<Vec<u8>> {
     out
 }
 
+/// The response codes a log may name (RFC 3501 §7.1 and RFC 5530): a
+/// server's own atom (which could be anything it likes) is logged as
+/// `other`.
+const LOGGED_CODES: [&str; 27] = [
+    "ALERT",
+    "ALREADYEXISTS",
+    "AUTHENTICATIONFAILED",
+    "AUTHORIZATIONFAILED",
+    "BADCHARSET",
+    "CANNOT",
+    "CAPABILITY",
+    "CLIENTBUG",
+    "CONTACTADMIN",
+    "CORRUPTION",
+    "EXPIRED",
+    "EXPUNGEISSUED",
+    "INUSE",
+    "LIMIT",
+    "NONEXISTENT",
+    "NOPERM",
+    "OVERQUOTA",
+    "PARSE",
+    "PERMANENTFLAGS",
+    "PRIVACYREQUIRED",
+    "READ-ONLY",
+    "READ-WRITE",
+    "SERVERBUG",
+    "TRYCREATE",
+    "UIDNEXT",
+    "UIDVALIDITY",
+    "UNAVAILABLE",
+];
+
+/// `code` as a log may carry it: one of [`LOGGED_CODES`], `other`, or empty
+/// when there is none.
+fn logged_code(code: Option<&Code>) -> &'static str {
+    match code {
+        None => "",
+        Some(code) => LOGGED_CODES
+            .iter()
+            .find(|known| **known == code.name)
+            .copied()
+            .unwrap_or("other"),
+    }
+}
+
 /// What a sign-in the server ended without `OK` means: busy (RFC 5530's
 /// `UNAVAILABLE`, `INUSE`, `LIMIT`), or a refusal. Logs the response code
-/// only, never the server's text.
+/// only when it is a known one, never the server's text.
 fn sign_in_refusal(done: &Done) -> Refusal {
-    let code = done.code.as_ref().map_or("", |code| code.name.as_str());
+    let code = logged_code(done.code.as_ref());
     if done.is_busy() {
         tracing::info!(code, "the IMAP server is busy");
         Refusal::ImapBusy

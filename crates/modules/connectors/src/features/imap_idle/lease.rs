@@ -109,7 +109,8 @@ pub async fn offer(
          VALUES ($1, $2, $3, $4, $5, $6)
          ON CONFLICT (connection_id) DO UPDATE
             SET stream_id = EXCLUDED.stream_id, login_key = EXCLUDED.login_key,
-                host_key = EXCLUDED.host_key, provider_host = EXCLUDED.provider_host
+                host_key = EXCLUDED.host_key, provider_host = EXCLUDED.provider_host,
+                offered = true
          RETURNING coalesce(holder IS NOT NULL AND expires_at > now(), false)",
     )
     .bind(connection)
@@ -123,13 +124,18 @@ pub async fn offer(
     Ok(held)
 }
 
-/// In `connection`'s workspace: withdraw its row (its holder loses the
-/// lease at its next renewal).
+/// In `connection`'s workspace: withdraw its row, whoever holds it (paused,
+/// waiting for the member, a new password, quiet, no IDLE). Its holder
+/// loses the lease at its next renewal and its session ends; the row is kept
+/// unheld, with its times, so a cooldown survives the next offer.
 pub async fn withdraw(conn: &mut PgConnection, connection: ConnectionId) -> Result<()> {
-    sqlx::query("DELETE FROM connectors.imap_idle_leases WHERE connection_id = $1")
-        .bind(connection)
-        .execute(conn)
-        .await?;
+    sqlx::query(
+        "UPDATE connectors.imap_idle_leases SET offered = false, holder = NULL
+          WHERE connection_id = $1",
+    )
+    .bind(connection)
+    .execute(conn)
+    .await?;
     Ok(())
 }
 
@@ -169,6 +175,8 @@ pub struct Caps {
     pub small_workspace: usize,
     /// One workspace's on a known provider's host.
     pub provider_workspace: usize,
+    /// One workspace's in one process's pool, whatever the hosts.
+    pub pool_workspace: usize,
 }
 
 impl Caps {
@@ -183,6 +191,7 @@ impl Caps {
                     .min(config.workspace_idle_sessions_per_host),
             ),
             provider_workspace: size(config.workspace_idle_sessions_per_host),
+            pool_workspace: size(config.idle_sessions_per_workspace),
         }
     }
 
@@ -231,11 +240,20 @@ impl From<RowTuple> for Row {
 
 /// Of the `free` rows, in order, those a pool with `room` sessions left
 /// may claim beside the `live` ones: one session per login, at most
-/// [`Caps::host`] per host and [`Caps::workspace`] per workspace on a host.
-pub fn choose(live: &[Row], free: Vec<Row>, room: usize, caps: Caps) -> Vec<Row> {
+/// [`Caps::host`] per host and [`Caps::workspace`] per workspace on a host,
+/// and at most [`Caps::pool_workspace`] per workspace in this pool, which
+/// holds `pool` sessions of each workspace already.
+pub fn choose(
+    live: &[Row],
+    free: Vec<Row>,
+    room: usize,
+    caps: Caps,
+    pool: &HashMap<WorkspaceId, usize>,
+) -> Vec<Row> {
     let mut logins: HashSet<String> = live.iter().map(|r| r.login_key.clone()).collect();
     let mut hosts: HashMap<String, usize> = HashMap::new();
     let mut shares: HashMap<(WorkspaceId, String), usize> = HashMap::new();
+    let mut mine = pool.clone();
     for row in live {
         *hosts.entry(row.host_key.clone()).or_default() += 1;
         *shares
@@ -253,21 +271,36 @@ pub fn choose(live: &[Row], free: Vec<Row>, room: usize, caps: Caps) -> Vec<Row>
         let on_host = hosts.get(&row.host_key).copied().unwrap_or(0);
         let share_key = (row.workspace, row.host_key.clone());
         let in_share = shares.get(&share_key).copied().unwrap_or(0);
-        if on_host >= caps.host(row.provider_host) || in_share >= caps.workspace(row.provider_host)
+        let in_pool = mine.get(&row.workspace).copied().unwrap_or(0);
+        if on_host >= caps.host(row.provider_host)
+            || in_share >= caps.workspace(row.provider_host)
+            || in_pool >= caps.pool_workspace
         {
             continue;
         }
         logins.insert(row.login_key.clone());
         *hosts.entry(row.host_key.clone()).or_default() += 1;
         *shares.entry(share_key).or_default() += 1;
+        *mine.entry(row.workspace).or_default() += 1;
         chosen.push(row);
     }
     chosen
 }
 
-/// Claim up to `room` free rows for `holder`, within `caps`. The rows
-/// claimed.
-pub async fn claim(pool: &PgPool, holder: Uuid, room: usize, caps: Caps) -> Result<Vec<Row>> {
+/// Claim up to `room` free rows for `holder`, within `caps`, its pool
+/// holding `pool` sessions of each workspace already. The rows claimed.
+///
+/// The free rows are read longest unlooked-at first, and every row read is
+/// stamped (`considered_at`): rows passed over at their caps go to the back,
+/// so however many there are, the others come up within a few claims.
+/// Logins already held anywhere are left out in the query itself.
+pub async fn claim(
+    pool: &PgPool,
+    holder: Uuid,
+    room: usize,
+    caps: Caps,
+    held: &HashMap<WorkspaceId, usize>,
+) -> Result<Vec<Row>> {
     if room == 0 {
         return Ok(Vec::new());
     }
@@ -284,17 +317,36 @@ pub async fn claim(pool: &PgPool, holder: Uuid, room: usize, caps: Caps) -> Resu
     .fetch_all(&mut *tx)
     .await?;
     let free: Vec<RowTuple> = sqlx::query_as(
-        "SELECT connection_id, workspace_id, stream_id, login_key, host_key, provider_host
-           FROM connectors.imap_idle_leases
-          WHERE expires_at IS NULL OR expires_at <= now()
-          ORDER BY claimed_at NULLS FIRST, connection_id
+        "SELECT l.connection_id, l.workspace_id, l.stream_id, l.login_key, l.host_key,
+                l.provider_host
+           FROM connectors.imap_idle_leases l
+          WHERE l.offered AND (l.expires_at IS NULL OR l.expires_at <= now())
+            AND NOT EXISTS (
+                SELECT 1 FROM connectors.imap_idle_leases h
+                 WHERE h.login_key = l.login_key AND h.holder IS NOT NULL
+                   AND h.expires_at > now())
+          ORDER BY l.considered_at NULLS FIRST, l.connection_id
           LIMIT $1",
     )
     .bind(CANDIDATES)
     .fetch_all(&mut *tx)
     .await?;
+    let looked_at: Vec<ConnectionId> = free.iter().map(|row| row.0).collect();
+    sqlx::query(
+        "UPDATE connectors.imap_idle_leases SET considered_at = now()
+          WHERE connection_id = ANY($1)",
+    )
+    .bind(&looked_at)
+    .execute(&mut *tx)
+    .await?;
     let live: Vec<Row> = live.into_iter().map(Row::from).collect();
-    let chosen = choose(&live, free.into_iter().map(Row::from).collect(), room, caps);
+    let chosen = choose(
+        &live,
+        free.into_iter().map(Row::from).collect(),
+        room,
+        caps,
+        held,
+    );
     if chosen.is_empty() {
         tx.commit().await?;
         return Ok(Vec::new());
@@ -302,8 +354,9 @@ pub async fn claim(pool: &PgPool, holder: Uuid, room: usize, caps: Caps) -> Resu
     let ids: Vec<ConnectionId> = chosen.iter().map(|row| row.connection).collect();
     let claimed: Vec<ConnectionId> = sqlx::query_scalar(
         "UPDATE connectors.imap_idle_leases
-            SET holder = $1, expires_at = now() + $2 * interval '1 second', claimed_at = now()
-          WHERE connection_id = ANY($3) AND (expires_at IS NULL OR expires_at <= now())
+            SET holder = $1, expires_at = now() + $2 * interval '1 second'
+          WHERE connection_id = ANY($3) AND offered
+            AND (expires_at IS NULL OR expires_at <= now())
         RETURNING connection_id",
     )
     .bind(holder)
@@ -410,6 +463,7 @@ mod tests {
                 provider_host: 100,
                 small_workspace: 1,
                 provider_workspace: 10,
+                pool_workspace: 5,
             }
         );
     }
@@ -419,11 +473,11 @@ mod tests {
         let (a, b) = (WorkspaceId::new(), WorkspaceId::new());
         // The same login connected in two workspaces.
         let free = vec![row(a, "login", "host", true), row(b, "login", "host", true)];
-        let chosen = choose(&[], free.clone(), 10, caps());
+        let chosen = choose(&[], free.clone(), 10, caps(), &HashMap::new());
         assert_eq!(chosen, vec![free[0].clone()]);
         // Held elsewhere already: none.
         let live = [row(a, "login", "host", true)];
-        assert!(choose(&live, vec![free[1].clone()], 10, caps()).is_empty());
+        assert!(choose(&live, vec![free[1].clone()], 10, caps(), &HashMap::new()).is_empty());
     }
 
     #[test]
@@ -435,7 +489,7 @@ mod tests {
             row(b, "3", "small", false),
             row(c, "4", "small", false),
         ];
-        let chosen = choose(&[], free.clone(), 10, caps());
+        let chosen = choose(&[], free.clone(), 10, caps(), &HashMap::new());
         // One per workspace (half of its share of two), two for the host.
         assert_eq!(chosen, vec![free[0].clone(), free[2].clone()]);
     }
@@ -446,13 +500,47 @@ mod tests {
         let free: Vec<Row> = (0..12)
             .map(|n| row(a, &n.to_string(), "provider", true))
             .collect();
-        let chosen = choose(&[], free.clone(), 100, caps());
+        let caps = Caps {
+            pool_workspace: 100,
+            ..caps()
+        };
+        let chosen = choose(&[], free.clone(), 100, caps, &HashMap::new());
         // The workspace's share of the provider's host: ten.
         assert_eq!(chosen.len(), 10);
         // Another workspace still gets its own.
         let b = WorkspaceId::new();
-        let more = choose(&chosen, vec![row(b, "x", "provider", true)], 100, caps());
+        let more = choose(
+            &chosen,
+            vec![row(b, "x", "provider", true)],
+            100,
+            caps(),
+            &HashMap::new(),
+        );
         assert_eq!(more.len(), 1);
+    }
+
+    #[test]
+    fn one_workspace_never_fills_a_pool() {
+        // One host name per mailbox (a wildcard domain) gets round the host
+        // caps, not the pool's share of a workspace.
+        let a = WorkspaceId::new();
+        let free: Vec<Row> = (0..20)
+            .map(|n| row(a, &n.to_string(), &format!("host-{n}"), false))
+            .collect();
+        assert_eq!(
+            choose(&[], free.clone(), 50, caps(), &HashMap::new()).len(),
+            5
+        );
+        // Two held already: three more.
+        let held = HashMap::from([(a, 2)]);
+        assert_eq!(choose(&[], free.clone(), 50, caps(), &held).len(), 3);
+        // Another workspace's mailboxes still come in.
+        let b = WorkspaceId::new();
+        let mut mixed = free;
+        mixed.push(row(b, "b", "host-b", false));
+        let chosen = choose(&[], mixed, 50, caps(), &HashMap::from([(a, 5)]));
+        assert_eq!(chosen.len(), 1);
+        assert_eq!(chosen[0].workspace, b);
     }
 
     #[test]
@@ -460,7 +548,7 @@ mod tests {
         let free: Vec<Row> = (0..5)
             .map(|n| row(WorkspaceId::new(), &n.to_string(), &n.to_string(), false))
             .collect();
-        assert_eq!(choose(&[], free, 3, caps()).len(), 3);
+        assert_eq!(choose(&[], free, 3, caps(), &HashMap::new()).len(), 3);
     }
 
     #[test]

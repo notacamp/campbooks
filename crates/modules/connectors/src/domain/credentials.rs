@@ -292,7 +292,9 @@ async fn stored_access(
     Ok(Some(opened.value))
 }
 
-/// Store the password of IMAP connection `id`, replacing what it had.
+/// Store the password of IMAP connection `id`, replacing what it had. An
+/// IDLE session signed in with the one it had is withdrawn: it ends at its
+/// holder's next renewal, and the next run offers the connection again.
 pub async fn store_password(
     conn: &mut PgConnection,
     cipher: &Cipher,
@@ -313,8 +315,9 @@ pub async fn store_password(
     .bind(workspace)
     .bind(sealed)
     .bind(now)
-    .execute(conn)
+    .execute(&mut *conn)
     .await?;
+    crate::features::imap_idle::lease::withdraw(conn, id).await?;
     Ok(())
 }
 

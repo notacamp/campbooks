@@ -110,9 +110,9 @@ pub struct ImapConfig {
     pub workspace_sessions_per_host: u32,
     /// Most folders of one mailbox read (default 200).
     pub max_folders: u32,
-    /// Sessions open at once to the IMAP host of a known provider (a fixed
-    /// IMAP host of the bundled provider database), across every process,
-    /// runs and IDLE together (default 200): the small hosts' cap
+    /// Sessions open at once to the IMAP host of a big provider (one of
+    /// [`PROVIDER_HOSTS`](crate::imap::PROVIDER_HOSTS)), across every
+    /// process, runs and IDLE together (default 200): the small hosts' cap
     /// ([`sessions_per_host`](Self::sessions_per_host)) would starve a big
     /// provider's customers.
     pub provider_sessions_per_host: u32,
@@ -121,6 +121,9 @@ pub struct ImapConfig {
     pub idle_enabled: bool,
     /// IDLE sessions one process holds at most (default 50).
     pub idle_sessions: u32,
+    /// Of those, the most one workspace's mailboxes hold (default 5), so
+    /// one workspace never fills a process's pool.
+    pub idle_sessions_per_workspace: u32,
     /// A mailbox's IDLE asks for at most one run per this many seconds
     /// (default 30), however often its server reports a change.
     pub idle_debounce_seconds: u32,
@@ -217,6 +220,7 @@ impl Default for ImapConfig {
             provider_sessions_per_host: 200,
             idle_enabled: false,
             idle_sessions: 50,
+            idle_sessions_per_workspace: 5,
             idle_debounce_seconds: 30,
             idle_refresh_minutes: 25,
             idle_quiet_days: 14,
@@ -362,6 +366,15 @@ impl ConnectorsConfig {
         }
         if imap.idle_sessions == 0 || imap.idle_sessions > 10_000 {
             return Err("CAMPBOOKS_CONNECTORS__IMAP__IDLE_SESSIONS must be 1 to 10000".to_owned());
+        }
+        if imap.idle_sessions_per_workspace == 0
+            || imap.idle_sessions_per_workspace > imap.idle_sessions
+        {
+            return Err(
+                "CAMPBOOKS_CONNECTORS__IMAP__IDLE_SESSIONS_PER_WORKSPACE must be at least 1 and \
+                 at most …__IDLE_SESSIONS"
+                    .to_owned(),
+            );
         }
         if imap.idle_debounce_seconds == 0 || imap.idle_debounce_seconds > 3_600 {
             return Err(
@@ -542,6 +555,7 @@ mod tests {
         assert_eq!(
             (
                 imap.idle_sessions,
+                imap.idle_sessions_per_workspace,
                 imap.idle_debounce_seconds,
                 imap.idle_refresh_minutes,
                 imap.idle_quiet_days,
@@ -549,7 +563,7 @@ mod tests {
                 imap.provider_sessions_per_host,
                 imap.workspace_idle_sessions_per_host,
             ),
-            (50, 30, 25, 14, 900, 200, 10)
+            (50, 5, 30, 25, 14, 900, 200, 10)
         );
         let on = ConnectorsConfig::from_figment(&figment(serde_json::json!({
             "connectors": {"imap": {"enabled": true, "idle_enabled": true, "idle_sessions": 5}}
@@ -557,8 +571,17 @@ mod tests {
         .unwrap();
         assert!(on.imap.idle_enabled);
         assert_eq!(on.imap.idle_sessions, 5);
+        assert_eq!(on.imap.idle_sessions_per_workspace, 5);
         for (bad, setting) in [
             (serde_json::json!({"idle_sessions": 0}), "IDLE_SESSIONS"),
+            (
+                serde_json::json!({"idle_sessions": 4}),
+                "IDLE_SESSIONS_PER_WORKSPACE",
+            ),
+            (
+                serde_json::json!({"idle_sessions_per_workspace": 0}),
+                "IDLE_SESSIONS_PER_WORKSPACE",
+            ),
             (
                 serde_json::json!({"idle_debounce_seconds": 0}),
                 "IDLE_DEBOUNCE_SECONDS",

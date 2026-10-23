@@ -33,6 +33,8 @@ use tokio::{
 };
 use uuid::Uuid;
 
+use campbooks_kernel::tenancy::WorkspaceId;
+
 use crate::{deps::Deps, domain::model::ConnectionId};
 
 /// How often the pool renews its leases and claims more.
@@ -60,6 +62,9 @@ pub(crate) struct Timing {
     pub give_up_after: u32,
     /// How long a given-up lease waits before any process claims it again.
     pub cooldown: Duration,
+    /// The longest one renewal or claim may take: well within a renewal
+    /// period, so the watchdog's margin holds.
+    pub db_timeout: Duration,
 }
 
 impl Timing {
@@ -75,6 +80,7 @@ impl Timing {
             backoff_max: Duration::from_mins(15),
             give_up_after: 6,
             cooldown: Duration::from_mins(30),
+            db_timeout: Duration::from_secs(20),
         }
     }
 
@@ -116,47 +122,81 @@ pub struct IdlePool {
     shared: Arc<Shared>,
 }
 
+/// One session of a pool.
+#[derive(Debug)]
+pub(crate) struct Running {
+    /// Its stop signal (closed once its task has ended).
+    stop: watch::Sender<bool>,
+    /// Its connection's workspace.
+    workspace: WorkspaceId,
+    /// Asked to stop, and still signing out.
+    stopping: bool,
+}
+
 /// The sessions a pool holds now.
 #[derive(Debug)]
 pub(crate) struct Held {
-    /// Each held connection's stop signal.
-    stops: HashMap<ConnectionId, watch::Sender<bool>>,
+    /// Each session, by its connection, until its task ends.
+    sessions: HashMap<ConnectionId, Running>,
     /// The sessions' tasks.
     tasks: JoinSet<ConnectionId>,
-    /// When the leases were last renewed.
+    /// When the last renewal that succeeded was asked for.
     renewed: Instant,
 }
 
 impl Held {
     fn new() -> Self {
         Self {
-            stops: HashMap::new(),
+            sessions: HashMap::new(),
             tasks: JoinSet::new(),
             renewed: Instant::now(),
         }
     }
 
-    /// The connections held now.
+    /// The connections held now (not stopping).
     pub(crate) fn connections(&self) -> Vec<ConnectionId> {
-        self.stops.keys().copied().collect()
+        self.sessions
+            .iter()
+            .filter(|(_, running)| !running.stopping)
+            .map(|(connection, _)| *connection)
+            .collect()
     }
 
-    /// Stop `connection`'s session.
+    /// Whether any session is held (not stopping).
+    fn holding(&self) -> bool {
+        self.sessions.values().any(|running| !running.stopping)
+    }
+
+    /// Each workspace's sessions, stopping ones included (they still hold a
+    /// connection to their server).
+    fn per_workspace(&self) -> HashMap<WorkspaceId, usize> {
+        let mut counts = HashMap::new();
+        for running in self.sessions.values() {
+            *counts.entry(running.workspace).or_default() += 1;
+        }
+        counts
+    }
+
+    /// Stop `connection`'s session; it counts until its task ends.
     fn stop(&mut self, connection: ConnectionId) {
-        if let Some(stop) = self.stops.remove(&connection) {
-            stop.send_replace(true);
+        if let Some(running) = self.sessions.get_mut(&connection) {
+            running.stopping = true;
+            running.stop.send_replace(true);
         }
     }
 
-    /// Forget the sessions that ended.
-    fn reap(&mut self) {
-        while let Some(ended) = self.tasks.try_join_next() {
-            if let Ok(connection) = ended {
-                self.stops.remove(&connection);
-            }
+    /// Stop every session.
+    fn stop_all(&mut self) {
+        for connection in self.connections() {
+            self.stop(connection);
         }
-        // A session that panicked dropped its receiver.
-        self.stops.retain(|_, stop| !stop.is_closed());
+    }
+
+    /// Forget the sessions whose task ended (however it ended: a task that
+    /// ends drops its receiver).
+    fn reap(&mut self) {
+        while self.tasks.try_join_next().is_some() {}
+        self.sessions.retain(|_, running| !running.stop.is_closed());
     }
 }
 
@@ -193,13 +233,33 @@ impl IdlePool {
     /// the leases.
     pub async fn run(self, stop: impl Future<Output = ()> + Send) {
         tracing::info!(sessions = self.size(), "holding IMAP mailboxes in IDLE");
-        let mut held = Held::new();
+        self.run_with(Held::new(), stop).await;
+    }
+
+    /// [`run`](Self::run), holding `held` already.
+    ///
+    /// Besides the renewals, a watchdog stops every session once the last
+    /// renewal that succeeded was asked for longer ago than the renewal
+    /// deadline, whatever a tick is doing: every database call is bounded
+    /// ([`Timing::db_timeout`]) and the leases outlive the deadline by a
+    /// renewal period, so no session outlives its lease.
+    pub(crate) async fn run_with(self, mut held: Held, stop: impl Future<Output = ()> + Send) {
         let mut ticks = tokio::time::interval(self.shared.timing.renew);
         ticks.set_missed_tick_behavior(MissedTickBehavior::Delay);
+        let deadline = self.shared.timing.renew_deadline();
         let mut stop = std::pin::pin!(stop);
         loop {
             tokio::select! {
+                biased;
                 () = &mut stop => break,
+                () = tokio::time::sleep_until(held.renewed + deadline), if held.holding() => {
+                    tracing::warn!(
+                        sessions = held.connections().len(),
+                        "IMAP IDLE leases not renewed in time; stopping every session"
+                    );
+                    held.stop_all();
+                    continue;
+                }
                 Some(_) = held.tasks.join_next(), if !held.tasks.is_empty() => {
                     held.reap();
                     continue;
@@ -212,17 +272,26 @@ impl IdlePool {
     }
 
     /// Renew the leases held (stopping the sessions of those lost), then
-    /// claim free ones while there is room.
+    /// claim free ones while there is room. Each database call takes at
+    /// most [`Timing::db_timeout`].
     pub(crate) async fn tick(&self, held: &mut Held) {
         held.reap();
         let db = &self.shared.state.db;
+        let bound = self.shared.timing.db_timeout;
+        // Stamped before asking: the lease runs from when the database
+        // renewed it, which is no earlier.
+        let asked_at = Instant::now();
         let connections = held.connections();
         if connections.is_empty() {
-            held.renewed = Instant::now();
+            held.renewed = asked_at;
         } else {
-            match lease::renew(db, self.shared.holder, &connections).await {
+            let renewed =
+                tokio::time::timeout(bound, lease::renew(db, self.shared.holder, &connections))
+                    .await
+                    .unwrap_or_else(|_| Err(campbooks_kernel::Error::internal("timed out")));
+            match renewed {
                 Ok(kept) => {
-                    held.renewed = Instant::now();
+                    held.renewed = asked_at;
                     let lost: Vec<ConnectionId> = connections
                         .into_iter()
                         .filter(|connection| !kept.contains(connection))
@@ -242,27 +311,39 @@ impl IdlePool {
                     if held.renewed.elapsed() >= self.shared.timing.renew_deadline() {
                         // Another process may claim them soon: stop first.
                         tracing::warn!(
-                            sessions = held.stops.len(),
+                            sessions = held.connections().len(),
                             "IMAP IDLE leases not renewed in time; stopping every session"
                         );
-                        for connection in held.connections() {
-                            held.stop(connection);
-                        }
+                        held.stop_all();
                     }
                     return;
                 }
             }
         }
-        let room = self.size().saturating_sub(held.stops.len());
+        // Sessions still signing out count: they hold a connection still.
+        let room = self.size().saturating_sub(held.sessions.len());
         let caps = lease::Caps::of(&self.shared.deps.imap.config);
-        match lease::claim(db, self.shared.holder, room, caps).await {
+        let claimed = tokio::time::timeout(
+            bound,
+            lease::claim(db, self.shared.holder, room, caps, &held.per_workspace()),
+        )
+        .await
+        .unwrap_or_else(|_| Err(campbooks_kernel::Error::internal("timed out")));
+        match claimed {
             Ok(claimed) => {
                 if !claimed.is_empty() {
                     tracing::info!(claimed = claimed.len(), "IMAP IDLE leases claimed");
                 }
                 for row in claimed {
                     let (stop, stopped) = watch::channel(false);
-                    held.stops.insert(row.connection, stop);
+                    held.sessions.insert(
+                        row.connection,
+                        Running {
+                            stop,
+                            workspace: row.workspace,
+                            stopping: false,
+                        },
+                    );
                     held.tasks
                         .spawn(hold::hold(Arc::clone(&self.shared), row, stopped));
                 }
@@ -277,9 +358,7 @@ impl IdlePool {
     /// Stop every session, give them [`SHUTDOWN_GRACE`] to sign out, and
     /// release the leases.
     pub(crate) async fn shutdown(&self, mut held: Held) {
-        for connection in held.connections() {
-            held.stop(connection);
-        }
+        held.stop_all();
         let ended = tokio::time::timeout(SHUTDOWN_GRACE, async {
             while held.tasks.join_next().await.is_some() {}
         })

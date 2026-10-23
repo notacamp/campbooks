@@ -5,8 +5,10 @@ When `CAMPBOOKS_CONNECTORS__IMAP__ENABLED` and
 `CAMPBOOKS_CONNECTORS__IMAP__IDLE_ENABLED` are both on (both default off),
 each process that runs sync jobs SHALL hold at most
 `CAMPBOOKS_CONNECTORS__IMAP__IDLE_SESSIONS` (default 50) IDLE sessions
-(RFC 2177) on the Inbox of IMAP mailboxes, and SHALL hold no database
-connection while a session waits. An `EXISTS`, `EXPUNGE`, `FETCH` or
+(RFC 2177) on the Inbox of IMAP mailboxes, of which one workspace's
+mailboxes SHALL hold at most
+`CAMPBOOKS_CONNECTORS__IMAP__IDLE_SESSIONS_PER_WORKSPACE` (default 5), and
+SHALL hold no database connection while a session waits. An `EXISTS`, `EXPUNGE`, `FETCH` or
 `VANISHED` the server sends in IDLE SHALL ask the stream's schedule for a run
 now, collapsing into a run already pending, at most once per
 `CAMPBOOKS_CONNECTORS__IMAP__IDLE_DEBOUNCE_SECONDS` (default 30) per stream,
@@ -27,6 +29,10 @@ most 29).
 - **WHEN** a session has been in IDLE for the refresh window
 - **THEN** it sends `DONE`, `NOOP` and `IDLE` again on the same connection
 
+#### Scenario: One workspace's share of a pool
+- **WHEN** one workspace has more mailboxes that may IDLE than its share of a process's sessions, each on a host of its own
+- **THEN** that process holds at most its share of them, and other workspaces' mailboxes still get sessions
+
 #### Scenario: IDLE is off by default
 - **WHEN** an instance reads IMAP mailboxes with `CAMPBOOKS_CONNECTORS__IMAP__IDLE_ENABLED` unset
 - **THEN** no IDLE session is opened and every mailbox is polled
@@ -34,10 +40,13 @@ most 29).
 ### Requirement: One IDLE holder per connection
 An IMAP connection SHALL be held in IDLE by at most one process at a time,
 through a lease renewed about every minute that expires after three
-minutes. A session whose lease is lost, expired or withdrawn SHALL stop;
-a process that cannot renew its leases for two minutes SHALL stop every
-session it holds; a process that shuts down cleanly SHALL release its
-leases.
+minutes. A session whose lease is lost, expired or withdrawn SHALL stop.
+Every renewal and claim SHALL take a bounded time, and a process SHALL stop
+every session it holds once two minutes have passed since it asked for its
+last renewal that succeeded, whatever else it is doing. A process that
+shuts down cleanly SHALL release its leases. A claim SHALL look at the
+claimable leases longest unlooked-at first, so that leases passed over at
+their caps never keep the others from being claimed.
 
 #### Scenario: Two processes
 - **WHEN** two processes claim IDLE sessions for the same connection
@@ -47,9 +56,38 @@ leases.
 - **WHEN** a session's lease expires or is taken while it is in IDLE
 - **THEN** the session stops at the holder's next renewal and another process may claim the connection
 
+#### Scenario: A database that hangs
+- **WHEN** every renewal of a process's leases hangs
+- **THEN** its sessions stop two minutes after its last renewal that succeeded, before its leases can expire
+
+#### Scenario: Mailboxes at their caps
+- **WHEN** hundreds of mailboxes wait on a host whose IDLE sessions are all held, and one mailbox on another host may IDLE
+- **THEN** the other mailbox is claimed within a few claims
+
 #### Scenario: Shutdown
 - **WHEN** a process holding IDLE sessions shuts down cleanly
 - **THEN** its sessions end and its leases are released for another process to claim
+
+### Requirement: Cutting access ends an IDLE session
+An IDLE session SHALL end, with `DONE` and `LOGOUT`, within a renewal of
+its lease once its connection needs the member, its stream is paused, its
+password is replaced or its connection is removed. A connection that needs
+the member, a replaced password and a removal SHALL withdraw its lease in
+the same transaction; a session SHALL check at every refresh of IDLE, and
+whenever it asks for a run, that its stream is not paused, its connection
+does not need the member, its lease is still offered and still its own.
+
+#### Scenario: Paused during IDLE
+- **WHEN** a mailbox's stream is paused while its session is in IDLE
+- **THEN** the session ends at its next refresh and its lease is withdrawn
+
+#### Scenario: Needs the member during IDLE
+- **WHEN** a sync run sets the connection to `needs_reauth` while its session is in IDLE
+- **THEN** its lease is withdrawn and the session ends at its holder's next renewal
+
+#### Scenario: A new password during IDLE
+- **WHEN** the member connects the mailbox again with a new password while a session signed in with the old one is in IDLE
+- **THEN** that session ends at its holder's next renewal, and the next run offers the mailbox again
 
 ### Requirement: IDLE sessions reconnect safely
 An IDLE session that ends with an error SHALL reconnect after an
@@ -60,7 +98,11 @@ than the sign-in. A password the server refuses SHALL count towards the
 same three consecutive refusals as sync runs; a server answering
 `UNAVAILABLE`, `INUSE` or `LIMIT` SHALL only back off. After six failures
 in a row the lease SHALL be given up for a cooldown, the stream still
-polled.
+polled; a lease withdrawn and offered again SHALL keep its cooldown.
+
+#### Scenario: A cooldown survives a withdrawal
+- **WHEN** a given-up lease is withdrawn and offered again before its cooldown ends
+- **THEN** no process claims it before the cooldown ends
 
 #### Scenario: The host now resolves to a private address
 - **WHEN** a session reconnects and the host's name now resolves to an address the guard refuses
@@ -97,7 +139,8 @@ session's bounded framer, at most 64 KiB a response, 1,000 responses and
 1 MiB per IDLE period; past those the session SHALL be dropped and back off.
 A session that gets no tagged answer within the command timeout of a
 refresh SHALL be dropped. Logs SHALL carry ids, stable codes and counts,
-never what the server said.
+never what the server said; a server's response code SHALL be logged only
+when it is one of RFC 3501's or RFC 5530's, and as `other` otherwise.
 
 #### Scenario: A server repeating EXISTS
 - **WHEN** the server sends `EXISTS` without end during IDLE
@@ -119,8 +162,9 @@ holder and times.
 ### Requirement: IMAP sessions are bounded and failures are classified
 A sync run SHALL use one session, through the host guard and TLS of
 `imap-connection`. Sessions SHALL be capped per IMAP host across all
-processes, IDLE sessions included: a host that is not a fixed IMAP host of
-the bundled ISPDB SHALL see at most
+processes, IDLE sessions included: a host that is not one of the big
+providers' IMAP hosts Campbooks lists by name, matched exactly, SHALL see at
+most
 `CAMPBOOKS_CONNECTORS__IMAP__SESSIONS_PER_HOST` (default 4) sessions, and a
 known provider's host at most
 `CAMPBOOKS_CONNECTORS__IMAP__PROVIDER_SESSIONS_PER_HOST` (default 200). Of a

@@ -32,13 +32,19 @@ the stream dispatcher, through the lease table's own maintenance policies).
 ## What Changes
 
 - **IDLE on the Inbox.** Each process that runs sync keeps a bounded pool of
-  IDLE sessions (`CAMPBOOKS_CONNECTORS__IMAP__IDLE_SESSIONS`), behind its own
+  IDLE sessions (`CAMPBOOKS_CONNECTORS__IMAP__IDLE_SESSIONS`, at most
+  `…__IDLE_SESSIONS_PER_WORKSPACE` of them for one workspace), behind its own
   flag `CAMPBOOKS_CONNECTORS__IMAP__IDLE_ENABLED` (off), on top of
   `CAMPBOOKS_CONNECTORS__IMAP__ENABLED` (off).
 - **One holder per connection**, through a lease row renewed every minute
   that expires after three, released on a clean shutdown; a session whose
-  lease is lost stops. No database connection is held while a session
-  waits.
+  lease is lost stops, and a watchdog stops them all before their leases can
+  expire when the database stops answering. No database connection is held
+  while a session waits.
+- **Cutting access ends the session**: `needs_reauth`, a new password and
+  removal withdraw the lease at once; a session re-checks at every refresh
+  and on every change that it may still IDLE (not paused, not needing the
+  member).
 - **What the server reports in IDLE** (`EXISTS`, `EXPUNGE`, `FETCH`,
   `VANISHED`) asks the stream's existing schedule for a run now, at most once
   per `CAMPBOOKS_CONNECTORS__IMAP__IDLE_DEBOUNCE_SECONDS` (30): a server
@@ -58,7 +64,8 @@ the stream dispatcher, through the lease table's own maintenance policies).
 - **Session caps for long sessions**: one IDLE session per mailbox login;
   on a host Campbooks does not know as a big provider, IDLE takes at most
   half of the host's sessions and of a workspace's share of it, and the runs
-  keep the rest; on a known provider (an IMAP host of the bundled ISPDB) a
+  keep the rest; on a known provider (one of a short list of big providers' IMAP hosts,
+  matched exactly) a
   workspace holds at most `CAMPBOOKS_CONNECTORS__IMAP__WORKSPACE_IDLE_SESSIONS_PER_HOST`
   (10).
 - **#311's run caps revisited**: the per-host cap of

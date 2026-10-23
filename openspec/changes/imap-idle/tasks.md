@@ -23,6 +23,14 @@
 - [ ] 4.1 After a run: offer or withdraw the lease (IDLE offered by the server, changed within the quiet days); the safety poll while held
 - [ ] 4.2 Run caps: known providers take `PROVIDER_SESSIONS_PER_HOST`; a run needs a slot beyond the live IDLE sessions (host, and workspace on small hosts)
 
+## 4b. Security review (PR #641)
+- [ ] 4b.1 Cutting access ends a session: `health::needs_reauth` and `credentials::store_password` withdraw the lease; a session re-checks (paused, needs the member, IDLE, offered, still held) at every refresh and on every ask
+- [ ] 4b.2 The claim reads longest unlooked-at first and stamps what it read (`considered_at`); logins held anywhere are left out in SQL
+- [ ] 4b.3 `IDLE_SESSIONS_PER_WORKSPACE` (5): one workspace's share of a pool
+- [ ] 4b.4 Watchdog beside the ticks; renewals and claims bounded (20 s); renewal time taken before asking
+- [ ] 4b.5 Room counts sessions still signing out; a withdrawn row is kept (`offered = false`) so its cooldown survives
+- [ ] 4b.6 Only RFC 3501 / RFC 5530 response codes logged; known providers a short curated list; composite foreign keys
+
 ## 5. Tests
 - [ ] 5.1 The fake IMAP server offers IDLE: pushes `EXISTS`/`EXPUNGE`/`FETCH` as its mailbox changes, can flood, hang up, and counts `IDLE`, `DONE` and `NOOP`
 - [ ] 5.2 One test per scenario of the spec delta, plus the caps' choice, the debounce, the backoff and the settings

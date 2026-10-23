@@ -218,17 +218,20 @@ async fn idle(
         let refresh_at = Instant::now() + shared.timing.refresh;
         let mut responses = 0_usize;
         let mut bytes = 0_usize;
-        let stopping = loop {
+        let next = loop {
             let wake = debounce.due().map_or(refresh_at, |due| due.min(refresh_at));
             match session.idle_wait(wake, stopped(stop)).await {
                 Err(err) => return (failed(err.code(), idled), false),
-                Ok(IdleWait::Stopped) => break true,
+                Ok(IdleWait::Stopped) => break Next::Stop,
                 Ok(IdleWait::TimedOut) => {
                     if debounce.take_due(Instant::now()) {
-                        ask(shared, row).await;
+                        match ask(shared, row).await {
+                            Standing::Eligible => {}
+                            standing => break Next::End(standing),
+                        }
                     }
                     if Instant::now() >= refresh_at {
-                        break false;
+                        break Next::Refresh;
                     }
                 }
                 Ok(IdleWait::Ready) => match session.idle_read(MAX_RESPONSE).await {
@@ -245,7 +248,10 @@ async fn idle(
                             return (failed("imap_idle_flood", false), false);
                         }
                         if heard == Heard::Changed && debounce.heard(Instant::now()) {
-                            ask(shared, row).await;
+                            match ask(shared, row).await {
+                                Standing::Eligible => {}
+                                standing => break Next::End(standing),
+                            }
                         }
                     }
                 },
@@ -261,8 +267,15 @@ async fn idle(
             Ok(_) => return (failed("imap_refused", idled), true),
             Err(err) => return (failed(err.code(), idled), false),
         }
-        if stopping {
-            return (Ended::Stopped, true);
+        match next {
+            Next::Stop => return (Ended::Stopped, true),
+            Next::End(standing) => return (standing.ended(), true),
+            // Access may have been cut since (paused, needs the member, a new
+            // password, the lease lost): never IDLE past a renewal for it.
+            Next::Refresh => match standing(shared, row).await {
+                Ok(Standing::Eligible) | Err(_) => {}
+                Ok(standing) => return (standing.ended(), true),
+            },
         }
         // The keepalive: traffic both ways, and a tagged answer that proves
         // the server is still there.
@@ -275,9 +288,80 @@ async fn idle(
             Err(err) => return (failed(err.code(), idled), false),
         }
         if changed && debounce.heard(Instant::now()) {
-            ask(shared, row).await;
+            match ask(shared, row).await {
+                Standing::Eligible => {}
+                standing => return (standing.ended(), true),
+            }
         }
     }
+}
+
+/// What an IDLE period ended with.
+enum Next {
+    /// The pool asked the session to stop.
+    Stop,
+    /// Time to renew IDLE.
+    Refresh,
+    /// The connection may no longer be held (found when asking for a run).
+    End(Standing),
+}
+
+/// Whether a held connection may still be held in IDLE.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Standing {
+    /// Yes.
+    Eligible,
+    /// No: paused, waiting for the member, its server without IDLE, or its
+    /// row withdrawn (a new password, a quiet mailbox).
+    Ineligible,
+    /// This process no longer holds its lease (another may).
+    Lost,
+}
+
+impl Standing {
+    /// How a session that finds it so ends.
+    const fn ended(self) -> Ended {
+        match self {
+            Self::Eligible | Self::Lost => Ended::Stopped,
+            Self::Ineligible => Ended::Withdrawn("imap_idle_not_eligible"),
+        }
+    }
+}
+
+/// In the connection's workspace: whether `row` may still be held in IDLE
+/// by this process.
+async fn standing(shared: &Shared, row: &Row) -> campbooks_kernel::Result<Standing> {
+    let mut tx = shared.state.db.begin_for(row.workspace).await?;
+    let standing = standing_in(&mut tx, shared, row).await?;
+    tx.commit().await?;
+    Ok(standing)
+}
+
+/// [`standing`], in `conn` (the connection's workspace).
+async fn standing_in(
+    conn: &mut sqlx::PgConnection,
+    shared: &Shared,
+    row: &Row,
+) -> campbooks_kernel::Result<Standing> {
+    let found: Option<(bool, bool)> = sqlx::query_as(
+        "SELECT NOT s.paused AND c.health <> 'needs_reauth'
+                    AND coalesce((s.cursor->>'idle')::boolean, true) AND l.offered,
+                coalesce(l.holder = $3, false)
+           FROM connectors.streams s
+           JOIN connectors.connections c ON c.id = s.connection_id
+           JOIN connectors.imap_idle_leases l ON l.connection_id = c.id
+          WHERE s.id = $1 AND c.id = $2",
+    )
+    .bind(row.stream)
+    .bind(row.connection)
+    .bind(shared.holder)
+    .fetch_optional(conn)
+    .await?;
+    Ok(match found {
+        None | Some((false, _)) => Standing::Ineligible,
+        Some((true, false)) => Standing::Lost,
+        Some((true, true)) => Standing::Eligible,
+    })
 }
 
 /// In the connection's workspace: its stream (not paused), its connection
@@ -321,38 +405,36 @@ async fn load(shared: &Shared, row: &Row) -> campbooks_kernel::Result<Option<Tar
     }))
 }
 
-/// Ask for a run of `row`'s stream now, in its workspace, unless it is
-/// paused or waits for the member: a run already pending absorbs it.
-async fn ask(shared: &Shared, row: &Row) {
+/// Ask for a run of `row`'s stream now, in its workspace, while it may
+/// still be held in IDLE: a run already pending absorbs it. Whether it may
+/// (on a database error, as if it may: the renewal settles it).
+async fn ask(shared: &Shared, row: &Row) -> Standing {
     shared.asked.fetch_add(1, Ordering::Relaxed);
     let now = shared.deps.clock.now();
     let asked = async {
         let mut tx = shared.state.db.begin_for(row.workspace).await?;
-        let runnable: Option<bool> = sqlx::query_scalar(
-            "SELECT NOT s.paused AND c.health <> 'needs_reauth'
-               FROM connectors.streams s JOIN connectors.connections c ON c.id = s.connection_id
-              WHERE s.id = $1",
-        )
-        .bind(row.stream)
-        .fetch_optional(&mut *tx)
-        .await?;
-        if runnable == Some(true) {
+        let standing = standing_in(&mut tx, shared, row).await?;
+        if standing == Standing::Eligible {
             schedule::run_now(&mut tx, row.workspace, row.stream, now).await?;
         }
         tx.commit().await?;
-        Ok::<(), campbooks_kernel::Error>(())
+        Ok::<Standing, campbooks_kernel::Error>(standing)
     };
-    if let Err(err) = asked.await {
-        tracing::warn!(
-            stream = %row.stream,
-            error = %campbooks_kernel::redact::error(&err),
-            "could not ask for a run after IMAP IDLE"
-        );
+    match asked.await {
+        Ok(standing) => standing,
+        Err(err) => {
+            tracing::warn!(
+                stream = %row.stream,
+                error = %campbooks_kernel::redact::error(&err),
+                "could not ask for a run after IMAP IDLE"
+            );
+            Standing::Eligible
+        }
     }
 }
 
 /// The server refused the password: count it with the sync runs' refusals;
-/// the last one allowed sets `needs_reauth` and withdraws the row.
+/// the last one allowed sets `needs_reauth` (which withdraws the row).
 async fn refused(shared: &Shared, row: &Row, granted_by: UserId) -> Ended {
     let now = shared.deps.clock.now();
     let counted = async {
@@ -370,7 +452,6 @@ async fn refused(shared: &Shared, row: &Row, granted_by: UserId) -> Ended {
                 now,
             )
             .await?;
-            lease::withdraw(&mut tx, row.connection).await?;
         }
         tx.commit().await?;
         Ok::<bool, campbooks_kernel::Error>(reauth)

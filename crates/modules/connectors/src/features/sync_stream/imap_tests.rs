@@ -1041,6 +1041,7 @@ async fn idle_sessions_count_against_a_small_hosts_sessions(db: PgPool) {
             backoff_max: std::time::Duration::from_millis(40),
             give_up_after: 3,
             cooldown: std::time::Duration::from_mins(30),
+            db_timeout: std::time::Duration::from_secs(20),
         },
     );
     let mut held = crate::features::imap_idle::IdlePool::held();

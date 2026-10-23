@@ -76,7 +76,8 @@ pub async fn count_login_refusal(
 }
 
 /// The grant stopped working: `needs_reauth`, every stream paused and off
-/// the schedule, and [`ConnectionNeedsReauth`] published once.
+/// the schedule, its IDLE lease withdrawn, and [`ConnectionNeedsReauth`]
+/// published once.
 pub async fn needs_reauth(
     tx: &mut Transaction<'_, Postgres>,
     events: &EventBus,
@@ -106,6 +107,8 @@ pub async fn needs_reauth(
     for stream in streams {
         schedule::unschedule(tx, stream).await?;
     }
+    // An IDLE session on it ends at its holder's next renewal.
+    crate::features::imap_idle::lease::withdraw(tx, connection).await?;
     if !already {
         events
             .publish(

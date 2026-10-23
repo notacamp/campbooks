@@ -284,11 +284,38 @@ impl Imap {
     }
 }
 
-/// Whether `host` is a known provider's IMAP host (a fixed IMAP host of the
-/// bundled provider database), whose sessions are capped as a provider's
-/// rather than as a small server's.
+/// The IMAP hosts of the big mail providers, which serve millions of
+/// mailboxes each: their sessions are capped as a provider's rather than as
+/// a small server's. A short list kept by hand, matched exactly: every other
+/// host (a small ISP, a hosting company, a self-hosted server) keeps the
+/// small hosts' caps, which protect it.
+pub const PROVIDER_HOSTS: [&str; 20] = [
+    "export.imap.mail.yahoo.com",
+    "imap-mail.outlook.com",
+    "imap.aol.com",
+    "imap.fastmail.com",
+    "imap.gmail.com",
+    "imap.gmx.com",
+    "imap.gmx.net",
+    "imap.googlemail.com",
+    "imap.mail.com",
+    "imap.mail.me.com",
+    "imap.mail.ru",
+    "imap.mail.yahoo.com",
+    "imap.web.de",
+    "imap.yandex.com",
+    "imap.yandex.ru",
+    "imap.zoho.com",
+    "imap.zoho.eu",
+    "imap.zoho.in",
+    "outlook.office365.com",
+    "imap.mail.yahoo.co.jp",
+];
+
+/// Whether `host` is one of [`PROVIDER_HOSTS`].
 pub fn is_provider_host(host: &str) -> bool {
-    ispdb::is_provider_host(host)
+    let host = host.trim_end_matches('.').to_ascii_lowercase();
+    PROVIDER_HOSTS.contains(&host.as_str())
 }
 
 /// Sign in to `servers` as `username` with `password`: the IMAP server (and
@@ -344,6 +371,23 @@ mod tests {
         for bad in ["", "imap example.com", "user@imap.example.com", "imap/x"] {
             assert!(server(bad).normalized().is_none(), "{bad}");
         }
+    }
+
+    #[test]
+    fn known_providers_are_a_short_list_matched_exactly() {
+        assert!(is_provider_host("imap.mail.yahoo.com"));
+        assert!(is_provider_host("IMAP.mail.me.com."));
+        assert!(!is_provider_host("smtp.mail.yahoo.com"));
+        assert!(!is_provider_host("imap.mail.yahoo.com.example.com"));
+        assert!(!is_provider_host("evil.imap.gmail.com"));
+        assert!(!is_provider_host("imap.example.com"));
+        // A small ISP of the bundled database keeps the small hosts' caps.
+        assert!(!is_provider_host("imap.bakery-isp.example"));
+        assert!(
+            PROVIDER_HOSTS
+                .iter()
+                .all(|host| guard::is_host_name(host) && *host == host.to_ascii_lowercase())
+        );
     }
 
     #[test]

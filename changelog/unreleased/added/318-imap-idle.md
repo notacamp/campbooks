@@ -3,9 +3,11 @@
   arrived, was deleted or changed, at most once every 30 seconds per mailbox however chatty
   the server is; the mailbox is still polled now and then for its other folders. Mailboxes
   whose server has no IDLE, and mailboxes quiet for two weeks, are polled as before. Each
-  mailbox is held by one worker at a time, a changed password still asks the member to connect
-  again after three refusals, and a server that misbehaves is dropped and retried later. Big
-  providers' mail servers (from the bundled provider database) are no longer limited to four
-  Campbooks sessions shared by every customer (`CAMPBOOKS_CONNECTORS__IMAP__PROVIDER_SESSIONS_PER_HOST`,
-  200). Off by default (`CAMPBOOKS_CONNECTORS__IMAP__IDLE_ENABLED`, on top of
-  `CAMPBOOKS_CONNECTORS__IMAP__ENABLED`).
+  mailbox is held by one worker at a time, and one workspace holds at most five of a worker's
+  sessions. Pausing a mailbox, a new password or a connection that needs the member ends its
+  session within a minute; a changed password still asks the member to connect again after
+  three refusals, and a server that misbehaves is dropped and retried later. Big providers'
+  mail servers (Gmail, Outlook, Yahoo, iCloud, Fastmail, GMX and a few others) are no longer
+  limited to four Campbooks sessions shared by every customer
+  (`CAMPBOOKS_CONNECTORS__IMAP__PROVIDER_SESSIONS_PER_HOST`, 200). Off by default
+  (`CAMPBOOKS_CONNECTORS__IMAP__IDLE_ENABLED`, on top of `CAMPBOOKS_CONNECTORS__IMAP__ENABLED`).

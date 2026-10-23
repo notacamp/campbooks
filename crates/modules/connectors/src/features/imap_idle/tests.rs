@@ -8,7 +8,10 @@
 use std::time::Duration;
 
 use axum::http::StatusCode;
+use std::collections::HashMap;
+
 use campbooks_kernel::{
+    AppState,
     clock::Clock as _,
     db::BeginFor as _,
     tenancy::{Role, WorkspaceId},
@@ -19,9 +22,11 @@ use sqlx::PgPool;
 use tokio::time::Instant;
 use uuid::Uuid;
 
-use super::{Held, IdlePool, Timing, lease};
+use super::{Held, IdlePool, Running, Timing, lease};
 use crate::{
     config::ImapConfig,
+    deps::Deps,
+    domain::model::ConnectionId,
     testkit::{Caller, Kit},
     testkit_imap::{self, FakeServer, Fakes, IMAP_HOST},
 };
@@ -113,6 +118,7 @@ fn timing() -> Timing {
         backoff_max: Duration::from_millis(40),
         give_up_after: 3,
         cooldown: Duration::from_mins(30),
+        db_timeout: Duration::from_secs(20),
     }
 }
 
@@ -141,11 +147,12 @@ impl Mailbox {
             .unwrap()
     }
 
-    /// The lease rows: holder, and whether live.
+    /// The lease rows offered (withdrawn ones are kept, unheld, for their
+    /// cooldown): holder, and whether live.
     async fn leases(&self) -> Vec<(Option<Uuid>, bool)> {
         sqlx::query_as(
             "SELECT holder, coalesce(holder IS NOT NULL AND expires_at > now(), false)
-               FROM connectors.imap_idle_leases ORDER BY connection_id",
+               FROM connectors.imap_idle_leases WHERE offered ORDER BY connection_id",
         )
         .fetch_all(&self.kit.db)
         .await
@@ -544,5 +551,257 @@ async fn leases_are_seen_only_by_their_workspace(db: PgPool) {
         keys.1,
         lease::host_key(&m.kit.state.signer, IMAP_HOST),
         "keyed by the instance"
+    );
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn pausing_a_mailbox_ends_its_session_at_the_next_refresh(db: PgPool) {
+    let m = mailbox(db, true, |_| {}).await;
+    let (pool, held) = m
+        .idling(Timing {
+            refresh: Duration::from_millis(200),
+            ..timing()
+        })
+        .await;
+    let logouts = m.imap.seen().logouts;
+    sqlx::query("UPDATE connectors.streams SET paused = true")
+        .execute(&m.kit.db)
+        .await
+        .unwrap();
+    until("the session to leave", async || {
+        m.imap.seen().logouts > logouts && m.leases().await.is_empty()
+    })
+    .await;
+    assert!(m.imap.seen().dones >= 1, "IDLE ended first");
+    pool.shutdown(held).await;
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_connection_that_needs_the_member_ends_its_session(db: PgPool) {
+    let m = mailbox(db, true, |_| {}).await;
+    let (pool, mut held) = m.idling(timing()).await;
+    // Two refusals already; the next run is refused too: needs_reauth.
+    sqlx::query(
+        "UPDATE connectors.streams SET cursor = jsonb_set(cursor, '{login_refusals}', '2')",
+    )
+    .execute(&m.kit.db)
+    .await
+    .unwrap();
+    m.imap.set_password("changed-at-the-provider");
+    m.kit.next_run().await;
+    assert_eq!(m.health().await, "needs_reauth");
+    assert!(m.leases().await.is_empty(), "withdrawn with the health");
+    let logouts = m.imap.seen().logouts;
+    pool.tick(&mut held).await;
+    assert!(held.connections().is_empty(), "the lease is lost");
+    until("the session to leave", async || {
+        m.imap.seen().logouts > logouts
+    })
+    .await;
+    pool.shutdown(held).await;
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_new_password_ends_the_session_signed_in_with_the_old_one(db: PgPool) {
+    let m = mailbox(db, true, |_| {}).await;
+    let (pool, mut held) = m.idling(timing()).await;
+    let connection: Uuid = sqlx::query_scalar("SELECT id FROM connectors.connections")
+        .fetch_one(&m.kit.db)
+        .await
+        .unwrap();
+    m.imap.set_password("new");
+    m.smtp.set_password("new");
+    let servers = crate::imap::Servers {
+        imap: m.imap.at(IMAP_HOST),
+        smtp: m.smtp.at(testkit_imap::SMTP_HOST),
+    };
+    let reconnected = m
+        .kit
+        .post(
+            &m.ana,
+            &format!("/api/v1/w/{}/connections/imap", m.ws),
+            serde_json::json!({
+                "address": "ana@bakery.example",
+                "password": "new",
+                "servers": servers,
+                "connection": connection,
+            }),
+        )
+        .await;
+    assert_eq!(
+        reconnected.status,
+        StatusCode::CREATED,
+        "{:?}",
+        reconnected.json
+    );
+    assert!(
+        m.leases().await.is_empty(),
+        "withdrawn with the old password"
+    );
+    let logouts = m.imap.seen().logouts;
+    pool.tick(&mut held).await;
+    assert!(held.connections().is_empty());
+    until("the old session to leave", async || {
+        m.imap.seen().logouts > logouts
+    })
+    .await;
+    // The next run offers it again (claimable once the old lease's time is
+    // up, so the old holder has certainly stopped).
+    m.kit.run_jobs().await;
+    assert_eq!(m.leases().await, [(None, false)]);
+    pool.shutdown(held).await;
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn mailboxes_at_their_caps_never_hide_the_others(db: PgPool) {
+    let m = mailbox(db, true, |_| {}).await;
+    let app = testing::app_role_pool(&m.kit.db).await;
+    // A small host with its two IDLE sessions held, and 600 more mailboxes
+    // on it waiting: every one is passed over at the host's cap.
+    for statement in [
+        "INSERT INTO connectors.connections
+             (id, workspace_id, provider, account_subject, address, granted_by)
+         SELECT md5('c' || i)::uuid, md5('w' || i)::uuid, 'imap', 'x' || i,
+                'x' || i || '@example.org', md5('u' || i)::uuid
+           FROM generate_series(1, 602) AS i",
+        "INSERT INTO connectors.streams
+             (id, workspace_id, connection_id, capability, phase, interval_seconds)
+         SELECT md5('s' || i)::uuid, md5('w' || i)::uuid, md5('c' || i)::uuid, 'messages',
+                'incremental', 60
+           FROM generate_series(1, 602) AS i",
+        "INSERT INTO connectors.imap_idle_leases
+             (connection_id, workspace_id, stream_id, login_key, host_key, provider_host,
+              holder, expires_at)
+         SELECT md5('c' || i)::uuid, md5('w' || i)::uuid, md5('s' || i)::uuid,
+                lpad(to_hex(i), 32, '0'), repeat('a', 32), false,
+                CASE WHEN i <= 2 THEN md5('h' || i)::uuid END,
+                CASE WHEN i <= 2 THEN now() + interval '1 hour' END
+           FROM generate_series(1, 602) AS i",
+    ] {
+        sqlx::query(statement).execute(&m.kit.db).await.unwrap();
+    }
+    // Ana's mailbox was looked at before: it is at the back of the queue.
+    sqlx::query(
+        "UPDATE connectors.imap_idle_leases SET considered_at = now() - interval '1 minute'
+          WHERE host_key <> repeat('a', 32)",
+    )
+    .execute(&m.kit.db)
+    .await
+    .unwrap();
+    let caps = lease::Caps::of(&m.kit.deps.imap.config);
+    let holder = Uuid::now_v7();
+    let mut claimed = Vec::new();
+    for _ in 0..3 {
+        claimed = lease::claim(&app, holder, 10, caps, &HashMap::new())
+            .await
+            .unwrap();
+        if !claimed.is_empty() {
+            break;
+        }
+    }
+    assert_eq!(claimed.len(), 1, "claimed within a few rounds");
+    assert_eq!(claimed[0].workspace, m.ws);
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_withdrawn_mailbox_offered_again_keeps_its_cooldown(db: PgPool) {
+    let m = mailbox(db, true, |_| {}).await;
+    // Given up a while ago: it waits half an hour.
+    sqlx::query(
+        "UPDATE connectors.imap_idle_leases SET expires_at = now() + interval '30 minutes'",
+    )
+    .execute(&m.kit.db)
+    .await
+    .unwrap();
+    let (connection, stream): (ConnectionId, crate::domain::model::StreamId) =
+        sqlx::query_as("SELECT connection_id, stream_id FROM connectors.imap_idle_leases")
+            .fetch_one(&m.kit.db)
+            .await
+            .unwrap();
+    let app = testing::app_role_pool(&m.kit.db).await;
+    let signer = &m.kit.state.signer;
+    let offer = lease::Offer {
+        login_key: lease::login_key(signer, "ana@bakery.example", IMAP_HOST),
+        host_key: lease::host_key(signer, IMAP_HOST),
+        provider_host: false,
+        capable: true,
+    };
+    let mut tx = app.begin_for(m.ws).await.unwrap();
+    lease::withdraw(&mut tx, connection).await.unwrap();
+    let held = lease::offer(
+        &mut tx,
+        m.ws,
+        connection,
+        stream,
+        &offer,
+        m.kit.clock.now() - TimeDelta::days(14),
+    )
+    .await
+    .unwrap();
+    tx.commit().await.unwrap();
+    assert!(!held);
+    assert_eq!(m.leases().await, [(None, false)], "offered again");
+    let cooling = m
+        .count(
+            "SELECT count(*) FROM connectors.imap_idle_leases
+              WHERE expires_at > now() + interval '20 minutes'",
+        )
+        .await;
+    assert_eq!(cooling, 1, "the cooldown survived");
+    let caps = lease::Caps::of(&m.kit.deps.imap.config);
+    let claimed = lease::claim(&app, Uuid::now_v7(), 10, caps, &HashMap::new())
+        .await
+        .unwrap();
+    assert!(claimed.is_empty());
+}
+
+#[tokio::test(start_paused = true)]
+async fn sessions_stop_before_their_leases_can_expire_when_the_database_hangs() {
+    // A database that accepts connections and never answers.
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let address = listener.local_addr().unwrap();
+    tokio::spawn(async move {
+        let mut open = Vec::new();
+        while let Ok((socket, _)) = listener.accept().await {
+            open.push(socket);
+        }
+    });
+    let db = sqlx::postgres::PgPoolOptions::new()
+        .acquire_timeout(Duration::from_hours(1))
+        .connect_lazy(&format!("postgres://campbooks@{address}/campbooks"))
+        .unwrap();
+    let state = AppState::new(
+        db,
+        testing::config("postgres://campbooks@localhost/campbooks"),
+    );
+    let pool = IdlePool::with_timing(Deps::default(), state, timing());
+    // One session held, its lease renewed when the pool started.
+    let mut held = IdlePool::held();
+    let started = Instant::now();
+    let (stop, mut stopped) = tokio::sync::watch::channel(false);
+    let connection = ConnectionId::new();
+    held.sessions.insert(
+        connection,
+        Running {
+            stop,
+            workspace: WorkspaceId::new(),
+            stopping: false,
+        },
+    );
+    let (told, heard) = tokio::sync::oneshot::channel();
+    held.tasks.spawn(async move {
+        let _ = stopped.wait_for(|stop| *stop).await;
+        let _ = told.send(Instant::now());
+        connection
+    });
+    let running = tokio::spawn(pool.run_with(held, std::future::pending()));
+    let at = heard.await.unwrap();
+    running.abort();
+    // Stopped by the watchdog at the renewal deadline, while every renewal
+    // hangs, a renewal's bound before the lease (three minutes) can expire.
+    let after = at - started;
+    assert!(
+        after >= Duration::from_mins(2) && after <= Duration::from_mins(3) - timing().db_timeout,
+        "{after:?}"
     );
 }
