@@ -11032,6 +11032,16 @@
             "schema": {
               "$ref": "#/components/schemas/WorkspaceId"
             }
+          },
+          {
+            "name": "utc_offset",
+            "in": "query",
+            "description": "The caller's offset from UTC, in minutes (-840 to 840; default 0):\nwhere their day starts, for what is overdue.",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
           }
         ],
         "requestBody": {
@@ -11144,6 +11154,16 @@
             "schema": {
               "$ref": "#/components/schemas/TaskId"
             }
+          },
+          {
+            "name": "utc_offset",
+            "in": "query",
+            "description": "The caller's offset from UTC, in minutes (-840 to 840; default 0):\nwhere their day starts, for what is overdue.",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
           }
         ],
         "responses": {
@@ -11232,6 +11252,16 @@
             "required": true,
             "schema": {
               "$ref": "#/components/schemas/TaskId"
+            }
+          },
+          {
+            "name": "utc_offset",
+            "in": "query",
+            "description": "The caller's offset from UTC, in minutes (-840 to 840; default 0):\nwhere their day starts, for what is overdue.",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
             }
           }
         ],
@@ -11354,6 +11384,16 @@
             "schema": {
               "$ref": "#/components/schemas/TaskId"
             }
+          },
+          {
+            "name": "utc_offset",
+            "in": "query",
+            "description": "The caller's offset from UTC, in minutes (-840 to 840; default 0):\nwhere their day starts, for what is overdue.",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
           }
         ],
         "requestBody": {
@@ -11465,6 +11505,16 @@
             "required": true,
             "schema": {
               "$ref": "#/components/schemas/TaskId"
+            }
+          },
+          {
+            "name": "utc_offset",
+            "in": "query",
+            "description": "The caller's offset from UTC, in minutes (-840 to 840; default 0):\nwhere their day starts, for what is overdue.",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
             }
           }
         ],
@@ -11588,6 +11638,16 @@
             "schema": {
               "$ref": "#/components/schemas/TaskId"
             }
+          },
+          {
+            "name": "utc_offset",
+            "in": "query",
+            "description": "The caller's offset from UTC, in minutes (-840 to 840; default 0):\nwhere their day starts, for what is overdue.",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
           }
         ],
         "requestBody": {
@@ -11699,6 +11759,16 @@
             "required": true,
             "schema": {
               "$ref": "#/components/schemas/TaskId"
+            }
+          },
+          {
+            "name": "utc_offset",
+            "in": "query",
+            "description": "The caller's offset from UTC, in minutes (-840 to 840; default 0):\nwhere their day starts, for what is overdue.",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
             }
           }
         ],
@@ -11821,6 +11891,16 @@
             "schema": {
               "$ref": "#/components/schemas/TaskId"
             }
+          },
+          {
+            "name": "utc_offset",
+            "in": "query",
+            "description": "The caller's offset from UTC, in minutes (-840 to 840; default 0):\nwhere their day starts, for what is overdue.",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
           }
         ],
         "requestBody": {
@@ -11931,6 +12011,16 @@
             "required": true,
             "schema": {
               "$ref": "#/components/schemas/TaskId"
+            }
+          },
+          {
+            "name": "utc_offset",
+            "in": "query",
+            "description": "The caller's offset from UTC, in minutes (-840 to 840; default 0):\nwhere their day starts, for what is overdue.",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
             }
           }
         ],
