@@ -2,9 +2,14 @@ import type { Meta, StoryObj } from "@storybook/react-vite";
 import { useState } from "react";
 import { expect, fn, userEvent, within } from "storybook/test";
 
-import type { Recipient } from "../RecipientField/RecipientField";
+import type { Recipient, RecipientSuggestion } from "../RecipientField/RecipientField";
 
-import { MessageComposer, type ComposerAttachment } from "./MessageComposer";
+import {
+  MessageComposer,
+  type ComposerAttachment,
+  type RecipientFieldName,
+  type RecipientSuggester,
+} from "./MessageComposer";
 
 interface DemoProps {
   title: string;
@@ -18,6 +23,8 @@ interface DemoProps {
   error?: string;
   sending?: boolean;
   focus?: "to" | "body";
+  /** Suggest the demo people in To, Cc and Bcc as you type. */
+  suggesting?: boolean;
   onSend: () => void;
   onClose: () => void;
   onDiscard: () => void;
@@ -25,6 +32,44 @@ interface DemoProps {
 
 const QUOTE =
   "On Fri 10 Oct 2026, 17:42, Maya Okafor wrote:\n> Could you review the budget section by Friday?\n> Thanks, Maya";
+
+/** The people you exchange mail with, written to most first (fictional). */
+const PEOPLE: RecipientSuggestion[] = [
+  { name: "Marta Ferreira", address: "marta@ferreira-studio.example" },
+  { name: "Mário Lopes", address: "mario.lopes@lopes-arquitetos.example" },
+  { name: "Omar Haddad", address: "omar@northwind-studio.example" },
+];
+
+const fold = (text: string) =>
+  text
+    .normalize("NFD")
+    .replaceAll(/\p{Diacritic}/gu, "")
+    .toLowerCase();
+
+/** Suggestions as a screen gives them: one field typed in at a time. */
+function useDemoSuggester(taken: readonly Recipient[]): RecipientSuggester {
+  const [typing, setTyping] = useState<{ field: RecipientFieldName; text: string }>({
+    field: "to",
+    text: "",
+  });
+  const typed = fold(typing.text.trim());
+  const chosen = new Set(taken.map((recipient) => recipient.address.toLowerCase()));
+  const people =
+    typed.length < 2
+      ? []
+      : PEOPLE.filter(
+          (person) =>
+            !chosen.has(person.address) &&
+            fold(`${person.address} ${person.name ?? ""}`).includes(typed),
+        );
+  return {
+    suggestions: (field) => (field === typing.field ? people : []),
+    loading: () => false,
+    onQueryChange: (field, text) => {
+      setTyping({ field, text });
+    },
+  };
+}
 
 /** The composer with its own state, as a screen would hold it. */
 function Demo({
@@ -34,6 +79,7 @@ function Demo({
   body = "",
   quoted,
   attachments = [],
+  suggesting = false,
   ...rest
 }: DemoProps) {
   const [state, setState] = useState({
@@ -45,9 +91,11 @@ function Demo({
     quoted,
     attachments,
   });
+  const suggest = useDemoSuggester([...state.to, ...state.cc, ...state.bcc]);
   return (
     <MessageComposer
       {...rest}
+      suggest={suggesting ? suggest : undefined}
       from="Sam Rivers <sam@example.com>"
       to={state.to}
       onToChange={(next) => {
@@ -159,5 +207,31 @@ export const WriteAndSend: Story = {
     // ⌘↵ on Apple platforms, Ctrl+↵ elsewhere: exactly one of them sends.
     await userEvent.keyboard("{Meta>}{Enter}{/Meta}{Control>}{Enter}{/Control}");
     await expect(args.onSend).toHaveBeenCalledOnce();
+  },
+};
+
+/** To, Cc and Bcc suggest people as you type: ↓ and Enter add one, Esc closes the list. */
+export const SuggestPeople: Story = {
+  args: {
+    title: "New message",
+    to: [],
+    quoted: undefined,
+    subject: "",
+    focus: "to",
+    status: "",
+    suggesting: true,
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const to = canvas.getByRole("combobox", { name: "To" });
+    await userEvent.type(to, "mar");
+    await expect(canvas.getByRole("listbox", { name: "Suggestions for To" })).toBeVisible();
+    await userEvent.keyboard("{ArrowDown}{Enter}");
+    await expect(canvas.getByText("Mário Lopes")).toBeVisible();
+    await userEvent.click(canvas.getByRole("button", { name: "Cc Bcc" }));
+    await userEvent.type(canvas.getByRole("combobox", { name: "Cc" }), "mar");
+    const list = canvas.getByRole("listbox", { name: "Suggestions for Cc" });
+    // Mário is in To already.
+    await expect(within(list).getAllByRole("option")).toHaveLength(2);
   },
 };

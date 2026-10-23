@@ -103,7 +103,7 @@ export default async function sendMail({ page }: ScenarioContext): Promise<void>
     "Forward: the subject, the quoted message and its attachments come along",
     2200,
   );
-  const to = forward.getByRole("textbox", { name: "To" });
+  const to = forward.getByRole("combobox", { name: "To" });
   await to.pressSequentially("leo@example.com", { delay: 30 });
   await to.press("Enter");
   await caption(page, "Recipients are chips", 1500);
@@ -122,11 +122,11 @@ export default async function sendMail({ page }: ScenarioContext): Promise<void>
     : page.keyboard.press("c"));
   const fresh = page.getByRole("region", { name: "New message" });
   await fresh.waitFor();
-  const freshTo = fresh.getByRole("textbox", { name: "To" });
+  const freshTo = fresh.getByRole("combobox", { name: "To" });
   await freshTo.pressSequentially("Ana Lopes <ana@example.com>,", { delay: 25 });
   await fresh.getByRole("button", { name: "Cc Bcc" }).click();
   await fresh
-    .getByRole("textbox", { name: "Cc", exact: true })
+    .getByRole("combobox", { name: "Cc", exact: true })
     .pressSequentially("joana@example.com", {
       delay: 25,
     });

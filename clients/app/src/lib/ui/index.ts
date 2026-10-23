@@ -163,6 +163,8 @@ export {
   MessageComposer,
   type ComposerAttachment,
   type MessageComposerProps,
+  type RecipientFieldName,
+  type RecipientSuggester,
 } from "./components/MessageComposer/MessageComposer";
 export { NavDivider, NavItem, type NavItemProps } from "./components/NavItem/NavItem";
 export { NoteField, type NoteFieldProps } from "./components/NoteField/NoteField";
@@ -203,6 +205,7 @@ export {
   RecipientField,
   type Recipient,
   type RecipientFieldProps,
+  type RecipientSuggestion,
 } from "./components/RecipientField/RecipientField";
 export {
   Segmented,

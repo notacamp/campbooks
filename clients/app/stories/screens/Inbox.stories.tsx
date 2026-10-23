@@ -32,7 +32,8 @@ import {
   STREAM_COUNTS,
   W,
 } from "../../test/demo/conversations";
-import { DRAFT_LIST } from "../../test/demo/drafts";
+import type { Draft } from "../../src/modules/conversations/api/drafts";
+import { DRAFT_LIST, NEW } from "../../test/demo/drafts";
 import { DUARTE, SESSION } from "../../test/demo/workspaces";
 
 import { mockFetch, type MockRoute } from "./mock-fetch";
@@ -765,3 +766,84 @@ export const RowsLeaveIdle: Story = { args: rowsLeave.args, ...at("desktop", 144
 
 /** On a phone, with nothing pressed yet. */
 export const RowsLeavePhone: Story = { args: rowsLeave.args, ...at("phone", 375, 812) };
+
+/** The people Sam exchanges mail with (`list_correspondents`), written to most first. */
+const CORRESPONDENTS = [
+  { address: "marta@ferreira-studio.example", name: "Marta Ferreira", wrote: 12, received: 9 },
+  { address: "mario.lopes@lopes-arquitetos.example", name: "Mário Lopes", wrote: 4, received: 6 },
+  { address: "omar@northwind-studio.example", name: "Omar Haddad", wrote: 1, received: 0 },
+  { address: "marisa@harbour-books.example", name: "Marisa Costa", wrote: 0, received: 3 },
+];
+
+const fold = (text: string) =>
+  text
+    .normalize("NFD")
+    .replaceAll(/\p{Diacritic}/gu, "")
+    .toLowerCase();
+
+/** A new message whose draft keeps what is typed, and the people to suggest. */
+function composing(): Record<string, MockRoute> {
+  let draft: Draft = NEW;
+  return inbox({
+    [`POST ${W}/drafts`]: () => ({ status: 201, body: draft }),
+    [`GET ${W}/drafts/${NEW.id}`]: () => ({ body: draft }),
+    [`PATCH ${W}/drafts/${NEW.id}`]: (body) => {
+      draft = { ...draft, ...(body as Partial<Draft>), version: draft.version + 1 };
+      return { body: draft };
+    },
+    [`GET ${W}/correspondents`]: (_body, url) => {
+      const words = fold(url.searchParams.get("q") ?? "")
+        .split(/[\s,]+/u)
+        .filter((word) => word !== "");
+      return {
+        body: {
+          correspondents: CORRESPONDENTS.filter((person) =>
+            words.every((word) => fold(`${person.address} ${person.name}`).includes(word)),
+          ),
+        },
+      };
+    },
+  });
+}
+
+/** A new message, its draft and the people to suggest, fresh for each story. */
+const suggestArgs = () => ({ path: `/w/${DUARTE.id}/compose`, api: composing() });
+
+/**
+ * Writing a new message: To, Cc and Bcc suggest the people Sam exchanges
+ * mail with as Sam types; ↓ and Enter add one, and someone already added
+ * is not suggested again.
+ */
+const suggestPlay: Story["play"] = async ({ canvasElement }) => {
+  const canvas = within(canvasElement);
+  const to = await canvas.findByRole("combobox", { name: "To" });
+  await userEvent.type(to, "mar");
+  const list = await canvas.findByRole("listbox", { name: "Suggestions for To" });
+  await expect(within(list).getAllByRole("option")).toHaveLength(4);
+  await userEvent.keyboard("{ArrowDown}{Enter}");
+  await expect(await canvas.findByText("Mário Lopes")).toBeVisible();
+  await userEvent.click(canvas.getByRole("button", { name: "Cc Bcc" }));
+  await userEvent.type(canvas.getByRole("combobox", { name: "Cc" }), "mar");
+  const copies = await canvas.findByRole("listbox", { name: "Suggestions for Cc" });
+  await waitFor(() => expect(within(copies).getAllByRole("option")).toHaveLength(3));
+  // The list never makes the page scroll sideways.
+  await expect(document.documentElement.scrollWidth).toBeLessThanOrEqual(globalThis.innerWidth);
+};
+
+export const SuggestPeople: Story = {
+  args: suggestArgs(),
+  play: suggestPlay,
+  ...at("desktop", 1440, 900),
+};
+
+export const SuggestPeoplePhone: Story = {
+  args: suggestArgs(),
+  play: suggestPlay,
+  ...at("phone", 375, 812),
+};
+
+/** The same, with nothing typed yet (the recording types). */
+export const SuggestPeopleIdle: Story = { args: suggestArgs(), ...at("desktop", 1440, 900) };
+
+/** On a phone, with nothing typed yet. */
+export const SuggestPeopleIdlePhone: Story = { args: suggestArgs(), ...at("phone", 375, 812) };
