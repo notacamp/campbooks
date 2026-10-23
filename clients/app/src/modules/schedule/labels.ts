@@ -94,7 +94,7 @@ export function metaLine(event: EventView, calendars: readonly CalendarView[]): 
 }
 
 /** "€84.20": an amount in minor units, in the member's language. */
-export function money(locale: string, amount: { minor: number; currency: string }): string {
+function money(locale: string, amount: { minor: number; currency: string }): string {
   try {
     return new Intl.NumberFormat(locale, { style: "currency", currency: amount.currency }).format(
       amount.minor / 100,

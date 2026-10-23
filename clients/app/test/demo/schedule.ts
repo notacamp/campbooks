@@ -14,7 +14,7 @@ type Read = Schema<"MessageReadView">;
 
 /** The clock the schedule demo is set at: Tuesday 27 October 2026, 14:20 in Lisbon. */
 export const SCHEDULE_NOW = "2026-10-27T14:20:00+00:00";
-export const SCHEDULE_ZONE = "Europe/Lisbon";
+const SCHEDULE_ZONE = "Europe/Lisbon";
 
 const id = (n: number) => `0192f1a0-0000-7000-8000-0000000042${String(n).padStart(2, "0")}`;
 
@@ -28,7 +28,7 @@ export const CAMPBOOKS: Calendar = {
   color: null,
   time_zone: SCHEDULE_ZONE,
 };
-export const PERSONAL: Calendar = {
+const PERSONAL: Calendar = {
   id: id(2),
   name: "Personal",
   source: "provider",
@@ -38,7 +38,7 @@ export const PERSONAL: Calendar = {
   color: "#2b7fb8",
   time_zone: SCHEDULE_ZONE,
 };
-export const WORK: Calendar = {
+const WORK: Calendar = {
   id: id(3),
   name: "Work",
   source: "provider",
@@ -113,7 +113,7 @@ function scout(
   };
 }
 
-export const SYNC: Event = {
+const SYNC: Event = {
   ...base,
   id: id(10),
   kind: "meeting",
@@ -127,7 +127,7 @@ export const SYNC: Event = {
   response: "accepted",
   place: "Video call",
 };
-export const STANDUP: Event = {
+const STANDUP: Event = {
   ...base,
   id: id(11),
   kind: "meeting",
@@ -139,7 +139,7 @@ export const STANDUP: Event = {
   on_provider: true,
   recurring: true,
 };
-export const HOLD: Event = {
+const HOLD: Event = {
   ...base,
   id: id(12),
   kind: "hold",
@@ -160,7 +160,7 @@ export const DENTIST: Event = scout(1, {
   place: "Clínica Sorriso, Rua Augusta 120, Lisboa",
   found_by: "model",
 });
-export const NUVEM: Event = scout(2, {
+const NUVEM: Event = scout(2, {
   id: id(14),
   kind: "charge",
   title: "Nuvem Drive renews · €9.99",
@@ -169,7 +169,7 @@ export const NUVEM: Event = scout(2, {
   all_day: true,
   found_by: "model",
 });
-export const PARCEL: Event = scout(3, {
+const PARCEL: Event = scout(3, {
   id: id(15),
   kind: "delivery",
   title: "Parcel from Lojamar arrives",
@@ -190,7 +190,7 @@ export const REVIEW: Event = {
   notice: "kept_theirs",
   place: "Room 2",
 };
-export const QUARTET: Event = scout(4, {
+const QUARTET: Event = scout(4, {
   id: id(17),
   kind: "show",
   title: "The Lisbon Quartet",
@@ -208,7 +208,7 @@ export const FLIGHT: Event = scout(5, {
   time_zone: "Europe/Amsterdam",
   place: "Lisbon Airport T1 → Amsterdam Schiphol",
 });
-export const HOTEL: Event = scout(6, {
+const HOTEL: Event = scout(6, {
   id: id(19),
   kind: "stay",
   title: "Hotel Canal Verde · 2 nights",
@@ -218,7 +218,7 @@ export const HOTEL: Event = scout(6, {
   place: "Prinsengracht 400, Amsterdam",
   found_by: "model",
 });
-export const DINNER: Event = scout(7, {
+const DINNER: Event = scout(7, {
   id: id(20),
   kind: "reservation",
   title: "Dinner for 2 · Restaurante Dijk",
@@ -227,7 +227,7 @@ export const DINNER: Event = scout(7, {
   time_zone: "Europe/Amsterdam",
   place: "Restaurante Dijk, Amsterdam",
 });
-export const BACK: Event = scout(5, {
+const BACK: Event = scout(5, {
   id: id(21),
   kind: "travel",
   title: "Flight AMS → LIS · AL 1677",
@@ -236,7 +236,7 @@ export const BACK: Event = scout(5, {
   time_zone: "Europe/Amsterdam",
   place: "Amsterdam Schiphol → Lisbon Airport T1",
 });
-export const INSURANCE: Event = scout(8, {
+const INSURANCE: Event = scout(8, {
   id: id(22),
   kind: "expiry",
   title: "Car insurance ends",
