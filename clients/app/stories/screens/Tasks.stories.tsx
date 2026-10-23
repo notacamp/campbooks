@@ -58,6 +58,7 @@ function week() {
 function tasks(overrides: Record<string, MockRoute> = {}, start?: ReturnType<typeof week>) {
   const mine = start ?? week();
   let open = [mine.bill, mine.lease, mine.accountant, mine.proposal, PHOTOS, mine.inspection];
+  let handedOff = [mine.venue];
   const routes: Record<string, MockRoute> = {
     "GET /bff/session": { body: SESSION },
     "GET /bff/api/v1/workspaces": { body: { workspaces: [DUARTE] } },
@@ -67,7 +68,7 @@ function tasks(overrides: Record<string, MockRoute> = {}, start?: ReturnType<typ
     [`GET ${W}/conversations`]: { body: { conversations: [MARTA], next_cursor: null } },
     [`GET ${W}/tasks`]: (_body, url) =>
       url.searchParams.get("whose") === "handed_off"
-        ? { body: { tasks: [mine.venue] } }
+        ? { body: { tasks: handedOff } }
         : { body: { tasks: open } },
     [`POST ${W}/tasks`]: (body) => {
       const made = { ...PHOTOS, id: "0192f1a0-0000-7000-8000-0000000007ee", ...(body as object) };
@@ -85,8 +86,11 @@ function tasks(overrides: Record<string, MockRoute> = {}, start?: ReturnType<typ
     [`POST ${W}/tasks/${mine.lease.id}/plan`]: {
       body: { ...mine.lease, plan: "later", revision: 2 },
     },
-    [`POST ${W}/tasks/${mine.venue.id}/take_back`]: {
-      body: { ...mine.venue, handed_by: null, assignee: ANA.user_id, revision: 2 },
+    [`POST ${W}/tasks/${mine.venue.id}/take_back`]: () => {
+      const back = { ...mine.venue, handed_by: null, assignee: ANA.user_id, revision: 2 };
+      handedOff = [];
+      open = [...open, back];
+      return { body: back };
     },
     [`GET ${W}/attention`]: { body: { items: [], counts: [] } },
     ...overrides,
