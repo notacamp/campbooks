@@ -160,52 +160,62 @@ pub fn triage_questions() -> Vec<Question> {
                 ),
             ],
         ),
-        Question::noul(
-            triage::HAS_DATED_THING,
-            "Does the email tell the recipient about something of theirs on a specific date or \
-             time: an appointment, a booking, a trip, a ticketed event, a delivery, a charge to \
-             their account, something expiring, or a date by which they must act? Sales and \
-             offers ending, newsletters, and dates only in quoted older messages do not count.",
-        ),
-        Question::choice(
-            triage::DATED_KIND,
-            "If the email tells the recipient about something dated, which kind of thing is it? \
-             If it holds several, choose the main one.",
-            [
-                (
-                    triage::DEADLINE,
-                    "The recipient must do something by a date, such as pay, sign, submit, reply \
-                     or renew",
-                ),
-                (
-                    "charge",
-                    "Money will be taken automatically on a date: a renewal, a subscription, a \
-                     direct debit, a trial ending",
-                ),
-                (
-                    "appointment",
-                    "A booked slot with a provider: a doctor, a dentist, a haircut, a service visit",
-                ),
-                ("meeting", "A meeting or a call with other people"),
-                ("travel", "A trip: a flight, a train, a bus, a rental car"),
-                ("stay", "A hotel or a rental stay"),
-                (
-                    "show",
-                    "A ticketed event: a concert, a film, a match, a night at the theatre",
-                ),
-                (
-                    "reservation",
-                    "A table or a visit booked: a restaurant, a museum slot",
-                ),
-                ("delivery", "A parcel or an order arriving"),
-                (
-                    "expiry",
-                    "Something expiring with nothing to do before it: a card, a plan, a pass",
-                ),
-                ("none", "None of these: nothing in the email is dated"),
-            ],
-        ),
+        has_dated_thing_question(),
+        dated_kind_question(),
     ]
+}
+
+/// The `has_dated_thing` question, worded for a `decide` model.
+fn has_dated_thing_question() -> Question {
+    Question::noul(
+        triage::HAS_DATED_THING,
+        "Does the email tell the recipient about something of theirs on a specific date or \
+         time: an appointment, a booking, a trip, a ticketed event, a delivery, a charge to \
+         their account, something expiring, or a date by which they must act? Sales and \
+         offers ending, newsletters, and dates only in quoted older messages do not count.",
+    )
+}
+
+/// The `dated_kind` question, worded for a `decide` model.
+fn dated_kind_question() -> Question {
+    Question::choice(
+        triage::DATED_KIND,
+        "If the email tells the recipient about something dated, which kind of thing is it? \
+         If it holds several, choose the main one.",
+        [
+            (
+                triage::DEADLINE,
+                "The recipient must do something by a date, such as pay, sign, submit, reply \
+                 or renew",
+            ),
+            (
+                "charge",
+                "Money will be taken automatically on a date: a renewal, a subscription, a \
+                 direct debit, a trial ending",
+            ),
+            (
+                "appointment",
+                "A booked slot with a provider: a doctor, a dentist, a haircut, a service visit",
+            ),
+            ("meeting", "A meeting or a call with other people"),
+            ("travel", "A trip: a flight, a train, a bus, a rental car"),
+            ("stay", "A hotel or a rental stay"),
+            (
+                "show",
+                "A ticketed event: a concert, a film, a match, a night at the theatre",
+            ),
+            (
+                "reservation",
+                "A table or a visit booked: a restaurant, a museum slot",
+            ),
+            ("delivery", "A parcel or an order arriving"),
+            (
+                "expiry",
+                "Something expiring with nothing to do before it: a card, a plan, a pass",
+            ),
+            ("none", "None of these: nothing in the email is dated"),
+        ],
+    )
 }
 
 /// A sender or recipient.
