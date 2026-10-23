@@ -106,6 +106,7 @@ impl JobHandler for SyncStream {
         let configured = match target.provider {
             Provider::Google => self.deps.google.is_some(),
             Provider::Zoho => self.deps.zoho.is_some(),
+            Provider::Imap => return self.idle_imap(ctx, workspace, &target, now).await,
         };
         let (true, Some(inbox)) = (configured, target.inbox) else {
             // The provider is no longer configured (or the stream has no
@@ -154,6 +155,7 @@ impl JobHandler for SyncStream {
                 self.run_zoho(ctx, workspace, &target, &token, &backlog, now)
                     .await
             }
+            Provider::Imap => Ok(None),
         }
         .inspect_err(|_| metrics::sync_finished(target.provider, SyncOutcome::Failed))?;
         // Without a page the run waits or has recorded its trouble, and
@@ -241,6 +243,8 @@ impl SyncStream {
                      VALUES ($1, $2, $3, $4, now())
                      ON CONFLICT (stream_id, label_id) DO UPDATE SET name = EXCLUDED.name",
                 ),
+                // No label cache yet (write-back lands with campbooks-cloud#312).
+                Provider::Imap => continue,
             };
             insert
                 .bind(workspace)
@@ -548,6 +552,34 @@ impl SyncStream {
             phase: page.phase,
             more: page.more,
         }))
+    }
+
+    /// An IMAP stream until reading lands (campbooks-cloud#311): its
+    /// password is opened, so one that no longer opens shows as
+    /// `needs_reauth`, and it waits at the slowest interval.
+    async fn idle_imap(
+        &self,
+        ctx: &mut JobContext,
+        workspace: WorkspaceId,
+        target: &Target,
+        now: DateTime<Utc>,
+    ) -> Result<(), JobError> {
+        if let Some(cipher) = self.deps.cipher.as_deref() {
+            let mut tx = ctx.pool().begin_for(workspace).await?;
+            let opened = credentials::password(&mut tx, cipher, target.connection).await;
+            tx.commit().await?;
+            match opened {
+                Err(TokenError::NeedsReauth(reason)) => {
+                    metrics::sync_finished(target.provider, SyncOutcome::Refused);
+                    return self.needs_reauth(ctx, workspace, target, reason, now).await;
+                }
+                Err(TokenError::Database(err)) => return Err(err.into()),
+                Err(TokenError::Provider(_)) | Ok(_) => {}
+            }
+        }
+        let idle = now + TimeDelta::seconds(i64::from(self.deps.config.poll.max_seconds));
+        schedule::set_due(ctx.tx().await?, workspace, target.stream, idle).await?;
+        Ok(())
     }
 
     /// The grant stopped working (`reason`).
@@ -990,6 +1022,7 @@ async fn label_rows(
               WHERE stream_id = $1 AND kind = 'user'"
         }
         Provider::Zoho => "SELECT label_id, name FROM connectors.zoho_labels WHERE stream_id = $1",
+        Provider::Imap => return Ok(Vec::new()),
     };
     let mut tx = ctx.pool().begin_for(workspace).await?;
     let rows: Vec<(String, String)> = sqlx::query_as(query)

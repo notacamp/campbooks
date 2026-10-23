@@ -17,10 +17,14 @@
 //! (`domain/push.rs` plans them, `gmail/write.rs` and `zoho/write.rs` make
 //! them); a write never comes back as a change.
 //!
+//! Any other mailbox is connected over IMAP and SMTP with its password
+//! (`imap/`: finding its servers and checking the password before it is
+//! kept; reading it comes with campbooks-cloud#311).
+//!
 //! `lib.rs` assembles [`module`]; each use case is a slice under
 //! `features/`, shared rules live in `domain/`, what the mail adapters share
-//! in `mail/`, Google's HTTP in `google/`, the Gmail adapter in `gmail/`, and
-//! Zoho (HTTP and adapter) in `zoho/`. The module is composed with its
+//! in `mail/`, Google's HTTP in `google/`, the Gmail adapter in `gmail/`,
+//! Zoho (HTTP and adapter) in `zoho/`, and the IMAP adapter in `imap/`. The module is composed with its
 //! dependencies ([`Deps`]): handlers reach them as an axum extension, jobs
 //! and consumers own a copy.
 
@@ -38,6 +42,7 @@ pub mod events;
 mod features;
 mod gmail;
 mod google;
+pub mod imap;
 mod mail;
 mod metrics;
 mod provider;
@@ -46,6 +51,8 @@ mod rls_tests;
 pub mod scopes;
 #[cfg(test)]
 mod testkit;
+#[cfg(test)]
+mod testkit_imap;
 #[cfg(test)]
 mod testkit_zoho;
 mod zoho;
@@ -76,6 +83,8 @@ pub fn module(deps: Deps) -> Module {
         router: OpenApiRouter::new()
             .routes(routes!(features::list_connections::handler))
             .routes(routes!(features::start_connection::handler))
+            .routes(routes!(features::discover_imap::handler))
+            .routes(routes!(features::connect_imap::handler))
             .routes(routes!(
                 features::get_connection::handler,
                 features::disconnect::handler

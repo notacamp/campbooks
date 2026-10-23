@@ -144,6 +144,17 @@ html5ever = "0.40.1"
 # Search: telling which of the four shipped languages an entry is written in
 # (whatlang: trigram profiles, no model files, MIT).
 whatlang = "0.18.0"
+# Email: any mailbox over IMAP (connectors' IMAP adapter, campbooks-cloud#310):
+# the IMAP client (chatmail's, on tokio; Campbooks wraps it in its own
+# `imap::Session`), SRV and MX lookups for finding a mailbox's servers, the
+# provider database's XML (already in the graph), and TLS to the servers
+# with the platform's verifier (rustls, tokio-rustls and the verifier are
+# already in the graph through reqwest and lettre).
+async-imap = { version = "0.12.0", default-features = false, features = ["runtime-tokio"] }
+hickory-resolver = { version = "0.26.3", default-features = false, features = ["system-config", "tokio"] }
+quick-xml = "0.41.0"
+rustls-platform-verifier = "0.7.1"
+tokio-rustls = "0.26.6"
 # Email: MIME building of messages to send and parsing of raw messages
 # (connectors' email adapters).
 mail-builder = { version = "1.0.0", default-features = false }

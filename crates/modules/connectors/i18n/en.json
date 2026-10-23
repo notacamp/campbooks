@@ -13,6 +13,25 @@
     "needs_reauth": "This connection needs you to connect the account again before it can sync.",
     "unknown_data_centre": "Campbooks does not know the Zoho data centre of this account. Ask your administrator.",
     "no_mailbox": "This account has no mailbox Campbooks can read.",
-    "disconnect_owner_only": "Only the member who connected this account can disconnect it."
+    "disconnect_owner_only": "Only the member who connected this account can disconnect it.",
+    "step_up_required": "For your security, sign in again before connecting a mailbox with its password.",
+    "imap_connects_with_a_password": "A mailbox over IMAP is connected with its password, not through a sign-in page.",
+    "imap_address_invalid": "Enter a valid email address.",
+    "imap_username_invalid": "Enter a valid username for this mailbox.",
+    "imap_password_invalid": "Enter the mailbox's password (at most 1024 characters, on one line).",
+    "imap_servers_required": "Campbooks could not find this mailbox's servers. Enter its IMAP and SMTP servers.",
+    "use_native_provider": "This mailbox is at {{provider}}: connect it with {{provider}} instead of a password.",
+    "too_many_attempts": "Too many failed sign-ins to this mailbox. Wait an hour and try again.",
+    "imap_login_refused_one": "The mail server refused the sign-in. This provider needs an app password: create one in your account's security settings and use it here instead of your usual password.",
+    "imap_login_refused_other": "The mail server refused the sign-in. Check the username and password. If your provider offers app passwords, use one.",
+    "smtp_login_refused_one": "The outgoing mail server refused the sign-in. This provider needs an app password: create one in your account's security settings and use it here.",
+    "smtp_login_refused_other": "The outgoing mail server (SMTP) refused the sign-in. Check the username and password, and that the server lets you send.",
+    "imap_unreachable": "The mail server (IMAP) could not be reached. Check its name and port, and try again.",
+    "smtp_unreachable": "The outgoing mail server (SMTP) could not be reached. Check its name and port, and try again.",
+    "imap_tls_failed": "The mail server's certificate is not valid for its name, so Campbooks did not connect. Check the server name.",
+    "smtp_tls_failed": "The outgoing mail server's certificate is not valid for its name, so Campbooks did not connect. Check the server name.",
+    "imap_not_an_imap_server": "The server at this address and port is not an IMAP mail server. Check the server and port.",
+    "host_refused": "Campbooks cannot connect to this server: it is on a private network, or the port is not a mail port (993, 143, 465 or 587).",
+    "starttls_missing": "The server does not offer an encrypted connection, so Campbooks did not send your password. Use the server's encrypted port (993 for IMAP, 465 for SMTP)."
   }
 }

@@ -1,7 +1,9 @@
 //! Turning a provider grant that is already in hand into a connection: the
-//! one seam every way of obtaining a grant goes through. Grants come from
-//! the identity module (a sign-up's held grant, or a connect or reconnect
-//! through its front door) by way of the kernel's grant-intake port.
+//! one seam every way of obtaining a grant goes through. OAuth grants come
+//! from the identity module (a sign-up's held grant, or a connect or
+//! reconnect through its front door) by way of the kernel's grant-intake
+//! port; an IMAP mailbox's password comes from `connect_imap`, once its
+//! servers accepted it.
 
 use campbooks_kernel::{
     AppState, Error, Result,
@@ -10,11 +12,13 @@ use campbooks_kernel::{
     tenancy::{UserId, WorkspaceId},
 };
 use chrono::{DateTime, Utc};
+use secrecy::SecretString;
 use sqlx::{Postgres, Transaction};
 
 use super::{
     connections::{self, parse_capabilities},
     credentials,
+    imap_servers::{self, ImapAccount},
     model::{Capability, ConnectionId, ConnectionView, InboxId, Phase, Provider, StreamId},
     removal::CONNECTION_OWNER,
     schedule,
@@ -46,8 +50,11 @@ pub struct ProviderGrant {
     pub display_name: Option<String>,
     /// The capabilities granted (and wanted); never empty.
     pub capabilities: Vec<Capability>,
-    /// The tokens: access, refresh (required for a new connection), scopes.
-    pub tokens: TokenGrant,
+    /// What Campbooks keeps to reach the account: OAuth tokens, or an IMAP
+    /// mailbox's password.
+    pub secret: Secret,
+    /// An IMAP mailbox's servers and username (provider `imap` only).
+    pub imap: Option<ImapAccount>,
     /// The connection this consent extends, when it was started as one.
     pub extending: Option<ConnectionId>,
     /// The grantor as the identity module knows them (its token subject),
@@ -58,6 +65,27 @@ pub struct ProviderGrant {
     /// The mailboxes the grant reaches (one for Gmail; a Zoho login's mail
     /// accounts). Never empty for `messages`.
     pub mailboxes: Vec<Mailbox>,
+}
+
+/// What a grant keeps to reach the account, sealed at rest and never
+/// returned.
+#[derive(Debug, Clone)]
+pub enum Secret {
+    /// OAuth tokens: access, refresh (required for a new connection),
+    /// scopes.
+    Tokens(TokenGrant),
+    /// An IMAP mailbox's password, which its servers accepted.
+    Password(SecretString),
+}
+
+impl Secret {
+    /// The scopes granted, space-separated (none for a password).
+    fn scope(&self) -> String {
+        match self {
+            Self::Tokens(tokens) => tokens.scope.clone().unwrap_or_default(),
+            Self::Password(_) => String::new(),
+        }
+    }
 }
 
 /// A mailbox a grant reaches: one `messages` stream and inbox.
@@ -175,23 +203,33 @@ async fn save(
         g.grant.display_name,
         g.grant.user as UserId,
         &capability_names,
-        g.grant.tokens.scope.clone().unwrap_or_default(),
+        g.grant.secret.scope(),
         g.now,
         g.grant.address_verified,
         g.grant.provider_server,
     )
     .execute(&mut **tx)
     .await?;
-    credentials::store(
-        tx,
-        cipher,
-        g.grant.workspace,
-        id,
-        g.grant.tokens.refresh_token.as_deref(),
-        &g.grant.tokens,
-        g.now,
-    )
-    .await?;
+    match &g.grant.secret {
+        Secret::Tokens(tokens) => {
+            credentials::store(
+                tx,
+                cipher,
+                g.grant.workspace,
+                id,
+                tokens.refresh_token.as_deref(),
+                tokens,
+                g.now,
+            )
+            .await?;
+        }
+        Secret::Password(password) => {
+            credentials::store_password(tx, cipher, g.grant.workspace, id, password, g.now).await?;
+        }
+    }
+    if let Some(account) = &g.grant.imap {
+        imap_servers::store(tx, g.grant.workspace, id, account, g.now).await?;
+    }
     for (_, blob) in &g.mailboxes {
         state
             .blobs
@@ -252,7 +290,9 @@ async fn existing(
             MESSAGES.reason("account_connected_by_another_member"),
         ));
     }
-    if existing.is_none() && g.grant.tokens.refresh_token.is_none() {
+    if existing.is_none()
+        && matches!(&g.grant.secret, Secret::Tokens(tokens) if tokens.refresh_token.is_none())
+    {
         return Err(Error::Denied(MESSAGES.reason("no_offline_access")));
     }
     existing

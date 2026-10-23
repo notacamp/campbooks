@@ -175,7 +175,8 @@
     "since": "since {{date}}",
     "provider": {
       "google": "Google",
-      "zoho": "Zoho"
+      "zoho": "Zoho",
+      "imap": "IMAP"
     },
     "capability": {
       "messages": "Mail",
