@@ -403,6 +403,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/w/{workspace_id}/assistant/chats/{chat_id}/proposals/{proposal_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Say what you did with one of Scout's proposals: `done`, `declined` or
+         *     `failed` for a pending card, `undone` for a done one.
+         * @description It records only: the change itself was your own request, sent by your
+         *     app. Scout reads what you did in the chat's next answers.
+         */
+        post: operations["assistant.settle_proposal"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/w/{workspace_id}/assistant/chats/{chat_id}/questions": {
         parameters: {
             query?: never;
@@ -2484,6 +2506,12 @@ export interface components {
             finish?: components["schemas"]["ChatFinish"] | null;
             /** @description The message. */
             id: components["schemas"]["ChatMessageId"];
+            /**
+             * @description What Scout proposed in this answer, at most three, each a card the
+             *     member confirms or declines (Scout's answers only). Nothing in them
+             *     has happened unless its state says so.
+             */
+            proposals: components["schemas"]["ChatProposal"][];
             /** @description What Scout looked at to answer (Scout's answers only). */
             steps: components["schemas"]["ChatStep"][];
             /**
@@ -2491,6 +2519,34 @@ export interface components {
              *     never as HTML and never with links made of it.
              */
             text: string;
+        };
+        /**
+         * @description Something Scout proposed in a chat: a card under its answer. Nothing
+         *     happens until the member confirms it, and then by their own request.
+         */
+        ChatProposal: {
+            action?: components["schemas"]["ProposalAction"] | null;
+            detail?: components["schemas"]["ProposalDetail"] | null;
+            facts?: components["schemas"]["ProposalFacts"] | null;
+            /**
+             * @description The proposal: the change's `Idempotency-Key` (`<id>:undo` for its
+             *     undo).
+             */
+            id: components["schemas"]["ProposalId"];
+            /**
+             * @description What the reply should say, Scout's words: show it quoted (a reply
+             *     only).
+             */
+            intent?: string | null;
+            /** @description What kind. */
+            kind: components["schemas"]["ProposalKind"];
+            record?: components["schemas"]["RecordRef"] | null;
+            request?: components["schemas"]["ProposalRequest"] | null;
+            /** @description The rule's sentence, Scout's words: show it quoted (a rule only). */
+            sentence?: string | null;
+            /** @description Where it stands. */
+            state: components["schemas"]["ProposalState"];
+            undo?: components["schemas"]["ProposalRequest"] | null;
         };
         /**
          * @description One thing Scout looked at, built by the server from the tool that ran,
@@ -4327,6 +4383,44 @@ export interface components {
             inboxes: components["schemas"]["ProposalInbox"][];
             who?: components["schemas"]["WhoQuestion"] | null;
         };
+        /**
+         * @description The change a change proposal names, from a fixed list, each mapped by
+         *     the server to one catalogue operation and its undo.
+         * @enum {string}
+         */
+        ProposalAction: "archive" | "unarchive" | "mark_read" | "mark_unread" | "star" | "unstar" | "add_label" | "remove_label" | "move_to_stream" | "trash" | "untrash" | "report_spam" | "not_spam" | "done" | "not_needed" | "already_paid" | "still_to_pay" | "yes_to_question" | "later";
+        /** @description What a change takes besides its conversation. */
+        ProposalDetail: {
+            /**
+             * @description The label's name, as its inbox has it (`add_label`, `remove_label`):
+             *     Scout's words, show them quoted.
+             */
+            label?: string | null;
+            /** @description The stream it moves to (`move_to_stream`). */
+            stream?: string | null;
+            /**
+             * Format: date-time
+             * @description Until when (`later`), RFC 3339, UTC.
+             */
+            until?: string | null;
+        };
+        /**
+         * @description A conversation's own facts, read from its record when the proposal was
+         *     made: what a card names, never the model's words.
+         */
+        ProposalFacts: {
+            /** @description Who wrote its newest message in: a name, else an address. */
+            sender: string;
+            /** @description Its stream then. */
+            stream: string;
+            /** @description Its subject (empty when it has none). */
+            subject: string;
+        };
+        /**
+         * Format: uuid
+         * @description ProposalId (UUIDv7)
+         */
+        ProposalId: string;
         /** @description An inbox a rule can be taught in. */
         ProposalInbox: {
             /** @description Its address. */
@@ -4336,6 +4430,44 @@ export interface components {
             /** @description Someone else uses it too: the rule would act for everyone there. */
             shared: boolean;
         };
+        /**
+         * @description What kind of thing Scout proposed.
+         * @enum {string}
+         */
+        ProposalKind: "change" | "rule" | "reply";
+        /**
+         * @description An HTTP method a proposal's request may use.
+         * @enum {string}
+         */
+        ProposalMethod: "POST" | "DELETE";
+        /**
+         * @description A request the member's client sends, as the server built it from the
+         *     catalogue: the client checks it is one of its own actions before
+         *     sending it, with the member's token.
+         */
+        ProposalRequest: {
+            /** @description Its JSON body, or none. */
+            body?: unknown;
+            /**
+             * @description For an undo: the top-level fields of the change's answer to copy
+             *     into this body, and nothing else.
+             */
+            from_response?: string[];
+            /** @description Its method. */
+            method: components["schemas"]["ProposalMethod"];
+            /** @description Its `operationId`. */
+            operation: string;
+            /**
+             * @description Its path, relative to the workspace's API root
+             *     (`conversations/{id}/archive` under `/api/v1/w/{workspace_id}/`).
+             */
+            path: string;
+        };
+        /**
+         * @description Where a proposal stands.
+         * @enum {string}
+         */
+        ProposalState: "pending" | "done" | "declined" | "failed" | "undone";
         /** @description What a rule does. */
         ProposedAction: {
             /** @enum {string} */
@@ -5227,6 +5359,19 @@ export interface components {
              */
             note: string;
         };
+        /** @description What the member did with a card. */
+        SettleProposal: {
+            /**
+             * @description `done`, `declined` or `failed` for a pending card; `undone` for a
+             *     done one.
+             */
+            state: components["schemas"]["Settlement"];
+        };
+        /**
+         * @description What the member did with a card.
+         * @enum {string}
+         */
+        Settlement: "done" | "declined" | "failed" | "undone";
         /** @description What a sign-in ceremony continues. */
         SignInStart: {
             /**
@@ -7095,6 +7240,82 @@ export interface operations {
             };
             /** @description No such chat, or it is not yours. */
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "assistant.settle_proposal": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The workspace. */
+                workspace_id: components["schemas"]["WorkspaceId"];
+                /** @description The chat. */
+                chat_id: components["schemas"]["ChatId"];
+                /** @description The proposal. */
+                proposal_id: components["schemas"]["ProposalId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SettleProposal"];
+            };
+        };
+        responses: {
+            /** @description The proposal, settled. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChatProposal"];
+                };
+            };
+            /** @description Not a state a card is settled with. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No valid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Missing scope. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No such chat or proposal, or it is not yours. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description It cannot become that state (`proposal_settled`): only a pending card is settled, and only a done one undone. */
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };

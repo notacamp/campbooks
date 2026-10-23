@@ -9,8 +9,16 @@ import {
 import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
+import { ReplyOpenerProvider, type OpenReply } from "~/lib/reply-opener";
+
 import {
   answerFrames,
+  ARCHIVE_PROPOSAL,
+  chatWithProposals,
+  MARTA_RULE,
+  REPLY_PROPOSAL,
+  RULE_PROPOSAL,
+  RULE_SENTENCE,
   MARTA_CHAT,
   MARTA_CHAT_ANSWERED,
   MARTA_CHAT_FAILED,
@@ -27,19 +35,20 @@ import { ScoutChat } from "./ScoutChat";
 const CHATS = `${W}/assistant/chats`;
 const STREAM = `POST ${CHATS}/${MARTA_CHAT.id}/questions/stream`;
 
-function renderChat(onClose = vi.fn()) {
+function renderChat(onClose = vi.fn(), openReply?: OpenReply) {
   const root = createRootRoute({ component: Outlet });
+  const chat = (
+    <ScoutChat workspaceId={DUARTE.id} conversationId={MARTA.id} onClose={onClose} modal={false} />
+  );
   const page = createRoute({
     getParentRoute: () => root,
     path: "/w/$workspaceId",
-    component: () => (
-      <ScoutChat
-        workspaceId={DUARTE.id}
-        conversationId={MARTA.id}
-        onClose={onClose}
-        modal={false}
-      />
-    ),
+    component: () =>
+      openReply === undefined ? (
+        chat
+      ) : (
+        <ReplyOpenerProvider open={openReply}>{chat}</ReplyOpenerProvider>
+      ),
   });
   const reader = createRoute({
     getParentRoute: () => root,
@@ -85,9 +94,7 @@ describe("ScoutChat", () => {
     for (const question of [WHY, "What happened to this email?", "What else has Marta sent?"]) {
       expect(within(region).getByRole("button", { name: question })).toBeInTheDocument();
     }
-    expect(
-      screen.getByText("Scout looks things up and explains. In this version it changes nothing."),
-    ).toBeInTheDocument();
+    expect(screen.getByText("Scout asks before it changes anything.")).toBeInTheDocument();
     expect(mocked.calls.find((call) => call.route === `POST ${CHATS}`)?.body).toEqual({
       about: { type: "conversations.conversation", id: MARTA.id },
     });
@@ -190,5 +197,223 @@ describe("ScoutChat", () => {
     fireEvent.keyDown(field, { key: "Escape" });
 
     expect(onClose).toHaveBeenCalledOnce();
+  });
+
+  describe("proposals", () => {
+    const SETTLE = (id: string) => `POST ${CHATS}/${MARTA_CHAT.id}/proposals/${id}`;
+    const ARCHIVE = `POST ${W}/conversations/${MARTA.id}/archive`;
+    const UNARCHIVE = `POST ${W}/conversations/${MARTA.id}/unarchive`;
+
+    /** The chat holding `proposals`, each settled as the client says. */
+    function proposing(proposals = [ARCHIVE_PROPOSAL, RULE_PROPOSAL], more = {}) {
+      const states = new Map<string, string>();
+      const settle = (id: string) => (_request: Request, body: unknown) => {
+        const state = (body as { state: string }).state;
+        states.set(id, state);
+        return { body: { ...proposals.find((p) => p.id === id), state } };
+      };
+      const keys: (string | null)[] = [];
+      const mocked = mockApi({
+        [`POST ${CHATS}`]: () => ({
+          body: chatWithProposals(
+            proposals.map((p) => ({ ...p, state: states.get(p.id) ?? p.state }) as typeof p),
+          ),
+        }),
+        [`GET ${W}/conversations/${MARTA.id}`]: { body: MARTA_DETAIL },
+        [`GET ${W}/conversations`]: { body: { conversations: [PEDRO], next_cursor: null } },
+        [ARCHIVE]: (request) => {
+          keys.push(request.headers.get("Idempotency-Key"));
+          return { body: { ...MARTA, archived: true } };
+        },
+        [UNARCHIVE]: (request) => {
+          keys.push(request.headers.get("Idempotency-Key"));
+          return { body: MARTA };
+        },
+        ...Object.fromEntries(proposals.map((p) => [SETTLE(p.id), settle(p.id)])),
+        ...more,
+      });
+      return { mocked, keys, states };
+    }
+
+    it("shows each proposal as a card from the record's facts, and sends nothing until Confirm", async () => {
+      const { mocked } = proposing();
+      renderChat();
+
+      const card = await screen.findByRole("region", { name: "Archive" });
+      expect(within(card).getByText("Marta Ferreira · Walkthrough on Thursday")).toBeVisible();
+      expect(within(card).getByText("Scout proposes")).toBeVisible();
+      const rule = screen.getByRole("region", { name: "A rule to teach Scout" });
+      expect(within(rule).getByText(RULE_SENTENCE).tagName).toBe("Q");
+      expect(mocked.calls.some((call) => call.route === ARCHIVE)).toBe(false);
+    });
+
+    it("confirms with the member's own request, keyed by the proposal, once; then Undo", async () => {
+      const { mocked, keys, states } = proposing();
+      renderChat();
+      const card = await screen.findByRole("region", { name: "Archive" });
+
+      const confirm = within(card).getByRole("button", { name: "Confirm" });
+      fireEvent.click(confirm);
+      fireEvent.click(confirm);
+
+      expect(await within(card).findByText("Done.")).toBeVisible();
+      expect(keys).toEqual([ARCHIVE_PROPOSAL.id]);
+      await waitFor(() => {
+        expect(states.get(ARCHIVE_PROPOSAL.id)).toBe("done");
+      });
+      fireEvent.click(within(card).getByRole("button", { name: "Undo" }));
+
+      expect(await within(card).findByText("Undone.")).toBeVisible();
+      expect(keys).toEqual([ARCHIVE_PROPOSAL.id, `${ARCHIVE_PROPOSAL.id}:undo`]);
+      await waitFor(() => {
+        expect(states.get(ARCHIVE_PROPOSAL.id)).toBe("undone");
+      });
+      expect(mocked.calls.filter((call) => call.route === ARCHIVE)).toHaveLength(1);
+    });
+
+    it("says it could not be done, with the API's reason, when the request is refused", async () => {
+      const { states } = proposing(undefined, {
+        [ARCHIVE]: {
+          status: 409,
+          body: {
+            status: 409,
+            code: "need_changed",
+            title: "Changed",
+            detail: "Marta wrote again since.",
+          },
+        },
+      });
+      renderChat();
+      const card = await screen.findByRole("region", { name: "Archive" });
+
+      fireEvent.click(within(card).getByRole("button", { name: "Confirm" }));
+
+      expect(
+        await within(card).findByText("This couldn’t be done: Marta wrote again since."),
+      ).toBeVisible();
+      await waitFor(() => {
+        expect(states.get(ARCHIVE_PROPOSAL.id)).toBe("failed");
+      });
+      expect(within(card).queryByRole("button")).not.toBeInTheDocument();
+    });
+
+    it("never sends a request that is not one of its own actions", async () => {
+      const odd = {
+        ...ARCHIVE_PROPOSAL,
+        request: {
+          operation: "conversations.archive",
+          method: "POST" as const,
+          path: `../../workspaces/${DUARTE.id}`,
+          body: null,
+        },
+      };
+      const { mocked } = proposing([odd]);
+      renderChat();
+
+      const card = await screen.findByRole("region", { name: "Archive" });
+      expect(within(card).getByText("Scout can’t do this here.")).toBeVisible();
+      expect(within(card).queryByRole("button", { name: "Confirm" })).not.toBeInTheDocument();
+      expect(mocked.calls.every((call) => !call.route.includes("workspaces"))).toBe(true);
+    });
+
+    it("settles Not now as declined, and a settled card has no buttons when read again", async () => {
+      const { states } = proposing();
+      renderChat();
+      const card = await screen.findByRole("region", { name: "Archive" });
+
+      fireEvent.click(within(card).getByRole("button", { name: "Not now" }));
+
+      await waitFor(() => {
+        expect(states.get(ARCHIVE_PROPOSAL.id)).toBe("declined");
+      });
+      expect(await within(card).findByText("Not now.")).toBeVisible();
+      expect(within(card).queryByRole("button")).not.toBeInTheDocument();
+    });
+
+    it("opens Teach Scout with the rule's sentence, and settles done when the rule is saved", async () => {
+      const inbox = MARTA_RULE.proposals[0]?.inboxes[0]?.id ?? "";
+      const { mocked, states } = proposing(undefined, {
+        [`POST ${W}/assistant/compile`]: { body: MARTA_RULE },
+        [`POST ${W}/inboxes/${inbox}/rules/preview`]: {
+          body: {
+            matching: 3,
+            would_change: 0,
+            samples: [],
+            skipped_suspicious: 0,
+            skipped_member: 0,
+            overrides: [],
+          },
+        },
+        [`POST ${W}/inboxes/${inbox}/rules`]: {
+          status: 201,
+          body: { rule: { id: "rule-1" }, acted_without_asking: false },
+        },
+      });
+      renderChat();
+      const card = await screen.findByRole("region", { name: "A rule to teach Scout" });
+
+      fireEvent.click(within(card).getByRole("button", { name: "Review the rule" }));
+
+      const dialog = await screen.findByRole("dialog", { name: "Teach Scout something" });
+      expect(within(dialog).getByRole("textbox", { name: "What should Scout do?" })).toHaveValue(
+        RULE_SENTENCE,
+      );
+      await waitFor(() => {
+        expect(
+          mocked.calls.find((call) => call.route === `POST ${W}/assistant/compile`)?.body,
+        ).toEqual({
+          text: RULE_SENTENCE,
+        });
+      });
+      // Nothing is saved until Sam presses Save rule.
+      expect(mocked.calls.some((call) => call.route === `POST ${W}/inboxes/${inbox}/rules`)).toBe(
+        false,
+      );
+      fireEvent.click(await within(dialog).findByRole("button", { name: /Save rule/u }));
+
+      await waitFor(() => {
+        expect(states.get(RULE_PROPOSAL.id)).toBe("done");
+      });
+      expect(await within(card).findByText("Rule saved.")).toBeVisible();
+    });
+
+    it("settles a rule card declined when Teach Scout closes without saving", async () => {
+      const { states } = proposing(undefined, {
+        [`POST ${W}/assistant/compile`]: { body: MARTA_RULE },
+      });
+      renderChat();
+      const card = await screen.findByRole("region", { name: "A rule to teach Scout" });
+
+      fireEvent.click(within(card).getByRole("button", { name: "Review the rule" }));
+      const dialog = await screen.findByRole("dialog", { name: "Teach Scout something" });
+      fireEvent.keyDown(dialog, { key: "Escape" });
+
+      await waitFor(() => {
+        expect(states.get(RULE_PROPOSAL.id)).toBe("declined");
+      });
+    });
+
+    it("opens the Reply dialog with the intent through the app's opener; nothing is sent", async () => {
+      const openReply = vi.fn();
+      const { mocked, states } = proposing([REPLY_PROPOSAL]);
+      renderChat(vi.fn(), openReply);
+      const card = await screen.findByRole("region", { name: "A reply to Marta Ferreira" });
+      expect(
+        within(card).getByText("Confirm Thursday at 10 and ask who else is coming"),
+      ).toBeVisible();
+
+      fireEvent.click(within(card).getByRole("button", { name: "Write the draft" }));
+
+      expect(openReply).toHaveBeenCalledWith({
+        conversationId: MARTA.id,
+        stream: "primary",
+        name: "Marta Ferreira",
+        intent: "Confirm Thursday at 10 and ask who else is coming",
+      });
+      await waitFor(() => {
+        expect(states.get(REPLY_PROPOSAL.id)).toBe("done");
+      });
+      expect(mocked.calls.every((call) => !call.route.includes("/drafts"))).toBe(true);
+    });
   });
 });
