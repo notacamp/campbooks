@@ -35,6 +35,7 @@ import {
   sentToLine,
   spamMove,
   splitQuoted,
+  suggestsReply,
   threadLayout,
   trashMove,
   undoMoves,
@@ -67,6 +68,13 @@ describe("inbox model", () => {
       'scout.read{"list":"scout.needsReply and scout.hasDeadline"}',
     );
     expect(noteSentence(t, [], "en")).toBe("scout.nothing");
+    expect(suggestsReply(Q4_DETAIL.decisions)).toBe(true);
+    expect(suggestsReply([])).toBe(false);
+    expect(
+      suggestsReply(
+        Q4_DETAIL.decisions.map((d) => (d.question === "needs_reply" ? { ...d, value: false } : d)),
+      ),
+    ).toBe(false);
   });
 
   it("puts a suggestion before where the conversation is", () => {

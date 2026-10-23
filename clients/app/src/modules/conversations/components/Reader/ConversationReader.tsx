@@ -40,6 +40,7 @@ import {
   placementLine,
   spamMove,
   streamName,
+  suggestsReply,
   threadLayout,
   trashMove,
   type Move,
@@ -331,6 +332,21 @@ export function ConversationReader({
   // J/K step between conversations; the arrows keep scrolling this one.
   useShortcut("list.next", onNext, { alternates: false });
   useShortcut("list.previous", onPrevious, { alternates: false });
+  // The note offers Reply whenever it says a reply is needed (campbooks-cloud#306).
+  // No key hint: the reader's own Reply carries R.
+  const noteReply =
+    renderReplySlot === undefined || newest === undefined ? null : (
+      <Button
+        variant="secondary"
+        icon="reply"
+        onClick={() => {
+          openReply();
+        }}
+      >
+        {tShortcuts("item.reply")}
+      </Button>
+    );
+
   const canReply = active && renderReplySlot !== undefined;
   useShortcut(
     "item.reply",
@@ -438,6 +454,7 @@ export function ConversationReader({
   const kind = avatarKind(conversation);
   const subject = conversation.subject === "" ? t("reader.noSubject") : conversation.subject;
   const decisions = detail?.decisions ?? [];
+  const suggestedReply = suggestsReply(decisions) ? noteReply : null;
   const exists = (key: string) => i18n.exists(`conversations:${key}`);
   const unread = conversation.unread_count > 0;
   const replyButtons =
@@ -625,7 +642,16 @@ export function ConversationReader({
               ? {}
               : { chips: <ExpiredChip /> })}
             footer={footerLine(conversation)}
-            {...(stopButton === null ? {} : { actions: stopButton })}
+            {...(suggestedReply === null && stopButton === null
+              ? {}
+              : {
+                  actions: (
+                    <>
+                      {suggestedReply}
+                      {stopButton}
+                    </>
+                  ),
+                })}
             how={
               <HowDecided rows={howRows(t, exists, decisions)} footnote={t("needs.how.footnote")} />
             }
@@ -739,6 +765,7 @@ export function ConversationReader({
               : {
                   actions: (
                     <>
+                      {need.reason === "reply" ? noteReply : null}
                       <Button
                         variant="secondary"
                         onClick={() => {

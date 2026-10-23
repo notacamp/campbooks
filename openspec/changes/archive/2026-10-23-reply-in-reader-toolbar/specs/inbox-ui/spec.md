@@ -35,7 +35,7 @@ composer directly.
 - **WHEN** the member opens a conversation at 1280px
 - **THEN** the reader's header is one row: Done, then Reply (R), Reply all (Shift+R) and Forward (F) side by side as icons whose tooltips name them and their keys, and no "Reply to <name>" button sits at the bottom of the reader
 
-#### Scenario: A narrow desktop window
+#### Scenario: A narrow reader folds the rest into More
 - **WHEN** the member opens a conversation at 1100px wide, where the reader is too narrow for every icon
 - **THEN** the header is still one row: Done, Reply, Reply all, Forward and Move, then "More actions" holding Delete, Report spam, Pin, Mark unread, Previous and Next with their keys, and # still deletes
 
