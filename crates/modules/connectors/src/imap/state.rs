@@ -63,6 +63,10 @@ pub struct Cursor {
     /// Messages left with no location still wait to be looked for.
     #[serde(skip_serializing_if = "is_false")]
     pub recheck: bool,
+    /// Whether the server offered IDLE at the last run (none before the
+    /// first): what makes the stream a candidate for push.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub idle: Option<bool>,
 }
 
 #[allow(clippy::trivially_copy_pass_by_ref, reason = "serde's signature")]

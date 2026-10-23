@@ -40,6 +40,8 @@ uuid.workspace = true
 [dev-dependencies]
 boon.workspace = true
 campbooks-kernel = { workspace = true, features = ["test-util"] }
+# Paused time for the IDLE pool's watchdog test.
+tokio = { workspace = true, features = ["test-util"] }
 wiremock.workspace = true
 
 [lints]

@@ -73,3 +73,20 @@ fn login_quotes_what_it_can_and_sends_the_rest_as_literals() {
         ["w1 LOGIN {3}\r\n", "ana {5}\r\n", "p\u{e4}ss\r\n"]
     );
 }
+
+#[test]
+fn only_known_response_codes_are_logged() {
+    let code = |name: &str| Code {
+        name: name.to_owned(),
+        number: None,
+    };
+    assert_eq!(logged_code(None), "");
+    assert_eq!(
+        logged_code(Some(&code("AUTHENTICATIONFAILED"))),
+        "AUTHENTICATIONFAILED"
+    );
+    assert_eq!(logged_code(Some(&code("UNAVAILABLE"))), "UNAVAILABLE");
+    // Whatever else a server puts there is its own word: never logged.
+    assert_eq!(logged_code(Some(&code("ANA-AT-BAKERY"))), "other");
+    assert!(LOGGED_CODES.windows(2).all(|pair| pair[0] < pair[1]));
+}

@@ -171,6 +171,10 @@ path = "crates/modules/connectors/src/domain/schedule.rs"
 reason = "The one-minute dispatcher leases due streams across workspaces (`connectors.sync_due` maintenance policies: ids and times, read and lease only) and enqueues each stream's run in its workspace."
 
 [[access.maintenance_scope]]
+path = "crates/modules/connectors/src/features/imap_idle/lease.rs"
+reason = "IMAP push with IDLE (campbooks-cloud#318): each process's pool claims, renews, releases and gives up IDLE leases across workspaces, and a sync run counts its host's live IDLE sessions (`connectors.imap_idle_leases` maintenance policies: ids, keyed digests, a flag and times, read and update only; a trigger lets the scope change only holders and times). Everything a session does with a connection (its password, its stream's runs, a refusal) happens in that connection's workspace."
+
+[[access.maintenance_scope]]
 path = "crates/modules/conversations/src/features/backfill_needs/mod.rs"
 reason = "The needs backfill's dispatcher starts pending backfills across workspaces (`conversations.needs_backfills` maintenance policies: ids and states, start only) and enqueues each inbox's page job in its workspace."
 

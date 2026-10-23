@@ -36,7 +36,9 @@ use crate::{
     deps::Deps,
     domain::{
         credentials::{self, TokenError},
-        emit, health, imap_servers,
+        emit,
+        health::{self, LOGIN_REFUSALS},
+        imap_servers,
         marks::MarkIds,
         model::{ConnectionId, Health, InboxId, Phase, Provider, StreamId},
         outbound::{self, Backlog},
@@ -44,6 +46,7 @@ use crate::{
         removal::BATCH_OWNER,
         schedule::{self, LEASE, Rate, SYNC_STREAM, SyncStreamPayload},
     },
+    features::imap_idle::lease,
     gmail::{self, Reader},
     google::LabelInfo,
     imap::{
@@ -213,6 +216,8 @@ struct RunPage {
     read_up_to: Option<i64>,
     /// Where IMAP messages now are (IMAP only).
     imap: Vec<LocationOp>,
+    /// What the run offers for IDLE (IMAP only).
+    idle: Option<lease::Offer>,
 }
 
 impl SyncStream {
@@ -423,6 +428,7 @@ impl SyncStream {
             labels: page.labels,
             zoho_labels: None,
             imap: Vec::new(),
+            idle: None,
             phase: page.phase,
             more: page.more,
         }))
@@ -570,6 +576,7 @@ impl SyncStream {
             labels: None,
             zoho_labels: labels.as_ref().and_then(zoho::read::LabelCache::fresh),
             imap: Vec::new(),
+            idle: None,
             phase: page.phase,
             more: page.more,
         }))
@@ -659,17 +666,23 @@ impl SyncStream {
             ))
         })?;
         let imap = self.deps.imap.clone();
-        let slots = [
-            // The workspace's share of the host, then the host's.
-            (
-                imap_workspace_slots(&server.host, workspace),
-                imap_rate(imap.config.workspace_sessions_per_host),
-            ),
-            (
-                imap_slots(&server.host),
-                imap_rate(imap.config.sessions_per_host),
-            ),
-        ];
+        let provider_host = imap::is_provider_host(&server.host);
+        let signer = &ctx.state().signer;
+        let host_key = lease::host_key(signer, &server.host);
+        let offer = lease::Offer {
+            login_key: lease::login_key(signer, &username, &server.host),
+            host_key: host_key.clone(),
+            provider_host,
+            capable: false,
+        };
+        // IDLE sessions hold some of the host's sessions for long: the run
+        // needs a slot beyond them.
+        let idling = if imap.config.idle_enabled {
+            lease::live_on_host(ctx.pool(), &host_key, workspace).await?
+        } else {
+            (0, 0)
+        };
+        let slots = run_slots(&imap.config, &server.host, workspace, provider_host, idling);
         if !take_slots(ctx.pool(), &slots).await? {
             // As many sessions as it may: the next dispatch.
             metrics::sync_finished(target.provider, SyncOutcome::Throttled);
@@ -688,7 +701,7 @@ impl SyncStream {
             workspace,
             stream: target.stream,
             phase: target.phase,
-            cursor: cursor.clone(),
+            cursor,
             now,
             address,
         };
@@ -697,9 +710,21 @@ impl SyncStream {
             .unwrap_or(Err(ImapTrouble::Failed(Failure::Server("imap_timed_out"))));
         give_back_slots(ctx.pool(), &slots).await;
         match read {
-            Ok(page) => imap_page(page).map(Some),
+            Ok(page) => {
+                let offer = lease::Offer {
+                    // After the backfill only: its continuation runs must
+                    // not be doubled by IDLE's.
+                    capable: imap.config.idle_enabled
+                        && page.cursor.idle == Some(true)
+                        && page.phase == Phase::Incremental,
+                    ..offer
+                };
+                let mut page = imap_page(page)?;
+                page.idle = Some(offer);
+                Ok(Some(page))
+            }
             Err(ImapTrouble::Refused(refusal)) => {
-                self.imap_refused(ctx, workspace, target, &cursor, refusal, now)
+                self.imap_refused(ctx, workspace, target, refusal, now)
                     .await?;
                 Ok(None)
             }
@@ -726,31 +751,21 @@ impl SyncStream {
         ctx: &mut JobContext,
         workspace: WorkspaceId,
         target: &Target,
-        cursor: &Cursor,
         refusal: Refusal,
         now: DateTime<Utc>,
     ) -> Result<(), JobError> {
         match refusal {
             Refusal::ImapLoginRefused => {
-                let refusals = cursor.login_refusals.saturating_add(1);
+                // Counted with the IDLE sessions' refusals (one count).
+                let tx = ctx.tx().await?;
+                let refusals =
+                    health::count_login_refusal(tx, target.connection, target.stream).await?;
                 if refusals >= LOGIN_REFUSALS {
                     metrics::sync_finished(target.provider, SyncOutcome::Refused);
                     return self
                         .needs_reauth(ctx, workspace, target, "imap_login_refused", now)
                         .await;
                 }
-                let tx = ctx.tx().await?;
-                // The connection before the stream (removal's order).
-                health::lock(tx, target.connection).await?;
-                sqlx::query(
-                    "UPDATE connectors.streams
-                        SET cursor = jsonb_set(cursor, '{login_refusals}', to_jsonb($2::int))
-                      WHERE id = $1",
-                )
-                .bind(target.stream)
-                .bind(i32::try_from(refusals).unwrap_or(i32::MAX))
-                .execute(&mut **tx)
-                .await?;
                 let err = ProviderError::Unavailable(refusal.code().to_owned());
                 self.trouble(ctx, workspace, target, &err, now).await
             }
@@ -922,6 +937,9 @@ impl SyncStream {
         if matches!(target.health, Health::Throttled | Health::Failing) {
             health::set(tx, target.connection, Health::Ok, None, now).await?;
         }
+        let least_wait = self
+            .offer_idle(tx, workspace, target, page.idle.as_ref(), now)
+            .await?;
         if settle_outbound(
             tx,
             target.stream,
@@ -949,7 +967,7 @@ impl SyncStream {
             )
             .await?;
         } else {
-            let next = now + TimeDelta::seconds(i64::from(interval));
+            let next = now + TimeDelta::seconds(i64::from(interval.max(least_wait)));
             schedule::set_due(tx, workspace, target.stream, next).await?;
         }
         tracing::info!(
@@ -957,6 +975,38 @@ impl SyncStream {
             phase = page.phase.as_str(), more = page.more, "stream synced"
         );
         Ok(())
+    }
+
+    /// An IMAP stream offers itself for IDLE (`offer`), or withdraws, in the
+    /// run's transaction. The least wait before its next poll: held in
+    /// IDLE, the safety poll's; none otherwise.
+    async fn offer_idle(
+        &self,
+        tx: &mut Transaction<'static, Postgres>,
+        workspace: WorkspaceId,
+        target: &Target,
+        offer: Option<&lease::Offer>,
+        now: DateTime<Utc>,
+    ) -> Result<i32, JobError> {
+        let Some(offer) = offer else {
+            return Ok(0);
+        };
+        let config = &self.deps.imap.config;
+        let quiet = TimeDelta::days(i64::from(config.idle_quiet_days));
+        let held = lease::offer(
+            tx,
+            workspace,
+            target.connection,
+            target.stream,
+            offer,
+            now - quiet,
+        )
+        .await?;
+        Ok(if held {
+            i32::try_from(config.idle_poll_seconds).unwrap_or(i32::MAX)
+        } else {
+            0
+        })
     }
 
     /// The provider refused the access token: drop it so the next run
@@ -1116,10 +1166,6 @@ impl SyncStream {
     }
 }
 
-/// Sign-ins an IMAP server refuses in a row before the connection needs the
-/// member.
-const LOGIN_REFUSALS: u32 = 3;
-
 /// The longest an IMAP run may take in all, well within a lease.
 const IMAP_RUN_LIMIT: Duration = Duration::from_mins(10);
 
@@ -1137,11 +1183,46 @@ fn imap_workspace_slots(host: &str, workspace: WorkspaceId) -> String {
     format!("imap:{host}:{workspace}")
 }
 
-/// Take one slot of each of `slots` (key, rate), in order; none when one
-/// is full (those taken are given back). Whether they were taken.
-async fn take_slots(pool: &PgPool, slots: &[(String, Rate)]) -> Result<bool, JobError> {
-    for (n, (key, rate)) in slots.iter().enumerate() {
-        if schedule::take(pool, key, 1, *rate).await?.is_err() {
+/// One session budget a run takes a slot of: its key, its rate, and the
+/// slots it must leave to live IDLE sessions.
+type Slot = (String, Rate, u32);
+
+/// The slots a run on `host` takes: the workspace's share of the host, then
+/// the host's. A known provider's host holds
+/// `provider_sessions_per_host` sessions, any other `sessions_per_host`;
+/// `idling` (the host's live IDLE sessions, and the workspace's) are left
+/// free on the host, and on a small host in the workspace's share too.
+fn run_slots(
+    config: &crate::config::ImapConfig,
+    host: &str,
+    workspace: WorkspaceId,
+    provider_host: bool,
+    idling: (u32, u32),
+) -> [Slot; 2] {
+    let (on_host, own) = idling;
+    let sessions = if provider_host {
+        config.provider_sessions_per_host
+    } else {
+        config.sessions_per_host
+    };
+    [
+        (
+            imap_workspace_slots(host, workspace),
+            imap_rate(config.workspace_sessions_per_host),
+            if provider_host { 0 } else { own },
+        ),
+        (imap_slots(host), imap_rate(sessions), on_host),
+    ]
+}
+
+/// Take one slot of each of `slots` (key, rate, reserve), in order; none
+/// when one is full (those taken are given back). Whether they were taken.
+async fn take_slots(pool: &PgPool, slots: &[Slot]) -> Result<bool, JobError> {
+    for (n, (key, rate, reserve)) in slots.iter().enumerate() {
+        if schedule::take_leaving(pool, key, 1, *rate, *reserve)
+            .await?
+            .is_err()
+        {
             give_back_slots(pool, &slots[..n]).await;
             return Ok(false);
         }
@@ -1151,8 +1232,8 @@ async fn take_slots(pool: &PgPool, slots: &[(String, Rate)]) -> Result<bool, Job
 
 /// Give back one slot of each of `slots` (best effort: a slot not given
 /// back comes back as its bucket refills).
-async fn give_back_slots(pool: &PgPool, slots: &[(String, Rate)]) {
-    for (key, rate) in slots {
+async fn give_back_slots(pool: &PgPool, slots: &[Slot]) {
+    for (key, rate, _) in slots {
         if let Err(err) = schedule::settle(pool, key, 1, 0, *rate).await {
             tracing::warn!(
                 error = %campbooks_kernel::redact::error(&err),
@@ -1232,6 +1313,7 @@ fn imap_page(page: Page) -> Result<RunPage, JobError> {
         labels: None,
         zoho_labels: None,
         imap: page.locations,
+        idle: None,
         phase: page.phase,
         more: page.more,
     })

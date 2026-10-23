@@ -6,6 +6,7 @@ pub mod disconnect;
 pub mod discover_imap;
 pub mod dispatch_due;
 pub mod get_connection;
+pub mod imap_idle;
 pub mod list_connections;
 pub mod member_left;
 pub mod queue_send;

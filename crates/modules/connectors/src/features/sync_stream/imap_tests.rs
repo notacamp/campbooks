@@ -14,7 +14,7 @@ use chrono::{DateTime, TimeDelta, Utc};
 use serde_json::Value;
 use sqlx::PgPool;
 
-use super::{imap_rate, imap_slots, imap_workspace_slots};
+use super::{imap_rate, imap_slots, imap_workspace_slots, run_slots, take_slots};
 use crate::{
     config::ImapConfig,
     domain::schedule,
@@ -990,4 +990,81 @@ async fn a_download_that_keeps_timing_out_is_given_up(db: PgPool) {
         m.count("SELECT count(*) FROM connectors.oversized").await,
         1
     );
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_known_providers_host_is_not_held_to_a_small_servers_cap(db: PgPool) {
+    // campbooks-cloud#318: four sessions per host would starve every
+    // customer of a big provider.
+    let pool = testing::app_role_pool(&db).await;
+    let config = ImapConfig::default();
+    assert!(crate::imap::is_provider_host("imap.mail.yahoo.com"));
+    assert!(!crate::imap::is_provider_host(IMAP_HOST));
+    for (host, provider, runs) in [("imap.mail.yahoo.com", true, 5), (IMAP_HOST, false, 4)] {
+        let mut granted = 0;
+        // Five streams of five workspaces, due at once.
+        for _ in 0..5 {
+            let slots = run_slots(&config, host, WorkspaceId::new(), provider, (0, 0));
+            if take_slots(&pool, &slots).await.unwrap() {
+                granted += 1;
+            }
+        }
+        assert_eq!(granted, runs, "{host}");
+    }
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn idle_sessions_count_against_a_small_hosts_sessions(db: PgPool) {
+    // Two sessions to the host: IDLE may hold one, the runs keep the other.
+    let m = mailbox(
+        db,
+        |config| {
+            config.sessions_per_host = 2;
+            config.idle_enabled = true;
+        },
+        |script| script.offers.idle = true,
+        |imap, now| {
+            imap.deliver("INBOX", &from_bea("a@bakery.example", "Hello"), now);
+        },
+    )
+    .await;
+    m.kit.run_jobs().await;
+    let pool = crate::features::imap_idle::IdlePool::with_timing(
+        m.kit.deps.clone(),
+        m.kit.state.clone(),
+        crate::features::imap_idle::Timing {
+            refresh: std::time::Duration::from_mins(1),
+            debounce: std::time::Duration::from_mins(10),
+            renew: std::time::Duration::from_mins(1),
+            lease: std::time::Duration::from_mins(3),
+            backoff: std::time::Duration::from_millis(10),
+            backoff_max: std::time::Duration::from_millis(40),
+            give_up_after: 3,
+            cooldown: std::time::Duration::from_mins(30),
+            db_timeout: std::time::Duration::from_secs(20),
+        },
+    );
+    let mut held = crate::features::imap_idle::IdlePool::held();
+    pool.tick(&mut held).await;
+    assert_eq!(held.connections().len(), 1, "IDLE holds one session");
+    // A run of another workspace holds the other.
+    assert_eq!(
+        schedule::take(&m.kit.db, &imap_slots(IMAP_HOST), 1, imap_rate(2))
+            .await
+            .unwrap(),
+        Ok(())
+    );
+    let before = m.changes().await.len();
+    let now = m.kit.clock.now();
+    m.imap
+        .deliver("INBOX", &from_bea("b@bakery.example", "Order"), now);
+    m.kit.next_run().await;
+    assert_eq!(m.changes().await.len(), before, "the run waits");
+    // The other run ends: the next dispatch runs it.
+    schedule::settle(&m.kit.db, &imap_slots(IMAP_HOST), 1, 0, imap_rate(2))
+        .await
+        .unwrap();
+    m.kit.next_run().await;
+    assert_eq!(m.changes().await.len(), before + 1);
+    pool.shutdown(held).await;
 }

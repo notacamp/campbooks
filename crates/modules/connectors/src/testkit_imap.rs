@@ -12,8 +12,13 @@
 
 use std::{
     collections::HashMap,
+    fmt::Write as _,
     net::{IpAddr, SocketAddr},
-    sync::{Arc, Mutex, PoisonError},
+    sync::{
+        Arc, Mutex, PoisonError,
+        atomic::{AtomicUsize, Ordering},
+    },
+    time::Duration,
 };
 
 use base64::{Engine as _, engine::general_purpose::STANDARD};
@@ -131,6 +136,13 @@ pub struct Seen {
     pub bodies: usize,
     pub marked_read: usize,
     pub changes: usize,
+    /// IMAP: changes reported in IDLE.
+    pub reported: usize,
+    /// IMAP: `IDLE` commands, `DONE`s, `NOOP`s and `LOGOUT`s received.
+    pub idles: usize,
+    pub dones: usize,
+    pub noops: usize,
+    pub logouts: usize,
 }
 
 #[derive(Debug)]
@@ -138,6 +150,8 @@ struct Shared {
     script: Mutex<Script>,
     seen: Mutex<Seen>,
     store: Mutex<Store>,
+    /// Bumped to make every session in IDLE say goodbye and hang up.
+    hangups: AtomicUsize,
 }
 
 impl Shared {
@@ -181,6 +195,7 @@ impl FakeServer {
             script: Mutex::new(script),
             seen: Mutex::new(Seen::default()),
             store: Mutex::new(Store::default()),
+            hangups: AtomicUsize::new(0),
         });
         let serving = shared.clone();
         tokio::spawn(async move {
@@ -263,6 +278,11 @@ impl FakeServer {
     /// Whether message `uid` of `folder` is read at the server.
     pub fn is_read(&self, folder: &str, uid: u32) -> bool {
         self.mailbox(|store| store.mail(folder, uid).seen)
+    }
+
+    /// Make every session in IDLE say goodbye and hang up (a restart).
+    pub fn hang_up(&self) {
+        self.shared.hangups.fetch_add(1, Ordering::SeqCst);
     }
 }
 
@@ -409,6 +429,7 @@ async fn imap_session<S: AsyncRead + AsyncWrite + Unpin>(
                         (offers.condstore, "CONDSTORE"),
                         (offers.qresync, "QRESYNC"),
                         (offers.objectid, "OBJECTID"),
+                        (offers.idle, "IDLE"),
                     ] {
                         if offered {
                             caps.push(name);
@@ -470,12 +491,31 @@ async fn imap_session<S: AsyncRead + AsyncWrite + Unpin>(
                 continue;
             }
             "LOGOUT" => {
+                shared.see(|seen| seen.logouts += 1);
                 write(
                     conn.get_mut(),
                     &format!("* BYE see you\r\n{tag} OK done\r\n"),
                 )
                 .await;
                 return Next::Done;
+            }
+            "IDLE" if encrypted && script.offers.idle => {
+                shared.see(|seen| seen.idles += 1);
+                if !write(conn.get_mut(), "+ idling\r\n").await {
+                    break;
+                }
+                let folder = selected.clone().unwrap_or_else(|| "INBOX".to_owned());
+                match idle(conn, shared, script.offers, &folder).await {
+                    Idled::Done => {
+                        shared.see(|seen| seen.dones += 1);
+                        format!("{tag} OK IDLE terminated\r\n")
+                    }
+                    Idled::Gone => break,
+                }
+            }
+            "NOOP" if encrypted => {
+                shared.see(|seen| seen.noops += 1);
+                format!("{tag} OK done\r\n")
             }
             _ if encrypted => {
                 let answer = signed_in(shared, &script, &tag, verb, args, &mut selected);
@@ -491,6 +531,95 @@ async fn imap_session<S: AsyncRead + AsyncWrite + Unpin>(
         }
     }
     Next::Done
+}
+
+/// How an IDLE ended.
+enum Idled {
+    /// The client said `DONE`.
+    Done,
+    /// The connection closed, or the fake hung up.
+    Gone,
+}
+
+/// What woke the fake in IDLE.
+enum Woke {
+    /// The client sent a line.
+    Line,
+    /// The client closed the connection.
+    Closed,
+    /// Time to look at the mailbox again.
+    Tick,
+}
+
+/// IDLE on `folder` until the client says `DONE`: the folder's changes are
+/// reported as they happen (`EXISTS` when it grew, an `EXPUNGE` per
+/// message gone, `FETCH` when only flags moved), or, with `idle_flood`,
+/// `EXISTS` without end.
+async fn idle<S: AsyncRead + AsyncWrite + Unpin>(
+    conn: &mut BufReader<S>,
+    shared: &Shared,
+    offers: Offers,
+    folder: &str,
+) -> Idled {
+    let hangups = shared.hangups.load(Ordering::SeqCst);
+    let state = || {
+        shared
+            .store
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .idle_state(folder)
+    };
+    let mut last = state();
+    let flood = "* 1 EXISTS\r\n".repeat(500);
+    loop {
+        if offers.idle_flood && !write(conn.get_mut(), &flood).await {
+            return Idled::Gone;
+        }
+        let woke = tokio::select! {
+            ready = conn.fill_buf() => match ready {
+                Ok(buf) if !buf.is_empty() => Woke::Line,
+                _ => Woke::Closed,
+            },
+            () = tokio::time::sleep(Duration::from_millis(10)) => Woke::Tick,
+        };
+        match woke {
+            Woke::Closed => return Idled::Gone,
+            Woke::Line => {
+                let line = read(conn).await;
+                return if line.is_some_and(|l| l.eq_ignore_ascii_case("DONE")) {
+                    Idled::Done
+                } else {
+                    Idled::Gone
+                };
+            }
+            Woke::Tick => {
+                if shared.hangups.load(Ordering::SeqCst) != hangups {
+                    write(conn.get_mut(), "* BYE going away\r\n").await;
+                    return Idled::Gone;
+                }
+                let now = state();
+                let mut report = String::new();
+                if let (Some((before, modseq_before)), Some((after, modseq_after))) = (last, now) {
+                    if after > before {
+                        let _ = write!(report, "* {after} EXISTS\r\n");
+                    } else if after < before {
+                        for _ in after..before {
+                            report.push_str("* 1 EXPUNGE\r\n");
+                        }
+                    } else if modseq_after != modseq_before {
+                        report.push_str("* 1 FETCH (FLAGS (\\Seen))\r\n");
+                    }
+                }
+                if !report.is_empty() {
+                    if !write(conn.get_mut(), &report).await {
+                        return Idled::Gone;
+                    }
+                    shared.see(|seen| seen.reported += 1);
+                }
+                last = now;
+            }
+        }
+    }
 }
 
 /// A command past signing in, answered from the mailbox.

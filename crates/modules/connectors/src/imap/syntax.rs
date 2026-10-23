@@ -138,6 +138,8 @@ pub enum Untagged<'a> {
     Search(Vec<u32>),
     /// `* 23 EXISTS`.
     Exists(u32),
+    /// `* 7 EXPUNGE`: the message at that sequence number is gone.
+    Expunge(u32),
     /// `* VANISHED (EARLIER) 41,43:116`: the UID ranges, inclusive.
     Vanished(Vec<(u32, u32)>),
     /// `* 12 FETCH (…)`.
@@ -240,6 +242,7 @@ fn untagged(text: &[u8]) -> Result<Untagged<'_>, Malformed> {
         let (kind, rest) = split_word(rest);
         return match kind.to_ascii_uppercase().as_slice() {
             b"EXISTS" => Ok(Untagged::Exists(n)),
+            b"EXPUNGE" => Ok(Untagged::Expunge(n)),
             b"FETCH" => fetch(rest).map(|f| Untagged::Fetch(Box::new(f))),
             _ => Ok(Untagged::Other),
         };
@@ -695,6 +698,7 @@ mod tests {
         );
         assert_eq!(untagged_of("* 7 EXISTS\r\n"), Untagged::Exists(7));
         assert_eq!(untagged_of("* 7 RECENT\r\n"), Untagged::Other);
+        assert_eq!(untagged_of("* 3 EXPUNGE\r\n"), Untagged::Expunge(3));
         assert_eq!(
             untagged_of("* CAPABILITY IMAP4rev1 condstore QRESYNC\r\n"),
             Untagged::Capabilities(vec![
