@@ -318,7 +318,8 @@ export function ReplyDialog({
   };
 
   // An intent handed over is drafted once, when the message it answers is
-  // known (never over a draft handed back).
+  // known (never over a draft handed back): asked for just after this
+  // render, as the member's own pick would be.
   const started = useRef(false);
   useEffect(() => {
     if (started.current || startWith === undefined || resume !== undefined) {
@@ -327,8 +328,15 @@ export function ReplyDialog({
     if (answered === undefined || startWith.trim() === "") {
       return;
     }
-    started.current = true;
-    write(startWith.slice(0, MAX_ASK_CHARS));
+    const timer = setTimeout(() => {
+      if (!started.current) {
+        started.current = true;
+        write(startWith.slice(0, MAX_ASK_CHARS));
+      }
+    }, 0);
+    return () => {
+      clearTimeout(timer);
+    };
   });
 
   const back = () => {
