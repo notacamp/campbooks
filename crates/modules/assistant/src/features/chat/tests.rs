@@ -1860,6 +1860,9 @@ fn team() -> Vec<Value> {
     ]
 }
 
+/// A call, the action it stores, and the request, undo and detail expected.
+type TaskCase = ((&'static str, Value), &'static str, Value, Value, Value);
+
 /// `propose_task_change` with `action` on the errand, and `extra`.
 fn task_change(action: &str, extra: &Value) -> (&'static str, Value) {
     let mut arguments = json!({ "action": action, "task_id": ERRAND });
@@ -1899,7 +1902,7 @@ async fn each_task_action_is_stored_with_its_request_and_undo(db: PgPool) {
     let until = (Utc::now() + chrono::Duration::days(4)).to_rfc3339();
     let path = |tail: &str| format!("tasks/{ERRAND}{tail}");
     let revision = json!(["revision"]);
-    let cases: Vec<((&str, Value), &str, Value, Value, Value)> = vec![
+    let cases: Vec<TaskCase> = vec![
         (
             task_change("done", &json!({})),
             "task_done",
