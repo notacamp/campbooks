@@ -165,8 +165,9 @@ fn read_definitions() -> Vec<ToolDefinition> {
                     ),
                 ),
                 ChatTool::WhatNeedsMe => (
-                    "What needs the member now (their list on Home), or what they are \
-                     waiting on others for. Up to 20.",
+                    "What needs the member now across all their mail (their list on \
+                     Home), or what they are waiting on others for. Up to 20. Not for \
+                     what the chat's own record asks of them: that is under `about`.",
                     object(
                         json!({
                             "waiting": {"type": "boolean",

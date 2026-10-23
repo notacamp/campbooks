@@ -739,6 +739,11 @@ async fn a_failed_answer_is_kept_failed_and_says_nothing_of_the_provider(db: PgP
 
     let logged = String::from_utf8_lossy(&captured.0.lock().unwrap()).into_owned();
     assert!(logged.contains("chat question"), "{logged}");
+    assert!(
+        logged.contains("about=\"conversations.conversation\"")
+            || logged.contains("about=conversations.conversation"),
+        "{logged}"
+    );
     for never in [
         "marta@example.com",
         "Rent for November",
