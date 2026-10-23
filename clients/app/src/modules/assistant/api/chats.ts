@@ -85,7 +85,7 @@ export function useChatCache(workspaceId: string, source: ChatSource) {
      * chat about nothing is asked for by its id: starting again would make
      * another.
      */
-    refresh: async (chatId: string | undefined) => {
+    refresh: async (chatId?: string) => {
       if (source.kind === "nothing" && chatId !== undefined) {
         const view = unwrap(
           await api.GET("/api/v1/w/{workspace_id}/assistant/chats/{chat_id}", {

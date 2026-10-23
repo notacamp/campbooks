@@ -42,9 +42,7 @@ export function ruleNoticeRef(id: string): RecordRef {
 const ScoutChatContext = createContext<OpenScoutChat | undefined>(undefined);
 
 /** Where a provider below says what opening does (the root's command menu listens). */
-const HostContext = createContext<((open: OpenScoutChat | undefined) => void) | undefined>(
-  undefined,
-);
+const HostContext = createContext<((open?: OpenScoutChat) => void) | undefined>(undefined);
 
 interface ScoutChatProviderProps {
   /** What opening does: the app shows its one panel. */
@@ -65,7 +63,7 @@ export function ScoutChatProvider({ open, children }: ScoutChatProviderProps) {
     }
     host(open);
     return () => {
-      host(undefined);
+      host();
     };
   }, [host, open]);
   return <ScoutChatContext value={open}>{children}</ScoutChatContext>;
@@ -73,7 +71,7 @@ export function ScoutChatProvider({ open, children }: ScoutChatProviderProps) {
 
 interface ScoutChatHostProps {
   /** The opener of the panel mounted below, or `undefined` while none is. Stable. */
-  onOpener: (open: OpenScoutChat | undefined) => void;
+  onOpener: (open?: OpenScoutChat) => void;
   children: ReactNode;
 }
 

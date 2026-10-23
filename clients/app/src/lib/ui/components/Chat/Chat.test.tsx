@@ -174,15 +174,16 @@ describe("ChatRecent", () => {
     fireEvent.click(screen.getByRole("button", { name: "Recent" }));
     expect(onOpen).toHaveBeenCalledOnce();
     const menu = screen.getByRole("dialog", { name: "Recent" });
-    const [first, second] = within(menu).getAllByRole("button");
+    const first = within(menu).getByRole("button", { name: /What am I waiting on/u });
+    const second = within(menu).getByRole("button", { name: /Why is this here/u });
     expect(first).toHaveTextContent("What am I waiting on?15:02");
     expect(first).toHaveAttribute("aria-current", "true");
     expect(first).toHaveFocus();
     expect(within(menu).getByText("Yesterday")).toHaveAttribute("datetime", "2026-10-12T09:40:00Z");
 
-    fireEvent.keyDown(first as HTMLElement, { key: "ArrowDown" });
+    fireEvent.keyDown(first, { key: "ArrowDown" });
     expect(second).toHaveFocus();
-    fireEvent.click(second as HTMLElement);
+    fireEvent.click(second);
     expect(onPick).toHaveBeenCalledWith("c-1");
     expect(screen.queryByText("Why is this here?")).not.toBeInTheDocument();
   });

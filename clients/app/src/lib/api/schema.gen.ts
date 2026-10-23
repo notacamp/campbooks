@@ -375,9 +375,18 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        /**
+         * Your chats with Scout, the newest message first: at most 30, each with
+         *     your first question and when its last message was written. A chat with
+         *     no question yet is not listed. What a chat is about is never read again
+         *     here: open it to see whether Scout still can.
+         */
+        get: operations["assistant.list_chats"];
         put?: never;
-        /** Start a chat with Scout, or continue yours about the same record. */
+        /**
+         * Start a chat with Scout, or continue yours about the same record.
+         *     Without `about`, a new chat about nothing in particular, every time.
+         */
         post: operations["assistant.start_chat"];
         delete?: never;
         options?: never;
@@ -1528,6 +1537,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/w/{workspace_id}/rule-notices/{notice_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Read one of Scout's suggestions, as `conversations.list_rule_notices`
+         *     lists it: an open one, in an inbox you may teach in, that you did not
+         *     answer "Not now" (for a while) or "Don't suggest this". It starts no
+         *     pass over the inbox.
+         */
+        get: operations["conversations.get_rule_notice"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/w/{workspace_id}/rule-notices/{notice_id}/answer": {
         parameters: {
             query?: never;
@@ -2489,6 +2520,11 @@ export interface components {
          * @description ChatId (UUIDv7)
          */
         ChatId: string;
+        /** @description Your chats with Scout, the newest message first. */
+        ChatList: {
+            /** @description At most 30, each with at least one question. */
+            chats: components["schemas"]["ChatSummary"][];
+        };
         /**
          * Format: uuid
          * @description ChatMessageId (UUIDv7)
@@ -2562,6 +2598,30 @@ export interface components {
             records: components["schemas"]["RecordRef"][];
             /** @description The tool. */
             tool: components["schemas"]["ChatTool"];
+        };
+        /**
+         * @description One of your chats, as the list shows it: never what it is about read
+         *     again, only what you asked.
+         */
+        ChatSummary: {
+            about?: components["schemas"]["RecordRef"] | null;
+            /**
+             * @description Your first question in it, your own words, at most 120 characters:
+             *     show it as text only.
+             */
+            first_question: string;
+            /** @description The chat. */
+            id: components["schemas"]["ChatId"];
+            /**
+             * Format: date-time
+             * @description When its last message was written.
+             */
+            last_message_at: string;
+            /**
+             * Format: int32
+             * @description Questions asked so far.
+             */
+            questions: number;
         };
         /**
          * @description A tool Scout used. Each reads as the member, and changes nothing.
@@ -7056,6 +7116,56 @@ export interface operations {
                 };
             };
             /** @description No such workspace, or you are not a member. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "assistant.list_chats": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The workspace. */
+                workspace_id: components["schemas"]["WorkspaceId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Your chats. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChatList"];
+                };
+            };
+            /** @description No valid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Missing scope, or not a member (`chat_needs_member`). */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No such workspace. */
             404: {
                 headers: {
                     [name: string]: unknown;
@@ -11727,6 +11837,58 @@ export interface operations {
             };
             /** @description Missing scope, or an app asked. */
             403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "conversations.get_rule_notice": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The workspace. */
+                workspace_id: components["schemas"]["WorkspaceId"];
+                /** @description The suggestion. */
+                notice_id: components["schemas"]["RuleNoticeId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The suggestion. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RuleNotice"];
+                };
+            };
+            /** @description No valid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Missing scope, or an app asked. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No such suggestion, it is no longer offered, you answered it, or you cannot teach in its inbox. */
+            404: {
                 headers: {
                     [name: string]: unknown;
                 };

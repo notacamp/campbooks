@@ -61,7 +61,7 @@ describe("useScoutChat", () => {
       const [mounted, setMounted] = useState(true);
       return (
         <ScoutChatHost
-          onOpener={(next) => {
+          onOpener={(next?: OpenScoutChat) => {
             hosted.current = next;
           }}
         >

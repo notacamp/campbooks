@@ -275,7 +275,7 @@ export function ScoutChat({
     }
     const timer = setTimeout(() => {
       setHandingOver(false);
-      if (chat.data?.messages.length === 0) {
+      if (chat.data.messages.length === 0) {
         void ask(first);
       }
     }, 0);
@@ -292,7 +292,7 @@ export function ScoutChat({
     await deleteChat(workspaceId, id);
     setAnswerProblem(undefined);
     if (source.kind === "about") {
-      await cache.refresh(undefined);
+      await cache.refresh();
       return;
     }
     // A chat from Recent, or about nothing: a new one about the same thing.
@@ -402,7 +402,7 @@ export function ScoutChat({
                 chatId={chat.data.id}
                 proposals={message.proposals}
                 onSettled={() => {
-                  void cache.refresh(chat.data?.id);
+                  void cache.refresh(chat.data.id);
                 }}
               />
             )

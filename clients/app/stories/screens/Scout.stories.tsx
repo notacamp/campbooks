@@ -470,7 +470,9 @@ export const Recent: Story = {
     await userEvent.click(await page.findByRole("button", { name: "Recent" }));
     const menu = await page.findByRole("dialog", { name: "Recent" });
     await userEvent.click(await within(menu).findByText(WHY));
-    await expect(await page.findByText("Marta Ferreira · Walkthrough on Thursday")).toBeVisible();
+    await expect(
+      (await page.findAllByText("Marta Ferreira · Walkthrough on Thursday"))[0],
+    ).toBeVisible();
     await expect((await page.findAllByText(/It is under Reply because/u))[0]).toBeVisible();
   },
 };

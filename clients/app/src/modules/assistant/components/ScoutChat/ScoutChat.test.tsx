@@ -541,11 +541,13 @@ describe("ScoutChat", () => {
         "What has it changed?",
       ]);
       expect(rows[0]).toHaveAttribute("aria-current", "true");
-      rows[0]?.focus();
-      fireEvent.keyDown(rows[0] as HTMLElement, { key: "ArrowDown" });
-      expect(rows[1]).toHaveFocus();
+      const waiting = within(menu).getByRole("button", { name: new RegExp(WAITING_QUESTION, "u") });
+      const why = within(menu).getByRole("button", { name: new RegExp(WHY, "u") });
+      waiting.focus();
+      fireEvent.keyDown(waiting, { key: "ArrowDown" });
+      expect(why).toHaveFocus();
 
-      fireEvent.click(rows[1] as HTMLElement);
+      fireEvent.click(why);
       expect(
         await screen.findAllByText(/It is under Reply because Marta asks you/u),
       ).not.toHaveLength(0);

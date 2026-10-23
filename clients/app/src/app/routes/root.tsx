@@ -44,7 +44,7 @@ function RootLayout() {
   };
   // Scout's chat of the open workspace, for "Ask Scout" in the menu (⌘K).
   const [scout, setScout] = useState<OpenScoutChat | undefined>();
-  const hostScout = useCallback((open: OpenScoutChat | undefined) => {
+  const hostScout = useCallback((open?: OpenScoutChat) => {
     setScout(() => open);
   }, []);
 
