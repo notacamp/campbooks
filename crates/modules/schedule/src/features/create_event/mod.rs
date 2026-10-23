@@ -148,6 +148,7 @@ pub async fn handler(
             series_id: None,
             original_start: None,
             source_conversation: None,
+            quote: None,
         },
     )
     .await?;

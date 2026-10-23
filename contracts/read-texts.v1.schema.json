@@ -18,6 +18,7 @@
           "key": { "type": "string", "description": "The item's key, as in `message_read`." },
           "title": { "type": "string", "maxLength": 200 },
           "place": { "type": ["string", "null"], "maxLength": 400 },
+          "quote": { "type": ["string", "null"], "maxLength": 600, "description": "The sentence of the email that gave the date (a model read only)." },
           "ical_uid": { "type": ["string", "null"], "maxLength": 1024, "description": "The `UID` of the sender's own iCalendar event, when the item came from one." }
         }
       }

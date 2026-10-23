@@ -203,6 +203,7 @@ pub async fn handler(
                     series_id: Some(row.id),
                     original_start: Some(&key),
                     source_conversation: row.source_conversation,
+                    quote: row.quote.as_deref(),
                 },
             )
             .await?;

@@ -30,7 +30,9 @@ ALTER TABLE schedule.events
     ADD COLUMN item_keys text[] NOT NULL DEFAULT '{}',
     -- The conversation of the source message (an id of the conversations
     -- module), so the event can be explained with its email.
-    ADD COLUMN source_conversation uuid;
+    ADD COLUMN source_conversation uuid,
+    -- The sentence of the email that gave the date (a model read only).
+    ADD COLUMN quote text;
 
 CREATE INDEX events_item_keys_idx ON schedule.events USING gin (item_keys);
 CREATE INDEX events_deleted_idx ON schedule.events (workspace_id, deleted_at)

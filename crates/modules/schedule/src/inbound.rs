@@ -93,6 +93,9 @@ pub struct ReadItemText {
     /// reader.
     #[serde(default)]
     pub ical_uid: Option<String>,
+    /// The sentence of the email that gave the date.
+    #[serde(default)]
+    pub quote: Option<String>,
 }
 
 /// `connectors.capability_granted` v1.

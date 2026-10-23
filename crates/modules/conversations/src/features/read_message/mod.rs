@@ -650,13 +650,19 @@ pub(crate) async fn put_texts(
 ) -> Result<Option<BlobRef>, JobError> {
     let entries: Vec<Value> = items
         .iter()
-        .filter(|item| !item.title.is_empty() || item.place.is_some() || item.uid.is_some())
+        .filter(|item| {
+            !item.title.is_empty()
+                || item.place.is_some()
+                || item.uid.is_some()
+                || item.quote.is_some()
+        })
         .map(|item| {
             serde_json::json!({
                 "key": item.key,
                 "title": item.title,
                 "place": item.place,
                 "ical_uid": item.uid,
+                "quote": item.quote,
             })
         })
         .collect();

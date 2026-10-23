@@ -157,10 +157,10 @@ async fn copy(
         "INSERT INTO schedule.events
              (id, workspace_id, calendar_id, kind, title, starts_at, ends_at, starts_on, ends_on,
               all_day, time_zone, place, notes, status, recurrence, source_type, source_id,
-              origin, found_by, pushed_from, busy, response, source_conversation)
+              origin, found_by, pushed_from, busy, response, source_conversation, quote)
          SELECT $1, workspace_id, $2, kind, title, starts_at, ends_at, starts_on, ends_on,
                 all_day, time_zone, place, notes, status, recurrence, source_type, source_id,
-                origin, found_by, id, busy, response, source_conversation
+                origin, found_by, id, busy, response, source_conversation, quote
            FROM schedule.events WHERE id = $3",
     )
     .bind(id)

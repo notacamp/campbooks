@@ -43,6 +43,18 @@
   --signal-look-h: 345;
   --signal-nudge-h: 255;
 
+  /* calendar kinds (what a dated thing is): hue only, colour carries kind */
+  --kind-charge-h: 155;
+  --kind-appointment-h: 195;
+  --kind-meeting-h: 255;
+  --kind-travel-h: 230;
+  --kind-stay-h: 120;
+  --kind-show-h: 345;
+  --kind-reservation-h: 62;
+  --kind-delivery-h: 85;
+  --kind-expiry-h: 25;
+  --kind-due-h: 300;
+
   /* avatar hues: identity only, deliberately low chroma */
   --avatar-c: 0.055;
   --avatar-1-h: 20;
@@ -270,6 +282,42 @@
     oklch(0.75 0.11 var(--signal-nudge-h))
   );
 
+  /* calendar kinds: the colour of an event's icon, chip and block; soft fills mix it at --kind-soft-mix */
+  --kind-soft-mix: 13%;
+  --kind-charge: light-dark(
+    oklch(0.46 0.12 var(--kind-charge-h)),
+    oklch(0.78 0.12 var(--kind-charge-h))
+  );
+  --kind-appointment: light-dark(
+    oklch(0.46 0.12 var(--kind-appointment-h)),
+    oklch(0.78 0.12 var(--kind-appointment-h))
+  );
+  --kind-meeting: light-dark(
+    oklch(0.46 0.12 var(--kind-meeting-h)),
+    oklch(0.78 0.12 var(--kind-meeting-h))
+  );
+  --kind-travel: light-dark(
+    oklch(0.46 0.12 var(--kind-travel-h)),
+    oklch(0.78 0.12 var(--kind-travel-h))
+  );
+  --kind-stay: light-dark(oklch(0.46 0.12 var(--kind-stay-h)), oklch(0.78 0.12 var(--kind-stay-h)));
+  --kind-show: light-dark(oklch(0.46 0.12 var(--kind-show-h)), oklch(0.78 0.12 var(--kind-show-h)));
+  --kind-reservation: light-dark(
+    oklch(0.46 0.12 var(--kind-reservation-h)),
+    oklch(0.78 0.12 var(--kind-reservation-h))
+  );
+  --kind-delivery: light-dark(
+    oklch(0.46 0.12 var(--kind-delivery-h)),
+    oklch(0.78 0.12 var(--kind-delivery-h))
+  );
+  --kind-expiry: light-dark(
+    oklch(0.46 0.12 var(--kind-expiry-h)),
+    oklch(0.78 0.12 var(--kind-expiry-h))
+  );
+  --kind-due: light-dark(oklch(0.46 0.12 var(--kind-due-h)), oklch(0.78 0.12 var(--kind-due-h)));
+  --kind-hold: var(--text-secondary);
+  --kind-none: var(--text-secondary);
+
   /* the visor (assistant's face) */
   --visor-glass-top: light-dark(
     oklch(0.3 0.025 var(--neutral-h)),
@@ -342,6 +390,14 @@
   --home-min: 640px;
   --home-main-min: 520px;
   --reader-min: 480px;
+  /* The calendar: one hour of the time grid, its hour gutter, the narrowest
+     week grid before it scrolls inside itself, and the event sheet. */
+  --calendar-hour: 44px;
+  --calendar-minute: calc(var(--calendar-hour) / 60);
+  --calendar-gutter: 56px;
+  --calendar-grid-min: 760px;
+  --calendar-sheet-width: 392px;
+  --calendar-when-width: 112px;
   /* A thread's own messages sit this far in from the left (more from 48rem). */
   --message-yours-indent: var(--space-5);
   /* The reader's pinned reply area grows up to this, then scrolls. */
@@ -430,6 +486,55 @@
 
 [data-signal="nudge"] {
   --sig: var(--signal-nudge);
+}
+
+/* Bindings: an element picks its kind by data attribute; components read --kind. */
+[data-kind="charge"] {
+  --kind: var(--kind-charge);
+}
+
+[data-kind="appointment"] {
+  --kind: var(--kind-appointment);
+}
+
+[data-kind="meeting"] {
+  --kind: var(--kind-meeting);
+}
+
+[data-kind="travel"] {
+  --kind: var(--kind-travel);
+}
+
+[data-kind="stay"] {
+  --kind: var(--kind-stay);
+}
+
+[data-kind="show"] {
+  --kind: var(--kind-show);
+}
+
+[data-kind="reservation"] {
+  --kind: var(--kind-reservation);
+}
+
+[data-kind="delivery"] {
+  --kind: var(--kind-delivery);
+}
+
+[data-kind="expiry"] {
+  --kind: var(--kind-expiry);
+}
+
+[data-kind="due"] {
+  --kind: var(--kind-due);
+}
+
+[data-kind="hold"] {
+  --kind: var(--kind-hold);
+}
+
+[data-kind="none"] {
+  --kind: var(--kind-none);
 }
 
 [data-avatar-hue="1"] {

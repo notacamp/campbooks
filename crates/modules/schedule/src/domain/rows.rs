@@ -75,6 +75,7 @@ pub struct EventRow {
     pub provider_version: Option<serde_json::Value>,
     pub item_keys: Vec<String>,
     pub source_conversation: Option<Uuid>,
+    pub quote: Option<String>,
 }
 
 /// The columns of [`EventRow`], for `SELECT` (table alias `e`).
@@ -83,7 +84,7 @@ pub const EVENT_COLUMNS: &str = "e.id, e.calendar_id, e.kind, e.title, e.starts_
      e.provider_event_id, e.etag, e.outbound_pending, e.recurrence, e.series_id, \
      e.original_start, e.source_type, e.source_id, e.origin, e.found_by, e.pushed_from, \
      e.item_key, e.ical_uid, e.response, e.notice, e.deleted_at, e.undo_token, e.pushed_to, \
-     e.busy, e.provider_version, e.item_keys, e.source_conversation";
+     e.busy, e.provider_version, e.item_keys, e.source_conversation, e.quote";
 
 impl EventRow {
     /// When it starts and ends.

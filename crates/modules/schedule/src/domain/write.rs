@@ -53,6 +53,8 @@ pub struct NewRow<'a> {
     pub original_start: Option<&'a str>,
     /// The conversation of the source message.
     pub source_conversation: Option<Uuid>,
+    /// The sentence of the email that gave the date.
+    pub quote: Option<&'a str>,
 }
 
 /// Insert `new`.
@@ -63,9 +65,9 @@ pub async fn insert(conn: &mut PgConnection, new: &NewRow<'_>) -> Result<(), sql
         "INSERT INTO schedule.events
              (id, workspace_id, calendar_id, kind, title, starts_at, ends_at, starts_on, ends_on,
               all_day, time_zone, place, notes, origin, found_by, source_type, source_id,
-              item_key, item_keys, ical_uid, busy, pushed_from, series_id, original_start, source_conversation)
+              item_key, item_keys, ical_uid, busy, pushed_from, series_id, original_start, source_conversation, quote)
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17,
-                 $18, $19, $20, $21, $22, $23, $24, $25)",
+                 $18, $19, $20, $21, $22, $23, $24, $25, $26)",
     )
     .bind(new.id)
     .bind(new.workspace)
@@ -92,6 +94,7 @@ pub async fn insert(conn: &mut PgConnection, new: &NewRow<'_>) -> Result<(), sql
     .bind(new.series_id)
     .bind(new.original_start)
     .bind(new.source_conversation)
+    .bind(new.quote)
     .execute(conn)
     .await?;
     Ok(())

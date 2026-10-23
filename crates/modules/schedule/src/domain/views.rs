@@ -97,6 +97,8 @@ pub struct EventView {
     pub source: Option<RecordRef>,
     /// The conversation of that email, when known.
     pub source_conversation: Option<String>,
+    /// The sentence of the email that gave the date, when Scout read one.
+    pub quote: Option<String>,
     /// Your answer to the invitation, if it is one.
     pub response: Option<Response>,
     /// Whether your last change still waits to reach the provider.
@@ -133,6 +135,7 @@ pub fn event_view(row: &EventRow, zone: Tz, occurrence: Option<&Occurrence>) -> 
         found_by: row.found_by.clone(),
         source: row.source(),
         source_conversation: row.source_conversation.map(|id| id.to_string()),
+        quote: row.quote.clone(),
         response: row.response.as_deref().and_then(|r| r.parse().ok()),
         pending: row.is_pending(),
         notice: row.notice.as_deref().and_then(|n| n.parse().ok()),

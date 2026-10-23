@@ -290,6 +290,7 @@ async fn add_item(
             series_id: None,
             original_start: None,
             source_conversation: place.conversation,
+            quote: text.and_then(|text| text.quote.as_deref()),
         },
     )
     .await?;
