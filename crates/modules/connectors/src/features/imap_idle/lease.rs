@@ -500,11 +500,11 @@ mod tests {
         let free: Vec<Row> = (0..12)
             .map(|n| row(a, &n.to_string(), "provider", true))
             .collect();
-        let caps = Caps {
+        let wide = Caps {
             pool_workspace: 100,
             ..caps()
         };
-        let chosen = choose(&[], free.clone(), 100, caps, &HashMap::new());
+        let chosen = choose(&[], free.clone(), 100, wide, &HashMap::new());
         // The workspace's share of the provider's host: ten.
         assert_eq!(chosen.len(), 10);
         // Another workspace still gets its own.
