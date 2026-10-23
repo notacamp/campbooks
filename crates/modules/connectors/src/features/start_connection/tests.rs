@@ -117,11 +117,12 @@ async fn a_member_connects_gmail(db: PgPool) {
     );
 
     // Credentials are sealed at rest.
-    let sealed = sqlx::query!("SELECT refresh_token, access_token FROM connectors.credentials")
-        .fetch_one(&kit.db)
-        .await
-        .unwrap();
-    for bytes in [sealed.refresh_token, sealed.access_token.unwrap()] {
+    let (refresh_token, access_token): (Option<Vec<u8>>, Option<Vec<u8>>) =
+        sqlx::query_as("SELECT refresh_token, access_token FROM connectors.credentials")
+            .fetch_one(&kit.db)
+            .await
+            .unwrap();
+    for bytes in [refresh_token.unwrap(), access_token.unwrap()] {
         let lossy = String::from_utf8_lossy(&bytes);
         assert!(!lossy.contains("fake-refresh") && !lossy.contains("fake-access"));
     }

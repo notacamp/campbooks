@@ -177,7 +177,9 @@ impl SendMessage {
         let configured = match provider {
             Some(Provider::Google) => self.deps.google.is_some(),
             Some(Provider::Zoho) => self.deps.zoho.is_some(),
-            None => false,
+            // Sending through an IMAP mailbox's SMTP server lands with
+            // campbooks-cloud#313: until then a send fails as not connected.
+            Some(Provider::Imap) | None => false,
         };
         let (Some(stream), Some(connection), Some(provider), true) =
             (target.stream, target.connection, provider, configured)
@@ -235,6 +237,7 @@ impl SendMessage {
         match provider {
             Provider::Google => self.attempt_gmail(ctx, target, attempt).await,
             Provider::Zoho => self.attempt_zoho(ctx, target, attempt).await,
+            Provider::Imap => finish_failed(ctx, workspace, send, &target, "not_connected").await,
         }
     }
 

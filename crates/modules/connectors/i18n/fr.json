@@ -13,6 +13,25 @@
     "needs_reauth": "Cette connexion nécessite que vous associiez de nouveau le compte avant de pouvoir synchroniser.",
     "unknown_data_centre": "Campbooks ne reconnaît pas le centre de données Zoho de ce compte. Contactez votre administrateur.",
     "no_mailbox": "Ce compte n’a aucune boîte aux lettres que Campbooks puisse lire.",
-    "disconnect_owner_only": "Seul le membre qui a connecté ce compte peut le déconnecter."
+    "disconnect_owner_only": "Seul le membre qui a connecté ce compte peut le déconnecter.",
+    "step_up_required": "Pour votre sécurité, reconnectez-vous avant d’associer une boîte aux lettres avec son mot de passe.",
+    "imap_connects_with_a_password": "Une boîte aux lettres IMAP s’associe avec son mot de passe, pas depuis une page de connexion.",
+    "imap_address_invalid": "Saisissez une adresse e-mail valide.",
+    "imap_username_invalid": "Saisissez un nom d’utilisateur valide pour cette boîte aux lettres.",
+    "imap_password_invalid": "Saisissez le mot de passe de la boîte aux lettres (1024 caractères au plus, sur une seule ligne).",
+    "imap_servers_required": "Campbooks n’a pas trouvé les serveurs de cette boîte aux lettres. Saisissez ses serveurs IMAP et SMTP.",
+    "use_native_provider": "Cette boîte aux lettres est chez {{provider}} : associez-la avec {{provider}} plutôt qu’avec un mot de passe.",
+    "too_many_attempts": "Trop de tentatives de connexion échouées pour cette boîte aux lettres. Patientez une heure, puis réessayez.",
+    "imap_login_refused_one": "Le serveur de messagerie a refusé la connexion. Ce fournisseur exige un mot de passe d’application : créez-en un dans les paramètres de sécurité de votre compte et utilisez-le ici à la place de votre mot de passe habituel.",
+    "imap_login_refused_other": "Le serveur de messagerie a refusé la connexion. Vérifiez le nom d’utilisateur et le mot de passe. Si votre fournisseur propose des mots de passe d’application, utilisez-en un.",
+    "smtp_login_refused_one": "Le serveur d’envoi a refusé la connexion. Ce fournisseur exige un mot de passe d’application : créez-en un dans les paramètres de sécurité de votre compte et utilisez-le ici.",
+    "smtp_login_refused_other": "Le serveur d’envoi (SMTP) a refusé la connexion. Vérifiez le nom d’utilisateur et le mot de passe, et que le serveur vous permet d’envoyer.",
+    "imap_unreachable": "Impossible de joindre le serveur de messagerie (IMAP). Vérifiez son nom et son port, puis réessayez.",
+    "smtp_unreachable": "Impossible de joindre le serveur d’envoi (SMTP). Vérifiez son nom et son port, puis réessayez.",
+    "imap_tls_failed": "Le certificat du serveur de messagerie n’est pas valide pour son nom : Campbooks ne s’est donc pas connecté. Vérifiez le nom du serveur.",
+    "smtp_tls_failed": "Le certificat du serveur d’envoi n’est pas valide pour son nom : Campbooks ne s’est donc pas connecté. Vérifiez le nom du serveur.",
+    "imap_not_an_imap_server": "Le serveur à cette adresse et sur ce port n’est pas un serveur de messagerie IMAP. Vérifiez le serveur et le port.",
+    "host_refused": "Campbooks ne peut pas se connecter à ce serveur : il se trouve sur un réseau privé, ou ce port n’est pas un port de messagerie (993, 143, 465 ou 587).",
+    "starttls_missing": "Le serveur ne propose pas de connexion chiffrée : Campbooks n’a donc pas envoyé votre mot de passe. Utilisez le port chiffré du serveur (993 pour IMAP, 465 pour SMTP)."
   }
 }

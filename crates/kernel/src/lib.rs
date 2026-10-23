@@ -25,6 +25,7 @@ pub mod ids;
 pub mod jobs;
 pub mod mail;
 pub mod module;
+pub mod net;
 pub mod operations;
 pub mod outbound;
 pub mod preferences;
