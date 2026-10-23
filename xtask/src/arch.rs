@@ -714,14 +714,14 @@ fn guarded_field(name: &str) -> bool {
 /// browser goes next, which may carry a ticket).
 const LOCATION_FIELD: &str = "Location";
 
-/// Secret-looking fields in the answers of mutating operations that show no
-/// secret, each with the reason: `(operationId, field, reason)`. Every other
-/// such field needs its operation to declare `x-campbooks.secret_once`.
 /// Why `item_keys` of an event is no secret.
 const ITEM_KEYS: &str = "the keys of the read items that made or changed an event \
      (`<message id>:<layer>:item:<n>`, built by the code from ids and a position), which the \
      reader's strip matches to find its event; they open nothing";
 
+/// Secret-looking fields in the answers of mutating operations that show no
+/// secret, each with the reason: `(operationId, field, reason)`. Every other
+/// such field needs its operation to declare `x-campbooks.secret_once`.
 pub const ANSWER_FIELDS_ALLOWED: &[(&str, &str, &str)] = &[
     ("schedule.create_event", "item_keys", ITEM_KEYS),
     ("schedule.update_event", "item_keys", ITEM_KEYS),
