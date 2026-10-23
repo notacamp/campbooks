@@ -26,6 +26,8 @@ export const recordReaders: Readonly<Record<string, readonly string[]>> = {
   "identity.session": ["identity.end_session", "identity.finish_sign_in"],
   "identity.signing_key": ["identity.jwks"],
   "identity.upstream_flow": ["identity.finish_sign_in", "identity.start_sign_in"],
+  "schedule.calendar": ["schedule.get_settings", "schedule.list_calendars"],
+  "schedule.event": ["schedule.free_slots", "schedule.get_event", "schedule.list_events"],
   "search.result": ["search.query"],
   "workspaces.invitation": ["workspaces.list_invitations"],
   "workspaces.member": ["workspaces.list_members"],
