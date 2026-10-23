@@ -69,6 +69,7 @@ export const COMPONENT_TOKENS = [
   "visor-size",
   "sidebar-width",
   "aside-width",
+  "chat-width",
   "list-width",
   "content-max",
   "toast-height",

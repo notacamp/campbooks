@@ -1,7 +1,9 @@
 //! One folder per use case.
 
 pub mod admin_list_connections;
+pub mod connect_imap;
 pub mod disconnect;
+pub mod discover_imap;
 pub mod dispatch_due;
 pub mod get_connection;
 pub mod list_connections;

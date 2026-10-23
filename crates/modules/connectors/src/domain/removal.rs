@@ -75,7 +75,10 @@ pub async fn revoke(state: &AppState, deps: &Deps, workspace: WorkspaceId, id: C
                 None => return,
             }
         }
-        Err(_) => return,
+        // A mailbox password cannot be revoked from here: it is deleted with
+        // the connection, and the member revokes the app password at their
+        // provider.
+        Ok(Provider::Imap) | Err(_) => return,
     };
     if let Err(err) = revoked {
         tracing::warn!(%workspace, connection = %id, provider = target.provider, error = %err, "could not revoke the grant at the provider");

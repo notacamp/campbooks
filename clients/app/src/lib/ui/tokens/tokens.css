@@ -311,6 +311,8 @@
   --visor-asleep-opacity: var(--opacity-muted);
   --sidebar-width: 256px;
   --aside-width: 300px;
+  /* Scout's chat beside the page, from the large breakpoint. */
+  --chat-width: 400px;
   --list-width: 400px;
   --content-max: 1180px;
   --toast-height: 44px;

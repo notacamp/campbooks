@@ -7,7 +7,9 @@ import {
   RouterProvider,
 } from "@tanstack/react-router";
 import { fireEvent, screen, waitFor, within } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+
+import { ScoutChatProvider, type OpenScoutChat } from "~/lib/scout-chat";
 
 import {
   ACME,
@@ -33,12 +35,19 @@ import { mockApi, problem, renderWithProviders, replyStream } from "../../../../
 
 import { WhatNeedsYou } from "./WhatNeedsYou";
 
-function renderHome() {
+function renderHome(scout?: OpenScoutChat) {
   const root = createRootRoute({ component: Outlet });
   const home = createRoute({
     getParentRoute: () => root,
     path: "/w/$workspaceId",
-    component: () => <WhatNeedsYou workspaceId={DUARTE.id} now={NOW} />,
+    component: () =>
+      scout === undefined ? (
+        <WhatNeedsYou workspaceId={DUARTE.id} now={NOW} />
+      ) : (
+        <ScoutChatProvider open={scout}>
+          <WhatNeedsYou workspaceId={DUARTE.id} now={NOW} />
+        </ScoutChatProvider>
+      ),
   });
   const conversation = createRoute({
     getParentRoute: () => root,
@@ -122,6 +131,37 @@ describe("What needs you", () => {
     expect(screen.getByText("it-support@at3lier-sol.example")).toBeVisible();
     expect(document.body).not.toHaveTextContent("%");
     expect(screen.getByText("Replied · Tile samples")).toBeVisible();
+  });
+
+  it("offers Continue with Scout after the need's own actions, on .", async () => {
+    api();
+    const scout = vi.fn();
+    renderHome(scout);
+    fireEvent.click(await screen.findByText("Marta Ferreira is waiting for your reply"));
+    const group = await screen.findByRole("group", { name: "Actions for Marta Ferreira" });
+    const actions = [...group.querySelectorAll("button")].map((b) => b.dataset["action"]);
+    const at = actions.indexOf("scout");
+
+    expect(at).toBeGreaterThan(0);
+    expect(actions.slice(at + 1)).toEqual(["done", "snooze", "not_needed"]);
+    const button = within(group).getByRole("button", { name: /Continue with Scout/u });
+    expect(button).toHaveAttribute("aria-keyshortcuts", ".");
+    expect(button).toHaveAttribute("data-ai", "true");
+
+    fireEvent.keyDown(document, { key: "." });
+    expect(scout).toHaveBeenCalledWith(MARTA.id, button);
+    expect(isSelected("Marta Ferreira is waiting for your reply")).toBe(true);
+    fireEvent.click(button);
+    expect(scout).toHaveBeenCalledTimes(2);
+  });
+
+  it("offers nothing of Scout where no chat is mounted", async () => {
+    api();
+    renderHome();
+    fireEvent.click(await screen.findByText("Marta Ferreira is waiting for your reply"));
+    await screen.findByRole("group", { name: "Actions for Marta Ferreira" });
+
+    expect(screen.queryByRole("button", { name: /Continue with Scout/u })).not.toBeInTheDocument();
   });
 
   it("keeps the sender's words as plain text", async () => {

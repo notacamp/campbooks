@@ -91,14 +91,6 @@ export function addresseeLine(t: Translate, message: MessageView): string {
     : t("reader.toNameOthers", { name, count: others });
 }
 
-/** Who Reply answers: the sender, or for a message of yours, its first recipient. */
-export function replyName(message: MessageView): string {
-  if (message.direction === "outbound") {
-    return displayName(message.to[0] ?? message.cc[0]);
-  }
-  return displayName(message.from);
-}
-
 export function streamName(t: Translate, stream: Stream): string {
   return t(`streams.${stream}`);
 }
@@ -262,6 +254,11 @@ function flagsOf(decisions: readonly DecisionView[]) {
     const decision = decisions.find((d) => d.question === flag.question);
     return decision !== undefined && holds(decision) ? [{ ...flag, decision }] : [];
   });
+}
+
+/** Whether the decide pass thinks the conversation needs a reply (the note then offers Reply). */
+export function suggestsReply(decisions: readonly DecisionView[]): boolean {
+  return flagsOf(decisions).some((flag) => flag.question === "needs_reply");
 }
 
 /** The note's sentence: what the decide pass thinks, said as suggestions. */

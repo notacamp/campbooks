@@ -9,6 +9,8 @@
 //! - `cargo xtask migrations --base <ref>` checks that new migrations sort after
 //!   every migration on the base branch.
 //! - `cargo xtask i18n` checks that every server message catalogue is at parity.
+//! - `cargo xtask ispdb` refreshes the mail provider database the connectors
+//!   module bundles (Thunderbird's ISPDB).
 //! - `cargo xtask new-module <name>` and `cargo xtask new-feature <module> <feature>`
 //!   scaffold a module or a feature slice; `cargo xtask scaffold-check` proves
 //!   their output passes the gates.
@@ -20,6 +22,7 @@ mod arch;
 mod eval;
 mod events;
 mod i18n;
+mod ispdb;
 mod migrations;
 mod openapi;
 mod payloads;
@@ -83,6 +86,9 @@ enum Command {
     /// `en`, `pt-PT`, `es-ES` and `fr` with the same messages, plural forms
     /// and placeholders, and no empty values.
     I18n,
+    /// Refresh the mail provider database the connectors module bundles
+    /// (Thunderbird's ISPDB, MPL-2.0) from its repository, with `git`.
+    Ispdb,
     /// Scaffold a domain module: crate (scopes, events, an `overview` read
     /// slice), schema migration, OpenSpec change, client module with i18n,
     /// registered in the workspace, the server and the client shell.
@@ -138,6 +144,7 @@ fn main() -> ExitCode {
         } => eval::run_actions(&args),
         Command::Migrations { base } => migrations::run(&root, &base),
         Command::I18n => i18n::run(&root),
+        Command::Ispdb => ispdb::run(&root),
         Command::NewModule { name, issue } => run_new_module(&root, &name, issue),
         Command::NewFeature { module, feature } => run_new_feature(&root, &module, &feature),
         Command::ScaffoldCheck { full } => scaffold::check::run(&root, full),

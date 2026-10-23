@@ -37,6 +37,7 @@
     "rule_needs_your_yes": "Only you can say yes to this rule. Scout can propose it: check it in Scout's memory and keep it there.",
     "undo_unavailable": "Some of what this rule changed can't be put back. Remove it keeping its changes instead.",
     "invalid_senders_query": "Search with 2 to 100 characters, and ask for 1 to {{max}} senders.",
+    "invalid_correspondents_query": "Search with 2 to 100 characters, and ask for 1 to {{max}} people.",
     "images_already_trusted": "A smart rule already covers this sender's images, even if it is paused or waiting for a yes. Find it in Scout's memory.",
     "send_needs_you": "Only you can send mail or take a send back. Scout can write a draft: check it and send it yourself.",
     "images_need_you": "Only you can choose to always show a sender's images. Open one of their messages and choose it there.",

@@ -28,6 +28,7 @@ mod jwks;
 mod oidc;
 mod revocation;
 mod scoped;
+pub mod step_up;
 mod verifier;
 
 use std::{borrow::Borrow, collections::BTreeSet};

@@ -13,16 +13,25 @@ axum.workspace = true
 campbooks-ai.workspace = true
 campbooks-kernel.workspace = true
 chrono.workspace = true
+# Streamed answers (`features::chat`).
+futures-util.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 sqlx.workspace = true
+# Streamed answers' timers and frames (`features::chat`).
+tokio.workspace = true
 tracing.workspace = true
 utoipa.workspace = true
 utoipa-axum.workspace = true
 
 [dev-dependencies]
 campbooks-kernel = { workspace = true, features = ["test-util"] }
-tokio.workspace = true
+# Reading streamed answers whole in tests.
+http-body-util.workspace = true
+# Calling the routes and keeping the answer's stream (`testkit`).
+tower.workspace = true
+# What a question logs (`chat` tests).
+tracing-subscriber.workspace = true
 wiremock.workspace = true
 
 [lints]

@@ -3,61 +3,39 @@
 //! (ADR 0014). A stolen session that is days old cannot add the thief's
 //! passkey.
 //!
-//! The proof is the access token's `auth_time`. When it is too old the
-//! operation answers 403 `step_up_required`, and the web client signs in
-//! again with `/bff/login?max_age=600`.
-//!
-//! Starting a passkey registration asks more: a sign-in from the last five
-//! minutes (403 `fresh_sign_in_required`), which the web client gets by
-//! signing in again at once (`max_age=0`). A passkey outlives every session,
-//! so a session that is merely recent is not proof enough.
+//! The rule is the kernel's ([`campbooks_kernel::auth::step_up`], shared
+//! with the connectors module); the messages are this module's:
+//! `step_up_required` when the sign-in is more than ten minutes old, and
+//! `fresh_sign_in_required` when starting a passkey registration more than
+//! five minutes after it.
 
-use campbooks_kernel::{Error, Result, auth::Principal};
-use chrono::{DateTime, TimeDelta, Utc};
+use campbooks_kernel::{Result, auth::Principal, auth::step_up};
+use chrono::{DateTime, Utc};
 
 use crate::MESSAGES;
 
-/// How recent the sign-in must be.
-pub const STEP_UP_WINDOW: TimeDelta = TimeDelta::minutes(10);
-
-/// How recent the sign-in must be to start registering a passkey.
-pub const FRESH_WINDOW: TimeDelta = TimeDelta::minutes(5);
+pub use step_up::{FRESH_WINDOW, STEP_UP_WINDOW};
 
 /// `Ok` when `principal` signed in within [`FRESH_WINDOW`] of `now`; 403
 /// `fresh_sign_in_required` otherwise (same rules as [`require_recent`]).
 pub fn require_fresh(principal: &Principal, now: DateTime<Utc>) -> Result<()> {
-    if signed_in_within(principal, now, FRESH_WINDOW) {
-        Ok(())
-    } else {
-        Err(Error::Denied(MESSAGES.reason("fresh_sign_in_required")))
-    }
+    step_up::require_fresh(principal, now, MESSAGES.reason("fresh_sign_in_required"))
 }
 
-/// Whether `principal` signed in within `window` of `now` (and not from
-/// beyond a minute of clock skew in the future).
-fn signed_in_within(principal: &Principal, now: DateTime<Utc>, window: TimeDelta) -> bool {
-    principal.auth_time.is_some_and(|at| {
-        let age = now - at;
-        age <= window && age >= -TimeDelta::minutes(1)
-    })
-}
-
-/// `Ok` when `principal` signed in within [`STEP_UP_WINDOW`] of `now`.
-/// A token without `auth_time` (a client, an in-process caller) never
-/// passes; nor does one from the future beyond a minute of clock skew.
+/// `Ok` when `principal` signed in within [`STEP_UP_WINDOW`] of `now`; 403
+/// `step_up_required` otherwise. A token without `auth_time` (a client, an
+/// in-process caller) never passes; nor does one from the future beyond a
+/// minute of clock skew.
 pub fn require_recent(principal: &Principal, now: DateTime<Utc>) -> Result<()> {
-    if signed_in_within(principal, now, STEP_UP_WINDOW) {
-        Ok(())
-    } else {
-        Err(Error::Denied(MESSAGES.reason("step_up_required")))
-    }
+    step_up::require_recent(principal, now, MESSAGES.reason("step_up_required"))
 }
 
 #[cfg(test)]
 mod tests {
     use std::collections::BTreeSet;
 
-    use campbooks_kernel::auth::PrincipalKind;
+    use campbooks_kernel::{Error, auth::PrincipalKind};
+    use chrono::TimeDelta;
 
     use super::*;
 
@@ -89,7 +67,10 @@ mod tests {
             None,
         ] {
             let refused = require_recent(&signed_in(stale), now).unwrap_err();
-            assert!(matches!(refused, Error::Denied(_)), "{stale:?}");
+            assert!(
+                matches!(&refused, Error::Denied(reason) if reason.code() == "step_up_required"),
+                "{stale:?}: {refused:?}"
+            );
         }
     }
 

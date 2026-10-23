@@ -111,6 +111,7 @@
     "unread": "Mark unread",
     "move": "Move",
     "moveTo": "Move to",
+    "more": "More actions",
     "replyAll": "Reply all",
     "forward": "Forward",
     "showImages": "Show images",
@@ -134,7 +135,8 @@
     "restore": "Restore",
     "reportSpam": "Report spam",
     "notSpam": "Not spam",
-    "toInbox": "Move to Inbox"
+    "toInbox": "Move to Inbox",
+    "askScout": "Ask Scout"
   },
   "toast": {
     "done": "Done · {{subject}}",

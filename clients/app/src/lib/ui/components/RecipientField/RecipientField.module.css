@@ -1,4 +1,5 @@
 .field {
+  position: relative;
   display: flex;
   flex-direction: column;
   gap: var(--space-1);
@@ -111,4 +112,106 @@
   margin: 0;
   font-size: var(--text-xs);
   color: var(--danger);
+}
+
+/* Suggestions: under the field, its full width, above the composer's text. */
+.popup {
+  position: absolute;
+  top: calc(100% + var(--space-1));
+  right: 0;
+  left: 0;
+  z-index: var(--z-popover);
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  overflow: hidden;
+  border-radius: var(--overlay-radius);
+  background: var(--surface-overlay);
+  box-shadow:
+    var(--shadow-overlay),
+    inset 0 0 0 var(--border-width) var(--border-strong);
+  color: var(--text-primary);
+}
+
+.list {
+  max-height: min(
+    calc(var(--size-control-lg) * 8 + var(--space-1-5) * 2),
+    calc(var(--size-viewport-min) / 2)
+  );
+  padding: var(--space-1-5);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.option {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+  min-height: var(--size-control-lg);
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-md);
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.option[aria-selected="true"] {
+  background: var(--surface-selected);
+  color: var(--text-primary);
+}
+
+.person {
+  display: flex;
+  flex: 1 1 0;
+  flex-direction: column;
+  min-width: 0;
+  line-height: var(--leading-tight);
+}
+
+.name,
+.address {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.name {
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+  color: var(--text-primary);
+}
+
+.address {
+  font-size: var(--text-xs);
+  color: var(--text-tertiary);
+}
+
+.hints {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-1) var(--space-3);
+  padding: var(--space-1-5) var(--space-3);
+  border-top: var(--border-width) solid var(--border-subtle);
+  font-size: var(--text-xs);
+  color: var(--text-tertiary);
+}
+
+.hint {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+/* Touch-only devices have no keyboard to hint at. */
+@media (hover: none) and (pointer: coarse) {
+  .hints {
+    display: none;
+  }
+}
+
+.searching {
+  padding: var(--space-2) var(--space-3);
+  font-size: var(--text-sm);
+  color: var(--text-tertiary);
 }

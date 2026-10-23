@@ -6,6 +6,16 @@
     "instruction_too_long": "Use no máximo {{max}} caracteres: uma ou duas frases.",
     "instruction_has_link": "Não inclua ligações. Diga que correio e o que fazer com ele.",
     "instruction_pasted_mail": "Isto parece colado de um email. Diga por palavras suas que correio e o que fazer com ele.",
-    "compile_unavailable": "Este servidor não tem um modelo de linguagem que possa ler frases. Crie a regra à mão."
+    "compile_unavailable": "Este servidor não tem um modelo de linguagem que possa ler frases. Crie a regra à mão.",
+    "chat_needs_member": "Só um membro deste espaço de trabalho pode conversar com o Scout.",
+    "chat_unavailable": "O Scout não pode conversar neste servidor: nenhum modelo de linguagem aqui pode ler correio.",
+    "chat_failed": "O Scout não conseguiu responder a isso. Tente de novo daqui a pouco.",
+    "chat_full": "Esta conversa está cheia: tem {{max}} perguntas. Recomece para continuar a perguntar.",
+    "question_empty": "Escreva uma pergunta para o Scout.",
+    "question_too_long": "Use no máximo {{max}} caracteres na sua pergunta.",
+    "about_unsupported": "O Scout ainda não pode conversar sobre este tipo de registo."
+  },
+  "chat": {
+    "about_lost": "Já não consigo ver esta conversa, por isso respondi sem ela."
   }
 }

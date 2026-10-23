@@ -133,6 +133,15 @@ export const DEFAULT_SHORTCUTS = [
     label: "shortcuts:compose.italic",
     allowInInputs: true,
   },
+  {
+    // Asking in a chat (Scout's): Enter asks, Shift+Enter is a new line.
+    id: "chat.send",
+    keys: "enter",
+    scope: "compose",
+    group: "compose",
+    label: "shortcuts:compose.ask",
+    allowInInputs: true,
+  },
 
   // Everywhere
   {

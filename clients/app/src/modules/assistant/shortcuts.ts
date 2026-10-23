@@ -7,7 +7,8 @@ import type { ShortcutDefinition } from "~/lib/shortcuts";
  * handle Enter themselves), `S` skips one, `B` goes back, Escape is "Not
  * now". Home's offer starts them (`T`) or puts them off (Shift+T); Scout's
  * memory opens them (`Q`) and saves a rule with ⌘↵ while the focus stays in
- * the sentence.
+ * the sentence. `.` opens Scout's chat about the selected need or the open
+ * conversation.
  */
 export const ASSISTANT_SHORTCUTS = [
   {
@@ -59,5 +60,14 @@ export const ASSISTANT_SHORTCUTS = [
     group: "general",
     label: "assistant:shortcuts.saveRule",
     allowInInputs: true,
+  },
+  {
+    // Continue with Scout (Home) and Ask Scout (the reader): the selected
+    // need's or the open conversation's chat (campbooks-cloud#305).
+    id: "scout.ask",
+    keys: ".",
+    scope: "item",
+    group: "item",
+    label: "assistant:shortcuts.ask",
   },
 ] as const satisfies readonly ShortcutDefinition[];

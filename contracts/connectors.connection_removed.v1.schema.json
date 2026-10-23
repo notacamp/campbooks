@@ -31,7 +31,8 @@
     "provider": {
       "enum": [
         "google",
-        "zoho"
+        "zoho",
+        "imap"
       ],
       "description": "Its provider."
     },

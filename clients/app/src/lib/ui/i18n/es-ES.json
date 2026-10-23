@@ -75,7 +75,12 @@
   "recipients": {
     "list": "Destinatarios en {{label}}",
     "remove": "Quitar a {{name}}",
-    "invalid": "Esto no es una dirección de correo: {{address}}"
+    "invalid": "Esto no es una dirección de correo: {{address}}",
+    "suggestions": "Sugerencias para {{label}}",
+    "searching": "Buscando…",
+    "hintMove": "Mover",
+    "hintPick": "Añadir",
+    "hintClose": "Cerrar"
   },
   "composer": {
     "from": "De",

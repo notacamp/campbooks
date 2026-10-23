@@ -82,6 +82,27 @@ export {
   type MenuSection,
 } from "./components/CommandMenu/CommandMenu";
 export { CodeBlock, type CodeBlockProps } from "./components/CodeBlock/CodeBlock";
+export {
+  ChatAbout,
+  ChatField,
+  ChatMessage,
+  ChatNotice,
+  ChatPanel,
+  ChatSteps,
+  ChatSuggestions,
+  ChatText,
+  ChatWorking,
+  type ChatAboutProps,
+  type ChatFieldProps,
+  type ChatMessageProps,
+  type ChatNoticeProps,
+  type ChatPanelProps,
+  type ChatStep,
+  type ChatStepRecord,
+  type ChatStepsProps,
+  type ChatSuggestionsProps,
+  type ChatWorkingProps,
+} from "./components/Chat/Chat";
 export { Composer, type ComposerProps } from "./components/Composer/Composer";
 export { CopyField, type CopyFieldProps } from "./components/CopyField/CopyField";
 export {
@@ -126,6 +147,11 @@ export {
 export { Icon, ICON_NAMES, type IconName, type IconProps } from "./components/Icon/Icon";
 export { IconButton, type IconButtonProps } from "./components/IconButton/IconButton";
 export {
+  OverflowActions,
+  type OverflowAction,
+  type OverflowActionsProps,
+} from "./components/OverflowActions/OverflowActions";
+export {
   Item,
   ItemDetail,
   SwipeAction,
@@ -163,6 +189,8 @@ export {
   MessageComposer,
   type ComposerAttachment,
   type MessageComposerProps,
+  type RecipientFieldName,
+  type RecipientSuggester,
 } from "./components/MessageComposer/MessageComposer";
 export { NavDivider, NavItem, type NavItemProps } from "./components/NavItem/NavItem";
 export { NoteField, type NoteFieldProps } from "./components/NoteField/NoteField";
@@ -203,6 +231,7 @@ export {
   RecipientField,
   type Recipient,
   type RecipientFieldProps,
+  type RecipientSuggestion,
 } from "./components/RecipientField/RecipientField";
 export {
   Segmented,

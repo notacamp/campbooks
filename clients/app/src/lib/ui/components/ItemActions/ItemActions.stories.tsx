@@ -67,6 +67,13 @@ export const Picked: Story = {
   },
 };
 
+/** An action after the item's own, in the same style: Continue with Scout. */
+export const WithScout: Story = {
+  args: {
+    after: [{ id: "scout", label: "Continue with Scout", key: "item.reply", ai: true }],
+  },
+};
+
 /** The arrow keys' highlight: a visible ring, and the focus. */
 export const Highlighted: Story = { args: { highlighted: "snooze" } };
 

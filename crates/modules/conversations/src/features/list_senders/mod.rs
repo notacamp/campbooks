@@ -26,11 +26,15 @@ use campbooks_kernel::{
 use serde::{Deserialize, Serialize};
 use utoipa::{IntoParams, ToSchema};
 
-use campbooks_ai::decide::signals::facts::{Facts, dmarc_refused, sender_checks_failed};
 use campbooks_kernel::authz::Action;
 
 use crate::{
-    domain::{access::visible_inboxes, resources},
+    domain::{
+        access::visible_inboxes,
+        reachable::{self, flagged_sender_sql, may_write_to},
+        resources,
+        search_words::like_words,
+    },
     events::INBOX_RECORD,
     scopes::ConversationsRead,
 };
@@ -45,9 +49,6 @@ pub const MAX_SCANNED: i64 = 5_000;
 const Q_CHARS: std::ops::RangeInclusive<usize> = 2..=100;
 /// Most words of `q` matched.
 const MAX_WORDS: usize = 5;
-/// Senders read beyond `limit` with `reachable`, so those it leaves out
-/// rarely shorten the answer.
-const REACHABLE_SLACK: i64 = 40;
 
 /// Which senders.
 #[derive(Debug, Clone, Default, Deserialize, IntoParams)]
@@ -99,7 +100,8 @@ type Row = (String, Option<String>, i32, i32, Option<String>);
 /// flagged is left out here, checked best first and only until `$3` pass,
 /// and the facts of their newest mail are read for the checks in Rust
 /// ([`may_write_to`]).
-const SENDERS: &str = r"
+const SENDERS: &str = concat!(
+    r"
     WITH recent AS (
         SELECT m.sender_address AS address,
                nullif(m.sender->>'name', '') AS name,
@@ -155,30 +157,15 @@ const SENDERS: &str = r"
     )
     SELECT address, name, received, replied, newest_results
       FROM ranked k
-     -- With `reachable`: none of the sender's own mail in the window, spam
-     -- included, was reported (Report and delete moves it to spam), is
-     -- under review (open, or cleared because a later message replaced
-     -- it), or was found suspicious and not said safe by a member. Judged
-     -- by the flagged message's own sender, so the real people in a
-     -- hijacked thread stay.
-     WHERE NOT ($6 AND EXISTS (
-           SELECT 1 FROM conversations.messages m
-            WHERE m.inbox_id = ANY($1) AND m.direction = 'inbound'
-              AND m.sender_address = k.address
-              AND m.sent_at > now() - make_interval(days => $4)
-              AND (m.in_spam
-                   OR EXISTS (SELECT 1 FROM conversations.needs n
-                               WHERE n.message_id = m.id AND n.reason = 'review'
-                                 AND (n.state = 'open' OR n.cleared_because = 'superseded'))
-                   OR (EXISTS (SELECT 1 FROM conversations.decisions d
-                                WHERE d.message_id = m.id AND d.question = 'suspicious'
-                                  AND d.value = 'true'::jsonb)
-                       AND NOT EXISTS (SELECT 1 FROM conversations.corrections c
-                                        WHERE c.message_id = m.id AND c.question = 'suspicious'
-                                          AND c.to_value = 'false' AND c.withdrawn_at IS NULL)))))
+     -- With `reachable`: none of the sender's own mail was reported, is
+     -- under review or was found suspicious (`reachable::flagged_sender_sql`).
+     WHERE NOT ($6 AND ",
+    flagged_sender_sql!(),
+    r")
      ORDER BY replied DESC, received DESC, address
      LIMIT $3
-    ";
+    "
+);
 
 /// List who writes to the inboxes you can read.
 #[utoipa::path(
@@ -210,7 +197,7 @@ pub async fn handler(
     let limit = query.limit.unwrap_or(MAX_LIMIT);
     let words = match query.q.as_deref() {
         None => None,
-        Some(q) if Q_CHARS.contains(&q.chars().count()) => Some(words(q)),
+        Some(q) if Q_CHARS.contains(&q.chars().count()) => Some(like_words(q, MAX_WORDS)),
         Some(_) => return Err(invalid()),
     };
     if !(1..=MAX_LIMIT).contains(&limit) || words.as_ref().is_some_and(Vec::is_empty) {
@@ -223,7 +210,7 @@ pub async fn handler(
     let rows: Vec<Row> = sqlx::query_as(SENDERS)
         .bind(&inboxes)
         .bind(words.as_deref())
-        .bind(i64::from(limit) + if reachable { REACHABLE_SLACK } else { 0 })
+        .bind(i64::from(limit) + if reachable { reachable::SLACK } else { 0 })
         .bind(WINDOW_DAYS)
         .bind(MAX_SCANNED)
         .bind(reachable)
@@ -244,42 +231,12 @@ pub async fn handler(
     Ok(Json(SenderList { senders }))
 }
 
-/// Whether `address` is safe to write to, from facts alone: not a no-reply
-/// address, and its newest mail (`results`, the provider's authentication
-/// results) neither fails its sender's checks nor pretends to be them.
-/// Absent results say nothing.
-fn may_write_to(address: &str, results: Option<&str>) -> bool {
-    let no_reply = Facts {
-        from: address.to_lowercase(),
-        ..Facts::default()
-    }
-    .no_reply_sender();
-    !no_reply && !sender_checks_failed(address, results) && !dmarc_refused(results)
-}
-
 fn invalid() -> Error {
     Error::BadRequest(
         crate::MESSAGES
             .reason("invalid_senders_query")
             .arg("max", MAX_LIMIT),
     )
-}
-
-/// The words of `q`, at most [`MAX_WORDS`], with `LIKE` wildcards escaped.
-fn words(q: &str) -> Vec<String> {
-    q.split(|c: char| c.is_whitespace() || c == ',')
-        .filter(|word| !word.is_empty())
-        .take(MAX_WORDS)
-        .map(|word| {
-            word.chars().fold(String::new(), |mut out, c| {
-                if matches!(c, '\\' | '%' | '_') {
-                    out.push('\\');
-                }
-                out.push(c);
-                out
-            })
-        })
-        .collect()
 }
 
 #[cfg(test)]
@@ -290,33 +247,7 @@ mod tests {
 
     use serde_json::json;
 
-    use super::{may_write_to, words};
     use crate::{model::InboxRole, testkit::Kit};
-
-    #[test]
-    fn wildcards_are_escaped() {
-        assert_eq!(words("50%_off a\\b"), vec!["50\\%\\_off", "a\\\\b"]);
-    }
-
-    #[test]
-    fn who_may_be_written_to_is_read_from_facts() {
-        let pass = "mx.google.com; dkim=pass header.i=@silva-contas.example header.s=s1; \
-                    dmarc=pass (p=REJECT sp=REJECT dis=NONE) header.from=silva-contas.example";
-        let refused = "mx.google.com; spf=pass smtp.mailfrom=bounce@spoofer.example; \
-                       dmarc=fail (p=REJECT sp=REJECT dis=REJECT) header.from=silva-contas.example";
-        assert!(may_write_to("rita@silva-contas.example", Some(pass)));
-        // No results say nothing (Zoho, IMAP).
-        assert!(may_write_to("rita@silva-contas.example", None));
-        assert!(!may_write_to("rita@silva-contas.example", Some(refused)));
-        for address in [
-            "no-reply@accounts.example",
-            "noreply@shop.example",
-            "do-not-reply@bank.example",
-            "mailer-daemon@example.com",
-        ] {
-            assert!(!may_write_to(address, Some(pass)), "{address}");
-        }
-    }
 
     #[sqlx::test(migrations = "../../../migrations")]
     async fn reachable_leaves_out_who_one_should_not_write_to(db: PgPool) {

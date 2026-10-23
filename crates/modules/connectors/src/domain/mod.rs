@@ -6,6 +6,7 @@ pub mod destinations;
 pub mod emit;
 pub mod grants;
 pub mod health;
+pub mod imap_servers;
 pub mod intake;
 pub mod marks;
 pub mod model;
