@@ -393,6 +393,7 @@ button.kindChip:hover {
   text-align: left;
   white-space: nowrap;
   cursor: pointer;
+  container-type: inline-size;
 }
 
 .pill > span {
@@ -404,6 +405,18 @@ button.kindChip:hover {
   word-break: normal;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
+}
+
+/* A chip too narrow for its words keeps them for assistive technology and the tooltip. */
+@container (width < 6.5rem) {
+  .pill > span {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
 }
 
 .pill[data-dashed] {
@@ -472,6 +485,7 @@ button.kindChip:hover {
   font: inherit;
   text-align: left;
   cursor: pointer;
+  container-type: inline-size;
 }
 
 .block[data-held] {
@@ -505,6 +519,13 @@ button.kindChip:hover {
   line-height: var(--leading-tight);
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/* Side by side with others a block has no room for its hours; the sheet shows them. */
+@container (width < 4.75rem) {
+  .blockWhen {
+    display: none;
+  }
 }
 
 .blockMail {

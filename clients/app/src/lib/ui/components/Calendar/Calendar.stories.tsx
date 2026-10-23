@@ -228,7 +228,7 @@ export const InTheReader: Story = {
           status="On your Campbooks calendar"
         />
       </FoundStrip>
-      <FoundStrip label="Scout noticed">
+      <FoundStrip label="Scout is reading">
         <FoundReading>Scout is reading this…</FoundReading>
       </FoundStrip>
     </div>
