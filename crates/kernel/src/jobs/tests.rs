@@ -1520,6 +1520,7 @@ fn registry_collects_kernel_and_module_work() {
             "kernel.prune_idempotency",
             "kernel.prune_jobs",
             "kernel.prune_rate_limits",
+            "kernel.prune_tracked_events",
             "kernel.sequence_changes",
             "kernel.sweep_blobs",
             "kernel.sweep_purged_workspaces",
@@ -1535,6 +1536,7 @@ fn registry_collects_kernel_and_module_work() {
         [
             "kernel.prune_jobs",
             "kernel.prune_events",
+            "kernel.prune_tracked_events",
             "kernel.sweep_blobs",
             "kernel.prune_idempotency",
             "kernel.prune_rate_limits",
@@ -1663,6 +1665,7 @@ fn registry_marks_the_instance_only_kinds() {
             "kernel.prune_idempotency",
             "kernel.prune_jobs",
             "kernel.prune_rate_limits",
+            "kernel.prune_tracked_events",
             "kernel.sweep_blobs",
             "kernel.sweep_purged_workspaces",
             "test.forget_fails",

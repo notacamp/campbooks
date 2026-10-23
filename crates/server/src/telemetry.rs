@@ -48,8 +48,12 @@ use tracing_subscriber::{
 /// `service.name` unless `OTEL_SERVICE_NAME` says otherwise.
 pub const SERVICE_NAME: &str = "campbooks-server";
 
-/// Log filter when `RUST_LOG` is unset.
-pub const DEFAULT_LOG_FILTER: &str = "info,sqlx=warn";
+/// Log filter when `RUST_LOG` is unset. The AMQP client's own lines are off:
+/// the tracking relay logs what failed by kind itself, and the client's
+/// lines could carry a returned message or connection details
+/// (campbooks-cloud#321).
+pub const DEFAULT_LOG_FILTER: &str =
+    "info,sqlx=warn,lapin=off,amq_protocol=off,amq_protocol_tcp=off,tcp_stream=off";
 
 /// sqlx's event for each pool acquire (`acquired_after_secs`), enabled at
 /// DEBUG by the server's pool options.

@@ -537,6 +537,15 @@ async fn run(
         );
     }
     if role.worker() {
+        // The tracked events relay (campbooks-cloud#321): with the sink
+        // `amqp` only, stopped like the worker, with its grace period.
+        if let Some(relay) = campbooks_kernel::tracking::Relay::from_state(&state) {
+            let stopped = stopped(&stop);
+            parts.spawn(async move {
+                relay.run(stopped).await;
+                Ok(())
+            });
+        }
         spawn_worker(&mut parts, state, !role.api(), &stop).await?;
     }
 

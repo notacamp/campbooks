@@ -5,4 +5,4 @@ allow-print-in-tests = true
 
 # Project vocabulary that `clippy::doc_markdown` would otherwise want in backticks.
 # ".." keeps clippy's built-in list.
-doc-valid-idents = ["OpenAPI", "OpenAI", "IdP", "UUIDv7", "PostgreSQL", "OAuth", "JWKS", "OpenSpec", "WebAuthn", "EdDSA", "COSE_Key", ".."]
+doc-valid-idents = ["OpenAPI", "OpenAI", "IdP", "UUIDv7", "PostgreSQL", "OAuth", "JWKS", "OpenSpec", "WebAuthn", "EdDSA", "COSE_Key", "RabbitMQ", ".."]

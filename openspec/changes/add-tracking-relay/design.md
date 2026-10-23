@@ -40,11 +40,29 @@ write but no configure permission.
 
 ## Data ownership
 
-Migration `<ts>_kernel__tracked_events_relay.sql`: the two definer functions
+Migration `<ts>_kernel__tracked_events_relay.sql`: the definer functions
 (owned by the definer role, as the kernel's other definer functions are,
-with `search_path` pinned), the `NOTIFY` trigger, and the outbox's purge
-grant if the purge needs one. `kernel.prune_tracked_events` is a kernel
+with `search_path` pinned), each refusing a transaction outside the kernel
+scope: `kernel.claim_tracked_events(batch)`,
+`kernel.mark_tracked_events_published(ids)`,
+`kernel.tracked_events_backlog()` (for the metrics: the runtime role cannot
+count the outbox itself) and `kernel.prune_tracked_events(hours, batch)`;
+`kernel.purge_workspace_tracked_events(workspace, batch)`, which refuses
+unless the transaction works in that workspace (as
+`kernel.purge_workspace_idempotency` does); and the statement-level `NOTIFY`
+trigger. The definer role gains `SELECT, UPDATE, DELETE` on the outbox; the
+runtime role still only appends. `kernel.prune_tracked_events` is a kernel
 schedule, like `kernel.prune_events`.
+
+## Dependency
+
+`lapin` 4.12.1 (MIT, the newest release at least 14 days old), with its
+`tokio` runtime and rustls (aws-lc-rs, platform verifier): no executor
+adapter is needed. Its AMQP stack (`amq-protocol*`, `async-rs`, `tcp-stream`,
+`rustls-connector`) is BSD-2-Clause, allowed in `deny.toml` for those crates
+only. The server's default log filter turns the AMQP client's own lines off,
+since they could carry a returned message or connection details; the relay
+logs failures by kind itself.
 
 ## Metrics (no ids, per the telemetry rules)
 

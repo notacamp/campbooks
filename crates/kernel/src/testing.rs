@@ -294,6 +294,7 @@ pub fn app(module: Module, state: AppState) -> Router {
 pub fn tracking_outbox(state: AppState) -> AppState {
     let tracker = crate::tracking::Tracker::new(&crate::config::TrackingConfig {
         sink: crate::config::TrackingSink::Outbox,
+        ..crate::config::TrackingConfig::default()
     });
     state.with_tracker(tracker)
 }
