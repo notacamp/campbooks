@@ -353,6 +353,10 @@ pub struct Offers {
 
 /// The answer to one signed-in command (`verb` and its `args`), on a
 /// session with `selected` open.
+#[allow(
+    clippy::too_many_lines,
+    reason = "one fake server's commands, verb by verb, as a server answers them"
+)]
 pub fn answer(
     store: &mut Store,
     offers: Offers,
