@@ -248,6 +248,9 @@ type KnownRow = (
     DateTime<Utc>,
 );
 
+/// A folder's location row: UID, key, seen, flagged, EMAILID, fingerprint.
+type FolderCopyRow = (i64, String, bool, bool, Option<String>, Option<String>);
+
 /// A location row: key, folder, UIDVALIDITY, UID, EMAILID, fingerprint.
 type CopyRow = (String, String, i64, i64, Option<String>, Option<String>);
 
@@ -1306,7 +1309,7 @@ impl Reader<'_> {
             return Ok((folder, HashMap::new()));
         };
         let mut tx = self.pool.begin_for(self.workspace).await?;
-        let rows: Vec<(i64, String, bool, bool, Option<String>, Option<String>)> = sqlx::query_as(
+        let rows: Vec<FolderCopyRow> = sqlx::query_as(
             "SELECT uid, message_key, seen, flagged, email_id, fingerprint
                FROM connectors.imap_locations
               WHERE stream_id = $1 AND folder = $2 AND uidvalidity = $3",
@@ -1487,13 +1490,13 @@ impl Reader<'_> {
             };
             match known.rfc_message_id.as_deref().map(quoted) {
                 Some(Some(id)) => searchable.push((key.clone(), id)),
-                // A Message-ID a search cannot carry (not ASCII, too long):
-                // it cannot be looked for, so it is kept.
-                Some(None) => {}
                 // Without a Message-ID it cannot be looked for: gone when
                 // the window's walk would have found it.
                 None if known.internal_date >= window => removable.push(key.clone()),
-                None => {}
+                // One a search cannot carry (not ASCII, too long), or none
+                // and older than the window: it cannot be looked for, so it
+                // is kept.
+                Some(None) | None => {}
             }
         }
         if searchable.len() > MAX_LOOKUPS {

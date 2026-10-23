@@ -538,20 +538,16 @@ fn login(tag: &str, username: &str, password: &SecretString) -> Vec<Zeroizing<Ve
     let secret = password.expose_secret();
     let quoted_username = quoted(username).map(Zeroizing::new);
     let quoted_password = quoted(secret).map(Zeroizing::new);
-    match (quoted_username, quoted_password) {
-        (Some(user), Some(pass)) => {
-            vec![line(&[tag, " LOGIN ", user.as_str(), " ", pass.as_str()])]
-        }
-        _ => {
-            let first = format!(" LOGIN {{{}}}", username.len());
-            let second = format!(" {{{}}}", secret.len());
-            vec![
-                line(&[tag, first.as_str()]),
-                line(&[username, second.as_str()]),
-                line(&[secret]),
-            ]
-        }
+    if let (Some(user), Some(pass)) = (quoted_username, quoted_password) {
+        return vec![line(&[tag, " LOGIN ", user.as_str(), " ", pass.as_str()])];
     }
+    let first = format!(" LOGIN {{{}}}", username.len());
+    let second = format!(" {{{}}}", secret.len());
+    vec![
+        line(&[tag, first.as_str()]),
+        line(&[username, second.as_str()]),
+        line(&[secret]),
+    ]
 }
 
 /// `parts` and a line ending, wiped when dropped.
