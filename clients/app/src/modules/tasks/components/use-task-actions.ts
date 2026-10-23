@@ -29,7 +29,7 @@ interface Change {
 }
 
 /** The call that puts `task`'s plan back as it is. */
-export function planOf(task: TaskView, now: Date): PlanChange {
+function planOf(task: TaskView, now: Date): PlanChange {
   if (task.plan === "date" && task.plan_on !== null && task.plan_on !== undefined) {
     return { plan: "date", plan_on: task.plan_on };
   }

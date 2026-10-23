@@ -22,7 +22,7 @@ export function addDays(date: Date, days: number): Date {
 }
 
 /** A day written "2026-10-23", at UTC midnight. */
-export function utcDay(iso: string): Date {
+function utcDay(iso: string): Date {
   const [year, month, day] = iso.split("-").map(Number);
   return new Date(Date.UTC(year ?? 0, (month ?? 1) - 1, day ?? 1));
 }
@@ -43,7 +43,7 @@ export function isLater(task: TaskView, now: Date): boolean {
 }
 
 /** The day the member means to do it: the planned day, else the due day. */
-export function doingDay(task: TaskView): string | undefined {
+function doingDay(task: TaskView): string | undefined {
   if (task.plan === "date" && task.plan_on !== null && task.plan_on !== undefined) {
     return task.plan_on;
   }

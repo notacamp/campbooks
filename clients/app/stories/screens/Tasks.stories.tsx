@@ -146,7 +146,7 @@ export const TaskOpen: Story = {
     const canvas = within(canvasElement);
     await expect(await canvas.findByText("Where it came from")).toBeVisible();
     await expect(await canvas.findByText("When will you do it?")).toBeVisible();
-    await expect(canvas.getByRole("button", { name: "Open the email" })).toBeVisible();
+    await expect(canvas.getByRole("link", { name: "Open the email" })).toBeVisible();
   },
 };
 
