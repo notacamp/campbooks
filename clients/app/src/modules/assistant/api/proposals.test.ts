@@ -49,6 +49,13 @@ describe("the client's own actions", () => {
         "conversations.unarchive",
         "conversations.unstar",
         "conversations.untrash",
+        "tasks.done",
+        "tasks.hand_off",
+        "tasks.not_needed",
+        "tasks.plan",
+        "tasks.reopen",
+        "tasks.take_back",
+        "tasks.update",
       ].toSorted(),
     );
   });
@@ -136,5 +143,79 @@ describe("an undo that takes fields of the change's answer", () => {
     expect(sent).toEqual([{ key: "p-2:undo", body: { note: "kept", undo_token: "t-9" } }]);
     // Not one of the app's own actions.
     expect(runnable(change)).toBeUndefined();
+  });
+});
+
+describe("a task's cards", () => {
+  const T = "0192f0c4-7d4e-7b39-a7f1-3a8f0e2b9c22";
+  const edit: ProposalRequest = {
+    operation: "tasks.update",
+    method: "PATCH",
+    path: `tasks/${T}`,
+    body: { revision: 7, title: "Renew the van insurance", verb: "do", due_on: "2026-10-30" },
+  };
+
+  it("run their exact paths, PATCH for the edit alone", () => {
+    expect(runnable(edit)?.params).toEqual({ task_id: T });
+    expect(
+      runnable({ ...edit, operation: "tasks.done", method: "POST", path: `tasks/${T}/done` })
+        ?.params,
+    ).toEqual({ task_id: T });
+    for (const odd of [
+      { ...edit, method: "POST" as const },
+      { ...edit, path: `tasks/${T}/plan` },
+      { ...edit, path: `tasks/../x` },
+      // PATCH is not allowed for any other operation, even with a matching entry.
+      { ...edit, operation: "tasks.plan", path: `tasks/${T}/plan` },
+      { ...archive, method: "PATCH" as const },
+      { ...edit, operation: "tasks.create", path: "tasks" },
+    ]) {
+      expect(runnable(odd)).toBeUndefined();
+    }
+    const patchOnly: Readonly<Record<string, Runnable>> = {
+      "schedule.edit": { method: "PATCH", path: "events/{event_id}", records: [] },
+    };
+    expect(
+      runnable(
+        { operation: "schedule.edit", method: "PATCH", path: "events/e-1", body: null },
+        patchOnly,
+      ),
+    ).toBeUndefined();
+  });
+
+  it("send the edit as a PATCH with the proposal as its key", async () => {
+    const seen: { key: string | null; body: unknown }[] = [];
+    mockApi({
+      [`PATCH ${W}/tasks/${T}`]: (request, body) => {
+        seen.push({ key: request.headers.get("Idempotency-Key"), body });
+        return { body: { id: T, revision: 8 } };
+      },
+    });
+    await runRequest("ws-1", edit, "p-3", edit.body);
+    expect(seen).toEqual([{ key: "p-3", body: edit.body }]);
+  });
+
+  it("undo with the new revision and nothing else of the answer", () => {
+    const undo: ProposalRequest = {
+      operation: "tasks.update",
+      method: "PATCH",
+      path: `tasks/${T}`,
+      body: { title: "Renew the van insurance", verb: "do", due_on: null, due_at: null },
+      from_response: ["revision"],
+    };
+    const answer = {
+      id: T,
+      revision: 8,
+      title: "A title another change wrote",
+      due_on: "2026-10-30",
+      assignee: "u-1",
+    };
+    expect(undoBody(undo, answer)).toEqual({
+      title: "Renew the van insurance",
+      verb: "do",
+      due_on: null,
+      due_at: null,
+      revision: 8,
+    });
   });
 });

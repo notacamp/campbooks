@@ -2720,6 +2720,7 @@ export interface components {
             sentence?: string | null;
             /** @description Where it stands. */
             state: components["schemas"]["ProposalState"];
+            task?: components["schemas"]["ProposalTask"] | null;
             undo?: components["schemas"]["ProposalRequest"] | null;
         };
         /**
@@ -4643,14 +4644,26 @@ export interface components {
          *     the server to one catalogue operation and its undo.
          * @enum {string}
          */
-        ProposalAction: "archive" | "unarchive" | "mark_read" | "mark_unread" | "star" | "unstar" | "add_label" | "remove_label" | "move_to_stream" | "trash" | "untrash" | "report_spam" | "not_spam" | "done" | "not_needed" | "already_paid" | "still_to_pay" | "yes_to_question" | "later";
+        ProposalAction: "archive" | "unarchive" | "mark_read" | "mark_unread" | "star" | "unstar" | "add_label" | "remove_label" | "move_to_stream" | "trash" | "untrash" | "report_spam" | "not_spam" | "done" | "not_needed" | "already_paid" | "still_to_pay" | "yes_to_question" | "later" | "task_done" | "task_not_needed" | "plan_day" | "task_later" | "due" | "hand_off";
         /** @description What a change takes besides its conversation. */
         ProposalDetail: {
+            /**
+             * Format: date
+             * @description The day (`plan_day`, `due`), `YYYY-MM-DD`.
+             */
+            day?: string | null;
             /**
              * @description The label's name, as its inbox has it (`add_label`, `remove_label`):
              *     Scout's words, show them quoted.
              */
             label?: string | null;
+            /** @description The teammate's user id (`hand_off`), a member of the workspace. */
+            member_id?: string | null;
+            /**
+             * @description The teammate's name, as the workspace's members list has it
+             *     (`hand_off`): read by the server, never the model's words.
+             */
+            member_name?: string | null;
             /** @description The stream it moves to (`move_to_stream`). */
             stream?: string | null;
             /**
@@ -4694,7 +4707,7 @@ export interface components {
          * @description An HTTP method a proposal's request may use.
          * @enum {string}
          */
-        ProposalMethod: "POST" | "DELETE";
+        ProposalMethod: "POST" | "PATCH" | "DELETE";
         /**
          * @description A request the member's client sends, as the server built it from the
          *     catalogue: the client checks it is one of its own actions before
@@ -4723,6 +4736,21 @@ export interface components {
          * @enum {string}
          */
         ProposalState: "pending" | "done" | "declined" | "failed" | "undone";
+        /**
+         * @description A task's own facts, read from its record when the proposal was made:
+         *     what a card names, never the model's words.
+         */
+        ProposalTask: {
+            /**
+             * Format: date
+             * @description The day it is due then.
+             */
+            due_on?: string | null;
+            /** @description Its title, as the member wrote it. */
+            title: string;
+            /** @description `do` or `pay`. */
+            verb: string;
+        };
         /** @description What a rule does. */
         ProposedAction: {
             /** @enum {string} */

@@ -6,6 +6,7 @@ export type Settlement = Schema<"Settlement">;
 
 const CONVERSATION = "conversations.conversation";
 const ITEM = "attention.item";
+const TASK = "tasks.task";
 
 /**
  * A request this client runs for one of Scout's proposals: its method, its
@@ -13,7 +14,7 @@ const ITEM = "attention.item";
  * record types it changes (whose lists are read again after it).
  */
 export interface Runnable {
-  method: "POST" | "DELETE";
+  method: "POST" | "DELETE" | "PATCH";
   path: string;
   records: readonly string[];
 }
@@ -29,10 +30,17 @@ const item = (path: string): Runnable => ({
   records: [ITEM, CONVERSATION],
 });
 
+const task = (tail: string, method: Runnable["method"] = "POST"): Runnable => ({
+  method,
+  path: `tasks/{task_id}${tail}`,
+  // The Tasks list and Home's asks read these.
+  records: [TASK, ITEM],
+});
+
 /**
  * The client's own list of the actions Scout may propose, and their undos
  * (the same operations as the server's action table): a proposal naming
- * anything else is never sent. Calendar events and tasks add theirs here.
+ * anything else is never sent. Calendar events add theirs here.
  */
 export const RUNNABLE: Readonly<Record<string, Runnable>> = {
   "conversations.archive": conversation("archive"),
@@ -53,6 +61,14 @@ export const RUNNABLE: Readonly<Record<string, Runnable>> = {
   "conversations.reopen_need": conversation("need/reopen"),
   "attention.snooze": item("snooze"),
   "attention.unsnooze": item("unsnooze"),
+  "tasks.done": task("/done"),
+  "tasks.not_needed": task("/not_needed"),
+  "tasks.reopen": task("/reopen"),
+  "tasks.plan": task("/plan"),
+  // A task's edit is the one PATCH Scout's cards run.
+  "tasks.update": task("", "PATCH"),
+  "tasks.hand_off": task("/hand_off"),
+  "tasks.take_back": task("/take_back"),
 };
 
 /** One plain id in a path. */
@@ -66,7 +82,8 @@ export interface Ready {
 
 /**
  * `request` when this client runs it: its operation is in `list`, its
- * method POST or DELETE and the one its entry says, and its path is the
+ * method POST or DELETE (PATCH for a task's edit alone) and the one its
+ * entry says, and its path is the
  * entry's, under the workspace's root, each id one plain segment. Anything
  * else is `undefined`: the card says Scout can't do it here.
  */
@@ -75,13 +92,14 @@ export function runnable(
   list: Readonly<Record<string, Runnable>> = RUNNABLE,
 ): Ready | undefined {
   const entry = Object.hasOwn(list, request.operation) ? list[request.operation] : undefined;
-  // Whatever the server's document says a method may be: only these two.
+  // Whatever the server's document says a method may be: only these, PATCH
+  // for the one operation that is an edit.
   const method: string = request.method;
-  if (
-    entry === undefined ||
-    (method !== "POST" && method !== "DELETE") ||
-    method !== entry.method
-  ) {
+  const allowed =
+    method === "POST" ||
+    method === "DELETE" ||
+    (method === "PATCH" && request.operation === "tasks.update");
+  if (entry === undefined || !allowed || method !== entry.method) {
     return undefined;
   }
   const want = entry.path.split("/");
@@ -145,7 +163,7 @@ interface LooseInit {
 }
 
 type LooseRequest = (
-  method: "post" | "delete",
+  method: "post" | "delete" | "patch",
   url: string,
   init: LooseInit,
 ) => Promise<{ data?: unknown; error?: unknown; response: Response }>;
@@ -171,7 +189,7 @@ export async function runRequest(
   // URL the proposal wrote.
   const send = api.request as unknown as LooseRequest;
   const result = await send(
-    ready.entry.method === "POST" ? "post" : "delete",
+    ready.entry.method === "POST" ? "post" : ready.entry.method === "PATCH" ? "patch" : "delete",
     `/api/v1/w/{workspace_id}/${ready.entry.path}`,
     {
       params: { path: { ...ready.params, workspace_id: workspaceId } },

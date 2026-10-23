@@ -63,6 +63,7 @@
     "label": "Task",
     "empty": "Choose a task",
     "emptyBody": "Pick a task from the list to see it here.",
+    "askScout": "Ask Scout",
     "back": "Back",
     "titleLabel": "Task title",
     "noDate": "No date",

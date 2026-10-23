@@ -12,19 +12,21 @@
 //! its input and its undo. A row's undo is the one its operation names in
 //! `x-campbooks.undo`, or, for a *restoring* row, the same operation with
 //! the record's values read when the proposal is checked (the catalogue
-//! forbids an operation naming itself as its undo). Calendar events and
-//! tasks add rows in their own changes; the client needs no change for them.
+//! forbids an operation naming itself as its undo). Tasks add their rows
+//! (campbooks-cloud#43, `propose_task_change`); calendar events add theirs
+//! in their own change. The three-per-answer cap and the dedupe are shared
+//! by every proposing tool.
 
 use campbooks_ai::{ToolCall, ToolDefinition};
 use campbooks_kernel::RecordRef;
-use chrono::{DateTime, Duration, Utc};
+use chrono::{DateTime, Duration, NaiveDate, Utc};
 use serde_json::{Map, Value, json};
 
 use super::{
     member::{Member, Unread},
     types::{
         ChatProposal, ProposalAction, ProposalDetail, ProposalFacts, ProposalId, ProposalKind,
-        ProposalMethod, ProposalRequest, ProposalState,
+        ProposalMethod, ProposalRequest, ProposalState, ProposalTask,
     },
     words::{clean, cut_bytes},
 };
@@ -37,10 +39,16 @@ const SENTENCE_CHARS: (usize, usize) = (3, 300);
 const INTENT_CHARS: (usize, usize) = (3, 200);
 /// Longest label name taken, in characters.
 const LABEL_CHARS: usize = 64;
+/// Longest teammate id or name taken, in characters.
+const MEMBER_CHARS: usize = 120;
 /// Most bytes of a fact (a sender, a subject).
 const FACT_BYTES: usize = 300;
 /// Record type of a conversation (the conversations module's).
 const CONVERSATION: &str = "conversations.conversation";
+/// Record type of a task (the tasks module's).
+const TASK: &str = "tasks.task";
+/// The furthest a day or a Later goes, as `tasks.plan` allows.
+const YEAR: i64 = 365;
 /// The workspace's API root, as the catalogue's paths start.
 const WORKSPACE_ROOT: &str = "/api/v1/w/{workspace_id}/";
 /// The streams a conversation may be moved to.
@@ -55,11 +63,13 @@ pub enum Proposing {
     Rule,
     /// An intent for a reply draft.
     Reply,
+    /// One change to one task.
+    Task,
 }
 
 impl Proposing {
     /// Every proposing tool, in the order they are offered.
-    pub const ALL: [Self; 3] = [Self::Change, Self::Rule, Self::Reply];
+    pub const ALL: [Self; 4] = [Self::Change, Self::Rule, Self::Reply, Self::Task];
 
     /// The name the model calls it by.
     pub const fn name(self) -> &'static str {
@@ -67,6 +77,7 @@ impl Proposing {
             Self::Change => "propose_change",
             Self::Rule => "propose_rule",
             Self::Reply => "propose_reply",
+            Self::Task => "propose_task_change",
         }
     }
 
@@ -100,7 +111,36 @@ impl ProposalAction {
         Self::Later,
     ];
 
-    /// Its name, as the model and the client say it.
+    /// The task actions, in the order the model is offered them.
+    pub const TASKS: [Self; 6] = [
+        Self::TaskDone,
+        Self::TaskNotNeeded,
+        Self::PlanDay,
+        Self::TaskLater,
+        Self::Due,
+        Self::HandOff,
+    ];
+
+    /// The task action the model names `name` (`done`, `not_needed`,
+    /// `plan_day`, `later`, `due`, `hand_off`), if there is one.
+    pub fn task_named(name: &str) -> Option<Self> {
+        Self::TASKS.into_iter().find(|a| a.task_name() == name)
+    }
+
+    /// A task action's name for the model.
+    pub const fn task_name(self) -> &'static str {
+        match self {
+            Self::TaskDone => "done",
+            Self::TaskNotNeeded => "not_needed",
+            Self::PlanDay => "plan_day",
+            Self::TaskLater => "later",
+            Self::Due => "due",
+            Self::HandOff => "hand_off",
+            _ => self.name(),
+        }
+    }
+
+    /// Its name, as the client says it.
     pub const fn name(self) -> &'static str {
         match self {
             Self::Archive => "archive",
@@ -122,6 +162,12 @@ impl ProposalAction {
             Self::StillToPay => "still_to_pay",
             Self::YesToQuestion => "yes_to_question",
             Self::Later => "later",
+            Self::TaskDone => "task_done",
+            Self::TaskNotNeeded => "task_not_needed",
+            Self::PlanDay => "plan_day",
+            Self::TaskLater => "task_later",
+            Self::Due => "due",
+            Self::HandOff => "hand_off",
         }
     }
 
@@ -152,8 +198,13 @@ pub enum Undo {
         from_response: &'static [&'static str],
     },
     /// The same operation with the record's values before the change, read
-    /// when the proposal is checked.
-    Restoring,
+    /// when the proposal is checked, taking from the change's answer the
+    /// top-level fields named (a task's `revision`, so a stale undo is a
+    /// 409 and never overwrites a later change).
+    Restoring {
+        /// Fields of the change's answer the undo's body takes.
+        from_response: &'static [&'static str],
+    },
 }
 
 /// One row of the action table.
@@ -177,6 +228,33 @@ const fn row(action: ProposalAction, operation: &'static str, undo: &'static str
         },
     }
 }
+
+/// A task row whose undo is its catalogue undo, copying the `revision`.
+const fn task_row(action: ProposalAction, operation: &'static str, undo: &'static str) -> Row {
+    Row {
+        action,
+        operation,
+        undo: Undo::Catalogue {
+            operation: undo,
+            from_response: REVISION,
+        },
+    }
+}
+
+/// A task row whose undo is itself with the values before, copying the
+/// `revision`.
+const fn restoring(action: ProposalAction, operation: &'static str) -> Row {
+    Row {
+        action,
+        operation,
+        undo: Undo::Restoring {
+            from_response: REVISION,
+        },
+    }
+}
+
+/// The one field of a task's answer an undo takes.
+const REVISION: &[&str] = &["revision"];
 
 /// The action table: each action's operation and undo.
 pub const ROWS: &[Row] = &[
@@ -223,7 +301,7 @@ pub const ROWS: &[Row] = &[
     Row {
         action: ProposalAction::MoveToStream,
         operation: "conversations.move_to_stream",
-        undo: Undo::Restoring,
+        undo: Undo::Restoring { from_response: &[] },
     },
     row(
         ProposalAction::Trash,
@@ -275,6 +353,16 @@ pub const ROWS: &[Row] = &[
         "attention.snooze",
         "attention.unsnooze",
     ),
+    task_row(ProposalAction::TaskDone, "tasks.done", "tasks.reopen"),
+    task_row(
+        ProposalAction::TaskNotNeeded,
+        "tasks.not_needed",
+        "tasks.reopen",
+    ),
+    restoring(ProposalAction::PlanDay, "tasks.plan"),
+    restoring(ProposalAction::TaskLater, "tasks.plan"),
+    restoring(ProposalAction::Due, "tasks.update"),
+    task_row(ProposalAction::HandOff, "tasks.hand_off", "tasks.take_back"),
 ];
 
 /// Why a proposal was not stored: a fixed code the model reads, and the log.
@@ -294,6 +382,12 @@ pub enum Refusal {
     NoSuchLabel,
     /// `until` not later than now, or a year or more away.
     UntilOutOfRange,
+    /// A task that is closed cannot be planned, edited or handed off.
+    TaskClosed,
+    /// `day` before the member's today, or a year or more away.
+    DayOutOfRange,
+    /// The teammate is the member, or not a member of the workspace.
+    NotATeammate,
     /// The answer holds [`MAX_PROPOSALS`] already.
     TooMany,
     /// A read failed, or the operation is not here.
@@ -311,6 +405,9 @@ impl Refusal {
             Self::NoSuchNeed => "no_such_need",
             Self::NoSuchLabel => "no_such_label",
             Self::UntilOutOfRange => "until_out_of_range",
+            Self::TaskClosed => "task_closed",
+            Self::DayOutOfRange => "day_out_of_range",
+            Self::NotATeammate => "not_a_teammate",
             Self::TooMany => "too_many",
             Self::Unavailable => "unavailable",
         }
@@ -343,6 +440,18 @@ impl Refusal {
                 "`until` must be later than now and less than a year away, RFC 3339 with an \
                  offset. Nothing was proposed."
             }
+            Self::TaskClosed => {
+                "The task is closed: it cannot be planned, edited, handed off or closed again. \
+                 Nothing was proposed."
+            }
+            Self::DayOutOfRange => {
+                "`day` must be today or later in the member's days, and less than a year \
+                 away, YYYY-MM-DD. Nothing was proposed."
+            }
+            Self::NotATeammate => {
+                "No teammate by that id or name, or it is the member themself: hand_off takes \
+                 another member of the workspace. Nothing was proposed."
+            }
             Self::TooMany => {
                 "This answer holds three proposals already: propose no more in it. Nothing was \
                  proposed."
@@ -370,6 +479,10 @@ fn object(properties: &Value, required: &[&str]) -> Value {
 /// Every proposing tool's definition, for the model.
 pub fn definitions() -> Vec<ToolDefinition> {
     let actions: Vec<&str> = ProposalAction::ALL.iter().map(|a| a.name()).collect();
+    let task_actions: Vec<&str> = ProposalAction::TASKS
+        .iter()
+        .map(|a| a.task_name())
+        .collect();
     let conversation_id = json!({
         "type": "string",
         "description": "The conversation's id, as `about` or another tool gave it.",
@@ -423,6 +536,28 @@ pub fn definitions() -> Vec<ToolDefinition> {
                 &["conversation_id", "intent"],
             ),
         ),
+        ToolDefinition::new(
+            Proposing::Task.name(),
+            "Propose one change to one of the member's tasks, for the member to confirm on a \
+             card. Nothing changes unless they confirm. done (paid, for a bill) and not_needed \
+             close it; plan_day plans it for `day` (YYYY-MM-DD, the member's days); later puts \
+             it off until `until` (RFC 3339 with an offset, in the member's time zone); due \
+             sets its due day to `day`; hand_off gives it to the teammate `member_id` (the \
+             member's user id, or their full name as the workspace lists it). Nothing else is \
+             sent with an action. This cannot create or rename a task.",
+            object(
+                &json!({
+                    "action": {"type": "string", "enum": task_actions},
+                    "task_id": {"type": "string", "minLength": 1, "maxLength": 64,
+                                "description": "The task's id, as `about` or another tool gave it."},
+                    "day": {"type": "string", "minLength": 10, "maxLength": 10,
+                            "description": "YYYY-MM-DD, for plan_day and due."},
+                    "until": {"type": "string", "format": "date-time"},
+                    "member_id": {"type": "string", "minLength": 1, "maxLength": MEMBER_CHARS},
+                }),
+                &["action", "task_id"],
+            ),
+        ),
     ]
 }
 
@@ -443,6 +578,14 @@ pub enum Asked {
     Reply {
         conversation: String,
         intent: String,
+    },
+    /// `propose_task_change`.
+    Task {
+        action: ProposalAction,
+        task: String,
+        day: Option<NaiveDate>,
+        until: Option<String>,
+        member: Option<String>,
     },
 }
 
@@ -475,6 +618,7 @@ pub fn arguments(tool: Proposing, raw: &str) -> Option<Asked> {
         Proposing::Change => &["action", "conversation_id", "stream", "label", "until"],
         Proposing::Rule => &["sentence"],
         Proposing::Reply => &["conversation_id", "intent"],
+        Proposing::Task => &["action", "task_id", "day", "until", "member_id"],
     };
     if !object.keys().all(|key| allowed.contains(&key.as_str())) {
         return None;
@@ -508,6 +652,31 @@ pub fn arguments(tool: Proposing, raw: &str) -> Option<Asked> {
                 until,
             })
         }
+        Proposing::Task => {
+            let action = ProposalAction::task_named(object.get("action")?.as_str()?)?;
+            let task = text("task_id", (1, 64))??;
+            let day = match text("day", (10, 10))? {
+                None => None,
+                Some(day) => Some(NaiveDate::parse_from_str(&day, "%Y-%m-%d").ok()?),
+            };
+            let until = text("until", (1, 64))?;
+            let member = text("member_id", (1, MEMBER_CHARS))?;
+            let takes = (
+                matches!(action, ProposalAction::PlanDay | ProposalAction::Due),
+                action == ProposalAction::TaskLater,
+                action == ProposalAction::HandOff,
+            );
+            if takes != (day.is_some(), until.is_some(), member.is_some()) {
+                return None;
+            }
+            Some(Asked::Task {
+                action,
+                task,
+                day,
+                until,
+                member,
+            })
+        }
         Proposing::Rule => Some(Asked::Rule {
             sentence: text("sentence", SENTENCE_CHARS)??,
         }),
@@ -522,6 +691,8 @@ pub fn arguments(tool: Proposing, raw: &str) -> Option<Asked> {
 #[derive(Debug)]
 pub struct Proposer {
     member: Member,
+    /// The member's offset from UTC in minutes: where their day starts.
+    utc_offset: i32,
     /// The proposals kept, in order.
     pub proposals: Vec<ChatProposal>,
     /// For the log: each refusal's code, in order.
@@ -538,10 +709,12 @@ pub struct Proposed {
 }
 
 impl Proposer {
-    /// Proposals checked as `member`.
-    pub fn new(member: Member) -> Self {
+    /// Proposals checked as `member`, whose day starts `utc_offset` minutes
+    /// from UTC's.
+    pub fn new(member: Member, utc_offset: i32) -> Self {
         Self {
             member,
+            utc_offset,
             proposals: Vec::new(),
             refusals: Vec::new(),
         }
@@ -608,6 +781,7 @@ impl Proposer {
                         action: None,
                         record: None,
                         facts: None,
+                        task: None,
                         detail: None,
                         request: None,
                         undo: None,
@@ -633,6 +807,7 @@ impl Proposer {
                         action: None,
                         record: Some(RecordRef::new(CONVERSATION, &seen.id)),
                         facts: Some(seen.facts()),
+                        task: None,
                         detail: None,
                         request: None,
                         undo: None,
@@ -665,12 +840,26 @@ impl Proposer {
                         action: Some(*action),
                         record: Some(RecordRef::new(CONVERSATION, &seen.id)),
                         facts: Some(seen.facts()),
+                        task: None,
                         detail: Some(built.detail),
                         request: Some(built.request),
                         undo: Some(built.undo),
                         sentence: None,
                         intent: None,
                     }
+                }
+                Asked::Task {
+                    action,
+                    task,
+                    day,
+                    until,
+                    member,
+                } => {
+                    if full && !self.holds(&asked) {
+                        return Err(Refusal::TooMany);
+                    }
+                    self.task_proposal(*action, task, *day, until.as_deref(), member.as_deref())
+                        .await?
                 }
             };
         if let Some(same) = self.proposals.iter().find(|p| same_card(p, &proposal)) {
@@ -710,6 +899,23 @@ impl Proposer {
                     && p.intent.as_ref() == Some(intent)
             }
             Asked::Rule { sentence } => p.sentence.as_ref() == Some(sentence),
+            Asked::Task {
+                action,
+                task,
+                day,
+                until,
+                member: _,
+            } => {
+                // Only a rough match, to spare a full answer a refusal it
+                // does not deserve: the exact check is `same_card`, in
+                // `checked`, after the proposal is built.
+                let until = until.as_deref().and_then(|u| until_within(u).ok());
+                p.action == Some(*action)
+                    && p.record.as_ref().is_some_and(|r| r.id == *task)
+                    && p.detail
+                        .as_ref()
+                        .is_some_and(|d| d.day == *day && d.until == until)
+            }
         })
     }
 
@@ -892,6 +1098,10 @@ impl Proposer {
                 body = Some(json!({ "until": until.to_rfc3339() }));
                 false
             }
+            // Task actions are built by `task_proposal`, never here.
+            A::TaskDone | A::TaskNotNeeded | A::PlanDay | A::TaskLater | A::Due | A::HandOff => {
+                return Err(Refusal::InvalidArguments);
+            }
         };
         if already {
             return Err(Refusal::AlreadySo);
@@ -899,7 +1109,9 @@ impl Proposer {
         let row = action.row();
         let request = self.request(row.operation, &params, body, &[])?;
         let undo = match row.undo {
-            Undo::Restoring => self.request(row.operation, &params, undo_body, &[])?,
+            Undo::Restoring { from_response } => {
+                self.request(row.operation, &params, undo_body, from_response)?
+            }
             Undo::Catalogue {
                 operation,
                 from_response,
@@ -915,6 +1127,235 @@ impl Proposer {
             request,
             undo,
         })
+    }
+
+    /// A task change's proposal, after reading the task as the member and
+    /// checking it changes something, for someone who may change it.
+    #[allow(clippy::too_many_lines)]
+    async fn task_proposal(
+        &self,
+        action: ProposalAction,
+        task: &str,
+        day: Option<NaiveDate>,
+        until: Option<&str>,
+        member: Option<&str>,
+    ) -> Result<ChatProposal, Refusal> {
+        use ProposalAction as A;
+        let now = Utc::now();
+        // The bounds first: they need no read.
+        let day = day
+            .map(|day| day_within(day, now, self.utc_offset))
+            .transpose()?;
+        let until = until.map(until_within).transpose()?;
+        let seen = self.read_task(task).await?;
+        let (me, people) = self.members().await?;
+        // The giver of a task reads it and takes it back: no more.
+        if seen.assignee != me {
+            return Err(Refusal::ReadOnly);
+        }
+        let open = seen.state == "open";
+        let mut detail = ProposalDetail::default();
+        let mut body = json!({ "revision": seen.revision });
+        let mut undo_body: Option<Value> = None;
+        match action {
+            A::TaskDone | A::TaskNotNeeded => {
+                let closes = if action == A::TaskDone {
+                    "done"
+                } else {
+                    "not_needed"
+                };
+                if seen.state == closes {
+                    return Err(Refusal::AlreadySo);
+                }
+                if !open {
+                    return Err(Refusal::TaskClosed);
+                }
+            }
+            A::PlanDay => {
+                let day = day.ok_or(Refusal::InvalidArguments)?;
+                if !open {
+                    return Err(Refusal::TaskClosed);
+                }
+                if seen.plan == "date" && seen.plan_on == Some(day) {
+                    return Err(Refusal::AlreadySo);
+                }
+                detail.day = Some(day);
+                body["plan"] = "date".into();
+                body["plan_on"] = day.to_string().into();
+                undo_body = Some(seen.plan_before(now));
+            }
+            A::TaskLater => {
+                let until = until.ok_or(Refusal::InvalidArguments)?;
+                if !open {
+                    return Err(Refusal::TaskClosed);
+                }
+                if seen.plan == "later" && seen.later_until == Some(until) {
+                    return Err(Refusal::AlreadySo);
+                }
+                detail.until = Some(until);
+                body["plan"] = "later".into();
+                body["later_until"] = until.to_rfc3339().into();
+                undo_body = Some(seen.plan_before(now));
+            }
+            A::Due => {
+                let day = day.ok_or(Refusal::InvalidArguments)?;
+                if !open {
+                    return Err(Refusal::TaskClosed);
+                }
+                if seen.due_on == Some(day) && seen.due_at.is_none() {
+                    return Err(Refusal::AlreadySo);
+                }
+                detail.day = Some(day);
+                // A full replacement: the record's own title and verb, the
+                // new day, no time of day.
+                body["title"] = seen.title.clone().into();
+                body["verb"] = seen.verb.clone().into();
+                body["due_on"] = day.to_string().into();
+                undo_body = Some(json!({
+                    "title": seen.title,
+                    "verb": seen.verb,
+                    "due_on": seen.due_on.map(|d| d.to_string()),
+                    "due_at": seen.due_at.map(|at| at.to_rfc3339()),
+                }));
+            }
+            A::HandOff => {
+                let asked = member.ok_or(Refusal::InvalidArguments)?;
+                if !open {
+                    return Err(Refusal::TaskClosed);
+                }
+                // A teammate by id, else by the full name the list gives;
+                // the card's name is the list's, never the model's.
+                let lowered = asked.trim().to_lowercase();
+                let by_id = people.iter().find(|p| p.id == asked.trim());
+                let named: Vec<&Teammate> = people
+                    .iter()
+                    .filter(|p| {
+                        p.name.to_lowercase() == lowered
+                            || p.email.as_deref().map(str::to_lowercase) == Some(lowered.clone())
+                    })
+                    .collect();
+                let teammate = by_id
+                    .or_else(|| (named.len() == 1).then(|| named[0]))
+                    .ok_or(Refusal::NotATeammate)?;
+                if teammate.id == me || !safe_segment(&teammate.id) {
+                    return Err(Refusal::NotATeammate);
+                }
+                detail.member_id = Some(teammate.id.clone());
+                detail.member_name = Some(teammate.name.clone());
+                body["to"] = teammate.id.clone().into();
+            }
+            _ => return Err(Refusal::InvalidArguments),
+        }
+        let row = action.row();
+        let params = [("task_id", seen.id.clone())];
+        let request = self.request(row.operation, &params, Some(body), &[])?;
+        let undo = match row.undo {
+            Undo::Restoring { from_response } => {
+                self.request(row.operation, &params, undo_body, from_response)?
+            }
+            Undo::Catalogue {
+                operation,
+                from_response,
+            } => self.request(operation, &params, None, from_response)?,
+        };
+        Ok(ChatProposal {
+            id: ProposalId::new(),
+            kind: ProposalKind::Change,
+            state: ProposalState::Pending,
+            action: Some(action),
+            record: Some(RecordRef::new(TASK, &seen.id)),
+            facts: None,
+            task: Some(ProposalTask {
+                title: fact(&seen.title),
+                verb: seen.verb.clone(),
+                due_on: seen.due_on,
+            }),
+            detail: Some(detail),
+            request: Some(request),
+            undo: Some(undo),
+            sentence: None,
+            intent: None,
+        })
+    }
+
+    /// The task as the member sees it (`tasks.get` refuses what they
+    /// cannot see).
+    async fn read_task(&self, task: &str) -> Result<SeenTask, Refusal> {
+        let detail = self
+            .member
+            .read(
+                "tasks.get",
+                json!({ "task_id": task, "utc_offset": self.utc_offset }),
+            )
+            .await
+            .map_err(|unread| match unread {
+                Unread::NotVisible | Unread::Refused => Refusal::NotVisible,
+                Unread::Broken(_) => Refusal::Unavailable,
+            })?;
+        let head = &detail["task"];
+        let text = |key: &str| head[key].as_str().map(ToOwned::to_owned);
+        let day = |key: &str| {
+            head[key]
+                .as_str()
+                .and_then(|d| NaiveDate::parse_from_str(d, "%Y-%m-%d").ok())
+        };
+        let at = |key: &str| {
+            head[key]
+                .as_str()
+                .and_then(|t| DateTime::parse_from_rfc3339(t).ok())
+                .map(|t| t.with_timezone(&Utc))
+        };
+        Ok(SeenTask {
+            id: text("id")
+                .filter(|id| safe_segment(id))
+                .ok_or(Refusal::Unavailable)?,
+            title: text("title").ok_or(Refusal::Unavailable)?,
+            verb: text("verb").ok_or(Refusal::Unavailable)?,
+            state: text("state").ok_or(Refusal::Unavailable)?,
+            plan: text("plan").ok_or(Refusal::Unavailable)?,
+            assignee: text("assignee").ok_or(Refusal::Unavailable)?,
+            revision: head["revision"].as_i64().ok_or(Refusal::Unavailable)?,
+            due_on: day("due_on"),
+            due_at: at("due_at"),
+            plan_on: day("plan_on"),
+            later_until: at("later_until"),
+        })
+    }
+
+    /// The workspace's members: who the member is (their user id), and
+    /// everyone, named as the list names them.
+    async fn members(&self) -> Result<(String, Vec<Teammate>), Refusal> {
+        let list = self
+            .member
+            .read("workspaces.list_members", Value::Null)
+            .await
+            .map_err(|_| Refusal::Unavailable)?;
+        let mut me = None;
+        let mut people = Vec::new();
+        for member in list["members"].as_array().into_iter().flatten() {
+            let Some(id) = member["user_id"].as_str() else {
+                continue;
+            };
+            if member["you"] == true {
+                me = Some(id.to_owned());
+            }
+            let email = member["email"].as_str().map(clean);
+            let name = member["display_name"]
+                .as_str()
+                .map(clean)
+                .filter(|n| !n.is_empty())
+                .or_else(|| email.clone())
+                .map(|n| fact(&n))
+                .unwrap_or_default();
+            people.push(Teammate {
+                id: id.to_owned(),
+                name,
+                email,
+            });
+        }
+        // Without who the member is, nothing about a hand-off or a role is
+        // known: no proposal.
+        Ok((me.ok_or(Refusal::Unavailable)?, people))
     }
 
     /// The id of the conversation's open item on the member's list.
@@ -956,6 +1397,9 @@ impl Proposer {
         let method = match info.method.as_str() {
             "POST" => ProposalMethod::Post,
             "DELETE" => ProposalMethod::Delete,
+            // Only a task's edit uses it (the client allows it for that
+            // entry alone).
+            "PATCH" if operation == "tasks.update" => ProposalMethod::Patch,
             _ => return Err(Refusal::Unavailable),
         };
         let path = fill(&info.path, params).ok_or(Refusal::Unavailable)?;
@@ -1008,6 +1452,16 @@ fn until_within(until: &str) -> Result<DateTime<Utc>, Refusal> {
         return Err(Refusal::UntilOutOfRange);
     }
     Ok(at)
+}
+
+/// `day`, when it is today or later in the member's days (`utc_offset`
+/// minutes from UTC) and less than a year away.
+fn day_within(day: NaiveDate, now: DateTime<Utc>, utc_offset: i32) -> Result<NaiveDate, Refusal> {
+    let today = (now + Duration::minutes(i64::from(utc_offset))).date_naive();
+    if day < today || day >= today + Duration::days(YEAR) {
+        return Err(Refusal::DayOutOfRange);
+    }
+    Ok(day)
 }
 
 /// A fact, cleaned and bounded.
@@ -1068,6 +1522,43 @@ impl Seen {
     }
 }
 
+/// A member of the workspace, as the members list has them.
+struct Teammate {
+    id: String,
+    /// Their name, else their address (bounded).
+    name: String,
+    email: Option<String>,
+}
+
+/// A task, as read for a proposal.
+struct SeenTask {
+    id: String,
+    title: String,
+    verb: String,
+    state: String,
+    plan: String,
+    assignee: String,
+    revision: i64,
+    due_on: Option<NaiveDate>,
+    due_at: Option<DateTime<Utc>>,
+    plan_on: Option<NaiveDate>,
+    later_until: Option<DateTime<Utc>>,
+}
+
+impl SeenTask {
+    /// The `tasks.plan` body that puts the plan back as it is now (a Later
+    /// already over is no plan).
+    fn plan_before(&self, now: DateTime<Utc>) -> Value {
+        match (self.plan.as_str(), self.plan_on, self.later_until) {
+            ("date", Some(day), _) => json!({ "plan": "date", "plan_on": day.to_string() }),
+            ("later", _, Some(until)) if until > now => {
+                json!({ "plan": "later", "later_until": until.to_rfc3339() })
+            }
+            _ => json!({ "plan": "none" }),
+        }
+    }
+}
+
 /// A change's detail, request and undo.
 struct Built {
     detail: ProposalDetail,
@@ -1078,6 +1569,9 @@ struct Built {
 /// What the model reads after Scout's earlier answer, for one of its
 /// proposals: a line the server writes, never the member's words.
 pub fn line(proposal: &ChatProposal) -> String {
+    if let (Some(task), Some(action)) = (&proposal.task, proposal.action) {
+        return task_line(proposal, action, task);
+    }
     let about = proposal.facts.as_ref().map_or_else(String::new, |facts| {
         let subject = if facts.subject.is_empty() {
             "(no subject)"
@@ -1126,22 +1620,69 @@ pub fn line(proposal: &ChatProposal) -> String {
     format!("Proposed: {what}. {state}")
 }
 
+/// The line for one of a task proposal.
+fn task_line(proposal: &ChatProposal, action: ProposalAction, task: &ProposalTask) -> String {
+    let detail = proposal.detail.as_ref().map_or_else(String::new, |d| {
+        if let Some(name) = &d.member_name {
+            format!(" to {name}")
+        } else if let Some(day) = d.day {
+            format!(" for {day}")
+        } else if let Some(until) = d.until {
+            format!(" until {}", until.to_rfc3339())
+        } else {
+            String::new()
+        }
+    });
+    let state = match proposal.state {
+        ProposalState::Pending => "The member has not answered it.",
+        ProposalState::Done => "The member confirmed it.",
+        ProposalState::Declined => "The member said not now.",
+        ProposalState::Failed => "The member confirmed it, and it could not be done.",
+        ProposalState::Undone => "The member confirmed it, then undid it.",
+    };
+    format!(
+        "Proposed: {}{detail} for the task \"{}\". {state}",
+        action.task_name(),
+        task.title
+    )
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
     fn every_action_has_one_row_and_a_strict_schema() {
-        for action in ProposalAction::ALL {
+        for action in ProposalAction::ALL.into_iter().chain(ProposalAction::TASKS) {
             assert_eq!(
                 ROWS.iter().filter(|row| row.action == action).count(),
                 1,
                 "{}",
                 action.name()
             );
+        }
+        for action in ProposalAction::ALL {
             assert_eq!(ProposalAction::named(action.name()), Some(action));
         }
-        assert_eq!(ROWS.len(), ProposalAction::ALL.len());
+        for action in ProposalAction::TASKS {
+            assert_eq!(ProposalAction::task_named(action.task_name()), Some(action));
+            // A task action is never one `propose_change` takes.
+            assert_eq!(ProposalAction::named(action.name()), None);
+            // Every task row's undo copies the revision it will need.
+            assert!(matches!(
+                action.row().undo,
+                Undo::Catalogue {
+                    from_response: &["revision"],
+                    ..
+                } | Undo::Restoring {
+                    from_response: &["revision"]
+                }
+            ));
+        }
+        assert_eq!(
+            ROWS.len(),
+            ProposalAction::ALL.len() + ProposalAction::TASKS.len()
+        );
         for definition in definitions() {
             assert_eq!(definition.parameters["additionalProperties"], false);
             assert!(Proposing::named(&definition.name).is_some());
@@ -1198,6 +1739,63 @@ mod tests {
             .is_some()
         );
         assert!(arguments(Proposing::Reply, "{\"intent\": \"Say yes\"}").is_none());
+    }
+
+    #[test]
+    fn task_arguments_take_only_what_their_action_takes() {
+        let id = "\"task_id\": \"t-1\"";
+        let fits = |raw: &str| arguments(Proposing::Task, raw).is_some();
+        assert!(fits(&format!("{{\"action\": \"done\", {id}}}")));
+        assert!(fits(&format!(
+            "{{\"action\": \"plan_day\", {id}, \"day\": \"2026-10-26\"}}"
+        )));
+        assert!(fits(&format!(
+            "{{\"action\": \"due\", {id}, \"day\": \"2026-10-26\"}}"
+        )));
+        assert!(fits(&format!(
+            "{{\"action\": \"later\", {id}, \"until\": \"2026-10-26T09:00:00+00:00\"}}"
+        )));
+        assert!(fits(&format!(
+            "{{\"action\": \"hand_off\", {id}, \"member_id\": \"u-1\"}}"
+        )));
+        for bad in [
+            format!("{{\"action\": \"create\", {id}}}"),
+            format!("{{\"action\": \"rename\", {id}, \"title\": \"x\"}}"),
+            format!("{{\"action\": \"archive\", {id}}}"),
+            format!("{{\"action\": \"done\", {id}, \"day\": \"2026-10-26\"}}"),
+            format!("{{\"action\": \"plan_day\", {id}}}"),
+            format!("{{\"action\": \"plan_day\", {id}, \"day\": \"Monday\"}}"),
+            format!("{{\"action\": \"plan_day\", {id}, \"day\": \"2026-13-40\"}}"),
+            format!("{{\"action\": \"later\", {id}}}"),
+            format!("{{\"action\": \"hand_off\", {id}}}"),
+            format!("{{\"action\": \"done\", {id}, \"title\": \"Pay Rui\"}}"),
+            "{\"action\": \"done\"}".to_owned(),
+        ] {
+            assert!(!fits(&bad), "{bad}");
+        }
+    }
+
+    #[test]
+    fn a_day_is_today_or_later_in_the_members_days_and_within_a_year() {
+        // 23:30 UTC on the 23rd is already the 24th at +120 minutes.
+        let now = DateTime::parse_from_rfc3339("2026-10-23T23:30:00Z")
+            .unwrap()
+            .with_timezone(&Utc);
+        let day = |d: &str| NaiveDate::parse_from_str(d, "%Y-%m-%d").unwrap();
+        assert!(day_within(day("2026-10-24"), now, 120).is_ok());
+        assert_eq!(
+            day_within(day("2026-10-23"), now, 120),
+            Err(Refusal::DayOutOfRange)
+        );
+        assert!(day_within(day("2026-10-23"), now, 0).is_ok());
+        assert!(day_within(day("2027-10-22"), now, 0).is_ok());
+        assert_eq!(
+            day_within(day("2027-10-23"), now, 0),
+            Err(Refusal::DayOutOfRange)
+        );
+        // West of UTC the day starts later: still the 23rd at -60 minutes.
+        assert!(day_within(day("2026-10-23"), now, -60).is_ok());
+        assert!(day_within(day("2026-10-22"), now, -60).is_err());
     }
 
     #[test]

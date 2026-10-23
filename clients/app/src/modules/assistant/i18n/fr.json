@@ -347,8 +347,18 @@
         "already_paid": "Déjà payée",
         "still_to_pay": "Reste à payer",
         "yes_to_question": "Répondre oui",
-        "later": "Plus tard, jusqu’à {{until}}"
+        "later": "Plus tard, jusqu’à {{until}}",
+        "task_done": "Marquer comme faite",
+        "task_paid": "Marquer comme payée",
+        "task_not_needed": "Pas nécessaire",
+        "plan_day": "Planifier pour le {{day}}",
+        "task_later": "Plus tard, jusqu’à {{until}}",
+        "due": "Échéance le {{day}}",
+        "hand_off": "Passer à {{name}}"
       },
+      "taskLine": "{{title}} · échéance {{due}}",
+      "taskNoDue": "{{title}}",
+      "handOffNote": "Arrive sur l’Accueil de {{name}}.",
       "streams": {
         "primary": "Principal",
         "updates": "Notifications",
@@ -387,6 +397,12 @@
     "unreadableRule": "Scout ne peut pas ouvrir de discussion sur cette règle.",
     "unreadableNotice": "Cette suggestion ne vous est plus proposée.",
     "unreadableNothing": "Scout ne peut pas commencer de discussion pour le moment. Réessayez dans un moment.",
+    "taskIntro": "Posez-moi vos questions sur cette tâche.",
+    "taskLeft": "Que reste-t-il à faire ?",
+    "taskWhen": "Quand dois-je m’en occuper ?",
+    "taskWho": "Qui pourrait la prendre ?",
+    "taskLine": "Tâche : {{title}}",
+    "unreadableTask": "Scout ne peut pas ouvrir de discussion sur cette tâche.",
     "gone": "Cette discussion n’existe plus."
   }
 }

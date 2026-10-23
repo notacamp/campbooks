@@ -11,11 +11,15 @@ import {
   answered,
   answerFrames,
   chatWithProposals,
+  chatWithTaskProposals,
+  TASK_CHAT,
   CLEAR,
   CLEAR_ANSWER,
   MARTA_CHAT,
   MARTA_CHAT_ANSWERED,
   MARTA_RULE,
+  TASKS_ANSWER,
+  TASKS_SAID,
   NOTHING_CHAT,
   NOTICE_ANSWER,
   NOTICE_CHAT,
@@ -54,6 +58,7 @@ import {
   STREAM_COUNTS,
   W,
 } from "../../test/demo/conversations";
+import { BILL, LEASE, OPEN_TASKS, PROPOSAL, TEAM } from "../../test/demo/tasks";
 import { ANA, DUARTE, SESSION, SOFIA as SOFIA_MEMBER } from "../../test/demo/workspaces";
 
 import { mockFetch, saveThemeFromGlobals, type MockRoute } from "./mock-fetch";
@@ -527,4 +532,90 @@ export const AskFromTheReplyDialogLive: Story = {
 /** Waiting on others: Ask Scout on Rui's row (recordings). */
 export const AskFromWaitingLive: Story = {
   args: { path: HOME, api: everywhere() },
+};
+
+/**
+ * The API for Scout's task proposals (campbooks-cloud#43): saying what
+ * happened to three tasks answers with three cards, each naming its task
+ * from the record. Confirm runs the member's own request with the revision
+ * read when it was proposed; Undo sends the one that puts it back, with the
+ * revision the change left.
+ */
+function taskProposalsApi(): Record<string, MockRoute> {
+  let asked = false;
+  const states = new Map<string, string>();
+  const proposals = () =>
+    TASKS_ANSWER.proposals.map((p) => ({ ...p, state: states.get(p.id) ?? p.state }) as typeof p);
+  const change = (task: { id: string }, tail: string, revision: number, over = {}) => ({
+    [`POST ${W}/tasks/${task.id}${tail}`]: { body: { ...task, revision, ...over } },
+  });
+  return api({
+    [`POST ${CHATS}`]: () => ({
+      body: asked ? chatWithTaskProposals(proposals()) : MARTA_CHAT,
+      status: asked ? 200 : 201,
+    }),
+    [`POST ${CHATS}/${MARTA_CHAT.id}/questions/stream`]: () => {
+      asked = true;
+      return { stream: answerFrames(TASKS_ANSWER, "Three tasks changed."), delay: 90 };
+    },
+    ...Object.fromEntries(
+      TASKS_ANSWER.proposals.map((p) => [
+        `POST ${CHATS}/${MARTA_CHAT.id}/proposals/${p.id}`,
+        (body: unknown) => {
+          const state = (body as { state: string }).state;
+          states.set(p.id, state);
+          return { body: { ...p, state } };
+        },
+      ]),
+    ),
+    ...change(BILL, "/done", 2, { state: "done" }),
+    ...change(BILL, "/reopen", 3),
+    ...change(LEASE, "/plan", 2, { plan: "date", plan_on: "2026-10-16" }),
+    ...change(PROPOSAL, "/hand_off", 2),
+    ...change(PROPOSAL, "/take_back", 3),
+  });
+}
+
+/**
+ * Scout proposes task changes: three cards, a bill paid, a lease planned
+ * for Friday and a draft handed to Rui; each is confirmed on its own, with
+ * Undo.
+ */
+export const TaskProposals: Story = {
+  args: { path: HOME, api: taskProposalsApi() },
+  play: async ({ canvasElement }) => {
+    await openFromHome(canvasElement);
+    const page = within(document.body);
+    const field = await page.findByRole("textbox", { name: "Ask about this" });
+    await userEvent.type(field, `${TASKS_SAID}{Enter}`);
+    const bill = await page.findByRole("region", { name: "Mark paid" }, { timeout: 15_000 });
+    await expect(within(bill).getByText(/EDP electricity bill/u)).toBeVisible();
+    await userEvent.click(within(bill).getByRole("button", { name: "Confirm" }));
+    await expect(await within(bill).findByText("Done.")).toBeVisible();
+    await userEvent.click(within(bill).getByRole("button", { name: "Undo" }));
+    await expect(await within(bill).findByText("Undone.")).toBeVisible();
+  },
+};
+
+/** The same, without a play: say it, then Confirm each card and Undo one (recordings). */
+export const TaskProposalsLive: Story = {
+  args: { path: HOME, api: taskProposalsApi() },
+};
+
+/**
+ * Ask Scout on a task (campbooks-cloud#43): the task's detail opens the
+ * chat about it, naming it and offering questions to start from.
+ */
+export const AskAboutATaskLive: Story = {
+  args: {
+    path: `${HOME}/tasks/${LEASE.id}`,
+    api: api({
+      [`GET ${W}/members`]: { body: { members: TEAM } },
+      [`GET ${W}/tasks`]: (_body, url) =>
+        url.searchParams.get("whose") === "handed_off"
+          ? { body: { tasks: [] } }
+          : { body: { tasks: OPEN_TASKS } },
+      [`POST ${CHATS}`]: { status: 201, body: TASK_CHAT },
+    }),
+  },
 };

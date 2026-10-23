@@ -2,6 +2,8 @@ import { useNavigate } from "@tanstack/react-router";
 import { useState, type MouseEvent } from "react";
 import { useTranslation } from "react-i18next";
 
+import { useShortcut } from "~/lib/shortcuts";
+import { taskRef, useScoutChat } from "~/lib/scout-chat";
 import {
   Avatar,
   Button,
@@ -82,6 +84,16 @@ export function TaskDetail({
     actions.rename(task, next);
   };
   const later = isLater(task, clock);
+  // Ask Scout (`.`): the chat about this task; the focus comes back to
+  // what it was asked from. Asking changes nothing, so a giver asks too.
+  const scout = useScoutChat();
+  const askScout = () => {
+    const active = document.activeElement;
+    scout?.(taskRef(task.id), {
+      from: active instanceof HTMLElement && active !== document.body ? active : null,
+    });
+  };
+  useShortcut("scout.ask", askScout, { enabled: scout !== undefined });
 
   const planChip =
     task.plan === "date" && task.plan_on !== null && task.plan_on !== undefined
@@ -107,6 +119,11 @@ export function TaskDetail({
           </Button>
         </span>
         <Spacer />
+        {scout === undefined ? null : (
+          <Button variant="ghost" shortcut="scout.ask" onClick={askScout}>
+            {t("detail.askScout")}
+          </Button>
+        )}
       </PaneHeader>
       <ReaderBody>
         <div className="flex flex-col gap-3">
