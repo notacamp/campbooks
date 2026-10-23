@@ -1758,6 +1758,7 @@ async fn an_email_asking_for_a_change_is_at_most_a_card(db: PgPool) {
 }
 
 #[test]
+#[allow(clippy::too_many_lines)]
 fn every_action_and_undo_is_a_low_risk_change_the_assistant_may_call() {
     let spec: Value =
         serde_json::from_str(include_str!("../../../../../../openapi/openapi.json")).unwrap();
