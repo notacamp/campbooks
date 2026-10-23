@@ -1,7 +1,7 @@
 # Tasks
 
 ## 1. Schema and settings
-- [ ] 1.1 Migration (slot from the merge coordinator) `connectors__imap_locations` with RLS and the `(stream_id, message_key)` index
+- [ ] 1.1 Migration `20261023150000_connectors__imap_locations.sql` with RLS and the `(stream_id, message_key)` index
 - [ ] 1.2 `ImapConfig` gains `backfill_days`, `max_message_bytes`, `run_budget_bytes`, `sweep_minutes`, `sessions_per_host`, `max_folders`
 
 ## 2. Adapter
