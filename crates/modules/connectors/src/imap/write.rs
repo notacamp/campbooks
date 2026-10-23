@@ -249,7 +249,7 @@ fn ops(change: &LabelChange, held: &[Located], places: &Places, can_move: bool) 
     let mut copying: Vec<(&Located, Option<String>)> = Vec::new();
     let bin_out = [("TRASH", Role::Trash), ("SPAM", Role::Junk)]
         .into_iter()
-        .find(|(token, role)| removes(*token) && any(&|r| r == *role))
+        .find(|(token, role)| removes(token) && any(&|r| r == *role))
         .map(|(_, role)| role);
     if adds("TRASH") || adds("SPAM") {
         let (role, to) = if adds("TRASH") {
