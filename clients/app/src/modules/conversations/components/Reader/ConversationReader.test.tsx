@@ -66,11 +66,13 @@ describe("ConversationReader", () => {
     }
     expect(ask).toHaveAttribute("aria-keyshortcuts", ".");
 
+    // The focus comes back to the button it was asked from.
+    ask.focus();
     fireEvent.click(ask);
     expect(scout).toHaveBeenCalledWith(Q4.id, ask);
     fireEvent.keyDown(document.body, { key: "." });
     expect(scout).toHaveBeenCalledTimes(2);
-    expect(scout).toHaveBeenLastCalledWith(Q4.id, expect.anything());
+    expect(scout.mock.calls[1]?.[0]).toBe(Q4.id);
   });
 
   it("offers no Ask Scout where no chat is mounted", async () => {
@@ -103,6 +105,21 @@ describe("ConversationReader", () => {
     }
     fireEvent.click(reply);
     expect(await screen.findByRole("dialog")).toBeVisible();
+  });
+
+  it("puts Reply in the header beside Reply all and Forward, not at the bottom", async () => {
+    routes();
+    const slot = vi.fn<RenderReplySlot>(() => null);
+    renderWithProviders(<Reader slot={slot} />);
+    await screen.findByRole("heading", { name: Q4.subject });
+    // The header's actions are icons named by aria-label; the phone bar's Reply is not.
+    const icons = screen
+      .getAllByRole("button")
+      .map((button) => button.getAttribute("aria-label"))
+      .filter((label) => label !== null);
+    const at = icons.indexOf("Reply");
+    expect(icons.slice(at, at + 3)).toEqual(["Reply", "Reply all", "Forward"]);
+    expect(screen.queryByRole("button", { name: /^Reply to/u })).toBeNull();
   });
 
   it("offers Reply in the note when it says a reply is needed, opening the same dialog", async () => {

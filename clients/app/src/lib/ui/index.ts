@@ -147,6 +147,11 @@ export {
 export { Icon, ICON_NAMES, type IconName, type IconProps } from "./components/Icon/Icon";
 export { IconButton, type IconButtonProps } from "./components/IconButton/IconButton";
 export {
+  OverflowActions,
+  type OverflowAction,
+  type OverflowActionsProps,
+} from "./components/OverflowActions/OverflowActions";
+export {
   Item,
   ItemDetail,
   SwipeAction,
