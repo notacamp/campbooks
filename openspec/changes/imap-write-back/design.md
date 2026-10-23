@@ -235,7 +235,10 @@ already have theirs.
 
 ## Settings
 
-`CAMPBOOKS_CONNECTORS__IMAP__MAX_CREATED_FOLDERS` (default 10, 1 to 100).
+`CAMPBOOKS_CONNECTORS__IMAP__MAX_CREATED_FOLDERS` (default 10, 1 to 100),
+checked at startup only while `CAMPBOOKS_CONNECTORS__IMAP__ENABLED` is on (a
+stray value never stops an instance that does not read IMAP), and tied to no
+poll bound.
 Write-back is on wherever IMAP is (`CAMPBOOKS_CONNECTORS__IMAP__ENABLED`,
 default off).
 
