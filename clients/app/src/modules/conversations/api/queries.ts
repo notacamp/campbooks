@@ -31,6 +31,7 @@ export type DecisionView = Schema<"DecisionView">;
 export type ReasonView = Schema<"ReasonView">;
 export type NeedView = Schema<"NeedView">;
 export type Sender = Schema<"SenderView">;
+export type Correspondent = Schema<"CorrespondentView">;
 
 /** A member's verdict on what a conversation needs (`conversations.resolve_need`, …). */
 export type NeedVerdict =
@@ -128,6 +129,8 @@ const keys = {
       q,
       ...(reachable ? { reachable: "true" } : {}),
     }),
+  correspondents: (workspaceId: string, q: string) =>
+    operationKey("conversations.list_correspondents", { workspace_id: workspaceId, q }),
   body: (
     workspaceId: string,
     conversationId: string,
@@ -622,6 +625,34 @@ export function useConversationAction(workspaceId: string) {
         queryClient.invalidateQueries({ queryKey: keys.inboxes(workspaceId) }),
       ]);
     },
+  });
+}
+
+/**
+ * `conversations.list_correspondents`: the people the caller exchanges mail
+ * with whose name or address holds every word of `q` (from two
+ * characters), written to most first; for To, Cc and Bcc as the member
+ * types. The previous answer stays while the next one loads, so the list
+ * doesn't flicker. Someone who only writes in is left out by the server
+ * when they are not safe to write to.
+ */
+export function useCorrespondents(
+  workspaceId: string,
+  q: string,
+  { enabled = true }: { enabled?: boolean } = {},
+) {
+  const query = q.trim();
+  return useQuery({
+    queryKey: keys.correspondents(workspaceId, query),
+    enabled: enabled && query.length >= 2,
+    placeholderData: keepPreviousData,
+    queryFn: async ({ signal }) =>
+      unwrap(
+        await api.GET("/api/v1/w/{workspace_id}/correspondents", {
+          params: { path: { workspace_id: workspaceId }, query: { q: query } },
+          signal,
+        }),
+      ).correspondents,
   });
 }
 

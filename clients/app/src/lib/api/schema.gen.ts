@@ -1016,6 +1016,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/w/{workspace_id}/correspondents": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Suggest the people you exchange mail with, as you type an address. */
+        get: operations["conversations.list_correspondents"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/w/{workspace_id}/drafts": {
         parameters: {
             query?: never;
@@ -2848,6 +2865,37 @@ export interface components {
              * @description Unread inbound messages.
              */
             unread_count: number;
+        };
+        /** @description People, written to most first. */
+        CorrespondentList: {
+            /** @description Written to most first, then written by most, then by address. */
+            correspondents: components["schemas"]["CorrespondentView"][];
+        };
+        /** @description Someone the caller's inboxes exchange mail with. */
+        CorrespondentView: {
+            /**
+             * @description Their address, lower-cased.
+             * @example marta@ferreira-studio.example
+             */
+            address: string;
+            /**
+             * @description The newest display name seen for them, sent or received, when there
+             *     was one.
+             * @example Marta Ferreira
+             */
+            name?: string | null;
+            /**
+             * Format: int32
+             * @description Messages from them in the caller's inboxes, among the newest (the
+             *     last year, at most 5,000 received messages).
+             */
+            received: number;
+            /**
+             * Format: int32
+             * @description Messages the caller's inboxes sent with them in To or Cc, among the
+             *     newest (the last year, at most 5,000 sent messages).
+             */
+            wrote: number;
         };
         /** @description A rule to create. */
         CreateRule: {
@@ -9132,6 +9180,74 @@ export interface operations {
                 };
             };
             /** @description No such conversation, or you cannot see it. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "conversations.list_correspondents": {
+        parameters: {
+            query: {
+                /**
+                 * @description Words (2 to 100 characters) every listed person's address or display
+                 *     name contains, ignoring case and accents: what is typed in To, Cc or
+                 *     Bcc.
+                 */
+                q: string;
+                /** @description How many, 1 to 10 (default 10). */
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                /** @description The workspace. */
+                workspace_id: components["schemas"]["WorkspaceId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The people. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CorrespondentList"];
+                };
+            };
+            /** @description No `q` (`invalid_query`), or a `q` or `limit` out of range (`invalid_correspondents_query`). */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No valid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Missing scope. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No such workspace, or you are not a member. */
             404: {
                 headers: {
                     [name: string]: unknown;

@@ -5855,6 +5855,118 @@
         }
       }
     },
+    "/api/v1/w/{workspace_id}/correspondents": {
+      "get": {
+        "tags": [
+          "conversations"
+        ],
+        "summary": "Suggest the people you exchange mail with, as you type an address.",
+        "operationId": "conversations.list_correspondents",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "description": "The workspace.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId"
+            }
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "description": "Words (2 to 100 characters) every listed person's address or display\nname contains, ignoring case and accents: what is typed in To, Cc or\nBcc.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "How many, 1 to 10 (default 10).",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "minimum": 0
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The people.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CorrespondentList"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "No `q` (`invalid_query`), or a `q` or `limit` out of range (`invalid_correspondents_query`).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid access token.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing scope.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such workspace, or you are not a member.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [
+              "conversations:read"
+            ]
+          }
+        ],
+        "x-campbooks": {
+          "access": {
+            "action": "read",
+            "resource": "conversations.inbox"
+          },
+          "assistant": false,
+          "automation": false,
+          "mutates": false,
+          "records": [
+            "conversations.inbox"
+          ],
+          "risk": "low"
+        }
+      }
+    },
     "/api/v1/w/{workspace_id}/drafts": {
       "get": {
         "tags": [
@@ -15224,6 +15336,58 @@
             "type": "integer",
             "format": "int32",
             "description": "Unread inbound messages.",
+            "minimum": 0
+          }
+        }
+      },
+      "CorrespondentList": {
+        "type": "object",
+        "description": "People, written to most first.",
+        "required": [
+          "correspondents"
+        ],
+        "properties": {
+          "correspondents": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CorrespondentView"
+            },
+            "description": "Written to most first, then written by most, then by address."
+          }
+        }
+      },
+      "CorrespondentView": {
+        "type": "object",
+        "description": "Someone the caller's inboxes exchange mail with.",
+        "required": [
+          "address",
+          "wrote",
+          "received"
+        ],
+        "properties": {
+          "address": {
+            "type": "string",
+            "description": "Their address, lower-cased.",
+            "example": "marta@ferreira-studio.example"
+          },
+          "name": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The newest display name seen for them, sent or received, when there\nwas one.",
+            "example": "Marta Ferreira"
+          },
+          "received": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Messages from them in the caller's inboxes, among the newest (the\nlast year, at most 5,000 received messages).",
+            "minimum": 0
+          },
+          "wrote": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Messages the caller's inboxes sent with them in To or Cc, among the\nnewest (the last year, at most 5,000 sent messages).",
             "minimum": 0
           }
         }

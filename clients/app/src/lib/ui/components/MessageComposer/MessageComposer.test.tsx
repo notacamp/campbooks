@@ -4,7 +4,13 @@ import { describe, expect, it, vi } from "vitest";
 
 import { renderUi } from "../../../../../test/render";
 
-import { MessageComposer, type MessageComposerProps } from "./MessageComposer";
+import type { Recipient } from "../RecipientField/RecipientField";
+
+import {
+  MessageComposer,
+  type MessageComposerProps,
+  type RecipientSuggester,
+} from "./MessageComposer";
 
 function props(overrides: Partial<MessageComposerProps> = {}): MessageComposerProps {
   return {
@@ -84,6 +90,44 @@ describe("MessageComposer", () => {
     expect(onSend).toHaveBeenCalledOnce();
     fireEvent.keyDown(box, { key: "Escape" });
     expect(onClose).toHaveBeenCalledOnce();
+  });
+
+  it("suggests people in each field, and Esc closes the list before the composer", () => {
+    const onClose = vi.fn();
+    const onQueryChange = vi.fn();
+    const suggest: RecipientSuggester = {
+      suggestions: (field) =>
+        field === "cc"
+          ? [{ name: "Marta Ferreira", address: "marta@ferreira-studio.example" }]
+          : [],
+      loading: () => false,
+      onQueryChange,
+    };
+    function Copying() {
+      const [cc, setCc] = useState<Recipient[]>([]);
+      return <MessageComposer {...props({ onClose, cc, onCcChange: setCc, suggest })} />;
+    }
+    renderUi(<Copying />);
+    fireEvent.click(screen.getByRole("button", { name: "Cc Bcc" }));
+    const cc = screen.getByRole("combobox", { name: "Cc" });
+    act(() => {
+      cc.focus();
+    });
+    fireEvent.change(cc, { target: { value: "mar" } });
+    expect(onQueryChange).toHaveBeenLastCalledWith("cc", "mar");
+    expect(screen.getByRole("listbox", { name: "Suggestions for Cc" })).toBeVisible();
+    expect(screen.getByRole("combobox", { name: "To" })).toHaveAttribute("aria-expanded", "false");
+
+    fireEvent.keyDown(cc, { key: "Escape" });
+    expect(screen.queryByRole("listbox")).not.toBeInTheDocument();
+    expect(onClose).not.toHaveBeenCalled();
+    fireEvent.keyDown(cc, { key: "Escape" });
+    expect(onClose).toHaveBeenCalledOnce();
+
+    fireEvent.keyDown(cc, { key: "ArrowDown" });
+    fireEvent.keyDown(cc, { key: "Enter" });
+    expect(screen.getByText("Marta Ferreira")).toBeVisible();
+    expect(onQueryChange).toHaveBeenLastCalledWith("cc", "");
   });
 
   it("formats from the toolbar, and offers its shortcuts", () => {
