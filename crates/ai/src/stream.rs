@@ -11,6 +11,11 @@
 //! self-hosted server without a reasoning parser, not a decision. A server
 //! that ignores `stream` and answers JSON is read as one text event.
 //!
+//! Tool calls come in pieces (`delta.tool_calls`, by `index`): their
+//! arguments are joined and each call is yielded once, whole, after the
+//! answer's text and before [`ChatEvent::Done`]. Nothing of a tool call is
+//! logged.
+//!
 //! The call is admitted against the daily cap (inside the caller's usage
 //! scope) before anything is sent, and settled once however its stream
 //! ends: with its usage after the last event, as failed after an error, and
@@ -33,13 +38,22 @@ use tracing::Instrument as _;
 
 use crate::{
     Error, Protocol, ProviderConfig, Role, Usage,
-    gateway::{ChatRequest, Gateway, WireChatRequest, WireChatResponse, finish_kind},
+    gateway::{
+        ChatRequest, Gateway, ToolCall, WireChatRequest, WireChatResponse, arguments_text,
+        finish_kind,
+    },
     telemetry::Call,
     usage::Ticket,
 };
 
 /// Most bytes of the stream held while a line or an event is incomplete.
 const MAX_BUFFER: usize = 1024 * 1024;
+
+/// Most bytes of all the tool calls' arguments of one answer.
+const MAX_TOOL_ARGUMENTS: usize = 64 * 1024;
+
+/// Most tool calls read from one answer.
+const MAX_TOOL_CALLS: usize = 16;
 
 /// Most bytes of answer text held at the start while it may still open
 /// `<think>` (blank lines before it, say): past this it is the answer.
@@ -53,8 +67,12 @@ pub enum ChatEvent {
     /// Some of its answer, as it writes.
     Text(String),
     /// The model is at work but sent nothing to show (an encrypted
-    /// reasoning chunk, an empty delta): a sign of life only.
+    /// reasoning chunk, an empty delta, a piece of a tool call): a sign of
+    /// life only.
     Alive,
+    /// A tool the model called, its arguments whole: after its text, before
+    /// [`ChatEvent::Done`].
+    ToolCall(ToolCall),
     /// The end: why it stopped and what it cost. Nothing follows.
     Done(ChatSummary),
 }
@@ -183,12 +201,13 @@ async fn whole(response: reqwest::Response, mut finisher: Finisher) -> Result<Ch
             .ok_or_else(|| Error::InvalidResponse("no choices".into()))?;
         Ok::<_, Error>((
             choice.message.content.unwrap_or_default(),
+            choice.message.tool_calls,
             wire.model,
             choice.finish_reason,
             wire.usage,
         ))
     };
-    let (content, model, finish_reason, usage) = match read.await {
+    let (content, calls, model, finish_reason, usage) = match read.await {
         Ok(read) => read,
         Err(error) => {
             finisher.fail(&error);
@@ -203,6 +222,9 @@ async fn whole(response: reqwest::Response, mut finisher: Finisher) -> Result<Ch
     };
     parser.content(&content);
     parser.flush();
+    parser
+        .out
+        .extend(calls.into_iter().map(ChatEvent::ToolCall));
     let mut events: Vec<Result<ChatEvent, Error>> = Vec::new();
     while let Some(event) = parser.out.pop_front() {
         finisher.note(&event);
@@ -318,7 +340,20 @@ struct Parser {
     usage: Option<Usage>,
     /// `[DONE]` came, or the body ended.
     done: bool,
+    /// The tool calls being read, in the order their pieces first came.
+    calls: Vec<PartialCall>,
+    /// Bytes of their arguments so far.
+    call_bytes: usize,
     out: VecDeque<ChatEvent>,
+}
+
+/// A tool call read in pieces.
+#[derive(Debug, Default)]
+struct PartialCall {
+    index: Option<usize>,
+    id: String,
+    name: String,
+    arguments: String,
 }
 
 impl Parser {
@@ -406,12 +441,60 @@ impl Parser {
             if let Some(content) = delta.content {
                 self.content(&content);
             }
+            for piece in delta.tool_calls.into_iter().flatten() {
+                self.tool_call(piece)?;
+            }
             if self.out.len() == before {
                 self.out.push_back(ChatEvent::Alive);
             }
         }
         if choice.finish_reason.is_some() {
             self.finish_reason = choice.finish_reason;
+        }
+        Ok(())
+    }
+
+    /// One piece of a tool call: a new call when its index (or, without an
+    /// index, its id) is new, else more of the call it continues.
+    fn tool_call(&mut self, piece: WireToolCallDelta) -> Result<(), Error> {
+        let id = piece.id.filter(|id| !id.is_empty());
+        let found = match piece.index {
+            Some(index) => self.calls.iter().position(|c| c.index == Some(index)),
+            None => match &id {
+                Some(id) => self.calls.iter().position(|c| &c.id == id),
+                None => self.calls.len().checked_sub(1),
+            },
+        };
+        let at = if let Some(at) = found {
+            at
+        } else {
+            if self.calls.len() == MAX_TOOL_CALLS {
+                return Err(Error::InvalidResponse("too many tool calls".into()));
+            }
+            self.calls.push(PartialCall {
+                index: piece.index,
+                ..PartialCall::default()
+            });
+            self.calls.len() - 1
+        };
+        let call = &mut self.calls[at];
+        if let Some(id) = id
+            && call.id.is_empty()
+        {
+            call.id = id;
+        }
+        if let Some(function) = piece.function {
+            if let Some(name) = function.name {
+                self.call_bytes += name.len();
+                call.name.push_str(&name);
+            }
+            self.call_bytes += function.arguments.len();
+            call.arguments.push_str(&function.arguments);
+        }
+        if self.call_bytes > MAX_TOOL_ARGUMENTS {
+            return Err(Error::InvalidResponse(
+                "tool call arguments longer than 64 KiB".into(),
+            ));
         }
         Ok(())
     }
@@ -470,15 +553,22 @@ impl Parser {
         }
     }
 
-    /// The end of the stream: whatever was held back goes out.
+    /// The end of the stream: whatever was held back goes out, then the
+    /// tool calls, whole.
     fn flush(&mut self) {
         let held = std::mem::take(&mut self.held);
-        if held.is_empty() {
-            return;
+        if !held.is_empty() {
+            match self.think {
+                Think::Inside => self.out.push_back(ChatEvent::Reasoning(held)),
+                Think::Start | Think::Text => self.out.push_back(ChatEvent::Text(held)),
+            }
         }
-        match self.think {
-            Think::Inside => self.out.push_back(ChatEvent::Reasoning(held)),
-            Think::Start | Think::Text => self.out.push_back(ChatEvent::Text(held)),
+        for call in std::mem::take(&mut self.calls) {
+            self.out.push_back(ChatEvent::ToolCall(ToolCall {
+                id: call.id,
+                name: call.name,
+                arguments: call.arguments,
+            }));
         }
     }
 
@@ -523,6 +613,27 @@ struct WireDelta {
     reasoning_content: Option<String>,
     #[serde(default)]
     reasoning_details: Option<Vec<WireReasoningDetail>>,
+    #[serde(default)]
+    tool_calls: Option<Vec<WireToolCallDelta>>,
+}
+
+/// A piece of a tool call in a chunk's delta.
+#[derive(Deserialize)]
+struct WireToolCallDelta {
+    #[serde(default)]
+    index: Option<usize>,
+    #[serde(default)]
+    id: Option<String>,
+    #[serde(default)]
+    function: Option<WireFunctionDelta>,
+}
+
+#[derive(Deserialize)]
+struct WireFunctionDelta {
+    #[serde(default)]
+    name: Option<String>,
+    #[serde(default, deserialize_with = "arguments_text")]
+    arguments: String,
 }
 
 impl WireDelta {
@@ -591,7 +702,7 @@ impl Finisher {
                 self.text_chars += n;
                 n
             }
-            ChatEvent::Done(_) | ChatEvent::Alive => 0,
+            ChatEvent::Done(_) | ChatEvent::Alive | ChatEvent::ToolCall(_) => 0,
         };
         if chars > 0 && self.first.is_none() {
             self.first = Some(self.started.elapsed());

@@ -88,22 +88,20 @@ export default async function threads({ page }: ScenarioContext): Promise<void> 
   await inline.getByText("Oiled, with a natural finish", { exact: false }).scrollIntoViewIfNeeded();
   await caption(page, "An answer written between the quotes is never folded", 2400);
 
-  // The reply box stays at the bottom while the thread scrolls.
+  // Reply stays in reach while the thread scrolls.
   await scroll(page, phone, 1600);
   await caption(
     page,
     phone
       ? "Reply and Done stay above the tab bar as the thread scrolls"
-      : "The reply box stays pinned at the bottom as the thread scrolls",
+      : "Reply stays in the toolbar, beside Reply all and Forward, as the thread scrolls",
     2400,
   );
   await scroll(page, phone, -1600);
   await pause(600);
 
   // Reply: the composer opens at the bottom, then is discarded unsent.
-  await (phone
-    ? page.getByRole("button", { name: "Reply", exact: true }).last().click()
-    : page.getByRole("button", { name: /^Reply to Clara Nunes/u }).click());
+  await page.getByRole("button", { name: "Reply", exact: true }).last().click();
   const own = page.getByRole("button", { name: /Write my own/u });
   await own.waitFor();
   await own.click();

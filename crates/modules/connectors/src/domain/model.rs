@@ -43,6 +43,9 @@ pub enum Provider {
     Google,
     /// Zoho: Zoho Mail.
     Zoho,
+    /// Any mailbox over IMAP and SMTP, with its password (usually an app
+    /// password). Never a way to sign in.
+    Imap,
 }
 
 impl Provider {
@@ -51,6 +54,7 @@ impl Provider {
         match self {
             Self::Google => "google",
             Self::Zoho => "zoho",
+            Self::Imap => "imap",
         }
     }
 
@@ -59,6 +63,7 @@ impl Provider {
         match value {
             "google" => Ok(Self::Google),
             "zoho" => Ok(Self::Zoho),
+            "imap" => Ok(Self::Imap),
             other => Err(Error::internal(format!("unknown provider `{other}`"))),
         }
     }

@@ -28,7 +28,7 @@ describe("NewMessage", () => {
     renderWithProviders(
       <NewMessage workspaceId={DUARTE.id} onLeave={onLeave} onReopen={vi.fn()} />,
     );
-    const to = await screen.findByRole("textbox", { name: "To" });
+    const to = await screen.findByRole("combobox", { name: "To" });
     expect(api.calls.find((call) => call.route === `POST ${D}`)?.body).toEqual({
       kind: "new",
       inbox_id: INBOX.id,

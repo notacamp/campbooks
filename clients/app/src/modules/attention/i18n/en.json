@@ -55,7 +55,8 @@
     "combo": "{{first}}, then {{second}}",
     "picked": "Scout picked these for this email",
     "noAttachment": "This email has no file to open.",
-    "nudge": "Nudge {{name}}…"
+    "nudge": "Nudge {{name}}…",
+    "scout": "Continue with Scout"
   },
   "confirm": {
     "done": "Done · {{name}}",

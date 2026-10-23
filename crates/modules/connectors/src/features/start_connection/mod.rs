@@ -69,7 +69,8 @@ pub struct StartedConnection {
     responses(
         (status = CREATED, description = "Send the browser to `authorize_url`.", body = StartedConnection),
         (status = BAD_REQUEST, description = "No capability, or one that is not offered \
-            (`capabilities_required`, `capability_not_offered`).", body = Problem,
+            (`capabilities_required`, `capability_not_offered`), or an IMAP mailbox, which is \
+            connected with its password instead (`imap_connects_with_a_password`).", body = Problem,
             content_type = "application/problem+json"),
         (status = UNAUTHORIZED, description = "No valid access token.", body = Problem,
             content_type = "application/problem+json"),
@@ -117,6 +118,14 @@ pub async fn execute(
     let configured = match input.provider {
         Provider::Google => deps.google.is_some(),
         Provider::Zoho => deps.zoho.is_some(),
+        // An IMAP mailbox has no consent page: it is connected with its
+        // password (`connect_imap`).
+        Provider::Imap if deps.imap_enabled() => {
+            return Err(Error::BadRequest(
+                MESSAGES.reason("imap_connects_with_a_password"),
+            ));
+        }
+        Provider::Imap => false,
     };
     if !configured || deps.cipher.is_none() {
         return Err(Error::Conflict(MESSAGES.reason("provider_not_configured")));
@@ -131,6 +140,7 @@ pub async fn execute(
         let offered = match input.provider {
             Provider::Google => google::capability_scope(capability).is_some(),
             Provider::Zoho => capability == Capability::Messages,
+            Provider::Imap => false,
         };
         if !offered {
             return Err(Error::BadRequest(

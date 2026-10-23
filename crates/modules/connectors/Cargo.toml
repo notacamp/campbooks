@@ -9,12 +9,15 @@ repository.workspace = true
 publish.workspace = true
 
 [dependencies]
+async-imap.workspace = true
 axum.workspace = true
 base64.workspace = true
 campbooks-kernel.workspace = true
 chrono.workspace = true
 figment.workspace = true
 futures-util.workspace = true
+hickory-resolver.workspace = true
+lettre.workspace = true
 mail-builder.workspace = true
 mail-parser.workspace = true
 reqwest.workspace = true
@@ -25,6 +28,10 @@ sqlx.workspace = true
 thiserror.workspace = true
 tokio.workspace = true
 opentelemetry.workspace = true
+psl.workspace = true
+quick-xml.workspace = true
+rustls-platform-verifier.workspace = true
+tokio-rustls.workspace = true
 tracing.workspace = true
 url.workspace = true
 utoipa.workspace = true

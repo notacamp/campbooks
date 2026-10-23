@@ -500,6 +500,33 @@ impl World {
         note
     }
 
+    /// `member`'s chat with Scout, about nothing (campbooks-cloud#305), with
+    /// a question.
+    async fn seed_chat(&self, member: UserId) -> Uuid {
+        let chat = Uuid::now_v7();
+        sqlx::query(
+            "INSERT INTO assistant.chats (id, workspace_id, user_id, questions)
+             VALUES ($1, $2, $3, 1)",
+        )
+        .bind(chat)
+        .bind(self.a.as_uuid())
+        .bind(member.as_uuid())
+        .execute(&self.db)
+        .await
+        .unwrap();
+        sqlx::query(
+            "INSERT INTO assistant.chat_messages (id, workspace_id, chat_id, author, text)
+             VALUES ($1, $2, $3, 'member', 'Why is this here?')",
+        )
+        .bind(Uuid::now_v7())
+        .bind(self.a.as_uuid())
+        .bind(chat)
+        .execute(&self.db)
+        .await
+        .unwrap();
+        chat
+    }
+
     /// Something Scout noticed in the inbox (campbooks-cloud#169).
     async fn seed_notice(&self, inbox: campbooks_conversations::model::InboxId) -> Uuid {
         let notice = Uuid::now_v7();
@@ -559,6 +586,7 @@ impl World {
         let rule = self.seed_rule(inbox, sender).await;
         let notice = self.seed_notice(inbox).await;
         let note = self.seed_note(u(Who::Member)).await;
+        let chat = self.seed_chat(u(Who::Member)).await;
         let invitation = Uuid::now_v7();
         sqlx::query(
             "INSERT INTO workspaces.invitations
@@ -608,6 +636,8 @@ impl World {
             // What a member told Scout about a person: theirs alone, in no
             // inbox (campbooks-cloud#272).
             ("conversations.person_note", note.to_string()),
+            // A member's chat with Scout: theirs alone (campbooks-cloud#305).
+            ("assistant.chat", chat.to_string()),
         ]);
         let mut ids: Vec<String> = sqlx::query_scalar(
             "SELECT id::text FROM conversations.conversations WHERE inbox_id = $1
@@ -651,9 +681,10 @@ impl World {
         match resource_type {
             // A profile is addressed by its member, like a membership; a
             // person note is the member's, in no inbox.
-            "workspaces.member" | "assistant.profile" | "conversations.person_note" => {
-                Facts::owned_by(OwnerFact::User(u(Who::Member)))
-            }
+            "workspaces.member"
+            | "assistant.profile"
+            | "assistant.chat"
+            | "conversations.person_note" => Facts::owned_by(OwnerFact::User(u(Who::Member))),
             "connectors.connection" => Facts::owned_by(OwnerFact::User(u(Who::Connector))),
             "conversations.inbox" => {
                 Facts::owned_by(OwnerFact::User(u(Who::Connector))).within(inbox, role)
@@ -883,6 +914,10 @@ fn body(world: &World, id: &str) -> Option<Value> {
         "connectors.start_connection" => {
             json!({"provider": "google", "capabilities": ["messages"]})
         }
+        "connectors.discover_imap" => json!({"address": "matrix@example.com"}),
+        "connectors.connect_imap" => {
+            json!({"address": "matrix@example.com", "password": "not-a-real-password"})
+        }
         "conversations.add_label" => json!({"name": "Matrix"}),
         "conversations.move_to_stream" => json!({"stream": "updates"}),
         "conversations.create_draft" => json!({"kind": "new", "inbox_id": inbox}),
@@ -922,11 +957,13 @@ fn body(world: &World, id: &str) -> Option<Value> {
         "conversations.confirm_rule"
         | "conversations.restore_rule"
         | "conversations.suggest_replies"
-        | "conversations.write_nudge" => json!({}),
+        | "conversations.write_nudge"
+        | "assistant.start_chat" => json!({}),
         "conversations.dismiss_rule_suggestion" => json!({"key": "matrix"}),
         "conversations.answer_rule_notice" => json!({"answer": "not_now"}),
         "assistant.update_profile" => json!({"proactivity": "ask_first", "asked": true}),
         "assistant.compile_instruction" => json!({"text": "newsletters never need me"}),
+        "assistant.ask_chat" | "assistant.stream_chat" => json!({"text": "Why is this here?"}),
         "conversations.write_reply" | "conversations.stream_reply" => {
             json!({"intent": "Say yes"})
         }
@@ -948,6 +985,7 @@ fn instance_of(world: &World, id: &str, path: &str, resource: &str) -> Option<St
         "conversations.draft" => "{draft_id}",
         "conversations.rule" => "{rule_id}",
         "conversations.person_note" => "{note_id}",
+        "assistant.chat" => "{chat_id}",
         "attention.item" => "{item_id}",
         "conversations.inbox" if acts_in_the_inbox(id) => {
             return world.instances.get(resource).cloned();
@@ -1001,6 +1039,7 @@ fn answers_a_notice(id: &str) -> bool {
 fn query_of(id: &str) -> &'static str {
     match id {
         "conversations.suggest_rules" => "?action=archive",
+        "conversations.list_correspondents" => "?q=example",
         _ => "",
     }
 }
@@ -1024,6 +1063,7 @@ fn fill(world: &World, path: &str) -> String {
         .replace("{rule_id}", &world.instances["conversations.rule"])
         .replace("{notice_id}", &world.instances["conversations.rule_notice"])
         .replace("{note_id}", &world.instances["conversations.person_note"])
+        .replace("{chat_id}", &world.instances["assistant.chat"])
         .replace("{id}", &Uuid::now_v7().to_string())
 }
 

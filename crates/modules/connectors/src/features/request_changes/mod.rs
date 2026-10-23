@@ -168,6 +168,7 @@ async fn known_labels(
     Ok(match target.provider {
         Provider::Google => Some(user_labels(conn, target.stream).await?),
         Provider::Zoho => zoho_labels(conn, target.connection, target.stream).await?,
+        Provider::Imap => None,
     })
 }
 
@@ -251,10 +252,15 @@ fn outcome(
     let writable = |label: &str| match provider {
         Provider::Google => outbound::writable(label),
         Provider::Zoho => zoho::state::writable(label),
+        Provider::Imap => false,
     };
     let mapped = match provider {
         Provider::Google => outbound::map(change, known.unwrap_or(&HashSet::new())),
         Provider::Zoho => outbound::map_zoho(change, known),
+        // Write-back to an IMAP mailbox lands with campbooks-cloud#312.
+        Provider::Imap => {
+            return (State::Skipped, Some("unsupported"), Vec::new(), Vec::new());
+        }
     };
     match mapped {
         Mapped::Labels { add, remove } if !add.iter().chain(&remove).all(|l| writable(l)) => {

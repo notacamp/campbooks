@@ -3042,7 +3042,8 @@
         "description": "An outside provider.",
         "enum": [
           "google",
-          "zoho"
+          "zoho",
+          "imap"
         ]
       },
       "QueueSummary": {

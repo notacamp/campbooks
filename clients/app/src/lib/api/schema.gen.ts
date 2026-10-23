@@ -368,6 +368,92 @@ export interface paths {
         patch: operations["workspaces.update"];
         trace?: never;
     };
+    "/api/v1/w/{workspace_id}/assistant/chats": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Start a chat with Scout, or continue yours about the same record. */
+        post: operations["assistant.start_chat"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/w/{workspace_id}/assistant/chats/{chat_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Your chat, what it is about, and its messages, oldest first. */
+        get: operations["assistant.get_chat"];
+        put?: never;
+        post?: never;
+        /** Delete your chat and its messages. There is no undo. */
+        delete: operations["assistant.delete_chat"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/w/{workspace_id}/assistant/chats/{chat_id}/questions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Ask Scout, and get its answer whole (the desktop app, where answers
+         *     don't stream).
+         */
+        post: operations["assistant.ask_chat"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/w/{workspace_id}/assistant/chats/{chat_id}/questions/stream": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Ask Scout, and get its answer as it is written.
+         * @description The same request as `assistant.ask_chat`, answered as Server-Sent
+         *     Events once every check passed (a refusal is an ordinary problem
+         *     answer). Events, each `data` a JSON object: `thinking` (`{"delta"}`:
+         *     Scout's reasoning as it arrives, at most 8,000 characters in all),
+         *     `step` (`{"tool"}`: a tool starting), `text` (`{"delta"}`: the answer's
+         *     words as they arrive; words before a `step` are not part of the answer),
+         *     then exactly one of `done` (the stored Scout message, as `ask_chat`
+         *     answers it) or `error` (a problem: `chat_failed` or
+         *     `ai_daily_limit_reached`). A comment every 10 seconds keeps the
+         *     connection open. The question is stored when the stream opens; a
+         *     stream that ends before `done` leaves Scout's message stored as
+         *     `failed`, with no text.
+         */
+        post: operations["assistant.stream_chat"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/w/{workspace_id}/assistant/compile": {
         parameters: {
             query?: never;
@@ -522,6 +608,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/w/{workspace_id}/connections/imap": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Connect a mailbox with its password. */
+        post: operations["connectors.connect_imap"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/w/{workspace_id}/connections/imap/discover": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Find a mailbox's servers. */
+        post: operations["connectors.discover_imap"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/w/{workspace_id}/connections/{connection_id}": {
         parameters: {
             query?: never;
@@ -602,6 +722,23 @@ export interface paths {
         put?: never;
         /** Archive a conversation. */
         post: operations["conversations.archive"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/w/{workspace_id}/conversations/{conversation_id}/history": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** What happened to a conversation, and who did it. */
+        get: operations["conversations.get_history"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -1010,6 +1147,23 @@ export interface paths {
         put?: never;
         /** Take a conversation out of the trash. */
         post: operations["conversations.untrash"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/w/{workspace_id}/correspondents": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Suggest the people you exchange mail with, as you type an address. */
+        get: operations["conversations.list_correspondents"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -2157,6 +2311,16 @@ export interface components {
             /** @description Its value. */
             value: string;
         };
+        /** @description A question. */
+        AskChat: {
+            /** @description What you ask, 1 to 2,000 characters (line breaks kept). */
+            text: string;
+            /**
+             * @description Your time zone, an IANA name (`Europe/Lisbon`), for "today" and
+             *     "Thursday afternoon"; UTC when absent or unknown.
+             */
+            time_zone?: string | null;
+        };
         /** @description `AuthenticatorAssertionResponseJSON`: the authenticator's signature. */
         AssertionResponse: {
             /** @description The authenticator data, base64url. */
@@ -2288,6 +2452,94 @@ export interface components {
          * @enum {string}
          */
         Channel: "email";
+        /**
+         * @description Who wrote a chat message.
+         * @enum {string}
+         */
+        ChatAuthor: "member" | "scout";
+        /**
+         * @description How Scout's answer ended.
+         * @enum {string}
+         */
+        ChatFinish: "done" | "failed" | "cut_short";
+        /**
+         * Format: uuid
+         * @description ChatId (UUIDv7)
+         */
+        ChatId: string;
+        /**
+         * Format: uuid
+         * @description ChatMessageId (UUIDv7)
+         */
+        ChatMessageId: string;
+        /** @description A question or an answer. */
+        ChatMessageView: {
+            /** @description Who wrote it. */
+            author: components["schemas"]["ChatAuthor"];
+            /**
+             * Format: date-time
+             * @description When.
+             */
+            created_at: string;
+            finish?: components["schemas"]["ChatFinish"] | null;
+            /** @description The message. */
+            id: components["schemas"]["ChatMessageId"];
+            /** @description What Scout looked at to answer (Scout's answers only). */
+            steps: components["schemas"]["ChatStep"][];
+            /**
+             * @description What was asked or answered, as plain text: show it as text only,
+             *     never as HTML and never with links made of it.
+             */
+            text: string;
+        };
+        /**
+         * @description One thing Scout looked at, built by the server from the tool that ran,
+         *     never from the model's words.
+         */
+        ChatStep: {
+            /**
+             * Format: int32
+             * @description How many it found.
+             */
+            count: number;
+            /** @description The records it returned, at most 10. */
+            records: components["schemas"]["RecordRef"][];
+            /** @description The tool. */
+            tool: components["schemas"]["ChatTool"];
+        };
+        /**
+         * @description A tool Scout used. Each reads as the member, and changes nothing.
+         * @enum {string}
+         */
+        ChatTool: "find_conversations" | "read_conversation" | "conversation_history" | "find_people" | "what_needs_me" | "my_inboxes";
+        /** @description A chat and its messages, oldest first. */
+        ChatView: {
+            about?: components["schemas"]["RecordRef"] | null;
+            /**
+             * Format: date-time
+             * @description When it was started.
+             */
+            created_at: string;
+            /** @description The chat. */
+            id: components["schemas"]["ChatId"];
+            /**
+             * Format: date-time
+             * @description When its last message was written; it is deleted 30 days after.
+             */
+            last_message_at: string;
+            /**
+             * Format: int32
+             * @description Questions it may hold; past them, start over.
+             */
+            max_questions: number;
+            /** @description Its messages, oldest first. */
+            messages: components["schemas"]["ChatMessageView"][];
+            /**
+             * Format: int32
+             * @description Questions asked so far.
+             */
+            questions: number;
+        };
         /** @description The browser or web view the app runs in. */
         ClientBrowser: {
             /** @description Whether the device is a phone or a tablet. */
@@ -2449,6 +2701,24 @@ export interface components {
              *     `content_changed`, and nothing is kept (campbooks-cloud#242).
              */
             content_token?: string | null;
+        };
+        /** @description A mailbox to connect. */
+        ConnectImap: {
+            /** @description The mailbox's email address. */
+            address: string;
+            connection?: components["schemas"]["ConnectionId"] | null;
+            /**
+             * Format: password
+             * @description Its password: an app password where the provider has them. Kept
+             *     sealed, never shown again.
+             */
+            password: string;
+            servers?: components["schemas"]["Servers"] | null;
+            /**
+             * @description What it signs in with, when not what the servers are found to want
+             *     (usually the address).
+             */
+            username?: string | null;
         };
         /** @description An app the caller let in. */
         ConnectedApp: {
@@ -2629,6 +2899,15 @@ export interface components {
              */
             need_summary?: string | null;
         };
+        /** @description What happened to a conversation, oldest first. */
+        ConversationHistory: {
+            /** @description The conversation. */
+            conversation_id: components["schemas"]["ConversationId"];
+            /** @description At most the 200 newest events, oldest first. */
+            events: components["schemas"]["HistoryEvent"][];
+            /** @description Older events were left out. */
+            truncated: boolean;
+        };
         /**
          * Format: uuid
          * @description ConversationId (UUIDv7)
@@ -2710,6 +2989,37 @@ export interface components {
              * @description Unread inbound messages.
              */
             unread_count: number;
+        };
+        /** @description People, written to most first. */
+        CorrespondentList: {
+            /** @description Written to most first, then written by most, then by address. */
+            correspondents: components["schemas"]["CorrespondentView"][];
+        };
+        /** @description Someone the caller's inboxes exchange mail with. */
+        CorrespondentView: {
+            /**
+             * @description Their address, lower-cased.
+             * @example marta@ferreira-studio.example
+             */
+            address: string;
+            /**
+             * @description The newest display name seen for them, sent or received, when there
+             *     was one.
+             * @example Marta Ferreira
+             */
+            name?: string | null;
+            /**
+             * Format: int32
+             * @description Messages from them in the caller's inboxes, among the newest (the
+             *     last year, at most 5,000 received messages).
+             */
+            received: number;
+            /**
+             * Format: int32
+             * @description Messages the caller's inboxes sent with them in To or Cc, among the
+             *     newest (the last year, at most 5,000 sent messages).
+             */
+            wrote: number;
         };
         /** @description A rule to create. */
         CreateRule: {
@@ -2863,6 +3173,33 @@ export interface components {
          * @enum {string}
          */
         Direction: "inbound" | "outbound";
+        /** @description The address to find servers for. */
+        DiscoverImap: {
+            /** @description The mailbox's email address. */
+            address: string;
+        };
+        /** @description The answer. */
+        DiscoveredImap: {
+            imap?: components["schemas"]["Server"] | null;
+            /** @description What was found. */
+            kind: components["schemas"]["DiscoveryKind"];
+            password?: components["schemas"]["PasswordKind"] | null;
+            provider?: components["schemas"]["Native"] | null;
+            /**
+             * @description The provider database's id of the provider, for its app-password
+             *     guide (`settings`, when known).
+             */
+            provider_hint?: string | null;
+            smtp?: components["schemas"]["Server"] | null;
+            source?: components["schemas"]["Source"] | null;
+            /** @description The username the servers most likely want (`settings`). */
+            username_hint?: string | null;
+        };
+        /**
+         * @description What was found.
+         * @enum {string}
+         */
+        DiscoveryKind: "settings" | "use_provider" | "not_supported_yet" | "not_found";
         /** @description The suggestion turned down. */
         DismissSuggestion: {
             /** @description Its `key`. */
@@ -3063,6 +3400,170 @@ export interface components {
         HeldGrants: {
             /** @description Oldest first. */
             items: components["schemas"]["HeldGrant"][];
+        };
+        /**
+         * @description Who did something.
+         * @enum {string}
+         */
+        HistoryActor: "you" | "member" | "rule" | "scout";
+        /** @description One thing that happened, by kind. */
+        HistoryEvent: {
+            /**
+             * Format: date-time
+             * @description When it was sent.
+             */
+            at: string;
+            /** @description Who wrote it. */
+            from: components["schemas"]["Address"];
+            /** @enum {string} */
+            kind: "received";
+            /** @description The message. */
+            message_id: components["schemas"]["MessageId"];
+        } | {
+            /**
+             * Format: date-time
+             * @description When it was sent.
+             */
+            at: string;
+            /** @description Who wrote it. */
+            from: components["schemas"]["Address"];
+            /** @enum {string} */
+            kind: "sent";
+            /** @description The message. */
+            message_id: components["schemas"]["MessageId"];
+        } | {
+            /** @description Whether it changed anything; otherwise it was a suggestion. */
+            acted: boolean;
+            /**
+             * Format: date-time
+             * @description When it was given.
+             */
+            at: string;
+            /**
+             * Format: int32
+             * @description How sure, 0 to 100, when the source says.
+             */
+            confidence?: number | null;
+            /** @enum {string} */
+            kind: "scout_read";
+            /** @description The message it is about. */
+            message_id: components["schemas"]["MessageId"];
+            /** @description The question (`stream`, `needs_reply`, `money`, …). */
+            question: string;
+            /** @description Who answered. */
+            source: components["schemas"]["DecisionSource"];
+            /** @description The answer. */
+            value: components["schemas"]["AnswerView"];
+        } | {
+            /**
+             * Format: date-time
+             * @description When.
+             */
+            at: string;
+            /** @description `you` or `member`. */
+            by: components["schemas"]["HistoryActor"];
+            /** @description The answer before. */
+            from: string;
+            /** @enum {string} */
+            kind: "corrected";
+            /** @description The question. */
+            question: string;
+            /** @description The answer after. */
+            to: string;
+        } | {
+            /**
+             * Format: date-time
+             * @description When.
+             */
+            at: string;
+            /** @enum {string} */
+            kind: "rule_applied";
+            /** @description The rule. */
+            rule: components["schemas"]["RuleRef"];
+        } | {
+            /**
+             * Format: date-time
+             * @description When.
+             */
+            at: string;
+            /** @enum {string} */
+            kind: "rule_reverted";
+            /** @description The rule. */
+            rule: components["schemas"]["RuleRef"];
+        } | {
+            /**
+             * Format: date-time
+             * @description When.
+             */
+            at: string;
+            /** @description `you` or `member`. */
+            by: components["schemas"]["HistoryActor"];
+            /** @enum {string} */
+            kind: "rule_excepted";
+            /** @description The rule. */
+            rule: components["schemas"]["RuleRef"];
+        } | {
+            /**
+             * Format: date-time
+             * @description When it was raised: Scout's answer raising it, else its last change.
+             */
+            at: string;
+            /** @description What raised it: `rules`, `model`, `taught` or `member`. */
+            basis: string;
+            /**
+             * Format: date
+             * @description When it is due, when known.
+             */
+            due_on?: string | null;
+            /** @enum {string} */
+            kind: "need_opened";
+            /**
+             * Format: date-time
+             * @description When it lapses on its own, when it does.
+             */
+            lapses_at?: string | null;
+            /** @description Whether it is still open. */
+            open: boolean;
+            /**
+             * @description `reply`, `do`, `pay`, `review`, `worth_a_look`, `waiting` or
+             *     `nudge`.
+             */
+            reason: string;
+            /**
+             * Format: date-time
+             * @description When it next changes with time alone, when it does.
+             */
+            wakes_at?: string | null;
+        } | {
+            /**
+             * Format: date-time
+             * @description When.
+             */
+            at: string;
+            /**
+             * @description Why: `replied`, `archived`, `trashed`, `done`, `not_needed`,
+             *     `superseded`, `rule`, `opened`, `lapsed` or `heard_back`.
+             */
+            because: string;
+            /** @description Who. */
+            by: components["schemas"]["HistoryActor"];
+            /** @enum {string} */
+            kind: "need_cleared";
+        } | {
+            /**
+             * Format: date-time
+             * @description When.
+             */
+            at: string;
+            /** @description `you` or `member`. */
+            by: components["schemas"]["HistoryActor"];
+            /** @enum {string} */
+            kind: "need_verdict";
+            /**
+             * @description `done`, `not_needed`, `confirmed`, `already_paid` or
+             *     `still_to_pay`.
+             */
+            verdict: string;
         };
         /** @description One result: a record the caller may open, with what a list row shows. */
         Hit: {
@@ -3469,6 +3970,12 @@ export interface components {
             stream: components["schemas"]["Stream"];
         };
         /**
+         * @description A provider Campbooks connects natively, with OAuth, rather than over
+         *     IMAP with a password.
+         * @enum {string}
+         */
+        Native: "google" | "zoho" | "microsoft";
+        /**
          * @description One action of the catalogue a need may offer (campbooks-cloud#166),
          *     as `campbooks_ai::decide::signals::actions::ActionId` names it.
          * @enum {string}
@@ -3684,6 +4191,12 @@ export interface components {
             items: components["schemas"]["PasskeyView"][];
         };
         /**
+         * @description Which password a provider takes over IMAP: what the connect screen's
+         *     guide says. It never changes what Campbooks does.
+         * @enum {string}
+         */
+        PasswordKind: "app_password" | "account_password" | "unknown";
+        /**
          * @description Why a taught rule is paused: the one that would still hold once the
          *     most passing one clears.
          * @enum {string}
@@ -3897,7 +4410,7 @@ export interface components {
          * @description An outside provider.
          * @enum {string}
          */
-        Provider: "google" | "zoho";
+        Provider: "google" | "zoho" | "imap";
         /** @description Something in the query that was not understood. */
         QueryWarning: {
             /** @description `unknown_operator`, `empty_value` or `invalid_value`. */
@@ -4381,6 +4894,18 @@ export interface components {
             would_change: number;
         };
         /**
+         * @description A taught rule, as an event names it: its id, and its conditions and
+         *     actions, which clients read as its sentence.
+         */
+        RuleRef: {
+            /** @description What it does. */
+            actions: components["schemas"]["RuleAction"][];
+            /** @description When it applies. */
+            conditions: components["schemas"]["RuleCondition"][];
+            /** @description The rule. */
+            id: components["schemas"]["RuleId"];
+        };
+        /**
          * Format: uuid
          * @description RuleRunId (UUIDv7)
          */
@@ -4562,6 +5087,11 @@ export interface components {
             query: components["schemas"]["ParsedQuery"];
         };
         /**
+         * @description How a connection to a mail server is encrypted. Never in the clear.
+         * @enum {string}
+         */
+        Security: "tls" | "starttls";
+        /**
          * Format: uuid
          * @description SecurityEventId (UUIDv7)
          */
@@ -4644,6 +5174,25 @@ export interface components {
              * @description Of those, their conversations the caller's inboxes replied to.
              */
             replied: number;
+        };
+        /** @description A mail server. */
+        Server: {
+            /** @description Its host name (or IP address). */
+            host: string;
+            /**
+             * Format: int32
+             * @description Its port.
+             */
+            port: number;
+            /** @description How the connection is encrypted. */
+            security: components["schemas"]["Security"];
+        };
+        /** @description A mailbox's two servers: where its mail is read, and where it sends. */
+        Servers: {
+            /** @description The IMAP server. */
+            imap: components["schemas"]["Server"];
+            /** @description The SMTP submission server. */
+            smtp: components["schemas"]["Server"];
         };
         /** @description Who is signed in. Never contains a token. */
         SessionInfo: {
@@ -4729,6 +5278,15 @@ export interface components {
              * @description Later than now and less than a year away.
              */
             until: string;
+        };
+        /**
+         * @description Where a mailbox's settings came from.
+         * @enum {string}
+         */
+        Source: "ispdb" | "autoconfig" | "srv" | "mx" | "manual";
+        /** @description Start a chat, or continue the one you have about the same record. */
+        StartChat: {
+            about?: components["schemas"]["RecordRef"] | null;
         };
         /** @description What to connect. */
         StartConnection: {
@@ -6363,6 +6921,373 @@ export interface operations {
             };
         };
     };
+    "assistant.start_chat": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The workspace. */
+                workspace_id: components["schemas"]["WorkspaceId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StartChat"];
+            };
+        };
+        responses: {
+            /** @description Your chat about that record, continued. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChatView"];
+                };
+            };
+            /** @description A new chat. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChatView"];
+                };
+            };
+            /** @description Scout cannot chat about that type of record (`about_unsupported`). */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No valid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Missing scope, or not a member (`chat_needs_member`). */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No such workspace or record, or you cannot see it. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No language model may read mail here (`chat_unavailable`). */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "assistant.get_chat": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The workspace. */
+                workspace_id: components["schemas"]["WorkspaceId"];
+                /** @description The chat. */
+                chat_id: components["schemas"]["ChatId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The chat. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChatView"];
+                };
+            };
+            /** @description No valid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Missing scope. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No such chat, or it is not yours. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "assistant.delete_chat": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The workspace. */
+                workspace_id: components["schemas"]["WorkspaceId"];
+                /** @description The chat. */
+                chat_id: components["schemas"]["ChatId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Deleted. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description No valid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Missing scope. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No such chat, or it is not yours. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "assistant.ask_chat": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The workspace. */
+                workspace_id: components["schemas"]["WorkspaceId"];
+                /** @description The chat. */
+                chat_id: components["schemas"]["ChatId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AskChat"];
+            };
+        };
+        responses: {
+            /** @description Scout's answer, as stored. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChatMessageView"];
+                };
+            };
+            /** @description An empty question (`question_empty`) or one over 2,000 characters (`question_too_long`). */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No valid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Missing scope. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No such chat, or it is not yours. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description The chat holds 40 questions already (`chat_full`): start over; or no language model may read mail here (`chat_unavailable`). */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Too many questions this hour. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Scout couldn't answer (`chat_failed`), or the workspace used its whole daily AI limit (`ai_daily_limit_reached`). */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "assistant.stream_chat": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The workspace. */
+                workspace_id: components["schemas"]["WorkspaceId"];
+                /** @description The chat. */
+                chat_id: components["schemas"]["ChatId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AskChat"];
+            };
+        };
+        responses: {
+            /** @description The answer as it is written: `thinking`, `step`, `text`, then `done` or `error`. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/event-stream": string;
+                };
+            };
+            /** @description An empty question (`question_empty`) or one over 2,000 characters (`question_too_long`). */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No valid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Missing scope. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No such chat, or it is not yours. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description The chat holds 40 questions already (`chat_full`): start over; or no language model may read mail here (`chat_unavailable`). */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Too many questions this hour. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Scout couldn't answer (`chat_failed`), or the workspace used its whole daily AI limit (`ai_daily_limit_reached`). */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
     "assistant.compile_instruction": {
         parameters: {
             query?: never;
@@ -6894,7 +7819,7 @@ export interface operations {
                     "application/json": components["schemas"]["StartedConnection"];
                 };
             };
-            /** @description No capability, or one that is not offered (`capabilities_required`, `capability_not_offered`). */
+            /** @description No capability, or one that is not offered (`capabilities_required`, `capability_not_offered`), or an IMAP mailbox, which is connected with its password instead (`imap_connects_with_a_password`). */
             400: {
                 headers: {
                     [name: string]: unknown;
@@ -6932,6 +7857,168 @@ export interface operations {
             };
             /** @description The provider is not configured on this instance (`provider_not_configured`), or this instance has no front door for consents (`mailbox_unsupported`). */
             409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "connectors.connect_imap": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The workspace. */
+                workspace_id: components["schemas"]["WorkspaceId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ConnectImap"];
+            };
+        };
+        responses: {
+            /** @description Connected (or connected again): the connection, never its password. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConnectionView"];
+                };
+            };
+            /** @description The servers refused or could not be reached (`imap_login_refused`, `smtp_login_refused`, `imap_unreachable`, `smtp_unreachable`, `imap_tls_failed`, `smtp_tls_failed`, `imap_not_an_imap_server`, `host_refused`, `starttls_missing`), no servers were found (`imap_servers_required`), the mailbox is connected natively instead (`use_native_provider`), or the input is not valid (`imap_address_invalid`, `imap_username_invalid`, `imap_password_invalid`). */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No valid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Missing scope, a client token (`connection_needs_user`), or a sign-in more than ten minutes old (`step_up_required`). */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No such workspace, or no such IMAP connection of yours. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description IMAP is not turned on on this instance (`provider_not_configured`), another member connected this mailbox (`account_connected_by_another_member`), or the mailbox is not the one being connected again (`account_mismatch`). */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Too many attempts by you or this workspace (`rate_limited`), or too many failed sign-ins to this mailbox (`too_many_attempts`). */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "connectors.discover_imap": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The workspace. */
+                workspace_id: components["schemas"]["WorkspaceId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DiscoverImap"];
+            };
+        };
+        responses: {
+            /** @description What was found: servers, a native provider to connect instead, or nothing. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DiscoveredImap"];
+                };
+            };
+            /** @description Not an email address (`imap_address_invalid`). */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No valid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Missing scope, a client token (`connection_needs_user`), or a sign-in more than ten minutes old (`step_up_required`). */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No such workspace. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description IMAP is not turned on on this instance (`provider_not_configured`). */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description More than 30 in an hour (`rate_limited`). */
+            429: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -7265,6 +8352,58 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ConversationSummary"];
+                };
+            };
+            /** @description No valid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Missing scope. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No such conversation, or you cannot see it. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "conversations.get_history": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The workspace. */
+                workspace_id: components["schemas"]["WorkspaceId"];
+                /** @description The conversation. */
+                conversation_id: components["schemas"]["ConversationId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description What happened to it, oldest first; no message text. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConversationHistory"];
                 };
             };
             /** @description No valid access token. */
@@ -8747,6 +9886,74 @@ export interface operations {
                 };
             };
             /** @description No such conversation, or you cannot see it. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "conversations.list_correspondents": {
+        parameters: {
+            query: {
+                /**
+                 * @description Words (2 to 100 characters) every listed person's address or display
+                 *     name contains, ignoring case and accents: what is typed in To, Cc or
+                 *     Bcc.
+                 */
+                q: string;
+                /** @description How many, 1 to 10 (default 10). */
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                /** @description The workspace. */
+                workspace_id: components["schemas"]["WorkspaceId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The people. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CorrespondentList"];
+                };
+            };
+            /** @description No `q` (`invalid_query`), or a `q` or `limit` out of range (`invalid_correspondents_query`). */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No valid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Missing scope. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No such workspace, or you are not a member. */
             404: {
                 headers: {
                     [name: string]: unknown;

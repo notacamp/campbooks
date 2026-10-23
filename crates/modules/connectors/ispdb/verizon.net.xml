@@ -1,0 +1,34 @@
+<clientConfig version="1.1">
+  <emailProvider id="verizon.net">
+    <domain>verizon.net</domain>
+    <displayName>Verizon Online</displayName>
+    <displayShortName>Verizon</displayShortName>
+    <incomingServer type="imap">
+      <hostname>imap.aol.com</hostname>
+      <port>993</port>
+      <socketType>SSL</socketType>
+      <username>%EMAILADDRESS%</username>
+      <authentication>OAuth2</authentication>
+      <authentication>password-cleartext</authentication>
+    </incomingServer>
+    <incomingServer type="pop3">
+      <hostname>pop.aol.com</hostname>
+      <port>995</port>
+      <socketType>SSL</socketType>
+      <username>%EMAILADDRESS%</username>
+      <authentication>OAuth2</authentication>
+      <authentication>password-cleartext</authentication>
+    </incomingServer>
+    <outgoingServer type="smtp">
+      <hostname>smtp.aol.com</hostname>
+      <port>465</port>
+      <socketType>SSL</socketType>
+      <username>%EMAILADDRESS%</username>
+      <authentication>OAuth2</authentication>
+      <authentication>password-cleartext</authentication>
+    </outgoingServer>
+    <documentation url="https://help.aol.com/articles/how-do-i-set-up-other-email-applications-to-send-and-receive-my-verizon-net-mail">
+       <descr lang="en">Configure POP and IMAP settings for Verizon.net AOL Mail accounts</descr>
+    </documentation>
+  </emailProvider>
+</clientConfig>

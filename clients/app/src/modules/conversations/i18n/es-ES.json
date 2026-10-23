@@ -111,6 +111,7 @@
     "unread": "Marcar como no leída",
     "move": "Mover",
     "moveTo": "Mover a",
+    "more": "Más acciones",
     "replyAll": "Responder a todos",
     "forward": "Reenviar",
     "showImages": "Mostrar imágenes",
@@ -134,7 +135,8 @@
     "restore": "Restaurar",
     "reportSpam": "Marcar como spam",
     "notSpam": "No es spam",
-    "toInbox": "Mover a la bandeja de entrada"
+    "toInbox": "Mover a la bandeja de entrada",
+    "askScout": "Preguntar a Scout"
   },
   "toast": {
     "done": "Hecho · {{subject}}",
