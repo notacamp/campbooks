@@ -161,6 +161,10 @@ mail-parser = { version = "0.11.9", default-features = false }
 icalendar = { version = "=0.17.13", default-features = false, features = ["parser"] }
 scraper = { version = "=0.29.0", default-features = false, features = ["errors"] }
 chrono-tz = "0.10.4"
+# Schedule: a series is stored once, with the provider's own RRULE/EXDATE/RDATE
+# lines, and its occurrences are expanded when events are listed
+# (campbooks-cloud#42). Pinned; 0.14.0 is the current release. Rust, no C.
+rrule = "=0.14.0"
 
 # Passkeys (identity, ADR 0014): COSE_Key parsing and the CBOR of WebAuthn
 # attestation objects. Signatures are verified with aws-lc-rs.

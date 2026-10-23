@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://campbooks.example.com/contracts/schedule.calendar_sync_changed.v1.schema.json",
+  "title": "schedule.calendar_sync_changed v1 (event payload)",
+  "description": "Published by the schedule module, in the transaction in which a member turns one of their provider calendars on or off. The connectors module reads a calendar turned on again from the start (the calendar's cursor is dropped), and stops reading one turned off. Ids and a flag only: the provider's calendar id is in the connectors module's own records. Workspace-scoped.",
+  "type": "object",
+  "required": ["workspace", "calendar", "connection", "syncing"],
+  "additionalProperties": false,
+  "properties": {
+    "workspace": { "type": "string" },
+    "calendar": { "$ref": "#/$defs/uuid", "description": "The calendar (an id of the schedule module)." },
+    "connection": { "$ref": "#/$defs/uuid", "description": "The connection whose calendar it is (an id of the connectors module)." },
+    "syncing": { "type": "boolean", "description": "Whether it syncs now." }
+  },
+  "$defs": {
+    "uuid": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+    }
+  }
+}

@@ -85,6 +85,17 @@ impl EventKind {
     }
 }
 
+impl std::str::FromStr for EventKind {
+    type Err = ();
+
+    fn from_str(text: &str) -> Result<Self, ()> {
+        Self::ALL
+            .into_iter()
+            .find(|kind| kind.as_str() == text)
+            .ok_or(())
+    }
+}
+
 /// Who made an event.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "snake_case")]
@@ -96,6 +107,153 @@ pub enum EventOrigin {
     /// Scout read it from an email.
     Scout,
 }
+
+impl EventOrigin {
+    /// The database name.
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Provider => "provider",
+            Self::Member => "member",
+            Self::Scout => "scout",
+        }
+    }
+}
+
+impl std::str::FromStr for EventOrigin {
+    type Err = ();
+
+    fn from_str(text: &str) -> Result<Self, ()> {
+        match text {
+            "provider" => Ok(Self::Provider),
+            "member" => Ok(Self::Member),
+            "scout" => Ok(Self::Scout),
+            _ => Err(()),
+        }
+    }
+}
+
+/// Whether an event stands.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum EventStatus {
+    /// It stands.
+    Confirmed,
+    /// It may happen.
+    Tentative,
+    /// It will not happen.
+    Cancelled,
+}
+
+impl EventStatus {
+    /// The database name.
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Confirmed => "confirmed",
+            Self::Tentative => "tentative",
+            Self::Cancelled => "cancelled",
+        }
+    }
+}
+
+impl std::str::FromStr for EventStatus {
+    type Err = ();
+
+    fn from_str(text: &str) -> Result<Self, ()> {
+        match text {
+            "confirmed" => Ok(Self::Confirmed),
+            "tentative" => Ok(Self::Tentative),
+            "cancelled" => Ok(Self::Cancelled),
+            _ => Err(()),
+        }
+    }
+}
+
+/// The member's answer to an invitation.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum Response {
+    /// Not answered yet.
+    NeedsAction,
+    /// Going.
+    Accepted,
+    /// Maybe.
+    Tentative,
+    /// Not going.
+    Declined,
+}
+
+impl Response {
+    /// The database name.
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::NeedsAction => "needs_action",
+            Self::Accepted => "accepted",
+            Self::Tentative => "tentative",
+            Self::Declined => "declined",
+        }
+    }
+}
+
+impl std::str::FromStr for Response {
+    type Err = ();
+
+    fn from_str(text: &str) -> Result<Self, ()> {
+        match text {
+            "needs_action" => Ok(Self::NeedsAction),
+            "accepted" => Ok(Self::Accepted),
+            "tentative" => Ok(Self::Tentative),
+            "declined" => Ok(Self::Declined),
+            _ => Err(()),
+        }
+    }
+}
+
+/// Why an event does not show what its member last asked for.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum EventNotice {
+    /// The event changed at the provider meanwhile: theirs was kept.
+    KeptTheirs,
+    /// The provider did not take the change.
+    NotSaved,
+}
+
+impl EventNotice {
+    /// The database name.
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::KeptTheirs => "kept_theirs",
+            Self::NotSaved => "not_saved",
+        }
+    }
+}
+
+impl std::str::FromStr for EventNotice {
+    type Err = ();
+
+    fn from_str(text: &str) -> Result<Self, ()> {
+        match text {
+            "kept_theirs" => Ok(Self::KeptTheirs),
+            "not_saved" => Ok(Self::NotSaved),
+            _ => Err(()),
+        }
+    }
+}
+
+/// Where a calendar lives.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum CalendarSource {
+    /// The member's own Campbooks calendar: no provider sees it.
+    Campbooks,
+    /// A calendar of a connected provider account.
+    Provider,
+}
+
+/// Record type of a calendar (the access catalogue and `x-campbooks`).
+pub const CALENDAR_RECORD: &str = "schedule.calendar";
+/// Record type of an event.
+pub const EVENT_RECORD: &str = "schedule.event";
 
 /// The change connectors is asked to make at the provider.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, ToSchema)]
@@ -111,6 +269,19 @@ pub enum CalendarChange {
     Delete,
     /// Answer an invitation.
     Respond,
+}
+
+impl CalendarChange {
+    /// The wire and database name.
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Create => "create",
+            Self::Update => "update",
+            Self::UpdateOccurrence => "update_occurrence",
+            Self::Delete => "delete",
+            Self::Respond => "respond",
+        }
+    }
 }
 
 /// The schema of a stored blob reference (`campbooks_kernel::blobs::BlobRef`)

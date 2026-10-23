@@ -1,0 +1,20 @@
+{
+  "errors": {
+    "calendar_read_only": "No se puede escribir en ese calendario. Elige uno de tus calendarios que lo permita.",
+    "change_pending": "Un cambio anterior en este evento aún no ha llegado al calendario. Inténtalo de nuevo en un momento.",
+    "invalid_calendar": "Elige uno de tus calendarios, activado y con escritura permitida, o déjalo en blanco.",
+    "invalid_color": "Un color se escribe #rrggbb, por ejemplo #0b8043.",
+    "invalid_hours": "El horario laboral necesita un día de la semana conocido (mon a sun), horas con formato HH:MM y un final posterior al inicio.",
+    "invalid_kind": "Ese no es un tipo de evento que Scout pueda añadir. Elige entre charge, appointment, meeting, travel, stay, show, reservation, delivery o expiry.",
+    "invalid_minutes": "Pide un hueco de 5 a 1440 minutos.",
+    "invalid_text": "Hace falta un título, y el título, el lugar y las notas no pueden ser demasiado largos.",
+    "invalid_time_zone": "Usa el nombre de una zona horaria IANA, como Europe/Lisbon.",
+    "invalid_undo": "Este deshacer no corresponde a este evento eliminado.",
+    "invalid_when": "Las horas son una hora RFC 3339 con desfase o una fecha AAAA-MM-DD, ambas del mismo tipo, con el final posterior al inicio.",
+    "invalid_window": "Pide un periodo que termine después de empezar y que no supere el máximo permitido (un año para eventos, 62 días para tiempo libre).",
+    "not_on_campbooks": "Solo un evento de tu calendario Campbooks puede añadirse a un calendario de un proveedor, y solo a uno distinto.",
+    "not_pushed": "Este evento no se añadió desde tu calendario Campbooks.",
+    "nothing_to_change": "Indica qué cambiar.",
+    "series_not_editable": "Una serie se cambia una ocurrencia cada vez. Indica la ocurrencia."
+  }
+}

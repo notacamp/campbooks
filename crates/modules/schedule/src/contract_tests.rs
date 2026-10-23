@@ -11,7 +11,11 @@ use campbooks_kernel::{
 use serde_json::{Value, json};
 
 use crate::{
-    events::{EventCancelled, EventChanged, EventCreated, OutboundRequested},
+    events::{CalendarSyncChanged, EventCancelled, EventChanged, EventCreated, OutboundRequested},
+    inbound::{
+        CalendarBatch, CalendarChangeCompleted, CalendarChanged, CalendarList, CapabilityGranted,
+        MessageRead, Outcome, ReadTexts,
+    },
     model::{CalendarChange, CalendarId, ConnectionId, EventId, EventKind, EventOrigin, RequestId},
 };
 
@@ -362,4 +366,167 @@ fn a_message_read_is_ids_enums_and_times() {
     let mut hold = read;
     hold["items"][0]["kind"] = json!("hold");
     assert!(!accepts(file, &hold));
+}
+
+#[test]
+fn the_calendar_sync_event_follows_its_contract() {
+    let event = CalendarSyncChanged {
+        workspace: UUID.to_owned(),
+        calendar: CalendarId::new(),
+        connection: ConnectionId::new(),
+        syncing: true,
+    };
+    let value = serde_json::to_value(&event).unwrap();
+    assert!(accepts(
+        "schedule.calendar_sync_changed.v1.schema.json",
+        &value
+    ));
+    assert_eq!(CalendarSyncChanged::NAME, "schedule.calendar_sync_changed");
+    let mut named = value;
+    named["name"] = json!("Family");
+    assert!(!accepts(
+        "schedule.calendar_sync_changed.v1.schema.json",
+        &named
+    ));
+}
+
+#[test]
+fn the_events_this_module_consumes_read_from_their_contracts() {
+    // conversations.message_read, with the blob of its texts.
+    let key = format!("{UUID}:model:item:1");
+    let read = json!({
+        "workspace": UUID, "message": UUID, "conversation": UUID, "inbox": UUID,
+        "owner": UUID, "layer": "model", "summary_ready": false, "asks": [],
+        "items": [{"key": key, "kind": "travel", "starts": "2026-11-06T07:40:00+00:00",
+                   "all_day": false, "time_zone": "Europe/Lisbon"}],
+        "texts": {"hash": "3".repeat(64), "size": 80,
+                  "content_type": "application/vnd.campbooks.read-texts+json; version=1"}
+    });
+    assert!(accepts("conversations.message_read.v1.schema.json", &read));
+    let parsed: MessageRead = serde_json::from_value(read).unwrap();
+    assert_eq!(parsed.items[0].kind, "travel");
+    assert!(parsed.texts.is_some() && parsed.owner.is_some());
+    assert_eq!(MessageRead::NAME, "conversations.message_read");
+
+    // The texts blob.
+    let texts = json!({"items": [
+        {"key": key, "title": "Flight LIS to AMS", "place": null, "ical_uid": "abc@example.com"}
+    ]});
+    assert!(accepts("read-texts.v1.schema.json", &texts));
+    let parsed: ReadTexts = serde_json::from_value(texts).unwrap();
+    assert_eq!(parsed.items[0].title, "Flight LIS to AMS");
+    assert_eq!(parsed.items[0].ical_uid.as_deref(), Some("abc@example.com"));
+
+    // connectors.capability_granted for a calendar, and its calendar list.
+    let granted = json!({
+        "workspace": UUID, "connection": UUID, "capability": "calendar", "granted_by": UUID,
+        "account": {"hash": "0".repeat(64), "size": 10, "content_type": "application/json"},
+        "calendars": {"hash": "1".repeat(64), "size": 90, "content_type": "application/json"}
+    });
+    assert!(accepts(
+        "connectors.capability_granted.v1.schema.json",
+        &granted
+    ));
+    let parsed: CapabilityGranted = serde_json::from_value(granted).unwrap();
+    assert_eq!(parsed.capability, "calendar");
+    assert!(parsed.calendars.is_some());
+    let list: CalendarList = serde_json::from_value(json!({
+        "version": 1,
+        "calendars": [{"provider_id": "ines@example.com", "name": "Inês", "primary": true,
+                       "writable": true, "color": "#0b8043", "time_zone": "Europe/Lisbon"}]
+    }))
+    .unwrap();
+    assert!(list.calendars[0].primary);
+
+    // connectors.calendar_changed and its batch.
+    let batch = json!({
+        "version": 1, "provider_calendar_id": "ines@example.com", "full": true,
+        "upserts": [
+            {"provider_id": "abc123", "etag": "\"3181\"", "status": "confirmed",
+             "title": "Team call", "recurrence": ["RRULE:FREQ=WEEKLY;BYDAY=MO"],
+             "start": {"date_time": "2026-11-02T10:00:00+00:00", "time_zone": "Europe/Lisbon"},
+             "end": {"date_time": "2026-11-02T10:30:00+00:00", "time_zone": "Europe/Lisbon"},
+             "private": {"campbooks_event": UUID, "campbooks_kind": "meeting"}},
+            {"provider_id": "abc123_20261116", "status": "confirmed", "series": "abc123",
+             "original_start": {"date_time": "2026-11-16T10:00:00+00:00"},
+             "start": {"date_time": "2026-11-17T11:00:00+00:00"}},
+            {"provider_id": "def456", "status": "confirmed", "start": {"date": "2026-11-12"}}
+        ],
+        "removals": [{"provider_id": "ghi789"}]
+    });
+    assert!(accepts("calendar-change-batch.v1.schema.json", &batch));
+    let parsed: CalendarBatch = serde_json::from_value(batch).unwrap();
+    assert!(parsed.full && parsed.upserts.len() == 3 && parsed.removals.len() == 1);
+    let exception = &parsed.upserts[1];
+    assert_eq!(exception.series.as_deref(), Some("abc123"));
+    let first = crate::domain::provider::parse(&parsed.upserts[0]).unwrap();
+    assert_eq!(first.time_zone.as_deref(), Some("Europe/Lisbon"));
+    assert_eq!(first.kind, Some(EventKind::Meeting));
+    let moved = crate::domain::provider::parse(exception).unwrap();
+    assert_eq!(moved.original.as_deref(), Some("2026-11-16T10:00:00Z"));
+    let day = crate::domain::provider::parse(&parsed.upserts[2]).unwrap();
+    assert!(day.span.start.is_day());
+    let changed = json!({
+        "workspace": UUID, "connection": UUID,
+        "batch": {"hash": "2".repeat(64), "size": 700, "content_type": "application/json"}
+    });
+    assert!(accepts(
+        "connectors.calendar_changed.v1.schema.json",
+        &changed
+    ));
+    let _: CalendarChanged = serde_json::from_value(changed).unwrap();
+
+    // connectors.calendar_change_completed.
+    let done = json!({
+        "workspace": UUID, "request": UUID, "calendar": UUID, "event": UUID,
+        "outcome": "superseded", "reason": "changed_at_provider"
+    });
+    assert!(accepts(
+        "connectors.calendar_change_completed.v1.schema.json",
+        &done
+    ));
+    let parsed: CalendarChangeCompleted = serde_json::from_value(done).unwrap();
+    assert_eq!(parsed.outcome, Outcome::Superseded);
+}
+
+#[test]
+fn a_change_document_follows_its_contract() {
+    use crate::{
+        domain::moment::Moment,
+        inbound::{ChangeDocument, ChangeEvent, PrivateProperties},
+    };
+    let start = Moment::parse("2026-11-12T15:00:00+00:00").unwrap();
+    let end = Moment::parse("2026-11-12T16:00:00+00:00").unwrap();
+    let document = ChangeDocument {
+        version: 1,
+        change: "create".to_owned(),
+        provider_calendar_id: "ines@example.com".to_owned(),
+        provider_event_id: None,
+        etag: None,
+        occurrence: None,
+        response: None,
+        event: Some(ChangeEvent {
+            title: Some("Dentist".to_owned()),
+            place: None,
+            description: None,
+            start: start.to_provider(Some("Europe/Lisbon")),
+            end: Some(end.to_provider(Some("Europe/Lisbon"))),
+            private: Some(PrivateProperties {
+                campbooks_event: Some(UUID.to_owned()),
+                campbooks_kind: Some("appointment".to_owned()),
+                campbooks_source: None,
+            }),
+        }),
+    };
+    let value = serde_json::to_value(&document).unwrap();
+    assert!(accepts("calendar-change.v1.schema.json", &value), "{value}");
+    // An update names the event and the etag it was based on.
+    let update = ChangeDocument {
+        change: "update".to_owned(),
+        provider_event_id: Some("abc123".to_owned()),
+        etag: Some("\"3181\"".to_owned()),
+        ..document
+    };
+    let value = serde_json::to_value(&update).unwrap();
+    assert!(accepts("calendar-change.v1.schema.json", &value), "{value}");
 }

@@ -1,0 +1,20 @@
+{
+  "errors": {
+    "calendar_read_only": "Ce calendrier n’accepte pas les modifications. Choisissez l’un de vos calendriers qui le permet.",
+    "change_pending": "Une modification précédente de cet événement n’est pas encore arrivée dans le calendrier. Réessayez dans un instant.",
+    "invalid_calendar": "Choisissez l’un de vos calendriers, activé et modifiable, ou laissez ce champ vide.",
+    "invalid_color": "Une couleur s’écrit #rrggbb, par exemple #0b8043.",
+    "invalid_hours": "Les horaires de travail demandent un jour de la semaine connu (mon à sun), des heures au format HH:MM et une fin postérieure au début.",
+    "invalid_kind": "Ce n’est pas un type d’événement que Scout peut ajouter. Choisissez parmi charge, appointment, meeting, travel, stay, show, reservation, delivery ou expiry.",
+    "invalid_minutes": "Demandez un créneau de 5 à 1 440 minutes.",
+    "invalid_text": "Un titre est nécessaire, et le titre, le lieu et les notes ne doivent pas être trop longs.",
+    "invalid_time_zone": "Utilisez le nom d’un fuseau horaire IANA, comme Europe/Lisbon.",
+    "invalid_undo": "Cette annulation ne correspond pas à cet événement supprimé.",
+    "invalid_when": "Les heures sont une heure RFC 3339 avec décalage ou une date AAAA-MM-JJ, du même type, avec une fin postérieure au début.",
+    "invalid_window": "Demandez une période qui finit après son début et ne dépasse pas le maximum autorisé (un an pour les événements, 62 jours pour le temps libre).",
+    "not_on_campbooks": "Seul un événement de votre calendrier Campbooks peut être ajouté à un calendrier d’un fournisseur, et seulement à un autre.",
+    "not_pushed": "Cet événement n’a pas été ajouté depuis votre calendrier Campbooks.",
+    "nothing_to_change": "Dites ce qu’il faut changer.",
+    "series_not_editable": "Une série se modifie une occurrence à la fois. Indiquez l’occurrence."
+  }
+}

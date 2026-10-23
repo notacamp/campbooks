@@ -16,6 +16,32 @@ use crate::model::{
     RequestId,
 };
 
+/// What the three events about an event of a calendar carry; each is built
+/// from it (`from_facts`).
+#[derive(Debug, Clone)]
+pub struct EventFacts {
+    /// The workspace.
+    pub workspace: String,
+    /// The event.
+    pub event: EventId,
+    /// Its calendar.
+    pub calendar: CalendarId,
+    /// The member whose calendar it is.
+    pub owner: UserId,
+    /// What kind of dated thing it is.
+    pub kind: EventKind,
+    /// When it starts.
+    pub starts: String,
+    /// When it ends.
+    pub ends: Option<String>,
+    /// Whether it lasts whole days.
+    pub all_day: bool,
+    /// Who made it.
+    pub origin: EventOrigin,
+    /// The record it was read from, if any.
+    pub source: Option<RecordRef>,
+}
+
 /// One of the module's events about an event of a calendar: the same facts
 /// for a creation, a change and a cancellation
 /// (`contracts/schedule.event_created.v1.schema.json` and its two siblings).
@@ -47,6 +73,24 @@ macro_rules! event_facts {
             /// The record it was read from, if any (an email).
             #[serde(default, skip_serializing_if = "Option::is_none")]
             pub source: Option<RecordRef>,
+        }
+
+        impl $name {
+            /// The event for `facts`.
+            pub fn from_facts(facts: EventFacts) -> Self {
+                Self {
+                    workspace: facts.workspace,
+                    event: facts.event,
+                    calendar: facts.calendar,
+                    owner: facts.owner,
+                    kind: facts.kind,
+                    starts: facts.starts,
+                    ends: facts.ends,
+                    all_day: facts.all_day,
+                    origin: facts.origin,
+                    source: facts.source,
+                }
+            }
         }
 
         impl DomainEvent for $name {
@@ -104,6 +148,30 @@ pub struct OutboundRequested {
 
 impl DomainEvent for OutboundRequested {
     const NAME: &'static str = "schedule.outbound_requested";
+    const VERSION: u16 = 1;
+
+    fn workspace(&self) -> Option<&str> {
+        Some(&self.workspace)
+    }
+}
+
+/// A provider calendar was turned on or off for the member. Connectors reads
+/// a calendar turned on again from the start, and stops reading one turned
+/// off (`contracts/schedule.calendar_sync_changed.v1.schema.json`).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+pub struct CalendarSyncChanged {
+    /// The workspace.
+    pub workspace: String,
+    /// The calendar.
+    pub calendar: CalendarId,
+    /// The connection whose calendar it is.
+    pub connection: ConnectionId,
+    /// Whether it syncs now.
+    pub syncing: bool,
+}
+
+impl DomainEvent for CalendarSyncChanged {
+    const NAME: &'static str = "schedule.calendar_sync_changed";
     const VERSION: u16 = 1;
 
     fn workspace(&self) -> Option<&str> {
