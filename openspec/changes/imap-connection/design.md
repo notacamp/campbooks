@@ -161,9 +161,10 @@ endpoint must not become a password-guessing service. Through the existing
 
 - per member: 10 connect attempts / hour;
 - per workspace: 30 / hour;
-- per target address (hash of the lower-cased address, across all
-  workspaces): 5 **failed** logins / hour, then `too_many_attempts` for an
-  hour.
+- per target mailbox (hash of `<lower(username)>@<lower(imap_host)>`, the
+  login actually tried, so typing another address does not reset it; across
+  all workspaces): 5 **failed** logins / hour, then `too_many_attempts` for
+  an hour.
 
 Discovery: 30 / hour per member.
 

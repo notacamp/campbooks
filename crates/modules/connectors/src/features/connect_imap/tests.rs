@@ -467,6 +467,14 @@ async fn a_mailbox_cannot_be_guessed_at(db: PgPool) {
     assert_eq!(locked.status, StatusCode::TOO_MANY_REQUESTS);
     assert_eq!(locked.json["code"], "too_many_attempts");
     assert_eq!(imap.seen().connections, tried);
+    // So is one that types another address but signs in as the same
+    // mailbox.
+    let mut other = body("postmaster@example.org", "secret", &servers);
+    other["username"] = "bob@example.net".into();
+    let locked = connect(&kit, &ana, ws_a, other).await;
+    assert_eq!(locked.status, StatusCode::TOO_MANY_REQUESTS);
+    assert_eq!(locked.json["code"], "too_many_attempts");
+    assert_eq!(imap.seen().connections, tried);
 }
 
 #[sqlx::test(migrations = "../../../migrations")]

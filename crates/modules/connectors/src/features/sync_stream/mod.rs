@@ -554,7 +554,6 @@ impl SyncStream {
         }))
     }
 
-    /// The grant stopped working (`reason`).
     /// An IMAP stream until reading lands (campbooks-cloud#311): its
     /// password is opened, so one that no longer opens shows as
     /// `needs_reauth`, and it waits at the slowest interval.
@@ -583,6 +582,7 @@ impl SyncStream {
         Ok(())
     }
 
+    /// The grant stopped working (`reason`).
     async fn needs_reauth(
         &self,
         ctx: &mut JobContext,

@@ -178,15 +178,9 @@ pub async fn execute(
         Rate::per_hour(ATTEMPTS_PER_WORKSPACE),
     )
     .await?;
-    let guard = Failures::take(state, &address).await?;
-    let settings = match settings(deps, &address, input.servers).await {
-        Ok(settings) => settings,
-        Err(err) => {
-            guard.give_back(state).await?;
-            return Err(err);
-        }
-    };
+    let settings = settings(deps, &address, input.servers).await?;
     let username = username.unwrap_or_else(|| settings.username.clone());
+    let guard = Failures::take(state, &username, &settings.servers.imap.host).await?;
     let verified = Box::pin(imap::verify(
         &deps.imap,
         &settings.servers,
@@ -345,9 +339,10 @@ async fn settings(deps: &Deps, address: &Address, given: Option<Servers>) -> Res
     Ok(settings)
 }
 
-/// The failed-sign-in budget of one target address, shared by every
-/// workspace: an attempt takes one unit before the server is contacted,
-/// and gives it back unless the server refused the password.
+/// The failed-sign-in budget of one target mailbox (its username on its
+/// IMAP server, whatever address was typed), shared by every workspace: an
+/// attempt takes one unit before the server is contacted, and gives it back
+/// unless the server refused the password.
 struct Failures {
     key: String,
 }
@@ -357,13 +352,18 @@ impl Failures {
         Rate::per_hour(FAILURES_PER_ADDRESS)
     }
 
-    /// Take a unit for `address`: 429 `too_many_attempts` when none is
-    /// left (the server is not contacted).
-    async fn take(state: &AppState, address: &Address) -> Result<Self> {
-        // The address's hash: the key holds no address.
+    /// Take a unit for `username` on `imap_host`: 429 `too_many_attempts`
+    /// when none is left (the server is not contacted).
+    async fn take(state: &AppState, username: &str, imap_host: &str) -> Result<Self> {
+        // The mailbox's hash: the key holds no address.
+        let mailbox = format!(
+            "{}@{}",
+            username.to_lowercase(),
+            imap_host.to_ascii_lowercase()
+        );
         let key = format!(
             "imap.failed:{}",
-            URL_SAFE_NO_PAD.encode(crypto::hash(&address.address))
+            URL_SAFE_NO_PAD.encode(crypto::hash(&mailbox))
         );
         match schedule::take(&state.db, &key, 1, Self::rate()).await? {
             Ok(()) => Ok(Self { key }),

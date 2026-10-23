@@ -107,10 +107,14 @@ ports by setting.
 
 ### Requirement: Connecting cannot be used to guess passwords
 Connect attempts SHALL be limited to 10 per member and 30 per workspace per
-hour, and failed logins to 5 per target address per hour across all
-workspaces, after which attempts for that address answer
-`too_many_attempts` for an hour.
+hour, and failed logins to 5 per target mailbox (its username on its IMAP
+server, whatever address was typed) per hour across all workspaces, after
+which attempts for that mailbox answer `too_many_attempts` for an hour.
 
 #### Scenario: Guessing one mailbox
 - **WHEN** five connect attempts for `bob@example.net` fail within an hour, from any workspaces
 - **THEN** the sixth answers `too_many_attempts` without contacting the server
+
+#### Scenario: Guessing one mailbox under another address
+- **WHEN** five connect attempts signing in as `bob@example.net` have failed, and a sixth types `postmaster@example.org` with the username `bob@example.net` on the same IMAP server
+- **THEN** it answers `too_many_attempts` without contacting the server

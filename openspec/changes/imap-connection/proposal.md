@@ -42,7 +42,7 @@ workspace.
   verified; on the hosted service, hosts that resolve to private, loopback,
   link-local or metadata addresses are refused at every connection.
 - **Hard to misuse as a password-guessing service**: attempts are limited
-  per member, per workspace and per target address.
+  per member, per workspace and per target mailbox.
 - **Off by default** (`CAMPBOOKS_CONNECTORS__IMAP__ENABLED`) until reading lands in #311;
   while off, `imap` is not offered and its endpoints answer
   `provider_not_configured`.
