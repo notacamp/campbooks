@@ -851,8 +851,8 @@ can revoke at their provider. Mail servers are reached only at public addresses 
 set `CAMPBOOKS_CONNECTORS__IMAP__ALLOW_PRIVATE_HOSTS=true` (private, loopback and CGNAT
 addresses; never link-local or cloud metadata addresses) and
 `CAMPBOOKS_CONNECTORS__IMAP__ALLOW_ANY_PORT=true`. Connect attempts are limited to 10 per
-member and 30 per workspace an hour, and 5 failed sign-ins an hour per mailbox address
-across the instance, so the endpoint cannot be used to guess passwords.
+member and 30 per workspace an hour, and 5 failed sign-ins an hour per mailbox login
+(its username on its IMAP server) across the instance, so the endpoint cannot be used to guess passwords.
 
 Connecting needs the built-in sign-in: an install that sets `CAMPBOOKS_AUTH__ISSUER` to an
 outside issuer cannot connect mail. `connectors.start_connection` answers with the
