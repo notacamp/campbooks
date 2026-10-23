@@ -199,6 +199,11 @@ export const Thread: Story = {
   },
 };
 
+/** The same conversation without a play, for recordings: the note offers Reply (campbooks-cloud#306). */
+export const ThreadIdle: Story = {
+  args: { path: `${PATH}/primary/${Q4.id}`, api: inbox() },
+};
+
 /** A mailbox disconnected with its mail kept: history, read-only, nothing to act on. */
 export const KeptHistory: Story = {
   args: {
