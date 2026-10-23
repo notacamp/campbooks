@@ -96,6 +96,66 @@ impl DomainEvent for ConversationNeedChanged {
     }
 }
 
+/// `tasks.task_changed` v1 (`contracts/tasks.task_changed.v1.schema.json`):
+/// a task was made or changed. Only what the projection reads.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TaskChanged {
+    /// The workspace.
+    pub workspace: String,
+    /// The task.
+    pub task: String,
+    /// Grows with every change of this task.
+    pub revision: i64,
+    /// Open, done or not needed.
+    pub state: TaskState,
+    /// Do or Pay.
+    pub verb: TaskVerb,
+    /// The day it is due.
+    #[serde(default)]
+    pub due_on: Option<NaiveDate>,
+    /// The plan: `none`, `date` or `later`.
+    pub plan: String,
+    /// When Later ends.
+    #[serde(default)]
+    pub later_until: Option<DateTime<Utc>>,
+    /// The member it is with.
+    pub assignee: UserId,
+    /// The record it came from.
+    #[serde(default)]
+    pub source: Option<RecordRef>,
+}
+
+/// A task's state, as `tasks.task_changed` carries it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum TaskState {
+    /// It still needs doing.
+    Open,
+    /// It was done (or paid).
+    Done,
+    /// It is not needed after all.
+    NotNeeded,
+}
+
+/// A task's verb, as `tasks.task_changed` carries it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum TaskVerb {
+    /// Something to do.
+    Do,
+    /// A bill to pay.
+    Pay,
+}
+
+impl DomainEvent for TaskChanged {
+    const NAME: &'static str = "tasks.task_changed";
+    const VERSION: u16 = 1;
+
+    fn workspace(&self) -> Option<&str> {
+        Some(&self.workspace)
+    }
+}
+
 /// `workspaces.workspace_deleting`: the workspace is gone at once and its
 /// data is purged at `purge_after`.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

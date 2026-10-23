@@ -33,6 +33,8 @@ These tools only read:
 - `find_people`: people who write to the member, by name or address.
 - `what_needs_me`: the member's open needs.
 - `my_inboxes`: the member's inboxes and how many conversations each stream holds.
+- `my_tasks`: the member's open tasks, by due day.
+- `read_task`: one task of the member's, with what changed in it.
 
 These tools only propose. Each makes a card, and changes nothing:
 

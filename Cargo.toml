@@ -35,6 +35,7 @@ campbooks-admin = { path = "crates/modules/admin" }
 campbooks-attention = { path = "crates/modules/attention" }
 campbooks-search = { path = "crates/modules/search" }
 campbooks-assistant = { path = "crates/modules/assistant" }
+campbooks-tasks = { path = "crates/modules/tasks" }
 campbooks-tracking-plan = { path = "crates/tracking-plan" }
 
 # HTTP / async

@@ -28,11 +28,18 @@ pub struct AboutType {
 }
 
 /// Every record type a chat may be about.
-pub const REGISTRY: &[AboutType] = &[AboutType {
-    record_type: "conversations.conversation",
-    reads: &["conversations.get", "conversations.get_history"],
-    id_param: "conversation_id",
-}];
+pub const REGISTRY: &[AboutType] = &[
+    AboutType {
+        record_type: "conversations.conversation",
+        reads: &["conversations.get", "conversations.get_history"],
+        id_param: "conversation_id",
+    },
+    AboutType {
+        record_type: "tasks.task",
+        reads: &["tasks.get"],
+        id_param: "task_id",
+    },
+];
 
 /// The registry's entry for `record_type`.
 pub fn entry(record_type: &str) -> Option<&'static AboutType> {
@@ -94,6 +101,7 @@ pub async fn read(member: &Member, about: &RecordRef) -> Result<Seen, Unread> {
             let detail = answers.first().unwrap_or(&Value::Null);
             project::conversation(detail, answers.get(1))
         }
+        "tasks.task" => project::task_detail(answers.first().unwrap_or(&Value::Null)),
         _ => return Ok(Seen::Lost),
     };
     let mut value = json!({ "type": entry.record_type, "id": about.id });

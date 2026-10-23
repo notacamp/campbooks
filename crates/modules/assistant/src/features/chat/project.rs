@@ -94,6 +94,53 @@ fn need(need: &Value) -> Value {
     out
 }
 
+/// Most history entries of a task handed on.
+const TASK_HISTORY: usize = 20;
+
+/// A task as lists show it (`tasks.list`'s entries): its title cleaned and
+/// bounded, its dates as the API gives them (RFC 3339).
+pub fn task(task: &Value) -> Value {
+    let mut out = pick(
+        task,
+        &[
+            "id",
+            "verb",
+            "origin",
+            "state",
+            "due_on",
+            "due_at",
+            "overdue",
+            "plan",
+            "plan_on",
+            "later_until",
+            "closed_at",
+            "assignee",
+            "handed_by",
+            "source",
+        ],
+    );
+    if let Some(object) = out.as_object_mut() {
+        object.insert("title".into(), short(&task["title"]));
+    }
+    out
+}
+
+/// A task with what changed in it (`tasks.get`'s answer): the newest
+/// entries, who did each and when.
+pub fn task_detail(detail: &Value) -> Value {
+    let history: Vec<Value> = detail["history"]
+        .as_array()
+        .map(|entries| {
+            entries
+                .iter()
+                .skip(entries.len().saturating_sub(TASK_HISTORY))
+                .map(|entry| pick(entry, &["at", "actor", "what"]))
+                .collect()
+        })
+        .unwrap_or_default();
+    json!({ "task": task(&detail["task"]), "history": history })
+}
+
 /// Where a conversation is beside its stream.
 fn place(summary: &Value) -> &'static str {
     if summary["trashed"] == true {
@@ -287,5 +334,15 @@ mod tests {
         assert!(cut && text.len() <= 1_000 && text.ends_with(CUT), "{text}");
         let (text, cut) = bounded(&json!({"text": "short"}), 1_000);
         assert!(!cut && !text.contains(CUT));
+    }
+
+    #[test]
+    fn a_task_says_who_it_is_with() {
+        let out = task(&json!({
+            "id": "t-1", "title": "Book the venue", "state": "open",
+            "assignee": "u-joao", "handed_by": "u-ana",
+        }));
+        assert_eq!(out["assignee"], "u-joao");
+        assert_eq!(out["handed_by"], "u-ana");
     }
 }

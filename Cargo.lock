@@ -682,6 +682,7 @@ dependencies = [
  "campbooks-kernel",
  "campbooks-search",
  "campbooks-system",
+ "campbooks-tasks",
  "campbooks-workspaces",
  "chrono",
  "clap",
@@ -734,6 +735,22 @@ dependencies = [
  "utoipa-axum",
  "uuid",
  "wiremock",
+]
+
+[[package]]
+name = "campbooks-tasks"
+version = "0.1.0"
+dependencies = [
+ "axum",
+ "campbooks-kernel",
+ "chrono",
+ "serde",
+ "serde_json",
+ "sqlx",
+ "tokio",
+ "tracing",
+ "utoipa",
+ "utoipa-axum",
 ]
 
 [[package]]

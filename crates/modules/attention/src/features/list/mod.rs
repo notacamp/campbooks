@@ -55,14 +55,25 @@ const MAX_OFFSET_MINUTES: i32 = 14 * 60;
 /// answers it), not lapsed (what they ask is no longer possible,
 /// campbooks-cloud#275) and not snoozed by the caller (`$4`) at `$5`; by
 /// reason, then overdue (before `$6`, the caller's today), due date, urgent
-/// and age.
+/// and age. A task (campbooks-cloud#43) stays until done however late, is left
+/// out while planned Later (`hidden_until`) and replaces its conversation's
+/// `do` or `pay` item for its assignee (`$7`, the caller as text).
 const OPEN: &str = "SELECT i.id, i.record_type, i.record_id, i.container_type, i.container_id, \
             i.cause_type, i.cause_id, i.reason, i.trust, i.due_on, i.urgent, i.since, i.state, \
             i.cleared_because, i.cleared_by, i.cleared_at, NULL::timestamptz AS snoozed_until \
        FROM attention.items i \
       WHERE i.workspace_id = $1 AND i.state = 'open' AND i.reason <> 'waiting' \
         AND i.container_type || ':' || i.container_id = ANY($2) \
-        AND (i.due_on IS NULL OR i.due_on >= $3 OR i.reason IN ('pay', 'nudge')) \
+        AND (i.due_on IS NULL OR i.due_on >= $3 OR i.reason IN ('pay', 'nudge') \
+             OR i.record_type = 'tasks.task') \
+        AND (i.hidden_until IS NULL OR i.hidden_until <= $5) \
+        AND NOT (i.record_type = 'conversations.conversation' AND i.reason IN ('do', 'pay') \
+                 AND EXISTS (SELECT 1 FROM attention.items t \
+                              WHERE t.workspace_id = i.workspace_id \
+                                AND t.record_type = 'tasks.task' AND t.state = 'open' \
+                                AND t.cause_type = i.record_type AND t.cause_id = i.record_id \
+                                AND t.container_type = 'tasks.assignee' \
+                                AND t.container_id = $7)) \
         AND (i.lapses_at IS NULL OR i.lapses_at > $5) \
         AND NOT EXISTS (SELECT 1 FROM attention.snoozes s \
                          WHERE s.item_id = i.id AND s.user_id = $4 AND s.until > $5) \
@@ -182,6 +193,7 @@ pub async fn handler(
                 .bind(user)
                 .bind(now)
                 .bind(today)
+                .bind(access.user.map(|u| u.to_string()))
                 .fetch_all(&mut *tx)
                 .await?
         }

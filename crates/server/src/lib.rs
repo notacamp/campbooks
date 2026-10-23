@@ -261,6 +261,7 @@ pub fn modules_with(composition: &Composition) -> Vec<Module> {
             handbook: handbook(),
             ..composition.assistant.clone()
         }),
+        campbooks_tasks::module(),
         // `cargo xtask new-module` inserts above this line.
     ]
 }
@@ -278,6 +279,10 @@ pub fn handbook() -> campbooks_assistant::Handbook {
         Section {
             module: campbooks_attention::NAME,
             text: campbooks_attention::HANDBOOK,
+        },
+        Section {
+            module: campbooks_tasks::NAME,
+            text: campbooks_tasks::HANDBOOK,
         },
     ])
 }
@@ -297,7 +302,13 @@ pub fn with_ports(state: AppState) -> AppState {
         .with_membership(campbooks_workspaces::membership())
         .with_locales(campbooks_workspaces::locale_preference())
         .with_invitations(campbooks_workspaces::invitations())
-        .with_visibility(campbooks_conversations::visibility())
+        .with_visibility(Arc::new(campbooks_kernel::changes::Visibilities::new(
+            vec![
+                campbooks_conversations::visibility(),
+                campbooks_tasks::visibility(),
+            ],
+        )))
+        .with_open_tasks(campbooks_tasks::open_tasks())
         .with_preferences(campbooks_assistant::preferences())
         .with_kept_mail(campbooks_conversations::kept_mail())
         .with_outbound(campbooks_conversations::outbound_requests())
@@ -459,6 +470,9 @@ fn security_scheme() -> SecurityScheme {
             a sentence you type into rules to check. Compiling uses the `complete` AI role only \
             when you ask, and sends it your sentence and your own addresses and label names, never \
             your mail; nothing is saved until you save a rule through the conversations module."),
+        (name = "tasks", description = "What you have to do: your tasks, with a due date, a \
+            plan (a day, or Later), a hand-off to one teammate and an undo for every change. \
+            Personal: a task is seen by who it is with, and by who handed it off."),
         // `cargo xtask new-module` inserts above this line.
         (name = "changes", description = "The change feed: a Server-Sent Events stream per \
             workspace of the records that changed (ids only), so clients refetch only what \
@@ -779,7 +793,10 @@ mod tests {
     fn every_handbook_section_fits() {
         let handbook = handbook();
         let modules: Vec<&str> = handbook.sections().iter().map(|s| s.module).collect();
-        assert_eq!(modules, ["assistant", "conversations", "attention"]);
+        assert_eq!(
+            modules,
+            ["assistant", "conversations", "attention", "tasks"]
+        );
         for section in handbook.sections() {
             assert!(
                 section.text.len() <= campbooks_assistant::handbook::MAX_SECTION_BYTES,

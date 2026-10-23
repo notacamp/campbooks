@@ -297,7 +297,9 @@
       "find_people_one": "Procurei pessoas: {{count}} encontrada",
       "find_people_other": "Procurei pessoas: {{count}} encontradas",
       "what_needs_me": "Li o que precisa de si",
-      "my_inboxes": "Li as suas caixas de entrada e fluxos"
+      "my_inboxes": "Li as suas caixas de entrada e fluxos",
+      "my_tasks": "Li as suas tarefas",
+      "read_task": "Li uma tarefa"
     },
     "working": {
       "find_conversations": "A procurar conversas…",
@@ -305,7 +307,9 @@
       "conversation_history": "A ler o que aconteceu a este email…",
       "find_people": "A procurar pessoas…",
       "what_needs_me": "A ler o que precisa de si…",
-      "my_inboxes": "A ler as suas caixas de entrada…"
+      "my_inboxes": "A ler as suas caixas de entrada…",
+      "my_tasks": "A ler as suas tarefas…",
+      "read_task": "A ler a tarefa…"
     },
     "proposal": {
       "label": "O Scout propõe",

@@ -36,6 +36,7 @@ import {
 import {
   awaitedOf,
   billKind,
+  displayName,
   dueLabel,
   ForwardDialog,
   howRows,
@@ -58,6 +59,7 @@ import {
   type NudgeResume,
   type ReplyResume,
 } from "~/modules/conversations";
+import { dueText, planText, useTaskActions, useTasksByIds, type TaskView } from "~/modules/tasks";
 
 import { useAttention, useRefreshAttention, useSnooze, type ItemView } from "../../api/queries";
 import {
@@ -80,6 +82,7 @@ import { WaitingOnOthers, type WaitingRow } from "./WaitingOnOthers";
 type Translate = (key: string, options?: Record<string, unknown>) => string;
 
 const CONVERSATION = "conversations.conversation";
+const TASK = "tasks.task";
 
 /** Continue with Scout: its action id and its key (`.`, the assistant's). */
 const SCOUT = "scout";
@@ -114,6 +117,27 @@ interface Row {
   /** Where the item stood in the list when it was acted on. */
   at?: number | undefined;
 }
+
+/**
+ * A task as Home shows it (campbooks-cloud#43): beside the conversations in
+ * Do and Pay, in the same order by due date. Its actions are Done (Paid),
+ * Later and Not needed; the tasks module does the work.
+ */
+interface TaskEntry {
+  item: ItemView;
+  task: TaskView;
+  /** Where it came from, when it came from a conversation. */
+  conversation?: ConversationSummary | undefined;
+  /** Acted on: the one-line confirmation it shows while it folds away. */
+  confirmation?: string | undefined;
+  /** Where the item stood in the list when it was acted on. */
+  at?: number | undefined;
+}
+
+/** What Home lists: a conversation's need, or a task. */
+type Entry = Row | TaskEntry;
+
+const isTask = (entry: Entry): entry is TaskEntry => "task" in entry;
 
 type ActionId = OwnActionId | UniversalActionId;
 
@@ -214,6 +238,8 @@ export function WhatNeedsYou({ workspaceId, now, offer }: WhatNeedsYouProps) {
   const t = typedAttention as unknown as Translate;
   const { t: typedConversations } = useTranslation("conversations");
   const tc = typedConversations as unknown as Translate;
+  const { t: typedTasks } = useTranslation("tasks");
+  const tt = typedTasks as unknown as Translate;
   const navigate = useNavigate();
   const undo = useUndoToast();
   // Scout's chat, where the app mounted it: Continue with Scout (`.`).
@@ -231,21 +257,31 @@ export function WhatNeedsYou({ workspaceId, now, offer }: WhatNeedsYouProps) {
   // Items acted on, hidden at once while the projection catches up; keyed
   // by their cause, so a follow-up from the sender shows again. A hidden
   // row with a confirmation still shows it while it folds away.
-  const [gone, setGone] = useState<ReadonlyMap<string, Row>>(new Map());
+  const [gone, setGone] = useState<ReadonlyMap<string, Entry>>(new Map());
   const openItems = open.data?.items ?? [];
 
   const clearedItems = cleared.data?.items ?? [];
   // Only waits, whatever else a list holds.
   const waitItems = (waits.data?.items ?? []).filter((item) => item.reason === "waiting");
+  // The conversations the items are about, and those the tasks came from.
   const ids = [
     ...new Set(
-      [...openItems, ...clearedItems, ...waitItems]
-        .filter((item) => item.record.type === CONVERSATION)
-        .map((item) => item.record.id),
+      [...openItems, ...clearedItems, ...waitItems].flatMap((item) => {
+        if (item.record.type === CONVERSATION) {
+          return [item.record.id];
+        }
+        return item.record.type === TASK && item.cause.type === CONVERSATION ? [item.cause.id] : [];
+      }),
     ),
   ];
   const conversations = useConversationsByIds(workspaceId, ids);
   const byId = new Map((conversations.data ?? []).map((c) => [c.id, c] as const));
+  // Tasks are their own records: read in one batch, as the member sees them.
+  const taskIds = openItems
+    .filter((item) => item.record.type === TASK)
+    .map((item) => item.record.id);
+  const tasks = useTasksByIds(workspaceId, taskIds);
+  const taskById = new Map((tasks.data ?? []).map((task) => [task.id, task] as const));
 
   // A row still folding away keeps its place even once the list no longer
   // has its item (the server answered and the list refetched first).
@@ -256,10 +292,18 @@ export function WhatNeedsYou({ workspaceId, now, offer }: WhatNeedsYouProps) {
       listed.splice(Math.min(row.at ?? listed.length, listed.length), 0, row.item);
     }
   }
-  const shown: Row[] = listed.flatMap((item) => {
+  const shown: Entry[] = listed.flatMap((item): Entry[] => {
     const hidden = gone.get(goneKey(item));
     if (hidden !== undefined) {
       return hidden.confirmation === undefined ? [] : [hidden];
+    }
+    if (item.record.type === TASK) {
+      const task = taskById.get(item.record.id);
+      if (task?.state !== "open") {
+        return [];
+      }
+      const origin = task.source?.type === CONVERSATION ? byId.get(task.source.id) : undefined;
+      return [{ item, task, conversation: origin }];
     }
     const conversation = byId.get(item.record.id);
     const need = conversation?.need;
@@ -287,6 +331,8 @@ export function WhatNeedsYou({ workspaceId, now, offer }: WhatNeedsYouProps) {
   const [highlight, setHighlight] = useState<string | undefined>();
   // Snooze's dialog, or Remind's (the same times, a bill's due date first).
   const [snoozing, setSnoozing] = useState<{ row: Row; remind: boolean } | undefined>();
+  // A task's Later dialog (S on a task).
+  const [laterFor, setLaterFor] = useState<TaskEntry | undefined>();
   // Forward's dialog: whom to send it to.
   const [forwarding, setForwarding] = useState<Row | undefined>();
   // Open attachment: the opened item whose first file takes the focus.
@@ -357,7 +403,7 @@ export function WhatNeedsYou({ workspaceId, now, offer }: WhatNeedsYouProps) {
     setHighlight(undefined);
   };
 
-  const hide = (row: Row, confirmation?: string) => {
+  const hide = (row: Entry, confirmation?: string) => {
     keepFocus();
     const at = openItems.findIndex((item) => goneKey(item) === goneKey(row.item));
     setGone((current) => new Map([...current, [goneKey(row.item), { ...row, confirmation, at }]]));
@@ -373,7 +419,7 @@ export function WhatNeedsYou({ workspaceId, now, offer }: WhatNeedsYouProps) {
     setHighlight(undefined);
   };
   // The confirmation has folded away: the row is simply hidden now.
-  const folded = (row: Row) => {
+  const folded = (row: Entry) => {
     setGone((current) => {
       const hidden = current.get(goneKey(row.item));
       return hidden?.confirmation === undefined
@@ -381,14 +427,21 @@ export function WhatNeedsYou({ workspaceId, now, offer }: WhatNeedsYouProps) {
         : new Map([...current, [goneKey(row.item), { ...hidden, confirmation: undefined }]]);
     });
   };
-  const show = (row: Row) => {
+  const show = (row: Entry) => {
     setGone((current) => new Map([...current].filter(([key]) => key !== goneKey(row.item))));
     select(row.item.id);
   };
   // A hidden row is found among the hidden ones: its summary may already say
   // it needs nothing.
   const rowOf = (conversation: ConversationSummary) =>
-    [...rows, ...gone.values()].find((row) => row.conversation.id === conversation.id);
+    [...rows, ...gone.values()].find(
+      (row): row is Row => !isTask(row) && row.conversation.id === conversation.id,
+    );
+  // A task's entry, hidden or shown, when its change is undone or fails.
+  const entryOfTask = (task: TaskView) =>
+    [...rows, ...gone.values()].find(
+      (entry): entry is TaskEntry => isTask(entry) && entry.task.id === task.id,
+    );
   // A row of Waiting on others, hidden or shown again with its verdict.
   const showWait = (conversation: ConversationSummary, shown: boolean) => {
     const key = waitKey(conversation);
@@ -441,6 +494,29 @@ export function WhatNeedsYou({ workspaceId, now, offer }: WhatNeedsYouProps) {
     },
   });
 
+  // Tasks (campbooks-cloud#43): the tasks module does the work and keeps the Undo.
+  const taskActions = useTaskActions(workspaceId, {
+    now,
+    onUndo: (task) => {
+      const entry = entryOfTask(task);
+      if (entry !== undefined) {
+        show(entry);
+      }
+    },
+    onRedo: (task) => {
+      const entry = entryOfTask(task);
+      if (entry !== undefined) {
+        hide(entry);
+      }
+    },
+    onFailed: (task) => {
+      const entry = entryOfTask(task);
+      if (entry !== undefined) {
+        show(entry);
+      }
+    },
+  });
+
   const when = (until: Date) =>
     new Intl.DateTimeFormat(i18n.language, {
       weekday: "short",
@@ -448,11 +524,30 @@ export function WhatNeedsYou({ workspaceId, now, offer }: WhatNeedsYouProps) {
       minute: "2-digit",
     }).format(until);
 
-  const done = (row: Row) => {
+  const doneTask = (entry: TaskEntry) => {
+    const { task } = entry;
+    hide(entry, tt(task.verb === "pay" ? "toast.paid" : "toast.done", { title: task.title }));
+    taskActions.done(task);
+  };
+  const notNeededTask = (entry: TaskEntry) => {
+    hide(entry, tt("toast.notNeeded", { title: entry.task.title }));
+    taskActions.notNeeded(entry.task);
+  };
+  const done = (entry: Entry) => {
+    if (isTask(entry)) {
+      doneTask(entry);
+      return;
+    }
+    const row = entry;
     hide(row, t(DONE_CONFIRMATION[kindOf(row.need)] ?? "confirm.done", { name: row.name }));
     needActions.done(row.conversation);
   };
-  const notNeeded = (row: Row) => {
+  const notNeeded = (entry: Entry) => {
+    if (isTask(entry)) {
+      notNeededTask(entry);
+      return;
+    }
+    const row = entry;
     hide(
       row,
       t(NOT_NEEDED_CONFIRMATION[kindOf(row.need)] ?? "confirm.notNeeded", { name: row.name }),
@@ -612,7 +707,7 @@ export function WhatNeedsYou({ workspaceId, now, offer }: WhatNeedsYouProps) {
    * it sent them (campbooks-cloud#166), else the fixed ones.
    */
   const actionsOf = (
-    row: Row,
+    entry: Entry,
   ): {
     own: ItemAction[];
     after: ItemAction[];
@@ -620,6 +715,25 @@ export function WhatNeedsYou({ workspaceId, now, offer }: WhatNeedsYouProps) {
     choices: OwnChoice[];
     picked: boolean;
   } => {
+    if (isTask(entry)) {
+      // A task has no questions: Done (Paid), Later, Not needed.
+      return {
+        own: [],
+        after: [],
+        universal: [
+          {
+            id: "done",
+            label: tt(entry.task.verb === "pay" ? "detail.paid" : "detail.done"),
+            key: UNIVERSAL_KEYS.done,
+          },
+          { id: "snooze", label: tt("detail.later"), key: UNIVERSAL_KEYS.snooze },
+          { id: "not_needed", label: tt("detail.notNeeded"), key: UNIVERSAL_KEYS.not_needed },
+        ],
+        choices: [],
+        picked: false,
+      };
+    }
+    const row = entry;
     const kind = kindOf(row.need);
     const all = rowChoices(kind, row.need.actions);
     // An inbox the member may only read: nothing that writes there (Reply,
@@ -703,10 +817,14 @@ export function WhatNeedsYou({ workspaceId, now, offer }: WhatNeedsYouProps) {
       picked: all.picked && own.length > 0,
     };
   };
-  const startSnooze = (row: Row, remind = false) => {
+  const startSnooze = (entry: Entry, remind = false) => {
     keepFocus();
     setHighlight(undefined);
-    setSnoozing({ row, remind });
+    if (isTask(entry)) {
+      setLaterFor(entry);
+      return;
+    }
+    setSnoozing({ row: entry, remind });
   };
   // Open attachment: the item opens on the email, its first file focused
   // (Enter previews or saves it, as in the reader). Before a dialog of the
@@ -784,7 +902,27 @@ export function WhatNeedsYou({ workspaceId, now, offer }: WhatNeedsYouProps) {
    * An action of the row: one of its own (a pair runs both, in order, with
    * at most one dialog) or a universal one.
    */
-  const run = (row: Row, id: string) => {
+  const run = (entry: Entry, id: string) => {
+    if (isTask(entry)) {
+      switch (id) {
+        case "done": {
+          doneTask(entry);
+          return;
+        }
+        case "snooze": {
+          startSnooze(entry);
+          return;
+        }
+        case "not_needed": {
+          notNeededTask(entry);
+          return;
+        }
+        default: {
+          return;
+        }
+      }
+    }
+    const row = entry;
     if (id === SCOUT) {
       continueWithScout(row);
       return;
@@ -956,7 +1094,7 @@ export function WhatNeedsYou({ workspaceId, now, offer }: WhatNeedsYouProps) {
     { enabled: offered("not_needed") || offered("no") || offered("safe") },
   );
   // Shift+E: every bill the Pay group asks about is already paid.
-  const askedBills = order.filter((row) => kindOf(row.need) === "bill");
+  const askedBills = order.filter((row): row is Row => !isTask(row) && kindOf(row.need) === "bill");
   useShortcut(
     "item.all_paid",
     () => {
@@ -967,7 +1105,7 @@ export function WhatNeedsYou({ workspaceId, now, offer }: WhatNeedsYouProps) {
   useShortcut(
     "item.reply",
     () => {
-      if (selected !== undefined) {
+      if (selected !== undefined && !isTask(selected)) {
         reply(selected);
       }
     },
@@ -976,7 +1114,7 @@ export function WhatNeedsYou({ workspaceId, now, offer }: WhatNeedsYouProps) {
   useShortcut(
     SCOUT_KEY,
     () => {
-      if (selected !== undefined) {
+      if (selected !== undefined && !isTask(selected)) {
         continueWithScout(selected);
       }
     },
@@ -989,7 +1127,10 @@ export function WhatNeedsYou({ workspaceId, now, offer }: WhatNeedsYouProps) {
     day: "numeric",
     month: "long",
   }).format(today);
-  const loading = open.isPending || (ids.length > 0 && conversations.isPending);
+  const loading =
+    open.isPending ||
+    (ids.length > 0 && conversations.isPending) ||
+    (taskIds.length > 0 && tasks.isPending);
   // "Worth a look" asks nothing of the member: it has its own group and
   // count, and stays out of "N things need you" (campbooks-cloud#282).
   const count = order.filter((row) => row.item.reason !== "worth_a_look").length;
@@ -1087,6 +1228,52 @@ export function WhatNeedsYou({ workspaceId, now, offer }: WhatNeedsYouProps) {
     </>
   );
 
+  // A task as a row: where it came from, its title, its date; the row opens it in Tasks.
+  const renderTask = (entry: TaskEntry) => {
+    const { task, conversation } = entry;
+    const isSelected = entry.item.id === selected?.item.id;
+    const actions = isSelected ? actionsOf(entry) : undefined;
+    const due = dueText(task, tt, i18n.language, today);
+    const plan = planText(task, tt, i18n.language, today);
+    const from = conversation === undefined ? undefined : displayName(conversation.latest_from);
+    const dueLine = [due?.text, plan].filter((part) => part !== undefined).join(" · ");
+    return (
+      <Item
+        key={entry.item.id}
+        id={itemId(entry.item.id)}
+        who={from === undefined ? tt("row.own") : tt("row.fromEmail", { name: from })}
+        what={task.title}
+        avatar={{ name: from ?? task.title, kind: task.verb === "pay" ? "service" : "person" }}
+        due={dueLine === "" ? undefined : dueLine}
+        soon={due?.late === true}
+        selected={isSelected}
+        confirmation={entry.confirmation}
+        onConfirmEnd={() => {
+          folded(entry);
+        }}
+        onToggle={() => {
+          select(entry.item.id);
+          void navigate({ to: `/w/${workspaceId}/tasks/${task.id}` });
+        }}
+        actions={
+          actions === undefined ? undefined : (
+            <ItemActions
+              label={t("actions.label", { name: task.title })}
+              own={actions.own}
+              after={actions.after}
+              universal={actions.universal}
+              highlighted={highlight}
+              onHighlight={setHighlight}
+              onAction={(id) => {
+                run(entry, id);
+              }}
+            />
+          )
+        }
+      />
+    );
+  };
+
   if (open.isError) {
     return (
       <HomeLayout asideLabel={t("context")} aside={aside}>
@@ -1125,8 +1312,13 @@ export function WhatNeedsYou({ workspaceId, now, offer }: WhatNeedsYouProps) {
       <div ref={list} className="flex flex-col">
         {groups.map((group, position) => {
           const live = group.rows.filter((row) => row.confirmation === undefined);
-          const bills = live.filter((row) => kindOf(row.need) === "bill");
+          const bills = live.filter(
+            (row): row is Row => !isTask(row) && kindOf(row.need) === "bill",
+          );
           const items = group.rows.map((row) => {
+            if (isTask(row)) {
+              return renderTask(row);
+            }
             const due = rowEnd(row);
             const expanded = expandedId === row.item.id;
             const isSelected = row.item.id === selected?.item.id;
@@ -1273,6 +1465,32 @@ export function WhatNeedsYou({ workspaceId, now, offer }: WhatNeedsYouProps) {
             setSnoozing(undefined);
             if (row !== undefined && option !== undefined) {
               snoozeUntil(row, option.until);
+            }
+          }}
+        />
+      </Dialog>
+      <Dialog
+        open={laterFor !== undefined}
+        onClose={() => {
+          setLaterFor(undefined);
+        }}
+        title={tt("laterDialog.title")}
+        description={tt("laterDialog.description")}
+      >
+        <DialogChoices
+          label={tt("laterDialog.choices")}
+          choices={times.map((option) => ({
+            id: option.key,
+            label: t(`snooze.${option.key}`),
+            detail: when(option.until),
+          }))}
+          onChoose={(key) => {
+            const entry = laterFor;
+            const option = times.find((o) => o.key === key);
+            setLaterFor(undefined);
+            if (entry !== undefined && option !== undefined) {
+              hide(entry, tt("toast.later", { title: entry.task.title, when: when(option.until) }));
+              taskActions.later(entry.task, option.until);
             }
           }}
         />

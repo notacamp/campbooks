@@ -10953,6 +10953,1292 @@
         }
       }
     },
+    "/api/v1/w/{workspace_id}/tasks": {
+      "get": {
+        "tags": [
+          "tasks"
+        ],
+        "summary": "List your tasks.",
+        "operationId": "tasks.list",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "description": "The workspace.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId"
+            }
+          },
+          {
+            "name": "state",
+            "in": "query",
+            "description": "`open` (the default), `done` or `not_needed`. Ignored when `ids`\nnames the tasks, unless given.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "description": "Whether it still needs doing.",
+              "enum": [
+                "open",
+                "done",
+                "not_needed"
+              ]
+            }
+          },
+          {
+            "name": "due_from",
+            "in": "query",
+            "description": "Due on or after this day.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "name": "due_to",
+            "in": "query",
+            "description": "Due on or before this day.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "name": "overdue",
+            "in": "query",
+            "description": "Only open tasks whose due day has passed.",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "undated",
+            "in": "query",
+            "description": "Only tasks with no due day.",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "source_type",
+            "in": "query",
+            "description": "Only tasks from this record type (with `source_id`).",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "source_id",
+            "in": "query",
+            "description": "Only tasks from this record.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "whose",
+            "in": "query",
+            "description": "`mine` (default) or `handed_off`.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "description": "Whose tasks.",
+              "enum": [
+                "mine",
+                "handed_off"
+              ]
+            }
+          },
+          {
+            "name": "ids",
+            "in": "query",
+            "description": "1 to 100 task ids, separated by commas: Home's batch read. Tasks the\ncaller cannot see are left out.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "utc_offset",
+            "in": "query",
+            "description": "The caller's offset from UTC, in minutes (-840 to 840; default 0):\nwhere their day starts, for what is overdue.",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The caller's tasks.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskList"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Ids that are not 1 to 100 task ids (`invalid_ids`), or an offset beyond 14 hours (`invalid_offset`).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid access token.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing scope.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such workspace, or you cannot see it.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [
+              "tasks:read"
+            ]
+          }
+        ],
+        "x-campbooks": {
+          "access": {
+            "action": "read",
+            "resource": "tasks.task"
+          },
+          "assistant": true,
+          "automation": false,
+          "mutates": false,
+          "records": [
+            "tasks.task"
+          ],
+          "risk": "low"
+        }
+      },
+      "post": {
+        "tags": [
+          "tasks"
+        ],
+        "summary": "Make a task.",
+        "operationId": "tasks.create",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "description": "The workspace.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId"
+            }
+          },
+          {
+            "name": "utc_offset",
+            "in": "query",
+            "description": "The caller's offset from UTC, in minutes (-840 to 840; default 0):\nwhere their day starts, for what is overdue.",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NewTask"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "The task.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskView"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "A blank or too long title (`invalid_title`), a due time without a day, or a bad sender address.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid access token.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing scope.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such workspace, or a source you cannot see.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [
+              "tasks:write"
+            ]
+          }
+        ],
+        "x-campbooks": {
+          "access": {
+            "action": "create",
+            "resource": "tasks.task"
+          },
+          "assistant": true,
+          "automation": true,
+          "mutates": true,
+          "records": [
+            "tasks.task"
+          ],
+          "risk": "low",
+          "undo": "tasks.not_needed"
+        }
+      }
+    },
+    "/api/v1/w/{workspace_id}/tasks/{task_id}": {
+      "get": {
+        "tags": [
+          "tasks"
+        ],
+        "summary": "Read a task.",
+        "operationId": "tasks.get",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "description": "The workspace.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId"
+            }
+          },
+          {
+            "name": "task_id",
+            "in": "path",
+            "description": "The task.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/TaskId"
+            }
+          },
+          {
+            "name": "utc_offset",
+            "in": "query",
+            "description": "The caller's offset from UTC, in minutes (-840 to 840; default 0):\nwhere their day starts, for what is overdue.",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The task and its history.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskDetail"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid access token.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing scope.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such task, or you cannot see it.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [
+              "tasks:read"
+            ]
+          }
+        ],
+        "x-campbooks": {
+          "access": {
+            "action": "read",
+            "resource": "tasks.task"
+          },
+          "assistant": true,
+          "automation": false,
+          "mutates": false,
+          "records": [
+            "tasks.task"
+          ],
+          "risk": "low"
+        }
+      },
+      "patch": {
+        "tags": [
+          "tasks"
+        ],
+        "summary": "Change a task's title, verb or due date.",
+        "operationId": "tasks.update",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "description": "The workspace.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId"
+            }
+          },
+          {
+            "name": "task_id",
+            "in": "path",
+            "description": "The task.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/TaskId"
+            }
+          },
+          {
+            "name": "utc_offset",
+            "in": "query",
+            "description": "The caller's offset from UTC, in minutes (-840 to 840; default 0):\nwhere their day starts, for what is overdue.",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TaskUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "The task afterwards.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskView"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "A blank or too long title (`invalid_title`), or a due time without a day.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid access token.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing scope, or the task is with someone else now (`task_not_yours`).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such task, or you cannot see it.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The task changed since you saw it (`task_changed`), or it is closed (`task_closed`).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [
+              "tasks:write"
+            ]
+          }
+        ],
+        "x-campbooks": {
+          "access": {
+            "action": "write",
+            "resource": "tasks.task"
+          },
+          "assistant": true,
+          "automation": true,
+          "mutates": true,
+          "records": [
+            "tasks.task"
+          ],
+          "risk": "low"
+        }
+      }
+    },
+    "/api/v1/w/{workspace_id}/tasks/{task_id}/done": {
+      "post": {
+        "tags": [
+          "tasks"
+        ],
+        "summary": "Mark a task done (paid, for a bill).",
+        "operationId": "tasks.done",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "description": "The workspace.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId"
+            }
+          },
+          {
+            "name": "task_id",
+            "in": "path",
+            "description": "The task.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/TaskId"
+            }
+          },
+          {
+            "name": "utc_offset",
+            "in": "query",
+            "description": "The caller's offset from UTC, in minutes (-840 to 840; default 0):\nwhere their day starts, for what is overdue.",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TaskRevision"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "The task afterwards.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskView"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid access token.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing scope, or the task is with someone else now (`task_not_yours`).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such task, or you cannot see it.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The task changed since you saw it (`task_changed`), or it is closed (`task_closed`).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [
+              "tasks:write"
+            ]
+          }
+        ],
+        "x-campbooks": {
+          "access": {
+            "action": "write",
+            "resource": "tasks.task"
+          },
+          "assistant": true,
+          "automation": true,
+          "mutates": true,
+          "records": [
+            "tasks.task"
+          ],
+          "risk": "low",
+          "undo": "tasks.reopen"
+        }
+      }
+    },
+    "/api/v1/w/{workspace_id}/tasks/{task_id}/hand_off": {
+      "post": {
+        "tags": [
+          "tasks"
+        ],
+        "summary": "Hand an open task to a teammate.",
+        "operationId": "tasks.hand_off",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "description": "The workspace.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId"
+            }
+          },
+          {
+            "name": "task_id",
+            "in": "path",
+            "description": "The task.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/TaskId"
+            }
+          },
+          {
+            "name": "utc_offset",
+            "in": "query",
+            "description": "The caller's offset from UTC, in minutes (-840 to 840; default 0):\nwhere their day starts, for what is overdue.",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/HandOffTo"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "The task afterwards.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskView"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Not a member of the workspace (`not_a_member`), or yourself (`hand_off_yourself`).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid access token.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing scope, or the task is with someone else now (`task_not_yours`).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such task, or you cannot see it.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The task changed since you saw it (`task_changed`), or it is closed (`task_closed`).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [
+              "tasks:write"
+            ]
+          }
+        ],
+        "x-campbooks": {
+          "access": {
+            "action": "write",
+            "resource": "tasks.task"
+          },
+          "assistant": true,
+          "automation": true,
+          "mutates": true,
+          "records": [
+            "tasks.task"
+          ],
+          "risk": "low",
+          "undo": "tasks.take_back"
+        }
+      }
+    },
+    "/api/v1/w/{workspace_id}/tasks/{task_id}/not_needed": {
+      "post": {
+        "tags": [
+          "tasks"
+        ],
+        "summary": "Mark a task not needed.",
+        "operationId": "tasks.not_needed",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "description": "The workspace.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId"
+            }
+          },
+          {
+            "name": "task_id",
+            "in": "path",
+            "description": "The task.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/TaskId"
+            }
+          },
+          {
+            "name": "utc_offset",
+            "in": "query",
+            "description": "The caller's offset from UTC, in minutes (-840 to 840; default 0):\nwhere their day starts, for what is overdue.",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TaskRevision"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "The task afterwards.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskView"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid access token.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing scope, or the task is with someone else now (`task_not_yours`).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such task, or you cannot see it.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The task changed since you saw it (`task_changed`), or it is closed (`task_closed`).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [
+              "tasks:write"
+            ]
+          }
+        ],
+        "x-campbooks": {
+          "access": {
+            "action": "write",
+            "resource": "tasks.task"
+          },
+          "assistant": true,
+          "automation": true,
+          "mutates": true,
+          "records": [
+            "tasks.task"
+          ],
+          "risk": "low",
+          "undo": "tasks.reopen"
+        }
+      }
+    },
+    "/api/v1/w/{workspace_id}/tasks/{task_id}/plan": {
+      "post": {
+        "tags": [
+          "tasks"
+        ],
+        "summary": "Plan a task: a day, Later, or nothing.",
+        "operationId": "tasks.plan",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "description": "The workspace.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId"
+            }
+          },
+          {
+            "name": "task_id",
+            "in": "path",
+            "description": "The task.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/TaskId"
+            }
+          },
+          {
+            "name": "utc_offset",
+            "in": "query",
+            "description": "The caller's offset from UTC, in minutes (-840 to 840; default 0):\nwhere their day starts, for what is overdue.",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PlanTask"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "The task afterwards.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskView"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "A `date` plan without a day (`plan_needs_day`), or a `later` time in the past or over a year away (`invalid_later`).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid access token.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing scope, or the task is with someone else now (`task_not_yours`).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such task, or you cannot see it.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The task changed since you saw it (`task_changed`), or it is closed (`task_closed`).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [
+              "tasks:write"
+            ]
+          }
+        ],
+        "x-campbooks": {
+          "access": {
+            "action": "write",
+            "resource": "tasks.task"
+          },
+          "assistant": true,
+          "automation": true,
+          "mutates": true,
+          "records": [
+            "tasks.task"
+          ],
+          "risk": "low"
+        }
+      }
+    },
+    "/api/v1/w/{workspace_id}/tasks/{task_id}/reopen": {
+      "post": {
+        "tags": [
+          "tasks"
+        ],
+        "summary": "Open a closed task again, with its plan.",
+        "operationId": "tasks.reopen",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "description": "The workspace.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId"
+            }
+          },
+          {
+            "name": "task_id",
+            "in": "path",
+            "description": "The task.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/TaskId"
+            }
+          },
+          {
+            "name": "utc_offset",
+            "in": "query",
+            "description": "The caller's offset from UTC, in minutes (-840 to 840; default 0):\nwhere their day starts, for what is overdue.",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TaskRevision"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "The task afterwards.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskView"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid access token.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing scope, or the task is with someone else now (`task_not_yours`).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such task, or you cannot see it.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The task changed since you saw it (`task_changed`), or it is still open (`task_open`).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [
+              "tasks:write"
+            ]
+          }
+        ],
+        "x-campbooks": {
+          "access": {
+            "action": "write",
+            "resource": "tasks.task"
+          },
+          "assistant": true,
+          "automation": true,
+          "mutates": true,
+          "records": [
+            "tasks.task"
+          ],
+          "risk": "low"
+        }
+      }
+    },
+    "/api/v1/w/{workspace_id}/tasks/{task_id}/take_back": {
+      "post": {
+        "tags": [
+          "tasks"
+        ],
+        "summary": "Take back a task you handed to someone, while it is open.",
+        "operationId": "tasks.take_back",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "description": "The workspace.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId"
+            }
+          },
+          {
+            "name": "task_id",
+            "in": "path",
+            "description": "The task.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/TaskId"
+            }
+          },
+          {
+            "name": "utc_offset",
+            "in": "query",
+            "description": "The caller's offset from UTC, in minutes (-840 to 840; default 0):\nwhere their day starts, for what is overdue.",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TaskRevision"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "The task afterwards.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskView"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid access token.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing scope, or you did not hand it off (`task_not_yours`).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such task, or you cannot see it.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The task changed since you saw it (`task_changed`), it is closed (`task_closed`) or was not handed to anyone (`not_handed_off`).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [
+              "tasks:write"
+            ]
+          }
+        ],
+        "x-campbooks": {
+          "access": {
+            "action": "share",
+            "resource": "tasks.task"
+          },
+          "assistant": true,
+          "automation": true,
+          "mutates": true,
+          "records": [
+            "tasks.task"
+          ],
+          "risk": "low"
+        }
+      }
+    },
     "/api/v1/workspaces": {
       "get": {
         "tags": [
@@ -14509,7 +15795,9 @@
           "conversation_history",
           "find_people",
           "what_needs_me",
-          "my_inboxes"
+          "my_inboxes",
+          "my_tasks",
+          "read_task"
         ]
       },
       "ChatView": {
@@ -16426,6 +17714,26 @@
           }
         }
       },
+      "HandOffTo": {
+        "type": "object",
+        "description": "Who to hand it to.",
+        "required": [
+          "revision",
+          "to"
+        ],
+        "properties": {
+          "revision": {
+            "type": "integer",
+            "format": "int64",
+            "description": "The revision you saw."
+          },
+          "to": {
+            "$ref": "#/components/schemas/UserId",
+            "description": "A member of the workspace."
+          }
+        },
+        "additionalProperties": false
+      },
       "HeaderCondition": {
         "type": "object",
         "description": "A header test: present, or equal to a value.",
@@ -16926,6 +18234,11 @@
           }
         ],
         "description": "One thing that happened, by kind."
+      },
+      "HistoryId": {
+        "type": "string",
+        "format": "uuid",
+        "description": "HistoryId (UUIDv7)"
       },
       "Hit": {
         "type": "object",
@@ -18052,6 +19365,65 @@
           "proposed"
         ]
       },
+      "NewTask": {
+        "type": "object",
+        "description": "A new task.",
+        "required": [
+          "title"
+        ],
+        "properties": {
+          "due_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "The time it is due; needs `due_on`, its local day."
+          },
+          "due_on": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date",
+            "description": "The day it is due."
+          },
+          "source": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/RecordRef",
+                "description": "The record it comes from (a conversation the caller can read)."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "source_sender": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The address of the source's sender, kept to recognise the same\nsender's other tasks."
+          },
+          "title": {
+            "type": "string",
+            "description": "What to do: 1 to 200 characters."
+          },
+          "verb": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/TaskVerb",
+                "description": "Do (the default) or Pay."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "additionalProperties": false
+      },
       "NoSuggestion": {
         "type": "string",
         "description": "Why there is nothing to offer.",
@@ -18316,6 +19688,42 @@
           "incremental",
           "resync"
         ]
+      },
+      "PlanTask": {
+        "type": "object",
+        "description": "The plan the task should have.",
+        "required": [
+          "revision",
+          "plan"
+        ],
+        "properties": {
+          "later_until": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "Later than now and less than a year away, for `later`."
+          },
+          "plan": {
+            "$ref": "#/components/schemas/TaskPlan",
+            "description": "`none`, `date` or `later`."
+          },
+          "plan_on": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date",
+            "description": "The day, for `date`."
+          },
+          "revision": {
+            "type": "integer",
+            "format": "int64",
+            "description": "The revision you saw."
+          }
+        },
+        "additionalProperties": false
       },
       "PreviewRule": {
         "type": "object",
@@ -21423,6 +22831,409 @@
           }
         }
       },
+      "TaskActor": {
+        "type": "string",
+        "description": "Who made a change.",
+        "enum": [
+          "member",
+          "scout",
+          "calendar"
+        ]
+      },
+      "TaskChange": {
+        "type": "string",
+        "description": "What changed: the event's `change` and the history's `what`.",
+        "enum": [
+          "created",
+          "edited",
+          "due_changed",
+          "planned",
+          "done",
+          "not_needed",
+          "reopened",
+          "handed_off",
+          "taken_back"
+        ]
+      },
+      "TaskDetail": {
+        "type": "object",
+        "description": "A task and its history.",
+        "required": [
+          "task",
+          "history"
+        ],
+        "properties": {
+          "history": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TaskHistoryEntry"
+            },
+            "description": "What changed in it, oldest first."
+          },
+          "task": {
+            "$ref": "#/components/schemas/TaskView",
+            "description": "The task."
+          }
+        }
+      },
+      "TaskEditedField": {
+        "type": "string",
+        "description": "A field `tasks.update` changed.",
+        "enum": [
+          "title",
+          "task_verb",
+          "due"
+        ]
+      },
+      "TaskHistoryDetail": {
+        "type": "object",
+        "description": "What a history entry holds besides its kind: ids, enums and dates only,\nnever a title.",
+        "properties": {
+          "due_on": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date",
+            "description": "The due day afterwards."
+          },
+          "fields": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TaskEditedField"
+            },
+            "description": "The fields an edit changed."
+          },
+          "later_until": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "When Later ends."
+          },
+          "member": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/UserId",
+                "description": "The other member of a hand-off or a take-back."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "plan": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/TaskPlan",
+                "description": "The plan afterwards."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "plan_on": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date",
+            "description": "The planned day."
+          }
+        }
+      },
+      "TaskHistoryEntry": {
+        "type": "object",
+        "description": "One entry of a task's history.",
+        "required": [
+          "id",
+          "at",
+          "actor",
+          "what",
+          "detail"
+        ],
+        "properties": {
+          "actor": {
+            "$ref": "#/components/schemas/TaskActor",
+            "description": "Who: the member, Scout or the calendar."
+          },
+          "actor_member": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/UserId",
+                "description": "The member Scout or the calendar acted for, or who acted."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When."
+          },
+          "detail": {
+            "$ref": "#/components/schemas/TaskHistoryDetail",
+            "description": "Ids, enums and dates of the change."
+          },
+          "id": {
+            "$ref": "#/components/schemas/HistoryId",
+            "description": "The entry."
+          },
+          "what": {
+            "$ref": "#/components/schemas/TaskChange",
+            "description": "What changed."
+          }
+        }
+      },
+      "TaskId": {
+        "type": "string",
+        "format": "uuid",
+        "description": "TaskId (UUIDv7)"
+      },
+      "TaskList": {
+        "type": "object",
+        "description": "The caller's tasks.",
+        "required": [
+          "tasks"
+        ],
+        "properties": {
+          "tasks": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TaskView"
+            },
+            "description": "In order: overdue first, then by due date and time, then undated."
+          }
+        }
+      },
+      "TaskOrigin": {
+        "type": "string",
+        "description": "How the task came to be.",
+        "enum": [
+          "own",
+          "ask",
+          "deadline"
+        ]
+      },
+      "TaskPlan": {
+        "type": "string",
+        "description": "When the member will do it.",
+        "enum": [
+          "none",
+          "date",
+          "later"
+        ]
+      },
+      "TaskRevision": {
+        "type": "object",
+        "description": "The revision of a task the caller saw, for a change that needs nothing\nelse.",
+        "required": [
+          "revision"
+        ],
+        "properties": {
+          "revision": {
+            "type": "integer",
+            "format": "int64",
+            "description": "The revision you saw."
+          }
+        },
+        "additionalProperties": false
+      },
+      "TaskState": {
+        "type": "string",
+        "description": "Whether it still needs doing.",
+        "enum": [
+          "open",
+          "done",
+          "not_needed"
+        ]
+      },
+      "TaskUpdate": {
+        "type": "object",
+        "description": "The task as it should become.",
+        "required": [
+          "revision",
+          "title",
+          "verb"
+        ],
+        "properties": {
+          "due_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "The time it is due; needs `due_on`."
+          },
+          "due_on": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date",
+            "description": "The day it is due; none clears it."
+          },
+          "revision": {
+            "type": "integer",
+            "format": "int64",
+            "description": "The revision you saw."
+          },
+          "title": {
+            "type": "string",
+            "description": "What to do: 1 to 200 characters."
+          },
+          "verb": {
+            "$ref": "#/components/schemas/TaskVerb",
+            "description": "Do or Pay."
+          }
+        },
+        "additionalProperties": false
+      },
+      "TaskVerb": {
+        "type": "string",
+        "description": "What kind of thing it is: something to do, or a bill to pay.",
+        "enum": [
+          "do",
+          "pay"
+        ]
+      },
+      "TaskView": {
+        "type": "object",
+        "description": "A task, as the caller sees it.",
+        "required": [
+          "id",
+          "title",
+          "verb",
+          "origin",
+          "overdue",
+          "plan",
+          "state",
+          "assignee",
+          "created_by",
+          "revision",
+          "created_at",
+          "updated_at"
+        ],
+        "properties": {
+          "assignee": {
+            "$ref": "#/components/schemas/UserId",
+            "description": "The member it is with."
+          },
+          "closed_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "When it was closed."
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When it was made."
+          },
+          "created_by": {
+            "$ref": "#/components/schemas/UserId",
+            "description": "The member who made it."
+          },
+          "due_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "The time it is due, when it has one (`due_on` is its local day)."
+          },
+          "due_on": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date",
+            "description": "The day it is due."
+          },
+          "handed_by": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/UserId",
+                "description": "The member who handed it to the assignee, while it is handed off."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "id": {
+            "$ref": "#/components/schemas/TaskId",
+            "description": "The task."
+          },
+          "later_until": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "When Later ends, for `later`."
+          },
+          "origin": {
+            "$ref": "#/components/schemas/TaskOrigin",
+            "description": "How it came to be."
+          },
+          "overdue": {
+            "type": "boolean",
+            "description": "Whether it is open and its due day has passed (the caller's today)."
+          },
+          "plan": {
+            "$ref": "#/components/schemas/TaskPlan",
+            "description": "The plan. A Later that has ended reads as `none`."
+          },
+          "plan_on": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date",
+            "description": "The planned day, for `date`."
+          },
+          "revision": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Grows with every change: send the one you saw with a change."
+          },
+          "source": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/RecordRef",
+                "description": "The record it came from, when it came from one."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "state": {
+            "$ref": "#/components/schemas/TaskState",
+            "description": "Open, done or not needed."
+          },
+          "title": {
+            "type": "string",
+            "description": "What to do, in the member's words."
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When it last changed."
+          },
+          "verb": {
+            "$ref": "#/components/schemas/TaskVerb",
+            "description": "Do or Pay."
+          }
+        }
+      },
       "TeachingId": {
         "type": "string",
         "format": "uuid",
@@ -22049,7 +23860,7 @@
         "type": "http",
         "scheme": "bearer",
         "bearerFormat": "JWT",
-        "description": "An OAuth 2.1 access token (a JWT) issued by this instance's identity provider, the issuer configured as `CAMPBOOKS_AUTH__ISSUER`. Each operation lists the scope it requires; operations with an empty requirement are public. Scopes:\n\n- `admin:access`: Reach the instance administration API, if your account has an admin profile. Granted to Campbooks' own apps only.\n- `assistant:read`: See what you told Scout about how it should act.\n- `assistant:write`: Tell Scout how it should act, and turn your sentences into rules to check.\n- `attention:read`: See what needs you: the items on your Home.\n- `attention:write`: Put items on your Home off until later, and bring them back.\n- `connectors:read`: See the outside accounts connected to your workspaces and how their sync is doing.\n- `connectors:write`: Connect outside accounts (such as Gmail), sync them now and disconnect them.\n- `conversations:read`: Read your inboxes, conversations and messages.\n- `conversations:send`: Write drafts and send messages, replies and forwards from your inboxes.\n- `conversations:write`: Mark conversations read or unread, star, archive, label and move them between streams.\n- `identity:clients`: Register, rotate and remove a workspace's own apps and their secrets.\n- `identity:read`: See your account, its ways in and the mailboxes waiting to be connected.\n- `identity:write`: Change your account and connect or discard the mailboxes waiting on it.\n- `search:read`: Search the records you may read (conversations need conversations:read too).\n- `system:read`: Read operational status, and report the app's own errors and timings.\n- `workspaces:admin`: Manage workspaces you own or administer: settings, members, invitations, deletion and the security log.\n- `workspaces:read`: See your workspaces and who belongs to them.\n- `workspaces:write`: Create workspaces, accept invitations and leave workspaces."
+        "description": "An OAuth 2.1 access token (a JWT) issued by this instance's identity provider, the issuer configured as `CAMPBOOKS_AUTH__ISSUER`. Each operation lists the scope it requires; operations with an empty requirement are public. Scopes:\n\n- `admin:access`: Reach the instance administration API, if your account has an admin profile. Granted to Campbooks' own apps only.\n- `assistant:read`: See what you told Scout about how it should act.\n- `assistant:write`: Tell Scout how it should act, and turn your sentences into rules to check.\n- `attention:read`: See what needs you: the items on your Home.\n- `attention:write`: Put items on your Home off until later, and bring them back.\n- `connectors:read`: See the outside accounts connected to your workspaces and how their sync is doing.\n- `connectors:write`: Connect outside accounts (such as Gmail), sync them now and disconnect them.\n- `conversations:read`: Read your inboxes, conversations and messages.\n- `conversations:send`: Write drafts and send messages, replies and forwards from your inboxes.\n- `conversations:write`: Mark conversations read or unread, star, archive, label and move them between streams.\n- `identity:clients`: Register, rotate and remove a workspace's own apps and their secrets.\n- `identity:read`: See your account, its ways in and the mailboxes waiting to be connected.\n- `identity:write`: Change your account and connect or discard the mailboxes waiting on it.\n- `search:read`: Search the records you may read (conversations need conversations:read too).\n- `system:read`: Read operational status, and report the app's own errors and timings.\n- `tasks:read`: See your tasks and the ones you handed to someone.\n- `tasks:write`: Add tasks, change them, mark them done and hand them to a teammate.\n- `workspaces:admin`: Manage workspaces you own or administer: settings, members, invitations, deletion and the security log.\n- `workspaces:read`: See your workspaces and who belongs to them.\n- `workspaces:write`: Create workspaces, accept invitations and leave workspaces."
       },
       "session": {
         "type": "apiKey",
@@ -22091,6 +23902,10 @@
     {
       "name": "assistant",
       "description": "What you told Scout about how to act, and turning a sentence you type into rules to check. Compiling uses the `complete` AI role only when you ask, and sends it your sentence and your own addresses and label names, never your mail; nothing is saved until you save a rule through the conversations module."
+    },
+    {
+      "name": "tasks",
+      "description": "What you have to do: your tasks, with a due date, a plan (a day, or Later), a hand-off to one teammate and an undo for every change. Personal: a task is seen by who it is with, and by who handed it off."
     },
     {
       "name": "changes",

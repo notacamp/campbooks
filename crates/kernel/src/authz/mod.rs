@@ -624,6 +624,25 @@ pub async fn authorize(
     Ok(decision)
 }
 
+/// The facts the owning module answers for `resource`, as `access` sees
+/// them: for a handler that needs more than the decision (the container a
+/// resource lives in). `None` when it does not exist, or its type is not
+/// catalogued.
+///
+/// # Errors
+/// When the owning module cannot answer (the database).
+pub async fn facts_of(
+    state: &AppState,
+    conn: &mut PgConnection,
+    access: &Access,
+    resource: &RecordRef,
+) -> Result<Option<Facts>, Error> {
+    let Some(port) = state.resources.facts_of(&resource.record_type) else {
+        return Ok(None);
+    };
+    port.facts(conn, access, resource).await
+}
+
 /// [`authorize`], as a `Result`: 404 when the caller may not see the
 /// resource, `forbidden()` when they may see it but not take the action.
 ///
