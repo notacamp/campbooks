@@ -543,6 +543,11 @@ impl World {
         chat
     }
 
+    /// What is `member`'s alone, in no inbox: a note about a person and a task.
+    async fn seed_personal(&self, member: UserId) -> (Uuid, Uuid) {
+        (self.seed_note(member).await, self.seed_task(member).await)
+    }
+
     /// Something Scout noticed in the inbox (campbooks-cloud#169).
     async fn seed_notice(&self, inbox: campbooks_conversations::model::InboxId) -> Uuid {
         let notice = Uuid::now_v7();
@@ -601,8 +606,7 @@ impl World {
         .unwrap();
         let rule = self.seed_rule(inbox, sender).await;
         let notice = self.seed_notice(inbox).await;
-        let note = self.seed_note(u(Who::Member)).await;
-        let task = self.seed_task(u(Who::Member)).await;
+        let (note, task) = self.seed_personal(u(Who::Member)).await;
         let chat = self.seed_chat(u(Who::Member)).await;
         let invitation = Uuid::now_v7();
         sqlx::query(
