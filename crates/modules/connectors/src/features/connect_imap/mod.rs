@@ -20,7 +20,7 @@ use campbooks_kernel::{
     authz::{self, Action},
     crypto,
     db::BeginFor as _,
-    tenancy::{Access, Workspace, WorkspaceId},
+    tenancy::{Access, UserId, Workspace, WorkspaceId},
 };
 use secrecy::{ExposeSecret as _, SecretString};
 use serde::Deserialize;
@@ -208,10 +208,38 @@ pub async fn execute(
     }
     guard.give_back(state).await?;
 
-    let servers = settings.servers;
-    let address_verified = username.eq_ignore_ascii_case(&address.address);
     let grant = ProviderGrant {
-        workspace: access.workspace,
+        extending: input.connection,
+        grantor_subject: Some(principal.subject.clone()),
+        ..mailbox_grant(
+            access.workspace,
+            user,
+            address,
+            username,
+            settings,
+            input.password,
+        )
+    };
+    let view = create_or_refresh_connection(state, deps, &grant).await?;
+    tracing::info!(workspace = %access.workspace, %user, connection = %view.id, "an IMAP mailbox was connected");
+    Ok(view)
+}
+
+/// The grant of `address`'s mailbox, whose servers accepted `username` and
+/// `password`: one `messages` stream, a password, never a way to sign in.
+fn mailbox_grant(
+    workspace: WorkspaceId,
+    user: UserId,
+    address: Address,
+    username: String,
+    settings: Settings,
+    password: SecretString,
+) -> ProviderGrant {
+    let servers = settings.servers;
+    // A login proves the username, not the address.
+    let address_verified = username.eq_ignore_ascii_case(&address.address);
+    ProviderGrant {
+        workspace,
         user,
         provider: Provider::Imap,
         account_subject: format!(
@@ -223,15 +251,15 @@ pub async fn execute(
         address_verified,
         display_name: None,
         capabilities: vec![Capability::Messages],
-        secret: Secret::Password(input.password),
+        secret: Secret::Password(password),
         imap: Some(ImapAccount {
             servers,
             username,
             source: settings.source,
             provider_hint: settings.provider_hint,
         }),
-        extending: input.connection,
-        grantor_subject: Some(principal.subject.clone()),
+        extending: None,
+        grantor_subject: None,
         provider_server: None,
         mailboxes: vec![Mailbox {
             key: String::new(),
@@ -239,10 +267,7 @@ pub async fn execute(
             address_verified,
             display_name: None,
         }],
-    };
-    let view = create_or_refresh_connection(state, deps, &grant).await?;
-    tracing::info!(workspace = %access.workspace, %user, connection = %view.id, "an IMAP mailbox was connected");
-    Ok(view)
+    }
 }
 
 /// The username given, trimmed; `None` when none was.
