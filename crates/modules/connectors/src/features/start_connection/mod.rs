@@ -82,8 +82,10 @@ pub struct StartedConnection {
         (status = NOT_FOUND, description = "No such workspace, or no such connection of yours.",
             body = Problem, content_type = "application/problem+json"),
         (status = CONFLICT, description = "The provider is not configured on this instance \
-            (`provider_not_configured`), or this instance has no front door for consents \
-            (`mailbox_unsupported`).", body = Problem, content_type = "application/problem+json"),
+            (`provider_not_configured`), this instance has no front door for consents \
+            (`mailbox_unsupported`), or the capability is switched off on it \
+            (`capability_not_offered`, Zoho Calendar).", body = Problem,
+            content_type = "application/problem+json"),
     )
 )]
 pub async fn handler(

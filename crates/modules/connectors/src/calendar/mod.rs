@@ -115,6 +115,10 @@ impl When {
 
 /// What Campbooks keeps on an event it created.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[allow(
+    clippy::struct_field_names,
+    reason = "the names are the keys Google stores, shared with every Campbooks client"
+)]
 pub struct Private {
     /// The Campbooks event (a UUID).
     #[serde(default, skip_serializing_if = "Option::is_none")]

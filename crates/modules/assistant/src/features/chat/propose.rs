@@ -632,6 +632,10 @@ fn object(properties: &Value, required: &[&str]) -> Value {
 }
 
 /// Every proposing tool's definition, for the model.
+#[allow(
+    clippy::too_many_lines,
+    reason = "one schema per proposing tool, read top to bottom"
+)]
 pub fn definitions() -> Vec<ToolDefinition> {
     let actions: Vec<&str> = ProposalAction::ALL.iter().map(|a| a.name()).collect();
     let task_actions: Vec<&str> = ProposalAction::TASKS
@@ -840,6 +844,10 @@ fn event_shape(action: ProposalAction, given: [bool; 8]) -> bool {
 /// `raw`'s arguments when they fit `tool`'s schema: only its properties,
 /// each of the right type and length, and for a change only the detail its
 /// action takes.
+#[allow(
+    clippy::too_many_lines,
+    reason = "one arm per proposing tool, read top to bottom"
+)]
 pub fn arguments(tool: Proposing, raw: &str) -> Option<Asked> {
     let raw = raw.trim();
     let object: Map<String, Value> = if raw.is_empty() {
@@ -2122,7 +2130,7 @@ fn event_changes(
     starts: Option<&str>,
     ends: Option<&str>,
     place: Option<&str>,
-) -> Result<(Map<String, Value>, Map<String, Value>), Refusal> {
+) -> Result<EventChanges, Refusal> {
     let mut now = Map::new();
     let mut before = Map::new();
     if let Some(title) = title.filter(|t| *t != seen.title) {
@@ -2237,7 +2245,14 @@ struct Teammate {
     email: Option<String>,
 }
 
+/// The fields an edit sets, and their values before.
+type EventChanges = (Map<String, Value>, Map<String, Value>);
+
 /// An event, as read for a proposal.
+#[allow(
+    clippy::struct_excessive_bools,
+    reason = "the flags are the event as the provider reports it"
+)]
 struct SeenEvent {
     id: String,
     title: String,

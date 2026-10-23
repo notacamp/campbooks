@@ -145,7 +145,9 @@ provider calendar only while the member has it on. A calendar turned on again
 SHALL be read from the start (its sync token is dropped); one turned off SHALL
 not be read. Which calendar of the provider the event is about SHALL travel in
 a `calendar-ref` v1 blob, since the provider's id can be an address and never
-travels in an event.
+travels in an event. Deliveries can arrive in any order and more than once:
+the newest event a calendar heard SHALL win, and an older or repeated one
+SHALL change nothing.
 
 #### Scenario: Turning a calendar on
 - **WHEN** Inês turns on her "Holidays" calendar
@@ -154,6 +156,10 @@ travels in an event.
 #### Scenario: Turning a calendar off
 - **WHEN** Inês turns it off again
 - **THEN** the stream stops reading it
+
+#### Scenario: Off and on, delivered out of order
+- **WHEN** Inês turns "Holidays" off and straight back on, and the "on" is delivered first
+- **THEN** the late "off" changes nothing, and the calendar is read from the start
 
 ### Requirement: A calendar stream says why it does not work
 A calendar stream that cannot work SHALL carry a stable reason a member or an

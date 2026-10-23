@@ -527,4 +527,36 @@ async fn turning_a_calendar_on_reads_it_again_from_the_start(db: PgPool) {
     assert_eq!(row.0, Some(schedule_calendar));
     assert!(row.1);
     assert_eq!(row.2.as_deref(), Some("t9"));
+
+    // Deliveries come in any order: one older than the last the calendar
+    // heard (here, every one) changes nothing.
+    sqlx::query(
+        "UPDATE connectors.calendars SET sync_changed_by = 'ffffffff-ffff-7fff-bfff-ffffffffffff'",
+    )
+    .execute(&kit.db)
+    .await
+    .unwrap();
+    let mut tx = kit.state.db.begin_for(ws).await.unwrap();
+    kit.state
+        .events
+        .publish(
+            &mut tx,
+            &crate::events::CalendarSyncChanged {
+                workspace: ws.to_string(),
+                calendar: schedule_calendar,
+                connection: ConnectionId::from_uuid(connection),
+                syncing: false,
+                provider_calendar: Some(reference.clone()),
+            },
+        )
+        .await
+        .unwrap();
+    tx.commit().await.unwrap();
+    kit.run_jobs().await;
+    let after: (bool, Option<String>) =
+        sqlx::query_as("SELECT syncing, sync_token FROM connectors.calendars")
+            .fetch_one(&kit.db)
+            .await
+            .unwrap();
+    assert_eq!(after, (true, Some("t9".to_owned())));
 }

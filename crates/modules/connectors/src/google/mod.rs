@@ -20,9 +20,7 @@ use crate::{
 use serde::Deserialize;
 use url::Url;
 
-pub use calendar::{
-    Calendar, CalendarEntry, CalendarError, EventTime, EventsQuery, GoogleEvent, Person,
-};
+pub use calendar::{Calendar, CalendarError, EventTime, EventsQuery, GoogleEvent, Person};
 pub use gmail::{Gmail, LabelInfo, MessageMeta, MessageRaw, RawFetch};
 
 /// The scope the `messages` capability needs: read mail and change labels,

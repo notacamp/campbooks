@@ -75,13 +75,12 @@ pub async fn read(
             )
             .await?;
         items.extend(answer.items);
-        match answer.next_page_token {
-            Some(next) => page = Some(next),
-            None => {
-                sync = answer.next_sync_token;
-                finished = true;
-                break;
-            }
+        if let Some(next) = answer.next_page_token {
+            page = Some(next);
+        } else {
+            sync = answer.next_sync_token;
+            finished = true;
+            break;
         }
     }
     if !finished || sync.is_none() {

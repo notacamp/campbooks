@@ -31,6 +31,10 @@ CREATE TABLE connectors.calendars (
     -- Whether it is read. The primary calendar at first; the others when the
     -- member turns them on.
     syncing boolean NOT NULL DEFAULT false,
+    -- The `calendar_sync_changed` event `syncing` was last set from (UUIDv7,
+    -- time-ordered): deliveries come in any order, and an older one never
+    -- undoes a newer one.
+    sync_changed_by uuid,
     -- The provider's sync token; none until the first full read finished.
     sync_token text,
     last_full_at timestamptz,

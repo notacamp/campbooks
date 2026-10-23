@@ -2406,7 +2406,14 @@ async fn each_event_action_is_stored_with_its_request_and_undo(db: PgPool) {
     let (sam, _) = kit.member("sam", workspace);
     let id = started(&kit, &sam, workspace).await;
     let path = |event: &str, tail: &str| format!("schedule/events/{event}{tail}");
-    let starts = "2026-11-20T10:00:00+00:00";
+    // A month ahead, whatever today is: a new event starts within a year.
+    let starts = (Utc::now() + chrono::Duration::days(30))
+        .date_naive()
+        .and_hms_opt(10, 0, 0)
+        .unwrap()
+        .and_utc()
+        .to_rfc3339();
+    let starts = starts.as_str();
     let moved = "2026-11-12T17:00:00+00:00";
     let cases: Vec<EventCase> = vec![
         (

@@ -439,7 +439,7 @@ const eventFacts = (
 });
 
 /** Move the dentist: the undo is the same edit with the values it had. */
-export const MOVE_PROPOSAL: Proposal = {
+const MOVE_PROPOSAL: Proposal = {
   id: "0192f1a0-0000-7000-8000-000000004061",
   kind: "change",
   state: "pending",
@@ -462,7 +462,7 @@ export const MOVE_PROPOSAL: Proposal = {
 };
 
 /** Answer the invitation: the undo sends the answer it had. */
-export const ACCEPT_PROPOSAL: Proposal = {
+const ACCEPT_PROPOSAL: Proposal = {
   id: "0192f1a0-0000-7000-8000-000000004062",
   kind: "change",
   state: "pending",
@@ -485,7 +485,7 @@ export const ACCEPT_PROPOSAL: Proposal = {
 };
 
 /** Add the handover to a Google calendar: the undo takes it off, by the id the answer names. */
-export const PUSH_PROPOSAL: Proposal = {
+const PUSH_PROPOSAL: Proposal = {
   id: "0192f1a0-0000-7000-8000-000000004063",
   kind: "change",
   state: "pending",

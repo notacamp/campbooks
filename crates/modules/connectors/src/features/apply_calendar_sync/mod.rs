@@ -1,7 +1,9 @@
 //! `connectors.apply_calendar_sync` ← `schedule.calendar_sync_changed`: a
 //! member turned a provider calendar on or off. A calendar turned on is read
 //! from the start (its sync token is dropped, so the first read is a full
-//! one); a calendar turned off is not read.
+//! one); a calendar turned off is not read. Deliveries come in any order
+//! (and again): the newest event the calendar heard wins, and an older or
+//! repeated one changes nothing.
 //!
 //! The event names the schedule module's calendar and the connection; which
 //! calendar of the provider it is travels in a small blob (the provider's
@@ -54,6 +56,7 @@ impl EventConsumer for ApplyCalendarSync {
         ctx: &mut JobContext,
         event: Event<CalendarSyncChanged>,
     ) -> Result<(), JobError> {
+        let heard = *event.id.as_uuid();
         let changed = event.payload;
         let workspace: WorkspaceId = changed
             .workspace
@@ -89,17 +92,23 @@ impl EventConsumer for ApplyCalendarSync {
         let Some(stream) = stream else {
             return Ok(());
         };
-        // Turned on: read from the start (the token goes), unless it was on
-        // already, and the event is only delivered again.
-        sqlx::query(
+        // Only an event newer than the one the calendar last heard applies
+        // (event ids are UUIDv7, time-ordered). Turned on: read from the
+        // start (the token goes); a repeated delivery is not newer, so it
+        // never drops the token again.
+        let applied = sqlx::query(
             "INSERT INTO connectors.calendars
-                 (id, workspace_id, stream_id, provider_calendar_id, schedule_calendar, syncing)
-             VALUES ($1, $2, $3, $4, $5, $6)
+                 (id, workspace_id, stream_id, provider_calendar_id, schedule_calendar, syncing,
+                  sync_changed_by)
+             VALUES ($1, $2, $3, $4, $5, $6, $7)
              ON CONFLICT (stream_id, provider_calendar_id) DO UPDATE
                 SET schedule_calendar = EXCLUDED.schedule_calendar,
-                    sync_token = CASE WHEN EXCLUDED.syncing AND NOT connectors.calendars.syncing
-                                      THEN NULL ELSE connectors.calendars.sync_token END,
-                    syncing = EXCLUDED.syncing",
+                    sync_token = CASE WHEN EXCLUDED.syncing THEN NULL
+                                      ELSE connectors.calendars.sync_token END,
+                    syncing = EXCLUDED.syncing,
+                    sync_changed_by = EXCLUDED.sync_changed_by
+              WHERE connectors.calendars.sync_changed_by IS NULL
+                 OR connectors.calendars.sync_changed_by < EXCLUDED.sync_changed_by",
         )
         .bind(Uuid::now_v7())
         .bind(workspace)
@@ -107,9 +116,11 @@ impl EventConsumer for ApplyCalendarSync {
         .bind(&document.provider_calendar_id)
         .bind(changed.calendar)
         .bind(changed.syncing)
+        .bind(heard)
         .execute(&mut **tx)
-        .await?;
-        if changed.syncing {
+        .await?
+        .rows_affected();
+        if applied == 1 && changed.syncing {
             schedule::run_now(tx, workspace, stream, now).await?;
         }
         Ok(())

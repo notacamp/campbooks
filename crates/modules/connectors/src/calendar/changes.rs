@@ -107,6 +107,10 @@ const COLUMNS: &str = "id, stream_id, request_id, calendar_id, event_id, change,
 
 /// What to record for a request the schedule module confirmed.
 #[derive(Debug, Clone)]
+#[allow(
+    clippy::struct_field_names,
+    reason = "the field names the schedule module's request, calendar and event"
+)]
 pub struct Request<'a> {
     /// The schedule module's request.
     pub request: Uuid,

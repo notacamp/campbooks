@@ -335,7 +335,7 @@ impl SyncStream {
         }
 
         let pushed = self
-            .push_calendar(ctx, workspace, target, source, known, backlog, now)
+            .push_calendar(ctx, workspace, source, known, backlog, now)
             .await?;
         if pushed.not_enabled {
             return self.calendar_disabled(ctx, workspace, target, now).await;
@@ -480,15 +480,10 @@ impl SyncStream {
     /// how each ended before the next is made. A change that met provider
     /// trouble stays pending (until it has met it [`MAX_ATTEMPTS`] times) and
     /// stops the push.
-    #[allow(
-        clippy::too_many_arguments,
-        reason = "one call site; the values are distinct"
-    )]
     async fn push_calendar(
         &self,
         ctx: &mut JobContext,
         workspace: WorkspaceId,
-        target: &Target,
         source: &Source<'_>,
         known: &[KnownCalendar],
         backlog: &changes::Backlog,
