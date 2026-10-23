@@ -170,4 +170,70 @@ mod tests {
             .unwrap();
         assert!(listed.is_empty());
     }
+
+    #[derive(Debug)]
+    struct Inboxes;
+
+    impl Visibility for Inboxes {
+        fn container_types(&self) -> &'static [&'static str] {
+            &["a.inbox"]
+        }
+
+        fn container_visible<'a>(
+            &'a self,
+            _db: &'a PgPool,
+            _access: &'a Access,
+            _container: &'a RecordRef,
+        ) -> VisibilityFuture<'a> {
+            Box::pin(async { Ok(true) })
+        }
+    }
+
+    #[derive(Debug)]
+    struct Mine;
+
+    impl Visibility for Mine {
+        fn container_types(&self) -> &'static [&'static str] {
+            &["b.mine"]
+        }
+
+        fn access_records(&self) -> &'static [&'static str] {
+            &["b.member"]
+        }
+
+        fn container_visible<'a>(
+            &'a self,
+            _db: &'a PgPool,
+            _access: &'a Access,
+            _container: &'a RecordRef,
+        ) -> VisibilityFuture<'a> {
+            Box::pin(async { Ok(false) })
+        }
+    }
+
+    #[tokio::test]
+    async fn several_ports_answer_each_for_its_own_container_types() {
+        let db = crate::testing::unreachable_pool();
+        let access = Access {
+            workspace: WorkspaceId::new(),
+            user: None,
+            role: None,
+        };
+        let port = Visibilities::new(vec![Arc::new(Inboxes), Arc::new(Mine)]);
+        let visible = |record_type: &'static str| {
+            let port = &port;
+            let (db, access) = (&db, &access);
+            async move {
+                port.container_visible(db, access, &RecordRef::new(record_type, "1"))
+                    .await
+                    .unwrap()
+            }
+        };
+        assert!(visible("a.inbox").await);
+        assert!(!visible("b.mine").await);
+        // A type no port declares is shown to nobody.
+        assert!(!visible("c.other").await);
+        assert_eq!(port.container_types(), ["a.inbox", "b.mine"]);
+        assert_eq!(port.access_records(), ["b.member"]);
+    }
 }
