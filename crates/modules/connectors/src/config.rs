@@ -390,8 +390,14 @@ impl ConnectorsConfig {
         if imap.idle_quiet_days == 0 || imap.idle_quiet_days > 365 {
             return Err("CAMPBOOKS_CONNECTORS__IMAP__IDLE_QUIET_DAYS must be 1 to 365".to_owned());
         }
-        if imap.idle_poll_seconds < self.poll.min_seconds
-            || imap.idle_poll_seconds > self.poll.max_seconds
+        // Tied to the poll bounds only while IDLE runs: with it off the
+        // setting is unused, and an instance that narrowed its poll bounds
+        // must still start.
+        if imap.idle_poll_seconds == 0
+            || (imap.enabled
+                && imap.idle_enabled
+                && (imap.idle_poll_seconds < self.poll.min_seconds
+                    || imap.idle_poll_seconds > self.poll.max_seconds))
         {
             return Err(
                 "CAMPBOOKS_CONNECTORS__IMAP__IDLE_POLL_SECONDS must be at least \
@@ -592,7 +598,11 @@ mod tests {
             ),
             (serde_json::json!({"idle_quiet_days": 0}), "IDLE_QUIET_DAYS"),
             (
-                serde_json::json!({"idle_poll_seconds": 10}),
+                serde_json::json!({"enabled": true, "idle_enabled": true, "idle_poll_seconds": 10}),
+                "IDLE_POLL_SECONDS",
+            ),
+            (
+                serde_json::json!({"idle_poll_seconds": 0}),
                 "IDLE_POLL_SECONDS",
             ),
             (
@@ -610,6 +620,25 @@ mod tests {
             .unwrap_err();
             assert!(refused.contains(setting), "{refused}");
         }
+    }
+
+    #[test]
+    fn narrowed_poll_bounds_start_while_idle_is_off() {
+        // An instance whose poll bounds leave out the IDLE safety poll's
+        // default still starts with IDLE off (the 2026-10-23 outage), and is
+        // told so only once it turns IDLE on.
+        let narrowed = serde_json::json!({"poll": {"min_seconds": 60, "max_seconds": 600}});
+        let config = ConnectorsConfig::from_figment(&figment(
+            serde_json::json!({"connectors": narrowed.clone()}),
+        ))
+        .unwrap();
+        assert_eq!(config.poll.max_seconds, 600);
+        let mut on = narrowed;
+        on["imap"] = serde_json::json!({"enabled": true, "idle_enabled": true});
+        let refused =
+            ConnectorsConfig::from_figment(&figment(serde_json::json!({"connectors": on})))
+                .unwrap_err();
+        assert!(refused.contains("IDLE_POLL_SECONDS"), "{refused}");
     }
 
     #[test]
