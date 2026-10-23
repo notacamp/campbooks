@@ -53,7 +53,7 @@ never what the mail says.
 
 #### Scenario: Another member's inbox
 - **WHEN** someone exchanged mail only with an inbox the caller is not in
-- **THEN** they are not listed for that caller, and a client acting for nobody gets an empty list
+- **THEN** they are not listed for that caller, until the caller is added to that inbox
 
 #### Scenario: Never yourself
 - **WHEN** Sam asks with `q=sam`

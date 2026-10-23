@@ -1001,6 +1001,7 @@ fn answers_a_notice(id: &str) -> bool {
 fn query_of(id: &str) -> &'static str {
     match id {
         "conversations.suggest_rules" => "?action=archive",
+        "conversations.list_correspondents" => "?q=example",
         _ => "",
     }
 }
