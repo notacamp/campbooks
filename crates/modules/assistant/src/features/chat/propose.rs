@@ -2072,12 +2072,12 @@ fn day_within(day: NaiveDate, now: DateTime<Utc>, utc_offset: i32) -> Result<Nai
 
 /// A time of an event: a day (all-day) or a moment.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd)]
-enum When {
+enum EventTime {
     Day(NaiveDate),
     At(DateTime<Utc>),
 }
 
-impl When {
+impl EventTime {
     fn parse(text: &str) -> Option<Self> {
         NaiveDate::parse_from_str(text, "%Y-%m-%d")
             .map(Self::Day)
@@ -2097,11 +2097,11 @@ impl When {
 /// A new event's `starts`: a day from today (in the member's days) to a year
 /// away, or a moment later than now and a year or more away.
 fn event_start_within(starts: &str, now: DateTime<Utc>, utc_offset: i32) -> Result<(), Refusal> {
-    match When::parse(starts).ok_or(Refusal::InvalidArguments)? {
-        When::Day(day) => day_within(day, now, utc_offset)
+    match EventTime::parse(starts).ok_or(Refusal::InvalidArguments)? {
+        EventTime::Day(day) => day_within(day, now, utc_offset)
             .map(|_| ())
             .map_err(|_| Refusal::StartOutOfRange),
-        When::At(at) => {
+        EventTime::At(at) => {
             if at <= now || at >= now + Duration::days(YEAR) {
                 Err(Refusal::StartOutOfRange)
             } else {
@@ -2133,7 +2133,7 @@ fn event_changes(
     let moved_end = ends.filter(|e| *e != seen.ends);
     // Every time given must be of the event's form.
     for given in [moved_start, moved_end].into_iter().flatten() {
-        let when = When::parse(given).ok_or(Refusal::InvalidWhen)?;
+        let when = EventTime::parse(given).ok_or(Refusal::InvalidWhen)?;
         if when.is_day() != seen.all_day {
             return Err(Refusal::InvalidWhen);
         }
@@ -2141,7 +2141,7 @@ fn event_changes(
     // The end, against the start the event will have.
     if let Some(end) = moved_end {
         let start = moved_start.unwrap_or(&seen.starts);
-        if let (Some(start), Some(end)) = (When::parse(start), When::parse(end))
+        if let (Some(start), Some(end)) = (EventTime::parse(start), EventTime::parse(end))
             && end < start
         {
             return Err(Refusal::InvalidWhen);
