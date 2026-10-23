@@ -485,7 +485,11 @@ fn invoice(bill: &Map<String, Value>) -> Option<Due> {
         })
         .filter(|amount| amount.currency.len() == 3 && amount.minor > 0)
     });
-    Some(Due { title, due, amount })
+    Some(Due {
+        title,
+        by: due,
+        amount,
+    })
 }
 
 /// A decimal price (`120`, `120.5`, `9.99`) in minor units; more than two
