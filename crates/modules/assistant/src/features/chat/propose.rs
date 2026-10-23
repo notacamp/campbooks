@@ -1225,21 +1225,17 @@ impl Proposer {
                 // A teammate by id, else by the full name the list gives;
                 // the card's name is the list's, never the model's.
                 let lowered = asked.trim().to_lowercase();
-                let mut found = people.iter().filter(|p| p.id == asked.trim());
-                let teammate = match found.next() {
-                    Some(p) => p,
-                    None => {
-                        let mut named = people.iter().filter(|p| {
-                            p.name.to_lowercase() == lowered
-                                || p.email.as_deref().map(str::to_lowercase)
-                                    == Some(lowered.clone())
-                        });
-                        match (named.next(), named.next()) {
-                            (Some(p), None) => p,
-                            _ => return Err(Refusal::NotATeammate),
-                        }
-                    }
-                };
+                let by_id = people.iter().find(|p| p.id == asked.trim());
+                let named: Vec<&Teammate> = people
+                    .iter()
+                    .filter(|p| {
+                        p.name.to_lowercase() == lowered
+                            || p.email.as_deref().map(str::to_lowercase) == Some(lowered.clone())
+                    })
+                    .collect();
+                let teammate = by_id
+                    .or_else(|| (named.len() == 1).then(|| named[0]))
+                    .ok_or(Refusal::NotATeammate)?;
                 if teammate.id == me || !safe_segment(&teammate.id) {
                     return Err(Refusal::NotATeammate);
                 }

@@ -200,10 +200,8 @@ describe("Tasks", () => {
     fireEvent.click(await rowOf(LEASE.title));
     fireEvent.click(await screen.findByRole("button", { name: /^Ask Scout/u }));
 
-    expect(open).toHaveBeenCalledWith(
-      { type: "tasks.task", id: LEASE.id },
-      { from: expect.any(HTMLElement) as unknown },
-    );
+    // Pressed with no focus of its own: the focus has nowhere to return to.
+    expect(open).toHaveBeenCalledWith({ type: "tasks.task", id: LEASE.id }, { from: null });
   });
 
   it("puts a task off until tomorrow morning from its detail", async () => {

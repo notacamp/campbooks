@@ -1814,7 +1814,7 @@ fn every_action_and_undo_is_a_low_risk_change_the_assistant_may_call() {
         }
     }
     // Every task action, as the model names it, has a row of its own.
-    for action in propose::ProposalAction::TASKS {
+    for action in super::types::ProposalAction::TASKS {
         assert!(propose::ROWS.iter().any(|row| row.action == action));
         assert!(
             propose::ROWS
