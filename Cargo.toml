@@ -178,6 +178,12 @@ tokio-rustls = "0.26.6"
 mail-builder = { version = "1.0.0", default-features = false }
 mail-parser = { version = "0.11.9", default-features = false }
 
+# Tracked events (ADR 0020, campbooks-cloud#321): the relay publishes the
+# outbox to RabbitMQ over AMQP 0-9-1 with publisher confirms. On tokio, TLS
+# (`amqps://`) through rustls with aws-lc-rs and the platform's verifier,
+# all already in the graph; no OpenSSL.
+lapin = { version = "4.12.1", default-features = false, features = ["rustls", "tokio"] }
+
 # Passkeys (identity, ADR 0014): COSE_Key parsing and the CBOR of WebAuthn
 # attestation objects. Signatures are verified with aws-lc-rs.
 coset = "0.4.2"

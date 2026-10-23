@@ -1195,6 +1195,18 @@ mod tests {
             (false, true, false, false, false),
             "`{role}` only appends to {append_only}"
         );
+        // The relay, the prune, the backlog sample and the purge reach it
+        // through the kernel's functions only (campbooks-cloud#321).
+        for function in OUTBOX_FUNCTIONS {
+            let granted: bool =
+                sqlx::query_scalar("SELECT has_function_privilege($1, $2, 'EXECUTE')")
+                    .bind(role)
+                    .bind(function)
+                    .fetch_one(&db)
+                    .await
+                    .unwrap();
+            assert!(granted, "`{role}` may call {function}");
+        }
         for table in at_deploy {
             let privileges: (bool, bool, bool, bool, bool) = sqlx::query_as(
                 "SELECT has_table_privilege($1, $2, 'SELECT'), has_table_privilege($1, $2, 'INSERT'),
@@ -1276,6 +1288,16 @@ mod tests {
             "`{role}` reaches schema `bff` through these"
         );
     }
+
+    /// The functions the runtime role reaches the tracked events outbox
+    /// through (campbooks-cloud#321).
+    const OUTBOX_FUNCTIONS: [&str; 5] = [
+        "kernel.claim_tracked_events(integer)",
+        "kernel.mark_tracked_events_published(uuid[])",
+        "kernel.tracked_events_backlog()",
+        "kernel.prune_tracked_events(integer, integer)",
+        "kernel.purge_workspace_tracked_events(text, integer)",
+    ];
 
     /// The web sign-in's tables (campbooks-cloud#212).
     const BFF_TABLES: [&str; 3] = [
@@ -1654,6 +1676,8 @@ mod tests {
             // `kernel.purge_workspace_idempotency` (campbooks-cloud#65).
             ("kernel.idempotency", "DELETE, SELECT"),
             ("kernel.rate_limits", "DELETE, INSERT, SELECT, UPDATE"),
+            // The tracked events outbox's functions (campbooks-cloud#321).
+            ("kernel.tracked_events", "DELETE, SELECT, UPDATE"),
         ]
         .map(|(table, privileges)| (table.to_owned(), privileges.to_owned()));
         assert_eq!(

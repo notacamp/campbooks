@@ -165,8 +165,17 @@ jobs:
         options: >-
           --health-cmd "pg_isready -U postgres" --health-interval 5s
           --health-timeout 5s --health-retries 10
+      # The tracked events relay's tests publish to and read from it
+      # (campbooks-cloud#321). Streams are core in RabbitMQ 4.
+      rabbitmq:
+        image: rabbitmq:4.3.5-alpine
+        ports: ["5672:5672"]
+        options: >-
+          --health-cmd "rabbitmq-diagnostics -q ping" --health-interval 5s
+          --health-timeout 10s --health-retries 20
     env:
       DATABASE_URL: postgres://postgres:postgres@localhost:5432/campbooks
+      CAMPBOOKS_TEST_AMQP_URL: amqp://guest:guest@localhost:5672/%2f
     steps:
       - uses: actions/checkout@v6
       - uses: actions-rust-lang/setup-rust-toolchain@v2 # reads rust-toolchain.toml

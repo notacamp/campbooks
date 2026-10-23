@@ -237,6 +237,7 @@ impl Config {
         self.events.check()?;
         self.rate_limits.check()?;
         self.analytics.check()?;
+        self.tracking.check()?;
         self.telemetry.check()
     }
 }
@@ -980,17 +981,157 @@ pub enum TrackingSink {
     #[default]
     None,
     /// The outbox `kernel.tracked_events`, in the transaction of the change;
-    /// nothing publishes it yet (campbooks-cloud#321 adds `amqp`).
+    /// nothing publishes it (for tests and inspection).
     Outbox,
+    /// The outbox, published to RabbitMQ by the worker's relay
+    /// (`CAMPBOOKS_TRACKING__AMQP_URL`, campbooks-cloud#321).
+    Amqp,
 }
 
-/// Tracked events settings (`CAMPBOOKS_TRACKING__*`, ADR 0020).
-#[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize)]
+/// Tracked events settings (`CAMPBOOKS_TRACKING__*`, ADR 0020). Its `Debug`
+/// never shows the AMQP URL (a secret: it carries the broker's password).
+#[derive(Debug, Clone, Deserialize)]
 #[serde(default)]
 pub struct TrackingConfig {
     /// Where tracked events go (`CAMPBOOKS_TRACKING__SINK`: `none`, the
-    /// default, or `outbox`).
+    /// default, `outbox` or `amqp`).
     pub sink: TrackingSink,
+    /// The broker the relay publishes to (`CAMPBOOKS_TRACKING__AMQP_URL`,
+    /// `amqp://user:password@host:5672/%2f` or `amqps://…`), required with
+    /// the sink `amqp`. Secret: never logged, not even its host.
+    pub amqp_url: Option<SecretString>,
+    /// The topic exchange events are published to
+    /// (`CAMPBOOKS_TRACKING__EXCHANGE`, default `campbooks.events`), with
+    /// routing key `<name>.v<version>`.
+    pub exchange: String,
+    /// The stream queue bound to the exchange when the relay declares its
+    /// topology (`CAMPBOOKS_TRACKING__STREAM`, default `campbooks.events`).
+    pub stream: String,
+    /// How long the stream keeps events (`CAMPBOOKS_TRACKING__STREAM_MAX_AGE`,
+    /// the stream's `x-max-age`: a number and a unit among `Y`, `M`, `D`, `h`,
+    /// `m`, `s`; default `30D`).
+    pub stream_max_age: String,
+    /// Declare the exchange, the stream and their binding at start
+    /// (`CAMPBOOKS_TRACKING__DECLARE_TOPOLOGY`, default `true`). Off, the
+    /// relay only publishes, which suits a broker user that may write but
+    /// not configure.
+    pub declare_topology: bool,
+    /// Events per batch, published and confirmed in one transaction
+    /// (`CAMPBOOKS_TRACKING__BATCH_SIZE`, 1 to 5000, default 200).
+    pub batch_size: u32,
+    /// How often an idle relay looks for events when no notification arrives
+    /// (`CAMPBOOKS_TRACKING__POLL_INTERVAL_MS`, at least 50, default 1000).
+    pub poll_interval_ms: u64,
+    /// How long published rows stay in the outbox before the hourly prune
+    /// deletes them (`CAMPBOOKS_TRACKING__PUBLISHED_RETENTION_HOURS`, at
+    /// least 1, default 24). Unpublished rows are never pruned.
+    pub published_retention_hours: u64,
+}
+
+impl Default for TrackingConfig {
+    fn default() -> Self {
+        Self {
+            sink: TrackingSink::None,
+            amqp_url: None,
+            exchange: "campbooks.events".to_owned(),
+            stream: "campbooks.events".to_owned(),
+            stream_max_age: "30D".to_owned(),
+            declare_topology: true,
+            batch_size: 200,
+            poll_interval_ms: 1_000,
+            published_retention_hours: 24,
+        }
+    }
+}
+
+impl TrackingConfig {
+    /// Most events per batch.
+    pub const MAX_BATCH_SIZE: u32 = 5_000;
+    /// Shortest poll interval accepted, in milliseconds.
+    pub const MIN_POLL_INTERVAL_MS: u64 = 50;
+
+    /// The AMQP URL, `None` when unset or blank. Never log it.
+    pub fn amqp_url(&self) -> Option<&str> {
+        non_blank(self.amqp_url.as_ref().map(SecretString::expose_secret))
+    }
+
+    /// Startup check: with the sink `amqp`, an `amqp` or `amqps` URL; names
+    /// AMQP accepts; a stream age RabbitMQ understands; usable numbers. The
+    /// message names the offending setting, never the URL or any part of it.
+    pub fn check(&self) -> Result<(), String> {
+        if self.sink == TrackingSink::Amqp {
+            let Some(url) = self.amqp_url() else {
+                return Err("CAMPBOOKS_TRACKING__AMQP_URL must be set when \
+                            CAMPBOOKS_TRACKING__SINK=amqp"
+                    .to_owned());
+            };
+            let scheme_ok = url::Url::parse(url)
+                .is_ok_and(|u| matches!(u.scheme(), "amqp" | "amqps") && u.host_str().is_some());
+            if !scheme_ok {
+                return Err(
+                    "CAMPBOOKS_TRACKING__AMQP_URL must be an amqp:// or amqps:// URL \
+                            with a host"
+                        .to_owned(),
+                );
+            }
+        }
+        for (name, value) in [("EXCHANGE", &self.exchange), ("STREAM", &self.stream)] {
+            if !is_amqp_name(value) {
+                return Err(format!(
+                    "CAMPBOOKS_TRACKING__{name}={value} must be 1 to 255 letters, digits, \
+                     dots, dashes, underscores or colons"
+                ));
+            }
+        }
+        if !is_stream_age(&self.stream_max_age) {
+            return Err(format!(
+                "CAMPBOOKS_TRACKING__STREAM_MAX_AGE={} must be a positive number followed by \
+                 Y, M, D, h, m or s (e.g. 30D)",
+                self.stream_max_age
+            ));
+        }
+        let checks = [
+            (
+                "BATCH_SIZE",
+                (1..=Self::MAX_BATCH_SIZE).contains(&self.batch_size),
+                "1 to 5000",
+            ),
+            (
+                "POLL_INTERVAL_MS",
+                self.poll_interval_ms >= Self::MIN_POLL_INTERVAL_MS,
+                "at least 50",
+            ),
+            (
+                "PUBLISHED_RETENTION_HOURS",
+                self.published_retention_hours >= 1,
+                "at least 1",
+            ),
+        ];
+        match checks.iter().find(|(_, ok, _)| !ok) {
+            Some((name, _, rule)) => Err(format!("CAMPBOOKS_TRACKING__{name} must be {rule}")),
+            None => Ok(()),
+        }
+    }
+}
+
+/// An exchange or queue name AMQP 0-9-1 accepts (a short string) and that
+/// reads well in logs: letters, digits, `.`, `-`, `_` and `:`.
+fn is_amqp_name(name: &str) -> bool {
+    (1..=255).contains(&name.len())
+        && name
+            .bytes()
+            .all(|b| b.is_ascii_alphanumeric() || matches!(b, b'.' | b'-' | b'_' | b':'))
+}
+
+/// A RabbitMQ stream `x-max-age`: digits, then one unit.
+fn is_stream_age(age: &str) -> bool {
+    let Some((digits, unit)) = age.split_at_checked(age.len().saturating_sub(1)) else {
+        return false;
+    };
+    matches!(unit, "Y" | "M" | "D" | "h" | "m" | "s")
+        && !digits.is_empty()
+        && digits.bytes().all(|b| b.is_ascii_digit())
+        && digits.parse::<u64>().is_ok_and(|n| n > 0)
 }
 
 /// Event log settings (`CAMPBOOKS_EVENTS__*`, ADR 0012).
