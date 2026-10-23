@@ -15903,7 +15903,7 @@
             "oneOf": [
               {
                 "$ref": "#/components/schemas/RecordRef",
-                "description": "The conversation it is about (a change or a reply)."
+                "description": "The conversation or task it is about (a change or a reply)."
               },
               {
                 "type": "null"
@@ -15931,6 +15931,17 @@
           "state": {
             "$ref": "#/components/schemas/ProposalState",
             "description": "Where it stands."
+          },
+          "task": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/ProposalTask",
+                "description": "The task's own facts (a task change only); its `record` is the task."
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "undo": {
             "oneOf": [
@@ -20170,19 +20181,47 @@
           "already_paid",
           "still_to_pay",
           "yes_to_question",
-          "later"
+          "later",
+          "task_done",
+          "task_not_needed",
+          "plan_day",
+          "task_later",
+          "due",
+          "hand_off"
         ]
       },
       "ProposalDetail": {
         "type": "object",
         "description": "What a change takes besides its conversation.",
         "properties": {
+          "day": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date",
+            "description": "The day (`plan_day`, `due`), `YYYY-MM-DD`."
+          },
           "label": {
             "type": [
               "string",
               "null"
             ],
             "description": "The label's name, as its inbox has it (`add_label`, `remove_label`):\nScout's words, show them quoted."
+          },
+          "member_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The teammate's user id (`hand_off`), a member of the workspace."
+          },
+          "member_name": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The teammate's name, as the workspace's members list has it\n(`hand_off`): read by the server, never the model's words."
           },
           "stream": {
             "type": [
@@ -20266,6 +20305,7 @@
         "description": "An HTTP method a proposal's request may use.",
         "enum": [
           "POST",
+          "PATCH",
           "DELETE"
         ]
       },
@@ -20312,6 +20352,32 @@
           "failed",
           "undone"
         ]
+      },
+      "ProposalTask": {
+        "type": "object",
+        "description": "A task's own facts, read from its record when the proposal was made:\nwhat a card names, never the model's words.",
+        "required": [
+          "title",
+          "verb"
+        ],
+        "properties": {
+          "due_on": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date",
+            "description": "The day it is due then."
+          },
+          "title": {
+            "type": "string",
+            "description": "Its title, as the member wrote it."
+          },
+          "verb": {
+            "type": "string",
+            "description": "`do` or `pay`."
+          }
+        }
       },
       "ProposedAction": {
         "oneOf": [

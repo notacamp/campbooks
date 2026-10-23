@@ -22,6 +22,7 @@ export const SCOUT_CHAT_ABOUT = {
   conversation: "conversations.conversation",
   rule: "conversations.rule",
   ruleNotice: "conversations.rule_notice",
+  task: "tasks.task",
 } as const;
 
 /** A conversation, as a chat is about it. */
@@ -37,6 +38,11 @@ export function ruleRef(id: string): RecordRef {
 /** One of Scout's noticed suggestions, as a chat is about it. */
 export function ruleNoticeRef(id: string): RecordRef {
   return { type: SCOUT_CHAT_ABOUT.ruleNotice, id };
+}
+
+/** A task, as a chat is about it. */
+export function taskRef(id: string): RecordRef {
+  return { type: SCOUT_CHAT_ABOUT.task, id };
 }
 
 const ScoutChatContext = createContext<OpenScoutChat | undefined>(undefined);

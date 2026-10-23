@@ -6,6 +6,7 @@ export {
   ruleNoticeRef,
   ruleRef,
   SCOUT_CHAT_ABOUT,
+  taskRef,
   ScoutChatHost,
   ScoutChatProvider,
   useScoutChat,

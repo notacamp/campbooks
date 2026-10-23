@@ -726,6 +726,9 @@ struct Question {
     /// The line an answer starts with, when Scout can no longer see what
     /// the chat is about (its message key).
     lost: Option<&'static str>,
+    /// The type of record the chat is about, or `none`: logged, never
+    /// the record itself.
+    about: &'static str,
     handbook_version: String,
     asking: Asking,
 }
@@ -825,6 +828,10 @@ impl Question {
             text,
             locale,
             lost,
+            about: row
+                .about()
+                .and_then(|about| about::entry(&about.record_type))
+                .map_or("none", |entry| entry.record_type),
             handbook_version: chatter.handbook.version(),
             asking: Asking::new(gateway, usage, Toolbox::new(member, utc_offset), messages),
         })
@@ -913,6 +920,7 @@ impl Question {
             prompt_tokens = self.asking.prompt_tokens,
             completion_tokens = self.asking.completion_tokens,
             question_chars = self.text.chars().count(),
+            about = self.about,
             about_lost = self.lost.is_some(),
             handbook = %self.handbook_version,
             elapsed_ms = self.asking.elapsed_ms(),

@@ -27,6 +27,7 @@ import {
   useRuleSubject,
   type ConversationSummary,
 } from "~/modules/conversations";
+import { useTaskSubject } from "~/modules/tasks";
 
 import {
   askScout,
@@ -79,7 +80,7 @@ interface Pending {
 type Problem = "unavailable" | "limit" | "full" | "unreadable";
 
 /** What kind of thing the chat is about, as its copy needs it. */
-type Kind = "conversation" | "rule" | "notice" | "nothing";
+type Kind = "conversation" | "rule" | "notice" | "task" | "nothing";
 
 function kindOf(about: RecordRef | null | undefined): Kind | undefined {
   if (about === undefined) {
@@ -94,6 +95,9 @@ function kindOf(about: RecordRef | null | undefined): Kind | undefined {
     }
     case SCOUT_CHAT_ABOUT.ruleNotice: {
       return "notice";
+    }
+    case SCOUT_CHAT_ABOUT.task: {
+      return "task";
     }
     default: {
       return "conversation";
@@ -147,6 +151,7 @@ export function ScoutChat({
   const detail = useConversation(workspaceId, conversationId);
   const rule = useRuleSubject(workspaceId, idOf(subject, SCOUT_CHAT_ABOUT.rule));
   const notice = useRuleNoticeSubject(workspaceId, idOf(subject, SCOUT_CHAT_ABOUT.ruleNotice));
+  const task = useTaskSubject(workspaceId, idOf(subject, SCOUT_CHAT_ABOUT.task));
   const [recentWanted, setRecentWanted] = useState(false);
   const recent = useRecentChats(workspaceId, recentWanted);
   const [draft, setDraft] = useState("");
@@ -366,12 +371,17 @@ export function ScoutChat({
               intro: t("chat.noticeIntro"),
               questions: [t("chat.noticeWhy"), t("chat.noticeChange")],
             }
-          : kind === "nothing"
+          : kind === "task"
             ? {
-                intro: t("chat.nothingIntro"),
-                questions: [t("chat.nothingToday"), t("chat.nothingWaiting")],
+                intro: t("chat.taskIntro"),
+                questions: [t("chat.taskLeft"), t("chat.taskWhen"), t("chat.taskWho")],
               }
-            : undefined;
+            : kind === "nothing"
+              ? {
+                  intro: t("chat.nothingIntro"),
+                  questions: [t("chat.nothingToday"), t("chat.nothingWaiting")],
+                }
+              : undefined;
 
   const log = (
     <>
@@ -446,9 +456,11 @@ export function ScoutChat({
         ? t("chat.unreadableRule")
         : kind === "notice"
           ? t("chat.unreadableNotice")
-          : kind === "nothing"
-            ? t("chat.unreadableNothing")
-            : t("chat.unreadable");
+          : kind === "task"
+            ? t("chat.unreadableTask")
+            : kind === "nothing"
+              ? t("chat.unreadableNothing")
+              : t("chat.unreadable");
 
   const footer =
     problem === "unavailable" ? (
@@ -509,6 +521,8 @@ export function ScoutChat({
       <ChatAbout label={t("chat.about")}>{rule.text}</ChatAbout>
     ) : kind === "notice" && notice.text !== undefined ? (
       <ChatAbout label={t("chat.about")}>{t("chat.noticeLine", { sender: notice.text })}</ChatAbout>
+    ) : kind === "task" && task.text !== undefined ? (
+      <ChatAbout label={t("chat.about")}>{t("chat.taskLine", { title: task.text })}</ChatAbout>
     ) : kind === "nothing" ? (
       <ChatAbout label={t("chat.about")}>{t("chat.aboutNothing")}</ChatAbout>
     ) : undefined;

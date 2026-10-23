@@ -8,6 +8,7 @@ import {
   ruleRef,
   ScoutChatHost,
   ScoutChatProvider,
+  taskRef,
   useScoutChat,
   type OpenScoutChat,
 } from "./scout-chat";
@@ -52,6 +53,7 @@ describe("useScoutChat", () => {
   it("names each record type a chat may be about", () => {
     expect(ruleRef("r-1")).toEqual({ type: "conversations.rule", id: "r-1" });
     expect(ruleNoticeRef("n-1")).toEqual({ type: "conversations.rule_notice", id: "n-1" });
+    expect(taskRef("t-1")).toEqual({ type: "tasks.task", id: "t-1" });
   });
 
   it("tells the host above how to open the panel while one is mounted", () => {

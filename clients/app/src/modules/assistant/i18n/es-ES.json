@@ -347,8 +347,18 @@
         "already_paid": "Ya está pagada",
         "still_to_pay": "Pendiente de pago",
         "yes_to_question": "Responder que sí",
-        "later": "Más tarde, hasta {{until}}"
+        "later": "Más tarde, hasta {{until}}",
+        "task_done": "Marcar como hecha",
+        "task_paid": "Marcar como pagada",
+        "task_not_needed": "No hace falta",
+        "plan_day": "Planificar para {{day}}",
+        "task_later": "Más tarde, hasta {{until}}",
+        "due": "Vence el {{day}}",
+        "hand_off": "Pasar a {{name}}"
       },
+      "taskLine": "{{title}} · vence {{due}}",
+      "taskNoDue": "{{title}}",
+      "handOffNote": "Llega al Inicio de {{name}}.",
       "streams": {
         "primary": "Principal",
         "updates": "Novedades",
@@ -387,6 +397,12 @@
     "unreadableRule": "Scout no puede abrir un chat sobre esta regla.",
     "unreadableNotice": "Esta sugerencia ya no se te ofrece.",
     "unreadableNothing": "Scout no puede empezar un chat ahora. Vuelve a intentarlo dentro de un rato.",
+    "taskIntro": "Pregúntame sobre esta tarea.",
+    "taskLeft": "¿Qué queda por hacer?",
+    "taskWhen": "¿Cuándo debería hacerlo?",
+    "taskWho": "¿Quién podría encargarse?",
+    "taskLine": "Tarea: {{title}}",
+    "unreadableTask": "Scout no puede abrir un chat sobre esta tarea.",
     "gone": "Este chat ya no está."
   }
 }
