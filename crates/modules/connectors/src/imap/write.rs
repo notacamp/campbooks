@@ -415,8 +415,6 @@ struct Wrote {
     left: HashSet<String>,
     /// Messages whose move this server cannot make safely.
     unsupported: HashSet<String>,
-    /// Where messages a trash change moved were, per message.
-    origins: HashMap<String, Vec<String>>,
     /// Somewhere a copy may be that is not recorded: the next complete read
     /// looks for it.
     recheck: bool,
