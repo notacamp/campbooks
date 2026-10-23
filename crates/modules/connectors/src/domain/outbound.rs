@@ -268,6 +268,28 @@ pub fn map_zoho(change: &RequestedChange, labels: Option<&HashSet<String>>) -> M
     }
 }
 
+/// `change` in an IMAP message's tokens (`imap/write.rs`): read, starred,
+/// in the inbox, the trash and spam as Zoho's, and a move to a stream by its
+/// stream mark (none for Primary, whose place is the Inbox; every other mark
+/// off), made by moving the message's inbox copies to that stream's folder.
+/// Label changes are not made at an IMAP server (`unsupported`): taking a
+/// label off would delete a copy.
+pub fn map_imap(change: &RequestedChange) -> Mapped {
+    match change {
+        RequestedChange::AddLabel { .. } | RequestedChange::RemoveLabel { .. } => {
+            Mapped::Skip("unsupported")
+        }
+        RequestedChange::MoveToStream { stream } => {
+            let Some(stream) = stream_of(stream) else {
+                return Mapped::Skip("unsupported");
+            };
+            let (add, remove) = with_mark(Vec::new(), Vec::new(), zoho_mark(stream));
+            Mapped::Labels { add, remove }
+        }
+        other => map_zoho(other, Some(&HashSet::new())),
+    }
+}
+
 /// Out of the trash or spam (`bin`), and into the inbox too for mail the
 /// inbox received.
 fn out_of(bin: &str, inbound: bool) -> Mapped {
@@ -1344,6 +1366,78 @@ mod tests {
             }),
             Mapped::Skip("label_not_at_provider")
         );
+    }
+
+    #[test]
+    fn intents_map_to_imap_tokens() {
+        let lab = uuid::Uuid::nil();
+        let set = |add: &[&str], remove: &[&str]| Mapped::Labels {
+            add: labels(add),
+            remove: labels(remove),
+        };
+        let cases = [
+            (RequestedChange::MarkRead, set(&[], &["UNREAD"])),
+            (RequestedChange::MarkUnread, set(&["UNREAD"], &[])),
+            (RequestedChange::Star, set(&["STARRED"], &[])),
+            (RequestedChange::Unstar, set(&[], &["STARRED"])),
+            (RequestedChange::Archive, set(&[], &["INBOX"])),
+            (RequestedChange::Unarchive, set(&["INBOX"], &[])),
+            (RequestedChange::Trash, set(&["TRASH"], &["SPAM"])),
+            (
+                RequestedChange::Untrash { inbound: true },
+                set(&["INBOX"], &["TRASH"]),
+            ),
+            (
+                RequestedChange::Unspam { inbound: false },
+                set(&[], &["SPAM"]),
+            ),
+            (
+                RequestedChange::MoveToStream {
+                    stream: "receipts".into(),
+                },
+                set(
+                    &["mark:receipts"],
+                    &["mark:primary", "mark:updates", "mark:newsletters"],
+                ),
+            ),
+            (
+                RequestedChange::MoveToStream {
+                    stream: "primary".into(),
+                },
+                set(
+                    &[],
+                    &[
+                        "mark:primary",
+                        "mark:updates",
+                        "mark:receipts",
+                        "mark:newsletters",
+                    ],
+                ),
+            ),
+            (
+                RequestedChange::AddLabel {
+                    label: lab,
+                    provider_key: Some("Bakery".into()),
+                },
+                Mapped::Skip("unsupported"),
+            ),
+            (
+                RequestedChange::RemoveLabel {
+                    label: lab,
+                    provider_key: Some("Bakery".into()),
+                },
+                Mapped::Skip("unsupported"),
+            ),
+            (
+                RequestedChange::MoveToStream {
+                    stream: "someday".into(),
+                },
+                Mapped::Skip("unsupported"),
+            ),
+        ];
+        for (change, want) in cases {
+            assert_eq!(map_imap(&change), want, "{change:?}");
+        }
     }
 
     #[test]

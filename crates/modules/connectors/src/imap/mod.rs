@@ -2,9 +2,9 @@
 //! its servers from the address ([`discover`]) and checking that its
 //! password opens both ([`verify`]) before it becomes a connection; then
 //! reading it (campbooks-cloud#311, [`read`]): its folders as places
-//! ([`folders`]), each message once wherever it is ([`state`]).
-//! Write-back (#312) and sending (#313) come later, over the same
-//! [`session::Session`].
+//! ([`folders`]), each message once wherever it is ([`state`]); and making
+//! members' changes there (campbooks-cloud#312, [`write`]), over the same
+//! [`session::Session`]. Sending (#313) comes later.
 //!
 //! Every host is reached through the kernel's SSRF guard
 //! ([`campbooks_kernel::net::guard`]), at the address it checked, on a mail
@@ -23,6 +23,7 @@ pub mod smtp;
 pub mod state;
 pub mod syntax;
 pub mod tls;
+pub mod write;
 
 use std::{net::SocketAddr, sync::Arc, time::Duration};
 

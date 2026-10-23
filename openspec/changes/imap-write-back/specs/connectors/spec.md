@@ -120,9 +120,10 @@ message emitted again. After a write, the locations (flags; a moved copy at
 the UID `COPYUID` names) and the index SHALL hold what was written, in the
 transaction that ends the change and before the run reads, so neither that
 read nor a run an IDLE session asks for after hearing the write announces
-it. A change SHALL meet trouble at most eight times before it is `failed`
-(`provider_errors`); a server that answers `OK` without applying a change
-SHALL NOT make it be retried.
+it. A flag write SHALL be checked by reading the copies' flags back: one
+the server answered `OK` to without making it SHALL be `failed`
+(`refused`), the message emitted again, and never retried. A change SHALL
+meet trouble at most eight times before it is `failed` (`provider_errors`).
 
 #### Scenario: UIDVALIDITY changed before the write
 - **WHEN** the Inbox's UIDVALIDITY changes after the last read and a member then marks a message of it read
@@ -146,7 +147,7 @@ SHALL NOT make it be retried.
 
 #### Scenario: A server that does not apply what it accepts
 - **WHEN** the server answers `OK` to a member's mark read without marking the message read
-- **THEN** the change is `applied` once, the next run announces the message unread as the server has it, and no further `STORE` is sent
+- **THEN** the change is `failed` (`refused`), the run announces the message unread as the server has it, and no further `STORE` is sent
 
 #### Scenario: The retry cap
 - **WHEN** the server answers every write of a change `[UNAVAILABLE]` for eight runs

@@ -31,7 +31,7 @@ use crate::{
         schedule,
     },
     events::{ChangesRequested, RequestedItem},
-    zoho,
+    imap, zoho,
 };
 
 /// Records a member's changes for the connector to make.
@@ -242,8 +242,9 @@ async fn destination_of(
 /// labels other than stream marks; `None` for a Zoho grant without the
 /// labels scope): its state, the reason when it is not pending, and the
 /// labels to add and remove. Defence in depth: only the flag labels,
-/// categories, stream marks and user labels (Gmail), or read, flag, inbox,
-/// labels and stream marks (Zoho), are ever written.
+/// categories, stream marks and user labels (Gmail), read, flag, inbox,
+/// labels and stream marks (Zoho), or read, flag, inbox, trash, spam and
+/// stream marks (IMAP), are ever written.
 fn outcome(
     provider: Provider,
     change: &crate::events::RequestedChange,
@@ -252,15 +253,12 @@ fn outcome(
     let writable = |label: &str| match provider {
         Provider::Google => outbound::writable(label),
         Provider::Zoho => zoho::state::writable(label),
-        Provider::Imap => false,
+        Provider::Imap => imap::write::writable(label),
     };
     let mapped = match provider {
         Provider::Google => outbound::map(change, known.unwrap_or(&HashSet::new())),
         Provider::Zoho => outbound::map_zoho(change, known),
-        // Write-back to an IMAP mailbox lands with campbooks-cloud#312.
-        Provider::Imap => {
-            return (State::Skipped, Some("unsupported"), Vec::new(), Vec::new());
-        }
+        Provider::Imap => outbound::map_imap(change),
     };
     match mapped {
         Mapped::Labels { add, remove } if !add.iter().chain(&remove).all(|l| writable(l)) => {

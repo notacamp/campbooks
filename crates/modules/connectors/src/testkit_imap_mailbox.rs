@@ -9,6 +9,13 @@
 //! folder's changes as a server does (`EXISTS`, `EXPUNGE`, `FETCH`). It can also misbehave: say it is
 //! busy, lie about a message's size, announce a literal larger than any
 //! memory, or never stop answering.
+//!
+//! It takes writes as a server does (campbooks-cloud#312): `SELECT`, `UID
+//! STORE` (CONDSTORE's `UNCHANGEDSINCE` and `[MODIFIED]`), `UID MOVE`
+//! (MOVE), `UID COPY`, `UID EXPUNGE` and `COPYUID` (UIDPLUS), `EXPUNGE`
+//! and `CLOSE` (expunging every `\Deleted` message of the folder, as a
+//! server would), `CREATE`, `SUBSCRIBE`, `UNSELECT`; and it can be busy
+//! for writes only, or accept them without making them.
 
 use std::fmt::Write as _;
 
@@ -26,6 +33,8 @@ pub struct FakeMail {
     pub email_id: String,
     /// The size the server states, when it lies about it.
     pub stated_size: Option<u64>,
+    /// Marked `\Deleted`, not yet expunged.
+    pub deleted: bool,
 }
 
 /// A fake folder.
@@ -62,6 +71,9 @@ pub struct Store {
     /// Messages (folder, UID) whose body is never sent: the command gets
     /// no answer at all.
     pub stalled: Vec<(String, u32)>,
+    /// Folders created (`CREATE`) and subscribed to (`SUBSCRIBE`).
+    pub created: Vec<String>,
+    pub subscribed: Vec<String>,
     modseq: u64,
     ids: u64,
     uidvalidities: u32,
@@ -73,6 +85,8 @@ impl Default for Store {
             folders: Vec::new(),
             refuse_open: Vec::new(),
             stalled: Vec::new(),
+            created: Vec::new(),
+            subscribed: Vec::new(),
             modseq: 1,
             ids: 0,
             uidvalidities: 1000,
@@ -138,6 +152,7 @@ impl Store {
             internal_date: at,
             email_id,
             stated_size: None,
+            deleted: false,
         });
         uid
     }
@@ -149,6 +164,24 @@ impl Store {
         mail.seen = seen;
         mail.flagged = flagged;
         mail.modseq = modseq;
+    }
+
+    /// Mark message `uid` of `name` `\Deleted`, as another mail app would
+    /// before it expunges.
+    pub fn set_deleted(&mut self, name: &str, uid: u32) {
+        let modseq = self.next_modseq();
+        let mail = self.mail(name, uid);
+        mail.deleted = true;
+        mail.modseq = modseq;
+    }
+
+    /// The UIDs of folder `name`, in order.
+    pub fn uids(&self, name: &str) -> Vec<u32> {
+        self.folders
+            .iter()
+            .find(|f| f.name == name)
+            .map(|f| f.mails.iter().map(|m| m.uid).collect())
+            .unwrap_or_default()
     }
 
     /// Message `uid` of `name`.
@@ -244,6 +277,33 @@ pub struct Effects {
     pub changes: usize,
 }
 
+impl Store {
+    /// Expunge the messages of `name` marked `\Deleted` whose UIDs `only`
+    /// lets through; the `EXPUNGE` lines a server sends for them.
+    fn expunge_deleted(&mut self, name: &str, only: impl Fn(u32) -> bool) -> String {
+        let doomed: Vec<u32> = self
+            .folder(name)
+            .mails
+            .iter()
+            .filter(|m| m.deleted && only(m.uid))
+            .map(|m| m.uid)
+            .collect();
+        let mut out = String::new();
+        for uid in doomed {
+            let seq = self
+                .folder(name)
+                .mails
+                .iter()
+                .position(|m| m.uid == uid)
+                .unwrap_or_default()
+                + 1;
+            self.expunge(name, uid);
+            let _ = write!(out, "* {seq} EXPUNGE\r\n");
+        }
+        out
+    }
+}
+
 /// How the fake behaves past signing in.
 #[derive(Debug, Clone, Copy, Default)]
 #[allow(
@@ -267,6 +327,16 @@ pub struct Offers {
     pub idle: bool,
     /// In IDLE, it repeats `EXISTS` without end.
     pub idle_flood: bool,
+    /// It offers MOVE (RFC 6851).
+    pub moves: bool,
+    /// It offers UIDPLUS (RFC 4315): `UID EXPUNGE` and `COPYUID`.
+    pub uidplus: bool,
+    /// It offers UNSELECT (RFC 3691).
+    pub unselect: bool,
+    /// It answers every write `NO [UNAVAILABLE]`.
+    pub busy_writes: bool,
+    /// It answers every write `OK` and makes none of them.
+    pub inert_writes: bool,
 }
 
 /// The answer to one signed-in command (`verb` and its `args`), on a
@@ -301,14 +371,75 @@ pub fn answer(
                 return format!("{tag} BAD nothing selected\r\n").into_bytes();
             };
             let rest = &args[1.min(args.len())..];
-            match args.first().map(|v| v.to_ascii_uppercase()).as_deref() {
+            let verb = args.first().map(|v| v.to_ascii_uppercase());
+            match verb.as_deref() {
                 Some("SEARCH") => search(store, tag, &folder, rest),
                 Some("FETCH") => return fetch(store, offers, tag, &folder, rest, effects),
-                _ => {
+                Some(write) => {
                     effects.changes += 1;
-                    format!("{tag} NO not here\r\n")
+                    if offers.busy_writes {
+                        format!("{tag} NO [UNAVAILABLE] try again later\r\n")
+                    } else if offers.inert_writes {
+                        format!("{tag} OK done (or so it says)\r\n")
+                    } else {
+                        match write {
+                            "STORE" => store_flags(store, offers, tag, &folder, rest),
+                            "MOVE" if offers.moves => copy(store, offers, tag, &folder, rest, true),
+                            "COPY" => copy(store, offers, tag, &folder, rest, false),
+                            "EXPUNGE" if offers.uidplus => {
+                                let set = rest.first().cloned().unwrap_or_default();
+                                let lines = store
+                                    .expunge_deleted(&folder, |uid| in_set(&set, uid, u32::MAX));
+                                format!("{lines}{tag} OK expunged\r\n")
+                            }
+                            _ => format!("{tag} BAD not here\r\n"),
+                        }
+                    }
                 }
+                None => format!("{tag} BAD not here\r\n"),
             }
+        }
+        "EXPUNGE" | "CLOSE" => {
+            // What Campbooks must never send: every `\Deleted` message of
+            // the folder goes for good.
+            effects.changes += 1;
+            let Some(folder) = selected.clone() else {
+                return format!("{tag} BAD nothing selected\r\n").into_bytes();
+            };
+            let lines = store.expunge_deleted(&folder, |_| true);
+            if verb == "CLOSE" {
+                *selected = None;
+                format!("{tag} OK closed\r\n")
+            } else {
+                format!("{lines}{tag} OK expunged\r\n")
+            }
+        }
+        "UNSELECT" if offers.unselect => {
+            *selected = None;
+            format!("{tag} OK unselected\r\n")
+        }
+        "CREATE" => {
+            effects.changes += 1;
+            let name = args.first().cloned().unwrap_or_default();
+            if store
+                .folders
+                .iter()
+                .any(|f| f.name.eq_ignore_ascii_case(&name))
+            {
+                format!("{tag} NO [ALREADYEXISTS] it is there\r\n")
+            } else if offers.busy_writes {
+                format!("{tag} NO [UNAVAILABLE] try again later\r\n")
+            } else {
+                store.add_folder(&name, &[]);
+                store.created.push(name);
+                format!("{tag} OK created\r\n")
+            }
+        }
+        "SUBSCRIBE" => {
+            store
+                .subscribed
+                .push(args.first().cloned().unwrap_or_default());
+            format!("{tag} OK subscribed\r\n")
         }
         _ => {
             effects.changes += 1;
@@ -318,12 +449,151 @@ pub fn answer(
     text.into_bytes()
 }
 
+/// `UID STORE set [(UNCHANGEDSINCE n)] ±FLAGS[.SILENT] (flags)` in `name`.
+fn store_flags(
+    store: &mut Store,
+    offers: Offers,
+    tag: &str,
+    name: &str,
+    args: &[String],
+) -> String {
+    let set = args.first().cloned().unwrap_or_default();
+    let unchanged = args.get(1).and_then(|a| {
+        a.trim_start_matches('(')
+            .trim_end_matches(')')
+            .to_ascii_uppercase()
+            .strip_prefix("UNCHANGEDSINCE ")
+            .and_then(|n| n.trim().parse::<u64>().ok())
+    });
+    let at = if unchanged.is_some() { 2 } else { 1 };
+    let op = args
+        .get(at)
+        .map(|o| o.to_ascii_uppercase())
+        .unwrap_or_default();
+    let flags = args
+        .get(at + 1)
+        .map(|f| tokens(f.trim_start_matches('(').trim_end_matches(')')))
+        .unwrap_or_default();
+    let has = |flag: &str| flags.iter().any(|f| f.eq_ignore_ascii_case(flag));
+    let on = !op.starts_with('-');
+    let silent = op.ends_with(".SILENT");
+    let uids: Vec<u32> = store
+        .folder(name)
+        .mails
+        .iter()
+        .filter(|m| in_set(&set, m.uid, u32::MAX))
+        .map(|m| m.uid)
+        .collect();
+    let mut out = String::new();
+    let mut modified = Vec::new();
+    for uid in uids {
+        if unchanged.is_some_and(|m| store.mail(name, uid).modseq > m) {
+            modified.push(uid.to_string());
+            continue;
+        }
+        let modseq = store.next_modseq();
+        let seq = store
+            .folder(name)
+            .mails
+            .iter()
+            .position(|m| m.uid == uid)
+            .unwrap_or_default()
+            + 1;
+        let mail = store.mail(name, uid);
+        if has("\\Seen") {
+            mail.seen = on;
+        }
+        if has("\\Flagged") {
+            mail.flagged = on;
+        }
+        if has("\\Deleted") {
+            mail.deleted = on;
+        }
+        mail.modseq = modseq;
+        if !silent || (unchanged.is_some() && offers.condstore) {
+            let _ = write!(out, "* {seq} FETCH (UID {uid} MODSEQ ({modseq}))\r\n");
+        }
+    }
+    if modified.is_empty() {
+        format!("{out}{tag} OK stored\r\n")
+    } else {
+        format!(
+            "{out}{tag} OK [MODIFIED {}] conditional store failed\r\n",
+            modified.join(",")
+        )
+    }
+}
+
+/// `UID COPY set dest` (or `UID MOVE`, the originals expunged): with
+/// UIDPLUS, the new UIDs in `COPYUID`.
+fn copy(
+    store: &mut Store,
+    offers: Offers,
+    tag: &str,
+    name: &str,
+    args: &[String],
+    moving: bool,
+) -> String {
+    let set = args.first().cloned().unwrap_or_default();
+    let dest = args.get(1).cloned().unwrap_or_default();
+    if !store.folders.iter().any(|f| f.name == dest) {
+        return format!("{tag} NO [TRYCREATE] no such folder\r\n");
+    }
+    let uids: Vec<u32> = store
+        .folder(name)
+        .mails
+        .iter()
+        .filter(|m| in_set(&set, m.uid, u32::MAX))
+        .map(|m| m.uid)
+        .collect();
+    let mut pairs: Vec<(u32, u32)> = Vec::new();
+    for uid in &uids {
+        let new = store.copy(name, *uid, &dest);
+        pairs.push((*uid, new));
+    }
+    let uidvalidity = store.folder(&dest).uidvalidity;
+    let from: Vec<String> = pairs.iter().map(|p| p.0.to_string()).collect();
+    let to: Vec<String> = pairs.iter().map(|p| p.1.to_string()).collect();
+    let copyuid = if offers.uidplus && !pairs.is_empty() {
+        format!(
+            "[COPYUID {uidvalidity} {} {}] ",
+            from.join(","),
+            to.join(",")
+        )
+    } else {
+        String::new()
+    };
+    if !moving {
+        return format!("{tag} OK {copyuid}copied\r\n");
+    }
+    let mut out = String::new();
+    if !copyuid.is_empty() {
+        let _ = write!(out, "* OK {copyuid}moved\r\n");
+    }
+    for uid in uids {
+        let seq = store
+            .folder(name)
+            .mails
+            .iter()
+            .position(|m| m.uid == uid)
+            .unwrap_or_default()
+            + 1;
+        store.expunge(name, uid);
+        let _ = write!(out, "* {seq} EXPUNGE\r\n");
+    }
+    format!("{out}{tag} OK moved\r\n")
+}
+
 fn quoted(name: &str) -> String {
     format!("\"{}\"", name.replace('\\', "\\\\").replace('"', "\\\""))
 }
 
 fn list(store: &Store, offers: Offers, tag: &str, args: &[String]) -> String {
     let pattern = args.get(1).map_or("", String::as_str);
+    if pattern.is_empty() {
+        // The hierarchy delimiter, and the root.
+        return format!("* LIST (\\Noselect) \".\" \"\"\r\n{tag} OK LIST done\r\n");
+    }
     let mut out = String::new();
     for folder in &store.folders {
         if pattern != "*" && !folder.name.eq_ignore_ascii_case(pattern) {

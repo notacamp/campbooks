@@ -200,10 +200,13 @@ run (debounced as #318); that run reads the same way and emits nothing. One
   sets are read only when they name at most 10,000 UIDs, and a `COPYUID`
   whose sets do not pair up is ignored (the new UIDs are then found by the
   read).
-- A server that answers `OK` but does not apply the change: the change is
-  `applied` once; the read then sees the server's state (unchanged flags,
-  the message still in its folder) and emits it, so conversations shows
-  what the server holds; nothing is retried. A change meets trouble (busy,
+- A server that answers `OK` but does not apply the change: each flag
+  write is read back (`UID FETCH … (UID FLAGS)`, one command per write); a
+  copy whose flags did not change ends the change `failed` (`refused`) and
+  the message is emitted again with the server's state; nothing is retried.
+  A move it pretends to make (no `COPYUID`, the message still there) is
+  found by the read, which looks the message up (`recheck`) and emits where
+  the server has it. A change meets trouble (busy,
   a stale UIDVALIDITY, a cut session) at most `MAX_ATTEMPTS` (8) runs, then
   is `failed` (`provider_errors`).
 - `[UNAVAILABLE]`, `[INUSE]`, `[LIMIT]` stop the push: unwritten changes

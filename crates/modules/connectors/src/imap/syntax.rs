@@ -97,12 +97,20 @@ pub enum Status {
     Preauth,
 }
 
+/// Most UIDs a response code's set may name to be read (`COPYUID`,
+/// `MODIFIED`): past it, the set is left unread.
+pub const MAX_CODE_UIDS: u64 = 10_000;
+
 /// A response code (`[UIDVALIDITY 3857529045]`): its name, upper-cased,
 /// and the number after it, if any. Never the text around it.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct Code {
     pub name: String,
     pub number: Option<u64>,
+    /// The UID sets of `COPYUID` (source, then destination; RFC 4315) or
+    /// `MODIFIED` (RFC 7162), each as the UIDs it names in order; empty for
+    /// any other code, or a set that names more than [`MAX_CODE_UIDS`].
+    pub sets: Vec<Vec<u32>>,
 }
 
 /// One response.
@@ -221,10 +229,60 @@ fn code(text: &[u8]) -> Option<Code> {
         && name
             .iter()
             .all(|b| b.is_ascii_alphanumeric() || matches!(b, b'-' | b'.' | b'_'));
-    valid.then(|| Code {
-        name: String::from_utf8_lossy(name).to_ascii_uppercase(),
+    if !valid {
+        return None;
+    }
+    let name = String::from_utf8_lossy(name).to_ascii_uppercase();
+    let words: Vec<&[u8]> = argument
+        .split(|b| *b == b' ')
+        .filter(|w| !w.is_empty())
+        .take(3)
+        .collect();
+    // Which words are UID sets: COPYUID's after its UIDVALIDITY, MODIFIED's
+    // first.
+    let set_words: &[&[u8]] = match name.as_str() {
+        "COPYUID" if words.len() == 3 => &words[1..],
+        "MODIFIED" if !words.is_empty() => &words[..1],
+        _ => &[],
+    };
+    let sets = set_words
+        .iter()
+        .copied()
+        .map(uid_list)
+        .collect::<Option<Vec<_>>>()
+        .unwrap_or_default();
+    Some(Code {
         number: number(split_word(argument).0),
+        name,
+        sets,
     })
+}
+
+/// The UIDs a set names, in order (`3:5,9` → 3, 4, 5, 9; `5:3` → 5, 4, 3);
+/// `None` when it is not a set or names more than [`MAX_CODE_UIDS`].
+fn uid_list(word: &[u8]) -> Option<Vec<u32>> {
+    let mut ranges = Vec::new();
+    let mut count: u64 = 0;
+    for part in word.split(|b| *b == b',') {
+        let (a, b) = match part.iter().position(|b| *b == b':') {
+            Some(at) => (nz32(&part[..at])?, nz32(&part[at + 1..])?),
+            None => (nz32(part)?, nz32(part)?),
+        };
+        count = count.saturating_add(u64::from(a.abs_diff(b)) + 1);
+        if count > MAX_CODE_UIDS {
+            return None;
+        }
+        ranges.push((a, b));
+    }
+    let mut uids = Vec::with_capacity(usize::try_from(count).ok()?);
+    for (a, b) in ranges {
+        if a <= b {
+            uids.extend(a..=b);
+        } else {
+            uids.extend((b..=a).rev());
+        }
+    }
+    Some(uids)
 }
 
 /// The bytes up to the first space, and those after it.
@@ -634,7 +692,8 @@ mod tests {
                 status: Status::No,
                 code: Some(Code {
                     name: "UNAVAILABLE".into(),
-                    number: None
+                    number: None,
+                    sets: Vec::new(),
                 }),
             }
         );
@@ -658,7 +717,8 @@ mod tests {
                 status: Status::Ok,
                 code: Some(Code {
                     name: "UIDVALIDITY".into(),
-                    number: Some(3_857_529_045)
+                    number: Some(3_857_529_045),
+                    sets: Vec::new(),
                 })
             }
         );
@@ -732,6 +792,46 @@ mod tests {
         assert_eq!(fetch.email_id.as_deref(), Some("M6d99ac3275bb4e"));
         assert_eq!(fetch.header.as_deref(), Some(header.as_bytes()));
         assert_eq!(fetch.body, None);
+    }
+
+    #[test]
+    fn copyuid_and_modified_keep_their_uid_sets() {
+        let Response::Tagged { code, .. } =
+            parse(b"w7 OK [COPYUID 38505 304,319:320 3956:3958] Done\r\n").unwrap()
+        else {
+            panic!()
+        };
+        let code = code.unwrap();
+        assert_eq!(code.name, "COPYUID");
+        assert_eq!(code.number, Some(38_505));
+        assert_eq!(code.sets, [vec![304, 319, 320], vec![3956, 3957, 3958]]);
+        let Untagged::Status { code, .. } = untagged_of("* OK [COPYUID 7 9:7 1,2,3] Moved\r\n")
+        else {
+            panic!()
+        };
+        assert_eq!(code.unwrap().sets, [vec![9, 8, 7], vec![1, 2, 3]]);
+        let Response::Tagged { code, .. } =
+            parse(b"w8 OK [MODIFIED 7,9] Conditional STORE failed\r\n").unwrap()
+        else {
+            panic!()
+        };
+        assert_eq!(code.unwrap().sets, [vec![7, 9]]);
+        // A set naming more UIDs than are ever asked about is not read.
+        let Response::Tagged { code, .. } =
+            parse(b"w9 OK [COPYUID 1 1:4294967295 1:4294967295] Done\r\n").unwrap()
+        else {
+            panic!()
+        };
+        assert!(code.unwrap().sets.is_empty());
+        // Other codes keep none; a broken set none either.
+        let Response::Tagged { code, .. } = parse(b"w1 OK [UIDNEXT 4 5] x\r\n").unwrap() else {
+            panic!()
+        };
+        assert!(code.unwrap().sets.is_empty());
+        let Response::Tagged { code, .. } = parse(b"w2 OK [COPYUID 1 a:b 1] x\r\n").unwrap() else {
+            panic!()
+        };
+        assert!(code.unwrap().sets.is_empty());
     }
 
     #[test]
