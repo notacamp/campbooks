@@ -68,7 +68,7 @@ export function EventPane({
   onEdit,
 }: EventPaneProps) {
   const { t: typed, i18n } = useTranslation("schedule");
-  const t = typed as unknown as T;
+  const t: T = typed;
   const locale = i18n.language;
   const navigate = useNavigate();
   const link = useInAppLink();

@@ -12,7 +12,7 @@ import {
   useScheduleSettings,
 } from "../../api/queries";
 import { SCOUT_KINDS, type EventKind, type ReadItem, type ScoutKind } from "../../api/types";
-import { type T } from "../../labels";
+import type { T } from "../../labels";
 import {
   addDays,
   canPush,
@@ -53,7 +53,7 @@ export function FoundInMessage({
   subject,
 }: FoundInMessageProps) {
   const { t: typed } = useTranslation("schedule");
-  const t = typed as unknown as T;
+  const t: T = typed;
   const read = useMessageRead(workspaceId, conversationId, messageId);
   const request = useRequestRead(workspaceId, conversationId, messageId);
   const settings = useScheduleSettings(workspaceId);
@@ -186,7 +186,7 @@ function FoundEvent({
   onAdd: () => void;
 }) {
   const { t: typed, i18n } = useTranslation("schedule");
-  const t = typed as unknown as T;
+  const t: T = typed;
   const locale = i18n.language;
   const day = dayOf(item.starts);
   const nearby = useEvents(workspaceId, { from: day, to: addDays(day, 2) });

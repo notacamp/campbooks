@@ -73,7 +73,7 @@ function useClock(fixed: Date | undefined): Date {
  */
 export function CalendarScreen({ workspaceId, search, onSearch, now }: CalendarScreenProps) {
   const { t: typed, i18n } = useTranslation("schedule");
-  const t = typed as unknown as T;
+  const t: T = typed;
   const locale = i18n.language;
   const settings = useScheduleSettings(workspaceId);
   const calendars = useCalendars(workspaceId);

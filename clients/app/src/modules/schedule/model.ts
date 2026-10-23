@@ -222,7 +222,9 @@ export function isShown(event: EventView): boolean {
 export function lastDay(event: EventView): Ymd {
   if (event.all_day) {
     const last = addDays(dayOf(event.ends), -1);
-    return last < dayOf(event.starts) ? dayOf(event.starts) : last;
+    const first = dayOf(event.starts);
+    if (last < first) return first;
+    return last;
   }
   const end = dayOf(event.ends);
   // Ending exactly at midnight belongs to the day before.

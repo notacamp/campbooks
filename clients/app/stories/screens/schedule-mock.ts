@@ -51,7 +51,7 @@ export function scheduleApi(
     [`GET ${S}/calendars`]: () => ({ body: { calendars } }),
     [`GET ${S}/settings`]: () => ({ body: settings }),
     [`PATCH ${S}/settings`]: (body) => {
-      settings = { ...settings, ...(body as Partial<Settings>) } as Settings;
+      settings = { ...settings, ...(body as Partial<Settings>) };
       return { body: settings };
     },
     [`GET ${S}/events`]: (_, url) => {
@@ -157,7 +157,7 @@ export function pinClock(iso: string): () => void {
       return Reflect.construct(target, args.length === 0 ? [fixed] : args, newTarget) as Date;
     },
     get(target, property, receiver) {
-      return property === "now" ? () => fixed : Reflect.get(target, property, receiver);
+      return property === "now" ? () => fixed : (Reflect.get(target, property, receiver) as unknown);
     },
   });
   return () => {

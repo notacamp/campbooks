@@ -50,7 +50,7 @@ describe("days", () => {
     expect(isYmd("2026-10-27")).toBe(true);
     expect(isYmd("2026-13-40")).toBe(false);
     expect(isYmd("27 October")).toBe(false);
-    expect(isYmd(undefined)).toBe(false);
+    expect(isYmd(null)).toBe(false);
   });
 });
 

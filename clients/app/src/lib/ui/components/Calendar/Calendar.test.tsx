@@ -205,7 +205,7 @@ describe("WeekGrid", () => {
         label="Week"
         days={days}
         allDay={{ label: "All day", pills: [] }}
-        hours={{ from: 7, to: 9, format: (hour) => String(hour) }}
+        hours={{ from: 7, to: 9, format: String }}
         blocks={[[], []]}
       />,
     );
@@ -231,7 +231,7 @@ describe("WeekGrid", () => {
         days={days}
         due={{ label: "Due", pills: [pill] }}
         allDay={{ label: "All day", pills: [] }}
-        hours={{ from: 7, to: 9, format: (hour) => String(hour) }}
+        hours={{ from: 7, to: 9, format: String }}
         blocks={[[], []]}
       />,
     );

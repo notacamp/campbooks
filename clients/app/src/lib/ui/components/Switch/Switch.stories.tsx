@@ -12,7 +12,13 @@ function Pressable(props: SwitchProps) {
 const meta = {
   title: "Components/Switch",
   component: Switch,
-  args: { label: "Show Work", checked: true, onChange: () => undefined },
+  args: {
+    label: "Show Work",
+    checked: true,
+    onChange: () => {
+      // The story only shows the control.
+    },
+  },
   render: (args) => <Pressable {...args} />,
 } satisfies Meta<typeof Switch>;
 
