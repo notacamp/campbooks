@@ -40,5 +40,5 @@
 
 - [x] 7.1 OpenAPI regenerated (unchanged), client types unchanged
 - [x] 7.2 Changelog entry file (`changelog/unreleased/added/320-tracked-events.md`)
-- [ ] 7.3 Gates green in CI; terminal recording of `cargo run -p campbooks-tracking-plan -- check` and an archive producing its event; tracking plan regenerated
-- [ ] 7.4 Archive the change (`openspec archive add-tracked-events --yes`)
+- [x] 7.3 Gates green in CI; terminal recording of `cargo run -p campbooks-tracking-plan -- check` and an archive producing its event; tracking plan regenerated
+- [x] 7.4 Archive the change (`openspec archive add-tracked-events --yes`)
