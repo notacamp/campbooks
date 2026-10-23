@@ -79,6 +79,11 @@ pub const NAME: &str = "conversations";
 /// The module's messages (`i18n/<locale>.json`): the reasons of its errors.
 pub static MESSAGES: Catalogue = campbooks_kernel::catalogue!(NAME);
 
+/// This module's section of Scout's handbook (campbooks-cloud#305): how
+/// mail, streams, Scout's read, taught rules, corrections, person notes, drafts, waiting and Nudge work, for the model answering a member's questions. The server
+/// composes it into the assistant's handbook; at most 8 KiB.
+pub const HANDBOOK: &str = include_str!("../handbook.md");
+
 /// What the module is composed with.
 #[derive(Clone)]
 pub struct ConversationsDeps {

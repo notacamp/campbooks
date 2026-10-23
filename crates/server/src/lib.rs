@@ -146,7 +146,8 @@ pub struct Composition {
     /// for the admin system overview.
     pub system: campbooks_system::Deps,
     /// The assistant module's AI gateway (its `complete` role compiles
-    /// members' sentences into rules to check).
+    /// members' sentences into rules to check and answers in Scout's chat).
+    /// Its handbook is always the one [`handbook`] composes.
     pub assistant: campbooks_assistant::AssistantDeps,
 }
 
@@ -253,9 +254,29 @@ pub fn modules_with(composition: &Composition) -> Vec<Module> {
         campbooks_admin::module(),
         campbooks_attention::module(),
         campbooks_search::module(),
-        campbooks_assistant::module(composition.assistant.clone()),
+        campbooks_assistant::module(campbooks_assistant::AssistantDeps {
+            handbook: handbook(),
+            ..composition.assistant.clone()
+        }),
         // `cargo xtask new-module` inserts above this line.
     ]
+}
+
+/// Scout's handbook (campbooks-cloud#305): the assistant's core section,
+/// then each module's own section, in this order. A module Scout should
+/// explain adds its `HANDBOOK` here.
+pub fn handbook() -> campbooks_assistant::Handbook {
+    use campbooks_assistant::Section;
+    campbooks_assistant::Handbook::new(vec![
+        Section {
+            module: campbooks_conversations::NAME,
+            text: campbooks_conversations::HANDBOOK,
+        },
+        Section {
+            module: campbooks_attention::NAME,
+            text: campbooks_attention::HANDBOOK,
+        },
+    ])
 }
 
 /// `state` with the ports modules implement for the kernel registered: the
@@ -742,6 +763,22 @@ mod tests {
     }
 
     #[test]
+    fn every_handbook_section_fits() {
+        let handbook = handbook();
+        let modules: Vec<&str> = handbook.sections().iter().map(|s| s.module).collect();
+        assert_eq!(modules, ["assistant", "conversations", "attention"]);
+        for section in handbook.sections() {
+            assert!(
+                section.text.len() <= campbooks_assistant::handbook::MAX_SECTION_BYTES,
+                "{}: {} bytes",
+                section.module,
+                section.text.len()
+            );
+            assert!(!section.text.trim().is_empty(), "{}", section.module);
+        }
+    }
+
+    #[test]
     fn openapi_declares_the_bearer_scheme() {
         let spec = serde_json::to_value(openapi()).unwrap();
         let scheme = &spec["components"]["securitySchemes"][SECURITY_SCHEME];
@@ -946,9 +983,12 @@ mod tests {
                 "ALL".to_owned()
             )]
         );
-        // The maintenance scope: these six, on module tables.
+        // The maintenance scope: these seven, on module tables.
         let policies = mentioning(testing::maintenance_scope_setting());
         let expected = [
+            // The chats' expiry (assistant, campbooks-cloud#305): which
+            // workspaces hold a chat to expire, read only.
+            ("assistant.chats", "maintenance_reads_chats", "SELECT"),
             // The stream dispatcher (connectors): reads and leases.
             (
                 "connectors.sync_due",

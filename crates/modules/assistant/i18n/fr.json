@@ -6,6 +6,16 @@
     "instruction_too_long": "Restez sous {{max}} caractères : une ou deux phrases.",
     "instruction_has_link": "Ne mettez pas de lien. Dites quel courrier et quoi en faire.",
     "instruction_pasted_mail": "Cela ressemble à un e-mail collé. Dites avec vos mots quel courrier et quoi en faire.",
-    "compile_unavailable": "Ce serveur n’a pas de modèle de langage autorisé à lire des phrases. Créez la règle à la main."
+    "compile_unavailable": "Ce serveur n’a pas de modèle de langage autorisé à lire des phrases. Créez la règle à la main.",
+    "chat_needs_member": "Seul un membre de cet espace de travail peut discuter avec Scout.",
+    "chat_unavailable": "Scout ne peut pas discuter sur ce serveur : aucun modèle de langage ici n’est autorisé à lire le courrier.",
+    "chat_failed": "Scout n’a pas pu répondre à cela. Réessayez dans un moment.",
+    "chat_full": "Cette discussion est pleine : elle compte {{max}} questions. Recommencez pour continuer à poser des questions.",
+    "question_empty": "Écrivez une question pour Scout.",
+    "question_too_long": "Limitez votre question à {{max}} caractères.",
+    "about_unsupported": "Scout ne peut pas encore discuter de ce type d’élément."
+  },
+  "chat": {
+    "about_lost": "Je ne vois plus cette conversation, j’ai donc répondu sans elle."
   }
 }
