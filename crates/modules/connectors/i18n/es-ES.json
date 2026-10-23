@@ -26,6 +26,7 @@
     "imap_login_refused_other": "El servidor de correo ha rechazado el inicio de sesión. Comprueba el nombre de usuario y la contraseña. Si tu proveedor ofrece contraseñas de aplicación, usa una.",
     "smtp_login_refused_one": "El servidor de envío ha rechazado el inicio de sesión. Este proveedor exige una contraseña de aplicación: crea una en los ajustes de seguridad de tu cuenta y úsala aquí.",
     "smtp_login_refused_other": "El servidor de envío (SMTP) ha rechazado el inicio de sesión. Comprueba el nombre de usuario y la contraseña, y que el servidor te permita enviar.",
+    "imap_busy": "El servidor de correo está ocupado y no ha dejado entrar a Campbooks. Inténtalo de nuevo en unos minutos.",
     "imap_unreachable": "No se ha podido contactar con el servidor de correo (IMAP). Comprueba su nombre y su puerto, y vuelve a intentarlo.",
     "smtp_unreachable": "No se ha podido contactar con el servidor de envío (SMTP). Comprueba su nombre y su puerto, y vuelve a intentarlo.",
     "imap_tls_failed": "El certificado del servidor de correo no es válido para su nombre, así que Campbooks no se ha conectado. Comprueba el nombre del servidor.",

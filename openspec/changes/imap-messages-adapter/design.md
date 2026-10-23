@@ -17,9 +17,14 @@ that returns `None`. This change implements it in `connectors/src/imap/`
 | **normalised `Message-ID`** (chosen) | survives moves, copies and resets; what Rails' IMAP adapter learned to use |
 | server `OBJECTID`/`EMAILID` (RFC 8474) | ideal, but few servers offer it; used as a tie-break when present |
 
-Missing `Message-ID` (rare: some automated senders): the id is
-`sha256(Date, From, To, Subject, size)` prefixed `digest:`; two genuinely
-identical header sets collapse, which is acceptable.
+The index's id is `mid:` and the SHA-256 (hex) of the normalised
+`Message-ID` (what is inside its angle brackets, without white space), so
+ids stay bounded and never carry an address; the `Message-ID` itself is the
+index's `rfc_message_id`. Missing `Message-ID` (rare: some automated
+senders): the id is `sha256(Date, From, To, Subject, size)` prefixed
+`digest:`; two genuinely identical header sets collapse, which is
+acceptable. With OBJECTID, a copy whose `EMAILID` differs from the ones the
+key already has is another message: `<key>~<16 hex of sha256(EMAILID)>`.
 
 | | Change detection |
 |---|---|
@@ -30,19 +35,38 @@ identical header sets collapse, which is acceptable.
 ## The cursor
 
 Per stream (jsonb), per tracked folder: `name` (as the server spells it,
-modified UTF-7 kept raw), `role` (`inbox|sent|junk|trash|archive|user`),
-`uidvalidity`, `uidnext`, `highestmodseq` (when CONDSTORE), `messages`,
-`backfill_low_uid` (how far down the window the walk has reached), plus
-`window_start`, `generation`, `swept_at`. The folder list is refreshed
-(`LIST`) at most every 30 minutes or when a `SELECT` fails with
-`[NONEXISTENT]`.
+modified UTF-7 kept raw), `display` (decoded, `Projects/Bakery`), `role`
+(`inbox|sent|junk|trash|archive|user`), `uidvalidity`, `uidnext`,
+`highestmodseq` (when CONDSTORE), `messages`, `backfill_low_uid` (how far
+down the window the walk has reached) and `backfilled`, plus `listed_at`,
+`generation`, `swept_at`, `login_refusals` and `recheck` (messages left with
+no location still to look for). The window slides with each run's time
+(`now - BACKFILL_DAYS`). The folder list is refreshed (`LIST`) at most every
+30 minutes, or at the next run when a `STATUS` or `EXAMINE` was refused; a
+folder is forgotten only when `LIST` no longer shows it, and a listing with
+no Inbox is not believed.
 
 ## A run
 
 One session per run (the stream is already locked per run), host guard
-and TLS as in #310, LOGOUT at the end. A run stops starting downloads at
-`CAMPBOOKS_CONNECTORS__IMAP__RUN_BUDGET_BYTES` (64 MiB) or 50 messages
-and sets `more`.
+and TLS as in #310, LOGOUT at the end. Folders are only ever opened with
+`EXAMINE` (read-only). A run stops starting downloads at
+`CAMPBOOKS_CONNECTORS__IMAP__RUN_BUDGET_BYTES` (64 MiB, after one download
+at least) or 50 messages, reads at most 2,000 UIDs' headers (100 a
+command), starts nothing new after 2 minutes, and sets `more`; a run takes
+10 minutes at most in all.
+
+`async-imap` signs in (as #310); every command after it is framed by
+Campbooks itself (`imap/session.rs`, `imap/syntax.rs`), because the client
+crate buffers a response whole, sized by the server's own literal
+announcement, up to 512 MiB. Each command has bounds: one response's size
+(a literal's size is checked before a byte of it is read), the number of
+untagged responses, all its bytes, and its time (from
+`CAMPBOOKS_CONNECTORS__IMAP__TIMEOUT_SECONDS`, also per socket read). Lists
+nest at most 8 deep; a vanished set is merged and searched, never expanded.
+A command cut short leaves the session unusable: it is dropped, not logged
+out. A run cut short after it read something keeps what it read (applied
+at the normal interval); one that read nothing is a failed run.
 
 1. `STATUS` every tracked folder (`UIDNEXT UIDVALIDITY MESSAGES` +
    `HIGHESTMODSEQ` when offered). Unchanged and not mid-backfill → skip.
@@ -55,17 +79,25 @@ and sets `more`.
    unknown → `BODY.PEEK[]` (skipped and recorded as oversized above
    `MAX_MESSAGE_BYTES`, 50 MiB), parsed with the shared `mail::parse`.
 4. **Flag changes**: with CONDSTORE `UID FETCH 1:* (FLAGS) (CHANGEDSINCE
-   m)`; with QRESYNC also `VANISHED`. Without CONDSTORE, flags and
-   expunges are found by the sweep.
+   m)`; with QRESYNC also `VANISHED`. Without CONDSTORE, flags are found by
+   the sweep. Without QRESYNC, a message count that does not add up (the
+   last count plus the new UIDs) checks the folder's known UIDs
+   (`UID SEARCH UID low:high`; an empty answer for a folder that has
+   messages is not believed).
 5. **Backfill** (phase `backfill`, or a re-walk): `UID SEARCH SINCE
    <window_start>` per folder, newest first below `backfill_low_uid`, as
    in step 3.
-6. **Sweep** every `CAMPBOOKS_CONNECTORS__IMAP__SWEEP_MINUTES` (360):
-   `UID FETCH <window> (FLAGS)` per folder and `UID SEARCH` of the window;
-   a location the server no longer has is dropped. A message with no
-   location left is looked for once by `Message-ID` (`UID SEARCH HEADER
-   Message-ID`) in the other tracked folders; found → moved; not found →
-   removed.
+6. **Sweep** every `CAMPBOOKS_CONNECTORS__IMAP__SWEEP_MINUTES` (360,
+   counted from the end of the backfill): per folder, its known UIDs
+   checked (`UID SEARCH`) and their flags read again (`UID FETCH low:high
+   (FLAGS)`); a location the server no longer has is dropped.
+7. **Messages with no location left**, at the end of any run that read
+   every folder (and, after a sweep or when some were left over, those the
+   index has with no location): looked for by `Message-ID` (`UID SEARCH
+   HEADER Message-ID`, ten to a search, `OR`ed) in every tracked folder,
+   at most 50 a run; found → located (moved); not found anywhere →
+   removed. One without a `Message-ID` cannot be looked for: removed when
+   it is within the window (the walk would have found it), kept otherwise.
 
 ## State mapping
 
@@ -97,24 +129,40 @@ server, never on message content (ADR 0018).
 
 ## Data ownership and events
 
-Schema `connectors`. Migration in the slot the merge coordinator assigns:
-`connectors.imap_locations (stream_id, message_key, folder, uidvalidity,
-uid, PRIMARY KEY (stream_id, folder, uidvalidity, uid))` with an index on
-`(stream_id, message_key)` and workspace RLS like `connectors.messages`.
-`message_key` is the index's provider message id. Events unchanged
-(the change stream and labels as for Zoho).
+Schema `connectors`. Migration `20261023170000_connectors__imap_locations`:
+`connectors.imap_locations (workspace_id, stream_id, folder, uidvalidity,
+uid, message_key, seen, flagged, email_id, PRIMARY KEY (stream_id, folder,
+uidvalidity, uid))` with an index on `(stream_id, message_key)`, rows
+removed with their stream, and workspace RLS (enabled, forced,
+`workspace_isolation`) like `connectors.messages`. `message_key` is the
+index's provider message id; `seen` and `flagged` are the copy's own flags
+(the message's state is the union); `email_id` is the server's RFC 8474
+id when given. Locations are written in the run's transaction, with the
+index. Events unchanged (the change stream as for Zoho; the member's
+folders travel as each message's labels).
 
 ## Health and limits
 
-- A login refused at sync three runs in a row → `needs_reauth`
-  (`imap_login_refused`); one refusal counts as a failed run.
-- `[UNAVAILABLE]`, `[INUSE]`, `[LIMIT]` or a connection refused/reset →
-  throttle that stream for the adaptive interval doubled (no
-  `Retry-After` in IMAP).
+- A login refused at sync three runs in a row (counted in the cursor's
+  `login_refusals`) → `needs_reauth` (`imap_login_refused`); one refusal
+  counts as a failed run.
+- `[UNAVAILABLE]`, `[INUSE]` or `[LIMIT]` (at sign-in or on a command) →
+  throttle that stream for the adaptive interval doubled (no `Retry-After`
+  in IMAP; health `throttled`). At connect, the same answer is
+  `imap_busy` (a new message in every locale), not a refused password, and
+  does not count towards the failed sign-ins.
+- A server that cannot be reached (refused, reset, timed out), a bad
+  certificate, or a server that misbehaves (too large, too many responses,
+  unreadable) → a failed run: backoff doubling from the poll minimum, and
+  `failing` after `CAMPBOOKS_CONNECTORS__FAILING_AFTER` in a row. (A
+  connection refused or reset slows the stream down this way rather than
+  through `throttled`, so a server gone for good ends up `failing`.)
 - `CAMPBOOKS_CONNECTORS__IMAP__SESSIONS_PER_HOST` (default 4) concurrent
   sessions per IMAP host across all processes, through the shared
-  `provider_budgets` table; a run that can't get a slot waits for the
-  next dispatch.
+  `provider_budgets` table (`imap:<host>`: a bucket holding that many
+  slots, one taken per run and given back at its end, refilling over 15
+  minutes so a slot a dead process held comes back); a run that can't get
+  a slot waits for the next dispatch.
 
 ## Settings
 

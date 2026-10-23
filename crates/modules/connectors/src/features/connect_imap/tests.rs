@@ -143,7 +143,7 @@ async fn an_app_password_connects_a_mailbox(db: PgPool) {
     assert_contract("connection-account.v1.schema.json", &account);
     assert_eq!(account["provider"], "imap");
 
-    // Its stream waits (reading lands with campbooks-cloud#311), healthy.
+    // Its stream reads the (empty) mailbox, healthy.
     kit.run_jobs().await;
     let view = kit
         .get(

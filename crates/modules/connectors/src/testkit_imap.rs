@@ -4,7 +4,9 @@
 //! tests trust (`fixtures/imap/`: a test root and a certificate for
 //! `imap.example.com`, `smtp.example.com` and `mail.example.com`, valid
 //! until 2126, made with `openssl`; no real host has them). A fake resolver
-//! names the fakes; fake DNS and a fake web serve discovery.
+//! names the fakes; fake DNS and a fake web serve discovery. The IMAP fake
+//! holds a mailbox (`testkit_imap_mailbox`) the tests change as another mail
+//! app would.
 //!
 //! No test talks to a real mail server, resolver or web server.
 
@@ -16,6 +18,7 @@ use std::{
 
 use base64::{Engine as _, engine::general_purpose::STANDARD};
 use campbooks_kernel::net::guard::{Resolve, ResolveFuture};
+use chrono::{DateTime, Utc};
 use sqlx::PgPool;
 use tokio::{
     io::{AsyncBufReadExt as _, AsyncRead, AsyncWrite, AsyncWriteExt as _, BufReader},
@@ -38,6 +41,7 @@ use crate::{
         net::{Dns, NetFuture, SrvTarget, Web},
     },
     testkit::Kit,
+    testkit_imap_mailbox::{self, Effects, Offers, Store},
 };
 
 /// The test root the fakes' certificate is issued by.
@@ -70,6 +74,10 @@ pub struct Script {
     pub login_disabled: bool,
     /// It greets like a web server, not a mail server.
     pub not_mail: bool,
+    /// IMAP: it refuses sign-ins as busy (`[UNAVAILABLE]`).
+    pub busy: bool,
+    /// IMAP, signed in: what it offers, and how it misbehaves.
+    pub offers: Offers,
 }
 
 impl Script {
@@ -82,6 +90,12 @@ impl Script {
             auth: true,
             login_disabled: false,
             not_mail: false,
+            busy: false,
+            offers: Offers {
+                special_use: true,
+                condstore: true,
+                ..Offers::default()
+            },
         }
     }
 }
@@ -99,12 +113,21 @@ pub struct Seen {
     pub listed: bool,
     /// SMTP: a `MAIL FROM` arrived (nothing may be sent).
     pub mail_from: bool,
+    /// IMAP: the folders opened, in order, and whether any read-write.
+    pub opened: Vec<String>,
+    pub selected: bool,
+    /// IMAP: bodies sent, those that marked their message read, and
+    /// changes asked for (`STORE`, `EXPUNGE`, …).
+    pub bodies: usize,
+    pub marked_read: usize,
+    pub changes: usize,
 }
 
 #[derive(Debug)]
 struct Shared {
     script: Mutex<Script>,
     seen: Mutex<Seen>,
+    store: Mutex<Store>,
 }
 
 impl Shared {
@@ -147,6 +170,7 @@ impl FakeServer {
         let shared = Arc::new(Shared {
             script: Mutex::new(script),
             seen: Mutex::new(Seen::default()),
+            store: Mutex::new(Store::default()),
         });
         let serving = shared.clone();
         tokio::spawn(async move {
@@ -197,6 +221,38 @@ impl FakeServer {
             .lock()
             .unwrap_or_else(PoisonError::into_inner)
             .clone()
+    }
+
+    /// Change how it behaves from its next session on.
+    pub fn script(&self, change: impl FnOnce(&mut Script)) {
+        change(
+            &mut self
+                .shared
+                .script
+                .lock()
+                .unwrap_or_else(PoisonError::into_inner),
+        );
+    }
+
+    /// Change its mailbox, as another mail app would; what `change` returns.
+    pub fn mailbox<T>(&self, change: impl FnOnce(&mut Store) -> T) -> T {
+        change(
+            &mut self
+                .shared
+                .store
+                .lock()
+                .unwrap_or_else(PoisonError::into_inner),
+        )
+    }
+
+    /// Put `raw` in `folder`, received `at`; its UID.
+    pub fn deliver(&self, folder: &str, raw: &[u8], at: DateTime<Utc>) -> u32 {
+        self.mailbox(|store| store.deliver(folder, raw, at))
+    }
+
+    /// Whether message `uid` of `folder` is read at the server.
+    pub fn is_read(&self, folder: &str, uid: u32) -> bool {
+        self.mailbox(|store| store.mail(folder, uid).seen)
     }
 }
 
@@ -294,6 +350,10 @@ fn plain(response: &str) -> Option<(String, String)> {
     Some((parts.next()?.to_owned(), parts.next()?.to_owned()))
 }
 
+#[allow(
+    clippy::too_many_lines,
+    reason = "one session of the fake, command by command"
+)]
 async fn imap_session<S: AsyncRead + AsyncWrite + Unpin>(
     conn: &mut BufReader<S>,
     encrypted: bool,
@@ -301,6 +361,7 @@ async fn imap_session<S: AsyncRead + AsyncWrite + Unpin>(
     shared: &Shared,
 ) -> Next {
     let script = shared.script();
+    let mut selected = None;
     if greet {
         let greeting = if script.not_mail {
             "HTTP/1.1 400 Bad Request\r\n"
@@ -326,6 +387,20 @@ async fn imap_session<S: AsyncRead + AsyncWrite + Unpin>(
                 }
                 if script.login_disabled || !encrypted {
                     caps.push("LOGINDISABLED");
+                }
+                if encrypted {
+                    let offers = script.offers;
+                    caps.push("ENABLE");
+                    for (offered, name) in [
+                        (offers.special_use, "SPECIAL-USE"),
+                        (offers.condstore, "CONDSTORE"),
+                        (offers.qresync, "QRESYNC"),
+                        (offers.objectid, "OBJECTID"),
+                    ] {
+                        if offered {
+                            caps.push(name);
+                        }
+                    }
                 }
                 format!("* CAPABILITY {}\r\n{tag} OK done\r\n", caps.join(" "))
             }
@@ -354,9 +429,13 @@ async fn imap_session<S: AsyncRead + AsyncWrite + Unpin>(
                     None => format!("{tag} BAD not PLAIN\r\n"),
                 }
             }
-            "LIST" => {
+            "LIST" if encrypted => {
                 shared.see(|seen| seen.listed = true);
-                format!("* LIST (\\HasNoChildren) \"/\" INBOX\r\n{tag} OK LIST done\r\n")
+                let answer = signed_in(shared, &script, &tag, verb, args, &mut selected);
+                if !write_bytes(conn.get_mut(), &answer).await {
+                    break;
+                }
+                continue;
             }
             "LOGOUT" => {
                 write(
@@ -365,6 +444,13 @@ async fn imap_session<S: AsyncRead + AsyncWrite + Unpin>(
                 )
                 .await;
                 return Next::Done;
+            }
+            _ if encrypted => {
+                let answer = signed_in(shared, &script, &tag, verb, args, &mut selected);
+                if !write_bytes(conn.get_mut(), &answer).await {
+                    break;
+                }
+                continue;
             }
             _ => format!("{tag} BAD unknown command\r\n"),
         };
@@ -375,7 +461,45 @@ async fn imap_session<S: AsyncRead + AsyncWrite + Unpin>(
     Next::Done
 }
 
+/// A command past signing in, answered from the mailbox.
+fn signed_in(
+    shared: &Shared,
+    script: &Script,
+    tag: &str,
+    verb: &str,
+    args: &str,
+    selected: &mut Option<String>,
+) -> Vec<u8> {
+    let mut effects = Effects::default();
+    let answer = testkit_imap_mailbox::answer(
+        &mut shared.store.lock().unwrap_or_else(PoisonError::into_inner),
+        script.offers,
+        tag,
+        &verb.to_ascii_uppercase(),
+        args,
+        selected,
+        &mut effects,
+    );
+    shared.see(|seen| {
+        if let Some((folder, write)) = effects.opened {
+            seen.opened.push(folder);
+            seen.selected |= write;
+        }
+        seen.bodies += effects.bodies;
+        seen.marked_read += effects.marked_read;
+        seen.changes += effects.changes;
+    });
+    answer
+}
+
+async fn write_bytes<S: AsyncWrite + Unpin>(stream: &mut S, bytes: &[u8]) -> bool {
+    stream.write_all(bytes).await.is_ok() && stream.flush().await.is_ok()
+}
+
 fn login(script: &Script, tag: &str, username: &str, password: &str) -> String {
+    if script.busy {
+        return format!("{tag} NO [UNAVAILABLE] {username} cannot sign in now\r\n");
+    }
     if username == script.username && password == script.password && !script.login_disabled {
         format!("{tag} OK signed in\r\n")
     } else {
@@ -657,6 +781,7 @@ pub fn adapter(fakes: &Fakes) -> Imap {
             allow_any_port: true,
             connect_timeout_seconds: 5,
             timeout_seconds: 10,
+            ..ImapConfig::default()
         },
         resolver: fakes.resolver.clone(),
         dns: fakes.dns.clone(),
@@ -667,12 +792,19 @@ pub fn adapter(fakes: &Fakes) -> Imap {
 
 /// The module with IMAP on over fresh fakes.
 pub async fn kit(db: PgPool) -> (Kit, Fakes) {
+    kit_with(db, |_| {}).await
+}
+
+/// [`kit`], its IMAP settings changed by `change`.
+pub async fn kit_with(db: PgPool, change: impl FnOnce(&mut ImapConfig)) -> (Kit, Fakes) {
     let fakes = Fakes {
         resolver: Arc::new(FakeResolver::default()),
         dns: Arc::new(FakeDns::default()),
         web: Arc::new(FakeWeb::default()),
     };
-    let kit = Kit::with_imap(db, adapter(&fakes)).await;
+    let mut imap = adapter(&fakes);
+    change(&mut imap.config);
+    let kit = Kit::with_imap(db, imap).await;
     (kit, fakes)
 }
 

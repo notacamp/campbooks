@@ -26,6 +26,7 @@
     "imap_login_refused_other": "The mail server refused the sign-in. Check the username and password. If your provider offers app passwords, use one.",
     "smtp_login_refused_one": "The outgoing mail server refused the sign-in. This provider needs an app password: create one in your account's security settings and use it here.",
     "smtp_login_refused_other": "The outgoing mail server (SMTP) refused the sign-in. Check the username and password, and that the server lets you send.",
+    "imap_busy": "The mail server is busy and did not let Campbooks in. Try again in a few minutes.",
     "imap_unreachable": "The mail server (IMAP) could not be reached. Check its name and port, and try again.",
     "smtp_unreachable": "The outgoing mail server (SMTP) could not be reached. Check its name and port, and try again.",
     "imap_tls_failed": "The mail server's certificate is not valid for its name, so Campbooks did not connect. Check the server name.",
