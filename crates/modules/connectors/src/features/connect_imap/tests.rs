@@ -543,3 +543,95 @@ async fn a_password_moved_to_another_row_does_not_open(db: PgPool) {
     assert_eq!(health(a).await, "ok");
     assert_eq!(health(b).await, "needs_reauth");
 }
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn sign_ins_take_every_form_a_server_offers(db: PgPool) {
+    let (kit, fakes) = testkit_imap::kit(db).await;
+    let (ana, ws) = member(&kit, "ana");
+    fakes.resolver.name(IMAP_HOST, &["127.0.0.1"]);
+    fakes.resolver.name(SMTP_HOST, &["127.0.0.1"]);
+    let smtp = FakeServer::smtp(
+        Security::Tls,
+        Script::accepting("ana", "p\u{e4}ss w\u{f6}rd"),
+    )
+    .await;
+
+    // `AUTHENTICATE PLAIN` with its response in the command (SASL-IR).
+    let sasl_ir = FakeServer::imap(
+        Security::Tls,
+        Script {
+            sasl_ir: true,
+            ..Script::accepting("ana", "p\u{e4}ss w\u{f6}rd")
+        },
+    )
+    .await;
+    // `LOGIN` with a password no quoted string can carry: literals.
+    let literal = FakeServer::imap(
+        Security::Tls,
+        Script {
+            auth: false,
+            ..Script::accepting("ana", "p\u{e4}ss w\u{f6}rd")
+        },
+    )
+    .await;
+    for imap in [&sasl_ir, &literal] {
+        let servers = Servers {
+            imap: imap.at(IMAP_HOST),
+            smtp: smtp.at(SMTP_HOST),
+        };
+        let mut request = body("ana@bakery.example", "p\u{e4}ss w\u{f6}rd", &servers);
+        request["username"] = "ana".into();
+        let connected = connect(&kit, &ana, ws, request).await;
+        assert_eq!(
+            connected.status,
+            StatusCode::CREATED,
+            "{:?}",
+            connected.json
+        );
+        assert_eq!(imap.seen().sign_ins, 1);
+        assert!(!imap.seen().password_in_clear);
+    }
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_sign_in_answered_with_a_huge_literal_is_refused_unread(db: PgPool) {
+    let (kit, fakes) = testkit_imap::kit(db).await;
+    let (ana, ws) = member(&kit, "ana");
+    let (_imap, _smtp, mut servers) =
+        testkit_imap::mailbox(&fakes, "ana@bakery.example", "pw").await;
+    let hostile = FakeServer::imap(
+        Security::Tls,
+        Script {
+            hostile_sign_in: true,
+            ..Script::accepting("ana@bakery.example", "pw")
+        },
+    )
+    .await;
+    servers.imap = hostile.at(IMAP_HOST);
+    let refused = connect(&kit, &ana, ws, body("ana@bakery.example", "pw", &servers)).await;
+    assert_eq!(refused.status, StatusCode::BAD_REQUEST);
+    assert_eq!(refused.json["code"], "imap_not_an_imap_server");
+    assert_eq!(hostile.seen().sign_ins, 1);
+    assert_eq!(count(&kit, "connections").await, 0);
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_busy_server_at_connect_is_not_a_wrong_password(db: PgPool) {
+    let (kit, fakes) = testkit_imap::kit(db).await;
+    let (ana, ws) = member(&kit, "ana");
+    let (imap, _smtp, servers) = testkit_imap::mailbox(&fakes, "bob@example.net", "pw").await;
+    imap.script(|script| script.busy = true);
+    for _ in 0..6 {
+        let busy = connect(&kit, &ana, ws, body("bob@example.net", "pw", &servers)).await;
+        assert_eq!(busy.json["code"], "imap_busy", "{:?}", busy.json);
+    }
+    // Six busy answers are no guess: the right password still gets in.
+    imap.script(|script| script.busy = false);
+    let connected = connect(&kit, &ana, ws, body("bob@example.net", "pw", &servers)).await;
+    assert_eq!(
+        connected.status,
+        StatusCode::CREATED,
+        "{:?}",
+        connected.json
+    );
+}

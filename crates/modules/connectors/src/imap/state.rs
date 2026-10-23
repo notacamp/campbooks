@@ -92,9 +92,14 @@ impl Cursor {
         self.folders.iter().find(|f| f.name == name).map(|f| f.role)
     }
 
-    /// Whether every folder has read its window.
+    /// Whether every folder has read its window, or is set aside for now
+    /// (it would not open: [`Folder::skipped_until`]).
     pub fn backfilled(&self) -> bool {
-        !self.folders.is_empty() && self.folders.iter().all(|f| f.backfilled)
+        !self.folders.is_empty()
+            && self
+                .folders
+                .iter()
+                .all(|f| f.backfilled || f.skipped_until.is_some())
     }
 }
 
@@ -125,6 +130,11 @@ pub struct Folder {
     /// Its window is read.
     #[serde(default)]
     pub backfilled: bool,
+    /// It would not open (`STATUS` or `EXAMINE` refused, or no UIDVALIDITY):
+    /// set aside until then, so a run neither retries it nor runs again at
+    /// once for it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub skipped_until: Option<DateTime<Utc>>,
 }
 
 impl Folder {
@@ -140,6 +150,7 @@ impl Folder {
             messages: None,
             backfill_low_uid: None,
             backfilled: false,
+            skipped_until: None,
         }
     }
 
@@ -171,6 +182,9 @@ pub struct Location {
     pub flagged: bool,
     /// The server's own id of the message (RFC 8474), when given.
     pub email_id: Option<String>,
+    /// A digest of this copy's `Date`, `From` and size: another message
+    /// reusing the `Message-ID` does not share it.
+    pub fingerprint: Option<String>,
 }
 
 /// One change to the locations, applied in order with the index.
@@ -335,6 +349,7 @@ async fn put(
     let mut seen = Vec::with_capacity(puts.len());
     let mut flagged = Vec::with_capacity(puts.len());
     let mut email_id = Vec::with_capacity(puts.len());
+    let mut fingerprint = Vec::with_capacity(puts.len());
     for (place, location) in puts.drain(..) {
         folder.push(place.folder);
         uidvalidity.push(i64::from(place.uidvalidity));
@@ -343,16 +358,19 @@ async fn put(
         seen.push(location.seen);
         flagged.push(location.flagged);
         email_id.push(location.email_id);
+        fingerprint.push(location.fingerprint);
     }
     sqlx::query(
         "INSERT INTO connectors.imap_locations
-             (workspace_id, stream_id, folder, uidvalidity, uid, message_key, seen, flagged, email_id)
+             (workspace_id, stream_id, folder, uidvalidity, uid, message_key, seen, flagged, email_id,
+              fingerprint)
          SELECT $1::uuid, $2::uuid, l.*
            FROM unnest($3::text[], $4::bigint[], $5::bigint[], $6::text[], $7::bool[], $8::bool[],
-                       $9::text[]) AS l
+                       $9::text[], $10::text[]) AS l
          ON CONFLICT (stream_id, folder, uidvalidity, uid) DO UPDATE
             SET message_key = EXCLUDED.message_key, seen = EXCLUDED.seen,
-                flagged = EXCLUDED.flagged, email_id = EXCLUDED.email_id",
+                flagged = EXCLUDED.flagged, email_id = EXCLUDED.email_id,
+                fingerprint = EXCLUDED.fingerprint",
     )
     .bind(workspace)
     .bind(stream)
@@ -363,6 +381,7 @@ async fn put(
     .bind(seen)
     .bind(flagged)
     .bind(email_id)
+    .bind(fingerprint)
     .execute(&mut **tx)
     .await?;
     Ok(())

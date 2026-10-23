@@ -22,6 +22,17 @@ const MAX_CAPABILITIES: usize = 256;
 /// Most ranges of one sequence set read.
 const MAX_RANGES: usize = 100_000;
 
+/// Most values one response is read into (a value takes some 30 bytes of
+/// memory for as little as two of input): past it, the response is
+/// [`Malformed`].
+pub const MAX_VALUES: usize = 100_000;
+
+/// Most items of one parenthesised list.
+pub const MAX_ITEMS: usize = 10_000;
+
+/// Most UIDs one `SEARCH` response is read into.
+pub const MAX_SEARCH: usize = 1_000_000;
+
 /// The response could not be read.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Malformed;
@@ -247,12 +258,19 @@ fn untagged(text: &[u8]) -> Result<Untagged<'_>, Malformed> {
         )),
         b"LIST" | b"LSUB" => list(rest).map(Untagged::List),
         b"STATUS" => mailbox_status(rest),
-        b"SEARCH" => Ok(Untagged::Search(
-            rest.split(|b| *b == b' ')
+        b"SEARCH" => {
+            let mut uids = Vec::new();
+            for word in rest
+                .split(|b| *b == b' ')
                 .take_while(|w| !w.starts_with(b"("))
-                .filter_map(nz32)
-                .collect(),
-        )),
+            {
+                if uids.len() >= MAX_SEARCH {
+                    return Err(Malformed);
+                }
+                uids.extend(nz32(word));
+            }
+            Ok(Untagged::Search(uids))
+        }
         b"VANISHED" => {
             let rest = rest
                 .strip_prefix(b"(EARLIER) ")
@@ -281,25 +299,6 @@ fn sequence_set(text: &[u8]) -> Result<Vec<(u32, u32)>, Malformed> {
         ranges.push((a.min(b), a.max(b)));
     }
     Ok(ranges)
-}
-
-/// `ranges` sorted, overlapping ones merged: what [`contains`] reads.
-pub fn merged(mut ranges: Vec<(u32, u32)>) -> Vec<(u32, u32)> {
-    ranges.sort_unstable();
-    let mut out: Vec<(u32, u32)> = Vec::with_capacity(ranges.len());
-    for (a, b) in ranges {
-        match out.last_mut() {
-            Some(last) if a <= last.1.saturating_add(1) => last.1 = last.1.max(b),
-            _ => out.push((a, b)),
-        }
-    }
-    out
-}
-
-/// Whether `uid` is in `ranges` ([`merged`]), by binary search.
-pub fn contains(ranges: &[(u32, u32)], uid: u32) -> bool {
-    let after = ranges.partition_point(|(a, _)| *a <= uid);
-    after > 0 && ranges[after - 1].1 >= uid
 }
 
 fn list(text: &[u8]) -> Result<ListEntry<'_>, Malformed> {
@@ -465,11 +464,17 @@ fn internal_date(bytes: &[u8]) -> Option<DateTime<Utc>> {
 struct Parser<'a> {
     input: &'a [u8],
     at: usize,
+    /// Values still allowed ([`MAX_VALUES`] for the response).
+    budget: usize,
 }
 
 impl<'a> Parser<'a> {
     fn new(input: &'a [u8]) -> Self {
-        Self { input, at: 0 }
+        Self {
+            input,
+            at: 0,
+            budget: MAX_VALUES,
+        }
     }
 
     fn peek(&self) -> Option<u8> {
@@ -488,6 +493,7 @@ impl<'a> Parser<'a> {
     }
 
     fn value(&mut self, depth: usize) -> Result<Value<'a>, Malformed> {
+        self.budget = self.budget.checked_sub(1).ok_or(Malformed)?;
         match self.peek().ok_or(Malformed)? {
             b'(' => self.list(depth + 1),
             b'"' => self.quoted(),
@@ -512,6 +518,7 @@ impl<'a> Parser<'a> {
                     self.at += 1;
                     return Ok(Value::List(items));
                 }
+                _ if items.len() >= MAX_ITEMS => return Err(Malformed),
                 _ => items.push(self.value(depth)?),
             }
         }
@@ -739,9 +746,17 @@ mod tests {
         assert!(parse(b"* VANISHED 1:*\r\n").is_err());
         // A message number past 32 bits.
         assert!(parse(b"* 99999999999 EXISTS\r\n").is_err());
-        let ranges = merged(vec![(10, 12), (1, 3), (2, 5), (13, 13), (20, 30)]);
-        assert_eq!(ranges, [(1, 5), (10, 13), (20, 30)]);
-        assert!(contains(&ranges, 4) && contains(&ranges, 13) && contains(&ranges, 20));
-        assert!(!contains(&ranges, 6) && !contains(&ranges, 31) && !contains(&[], 1));
+        // A list of more items than any answer has, or more values than
+        // the response is allowed: refused before they take memory.
+        let wide = format!("* 1 FETCH (X ({}))\r\n", "a ".repeat(MAX_ITEMS + 1));
+        assert!(parse(wide.as_bytes()).is_err());
+        let many = format!(
+            "* 1 FETCH (X ({}) Y ({}))\r\n",
+            "a ".repeat(MAX_ITEMS - 1),
+            "(a a a a a a a a a) ".repeat(MAX_VALUES / 10)
+        );
+        assert!(parse(many.as_bytes()).is_err());
+        let search = format!("* SEARCH {}\r\n", "7 ".repeat(MAX_SEARCH + 1));
+        assert!(parse(search.as_bytes()).is_err());
     }
 }

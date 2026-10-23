@@ -56,6 +56,11 @@ impl FakeFolder {
 #[derive(Debug, Clone)]
 pub struct Store {
     pub folders: Vec<FakeFolder>,
+    /// Folders `EXAMINE` and `SELECT` refuse to open.
+    pub refuse_open: Vec<String>,
+    /// Messages (folder, UID) whose body is never sent: the command gets
+    /// no answer at all.
+    pub stalled: Vec<(String, u32)>,
     modseq: u64,
     ids: u64,
     uidvalidities: u32,
@@ -65,6 +70,8 @@ impl Default for Store {
     fn default() -> Self {
         let mut store = Self {
             folders: Vec::new(),
+            refuse_open: Vec::new(),
+            stalled: Vec::new(),
             modseq: 1,
             ids: 0,
             uidvalidities: 1000,
@@ -242,6 +249,9 @@ pub struct Offers {
     pub chatty: bool,
     /// Every body is announced as a literal larger than any memory.
     pub huge_literal: bool,
+    /// Every `CHANGEDSINCE … VANISHED` is answered with more vanished
+    /// ranges than anything holds (QRESYNC).
+    pub vanish_flood: bool,
 }
 
 /// The answer to one signed-in command (`verb` and its `args`), on a
@@ -345,6 +355,9 @@ fn status(store: &mut Store, tag: &str, args: &[String]) -> String {
 
 fn open(store: &Store, offers: Offers, tag: &str, args: &[String], write: bool) -> String {
     let name = args.first().cloned().unwrap_or_default();
+    if store.refuse_open.contains(&name) {
+        return format!("{tag} NO [SERVERBUG] cannot open it now\r\n");
+    }
     let Some(folder) = store.folders.iter().find(|f| f.name == name) else {
         return format!("{tag} NO [NONEXISTENT] no such folder\r\n");
     };
@@ -526,8 +539,26 @@ fn fetch(
             out.extend_from_slice(b"* 1 EXISTS\r\n");
         }
     }
+    if offers.vanish_flood && vanished && changed_since.is_some() {
+        let line = format!("* VANISHED (EARLIER) {}1\r\n", "1,".repeat(4_999));
+        for _ in 0..210 {
+            out.extend_from_slice(line.as_bytes());
+        }
+    }
+    let wants_body = items.iter().any(|item| {
+        let upper = item.to_ascii_uppercase();
+        upper == "BODY.PEEK[]" || upper == "BODY[]"
+    });
+    let stalled = store.stalled.clone();
     let folder = store.folder(name);
     let max = folder.mails.iter().map(|m| m.uid).max().unwrap_or(0);
+    if wants_body
+        && folder.mails.iter().any(|mail| {
+            in_set(&set, mail.uid, max) && stalled.contains(&(name.to_owned(), mail.uid))
+        })
+    {
+        return Vec::new();
+    }
     if let (Some(since), true, true) = (changed_since, vanished, offers.qresync) {
         let gone: Vec<String> = folder
             .expunged

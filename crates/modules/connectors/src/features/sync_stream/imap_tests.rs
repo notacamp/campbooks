@@ -14,10 +14,11 @@ use chrono::{DateTime, TimeDelta, Utc};
 use serde_json::Value;
 use sqlx::PgPool;
 
-use super::{imap_rate, imap_slots};
+use super::{imap_rate, imap_slots, imap_workspace_slots};
 use crate::{
     config::ImapConfig,
     domain::schedule,
+    imap::read::MAX_TIMEOUTS,
     testkit::{Caller, Kit, assert_contract},
     testkit_imap::{self, FakeServer, Fakes, IMAP_HOST, Script},
 };
@@ -771,4 +772,222 @@ async fn locations_are_seen_only_by_their_workspace(db: PgPool) {
         .await
         .unwrap();
     assert_eq!(none, 0);
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_folder_that_will_not_open_is_set_aside_not_retried_at_once(db: PgPool) {
+    let m = mailbox(
+        db,
+        |_| {},
+        |_| {},
+        |imap, now| {
+            imap.mailbox(|store| {
+                store.add_folder("Bakery", &[]);
+                store.refuse_open.push("Bakery".to_owned());
+            });
+            imap.deliver("INBOX", &from_bea("a@bakery.example", "Read"), now);
+            imap.deliver("Bakery", &from_bea("b@bakery.example", "Set aside"), now);
+        },
+    )
+    .await;
+    let connections = m.imap.seen().connections;
+    m.kit.run_jobs().await;
+    // One run: the Inbox read, the backfill over, no run straight after.
+    assert_eq!(m.imap.seen().connections, connections + 1);
+    let changes = m.changes().await;
+    assert_eq!(changes.len(), 1);
+    assert_eq!(subject(&changes[0]), "Read");
+    let stream = m.kit.stream().await;
+    assert_eq!(stream["phase"], "incremental");
+    let bakery = stream["cursor"]["folders"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|f| f["name"] == "Bakery")
+        .unwrap()
+        .clone();
+    assert!(bakery["skipped_until"].is_string(), "{bakery}");
+    assert_eq!(m.kit.pending("connectors.sync_stream").await, 0);
+
+    // Its next runs leave it alone; an hour on, it is tried again.
+    m.kit.next_run().await;
+    assert_eq!(m.changes().await.len(), 1);
+    m.imap.mailbox(|store| store.refuse_open.clear());
+    m.kit.tick(TimeDelta::minutes(61)).await;
+    m.kit.run_jobs().await;
+    let changes = m.changes().await;
+    assert_eq!(changes.len(), 2, "{changes:#?}");
+    assert_eq!(subject(&changes[1]), "Set aside");
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_flood_of_vanished_uids_is_cut_short_and_removes_nothing(db: PgPool) {
+    let mut uid = 0;
+    let m = mailbox(
+        db,
+        |_| {},
+        |script| script.offers.qresync = true,
+        |imap, now| {
+            uid = imap.deliver("INBOX", &from_bea("a@bakery.example", "Kept"), now);
+        },
+    )
+    .await;
+    m.kit.run_jobs().await;
+    m.imap
+        .mailbox(|store| store.set_flags("INBOX", uid, true, false));
+    m.imap.script(|script| script.offers.vanish_flood = true);
+    m.kit.next_run().await;
+    let changes = m.changes().await;
+    assert_eq!(changes.len(), 1, "{changes:#?}");
+    assert_eq!(m.count("SELECT count(*) FROM connectors.messages").await, 1);
+    let failures = m.kit.stream().await["consecutive_failures"]
+        .as_i64()
+        .unwrap();
+    assert!(failures >= 1, "{failures}");
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_reused_message_id_never_replaces_the_message_it_imitates(db: PgPool) {
+    let m = mailbox(
+        db,
+        |_| {},
+        |_| {},
+        |imap, now| {
+            imap.mailbox(|store| store.add_folder("Sent", &["\\Sent"]));
+            // The member's own mail…
+            imap.deliver(
+                "Sent",
+                &raw(
+                    Some("quote-7@bakery.example"),
+                    "Ana <ana@bakery.example>",
+                    "Quote for the wedding cake",
+                ),
+                now - TimeDelta::hours(2),
+            );
+            // …and a message from someone else reusing its Message-ID,
+            // read first (the Inbox is read first).
+            imap.deliver(
+                "INBOX",
+                &raw(
+                    Some("quote-7@bakery.example"),
+                    "Mallory <mallory@example.net>",
+                    "Pay this account instead",
+                ),
+                now - TimeDelta::hours(1),
+            );
+        },
+    )
+    .await;
+    m.kit.run_jobs().await;
+    let changes = m.changes().await;
+    assert_eq!(changes.len(), 2, "{changes:#?}");
+    let own = of(&changes, "Quote for the wedding cake");
+    let other = of(&changes, "Pay this account instead");
+    assert_ne!(id(own), id(other));
+    assert_eq!(own["message"]["direction"], "outbound");
+    assert_eq!(own["message"]["from"]["address"], "ana@bakery.example");
+    assert_eq!(other["message"]["from"]["address"], "mallory@example.net");
+    assert_eq!(m.imap.seen().bodies, 2);
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_workspace_holds_at_most_its_share_of_a_hosts_sessions(db: PgPool) {
+    let m = mailbox(
+        db,
+        |config| {
+            config.sessions_per_host = 4;
+            config.workspace_sessions_per_host = 2;
+        },
+        |_| {},
+        |imap, now| {
+            imap.deliver("INBOX", &from_bea("a@bakery.example", "Hello"), now);
+        },
+    )
+    .await;
+    // Two sessions of this workspace are open elsewhere.
+    let share = imap_workspace_slots(IMAP_HOST, m.ws);
+    assert_eq!(
+        schedule::take(&m.kit.db, &share, 2, imap_rate(2))
+            .await
+            .unwrap(),
+        Ok(())
+    );
+    let connections = m.imap.seen().connections;
+    m.kit.run_jobs().await;
+    assert_eq!(m.imap.seen().connections, connections, "the third waits");
+    // The host's own sessions were never taken: other workspaces go on.
+    assert_eq!(
+        schedule::take(&m.kit.db, &imap_slots(IMAP_HOST), 4, imap_rate(4))
+            .await
+            .unwrap(),
+        Ok(())
+    );
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_message_whose_id_cannot_be_searched_is_kept(db: PgPool) {
+    let mut accented = 0;
+    let m = mailbox(
+        db,
+        |_| {},
+        |script| script.offers.condstore = false,
+        |imap, now| {
+            accented = imap.deliver(
+                "INBOX",
+                &from_bea("caf\u{e9}@bakery.example", "Accented id"),
+                now,
+            );
+            imap.deliver("INBOX", &from_bea("plain@bakery.example", "Plain id"), now);
+        },
+    )
+    .await;
+    m.kit.run_jobs().await;
+    let batches = m.kit.batches(m.ws).await.len();
+
+    m.imap.mailbox(|store| store.expunge("INBOX", accented));
+    m.kit.next_run().await;
+    // Not looked for (no search can carry it), so not removed.
+    assert!(
+        m.changes()
+            .await
+            .iter()
+            .all(|change| change["op"] != "remove")
+    );
+    assert_eq!(m.kit.batches(m.ws).await.len(), batches);
+    assert_eq!(m.count("SELECT count(*) FROM connectors.messages").await, 2);
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_download_that_keeps_timing_out_is_given_up(db: PgPool) {
+    let m = mailbox(
+        db,
+        |config| {
+            config.connect_timeout_seconds = 1;
+            config.timeout_seconds = 1;
+        },
+        |_| {},
+        |imap, now| {
+            imap.deliver(
+                "INBOX",
+                &from_bea("fine@bakery.example", "Fine"),
+                now - TimeDelta::hours(1),
+            );
+            let stuck = imap.deliver("INBOX", &from_bea("stuck@bakery.example", "Stuck"), now);
+            imap.mailbox(|store| store.stalled.push(("INBOX".to_owned(), stuck)));
+        },
+    )
+    .await;
+    m.kit.run_jobs().await;
+    for _ in 1..MAX_TIMEOUTS {
+        m.kit.next_run().await;
+    }
+    assert!(m.changes().await.is_empty());
+    m.kit.next_run().await;
+    let changes = m.changes().await;
+    assert_eq!(changes.len(), 1, "{changes:#?}");
+    assert_eq!(subject(&changes[0]), "Fine");
+    assert_eq!(
+        m.count("SELECT count(*) FROM connectors.oversized").await,
+        1
+    );
 }

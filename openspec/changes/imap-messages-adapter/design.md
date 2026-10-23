@@ -25,6 +25,12 @@ senders): the id is `sha256(Date, From, To, Subject, size)` prefixed
 `digest:`; two genuinely identical header sets collapse, which is
 acceptable. With OBJECTID, a copy whose `EMAILID` differs from the ones the
 key already has is another message: `<key>~<16 hex of sha256(EMAILID)>`.
+Every copy also carries a **fingerprint** (SHA-256 of its `Date`, `From`
+and size, from the header fetch): a copy whose fingerprint none of the
+key's current copies has is another message reusing the `Message-ID` (a
+forgery, an auto-reply, a mailing list's copy of the member's own mail),
+keyed `<key>~<16 hex of the fingerprint>` and downloaded on its own. A
+message with no copy left (moved) keeps its key whatever its fingerprint.
 
 | | Change detection |
 |---|---|
@@ -56,20 +62,39 @@ at least) or 50 messages, reads at most 2,000 UIDs' headers (100 a
 command), starts nothing new after 2 minutes, and sets `more`; a run takes
 10 minutes at most in all.
 
-`async-imap` signs in (as #310); every command after it is framed by
-Campbooks itself (`imap/session.rs`, `imap/syntax.rs`), because the client
-crate buffers a response whole, sized by the server's own literal
-announcement, up to 512 MiB. Each command has bounds: one response's size
-(a literal's size is checked before a byte of it is read), the number of
-untagged responses, all its bytes, and its time (from
-`CAMPBOOKS_CONNECTORS__IMAP__TIMEOUT_SECONDS`, also per socket read). Lists
-nest at most 8 deep; a vanished set is merged and searched, never expanded.
+The IMAP client is Campbooks' own (`imap/session.rs`, `imap/syntax.rs`):
+`async-imap` (#310's client) is removed, because it buffers a response
+whole, sized by the server's own literal announcement, up to 512 MiB (at
+sign-in too), and traces every command it sends, passwords included.
+Signing in is `AUTHENTICATE PLAIN` (its response in the command with
+SASL-IR, else after the server's go-ahead), else `LOGIN` with quoted
+strings, or literals when a quoted string cannot carry the username or
+password; the STARTTLS and `LOGINDISABLED` rules of #310 are unchanged, a
+busy answer is told from a refusal, and every answer before the sign-in
+completes is at most 16 KiB. The connect check (#310's `verify`) signs in
+the same way. The server's log filter keeps `async_imap` and `imap_proto`
+off whatever `RUST_LOG` says.
+
+Each command has bounds: one response's size (a literal's size is checked
+before a byte of it is read), the number of untagged responses, all its
+bytes, and its time (from `CAMPBOOKS_CONNECTORS__IMAP__TIMEOUT_SECONDS`,
+also per socket read). A response is read into at most 100,000 values,
+lists of at most 10,000 items nested at most 8 deep; a `SEARCH` into at
+most 1,000,000 UIDs a command; vanished UIDs are matched against the
+folder's known copies as they arrive (only those are kept), at most
+1,000,000 ranges a command.
 A command cut short leaves the session unusable: it is dropped, not logged
 out. A run cut short after it read something keeps what it read (applied
 at the normal interval); one that read nothing is a failed run.
 
 1. `STATUS` every tracked folder (`UIDNEXT UIDVALIDITY MESSAGES` +
    `HIGHESTMODSEQ` when offered). Unchanged and not mid-backfill → skip.
+   A folder that will not open (`STATUS` or `EXAMINE` refused, no
+   UIDVALIDITY or UIDNEXT) is **set aside** for an hour (`skipped_until`):
+   it counts as read for the backfill, and the folders are listed again at
+   the next run. Only a run that read something runs again at once
+   (`more`), so a folder that will not open never makes a stream sign in
+   back to back.
 2. **UIDVALIDITY changed** → forget that folder's locations, set
    `backfill_low_uid` to none and re-walk the window; messages already
    known by `Message-ID` are re-located, not re-downloaded.
@@ -77,7 +102,10 @@ at the normal interval); one that read nothing is a failed run.
    RFC822.SIZE INTERNALDATE BODY.PEEK[HEADER.FIELDS (MESSAGE-ID DATE FROM
    TO SUBJECT)])`; known `Message-ID` → new location + state re-emitted;
    unknown → `BODY.PEEK[]` (skipped and recorded as oversized above
-   `MAX_MESSAGE_BYTES`, 50 MiB), parsed with the shared `mail::parse`.
+   `MAX_MESSAGE_BYTES`, 50 MiB), parsed with the shared `mail::parse`. A
+   download that times out ends the run and is counted
+   (`connectors.skipped_messages`); after three, the message is recorded
+   as oversized and never asked for again.
 4. **Flag changes**: with CONDSTORE `UID FETCH 1:* (FLAGS) (CHANGEDSINCE
    m)`; with QRESYNC also `VANISHED`. Without CONDSTORE, flags are found by
    the sweep. Without QRESYNC, a message count that does not add up (the
@@ -98,6 +126,8 @@ at the normal interval); one that read nothing is a failed run.
    at most 50 a run; found → located (moved); not found anywhere →
    removed. One without a `Message-ID` cannot be looked for: removed when
    it is within the window (the walk would have found it), kept otherwise.
+   One whose `Message-ID` no search can carry (not ASCII, or longer than
+   2,048 bytes) is kept.
 
 ## State mapping
 
@@ -158,17 +188,24 @@ folders travel as each message's labels).
   connection refused or reset slows the stream down this way rather than
   through `throttled`, so a server gone for good ends up `failing`.)
 - `CAMPBOOKS_CONNECTORS__IMAP__SESSIONS_PER_HOST` (default 4) concurrent
-  sessions per IMAP host across all processes, through the shared
-  `provider_budgets` table (`imap:<host>`: a bucket holding that many
-  slots, one taken per run and given back at its end, refilling over 15
-  minutes so a slot a dead process held comes back); a run that can't get
-  a slot waits for the next dispatch.
+  sessions per IMAP host across all processes, of which one workspace
+  holds at most `…__WORKSPACE_SESSIONS_PER_HOST` (default 2), through the
+  shared `provider_budgets` table: `imap:<host>:<workspace>` then
+  `imap:<host>`, each a bucket holding that many slots, one taken per run
+  and given back at its end (the workspace's is given back if the host's
+  is full); a run that can't get both waits for the next dispatch. The
+  buckets refill over 15 minutes, so a slot a dead process held comes
+  back; the cap is therefore **approximate**: a run longer than a quarter
+  of that (at most 10 minutes) lets one more session start. A lease table
+  would make it exact, and is not needed yet.
 
 ## Settings
 
 `CAMPBOOKS_CONNECTORS__IMAP__*` gains `BACKFILL_DAYS` (90),
 `MAX_MESSAGE_BYTES` (50 MiB), `RUN_BUDGET_BYTES` (64 MiB),
-`SWEEP_MINUTES` (360), `SESSIONS_PER_HOST` (4), `MAX_FOLDERS` (200).
+`SWEEP_MINUTES` (360), `SESSIONS_PER_HOST` (4),
+`WORKSPACE_SESSIONS_PER_HOST` (2, at most `SESSIONS_PER_HOST`),
+`MAX_FOLDERS` (200).
 
 ## Risks
 
@@ -176,3 +213,10 @@ folders travel as each message's labels).
   sweep and Message-ID identity bound the damage to extra reads.
 - **Huge folders**: the window and `MAX_FOLDERS` bound a backfill; the
   sweep only reads flags.
+- **A reused `Message-ID`**: identity by `Message-ID` would let anyone who
+  knows the id of the member's mail (it travels in every reply) send a
+  message the adapter takes for it. The fingerprint keeps such a message
+  apart; a forger who also copies `Date`, `From` and the exact size is not
+  told apart (the EMAILID tie-break still is, on servers that offer it).
+  A server reporting another size for the same message in two folders
+  would show it twice; none is known to.

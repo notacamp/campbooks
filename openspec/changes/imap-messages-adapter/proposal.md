@@ -11,9 +11,10 @@ it need no change.
 Tracking issue: https://github.com/notacamp/campbooks-cloud/issues/311
 (epic https://github.com/notacamp/campbooks-cloud/issues/308).
 
-Modules touched: `connectors` only (the IMAP adapter and its index of
-message locations). No new module, no new crate (uses `async-imap` from
-#310).
+Modules touched: `connectors` (the IMAP adapter and its index of message
+locations) and the server's log filter. No new module and no new crate: the
+`async-imap` crate from #310 is removed, its sign-in replaced by Campbooks'
+own bounded IMAP client.
 
 ## What Changes
 

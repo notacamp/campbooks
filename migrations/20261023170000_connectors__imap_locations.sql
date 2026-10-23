@@ -26,6 +26,9 @@ CREATE TABLE connectors.imap_locations (
     -- The server's own id of the message (RFC 8474 EMAILID), when it gives
     -- one: tells apart two messages that share a Message-ID.
     email_id text,
+    -- A digest of this copy's Date, From and size: tells apart another
+    -- message (a forgery, an auto-reply) that reuses a Message-ID.
+    fingerprint text,
     PRIMARY KEY (stream_id, folder, uidvalidity, uid)
 );
 

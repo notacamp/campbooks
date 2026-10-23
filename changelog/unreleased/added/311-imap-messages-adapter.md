@@ -5,5 +5,7 @@
   duplicates it, and the member's own folders show as labels. Reading never marks mail
   read. A password refused three runs in a row asks the member to connect again; a busy
   server only slows the mailbox down; each mail server sees at most four Campbooks sessions
-  at once (`CAMPBOOKS_CONNECTORS__IMAP__SESSIONS_PER_HOST`). Still off by default
+  at once, two of them per workspace (`CAMPBOOKS_CONNECTORS__IMAP__SESSIONS_PER_HOST`,
+  `…__WORKSPACE_SESSIONS_PER_HOST`); a folder the server will not open is set aside for an
+  hour. Still off by default
   (`CAMPBOOKS_CONNECTORS__IMAP__ENABLED`) until the connect screen lands.

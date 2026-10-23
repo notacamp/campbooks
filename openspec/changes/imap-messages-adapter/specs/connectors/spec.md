@@ -34,6 +34,10 @@ and stored like Gmail's; reading SHALL never change a flag at the server.
 - **WHEN** a message is larger than `CAMPBOOKS_CONNECTORS__IMAP__MAX_MESSAGE_BYTES`
 - **THEN** it is recorded as oversized and not downloaded
 
+#### Scenario: A folder that will not open
+- **WHEN** the server refuses to open one of the mailbox's folders
+- **THEN** the other folders are read, the run ends without another run at once, and that folder is tried again an hour later
+
 ### Requirement: An IMAP message is one message wherever it is
 An IMAP message SHALL be identified by its normalised `Message-ID` (or a
 digest of its headers when it has none), so that moving it between folders,
@@ -53,11 +57,18 @@ SHALL be kept for write-back.
 - **WHEN** a sweep finds a message in no tracked folder
 - **THEN** it is announced as removed
 
+#### Scenario: A reused Message-ID
+- **WHEN** a message from someone else reuses the `Message-ID` of the member's own mail, with another `Date`, `From` or size
+- **THEN** it is a message of its own, and the member's mail keeps its body
+
 ### Requirement: IMAP sessions are bounded and failures are classified
 A sync run SHALL use one session, through the host guard and TLS of
 `imap-connection`, and SHALL hold one of at most
 `CAMPBOOKS_CONNECTORS__IMAP__SESSIONS_PER_HOST` (default 4) sessions per host
-across all processes. A login refused in three consecutive runs SHALL set
+across all processes, of which one workspace SHALL hold at most
+`CAMPBOOKS_CONNECTORS__IMAP__WORKSPACE_SESSIONS_PER_HOST` (default 2). Every
+answer of the server, the sign-in's included, SHALL be read within bounds
+set before it is read, never sized by the server's own word. A login refused in three consecutive runs SHALL set
 the connection's health to `needs_reauth`; a server answering
 `UNAVAILABLE`, `INUSE` or `LIMIT`, or refusing the connection, SHALL only
 slow that stream down.
@@ -73,3 +84,11 @@ slow that stream down.
 #### Scenario: Many mailboxes on one provider
 - **WHEN** five streams on the same IMAP host are due at once
 - **THEN** at most four run at the same time and the fifth runs at a later dispatch
+
+#### Scenario: One workspace's share of a provider
+- **WHEN** a workspace already holds two sessions to an IMAP host
+- **THEN** its next stream on that host waits, and other workspaces' streams on it still run
+
+#### Scenario: A huge answer to a sign-in
+- **WHEN** the server answers a sign-in by announcing a literal larger than the sign-in allows
+- **THEN** the sign-in is refused before any of it is read

@@ -10,6 +10,8 @@
 //! common providers. Only folder names given by the server are matched,
 //! never anything in a message (ADR 0018).
 
+use std::collections::HashSet;
+
 use serde::{Deserialize, Serialize};
 
 /// What a folder is to the adapter.
@@ -177,14 +179,27 @@ fn without_inbox(name: &str, delimiter: Option<char>) -> &str {
 }
 
 /// How `name` is shown: decoded, without an `INBOX` parent, its parents
-/// separated by `/`.
+/// separated by `/`, and without control or text-direction characters
+/// (a name is the server's word, shown as a label).
 pub fn display(name: &str, delimiter: Option<char>) -> String {
     let decoded = decode(name).unwrap_or_else(|| name.to_owned());
     let shown = without_inbox(&decoded, delimiter);
-    match delimiter {
+    let shown = match delimiter {
         Some(d) if d != '/' => shown.replace(d, "/"),
         _ => shown.to_owned(),
-    }
+    };
+    shown.chars().filter(|c| !hidden(*c)).collect()
+}
+
+/// A character that is not shown, or that changes how the text around it
+/// reads: controls, and the bidirectional marks, embeddings, overrides and
+/// isolates.
+fn hidden(c: char) -> bool {
+    c.is_control()
+        || matches!(
+            c,
+            '\u{061C}' | '\u{200E}' | '\u{200F}' | '\u{202A}'..='\u{202E}' | '\u{2066}'..='\u{2069}'
+        )
 }
 
 /// Whether `name` can be read: printable ASCII (modified UTF-7 is), short
@@ -198,14 +213,16 @@ fn readable(name: &str) -> bool {
 /// when the listing has no Inbox (an answer not believed).
 pub fn tracked(listed: &[Listed], max: usize) -> Option<Vec<Tracked>> {
     let mut folders: Vec<Tracked> = Vec::new();
+    let mut names: HashSet<&str> = HashSet::new();
+    let mut inbox = false;
     for folder in listed {
-        if !readable(&folder.name) || folders.iter().any(|f| f.name == folder.name) {
+        if !readable(&folder.name) || !names.insert(folder.name.as_str()) {
             continue;
         }
         let Some(role) = role(folder) else {
             continue;
         };
-        if role == Role::Inbox && folders.iter().any(|f| f.role == Role::Inbox) {
+        if role == Role::Inbox && std::mem::replace(&mut inbox, true) {
             continue;
         }
         folders.push(Tracked {
@@ -214,7 +231,7 @@ pub fn tracked(listed: &[Listed], max: usize) -> Option<Vec<Tracked>> {
             role,
         });
     }
-    if !folders.iter().any(|f| f.role == Role::Inbox) {
+    if !inbox {
         return None;
     }
     folders.sort_by(|a, b| (a.role, &a.name).cmp(&(b.role, &b.name)));
@@ -357,5 +374,12 @@ mod tests {
         assert_eq!(capped.unwrap().len(), 2);
         // No Inbox: not believed.
         assert_eq!(tracked(&[listed("Sent", &[])], 10), None);
+    }
+
+    #[test]
+    fn names_are_shown_without_controls_or_direction_overrides() {
+        assert_eq!(display("Bakery\u{202E}gpj.exe", None), "Bakerygpj.exe");
+        assert_eq!(display("Ba\u{7}k\u{2066}ery\u{200F}", None), "Bakery");
+        assert_eq!(display("Caf&AOk-", None), "Caf\u{e9}");
     }
 }

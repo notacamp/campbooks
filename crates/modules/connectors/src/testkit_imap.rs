@@ -76,6 +76,10 @@ pub struct Script {
     pub not_mail: bool,
     /// IMAP: it refuses sign-ins as busy (`[UNAVAILABLE]`).
     pub busy: bool,
+    /// IMAP: it offers SASL-IR (`AUTHENTICATE PLAIN` with its response).
+    pub sasl_ir: bool,
+    /// IMAP: it answers a sign-in with a literal larger than any memory.
+    pub hostile_sign_in: bool,
     /// IMAP, signed in: what it offers, and how it misbehaves.
     pub offers: Offers,
 }
@@ -91,6 +95,8 @@ impl Script {
             login_disabled: false,
             not_mail: false,
             busy: false,
+            sasl_ir: false,
+            hostile_sign_in: false,
             offers: Offers {
                 special_use: true,
                 condstore: true,
@@ -389,6 +395,9 @@ async fn imap_session<S: AsyncRead + AsyncWrite + Unpin>(
                 if encrypted && script.auth {
                     caps.push("AUTH=PLAIN");
                 }
+                if encrypted && script.sasl_ir {
+                    caps.push("SASL-IR");
+                }
                 if script.login_disabled || !encrypted {
                     caps.push("LOGINDISABLED");
                 }
@@ -412,22 +421,41 @@ async fn imap_session<S: AsyncRead + AsyncWrite + Unpin>(
                 write(conn.get_mut(), &format!("{tag} OK begin TLS\r\n")).await;
                 return Next::Starttls;
             }
+            "LOGIN" | "AUTHENTICATE" if script.hostile_sign_in => {
+                shared.see(|seen| seen.sign_ins += 1);
+                // Five hundred megabytes announced, a few bytes sent.
+                "* LIST () \"/\" {500000000}\r\nINBOX".to_owned()
+            }
             "LOGIN" => {
                 shared.see(|seen| {
                     seen.sign_ins += 1;
                     seen.password_in_clear |= !encrypted;
                 });
-                let (username, rest) = argument(args);
-                let (password, _) = argument(rest);
-                login(&script, &tag, &username, &password)
+                let credentials = if args.trim_end().ends_with('}') {
+                    login_literals(conn, args).await
+                } else {
+                    let (username, rest) = argument(args);
+                    let (password, _) = argument(rest);
+                    Some((username, password))
+                };
+                match credentials {
+                    Some((username, password)) => login(&script, &tag, &username, &password),
+                    None => format!("{tag} BAD not LOGIN\r\n"),
+                }
             }
             "AUTHENTICATE" => {
                 shared.see(|seen| {
                     seen.sign_ins += 1;
                     seen.password_in_clear |= !encrypted;
                 });
-                write(conn.get_mut(), "+ \r\n").await;
-                let response = read(conn).await.unwrap_or_default();
+                let initial = args.split_once(' ').map(|(_, response)| response.trim());
+                let response = match initial.filter(|r| !r.is_empty() && script.sasl_ir) {
+                    Some(response) => response.to_owned(),
+                    None => {
+                        write(conn.get_mut(), "+ \r\n").await;
+                        read(conn).await.unwrap_or_default()
+                    }
+                };
                 match plain(&response) {
                     Some((username, password)) => login(&script, &tag, &username, &password),
                     None => format!("{tag} BAD not PLAIN\r\n"),
@@ -498,6 +526,29 @@ fn signed_in(
 
 async fn write_bytes<S: AsyncWrite + Unpin>(stream: &mut S, bytes: &[u8]) -> bool {
     stream.write_all(bytes).await.is_ok() && stream.flush().await.is_ok()
+}
+
+/// `LOGIN {n}` (its arguments `first`): the username and password sent as
+/// synchronising literals, each after the go-ahead.
+async fn login_literals<S: AsyncRead + AsyncWrite + Unpin>(
+    conn: &mut BufReader<S>,
+    first: &str,
+) -> Option<(String, String)> {
+    let size = |text: &str| -> Option<usize> {
+        text.trim()
+            .strip_prefix('{')?
+            .strip_suffix('}')?
+            .parse()
+            .ok()
+    };
+    let username_len = size(first)?;
+    write(conn.get_mut(), "+ go on\r\n").await;
+    let line = read(conn).await?;
+    let username = line.get(..username_len)?.to_owned();
+    let password_len = size(line.get(username_len..)?)?;
+    write(conn.get_mut(), "+ go on\r\n").await;
+    let password = read(conn).await?;
+    (password.len() == password_len).then_some((username, password))
 }
 
 fn login(script: &Script, tag: &str, username: &str, password: &str) -> String {

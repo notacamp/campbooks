@@ -101,6 +101,9 @@ pub struct ImapConfig {
     /// Sessions open at once to one IMAP host, across every process
     /// (default 4).
     pub sessions_per_host: u32,
+    /// Of those, the most one workspace may hold (default 2), so one
+    /// workspace never takes a provider's every session.
+    pub workspace_sessions_per_host: u32,
     /// Most folders of one mailbox read (default 200).
     pub max_folders: u32,
 }
@@ -176,6 +179,7 @@ impl Default for ImapConfig {
             run_budget_bytes: 64 * 1024 * 1024,
             sweep_minutes: 360,
             sessions_per_host: 4,
+            workspace_sessions_per_host: 2,
             max_folders: 200,
         }
     }
@@ -272,6 +276,15 @@ impl ConnectorsConfig {
             return Err(
                 "CAMPBOOKS_CONNECTORS__IMAP__MAX_MESSAGE_BYTES, …__RUN_BUDGET_BYTES, \
                  …__SWEEP_MINUTES, …__SESSIONS_PER_HOST and …__MAX_FOLDERS must be positive"
+                    .to_owned(),
+            );
+        }
+        if imap.workspace_sessions_per_host == 0
+            || imap.workspace_sessions_per_host > imap.sessions_per_host
+        {
+            return Err(
+                "CAMPBOOKS_CONNECTORS__IMAP__WORKSPACE_SESSIONS_PER_HOST must be at least 1 and \
+                 at most …__SESSIONS_PER_HOST"
                     .to_owned(),
             );
         }
@@ -416,6 +429,8 @@ mod tests {
             serde_json::json!({"max_folders": 0}),
             serde_json::json!({"backfill_days": 0}),
             serde_json::json!({"max_message_bytes": 2_u64 << 30}),
+            serde_json::json!({"workspace_sessions_per_host": 5}),
+            serde_json::json!({"workspace_sessions_per_host": 0}),
         ] {
             let refused = ConnectorsConfig::from_figment(&figment(
                 serde_json::json!({"connectors": {"imap": bad}}),

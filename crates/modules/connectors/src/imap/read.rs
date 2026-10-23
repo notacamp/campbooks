@@ -44,7 +44,7 @@ use super::{
     folders::{self, Listed, Role},
     session::{Done, Limits, Session, WireError, quoted},
     state::{self, Cursor, Folder, Location, LocationOp, Place},
-    syntax::{self, Fetch, Untagged},
+    syntax::{Fetch, Untagged},
 };
 use crate::{
     config::ImapConfig,
@@ -73,6 +73,20 @@ const LOOKUP_HITS: usize = 200;
 
 /// How often the folders are listed again.
 pub const LIST_EVERY: TimeDelta = TimeDelta::minutes(30);
+
+/// How long a folder that would not open is set aside before it is tried
+/// again.
+pub const SKIP_FOR: TimeDelta = TimeDelta::hours(1);
+
+/// Downloads of one message that timed out (in as many runs) before it is
+/// recorded as oversized and never asked for again.
+pub const MAX_TIMEOUTS: i32 = 3;
+
+/// Most UIDs one command's searches are read into.
+const MAX_UIDS: usize = 1_000_000;
+
+/// Most vanished ranges one command's answers are read into.
+const MAX_VANISHED: usize = 1_000_000;
 
 /// A run starts nothing new after this long.
 pub const SOFT_DEADLINE: Duration = Duration::from_mins(2);
@@ -234,6 +248,23 @@ type KnownRow = (
     DateTime<Utc>,
 );
 
+/// A location row: key, folder, UIDVALIDITY, UID, EMAILID, fingerprint.
+type CopyRow = (String, String, i64, i64, Option<String>, Option<String>);
+
+/// What a key's copies are known by.
+#[derive(Debug, Default)]
+struct Marks {
+    email_ids: HashSet<String>,
+    fingerprints: HashSet<String>,
+}
+
+impl Marks {
+    fn add(&mut self, email_id: Option<String>, fingerprint: Option<String>) {
+        self.email_ids.extend(email_id);
+        self.fingerprints.extend(fingerprint);
+    }
+}
+
 /// A message this run downloaded: where its change and index row are.
 #[derive(Debug, Clone, Copy)]
 struct Inserted {
@@ -254,6 +285,8 @@ struct Header {
     /// What identifies it without one.
     fields: String,
     email_id: Option<String>,
+    /// A digest of its `Date`, `From` and size ([`Location::fingerprint`]).
+    fingerprint: String,
     from_self: bool,
 }
 
@@ -286,6 +319,13 @@ impl Header {
                 fetch.size.unwrap_or_default()
             ),
             email_id: fetch.email_id.clone(),
+            fingerprint: hex(&format!(
+                "{}\n{}\n{}",
+                field("date"),
+                field("from"),
+                fetch.size.unwrap_or_default()
+            ))[..32]
+                .to_owned(),
             from_self,
         }
     }
@@ -443,7 +483,9 @@ impl Reader<'_> {
             tracing::warn!(stream = %self.stream, code, "an IMAP run was cut short; what it read is kept");
         }
         Ok(Page {
-            more: trouble.is_none() && (!complete || !backfilled),
+            // Only a run that read something runs again at once: one that
+            // could not (a folder that will not open, the time) waits.
+            more: trouble.is_none() && (!complete || !backfilled) && run.progressed(&before),
             changes: run.changes,
             index: run.index,
             locations: run.locations,
@@ -605,11 +647,19 @@ impl Reader<'_> {
     /// the run's budget or time ran out in it).
     async fn folder(&mut self, run: &mut Run, i: usize) -> Result<bool, Stop> {
         let name = run.cursor.folders[i].name.clone();
+        if run.cursor.folders[i]
+            .skipped_until
+            .is_some_and(|until| until > self.now)
+        {
+            return Ok(true);
+        }
         let Some(status) = self.status(run, &name).await? else {
+            self.skip(run, i);
             return Ok(true);
         };
         let (Some(uidvalidity), Some(_)) = (status.uidvalidity, status.uidnext) else {
-            tracing::info!(stream = %self.stream, "an IMAP folder without UIDVALIDITY or UIDNEXT is skipped");
+            tracing::info!(stream = %self.stream, "an IMAP folder without UIDVALIDITY or UIDNEXT is set aside");
+            self.skip(run, i);
             return Ok(true);
         };
         let folder = &run.cursor.folders[i];
@@ -623,8 +673,10 @@ impl Reader<'_> {
             return Ok(true);
         }
         let Some(opened) = self.examine(run, &name).await? else {
+            self.skip(run, i);
             return Ok(true);
         };
+        run.cursor.folders[i].skipped_until = None;
         let uidvalidity = opened.uidvalidity.unwrap_or(uidvalidity);
         if run.cursor.folders[i]
             .uidvalidity
@@ -674,6 +726,11 @@ impl Reader<'_> {
         folder.messages = messages;
         folder.highestmodseq = highest;
         Ok(true)
+    }
+
+    /// Set folder `i` aside for [`SKIP_FOR`]: it would not open.
+    fn skip(&self, run: &mut Run, i: usize) {
+        run.cursor.folders[i].skipped_until = Some(self.now + SKIP_FOR);
     }
 
     /// Walk folder `i`'s window, newest first, below where the walk got.
@@ -792,7 +849,8 @@ impl Reader<'_> {
         Ok(Some(opened))
     }
 
-    /// `UID SEARCH criteria` in the open folder.
+    /// `UID SEARCH criteria` in the open folder: at most [`MAX_UIDS`] UIDs
+    /// (more cuts the run short).
     async fn search(&mut self, criteria: &str) -> Result<Vec<u32>, Stop> {
         let limits = Limits {
             response: 16 * 1024 * 1024,
@@ -801,14 +859,22 @@ impl Reader<'_> {
             time: self.timeout() * 2,
         };
         let mut uids = Vec::new();
+        let mut over = false;
         let done = self
             .session
             .command(&format!("UID SEARCH {criteria}"), limits, |untagged| {
                 if let Untagged::Search(found) = untagged {
-                    uids.extend(found);
+                    if uids.len().saturating_add(found.len()) > MAX_UIDS {
+                        over = true;
+                    } else {
+                        uids.extend(found);
+                    }
                 }
             })
             .await?;
+        if over {
+            return Err(Stop::Wire(WireError::TooMany));
+        }
         check(&done)?;
         Ok(uids)
     }
@@ -849,6 +915,7 @@ impl Reader<'_> {
                         seen: header.seen,
                         flagged: header.flagged,
                         email_id: header.email_id.clone(),
+                        fingerprint: Some(header.fingerprint.clone()),
                     };
                     let old =
                         mode == Mode::New && header.internal_date.is_some_and(|at| at < window);
@@ -882,6 +949,15 @@ impl Reader<'_> {
                                 run.mark_oversized(key);
                                 advance(run, i, uid, mode);
                                 return Err(Stop::Wire(WireError::TooLarge));
+                            }
+                            Err(Stop::Wire(WireError::TimedOut)) => {
+                                // Counted: after [`MAX_TIMEOUTS`] it is
+                                // never asked for again.
+                                run.index.push(IndexOp::Skipped {
+                                    provider_message_id: key.clone(),
+                                    at: self.now,
+                                });
+                                return Err(Stop::Wire(WireError::TimedOut));
                             }
                             Err(err) => return Err(err),
                         }
@@ -927,8 +1003,12 @@ impl Reader<'_> {
         Ok(found)
     }
 
-    /// The keys of `headers`: the `Message-ID` (or digest) key, unless the
-    /// server's EMAILID says another message already has it.
+    /// The keys of `headers`: the `Message-ID` (or digest) key, unless
+    /// that key's copies say this is another message: another EMAILID (with
+    /// OBJECTID), or another fingerprint (`Date`, `From`, size) — a forgery
+    /// or an auto-reply reusing the `Message-ID` is its own message, never
+    /// the stored body of the one it imitates. A message with no copy left
+    /// (moved) keeps its key.
     async fn identify(
         &self,
         run: &Run,
@@ -936,37 +1016,36 @@ impl Reader<'_> {
     ) -> Result<HashMap<u32, String>, Stop> {
         let mut keys: HashMap<u32, String> =
             headers.iter().map(|(uid, h)| (*uid, h.key())).collect();
-        if !run.caps.objectid || headers.values().all(|h| h.email_id.is_none()) {
-            return Ok(keys);
-        }
-        let bases: Vec<String> = keys.values().cloned().collect();
+        let mut bases: Vec<String> = keys.values().cloned().collect();
+        bases.sort_unstable();
+        bases.dedup();
         let mut tx = self.pool.begin_for(self.workspace).await?;
-        let rows: Vec<(String, String, i64, i64, String)> = sqlx::query_as(
-            "SELECT message_key, folder, uidvalidity, uid, email_id FROM connectors.imap_locations
-              WHERE stream_id = $1 AND message_key = ANY($2) AND email_id IS NOT NULL",
+        let rows: Vec<CopyRow> = sqlx::query_as(
+            "SELECT message_key, folder, uidvalidity, uid, email_id, fingerprint
+               FROM connectors.imap_locations
+              WHERE stream_id = $1 AND message_key = ANY($2)",
         )
         .bind(self.stream)
         .bind(&bases)
         .fetch_all(&mut *tx)
         .await?;
         tx.commit().await?;
-        let mut ids: HashMap<String, HashSet<String>> = HashMap::new();
-        for (key, folder, uidvalidity, uid, email_id) in rows {
+        let mut marks: HashMap<String, Marks> = HashMap::new();
+        for (key, folder, uidvalidity, uid, email_id, fingerprint) in rows {
             let place = Place {
                 folder,
                 uidvalidity: u32::try_from(uidvalidity).unwrap_or_default(),
                 uid: u32::try_from(uid).unwrap_or_default(),
             };
             if run.stored(&place) {
-                ids.entry(key).or_default().insert(email_id);
+                marks.entry(key).or_default().add(email_id, fingerprint);
             }
         }
         for location in run.put.values() {
-            if let Some(email_id) = &location.email_id {
-                ids.entry(location.key.clone())
-                    .or_default()
-                    .insert(email_id.clone());
-            }
+            marks
+                .entry(location.key.clone())
+                .or_default()
+                .add(location.email_id.clone(), location.fingerprint.clone());
         }
         let mut uids: Vec<&u32> = headers.keys().collect();
         uids.sort_unstable();
@@ -974,19 +1053,23 @@ impl Reader<'_> {
             let (Some(header), Some(key)) = (headers.get(uid), keys.get_mut(uid)) else {
                 continue;
             };
-            let Some(email_id) = &header.email_id else {
-                continue;
-            };
-            let seen = ids.entry(key.clone()).or_default();
-            if seen.is_empty() || seen.contains(email_id) {
-                seen.insert(email_id.clone());
-            } else {
-                let variant = format!("{key}~{}", &hex(email_id)[..16]);
-                ids.entry(variant.clone())
-                    .or_default()
-                    .insert(email_id.clone());
-                *key = variant;
+            if run.caps.objectid
+                && let Some(email_id) = &header.email_id
+                && marks
+                    .get(key.as_str())
+                    .is_some_and(|m| !m.email_ids.is_empty() && !m.email_ids.contains(email_id))
+            {
+                *key = format!("{key}~{}", &hex(email_id)[..16]);
             }
+            if marks.get(key.as_str()).is_some_and(|m| {
+                !m.fingerprints.is_empty() && !m.fingerprints.contains(&header.fingerprint)
+            }) {
+                *key = format!("{key}~{}", &header.fingerprint[..16]);
+            }
+            marks
+                .entry(key.clone())
+                .or_default()
+                .add(header.email_id.clone(), Some(header.fingerprint.clone()));
         }
         Ok(keys)
     }
@@ -1077,42 +1160,63 @@ impl Reader<'_> {
         let (_, copies) = self.copies(run, i).await?;
         let vanished = if run.caps.qresync { " VANISHED" } else { "" };
         let command = format!("UID FETCH 1:* (UID FLAGS) (CHANGEDSINCE {since}{vanished})");
-        let (changed, gone) = self.flags_of(&command).await?;
+        let (changed, gone) = self.flags_of(&command, &copies).await?;
         put_flags(run, &copies, &changed);
-        if !gone.is_empty() {
-            let gone = syntax::merged(gone);
-            for (place, location) in &copies {
-                if syntax::contains(&gone, place.uid) {
-                    run.drop_copy(place.clone(), &location.key);
-                }
+        for (place, location) in &copies {
+            if gone.contains(&place.uid) {
+                run.drop_copy(place.clone(), &location.key);
             }
         }
         Ok(())
     }
 
-    /// `FETCH … (UID FLAGS)`: each UID's (seen, flagged), and the UID
-    /// ranges reported vanished.
-    async fn flags_of(&mut self, command: &str) -> Result<FlagsRead, Stop> {
+    /// `FETCH … (UID FLAGS)` over a folder's `copies`: the (seen, flagged)
+    /// of each copy's UID, and the copies' UIDs reported vanished. Only
+    /// known UIDs are kept, so what is held stays within the copies,
+    /// whatever the server sends; past [`MAX_VANISHED`] ranges the answer
+    /// is cut short.
+    async fn flags_of(
+        &mut self,
+        command: &str,
+        copies: &HashMap<Place, Location>,
+    ) -> Result<FlagsRead, Stop> {
         let limits = Limits {
             response: 64 * 1024,
             responses: 2_000_000,
             total: 256 * 1024 * 1024,
             time: self.timeout() * 4,
         };
+        let mut known: Vec<u32> = copies.keys().map(|place| place.uid).collect();
+        known.sort_unstable();
         let mut changed: HashMap<u32, (bool, bool)> = HashMap::new();
-        let mut gone = Vec::new();
+        let mut gone: HashSet<u32> = HashSet::new();
+        let mut ranges = 0_usize;
         let done = self
             .session
             .command(command, limits, |untagged| match untagged {
                 Untagged::Fetch(fetch) => {
-                    if let (Some(uid), Some(flags)) = (fetch.uid, fetch.flags) {
+                    if let (Some(uid), Some(flags)) = (fetch.uid, fetch.flags)
+                        && known.binary_search(&uid).is_ok()
+                    {
                         changed.entry(uid).or_insert(flags);
                     }
                 }
-                Untagged::Vanished(ranges) => gone.extend(ranges),
+                Untagged::Vanished(vanished) => {
+                    ranges = ranges.saturating_add(vanished.len());
+                    if ranges <= MAX_VANISHED {
+                        for (low, high) in vanished {
+                            let from = known.partition_point(|uid| *uid < low);
+                            let to = known.partition_point(|uid| *uid <= high);
+                            gone.extend(known.get(from..to).unwrap_or_default());
+                        }
+                    }
+                }
                 _ => {}
             })
             .await?;
+        if ranges > MAX_VANISHED {
+            return Err(Stop::Wire(WireError::TooMany));
+        }
         check(&done)?;
         Ok((changed, gone))
     }
@@ -1133,17 +1237,14 @@ impl Reader<'_> {
         ) else {
             return Ok(());
         };
-        let present: HashSet<u32> = self
-            .search(&format!("UID {low}:{high}"))
-            .await?
-            .into_iter()
-            .collect();
+        let mut present = self.search(&format!("UID {low}:{high}")).await?;
+        present.sort_unstable();
         if present.is_empty() && messages.is_some_and(|n| n > 0) {
             tracing::warn!(stream = %self.stream, "an IMAP search found none of a folder's messages; not believed");
             return Ok(());
         }
         for (place, location) in copies {
-            if !present.contains(&place.uid) {
+            if present.binary_search(&place.uid).is_err() {
                 run.drop_copy(place, &location.key);
             }
         }
@@ -1161,11 +1262,15 @@ impl Reader<'_> {
             let Some(uidvalidity) = run.cursor.folders[i].uidvalidity else {
                 continue;
             };
+            if run.cursor.folders[i].skipped_until.is_some() {
+                continue;
+            }
             let (_, copies) = self.copies(run, i).await?;
             if copies.is_empty() {
                 continue;
             }
             let Some(opened) = self.examine(run, &name).await? else {
+                self.skip(run, i);
                 continue;
             };
             if opened.uidvalidity.is_some_and(|v| v != uidvalidity) {
@@ -1183,7 +1288,7 @@ impl Reader<'_> {
                 continue;
             };
             let (changed, _) = self
-                .flags_of(&format!("UID FETCH {low}:{high} (UID FLAGS)"))
+                .flags_of(&format!("UID FETCH {low}:{high} (UID FLAGS)"), &copies)
                 .await?;
             put_flags(run, &copies, &changed);
         }
@@ -1201,8 +1306,9 @@ impl Reader<'_> {
             return Ok((folder, HashMap::new()));
         };
         let mut tx = self.pool.begin_for(self.workspace).await?;
-        let rows: Vec<(i64, String, bool, bool, Option<String>)> = sqlx::query_as(
-            "SELECT uid, message_key, seen, flagged, email_id FROM connectors.imap_locations
+        let rows: Vec<(i64, String, bool, bool, Option<String>, Option<String>)> = sqlx::query_as(
+            "SELECT uid, message_key, seen, flagged, email_id, fingerprint
+               FROM connectors.imap_locations
               WHERE stream_id = $1 AND folder = $2 AND uidvalidity = $3",
         )
         .bind(self.stream)
@@ -1212,7 +1318,7 @@ impl Reader<'_> {
         .await?;
         tx.commit().await?;
         let mut copies = HashMap::new();
-        for (uid, key, seen, flagged, email_id) in rows {
+        for (uid, key, seen, flagged, email_id, fingerprint) in rows {
             let Ok(uid) = u32::try_from(uid) else {
                 continue;
             };
@@ -1229,6 +1335,7 @@ impl Reader<'_> {
                         seen,
                         flagged,
                         email_id,
+                        fingerprint,
                     },
                 );
             }
@@ -1315,7 +1422,8 @@ impl Reader<'_> {
         Ok(())
     }
 
-    /// Which of `keys` were recorded as oversized before.
+    /// Which of `keys` were recorded as oversized before, or timed out
+    /// [`MAX_TIMEOUTS`] times (recorded as oversized now).
     async fn load_oversized(&self, run: &mut Run, keys: &[String]) -> Result<(), Stop> {
         if keys.is_empty() {
             return Ok(());
@@ -1329,8 +1437,21 @@ impl Reader<'_> {
         .bind(keys)
         .fetch_all(&mut *tx)
         .await?;
+        // Downloads that timed out run after run: as good as oversized.
+        let stuck: Vec<String> = sqlx::query_scalar(
+            "SELECT provider_message_id FROM connectors.skipped_messages
+              WHERE stream_id = $1 AND provider_message_id = ANY($2) AND failures >= $3",
+        )
+        .bind(self.stream)
+        .bind(keys)
+        .bind(MAX_TIMEOUTS)
+        .fetch_all(&mut *tx)
+        .await?;
         tx.commit().await?;
         run.oversized.extend(rows);
+        for key in stuck {
+            run.mark_oversized(&key);
+        }
         Ok(())
     }
 
@@ -1364,8 +1485,11 @@ impl Reader<'_> {
             let Some(Some(known)) = run.known.get(key) else {
                 continue;
             };
-            match known.rfc_message_id.as_deref().and_then(quoted) {
-                Some(id) => searchable.push((key.clone(), id)),
+            match known.rfc_message_id.as_deref().map(quoted) {
+                Some(Some(id)) => searchable.push((key.clone(), id)),
+                // A Message-ID a search cannot carry (not ASCII, too long):
+                // it cannot be looked for, so it is kept.
+                Some(None) => {}
                 // Without a Message-ID it cannot be looked for: gone when
                 // the window's walk would have found it.
                 None if known.internal_date >= window => removable.push(key.clone()),
@@ -1424,7 +1548,12 @@ impl Reader<'_> {
                 return Ok(false);
             }
             let name = run.cursor.folders[i].name.clone();
+            if run.cursor.folders[i].skipped_until.is_some() {
+                whole = false;
+                continue;
+            }
             let Some(opened) = self.examine(run, &name).await? else {
+                self.skip(run, i);
                 whole = false;
                 continue;
             };
@@ -1591,8 +1720,9 @@ impl Reader<'_> {
     }
 }
 
-/// What `FETCH … (UID FLAGS)` read: flags by UID, and vanished ranges.
-type FlagsRead = (HashMap<u32, (bool, bool)>, Vec<(u32, u32)>);
+/// What `FETCH … (UID FLAGS)` read: flags by known UID, and the known UIDs
+/// reported vanished.
+type FlagsRead = (HashMap<u32, (bool, bool)>, HashSet<u32>);
 
 /// Put the flags of `changed` (by UID) on the `copies` of one folder they
 /// differ on.

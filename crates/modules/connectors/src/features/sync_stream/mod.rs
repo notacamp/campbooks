@@ -659,10 +659,19 @@ impl SyncStream {
             ))
         })?;
         let imap = self.deps.imap.clone();
-        let slots = imap_slots(&server.host);
-        let rate = imap_rate(imap.config.sessions_per_host);
-        if schedule::take(ctx.pool(), &slots, 1, rate).await?.is_err() {
-            // The host has as many sessions as it may: the next dispatch.
+        let slots = [
+            // The workspace's share of the host, then the host's.
+            (
+                imap_workspace_slots(&server.host, workspace),
+                imap_rate(imap.config.workspace_sessions_per_host),
+            ),
+            (
+                imap_slots(&server.host),
+                imap_rate(imap.config.sessions_per_host),
+            ),
+        ];
+        if !take_slots(ctx.pool(), &slots).await? {
+            // As many sessions as it may: the next dispatch.
             metrics::sync_finished(target.provider, SyncOutcome::Throttled);
             let wait = Duration::from_secs(u64::from(self.deps.config.poll.min_seconds));
             Self::wait_for_budget(ctx, workspace, target.stream, wait, now).await?;
@@ -686,14 +695,7 @@ impl SyncStream {
         let read = tokio::time::timeout(IMAP_RUN_LIMIT, Box::pin(read_imap(run)))
             .await
             .unwrap_or(Err(ImapTrouble::Failed(Failure::Server("imap_timed_out"))));
-        if let Err(err) = schedule::settle(ctx.pool(), &slots, 1, 0, rate).await {
-            tracing::warn!(
-                %workspace,
-                stream = %target.stream,
-                error = %campbooks_kernel::redact::error(&err),
-                "could not give back an IMAP session slot"
-            );
-        }
+        give_back_slots(ctx.pool(), &slots).await;
         match read {
             Ok(page) => imap_page(page).map(Some),
             Err(ImapTrouble::Refused(refusal)) => {
@@ -1128,6 +1130,36 @@ const SLOT_SECONDS: f64 = 900.0;
 /// The budget of `host`'s IMAP sessions (`connectors.provider_budgets`).
 fn imap_slots(host: &str) -> String {
     format!("imap:{host}")
+}
+
+/// The budget of `workspace`'s sessions to `host`: its share of the host's.
+fn imap_workspace_slots(host: &str, workspace: WorkspaceId) -> String {
+    format!("imap:{host}:{workspace}")
+}
+
+/// Take one slot of each of `slots` (key, rate), in order; none when one
+/// is full (those taken are given back). Whether they were taken.
+async fn take_slots(pool: &PgPool, slots: &[(String, Rate)]) -> Result<bool, JobError> {
+    for (n, (key, rate)) in slots.iter().enumerate() {
+        if schedule::take(pool, key, 1, *rate).await?.is_err() {
+            give_back_slots(pool, &slots[..n]).await;
+            return Ok(false);
+        }
+    }
+    Ok(true)
+}
+
+/// Give back one slot of each of `slots` (best effort: a slot not given
+/// back comes back as its bucket refills).
+async fn give_back_slots(pool: &PgPool, slots: &[(String, Rate)]) {
+    for (key, rate) in slots {
+        if let Err(err) = schedule::settle(pool, key, 1, 0, *rate).await {
+            tracing::warn!(
+                error = %campbooks_kernel::redact::error(&err),
+                "could not give back an IMAP session slot"
+            );
+        }
+    }
 }
 
 /// `sessions` slots per host: taken one per run, given back when it ends.
