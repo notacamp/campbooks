@@ -12,8 +12,17 @@ import { describe, expect, it, vi } from "vitest";
 import { ReplyOpenerProvider, type OpenReply } from "~/lib/reply-opener";
 
 import {
+  answered,
   answerFrames,
   ARCHIVE_PROPOSAL,
+  NOTHING_CHAT,
+  NOTICE_ANSWER,
+  NOTICE_CHAT,
+  NOTICE_WHY,
+  RECENT,
+  RULE_CHAT,
+  WAITING_ANSWER,
+  WAITING_QUESTION,
   chatWithProposals,
   MARTA_RULE,
   REPLY_PROPOSAL,
@@ -26,19 +35,25 @@ import {
   WHY_ANSWER,
 } from "../../../../../test/demo/assistant";
 import { MARTA, MARTA_DETAIL, PEDRO } from "../../../../../test/demo/attention";
-import { W } from "../../../../../test/demo/conversations";
+import { BUILDS_NOTICE, LEDGER_RULE, W } from "../../../../../test/demo/conversations";
 import { DUARTE } from "../../../../../test/demo/workspaces";
 import { mockApi, problem, renderWithProviders } from "../../../../../test/render";
 
-import { ScoutChat } from "./ScoutChat";
+import { ScoutChat, type ScoutChatProps } from "./ScoutChat";
 
 const CHATS = `${W}/assistant/chats`;
 const STREAM = `POST ${CHATS}/${MARTA_CHAT.id}/questions/stream`;
 
-function renderChat(onClose = vi.fn(), openReply?: OpenReply) {
+function renderChat(onClose = vi.fn(), openReply?: OpenReply, props: Partial<ScoutChatProps> = {}) {
   const root = createRootRoute({ component: Outlet });
   const chat = (
-    <ScoutChat workspaceId={DUARTE.id} conversationId={MARTA.id} onClose={onClose} modal={false} />
+    <ScoutChat
+      workspaceId={DUARTE.id}
+      about={{ type: "conversations.conversation", id: MARTA.id }}
+      onClose={onClose}
+      modal={false}
+      {...props}
+    />
   );
   const page = createRoute({
     getParentRoute: () => root,
@@ -414,6 +429,148 @@ describe("ScoutChat", () => {
         expect(states.get(REPLY_PROPOSAL.id)).toBe("done");
       });
       expect(mocked.calls.every((call) => !call.route.includes("/drafts"))).toBe(true);
+    });
+  });
+  describe("about other things (phase 3)", () => {
+    it("chats about a rule: its sentence, and questions about what it does", async () => {
+      const mocked = api([{ status: 201, body: RULE_CHAT }], {
+        [`GET ${W}/rules/${LEDGER_RULE.id}`]: { body: LEDGER_RULE },
+      });
+      renderChat(vi.fn(), undefined, {
+        about: { type: "conversations.rule", id: LEDGER_RULE.id },
+      });
+
+      const region = await screen.findByRole("region", { name: "Scout" });
+      expect(
+        await within(region).findByText("Mail from hello@weekly-ledger.example → Newsletters"),
+      ).toBeVisible();
+      expect(within(region).getByText("Ask me about this rule.")).toBeVisible();
+      for (const question of ["What does this rule do?", "What has it changed?"]) {
+        expect(within(region).getByRole("button", { name: question })).toBeVisible();
+      }
+      expect(mocked.calls.find((call) => call.route === `POST ${CHATS}`)?.body).toEqual({
+        about: { type: "conversations.rule", id: LEDGER_RULE.id },
+      });
+    });
+
+    it("chats about one of Scout's suggestions: its sender, and why", async () => {
+      const stream = `POST ${CHATS}/${NOTICE_CHAT.id}/questions/stream`;
+      const mocked = api(
+        [
+          { status: 201, body: NOTICE_CHAT },
+          { body: answered(NOTICE_CHAT, NOTICE_WHY, NOTICE_ANSWER) },
+        ],
+        {
+          [`GET ${W}/rule-notices/${BUILDS_NOTICE.id}`]: { body: BUILDS_NOTICE },
+          [stream]: { stream: answerFrames(NOTICE_ANSWER, "CI writes most days.") },
+        },
+      );
+      renderChat(vi.fn(), undefined, {
+        about: { type: "conversations.rule_notice", id: BUILDS_NOTICE.id },
+      });
+
+      expect(
+        await screen.findByText("Scout’s suggestion for CI (builds@ci.example.com)"),
+      ).toBeVisible();
+      fireEvent.click(await screen.findByRole("button", { name: NOTICE_WHY }));
+
+      expect(await screen.findAllByText(/you opened 2 of them/u)).not.toHaveLength(0);
+      expect(mocked.calls.find((call) => call.route === stream)?.body).toMatchObject({
+        text: NOTICE_WHY,
+      });
+      expect(screen.queryByRole("button", { name: "What would it change?" })).toBeNull();
+    });
+
+    it("says a suggestion is gone when it is no longer offered", async () => {
+      api([problem(404, "not_found")]);
+      renderChat(vi.fn(), undefined, {
+        about: { type: "conversations.rule_notice", id: BUILDS_NOTICE.id },
+      });
+
+      expect(await screen.findByText("This suggestion is no longer offered to you.")).toBeVisible();
+      expect(screen.queryByRole("textbox")).not.toBeInTheDocument();
+    });
+
+    it("starts a chat about nothing and asks the question handed over, once", async () => {
+      const stream = `POST ${CHATS}/${NOTHING_CHAT.id}/questions/stream`;
+      const mocked = api([{ status: 201, body: NOTHING_CHAT }], {
+        [stream]: { stream: answerFrames(WAITING_ANSWER, "Two people owe Sam an answer.") },
+        [`GET ${CHATS}/${NOTHING_CHAT.id}`]: {
+          body: answered(NOTHING_CHAT, WAITING_QUESTION, WAITING_ANSWER),
+        },
+      });
+      renderChat(vi.fn(), undefined, { about: null, opening: 1, ask: WAITING_QUESTION });
+
+      expect(await screen.findAllByText(/You’re waiting on two people/u)).not.toHaveLength(0);
+      expect(screen.getByText("your mail")).toBeVisible();
+      expect(mocked.calls.find((call) => call.route === `POST ${CHATS}`)?.body).toEqual({});
+      await waitFor(() => {
+        // Read again by its id: starting again would make another chat.
+        expect(mocked.calls.some((call) => call.route === `GET ${CHATS}/${NOTHING_CHAT.id}`)).toBe(
+          true,
+        );
+      });
+      expect(mocked.calls.filter((call) => call.route === stream)).toHaveLength(1);
+      expect(mocked.calls.filter((call) => call.route === `POST ${CHATS}`)).toHaveLength(1);
+      expect(screen.getByRole("textbox", { name: "Ask about your mail" })).toBeVisible();
+    });
+
+    it("offers what needs you and what you wait on in a chat about nothing", async () => {
+      api([{ status: 201, body: NOTHING_CHAT }]);
+      renderChat(vi.fn(), undefined, { about: null, opening: 2 });
+
+      for (const question of ["What needs me today?", WAITING_QUESTION]) {
+        expect(await screen.findByRole("button", { name: question })).toBeVisible();
+      }
+    });
+
+    it("lists Recent by first question and reopens a chat chosen there", async () => {
+      const mocked = api([{ status: 201, body: NOTHING_CHAT }], {
+        [`GET ${CHATS}`]: { body: { chats: RECENT } },
+        [`GET ${CHATS}/${MARTA_CHAT.id}`]: { body: MARTA_CHAT_ANSWERED },
+      });
+      renderChat(vi.fn(), undefined, { about: null, opening: 3 });
+      await screen.findByRole("button", { name: "What needs me today?" });
+
+      fireEvent.click(screen.getByRole("button", { name: "Recent" }));
+      const menu = await screen.findByRole("dialog", { name: "Recent" });
+      const rows = await within(menu).findAllByRole("button");
+      expect(rows.map((row) => row.querySelector("span")?.textContent)).toEqual([
+        WAITING_QUESTION,
+        WHY,
+        "What has it changed?",
+      ]);
+      expect(rows[0]).toHaveAttribute("aria-current", "true");
+      const waiting = within(menu).getByRole("button", { name: new RegExp(WAITING_QUESTION, "u") });
+      const why = within(menu).getByRole("button", { name: new RegExp(WHY, "u") });
+      waiting.focus();
+      fireEvent.keyDown(waiting, { key: "ArrowDown" });
+      expect(why).toHaveFocus();
+
+      fireEvent.click(why);
+      expect(
+        await screen.findAllByText(/It is under Reply because Marta asks you/u),
+      ).not.toHaveLength(0);
+      expect(await screen.findByText("Marta Ferreira · Walkthrough on Thursday")).toBeVisible();
+      expect(mocked.calls.some((call) => call.route === `GET ${CHATS}/${MARTA_CHAT.id}`)).toBe(
+        true,
+      );
+    });
+
+    it("closes Recent with Esc before the panel", async () => {
+      api([{ status: 201, body: NOTHING_CHAT }], { [`GET ${CHATS}`]: { body: { chats: [] } } });
+      const { onClose } = renderChat(vi.fn(), undefined, { about: null, opening: 4 });
+      await screen.findByRole("button", { name: "What needs me today?" });
+
+      fireEvent.click(screen.getByRole("button", { name: "Recent" }));
+      const menu = await screen.findByRole("dialog", { name: "Recent" });
+      expect(
+        await within(menu).findByText("No chats yet. Ask Scout something to start one."),
+      ).toBeVisible();
+      fireEvent.keyDown(menu, { key: "Escape" });
+
+      expect(onClose).not.toHaveBeenCalled();
+      expect(screen.queryByText("No chats yet. Ask Scout something to start one.")).toBeNull();
     });
   });
 });

@@ -69,10 +69,13 @@ describe("ConversationReader", () => {
     // The focus comes back to the button it was asked from.
     ask.focus();
     fireEvent.click(ask);
-    expect(scout).toHaveBeenCalledWith(Q4.id, ask);
+    expect(scout).toHaveBeenCalledWith(
+      { type: "conversations.conversation", id: Q4.id },
+      { from: ask },
+    );
     fireEvent.keyDown(document.body, { key: "." });
     expect(scout).toHaveBeenCalledTimes(2);
-    expect(scout.mock.calls[1]?.[0]).toBe(Q4.id);
+    expect(scout.mock.calls[1]?.[0]).toEqual({ type: "conversations.conversation", id: Q4.id });
   });
 
   it("offers no Ask Scout where no chat is mounted", async () => {

@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
+import { ruleNoticeRef, useScoutChat } from "~/lib/scout-chat";
 import { useShortcut } from "~/lib/shortcuts";
 import { Button, Note, Text, useUndoToast } from "~/lib/ui";
 
@@ -8,22 +9,12 @@ import { useInboxes } from "../../api/queries";
 import { useNoticeAnswers, useRuleNotices, type RuleNotice } from "../../api/rules";
 import { streamName, type Translate } from "../../model";
 import { ruleStream } from "../../rules-text";
+import { noticeSender } from "../../scout-subjects";
 
 import { SmartRuleConfirm, type SmartRuleDraft } from "./SmartRuleConfirm";
 
 export interface ScoutNoticedProps {
   workspaceId: string;
-}
-
-/**
- * Who it is about: the address, after the name the sender gives (which the
- * sender chooses, so never alone).
- */
-function senderOf(notice: RuleNotice): string {
-  const name = notice.sender_name?.trim();
-  return name === undefined || name === "" || name === notice.sender
-    ? notice.sender
-    : `${name} (${notice.sender})`;
 }
 
 /** What the question calls the sender: their name when they give one, else the address. */
@@ -36,7 +27,7 @@ function nameOf(notice: RuleNotice): string {
 function sentence(t: Translate, locale: string, notice: RuleNotice): string {
   const { evidence } = notice;
   const number = (n: number) => new Intl.NumberFormat(locale).format(n);
-  const sender = senderOf(notice);
+  const sender = noticeSender(notice);
   const counts = {
     count: evidence.received,
     n: number(evidence.received),
@@ -61,9 +52,10 @@ function sentence(t: Translate, locale: string, notice: RuleNotice): string {
 /**
  * "Scout noticed" on Home, right after the first group (campbooks-cloud#169,
  * #274): one suggestion at a time from `conversations.list_rule_notices`, with
- * "n of N", what Scout noticed in numbers, and four buttons of one style: the
+ * "n of N", what Scout noticed in numbers, and buttons of one style: the
  * notice's own verb ("Archive them…"), Something else… (with the visor), Not
- * now and Don't suggest this (each with Undo). Both of the first two open the
+ * now and Don't suggest this (each with Undo), and Ask Scout (the chat about
+ * the suggestion, where one is mounted). Both of the first two open the
  * confirmation, which asks what should happen to the sender's mail and alone
  * saves. Nothing while the list loads or fails, or when there is none.
  */
@@ -79,6 +71,15 @@ export function ScoutNoticed({ workspaceId }: ScoutNoticedProps) {
   const [draft, setDraft] = useState<SmartRuleDraft | null>(null);
   const shown = (notices.data ?? []).filter((notice) => !hidden.has(notice.id));
   const notice = shown[0];
+  // Ask Scout (campbooks-cloud#305): the chat about this suggestion; the
+  // focus comes back to the button on close.
+  const scout = useScoutChat();
+  const askButton = useRef<HTMLButtonElement>(null);
+  const ask = () => {
+    if (notice !== undefined) {
+      scout?.(ruleNoticeRef(notice.id), { from: askButton.current });
+    }
+  };
 
   const hide = (id: string, on: boolean) => {
     setHidden((current) => {
@@ -178,6 +179,7 @@ export function ScoutNoticed({ workspaceId }: ScoutNoticedProps) {
     },
     { enabled: live },
   );
+  useShortcut("inbox.noticed.ask", ask, { enabled: live && scout !== undefined });
   // The confirmation stays where it is when the suggestion it answers goes
   // (saved): its result shows to the end.
   if (notice === undefined) {
@@ -236,6 +238,17 @@ export function ScoutNoticed({ workspaceId }: ScoutNoticedProps) {
             >
               {t("noticed.never")}
             </Button>
+            {scout === undefined ? null : (
+              <Button
+                ref={askButton}
+                variant="secondary"
+                shortcut="inbox.noticed.ask"
+                ai
+                onClick={ask}
+              >
+                {t("noticed.ask")}
+              </Button>
+            )}
           </>
         }
       >

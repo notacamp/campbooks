@@ -1,7 +1,8 @@
-import { fireEvent, screen, waitFor } from "@testing-library/react";
+import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 import type { Schema } from "~/lib/api";
+import { ScoutChatProvider } from "~/lib/scout-chat";
 
 import { ANA, ANA_DETAIL } from "../../../../../test/demo/attention";
 import { INBOX, W } from "../../../../../test/demo/conversations";
@@ -79,6 +80,36 @@ function dialog(props: Partial<Parameters<typeof NudgeDialog>[0]> = {}) {
 }
 
 describe("NudgeDialog", () => {
+  it("asks Scout about the conversation from its header, and stays open", async () => {
+    routes();
+    const scout = vi.fn();
+    const onClose = vi.fn();
+    if (ANA.need === null || ANA.need === undefined) {
+      throw new Error("the fixture has no need");
+    }
+    renderWithProviders(
+      <ScoutChatProvider open={scout}>
+        <NudgeDialog
+          workspaceId={DUARTE.id}
+          conversationId={ANA.id}
+          need={ANA.need}
+          onClose={onClose}
+          onOpenDraft={vi.fn()}
+        />
+      </ScoutChatProvider>,
+    );
+    const nudge = await screen.findByRole("dialog", { name: "Nudge Ana" });
+    const ask = within(nudge).getByRole("button", { name: "Ask Scout about this email" });
+
+    fireEvent.click(ask);
+    expect(scout).toHaveBeenCalledWith(
+      { type: "conversations.conversation", id: ANA.id },
+      { from: ask },
+    );
+    expect(onClose).not.toHaveBeenCalled();
+    expect(screen.getByRole("dialog", { name: "Nudge Ana" })).toBeVisible();
+  });
+
   it("writes Scout's nudge, says who it goes to and who is copied, and sends it with undo", async () => {
     const api = routes();
     const handlers = dialog();

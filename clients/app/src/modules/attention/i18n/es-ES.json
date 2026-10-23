@@ -104,6 +104,7 @@
     "nudgeNow": "Recordar ahora",
     "notWaiting": "No estoy esperando",
     "label": "Esperando a {{name}}",
-    "fold": "Esperando a otros · {{count}}"
+    "fold": "Esperando a otros · {{count}}",
+    "ask": "Preguntar a Scout"
   }
 }

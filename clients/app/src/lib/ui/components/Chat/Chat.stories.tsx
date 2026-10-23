@@ -12,6 +12,7 @@ import {
   ChatNotice,
   ChatPanel,
   ChatProposal,
+  ChatRecent,
   ChatSteps,
   ChatSuggestions,
   ChatWorking,
@@ -201,6 +202,47 @@ export const Unavailable: Story = {
   args: {
     footer: <ChatNotice visor="asleep">Scout can&apos;t chat on this server.</ChatNotice>,
     children: null,
+  },
+};
+
+/** Recent, in the header: the member's chats by their first question; one opens. */
+export const Recent: Story = {
+  args: {
+    actions: (
+      <ChatRecent
+        label="Recent"
+        current="c-1"
+        items={[
+          {
+            id: "c-1",
+            text: "What am I waiting on?",
+            time: "15:02",
+            dateTime: "2026-10-13T15:02:00Z",
+          },
+          {
+            id: "c-2",
+            text: "Why is Marta’s walkthrough email under Reply, and does she need an answer today?",
+            time: "Yesterday",
+            dateTime: "2026-10-12T09:40:00Z",
+          },
+          {
+            id: "c-3",
+            text: "What has it changed?",
+            time: "9 Oct",
+            dateTime: "2026-10-09T17:05:00Z",
+          },
+        ]}
+        empty="No chats yet. Ask Scout something to start one."
+        loading="Loading your chats…"
+        onPick={fn()}
+      />
+    ),
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await userEvent.click(canvas.getByRole("button", { name: "Recent" }));
+    const menu = canvas.getByRole("dialog", { name: "Recent" });
+    await expect(within(menu).getAllByRole("button")).toHaveLength(3);
   },
 };
 

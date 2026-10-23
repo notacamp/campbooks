@@ -182,7 +182,7 @@ export const CONVERSATIONS_SHORTCUTS = [
     group: "item",
     label: "conversations:shortcuts.allPaid",
   },
-  // Scout noticed on Home: its four buttons, on Shift + a letter so none
+  // Scout noticed on Home: its buttons, on Shift + a letter so none
   // meets Home's item keys (R E S H X 1-3 ...).
   {
     // Its own verb: archive them, or file them under a stream.
@@ -212,6 +212,14 @@ export const CONVERSATIONS_SHORTCUTS = [
     scope: "item",
     group: "item",
     label: "conversations:shortcuts.noticedNever",
+  },
+  {
+    // Ask Scout about the suggestion (campbooks-cloud#305).
+    id: "inbox.noticed.ask",
+    keys: "shift+q",
+    scope: "item",
+    group: "item",
+    label: "conversations:shortcuts.noticedAsk",
   },
   {
     // Focus moves through the open messages' attachments; Enter opens one.

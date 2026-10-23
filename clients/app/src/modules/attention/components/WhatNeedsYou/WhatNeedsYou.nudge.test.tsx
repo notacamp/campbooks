@@ -12,6 +12,7 @@ import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { Schema } from "~/lib/api";
+import { ScoutChatProvider, type OpenScoutChat } from "~/lib/scout-chat";
 
 import {
   ANA,
@@ -54,7 +55,7 @@ const NUDGE: Schema<"DraftView"> = {
   subject: `Re: ${ANA.subject}`,
 };
 
-function renderHome() {
+function renderHome(scout?: OpenScoutChat) {
   const root = createRootRoute({ component: Outlet });
   const home = createRoute({
     getParentRoute: () => root,
@@ -70,7 +71,13 @@ function renderHome() {
     routeTree: root.addChildren([home, conversation]),
     history: createMemoryHistory({ initialEntries: [`/w/${DUARTE.id}`] }),
   });
-  return { router, ...renderWithProviders(<RouterProvider router={router} />) };
+  const app = <RouterProvider router={router} />;
+  return {
+    router,
+    ...renderWithProviders(
+      scout === undefined ? app : <ScoutChatProvider open={scout}>{app}</ScoutChatProvider>,
+    ),
+  };
 }
 
 function api({ role = "manager" }: { role?: "manager" | "reader" } = {}) {
@@ -280,6 +287,28 @@ describe("What needs you: Waiting on others", () => {
     const to = await screen.findByText("Rui Matos <rui@matos-carpintaria.example>");
     expect(to.closest("p")).toHaveTextContent("To Rui Matos <rui@matos-carpintaria.example>");
     expect(screen.getByRole("dialog")).not.toHaveTextContent("Copying");
+  });
+
+  it("asks Scout about Rui's conversation from his row, where a chat is mounted", async () => {
+    api();
+    const scout = vi.fn();
+    renderHome(scout);
+    const rui = within(await screen.findByRole("listitem", { name: "Waiting on Rui Matos" }));
+    const ask = rui.getByRole("button", { name: /Ask Scout/u });
+
+    fireEvent.click(ask);
+    expect(scout).toHaveBeenCalledWith(
+      { type: "conversations.conversation", id: RUI.id },
+      { from: ask },
+    );
+  });
+
+  it("offers no Ask Scout on a row where no chat is mounted", async () => {
+    api();
+    renderHome();
+    const rui = within(await screen.findByRole("listitem", { name: "Waiting on Rui Matos" }));
+
+    expect(rui.queryByRole("button", { name: /Ask Scout/u })).toBeNull();
   });
 
   it("stops waiting on Inês with Not waiting, and Undo brings the row back", async () => {
