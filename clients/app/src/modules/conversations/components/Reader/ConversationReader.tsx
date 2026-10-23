@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { errorStatus } from "~/lib/api";
+import { useScoutChat } from "~/lib/scout-chat";
 import { useShortcut } from "~/lib/shortcuts";
 import {
   ActionBar,
@@ -20,6 +21,7 @@ import {
   ReaderFooter,
   SkeletonList,
   Spacer,
+  Visor,
 } from "~/lib/ui";
 
 import {
@@ -316,6 +318,28 @@ export function ConversationReader({
     },
     { enabled: active },
   );
+  // Ask Scout (`.`): the chat about this conversation; the focus comes
+  // back to the button it was asked from (the one on screen for `.`).
+  const scout = useScoutChat();
+  const askScoutWide = useRef<HTMLButtonElement>(null);
+  const askScoutNarrow = useRef<HTMLButtonElement>(null);
+  const askScout = (from?: HTMLElement | null) => {
+    if (conversation === undefined) {
+      return;
+    }
+    const shown = [askScoutWide.current, askScoutNarrow.current].find(
+      (button) => button !== null && button.offsetParent !== null,
+    );
+    scout?.(conversation.id, from ?? shown ?? askScoutWide.current);
+  };
+  useShortcut(
+    "scout.ask",
+    () => {
+      askScout();
+    },
+    // Asking changes nothing: a reader of the inbox asks too.
+    { enabled: scout !== undefined && conversation !== undefined },
+  );
   const viewing = conversation !== undefined;
   // Remote images never load in spam.
   useShortcut("inbox.show_images", showAllImages, { enabled: viewing && !inSpam });
@@ -557,6 +581,34 @@ export function ConversationReader({
           </>
         ) : null}
         {replyButtons}
+        {scout === undefined ? null : (
+          <>
+            <span className="flex max-md:hidden">
+              <Button
+                ref={askScoutWide}
+                variant="ghost"
+                ai
+                shortcut="scout.ask"
+                onClick={(event) => {
+                  askScout(event.currentTarget);
+                }}
+              >
+                {t("actions.askScout")}
+              </Button>
+            </span>
+            <span className="flex md:hidden">
+              <IconButton
+                ref={askScoutNarrow}
+                label={t("actions.askScout")}
+                icon={<Visor size="xs" />}
+                shortcut="scout.ask"
+                onClick={(event) => {
+                  askScout(event.currentTarget);
+                }}
+              />
+            </span>
+          </>
+        )}
         {renderReplySlot === undefined ? null : (
           // Phones: Reply is in the floating bar; these two stay in the header.
           <span className="flex gap-1 md:hidden">

@@ -84,8 +84,7 @@ async fn kit_with(db: PgPool, gateway: Option<Gateway>) -> Kit {
     .await;
     {
         let mut mail = kit.mail.lock().unwrap();
-        mail.conversations
-            .insert(CONVERSATION.into(), marta(RENT));
+        mail.conversations.insert(CONVERSATION.into(), marta(RENT));
         mail.histories.insert(CONVERSATION.into(), history());
     }
     kit
@@ -134,7 +133,10 @@ fn streamed_text(content: &str) -> String {
         .find(|at| content.is_char_boundary(*at))
         .unwrap_or(0);
     [
-        chunk(json!({"reasoning": "Marta's email is a bill."}), Value::Null),
+        chunk(
+            json!({"reasoning": "Marta's email is a bill."}),
+            Value::Null,
+        ),
         chunk(json!({"content": &content[..half]}), Value::Null),
         chunk(json!({"content": &content[half..]}), json!("stop")),
         "data: [DONE]\n\n".to_owned(),
@@ -283,7 +285,10 @@ async fn a_chat_is_its_members_alone(db: PgPool) {
     assert_ne!(owners.json["id"], id.as_str());
 
     // An app acting for nobody: 403, and nothing made.
-    let client = kit.client(workspace, "assistant:read assistant:write conversations:read");
+    let client = kit.client(
+        workspace,
+        "assistant:read assistant:write conversations:read",
+    );
     let refused = kit.post(&client, &chats(workspace), json!({})).await;
     assert_eq!(refused.status, StatusCode::FORBIDDEN, "{}", refused.json);
     assert_eq!(refused.json["code"], "chat_needs_member");
@@ -417,7 +422,8 @@ async fn the_desktop_gets_the_same_answer_whole(db: PgPool) {
     let kit = kit_with(db, Some(gateway(&server.uri()))).await;
     {
         let mut mail = kit.mail.lock().unwrap();
-        mail.hits = vec![json!({"record": {"type": "conversations.conversation", "id": CONVERSATION}})];
+        mail.hits =
+            vec![json!({"record": {"type": "conversations.conversation", "id": CONVERSATION}})];
         mail.list = vec![json!({
             "id": CONVERSATION, "subject": "Rent for November", "inbox_id": "inbox-1",
             "stream": "primary", "last_message_at": "2026-10-20T09:00:00Z",
@@ -441,10 +447,7 @@ async fn the_desktop_gets_the_same_answer_whole(db: PgPool) {
     assert_eq!(asked.json["text"], ANSWER);
     assert_eq!(asked.json["steps"][0]["tool"], "find_conversations");
     assert_eq!(asked.json["steps"][0]["count"], 1);
-    assert_eq!(
-        asked.json["steps"][0]["records"][0]["id"],
-        CONVERSATION
-    );
+    assert_eq!(asked.json["steps"][0]["records"][0]["id"], CONVERSATION);
     let requests = sent(&server).await;
     assert_eq!(requests[0]["stream"], false);
     let called = kit.mail.lock().unwrap().called.clone();
@@ -551,7 +554,11 @@ async fn access_lost_sends_nothing_of_it(db: PgPool) {
     assert_eq!(context["about"], Value::Null);
     assert_eq!(context["about_lost"], true);
     let whole = request.to_string();
-    for never in ["Rent for November", "marta@example.com", "the rent for November"] {
+    for never in [
+        "Rent for November",
+        "marta@example.com",
+        "the rent for November",
+    ] {
         assert!(!whole.contains(never), "{never}");
     }
 }
@@ -580,7 +587,11 @@ async fn questions_are_bounded_before_any_model(db: PgPool) {
     assert_eq!(full.status, StatusCode::CONFLICT);
     assert_eq!(full.json["code"], "chat_full");
     let streamed = kit
-        .post(&sam, &format!("{uri}/stream"), json!({ "text": "One more?" }))
+        .post(
+            &sam,
+            &format!("{uri}/stream"),
+            json!({ "text": "One more?" }),
+        )
         .await;
     assert_eq!(streamed.status, StatusCode::CONFLICT);
     assert!(sent(&server).await.is_empty());
@@ -604,7 +615,9 @@ async fn thirty_questions_an_hour(db: PgPool) {
     let id = started(&kit, &sam, workspace).await;
     let uri = format!("{}/{id}/questions", chats(workspace));
     for n in 0..30 {
-        let asked = kit.post(&sam, &uri, json!({ "text": format!("Question {n}") })).await;
+        let asked = kit
+            .post(&sam, &uri, json!({ "text": format!("Question {n}") }))
+            .await;
         assert_eq!(asked.status, StatusCode::OK, "{n}: {}", asked.json);
     }
     let over = kit.post(&sam, &uri, json!({ "text": "And another" })).await;
@@ -762,8 +775,8 @@ async fn a_dropped_stream_keeps_the_question_and_a_failed_answer(db: PgPool) {
 
 #[test]
 fn every_tool_and_about_read_is_a_catalogued_read_the_assistant_may_call() {
-    let spec: Value = serde_json::from_str(include_str!("../../../../../../openapi/openapi.json"))
-        .unwrap();
+    let spec: Value =
+        serde_json::from_str(include_str!("../../../../../../openapi/openapi.json")).unwrap();
     let catalogue = Catalogue::from_json(&spec);
     let reads = tools::OPERATIONS
         .iter()
@@ -775,7 +788,10 @@ fn every_tool_and_about_read_is_a_catalogued_read_the_assistant_may_call() {
             .unwrap_or_else(|| panic!("{id} is not in the catalogue"));
         let meta = operation.meta.as_ref().unwrap();
         assert!(meta.assistant, "{id}: the assistant may not call it");
-        assert!(!meta.mutates && !operation.mutates(), "{id} changes something");
+        assert!(
+            !meta.mutates && !operation.mutates(),
+            "{id} changes something"
+        );
     }
     // The chat's own operations are the member's alone.
     for id in [

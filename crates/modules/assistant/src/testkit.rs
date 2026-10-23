@@ -132,12 +132,12 @@ type Shared = Arc<Mutex<Mail>>;
 async fn get_conversation(
     _: Workspace<ConversationsRead>,
     Extension(mail): Extension<Shared>,
-    extract::Path((_, id)): extract::Path<(String, String)>,
+    extract::Path(path): extract::Path<(String, String)>,
 ) -> Result<Json<Value>, Error> {
     let mut mail = mail.lock().unwrap();
     mail.called.push("conversations.get".into());
     mail.conversations
-        .get(&id)
+        .get(&path.1)
         .cloned()
         .map(Json)
         .ok_or(Error::NotFound)
@@ -152,14 +152,14 @@ async fn get_conversation(
 async fn get_history(
     _: Workspace<ConversationsRead>,
     Extension(mail): Extension<Shared>,
-    extract::Path((_, id)): extract::Path<(String, String)>,
+    extract::Path(path): extract::Path<(String, String)>,
 ) -> Result<Json<Value>, Error> {
     let mut mail = mail.lock().unwrap();
     mail.called.push("conversations.get_history".into());
-    if !mail.conversations.contains_key(&id) {
+    if !mail.conversations.contains_key(&path.1) {
         return Err(Error::NotFound);
     }
-    Ok(Json(mail.histories.get(&id).cloned().unwrap_or_else(
+    Ok(Json(mail.histories.get(&path.1).cloned().unwrap_or_else(
         || json!({ "events": [], "truncated": false }),
     )))
 }

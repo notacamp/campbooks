@@ -200,19 +200,19 @@ pub async fn start(
         Some(about) => store::chat_about(&mut tx, user, about).await?,
         None => None,
     };
-    let (status, row) = match existing {
-        Some(row) => (StatusCode::OK, row),
-        None => match store::create(&mut tx, workspace.id, user, body.about.as_ref()).await? {
-            Some(row) => (StatusCode::CREATED, row),
-            // Made meanwhile, by the same member in another tab.
-            None => {
-                let about = body.about.as_ref().ok_or(Error::NotFound)?;
-                let row = store::chat_about(&mut tx, user, about)
-                    .await?
-                    .ok_or(Error::NotFound)?;
-                (StatusCode::OK, row)
-            }
-        },
+    let (status, row) = if let Some(row) = existing {
+        (StatusCode::OK, row)
+    } else if let Some(row) =
+        store::create(&mut tx, workspace.id, user, body.about.as_ref()).await?
+    {
+        (StatusCode::CREATED, row)
+    } else {
+        // Made meanwhile, by the same member in another tab.
+        let about = body.about.as_ref().ok_or(Error::NotFound)?;
+        let row = store::chat_about(&mut tx, user, about)
+            .await?
+            .ok_or(Error::NotFound)?;
+        (StatusCode::OK, row)
     };
     let view = store::view(&mut tx, &row).await?;
     tx.commit().await?;
