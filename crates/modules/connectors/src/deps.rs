@@ -93,10 +93,10 @@ impl Deps {
         config: &Config,
         secret: Option<SecretKey>,
     ) -> Result<Self, String> {
-        let config = ConnectorsConfig::from_figment(figment)?;
+        let settings = ConnectorsConfig::from_figment(figment)?;
         let mut deps = Self {
-            imap: Arc::new(Imap::new(config.imap.clone())),
-            config: Arc::new(config),
+            imap: Arc::new(Imap::new(settings.imap.clone())),
+            config: Arc::new(settings),
             ..Self::default()
         };
         let development = config.env == Environment::Development;
