@@ -34,8 +34,8 @@ use utoipa_axum::routes;
 use crate::AssistantDeps;
 
 /// Every scope a member's token carries here.
-pub const ALL_SCOPES: &str =
-    "assistant:read assistant:write conversations:read search:read attention:read";
+pub const ALL_SCOPES: &str = "assistant:read assistant:write conversations:read search:read attention:read \
+     tasks:read workspaces:read";
 
 #[derive(Debug, Default)]
 struct TestMembership {
@@ -101,6 +101,10 @@ pub struct Mail {
     pub items: Vec<Value>,
     /// `conversations.list_streams`'s `streams`.
     pub streams: Vec<Value>,
+    /// `tasks.get`'s `task`, by task id; any other id is 404.
+    pub tasks: HashMap<String, Value>,
+    /// `workspaces.list_members`'s `members`.
+    pub members: Vec<Value>,
     /// Every stand-in operation called, in order.
     pub called: Vec<String>,
     /// Every change a chat invoked: always empty (each panics).
@@ -128,7 +132,56 @@ impl ScopeName for AttentionRead {
     const DESCRIPTION: &'static str = "What needs you (stand-in).";
 }
 
+struct TasksRead;
+
+impl ScopeName for TasksRead {
+    const NAME: &'static str = "tasks:read";
+    const DESCRIPTION: &'static str = "Read tasks (stand-in).";
+}
+
+struct WorkspacesRead;
+
+impl ScopeName for WorkspacesRead {
+    const NAME: &'static str = "workspaces:read";
+    const DESCRIPTION: &'static str = "Read members (stand-in).";
+}
+
 type Shared = Arc<Mutex<Mail>>;
+
+#[utoipa::path(get, path = "/api/v1/w/{workspace_id}/tasks/{task_id}",
+    operation_id = "tasks.get",
+    params(("workspace_id" = String, Path), ("task_id" = String, Path),
+        ("utc_offset" = Option<i32>, Query)),
+    security(("bearer" = ["tasks:read"])),
+    extensions(("x-campbooks" = json!(Operation::query().assistant().records(["tasks.task"])))),
+    responses((status = OK, body = Value)))]
+async fn get_task(
+    _: Workspace<TasksRead>,
+    Extension(mail): Extension<Shared>,
+    extract::Path(path): extract::Path<(String, String)>,
+) -> Result<Json<Value>, Error> {
+    let mut mail = mail.lock().unwrap();
+    mail.called.push("tasks.get".into());
+    mail.tasks
+        .get(&path.1)
+        .map(|task| Json(json!({ "task": task, "history": [] })))
+        .ok_or(Error::NotFound)
+}
+
+#[utoipa::path(get, path = "/api/v1/w/{workspace_id}/members",
+    operation_id = "workspaces.list_members",
+    params(("workspace_id" = String, Path)),
+    security(("bearer" = ["workspaces:read"])),
+    extensions(("x-campbooks" = json!(Operation::query().assistant().records(["workspaces.member"])))),
+    responses((status = OK, body = Value)))]
+async fn list_members(
+    _: Workspace<WorkspacesRead>,
+    Extension(mail): Extension<Shared>,
+) -> Json<Value> {
+    let mut mail = mail.lock().unwrap();
+    mail.called.push("workspaces.list_members".into());
+    Json(json!({ "members": mail.members }))
+}
 
 #[utoipa::path(get, path = "/api/v1/w/{workspace_id}/conversations/{conversation_id}",
     operation_id = "conversations.get",
@@ -517,6 +570,76 @@ async fn never_unsnooze(Extension(mail): Extension<Shared>) -> Json<Value> {
     never(&mail, "attention.unsnooze")
 }
 
+#[utoipa::path(post, path = "/api/v1/w/{workspace_id}/tasks/{task_id}/done",
+    operation_id = "tasks.done",
+    params(("workspace_id" = String, Path), ("task_id" = String, Path)),
+    request_body = Value,
+    extensions(("x-campbooks" = json!(Operation::command(Risk::Low).undo("tasks.reopen").automation().assistant().records(["tasks.task"])))),
+    responses((status = OK, body = Value)))]
+async fn never_task_done(Extension(mail): Extension<Shared>) -> Json<Value> {
+    never(&mail, "tasks.done")
+}
+
+#[utoipa::path(post, path = "/api/v1/w/{workspace_id}/tasks/{task_id}/not_needed",
+    operation_id = "tasks.not_needed",
+    params(("workspace_id" = String, Path), ("task_id" = String, Path)),
+    request_body = Value,
+    extensions(("x-campbooks" = json!(Operation::command(Risk::Low).undo("tasks.reopen").automation().assistant().records(["tasks.task"])))),
+    responses((status = OK, body = Value)))]
+async fn never_task_not_needed(Extension(mail): Extension<Shared>) -> Json<Value> {
+    never(&mail, "tasks.not_needed")
+}
+
+#[utoipa::path(post, path = "/api/v1/w/{workspace_id}/tasks/{task_id}/reopen",
+    operation_id = "tasks.reopen",
+    params(("workspace_id" = String, Path), ("task_id" = String, Path)),
+    request_body = Value,
+    extensions(("x-campbooks" = json!(Operation::command(Risk::Low).automation().assistant().records(["tasks.task"])))),
+    responses((status = OK, body = Value)))]
+async fn never_task_reopen(Extension(mail): Extension<Shared>) -> Json<Value> {
+    never(&mail, "tasks.reopen")
+}
+
+#[utoipa::path(post, path = "/api/v1/w/{workspace_id}/tasks/{task_id}/plan",
+    operation_id = "tasks.plan",
+    params(("workspace_id" = String, Path), ("task_id" = String, Path)),
+    request_body = Value,
+    extensions(("x-campbooks" = json!(Operation::command(Risk::Low).automation().assistant().records(["tasks.task"])))),
+    responses((status = OK, body = Value)))]
+async fn never_task_plan(Extension(mail): Extension<Shared>) -> Json<Value> {
+    never(&mail, "tasks.plan")
+}
+
+#[utoipa::path(patch, path = "/api/v1/w/{workspace_id}/tasks/{task_id}",
+    operation_id = "tasks.update",
+    params(("workspace_id" = String, Path), ("task_id" = String, Path)),
+    request_body = Value,
+    extensions(("x-campbooks" = json!(Operation::command(Risk::Low).automation().assistant().records(["tasks.task"])))),
+    responses((status = OK, body = Value)))]
+async fn never_task_update(Extension(mail): Extension<Shared>) -> Json<Value> {
+    never(&mail, "tasks.update")
+}
+
+#[utoipa::path(post, path = "/api/v1/w/{workspace_id}/tasks/{task_id}/hand_off",
+    operation_id = "tasks.hand_off",
+    params(("workspace_id" = String, Path), ("task_id" = String, Path)),
+    request_body = Value,
+    extensions(("x-campbooks" = json!(Operation::command(Risk::Low).undo("tasks.take_back").automation().assistant().records(["tasks.task"])))),
+    responses((status = OK, body = Value)))]
+async fn never_task_hand_off(Extension(mail): Extension<Shared>) -> Json<Value> {
+    never(&mail, "tasks.hand_off")
+}
+
+#[utoipa::path(post, path = "/api/v1/w/{workspace_id}/tasks/{task_id}/take_back",
+    operation_id = "tasks.take_back",
+    params(("workspace_id" = String, Path), ("task_id" = String, Path)),
+    request_body = Value,
+    extensions(("x-campbooks" = json!(Operation::command(Risk::Low).automation().assistant().records(["tasks.task"])))),
+    responses((status = OK, body = Value)))]
+async fn never_task_take_back(Extension(mail): Extension<Shared>) -> Json<Value> {
+    never(&mail, "tasks.take_back")
+}
+
 /// The module over a fresh database.
 pub struct Kit {
     /// The test database as its owner (no row-level security).
@@ -575,6 +698,15 @@ impl Kit {
             .routes(routes!(never_reopen_need))
             .routes(routes!(never_snooze))
             .routes(routes!(never_unsnooze))
+            .routes(routes!(get_task))
+            .routes(routes!(list_members))
+            .routes(routes!(never_task_done))
+            .routes(routes!(never_task_not_needed))
+            .routes(routes!(never_task_reopen))
+            .routes(routes!(never_task_plan))
+            .routes(routes!(never_task_update))
+            .routes(routes!(never_task_hand_off))
+            .routes(routes!(never_task_take_back))
             .layer(Extension(mail.clone()));
         let state = idp
             .state(pool)

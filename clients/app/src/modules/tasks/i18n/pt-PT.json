@@ -63,6 +63,7 @@
     "label": "Tarefa",
     "empty": "Escolha uma tarefa",
     "emptyBody": "Escolha uma tarefa da lista para a ver aqui.",
+    "askScout": "Perguntar ao Scout",
     "back": "Voltar",
     "titleLabel": "Título da tarefa",
     "noDate": "Sem data",

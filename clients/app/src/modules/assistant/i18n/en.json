@@ -354,8 +354,18 @@
         "already_paid": "Already paid",
         "still_to_pay": "Still to pay",
         "yes_to_question": "Answer yes",
-        "later": "Later, until {{until}}"
+        "later": "Later, until {{until}}",
+        "task_done": "Mark done",
+        "task_paid": "Mark paid",
+        "task_not_needed": "Not needed",
+        "plan_day": "Plan it for {{day}}",
+        "task_later": "Later, until {{until}}",
+        "due": "Due on {{day}}",
+        "hand_off": "Hand to {{name}}"
       },
+      "taskLine": "{{title}} · due {{due}}",
+      "taskNoDue": "{{title}}",
+      "handOffNote": "It goes to {{name}}’s Home.",
       "streams": {
         "primary": "Primary",
         "updates": "Updates",
@@ -394,6 +404,12 @@
     "unreadableRule": "Scout can’t open a chat about this rule.",
     "unreadableNotice": "This suggestion is no longer offered to you.",
     "unreadableNothing": "Scout can’t start a chat just now. Try again in a moment.",
+    "taskIntro": "Ask me about this task.",
+    "taskLeft": "What’s left on this?",
+    "taskWhen": "When should I do this?",
+    "taskWho": "Who could take this?",
+    "taskLine": "Task: {{title}}",
+    "unreadableTask": "Scout can’t open a chat about this task.",
     "gone": "This chat is no longer here."
   }
 }

@@ -8,7 +8,7 @@ import {
   useParams,
 } from "@tanstack/react-router";
 import { fireEvent, screen, waitFor } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { MARTA } from "../../../../../test/demo/attention";
 import { W } from "../../../../../test/demo/conversations";
@@ -25,6 +25,8 @@ import {
   VENUE,
 } from "../../../../../test/demo/tasks";
 import { ANA, DUARTE } from "../../../../../test/demo/workspaces";
+import { ScoutChatProvider, type OpenScoutChat } from "~/lib/scout-chat";
+
 import { mockApi, renderWithProviders } from "../../../../../test/render";
 import type { TaskSource } from "../../source";
 
@@ -49,7 +51,7 @@ function Route() {
   );
 }
 
-function renderTasks(path = "tasks") {
+function renderTasks(path = "tasks", openChat?: OpenScoutChat) {
   const root = createRootRoute({ component: Outlet });
   const list = createRoute({
     getParentRoute: () => root,
@@ -70,7 +72,13 @@ function renderTasks(path = "tasks") {
     routeTree: root.addChildren([list, open, reader]),
     history: createMemoryHistory({ initialEntries: [`/w/${DUARTE.id}/${path}`] }),
   });
-  return { router, ...renderWithProviders(<RouterProvider router={router} />) };
+  const app = <RouterProvider router={router} />;
+  return {
+    router,
+    ...renderWithProviders(
+      openChat === undefined ? app : <ScoutChatProvider open={openChat}>{app}</ScoutChatProvider>,
+    ),
+  };
 }
 
 /** The button that opens the task titled `title` (not its check). */
@@ -183,6 +191,17 @@ describe("Tasks", () => {
     expect(field).toHaveValue("");
     expect(field).toHaveFocus();
     expect(await screen.findByText("Renew the parking permit")).toBeVisible();
+  });
+
+  it("asks Scout about the open task, from its detail", async () => {
+    api();
+    const open = vi.fn();
+    renderTasks("tasks", open);
+    fireEvent.click(await rowOf(LEASE.title));
+    fireEvent.click(await screen.findByRole("button", { name: /^Ask Scout/u }));
+
+    // Pressed with no focus of its own: the focus has nowhere to return to.
+    expect(open).toHaveBeenCalledWith({ type: "tasks.task", id: LEASE.id }, { from: null });
   });
 
   it("puts a task off until tomorrow morning from its detail", async () => {
