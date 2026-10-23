@@ -13,6 +13,8 @@
 //!   teach in, without those the caller answered "Not now" (for a while) or
 //!   "Don't suggest this" (for good, per sender and kind), and starts a pass
 //!   for an inbox not looked at lately.
+//! - `GET …/rule-notices/{id}` reads one of them, as the list shows it (Scout's
+//!   chat about a suggestion reads it so, as the member), and starts no pass.
 //! - `POST …/rule-notices/{id}/answer` records that answer, per member;
 //!   `DELETE` takes it back (Undo).
 //! - Saying yes goes through `conversations.create_rule` with the
@@ -426,6 +428,7 @@ pub struct RuleNoticeList {
     pub notices: Vec<RuleNotice>,
 }
 
+#[derive(sqlx::FromRow)]
 struct NoticeRow {
     id: RuleNoticeId,
     inbox_id: InboxId,
@@ -516,24 +519,90 @@ pub async fn list(
     .await?;
     let shared = rules::shared_of(&mut tx, &teachable).await?;
     tx.commit().await?;
-    let json = |e: serde_json::Error| Error::internal(crate::domain::redact::json(&e));
     let notices = rows
         .into_iter()
         .map(|row| {
-            Ok(RuleNotice {
-                id: row.id,
-                inbox_id: row.inbox_id,
-                kind: row.kind.parse()?,
-                sender: row.sender_address,
-                sender_name: row.sender_name,
-                conditions: serde_json::from_value(row.conditions).map_err(json)?,
-                actions: serde_json::from_value(row.actions).map_err(json)?,
-                evidence: serde_json::from_value(row.evidence).map_err(json)?,
-                shared: shared.contains(&row.inbox_id),
-            })
+            let shared = shared.contains(&row.inbox_id);
+            notice_of(row, shared)
         })
         .collect::<Result<Vec<_>>>()?;
     Ok(Json(RuleNoticeList { notices }))
+}
+
+/// A suggestion as the lists show it.
+fn notice_of(row: NoticeRow, shared: bool) -> Result<RuleNotice> {
+    let json = |e: serde_json::Error| Error::internal(crate::domain::redact::json(&e));
+    Ok(RuleNotice {
+        id: row.id,
+        inbox_id: row.inbox_id,
+        kind: row.kind.parse()?,
+        sender: row.sender_address,
+        sender_name: row.sender_name,
+        conditions: serde_json::from_value(row.conditions).map_err(json)?,
+        actions: serde_json::from_value(row.actions).map_err(json)?,
+        evidence: serde_json::from_value(row.evidence).map_err(json)?,
+        shared,
+    })
+}
+
+/// Read one of Scout's suggestions, as `conversations.list_rule_notices`
+/// lists it: an open one, in an inbox you may teach in, that you did not
+/// answer "Not now" (for a while) or "Don't suggest this". It starts no
+/// pass over the inbox.
+#[utoipa::path(
+    get,
+    path = "/api/v1/w/{workspace_id}/rule-notices/{notice_id}",
+    operation_id = "conversations.get_rule_notice",
+    tag = "conversations",
+    security(("bearer" = ["conversations:read"])),
+    extensions(("x-campbooks" = json!(Operation::query().assistant().records(["conversations.rule"]).access("conversations.inbox", campbooks_kernel::authz::Action::Write)))),
+    params(
+        ("workspace_id" = WorkspaceId, Path, description = "The workspace."),
+        ("notice_id" = RuleNoticeId, Path, description = "The suggestion."),
+    ),
+    responses(
+        (status = OK, description = "The suggestion.", body = RuleNotice),
+        (status = UNAUTHORIZED, description = "No valid access token.", body = Problem,
+            content_type = "application/problem+json"),
+        (status = FORBIDDEN, description = "Missing scope, you may only read this inbox, or an app asked.",
+            body = Problem, content_type = "application/problem+json"),
+        (status = NOT_FOUND, description = "No such suggestion, it is no longer offered, \
+            you answered it, or you cannot see it.",
+            body = Problem, content_type = "application/problem+json"),
+    )
+)]
+pub async fn get(
+    State(state): State<AppState>,
+    workspace: Workspace<ConversationsRead>,
+    extract::Path(path): extract::Path<NoticePath>,
+) -> Result<Json<RuleNotice>> {
+    let access = &workspace.access;
+    let mut tx = state.db.begin_for(access.workspace).await?;
+    let (inbox, _, _) = target(&mut tx, path.notice_id).await?;
+    // As for an answer: 404 unless the caller sees its inbox, 403 when they
+    // only read it; an app gets 403 too: suggestions are a member's own.
+    may_teach(&state, &mut tx, access, inbox).await?;
+    member_only(&workspace.principal)?;
+    let user = access.user.ok_or(Error::NotFound)?;
+    let row: NoticeRow = sqlx::query_as(
+        "SELECT n.id, n.inbox_id, n.kind, n.sender_address, n.sender_name, n.conditions, \
+                n.actions, n.evidence \
+           FROM conversations.rule_notices n \
+          WHERE n.id = $1 AND n.state = 'open' \
+            AND NOT EXISTS ( \
+                SELECT 1 FROM conversations.rule_notice_answers a \
+                 WHERE a.inbox_id = n.inbox_id AND a.user_id = $2 AND a.kind = n.kind \
+                   AND a.sender_address = n.sender_address \
+                   AND (a.answer = 'never' OR a.until > now()))",
+    )
+    .bind(path.notice_id)
+    .bind(user.as_uuid())
+    .fetch_optional(&mut *tx)
+    .await?
+    .ok_or(Error::NotFound)?;
+    let shared = rules::shared_of(&mut tx, &[inbox]).await?.contains(&inbox);
+    tx.commit().await?;
+    Ok(Json(notice_of(row, shared)?))
 }
 
 // --- Answers ----------------------------------------------------------------

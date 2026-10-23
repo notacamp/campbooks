@@ -1033,6 +1033,7 @@ fn acts_in_the_inbox(id: &str) -> bool {
             | "conversations.write_reply"
             | "conversations.write_nudge"
             | "conversations.stream_reply"
+            | "conversations.get_rule_notice"
             | "conversations.answer_rule_notice"
             | "conversations.clear_rule_notice_answer"
     )
@@ -1048,7 +1049,9 @@ fn in_the_inbox(resource_type: &str) -> bool {
 fn answers_a_notice(id: &str) -> bool {
     matches!(
         id,
-        "conversations.answer_rule_notice" | "conversations.clear_rule_notice_answer"
+        "conversations.get_rule_notice"
+            | "conversations.answer_rule_notice"
+            | "conversations.clear_rule_notice_answer"
     )
 }
 

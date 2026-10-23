@@ -86,7 +86,7 @@ fn router() -> OpenApiRouter<AppState> {
     OpenApiRouter::new()
         .routes(routes!(profile::get, profile::update))
         .routes(routes!(compile::handler))
-        .routes(routes!(chat::start))
+        .routes(routes!(chat::start, chat::list))
         .routes(routes!(chat::get, chat::delete))
         .routes(routes!(chat::ask))
         .routes(routes!(chat::stream))

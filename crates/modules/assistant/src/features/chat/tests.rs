@@ -775,6 +775,298 @@ async fn a_dropped_stream_keeps_the_question_and_a_failed_answer(db: PgPool) {
     assert_eq!(messages[1]["text"], "");
 }
 
+const RULE: &str = "0192f0c4-7d4e-7b39-a7f1-3a8f0e2b9c22";
+const NOTICE: &str = "0192f0c4-7d4e-7b39-a7f1-3a8f0e2b9c33";
+const ELSEWHERE: &str = "0192f0c4-0000-7000-8000-000000000000";
+
+/// A rule Sam taught, as `conversations.get_rule` answers it.
+fn newsletters_rule() -> Value {
+    json!({
+        "id": RULE, "inbox_id": "inbox-1", "teaching_id": "t-1",
+        "conditions": [{"field": "sender_address", "value": "news@shop.example"}],
+        "actions": [{"action": "archive"}],
+        "origin": "instruction", "origin_text": "Shop newsletters never need me",
+        "state": "active", "created_at": "2026-10-01T09:00:00Z",
+        "applied_count": 14, "last_applied_at": "2026-10-20T09:00:00Z",
+        "recent_exceptions": 0, "shared": false, "may_change": true,
+        "content_token": "do-not-hand-on",
+    })
+}
+
+/// What Scout noticed, as `conversations.get_rule_notice` answers it.
+fn builds_notice() -> Value {
+    json!({
+        "id": NOTICE, "inbox_id": "inbox-1", "kind": "keep_off_home",
+        "sender": "builds@ci.example.com", "sender_name": "CI",
+        "conditions": [{"field": "sender_address", "value": "builds@ci.example.com"}],
+        "actions": [{"action": "surface", "value": "never"}],
+        "evidence": {"received": 12, "opened": 0, "archived_unread": 0, "last_week": 7,
+                     "window_days": 60, "cadence": "daily"},
+        "shared": false,
+    })
+}
+
+async fn chat_count(kit: &Kit) -> i64 {
+    sqlx::query_scalar("SELECT count(*) FROM assistant.chats")
+        .fetch_one(&kit.db)
+        .await
+        .unwrap()
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_chat_about_a_rule_or_a_suggestion_reads_it_as_the_member(db: PgPool) {
+    let server = MockServer::start().await;
+    Mock::given(method("POST"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(text(ANSWER)))
+        .mount(&server)
+        .await;
+    let kit = kit_with(db, Some(gateway(&server.uri()))).await;
+    {
+        let mut mail = kit.mail.lock().unwrap();
+        mail.rules.insert(RULE.into(), newsletters_rule());
+        mail.notices.insert(NOTICE.into(), builds_notice());
+    }
+    let workspace = WorkspaceId::new();
+    let (sam, _) = kit.member("sam", workspace);
+
+    // A rule or a suggestion of an inbox Sam is not in (the reads answer
+    // 404): nothing is started.
+    for kind in ["conversations.rule", "conversations.rule_notice"] {
+        let hidden = kit
+            .post(
+                &sam,
+                &chats(workspace),
+                json!({ "about": { "type": kind, "id": ELSEWHERE } }),
+            )
+            .await;
+        assert_eq!(
+            hidden.status,
+            StatusCode::NOT_FOUND,
+            "{kind}: {}",
+            hidden.json
+        );
+    }
+    assert_eq!(chat_count(&kit).await, 0);
+
+    for (kind, id, expected) in [
+        ("conversations.rule", RULE, "news@shop.example"),
+        ("conversations.rule_notice", NOTICE, "builds@ci.example.com"),
+    ] {
+        let about = json!({ "about": { "type": kind, "id": id } });
+        let started = kit.post(&sam, &chats(workspace), about.clone()).await;
+        assert_eq!(
+            started.status,
+            StatusCode::CREATED,
+            "{kind}: {}",
+            started.json
+        );
+        assert_eq!(started.json["about"]["type"], kind);
+        let chat = started.json["id"].as_str().unwrap().to_owned();
+        let asked = kit
+            .post(
+                &sam,
+                &format!("{}/{chat}/questions", chats(workspace)),
+                json!({ "text": "What does this do?" }),
+            )
+            .await;
+        assert_eq!(asked.status, StatusCode::OK, "{kind}: {}", asked.json);
+        let again = kit.post(&sam, &chats(workspace), about).await;
+        assert_eq!(again.status, StatusCode::OK, "{kind}: continued");
+        assert_eq!(again.json["id"], chat.as_str());
+        let seen = context(sent(&server).await.last().unwrap());
+        assert_eq!(seen["about"]["type"], kind);
+        assert_eq!(seen["about"]["id"], id);
+        assert!(seen.to_string().contains(expected), "{kind}: {seen}");
+        assert!(seen.get("about_nothing").is_none());
+    }
+    let requests = sent(&server).await;
+    let rule = context(&requests[0]);
+    assert_eq!(rule["about"]["conversations_acted_on"], 14);
+    assert_eq!(rule["about"]["taught_as"], "Shop newsletters never need me");
+    assert!(!rule.to_string().contains("do-not-hand-on"), "no tokens");
+    let notice = context(&requests[1]);
+    assert_eq!(notice["about"]["sender"]["name"], "CI");
+    assert_eq!(notice["about"]["evidence"]["received"], 12);
+
+    // The suggestion is no longer offered (Sam said yes, or Never): the
+    // next answer says Scout can no longer see it, and nothing of it goes.
+    let notice_chat = kit
+        .post(
+            &sam,
+            &chats(workspace),
+            json!({ "about": { "type": "conversations.rule_notice", "id": NOTICE } }),
+        )
+        .await
+        .json["id"]
+        .as_str()
+        .unwrap()
+        .to_owned();
+    kit.mail.lock().unwrap().notices.clear();
+    let asked = kit
+        .post(
+            &sam,
+            &format!("{}/{notice_chat}/questions", chats(workspace)),
+            json!({ "text": "And now?" }),
+        )
+        .await;
+    assert_eq!(asked.status, StatusCode::OK, "{}", asked.json);
+    assert!(
+        asked.json["text"]
+            .as_str()
+            .unwrap()
+            .starts_with("This suggestion is no longer offered to you"),
+        "{}",
+        asked.json["text"]
+    );
+    let last = sent(&server).await.last().unwrap().clone();
+    assert_eq!(context(&last)["about_lost"], true);
+    assert!(!last.to_string().contains("builds@ci.example.com"));
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_chat_about_nothing_is_always_a_new_one(db: PgPool) {
+    let server = MockServer::start().await;
+    once(&server, text(ANSWER)).await;
+    let kit = kit_with(db, Some(gateway(&server.uri()))).await;
+    let workspace = WorkspaceId::new();
+    let (sam, _) = kit.member("sam", workspace);
+
+    let first = kit.post(&sam, &chats(workspace), json!({})).await;
+    let second = kit.post(&sam, &chats(workspace), json!({})).await;
+    for started in [&first, &second] {
+        assert_eq!(started.status, StatusCode::CREATED, "{}", started.json);
+        assert_eq!(started.json["about"], Value::Null);
+        assert_eq!(started.json["messages"], json!([]));
+    }
+    assert_ne!(first.json["id"], second.json["id"]);
+    assert!(sent(&server).await.is_empty(), "starting calls no model");
+
+    let id = first.json["id"].as_str().unwrap();
+    let asked = kit
+        .post(
+            &sam,
+            &format!("{}/{id}/questions", chats(workspace)),
+            json!({ "text": "What am I waiting on?" }),
+        )
+        .await;
+    assert_eq!(asked.status, StatusCode::OK, "{}", asked.json);
+    let context = context(&sent(&server).await[0]);
+    assert_eq!(context["about"], Value::Null);
+    assert_eq!(context["about_nothing"], true);
+    assert!(context.get("about_lost").is_none());
+    assert!(
+        !asked.json["text"]
+            .as_str()
+            .unwrap()
+            .starts_with("I can no longer see")
+    );
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn recent_chats_are_ones_own_newest_first(db: PgPool) {
+    let kit = kit_with(db, None).await;
+    let workspace = WorkspaceId::new();
+    let (sam_token, sam) = kit.member("sam", workspace);
+    let (ana_token, ana) = kit.member("ana", workspace);
+    let (wes_token, _) = kit.member_as("wes", workspace, Role::Owner);
+    // Chats as they are stored: `days` since the last message, the
+    // questions asked in it, what it is about.
+    let chat = |user: campbooks_kernel::tenancy::UserId,
+                days: i32,
+                questions: Vec<String>,
+                about: Option<&'static str>| {
+        let db = kit.db.clone();
+        async move {
+            let id = super::ChatId::new();
+            sqlx::query(
+                "INSERT INTO assistant.chats
+                     (id, workspace_id, user_id, about_type, about_id, questions, last_message_at)
+                 VALUES ($1, $2, $3, $4, $5, $6, now() - make_interval(days => $7))",
+            )
+            .bind(id)
+            .bind(workspace.as_uuid())
+            .bind(user.as_uuid())
+            .bind(about.map(|_| "conversations.conversation"))
+            .bind(about)
+            .bind(i32::try_from(questions.len()).unwrap())
+            .bind(days)
+            .execute(&db)
+            .await
+            .unwrap();
+            for (n, question) in questions.iter().enumerate() {
+                for (author, text) in [("member", question.as_str()), ("scout", ANSWER)] {
+                    sqlx::query(
+                        "INSERT INTO assistant.chat_messages
+                             (id, workspace_id, chat_id, author, text, finish, created_at)
+                         VALUES ($1, $2, $3, $4, $5, CASE WHEN $4 = 'scout' THEN 'done' END,
+                                 now() - make_interval(days => $6, mins => $7))",
+                    )
+                    .bind(super::ChatMessageId::new())
+                    .bind(workspace.as_uuid())
+                    .bind(id)
+                    .bind(author)
+                    .bind(text)
+                    .bind(days)
+                    .bind(i32::try_from(10 - n).unwrap())
+                    .execute(&db)
+                    .await
+                    .unwrap();
+                }
+            }
+            id.to_string()
+        }
+    };
+    let long = format!("Why is {} here?", "this ".repeat(60));
+    let older = chat(sam, 3, vec!["Why is this here?".into()], Some(CONVERSATION)).await;
+    let newer = chat(sam, 1, vec![long.clone(), "And the next one?".into()], None).await;
+    let _empty = chat(sam, 0, vec![], None).await;
+    let anas = chat(ana, 0, vec!["What needs me today?".into()], None).await;
+
+    let uri = chats(workspace);
+    let listed = kit.get(&sam_token, &uri).await;
+    assert_eq!(listed.status, StatusCode::OK, "{}", listed.json);
+    let rows = listed.json["chats"].as_array().unwrap();
+    let ids: Vec<&str> = rows.iter().map(|r| r["id"].as_str().unwrap()).collect();
+    assert_eq!(
+        ids,
+        [newer.as_str(), older.as_str()],
+        "newest first, his only"
+    );
+    assert_eq!(rows[0]["about"], Value::Null);
+    assert_eq!(rows[0]["questions"], 2);
+    let first = rows[0]["first_question"].as_str().unwrap();
+    assert_eq!(first.chars().count(), 120);
+    assert!(long.starts_with(first));
+    assert_eq!(rows[1]["first_question"], "Why is this here?");
+    assert_eq!(rows[1]["about"]["id"], CONVERSATION);
+    assert!(rows[1].get("messages").is_none(), "no messages, no subject");
+
+    let anas_list = kit.get(&ana_token, &uri).await;
+    let anas_ids: Vec<&str> = anas_list.json["chats"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|r| r["id"].as_str().unwrap())
+        .collect();
+    assert_eq!(anas_ids, [anas.as_str()]);
+    // The owner has none of their own, and sees nobody else's.
+    let owners = kit.get(&wes_token, &uri).await;
+    assert_eq!(owners.status, StatusCode::OK);
+    assert_eq!(owners.json["chats"], json!([]));
+    // An app acting for nobody: 403.
+    let client = kit.client(workspace, "assistant:read");
+    let refused = kit.get(&client, &uri).await;
+    assert_eq!(refused.status, StatusCode::FORBIDDEN, "{}", refused.json);
+    assert_eq!(refused.json["code"], "chat_needs_member");
+    // Thirty at most.
+    for days in 4..40 {
+        chat(sam, days, vec![format!("Question {days}")], None).await;
+    }
+    let full = kit.get(&sam_token, &uri).await;
+    assert_eq!(full.json["chats"].as_array().unwrap().len(), 30);
+    assert_eq!(full.json["chats"][0]["id"], newer.as_str());
+}
+
 #[test]
 fn every_tool_and_about_read_is_a_catalogued_read_the_assistant_may_call() {
     let spec: Value =
@@ -798,6 +1090,7 @@ fn every_tool_and_about_read_is_a_catalogued_read_the_assistant_may_call() {
     // The chat's own operations are the member's alone.
     for id in [
         "assistant.start_chat",
+        "assistant.list_chats",
         "assistant.get_chat",
         "assistant.ask_chat",
         "assistant.stream_chat",

@@ -1,8 +1,9 @@
 //! What a chat may be about: the about registry, by record type. Each entry
 //! names the read operations that describe a record of its type (invoked as
 //! the member, by operation id only) and how their answers are projected for
-//! the model. Calendar events and tasks add an entry each (no migration: the
-//! stored type is checked here).
+//! the model: a conversation, a rule, or one of Scout's noticed suggestions.
+//! Calendar events and tasks add an entry each (no migration: the stored
+//! type is checked here).
 
 use campbooks_kernel::RecordRef;
 use serde_json::{Value, json};
@@ -25,14 +26,39 @@ pub struct AboutType {
     pub reads: &'static [&'static str],
     /// The path parameter naming the record.
     pub id_param: &'static str,
+    /// The message (`chat.*`) an answer starts with when the member can no
+    /// longer see the record.
+    pub lost_line: &'static str,
 }
 
+/// A conversation.
+const CONVERSATION: &str = "conversations.conversation";
+/// A rule taught for an inbox.
+const RULE: &str = "conversations.rule";
+/// One of Scout's noticed suggestions (a smart rule it offers).
+const RULE_NOTICE: &str = "conversations.rule_notice";
+
 /// Every record type a chat may be about.
-pub const REGISTRY: &[AboutType] = &[AboutType {
-    record_type: "conversations.conversation",
-    reads: &["conversations.get", "conversations.get_history"],
-    id_param: "conversation_id",
-}];
+pub const REGISTRY: &[AboutType] = &[
+    AboutType {
+        record_type: CONVERSATION,
+        reads: &["conversations.get", "conversations.get_history"],
+        id_param: "conversation_id",
+        lost_line: "chat.about_lost",
+    },
+    AboutType {
+        record_type: RULE,
+        reads: &["conversations.get_rule"],
+        id_param: "rule_id",
+        lost_line: "chat.about_lost_rule",
+    },
+    AboutType {
+        record_type: RULE_NOTICE,
+        reads: &["conversations.get_rule_notice"],
+        id_param: "notice_id",
+        lost_line: "chat.about_lost_rule_notice",
+    },
+];
 
 /// The registry's entry for `record_type`.
 pub fn entry(record_type: &str) -> Option<&'static AboutType> {
@@ -89,11 +115,11 @@ pub async fn read(member: &Member, about: &RecordRef) -> Result<Seen, Unread> {
             Err(broken) => return Err(broken),
         }
     }
+    let first = answers.first().unwrap_or(&Value::Null);
     let projected = match entry.record_type {
-        "conversations.conversation" => {
-            let detail = answers.first().unwrap_or(&Value::Null);
-            project::conversation(detail, answers.get(1))
-        }
+        CONVERSATION => project::conversation(first, answers.get(1)),
+        RULE => project::rule(first),
+        RULE_NOTICE => project::rule_notice(first),
         _ => return Ok(Seen::Lost),
     };
     let mut value = json!({ "type": entry.record_type, "id": about.id });

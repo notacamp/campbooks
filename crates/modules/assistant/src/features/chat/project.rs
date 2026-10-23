@@ -217,6 +217,86 @@ pub fn conversation(detail: &Value, history: Option<&Value>) -> Value {
     out
 }
 
+/// Most conditions or actions of a rule handed on.
+const RULE_PARTS: usize = 12;
+
+/// A rule's conditions or actions, as the rule holds them, at most
+/// [`RULE_PARTS`], each string bounded.
+fn parts(parts: &Value) -> Value {
+    parts
+        .as_array()
+        .into_iter()
+        .flatten()
+        .take(RULE_PARTS)
+        .map(|part| match part {
+            Value::Object(fields) => Value::Object(
+                fields
+                    .iter()
+                    .map(|(key, value)| {
+                        let value = if value.is_string() {
+                            short(value)
+                        } else {
+                            value.clone()
+                        };
+                        (key.clone(), value)
+                    })
+                    .collect(),
+            ),
+            other => short(other),
+        })
+        .collect()
+}
+
+/// A rule as the model reads what a chat is about
+/// (`conversations.get_rule`'s answer): what it matches and does, where it
+/// came from, whether it acts, and what it has changed.
+pub fn rule(rule: &Value) -> Value {
+    let mut out = json!({
+        "id": rule["id"],
+        "inbox_id": rule["inbox_id"],
+        "conditions": parts(&rule["conditions"]),
+        "actions": parts(&rule["actions"]),
+        "origin": rule["origin"],
+        "state": rule["state"],
+        "created_at": rule["created_at"],
+        "conversations_acted_on": rule["applied_count"],
+        "last_acted_at": rule["last_applied_at"],
+        "changed_back_in_the_last_30_days": rule["recent_exceptions"],
+        "shared_with_other_members": rule["shared"],
+    });
+    if !rule["origin_text"].is_null() {
+        out["taught_as"] = short(&rule["origin_text"]);
+    }
+    if !rule["paused_reason"].is_null() {
+        out["paused_reason"] = rule["paused_reason"].clone();
+    }
+    out
+}
+
+/// One of Scout's suggestions as the model reads what a chat is about
+/// (`conversations.get_rule_notice`'s answer): what Scout noticed, of whom,
+/// the rule it offers and why, in numbers.
+pub fn rule_notice(notice: &Value) -> Value {
+    json!({
+        "id": notice["id"],
+        "inbox_id": notice["inbox_id"],
+        "kind": notice["kind"],
+        "sender": {
+            "name": short(&notice["sender_name"]),
+            "address": short(&notice["sender"]),
+        },
+        "rule_offered": {
+            "conditions": parts(&notice["conditions"]),
+            "actions": parts(&notice["actions"]),
+        },
+        "evidence": pick(
+            &notice["evidence"],
+            &["received", "opened", "archived_unread", "last_week", "window_days", "cadence"],
+        ),
+        "shared_with_other_members": notice["shared"],
+    })
+}
+
 /// A conversation's history (`conversations.get_history`): its newest
 /// `max` events, oldest first.
 pub fn events(history: &Value, max: usize) -> Value {
@@ -279,6 +359,45 @@ mod tests {
         assert!(!out.to_string().contains("Pay by Friday"), "no sentences");
         assert_eq!(out["with"].as_array().unwrap().len(), 2);
         assert_eq!(out["scout_read_the_newest_inbound"][0]["confidence"], 91);
+    }
+
+    #[test]
+    fn a_rule_is_its_parts_origin_state_and_what_it_changed() {
+        let long = "x".repeat(2_000);
+        let out = rule(&json!({
+            "id": "r-1", "inbox_id": "i-1", "teaching_id": "t-1",
+            "conditions": [{"field": "sender_address", "value": "news@shop.example"}],
+            "actions": [{"action": "archive"}, {"action": "label", "value": long}],
+            "origin": "instruction", "origin_text": "Newsletters never need me",
+            "state": "active", "created_at": "2026-10-01T09:00:00Z",
+            "applied_count": 14, "last_applied_at": "2026-10-20T09:00:00Z",
+            "recent_exceptions": 1, "shared": false, "may_change": true,
+            "content_token": "secret-token",
+        }));
+        assert_eq!(out["conversations_acted_on"], 14);
+        assert_eq!(out["taught_as"], "Newsletters never need me");
+        assert_eq!(out["conditions"][0]["value"], "news@shop.example");
+        assert!(out["actions"][1]["value"].as_str().unwrap().ends_with(CUT));
+        assert!(!out.to_string().contains("secret-token"), "no tokens");
+        assert!(out.get("paused_reason").is_none());
+    }
+
+    #[test]
+    fn a_suggestion_is_its_sender_rule_and_numbers() {
+        let out = rule_notice(&json!({
+            "id": "n-1", "inbox_id": "i-1", "kind": "keep_off_home",
+            "sender": "builds@ci.example.com", "sender_name": "CI",
+            "conditions": [{"field": "sender_address", "value": "builds@ci.example.com"}],
+            "actions": [{"action": "surface", "value": "never"}],
+            "evidence": {"received": 12, "opened": 0, "archived_unread": 0,
+                         "last_week": 7, "window_days": 60, "cadence": "daily"},
+            "shared": true,
+        }));
+        assert_eq!(out["sender"]["address"], "builds@ci.example.com");
+        assert_eq!(out["sender"]["name"], "CI");
+        assert_eq!(out["rule_offered"]["actions"][0]["value"], "never");
+        assert_eq!(out["evidence"]["cadence"], "daily");
+        assert_eq!(out["shared_with_other_members"], true);
     }
 
     #[test]
