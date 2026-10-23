@@ -70,12 +70,13 @@ pub async fn hand_off(
     extract::Json(body): extract::Json<HandOffTo>,
 ) -> Result<Json<TaskView>> {
     let access = &workspace.access;
-    let Some(me) = access.user else {
-        return Err(Error::Forbidden);
-    };
     let mut tx = state.db.begin_for(access.workspace).await?;
     let row =
         access::require_task(&state, &mut tx, access, Action::Write, path.task_id, true).await?;
+    // A client acting for nobody never gets this far: it cannot see the task.
+    let Some(me) = access.user else {
+        return Err(Error::Forbidden);
+    };
     access::expect_revision(&row, body.revision)?;
     access::expect_open(&row)?;
     if body.to == me {
@@ -157,12 +158,13 @@ pub async fn take_back(
     extract::Json(body): extract::Json<TaskRevision>,
 ) -> Result<Json<TaskView>> {
     let access = &workspace.access;
-    let Some(me) = access.user else {
-        return Err(Error::Forbidden);
-    };
     let mut tx = state.db.begin_for(access.workspace).await?;
     let row =
         access::require_task(&state, &mut tx, access, Action::Share, path.task_id, true).await?;
+    // A client acting for nobody never gets this far: it cannot see the task.
+    let Some(me) = access.user else {
+        return Err(Error::Forbidden);
+    };
     access::expect_revision(&row, body.revision)?;
     access::expect_open(&row)?;
     match row.handed_by {
