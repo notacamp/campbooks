@@ -6,6 +6,7 @@ import type { Draft } from "../../api/drafts";
 import type { Translate } from "../../model";
 import { addressLine, displayName } from "../../compose/quote";
 import { useDraftEditor } from "../../compose/use-draft-editor";
+import { useRecipientSuggestions } from "../../compose/use-recipient-suggestions";
 
 export interface DraftComposerProps {
   workspaceId: string;
@@ -41,7 +42,10 @@ const KNOWN_ERRORS = new Set([
   "unknown_outcome",
 ]);
 
-/** A draft in the message composer: saved as you type, sent with an undo window. */
+/**
+ * A draft in the message composer: saved as you type, sent with an undo
+ * window, with people suggested in To, Cc and Bcc as you type.
+ */
 export function DraftComposer({
   workspaceId,
   draft,
@@ -58,6 +62,8 @@ export function DraftComposer({
   const undoToast = useUndoToast();
   const editor = useDraftEditor(workspaceId, draft);
   const { fields, update } = editor;
+  // To, Cc and Bcc suggest the people you exchange mail with as you type.
+  const suggest = useRecipientSuggestions(workspaceId, fields);
 
   async function send() {
     const scheduled = await editor.send();
@@ -149,6 +155,7 @@ export function DraftComposer({
       onDiscard={() => {
         void discard();
       }}
+      suggest={suggest}
     />
   );
 }
