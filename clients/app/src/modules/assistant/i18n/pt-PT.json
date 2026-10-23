@@ -271,7 +271,7 @@
     "else": "Que mais enviou {{name}}?",
     "field": "Pergunte sobre isto",
     "ask": "Perguntar",
-    "note": "O Scout procura e explica. Nesta versão não altera nada.",
+    "note": "O Scout pergunta antes de mudar o que quer que seja.",
     "you": "Perguntou",
     "scout": "O Scout respondeu",
     "writing": "O Scout está a responder",
@@ -313,6 +313,61 @@
       "my_calendar": "A ver o seu calendário…",
       "free_time": "A procurar tempo livre…",
       "read_event": "A ler o evento…"
+    },
+    "proposal": {
+      "label": "O Scout propõe",
+      "labelPast": "O Scout propôs",
+      "scoutWords": "Palavras do Scout",
+      "confirm": "Confirmar",
+      "notNow": "Agora não",
+      "undo": "Anular",
+      "working": "A tratar…",
+      "done": "Feito.",
+      "undone": "Anulado.",
+      "declined": "Agora não.",
+      "failed": "Não foi possível fazer isto.",
+      "failedBecause": "Não foi possível fazer isto: {{reason}}",
+      "undoFailed": "Feito, mas não foi possível anular.",
+      "blocked": "O Scout não pode fazer isto aqui.",
+      "action": {
+        "archive": "Arquivar",
+        "unarchive": "Mover para a Caixa de entrada",
+        "mark_read": "Marcar como lida",
+        "mark_unread": "Marcar como não lida",
+        "star": "Fixar",
+        "unstar": "Desafixar",
+        "add_label": "Adicionar a etiqueta",
+        "remove_label": "Retirar a etiqueta",
+        "move_to_stream": "Mover para {{stream}}",
+        "trash": "Eliminar",
+        "untrash": "Restaurar",
+        "report_spam": "Denunciar spam",
+        "not_spam": "Não é spam",
+        "done": "Marcar como feito",
+        "not_needed": "Não é preciso",
+        "already_paid": "Já está paga",
+        "still_to_pay": "Ainda por pagar",
+        "yes_to_question": "Responder que sim",
+        "later": "Mais tarde, até {{until}}"
+      },
+      "streams": {
+        "primary": "Principal",
+        "updates": "Atualizações",
+        "receipts": "Recibos",
+        "newsletters": "Newsletters"
+      },
+      "rule": {
+        "title": "Uma regra para ensinar ao Scout",
+        "review": "Rever a regra",
+        "done": "Regra guardada.",
+        "dialog": "Ensine algo ao Scout",
+        "dialogLead": "O Scout lê a frase. Nada fica guardado até carregar em Guardar regra."
+      },
+      "reply": {
+        "title": "Uma resposta a {{sender}}",
+        "write": "Escrever o rascunho",
+        "done": "Rascunho aberto. É você quem o envia, ou não."
+      }
     }
   }
 }

@@ -24,6 +24,9 @@ pub enum Kind {
     Module(String),
     /// `xtask`
     Xtask,
+    /// `crates/tracking-plan`: repository tooling CI runs without building
+    /// the server (the tracking plan, ADR 0020).
+    Tooling,
     /// Anywhere else — not allowed until the rules know about it.
     Unknown,
 }
@@ -39,6 +42,7 @@ impl Kind {
             ["crates", "server"] => Self::Server,
             ["crates", "modules", name] => Self::Module((*name).to_owned()),
             ["xtask"] => Self::Xtask,
+            ["crates", "tracking-plan"] => Self::Tooling,
             _ => Self::Unknown,
         }
     }
@@ -52,6 +56,7 @@ impl fmt::Display for Kind {
             Self::Server => f.write_str("server"),
             Self::Module(name) => write!(f, "module `{name}`"),
             Self::Xtask => f.write_str("xtask"),
+            Self::Tooling => f.write_str("tooling"),
             Self::Unknown => f.write_str("unclassified crate"),
         }
     }
@@ -118,7 +123,8 @@ pub fn check_dependencies(crates: &[Crate], allow: &[Allow]) -> Vec<String> {
         if from == Kind::Unknown {
             violations.push(format!(
                 "`{}` lives at `{}`, which is not a known crate location \
-                 (crates/kernel, crates/ai, crates/server, crates/modules/<name>, xtask)",
+                 (crates/kernel, crates/ai, crates/server, crates/modules/<name>, xtask, \
+                 crates/tracking-plan)",
                 krate.name, krate.path
             ));
             continue;
@@ -149,6 +155,9 @@ fn edge_violation(from: &Kind, to: &Kind, allow: &[Allow]) -> Option<&'static st
     if *to == Kind::Server && *from != Kind::Xtask {
         return Some("only xtask may depend on the server");
     }
+    if *to == Kind::Tooling && *from != Kind::Xtask {
+        return Some("only xtask may depend on the tooling crates");
+    }
     match (from, to) {
         (Kind::Kernel, _) => Some("the kernel depends on no workspace crate"),
         (Kind::Ai, Kind::Kernel) => None,
@@ -166,6 +175,10 @@ fn edge_violation(from: &Kind, to: &Kind, allow: &[Allow]) -> Option<&'static st
         }
         (Kind::Module(_), _) => Some("modules may depend only on the kernel and campbooks-ai"),
         (Kind::Server | Kind::Xtask, _) => None,
+        (Kind::Tooling, _) => Some(
+            "the tooling crates depend on no workspace crate, so CI runs them without \
+             building the server",
+        ),
         (Kind::Unknown, _) => Some("unclassified crate"),
     }
 }
@@ -1213,6 +1226,10 @@ pub const ADMIN_EXTENSION: &str = "x-campbooks-admin";
 /// kernel may name it.
 pub const ADMIN_READS_SETTING: &str = "campbooks.admin_reads";
 
+/// The tooling crate (`campbooks-tracking-plan`): repository tooling with
+/// no database access.
+const TOOLING_DIR: &str = "crates/tracking-plan/";
+
 /// Files besides the admin module allowed to name schema `admin`: the
 /// server's CLI.
 pub const ADMIN_CLI_FILES: [&str; 2] = [
@@ -1436,7 +1453,10 @@ pub fn check_admin_sources(files: &[(String, String)]) -> Vec<String> {
     for (path, text) in files {
         let in_admin = path.starts_with(&format!("crates/modules/{ADMIN_MODULE}/"));
         let in_cli = ADMIN_CLI_FILES.contains(&path.as_str());
-        if !in_admin && !in_cli {
+        // The tooling crate reads no database (it has no sqlx); it names the
+        // admin API's OpenAPI file, `openapi/admin.json`.
+        let in_tooling = path.starts_with(TOOLING_DIR);
+        if !in_admin && !in_cli && !in_tooling {
             for literal in string_literals(text) {
                 if names_schema(&literal, ADMIN_MODULE) {
                     violations.push(format!(
@@ -1627,7 +1647,29 @@ mod tests {
             Kind::Module("mail".into())
         );
         assert_eq!(Kind::from_path("xtask"), Kind::Xtask);
+        assert_eq!(Kind::from_path("crates/tracking-plan"), Kind::Tooling);
         assert_eq!(Kind::from_path("crates/utils"), Kind::Unknown);
+    }
+
+    #[test]
+    fn tooling_depends_on_nothing_and_only_xtask_on_it() {
+        let mut crates = healthy();
+        crates.push(krate(
+            "campbooks-tracking-plan",
+            "crates/tracking-plan",
+            &["campbooks-kernel"],
+        ));
+        crates[3].deps.push("campbooks-tracking-plan".into());
+        let v = check_dependencies(&crates, &[]);
+        assert_eq!(v.len(), 2, "{v:?}");
+        assert!(
+            v.iter()
+                .any(|v| v.contains("only xtask may depend on the tooling"))
+        );
+        assert!(v.iter().any(|v| v.contains("tooling crates depend on no")));
+        let xtask = crates.iter().position(|c| c.name == "xtask").unwrap();
+        crates[xtask].deps.push("campbooks-tracking-plan".into());
+        assert_eq!(check_dependencies(&crates, &[]).len(), 2);
     }
 
     #[test]

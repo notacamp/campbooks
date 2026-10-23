@@ -1,5 +1,5 @@
 //! `conversations.read_structured`: the dates a sender structured for
-//! machines (ADR 0020, campbooks-cloud#42), read with no model at all.
+//! machines (ADR 0021, campbooks-cloud#42), read with no model at all.
 //!
 //! After the decide pass has answered a new inbound message (the pass queues
 //! this job, so its answer about phishing is on record), this job reads the

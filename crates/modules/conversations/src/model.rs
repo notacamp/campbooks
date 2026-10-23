@@ -706,7 +706,7 @@ vocabulary!(
     /// Which reader produced a read: the sender's own machine-readable data,
     /// or Scout's one `complete` call.
     ReadLayer {
-        /// An iCalendar part or schema.org markup (ADR 0020), no model.
+        /// An iCalendar part or schema.org markup (ADR 0021), no model.
         Structured => "structured",
         /// The `complete` role.
         Model => "model",

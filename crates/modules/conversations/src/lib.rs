@@ -18,7 +18,7 @@
 //! - **Dates in mail** (campbooks-cloud#42): the pass also asks whether the
 //!   email tells of something dated, and flags it (`domain::dated`); the
 //!   sender's own machine-readable dates are read with no model
-//!   (`conversations.read_structured`, ADR 0020); and one `complete` call per
+//!   (`conversations.read_structured`, ADR 0021); and one `complete` call per
 //!   flagged message, when a need opens or a member opens it, reads the
 //!   summary, the need's dates, the things that happen at a time and the
 //!   obligations (`conversations.read_message`). Both reads are stored in
@@ -60,6 +60,9 @@ pub mod outgoing;
 pub mod scopes;
 #[cfg(test)]
 mod testkit;
+/// The module's tracked events, generated from the tracking plan (ADR 0020).
+#[path = "tracking.gen.rs"]
+pub mod tracking;
 
 pub use config::{
     ActionSettings, ConversationsConfig, DEFAULT_DATED_FLAG, DEFAULT_DECIDE_BACKFILL_DAYS,

@@ -1,4 +1,4 @@
-//! Dates a sender structured for machines (ADR 0020, campbooks-cloud#42): an
+//! Dates a sender structured for machines (ADR 0021, campbooks-cloud#42): an
 //! iCalendar part (`text/calendar`) and schema.org markup (JSON-LD or
 //! microdata) in a message's HTML.
 //!
@@ -430,7 +430,7 @@ SUMMARY:Dentist\nEND:VEVENT\nEND:VCALENDAR\n"
         assert_eq!(read(&[], None), Found::default());
     }
 
-    /// No rule here may read what an email says (ADR 0018, ADR 0020): outside
+    /// No rule here may read what an email says (ADR 0018, ADR 0021): outside
     /// the tests, these files never name a subject, a body, the text part,
     /// plain-text conversion or a pattern. The only text taken from a tree is
     /// a JSON-LD block's JSON and a microdata property's value.
@@ -466,7 +466,7 @@ SUMMARY:Dentist\nEND:VEVENT\nEND:VCALENDAR\n"
                     assert!(
                         !line.contains(word),
                         "{file} line {}: names `{word}`, which is prose or content \
-                         (ADR 0018, ADR 0020): leave understanding it to the model",
+                         (ADR 0018, ADR 0021): leave understanding it to the model",
                         number + 1
                     );
                 }

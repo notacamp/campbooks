@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { errorStatus, problemCode } from "~/lib/api";
@@ -23,6 +23,13 @@ const REFUSALS = new Set([
 
 export interface TeachScoutProps {
   workspaceId: string;
+  /**
+   * A sentence to start from (Scout proposed it in a chat): it is in the
+   * field and read at once, then checked and saved as any other.
+   */
+  initial?: string | undefined;
+  /** A rule was saved, by the member's own Save. */
+  onSaved?: (() => void) | undefined;
 }
 
 /** Why the builder is shown instead of the sentence. */
@@ -36,13 +43,23 @@ type BuilderReason = "chosen" | "failed";
  * opens a rule builder at any time, with no model call; without a language
  * model here, the builder is all there is.
  */
-export function TeachScout({ workspaceId }: TeachScoutProps) {
+export function TeachScout({ workspaceId, initial, onSaved }: TeachScoutProps) {
   const { t: typed } = useTranslation("assistant");
   const t = typed as unknown as Translate;
   const compile = useCompile(workspaceId);
-  const [text, setText] = useState("");
+  const [text, setText] = useState(initial ?? "");
   const [result, setResult] = useState<CompileResult | undefined>();
   const [builder, setBuilder] = useState<BuilderReason | undefined>();
+  // A sentence handed over is read once, as if the member pressed Teach.
+  const started = useRef(false);
+  const { mutate } = compile;
+  useEffect(() => {
+    if (started.current || initial === undefined || initial.trim() === "") {
+      return;
+    }
+    started.current = true;
+    mutate(initial, { onSuccess: setResult });
+  }, [initial, mutate]);
 
   const code = compile.isError ? problemCode(compile.error) : undefined;
   const noModel = code === "compile_unavailable";
@@ -64,7 +81,7 @@ export function TeachScout({ workspaceId }: TeachScoutProps) {
         <Note visor={noModel || builder === "failed" ? "unsure" : "idle"} label={lead}>
           {lead}
         </Note>
-        <RuleBuilder workspaceId={workspaceId} />
+        <RuleBuilder workspaceId={workspaceId} onSaved={onSaved} />
         {noModel ? null : (
           <div className="flex flex-wrap gap-2">
             <Button
@@ -146,7 +163,13 @@ export function TeachScout({ workspaceId }: TeachScoutProps) {
         />
       ) : null}
       {result === undefined ? null : (
-        <Understood workspaceId={workspaceId} result={result} onDone={reset} onBuild={build} />
+        <Understood
+          workspaceId={workspaceId}
+          result={result}
+          onDone={reset}
+          onBuild={build}
+          onSaved={onSaved}
+        />
       )}
     </div>
   );
@@ -162,12 +185,14 @@ function Understood({
   result,
   onDone,
   onBuild,
+  onSaved,
 }: {
   workspaceId: string;
   result: CompileResult;
   onDone: () => void;
   /** Open the rule builder instead. */
   onBuild: () => void;
+  onSaved?: (() => void) | undefined;
 }) {
   const { t: typed } = useTranslation("assistant");
   const t = typed as unknown as Translate;
@@ -180,6 +205,7 @@ function Understood({
       text={result.text}
       first={index === 0}
       onDone={onDone}
+      onSaved={onSaved}
     />
   ));
   if (result.outcome === "rules") {
@@ -228,12 +254,14 @@ function ProposalCard({
   text,
   first,
   onDone,
+  onSaved,
 }: {
   workspaceId: string;
   proposal: Proposal;
   text: string;
   first: boolean;
   onDone: () => void;
+  onSaved?: (() => void) | undefined;
 }) {
   const { t: typed } = useTranslation("assistant");
   const t = typed as unknown as Translate;
@@ -283,6 +311,7 @@ function ProposalCard({
       names={names}
       primary={first}
       onDone={onDone}
+      onSaved={onSaved}
     />
   );
 }

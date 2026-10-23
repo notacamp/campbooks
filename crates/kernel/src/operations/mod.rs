@@ -279,7 +279,8 @@ impl std::fmt::Debug for Composed {
 /// never claims a key), with the
 /// [`localize`](crate::i18n::localize) layer on both sides of it (inside,
 /// so a stored response is already in the caller's language; outside, for
-/// the idempotency layer's own problems), and install the result in the
+/// the idempotency layer's own problems), all inside the request's
+/// [tracking context](crate::tracking::http), and install the result in the
 /// state's [`Operations`]. HTTP requests and [`invoke`] then go through the
 /// same router.
 pub fn compose(api: OpenApiRouter<AppState>, state: AppState) -> Composed {
@@ -297,6 +298,12 @@ pub fn compose(api: OpenApiRouter<AppState>, state: AppState) -> Composed {
             rate_limit::api::middleware,
         ))
         .route_layer(localize());
+    // Outermost: the request's tracking context (ADR 0020), for the layers
+    // above and the handler, invoked operations included.
+    let routes = crate::tracking::http::around(
+        routes,
+        crate::tracking::http::HttpTracking::new(Arc::clone(&catalogue)),
+    );
     let state = state.with_operations(Operations::new(routes.clone(), catalogue));
     Composed {
         routes,

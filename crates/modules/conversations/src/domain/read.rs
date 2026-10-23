@@ -1,7 +1,7 @@
 //! What a read of a message holds (campbooks-cloud#42): the **items** (things
 //! that happen at a time) and **asks** (obligations of the reader, dated or
 //! not) found in it, whether by the sender's own machine-readable data
-//! ([`super::structured`], ADR 0020) or by Scout's one `complete` call
+//! ([`super::structured`], ADR 0021) or by Scout's one `complete` call
 //! (`conversations.read_message`).
 //!
 //! These are the shapes kept in `conversations.message_reads` and shown by

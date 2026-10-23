@@ -8,7 +8,7 @@ summary in a single `complete` call, published as
 `conversations.message_read`; it replaces `summarize_need`), `campbooks-ai` (two triage questions in
 the existing decide pass). Tracking:
 https://github.com/notacamp/campbooks-cloud/issues/42. Entry in
-`docs/domain-map.md` → *schedule*. New ADR 0020 (machine-readable dates
+`docs/domain-map.md` → *schedule*. New ADR 0021 (machine-readable dates
 may assert). Seams with `tasks` (campbooks-cloud#43, built in parallel) are
 agreed and listed in design.md; the parts that need `tasks` contracts land
 with that module, not here.
@@ -59,7 +59,7 @@ The owner's requirements for this change:
 - **The dated-things read, layered by cost** (design.md → *Three layers*):
   1. **L0, free**: an iCalendar part (`text/calendar`) or schema.org
      reservation markup in a message from an authenticated sender becomes
-     typed items with no model at all (ADR 0020).
+     typed items with no model at all (ADR 0021).
   2. **L1, Jev, no new call**: two questions join the existing decide pass:
      `has_dated_thing` (noul) and `dated_kind` (choice). Jev's answers gate
      everything after them.
@@ -109,7 +109,7 @@ The owner's requirements for this change:
 - `connectors`: the `calendar` capability offered for Google and Zoho;
   calendar adapters, change stream and outbound changes.
 - `ai-decide-facts`: "No content rules" names machine-readable calendar
-  data as structured data, not content (ADR 0020).
+  data as structured data, not content (ADR 0021).
 
 ## Impact
 

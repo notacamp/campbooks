@@ -1,4 +1,4 @@
-# 0020 — Machine-readable dates may assert
+# 0021 — Machine-readable dates may assert
 
 **Status:** Accepted · 2026-10-23 · amends [0018](0018-a-model-reads-email-content-facts-only-say-no.md)
 · Tracking: notacamp/campbooks-cloud#42 · Change: `openspec/changes/add-schedule-module`

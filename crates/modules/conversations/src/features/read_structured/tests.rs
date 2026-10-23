@@ -1,4 +1,4 @@
-//! The dates a sender structured for machines (ADR 0020), end to end: an
+//! The dates a sender structured for machines (ADR 0021), end to end: an
 //! airline's JSON-LD, an invitation's iCalendar part, a bill's markup, and
 //! every reason the message is not believed. A `complete` role on a mock
 //! server proves none of it calls a model.

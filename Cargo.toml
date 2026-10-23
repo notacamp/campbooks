@@ -2,7 +2,14 @@
 resolver = "3"
 # `crates/*` would also match the `crates/modules` directory (which has no
 # manifest), so the platform crates are listed explicitly; modules use a glob.
-members = ["crates/kernel", "crates/ai", "crates/server", "crates/modules/*", "xtask"]
+members = [
+    "crates/kernel",
+    "crates/ai",
+    "crates/server",
+    "crates/tracking-plan",
+    "crates/modules/*",
+    "xtask",
+]
 exclude = ["clients"]
 
 [workspace.package]
@@ -29,6 +36,7 @@ campbooks-attention = { path = "crates/modules/attention" }
 campbooks-search = { path = "crates/modules/search" }
 campbooks-assistant = { path = "crates/modules/assistant" }
 campbooks-schedule = { path = "crates/modules/schedule" }
+campbooks-tracking-plan = { path = "crates/tracking-plan" }
 
 # HTTP / async
 axum = { version = "0.8.9", default-features = false, features = ["http1", "http2", "json", "query", "form", "tokio", "tower-log", "tracing", "matched-path"] }
@@ -123,6 +131,17 @@ clap = { version = "4.6.7", features = ["derive", "env"] }
 # Tooling (xtask)
 cargo_metadata = "0.23.1"
 regex = "1.13.1"
+# The tracking plan workbook (`campbooks-tracking-plan`, ADR 0020): read it
+# (calamine), write it in canonical form (rust_xlsxwriter), and read the YAML
+# patches agents apply to it (serde-saphyr, a pure-Rust YAML parser).
+# Pinned: calamine 0.37.0 and rust_xlsxwriter 0.100.0 are newer than the
+# two-week rule because they are the first to take zip 9, which fixes
+# RUSTSEC-2026-0367, -0368 and -0369 (zip 8's extraction; neither crate
+# extracts to disk, but cargo deny fails on the advisories). Relax to caret
+# requirements after 2026-11-03.
+calamine = { version = "=0.37.0", default-features = false }
+rust_xlsxwriter = { version = "=0.100.0", default-features = false }
+serde-saphyr = { version = "1.3.0", default-features = false, features = ["deserialize"] }
 
 # Email: sanitising untrusted HTML bodies before they reach the client's
 # sandboxed frame (conversations). html5ever-based allow-list cleaner.
@@ -160,7 +179,7 @@ tokio-rustls = "0.26.6"
 mail-builder = { version = "1.0.0", default-features = false }
 mail-parser = { version = "0.11.9", default-features = false }
 
-# Email: the dates a sender structured for machines (conversations, ADR 0020,
+# Email: the dates a sender structured for machines (conversations, ADR 0021,
 # campbooks-cloud#42), read with proper parsers and never with patterns.
 # `icalendar`: RFC 5545 content lines for `text/calendar` parts (parser only,
 # no builder features). `scraper`: the parsed HTML tree JSON-LD and microdata

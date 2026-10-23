@@ -532,7 +532,8 @@ impl World {
     }
 
     /// `member`'s chat with Scout, about nothing (campbooks-cloud#305), with
-    /// a question.
+    /// a question, and Scout's answer holding a pending proposal whose id is
+    /// the chat's (so one instance fills both).
     async fn seed_chat(&self, member: UserId) -> Uuid {
         let chat = Uuid::now_v7();
         sqlx::query(
@@ -552,6 +553,21 @@ impl World {
         .bind(Uuid::now_v7())
         .bind(self.a.as_uuid())
         .bind(chat)
+        .execute(&self.db)
+        .await
+        .unwrap();
+        sqlx::query(
+            "INSERT INTO assistant.chat_messages
+                 (id, workspace_id, chat_id, author, text, finish, proposals)
+             VALUES ($1, $2, $3, 'scout', 'I can propose a rule.', 'done', $4)",
+        )
+        .bind(Uuid::now_v7())
+        .bind(self.a.as_uuid())
+        .bind(chat)
+        .bind(
+            json!([{"id": chat.to_string(), "kind": "rule", "state": "pending",
+                      "sentence": "Keep newsletters off Home"}]),
+        )
         .execute(&self.db)
         .await
         .unwrap();
@@ -1012,6 +1028,7 @@ fn body(world: &World, id: &str) -> Option<Value> {
         "assistant.update_profile" => json!({"proactivity": "ask_first", "asked": true}),
         "assistant.compile_instruction" => json!({"text": "newsletters never need me"}),
         "assistant.ask_chat" | "assistant.stream_chat" => json!({"text": "Why is this here?"}),
+        "assistant.settle_proposal" => json!({"state": "declined"}),
         "conversations.write_reply" | "conversations.stream_reply" => {
             json!({"intent": "Say yes"})
         }
@@ -1118,6 +1135,8 @@ fn fill(world: &World, path: &str) -> String {
         .replace("{chat_id}", &world.instances["assistant.chat"])
         .replace("{calendar_id}", &world.instances["schedule.calendar"])
         .replace("{event_id}", &world.instances["schedule.event"])
+        // Scout's proposal in that chat shares its id (`seed_chat`).
+        .replace("{proposal_id}", &world.instances["assistant.chat"])
         .replace("{id}", &Uuid::now_v7().to_string())
 }
 
@@ -1968,7 +1987,8 @@ async fn a_transaction_that_sets_nothing_sees_no_row_of_any_table(db: PgPool) {
     // With whether the runtime role may read the table at all: one it may
     // not (the rate-limit counters, reached through the kernel's functions
     // only, campbooks-cloud#210; the web sign-in's tables, reached through
-    // the BFF's, campbooks-cloud#212) must refuse the read outright.
+    // the BFF's, campbooks-cloud#212; the tracked events outbox, appended
+    // to only, ADR 0020) must refuse the read outright.
     let listed: Vec<(String, bool)> = sqlx::query_as(
         "SELECT format('%I.%I', n.nspname, c.relname),
                 has_table_privilege($1, c.oid, 'SELECT')
@@ -1993,6 +2013,7 @@ async fn a_transaction_that_sets_nothing_sees_no_row_of_any_table(db: PgPool) {
             "bff.retired_tokens",
             "bff.sessions",
             "kernel.rate_limits",
+            "kernel.tracked_events",
         ]),
         "tables the runtime role may not read at all"
     );
@@ -2057,13 +2078,17 @@ async fn a_transaction_that_sets_nothing_sees_no_row_of_any_table(db: PgPool) {
         populated.len()
     );
 
-    // Nor can it write an instance-wide row straight into the event log or
-    // the queue: only the kernel's own insert, lifted, may.
+    // Nor can it write an instance-wide row straight into the event log, the
+    // queue or the tracked events outbox: only the kernel's own insert,
+    // lifted, may.
     for insert in [
         "INSERT INTO kernel.jobs (queue, kind, payload, workspace_id, max_attempts)
          VALUES ('default', 'test.forged', '{}', NULL, 1)",
         "INSERT INTO kernel.events (name, version, workspace_id, payload)
          VALUES ('test.forged', 1, NULL, '{}')",
+        "INSERT INTO kernel.tracked_events (id, workspace_id, name, version, occurred_at,
+                                            envelope, body)
+         VALUES (gen_random_uuid(), NULL, 'test.forged', 1, now(), '{}', '{}')",
     ] {
         let mut tx = pool.begin().await.unwrap();
         let forged = sqlx::query(insert).execute(&mut *tx).await;

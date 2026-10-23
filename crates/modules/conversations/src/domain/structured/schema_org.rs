@@ -6,7 +6,7 @@
 //! Only the closed list of types below is read, and only their typed fields
 //! (times, names of the things reserved, places, prices). The prose around
 //! the markup is never read, and neither is a field such as `description`
-//! that holds prose (ADR 0020). Both syntaxes become one JSON shape first,
+//! that holds prose (ADR 0021). Both syntaxes become one JSON shape first,
 //! so one reader serves both.
 
 use chrono::{DateTime, FixedOffset, NaiveDateTime, TimeZone as _};

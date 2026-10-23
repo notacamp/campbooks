@@ -55,6 +55,7 @@ pub fn config(database_url: &str) -> Config {
         trusted_proxies: crate::rate_limit::TrustedProxies::default(),
         rate_limits: crate::config::RateLimitsConfig::default(),
         analytics: crate::config::AnalyticsConfig::default(),
+        tracking: crate::config::TrackingConfig::default(),
     }
 }
 
@@ -262,7 +263,9 @@ pub fn unreachable_pool() -> PgPool {
 
 /// A module's routes as a plain router over `state`, behind the
 /// [`localize`](crate::i18n::localize) layer (so problems answer in the
-/// request's locale, as in the server). When `state` has no access
+/// request's locale, as in the server) and the
+/// [tracking context](crate::tracking::http) layer (so what a handler
+/// tracks names its operation and caller). When `state` has no access
 /// catalogue yet, the module's own resource types are installed.
 pub fn app(module: Module, state: AppState) -> Router {
     let state = if state.resources.is_empty() {
@@ -273,13 +276,60 @@ pub fn app(module: Module, state: AppState) -> Router {
     } else {
         state
     };
-    let router: Router<AppState> = module.router.into();
-    router
-        .route_layer(axum::middleware::from_fn_with_state(
-            state.clone(),
-            crate::i18n::localize,
-        ))
-        .with_state(state)
+    let (router, spec) = module.router.split_for_parts();
+    let router = router.route_layer(axum::middleware::from_fn_with_state(
+        state.clone(),
+        crate::i18n::localize,
+    ));
+    crate::tracking::http::around(
+        router,
+        crate::tracking::http::HttpTracking::from_spec(&spec),
+    )
+    .with_state(state)
+}
+
+/// The same state, writing tracked events to the outbox
+/// (`CAMPBOOKS_TRACKING__SINK=outbox`), so a test can read them back with
+/// [`tracked_events`].
+pub fn tracking_outbox(state: AppState) -> AppState {
+    let tracker = crate::tracking::Tracker::new(&crate::config::TrackingConfig {
+        sink: crate::config::TrackingSink::Outbox,
+    });
+    state.with_tracker(tracker)
+}
+
+/// One row of `kernel.tracked_events`, as [`tracked_events`] reads it.
+#[derive(Debug, Clone, sqlx::FromRow)]
+pub struct TrackedRow {
+    /// The event's id.
+    pub id: uuid::Uuid,
+    /// Its workspace, if any.
+    pub workspace_id: Option<uuid::Uuid>,
+    /// Its name.
+    pub name: String,
+    /// Its version.
+    pub version: i32,
+    /// What the kernel wrote around it.
+    pub envelope: serde_json::Value,
+    /// Its properties and snapshots.
+    pub body: serde_json::Value,
+}
+
+/// The tracked events named `name` in the outbox, oldest first. `db` must
+/// read past row-level security (the pool `#[sqlx::test]` hands you): the
+/// runtime role may only append to the outbox.
+///
+/// # Panics
+/// If the database refuses the read.
+pub async fn tracked_events(db: &PgPool, name: &str) -> Vec<TrackedRow> {
+    sqlx::query_as(
+        "SELECT id, workspace_id, name, version, envelope, body
+           FROM kernel.tracked_events WHERE name = $1 ORDER BY id",
+    )
+    .bind(name)
+    .fetch_all(db)
+    .await
+    .unwrap_or_else(|e| panic!("reading tracked events: {e}"))
 }
 
 /// A module's admin routes (its [`admin_router`](Module::admin_router)) as

@@ -32,7 +32,7 @@ is left.
 | **L1 · Jev** | the decide pass's existing state | two questions in a call that already happens | is there a dated thing, and of which kind |
 | **L2 · the message read (`complete`)** | the message's own words, bounded | the call that already runs for a need, or one call when the member first opens a flagged email | dated items, asks, the need summary |
 
-### L0 — structured data (ADR 0020)
+### L0 — structured data (ADR 0021)
 
 - **iCalendar**: the module parses each `text/calendar` part with an
   iCalendar parser (not regex). VEVENT → item; `METHOD:CANCEL` cancels the

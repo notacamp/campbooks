@@ -457,7 +457,7 @@ impl EventConsumer for DecideMessage {
         }
         // The sender's own machine-readable dates are read after the pass,
         // whatever it did, so its answer about phishing is on record when it
-        // does answer (ADR 0020).
+        // does answer (ADR 0021).
         let tx = ctx.tx().await?;
         crate::features::read_structured::enqueue(tx, &facts.workspace, facts.message).await?;
         Ok(())

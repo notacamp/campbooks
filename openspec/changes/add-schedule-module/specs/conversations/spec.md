@@ -353,7 +353,7 @@ only.
 
 ### Requirement: Dates from structured data
 Before any read, the module SHALL read the message's machine-readable dates
-(ADR 0020): each `text/calendar` part, with an iCalendar parser (an event
+(ADR 0021): each `text/calendar` part, with an iCalendar parser (an event
 becomes a `meeting` item when it has attendees and an `appointment`
 otherwise; `METHOD:CANCEL` cancels the item with the same `UID`; a higher
 `SEQUENCE` updates it), and schema.org markup in its HTML (JSON-LD or

@@ -24,6 +24,7 @@ it superseded. Disagree? Write a new ADR that supersedes the old one.
 | [0017](0017-resource-ownership-and-access.md) | Resource ownership and access: one catalogue, one central check, RLS underneath | Accepted |
 | [0018](0018-a-model-reads-email-content-facts-only-say-no.md) | A decision model reads email content; facts only say no | Accepted |
 | [0019](0019-scout-streams-its-drafts.md) | Scout streams its drafts: SSE over POST, plain-text replies, per-route deadlines | Accepted |
-| [0020](0020-machine-readable-dates-may-assert.md) | Machine-readable dates (iCalendar, schema.org) from authenticated senders may assert | Accepted |
+| [0020](0020-tracked-events-and-the-tracking-plan.md) | Tracked events: a tracking plan in a workbook, a transactional outbox, RabbitMQ streams | Accepted |
+| [0021](0021-machine-readable-dates-may-assert.md) | Machine-readable dates (iCalendar, schema.org) from authenticated senders may assert | Accepted |
 
 Template: Context → Decision → Consequences → Alternatives considered.

@@ -61,7 +61,7 @@ With one Jev pass and at most one chat read per email (`add-schedule-module`,
 campbooks-cloud#42), the read runs only for flagged mail that raised a need
 or that a member opened. A booking that raises no need (a flight, a hotel, a
 concert ticket) and is never opened reaches the calendar only when it
-carries an iCalendar part or schema.org markup (ADR 0020). Options: (a)
+carries an iCalendar part or schema.org markup (ADR 0021). Options: (a)
 accept it; (b) also read flagged `has_dated_thing` mail on arrival (more
 chat calls, the cost the owner ruled out); (c) a per-workspace switch for
 (b). **Recommended:** (a). Most large booking senders ship markup or an
@@ -96,9 +96,9 @@ sharing (reader/writer/manager), which is out of scope here.
 **Decided 2026-10-23:** the recommendation, (a). The owner approved the
 prototype and said to implement it.
 
-## Calendar: machine-readable dates may assert (ADR 0020)
+## Calendar: machine-readable dates may assert (ADR 0021)
 
-ADR 0018 lets deterministic code only say "no". ADR 0020 (Proposed) lets
+ADR 0018 lets deterministic code only say "no". ADR 0021 (Proposed) lets
 iCalendar parts and schema.org markup from DMARC-aligned senders assert
 dated items and asks: typed fields only, a proper parser, never the prose
 around them. Options: (a) accept the carve-out; (b) markup may only veto, and

@@ -15,7 +15,7 @@ ammonia.workspace = true
 css-inline.workspace = true
 cssparser.workspace = true
 html5ever.workspace = true
-# The sender's own calendar data (`domain::structured`, ADR 0020).
+# The sender's own calendar data (`domain::structured`, ADR 0021).
 icalendar.workspace = true
 axum.workspace = true
 # Opaque list cursors.

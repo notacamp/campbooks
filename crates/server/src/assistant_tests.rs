@@ -714,3 +714,154 @@ async fn scouts_chat_reads_only_what_the_member_can(db: PgPool) {
         assert!(!sent.contains("Q4 plan"), "{sent}");
     }
 }
+
+/// Scout proposes with the real conversations module (campbooks-cloud#305,
+/// phase 2): the proposal names the request the catalogue serves, nothing
+/// changes when it is made, and only the member's own request, sent as the
+/// proposal says with its id as the key, archives the conversation; its
+/// undo puts it back.
+#[sqlx::test(migrations = "../../migrations")]
+#[allow(clippy::too_many_lines)]
+async fn scout_proposes_and_only_the_members_own_request_changes_it(db: PgPool) {
+    let model = MockServer::start().await;
+    let gateway = Gateway::new(AiConfig {
+        roles: [(
+            Role::Complete,
+            ProviderConfig::new(format!("{}/v1", model.uri()).parse().unwrap(), "test-model"),
+        )]
+        .into(),
+        ..AiConfig::default()
+    })
+    .unwrap();
+    let composition = Composition {
+        assistant: campbooks_assistant::AssistantDeps {
+            ai: Some(gateway),
+            ..campbooks_assistant::AssistantDeps::default()
+        },
+        ..Composition::default()
+    };
+    let server = Server::new(&db, &composition).await;
+    let (workspace, sam_id) = server.workspace(&db, "sam").await;
+    let sams = dev::create_inbox(
+        &server.state,
+        workspace,
+        "sam@example.com",
+        &[(sam_id, InboxRole::Manager)],
+    )
+    .await
+    .unwrap();
+    server.ingest(workspace, sams, EN).await;
+    let maya: String = sqlx::query_scalar(
+        "SELECT conversation_id::text FROM conversations.messages WHERE provider_message_id = 'en-1'",
+    )
+    .fetch_one(&db)
+    .await
+    .unwrap();
+    // The model proposes archiving Maya's email, then says so.
+    Mock::given(method("POST"))
+        .and(path("/v1/chat/completions"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(tool_call(
+            "propose_change",
+            &json!({ "action": "archive", "conversation_id": maya }),
+        )))
+        .up_to_n_times(1)
+        .mount(&model)
+        .await;
+    Mock::given(method("POST"))
+        .and(path("/v1/chat/completions"))
+        .respond_with(
+            ResponseTemplate::new(200)
+                .set_body_json(said("I proposed archiving it: confirm on the card.")),
+        )
+        .mount(&model)
+        .await;
+    let sam = server.token("sam");
+    let root = format!("/api/v1/w/{workspace}");
+    let chats = format!("{root}/assistant/chats");
+    let (status, chat) = server
+        .call(
+            &sam,
+            "POST",
+            &chats,
+            Some(json!({ "about": { "type": "conversations.conversation", "id": maya } })),
+        )
+        .await;
+    assert_eq!(status, StatusCode::CREATED, "{chat}");
+    let id = chat["id"].as_str().unwrap();
+    let (status, answer) = server
+        .call(
+            &sam,
+            "POST",
+            &format!("{chats}/{id}/questions"),
+            Some(json!({ "text": "Can you get this out of my inbox?" })),
+        )
+        .await;
+    assert_eq!(status, StatusCode::OK, "{answer}");
+    let proposal = &answer["proposals"][0];
+    assert_eq!(
+        proposal["request"]["path"],
+        format!("conversations/{maya}/archive")
+    );
+    assert_eq!(
+        proposal["undo"]["path"],
+        format!("conversations/{maya}/unarchive")
+    );
+    assert_eq!(proposal["facts"]["stream"], "primary");
+    let archived = || async {
+        let (status, detail) = server
+            .call(&sam, "GET", &format!("{root}/conversations/{maya}"), None)
+            .await;
+        assert_eq!(status, StatusCode::OK, "{detail}");
+        detail["conversation"]["archived"] == true
+    };
+    assert!(!archived().await, "proposing changed nothing");
+
+    // Sam's own request, as the card sends it.
+    let send = |request: &Value, key: String| {
+        let method = request["method"].as_str().unwrap().to_owned();
+        let uri = format!("{root}/{}", request["path"].as_str().unwrap());
+        let token = sam.clone();
+        let app = server.app.clone();
+        async move {
+            let response = app
+                .oneshot(
+                    Request::builder()
+                        .method(method.as_str())
+                        .uri(uri)
+                        .header(header::AUTHORIZATION, format!("Bearer {token}"))
+                        .header("idempotency-key", key)
+                        .body(Body::empty())
+                        .unwrap(),
+                )
+                .await
+                .unwrap();
+            response.status()
+        }
+    };
+    let key = proposal["id"].as_str().unwrap().to_owned();
+    assert_eq!(
+        send(&proposal["request"], key.clone()).await,
+        StatusCode::OK
+    );
+    assert!(archived().await);
+    // A second press replays, and acts once.
+    assert_eq!(
+        send(&proposal["request"], key.clone()).await,
+        StatusCode::OK
+    );
+    let (status, settled) = server
+        .call(
+            &sam,
+            "POST",
+            &format!("{chats}/{id}/proposals/{key}"),
+            Some(json!({ "state": "done" })),
+        )
+        .await;
+    assert_eq!(status, StatusCode::OK, "{settled}");
+    assert_eq!(settled["state"], "done");
+    assert_eq!(
+        send(&proposal["undo"], format!("{key}:undo")).await,
+        StatusCode::OK
+    );
+    assert!(!archived().await);
+}
