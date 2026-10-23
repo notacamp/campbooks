@@ -410,6 +410,12 @@ CAMPBOOKS_TRACKING__SINK=amqp
 CAMPBOOKS_TRACKING__AMQP_URL=amqp://campbooks:<password>@rabbitmq:5672/%2f   # secret; amqps:// for TLS
 ```
 
+To keep the broker password out of the environment, leave it out of the URL
+(`amqp://campbooks@rabbitmq:5672/%2f`) and point
+`CAMPBOOKS_TRACKING__AMQP_PASSWORD_FILE` at a file holding it, like
+`CAMPBOOKS_DATABASE_PASSWORD_FILE`: the file's password replaces any in the URL, and
+the server refuses to start if the file is missing or empty.
+
 The worker publishes each event once the change that made it commits, to the topic
 exchange `campbooks.events` (routing key `<event>.v<version>`), and declares a stream
 `campbooks.events` bound to it, kept for 30 days (`CAMPBOOKS_TRACKING__STREAM_MAX_AGE`).
