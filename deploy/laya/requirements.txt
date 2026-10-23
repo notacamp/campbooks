@@ -14,3 +14,7 @@ python-multipart==0.0.32
 # torch needs setuptools>=77.0.3; the PyTorch index serves an old one whose
 # vendored jaraco.context and wheel have fixable CVEs.
 setuptools==84.0.0
+# certifi arrives transitively. Pinned here for GHSA-6q48-6c7w-9gw2
+# (emSign roots with compromised intermediate keys): a critical CA-trust fix,
+# so it skips the two-week rule.
+certifi==2026.10.19
