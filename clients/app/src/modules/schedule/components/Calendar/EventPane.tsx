@@ -264,11 +264,7 @@ export function EventPane({
                   : t("sheet.alsoIn", { calendar: elsewhere })}
               </Text>
             ) : null}
-            {own && !event.on_provider && writable.length === 0 ? (
-              <Text as="span" tone="tertiary" size="sm">
-                {t("sheet.noWritable")}
-              </Text>
-            ) : null}
+
             <Button size="lg" shortcut="schedule.update_event" icon="edit" onClick={onEdit}>
               {t("sheet.edit")}
             </Button>

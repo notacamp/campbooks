@@ -446,6 +446,24 @@ export const LEASE: Summary = {
   last_sent_at: null,
   sent_to: [],
   replied_since_sent: false,
+  // The same ask as the "Do · Send the signed lease" row on the calendar.
+  need: {
+    reason: "do",
+    trust: "sure",
+    question: "asks_action",
+    basis: "model",
+    rule: "model.decide",
+    due_on: "2026-10-29",
+    overdue: false,
+    urgent: false,
+    message_id: message(11),
+    sent_at: "2026-10-26T18:12:00Z",
+    quote: {
+      text: "Can you send me the signed lease by Thursday 29 October?",
+      from: { name: "Marta Lopes", address: "marta@lopesimoveis.example" },
+      sent_at: "2026-10-26T18:12:00Z",
+    },
+  },
 };
 export const LEASE_MESSAGE = message(11);
 export const LEASE_DETAIL: Detail = {

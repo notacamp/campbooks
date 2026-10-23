@@ -238,7 +238,7 @@ export function WeekView(props: ViewProps) {
       return {
         id: key,
         kind: "due",
-        title: dueTitle(t, locale, item),
+        title: t(item.verb === "pay" ? "due.pay" : "due.do", { title: item.title }),
         from: column,
         to: column + 1,
         dashed: true,

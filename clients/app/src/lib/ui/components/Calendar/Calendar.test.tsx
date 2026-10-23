@@ -287,7 +287,7 @@ describe("the strip in the reader", () => {
           title="Key handover at the flat"
           meta="Appointment · Saturday 31 October, 10:00"
           quote="The key handover is on Saturday 31 October at 10:00."
-          status="Added to your calendar"
+          status="On your Campbooks calendar"
           actions={<button onClick={undo}>Undo</button>}
         />
       </FoundStrip>,
@@ -295,7 +295,7 @@ describe("the strip in the reader", () => {
 
     const strip = screen.getByRole("region", { name: "Scout noticed" });
     expect(within(strip).getByText("Key handover at the flat")).toBeVisible();
-    expect(within(strip).getByText("Added to your calendar")).toBeVisible();
+    expect(within(strip).getByText("On your Campbooks calendar")).toBeVisible();
     fireEvent.click(within(strip).getByRole("button", { name: "Undo" }));
     expect(undo).toHaveBeenCalledOnce();
   });

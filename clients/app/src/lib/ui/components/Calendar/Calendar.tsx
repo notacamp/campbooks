@@ -413,6 +413,7 @@ export function WeekGrid({ label, days, due, allDay, hours, blocks, now }: WeekG
                     data-kind={block.kind}
                     data-held={block.held === true ? "" : undefined}
                     aria-current={block.selected || undefined}
+                    title={`${block.title}, ${block.when}`}
                     style={place({
                       "--start": block.start,
                       "--len": block.length,
@@ -430,7 +431,9 @@ export function WeekGrid({ label, days, due, allDay, hours, blocks, now }: WeekG
                       )}
                       {block.title}
                     </span>
-                    <span className={styles["blockWhen"]}>{block.when}</span>
+                    {block.length >= 50 ? (
+                      <span className={styles["blockWhen"]}>{block.when}</span>
+                    ) : null}
                   </button>
                 ))}
               </div>

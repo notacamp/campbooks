@@ -225,7 +225,7 @@ export const InTheReader: Story = {
           title="Key handover at the flat"
           meta="Appointment · Saturday 31 October, 10:00"
           quote="The key handover is on Saturday 31 October at 10:00 at the flat."
-          status="Added to your calendar"
+          status="On your Campbooks calendar"
         />
       </FoundStrip>
       <FoundStrip label="Scout noticed">

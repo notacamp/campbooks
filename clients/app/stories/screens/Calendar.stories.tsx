@@ -11,6 +11,7 @@ import { DUE_ACTION_KEY, dueKey, type DueItem } from "../../src/modules/schedule
 import { INBOX, LEDGER, NDA, PRIMARY, Q4, STREAM_COUNTS, W } from "../../test/demo/conversations";
 import { CONNECTION, ZOHO_CONNECTION } from "../../test/demo/identity";
 import {
+  CAMPBOOKS,
   DENTIST,
   DENTIST_READ,
   DUE_ITEMS,
@@ -337,7 +338,12 @@ function reader(read: () => Record<string, MockRoute>) {
       [`GET ${W}/conversations/${LEASE.id}`]: { body: LEASE_DETAIL },
       [`POST ${W}/conversations/${LEASE.id}/read`]: { body: { ...LEASE, unread_count: 0 } },
     };
-    return { ...scheduleApi([...WEEK_EVENTS, HANDOVER]).routes, ...conversationRoutes, ...read() };
+    return {
+      // No provider calendar is connected yet: no "Add to my calendar" here.
+      ...scheduleApi([...WEEK_EVENTS, HANDOVER], { calendars: [CAMPBOOKS] }).routes,
+      ...conversationRoutes,
+      ...read(),
+    };
   };
 }
 
@@ -353,7 +359,7 @@ export const ReaderScoutRead: Story = {
     const canvas = within(canvasElement);
     const strip = await canvas.findByRole("region", { name: "Scout noticed" });
     await expect(within(strip).getByText(HANDOVER_ITEM.title)).toBeVisible();
-    await expect(await within(strip).findByText("Added to your calendar")).toBeVisible();
+    await expect(await within(strip).findByText("On your Campbooks calendar")).toBeVisible();
     await expect(await within(strip).findByRole("button", { name: /Undo/u })).toBeVisible();
   },
 };

@@ -19,7 +19,7 @@ import { dueKeyOf, eventKey, type T } from "../../labels";
 import {
   addDays,
   cityOf,
-  dayLong,
+  daySub,
   daysOf,
   monthTitle,
   nowIn,
@@ -151,7 +151,7 @@ export function CalendarScreen({ workspaceId, search, onSearch, now }: CalendarS
   const periodLabel = `${
     view === "month"
       ? monthTitle(locale, anchor)
-      : t("when.range", { start: dayLong(locale, period.from), end: dayLong(locale, last) })
+      : t("when.range", { start: daySub(locale, period.from), end: daySub(locale, last) })
   } · ${t("period.zone", { city: cityOf(zone) })}`;
   const unit = view === "month" ? "Month" : "Week";
 

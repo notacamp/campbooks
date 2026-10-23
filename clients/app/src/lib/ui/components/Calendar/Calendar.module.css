@@ -313,6 +313,13 @@ button.kindChip:hover {
   min-width: var(--calendar-grid-min);
 }
 
+/* Beside the sheet the seven days share what is left, titles cut with an ellipsis. */
+@media (width >= 64rem) {
+  .weekInner {
+    min-width: calc(var(--calendar-gutter) + var(--space-10) * 7);
+  }
+}
+
 .weekHead,
 .lane {
   display: grid;
@@ -376,8 +383,8 @@ button.kindChip:hover {
   gap: var(--space-1-5);
   align-items: center;
   min-width: 0;
-  height: var(--space-6);
-  padding: 0 var(--space-1-5);
+  min-height: var(--space-6);
+  padding: var(--space-0-5) var(--space-1-5);
   border: 0;
   border-radius: var(--radius-sm);
   background: color-mix(in oklch, var(--kind) var(--kind-soft-mix), transparent);
@@ -389,8 +396,14 @@ button.kindChip:hover {
 }
 
 .pill > span {
+  display: -webkit-box;
+  min-width: 0;
   overflow: hidden;
-  text-overflow: ellipsis;
+  overflow-wrap: normal;
+  white-space: normal;
+  word-break: normal;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
 }
 
 .pill[data-dashed] {
@@ -476,6 +489,9 @@ button.kindChip:hover {
 .blockTitle {
   display: block;
   overflow: hidden;
+  overflow-wrap: normal;
+  white-space: nowrap;
+  word-break: normal;
   font-size: var(--text-xs);
   font-weight: var(--weight-semibold);
   line-height: var(--leading-tight);
@@ -927,11 +943,8 @@ button.kindChip:hover {
 }
 
 .period {
-  overflow: hidden;
   color: var(--text-secondary);
   font-size: var(--text-sm);
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 .headViews {
@@ -946,10 +959,19 @@ button.kindChip:hover {
 
 @media (width >= 48rem) {
   .header {
-    grid-template-areas: "title views actions";
-    grid-template-columns: minmax(0, 1fr) auto auto;
-    gap: var(--space-3);
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2) var(--space-3);
     padding: var(--space-4) var(--space-6) var(--space-3);
+  }
+
+  .headTitle {
+    flex: 1 1 20rem;
+  }
+
+  .headViews,
+  .headActions {
+    flex: none;
   }
 }
 
