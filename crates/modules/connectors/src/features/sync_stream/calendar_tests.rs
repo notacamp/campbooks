@@ -486,7 +486,17 @@ async fn zoho_calendar_is_not_offered_while_its_flag_is_off(db: PgPool) {
 #[sqlx::test(migrations = "../../../migrations")]
 async fn turning_a_calendar_on_reads_it_again_from_the_start(db: PgPool) {
     let kit = Kit::new(db).await;
-    let (ws, connection) = connected(&kit).await;
+    // As `connected`, but its first read answers once: the full read after
+    // the calendar is turned on again gets the answer mounted below.
+    let (sam, ws) = member(&kit).await;
+    calendar_list(&kit).await;
+    first_read(&kit, &[timed("e1", "\"1\"", "Dentist")], "t1", Some(1)).await;
+    kit.adopt_calendar(&sam, ws, ACCOUNT_SUB).await.unwrap();
+    kit.run_jobs().await;
+    let connection: Uuid = sqlx::query_scalar("SELECT id FROM connectors.connections")
+        .fetch_one(&kit.db)
+        .await
+        .unwrap();
     let reference = kit
         .state
         .blobs
