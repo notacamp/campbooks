@@ -20,6 +20,7 @@ pub mod kept_mail;
 pub mod labelling_export;
 pub mod labels;
 pub mod list_conversations;
+pub mod list_correspondents;
 pub mod list_drafts;
 pub mod list_inboxes;
 pub mod list_labels;

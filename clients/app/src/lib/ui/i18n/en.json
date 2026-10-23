@@ -75,7 +75,12 @@
   "recipients": {
     "list": "{{label}} recipients",
     "remove": "Remove {{name}}",
-    "invalid": "This is not an email address: {{address}}"
+    "invalid": "This is not an email address: {{address}}",
+    "suggestions": "Suggestions for {{label}}",
+    "searching": "Searching…",
+    "hintMove": "Move",
+    "hintPick": "Add",
+    "hintClose": "Close"
   },
   "composer": {
     "from": "From",
