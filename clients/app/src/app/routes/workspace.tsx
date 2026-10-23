@@ -137,7 +137,10 @@ function WorkspaceFrame({ workspace, all }: { workspace: Workspace; all: Workspa
   const [switching, setSwitching] = useState(false);
   // Scout's chat: one panel, about one conversation at a time; the focus
   // goes back to what opened it when it closes.
-  const [chat, setChat] = useState<{ conversationId: string; from?: HTMLElement | null }>();
+  const [chat, setChat] = useState<{
+    conversationId: string;
+    from: HTMLElement | null | undefined;
+  }>();
   const openChat = useCallback((conversationId: string, from?: HTMLElement | null) => {
     setChat({ conversationId, from });
   }, []);
