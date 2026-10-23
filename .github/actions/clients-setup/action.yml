@@ -1,0 +1,46 @@
+name: clients setup
+description: >-
+  pnpm, Node from clients/.nvmrc (with the pnpm store cached) and a frozen
+  install of the clients workspace. Shared by the parallel clients jobs.
+
+inputs:
+  playwright:
+    description: >-
+      Space-separated Playwright browsers to install with their system
+      libraries (e.g. `chromium`), or empty for none.
+    required: false
+    default: ""
+
+runs:
+  using: composite
+  steps:
+    - uses: pnpm/action-setup@v6
+      with: { package_json_file: clients/package.json }
+    - uses: actions/setup-node@v7
+      with:
+        node-version-file: clients/.nvmrc
+        cache: pnpm
+        cache-dependency-path: clients/pnpm-lock.yaml
+    - shell: bash
+      working-directory: clients
+      run: pnpm install --frozen-lockfile
+    # The browser builds are cached by Playwright version. Their system
+    # libraries go through the apt cache: on an exact hit they install from it
+    # and the browser installs without `--with-deps`, whose own `apt-get
+    # update` reaches the mirror (10-20 minutes on a slow day).
+    - if: inputs.playwright != ''
+      id: pw
+      shell: bash
+      run: echo "version=$(node -p "require('./clients/app/package.json').devDependencies.playwright")" >> "$GITHUB_OUTPUT"
+    - if: inputs.playwright != ''
+      uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: ~/.cache/ms-playwright
+        key: playwright-${{ runner.os }}-${{ runner.arch }}-${{ inputs.playwright }}-${{ steps.pw.outputs.version }}
+    - if: inputs.playwright != ''
+      uses: ./.github/actions/apt-packages
+      with:
+        key: playwright-${{ inputs.playwright }}-${{ steps.pw.outputs.version }}
+        working-directory: clients
+        run: pnpm --filter @campbooks/app exec playwright install --with-deps ${{ inputs.playwright }}
+        run-cached: pnpm --filter @campbooks/app exec playwright install ${{ inputs.playwright }}
