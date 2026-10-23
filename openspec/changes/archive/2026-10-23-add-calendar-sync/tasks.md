@@ -20,7 +20,7 @@ for sync. Builders don't compile or test locally: push and read CI.
 
 ## 3. Scout chat
 
-- [x] 3.1 Scout chat proposal rows for the schedule writes (create, update, delete, restore, respond, push, unpush): `crates/modules/assistant/src/features/chat/propose.rs`; client `modules/assistant/api/proposals.ts` (mark them RUNNABLE) and `ProposalCards.tsx`, with i18n in the four languages
+- [x] 3.1 Scout chat proposal rows for the schedule writes (create, update, delete, respond, push, unpush): `crates/modules/assistant/src/features/chat/propose.rs`; client `modules/assistant/api/proposals.ts` (mark them RUNNABLE) and `ProposalCards.tsx`, with i18n in the four languages
 
 ## 4. Missing server fields
 
@@ -39,3 +39,8 @@ for sync. Builders don't compile or test locally: push and read CI.
 - [x] 6.2 Changelog entry files in `changelog/unreleased/<kind>/`
 - [x] 6.3 Gates green in CI; recording in the PR (`## Recording`)
 - [x] 6.4 `openspec archive add-calendar-sync --yes` before merge; baseline specs reflect the change
+
+## Follow-ups
+
+- A restoring undo (update, respond) writes back the values read when the card was proposed; events have no revision, so a provider change between the card and Confirm is overwritten by Undo. Taking the undo from the answer's prior values (`UpdatedEvent`, `previous_response`) is exact but needs a `from_response` rename.
+- After a reload, the undo of a create, delete, push or unpush needs the change's answer, which only lives in component state: a settled card shows no Undo, as task cards do.

@@ -121,6 +121,37 @@ function whenText(start: string, locale: string): string {
   }).format(at);
 }
 
+type Detail = Partial<NonNullable<Proposal["detail"]>>;
+
+const present = (value: string | null | undefined): value is string =>
+  value !== undefined && value !== null && value !== "";
+
+/**
+ * Which wording an event's edit takes, from the fields it actually sends:
+ * a new start moves it, a new end alone ends it there, a new title alone
+ * renames it.
+ */
+function eventUpdateKey(action: string, detail: Detail): string | undefined {
+  if (action !== "update_event") {
+    return undefined;
+  }
+  if (present(detail.starts)) {
+    return "update_event_moved";
+  }
+  if (present(detail.ends)) {
+    return "update_event_ends";
+  }
+  return present(detail.title) && !present(detail.place) ? "update_event_renamed" : undefined;
+}
+
+/** The time a card names: the new start, or for an edit that only ends it, the new end. */
+function whenOf(action: string, detail: Detail, locale: string): string {
+  if (present(detail.starts)) {
+    return whenText(detail.starts, locale);
+  }
+  return action === "update_event" && present(detail.ends) ? whenText(detail.ends, locale) : "";
+}
+
 /**
  * "Dentist · Thu, 12 Nov, 15:00", from the event's own record, never from
  * the model's words.
@@ -252,24 +283,19 @@ function ChangeCard(props: CardProps) {
   };
 
   const action = proposal.action ?? "archive";
-  const detail: Partial<NonNullable<Proposal["detail"]>> = proposal.detail ?? {};
+  const detail: Detail = proposal.detail ?? {};
   // A bill is paid, not done.
   const key =
     action === "task_done" && proposal.task?.verb === "pay"
       ? "task_paid"
-      : action === "update_event" && detail.starts !== undefined && detail.starts !== null
-        ? "update_event_moved"
-        : action;
+      : (eventUpdateKey(action, detail) ?? action);
   const title = t(`chat.proposal.action.${key}`, {
     calendar: detail.calendar_name ?? proposal.event?.calendar ?? "",
     response:
       detail.response === undefined || detail.response === null
         ? ""
         : t(`chat.proposal.responses.${detail.response}`),
-    when:
-      detail.starts === undefined || detail.starts === null
-        ? ""
-        : whenText(detail.starts, i18n.language),
+    when: whenOf(action, detail, i18n.language),
     day: detail.day === undefined || detail.day === null ? "" : dayText(detail.day, i18n.language),
     name: detail.member_name ?? "",
     stream:

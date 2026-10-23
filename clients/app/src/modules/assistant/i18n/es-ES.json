@@ -365,6 +365,8 @@
         "create_event": "Añadir al calendario: {{when}}",
         "update_event": "Cambiar este evento",
         "update_event_moved": "Mover este evento a {{when}}",
+        "update_event_renamed": "Cambiar el nombre de este evento",
+        "update_event_ends": "Terminar este evento a las {{when}}",
         "delete_event": "Eliminar este evento",
         "respond_event": "Responder: {{response}}",
         "push_event": "Añadir a {{calendar}}",

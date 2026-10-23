@@ -2589,6 +2589,49 @@ async fn a_refused_event_proposal_is_never_a_card(db: PgPool) {
             event_change("update", MEETING, &json!({"title": "Dentist"})),
             "already_so",
         ),
+        // Times that can only fail when written: a day on a timed event, a
+        // moment on an all-day one, an end before the start.
+        (
+            on(HOME),
+            event_change("update", MEETING, &json!({"starts": "2026-11-14"})),
+            "invalid_when",
+        ),
+        (
+            with("all_day", true.into()),
+            event_change(
+                "update",
+                MEETING,
+                &json!({"starts": "2026-11-14T10:00:00+00:00"}),
+            ),
+            "invalid_when",
+        ),
+        (
+            on(HOME),
+            event_change(
+                "update",
+                MEETING,
+                &json!({"ends": "2026-11-12T14:00:00+00:00"}),
+            ),
+            "invalid_when",
+        ),
+        // A new event starts between now and a year ahead.
+        (
+            on(HOME),
+            (
+                "propose_event_change",
+                json!({"action": "create", "title": "Dentist check",
+                       "starts": "2020-01-01T10:00:00+00:00"}),
+            ),
+            "start_out_of_range",
+        ),
+        (
+            on(HOME),
+            (
+                "propose_event_change",
+                json!({"action": "create", "title": "Dentist check", "starts": "2099-01-01"}),
+            ),
+            "start_out_of_range",
+        ),
         // Only a calendar of theirs that an event can be added to.
         (
             on(HOME),

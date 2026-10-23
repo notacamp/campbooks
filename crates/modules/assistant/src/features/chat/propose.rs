@@ -508,6 +508,11 @@ pub enum Refusal {
     EventNotChangeable,
     /// The event is not an invitation the member answers.
     NotAnInvitation,
+    /// A new event's start is before now, or a year or more away.
+    StartOutOfRange,
+    /// The times cannot be written: a time on an all-day event, a day on a
+    /// timed one, or an end before the start.
+    InvalidWhen,
     /// No calendar of theirs by that id or name that an event can be added
     /// to.
     NoSuchCalendar,
@@ -533,6 +538,8 @@ impl Refusal {
             Self::NotATeammate => "not_a_teammate",
             Self::EventNotChangeable => "event_not_changeable",
             Self::NotAnInvitation => "not_an_invitation",
+            Self::StartOutOfRange => "start_out_of_range",
+            Self::InvalidWhen => "invalid_when",
             Self::NoSuchCalendar => "no_such_calendar",
             Self::TooMany => "too_many",
             Self::Unavailable => "unavailable",
@@ -585,6 +592,15 @@ impl Refusal {
             }
             Self::NotAnInvitation => {
                 "The event is not an invitation the member can answer. Nothing was proposed."
+            }
+            Self::StartOutOfRange => {
+                "`starts` must be later than now and less than a year away (RFC 3339 with an \
+                 offset, or YYYY-MM-DD for a day in the member's days). Nothing was proposed."
+            }
+            Self::InvalidWhen => {
+                "The times do not fit the event: an all-day event takes days (YYYY-MM-DD), a \
+                 timed one RFC 3339 times with an offset, and it cannot end before it starts. \
+                 Nothing was proposed."
             }
             Self::NoSuchCalendar => {
                 "No calendar of the member's by that id or name that an event can be added to \
@@ -1629,6 +1645,11 @@ impl Proposer {
             ..ProposalDetail::default()
         };
         if action == A::CreateEvent {
+            event_start_within(
+                starts.as_deref().ok_or(Refusal::InvalidArguments)?,
+                Utc::now(),
+                self.utc_offset,
+            )?;
             let mut body = json!({
                 "title": title.as_deref().ok_or(Refusal::InvalidArguments)?,
                 "starts": starts.as_deref().ok_or(Refusal::InvalidArguments)?,
@@ -1675,39 +1696,18 @@ impl Proposer {
                 if seen.recurring || !here.writes() {
                     return Err(Refusal::EventNotChangeable);
                 }
-                let mut now = Map::new();
-                let mut before = Map::new();
-                if let Some(title) = title.as_ref().filter(|t| **t != seen.title) {
-                    now.insert("title".into(), title.clone().into());
-                    before.insert("title".into(), seen.title.clone().into());
-                }
-                let moved_start = starts.as_ref().filter(|s| **s != seen.starts);
-                let moved_end = ends.as_ref().filter(|e| **e != seen.ends);
-                if let Some(starts) = moved_start {
-                    now.insert("starts".into(), starts.clone().into());
-                }
-                if let Some(ends) = moved_end {
-                    now.insert("ends".into(), ends.clone().into());
-                }
-                if moved_start.is_some() || moved_end.is_some() {
-                    // The start moves the end with it unless it is given: put
-                    // both back.
-                    before.insert("starts".into(), seen.starts.clone().into());
-                    before.insert("ends".into(), seen.ends.clone().into());
-                }
-                if let Some(place) = place
-                    .as_ref()
-                    .filter(|p| Some(p.as_str()) != seen.place.as_deref())
-                {
-                    now.insert("place".into(), place.clone().into());
-                    before.insert(
-                        "place".into(),
-                        seen.place.clone().unwrap_or_default().into(),
-                    );
-                }
-                if now.is_empty() {
-                    return Err(Refusal::AlreadySo);
-                }
+                let (now, before) = event_changes(
+                    &seen,
+                    title.as_deref(),
+                    starts.as_deref(),
+                    ends.as_deref(),
+                    place.as_deref(),
+                )?;
+                // What the card says is what is sent, not what was asked.
+                detail.title = now.get("title").and_then(Value::as_str).map(fact);
+                detail.starts = now.get("starts").and_then(Value::as_str).map(str::to_owned);
+                detail.ends = now.get("ends").and_then(Value::as_str).map(str::to_owned);
+                detail.place = now.get("place").and_then(Value::as_str).map(fact);
                 body = Some(Value::Object(now));
                 undo_body = Some(Value::Object(before));
             }
@@ -2070,6 +2070,107 @@ fn day_within(day: NaiveDate, now: DateTime<Utc>, utc_offset: i32) -> Result<Nai
     Ok(day)
 }
 
+/// A time of an event: a day (all-day) or a moment.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd)]
+enum When {
+    Day(NaiveDate),
+    At(DateTime<Utc>),
+}
+
+impl When {
+    fn parse(text: &str) -> Option<Self> {
+        NaiveDate::parse_from_str(text, "%Y-%m-%d")
+            .map(Self::Day)
+            .ok()
+            .or_else(|| {
+                DateTime::parse_from_rfc3339(text)
+                    .ok()
+                    .map(|at| Self::At(at.with_timezone(&Utc)))
+            })
+    }
+
+    const fn is_day(self) -> bool {
+        matches!(self, Self::Day(_))
+    }
+}
+
+/// A new event's `starts`: a day from today (in the member's days) to a year
+/// away, or a moment later than now and a year or more away.
+fn event_start_within(starts: &str, now: DateTime<Utc>, utc_offset: i32) -> Result<(), Refusal> {
+    match When::parse(starts).ok_or(Refusal::InvalidArguments)? {
+        When::Day(day) => day_within(day, now, utc_offset)
+            .map(|_| ())
+            .map_err(|_| Refusal::StartOutOfRange),
+        When::At(at) => {
+            if at <= now || at >= now + Duration::days(YEAR) {
+                Err(Refusal::StartOutOfRange)
+            } else {
+                Ok(())
+            }
+        }
+    }
+}
+
+/// The fields of an event's edit that would really change it (`now`), and
+/// their values before (`before`, which puts them back), judged against the
+/// event as read. Refuses an edit that changes nothing, or that cannot be
+/// written: a day on a timed event, a time on an all-day one, an end before
+/// the start.
+fn event_changes(
+    seen: &SeenEvent,
+    title: Option<&str>,
+    starts: Option<&str>,
+    ends: Option<&str>,
+    place: Option<&str>,
+) -> Result<(Map<String, Value>, Map<String, Value>), Refusal> {
+    let mut now = Map::new();
+    let mut before = Map::new();
+    if let Some(title) = title.filter(|t| *t != seen.title) {
+        now.insert("title".into(), title.into());
+        before.insert("title".into(), seen.title.clone().into());
+    }
+    let moved_start = starts.filter(|s| *s != seen.starts);
+    let moved_end = ends.filter(|e| *e != seen.ends);
+    // Every time given must be of the event's form.
+    for given in [moved_start, moved_end].into_iter().flatten() {
+        let when = When::parse(given).ok_or(Refusal::InvalidWhen)?;
+        if when.is_day() != seen.all_day {
+            return Err(Refusal::InvalidWhen);
+        }
+    }
+    // The end, against the start the event will have.
+    if let Some(end) = moved_end {
+        let start = moved_start.unwrap_or(&seen.starts);
+        if let (Some(start), Some(end)) = (When::parse(start), When::parse(end))
+            && end < start
+        {
+            return Err(Refusal::InvalidWhen);
+        }
+    }
+    if let Some(starts) = moved_start {
+        now.insert("starts".into(), starts.into());
+    }
+    if let Some(ends) = moved_end {
+        now.insert("ends".into(), ends.into());
+    }
+    if moved_start.is_some() || moved_end.is_some() {
+        // The start moves the end with it unless it is given: put both back.
+        before.insert("starts".into(), seen.starts.clone().into());
+        before.insert("ends".into(), seen.ends.clone().into());
+    }
+    if let Some(place) = place.filter(|p| Some(*p) != seen.place.as_deref()) {
+        now.insert("place".into(), place.into());
+        before.insert(
+            "place".into(),
+            seen.place.clone().unwrap_or_default().into(),
+        );
+    }
+    if now.is_empty() {
+        return Err(Refusal::AlreadySo);
+    }
+    Ok((now, before))
+}
+
 /// A fact, cleaned and bounded.
 fn fact(text: &str) -> String {
     cut_bytes(&clean(text), FACT_BYTES).to_owned()
@@ -2329,6 +2430,113 @@ fn event_line(proposal: &ChatProposal, action: ProposalAction) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn event(all_day: bool) -> SeenEvent {
+        SeenEvent {
+            id: "e1".into(),
+            title: "Dentist".into(),
+            starts: if all_day {
+                "2026-11-05"
+            } else {
+                "2026-11-05T15:00:00+00:00"
+            }
+            .into(),
+            ends: if all_day {
+                "2026-11-06"
+            } else {
+                "2026-11-05T16:00:00+00:00"
+            }
+            .into(),
+            all_day,
+            calendar_id: "c1".into(),
+            place: None,
+            recurring: false,
+            response: None,
+            pending: false,
+            on_provider: true,
+        }
+    }
+
+    #[test]
+    fn a_new_events_start_is_bounded_like_a_tasks_day() {
+        let now = DateTime::parse_from_rfc3339("2026-10-23T12:00:00Z")
+            .unwrap()
+            .with_timezone(&Utc);
+        assert!(event_start_within("2026-10-23T13:00:00+00:00", now, 0).is_ok());
+        assert!(event_start_within("2026-10-24", now, 0).is_ok());
+        for out in [
+            "2026-10-23T11:00:00+00:00",
+            "2027-10-23T13:00:00+00:00",
+            "2026-10-22",
+            "2027-10-23",
+        ] {
+            assert_eq!(
+                event_start_within(out, now, 0),
+                Err(Refusal::StartOutOfRange),
+                "{out}"
+            );
+        }
+        assert_eq!(
+            event_start_within("next Thursday", now, 0),
+            Err(Refusal::InvalidArguments)
+        );
+    }
+
+    #[test]
+    fn an_edit_is_what_it_really_changes() {
+        let seen = event(false);
+        // The same start with a new title renames; it does not move.
+        let (now, before) = event_changes(
+            &seen,
+            Some("Dentist, Dr Lopes"),
+            Some("2026-11-05T15:00:00+00:00"),
+            None,
+            None,
+        )
+        .unwrap();
+        assert_eq!(now.keys().collect::<Vec<_>>(), ["title"]);
+        assert_eq!(before["title"], "Dentist");
+        // An end alone changes the end, and puts both times back.
+        let (now, before) =
+            event_changes(&seen, None, None, Some("2026-11-05T17:00:00+00:00"), None).unwrap();
+        assert_eq!(now.keys().collect::<Vec<_>>(), ["ends"]);
+        assert_eq!(before["starts"], "2026-11-05T15:00:00+00:00");
+        assert_eq!(
+            event_changes(&seen, Some("Dentist"), None, None, None),
+            Err(Refusal::AlreadySo)
+        );
+    }
+
+    #[test]
+    fn an_edit_that_can_only_fail_is_refused_when_it_is_proposed() {
+        let timed = event(false);
+        let day = event(true);
+        // A day on a timed event, a moment on an all-day one.
+        assert_eq!(
+            event_changes(&timed, None, Some("2026-11-07"), None, None),
+            Err(Refusal::InvalidWhen)
+        );
+        assert_eq!(
+            event_changes(&day, None, Some("2026-11-07T10:00:00+00:00"), None, None),
+            Err(Refusal::InvalidWhen)
+        );
+        // An end alone before the current start, or before the new start.
+        assert_eq!(
+            event_changes(&timed, None, None, Some("2026-11-05T14:00:00+00:00"), None),
+            Err(Refusal::InvalidWhen)
+        );
+        assert_eq!(
+            event_changes(
+                &timed,
+                None,
+                Some("2026-11-06T10:00:00+00:00"),
+                Some("2026-11-05T17:00:00+00:00"),
+                None
+            ),
+            Err(Refusal::InvalidWhen)
+        );
+        assert!(event_changes(&day, None, Some("2026-11-07"), Some("2026-11-08"), None).is_ok());
+    }
 
     #[test]
     fn every_action_has_one_row_and_a_strict_schema() {
