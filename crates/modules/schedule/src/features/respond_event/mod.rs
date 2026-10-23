@@ -30,7 +30,7 @@ use crate::{
 /// Your answer.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 #[serde(deny_unknown_fields)]
-pub struct Answer {
+pub struct EventAnswer {
     /// `accepted`, `tentative` or `declined` (a provider is never told
     /// `needs_action`: it only takes an answer back to "not answered" on
     /// events kept on Campbooks).
@@ -39,7 +39,7 @@ pub struct Answer {
 
 /// Your answer, and the one before it.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
-pub struct Answered {
+pub struct AnsweredEvent {
     /// The event afterwards.
     pub event: EventView,
     /// The answer before this one: send it back as `response` to undo.
@@ -62,10 +62,10 @@ pub struct Answered {
         ("workspace_id" = WorkspaceId, Path, description = "The workspace."),
         ("event_id" = EventId, Path, description = "The event."),
     ),
-    request_body = Answer,
+    request_body = EventAnswer,
     responses(
         (status = OK, description = "The event afterwards, and your earlier answer.",
-            body = Answered),
+            body = AnsweredEvent),
         (status = UNAUTHORIZED, description = "No valid access token.", body = Problem,
             content_type = "application/problem+json"),
         (status = FORBIDDEN, description = "Missing scope.", body = Problem,
@@ -80,8 +80,8 @@ pub async fn handler(
     State(state): State<AppState>,
     workspace: Workspace<ScheduleWrite>,
     extract::Path(path): extract::Path<EventPath>,
-    extract::Json(answer): extract::Json<Answer>,
-) -> Result<Json<Answered>> {
+    extract::Json(answer): extract::Json<EventAnswer>,
+) -> Result<Json<AnsweredEvent>> {
     let access = &workspace.access;
     let mut tx = state.db.begin_for(access.workspace).await?;
     let member = ops::require_event(&state, &mut tx, access, Action::Write, path.event_id).await?;
@@ -136,7 +136,7 @@ pub async fn handler(
     let after = event_of(&mut tx, member, row.id).await?;
     tx.commit().await?;
     let event = event_view(&after, zone, None).ok_or(Error::NotFound)?;
-    Ok(Json(Answered {
+    Ok(Json(AnsweredEvent {
         event,
         previous_response: previous,
     }))
