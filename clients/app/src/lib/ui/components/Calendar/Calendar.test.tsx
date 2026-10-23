@@ -269,7 +269,8 @@ describe("MonthGrid", () => {
     );
 
     fireEvent.click(screen.getByRole("button", { name: "Standup" }));
-    fireEvent.click(screen.getByRole("button", { name: "+2 more" }));
+    // Hidden below 48rem by its style, which jsdom applies.
+    fireEvent.click(screen.getByRole("button", { name: "+2 more", hidden: true }));
     fireEvent.click(screen.getByRole("button", { name: "Monday 26 October" }));
 
     expect(onSelect).toHaveBeenCalledOnce();

@@ -348,7 +348,7 @@ describe("Settings → Calendar", () => {
     renderAt(`/w/${DUARTE.id}/settings/calendar`, { start });
 
     expect(await screen.findByRole("heading", { name: "Calendars" })).toBeVisible();
-    expect(screen.getByText("Always on")).toBeVisible();
+    expect(await screen.findByText("Always on")).toBeVisible();
     fireEvent.click(await screen.findByRole("switch", { name: "Show Holidays in Portugal" }));
     await waitFor(() => {
       expect(
@@ -390,7 +390,7 @@ describe("Settings → Calendar", () => {
 
     await waitFor(() => {
       expect(calls.calls.find((call) => call.route === `PATCH ${S}/settings`)?.body).toMatchObject({
-        also_add_to: { show: CALENDARS[1]?.id },
+        also_add_to: { show: CALENDARS[2]?.id },
       });
     });
   });
