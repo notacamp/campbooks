@@ -602,7 +602,7 @@ async fn keep(
     }
     if usable && stored == 1 {
         if !items.is_empty() || !asks.is_empty() || summary_ready {
-            let texts = put_texts(blobs, tx, &workspace, read.message, &items).await?;
+            let texts = put_texts(blobs, tx, &workspace, read.message, &items, &asks).await?;
             events
                 .publish(
                     tx,
@@ -638,7 +638,8 @@ async fn keep(
     Ok(())
 }
 
-/// The titles, places and calendar `UID`s of `items`, as a blob that the
+/// The titles, places and calendar `UID`s of `items`, and the title and amount
+/// of `asks`, as a blob that the
 /// message holds: what `message_read` points at instead of carrying it. `None`
 /// when no item has any.
 pub(crate) async fn put_texts(
@@ -647,6 +648,7 @@ pub(crate) async fn put_texts(
     workspace: &str,
     message: MessageId,
     items: &[ReadItem],
+    asks: &[ReadAsk],
 ) -> Result<Option<BlobRef>, JobError> {
     let entries: Vec<Value> = items
         .iter()
@@ -666,10 +668,28 @@ pub(crate) async fn put_texts(
             })
         })
         .collect();
-    if entries.is_empty() {
+    let ask_entries: Vec<Value> = asks
+        .iter()
+        .filter(|ask| !ask.title.is_empty() || ask.amount.is_some())
+        .map(|ask| {
+            serde_json::json!({
+                "key": ask.key,
+                "title": ask.title,
+                "amount": ask.amount.as_ref().map(|a| serde_json::json!({
+                    "minor": a.minor,
+                    "currency": a.currency,
+                })),
+            })
+        })
+        .collect();
+    if entries.is_empty() && ask_entries.is_empty() {
         return Ok(None);
     }
-    let bytes = serde_json::to_vec(&serde_json::json!({ "items": entries }))
+    let mut body = serde_json::json!({ "items": entries });
+    if !ask_entries.is_empty() {
+        body["asks"] = Value::Array(ask_entries);
+    }
+    let bytes = serde_json::to_vec(&body)
         .map_err(|_| JobError::fatal("the texts of a read do not encode"))?;
     let blob = blobs
         .put(

@@ -442,6 +442,15 @@ fn the_events_this_module_consumes_read_from_their_contracts() {
     let parsed: ReadTexts = serde_json::from_value(texts).unwrap();
     assert_eq!(parsed.items[0].title, "Flight LIS to AMS");
     assert_eq!(parsed.items[0].ical_uid.as_deref(), Some("abc@example.com"));
+    // A read with asks only (an invoice): the tasks module's section, which
+    // schedule ignores.
+    let asks_only = json!({"items": [], "asks": [
+        {"key": key, "title": "Pay invoice 2026-114",
+         "amount": {"minor": 12850, "currency": "EUR"}}
+    ]});
+    assert!(accepts("read-texts.v1.schema.json", &asks_only));
+    let parsed: ReadTexts = serde_json::from_value(asks_only).unwrap();
+    assert!(parsed.items.is_empty());
 
     // connectors.capability_granted for a calendar, and its calendar list.
     let granted = json!({
