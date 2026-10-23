@@ -1097,6 +1097,10 @@ impl Proposer {
                 body = Some(json!({ "until": until.to_rfc3339() }));
                 false
             }
+            // Task actions are built by `task_proposal`, never here.
+            A::TaskDone | A::TaskNotNeeded | A::PlanDay | A::TaskLater | A::Due | A::HandOff => {
+                return Err(Refusal::InvalidArguments);
+            }
         };
         if already {
             return Err(Refusal::AlreadySo);
