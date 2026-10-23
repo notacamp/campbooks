@@ -126,6 +126,11 @@ export {
 export { Icon, ICON_NAMES, type IconName, type IconProps } from "./components/Icon/Icon";
 export { IconButton, type IconButtonProps } from "./components/IconButton/IconButton";
 export {
+  OverflowActions,
+  type OverflowAction,
+  type OverflowActionsProps,
+} from "./components/OverflowActions/OverflowActions";
+export {
   Item,
   ItemDetail,
   SwipeAction,
@@ -163,6 +168,8 @@ export {
   MessageComposer,
   type ComposerAttachment,
   type MessageComposerProps,
+  type RecipientFieldName,
+  type RecipientSuggester,
 } from "./components/MessageComposer/MessageComposer";
 export { NavDivider, NavItem, type NavItemProps } from "./components/NavItem/NavItem";
 export { NoteField, type NoteFieldProps } from "./components/NoteField/NoteField";
@@ -203,6 +210,7 @@ export {
   RecipientField,
   type Recipient,
   type RecipientFieldProps,
+  type RecipientSuggestion,
 } from "./components/RecipientField/RecipientField";
 export {
   Segmented,

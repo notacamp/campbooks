@@ -10,7 +10,7 @@ import {
 import { useTranslation } from "react-i18next";
 
 import { useShortcut } from "~/lib/shortcuts";
-import { Button } from "~/lib/ui";
+import { Button, ReaderPane } from "~/lib/ui";
 
 import { DRAFTS, isPlace } from "./api/queries";
 import { DraftsScreen } from "./components/InboxScreen/DraftsScreen";
@@ -91,22 +91,26 @@ function ComposePage() {
   const search: { draft?: string } = useSearch({ strict: false });
   const workspaceId = params.workspaceId ?? "";
   const navigate = useNavigate();
+  const { t } = useTranslation("conversations");
+  // The page's main column: it takes what the sidebar leaves, never the sidebar's width.
   return (
-    <NewMessage
-      key={search.draft ?? "new"}
-      workspaceId={workspaceId}
-      draftId={search.draft}
-      onLeave={() => {
-        void navigate({ to: "/w/$workspaceId/inbox", params: { workspaceId } });
-      }}
-      onReopen={(draft) => {
-        void navigate({
-          to: "/w/$workspaceId/compose",
-          params: { workspaceId },
-          search: { draft },
-        });
-      }}
-    />
+    <ReaderPane label={t("compose.newMessage")}>
+      <NewMessage
+        key={search.draft ?? "new"}
+        workspaceId={workspaceId}
+        draftId={search.draft}
+        onLeave={() => {
+          void navigate({ to: "/w/$workspaceId/inbox", params: { workspaceId } });
+        }}
+        onReopen={(draft) => {
+          void navigate({
+            to: "/w/$workspaceId/compose",
+            params: { workspaceId },
+            search: { draft },
+          });
+        }}
+      />
+    </ReaderPane>
   );
 }
 

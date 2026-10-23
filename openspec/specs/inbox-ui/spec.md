@@ -65,11 +65,17 @@ percentage. "How Campbooks decided" (closed by default) SHALL list, for each
 question, the answer in words, the stored reasons in the user's language, the
 source (rules or model), the confidence and the threshold the answer was held
 to, and whether it acted. A stream suggestion SHALL offer "Move to <stream>"
-(1), which the user can undo.
+(1), which the user can undo. The note SHALL offer Reply, opening the same
+reply dialog as the reader's own Reply, whenever it says a reply is needed (a
+needs_reply suggestion or an open Reply need) and the user can reply.
 
 #### Scenario: Taking a suggestion
 - **WHEN** the user opens a newsletter that the rules suggest for Newsletters and presses 1
 - **THEN** it moves to Newsletters, the toast offers Undo, and "How Campbooks decided" had listed the mailing-list header reason
+
+#### Scenario: Replying from the note
+- **WHEN** the user opens a conversation whose note says it needs a reply
+- **THEN** the note offers Reply, which opens Scout's reply dialog
 
 #### Scenario: No numbers up front
 - **WHEN** the user opens a conversation whose stream answer has a confidence of 0.87
@@ -152,15 +158,23 @@ The reader SHALL expose a slot for the send slice's composer, pinned to the
 bottom of the reader after the thread and never between or after its
 messages in the flow, with Reply (R), Reply all (Shift+R) and Forward (F) that
 tell the slot which message to answer and how; without a composer those
-actions SHALL be hidden. From 48rem the pinned area SHALL stay in view while
-the thread scrolls under it, showing "Reply to <name>" (R) while the composer
-is closed and the open composer in its place, growing upward to 60% of the
-window's height and then scrolling inside itself. Below 48rem the floating
-bar above the tab bar SHALL offer Reply and Done, and an open composer SHALL
-take its place. Reply SHALL first open the reply dialog (Scout's likely replies and
-draft); its "Write my own" and "Open in composer" SHALL open the slot's
-composer on the newest message, the latter on the draft Scout wrote. Reply
-all and Forward SHALL open the composer directly.
+actions SHALL be hidden. From 48rem Reply, Reply all and Forward SHALL sit
+together in the reader's header right after Done, in that order, then Move;
+every action after Done SHALL be an icon button whose tooltip names it and
+its key. Delete, Report spam, Pin, Read or Unread, and Previous and Next at
+the end, SHALL show as icons while the header has room for them, and
+otherwise fold into one "More actions" menu (each row with its name and
+key, ↑/↓ between rows, Esc closes), so the header is one row at every
+width; their keys work either way. The
+pinned area SHALL hold only the open composer: it stays in view while the
+thread scrolls under it, growing upward to 60% of the window's height and
+then scrolling inside itself; while the composer is closed nothing SHALL be
+pinned there. Below 48rem the floating bar above the tab bar SHALL offer
+Reply and Done, and an open composer SHALL take its place. Reply SHALL first
+open the reply dialog (Scout's likely replies and draft); its "Write my own"
+and "Open in composer" SHALL open the slot's composer on the newest message,
+the latter on the draft Scout wrote. Reply all and Forward SHALL open the
+composer directly.
 
 #### Scenario: No composer yet
 - **WHEN** the inbox runs without a reply-slot renderer
@@ -170,9 +184,17 @@ all and Forward SHALL open the composer directly.
 - **WHEN** the user presses R in the reader, then chooses "Write my own"
 - **THEN** the dialog closes and the composer opens in the pinned area at the bottom of the reader
 
+#### Scenario: Reply beside Reply all and Forward
+- **WHEN** the member opens a conversation at 1280px
+- **THEN** the reader's header is one row: Done, then Reply (R), Reply all (Shift+R) and Forward (F) side by side as icons whose tooltips name them and their keys, and no "Reply to <name>" button sits at the bottom of the reader
+
+#### Scenario: A narrow reader folds the rest into More
+- **WHEN** the member opens a conversation at 1100px wide, where the reader is too narrow for every icon
+- **THEN** the header is still one row: Done, Reply, Reply all, Forward and Move, then "More actions" holding Delete, Report spam, Pin, Mark unread, Previous and Next with their keys, and # still deletes
+
 #### Scenario: A long thread on a desktop
 - **WHEN** the member opens a twelve-message thread at 1440px and scrolls it
-- **THEN** "Reply to Marta Silva" stays at the bottom of the reader and no reply box sits between or after the messages
+- **THEN** Reply stays in the header beside Reply all and Forward, nothing is pinned at the bottom, and no reply box sits between or after the messages
 
 ### Requirement: Separate screens on phones
 From 64rem the list and the reader SHALL show side by side at every width,
@@ -238,7 +260,7 @@ reply", "To do", "Pay", "Looks suspicious", or "Check" for a question) and,
 when it has one, its due date ("Due Thu", "Overdue"). The reader's note SHALL
 lead with the need's sentence, in the user's language, naming the sender (by
 address for a `review` need), then the sender's sentence quoted as plain text
-with who wrote it and when, then the chips, then Done and Not needed (X)
+with who wrote it and when, then the chips, then Reply (for a `reply` need), Done and Not needed (X)
 (E stays the inbox's Done, which archives); a `check` need SHALL ask its
 question with Yes (1) and No (2). Every action
 SHALL push an entry Undo (Z) takes back. The quote SHALL never be rendered as
@@ -886,3 +908,36 @@ device, a sync) SHALL go at once.
 #### Scenario: Undo while it folds
 - **WHEN** the user presses # on a row, then Z before the row has gone
 - **THEN** the conversation is back in the list as a normal row
+
+### Requirement: Suggesting people in To, Cc and Bcc
+In the composer (New message, Reply, Reply all and Forward's composer), To,
+Cc and Bcc SHALL each suggest people as the member types: from two
+characters, after typing settles for about 200 ms, the field SHALL ask
+`conversations.list_correspondents` with what it holds and show up to 8 of
+the people it answers in a list under the field, each with their avatar,
+their name and their address (the address alone when there is no name).
+People already in To, Cc or Bcc SHALL be left out. The field SHALL follow
+the ARIA combobox pattern: focus stays in the input, the first person is
+highlighted, ↑ and ↓ move the highlight (wrapping), Enter or Tab add the
+highlighted person as a chip, a click or a tap adds the person clicked, and
+Esc closes the list without closing the composer. Leaving the field and
+adding a person SHALL close the list. While the list is closed, or holds
+nobody, Enter, Tab, a comma and leaving the field SHALL add what was typed,
+as before. The list SHALL show the keys that work in it, fit the field's
+width at 375px and scroll when it is taller than the space it has.
+
+#### Scenario: Picking with the keyboard
+- **WHEN** Sam types "mar" in To and Marta Ferreira and Mário Lopes are suggested
+- **THEN** Marta is highlighted; ↓ highlights Mário, Enter adds "Mário Lopes" as a chip and the list closes
+
+#### Scenario: Already added
+- **WHEN** Marta is already in To and Sam types "mar" in Cc
+- **THEN** Cc suggests Mário and not Marta
+
+#### Scenario: A new address
+- **WHEN** Sam types "new@studio.example", Esc closes the list, and Sam presses Enter
+- **THEN** new@studio.example is added as a chip and the composer stays open
+
+#### Scenario: Esc twice
+- **WHEN** the list is open and Sam presses Esc twice
+- **THEN** the first Esc closes the list and the second closes the composer, keeping the draft

@@ -7,7 +7,11 @@ import { formatSize } from "../../internal/format-size";
 import { Button } from "../Button/Button";
 import { Icon, type IconName } from "../Icon/Icon";
 import { IconButton } from "../IconButton/IconButton";
-import { RecipientField, type Recipient } from "../RecipientField/RecipientField";
+import {
+  RecipientField,
+  type Recipient,
+  type RecipientSuggestion,
+} from "../RecipientField/RecipientField";
 
 import { applyFormat, type Format } from "./formatting";
 import styles from "./MessageComposer.module.css";
@@ -18,6 +22,19 @@ export interface ComposerAttachment {
   filename: string;
   /** Bytes. */
   size: number;
+}
+
+/** One of the composer's address fields. */
+export type RecipientFieldName = "to" | "cc" | "bcc";
+
+/** Who to suggest in To, Cc and Bcc as the member types, per field. */
+export interface RecipientSuggester {
+  /** The people to suggest for what `field` holds. */
+  suggestions: (field: RecipientFieldName) => readonly RecipientSuggestion[];
+  /** Whether `field`'s suggestions are on their way. */
+  loading: (field: RecipientFieldName) => boolean;
+  /** What is being typed in `field`, as it changes. */
+  onQueryChange: (field: RecipientFieldName, text: string) => void;
 }
 
 export interface MessageComposerProps {
@@ -56,6 +73,8 @@ export interface MessageComposerProps {
   onClose: () => void;
   /** Throw the draft away. */
   onDiscard?: (() => void) | undefined;
+  /** Suggest people in To, Cc and Bcc as the member types; omit for none. */
+  suggest?: RecipientSuggester | undefined;
 }
 
 const FORMATS: { format: Format; icon: IconName; shortcut?: string }[] = [
@@ -68,7 +87,8 @@ const FORMATS: { format: Format; icon: IconName; shortcut?: string }[] = [
 /**
  * Writing a message: From, To/Cc/Bcc as chips, the subject, plain text with
  * basic formatting, the quoted history and forwarded attachments. While
- * focus is inside it, ⌘↵ sends, ⌘B and ⌘I format and Esc closes.
+ * focus is inside it, ⌘↵ sends, ⌘B and ⌘I format and Esc closes (once an
+ * address field's suggestions, given by `suggest`, are closed).
  */
 export function MessageComposer({
   title,
@@ -95,6 +115,7 @@ export function MessageComposer({
   onSend,
   onClose,
   onDiscard,
+  suggest,
 }: MessageComposerProps) {
   const { t, i18n } = useTranslation("ui");
   const id = useId();
@@ -110,6 +131,18 @@ export function MessageComposer({
   const toRef = useRef<HTMLInputElement>(null);
   // Where the cursor starts, read once: the composer focuses when it opens.
   const startAt = useRef(focus);
+
+  // Each address field's suggestions, when there are any to give.
+  const suggestIn = (field: RecipientFieldName) =>
+    suggest === undefined
+      ? {}
+      : {
+          suggestions: suggest.suggestions(field),
+          loadingSuggestions: suggest.loading(field),
+          onQueryChange: (text: string) => {
+            suggest.onQueryChange(field, text);
+          },
+        };
 
   // Where formatting leaves the cursor, applied once the new text is in.
   const selection = useRef<{ start: number; end: number } | null>(null);
@@ -207,6 +240,7 @@ export function MessageComposer({
           recipients={to}
           onChange={onToChange}
           inputRef={toRef}
+          {...suggestIn("to")}
           trailing={
             copies ? undefined : (
               <Button
@@ -222,8 +256,18 @@ export function MessageComposer({
         />
         {copies ? (
           <>
-            <RecipientField label={t("composer.cc")} recipients={cc} onChange={onCcChange} />
-            <RecipientField label={t("composer.bcc")} recipients={bcc} onChange={onBccChange} />
+            <RecipientField
+              label={t("composer.cc")}
+              recipients={cc}
+              onChange={onCcChange}
+              {...suggestIn("cc")}
+            />
+            <RecipientField
+              label={t("composer.bcc")}
+              recipients={bcc}
+              onChange={onBccChange}
+              {...suggestIn("bcc")}
+            />
           </>
         ) : null}
         {subject === undefined ? null : (
