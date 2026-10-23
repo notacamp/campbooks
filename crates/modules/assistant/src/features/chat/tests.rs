@@ -707,6 +707,7 @@ async fn a_failed_answer_is_kept_failed_and_says_nothing_of_the_provider(db: PgP
     let captured = Captured::default();
     let subscriber = tracing_subscriber::fmt()
         .with_max_level(tracing::Level::TRACE)
+        .with_ansi(false)
         .with_writer(captured.clone())
         .finish();
     let _guard = tracing::subscriber::set_default(subscriber);
@@ -739,6 +740,10 @@ async fn a_failed_answer_is_kept_failed_and_says_nothing_of_the_provider(db: PgP
 
     let logged = String::from_utf8_lossy(&captured.0.lock().unwrap()).into_owned();
     assert!(logged.contains("chat question"), "{logged}");
+    assert!(
+        logged.contains("about=\"conversations.conversation\""),
+        "{logged}"
+    );
     for never in [
         "marta@example.com",
         "Rent for November",
