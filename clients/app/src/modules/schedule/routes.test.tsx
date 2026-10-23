@@ -342,12 +342,11 @@ describe("Settings → Calendar", () => {
     });
   }
 
-  it("lists the calendars, turns one on, and asks for calendar access for a mailbox without it", async () => {
-    const start = vi.fn();
+  it("lists the calendars, turns one on, and does not offer calendar access yet", async () => {
     const calls = settings({
       [`PATCH ${S}/calendars/${HOLIDAYS.id}`]: { body: { ...HOLIDAYS, syncing: true } },
     });
-    renderAt(`/w/${DUARTE.id}/settings/calendar`, { start });
+    renderAt(`/w/${DUARTE.id}/settings/calendar`);
 
     expect(await screen.findByRole("heading", { name: "Calendars" })).toBeVisible();
     expect(await screen.findByText("Always on")).toBeVisible();
@@ -358,8 +357,7 @@ describe("Settings → Calendar", () => {
       ).toEqual({ syncing: true });
     });
 
-    fireEvent.click(screen.getByRole("button", { name: "Add calendar access" }));
-    expect(start).toHaveBeenCalledWith({ purpose: "reconnect", connection: ZOHO_CONNECTION.id });
+    expect(screen.queryByRole("button", { name: "Add calendar access" })).toBeNull();
   });
 
   it("turns off a kind Scout adds, keeping the others", async () => {

@@ -448,7 +448,7 @@ export const Settings: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     await expect(await canvas.findByRole("heading", { name: "Calendars" })).toBeVisible();
-    await expect(await canvas.findByRole("button", { name: "Add calendar access" })).toBeVisible();
+    await expect(canvas.queryByRole("button", { name: "Add calendar access" })).toBeNull();
     const holidays = await canvas.findByRole("switch", { name: "Show Holidays in Portugal" });
     await expect(holidays).toHaveAttribute("aria-checked", "false");
     await userEvent.click(canvas.getByRole("switch", { name: "Scout adds Stays" }));

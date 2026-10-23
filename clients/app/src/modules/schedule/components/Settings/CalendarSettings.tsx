@@ -53,6 +53,12 @@ function zoneOptions(current: string): { value: string; label: string }[] {
   return zones.map((zone) => ({ value: zone, label: zone.replaceAll("_", " ") }));
 }
 
+/**
+ * "Add calendar access" starts a consent the server cannot grant until
+ * Google and Zoho calendar sync lands (add-calendar-sync), so it is hidden.
+ */
+const CALENDAR_ACCESS_OFFERED = false as boolean;
+
 export interface CalendarSettingsProps {
   workspaceId: string;
   /** The front door: starts the provider's consent for calendar access. */
@@ -119,9 +125,9 @@ function CalendarsSection({
   onColour: (calendar: CalendarView, color: string) => void;
 }) {
   const { t } = useTranslation("schedule");
-  const withoutAccess = (connections ?? []).filter(
-    (connection) => !connection.capabilities.includes("calendar"),
-  );
+  const withoutAccess = CALENDAR_ACCESS_OFFERED
+    ? (connections ?? []).filter((connection) => !connection.capabilities.includes("calendar"))
+    : [];
   return (
     <SettingsSection
       title={t("settings.calendars.title")}

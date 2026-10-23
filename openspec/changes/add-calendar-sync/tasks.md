@@ -30,7 +30,7 @@ for sync. Builders don't compile or test locally: push and read CI.
 
 ## 5. Client
 
-- [ ] 5.1 Show "Add to my calendar" only once a provider calendar that can be written exists, and "Add calendar access" only while connectors offers `calendar` (today Settings shows it for every mailbox without it)
+- [ ] 5.1 Show "Add to my calendar" only once a provider calendar that can be written exists, and show "Add calendar access" in Settings → Calendar once sync lands (hidden in the first change, because its consent cannot succeed before connectors offers `calendar`; the code is behind `CALENDAR_ACCESS_OFFERED` in `CalendarSettings.tsx`)
 - [ ] 5.2 Provider events, invitations and the "kept theirs" notice verified in the real app; i18n and `pnpm test:fit` at 375 and 1280
 
 ## 6. Wrap-up
