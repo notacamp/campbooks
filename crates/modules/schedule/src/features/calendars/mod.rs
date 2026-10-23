@@ -8,6 +8,7 @@ use axum::{Json, extract::State};
 use campbooks_kernel::{
     AppState, Error, Operation, Problem, Result, Risk,
     authz::Action,
+    blobs::BlobOwner,
     db::BeginFor as _,
     extract,
     tenancy::{Workspace, WorkspaceId},
@@ -17,6 +18,7 @@ use utoipa::ToSchema;
 
 use crate::{
     domain::{
+        blobs::{CALENDAR_REF_CONTENT_TYPE, CALENDAR_REF_OWNER},
         ops::{self, CalendarPath},
         rows::{calendar_of, calendars_of},
         views::CalendarView,
@@ -147,15 +149,43 @@ pub async fn update(
     if let Some(connection) = calendar.connection_id
         && syncing != calendar.syncing
     {
+        // Which calendar of the provider it is travels in a blob: its id can
+        // be an address.
+        let workspace = access.workspace.to_string();
+        let provider_calendar = match &calendar.provider_calendar_id {
+            Some(provider_id) => {
+                let document = serde_json::to_vec(&serde_json::json!({
+                    "version": 1,
+                    "provider_calendar_id": provider_id,
+                }))
+                .map_err(Error::internal)?;
+                let blob = state
+                    .blobs
+                    .put(&workspace, document, CALENDAR_REF_CONTENT_TYPE)
+                    .await?;
+                state
+                    .blobs
+                    .attach(
+                        &mut tx,
+                        &workspace,
+                        &blob,
+                        &BlobOwner::new(CALENDAR_REF_OWNER, calendar.id),
+                    )
+                    .await?;
+                Some(blob)
+            }
+            None => None,
+        };
         state
             .events
             .publish(
                 &mut tx,
                 &CalendarSyncChanged {
-                    workspace: access.workspace.to_string(),
+                    workspace,
                     calendar: calendar.id,
                     connection,
                     syncing,
+                    provider_calendar,
                 },
             )
             .await?;

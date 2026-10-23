@@ -17,6 +17,8 @@
 //! holding one of the host's few session slots, and keeps where each
 //! message is (`connectors.imap_locations`) with the index.
 
+mod calendar;
+
 use campbooks_kernel::{
     JobContext, JobError,
     blobs::BlobOwner,
@@ -116,6 +118,9 @@ impl JobHandler for SyncStream {
         if let Some(until) = target.throttled_until.filter(|until| *until > now) {
             schedule::set_due(ctx.tx().await?, workspace, target.stream, until).await?;
             return Ok(());
+        }
+        if is_calendar(ctx, workspace, target.stream).await? {
+            return self.run_calendar(ctx, workspace, &target, now).await;
         }
         let configured = match target.provider {
             Provider::Google => self.deps.google.is_some(),
@@ -1625,6 +1630,23 @@ impl Target {
     }
 }
 
+/// Whether `stream` reads a calendar (a stream of the `calendar`
+/// capability), read in a short transaction of its own.
+async fn is_calendar(
+    ctx: &JobContext,
+    workspace: WorkspaceId,
+    stream: StreamId,
+) -> Result<bool, JobError> {
+    let mut tx = ctx.pool().begin_for(workspace).await?;
+    let capability: Option<String> =
+        sqlx::query_scalar("SELECT capability FROM connectors.streams WHERE id = $1")
+            .bind(stream)
+            .fetch_optional(&mut *tx)
+            .await?;
+    tx.commit().await?;
+    Ok(capability.as_deref() == Some("calendar"))
+}
+
 /// The stream and its connection, read in a short transaction of its own.
 async fn load(
     ctx: &JobContext,
@@ -1742,6 +1764,8 @@ pub(crate) async fn read_page(
         .collect()
 }
 
+#[cfg(test)]
+mod calendar_tests;
 #[cfg(test)]
 mod imap_tests;
 #[cfg(test)]

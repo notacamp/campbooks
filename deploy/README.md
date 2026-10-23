@@ -852,6 +852,14 @@ A connection belongs to the workspace and records the member who granted it. Whe
 member leaves the workspace, or the workspace is deleted, the grant is revoked at Google.
 Tuning (all optional) is the `CAMPBOOKS_CONNECTORS__*` block of `.env.example`.
 
+**Google Calendar** rides on the same grant: a member adds calendar access in Settings, which
+asks Google for `https://www.googleapis.com/auth/calendar.events` and
+`https://www.googleapis.com/auth/calendar.calendarlist.readonly` (add both to the consent
+screen; they are sensitive scopes, not restricted ones, and join the verification of the app)
+and reconnects once. Enable the **Google Calendar API** on the same Google project: without it
+the member's calendar stream says so and mail goes on syncing. Their primary calendar syncs
+at first and they turn the others on; changes sync both ways.
+
 **Zoho Mail** uses the Zoho app of Sign in with Zoho (above): the same client, secret and
 redirect URI (`/auth/callback/zoho`, or `CAMPBOOKS_ZOHO__REDIRECT_PATH` behind a proxy
 that rewrites it). Signing in with Zoho then also asks for the mailbox, and members can

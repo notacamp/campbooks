@@ -161,6 +161,7 @@ pub async fn delete(
         return Ok(false);
     }
     schedule::forget_budget(tx, &schedule::connection_budget(id)).await?;
+    schedule::forget_budget(tx, &schedule::calendar_budget(id)).await?;
     state
         .events
         .publish(

@@ -37,7 +37,8 @@ use crate::{
 pub struct StartConnection {
     /// The provider.
     pub provider: Provider,
-    /// The capabilities to ask for (`messages` is offered today).
+    /// The capabilities to ask for (`messages`, and `calendar` for Google,
+    /// and for Zoho while its flag is on).
     pub capabilities: Vec<Capability>,
     /// An existing connection of yours to re-authorise; the same account
     /// must consent.
@@ -137,9 +138,22 @@ pub async fn execute(
         return Err(Error::BadRequest(MESSAGES.reason("capabilities_required")));
     }
     for &capability in &capabilities {
+        // Zoho Calendar is unverified against a live grant: it is asked for
+        // only while its flag is on, and a conflict with the instance's
+        // settings (not a mistake in the request) while it is off.
+        if input.provider == Provider::Zoho
+            && capability == Capability::Calendar
+            && !deps.config.zoho_calendar
+        {
+            return Err(Error::Conflict(
+                MESSAGES
+                    .reason("capability_not_offered")
+                    .arg("capability", capability.as_str()),
+            ));
+        }
         let offered = match input.provider {
-            Provider::Google => google::capability_scope(capability).is_some(),
-            Provider::Zoho => capability == Capability::Messages,
+            Provider::Google => !google::capability_scopes(capability).is_empty(),
+            Provider::Zoho => matches!(capability, Capability::Messages | Capability::Calendar),
             Provider::Imap => false,
         };
         if !offered {
@@ -168,6 +182,7 @@ pub async fn execute(
                 workspace: access.workspace,
                 provider: input.provider.as_str().to_owned(),
                 connection: input.connection.map(|c| c.to_string()),
+                capabilities: capabilities.iter().map(|c| c.as_str().to_owned()).collect(),
             },
         )
         .await?;

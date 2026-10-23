@@ -39,9 +39,9 @@ campbooks_kernel::define_id!(
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum Provider {
-    /// Google: Gmail today; Calendar and Drive later.
+    /// Google: Gmail and Google Calendar today; Drive later.
     Google,
-    /// Zoho: Zoho Mail.
+    /// Zoho: Zoho Mail, and Zoho Calendar while its flag is on.
     Zoho,
     /// Any mailbox over IMAP and SMTP, with its password (usually an app
     /// password). Never a way to sign in.
@@ -77,7 +77,7 @@ impl Provider {
 pub enum Capability {
     /// Read and tidy mail.
     Messages,
-    /// Calendars and events (not offered yet).
+    /// Calendars and events.
     Calendar,
     /// Files (not offered yet).
     Files,
@@ -238,6 +238,10 @@ pub struct StreamView {
     pub address: Option<String>,
     /// Where it is in its reading.
     pub phase: Phase,
+    /// Why this stream does not work, when its connection is otherwise fine
+    /// (`calendar_api_not_enabled`: the calendar API is not enabled for this
+    /// server's Google project; `provider_errors`).
+    pub health_reason: Option<String>,
     /// Paused until the member connects again.
     pub paused: bool,
     /// When a run last finished.

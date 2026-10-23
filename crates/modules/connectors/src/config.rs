@@ -22,6 +22,11 @@ pub struct ConnectorsConfig {
     pub zoho: ZohoMailConfig,
     /// Any mailbox over IMAP and SMTP (`CAMPBOOKS_CONNECTORS__IMAP__*`).
     pub imap: ImapConfig,
+    /// Calendar sync (`CAMPBOOKS_CONNECTORS__CALENDAR__*`).
+    pub calendar: CalendarConfig,
+    /// Whether Zoho Calendar is offered (`CAMPBOOKS_CONNECTORS__ZOHO_CALENDAR`,
+    /// default off): its adapter is unverified against a live Zoho grant.
+    pub zoho_calendar: bool,
     /// Consecutive failed runs before a connection's health is `failing`
     /// (`CAMPBOOKS_CONNECTORS__FAILING_AFTER`, default 5).
     pub failing_after: u32,
@@ -63,6 +68,16 @@ pub struct ZohoMailConfig {
     /// Minutes between sweeps that re-read a mailbox's whole window
     /// (default 360).
     pub sweep_minutes: u32,
+}
+
+/// `CAMPBOOKS_CONNECTORS__CALENDAR__*`.
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[serde(default, deny_unknown_fields)]
+pub struct CalendarConfig {
+    /// Requests per minute each connection's calendar may make, shared by
+    /// every process (default 300). Google allows a user far more; this
+    /// leaves room for a member's other apps.
+    pub requests_per_minute: u32,
 }
 
 /// `CAMPBOOKS_CONNECTORS__IMAP__*`: connecting any mailbox with its
@@ -174,6 +189,8 @@ impl Default for ConnectorsConfig {
             google: BudgetConfig::default(),
             zoho: ZohoMailConfig::default(),
             imap: ImapConfig::default(),
+            calendar: CalendarConfig::default(),
+            zoho_calendar: false,
             failing_after: 5,
             batch_retention_days: 7,
         }
@@ -198,6 +215,14 @@ impl Default for ZohoMailConfig {
             run_budget_bytes: 64 * 1024 * 1024,
             requests_per_minute: 60,
             sweep_minutes: 360,
+        }
+    }
+}
+
+impl Default for CalendarConfig {
+    fn default() -> Self {
+        Self {
+            requests_per_minute: 300,
         }
     }
 }
@@ -280,6 +305,11 @@ impl ConnectorsConfig {
         if self.google.units_per_second == 0 {
             return Err(
                 "CAMPBOOKS_CONNECTORS__GOOGLE__UNITS_PER_SECOND must be positive".to_owned(),
+            );
+        }
+        if self.calendar.requests_per_minute == 0 {
+            return Err(
+                "CAMPBOOKS_CONNECTORS__CALENDAR__REQUESTS_PER_MINUTE must be positive".to_owned(),
             );
         }
         let zoho = &self.zoho;

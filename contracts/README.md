@@ -26,6 +26,8 @@ produce or accept against the file.
 | `schedule.event_created.v1.schema.json`, `schedule.event_changed.v1.schema.json`, `schedule.event_cancelled.v1.schema.json` | `schedule` | (any) | An event added to, changed on or cancelled from a calendar (ids, enums and times only; no title, place or attendees) |
 | `schedule.outbound_requested.v1.schema.json` | `schedule` | `connectors` | A member's change to an event on a provider calendar, to be made there once schedule confirms it (ids, the kind of change and a blob reference) |
 | `calendar-change.v1.schema.json` | `schedule` | `connectors` | What to write at the provider and against which etag, as the blob that event points at (`application/vnd.campbooks.calendar-change+json; version=1`) |
+| `schedule.calendar_sync_changed.v1.schema.json` | `schedule` | `connectors` | A member turned a provider calendar on or off (ids, a flag and a blob reference to which calendar of the provider it is) |
+| `calendar-ref.v1.schema.json` | `schedule` | `connectors` | Which calendar of the provider a sync change is about, as the blob that event points at (`application/vnd.campbooks.calendar-ref+json; version=1`) |
 | `connectors.calendar_change_completed.v1.schema.json` | `connectors` | `schedule` | The event telling how a calendar change ended: applied (with the provider's id and etag), superseded, skipped or failed (with a reason code) |
 
 Rules:

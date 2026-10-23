@@ -79,6 +79,7 @@ pub fn module() -> Module {
             .on_event::<features::forget::ForgetMember>()
             .on_event::<features::forget::ForgetConnection>()
             .on_event::<features::forget::ScheduleWorkspacePurge>()
+            .rekey::<features::retag_bindings::RetagBindings>()
             .job::<features::forget::PurgeWorkspace>()
             .job::<features::delete_event::ReleaseDelete>(),
         resources: domain::resources::resources(),
@@ -141,6 +142,7 @@ mod tests {
             "schedule.schedule_workspace_purge",
             "schedule.purge_workspace",
             "schedule.release_delete",
+            "schedule.retag_bindings",
         ] {
             assert!(kinds.contains(&kind), "{kind}");
         }

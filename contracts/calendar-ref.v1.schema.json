@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://campbooks.example.com/contracts/calendar-ref.v1.schema.json",
+  "title": "calendar-ref v1 (blob)",
+  "description": "Which calendar of the provider a `schedule.calendar_sync_changed` v1 event is about. A blob (`application/vnd.campbooks.calendar-ref+json; version=1`) that event points at: the provider's calendar id can be an address, so it never travels in an event. Deleted with the workspace.",
+  "type": "object",
+  "required": [
+    "version",
+    "provider_calendar_id"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "version": {
+      "const": 1
+    },
+    "provider_calendar_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 512,
+      "description": "The calendar's id at the provider."
+    }
+  }
+}

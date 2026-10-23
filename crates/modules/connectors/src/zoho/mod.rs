@@ -11,6 +11,7 @@
 //! configured development fake) maps to one.
 
 mod api;
+mod calendar;
 #[cfg(test)]
 mod flows;
 pub mod html;
@@ -22,6 +23,7 @@ use secrecy::ExposeSecret as _;
 use url::Url;
 
 pub use api::{Listed, OriginalFetch, ZohoLabel, ZohoMail};
+pub use calendar::ZohoCalendar;
 
 use crate::provider::{
     ClientSecret, FORM, OAuthError, ProviderError, TokenGrant, form_body, http_client, transport,
@@ -38,6 +40,11 @@ pub const MAIL_SCOPES: [&str; 4] = [
     "ZohoMail.messages.ALL",
     LABELS_SCOPE,
 ];
+
+/// The scopes the `calendar` capability needs: read the calendars, and read
+/// and write their events. Offered only while
+/// `CAMPBOOKS_CONNECTORS__ZOHO_CALENDAR` is on.
+pub const CALENDAR_SCOPES: [&str; 2] = ["ZohoCalendar.calendar.READ", "ZohoCalendar.event.ALL"];
 
 /// The scope of Zoho's labels API. A connection granted before it was
 /// asked for keeps syncing without labels or streams until the member
@@ -76,6 +83,8 @@ pub struct DataCentre {
     pub revoke: Url,
     /// The Mail API base, up to `/api/`.
     pub mail: Url,
+    /// The Calendar API base, up to `/api/v1/`.
+    pub calendar: Url,
 }
 
 /// Which data centres a grant may name.
@@ -92,18 +101,26 @@ impl Centres {
     /// The data centre of `issuer`, when it is one of these.
     pub fn of(&self, issuer: &str) -> Option<DataCentre> {
         let issuer = issuer.trim().trim_end_matches('/');
-        let (origin, mail) = match self {
+        let (origin, mail, calendar) = match self {
             Self::Zoho => {
                 let origin = ACCOUNTS_SERVERS.iter().find(|s| **s == issuer)?;
                 let host = origin.strip_prefix("https://accounts.")?;
-                ((*origin).to_owned(), format!("https://mail.{host}/api/"))
+                (
+                    (*origin).to_owned(),
+                    format!("https://mail.{host}/api/"),
+                    format!("https://calendar.{host}/api/v1/"),
+                )
             }
             Self::Fake(base) => {
                 let base = base.as_str().trim_end_matches('/');
                 if base != issuer {
                     return None;
                 }
-                (base.to_owned(), format!("{base}/api/"))
+                (
+                    base.to_owned(),
+                    format!("{base}/api/"),
+                    format!("{base}/calendar/api/v1/"),
+                )
             }
         };
         let parse = |url: &str| Url::parse(url).ok();
@@ -111,6 +128,7 @@ impl Centres {
             token: parse(&format!("{origin}/oauth/v2/token"))?,
             revoke: parse(&format!("{origin}/oauth/v2/token/revoke"))?,
             mail: parse(&mail)?,
+            calendar: parse(&calendar)?,
             issuer: origin,
         })
     }
@@ -155,6 +173,15 @@ impl Zoho {
         account: &'a str,
     ) -> ZohoMail<'a> {
         ZohoMail::new(&self.http, &centre.mail, access_token, account)
+    }
+
+    /// The Calendar API of `centre` with `access_token`.
+    pub fn calendar<'a>(
+        &'a self,
+        centre: &'a DataCentre,
+        access_token: &'a str,
+    ) -> ZohoCalendar<'a> {
+        ZohoCalendar::new(&self.http, &centre.calendar, access_token)
     }
 
     /// A fresh access token for `refresh_token` at `centre`. Zoho answers

@@ -3460,7 +3460,7 @@
             }
           },
           "409": {
-            "description": "The provider is not configured on this instance (`provider_not_configured`), or this instance has no front door for consents (`mailbox_unsupported`).",
+            "description": "The provider is not configured on this instance (`provider_not_configured`), this instance has no front door for consents (`mailbox_unsupported`), or the capability is switched off on it (`capability_not_offered`, Zoho Calendar).",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -25532,7 +25532,7 @@
             "items": {
               "$ref": "#/components/schemas/Capability"
             },
-            "description": "The capabilities to ask for (`messages` is offered today)."
+            "description": "The capabilities to ask for (`messages`, and `calendar` for Google,\nand for Zoho while its flag is on)."
           },
           "connection": {
             "oneOf": [
@@ -25771,6 +25771,13 @@
           "capability": {
             "$ref": "#/components/schemas/Capability",
             "description": "The capability it reads."
+          },
+          "health_reason": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Why this stream does not work, when its connection is otherwise fine\n(`calendar_api_not_enabled`: the calendar API is not enabled for this\nserver's Google project; `provider_errors`)."
           },
           "inbox_id": {
             "oneOf": [

@@ -86,6 +86,10 @@ pub struct ReconnectTarget {
     pub account_subject: String,
     /// Whether its grant stopped working and needs consent again.
     pub needs_reauth: bool,
+    /// What the connection lets Campbooks do (`messages`, `calendar`, …):
+    /// a reconnect asks for the scopes of each again, or the new grant
+    /// would lose them.
+    pub capabilities: Vec<String>,
 }
 
 /// A future returned by [`GrantIntake::reconnect_target`].
@@ -103,6 +107,14 @@ pub trait GrantIntake: std::fmt::Debug + Send + Sync + 'static {
     /// for `provider` (empty when it has no adapter for it). A sign-in asks
     /// for these in the same consent.
     fn mailbox_scopes(&self, provider: &str) -> Vec<String>;
+
+    /// The provider scopes the capabilities other than `messages` in
+    /// `capabilities` need (`calendar`), which a connect or reconnect asks
+    /// for besides [`mailbox_scopes`](Self::mailbox_scopes). Names this
+    /// instance does not offer for `provider` add nothing.
+    fn capability_scopes(&self, _provider: &str, _capabilities: &[String]) -> Vec<String> {
+        Vec::new()
+    }
 
     /// Create the connection of `grant` in its workspace, or refresh the
     /// existing one of the same account. Errors are the implementation's
@@ -188,6 +200,9 @@ pub struct ConsentRequest {
     pub provider: String,
     /// The connection to reconnect, if any (a new connection otherwise).
     pub connection: Option<String>,
+    /// The capabilities to ask for besides the mailbox (`calendar`): their
+    /// scopes join the consent ([`GrantIntake::capability_scopes`]).
+    pub capabilities: Vec<String>,
 }
 
 /// A started consent: send the browser to `url` before `expires_at`.

@@ -6369,7 +6369,10 @@ export interface components {
         };
         /** @description What to connect. */
         StartConnection: {
-            /** @description The capabilities to ask for (`messages` is offered today). */
+            /**
+             * @description The capabilities to ask for (`messages`, and `calendar` for Google,
+             *     and for Zoho while its flag is on).
+             */
             capabilities: components["schemas"]["Capability"][];
             connection?: components["schemas"]["ConnectionId"] | null;
             /** @description The provider. */
@@ -6485,6 +6488,12 @@ export interface components {
             address?: string | null;
             /** @description The capability it reads. */
             capability: components["schemas"]["Capability"];
+            /**
+             * @description Why this stream does not work, when its connection is otherwise fine
+             *     (`calendar_api_not_enabled`: the calendar API is not enabled for this
+             *     server's Google project; `provider_errors`).
+             */
+            health_reason?: string | null;
             inbox_id?: components["schemas"]["InboxId"] | null;
             /**
              * Format: date-time

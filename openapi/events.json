@@ -147,6 +147,17 @@
             "$ref": "#/components/schemas/BlobRef",
             "description": "The account's address and name: an [`AccountDocument`] blob."
           },
+          "calendars": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/BlobRef",
+                "description": "The account's calendars: a `calendar-list` v1 blob (`calendar` only).\nThe provider's calendar ids can be addresses, so they travel in the\nblob and never in the event."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "capability": {
             "$ref": "#/components/schemas/Capability",
             "description": "The capability."
@@ -1381,6 +1392,17 @@
           "connection": {
             "$ref": "#/components/schemas/ConnectionId",
             "description": "The connection whose calendar it is."
+          },
+          "provider_calendar": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/BlobPointer",
+                "description": "Which calendar of the provider it is: a `calendar-ref` v1 document, a\nblob. The provider's id can be an address, so it never travels in the\nevent itself."
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "syncing": {
             "type": "boolean",

@@ -10,7 +10,7 @@ use serde::{Deserialize, Serialize};
 use sqlx::types::Uuid;
 
 use crate::{
-    domain::outbound::BLOB_OWNER,
+    domain::{blobs::CALENDAR_REF_OWNER, outbound::BLOB_OWNER},
     inbound::{ConnectionRemoved, MemberLeft, WorkspaceDeleting},
 };
 
@@ -48,16 +48,21 @@ impl EventHandler for ForgetMember {
             .detach_owners(tx, &left.workspace, BLOB_OWNER, &requests)
             .await?;
         // The events go with their calendars.
-        let calendars = sqlx::query(
+        let calendar_ids: Vec<Uuid> = sqlx::query_scalar(
             "DELETE FROM schedule.calendars
-              WHERE workspace_id = $1 AND member_id = $2 AND created_at <= $3",
+              WHERE workspace_id = $1 AND member_id = $2 AND created_at <= $3
+          RETURNING id",
         )
         .bind(workspace)
         .bind(left.user)
         .bind(before)
-        .execute(&mut **tx)
-        .await?
-        .rows_affected();
+        .fetch_all(&mut **tx)
+        .await?;
+        state
+            .blobs
+            .detach_owners(tx, &left.workspace, CALENDAR_REF_OWNER, &calendar_ids)
+            .await?;
+        let calendars = calendar_ids.len();
         sqlx::query(
             "DELETE FROM schedule.removed_items
               WHERE workspace_id = $1 AND member_id = $2 AND removed_at <= $3",
@@ -118,11 +123,17 @@ impl EventHandler for ForgetConnection {
             .blobs
             .detach_owners(tx, &removed.workspace, BLOB_OWNER, &requests)
             .await?;
-        let calendars = sqlx::query("DELETE FROM schedule.calendars WHERE connection_id = $1")
-            .bind(removed.connection)
-            .execute(&mut **tx)
-            .await?
-            .rows_affected();
+        let calendar_ids: Vec<Uuid> = sqlx::query_scalar(
+            "DELETE FROM schedule.calendars WHERE connection_id = $1 RETURNING id",
+        )
+        .bind(removed.connection)
+        .fetch_all(&mut **tx)
+        .await?;
+        state
+            .blobs
+            .detach_owners(tx, &removed.workspace, CALENDAR_REF_OWNER, &calendar_ids)
+            .await?;
+        let calendars = calendar_ids.len();
         tracing::info!(calendars, "the calendars of a removed connection deleted");
         Ok(())
     }
