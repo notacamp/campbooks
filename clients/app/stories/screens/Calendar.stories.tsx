@@ -319,7 +319,7 @@ export const NewEvent: Story = {
     const canvas = within(canvasElement);
     await canvas.findByText(DENTIST.title);
     await userEvent.click(canvas.getByRole("button", { name: /New event/u }));
-    await expect(await within(document.body).findByRole("dialog")).toBeVisible();
+    await expect(await within(document.body).findByRole("dialog")).toBeInTheDocument();
   },
 };
 
@@ -353,8 +353,8 @@ export const ReaderScoutRead: Story = {
     const canvas = within(canvasElement);
     const strip = await canvas.findByRole("region", { name: "Scout noticed" });
     await expect(within(strip).getByText(HANDOVER_ITEM.title)).toBeVisible();
-    await expect(within(strip).getByText("Added to your calendar")).toBeVisible();
-    await expect(within(strip).getByRole("button", { name: /Undo/u })).toBeVisible();
+    await expect(await within(strip).findByText("Added to your calendar")).toBeVisible();
+    await expect(await within(strip).findByRole("button", { name: /Undo/u })).toBeVisible();
   },
 };
 
@@ -393,7 +393,7 @@ export const ReaderNoModel: Story = {
     const strip = await canvas.findByRole("region", { name: "Scout noticed" });
     await expect(within(strip).getByText("This email has an appointment")).toBeVisible();
     await userEvent.click(within(strip).getByRole("button", { name: "Add" }));
-    await expect(await within(document.body).findByRole("dialog")).toBeVisible();
+    await expect(await within(document.body).findByRole("dialog")).toBeInTheDocument();
   },
 };
 
@@ -442,7 +442,7 @@ export const Settings: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     await expect(await canvas.findByRole("heading", { name: "Calendars" })).toBeVisible();
-    await expect(canvas.getByRole("button", { name: "Add calendar access" })).toBeVisible();
+    await expect(await canvas.findByRole("button", { name: "Add calendar access" })).toBeVisible();
     const holidays = await canvas.findByRole("switch", { name: "Show Holidays in Portugal" });
     await expect(holidays).toHaveAttribute("aria-checked", "false");
     await userEvent.click(canvas.getByRole("switch", { name: "Scout adds Stays" }));

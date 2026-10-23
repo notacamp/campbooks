@@ -182,7 +182,7 @@ function CalendarsSection({
             <ListRow
               key={connection.id}
               title={connection.address}
-              meta={t("settings.calendars.accessHint", { address: connection.address })}
+              meta={t("settings.calendars.accessHint")}
               trailing={
                 connection.granted_by_you ? (
                   <Button

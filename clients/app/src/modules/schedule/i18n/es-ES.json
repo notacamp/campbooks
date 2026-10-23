@@ -180,7 +180,7 @@
       "show": "Mostrar {{name}}",
       "colour": "Color de {{name}}",
       "access": "Dar acceso al calendario",
-      "accessHint": "{{address}}: solo correo. Da acceso al calendario para ver aquí los calendarios de esta cuenta.",
+      "accessHint": "Solo correo. Da acceso al calendario para ver aquí los calendarios de esta cuenta.",
       "refused": "No se pudo empezar. Inténtalo de nuevo."
     },
     "kinds": {

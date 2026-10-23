@@ -301,7 +301,9 @@ button.kindChip:hover {
 /* Week */
 
 .weekScroll {
-  flex: 1 1 0;
+  /* Positioned, so visually hidden text inside it scrolls with it. */
+  position: relative;
+  flex: 1 1 auto;
   min-height: 0;
   overflow: auto;
   overscroll-behavior: contain;
@@ -419,7 +421,7 @@ button.kindChip:hover {
   font-size: var(--text-xs);
   line-height: var(--leading-none);
   text-align: right;
-  transform: translateY(-50%);
+  transform: translateY(calc(var(--space-1-5) * -1));
 }
 
 .columns {
@@ -452,11 +454,7 @@ button.kindChip:hover {
   border: var(--border-width) solid var(--surface-base);
   border-left: var(--space-0-5) solid var(--kind);
   border-radius: var(--radius-sm);
-  background: color-mix(
-    in oklch,
-    var(--kind) calc(var(--kind-soft-mix) * 1.4),
-    var(--surface-base)
-  );
+  background: color-mix(in oklch, var(--kind) calc(var(--kind-soft-mix) * 1.6), transparent);
   color: var(--kind);
   font: inherit;
   text-align: left;
@@ -527,7 +525,7 @@ button.kindChip:hover {
 .month {
   display: flex;
   flex-direction: column;
-  flex: 1 1 0;
+  flex: 1 1 auto;
 }
 
 .monthWeekdays,
@@ -550,6 +548,7 @@ button.kindChip:hover {
 .monthCell {
   display: flex;
   flex-direction: column;
+  overflow: hidden;
   gap: var(--space-0-5);
   min-width: 0;
   min-height: calc(var(--size-hit) * 2);
@@ -629,6 +628,8 @@ button.kindChip:hover {
     gap: var(--space-1-5);
     align-items: center;
     width: auto;
+    min-width: 0;
+    overflow: hidden;
     height: var(--space-5);
     padding: 0 var(--space-1-5);
     border-radius: var(--radius-xs);
@@ -640,6 +641,7 @@ button.kindChip:hover {
 
   .monthEventTitle {
     display: block;
+    min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;

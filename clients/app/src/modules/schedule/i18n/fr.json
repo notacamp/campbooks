@@ -180,7 +180,7 @@
       "show": "Afficher {{name}}",
       "colour": "Couleur de {{name}}",
       "access": "Donner l’accès à l’agenda",
-      "accessHint": "{{address}} : e-mails seulement. Donnez l’accès à l’agenda pour voir ici les agendas de ce compte.",
+      "accessHint": "E-mails seulement. Donnez l’accès à l’agenda pour voir ici les agendas de ce compte.",
       "refused": "Impossible de commencer. Réessayez."
     },
     "kinds": {

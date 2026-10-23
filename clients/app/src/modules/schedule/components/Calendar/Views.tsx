@@ -68,7 +68,7 @@ function useLabels() {
 }
 
 const fromEmail = (t: T, event: EventView) =>
-  event.source === undefined || event.source === null ? undefined : { label: t("from.email") };
+  event.source?.type.startsWith("conversations.") === true ? { label: t("from.email") } : undefined;
 
 /** One row of a day, with what orders it among the others. */
 interface Row {
