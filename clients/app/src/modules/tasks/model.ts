@@ -79,7 +79,12 @@ export function groupTasks(tasks: readonly TaskView[], now: Date): Map<Group, Ta
   for (const task of tasks) {
     groups.get(groupOf(task, now))?.push(task);
   }
-  groups.get("later")?.sort((a, b) => (a.later_until ?? "").localeCompare(b.later_until ?? ""));
+  groups.set(
+    "later",
+    (groups.get("later") ?? []).toSorted((a, b) =>
+      (a.later_until ?? "").localeCompare(b.later_until ?? ""),
+    ),
+  );
   return groups;
 }
 

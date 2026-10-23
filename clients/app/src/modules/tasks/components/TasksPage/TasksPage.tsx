@@ -92,7 +92,7 @@ export function TasksPage({ workspaceId, taskId, addRequest, useSources, now }: 
 
   const own = mine.data ?? [];
   const handed = away.data ?? [];
-  const all = [...own, ...handed].sort(byDue);
+  const all = [...own, ...handed].toSorted(byDue);
   const groups = groupTasks(all, clock);
   const order = listOrder(groups, laterOpen);
   const open = taskId === undefined ? undefined : all.find((task) => task.id === taskId);
