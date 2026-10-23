@@ -6,7 +6,7 @@
 - [x] 1.3 Move the step-up rule to `campbooks_kernel::auth::step_up` (`require_recent`, `require_fresh`); identity calls it; messages stay in identity's catalogue and connectors gets its own `step_up_required` reason
 
 ## 2. connectors: schema and credential
-- [x] 2.1 Migration `20261023130000_connectors__imap.sql`: provider CHECK + `imap`; `credentials.refresh_token` nullable, `password bytea`, exactly-one CHECK; `connectors.imap_servers` with RLS
+- [x] 2.1 Migration `20261023160000_connectors__imap.sql`: provider CHECK + `imap`; `credentials.refresh_token` nullable, `password bytea`, exactly-one CHECK; `connectors.imap_servers` with RLS
 - [x] 2.2 `Provider::Imap` and every exhaustive match (start_connection offered list, credentials refresh = none, intake none, removal revoke = none, sync_stream idle arm, send_message `provider_not_configured`, request_changes none, schedule budget key, metrics, events); `contracts/*` enums + `openapi/events.json`
 - [x] 2.3 `credentials::store_password` / `credentials::password` with AAD `password`; previous-key re-seal like tokens; RLS test
 - [x] 2.4 `ImapConfig` (`CAMPBOOKS_CONNECTORS__IMAP__*`) and `Deps::imap_enabled`

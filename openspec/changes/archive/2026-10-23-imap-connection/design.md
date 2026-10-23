@@ -61,7 +61,7 @@ token-refresh path would have to know it is not a token.
 ## Data ownership and events
 
 Schema `connectors` only. Migration
-`20261023130000_connectors__imap.sql`:
+`20261023160000_connectors__imap.sql`:
 
 - `connections.provider` CHECK gains `'imap'`.
 - `credentials.refresh_token` DROP NOT NULL; `credentials.password bytea`;
