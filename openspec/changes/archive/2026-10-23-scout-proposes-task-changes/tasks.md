@@ -18,6 +18,8 @@
 - [x] 3.2 Cards for the six actions in four languages, the task and its due day as the fact line, the teammate named by the server
 - [x] 3.3 Tests: runnable, the undo copying only `revision`, a task card confirmed and undone; Storybook screen story; recording scenario
 
+- [x] 3.4 `taskRef` in `lib/scout-chat`, a `task` kind in the panel (about line, starters in four languages), `useTaskSubject`, "Ask Scout" with `.` on the task detail; tests; in the recording
+
 ## 4. Close
 
 - [x] 4.1 OpenAPI and client types regenerated

@@ -198,7 +198,9 @@
       "saveFailed": "Scout couldn’t save the rule. Try again.",
       "savePartial": "Saved in {{saved}} of {{total}} inboxes, then Scout stopped. Try again saves it in the rest.",
       "retry": "Try again",
-      "description": "Say it in a sentence. Scout shows you the rule, and what it matches, before anything is saved."
+      "description": "Say it in a sentence. Scout shows you the rule, and what it matches, before anything is saved.",
+      "savedNote": "Rule saved. Scout can tell you what it does and what it changes.",
+      "askAbout": "Ask Scout about this rule"
     },
     "builder": {
       "noModel": "This server has no language model for reading sentences, so build the rule here.",
@@ -375,6 +377,32 @@
         "write": "Write the draft",
         "done": "Draft opened. You send it, or not."
       }
-    }
+    },
+    "recent": "Recent",
+    "recentEmpty": "No chats yet. Ask Scout something to start one.",
+    "recentLoading": "Loading your chats…",
+    "recentFailed": "Your chats couldn’t be listed. Try again in a moment.",
+    "noticeLine": "Scout’s suggestion for {{sender}}",
+    "aboutNothing": "your mail",
+    "ruleIntro": "Ask me about this rule.",
+    "ruleDoes": "What does this rule do?",
+    "ruleChanged": "What has it changed?",
+    "noticeIntro": "Ask me about what I noticed.",
+    "noticeWhy": "Why do you suggest this?",
+    "noticeChange": "What would it change?",
+    "nothingIntro": "Ask me about your mail: what needs you, who you’re waiting on, what someone sent.",
+    "nothingToday": "What needs me today?",
+    "nothingWaiting": "What am I waiting on?",
+    "fieldNothing": "Ask about your mail",
+    "unreadableRule": "Scout can’t open a chat about this rule.",
+    "unreadableNotice": "This suggestion is no longer offered to you.",
+    "unreadableNothing": "Scout can’t start a chat just now. Try again in a moment.",
+    "taskIntro": "Ask me about this task.",
+    "taskLeft": "What’s left on this?",
+    "taskWhen": "When should I do this?",
+    "taskWho": "Who could take this?",
+    "taskLine": "Task: {{title}}",
+    "unreadableTask": "Scout can’t open a chat about this task.",
+    "gone": "This chat is no longer here."
   }
 }

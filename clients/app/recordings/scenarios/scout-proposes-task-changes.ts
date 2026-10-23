@@ -46,5 +46,14 @@ export default async function scoutProposesTaskChanges({ page }: ScenarioContext
   await hand.getByRole("button", { name: "Confirm" }).click();
   await hand.getByText("Done.").waitFor();
   await caption(page, "Handed to Rui; you can take it back", 2200);
+
+  // Ask Scout on a task itself.
+  await page.goto(story("screens-scout--ask-about-a-task-live"));
+  const ask = page.getByRole("button", { name: /^Ask Scout/u });
+  await ask.waitFor();
+  await caption(page, "A task's detail: Ask Scout, or press .", 2000);
+  await ask.click();
+  await page.getByText("Ask me about this task.").waitFor();
+  await caption(page, "The chat is about this task, with questions to start from", 2600);
   await pause(800);
 }

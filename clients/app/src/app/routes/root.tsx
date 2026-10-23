@@ -6,9 +6,10 @@ import {
   useNavigate,
   useParams,
 } from "@tanstack/react-router";
-import { Suspense, useState } from "react";
+import { Suspense, useCallback, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
+import { ScoutChatHost, type OpenScoutChat } from "~/lib/scout-chat";
 import { useShortcut } from "~/lib/shortcuts";
 import { readPref } from "~/lib/storage/prefs";
 import { CommandMenu, ShortcutSheet, Text, ThemeProvider } from "~/lib/ui";
@@ -31,6 +32,21 @@ function RootLayout() {
   const { workspaceId } = useParams({ strict: false });
   const [sheetOpen, setSheetOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  // What had the focus when the menu opened: Scout's chat, asked from the
+  // menu, gives it back there when it closes.
+  const menuFrom = useRef<HTMLElement | null>(null);
+  const openMenu = (open: boolean) => {
+    if (open) {
+      const active = document.activeElement;
+      menuFrom.current = active instanceof HTMLElement && active !== document.body ? active : null;
+    }
+    setMenuOpen(open);
+  };
+  // Scout's chat of the open workspace, for "Ask Scout" in the menu (⌘K).
+  const [scout, setScout] = useState<OpenScoutChat | undefined>();
+  const hostScout = useCallback((open?: OpenScoutChat) => {
+    setScout(() => open);
+  }, []);
 
   // `/` searches the open workspace: in the menu on a desktop, the page on a phone.
   const openSearch = () => {
@@ -42,7 +58,7 @@ function RootLayout() {
       setMenuOpen(false);
       void navigate({ to: "/w/$workspaceId/search", params: { workspaceId } });
     } else {
-      setMenuOpen(true);
+      openMenu(true);
     }
   };
   useShortcut("search.open", openSearch, { enabled: workspaceId !== undefined });
@@ -53,7 +69,7 @@ function RootLayout() {
   });
   useShortcut("command.open", () => {
     setSheetOpen(false);
-    setMenuOpen((open) => !open);
+    openMenu(!menuOpen);
   });
   useShortcut("nav.home", () => {
     void navigate({ to: "/" });
@@ -63,7 +79,9 @@ function RootLayout() {
     // The accent follows the open workspace; outside one, the last one opened.
     <ThemeProvider workspaceId={workspaceId ?? readPref("workspace") ?? undefined}>
       <Suspense fallback={<Text tone="tertiary">{t("loading")}</Text>}>
-        <Outlet />
+        <ScoutChatHost onOpener={hostScout}>
+          <Outlet />
+        </ScoutChatHost>
       </Suspense>
       <ShortcutSheet
         open={sheetOpen}
@@ -77,6 +95,17 @@ function RootLayout() {
           setMenuOpen(false);
         }}
         useSection={useConversationSection}
+        onAsk={
+          scout === undefined
+            ? undefined
+            : (query) => {
+                // A new chat about nothing; with words typed, asked at once.
+                scout(null, {
+                  from: menuFrom.current,
+                  ask: query.trim() === "" ? undefined : query,
+                });
+              }
+        }
       />
     </ThemeProvider>
   );

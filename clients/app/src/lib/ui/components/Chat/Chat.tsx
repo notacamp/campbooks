@@ -1,4 +1,11 @@
-import { useEffect, useId, useRef, useSyncExternalStore, type ReactNode } from "react";
+import {
+  useEffect,
+  useId,
+  useRef,
+  useSyncExternalStore,
+  type KeyboardEvent as ReactKeyboardEvent,
+  type ReactNode,
+} from "react";
 import { createPortal } from "react-dom";
 
 import { cx } from "../../internal/cx";
@@ -6,6 +13,7 @@ import { useFocusTrap } from "../../internal/use-focus-trap";
 import { Button } from "../Button/Button";
 import { Icon } from "../Icon/Icon";
 import { IconButton } from "../IconButton/IconButton";
+import { Popover } from "../Popover/Popover";
 import { VisuallyHidden } from "../Typography/Typography";
 import { Visor, type VisorState } from "../Visor/Visor";
 
@@ -55,6 +63,14 @@ export interface ChatPanelProps {
    * the window when absent.
    */
   modal?: boolean | undefined;
+  /**
+   * Opened from a dialog, which stays open: from the large breakpoint the
+   * panel stands over the page at its edge, beside the dialog (which moves
+   * aside for it), and takes the focus; Esc closes the panel first.
+   */
+  over?: boolean | undefined;
+  /** In the header, before Close: Recent ({@link ChatRecent}). */
+  actions?: ReactNode | undefined;
 }
 
 /**
@@ -74,13 +90,27 @@ export function ChatPanel({
   announcement,
   follow,
   modal,
+  over = false,
+  actions,
 }: ChatPanelProps) {
   const titleId = useId();
   const root = useRef<HTMLElement>(null);
   const log = useRef<HTMLDivElement>(null);
   const wide = useSyncExternalStore(subscribeWide, isWide, () => true);
-  const asDialog = modal ?? !wide;
+  // Over a dialog on a wide screen: at the page's edge, the dialog beside it.
+  const floating = over && modal === undefined && wide;
+  const asDialog = floating || (modal ?? !wide);
   useFocusTrap(root, asDialog);
+  useEffect(() => {
+    if (!floating) {
+      return;
+    }
+    const page = document.documentElement;
+    page.dataset["chatBeside"] = "";
+    return () => {
+      delete page.dataset["chatBeside"];
+    };
+  }, [floating]);
 
   useEffect(() => {
     const element = log.current;
@@ -121,6 +151,7 @@ export function ChatPanel({
           {title}
         </h2>
         <span className={styles["spacer"]} />
+        {actions}
         <IconButton icon="close" label={closeLabel} shortcut="overlay.close" onClick={onClose} />
       </header>
       {about === undefined ? null : <div className={styles["about"]}>{about}</div>}
@@ -140,7 +171,7 @@ export function ChatPanel({
         ref={(element) => {
           root.current = element;
         }}
-        className={cx(styles["panel"], styles["sheet"])}
+        className={cx(styles["panel"], floating ? styles["floating"] : styles["sheet"])}
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
@@ -156,6 +187,108 @@ export function ChatPanel({
       {body}
     </section>
   );
+}
+
+/** One of the member's chats, as Recent lists it. */
+export interface ChatRecentItem {
+  id: string;
+  /** Its first question, the member's own words. */
+  text: string;
+  /** When its last message was written, in words ("Yesterday", "09:40"). */
+  time: string;
+  /** The same, for machines. */
+  dateTime: string;
+}
+
+export interface ChatRecentProps {
+  /** The button's and the menu's name: "Recent". */
+  label: string;
+  /** The chats, newest first; `undefined` while they load. */
+  items: readonly ChatRecentItem[] | undefined;
+  /** Said when there is none: "No chats yet". */
+  empty: string;
+  /** Said while they load. */
+  loading: string;
+  /** Said when they could not be listed. */
+  failed?: string | undefined;
+  /** The chat on screen, marked as current. */
+  current?: string | undefined;
+  /** The menu opened: list them afresh. */
+  onOpen?: (() => void) | undefined;
+  /** Open this chat. */
+  onPick: (id: string) => void;
+}
+
+/**
+ * "Recent", in the panel's header: the member's chats by their first
+ * question and the time of their last message; choosing one opens it. ↑ ↓
+ * move between them, Esc closes the menu (and only the menu).
+ */
+export function ChatRecent({
+  label,
+  items,
+  empty,
+  loading,
+  failed,
+  current,
+  onOpen,
+  onPick,
+}: ChatRecentProps) {
+  return (
+    <Popover
+      label={label}
+      onOpenChange={(open) => {
+        if (open) {
+          onOpen?.();
+        }
+      }}
+      renderTrigger={(trigger) => <IconButton {...trigger} label={label} icon="clock" />}
+    >
+      {(close) => (
+        <div className={styles["recent"]}>
+          {failed === undefined ? null : <p className={styles["recentNote"]}>{failed}</p>}
+          {failed === undefined && items === undefined ? (
+            <p className={styles["recentNote"]}>{loading}</p>
+          ) : null}
+          {items?.length === 0 ? <p className={styles["recentNote"]}>{empty}</p> : null}
+          {items?.map((item) => (
+            <button
+              key={item.id}
+              type="button"
+              className={styles["recentItem"]}
+              aria-current={item.id === current ? "true" : undefined}
+              onKeyDown={moveBetweenRows}
+              onClick={() => {
+                close();
+                onPick(item.id);
+              }}
+            >
+              <span className={styles["recentText"]}>{item.text}</span>
+              <time className={styles["recentTime"]} dateTime={item.dateTime}>
+                {item.time}
+              </time>
+            </button>
+          ))}
+        </div>
+      )}
+    </Popover>
+  );
+}
+
+/** ↑/↓ move between a menu's rows (the row's sibling buttons). */
+function moveBetweenRows(event: ReactKeyboardEvent<HTMLButtonElement>) {
+  if (event.key !== "ArrowDown" && event.key !== "ArrowUp") {
+    return;
+  }
+  const row = event.currentTarget;
+  const rows = [
+    ...(row.parentElement?.querySelectorAll<HTMLButtonElement>(":scope > button") ?? []),
+  ];
+  const at = rows.indexOf(row);
+  const next = rows[(at + (event.key === "ArrowDown" ? 1 : rows.length - 1)) % rows.length];
+  event.preventDefault();
+  event.stopPropagation();
+  next?.focus();
 }
 
 export interface ChatAboutProps {

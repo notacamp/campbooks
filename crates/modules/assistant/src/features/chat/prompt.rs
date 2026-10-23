@@ -37,8 +37,12 @@ The first user message is a JSON object, the context: `now` (the current \
 time, UTC), `time_zone` (the member's IANA time zone), `local_date`, \
 `local_time` and `weekday` (the member's date, time and weekday there), \
 `language` (the member's language), and `about`: what the chat is about, \
-read just now as the member (null when nothing; `about_lost` true when the \
-member can no longer see it). Read relative dates (\"today\", \"this week\", \
+read just now as the member (`about_lost` true when the member can no \
+longer see it): a conversation, a rule taught for an inbox, or one of your \
+noticed suggestions (a smart rule you offer for mail an inbox gets a lot \
+of). When `about_nothing` is true, the chat is about nothing in particular: \
+the member asks about their mail in general, and the tools are how you find \
+what they mean. Read relative dates (\"today\", \"this week\", \
 \"Thursday afternoon\") in the member's time zone. Then come the member's \
 earlier questions and your earlier answers, then the question. After an \
 earlier answer, lines starting with `Proposed:` are written by Campbooks, \
@@ -95,6 +99,8 @@ struct Context<'a> {
     about: Option<serde_json::Value>,
     #[serde(skip_serializing_if = "std::ops::Not::not")]
     about_lost: bool,
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    about_nothing: bool,
 }
 
 /// The conversation so far, before any tool round: the instruction and
@@ -123,6 +129,7 @@ pub fn messages(
         language: language(locale),
         about,
         about_lost: matches!(seen, Some(Seen::Lost)),
+        about_nothing: seen.is_none(),
     };
     let mut messages = vec![
         Message::system(format!(
@@ -239,6 +246,28 @@ mod tests {
         .unwrap();
         assert_eq!(context["about"], Value::Null);
         assert_eq!(context["about_lost"], true);
+        assert!(context.get("about_nothing").is_none());
+    }
+
+    #[test]
+    fn a_chat_about_nothing_says_so() {
+        let messages = messages(
+            &Handbook::default(),
+            &now(),
+            Locale::En,
+            None,
+            &[],
+            "What am I waiting on?",
+        );
+        let context: Value = serde_json::from_str(
+            serde_json::to_value(&messages[1]).unwrap()["content"]
+                .as_str()
+                .unwrap(),
+        )
+        .unwrap();
+        assert_eq!(context["about"], Value::Null);
+        assert_eq!(context["about_nothing"], true);
+        assert!(context.get("about_lost").is_none());
     }
 
     #[test]

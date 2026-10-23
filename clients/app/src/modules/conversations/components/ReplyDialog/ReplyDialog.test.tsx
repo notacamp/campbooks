@@ -1,5 +1,7 @@
-import { fireEvent, screen, waitFor } from "@testing-library/react";
+import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
+
+import { ScoutChatProvider } from "~/lib/scout-chat";
 
 import { Q4, Q4_DETAIL, W } from "../../../../../test/demo/conversations";
 import { REPLY } from "../../../../../test/demo/drafts";
@@ -112,6 +114,41 @@ function dialog(props: Partial<Parameters<typeof ReplyDialog>[0]> = {}) {
 }
 
 describe("ReplyDialog", () => {
+  it("asks Scout about the conversation from its header, and stays open", async () => {
+    routes();
+    const scout = vi.fn();
+    const onClose = vi.fn();
+    renderWithProviders(
+      <ScoutChatProvider open={scout}>
+        <ReplyDialog
+          workspaceId={DUARTE.id}
+          conversationId={Q4.id}
+          onClose={onClose}
+          onWriteOwn={vi.fn()}
+          onOpenDraft={vi.fn()}
+        />
+      </ScoutChatProvider>,
+    );
+    const reply = await screen.findByRole("dialog", { name: "Reply to Maya" });
+    const ask = within(reply).getByRole("button", { name: "Ask Scout about this email" });
+
+    fireEvent.click(ask);
+    expect(scout).toHaveBeenCalledWith(
+      { type: "conversations.conversation", id: Q4.id },
+      { from: ask },
+    );
+    expect(onClose).not.toHaveBeenCalled();
+    expect(screen.getByRole("dialog", { name: "Reply to Maya" })).toBeVisible();
+  });
+
+  it("offers no Ask Scout where no chat is mounted", async () => {
+    routes();
+    dialog();
+    const reply = await screen.findByRole("dialog", { name: "Reply to Maya" });
+
+    expect(within(reply).queryByRole("button", { name: /Ask Scout/u })).toBeNull();
+  });
+
   it("offers Scout's likely replies, writes the one picked, and sends it with undo", async () => {
     const api = routes();
     const handlers = dialog();

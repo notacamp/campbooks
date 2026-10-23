@@ -25,7 +25,9 @@ define_id!(
 #[serde(deny_unknown_fields)]
 pub struct StartChat {
     /// What the chat is about: a record of a type Scout can read
-    /// (`conversations.conversation`); nothing when absent.
+    /// (`conversations.conversation`, `conversations.rule`,
+    /// `conversations.rule_notice`). When absent, a new chat about nothing
+    /// in particular, every time.
     #[serde(default)]
     pub about: Option<RecordRef>,
 }
@@ -168,6 +170,30 @@ pub struct ChatView {
     pub last_message_at: DateTime<Utc>,
     /// Its messages, oldest first.
     pub messages: Vec<ChatMessageView>,
+}
+
+/// One of your chats, as the list shows it: never what it is about read
+/// again, only what you asked.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+pub struct ChatSummary {
+    /// The chat.
+    pub id: ChatId,
+    /// What it is about; none for a chat about nothing in particular.
+    pub about: Option<RecordRef>,
+    /// Your first question in it, your own words, at most 120 characters:
+    /// show it as text only.
+    pub first_question: String,
+    /// Questions asked so far.
+    pub questions: u32,
+    /// When its last message was written.
+    pub last_message_at: DateTime<Utc>,
+}
+
+/// Your chats with Scout, the newest message first.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+pub struct ChatList {
+    /// At most 30, each with at least one question.
+    pub chats: Vec<ChatSummary>,
 }
 
 /// What kind of thing Scout proposed.

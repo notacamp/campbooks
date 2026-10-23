@@ -265,7 +265,8 @@
     "spam": "Go to Spam",
     "trash": "Go to Trash",
     "delete": "Delete, or restore from Trash",
-    "reportSpam": "Report spam, or not spam"
+    "reportSpam": "Report spam, or not spam",
+    "noticedAsk": "Ask Scout about the suggestion"
   },
   "compose": {
     "title": {
@@ -647,7 +648,9 @@
       "retry": "Try again",
       "inbox": "An inbox",
       "emptyTitle": "No rules yet",
-      "removeImagesQuestion": "Remove this rule? Their images are held back again until you choose Show images."
+      "removeImagesQuestion": "Remove this rule? Their images are held back again until you choose Show images.",
+      "more": "More actions",
+      "askScout": "Ask Scout about this rule"
     }
   },
   "reply": {
@@ -705,7 +708,8 @@
     "quoteCut": "This email is long: your reply quotes its first part.",
     "quoteShortened": "Shown in part: your reply quotes all of it.",
     "newer": "A newer message from {{name}} arrived. Your reply still answers the one quoted below.",
-    "answerNewer": "Answer the newer one"
+    "answerNewer": "Answer the newer one",
+    "askScout": "Ask Scout about this email"
   },
   "smartRule": {
     "tag": "Smart rule",
@@ -802,7 +806,8 @@
     "shared": "For everyone in {{inbox}}.",
     "verbArchive": "Archive them…",
     "verbFile": "File under {{stream}}…",
-    "other": "Something else…"
+    "other": "Something else…",
+    "ask": "Ask Scout"
   },
   "forward": {
     "title": "Forward {{name}}’s email to…",
@@ -871,6 +876,7 @@
       "notWaiting": "{{name}} already wrote back, so there’s nothing to nudge.",
       "addressed": "This nudge now goes to other people than shown. Check who it goes to and send again.",
       "ownAddress": "This waits on your own address, so there is nobody to nudge."
-    }
+    },
+    "askScout": "Ask Scout about this email"
   }
 }

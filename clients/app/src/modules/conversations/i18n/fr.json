@@ -265,7 +265,8 @@
     "spam": "Aller à Spam",
     "trash": "Aller à Corbeille",
     "delete": "Supprimer, ou restaurer depuis la Corbeille",
-    "reportSpam": "Signaler comme spam, ou pas un spam"
+    "reportSpam": "Signaler comme spam, ou pas un spam",
+    "noticedAsk": "Demander à Scout à propos de la suggestion"
   },
   "compose": {
     "title": {
@@ -647,7 +648,9 @@
       "retry": "Réessayer",
       "inbox": "Une boîte de réception",
       "emptyTitle": "Pas encore de règles",
-      "removeImagesQuestion": "Retirer cette règle ? Ses images sont de nouveau retenues jusqu’à ce que vous choisissiez Afficher les images."
+      "removeImagesQuestion": "Retirer cette règle ? Ses images sont de nouveau retenues jusqu’à ce que vous choisissiez Afficher les images.",
+      "more": "Plus d’actions",
+      "askScout": "Demander à Scout à propos de cette règle"
     }
   },
   "reply": {
@@ -705,7 +708,8 @@
     "quoteCut": "Cet e-mail est long : votre réponse en cite le début.",
     "quoteShortened": "Affiché en partie : votre réponse le cite en entier.",
     "newer": "Un message plus récent de {{name}} est arrivé. Votre réponse répond toujours à celui cité ci-dessous.",
-    "answerNewer": "Répondre au plus récent"
+    "answerNewer": "Répondre au plus récent",
+    "askScout": "Demander à Scout à propos de cet e-mail"
   },
   "smartRule": {
     "tag": "Règle intelligente",
@@ -802,7 +806,8 @@
     "shared": "Pour tout le monde dans {{inbox}}.",
     "verbArchive": "Les archiver…",
     "verbFile": "Classer dans {{stream}}…",
-    "other": "Autre chose…"
+    "other": "Autre chose…",
+    "ask": "Demander à Scout"
   },
   "forward": {
     "title": "Transférer l’e-mail de {{name}} à…",
@@ -871,6 +876,7 @@
       "notWaiting": "{{name}} a déjà répondu : il n’y a rien à relancer.",
       "addressed": "Cette relance part maintenant à d’autres personnes que celles indiquées. Vérifiez à qui elle part et renvoyez-la.",
       "ownAddress": "Ceci attend votre propre adresse : il n’y a personne à relancer."
-    }
+    },
+    "askScout": "Demander à Scout à propos de cet e-mail"
   }
 }

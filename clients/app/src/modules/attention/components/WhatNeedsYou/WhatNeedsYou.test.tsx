@@ -149,7 +149,10 @@ describe("What needs you", () => {
     expect(button).toHaveAttribute("data-ai", "true");
 
     fireEvent.keyDown(document, { key: "." });
-    expect(scout).toHaveBeenCalledWith(MARTA.id, button);
+    expect(scout).toHaveBeenCalledWith(
+      { type: "conversations.conversation", id: MARTA.id },
+      { from: button },
+    );
     expect(isSelected("Marta Ferreira is waiting for your reply")).toBe(true);
     fireEvent.click(button);
     expect(scout).toHaveBeenCalledTimes(2);

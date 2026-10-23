@@ -5,7 +5,9 @@
 //! the member's own request does.
 //!
 //! A chat belongs to one member and is about one record of a registered
-//! type ([`about`]) or nothing. Each answer is written by the `complete`
+//! type ([`about`]: a conversation, a rule, one of Scout's suggestions) or
+//! nothing (asked from the command menu; always a new chat). The member's
+//! chats are listed by their first question, newest first. Each answer is written by the `complete`
 //! role, through the provider that may receive mail content, from a fixed
 //! instruction and the handbook ([`crate::handbook`]), the question's
 //! context and what the chat is about (read again as the member for every
@@ -64,8 +66,8 @@ use serde::Deserialize;
 use tokio::sync::mpsc;
 
 use self::types::{
-    AskChat, ChatFinish, ChatId, ChatMessageId, ChatMessageView, ChatProposal, ChatTool, ChatView,
-    ProposalId, SettleProposal, StartChat,
+    AskChat, ChatFinish, ChatId, ChatList, ChatMessageId, ChatMessageView, ChatProposal, ChatTool,
+    ChatView, ProposalId, SettleProposal, StartChat,
 };
 use self::{
     about::Seen,
@@ -151,6 +153,7 @@ fn caller(workspace_access: &campbooks_kernel::tenancy::Access) -> Result<UserId
 }
 
 /// Start a chat with Scout, or continue yours about the same record.
+/// Without `about`, a new chat about nothing in particular, every time.
 #[utoipa::path(
     post,
     path = "/api/v1/w/{workspace_id}/assistant/chats",
@@ -232,6 +235,46 @@ pub async fn start(
     let view = store::view(&mut tx, &row).await?;
     tx.commit().await?;
     Ok((status, Json(view)))
+}
+
+/// Your chats with Scout, the newest message first: at most 30, each with
+/// your first question and when its last message was written. A chat with
+/// no question yet is not listed. What a chat is about is never read again
+/// here: open it to see whether Scout still can.
+#[utoipa::path(
+    get,
+    path = "/api/v1/w/{workspace_id}/assistant/chats",
+    operation_id = "assistant.list_chats",
+    tag = "assistant",
+    security(("bearer" = ["assistant:read"])),
+    extensions(("x-campbooks" = json!(Operation::query().records(["assistant.chat"]).access("assistant.chat", campbooks_kernel::authz::Action::Read)))),
+    params(("workspace_id" = WorkspaceId, Path, description = "The workspace.")),
+    responses(
+        (status = OK, description = "Your chats.", body = ChatList),
+        (status = UNAUTHORIZED, description = "No valid access token.", body = Problem,
+            content_type = "application/problem+json"),
+        (status = FORBIDDEN, description = "Missing scope, or not a member (`chat_needs_member`).",
+            body = Problem, content_type = "application/problem+json"),
+        (status = NOT_FOUND, description = "No such workspace.",
+            body = Problem, content_type = "application/problem+json"),
+    )
+)]
+pub async fn list(
+    State(state): State<AppState>,
+    workspace: Workspace<AssistantRead>,
+) -> Result<Json<ChatList>> {
+    authz::require_type(
+        &state,
+        &workspace.access,
+        Action::Read,
+        CHAT_RECORD,
+        needs_member,
+    )?;
+    let user = caller(&workspace.access)?;
+    let mut tx = state.db.begin_for(workspace.id).await?;
+    let chats = store::list(&mut tx, user).await?;
+    tx.commit().await?;
+    Ok(Json(ChatList { chats }))
 }
 
 /// Your chat, what it is about, and its messages, oldest first.
@@ -680,7 +723,9 @@ struct Question {
     chat: ChatId,
     text: String,
     locale: Locale,
-    lost: bool,
+    /// The line an answer starts with, when Scout can no longer see what
+    /// the chat is about (its message key).
+    lost: Option<&'static str>,
     handbook_version: String,
     asking: Asking,
 }
@@ -758,7 +803,12 @@ impl Question {
             })),
             None => None,
         };
-        let lost = matches!(seen, Some(Seen::Lost));
+        let lost = match (&seen, row.about()) {
+            (Some(Seen::Lost), Some(about)) => Some(
+                about::entry(&about.record_type).map_or("chat.about_lost", |entry| entry.lost_line),
+            ),
+            _ => None,
+        };
         let messages = prompt::messages(
             &chatter.handbook,
             &now,
@@ -784,7 +834,7 @@ impl Question {
     /// what the chat is about.
     fn lost_line(&self) -> Option<String> {
         self.lost
-            .then(|| crate::MESSAGES.t(self.locale, "chat.about_lost", &[]))
+            .map(|key| crate::MESSAGES.t(self.locale, key, &[]))
     }
 
     /// Store the question and Scout's answer to come (as `failed`, until
@@ -863,7 +913,7 @@ impl Question {
             prompt_tokens = self.asking.prompt_tokens,
             completion_tokens = self.asking.completion_tokens,
             question_chars = self.text.chars().count(),
-            about_lost = self.lost,
+            about_lost = self.lost.is_some(),
             handbook = %self.handbook_version,
             elapsed_ms = self.asking.elapsed_ms(),
             "chat question"

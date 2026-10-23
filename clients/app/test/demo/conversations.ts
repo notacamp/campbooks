@@ -422,3 +422,29 @@ export const LEDGER_SUGGESTIONS: Schema<"RuleSuggestions"> = {
     },
   ],
 };
+
+/**
+ * What Scout noticed in Sam's inbox (campbooks-cloud#169): the build robot
+ * of a fictional CI service writes most days, and Sam never opens it.
+ */
+export const BUILDS_NOTICE: Schema<"RuleNotice"> = {
+  id: "0192f1a0-0000-7000-8000-0000000000e7",
+  inbox_id: INBOX.id,
+  kind: "keep_off_home",
+  sender: "builds@ci.example.com",
+  sender_name: "CI",
+  conditions: [{ field: "sender_address", value: "builds@ci.example.com" }],
+  actions: [
+    { action: "move_to_stream", stream: "updates" },
+    { action: "surface", value: "never" },
+  ],
+  evidence: {
+    received: 34,
+    opened: 2,
+    archived_unread: 0,
+    last_week: 7,
+    window_days: 60,
+    cadence: "daily",
+  },
+  shared: false,
+};

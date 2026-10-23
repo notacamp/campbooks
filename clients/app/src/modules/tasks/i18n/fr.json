@@ -63,6 +63,7 @@
     "label": "Tâche",
     "empty": "Choisissez une tâche",
     "emptyBody": "Choisissez une tâche dans la liste pour la voir ici.",
+    "askScout": "Demander à Scout",
     "back": "Retour",
     "titleLabel": "Titre de la tâche",
     "noDate": "Sans date",

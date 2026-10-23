@@ -36,6 +36,11 @@ export interface DialogProps {
   /** Buttons at the bottom (Save, Cancel). */
   footer?: ReactNode;
   /**
+   * One icon button in the header, before Close (Ask Scout): what it opens
+   * leaves the dialog as it is.
+   */
+  headerAction?: ReactNode;
+  /**
    * Once set, the dialog shows the result (visor happy, the sentence and a
    * thin draining bar) and calls `onResultEnd` after about a second, or at
    * once on any key or click.
@@ -60,6 +65,7 @@ export function Dialog({
   visor = "idle",
   children,
   footer,
+  headerAction,
   result,
   onResultEnd,
 }: DialogProps) {
@@ -202,6 +208,7 @@ export function Dialog({
                   </p>
                 )}
               </div>
+              {headerAction}
               <Button variant="ghost" shortcut="overlay.close" onClick={onClose}>
                 {t("close")}
               </Button>

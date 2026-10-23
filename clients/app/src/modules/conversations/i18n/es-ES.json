@@ -265,7 +265,8 @@
     "spam": "Ir a Spam",
     "trash": "Ir a Papelera",
     "delete": "Eliminar, o restaurar de la Papelera",
-    "reportSpam": "Marcar como spam, o no es spam"
+    "reportSpam": "Marcar como spam, o no es spam",
+    "noticedAsk": "Preguntar a Scout sobre la sugerencia"
   },
   "compose": {
     "title": {
@@ -647,7 +648,9 @@
       "retry": "Reintentar",
       "inbox": "Una bandeja de entrada",
       "emptyTitle": "Aún no hay reglas",
-      "removeImagesQuestion": "¿Quitar esta regla? Sus imágenes vuelven a quedar retenidas hasta que elijas Mostrar imágenes."
+      "removeImagesQuestion": "¿Quitar esta regla? Sus imágenes vuelven a quedar retenidas hasta que elijas Mostrar imágenes.",
+      "more": "Más acciones",
+      "askScout": "Preguntar a Scout sobre esta regla"
     }
   },
   "reply": {
@@ -705,7 +708,8 @@
     "quoteCut": "Este correo es largo: tu respuesta cita la primera parte.",
     "quoteShortened": "Se muestra en parte: tu respuesta lo cita entero.",
     "newer": "Ha llegado un mensaje más reciente de {{name}}. Tu respuesta sigue respondiendo al citado abajo.",
-    "answerNewer": "Responder al más reciente"
+    "answerNewer": "Responder al más reciente",
+    "askScout": "Preguntar a Scout sobre este correo"
   },
   "smartRule": {
     "tag": "Regla inteligente",
@@ -802,7 +806,8 @@
     "shared": "Para todos en {{inbox}}.",
     "verbArchive": "Archivarlos…",
     "verbFile": "Guardar en {{stream}}…",
-    "other": "Otra cosa…"
+    "other": "Otra cosa…",
+    "ask": "Preguntar a Scout"
   },
   "forward": {
     "title": "Reenviar el correo de {{name}} a…",
@@ -871,6 +876,7 @@
       "notWaiting": "{{name}} ya ha respondido, así que no hay nada que recordar.",
       "addressed": "Este recordatorio va ahora a personas distintas de las indicadas. Revisa a quién va y vuelve a enviarlo.",
       "ownAddress": "Esto espera a tu propia dirección, así que no hay nadie a quien recordar."
-    }
+    },
+    "askScout": "Preguntar a Scout sobre este correo"
   }
 }

@@ -38,8 +38,6 @@ opted in for the assistant, with an undo or the values to restore.
   record. `tasks.create` stays off the proposing list.
 - Changes without a yes, taking a task back (the giver reads and takes
   back by hand), reopening from a card, or editing more than the due day.
-- The "Ask Scout" entry on a task and chats about a task as the opener:
-  they wait for phase 3 (#637) and are a separate change.
 
 ## Capabilities
 
@@ -47,6 +45,7 @@ opted in for the assistant, with an undo or the values to restore.
 
 - `assistant-chat`: the task proposing tool, its checks, what a task
   proposal holds.
+- `tasks-ui`: Ask Scout on a task.
 
 ## Modules
 

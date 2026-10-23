@@ -63,6 +63,7 @@
     "label": "Tarea",
     "empty": "Elige una tarea",
     "emptyBody": "Elige una tarea de la lista para verla aquí.",
+    "askScout": "Preguntar a Scout",
     "back": "Volver",
     "titleLabel": "Título de la tarea",
     "noDate": "Sin fecha",
