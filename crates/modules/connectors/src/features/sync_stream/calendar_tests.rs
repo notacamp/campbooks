@@ -84,7 +84,7 @@ async fn changes_since(kit: &Kit, from: &str, items: &[Value], token: &str) {
         .await;
 }
 
-async fn member(kit: &Kit) -> (Caller, WorkspaceId) {
+fn member(kit: &Kit) -> (Caller, WorkspaceId) {
     let ws = WorkspaceId::new();
     let sam = kit.user("sam");
     kit.join(&sam, ws, Role::Member);
@@ -122,7 +122,7 @@ async fn sync_token(kit: &Kit) -> Option<String> {
 #[sqlx::test(migrations = "../../../migrations")]
 async fn a_calendar_grant_lists_the_calendars_and_the_stream_reads_them(db: PgPool) {
     let kit = Kit::new(db).await;
-    let (sam, ws) = member(&kit).await;
+    let (sam, ws) = member(&kit);
     calendar_list(&kit).await;
     first_read(
         &kit,
@@ -255,7 +255,7 @@ async fn ask(kit: &Kit, ws: WorkspaceId, connection: Uuid, document: Value, boun
 /// A connected member whose calendar holds event `e1`, and the id of the
 /// connection.
 async fn connected(kit: &Kit) -> (WorkspaceId, Uuid) {
-    let (sam, ws) = member(kit).await;
+    let (sam, ws) = member(kit);
     calendar_list(kit).await;
     first_read(kit, &[timed("e1", "\"1\"", "Dentist")], "t1", None).await;
     kit.adopt_calendar(&sam, ws, ACCOUNT_SUB).await.unwrap();
@@ -419,7 +419,7 @@ async fn a_change_nobody_asked_for_is_never_made(db: PgPool) {
 #[sqlx::test(migrations = "../../../migrations")]
 async fn google_refusing_the_calendar_api_marks_the_calendar_stream_only(db: PgPool) {
     let kit = Kit::new(db).await;
-    let (sam, ws) = member(&kit).await;
+    let (sam, ws) = member(&kit);
     kit.google
         .mount_first(
             Mock::given(method("GET"))
@@ -457,7 +457,7 @@ async fn google_refusing_the_calendar_api_marks_the_calendar_stream_only(db: PgP
 #[sqlx::test(migrations = "../../../migrations")]
 async fn zoho_calendar_is_not_offered_while_its_flag_is_off(db: PgPool) {
     let kit = Kit::new(db).await;
-    let (sam, ws) = member(&kit).await;
+    let (sam, ws) = member(&kit);
     let refused = kit
         .post(
             &sam,
@@ -488,7 +488,7 @@ async fn turning_a_calendar_on_reads_it_again_from_the_start(db: PgPool) {
     let kit = Kit::new(db).await;
     // As `connected`, but its first read answers once: the full read after
     // the calendar is turned on again gets the answer mounted below.
-    let (sam, ws) = member(&kit).await;
+    let (sam, ws) = member(&kit);
     calendar_list(&kit).await;
     first_read(&kit, &[timed("e1", "\"1\"", "Dentist")], "t1", Some(1)).await;
     kit.adopt_calendar(&sam, ws, ACCOUNT_SUB).await.unwrap();

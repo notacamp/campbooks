@@ -635,9 +635,7 @@ mod tests {
     #[test]
     fn a_read_over_the_limit_is_chunked_and_not_full() {
         let read = Read {
-            upserts: (0..BATCH_LIMIT + 1)
-                .map(|n| event(&n.to_string()))
-                .collect(),
+            upserts: (0..=BATCH_LIMIT).map(|n| event(&n.to_string())).collect(),
             removals: Vec::new(),
             full: true,
             token: None,
