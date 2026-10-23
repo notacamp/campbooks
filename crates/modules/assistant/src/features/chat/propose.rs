@@ -1104,7 +1104,9 @@ impl Proposer {
         let row = action.row();
         let request = self.request(row.operation, &params, body, &[])?;
         let undo = match row.undo {
-            Undo::Restoring => self.request(row.operation, &params, undo_body, &[])?,
+            Undo::Restoring { from_response } => {
+                self.request(row.operation, &params, undo_body, from_response)?
+            }
             Undo::Catalogue {
                 operation,
                 from_response,
