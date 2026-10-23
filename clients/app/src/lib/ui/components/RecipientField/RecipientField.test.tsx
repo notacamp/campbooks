@@ -47,14 +47,20 @@ function Suggesting({
   );
 }
 
-/** The options listed, by their text. */
+/** The options listed, by the text read out (the avatar's initials are hidden from it). */
 function options(): string[] {
   const list = screen.queryByRole("listbox", { name: "Suggestions for To" });
   return list === null
     ? []
     : within(list)
         .getAllByRole("option")
-        .map((option) => option.textContent);
+        .map((option) => {
+          const read = option.cloneNode(true) as HTMLElement;
+          for (const hidden of read.querySelectorAll('[aria-hidden="true"]')) {
+            hidden.remove();
+          }
+          return read.textContent;
+        });
 }
 
 describe("parseRecipients", () => {

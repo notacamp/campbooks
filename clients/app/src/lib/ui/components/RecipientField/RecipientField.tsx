@@ -181,16 +181,16 @@ export function RecipientField({
     }
     const picked = listed[activeIndex];
     if (event.key === "ArrowDown" || event.key === "ArrowUp") {
-      if (!expanded) {
+      if (expanded) {
+        const by = event.key === "ArrowDown" ? 1 : -1;
+        setActive((activeIndex + by + listed.length) % listed.length);
+      } else {
         // Closed with Esc: the arrows bring it back.
         if (typing || listed.length === 0 || text.trim() === "") {
           return false;
         }
         setOpen(true);
         setActive(0);
-      } else {
-        const by = event.key === "ArrowDown" ? 1 : -1;
-        setActive((activeIndex + by + listed.length) % listed.length);
       }
       event.preventDefault();
       return true;
