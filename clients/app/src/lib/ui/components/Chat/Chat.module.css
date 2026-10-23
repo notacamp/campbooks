@@ -25,6 +25,7 @@
 .aside {
   flex: none;
   width: var(--chat-width);
+  max-width: 100%;
   border-left: var(--border-width) solid var(--border-subtle);
 }
 
