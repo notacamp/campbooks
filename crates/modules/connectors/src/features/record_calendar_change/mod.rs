@@ -55,6 +55,10 @@ impl EventConsumer for RecordCalendarChange {
     const NAME: &'static str = "connectors.record_calendar_change";
     const QUEUE: &'static str = "events";
 
+    #[allow(
+        clippy::too_many_lines,
+        reason = "one transaction read top to bottom: verify, read, ask, record"
+    )]
     async fn handle(
         &self,
         ctx: &mut JobContext,

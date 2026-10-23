@@ -526,6 +526,7 @@ export const HANDOVER: Event = {
   ends: HANDOVER_ITEM.ends ?? HANDOVER_ITEM.starts,
   place: HANDOVER_ITEM.place ?? null,
   found_by: "model",
+  item_keys: [HANDOVER_ITEM.key],
   source: { type: "conversations.message", id: LEASE_MESSAGE },
   source_conversation: LEASE.id,
 };

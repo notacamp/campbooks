@@ -330,8 +330,10 @@ describe("an event's cards", () => {
 
     const answer = await runRequest("ws-1", create, "p-4", create.body);
     const target = withAnswer(deleteNew, answer);
-    expect(target).toBeDefined();
-    await runRequest("ws-1", target as ProposalRequest, "p-4:undo", undoBody(deleteNew, answer));
+    if (target === undefined) {
+      throw new Error("the answer names the event the undo deletes");
+    }
+    await runRequest("ws-1", target, "p-4:undo", undoBody(deleteNew, answer));
 
     expect(sent).toEqual([{ key: "p-4:undo" }]);
   });

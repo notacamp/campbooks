@@ -181,11 +181,15 @@ export function EventPane({
         </SheetFact>
       </SheetFacts>
       {event.notice === "kept_theirs" ? (
-        <SheetNotice>{t("notice.keptTheirs", { where: provider ?? calendar?.name ?? "" })}</SheetNotice>
+        <SheetNotice>
+          {t("notice.keptTheirs", { where: provider ?? calendar?.name ?? "" })}
+        </SheetNotice>
       ) : null}
       {event.notice === "not_saved" ? <SheetNotice>{t("notice.notSaved")}</SheetNotice> : null}
       {event.pending ? (
-        <SheetNotice>{t("notice.pending", { where: provider ?? calendar?.name ?? "" })}</SheetNotice>
+        <SheetNotice>
+          {t("notice.pending", { where: provider ?? calendar?.name ?? "" })}
+        </SheetNotice>
       ) : null}
       {source.data === undefined ? null : (
         <SourceLink

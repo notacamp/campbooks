@@ -235,6 +235,14 @@ impl SyncStream {
                     .await;
             }
         };
+        if listed.is_empty() {
+            // An account with no calendar to announce: look again at the
+            // slowest interval.
+            metrics::sync_finished(target.provider, SyncOutcome::Ok);
+            let wait = TimeDelta::seconds(i64::from(self.deps.config.poll.max_seconds));
+            schedule::set_due(ctx.tx().await?, workspace, target.stream, now + wait).await?;
+            return Ok(());
+        }
         let state = ctx.state().clone();
         let key = workspace.to_string();
         let document = ListDocument {

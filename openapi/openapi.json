@@ -17745,6 +17745,17 @@
               }
             ]
           },
+          "event": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/ProposalEvent",
+                "description": "The event's own facts (an event change, except a new one); its\n`record` is the event."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "facts": {
             "oneOf": [
               {
@@ -22608,13 +22619,26 @@
           "plan_day",
           "task_later",
           "due",
-          "hand_off"
+          "hand_off",
+          "create_event",
+          "update_event",
+          "delete_event",
+          "respond_event",
+          "push_event",
+          "unpush_event"
         ]
       },
       "ProposalDetail": {
         "type": "object",
         "description": "What a change takes besides its conversation.",
         "properties": {
+          "calendar_name": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The calendar an event is added to (`push_event`), as the calendars\nlist names it: read by the server, never the model's words."
+          },
           "day": {
             "type": [
               "string",
@@ -22622,6 +22646,13 @@
             ],
             "format": "date",
             "description": "The day (`plan_day`, `due`), `YYYY-MM-DD`."
+          },
+          "ends": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The new end (`create_event`, `update_event`), as Scout wrote it."
           },
           "label": {
             "type": [
@@ -22644,12 +22675,40 @@
             ],
             "description": "The teammate's name, as the workspace's members list has it\n(`hand_off`): read by the server, never the model's words."
           },
+          "place": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The new place (`create_event`, `update_event`), Scout's words."
+          },
+          "response": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The answer to an invitation (`respond_event`): `accepted`,\n`tentative` or `declined`."
+          },
+          "starts": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The new start (`create_event`, `update_event`), as Scout wrote it."
+          },
           "stream": {
             "type": [
               "string",
               "null"
             ],
             "description": "The stream it moves to (`move_to_stream`)."
+          },
+          "title": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The title in Scout's words (`create_event`, `update_event`): show it\nquoted."
           },
           "until": {
             "type": [
@@ -22658,6 +22717,36 @@
             ],
             "format": "date-time",
             "description": "Until when (`later`), RFC 3339, UTC."
+          }
+        }
+      },
+      "ProposalEvent": {
+        "type": "object",
+        "description": "A calendar event's own facts, read from its record when the proposal was\nmade: what a card names, never the model's words.",
+        "required": [
+          "title",
+          "starts",
+          "all_day"
+        ],
+        "properties": {
+          "all_day": {
+            "type": "boolean",
+            "description": "Whether it lasts whole days."
+          },
+          "calendar": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The name of the calendar it is on."
+          },
+          "starts": {
+            "type": "string",
+            "description": "When it starts: an RFC 3339 time with an offset, or a `YYYY-MM-DD`\ndate when it is all-day."
+          },
+          "title": {
+            "type": "string",
+            "description": "Its title, as the calendar has it."
           }
         }
       },

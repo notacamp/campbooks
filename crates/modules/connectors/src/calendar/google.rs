@@ -321,12 +321,9 @@ pub async fn write(
             Ok(written(updated))
         }
         "delete" => match api.delete(calendar, event_id, change.etag.as_deref()).await {
-            Ok(()) => Ok(Written {
-                provider_event_id: event_id.to_owned(),
-                etag: None,
-            }),
             // Gone already: what was asked is so.
-            Err(CalendarError::Gone | CalendarError::Provider(ProviderError::NotFound)) => {
+            Ok(())
+            | Err(CalendarError::Gone | CalendarError::Provider(ProviderError::NotFound)) => {
                 Ok(Written {
                     provider_event_id: event_id.to_owned(),
                     etag: None,

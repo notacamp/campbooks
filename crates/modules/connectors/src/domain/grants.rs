@@ -246,6 +246,10 @@ async fn list_calendars(
 
 /// Create or extend the connection, store its credentials, create the
 /// streams of new capabilities and start them. Returns the connection.
+#[allow(
+    clippy::too_many_lines,
+    reason = "one transaction read top to bottom: connection, credentials, streams, events"
+)]
 async fn save(
     tx: &mut Transaction<'static, Postgres>,
     state: &AppState,
@@ -403,6 +407,10 @@ async fn existing(
 /// Resume a reconnected connection's paused streams, and create, announce
 /// and start the streams it did not have: one per new capability, and for
 /// `messages` one per mailbox (a refreshed grant can reach a new one).
+#[allow(
+    clippy::too_many_lines,
+    reason = "one transaction read top to bottom: resume, create, announce, start"
+)]
 async fn start_streams(
     tx: &mut Transaction<'static, Postgres>,
     state: &AppState,

@@ -525,7 +525,7 @@ pub enum Source<'a> {
     /// Google Calendar.
     Google(crate::google::Calendar<'a>),
     /// Zoho Calendar (only while its flag is on).
-    Zoho(zoho::ZohoCalendar<'a>),
+    Zoho(crate::zoho::ZohoCalendar<'a>),
 }
 
 impl Source<'_> {
