@@ -159,7 +159,7 @@ server, never on message content (ADR 0018).
 
 ## Data ownership and events
 
-Schema `connectors`. Migration `20261023170000_connectors__imap_locations`:
+Schema `connectors`. Migration `20261024030000_connectors__imap_locations`:
 `connectors.imap_locations (workspace_id, stream_id, folder, uidvalidity,
 uid, message_key, seen, flagged, email_id, PRIMARY KEY (stream_id, folder,
 uidvalidity, uid))` with an index on `(stream_id, message_key)`, rows
