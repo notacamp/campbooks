@@ -8,7 +8,7 @@ export type OpenScoutChat = (conversationId: string, from?: HTMLElement | null) 
 
 const ScoutChatContext = createContext<OpenScoutChat | undefined>(undefined);
 
-export interface ScoutChatProviderProps {
+interface ScoutChatProviderProps {
   /** What opening does: the app shows its one panel. */
   open: OpenScoutChat;
   children: ReactNode;

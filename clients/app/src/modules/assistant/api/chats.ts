@@ -10,7 +10,6 @@ import {
   type Schema,
 } from "~/lib/api";
 
-export type ChatView = Schema<"ChatView">;
 export type ChatMessage = Schema<"ChatMessageView">;
 export type ChatStep = Schema<"ChatStep">;
 export type ChatTool = Schema<"ChatTool">;
@@ -69,7 +68,7 @@ export async function deleteChat(workspaceId: string, chatId: string): Promise<v
 }
 
 /** What a streamed answer calls back with as it is written. */
-export interface AnswerHandlers {
+interface AnswerHandlers {
   /** Stops the request (the panel closed). */
   signal: AbortSignal;
   /** More of Scout's thinking. */

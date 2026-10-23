@@ -116,7 +116,8 @@ export function ScoutChat({ workspaceId, conversationId, onClose, modal }: Scout
   const firstName = inbound?.from.name?.trim().split(/\s+/u)[0] ?? "";
 
   const openConversation = (summary: Pick<ConversationSummary, "id" | "stream">) => {
-    if (!(globalThis.matchMedia?.(WIDE).matches ?? false)) {
+    const wide = typeof globalThis.matchMedia === "function" && globalThis.matchMedia(WIDE).matches;
+    if (!wide) {
       onClose();
     }
     void navigate({

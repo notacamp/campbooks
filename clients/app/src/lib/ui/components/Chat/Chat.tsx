@@ -15,16 +15,20 @@ import styles from "./Chat.module.css";
 const WIDE = "(width >= 64rem)";
 
 function subscribeWide(change: () => void): () => void {
-  const query = globalThis.matchMedia?.(WIDE);
-  query?.addEventListener("change", change);
+  if (typeof globalThis.matchMedia !== "function") {
+    return () => {
+      // Nothing was listened to.
+    };
+  }
+  const query = globalThis.matchMedia(WIDE);
+  query.addEventListener("change", change);
   return () => {
-    query?.removeEventListener("change", change);
+    query.removeEventListener("change", change);
   };
 }
 
-function isWide(): boolean {
-  return globalThis.matchMedia?.(WIDE).matches ?? false;
-}
+const isWide = () =>
+  typeof globalThis.matchMedia === "function" && globalThis.matchMedia(WIDE).matches;
 
 export interface ChatPanelProps {
   /** Its title and accessible name: "Scout". */
@@ -132,8 +136,10 @@ export function ChatPanel({
 
   if (asDialog) {
     return createPortal(
-      <section
-        ref={root}
+      <div
+        ref={(element) => {
+          root.current = element;
+        }}
         className={cx(styles["panel"], styles["sheet"])}
         role="dialog"
         aria-modal="true"
@@ -141,7 +147,7 @@ export function ChatPanel({
         tabIndex={-1}
       >
         {body}
-      </section>,
+      </div>,
       document.body,
     );
   }
