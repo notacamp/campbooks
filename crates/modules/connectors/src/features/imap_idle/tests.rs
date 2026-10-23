@@ -825,9 +825,10 @@ async fn sessions_stop_before_their_leases_can_expire_when_the_database_hangs() 
     running.abort();
     // Stopped by the watchdog at the renewal deadline, while every renewal
     // hangs, a renewal's bound before the lease (three minutes) can expire.
-    let after = at - started;
+    let after = at.duration_since(started);
+    let latest = Duration::from_mins(3).saturating_sub(timing().db_timeout);
     assert!(
-        after >= Duration::from_mins(2) && after <= Duration::from_mins(3) - timing().db_timeout,
+        after >= Duration::from_mins(2) && after <= latest,
         "{after:?}"
     );
 }
