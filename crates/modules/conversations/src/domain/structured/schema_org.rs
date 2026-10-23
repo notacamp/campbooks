@@ -642,7 +642,7 @@ mod tests {
             ),
         ];
         for (markup, kind, title) in cases {
-            let (items, asks) = interpret(&[markup.clone()]);
+            let (items, asks) = interpret(std::slice::from_ref(&markup));
             assert!(asks.is_empty(), "{markup}");
             assert_eq!(items.len(), 1, "{markup}");
             assert_eq!(

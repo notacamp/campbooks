@@ -3789,6 +3789,204 @@
         }
       }
     },
+    "/api/v1/w/{workspace_id}/conversations/{conversation_id}/messages/{message_id}/read": {
+      "get": {
+        "tags": [
+          "conversations"
+        ],
+        "summary": "What Scout read in a message.",
+        "operationId": "conversations.get_message_read",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "description": "The workspace.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId"
+            }
+          },
+          {
+            "name": "conversation_id",
+            "in": "path",
+            "description": "The conversation.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ConversationId"
+            }
+          },
+          {
+            "name": "message_id",
+            "in": "path",
+            "description": "The message.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/MessageId"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The read.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MessageReadView"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid access token.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing scope.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such message, or you cannot see it.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [
+              "conversations:read"
+            ]
+          }
+        ],
+        "x-campbooks": {
+          "access": {
+            "action": "read",
+            "resource": "conversations.message"
+          },
+          "assistant": false,
+          "automation": false,
+          "mutates": false,
+          "records": [
+            "conversations.message"
+          ],
+          "risk": "low"
+        }
+      },
+      "post": {
+        "tags": [
+          "conversations"
+        ],
+        "summary": "Queue Scout's read of a message, when it has none.",
+        "operationId": "conversations.request_message_read",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "description": "The workspace.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId"
+            }
+          },
+          {
+            "name": "conversation_id",
+            "in": "path",
+            "description": "The conversation.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ConversationId"
+            }
+          },
+          {
+            "name": "message_id",
+            "in": "path",
+            "description": "The message.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/MessageId"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "What was done.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReadRequested"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid access token.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing scope.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such message, or you cannot see it.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [
+              "conversations:read"
+            ]
+          }
+        ],
+        "x-campbooks": {
+          "access": {
+            "action": "read",
+            "resource": "conversations.message"
+          },
+          "assistant": false,
+          "automation": false,
+          "mutates": true,
+          "records": [
+            "conversations.message"
+          ],
+          "risk": "low"
+        }
+      }
+    },
     "/api/v1/w/{workspace_id}/conversations/{conversation_id}/need/confirm": {
       "post": {
         "tags": [
@@ -12752,6 +12950,25 @@
           }
         }
       },
+      "Amount": {
+        "type": "object",
+        "description": "An amount of money, in minor units.",
+        "required": [
+          "minor",
+          "currency"
+        ],
+        "properties": {
+          "currency": {
+            "type": "string",
+            "description": "The ISO 4217 currency code."
+          },
+          "minor": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Minor units (cents)."
+          }
+        }
+      },
       "Answer": {
         "type": "object",
         "description": "The person's answer.",
@@ -15182,6 +15399,21 @@
         "format": "uuid",
         "description": "ItemId (UUIDv7)"
       },
+      "ItemKind": {
+        "type": "string",
+        "description": "What kind of thing that happens at a time a read of a message found\n(campbooks-cloud#42). Obligations are not items: they are asks.",
+        "enum": [
+          "charge",
+          "appointment",
+          "meeting",
+          "travel",
+          "stay",
+          "show",
+          "reservation",
+          "delivery",
+          "expiry"
+        ]
+      },
       "ItemState": {
         "type": "string",
         "description": "Whether an item still needs someone.",
@@ -15538,6 +15770,60 @@
         "type": "string",
         "format": "uuid",
         "description": "MessageId (UUIDv7)"
+      },
+      "MessageReadView": {
+        "type": "object",
+        "description": "What Scout read in a message.",
+        "required": [
+          "status",
+          "layers",
+          "items",
+          "asks",
+          "flagged",
+          "can_read"
+        ],
+        "properties": {
+          "asks": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReadAsk"
+            },
+            "description": "The obligations found."
+          },
+          "can_read": {
+            "type": "boolean",
+            "description": "Whether Scout can read this message for dates: the pass said it tells\nof something dated and the sender's own data did not cover it."
+          },
+          "dated_kind": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The kind of dated thing the pass named, when it flagged the message\nand no `complete` role may read mail here (the reader offers to add it\nby hand)."
+          },
+          "flagged": {
+            "type": "boolean",
+            "description": "Whether the decide pass flagged the message for a read."
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReadItem"
+            },
+            "description": "The things that happen at a time found, the sender's data first."
+          },
+          "layers": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReadLayer"
+            },
+            "description": "The readers that produced a read: the sender's own data\n(`structured`), and Scout's call (`model`)."
+          },
+          "status": {
+            "$ref": "#/components/schemas/ReadStatus",
+            "description": "Where the model's read is."
+          }
+        }
       },
       "MessageText": {
         "type": "object",
@@ -16762,6 +17048,182 @@
             "description": "The sentence, at most 240 characters."
           }
         }
+      },
+      "ReadAsk": {
+        "type": "object",
+        "description": "An obligation of the reader, dated or not.",
+        "required": [
+          "key",
+          "title",
+          "verb"
+        ],
+        "properties": {
+          "amount": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Amount",
+                "description": "How much, for a payment, when the message says."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "due": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "By when: a date, or an RFC 3339 time with an offset."
+          },
+          "key": {
+            "type": "string",
+            "description": "Stable for the same message, layer and position\n(`<message>:<layer>:ask:<n>`)."
+          },
+          "quote": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The sentence that asks, as written (a model read only)."
+          },
+          "same_as": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The reference of an open task this ask repeats."
+          },
+          "title": {
+            "type": "string",
+            "description": "What to do, at most 80 characters."
+          },
+          "verb": {
+            "$ref": "#/components/schemas/Verb",
+            "description": "Do something, or pay something."
+          }
+        }
+      },
+      "ReadItem": {
+        "type": "object",
+        "description": "Something of the reader's that happens at a time.",
+        "required": [
+          "key",
+          "kind",
+          "title",
+          "starts",
+          "all_day"
+        ],
+        "properties": {
+          "all_day": {
+            "type": "boolean",
+            "description": "Whether it lasts whole days."
+          },
+          "cancels": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The key of an earlier item of the conversation that this one cancels."
+          },
+          "ends": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "When it ends, if the message says."
+          },
+          "key": {
+            "type": "string",
+            "description": "Stable for the same message, layer and position\n(`<message>:<layer>:item:<n>`)."
+          },
+          "kind": {
+            "$ref": "#/components/schemas/ItemKind",
+            "description": "What kind of thing it is."
+          },
+          "place": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Where, at most 120 characters."
+          },
+          "quote": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The sentence that gives its date, as written (a model read only)."
+          },
+          "sequence": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "That event's `SEQUENCE`."
+          },
+          "starts": {
+            "type": "string",
+            "description": "When it starts: an RFC 3339 time with an offset, or a date when\nall-day."
+          },
+          "time_zone": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The IANA time zone it is in, when the message says."
+          },
+          "title": {
+            "type": "string",
+            "description": "What it is, at most 80 characters; never the subject."
+          },
+          "uid": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The `UID` of the iCalendar event it came from, if it came from one."
+          },
+          "updates": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The key of an earlier item of the conversation that this one changes."
+          }
+        }
+      },
+      "ReadLayer": {
+        "type": "string",
+        "description": "Which reader produced a read: the sender's own machine-readable data,\nor Scout's one `complete` call.",
+        "enum": [
+          "structured",
+          "model"
+        ]
+      },
+      "ReadRequested": {
+        "type": "object",
+        "description": "What asking for the read did.",
+        "required": [
+          "outcome"
+        ],
+        "properties": {
+          "outcome": {
+            "$ref": "#/components/schemas/Outcome",
+            "description": "The outcome."
+          }
+        }
+      },
+      "ReadStatus": {
+        "type": "string",
+        "description": "Where the model's read of a message is.",
+        "enum": [
+          "none",
+          "queued",
+          "failed",
+          "done"
+        ]
       },
       "Reason": {
         "type": "string",
@@ -19284,6 +19746,14 @@
         "format": "uuid",
         "description": "UserId (UUIDv7)"
       },
+      "Verb": {
+        "type": "string",
+        "description": "What an ask of the reader is: do something, or pay something.",
+        "enum": [
+          "do",
+          "pay"
+        ]
+      },
       "VersionResponse": {
         "type": "object",
         "description": "The running build.",
@@ -19677,7 +20147,7 @@
         "type": "http",
         "scheme": "bearer",
         "bearerFormat": "JWT",
-        "description": "An OAuth 2.1 access token (a JWT) issued by this instance's identity provider, the issuer configured as `CAMPBOOKS_AUTH__ISSUER`. Each operation lists the scope it requires; operations with an empty requirement are public. Scopes:\n\n- `admin:access`: Reach the instance administration API, if your account has an admin profile. Granted to Campbooks' own apps only.\n- `assistant:read`: See what you told Scout about how it should act.\n- `assistant:write`: Tell Scout how it should act, and turn your sentences into rules to check.\n- `attention:read`: See what needs you: the items on your Home.\n- `attention:write`: Put items on your Home off until later, and bring them back.\n- `connectors:read`: See the outside accounts connected to your workspaces and how their sync is doing.\n- `connectors:write`: Connect outside accounts (such as Gmail), sync them now and disconnect them.\n- `conversations:read`: Read your inboxes, conversations and messages.\n- `conversations:send`: Write drafts and send messages, replies and forwards from your inboxes.\n- `conversations:write`: Mark conversations read or unread, star, archive, label and move them between streams.\n- `identity:clients`: Register, rotate and remove a workspace's own apps and their secrets.\n- `identity:read`: See your account, its ways in and the mailboxes waiting to be connected.\n- `identity:write`: Change your account and connect or discard the mailboxes waiting on it.\n- `search:read`: Search the records you may read (conversations need conversations:read too).\n- `system:read`: Read operational status, and report the app's own errors and timings.\n- `workspaces:admin`: Manage workspaces you own or administer: settings, members, invitations, deletion and the security log.\n- `workspaces:read`: See your workspaces and who belongs to them.\n- `workspaces:write`: Create workspaces, accept invitations and leave workspaces."
+        "description": "An OAuth 2.1 access token (a JWT) issued by this instance's identity provider, the issuer configured as `CAMPBOOKS_AUTH__ISSUER`. Each operation lists the scope it requires; operations with an empty requirement are public. Scopes:\n\n- `admin:access`: Reach the instance administration API, if your account has an admin profile. Granted to Campbooks' own apps only.\n- `assistant:read`: See what you told Scout about how it should act.\n- `assistant:write`: Tell Scout how it should act, and turn your sentences into rules to check.\n- `attention:read`: See what needs you: the items on your Home.\n- `attention:write`: Put items on your Home off until later, and bring them back.\n- `connectors:read`: See the outside accounts connected to your workspaces and how their sync is doing.\n- `connectors:write`: Connect outside accounts (such as Gmail), sync them now and disconnect them.\n- `conversations:read`: Read your inboxes, conversations and messages.\n- `conversations:send`: Write drafts and send messages, replies and forwards from your inboxes.\n- `conversations:write`: Mark conversations read or unread, star, archive, label and move them between streams.\n- `identity:clients`: Register, rotate and remove a workspace's own apps and their secrets.\n- `identity:read`: See your account, its ways in and the mailboxes waiting to be connected.\n- `identity:write`: Change your account and connect or discard the mailboxes waiting on it.\n- `schedule:read`: See your calendars and events, your calendar settings, and when you are free.\n- `schedule:write`: Create, change, delete and answer events, add them to your provider calendars, and change your calendars and calendar settings.\n- `search:read`: Search the records you may read (conversations need conversations:read too).\n- `system:read`: Read operational status, and report the app's own errors and timings.\n- `workspaces:admin`: Manage workspaces you own or administer: settings, members, invitations, deletion and the security log.\n- `workspaces:read`: See your workspaces and who belongs to them.\n- `workspaces:write`: Create workspaces, accept invitations and leave workspaces."
       },
       "session": {
         "type": "apiKey",
@@ -19719,6 +20189,10 @@
     {
       "name": "assistant",
       "description": "What you told Scout about how to act, and turning a sentence you type into rules to check. Compiling uses the `complete` AI role only when you ask, and sends it your sentence and your own addresses and label names, never your mail; nothing is saved until you save a rule through the conversations module."
+    },
+    {
+      "name": "schedule",
+      "description": "Your calendars and their events: the provider calendars you connect and your own Campbooks calendar, where Scout puts the dated things it reads in your email. Events have a kind; free time is answered from your working hours."
     },
     {
       "name": "changes",

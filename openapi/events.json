@@ -517,6 +517,77 @@
       }
     },
     {
+      "name": "conversations.message_read",
+      "module": "conversations",
+      "version": 1,
+      "workspaceScoped": true,
+      "payload": {
+        "type": "object",
+        "description": "A read of a message was stored, of either layer\n(`contracts/conversations.message_read.v1.schema.json`). The schedule\nmodule turns its items into events and the tasks module its asks into\ntasks. Ids, enums, keys and times only: no title, place, quote or amount\n(a reader fetches them through `conversations.get_message_read`).",
+        "required": [
+          "workspace",
+          "message",
+          "conversation",
+          "inbox",
+          "layer",
+          "items",
+          "asks",
+          "summary_ready"
+        ],
+        "properties": {
+          "asks": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReadAskFacts"
+            },
+            "description": "The obligations of the reader, at most three."
+          },
+          "conversation": {
+            "$ref": "#/components/schemas/ConversationId",
+            "description": "Its conversation."
+          },
+          "inbox": {
+            "$ref": "#/components/schemas/InboxId",
+            "description": "Its inbox."
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReadItemFacts"
+            },
+            "description": "The things that happen at a time, at most five."
+          },
+          "layer": {
+            "$ref": "#/components/schemas/ReadLayer",
+            "description": "Which reader produced it."
+          },
+          "message": {
+            "$ref": "#/components/schemas/MessageId",
+            "description": "The message read."
+          },
+          "owner": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/UserId",
+                "description": "The inbox's personal owner: the one member who reads it. None for a\nshared inbox."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "summary_ready": {
+            "type": "boolean",
+            "description": "Whether the read holds a summary of the message."
+          },
+          "workspace": {
+            "type": "string",
+            "description": "The workspace."
+          }
+        }
+      }
+    },
+    {
       "name": "conversations.message_received",
       "module": "conversations",
       "version": 1,
@@ -1182,6 +1253,271 @@
       }
     },
     {
+      "name": "schedule.event_cancelled",
+      "module": "schedule",
+      "version": 1,
+      "workspaceScoped": true,
+      "payload": {
+        "type": "object",
+        "description": "An event was cancelled, removed or deleted. Expanding the occurrences\nof a series publishes nothing.",
+        "required": [
+          "workspace",
+          "event",
+          "calendar",
+          "owner",
+          "kind",
+          "starts",
+          "all_day",
+          "origin"
+        ],
+        "properties": {
+          "all_day": {
+            "type": "boolean",
+            "description": "Whether it lasts whole days."
+          },
+          "calendar": {
+            "$ref": "#/components/schemas/CalendarId",
+            "description": "Its calendar."
+          },
+          "ends": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "When it ends, in the same form, if it has an end."
+          },
+          "event": {
+            "$ref": "#/components/schemas/EventId",
+            "description": "The event."
+          },
+          "kind": {
+            "$ref": "#/components/schemas/EventKind",
+            "description": "What kind of dated thing it is."
+          },
+          "origin": {
+            "$ref": "#/components/schemas/EventOrigin",
+            "description": "Who made it."
+          },
+          "owner": {
+            "$ref": "#/components/schemas/UserId",
+            "description": "The member whose calendar it is."
+          },
+          "source": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/RecordRef",
+                "description": "The record it was read from, if any (an email)."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "starts": {
+            "type": "string",
+            "description": "When it starts: an RFC 3339 time with an offset, or a\n`YYYY-MM-DD` date when it is all-day."
+          },
+          "workspace": {
+            "type": "string",
+            "description": "The workspace."
+          }
+        }
+      }
+    },
+    {
+      "name": "schedule.event_changed",
+      "module": "schedule",
+      "version": 1,
+      "workspaceScoped": true,
+      "payload": {
+        "type": "object",
+        "description": "An event changed: its time, its kind, its calendar, or the provider's\nversion replaced the member's.",
+        "required": [
+          "workspace",
+          "event",
+          "calendar",
+          "owner",
+          "kind",
+          "starts",
+          "all_day",
+          "origin"
+        ],
+        "properties": {
+          "all_day": {
+            "type": "boolean",
+            "description": "Whether it lasts whole days."
+          },
+          "calendar": {
+            "$ref": "#/components/schemas/CalendarId",
+            "description": "Its calendar."
+          },
+          "ends": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "When it ends, in the same form, if it has an end."
+          },
+          "event": {
+            "$ref": "#/components/schemas/EventId",
+            "description": "The event."
+          },
+          "kind": {
+            "$ref": "#/components/schemas/EventKind",
+            "description": "What kind of dated thing it is."
+          },
+          "origin": {
+            "$ref": "#/components/schemas/EventOrigin",
+            "description": "Who made it."
+          },
+          "owner": {
+            "$ref": "#/components/schemas/UserId",
+            "description": "The member whose calendar it is."
+          },
+          "source": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/RecordRef",
+                "description": "The record it was read from, if any (an email)."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "starts": {
+            "type": "string",
+            "description": "When it starts: an RFC 3339 time with an offset, or a\n`YYYY-MM-DD` date when it is all-day."
+          },
+          "workspace": {
+            "type": "string",
+            "description": "The workspace."
+          }
+        }
+      }
+    },
+    {
+      "name": "schedule.event_created",
+      "module": "schedule",
+      "version": 1,
+      "workspaceScoped": true,
+      "payload": {
+        "type": "object",
+        "description": "An event was added to a calendar: made by the member, read by Scout\nfrom an email, or applied from a provider's batch.",
+        "required": [
+          "workspace",
+          "event",
+          "calendar",
+          "owner",
+          "kind",
+          "starts",
+          "all_day",
+          "origin"
+        ],
+        "properties": {
+          "all_day": {
+            "type": "boolean",
+            "description": "Whether it lasts whole days."
+          },
+          "calendar": {
+            "$ref": "#/components/schemas/CalendarId",
+            "description": "Its calendar."
+          },
+          "ends": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "When it ends, in the same form, if it has an end."
+          },
+          "event": {
+            "$ref": "#/components/schemas/EventId",
+            "description": "The event."
+          },
+          "kind": {
+            "$ref": "#/components/schemas/EventKind",
+            "description": "What kind of dated thing it is."
+          },
+          "origin": {
+            "$ref": "#/components/schemas/EventOrigin",
+            "description": "Who made it."
+          },
+          "owner": {
+            "$ref": "#/components/schemas/UserId",
+            "description": "The member whose calendar it is."
+          },
+          "source": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/RecordRef",
+                "description": "The record it was read from, if any (an email)."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "starts": {
+            "type": "string",
+            "description": "When it starts: an RFC 3339 time with an offset, or a\n`YYYY-MM-DD` date when it is all-day."
+          },
+          "workspace": {
+            "type": "string",
+            "description": "The workspace."
+          }
+        }
+      }
+    },
+    {
+      "name": "schedule.outbound_requested",
+      "module": "schedule",
+      "version": 1,
+      "workspaceScoped": true,
+      "payload": {
+        "type": "object",
+        "description": "A member's change of an event on a provider calendar, for connectors to\nmake there (`contracts/schedule.outbound_requested.v1.schema.json`). The\ntext to write, the provider's ids and the etag the change was made\nagainst travel in the blob, a `calendar-change` v1 document: the ids of a\ncalendar can be an address. Connectors asks the schedule module to\nconfirm the request through the kernel's calendar-requests port before it\nacts.",
+        "required": [
+          "workspace",
+          "request",
+          "calendar",
+          "event",
+          "connection",
+          "change",
+          "body"
+        ],
+        "properties": {
+          "body": {
+            "$ref": "#/components/schemas/BlobPointer",
+            "description": "The `calendar-change` v1 document, a blob of the workspace."
+          },
+          "calendar": {
+            "$ref": "#/components/schemas/CalendarId",
+            "description": "The calendar the event is on."
+          },
+          "change": {
+            "$ref": "#/components/schemas/CalendarChange",
+            "description": "What to do."
+          },
+          "connection": {
+            "$ref": "#/components/schemas/ConnectionId",
+            "description": "The connection whose grant makes the change."
+          },
+          "event": {
+            "$ref": "#/components/schemas/EventId",
+            "description": "The event."
+          },
+          "request": {
+            "$ref": "#/components/schemas/RequestId",
+            "description": "This request: unique, the connector records it once."
+          },
+          "workspace": {
+            "type": "string",
+            "description": "The workspace."
+          }
+        }
+      }
+    },
+    {
       "name": "workspaces.member_joined",
       "module": "workspaces",
       "version": 1,
@@ -1476,13 +1812,11 @@
         "properties": {
           "content_type": {
             "type": "string",
-            "description": "The media type recorded with it.",
-            "example": "text/plain; charset=utf-8"
+            "description": "The media type recorded with it."
           },
           "hash": {
             "type": "string",
-            "description": "SHA-256 of the bytes, 64 lower-case hex digits.",
-            "example": "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08"
+            "description": "SHA-256 of the bytes, 64 lower-case hex digits."
           },
           "size": {
             "type": "integer",
@@ -1516,6 +1850,22 @@
             "minimum": 0
           }
         }
+      },
+      "CalendarChange": {
+        "type": "string",
+        "description": "The change connectors is asked to make at the provider.",
+        "enum": [
+          "create",
+          "update",
+          "update_occurrence",
+          "delete",
+          "respond"
+        ]
+      },
+      "CalendarId": {
+        "type": "string",
+        "format": "uuid",
+        "description": "CalendarId (UUIDv7)"
       },
       "Capability": {
         "type": "string",
@@ -1613,6 +1963,37 @@
         "format": "uuid",
         "description": "DraftId (UUIDv7)"
       },
+      "EventId": {
+        "type": "string",
+        "format": "uuid",
+        "description": "EventId (UUIDv7)"
+      },
+      "EventKind": {
+        "type": "string",
+        "description": "What kind of dated thing an event is. A fixed set: obligations (pay by,\nsubmit by, renew by) are never events, they are asks owned by `tasks`.",
+        "enum": [
+          "charge",
+          "appointment",
+          "meeting",
+          "travel",
+          "stay",
+          "show",
+          "reservation",
+          "delivery",
+          "expiry",
+          "hold",
+          "none"
+        ]
+      },
+      "EventOrigin": {
+        "type": "string",
+        "description": "Who made an event.",
+        "enum": [
+          "provider",
+          "member",
+          "scout"
+        ]
+      },
       "InboxId": {
         "type": "string",
         "format": "uuid",
@@ -1622,6 +2003,21 @@
         "type": "string",
         "format": "uuid",
         "description": "ItemId (UUIDv7)"
+      },
+      "ItemKind": {
+        "type": "string",
+        "description": "What kind of thing that happens at a time a read of a message found\n(campbooks-cloud#42). Obligations are not items: they are asks.",
+        "enum": [
+          "charge",
+          "appointment",
+          "meeting",
+          "travel",
+          "stay",
+          "show",
+          "reservation",
+          "delivery",
+          "expiry"
+        ]
       },
       "Kind": {
         "type": "string",
@@ -1797,6 +2193,107 @@
           "zoho"
         ]
       },
+      "ReadAskFacts": {
+        "type": "object",
+        "description": "An ask of a stored read, as `message_read` carries it: its key, verb and\ndue, never its title, quote or amount.",
+        "required": [
+          "key",
+          "verb",
+          "has_amount"
+        ],
+        "properties": {
+          "due": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "By when: a date, or an RFC 3339 time with an offset."
+          },
+          "has_amount": {
+            "type": "boolean",
+            "description": "Whether the read holds an amount (the amount itself is not here)."
+          },
+          "key": {
+            "type": "string",
+            "description": "Stable for the same message, layer and position."
+          },
+          "same_as": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The reference of an open task it repeats."
+          },
+          "verb": {
+            "$ref": "#/components/schemas/Verb",
+            "description": "Do something, or pay something."
+          }
+        }
+      },
+      "ReadItemFacts": {
+        "type": "object",
+        "description": "An item of a stored read, as `message_read` carries it: its key, kind and\ntimes, never its title, place or quote.",
+        "required": [
+          "key",
+          "kind",
+          "starts",
+          "all_day"
+        ],
+        "properties": {
+          "all_day": {
+            "type": "boolean",
+            "description": "Whether it lasts whole days."
+          },
+          "cancels": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The key of an earlier item of the conversation that it cancels."
+          },
+          "ends": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "When it ends, in the same form."
+          },
+          "key": {
+            "type": "string",
+            "description": "Stable for the same message, layer and position."
+          },
+          "kind": {
+            "$ref": "#/components/schemas/ItemKind",
+            "description": "What kind of thing it is."
+          },
+          "starts": {
+            "type": "string",
+            "description": "When it starts: an RFC 3339 time with an offset, or a date when\nall-day."
+          },
+          "time_zone": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Its IANA time zone, when the message gave one."
+          },
+          "updates": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The key of an earlier item of the conversation that it changes."
+          }
+        }
+      },
+      "ReadLayer": {
+        "type": "string",
+        "description": "Which reader produced a read: the sender's own machine-readable data,\nor Scout's one `complete` call.",
+        "enum": [
+          "structured",
+          "model"
+        ]
+      },
       "RecordRef": {
         "type": "object",
         "description": "A pointer to any record of any module.\n\n`type` is `<module>.<record>` (for example `conversations.thread`), the\nsame names operations list in `x-campbooks.records`; `id` is the record's\nid as its module writes it (usually a UUID).\n\n```\nuse campbooks_kernel::records::RecordRef;\n\nlet thread = RecordRef::new(\n    \"conversations.thread\",\n    \"0192f0c4-7d4e-7b39-a7f1-3a8f0e2b9c11\",\n);\nassert_eq!(thread.module(), Some(\"conversations\"));\nassert_eq!(\n    serde_json::to_value(&thread).unwrap(),\n    serde_json::json!({\"type\": \"conversations.thread\", \"id\": \"0192f0c4-7d4e-7b39-a7f1-3a8f0e2b9c11\"})\n);\n```",
@@ -1816,6 +2313,11 @@
             "example": "conversations.thread"
           }
         }
+      },
+      "RequestId": {
+        "type": "string",
+        "format": "uuid",
+        "description": "RequestId (UUIDv7)"
       },
       "RequestOrigin": {
         "type": "string",
@@ -2191,6 +2693,14 @@
         "type": "string",
         "format": "uuid",
         "description": "UserId (UUIDv7)"
+      },
+      "Verb": {
+        "type": "string",
+        "description": "What an ask of the reader is: do something, or pay something.",
+        "enum": [
+          "do",
+          "pay"
+        ]
       }
     }
   }
