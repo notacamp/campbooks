@@ -8,7 +8,7 @@ import { UndoProvider } from "~/lib/ui";
 
 import { createAppRouter } from "../../src/app/router";
 import { addDays, isoDay } from "../../src/modules/tasks/model";
-import { COUNTS, MARTA } from "../../test/demo/attention";
+import { COUNTS, LUZ, MARTA } from "../../test/demo/attention";
 import {
   INBOX,
   PRIMARY,
@@ -20,6 +20,8 @@ import {
 } from "../../test/demo/conversations";
 import {
   ACCOUNTANT,
+  ASK_BILL,
+  ASK_LEASE,
   BILL,
   INSPECTION,
   LEASE,
@@ -289,3 +291,44 @@ export const HomeIdle: Story = { args: OnHome.args };
 
 /** The reader on an email, idle. */
 export const ReaderIdle: Story = { args: MakeItATask.args };
+
+/** What Scout found in two emails, as Ana's tasks around today. */
+function found() {
+  const day = (n: number) => isoDay(addDays(new Date(), n));
+  const lease = { ...ASK_LEASE, due_on: day(3) };
+  const bill = { ...ASK_BILL, due_on: day(-1) };
+  return { lease, bill };
+}
+
+/** The API for tasks Scout made from emails. */
+function foundApi() {
+  const { lease, bill } = found();
+  return tasks({
+    [`GET ${W}/conversations`]: { body: { conversations: [MARTA, LUZ], next_cursor: null } },
+    [`GET ${W}/tasks`]: { body: { tasks: [bill, lease] } },
+    [`GET ${W}/attention`]: (_body, url) =>
+      url.searchParams.get("state") === "open"
+        ? { body: { items: [taskItem(bill), taskItem(lease)], counts: COUNTS } }
+        : { body: { items: [], counts: [] } },
+  });
+}
+
+/** A task Scout made from an email says so, above where it came from. */
+export const FoundByScout: Story = {
+  args: { path: `${PATH}/${ASK_BILL.id}`, api: foundApi() },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(await canvas.findByText("Scout found this in the email")).toBeVisible();
+    await expect(canvas.getByRole("link", { name: "Open the email" })).toBeVisible();
+  },
+};
+
+/** Home with the two tasks Scout made from emails (Pay and Do), idle. */
+export const FoundOnHomeIdle: Story = {
+  args: { path: `/w/${DUARTE.id}`, api: foundApi() },
+};
+
+/** The detail of the invoice's task, idle. */
+export const FoundByScoutIdle: Story = {
+  args: { path: `${PATH}/${ASK_BILL.id}`, api: foundApi() },
+};

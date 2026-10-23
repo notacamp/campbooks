@@ -12,7 +12,9 @@ publish.workspace = true
 axum.workspace = true
 campbooks-kernel.workspace = true
 chrono.workspace = true
+futures-util.workspace = true
 serde.workspace = true
+serde_json.workspace = true
 sqlx.workspace = true
 tracing.workspace = true
 utoipa.workspace = true
@@ -20,7 +22,6 @@ utoipa-axum.workspace = true
 
 [dev-dependencies]
 campbooks-kernel = { workspace = true, features = ["test-util"] }
-serde_json.workspace = true
 tokio.workspace = true
 
 [lints]

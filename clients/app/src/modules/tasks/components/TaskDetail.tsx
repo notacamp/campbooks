@@ -278,6 +278,11 @@ export function TaskDetail({
             <Heading level={3} size="section">
               {t("detail.source")}
             </Heading>
+            {task.origin === "ask" ? (
+              <Text tone="secondary" size="sm">
+                {t("detail.foundByScout")}
+              </Text>
+            ) : null}
             <div className="flex items-center gap-2">
               <Avatar name={source.name} />
               <div className="flex min-w-0 flex-col">
