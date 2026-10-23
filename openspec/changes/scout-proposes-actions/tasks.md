@@ -22,17 +22,17 @@
 
 ## 4. Client
 
-- [ ] 4.1 `lib/ui` card for a proposal (action line, facts, quoted Scout words, Confirm / Not now, done with Undo, failed, settled read-only)
-- [ ] 4.2 The client's list of runnable actions (same ids as the server's), the guard on method and path, `Idempotency-Key` from the proposal id, query refresh, settle calls
-- [ ] 4.2a `from_response`: copy only the named top-level fields of the change's answer into the undo body (test with a fake row)
-- [ ] 4.3 Rule card → Teach Scout with the sentence (settles on save or close); reply card → Reply dialog with the intent through a `lib/` opener wired by the app
-- [ ] 4.4 The panel's line "Scout asks before it changes anything."; four locales; stories with mocked proposals; component tests; `test:fit`
-- [ ] 4.5 Recording scenario: a proposal confirmed and undone, a rule card, at 375px and desktop
+- [x] 4.1 `lib/ui` card for a proposal (action line, facts, quoted Scout words, Confirm / Not now, done with Undo, failed, settled read-only)
+- [x] 4.2 The client's list of runnable actions (same ids as the server's), the guard on method and path, `Idempotency-Key` from the proposal id, query refresh, settle calls
+- [x] 4.2a `from_response`: copy only the named top-level fields of the change's answer into the undo body (test with a fake row)
+- [x] 4.3 Rule card → Teach Scout with the sentence (settles on save or close); reply card → Reply dialog with the intent through a `lib/` opener wired by the app
+- [x] 4.4 The panel's line "Scout asks before it changes anything."; four locales; stories with mocked proposals; component tests; `test:fit`
+- [x] 4.5 Recording scenario: a proposal confirmed and undone, a rule card, at 375px and desktop
 
 ## 5. Close
 
-- [ ] 5.1 OpenAPI and client types regenerated (CI artifacts)
-- [ ] 5.2 Changelog entry file
-- [ ] 5.3 Gates green
+- [x] 5.1 OpenAPI and client types regenerated (CI artifacts)
+- [x] 5.2 Changelog entry file
+- [x] 5.3 Gates green
 - [ ] 5.4 UI recorded at 375px and desktop
 - [ ] 5.5 `openspec archive scout-proposes-actions --yes` before merge
