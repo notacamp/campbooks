@@ -361,11 +361,24 @@
         "plan_day": "Planear para {{day}}",
         "task_later": "Mais tarde, até {{until}}",
         "due": "Prazo em {{day}}",
-        "hand_off": "Passar a {{name}}"
+        "hand_off": "Passar a {{name}}",
+        "create_event": "Adicionar ao calendário: {{when}}",
+        "update_event": "Alterar este evento",
+        "update_event_moved": "Mudar este evento para {{when}}",
+        "delete_event": "Eliminar este evento",
+        "respond_event": "Responder: {{response}}",
+        "push_event": "Adicionar a {{calendar}}",
+        "unpush_event": "Retirar de {{calendar}}"
       },
       "taskLine": "{{title}} · prazo {{due}}",
       "taskNoDue": "{{title}}",
       "handOffNote": "Vai para o Início de {{name}}.",
+      "eventLine": "{{title}} · {{when}}",
+      "responses": {
+        "accepted": "Vou",
+        "tentative": "Talvez",
+        "declined": "Não vou"
+      },
       "streams": {
         "primary": "Principal",
         "updates": "Atualizações",

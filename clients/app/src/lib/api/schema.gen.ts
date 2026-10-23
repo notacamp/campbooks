@@ -2856,6 +2856,11 @@ export interface components {
             name: string;
             /** @description Whether it is the account's primary calendar. */
             primary: boolean;
+            /**
+             * @description Whose calendar it is, `google` or `zoho`, when known (none for your
+             *     Campbooks calendar).
+             */
+            provider?: string | null;
             /** @description Their Campbooks calendar, or one of a connected provider account. */
             source: components["schemas"]["CalendarSource"];
             /** @description Whether its events are shown (the Campbooks calendar always is). */
@@ -2955,6 +2960,11 @@ export interface components {
         ChatProposal: {
             action?: components["schemas"]["ProposalAction"] | null;
             detail?: components["schemas"]["ProposalDetail"] | null;
+            /**
+             * @description The event's own facts (an event change, except a new one); its
+             *     `record` is the event.
+             */
+            event?: components["schemas"]["ProposalEvent"] | null;
             facts?: components["schemas"]["ProposalFacts"] | null;
             /**
              * @description The proposal: the change's `Idempotency-Key` (`<id>:undo` for its
@@ -3948,6 +3958,11 @@ export interface components {
             found_by?: string | null;
             /** @description The event (a series and its occurrences share it). */
             id: components["schemas"]["EventId"];
+            /**
+             * @description The keys of the things Scout read that this event stands for (a read
+             *     item's `key`), so a reader can tell which event an item became.
+             */
+            item_keys: string[];
             /** @description What kind of dated thing it is. */
             kind: components["schemas"]["EventKind"];
             /** @description Notes. */
@@ -4805,6 +4820,9 @@ export interface components {
             notes?: string | null;
             /** @description Where it is. */
             place?: string | null;
+            source?: components["schemas"]["RecordRef"] | null;
+            /** @description The conversation of that email (needed to open it). */
+            source_conversation?: string | null;
             /**
              * @description When it starts: an RFC 3339 time with an offset, or a `YYYY-MM-DD`
              *     date for an all-day event.
@@ -5105,14 +5123,21 @@ export interface components {
          *     the server to one catalogue operation and its undo.
          * @enum {string}
          */
-        ProposalAction: "archive" | "unarchive" | "mark_read" | "mark_unread" | "star" | "unstar" | "add_label" | "remove_label" | "move_to_stream" | "trash" | "untrash" | "report_spam" | "not_spam" | "done" | "not_needed" | "already_paid" | "still_to_pay" | "yes_to_question" | "later" | "task_done" | "task_not_needed" | "plan_day" | "task_later" | "due" | "hand_off";
+        ProposalAction: "archive" | "unarchive" | "mark_read" | "mark_unread" | "star" | "unstar" | "add_label" | "remove_label" | "move_to_stream" | "trash" | "untrash" | "report_spam" | "not_spam" | "done" | "not_needed" | "already_paid" | "still_to_pay" | "yes_to_question" | "later" | "task_done" | "task_not_needed" | "plan_day" | "task_later" | "due" | "hand_off" | "create_event" | "update_event" | "delete_event" | "respond_event" | "push_event" | "unpush_event";
         /** @description What a change takes besides its conversation. */
         ProposalDetail: {
+            /**
+             * @description The calendar an event is added to (`push_event`), as the calendars
+             *     list names it: read by the server, never the model's words.
+             */
+            calendar_name?: string | null;
             /**
              * Format: date
              * @description The day (`plan_day`, `due`), `YYYY-MM-DD`.
              */
             day?: string | null;
+            /** @description The new end (`create_event`, `update_event`), as Scout wrote it. */
+            ends?: string | null;
             /**
              * @description The label's name, as its inbox has it (`add_label`, `remove_label`):
              *     Scout's words, show them quoted.
@@ -5125,13 +5150,44 @@ export interface components {
              *     (`hand_off`): read by the server, never the model's words.
              */
             member_name?: string | null;
+            /** @description The new place (`create_event`, `update_event`), Scout's words. */
+            place?: string | null;
+            /**
+             * @description The answer to an invitation (`respond_event`): `accepted`,
+             *     `tentative` or `declined`.
+             */
+            response?: string | null;
+            /** @description The new start (`create_event`, `update_event`), as Scout wrote it. */
+            starts?: string | null;
             /** @description The stream it moves to (`move_to_stream`). */
             stream?: string | null;
+            /**
+             * @description The title in Scout's words (`create_event`, `update_event`): show it
+             *     quoted.
+             */
+            title?: string | null;
             /**
              * Format: date-time
              * @description Until when (`later`), RFC 3339, UTC.
              */
             until?: string | null;
+        };
+        /**
+         * @description A calendar event's own facts, read from its record when the proposal was
+         *     made: what a card names, never the model's words.
+         */
+        ProposalEvent: {
+            /** @description Whether it lasts whole days. */
+            all_day: boolean;
+            /** @description The name of the calendar it is on. */
+            calendar?: string | null;
+            /**
+             * @description When it starts: an RFC 3339 time with an offset, or a `YYYY-MM-DD`
+             *     date when it is all-day.
+             */
+            starts: string;
+            /** @description Its title, as the calendar has it. */
+            title: string;
         };
         /**
          * @description A conversation's own facts, read from its record when the proposal was
@@ -13820,7 +13876,7 @@ export interface operations {
                     "application/json": components["schemas"]["EventView"];
                 };
             };
-            /** @description Times that do not read or do not follow each other (`invalid_when`), a title that is empty or too long (`invalid_text`), a time zone that is not an IANA name (`invalid_time_zone`), or a calendar that cannot be written (`calendar_read_only`). */
+            /** @description Times that do not read or do not follow each other (`invalid_when`), a title that is empty or too long (`invalid_text`), a time zone that is not an IANA name (`invalid_time_zone`), or a calendar that cannot be written (`calendar_read_only`), or a source that is not an email (`invalid_source`). */
             400: {
                 headers: {
                     [name: string]: unknown;
@@ -13847,7 +13903,7 @@ export interface operations {
                     "application/problem+json": components["schemas"]["Problem"];
                 };
             };
-            /** @description No such calendar, or it is not yours. */
+            /** @description No such calendar, or it is not yours, or the source email is not one you can read. */
             404: {
                 headers: {
                     [name: string]: unknown;
