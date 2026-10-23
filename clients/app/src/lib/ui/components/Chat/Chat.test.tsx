@@ -9,6 +9,7 @@ import {
   ChatMessage,
   ChatNotice,
   ChatPanel,
+  ChatProposal,
   ChatSteps,
   ChatSuggestions,
   ChatText,
@@ -209,5 +210,53 @@ describe("ChatSuggestions, ChatSteps, ChatWorking and ChatNotice", () => {
     const { container } = renderUi(<ChatSteps summary="What I looked at" steps={[]} />);
 
     expect(container).toBeEmptyDOMElement();
+  });
+});
+
+describe("ChatProposal", () => {
+  it("names the change and what it is about, quotes Scout's words, and offers the choice", () => {
+    const confirm = vi.fn();
+    renderUi(
+      <ChatProposal
+        label="Scout proposes"
+        title="Add the label"
+        about="Marta Silva · Rent for November"
+        quote="<b>Accountant</b>"
+        quoteLabel="Scout’s words"
+        state="pending"
+        actions={
+          <button type="button" onClick={confirm}>
+            Confirm
+          </button>
+        }
+      />,
+    );
+
+    const card = screen.getByRole("region", { name: "Add the label" });
+    expect(within(card).getByText("Marta Silva · Rent for November")).toBeVisible();
+    // Plain text, quoted: never markup.
+    const quote = within(card).getByText("<b>Accountant</b>");
+    expect(quote.tagName).toBe("Q");
+    expect(card.querySelector("b")).toBeNull();
+    // Nothing to say yet: the status line is empty.
+    expect(within(card).queryByRole("status")).not.toBeInTheDocument();
+    fireEvent.click(within(card).getByRole("button", { name: "Confirm" }));
+    expect(confirm).toHaveBeenCalledOnce();
+  });
+
+  it("says how a settled card ended, without buttons", () => {
+    renderUi(
+      <ChatProposal
+        label="Scout proposed"
+        title="Archive"
+        about="Marta Silva · Rent for November"
+        state="failed"
+        status="This couldn’t be done."
+      />,
+    );
+
+    const card = screen.getByRole("region", { name: "Archive" });
+    expect(within(card).getByRole("status")).toHaveTextContent("This couldn’t be done.");
+    expect(within(card).queryByRole("button")).toBeNull();
   });
 });

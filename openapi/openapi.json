@@ -2058,6 +2058,137 @@
         }
       }
     },
+    "/api/v1/w/{workspace_id}/assistant/chats/{chat_id}/proposals/{proposal_id}": {
+      "post": {
+        "tags": [
+          "assistant"
+        ],
+        "summary": "Say what you did with one of Scout's proposals: `done`, `declined` or\n`failed` for a pending card, `undone` for a done one.",
+        "description": "It records only: the change itself was your own request, sent by your\napp. Scout reads what you did in the chat's next answers.",
+        "operationId": "assistant.settle_proposal",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "description": "The workspace.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId"
+            }
+          },
+          {
+            "name": "chat_id",
+            "in": "path",
+            "description": "The chat.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ChatId"
+            }
+          },
+          {
+            "name": "proposal_id",
+            "in": "path",
+            "description": "The proposal.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ProposalId"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SettleProposal"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "The proposal, settled.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChatProposal"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Not a state a card is settled with.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid access token.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing scope.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such chat or proposal, or it is not yours.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "It cannot become that state (`proposal_settled`): only a pending card is settled, and only a done one undone.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [
+              "assistant:write"
+            ]
+          }
+        ],
+        "x-campbooks": {
+          "access": {
+            "action": "write",
+            "resource": "assistant.chat"
+          },
+          "assistant": false,
+          "automation": false,
+          "mutates": true,
+          "records": [
+            "assistant.chat"
+          ],
+          "risk": "low"
+        }
+      }
+    },
     "/api/v1/w/{workspace_id}/assistant/chats/{chat_id}/questions": {
       "post": {
         "tags": [
@@ -14190,6 +14321,7 @@
           "author",
           "text",
           "steps",
+          "proposals",
           "created_at"
         ],
         "properties": {
@@ -14217,6 +14349,13 @@
             "$ref": "#/components/schemas/ChatMessageId",
             "description": "The message."
           },
+          "proposals": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ChatProposal"
+            },
+            "description": "What Scout proposed in this answer, at most three, each a card the\nmember confirms or declines (Scout's answers only). Nothing in them\nhas happened unless its state says so."
+          },
           "steps": {
             "type": "array",
             "items": {
@@ -14227,6 +14366,109 @@
           "text": {
             "type": "string",
             "description": "What was asked or answered, as plain text: show it as text only,\nnever as HTML and never with links made of it."
+          }
+        }
+      },
+      "ChatProposal": {
+        "type": "object",
+        "description": "Something Scout proposed in a chat: a card under its answer. Nothing\nhappens until the member confirms it, and then by their own request.",
+        "required": [
+          "id",
+          "kind",
+          "state"
+        ],
+        "properties": {
+          "action": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/ProposalAction",
+                "description": "The change (a change only)."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "detail": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/ProposalDetail",
+                "description": "What the change takes (a change only)."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "facts": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/ProposalFacts",
+                "description": "The conversation's own facts (a change or a reply)."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "id": {
+            "$ref": "#/components/schemas/ProposalId",
+            "description": "The proposal: the change's `Idempotency-Key` (`<id>:undo` for its\nundo)."
+          },
+          "intent": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "What the reply should say, Scout's words: show it quoted (a reply\nonly)."
+          },
+          "kind": {
+            "$ref": "#/components/schemas/ProposalKind",
+            "description": "What kind."
+          },
+          "record": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/RecordRef",
+                "description": "The conversation it is about (a change or a reply)."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "request": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/ProposalRequest",
+                "description": "The change's request (a change only)."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "sentence": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The rule's sentence, Scout's words: show it quoted (a rule only)."
+          },
+          "state": {
+            "$ref": "#/components/schemas/ProposalState",
+            "description": "Where it stands."
+          },
+          "undo": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/ProposalRequest",
+                "description": "Its undo (a change only)."
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         }
       },
@@ -18269,6 +18511,87 @@
           }
         }
       },
+      "ProposalAction": {
+        "type": "string",
+        "description": "The change a change proposal names, from a fixed list, each mapped by\nthe server to one catalogue operation and its undo.",
+        "enum": [
+          "archive",
+          "unarchive",
+          "mark_read",
+          "mark_unread",
+          "star",
+          "unstar",
+          "add_label",
+          "remove_label",
+          "move_to_stream",
+          "trash",
+          "untrash",
+          "report_spam",
+          "not_spam",
+          "done",
+          "not_needed",
+          "already_paid",
+          "still_to_pay",
+          "yes_to_question",
+          "later"
+        ]
+      },
+      "ProposalDetail": {
+        "type": "object",
+        "description": "What a change takes besides its conversation.",
+        "properties": {
+          "label": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The label's name, as its inbox has it (`add_label`, `remove_label`):\nScout's words, show them quoted."
+          },
+          "stream": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The stream it moves to (`move_to_stream`)."
+          },
+          "until": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "Until when (`later`), RFC 3339, UTC."
+          }
+        }
+      },
+      "ProposalFacts": {
+        "type": "object",
+        "description": "A conversation's own facts, read from its record when the proposal was\nmade: what a card names, never the model's words.",
+        "required": [
+          "sender",
+          "subject",
+          "stream"
+        ],
+        "properties": {
+          "sender": {
+            "type": "string",
+            "description": "Who wrote its newest message in: a name, else an address."
+          },
+          "stream": {
+            "type": "string",
+            "description": "Its stream then."
+          },
+          "subject": {
+            "type": "string",
+            "description": "Its subject (empty when it has none)."
+          }
+        }
+      },
+      "ProposalId": {
+        "type": "string",
+        "format": "uuid",
+        "description": "ProposalId (UUIDv7)"
+      },
       "ProposalInbox": {
         "type": "object",
         "description": "An inbox a rule can be taught in.",
@@ -18291,6 +18614,67 @@
             "description": "Someone else uses it too: the rule would act for everyone there."
           }
         }
+      },
+      "ProposalKind": {
+        "type": "string",
+        "description": "What kind of thing Scout proposed.",
+        "enum": [
+          "change",
+          "rule",
+          "reply"
+        ]
+      },
+      "ProposalMethod": {
+        "type": "string",
+        "description": "An HTTP method a proposal's request may use.",
+        "enum": [
+          "POST",
+          "DELETE"
+        ]
+      },
+      "ProposalRequest": {
+        "type": "object",
+        "description": "A request the member's client sends, as the server built it from the\ncatalogue: the client checks it is one of its own actions before\nsending it, with the member's token.",
+        "required": [
+          "operation",
+          "method",
+          "path"
+        ],
+        "properties": {
+          "body": {
+            "description": "Its JSON body, or none."
+          },
+          "from_response": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "For an undo: the top-level fields of the change's answer to copy\ninto this body, and nothing else."
+          },
+          "method": {
+            "$ref": "#/components/schemas/ProposalMethod",
+            "description": "Its method."
+          },
+          "operation": {
+            "type": "string",
+            "description": "Its `operationId`."
+          },
+          "path": {
+            "type": "string",
+            "description": "Its path, relative to the workspace's API root\n(`conversations/{id}/archive` under `/api/v1/w/{workspace_id}/`)."
+          }
+        }
+      },
+      "ProposalState": {
+        "type": "string",
+        "description": "Where a proposal stands.",
+        "enum": [
+          "pending",
+          "done",
+          "declined",
+          "failed",
+          "undone"
+        ]
       },
       "ProposedAction": {
         "oneOf": [
@@ -20501,6 +20885,30 @@
           }
         },
         "additionalProperties": false
+      },
+      "SettleProposal": {
+        "type": "object",
+        "description": "What the member did with a card.",
+        "required": [
+          "state"
+        ],
+        "properties": {
+          "state": {
+            "$ref": "#/components/schemas/Settlement",
+            "description": "`done`, `declined` or `failed` for a pending card; `undone` for a\ndone one."
+          }
+        },
+        "additionalProperties": false
+      },
+      "Settlement": {
+        "type": "string",
+        "description": "What the member did with a card.",
+        "enum": [
+          "done",
+          "declined",
+          "failed",
+          "undone"
+        ]
       },
       "SignInStart": {
         "type": "object",

@@ -476,3 +476,80 @@ export function ChatNotice({ children, visor = "unsure", action }: ChatNoticePro
     </div>
   );
 }
+
+/** Where a proposal stands, as its card shows it. */
+export type ChatProposalState =
+  "pending" | "working" | "done" | "undone" | "declined" | "failed" | "blocked";
+
+export interface ChatProposalProps {
+  /** Who proposes it, above the card: "Scout proposes". */
+  label: string;
+  /** The change, as an action: "Archive", "Move to Updates", "Later, until Monday 9:00". */
+  title: string;
+  /** What it is about: "Marta Ferreira · Walkthrough on Thursday". */
+  about?: string | undefined;
+  /**
+   * Scout's own words, shown quoted as plain text: a label name, a rule
+   * sentence, a reply intent. Nothing else on the card is the model's.
+   */
+  quote?: string | undefined;
+  /** Who the quote is from: "Scout’s words". */
+  quoteLabel?: string | undefined;
+  /** Where it stands; `pending` is the only state with a choice to make. */
+  state: ChatProposalState;
+  /** The state as a sentence once it is not pending: "Done.", "Not now.". */
+  status?: string | undefined;
+  /** Confirm and Not now while pending; Undo once done (one button style). */
+  actions?: ReactNode | undefined;
+}
+
+/**
+ * A change Scout proposes under its answer: what, about what, Scout's own
+ * words quoted, and the member's choice. Nothing happens until they choose;
+ * once settled the card says how it ended, and a settled card read again
+ * has no buttons.
+ */
+export function ChatProposal({
+  label,
+  title,
+  about,
+  quote,
+  quoteLabel,
+  state,
+  status,
+  actions,
+}: ChatProposalProps) {
+  const titleId = useId();
+  const settled = state !== "pending" && state !== "working";
+  return (
+    <section className={styles["proposal"]} data-state={state} aria-labelledby={titleId}>
+      <p className={styles["proposalLabel"]}>
+        <Visor state={state === "working" ? "thinking" : "idle"} size="xs" />
+        <span>{label}</span>
+      </p>
+      <h3 className={styles["proposalTitle"]} id={titleId}>
+        {title}
+      </h3>
+      {about === undefined ? null : <p className={styles["proposalAbout"]}>{about}</p>}
+      {quote === undefined ? null : (
+        <figure className={styles["proposalQuote"]}>
+          <blockquote className={styles["proposalQuoteText"]}>
+            <q>{quote}</q>
+          </blockquote>
+          {quoteLabel === undefined ? null : (
+            <figcaption className={styles["proposalAttribution"]}>{quoteLabel}</figcaption>
+          )}
+        </figure>
+      )}
+      <p className={styles["proposalStatus"]} role="status">
+        {settled || state === "working" ? (
+          <>
+            {state === "done" ? <Icon name="check" /> : null}
+            <span>{status}</span>
+          </>
+        ) : null}
+      </p>
+      {actions === undefined ? null : <div className={styles["proposalActions"]}>{actions}</div>}
+    </section>
+  );
+}

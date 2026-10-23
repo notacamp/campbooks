@@ -14,7 +14,8 @@
 //! the member asks about what they are looking at, and Scout explains and
 //! looks things up as that member, through other modules' read operations
 //! invoked by id, from a handbook whose sections the modules own
-//! ([`handbook`]). In this version a chat changes nothing.
+//! ([`handbook`]). Scout may propose a change in a chat; it never makes
+//! one: the member confirms a card and their own request does.
 
 #![forbid(unsafe_code)]
 
@@ -89,6 +90,7 @@ fn router() -> OpenApiRouter<AppState> {
         .routes(routes!(chat::get, chat::delete))
         .routes(routes!(chat::ask))
         .routes(routes!(chat::stream))
+        .routes(routes!(chat::settle))
 }
 
 #[cfg(test)]

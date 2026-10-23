@@ -13,7 +13,8 @@
     "chat_full": "Esta conversa está cheia: tem {{max}} perguntas. Recomece para continuar a perguntar.",
     "question_empty": "Escreva uma pergunta para o Scout.",
     "question_too_long": "Use no máximo {{max}} caracteres na sua pergunta.",
-    "about_unsupported": "O Scout ainda não pode conversar sobre este tipo de registo."
+    "about_unsupported": "O Scout ainda não pode conversar sobre este tipo de registo.",
+    "proposal_settled": "Esta proposta do Scout já teve resposta, por isso já não pode mudar assim."
   },
   "chat": {
     "about_lost": "Já não consigo ver esta conversa, por isso respondi sem ela."
