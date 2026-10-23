@@ -32,7 +32,7 @@
 use campbooks_ai::decide::signals::facts::sender_authenticated;
 use campbooks_kernel::{
     AppState, EventBus, JobContext, JobError, JobHandler,
-    blobs::BlobRef,
+    blobs::{BlobRef, BlobStore},
     db::BeginFor as _,
     jobs::{EnqueueOptions, Enqueued},
     tenancy::WorkspaceId,
@@ -171,6 +171,7 @@ pub async fn read(
     keep(
         &mut tx,
         &state.events,
+        &state.blobs,
         needs,
         workspace,
         message,
@@ -262,6 +263,7 @@ async fn still_there(
 async fn keep(
     tx: &mut Transaction<'_, Postgres>,
     events: &EventBus,
+    blobs: &BlobStore,
     settings: &NeedSettings,
     workspace: WorkspaceId,
     message: MessageId,
@@ -296,6 +298,7 @@ async fn keep(
     }
     let owner = store::owner(tx, loaded.inbox_id).await?;
     let ws = workspace.to_string();
+    let texts = crate::features::read_message::put_texts(blobs, tx, &ws, message, &items).await?;
     events
         .publish(
             tx,
@@ -309,6 +312,7 @@ async fn keep(
                 items: items.iter().map(item_facts).collect(),
                 asks: asks.iter().map(ask_facts).collect(),
                 summary_ready: false,
+                texts,
             },
         )
         .await?;

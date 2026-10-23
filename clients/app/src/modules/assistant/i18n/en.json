@@ -297,7 +297,11 @@
       "find_people_one": "Looked for people: {{count}} found",
       "find_people_other": "Looked for people: {{count}} found",
       "what_needs_me": "Read what needs you",
-      "my_inboxes": "Read your inboxes and streams"
+      "my_inboxes": "Read your inboxes and streams",
+      "my_calendar_one": "Looked at your calendar: {{count}} event",
+      "my_calendar_other": "Looked at your calendar: {{count}} events",
+      "free_time": "Looked for free time",
+      "read_event": "Read an event of your calendar"
     },
     "working": {
       "find_conversations": "Looking for conversations…",
@@ -305,7 +309,10 @@
       "conversation_history": "Reading what happened to this email…",
       "find_people": "Looking for people…",
       "what_needs_me": "Reading what needs you…",
-      "my_inboxes": "Reading your inboxes…"
+      "my_inboxes": "Reading your inboxes…",
+      "my_calendar": "Looking at your calendar…",
+      "free_time": "Looking for free time…",
+      "read_event": "Reading the event…"
     }
   }
 }

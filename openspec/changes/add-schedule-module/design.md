@@ -171,7 +171,9 @@ drafts excepted: those write, on request). No module adds another:
   `amount`'s digits must appear in the quote or the message's words, else
   the amount (not the ask) is dropped; an item that has
   already ended when it is read is dropped; `kind` must be in the set; an
-  `updates`/`cancels` id must belong to the same conversation; a `same_as`
+  `updates` id that names no item of the same conversation loses the
+  reference (the item is kept as a new one), and a `cancels` id that names
+  none drops the item (a cancellation of something never held adds nothing); a `same_as`
   must be a `task_ref` that was in the list sent. A dropped
   item is logged by reason only.
 - **Reasoning budget**: GLM-5.3 Flash shares `max_tokens` with its thinking:
@@ -237,6 +239,19 @@ Per 1,000 inbound emails with prod's models:
 - `removed_items`: a Scout event the member removed: source message, kind,
   the item's identity. A re-read never adds it again; it is kept as a
   labelled example for the eval set.
+- `change_requests`: a change to an event on a provider calendar that
+  connectors is asked to make: the request id, member, calendar, event,
+  connection, kind of change, the `calendar-change` blob and its MAC
+  (campbooks-cloud#227), and whether it still waits. The kernel's
+  calendar-requests port answers from it.
+- Event columns beyond the first sketch: the member's `response` to an
+  invitation, a `notice` (`kept_theirs` | `not_saved`) when the provider did
+  not keep their change, `deleted_at` + `undo_token` for a delete that can
+  still be undone, `pushed_to` (the Campbooks event is hidden while its
+  provider copy stands), `busy`, `provider_version` (the event as the
+  provider last had it, written back when a change is not kept),
+  `item_keys` (every key of a read item that made or changed it) and
+  `source_conversation`.
 
 Occurrences of a series are expanded at read time, within the asked
 window, with an RRULE library (no stored occurrence rows); exceptions
@@ -248,6 +263,9 @@ replace their occurrence.
   `schedule.event_cancelled` (v1): event id, calendar id, member, kind,
   starts/ends, all-day, source RecordRef, origin. No title, place or notes
   (PII stays in the module; readers ask the API).
+- `schedule.calendar_sync_changed` (v1): a member turned a provider calendar
+  on or off (calendar, connection, whether it syncs). Connectors reads a
+  calendar turned on from the start.
 - `schedule.outbound_requested` (v1): an intent for connectors to create,
   update, delete or RSVP an event at the provider (ids, the calendar's
   connection and provider ids, the etag the change was made against). The
@@ -267,7 +285,9 @@ replace their occurrence.
   member's Campbooks calendar for each of its `items[]` (idempotent on
   `item_key`; `asks[]` are for `tasks`), unless the member
   removed that item, turned the kind off, or the message is in a shared
-  inbox. Shared inboxes add nothing in this change (whose calendar would it
+  inbox. The title, place and calendar `UID` of an item are not in the
+  event: they are in a `read-texts` v1 blob (`texts`) that the message holds
+  and that `schedule` reads in the handler; an event never repeats them. Shared inboxes add nothing in this change (whose calendar would it
   be?); recorded in `openspec/decisions-needed.md`. The event payload names
   the inbox's personal owner, and the event goes on that member's calendar
   only.
@@ -312,25 +332,55 @@ replace their occurrence.
 
 ## Endpoints and scopes
 
-| Endpoint | operationId | Scope |
-| --- | --- | --- |
-| `GET /api/v1/schedule/events?from=&to=&calendars=` | `schedule.list_events` | `schedule:read` |
-| `GET /api/v1/schedule/events/{id}` | `schedule.get_event` | `schedule:read` |
-| `POST /api/v1/schedule/events` | `schedule.create_event` | `schedule:write` |
-| `PATCH /api/v1/schedule/events/{id}` (one occurrence via `?occurrence=`) | `schedule.update_event` | `schedule:write` |
-| `DELETE /api/v1/schedule/events/{id}` (undo token) | `schedule.delete_event` | `schedule:write` |
-| `POST /api/v1/schedule/events/{id}/response` | `schedule.respond_event` | `schedule:write` |
-| `POST /api/v1/schedule/events/{id}/push` | `schedule.push_event` | `schedule:write` |
-| `GET /api/v1/schedule/calendars` | `schedule.list_calendars` | `schedule:read` |
-| `PATCH /api/v1/schedule/calendars/{id}` | `schedule.update_calendar` | `schedule:write` |
-| `GET /api/v1/schedule/settings` | `schedule.get_settings` | `schedule:read` |
-| `PATCH /api/v1/schedule/settings` | `schedule.update_settings` | `schedule:write` |
-| `GET /api/v1/schedule/free-slots?from=&to=&minutes=` | `schedule.free_slots` | `schedule:read` |
-| `GET /api/v1/conversations/messages/{id}/read` (items and asks with their text) | `conversations.get_message_read` | `conversations:read` |
-| `POST /api/v1/conversations/messages/{id}/read` (queue the read on open; no-op when read or not flagged) | `conversations.request_message_read` | `conversations:read` |
+Paths are under `/api/v1/w/{workspace_id}/` like every workspace operation
+(the table writes them without it). Bad input answers 400 (the repo has no
+422); a calendar or event the caller may not see answers 404.
+
+| Endpoint | operationId | Scope | Undo |
+| --- | --- | --- | --- |
+| `GET schedule/events?from=&to=&calendars=&kind=&q=&limit=` (`calendars` and `kind` are comma-separated) | `schedule.list_events` | `schedule:read` | |
+| `GET schedule/events/{id}` | `schedule.get_event` | `schedule:read` | |
+| `POST schedule/events` | `schedule.create_event` | `schedule:write` | `delete_event` |
+| `PATCH schedule/events/{id}` (one occurrence via `?occurrence=`) | `schedule.update_event` | `schedule:write` | `update_event` |
+| `DELETE schedule/events/{id}` | `schedule.delete_event` | `schedule:write` | `restore_event` |
+| `POST schedule/events/{id}/restore` `{undo_token}` | `schedule.restore_event` | `schedule:write` | `delete_event` |
+| `POST schedule/events/{id}/response` | `schedule.respond_event` | `schedule:write` | `respond_event` |
+| `POST schedule/events/{id}/push` `{calendar_id}` | `schedule.push_event` | `schedule:write` | `unpush_event` |
+| `DELETE schedule/events/{id}/push` | `schedule.unpush_event` | `schedule:write` | `push_event` |
+| `GET schedule/calendars` | `schedule.list_calendars` | `schedule:read` | |
+| `PATCH schedule/calendars/{id}` | `schedule.update_calendar` | `schedule:write` | |
+| `GET schedule/settings` | `schedule.get_settings` | `schedule:read` | |
+| `PATCH schedule/settings` | `schedule.update_settings` | `schedule:write` | |
+| `GET schedule/free-slots?from=&to=&minutes=` | `schedule.free_slots` | `schedule:read` | |
+| `GET conversations/{conversation_id}/messages/{id}/read` (items and asks with their text) | `conversations.get_message_read` | `conversations:read` | |
+| `POST conversations/{conversation_id}/messages/{id}/read` (queue the read on open; no-op when read or not flagged) | `conversations.request_message_read` | `conversations:read` | |
 
 A calendar or event the caller may not see answers 404. Every mutating
 operation declares its undo in `x-campbooks` (ADR 0013).
+
+### What the writes answer (agreed with the Scout chat session)
+
+The chat copies only **top-level** fields of an answer into an undo body, so
+each write answers with what its inverse needs, flat:
+
+- `delete_event` → `{ id, undo_token }`; `restore_event` takes
+  `{ undo_token }` and answers the event.
+- `update_event` → `{ id, event, <prior values> }` where the prior values are
+  named exactly like the `PATCH` fields they undo (`title`, `kind`, `starts`,
+  `ends`, `time_zone`, `place`, `notes`, `busy`; an empty string clears
+  `place`, `notes` and `time_zone`) and only the fields that changed are
+  present. `id` is the event changed (changing one occurrence of a series makes
+  an exception with an id of its own).
+- `respond_event` → `{ event, previous_response }`; the body of the inverse is
+  `{ response: <previous_response> }`.
+- `push_event` → the copy (`id` to `unpush_event`); `unpush_event` →
+  `{ id, calendar_id, event }`: the Campbooks event, and the provider calendar
+  it was removed from, to push again.
+
+The chat-exposed writes (`create`, `update`, `delete`, `restore`, `respond`,
+`push`, `unpush`) are `assistant: true`, `mutates: true`, `risk: low`.
+`update_calendar` and `update_settings` are `assistant: false`. Reads are
+`assistant: true`, `mutates: false`.
 
 ## AI: roles, fallbacks, undo
 
@@ -352,14 +402,23 @@ deletes it at the provider too, with Undo.
   so "when is my flight?" needs no guessed range. `free_slots` works in
   the member's zone and names the calendars it counted.
 - Write ops are `risk: low`. Every chat change is a confirmation card in
-  v1. `push_event` cards name the target calendar.
-- The assistant's chat registry gets three tools: `my_calendar`, `free_time`
-  and `read_event`. It also gets an about entry, `schedule.event` →
-  `get_event` + `conversations.get_message_read` of its source. Each entry
-  is a few lines in `crates/modules/assistant/src/features/chat/`. They
-  land in this change if #305 merges first, else in a follow-up.
+  v1. `push_event` cards name the target calendar from `list_calendars`,
+  never from model text.
+- #305 phase 1 is on `next`, so this change wires the chat in: the
+  assistant's chat gets three tools, `my_calendar`, `free_time` and
+  `read_event` (closed argument schemas, results at most 8 KiB, records as
+  references, never logged), and an about entry `schedule.event` →
+  `get_event` + `conversations.get_message_read` of its source (the second
+  read only when the event names its source message and conversation, and
+  skipped without error when the member can no longer read the email; the
+  event answers its `source` and `source_conversation`). Each is a few lines in
+  `crates/modules/assistant/src/features/chat/`.
+  `conversations.get_message_read` becomes `assistant: true` for this.
+- The chat's **action table** rows for the writes wait for
+  `feat/305-scout-proposes-actions`, which is not on `next` yet; the
+  operations are ready for them (flags, undo pairs, answers above).
 - `crates/modules/schedule/handbook.md` (≤ 8 KiB, English, concepts, not op
-  ids) is composed into Scout's handbook.
+  ids) is composed into Scout's handbook, after conversations and attention.
 
 ## Two-way sync
 

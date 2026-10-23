@@ -292,6 +292,11 @@ pub const JOB_PAYLOAD_FIELDS: &[(&str, &str, &str)] = &[
     ("conversations.notice_rules", "inbox", INBOX_ID),
     ("conversations.read_message", "message", MESSAGE_ID),
     ("conversations.read_structured", "message", MESSAGE_ID),
+    (
+        "schedule.release_delete",
+        "event",
+        "the event's id (a UUID), never its content",
+    ),
 ];
 
 const WORKSPACE_ID: &str = "the workspace's id (a UUID)";

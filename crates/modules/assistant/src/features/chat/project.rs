@@ -242,6 +242,118 @@ pub fn events(history: &Value, max: usize) -> Value {
     })
 }
 
+/// Most events of the calendar handed on in one result.
+const EVENTS: usize = 25;
+/// Most free slots handed on in one result.
+const SLOTS: usize = 30;
+
+/// An event of the member's calendar as lists show it (`schedule.list_events`'s
+/// entries).
+fn event_line(event: &Value) -> Value {
+    let mut out = pick(
+        event,
+        &[
+            "id",
+            "kind",
+            "starts",
+            "ends",
+            "all_day",
+            "status",
+            "calendar_id",
+            "occurrence",
+            "response",
+            "source",
+        ],
+    );
+    for key in ["title", "place"] {
+        let text = short(&event[key]);
+        if let (Some(object), false) = (out.as_object_mut(), text.is_null()) {
+            object.insert(key.to_owned(), text);
+        }
+    }
+    out
+}
+
+/// The member's events in a window (`schedule.list_events`): the first
+/// [`EVENTS`], and whether there were more.
+pub fn calendar(list: &Value) -> Value {
+    let all: Vec<&Value> = list["events"]
+        .as_array()
+        .map(|events| events.iter().collect())
+        .unwrap_or_default();
+    let shown: Vec<Value> = all.iter().take(EVENTS).map(|e| event_line(e)).collect();
+    json!({
+        "events": shown,
+        "more_than_shown": all.len() > EVENTS || list["truncated"] == true,
+    })
+}
+
+/// When the member is free (`schedule.free_slots`): the first [`SLOTS`], the
+/// calendars counted and the time zone the times are in.
+pub fn free_time(list: &Value) -> Value {
+    let all = list["slots"].as_array().cloned().unwrap_or_default();
+    let counted: Vec<Value> = list["calendars"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .map(|calendar| short(&calendar["name"]))
+        .collect();
+    json!({
+        "free": all.iter().take(SLOTS).cloned().collect::<Vec<_>>(),
+        "more_than_shown": all.len() > SLOTS,
+        "calendars_counted": counted,
+        "time_zone": list["time_zone"],
+    })
+}
+
+/// One event of the member's calendar (`schedule.get_event`) and, when it
+/// was read from an email, what Scout read there
+/// (`conversations.get_message_read`).
+pub fn event(detail: &Value, read: Option<&Value>) -> Value {
+    let mut out = event_line(detail);
+    if let Some(object) = out.as_object_mut() {
+        let notes = short(&detail["notes"]);
+        if !notes.is_null() {
+            object.insert("notes".to_owned(), notes);
+        }
+        for (from, to) in [
+            ("origin", "made_by"),
+            ("found_by", "found_by"),
+            ("time_zone", "written_in_time_zone"),
+            ("recurring", "part_of_a_series"),
+            ("pending", "waiting_for_the_provider"),
+            ("notice", "notice"),
+            ("on_provider", "on_a_provider_calendar"),
+        ] {
+            if !detail[from].is_null() {
+                object.insert(to.to_owned(), detail[from].clone());
+            }
+        }
+        if let Some(read) = read.filter(|read| !read.is_null()) {
+            let items: Vec<Value> = read["items"]
+                .as_array()
+                .into_iter()
+                .flatten()
+                .map(|item| {
+                    let mut line = pick(item, &["kind", "starts", "ends", "all_day", "cancels"]);
+                    for key in ["title", "place", "quote"] {
+                        let text = short(&item[key]);
+                        if let (Some(fields), false) = (line.as_object_mut(), text.is_null()) {
+                            fields.insert(key.to_owned(), text);
+                        }
+                    }
+                    line
+                })
+                .collect();
+            object.insert(
+                "scout_read_in_the_email".to_owned(),
+                json!({ "layers": read["layers"], "items": items }),
+            );
+        }
+    }
+    out
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

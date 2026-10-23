@@ -388,6 +388,13 @@ pub struct MessageRead {
     pub asks: Vec<ReadAskFacts>,
     /// Whether the read holds a summary of the message.
     pub summary_ready: bool,
+    /// The titles, places and calendar `UID`s of the items, by key: a
+    /// `read-texts` v1 document, a blob of the workspace that the message
+    /// holds (deleted with it). The schedule module reads it to name the
+    /// events it makes; the event log never holds the text.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schema(value_type = Option<BlobPointer>)]
+    pub texts: Option<BlobRef>,
 }
 
 impl DomainEvent for MessageRead {

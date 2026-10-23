@@ -2505,7 +2505,7 @@ export interface components {
          * @description A tool Scout used. Each reads as the member, and changes nothing.
          * @enum {string}
          */
-        ChatTool: "find_conversations" | "read_conversation" | "conversation_history" | "find_people" | "what_needs_me" | "my_inboxes";
+        ChatTool: "find_conversations" | "read_conversation" | "conversation_history" | "find_people" | "what_needs_me" | "my_inboxes" | "my_calendar" | "free_time" | "read_event";
         /** @description A chat and its messages, oldest first. */
         ChatView: {
             about?: components["schemas"]["RecordRef"] | null;

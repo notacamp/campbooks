@@ -391,8 +391,11 @@ conversation and inbox ids, the inbox's personal owner (none for a shared
 inbox), the layer, the items (key, kind, start, end, all-day, time zone,
 updates or cancels), the asks (key, verb, due, whether it has an amount, same
 as) and whether a summary is ready, and no title, place, quote, amount or
-other text. Item and ask keys SHALL be stable for the same message and
-position, so a repeated delivery changes nothing for a consumer.
+other text. The titles, places and calendar `UID`s of the items SHALL travel
+in a `read-texts` v1 blob that the event points at (`texts`) and that the
+message holds, so they are deleted with it and are never in the event log.
+Item and ask keys SHALL be stable for the same message and position, so a
+repeated delivery changes nothing for a consumer.
 
 #### Scenario: The payload of a booking
 - **WHEN** a restaurant booking is read
@@ -406,7 +409,9 @@ return a message's read: its layer, its items and asks with their text
 when the pass flagged a dated thing and no `complete` role may read mail,
 the `dated_kind` the pass named. It SHALL be read with the same access
 checks as the conversation, so a caller who may not read the inbox gets 404,
-and reading it SHALL never ask the model.
+and reading it SHALL never ask the model. The operation SHALL be
+`assistant: true` (read-only), so Scout can read what it found in an email
+when a chat is about an event made from it.
 
 #### Scenario: Read by the inbox's member
 - **WHEN** Inês asks for the read of her flight email

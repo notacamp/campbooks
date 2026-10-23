@@ -278,6 +278,10 @@ pub fn handbook() -> campbooks_assistant::Handbook {
             module: campbooks_attention::NAME,
             text: campbooks_attention::HANDBOOK,
         },
+        Section {
+            module: campbooks_schedule::NAME,
+            text: campbooks_schedule::HANDBOOK,
+        },
     ])
 }
 
@@ -301,6 +305,9 @@ pub fn with_ports(state: AppState) -> AppState {
         .with_kept_mail(campbooks_conversations::kept_mail())
         .with_outbound(campbooks_conversations::outbound_requests())
         .with_destinations(campbooks_connectors::outbound_destinations())
+        .with_calendar_requests(campbooks_schedule::calendar_requests())
+        .with_time_zones(campbooks_schedule::time_zones())
+        .with_availability(campbooks_schedule::availability())
         .with_search_sources(SearchSources::new(vec![
             campbooks_conversations::search_source(),
         ]))
@@ -772,7 +779,10 @@ mod tests {
     fn every_handbook_section_fits() {
         let handbook = handbook();
         let modules: Vec<&str> = handbook.sections().iter().map(|s| s.module).collect();
-        assert_eq!(modules, ["assistant", "conversations", "attention"]);
+        assert_eq!(
+            modules,
+            ["assistant", "conversations", "attention", "schedule"]
+        );
         for section in handbook.sections() {
             assert!(
                 section.text.len() <= campbooks_assistant::handbook::MAX_SECTION_BYTES,

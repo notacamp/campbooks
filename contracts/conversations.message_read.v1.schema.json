@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://campbooks.example.com/contracts/conversations.message_read.v1.schema.json",
   "title": "conversations.message_read v1 (event payload)",
-  "description": "Published by the conversations module, in the transaction that stores a read of one message, once per layer that produced something: `structured` (the sender's own machine-readable dates, read with no model) or `model` (Scout's one `complete` read of the message). The schedule module turns `items` (things that happen at a time) into events on the inbox owner's Campbooks calendar; the tasks module turns `asks` (obligations of the reader) into tasks. Ids, enums, keys and times only: no title, place, quote, amount or other text; a reader fetches them through `conversations.get_message_read` with their own access. Keys are stable for the same message and position, so a repeated delivery changes nothing for a consumer. Workspace-scoped.",
+  "description": "Published by the conversations module, in the transaction that stores a read of one message, once per layer that produced something: `structured` (the sender's own machine-readable dates, read with no model) or `model` (Scout's one `complete` read of the message). The schedule module turns `items` (things that happen at a time) into events on the inbox owner's Campbooks calendar; the tasks module turns `asks` (obligations of the reader) into tasks. Ids, enums, keys and times only: no title, place, quote, amount or other text; a reader fetches them through `conversations.get_message_read` with their own access, and the schedule module through the `texts` blob. Keys are stable for the same message and position, so a repeated delivery changes nothing for a consumer. Workspace-scoped.",
   "type": "object",
   "required": ["workspace", "message", "conversation", "inbox", "layer", "items", "asks", "summary_ready"],
   "additionalProperties": false,
@@ -29,6 +29,17 @@
     "summary_ready": {
       "type": "boolean",
       "description": "Whether the read holds a summary of the message (written when a need was open)."
+    },
+    "texts": {
+      "description": "The `read-texts` v1 document, a blob of the workspace that the message holds (deleted with it): the title, place and calendar UID of each item, by its key. The schedule module reads it to name the events it makes. Present only when an item has any; the text is never in the event.",
+      "type": "object",
+      "required": ["hash", "size", "content_type"],
+      "additionalProperties": false,
+      "properties": {
+        "hash": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "size": { "type": "integer", "minimum": 0 },
+        "content_type": { "type": "string" }
+      }
     }
   },
   "$defs": {

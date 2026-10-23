@@ -46,7 +46,7 @@ use std::time::Duration;
 use campbooks_ai::{Gateway, Role, usage::Scope};
 use campbooks_kernel::{
     EventBus, JobContext, JobError, JobHandler,
-    blobs::BlobRef,
+    blobs::{BlobOwner, BlobRef, BlobStore},
     db::BeginFor as _,
     tenancy::{UserId, WorkspaceId},
 };
@@ -70,7 +70,7 @@ use crate::{
         read::{ReadAsk, ReadItem},
         redact,
     },
-    events::{MessageRead, NeedSummarised, ReadAskFacts, ReadItemFacts},
+    events::{MESSAGE_RECORD, MessageRead, NeedSummarised, ReadAskFacts, ReadItemFacts},
     model::{Address, ConversationId, InboxId, MessageId},
 };
 
@@ -253,8 +253,9 @@ impl JobHandler for ReadMessage {
             }
         };
         let events = ctx.state().events.clone();
+        let blobs = ctx.state().blobs.clone();
         let tx = ctx.tx().await?;
-        keep(tx, &events, &self.needs, &read, answer).await?;
+        keep(tx, &events, &blobs, &self.needs, &read, answer).await?;
         Ok(())
     }
 }
@@ -527,6 +528,7 @@ pub(crate) fn covers(structured: Option<&(Value, Value)>, flag: Option<&Flagged>
 async fn keep(
     tx: &mut Transaction<'_, Postgres>,
     events: &EventBus,
+    blobs: &BlobStore,
     settings: &NeedSettings,
     read: &Read,
     answer: Option<Answer>,
@@ -600,6 +602,7 @@ async fn keep(
     }
     if usable && stored == 1 {
         if !items.is_empty() || !asks.is_empty() || summary_ready {
+            let texts = put_texts(blobs, tx, &workspace, read.message, &items).await?;
             events
                 .publish(
                     tx,
@@ -613,6 +616,7 @@ async fn keep(
                         items: items.iter().map(item_facts).collect(),
                         asks: asks.iter().map(ask_facts).collect(),
                         summary_ready,
+                        texts,
                     },
                 )
                 .await?;
@@ -632,6 +636,51 @@ async fn keep(
         }
     }
     Ok(())
+}
+
+/// The titles, places and calendar `UID`s of `items`, as a blob that the
+/// message holds: what `message_read` points at instead of carrying it. `None`
+/// when no item has any.
+pub(crate) async fn put_texts(
+    blobs: &BlobStore,
+    tx: &mut Transaction<'_, Postgres>,
+    workspace: &str,
+    message: MessageId,
+    items: &[ReadItem],
+) -> Result<Option<BlobRef>, JobError> {
+    let entries: Vec<Value> = items
+        .iter()
+        .filter(|item| !item.title.is_empty() || item.place.is_some() || item.uid.is_some())
+        .map(|item| {
+            serde_json::json!({
+                "key": item.key,
+                "title": item.title,
+                "place": item.place,
+                "ical_uid": item.uid,
+            })
+        })
+        .collect();
+    if entries.is_empty() {
+        return Ok(None);
+    }
+    let bytes = serde_json::to_vec(&serde_json::json!({ "items": entries }))
+        .map_err(|_| JobError::fatal("the texts of a read do not encode"))?;
+    let blob = blobs
+        .put(
+            workspace,
+            bytes,
+            "application/vnd.campbooks.read-texts+json; version=1",
+        )
+        .await?;
+    blobs
+        .attach(
+            tx,
+            workspace,
+            &blob,
+            &BlobOwner::new(MESSAGE_RECORD, message),
+        )
+        .await?;
+    Ok(Some(blob))
 }
 
 /// An item as `message_read` carries it: no title, place or quote.

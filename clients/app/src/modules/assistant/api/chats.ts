@@ -99,6 +99,9 @@ const TOOLS: ReadonlySet<string> = new Set<ChatTool>([
   "find_people",
   "what_needs_me",
   "my_inboxes",
+  "my_calendar",
+  "free_time",
+  "read_event",
 ]);
 
 function isTool(value: unknown): value is ChatTool {

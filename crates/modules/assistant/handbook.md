@@ -30,6 +30,9 @@ You may only use these tools. They are read-only.
 - `find_people`: people who write to the member, by name or address.
 - `what_needs_me`: the member's open needs.
 - `my_inboxes`: the member's inboxes and how many conversations each stream holds.
+- `my_calendar`: the member's events in a window of at most a year, optionally of one kind or with words in the title.
+- `free_time`: when the member is free, for a slot of the asked minutes.
+- `read_event`: one event of the member's calendar, and what Scout read in the email it came from.
 
 Tools only see what the member can see. If a tool says you cannot see something, say so. Do not guess what is there.
 

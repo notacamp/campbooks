@@ -81,7 +81,7 @@ pub struct MessageReadView {
     operation_id = "conversations.get_message_read",
     tag = "conversations",
     security(("bearer" = ["conversations:read"])),
-    extensions(("x-campbooks" = json!(Operation::query().records(["conversations.message"]).access("conversations.message", campbooks_kernel::authz::Action::Read)))),
+    extensions(("x-campbooks" = json!(Operation::query().assistant().records(["conversations.message"]).access("conversations.message", campbooks_kernel::authz::Action::Read)))),
     params(
         ("workspace_id" = WorkspaceId, Path, description = "The workspace."),
         ("conversation_id" = ConversationId, Path, description = "The conversation."),

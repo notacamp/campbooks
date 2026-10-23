@@ -297,7 +297,11 @@
       "find_people_one": "He buscado personas: {{count}} encontrada",
       "find_people_other": "He buscado personas: {{count}} encontradas",
       "what_needs_me": "He leído lo que te necesita",
-      "my_inboxes": "He leído tus bandejas de entrada y flujos"
+      "my_inboxes": "He leído tus bandejas de entrada y flujos",
+      "my_calendar_one": "He mirado tu calendario: {{count}} evento",
+      "my_calendar_other": "He mirado tu calendario: {{count}} eventos",
+      "free_time": "He buscado tiempo libre",
+      "read_event": "He leído un evento de tu calendario"
     },
     "working": {
       "find_conversations": "Buscando conversaciones…",
@@ -305,7 +309,10 @@
       "conversation_history": "Leyendo qué ha pasado con este correo…",
       "find_people": "Buscando personas…",
       "what_needs_me": "Leyendo lo que te necesita…",
-      "my_inboxes": "Leyendo tus bandejas de entrada…"
+      "my_inboxes": "Leyendo tus bandejas de entrada…",
+      "my_calendar": "Mirando tu calendario…",
+      "free_time": "Buscando tiempo libre…",
+      "read_event": "Leyendo el evento…"
     }
   }
 }

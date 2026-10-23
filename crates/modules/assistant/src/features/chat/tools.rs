@@ -29,6 +29,10 @@ const HISTORY_EVENTS: usize = 60;
 const CONVERSATION: &str = "conversations.conversation";
 /// Record type of an inbox (the conversations module's).
 const INBOX: &str = "conversations.inbox";
+/// Record type of a calendar event (the schedule module's).
+const EVENT: &str = "schedule.event";
+/// Most events `my_calendar` lists.
+const CALENDAR_EVENTS: usize = 25;
 
 /// The catalogue operations each tool may invoke: the test checks that each
 /// is in the catalogue, may be called by the assistant and changes nothing.
@@ -52,17 +56,23 @@ pub const OPERATIONS: &[(ChatTool, &[&str])] = &[
         ChatTool::MyInboxes,
         &["conversations.list_inboxes", "conversations.list_streams"],
     ),
+    (ChatTool::MyCalendar, &["schedule.list_events"]),
+    (ChatTool::FreeTime, &["schedule.free_slots"]),
+    (ChatTool::ReadEvent, &["schedule.get_event"]),
 ];
 
 impl ChatTool {
     /// Every tool, in the order they are offered.
-    pub const ALL: [Self; 6] = [
+    pub const ALL: [Self; 9] = [
         Self::FindConversations,
         Self::ReadConversation,
         Self::ConversationHistory,
         Self::FindPeople,
         Self::WhatNeedsMe,
         Self::MyInboxes,
+        Self::MyCalendar,
+        Self::FreeTime,
+        Self::ReadEvent,
     ];
 
     /// The name the model calls it by.
@@ -74,6 +84,9 @@ impl ChatTool {
             Self::FindPeople => "find_people",
             Self::WhatNeedsMe => "what_needs_me",
             Self::MyInboxes => "my_inboxes",
+            Self::MyCalendar => "my_calendar",
+            Self::FreeTime => "free_time",
+            Self::ReadEvent => "read_event",
         }
     }
 
@@ -92,6 +105,31 @@ fn conversation_id() -> Value {
         "maxLength": 64,
     })
 }
+
+/// A window edge argument of the calendar tools.
+fn edge(description: &str) -> Value {
+    json!({
+        "type": "string",
+        "description": description,
+        "minLength": 10,
+        "maxLength": 40,
+    })
+}
+
+/// The kinds of event the calendar tool can filter by.
+const KINDS: [&str; 11] = [
+    "charge",
+    "appointment",
+    "meeting",
+    "travel",
+    "stay",
+    "show",
+    "reservation",
+    "delivery",
+    "expiry",
+    "hold",
+    "none",
+];
 
 /// Every tool's definition, for the model.
 pub fn definitions() -> Vec<ToolDefinition> {
@@ -158,6 +196,49 @@ pub fn definitions() -> Vec<ToolDefinition> {
                     "The member's inboxes (addresses, roles) and how many conversations each \
                      stream holds.",
                     object(json!({}), &[]),
+                ),
+                ChatTool::MyCalendar => (
+                    "The member's calendar: their events and the occurrences of their series \
+                     in a window of at most 365 days, earliest first, with the kind of each \
+                     (flight, hotel stay, appointment, ...). Filter by kind or by words of the \
+                     title to find one (\"when is my flight?\" needs no guessed range: use a \
+                     year). Obligations such as pay-by dates are tasks, not events.",
+                    object(
+                        json!({
+                            "from": edge("Start of the window: a date (2026-11-03) or an RFC 3339 time with an offset."),
+                            "to": edge("End of the window, in the same form, after `from`."),
+                            "kind": {"type": "string", "enum": KINDS},
+                            "q": {"type": "string", "minLength": 2, "maxLength": 100,
+                                  "description": "Words of the event's title."},
+                            "limit": {"type": "integer", "minimum": 1, "maximum": 25},
+                        }),
+                        &["from", "to"],
+                    ),
+                ),
+                ChatTool::FreeTime => (
+                    "When the member is free: slots of at least the asked minutes inside their \
+                     working hours that no event overlaps, in their time zone. Names the \
+                     calendars it counted.",
+                    object(
+                        json!({
+                            "from": edge("Start of the window: a date or an RFC 3339 time with an offset."),
+                            "to": edge("End of the window, in the same form; at most 62 days."),
+                            "minutes": {"type": "integer", "minimum": 5, "maximum": 1440,
+                                        "description": "The length of slot to look for."},
+                        }),
+                        &["from", "to", "minutes"],
+                    ),
+                ),
+                ChatTool::ReadEvent => (
+                    "Read one event of the member's calendar: its kind, time, place, where it \
+                     came from and, when Scout found it in an email, what Scout read there.",
+                    object(
+                        json!({
+                            "event_id": {"type": "string", "minLength": 1, "maxLength": 64,
+                                         "description": "The event's id, as `my_calendar` gave it."},
+                        }),
+                        &["event_id"],
+                    ),
                 ),
             };
             ToolDefinition::new(tool.name(), description, parameters)
@@ -298,7 +379,69 @@ impl Toolbox {
                 self.what_needs_me(waiting).await
             }
             ChatTool::MyInboxes => self.my_inboxes().await,
+            ChatTool::MyCalendar => self.my_calendar(arguments).await,
+            ChatTool::FreeTime => self.free_time(arguments).await,
+            ChatTool::ReadEvent => {
+                let id = text("event_id").unwrap_or_default();
+                let event = self
+                    .member
+                    .read("schedule.get_event", json!({ "event_id": id }))
+                    .await?;
+                Ok((
+                    project::event(&event, None),
+                    vec![RecordRef::new(EVENT, id)],
+                    1,
+                ))
+            }
         }
+    }
+
+    /// The member's events in a window.
+    async fn my_calendar(
+        &self,
+        arguments: &Map<String, Value>,
+    ) -> Result<(Value, Vec<RecordRef>, u32), Unread> {
+        let mut input = Map::new();
+        for key in ["from", "to", "kind", "q", "limit"] {
+            if let Some(value) = arguments.get(key) {
+                input.insert(key.to_owned(), value.clone());
+            }
+        }
+        let list = self
+            .member
+            .read("schedule.list_events", Value::Object(input))
+            .await?;
+        let events: Vec<&Value> = list["events"]
+            .as_array()
+            .into_iter()
+            .flatten()
+            .take(CALENDAR_EVENTS)
+            .collect();
+        let records = events
+            .iter()
+            .filter_map(|event| event["id"].as_str())
+            .map(|id| RecordRef::new(EVENT, id))
+            .collect();
+        Ok((project::calendar(&list), records, count(events.len())))
+    }
+
+    /// When the member is free.
+    async fn free_time(
+        &self,
+        arguments: &Map<String, Value>,
+    ) -> Result<(Value, Vec<RecordRef>, u32), Unread> {
+        let mut input = Map::new();
+        for key in ["from", "to", "minutes"] {
+            if let Some(value) = arguments.get(key) {
+                input.insert(key.to_owned(), value.clone());
+            }
+        }
+        let list = self
+            .member
+            .read("schedule.free_slots", Value::Object(input))
+            .await?;
+        let slots = list["slots"].as_array().map_or(0, Vec::len);
+        Ok((project::free_time(&list), Vec::new(), count(slots)))
     }
 
     /// Conversations by words (search, then their own facts), or the newest
@@ -539,6 +682,9 @@ fn arguments(tool: ChatTool, raw: &str) -> Option<Map<String, Value>> {
     };
     let one_of =
         |value: &Value, options: &[&str]| value.as_str().is_some_and(|s| options.contains(&s));
+    let whole = |value: &Value, min: u64, max: u64| {
+        value.as_u64().is_some_and(|n| (min..=max).contains(&n))
+    };
     let fits = |key: &str, value: &Value| match (tool, key) {
         (ChatTool::FindConversations, "query") => string(value, 2, 200),
         (ChatTool::FindConversations, "stream") => {
@@ -553,6 +699,12 @@ fn arguments(tool: ChatTool, raw: &str) -> Option<Map<String, Value>> {
         }
         (ChatTool::FindPeople, "query") => string(value, 2, 100),
         (ChatTool::WhatNeedsMe, "waiting") => value.is_boolean(),
+        (ChatTool::MyCalendar | ChatTool::FreeTime, "from" | "to") => string(value, 10, 40),
+        (ChatTool::MyCalendar, "kind") => one_of(value, &KINDS),
+        (ChatTool::MyCalendar, "q") => string(value, 2, 100),
+        (ChatTool::MyCalendar, "limit") => whole(value, 1, 25),
+        (ChatTool::FreeTime, "minutes") => whole(value, 5, 1440),
+        (ChatTool::ReadEvent, "event_id") => string(value, 1, 64),
         _ => false,
     };
     // A null optional argument is as if it were absent.
@@ -565,6 +717,15 @@ fn arguments(tool: ChatTool, raw: &str) -> Option<Map<String, Value>> {
         ChatTool::ReadConversation | ChatTool::ConversationHistory
     );
     if needs_id && !object.contains_key("conversation_id") {
+        return None;
+    }
+    let required: &[&str] = match tool {
+        ChatTool::MyCalendar => &["from", "to"],
+        ChatTool::FreeTime => &["from", "to", "minutes"],
+        ChatTool::ReadEvent => &["event_id"],
+        _ => &[],
+    };
+    if !required.iter().all(|key| object.contains_key(*key)) {
         return None;
     }
     Some(object)
@@ -609,5 +770,51 @@ mod tests {
         }
         assert!(arguments(ChatTool::ReadConversation, "{}").is_none());
         assert!(arguments(ChatTool::MyInboxes, "{\"all\": true}").is_none());
+    }
+
+    #[test]
+    fn the_calendar_tools_take_closed_arguments() {
+        let calendar = ChatTool::MyCalendar;
+        assert!(
+            arguments(
+                calendar,
+                "{\"from\": \"2026-11-01\", \"to\": \"2026-11-08\"}"
+            )
+            .is_some()
+        );
+        assert!(
+            arguments(
+                calendar,
+                "{\"from\": \"2026-11-01\", \"to\": \"2027-11-01\", \"kind\": \"travel\", \"limit\": 5}"
+            )
+            .is_some()
+        );
+        for bad in [
+            "{}",
+            "{\"from\": \"2026-11-01\"}",
+            "{\"from\": \"2026-11-01\", \"to\": \"2026-11-08\", \"kind\": \"holiday\"}",
+            "{\"from\": \"2026-11-01\", \"to\": \"2026-11-08\", \"limit\": 100}",
+            "{\"from\": \"2026-11-01\", \"to\": \"2026-11-08\", \"calendars\": \"x\"}",
+        ] {
+            assert!(arguments(calendar, bad).is_none(), "{bad}");
+        }
+        let free = ChatTool::FreeTime;
+        assert!(
+            arguments(
+                free,
+                "{\"from\": \"2026-11-03\", \"to\": \"2026-11-04\", \"minutes\": 60}"
+            )
+            .is_some()
+        );
+        assert!(
+            arguments(
+                free,
+                "{\"from\": \"2026-11-03\", \"to\": \"2026-11-04\", \"minutes\": 2}"
+            )
+            .is_none()
+        );
+        assert!(arguments(free, "{\"from\": \"2026-11-03\", \"to\": \"2026-11-04\"}").is_none());
+        assert!(arguments(ChatTool::ReadEvent, "{}").is_none());
+        assert!(arguments(ChatTool::ReadEvent, "{\"event_id\": \"e-1\"}").is_some());
     }
 }

@@ -44,19 +44,19 @@ time.
 
 ## 6. schedule module
 
-- [ ] 6.1 Calendars: Campbooks calendar on first use; `capability_granted` → provider calendars (primary syncing); `update_calendar` (sync, colour)
-- [ ] 6.2 `apply_calendar_changes`: upserts, removals, series stored once, exceptions; pending member changes kept
-- [ ] 6.3 `list_events` with RRULE expansion in the window, `get_event`; 404 for others' calendars
-- [ ] 6.4 `add_read_items`: items → Scout events (idempotent on `item_key`, updates/cancels, removed items, kinds off, shared inbox, iCalendar UID link, per-kind "also add to")
-- [ ] 6.5 `create_event` / `update_event` (single, one occurrence) / `delete_event` with undo / `respond_event` → `outbound_requested`
-- [ ] 6.6 `push_event` ("Add to my calendar") and the outcome handler (etag, 412 kept-theirs notice, failures)
-- [ ] 6.7 Member settings (time zone once from the device, working hours, kinds, also-add-to) + `TimeZones` impl
-- [ ] 6.8 `free_slots` operation + `Availability` impl
-- [ ] 6.9 `event_*` events without PII; `member_left`, `connection_removed`, workspace purge
-- [ ] 6.10 `list_events` filters (`kind` repeatable, `q`, `limit`, ≤ 365-day window), RFC 3339 with offset, source link per event; `free_slots` names the calendars counted
-- [ ] 6.11 Catalogue metadata: reads `assistant: true`, `mutates: false`; writes `risk: low`; `push_event` confirmation names the target calendar
-- [ ] 6.12 `crates/modules/schedule/handbook.md` (`HANDBOOK`, English, ≤ 8 KiB): kinds, Campbooks vs provider calendars, obligations are Due, never writes to a provider without the member
-- [ ] 6.13 If campbooks-cloud#305 has merged: Scout tools `my_calendar`, `free_time`, `read_event` (closed arg schemas, ≤ 8 KiB, RecordRefs, never logged) and about entry `schedule.event`; otherwise open the follow-up "wire the Scout tool + about entries after #305 merges"
+- [x] 6.1 Calendars: Campbooks calendar on first use; `capability_granted` → provider calendars (primary syncing); `update_calendar` (sync, colour)
+- [x] 6.2 `apply_calendar_changes`: upserts, removals, series stored once, exceptions; pending member changes kept
+- [x] 6.3 `list_events` with RRULE expansion in the window, `get_event`; 404 for others' calendars
+- [x] 6.4 `add_read_items`: items → Scout events (idempotent on `item_key`, updates/cancels, removed items, kinds off, shared inbox, iCalendar UID link, per-kind "also add to")
+- [x] 6.5 `create_event` / `update_event` (single, one occurrence) / `delete_event` with undo / `restore_event` / `respond_event` → `outbound_requested`; each answers with what its inverse needs at the top level (`undo_token`, the prior values named like the `PATCH` fields, `previous_response`), see design.md
+- [x] 6.6 `push_event` ("Add to my calendar"), `unpush_event` (removes the provider copy, keeps the Campbooks event) and the outcome handler (etag, 412 kept-theirs notice, failures)
+- [x] 6.7 Member settings (time zone once from the device, working hours, kinds, also-add-to) + `TimeZones` impl
+- [x] 6.8 `free_slots` operation + `Availability` impl
+- [x] 6.9 `event_*` events without PII; `member_left`, `connection_removed`, workspace purge
+- [x] 6.10 `list_events` filters (`kind` comma-separated, `q`, `limit`, ≤ 365-day window), RFC 3339 with offset, source link per event; `free_slots` names the calendars counted
+- [x] 6.11 Catalogue metadata: reads `assistant: true`, `mutates: false`; chat-exposed writes (create, update, delete, restore, respond, push, unpush) `assistant: true`, `risk: low`, with their undo pairs; `update_calendar` and `update_settings` `assistant: false`; `push_event` confirmation names the target calendar from `list_calendars`
+- [x] 6.12 `crates/modules/schedule/handbook.md` (`HANDBOOK`, English, ≤ 8 KiB): kinds, Campbooks vs provider calendars, obligations are Due, never writes to a provider without the member
+- [x] 6.13 #305 has merged: Scout tools `my_calendar`, `free_time`, `read_event` (closed arg schemas, ≤ 8 KiB, RecordRefs, never logged) and about entry `schedule.event`; the action-table rows wait for `feat/305-scout-proposes-actions`
 
 ## 7. Connectors
 

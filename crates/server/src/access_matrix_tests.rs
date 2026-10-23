@@ -500,6 +500,37 @@ impl World {
         note
     }
 
+    /// `member`'s Campbooks calendar and one event on it (campbooks-cloud#42):
+    /// theirs alone, in no inbox.
+    async fn seed_calendar(&self, member: UserId) -> (Uuid, Uuid) {
+        let calendar = Uuid::now_v7();
+        sqlx::query(
+            "INSERT INTO schedule.calendars
+                 (id, workspace_id, member_id, source, name, syncing, writable)
+             VALUES ($1, $2, $3, 'campbooks', 'Campbooks', true, true)",
+        )
+        .bind(calendar)
+        .bind(self.a.as_uuid())
+        .bind(member.as_uuid())
+        .execute(&self.db)
+        .await
+        .unwrap();
+        let event = Uuid::now_v7();
+        sqlx::query(
+            "INSERT INTO schedule.events
+                 (id, workspace_id, calendar_id, kind, title, starts_at, ends_at, all_day, origin)
+             VALUES ($1, $2, $3, 'appointment', 'Matrix event', now() + interval '1 day',
+                     now() + interval '1 day 1 hour', false, 'member')",
+        )
+        .bind(event)
+        .bind(self.a.as_uuid())
+        .bind(calendar)
+        .execute(&self.db)
+        .await
+        .unwrap();
+        (calendar, event)
+    }
+
     /// `member`'s chat with Scout, about nothing (campbooks-cloud#305), with
     /// a question.
     async fn seed_chat(&self, member: UserId) -> Uuid {
@@ -587,6 +618,7 @@ impl World {
         let notice = self.seed_notice(inbox).await;
         let note = self.seed_note(u(Who::Member)).await;
         let chat = self.seed_chat(u(Who::Member)).await;
+        let (calendar, calendar_event) = self.seed_calendar(u(Who::Member)).await;
         let invitation = Uuid::now_v7();
         sqlx::query(
             "INSERT INTO workspaces.invitations
@@ -638,6 +670,10 @@ impl World {
             ("conversations.person_note", note.to_string()),
             // A member's chat with Scout: theirs alone (campbooks-cloud#305).
             ("assistant.chat", chat.to_string()),
+            // A member's calendar and its events: theirs alone, in no inbox
+            // (campbooks-cloud#42).
+            ("schedule.calendar", calendar.to_string()),
+            ("schedule.event", calendar_event.to_string()),
         ]);
         let mut ids: Vec<String> = sqlx::query_scalar(
             "SELECT id::text FROM conversations.conversations WHERE inbox_id = $1
@@ -684,6 +720,8 @@ impl World {
             "workspaces.member"
             | "assistant.profile"
             | "assistant.chat"
+            | "schedule.calendar"
+            | "schedule.event"
             | "conversations.person_note" => Facts::owned_by(OwnerFact::User(u(Who::Member))),
             "connectors.connection" => Facts::owned_by(OwnerFact::User(u(Who::Connector))),
             "conversations.inbox" => {
@@ -925,6 +963,15 @@ fn body(world: &World, id: &str) -> Option<Value> {
         "identity.register_client" => json!({"name": "Matrix agent", "scopes": []}),
         "system.report_client_telemetry" => json!({"session_id": "matrix"}),
         "system.report_screen_view" => json!({"route": "/inbox"}),
+        "schedule.create_event" => {
+            json!({"title": "Matrix", "starts": "2026-11-12T15:00:00+00:00"})
+        }
+        "schedule.update_event" => json!({"title": "Matrix"}),
+        "schedule.restore_event" => json!({"undo_token": Uuid::now_v7().to_string()}),
+        "schedule.respond_event" => json!({"response": "accepted"}),
+        "schedule.push_event" => json!({"calendar_id": world.instances["schedule.calendar"]}),
+        "schedule.update_calendar" => json!({"color": "#112233"}),
+        "schedule.update_settings" => json!({"time_zone": "Europe/Lisbon"}),
         "attention.snooze" => json!({"until": chrono::Utc::now() + chrono::TimeDelta::days(1)}),
         "conversations.resolve_need" => {
             json!({"outcome": "done", "message_id": world.instances["conversations.message"]})
@@ -982,6 +1029,8 @@ fn instance_of(world: &World, id: &str, path: &str, resource: &str) -> Option<St
         "conversations.rule" => "{rule_id}",
         "conversations.person_note" => "{note_id}",
         "assistant.chat" => "{chat_id}",
+        "schedule.calendar" => "{calendar_id}",
+        "schedule.event" => "{event_id}",
         "attention.item" => "{item_id}",
         "conversations.inbox" if acts_in_the_inbox(id) => {
             return world.instances.get(resource).cloned();
@@ -1036,6 +1085,8 @@ fn query_of(id: &str) -> &'static str {
     match id {
         "conversations.suggest_rules" => "?action=archive",
         "conversations.list_correspondents" => "?q=example",
+        "schedule.list_events" => "?from=2026-11-01&to=2026-11-08",
+        "schedule.free_slots" => "?from=2026-11-03&to=2026-11-04&minutes=60",
         _ => "",
     }
 }
@@ -1060,6 +1111,8 @@ fn fill(world: &World, path: &str) -> String {
         .replace("{notice_id}", &world.instances["conversations.rule_notice"])
         .replace("{note_id}", &world.instances["conversations.person_note"])
         .replace("{chat_id}", &world.instances["assistant.chat"])
+        .replace("{calendar_id}", &world.instances["schedule.calendar"])
+        .replace("{event_id}", &world.instances["schedule.event"])
         .replace("{id}", &Uuid::now_v7().to_string())
 }
 
