@@ -36,6 +36,8 @@ runs:
   steps:
     - id: setup
       shell: bash
+      env:
+        PACKAGES: ${{ inputs.packages }}
       run: |
         # A directory the runner user owns, so actions/cache can restore into
         # it and save from it; apt (as root) reads and writes it through the
@@ -55,7 +57,7 @@ runs:
         # A new runner image can ship newer versions of what these packages
         # depend on, so the image version is part of the key.
         echo "image=${ImageOS:-unknown}-${ImageVersion:-unknown}" >> "$GITHUB_OUTPUT"
-        echo "packages=$(echo "${{ inputs.packages }}" | tr -s ' ' '\n' | sort | sha256sum | cut -c1-12)" >> "$GITHUB_OUTPUT"
+        echo "packages=$(echo "$PACKAGES" | tr -s ' ' '\n' | sort | sha256sum | cut -c1-12)" >> "$GITHUB_OUTPUT"
 
     - id: restore
       uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0

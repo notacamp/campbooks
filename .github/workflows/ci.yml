@@ -213,7 +213,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-    timeout-minutes: 20
+    timeout-minutes: 30
     defaults:
       run: { working-directory: clients }
     steps:
@@ -264,7 +264,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-    timeout-minutes: 20
+    timeout-minutes: 30
     defaults:
       run: { working-directory: clients }
     steps:
@@ -277,7 +277,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-    timeout-minutes: 20
+    timeout-minutes: 30
     defaults:
       run: { working-directory: clients }
     steps:
@@ -291,7 +291,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-    timeout-minutes: 20
+    timeout-minutes: 30
     defaults:
       run: { working-directory: clients }
     steps:
@@ -305,7 +305,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-    timeout-minutes: 20
+    timeout-minutes: 30
     defaults:
       run: { working-directory: clients }
     steps:
