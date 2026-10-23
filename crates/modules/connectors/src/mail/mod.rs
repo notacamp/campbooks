@@ -1,7 +1,7 @@
 //! What the mail adapters share: a parsed raw message, the state the
 //! contract carries, the index rows of what was emitted, and storing a
 //! fetched message's blobs. Provider vocabulary stays in each adapter
-//! (`gmail/`, `zoho/`).
+//! (`gmail/`, `zoho/`, `imap/`).
 
 pub mod parse;
 
@@ -121,6 +121,9 @@ pub enum Receiver {
     Gmail,
     /// Zoho Mail, in any of its data centres.
     Zoho,
+    /// Any mailbox over IMAP: whoever runs its server, so no
+    /// `Authentication-Results` is known to be its own.
+    Imap,
 }
 
 impl Receiver {
@@ -137,7 +140,7 @@ impl Receiver {
     pub const fn authserv_ids(self) -> &'static [&'static str] {
         match self {
             Self::Gmail => &["mx.google.com"],
-            Self::Zoho => &[],
+            Self::Zoho | Self::Imap => &[],
         }
     }
 }

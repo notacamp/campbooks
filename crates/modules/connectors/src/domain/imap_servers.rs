@@ -7,7 +7,7 @@ use chrono::{DateTime, Utc};
 use sqlx::PgConnection;
 
 use super::model::ConnectionId;
-use crate::imap::{Servers, Source};
+use crate::imap::{Security, Server, Servers, Source};
 
 /// An IMAP connection's account: what it signs in with, and where.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -56,4 +56,33 @@ pub async fn store(
     .execute(conn)
     .await?;
     Ok(())
+}
+
+/// Connection `id`'s IMAP server and the username it signs in with;
+/// `None` when it has none (or one this version cannot read).
+pub async fn imap_server(
+    conn: &mut PgConnection,
+    id: ConnectionId,
+) -> Result<Option<(String, Server)>> {
+    let row: Option<(String, String, i32, String)> = sqlx::query_as(
+        "SELECT username, imap_host, imap_port, imap_security
+           FROM connectors.imap_servers WHERE connection_id = $1",
+    )
+    .bind(id)
+    .fetch_optional(conn)
+    .await?;
+    Ok(row.and_then(|(username, host, port, security)| {
+        let security = match security.as_str() {
+            "tls" => Security::Tls,
+            "starttls" => Security::Starttls,
+            _ => return None,
+        };
+        let server = Server {
+            host,
+            port: u16::try_from(port).ok()?,
+            security,
+        }
+        .normalized()?;
+        Some((username, server))
+    }))
 }
