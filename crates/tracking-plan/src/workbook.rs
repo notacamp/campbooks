@@ -222,7 +222,7 @@ pub fn read(path: &Path) -> Result<Result<Plan, Vec<String>>> {
             let mut at = Cells {
                 sheet,
                 line,
-                cells: &cells,
+                values: &cells,
                 problems: &mut problems,
             };
             match *sheet {
@@ -302,7 +302,7 @@ fn text(data: &Data) -> String {
     match data {
         Data::Float(f) if f.fract() == 0.0 && f.abs() < 1e15 => format!("{f:.0}"),
         Data::Bool(b) => if *b { "yes" } else { "no" }.to_owned(),
-        Data::DateTime(date) => serial_to_date(date.as_f64()),
+        Data::DateTime(when) => serial_to_date(when.as_f64()),
         Data::DateTimeIso(iso) => iso.get(..10).unwrap_or(iso).to_owned(),
         other => other.to_string().trim().to_owned(),
     }
@@ -315,8 +315,8 @@ fn serial_to_date(serial: f64) -> String {
         clippy::cast_possible_truncation,
         reason = "a spreadsheet date is far inside i64"
     )]
-    let days = serial.floor() as i64 - 25_569;
-    let shifted = days + 719_468;
+    let since_epoch = serial.floor() as i64 - 25_569;
+    let shifted = since_epoch + 719_468;
     let era = shifted.div_euclid(146_097);
     let day_of_era = shifted.rem_euclid(146_097);
     let year_of_era =
@@ -349,18 +349,18 @@ fn cell_name(row: u32, col: u32) -> String {
 struct Cells<'a> {
     sheet: &'a str,
     line: u32,
-    cells: &'a [String],
+    values: &'a [String],
     problems: &'a mut Vec<String>,
 }
 
 impl Cells<'_> {
     fn text(&self, col: usize) -> String {
-        self.cells.get(col).cloned().unwrap_or_default()
+        self.values.get(col).cloned().unwrap_or_default()
     }
 
-    fn number<T: std::str::FromStr>(&mut self, col: usize, what: &str) -> T
+    fn number<T>(&mut self, col: usize, what: &str) -> T
     where
-        T: Default,
+        T: std::str::FromStr + Default,
     {
         let raw = self.text(col);
         raw.parse().unwrap_or_else(|_| {

@@ -91,6 +91,7 @@ pub async fn apply(
     let inbox = lock_conversation(state, &mut tx, access, id).await?;
     let items = change_items(&mut tx, id, flag).await?;
     let changed: Vec<String> = items.iter().map(|(message, _)| message.clone()).collect();
+    let anything_changed = !changed.is_empty();
     let undone = match flag {
         Flag::Unarchive => Some(rules::Undone::Archive),
         Flag::Unread => Some(rules::Undone::Read),
@@ -127,7 +128,7 @@ pub async fn apply(
     }
     let mut summary = summary(&mut tx, access.user, id).await?;
     summary.rule_exception = exception;
-    if !changed.is_empty() {
+    if anything_changed {
         track(state, &mut tx, access, flag, &summary).await?;
     }
     tx.commit().await?;

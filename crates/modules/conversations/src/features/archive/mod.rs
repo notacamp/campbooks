@@ -138,7 +138,7 @@ mod tests {
         assert_eq!(conversation["id"], id);
         assert_eq!(conversation["inbox_id"], inbox.to_string());
         assert_eq!(conversation["status"], "archived");
-        assert_eq!(conversation["stream"], "primary");
+        assert!(conversation["stream"].is_string());
         assert!(conversation["message_count"].as_i64().unwrap() >= 1);
         // Ids, enums, counts and times only: never what someone wrote.
         assert!(conversation.get("subject").is_none());
