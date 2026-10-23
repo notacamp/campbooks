@@ -72,7 +72,10 @@ export interface CommandMenuProps {
   onClose: () => void;
   /** Commands for this screen, listed first (suggestions for the selected item). */
   commands?: Command[] | undefined;
-  /** Offered as the last row while there is a query: hand it to the assistant. */
+  /**
+   * Offered as the last row: open the assistant ("Ask Scout"), or with a
+   * query, hand it the query ("Ask Scout: <query>"); empty when none.
+   */
   onAsk?: ((query: string) => void) | undefined;
   /**
    * A hook returning the section listed above the commands (conversation
@@ -153,19 +156,22 @@ function MenuContent({
           registry.run(definition.id);
         },
       }));
+    // Always offered: alone, it opens the assistant; with words typed, it
+    // asks them.
     const ask: Command[] =
-      onAsk !== undefined && typed !== ""
-        ? [
+      onAsk === undefined
+        ? []
+        : [
             {
               id: "ask",
-              label: t("commandMenu.ask", { query: typed }),
+              label:
+                typed === "" ? t("commandMenu.askAlone") : t("commandMenu.ask", { query: typed }),
               group: t("commandMenu.askGroup"),
               onSelect: () => {
                 onAsk(typed);
               },
             },
-          ]
-        : [];
+          ];
     const needle = fold(typed);
     const matches = [...commands, ...fromRegistry].filter((command) =>
       fold(command.label).includes(needle),

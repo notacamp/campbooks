@@ -12,6 +12,7 @@ import {
 import { DUARTE } from "../../../../../test/demo/workspaces";
 import { mockApi, renderWithProviders } from "../../../../../test/render";
 import type { Schema } from "~/lib/api";
+import { ScoutChatProvider } from "~/lib/scout-chat";
 
 import { useAheadOffer } from "./AheadOffer";
 import { ScoutNoticed } from "./ScoutNoticed";
@@ -220,6 +221,39 @@ describe("Scout noticed", () => {
         api.calls.some((call) => call.route === `DELETE ${W}/rule-notices/${NOTICE.id}/answer`),
       ).toBe(true);
     });
+  });
+
+  it("asks Scout about the suggestion, where a chat is mounted", async () => {
+    mockApi({
+      [`GET ${W}/rule-notices`]: { body: { notices: [NOTICE] } },
+      [`GET ${W}/inboxes`]: { body: { inboxes: [INBOX] } },
+    });
+    const scout = vi.fn();
+    renderWithProviders(
+      <ScoutChatProvider open={scout}>
+        <ScoutNoticed workspaceId={DUARTE.id} />
+      </ScoutChatProvider>,
+    );
+    const note = await screen.findByRole("region", { name: "Scout noticed" });
+    const ask = within(note).getByRole("button", { name: /Ask Scout/u });
+    expect(ask).toHaveAttribute("aria-keyshortcuts", "Shift+Q");
+
+    fireEvent.click(ask);
+    expect(scout).toHaveBeenCalledWith(
+      { type: "conversations.rule_notice", id: NOTICE.id },
+      { from: ask },
+    );
+  });
+
+  it("offers no Ask Scout where no chat is mounted", async () => {
+    mockApi({
+      [`GET ${W}/rule-notices`]: { body: { notices: [NOTICE] } },
+      [`GET ${W}/inboxes`]: { body: { inboxes: [INBOX] } },
+    });
+    renderWithProviders(<ScoutNoticed workspaceId={DUARTE.id} />);
+    const note = await screen.findByRole("region", { name: "Scout noticed" });
+
+    expect(within(note).queryByRole("button", { name: /Ask Scout/u })).toBeNull();
   });
 
   it("asks what should happen first: the verb button starts on Scout's guess", async () => {

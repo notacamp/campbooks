@@ -545,6 +545,89 @@ async fn nobody_else_sees_or_answers_an_inboxs_notices(db: PgPool) {
 }
 
 #[sqlx::test(migrations = "../../../migrations")]
+async fn one_suggestion_reads_as_the_list_shows_it_and_starts_no_pass(db: PgPool) {
+    let kit = Kit::with_deps(db, ConversationsDeps::offline()).await;
+    let (workspace, inbox, sam) = sams_inbox(&kit).await;
+    kit.ingest_value(workspace, inbox, &daily("ci", BUILDS, 12))
+        .await;
+    let notices = noticed(&kit, &sam, workspace).await;
+    let id = notices[0]["id"].as_str().unwrap().to_owned();
+    let one = format!("/api/v1/w/{workspace}/rule-notices/{id}");
+
+    // Looked at lately or not, reading one never starts a pass.
+    sqlx::query(
+        "UPDATE conversations.rule_notice_scans SET scanned_at = now() - interval '2 days'",
+    )
+    .execute(&kit.db)
+    .await
+    .unwrap();
+    let read = kit.get(&sam, &one).await;
+    assert_eq!(read.status, StatusCode::OK, "{:?}", read.json);
+    assert_eq!(read.json, notices[0]);
+    kit.run_jobs().await;
+    let stale: bool = sqlx::query_scalar(
+        "SELECT scanned_at < now() - interval '1 day' FROM conversations.rule_notice_scans",
+    )
+    .fetch_one(&kit.db)
+    .await
+    .unwrap();
+    assert!(stale, "a read started a pass");
+
+    // Leo is in the workspace but not the inbox; Rita only reads it; an app
+    // acts for nobody; another workspace's member asks with the id.
+    let (leo, _) = kit.member("leo", workspace);
+    let (rita, rita_id) = kit.member("rita", workspace);
+    kit.add_to_inbox(inbox, rita_id, InboxRole::Reader).await;
+    let app = kit.client(workspace, "conversations:read");
+    let elsewhere = WorkspaceId::new();
+    let (eve, _) = kit.member("eve", elsewhere);
+    assert_eq!(kit.get(&leo, &one).await.status, StatusCode::NOT_FOUND);
+    // Rita only reads the inbox: the list never shows her its suggestions.
+    assert_eq!(kit.get(&rita, &one).await.status, StatusCode::NOT_FOUND);
+    // An app is given no inbox, so it sees no suggestion in one.
+    assert_eq!(kit.get(&app, &one).await.status, StatusCode::NOT_FOUND);
+    assert_eq!(
+        kit.get(&eve, &format!("/api/v1/w/{elsewhere}/rule-notices/{id}"))
+            .await
+            .status,
+        StatusCode::NOT_FOUND
+    );
+
+    // A suggestion Sam hid is gone for him, until he takes the answer back.
+    let answer = format!("{one}/answer");
+    for hidden in ["not_now", "never"] {
+        let answered = kit
+            .post(&sam, &answer, Some(json!({"answer": hidden})))
+            .await;
+        assert_eq!(answered.status, StatusCode::NO_CONTENT);
+        assert_eq!(kit.get(&sam, &one).await.status, StatusCode::NOT_FOUND);
+        kit.delete(&sam, &answer).await;
+        assert_eq!(kit.get(&sam, &one).await.status, StatusCode::OK);
+    }
+
+    // Once said yes to, it is no longer offered.
+    let created = kit
+        .post(
+            &sam,
+            &format!("/api/v1/w/{workspace}/inboxes/{inbox}/rules"),
+            Some(json!({
+                "conditions": notices[0]["conditions"],
+                "actions": notices[0]["actions"],
+                "origin": "suggestion",
+                "notice_id": id,
+            })),
+        )
+        .await;
+    assert_eq!(created.status, StatusCode::CREATED, "{:?}", created.json);
+    assert_eq!(kit.get(&sam, &one).await.status, StatusCode::NOT_FOUND);
+    let unknown = format!(
+        "/api/v1/w/{workspace}/rule-notices/{}",
+        crate::model::RuleNoticeId::new()
+    );
+    assert_eq!(kit.get(&sam, &unknown).await.status, StatusCode::NOT_FOUND);
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
 async fn mail_that_matters_is_not_noticed(db: PgPool) {
     let kit = Kit::with_deps(db, ConversationsDeps::offline()).await;
     let (workspace, inbox, sam) = sams_inbox(&kit).await;

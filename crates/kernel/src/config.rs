@@ -1000,6 +1000,11 @@ pub struct TrackingConfig {
     /// `amqp://user:password@host:5672/%2f` or `amqps://…`), required with
     /// the sink `amqp`. Secret: never logged, not even its host.
     pub amqp_url: Option<SecretString>,
+    /// File holding the broker password
+    /// (`CAMPBOOKS_TRACKING__AMQP_PASSWORD_FILE`), so `AMQP_URL` can omit it
+    /// and the secret stays out of the environment. The file's password
+    /// (a trailing newline dropped) replaces any in the URL. Never logged.
+    pub amqp_password_file: Option<PathBuf>,
     /// The topic exchange events are published to
     /// (`CAMPBOOKS_TRACKING__EXCHANGE`, default `campbooks.events`), with
     /// routing key `<name>.v<version>`.
@@ -1033,6 +1038,7 @@ impl Default for TrackingConfig {
         Self {
             sink: TrackingSink::None,
             amqp_url: None,
+            amqp_password_file: None,
             exchange: "campbooks.events".to_owned(),
             stream: "campbooks.events".to_owned(),
             stream_max_age: "30D".to_owned(),
@@ -1055,9 +1061,53 @@ impl TrackingConfig {
         non_blank(self.amqp_url.as_ref().map(SecretString::expose_secret))
     }
 
-    /// Startup check: with the sink `amqp`, an `amqp` or `amqps` URL; names
-    /// AMQP accepts; a stream age RabbitMQ understands; usable numbers. The
-    /// message names the offending setting, never the URL or any part of it.
+    /// The password file, `None` when unset or blank.
+    pub fn amqp_password_file(&self) -> Option<&std::path::Path> {
+        self.amqp_password_file
+            .as_deref()
+            .filter(|p| !p.as_os_str().is_empty())
+    }
+
+    /// The URL the relay connects with: `AMQP_URL`, its password replaced by
+    /// the one in `AMQP_PASSWORD_FILE` when that is set. `Ok(None)` when no
+    /// URL is set. Never log it.
+    ///
+    /// # Errors
+    /// If the password file cannot be read or the URL cannot carry a
+    /// password. The message names the setting and the file's path, never
+    /// the URL or the password.
+    pub fn amqp_connection_url(&self) -> Result<Option<SecretString>, String> {
+        let Some(url) = self.amqp_url() else {
+            return Ok(None);
+        };
+        let Some(path) = self.amqp_password_file() else {
+            return Ok(Some(SecretString::from(url.to_owned())));
+        };
+        let password = std::fs::read_to_string(path).map_err(|e| {
+            format!(
+                "could not read CAMPBOOKS_TRACKING__AMQP_PASSWORD_FILE ({}): {e}",
+                path.display()
+            )
+        })?;
+        let password = password.trim_end_matches(['\r', '\n']);
+        if password.is_empty() {
+            return Err(format!(
+                "CAMPBOOKS_TRACKING__AMQP_PASSWORD_FILE ({}) is empty",
+                path.display()
+            ));
+        }
+        let mut parsed = url::Url::parse(url)
+            .map_err(|_| "CAMPBOOKS_TRACKING__AMQP_URL is not a URL".to_owned())?;
+        parsed.set_password(Some(password)).map_err(|()| {
+            "CAMPBOOKS_TRACKING__AMQP_URL cannot carry a password (it needs a host)".to_owned()
+        })?;
+        Ok(Some(SecretString::from(String::from(parsed))))
+    }
+
+    /// Startup check: with the sink `amqp`, an `amqp` or `amqps` URL and a
+    /// readable password file when one is named; names AMQP accepts; a stream
+    /// age RabbitMQ understands; usable numbers. The message names the
+    /// offending setting, never the URL, the password or any part of them.
     pub fn check(&self) -> Result<(), String> {
         if self.sink == TrackingSink::Amqp {
             let Some(url) = self.amqp_url() else {
@@ -1074,6 +1124,7 @@ impl TrackingConfig {
                         .to_owned(),
                 );
             }
+            self.amqp_connection_url()?;
         }
         for (name, value) in [("EXCHANGE", &self.exchange), ("STREAM", &self.stream)] {
             if !is_amqp_name(value) {
@@ -2302,6 +2353,99 @@ mod tests {
         assert!(!format!("{config:?}").contains("hunter2"));
         let matomo = config.analytics.matomo().unwrap();
         assert!(!format!("{matomo:?}").contains("hunter2"));
+    }
+
+    fn amqp_settings(url: &str, file: Option<&std::path::Path>) -> TrackingConfig {
+        TrackingConfig {
+            sink: TrackingSink::Amqp,
+            amqp_url: Some(SecretString::from(url)),
+            amqp_password_file: file.map(std::path::Path::to_path_buf),
+            ..TrackingConfig::default()
+        }
+    }
+
+    #[test]
+    fn the_amqp_password_comes_from_the_file() {
+        let dir = std::env::temp_dir().join(format!("cb-amqp-pw-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let file = dir.join("relay-password");
+        std::fs::write(&file, "s3cret/with:odd@chars\n").unwrap();
+
+        // The file's password replaces the URL's, or fills in a missing one,
+        // percent-encoded; the trailing newline is dropped.
+        for url in [
+            "amqp://campbooks-relay@broker.example.com:5672/campbooks",
+            "amqp://campbooks-relay:old@broker.example.com:5672/campbooks",
+        ] {
+            let config = amqp_settings(url, Some(&file));
+            assert!(config.check().is_ok(), "{url}");
+            let resolved = config.amqp_connection_url().unwrap().unwrap();
+            let parsed = url::Url::parse(resolved.expose_secret()).unwrap();
+            assert_eq!(parsed.username(), "campbooks-relay");
+            assert_eq!(parsed.password(), Some("s3cret%2Fwith%3Aodd%40chars"));
+            assert_eq!(parsed.host_str(), Some("broker.example.com"));
+            assert_eq!(parsed.path(), "/campbooks");
+        }
+
+        // No file: the URL as given. A blank path counts as unset.
+        let url = "amqp://u:p@broker.example.com/%2f";
+        for config in [
+            amqp_settings(url, None),
+            amqp_settings(url, Some(std::path::Path::new(""))),
+        ] {
+            let resolved = config.amqp_connection_url().unwrap().unwrap();
+            assert_eq!(resolved.expose_secret(), url);
+        }
+        let none = TrackingConfig {
+            amqp_password_file: Some(file.clone()),
+            ..TrackingConfig::default()
+        };
+        assert!(
+            none.amqp_connection_url().unwrap().is_none(),
+            "no URL, no file read"
+        );
+        std::fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn a_missing_or_empty_amqp_password_file_stops_the_start() {
+        let dir = std::env::temp_dir().join(format!("cb-amqp-pw-bad-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let empty = dir.join("empty");
+        std::fs::write(&empty, "\n").unwrap();
+        let url = "amqp://campbooks-relay:hunter2@broker.example.com/campbooks";
+        for file in [dir.join("missing"), empty] {
+            let err = amqp_settings(url, Some(&file)).check().unwrap_err();
+            assert!(
+                err.contains("CAMPBOOKS_TRACKING__AMQP_PASSWORD_FILE"),
+                "{err}"
+            );
+            assert!(!err.contains("hunter2"), "{err}");
+            assert!(!err.contains("broker.example.com"), "{err}");
+        }
+        // With another sink the file is not needed, so it is not read.
+        let mut outbox = amqp_settings(url, Some(&dir.join("missing")));
+        outbox.sink = TrackingSink::Outbox;
+        assert!(outbox.check().is_ok());
+        std::fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn the_amqp_password_file_setting_loads() {
+        let figment =
+            figment(&[("database_url", "postgres://localhost/x")]).merge(Serialized::default(
+                "tracking",
+                serde_json::json!({
+                    "sink": "amqp",
+                    "amqp_url": "amqp://campbooks-relay@broker.example.com/campbooks",
+                    "amqp_password_file": "/run/mq/relay-password",
+                }),
+            ));
+        let config = Config::from_figment(&figment).unwrap();
+        assert_eq!(
+            config.tracking.amqp_password_file(),
+            Some(std::path::Path::new("/run/mq/relay-password"))
+        );
     }
 
     #[test]

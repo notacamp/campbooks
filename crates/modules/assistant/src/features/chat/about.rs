@@ -1,8 +1,9 @@
 //! What a chat may be about: the about registry, by record type. Each entry
 //! names the read operations that describe a record of its type (invoked as
 //! the member, by operation id only) and how their answers are projected for
-//! the model. Calendar events and tasks add an entry each (no migration: the
-//! stored type is checked here).
+//! the model: a conversation, a rule, one of Scout's noticed suggestions, or
+//! a task. Calendar events add an entry (no migration: the stored
+//! type is checked here).
 
 use campbooks_kernel::RecordRef;
 use serde_json::{Value, json};
@@ -25,27 +26,56 @@ pub struct AboutType {
     pub reads: &'static [&'static str],
     /// The path parameter naming the record.
     pub id_param: &'static str,
+    /// The message (`chat.*`) an answer starts with when the member can no
+    /// longer see the record.
+    pub lost_line: &'static str,
 }
+
+/// A conversation.
+const CONVERSATION: &str = "conversations.conversation";
+/// A rule taught for an inbox.
+const RULE: &str = "conversations.rule";
+/// One of Scout's noticed suggestions (a smart rule it offers).
+const RULE_NOTICE: &str = "conversations.rule_notice";
+/// A task.
+const TASK: &str = "tasks.task";
+/// An event of the member's calendar.
+const SCHEDULE_EVENT: &str = "schedule.event";
 
 /// Every record type a chat may be about.
 pub const REGISTRY: &[AboutType] = &[
     AboutType {
-        record_type: "conversations.conversation",
+        record_type: CONVERSATION,
         reads: &["conversations.get", "conversations.get_history"],
         id_param: "conversation_id",
+        lost_line: "chat.about_lost",
     },
     AboutType {
-        record_type: "tasks.task",
+        record_type: RULE,
+        reads: &["conversations.get_rule"],
+        id_param: "rule_id",
+        lost_line: "chat.about_lost_rule",
+    },
+    AboutType {
+        record_type: RULE_NOTICE,
+        reads: &["conversations.get_rule_notice"],
+        id_param: "notice_id",
+        lost_line: "chat.about_lost_rule_notice",
+    },
+    AboutType {
+        record_type: TASK,
         reads: &["tasks.get"],
         id_param: "task_id",
+        lost_line: "chat.about_lost_task",
     },
     // An event of the member's calendar, and what Scout read in the email it
     // came from (the second read is made only when the event has a source
     // message, and only if the member can still read it).
     AboutType {
-        record_type: "schedule.event",
+        record_type: SCHEDULE_EVENT,
         reads: &["schedule.get_event", "conversations.get_message_read"],
         id_param: "event_id",
+        lost_line: "chat.about_lost_event",
     },
 ];
 
@@ -76,7 +106,7 @@ fn input_for(
     }
     match entry.record_type {
         // What Scout read in the event's source message.
-        "schedule.event" => {
+        SCHEDULE_EVENT => {
             let event = earlier.first()?;
             let source = &event["source"];
             let message = source["id"]
@@ -130,7 +160,7 @@ pub async fn read(member: &Member, about: &RecordRef) -> Result<Seen, Unread> {
             // The email behind an event may be one the member cannot read:
             // the event is still theirs to ask about.
             Err(Unread::NotVisible | Unread::Refused)
-                if step > 0 && entry.record_type == "schedule.event" =>
+                if step > 0 && entry.record_type == SCHEDULE_EVENT =>
             {
                 answers.push(Value::Null);
             }
@@ -138,16 +168,13 @@ pub async fn read(member: &Member, about: &RecordRef) -> Result<Seen, Unread> {
             Err(broken) => return Err(broken),
         }
     }
+    let first = answers.first().unwrap_or(&Value::Null);
     let projected = match entry.record_type {
-        "conversations.conversation" => {
-            let detail = answers.first().unwrap_or(&Value::Null);
-            project::conversation(detail, answers.get(1))
-        }
-        "tasks.task" => project::task_detail(answers.first().unwrap_or(&Value::Null)),
-        "schedule.event" => {
-            let detail = answers.first().unwrap_or(&Value::Null);
-            project::event(detail, answers.get(1))
-        }
+        CONVERSATION => project::conversation(first, answers.get(1)),
+        RULE => project::rule(first),
+        RULE_NOTICE => project::rule_notice(first),
+        TASK => project::task_detail(first),
+        SCHEDULE_EVENT => project::event(first, answers.get(1)),
         _ => return Ok(Seen::Lost),
     };
     let mut value = json!({ "type": entry.record_type, "id": about.id });

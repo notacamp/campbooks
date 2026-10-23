@@ -373,6 +373,7 @@ fn router() -> OpenApiRouter<AppState> {
         .routes(routes!(suggest_rules::suggest))
         .routes(routes!(suggest_rules::dismiss))
         .routes(routes!(rule_notices::list))
+        .routes(routes!(rule_notices::get))
         .routes(routes!(rule_notices::answer, rule_notices::clear_answer))
         .routes(routes!(reply::suggest))
         .routes(routes!(reply::write))

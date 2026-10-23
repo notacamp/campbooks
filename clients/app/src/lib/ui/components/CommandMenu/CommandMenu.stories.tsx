@@ -101,7 +101,7 @@ export const Ask: Story = {
     const body = within(canvasElement.ownerDocument.body);
     await userEvent.type(await body.findByRole("combobox"), "Anything I still owe Brightloop?");
     await expect(
-      body.getByRole("option", { name: /Ask Campbooks: Anything I still owe Brightloop\?/ }),
+      body.getByRole("option", { name: /Ask Scout: Anything I still owe Brightloop\?/ }),
     ).toBeVisible();
   },
 };
@@ -128,7 +128,7 @@ export const WithSection: Story = {
     await userEvent.type(input, "lease");
     const options = body.getAllByRole("option");
     await expect(options[0]).toHaveTextContent("Lease renewal");
-    await expect(options.at(-1)).toHaveTextContent("Ask Campbooks: lease");
+    await expect(options.at(-1)).toHaveTextContent("Ask Scout: lease");
     await userEvent.keyboard("{ArrowDown}{ArrowDown}");
     await expect(input).toHaveAttribute("aria-activedescendant", options[2]?.id);
     await expect(body.getByRole("button", { name: "Remove filter: From ana" })).toBeVisible();

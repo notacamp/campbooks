@@ -198,7 +198,9 @@
       "saveFailed": "O Scout não conseguiu guardar a regra. Tente de novo.",
       "savePartial": "Guardada em {{saved}} de {{total}} caixas, e o Scout parou. Tentar de novo guarda-a nas restantes.",
       "retry": "Tentar de novo",
-      "description": "Diga-o numa frase. O Scout mostra-lhe a regra, e o que ela apanha, antes de guardar seja o que for."
+      "description": "Diga-o numa frase. O Scout mostra-lhe a regra, e o que ela apanha, antes de guardar seja o que for.",
+      "savedNote": "Regra guardada. O Scout pode explicar o que faz e o que muda.",
+      "askAbout": "Perguntar ao Scout sobre esta regra"
     },
     "builder": {
       "noModel": "Este servidor não tem um modelo de linguagem para ler frases, por isso crie a regra aqui.",
@@ -372,6 +374,26 @@
         "write": "Escrever o rascunho",
         "done": "Rascunho aberto. É você quem o envia, ou não."
       }
-    }
+    },
+    "recent": "Recentes",
+    "recentEmpty": "Ainda não há conversas. Pergunte algo ao Scout para começar uma.",
+    "recentLoading": "A carregar as suas conversas…",
+    "recentFailed": "Não foi possível listar as suas conversas. Tente de novo daqui a pouco.",
+    "noticeLine": "Sugestão do Scout para {{sender}}",
+    "aboutNothing": "o seu correio",
+    "ruleIntro": "Pergunte-me sobre esta regra.",
+    "ruleDoes": "O que faz esta regra?",
+    "ruleChanged": "O que é que já mudou?",
+    "noticeIntro": "Pergunte-me sobre aquilo em que reparei.",
+    "noticeWhy": "Porquê esta sugestão?",
+    "noticeChange": "O que mudaria?",
+    "nothingIntro": "Pergunte-me sobre o seu correio: o que precisa de si, de quem está à espera, o que alguém enviou.",
+    "nothingToday": "O que precisa de mim hoje?",
+    "nothingWaiting": "De que estou à espera?",
+    "fieldNothing": "Pergunte sobre o seu correio",
+    "unreadableRule": "O Scout não consegue abrir uma conversa sobre esta regra.",
+    "unreadableNotice": "Esta sugestão já não lhe é feita.",
+    "unreadableNothing": "O Scout não consegue começar uma conversa agora. Tente de novo daqui a pouco.",
+    "gone": "Esta conversa já não existe."
   }
 }

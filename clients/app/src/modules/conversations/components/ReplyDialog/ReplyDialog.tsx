@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { problemCode } from "~/lib/api";
+import { conversationRef } from "~/lib/scout-chat";
 import { useShortcut } from "~/lib/shortcuts";
 import {
   AskLine,
@@ -18,6 +19,7 @@ import {
   type DialogResult,
 } from "~/lib/ui";
 
+import { AskScoutIcon } from "../AskScout/AskScoutIcon";
 import {
   cancelSend,
   changedElsewhere,
@@ -679,6 +681,9 @@ export function ReplyDialog({
       }
       result={result}
       onResultEnd={onClose}
+      headerAction={
+        <AskScoutIcon about={conversationRef(conversationId)} label={t("reply.askScout")} />
+      }
       footer={
         drafting ? (
           <>

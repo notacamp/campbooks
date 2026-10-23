@@ -11,7 +11,7 @@ use super::{
     propose,
     types::{
         ChatAuthor, ChatFinish, ChatId, ChatMessageId, ChatMessageView, ChatProposal, ChatStep,
-        ChatView, ProposalId,
+        ChatSummary, ChatView, ProposalId,
     },
 };
 
@@ -133,6 +133,60 @@ pub async fn create(
     .bind(about.map(|a| a.id.as_str()))
     .fetch_optional(conn)
     .await?)
+}
+
+/// Chats a list holds.
+pub const LISTED: i64 = 30;
+/// Characters of a chat's first question a list shows.
+pub const FIRST_QUESTION_CHARS: i32 = 120;
+
+#[derive(sqlx::FromRow)]
+struct SummaryRow {
+    id: ChatId,
+    about_type: Option<String>,
+    about_id: Option<String>,
+    first_question: String,
+    questions: i32,
+    last_message_at: DateTime<Utc>,
+}
+
+/// `user`'s chats with at least one question, the newest message first, at
+/// most [`LISTED`]: each with its first question, cut.
+pub async fn list(conn: &mut PgConnection, user: UserId) -> Result<Vec<ChatSummary>> {
+    let rows: Vec<SummaryRow> = sqlx::query_as(
+        "SELECT c.id, c.about_type, c.about_id, left(q.text, $2) AS first_question, \
+                c.questions, c.last_message_at \
+           FROM assistant.chats c \
+          CROSS JOIN LATERAL ( \
+                SELECT m.text FROM assistant.chat_messages m \
+                 WHERE m.chat_id = c.id AND m.author = 'member' \
+                 ORDER BY m.created_at, m.id LIMIT 1) q \
+          WHERE c.user_id = $1 \
+          ORDER BY c.last_message_at DESC, c.id DESC \
+          LIMIT $3",
+    )
+    .bind(user.as_uuid())
+    .bind(FIRST_QUESTION_CHARS)
+    .bind(LISTED)
+    .fetch_all(conn)
+    .await?;
+    Ok(rows
+        .into_iter()
+        .map(|row| {
+            let about = row
+                .about_type
+                .as_deref()
+                .zip(row.about_id.as_deref())
+                .map(|(record_type, id)| RecordRef::new(record_type, id));
+            ChatSummary {
+                id: row.id,
+                about,
+                first_question: row.first_question,
+                questions: u32::try_from(row.questions).unwrap_or_default(),
+                last_message_at: row.last_message_at,
+            }
+        })
+        .collect())
 }
 
 /// The chat's messages, oldest first (a question before its answer).

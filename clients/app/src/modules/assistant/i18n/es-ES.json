@@ -198,7 +198,9 @@
       "saveFailed": "Scout no ha podido guardar la regla. Inténtalo de nuevo.",
       "savePartial": "Guardada en {{saved}} de {{total}} bandejas, y Scout se ha detenido. Reintentar la guarda en las demás.",
       "retry": "Reintentar",
-      "description": "Dilo en una frase. Scout te muestra la regla, y a qué correos afecta, antes de guardar nada."
+      "description": "Dilo en una frase. Scout te muestra la regla, y a qué correos afecta, antes de guardar nada.",
+      "savedNote": "Regla guardada. Scout puede explicarte qué hace y qué cambia.",
+      "askAbout": "Preguntar a Scout sobre esta regla"
     },
     "builder": {
       "noModel": "Este servidor no tiene un modelo de lenguaje para leer frases, así que crea la regla aquí.",
@@ -372,6 +374,26 @@
         "write": "Escribir el borrador",
         "done": "Borrador abierto. Lo envías tú, o no."
       }
-    }
+    },
+    "recent": "Recientes",
+    "recentEmpty": "Aún no hay chats. Pregunta algo a Scout para empezar uno.",
+    "recentLoading": "Cargando tus chats…",
+    "recentFailed": "No se han podido mostrar tus chats. Vuelve a intentarlo dentro de un rato.",
+    "noticeLine": "Sugerencia de Scout para {{sender}}",
+    "aboutNothing": "tu correo",
+    "ruleIntro": "Pregúntame sobre esta regla.",
+    "ruleDoes": "¿Qué hace esta regla?",
+    "ruleChanged": "¿Qué ha cambiado esta regla?",
+    "noticeIntro": "Pregúntame sobre lo que he notado.",
+    "noticeWhy": "¿Por qué sugieres esto?",
+    "noticeChange": "¿Qué cambiaría?",
+    "nothingIntro": "Pregúntame sobre tu correo: qué te necesita, a quién esperas, qué te ha enviado alguien.",
+    "nothingToday": "¿Qué requiere mi atención hoy?",
+    "nothingWaiting": "¿Qué estoy esperando?",
+    "fieldNothing": "Pregunta sobre tu correo",
+    "unreadableRule": "Scout no puede abrir un chat sobre esta regla.",
+    "unreadableNotice": "Esta sugerencia ya no se te ofrece.",
+    "unreadableNothing": "Scout no puede empezar un chat ahora. Vuelve a intentarlo dentro de un rato.",
+    "gone": "Este chat ya no está."
   }
 }

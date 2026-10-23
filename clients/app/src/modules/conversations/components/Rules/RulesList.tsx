@@ -1,15 +1,18 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { useSession } from "~/lib/api";
+import { ruleRef, useScoutChat } from "~/lib/scout-chat";
 import {
   Button,
   ChoiceCards,
   EmptyState,
   Heading,
+  IconButton,
   InlineConfirm,
   List,
   ListRow,
+  Popover,
   SettingsEmpty,
   SkeletonList,
   StatusText,
@@ -222,6 +225,7 @@ function RuleRow({
       </Button>
     ) : undefined;
 
+  const more = <RuleMore rule={rule} t={t} />;
   // Keeping it keeps its author: one who is away for now leaves it paused,
   // and the member is told before saying yes, never why.
   const staysPaused = rule.state === "proposed" && rule.paused_once_kept === "author_unavailable";
@@ -232,7 +236,16 @@ function RuleRow({
       badge={rule.shared ? t("rules.list.forEveryone") : undefined}
       meta={facts.join(" · ")}
       muted={rule.state === "paused"}
-      trailing={trailing}
+      trailing={
+        trailing === undefined ? (
+          more
+        ) : (
+          <>
+            {trailing}
+            {more}
+          </>
+        )
+      }
     >
       {confirming ? (
         <InlineConfirm
@@ -279,5 +292,42 @@ function RuleRow({
         <StatusText tone="waiting">{t("rules.list.keptStaysPaused")}</StatusText>
       ) : null}
     </ListRow>
+  );
+}
+
+/**
+ * The row's overflow: Ask Scout about this rule (campbooks-cloud#305), where
+ * a chat is mounted; the focus comes back to More when the chat closes.
+ */
+function RuleMore({ rule, t }: { rule: RuleView; t: Translate }) {
+  const open = useScoutChat();
+  const anchor = useRef<HTMLSpanElement>(null);
+  if (open === undefined) {
+    return null;
+  }
+  return (
+    <span ref={anchor} className="flex">
+      <Popover
+        label={t("rules.list.more")}
+        renderTrigger={(trigger) => (
+          <IconButton {...trigger} label={t("rules.list.more")} icon="more" />
+        )}
+      >
+        {(close) => (
+          <div className="flex flex-col p-2">
+            <Button
+              variant="ghost"
+              ai
+              onClick={() => {
+                close();
+                open(ruleRef(rule.id), { from: anchor.current?.querySelector("button") ?? null });
+              }}
+            >
+              {t("rules.list.askScout")}
+            </Button>
+          </div>
+        )}
+      </Popover>
+    </span>
   );
 }
