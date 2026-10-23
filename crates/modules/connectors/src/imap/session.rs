@@ -1,25 +1,38 @@
-//! One conversation with an IMAP server, signed in: Campbooks' own wrapper
-//! over the `async-imap` client (what reading, write-back and sending will
-//! grow, so the client crate stays swappable).
+//! One conversation with an IMAP server, signed in: Campbooks' own IMAP
+//! client (what reading, write-back and sending grow on).
 //!
 //! Opening one: connect to the address the guard checked; TLS from the
 //! first byte, or STARTTLS before anything else is said (refused when the
 //! server does not offer it: no password ever goes in the clear); then
-//! `CAPABILITY`, and `AUTHENTICATE PLAIN` when offered, else `LOGIN`
-//! (refused when `LOGINDISABLED` persists). Nothing the server says is kept,
-//! returned or logged, except the response code of a refused sign-in.
+//! `CAPABILITY`, and `AUTHENTICATE PLAIN` when offered (its response in the
+//! command with SASL-IR, else after the server's go-ahead), else `LOGIN`
+//! (refused, nothing sent, when `LOGINDISABLED` persists). Nothing the
+//! server says is kept, returned or logged, except the response code of a
+//! refused sign-in.
+//!
+//! Every response, from the sign-in on, is framed here within the caller's
+//! [`Limits`] (its size, every literal's size before a byte of it is read,
+//! the number of responses, the time), then parsed (`syntax`): a server
+//! that lies or never stops talking ends the command with a [`WireError`],
+//! and never sizes a buffer by its own word. Before signing in, a response
+//! may take at most [`SIGN_IN_RESPONSE`] bytes.
 
-use async_imap::error::Error as ImapError;
-use futures_util::TryStreamExt as _;
-use secrecy::{ExposeSecret as _, SecretString};
+use std::time::Duration;
+
+use base64::{Engine as _, engine::general_purpose::STANDARD};
+use secrecy::{ExposeSecret as _, SecretString, zeroize::Zeroizing};
 use tokio::{
     io::{AsyncRead, AsyncReadExt as _, AsyncWrite, AsyncWriteExt as _},
     net::TcpStream,
-    time::timeout,
+    time::{Instant, timeout, timeout_at},
 };
 use tokio_rustls::{TlsConnector, client::TlsStream};
 
-use super::{Imap, Refusal, Security, Server, tls};
+use super::{
+    Imap, Refusal, Security, Server,
+    syntax::{self, Code, Response, Status, Untagged},
+    tls,
+};
 
 /// The longest line read before signing in.
 const MAX_LINE: usize = 8 * 1024;
@@ -27,10 +40,102 @@ const MAX_LINE: usize = 8 * 1024;
 /// The most lines one command's answer may take before signing in.
 const MAX_LINES: usize = 64;
 
+/// How much reading the socket asks for at once.
+const CHUNK: usize = 64 * 1024;
+
+/// The largest response read while signing in (the server is not signed in
+/// to, and trusted with no memory, yet).
+pub const SIGN_IN_RESPONSE: usize = 16 * 1024;
+
+/// The most responses the sign-in reads.
+const SIGN_IN_RESPONSES: usize = 64;
+
+/// The response codes of a server that is busy rather than refusing
+/// (RFC 5530): `UNAVAILABLE`, `INUSE`, `LIMIT`.
+pub const BUSY_CODES: [&str; 3] = ["UNAVAILABLE", "INUSE", "LIMIT"];
+
 /// A signed-in IMAP session.
 #[derive(Debug)]
 pub struct Session {
-    inner: async_imap::Session<TlsStream<TcpStream>>,
+    stream: TlsStream<TcpStream>,
+    /// Bytes read from the socket and not yet framed, from `start`.
+    pending: Vec<u8>,
+    start: usize,
+    /// The last tag sent.
+    tags: u32,
+    /// Every byte read since signing in.
+    received: u64,
+    /// How long one read of the socket may wait.
+    read_timeout: Duration,
+    /// A command was cut short: the session is mid-answer and is never
+    /// used again (not even to log out).
+    broken: bool,
+}
+
+/// The bounds of one command's answer.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Limits {
+    /// The largest single response, line and literals, in bytes.
+    pub response: usize,
+    /// The most untagged responses.
+    pub responses: usize,
+    /// The most bytes of all its responses.
+    pub total: usize,
+    /// How long the whole command may take.
+    pub time: Duration,
+}
+
+/// Why a command was cut short: a stable code, never the server's words.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum WireError {
+    /// The server did not answer in time.
+    TimedOut,
+    /// The connection closed, or the server said goodbye.
+    Closed,
+    /// A response (or a literal in it) larger than the command allows.
+    TooLarge,
+    /// More responses, or bytes, than the command allows.
+    TooMany,
+    /// A response that is not IMAP.
+    Malformed,
+}
+
+impl WireError {
+    /// The stable code.
+    pub const fn code(self) -> &'static str {
+        match self {
+            Self::TimedOut => "imap_timed_out",
+            Self::Closed => "imap_closed",
+            Self::TooLarge => "imap_too_large",
+            Self::TooMany => "imap_too_many_responses",
+            Self::Malformed => "imap_malformed",
+        }
+    }
+}
+
+/// How a command ended.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Done {
+    /// `OK`, `NO` or `BAD`.
+    pub status: Status,
+    /// Its response code, if any.
+    pub code: Option<Code>,
+}
+
+impl Done {
+    /// Whether it succeeded.
+    pub fn is_ok(&self) -> bool {
+        self.status == Status::Ok
+    }
+
+    /// Whether the server refused it for being busy ([`BUSY_CODES`]).
+    pub fn is_busy(&self) -> bool {
+        self.status != Status::Ok
+            && self
+                .code
+                .as_ref()
+                .is_some_and(|code| BUSY_CODES.contains(&code.name.as_str()))
+    }
 }
 
 impl Session {
@@ -78,34 +183,321 @@ impl Session {
             }
         };
         let capabilities = capabilities(&mut stream, "c3").await?;
-        let client = async_imap::Client::new(stream);
-        let signed_in = if capabilities.iter().any(|c| c == "AUTH=PLAIN") {
-            client
-                .authenticate("PLAIN", Plain { username, password })
-                .await
-        } else if capabilities.iter().any(|c| c == "LOGINDISABLED") {
+        let mut session = Self {
+            stream,
+            pending: Vec::new(),
+            start: 0,
+            tags: 0,
+            received: 0,
+            read_timeout: imap.timeout(),
+            broken: false,
+        };
+        session.sign_in(&capabilities, username, password).await?;
+        session.received = 0;
+        Ok(session)
+    }
+
+    /// Sign in: `AUTHENTICATE PLAIN` when offered, else `LOGIN` (none when
+    /// `LOGINDISABLED`). A busy server is told from a refusal.
+    async fn sign_in(
+        &mut self,
+        capabilities: &[String],
+        username: &str,
+        password: &SecretString,
+    ) -> Result<(), Refusal> {
+        let has = |name: &str| capabilities.iter().any(|c| c == name);
+        let tag = self.next_tag();
+        let steps = if has("AUTH=PLAIN") {
+            let response = plain(username, password);
+            if has("SASL-IR") {
+                vec![line(&[
+                    tag.as_str(),
+                    " AUTHENTICATE PLAIN ",
+                    response.as_str(),
+                ])]
+            } else {
+                vec![
+                    line(&[tag.as_str(), " AUTHENTICATE PLAIN"]),
+                    line(&[response.as_str()]),
+                ]
+            }
+        } else if has("LOGINDISABLED") {
             return Err(Refusal::ImapLoginRefused);
         } else {
-            client.login(username, password.expose_secret()).await
+            login(&tag, username, password)
         };
-        let inner = signed_in.map_err(|(err, _)| refused(&err))?;
-        Ok(Self { inner })
+        let deadline = Instant::now() + self.read_timeout;
+        match self.steps(&tag, &steps, deadline).await {
+            Ok(done) if done.is_ok() => Ok(()),
+            Ok(done) => Err(sign_in_refusal(&done)),
+            Err(err) => {
+                self.broken = true;
+                Err(match err {
+                    WireError::TimedOut | WireError::Closed => Refusal::ImapUnreachable,
+                    WireError::TooLarge | WireError::TooMany | WireError::Malformed => {
+                        Refusal::ImapNotAnImapServer
+                    }
+                })
+            }
+        }
+    }
+
+    /// Send the sign-in's `steps` under `tag`: the first, then each next
+    /// one once the server asks for more (`+`). How the server ended it,
+    /// every answer within [`SIGN_IN_RESPONSE`].
+    async fn steps(
+        &mut self,
+        tag: &str,
+        steps: &[Zeroizing<Vec<u8>>],
+        deadline: Instant,
+    ) -> Result<Done, WireError> {
+        let mut count = 0;
+        for (n, step) in steps.iter().enumerate() {
+            self.write(step, deadline).await?;
+            let last = n + 1 == steps.len();
+            loop {
+                let response = self.response(SIGN_IN_RESPONSE, deadline).await?;
+                count += 1;
+                if count > SIGN_IN_RESPONSES {
+                    return Err(WireError::TooMany);
+                }
+                match syntax::parse(&response).map_err(|_| WireError::Malformed)? {
+                    Response::Continue if !last => break,
+                    Response::Tagged {
+                        tag: done,
+                        status,
+                        code,
+                    } if done == tag.as_bytes() => {
+                        return Ok(Done { status, code });
+                    }
+                    Response::Continue | Response::Tagged { .. } => {
+                        return Err(WireError::Malformed);
+                    }
+                    Response::Untagged(Untagged::Status {
+                        status: Status::Bye,
+                        ..
+                    }) => return Err(WireError::Closed),
+                    Response::Untagged(_) => {}
+                }
+            }
+        }
+        Err(WireError::Malformed)
+    }
+
+    /// The next command's tag.
+    fn next_tag(&mut self) -> String {
+        self.tags = self.tags.wrapping_add(1);
+        format!("w{}", self.tags)
+    }
+
+    /// Write `bytes` and flush, by `deadline`.
+    async fn write(&mut self, bytes: &[u8], deadline: Instant) -> Result<(), WireError> {
+        let stream = &mut self.stream;
+        let written = timeout_at(deadline, async {
+            stream.write_all(bytes).await?;
+            stream.flush().await?;
+            Ok::<(), std::io::Error>(())
+        })
+        .await;
+        match written {
+            Ok(Ok(())) => Ok(()),
+            Ok(Err(_)) => Err(WireError::Closed),
+            Err(_) => Err(WireError::TimedOut),
+        }
+    }
+
+    /// Every byte read from the server since signing in.
+    pub fn received(&self) -> u64 {
+        self.received
+    }
+
+    /// Send `command` (built by the caller from numbers, atoms and
+    /// [`quoted`] strings only) and hand each untagged response to `each`,
+    /// within `limits`. How it ended; `Err` when it was cut short, after
+    /// which the session must not be used again.
+    pub async fn command<F>(
+        &mut self,
+        command: &str,
+        limits: Limits,
+        each: F,
+    ) -> Result<Done, WireError>
+    where
+        F: FnMut(Untagged<'_>),
+    {
+        if self.broken {
+            return Err(WireError::Closed);
+        }
+        let done = self.exchange(command, limits, each).await;
+        self.broken = done.is_err();
+        done
+    }
+
+    /// [`command`](Self::command), on a session in step.
+    async fn exchange<F>(
+        &mut self,
+        command: &str,
+        limits: Limits,
+        mut each: F,
+    ) -> Result<Done, WireError>
+    where
+        F: FnMut(Untagged<'_>),
+    {
+        let tag = self.next_tag();
+        let deadline = Instant::now() + limits.time;
+        let line = format!("{tag} {command}\r\n");
+        self.write(line.as_bytes(), deadline).await?;
+        let mut total = 0_usize;
+        let mut count = 0_usize;
+        loop {
+            let response = self.response(limits.response, deadline).await?;
+            total = total.saturating_add(response.len());
+            if total > limits.total {
+                return Err(WireError::TooMany);
+            }
+            match syntax::parse(&response).map_err(|_| WireError::Malformed)? {
+                Response::Tagged {
+                    tag: done,
+                    status,
+                    code,
+                } if done == tag.as_bytes() => return Ok(Done { status, code }),
+                Response::Tagged { .. } | Response::Continue => {
+                    return Err(WireError::Malformed);
+                }
+                Response::Untagged(Untagged::Status {
+                    status: Status::Bye,
+                    ..
+                }) => return Err(WireError::Closed),
+                Response::Untagged(untagged) => {
+                    count += 1;
+                    if count > limits.responses {
+                        return Err(WireError::TooMany);
+                    }
+                    each(untagged);
+                }
+            }
+        }
+    }
+
+    /// One whole response: its line, and each literal it announces (its
+    /// size checked against `max` before any of it is read).
+    async fn response(&mut self, max: usize, deadline: Instant) -> Result<Vec<u8>, WireError> {
+        let mut out = Vec::new();
+        loop {
+            // How far past `start` the line ending was looked for (`fill`
+            // may move `start`, never what lies after it).
+            let mut scanned = 0;
+            let end = loop {
+                let from = self.start + scanned;
+                if let Some(at) = self.pending[from..].iter().position(|b| *b == b'\n') {
+                    break from + at;
+                }
+                scanned = self.pending.len() - self.start;
+                if out.len().saturating_add(scanned) > max {
+                    return Err(WireError::TooLarge);
+                }
+                self.fill(deadline).await?;
+            };
+            out.extend_from_slice(&self.pending[self.start..=end]);
+            self.start = end + 1;
+            if out.len() > max {
+                return Err(WireError::TooLarge);
+            }
+            let Some(size) = literal_size(&out) else {
+                return Ok(out);
+            };
+            if size > max.saturating_sub(out.len()) {
+                return Err(WireError::TooLarge);
+            }
+            out.reserve(size);
+            let mut left = size;
+            while left > 0 {
+                if self.start == self.pending.len() {
+                    self.fill(deadline).await?;
+                }
+                let take = left.min(self.pending.len() - self.start);
+                out.extend_from_slice(&self.pending[self.start..self.start + take]);
+                self.start += take;
+                left -= take;
+            }
+        }
+    }
+
+    /// Read more of the socket into the pending bytes.
+    async fn fill(&mut self, deadline: Instant) -> Result<(), WireError> {
+        if self.start > 0 && self.start == self.pending.len() {
+            self.pending.clear();
+            self.start = 0;
+        } else if self.start > CHUNK {
+            self.pending.drain(..self.start);
+            self.start = 0;
+        }
+        let mut chunk = vec![0_u8; CHUNK];
+        let until = deadline.min(Instant::now() + self.read_timeout);
+        let read = timeout_at(until, self.stream.read(&mut chunk))
+            .await
+            .map_err(|_| WireError::TimedOut)?
+            .map_err(|_| WireError::Closed)?;
+        if read == 0 {
+            return Err(WireError::Closed);
+        }
+        self.pending.extend_from_slice(&chunk[..read]);
+        self.received = self
+            .received
+            .saturating_add(u64::try_from(read).unwrap_or(u64::MAX));
+        Ok(())
+    }
+
+    /// The capabilities the server offers now that it is signed in to,
+    /// upper-cased.
+    pub async fn capabilities(&mut self, limits: Limits) -> Result<Vec<String>, WireError> {
+        let mut capabilities = Vec::new();
+        let done = self
+            .command("CAPABILITY", limits, |untagged| {
+                if let Untagged::Capabilities(list) = untagged {
+                    capabilities.extend(list);
+                }
+            })
+            .await?;
+        if !done.is_ok() {
+            return Err(WireError::Malformed);
+        }
+        Ok(capabilities)
     }
 
     /// Whether the mailbox lists its inbox (`LIST "" INBOX` answers).
     pub async fn list_inbox(&mut self) -> Result<(), Refusal> {
-        let names = self
-            .inner
-            .list(Some(""), Some("INBOX"))
+        let limits = Limits {
+            response: SIGN_IN_RESPONSE,
+            responses: SIGN_IN_RESPONSES,
+            total: 256 * 1024,
+            time: self.read_timeout,
+        };
+        let done = self
+            .command(r#"LIST "" INBOX"#, limits, |_| {})
             .await
-            .map_err(|err| refused(&err))?;
-        let _names: Vec<_> = names.try_collect().await.map_err(|err| refused(&err))?;
-        Ok(())
+            .map_err(|err| match err {
+                WireError::TimedOut | WireError::Closed => Refusal::ImapUnreachable,
+                WireError::TooLarge | WireError::TooMany | WireError::Malformed => {
+                    Refusal::ImapNotAnImapServer
+                }
+            })?;
+        if done.is_ok() {
+            Ok(())
+        } else {
+            Err(sign_in_refusal(&done))
+        }
     }
 
-    /// Say goodbye; whatever the server answers.
+    /// Say goodbye, briefly; whatever the server answers. A session cut
+    /// short is only closed.
     pub async fn logout(mut self) {
-        let _ = self.inner.logout().await;
+        let limits = Limits {
+            response: 4 * 1024,
+            responses: 16,
+            total: 64 * 1024,
+            time: Duration::from_secs(5),
+        };
+        let _ = self.command("LOGOUT", limits, |_| {}).await;
     }
 }
 
@@ -127,24 +519,91 @@ pub async fn verify(
     .unwrap_or(Err(Refusal::ImapUnreachable))
 }
 
-/// `AUTHENTICATE PLAIN` (RFC 4616): no authorization identity, the
-/// username and the password.
-struct Plain<'a> {
-    username: &'a str,
-    password: &'a SecretString,
+/// `AUTHENTICATE PLAIN`'s response (RFC 4616), base64: no authorization
+/// identity, the username and the password. Wiped when dropped.
+fn plain(username: &str, password: &SecretString) -> Zeroizing<String> {
+    let secret = password.expose_secret();
+    let mut raw = Zeroizing::new(Vec::with_capacity(username.len() + secret.len() + 2));
+    raw.push(0);
+    raw.extend_from_slice(username.as_bytes());
+    raw.push(0);
+    raw.extend_from_slice(secret.as_bytes());
+    Zeroizing::new(STANDARD.encode(raw.as_slice()))
 }
 
-impl async_imap::Authenticator for Plain<'_> {
-    type Response = Vec<u8>;
-
-    fn process(&mut self, _challenge: &[u8]) -> Vec<u8> {
-        let mut response = Vec::with_capacity(self.username.len() + 64);
-        response.push(0);
-        response.extend_from_slice(self.username.as_bytes());
-        response.push(0);
-        response.extend_from_slice(self.password.expose_secret().as_bytes());
-        response
+/// `LOGIN`'s steps: one line of quoted strings, or (for a username or
+/// password a quoted string cannot carry) literals, each sent once the
+/// server asks for it. Wiped when dropped.
+fn login(tag: &str, username: &str, password: &SecretString) -> Vec<Zeroizing<Vec<u8>>> {
+    let secret = password.expose_secret();
+    let quoted_username = quoted(username).map(Zeroizing::new);
+    let quoted_password = quoted(secret).map(Zeroizing::new);
+    if let (Some(user), Some(pass)) = (quoted_username, quoted_password) {
+        return vec![line(&[tag, " LOGIN ", user.as_str(), " ", pass.as_str()])];
     }
+    let first = format!(" LOGIN {{{}}}", username.len());
+    let second = format!(" {{{}}}", secret.len());
+    vec![
+        line(&[tag, first.as_str()]),
+        line(&[username, second.as_str()]),
+        line(&[secret]),
+    ]
+}
+
+/// `parts` and a line ending, wiped when dropped.
+fn line(parts: &[&str]) -> Zeroizing<Vec<u8>> {
+    let mut out = Zeroizing::new(Vec::new());
+    for part in parts {
+        out.extend_from_slice(part.as_bytes());
+    }
+    out.extend_from_slice(b"\r\n");
+    out
+}
+
+/// What a sign-in the server ended without `OK` means: busy (RFC 5530's
+/// `UNAVAILABLE`, `INUSE`, `LIMIT`), or a refusal. Logs the response code
+/// only, never the server's text.
+fn sign_in_refusal(done: &Done) -> Refusal {
+    let code = done.code.as_ref().map_or("", |code| code.name.as_str());
+    if done.is_busy() {
+        tracing::info!(code, "the IMAP server is busy");
+        Refusal::ImapBusy
+    } else {
+        tracing::info!(code, "the IMAP server refused the sign-in");
+        Refusal::ImapLoginRefused
+    }
+}
+
+/// The size of the literal `line` ends with (`{12}` or `{12+}`, then the
+/// line ending), if it announces one.
+fn literal_size(line: &[u8]) -> Option<usize> {
+    let line = line
+        .strip_suffix(b"\r\n")
+        .or_else(|| line.strip_suffix(b"\n"))?
+        .strip_suffix(b"}")?;
+    let open = line.iter().rposition(|b| *b == b'{')?;
+    let digits = &line[open + 1..];
+    let digits = digits.strip_suffix(b"+").unwrap_or(digits);
+    usize::try_from(syntax::number(digits)?).ok()
+}
+
+/// `text` as an IMAP quoted string; `None` when it cannot be one (a line
+/// break, a NUL, or anything outside ASCII: such names and ids are left
+/// alone rather than sent as literals).
+pub fn quoted(text: &str) -> Option<String> {
+    if text.len() > 2048 || !text.bytes().all(|b| (0x20..0x7f).contains(&b)) {
+        return None;
+    }
+    let mut out = String::with_capacity(text.len() + 2);
+    out.push('"');
+    for c in text.chars() {
+        if c == '"' || c == '\\' {
+            out.push('\\');
+        }
+        out.push(c);
+    }
+    out.push('"');
+    Some(out)
 }
 
 /// What a failed TLS handshake means: a certificate (or TLS) problem, or a
@@ -155,40 +614,6 @@ fn handshake(err: &std::io::Error) -> Refusal {
     } else {
         Refusal::ImapUnreachable
     }
-}
-
-/// What an error of the IMAP client means. A refused sign-in logs its
-/// response code only, never the server's text.
-fn refused(err: &ImapError) -> Refusal {
-    match err {
-        ImapError::No(answer) | ImapError::Bad(answer) => {
-            tracing::info!(
-                code = response_code(answer),
-                "the IMAP server refused the sign-in"
-            );
-            Refusal::ImapLoginRefused
-        }
-        ImapError::Validate(_) => Refusal::ImapLoginRefused,
-        ImapError::Parse(_) => Refusal::ImapNotAnImapServer,
-        ImapError::Io(io) if tls::is_tls_failure(io) => Refusal::ImapTlsFailed,
-        _ => Refusal::ImapUnreachable,
-    }
-}
-
-/// The response code of a refused command as the client reports it: one
-/// it knows (`code: Some(Alert)`), else one left at the start of the text
-/// (`[AUTHENTICATIONFAILED]`, RFC 5530). Letters only, never the text.
-fn response_code(answer: &str) -> &str {
-    const UNKNOWN: &str = "info: Some(\"[";
-    let code = answer
-        .strip_prefix("code: Some(")
-        .or_else(|| answer.find(UNKNOWN).map(|at| &answer[at + UNKNOWN.len()..]))
-        .unwrap_or_default();
-    let end = code
-        .find(|c: char| !c.is_ascii_alphabetic())
-        .unwrap_or(code.len())
-        .min(40);
-    &code[..end]
 }
 
 /// Read the server's greeting: `* OK` (or `* PREAUTH`); `* BYE` means it
@@ -278,34 +703,5 @@ async fn read_line<S: AsyncRead + Unpin>(stream: &mut S) -> Result<String, Refus
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn only_the_response_code_is_kept() {
-        assert_eq!(
-            response_code(
-                r#"code: Some(AuthenticationFailed), info: Some("ana@example.com: bad")"#
-            ),
-            "AuthenticationFailed"
-        );
-        assert_eq!(
-            response_code(r#"code: None, info: Some("[AUTHENTICATIONFAILED] ana@example.com")"#),
-            "AUTHENTICATIONFAILED"
-        );
-        assert_eq!(response_code(r#"code: None, info: Some("secret")"#), "");
-    }
-
-    #[test]
-    fn plain_carries_the_username_and_password_once() {
-        let password = SecretString::from("app-password");
-        let mut plain = Plain {
-            username: "ana@example.com",
-            password: &password,
-        };
-        assert_eq!(
-            async_imap::Authenticator::process(&mut plain, b""),
-            b"\0ana@example.com\0app-password"
-        );
-    }
-}
+#[path = "session_tests.rs"]
+mod tests;
