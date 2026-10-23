@@ -52,7 +52,7 @@ async fn count(kit: &Kit, table: &str) -> i64 {
 }
 
 /// A member of a fresh workspace who signed in five minutes ago.
-async fn member(kit: &Kit, sub: &str) -> (Caller, WorkspaceId) {
+fn member(kit: &Kit, sub: &str) -> (Caller, WorkspaceId) {
     let ws = WorkspaceId::new();
     let caller = kit.user_signed_in(sub, 5);
     kit.join(&caller, ws, Role::Member);
@@ -62,7 +62,7 @@ async fn member(kit: &Kit, sub: &str) -> (Caller, WorkspaceId) {
 #[sqlx::test(migrations = "../../../migrations")]
 async fn an_app_password_connects_a_mailbox(db: PgPool) {
     let (kit, fakes) = testkit_imap::kit(db).await;
-    let (ana, ws) = member(&kit, "ana").await;
+    let (ana, ws) = member(&kit, "ana");
     let (imap, smtp, servers) =
         testkit_imap::mailbox(&fakes, "ana@yahoo.com", "abcd efgh ijkl mnop").await;
 
@@ -160,7 +160,7 @@ async fn an_app_password_connects_a_mailbox(db: PgPool) {
 #[sqlx::test(migrations = "../../../migrations")]
 async fn a_wrong_password_keeps_nothing_and_never_repeats_the_server(db: PgPool) {
     let (kit, fakes) = testkit_imap::kit(db).await;
-    let (ana, ws) = member(&kit, "ana").await;
+    let (ana, ws) = member(&kit, "ana");
     let (imap, _smtp, servers) = testkit_imap::mailbox(&fakes, "ana@yahoo.com", "right").await;
 
     let refused = connect(&kit, &ana, ws, body("ana@yahoo.com", "wrong", &servers)).await;
@@ -192,7 +192,7 @@ async fn a_wrong_password_keeps_nothing_and_never_repeats_the_server(db: PgPool)
 #[sqlx::test(migrations = "../../../migrations")]
 async fn no_password_is_sent_without_tls(db: PgPool) {
     let (kit, fakes) = testkit_imap::kit(db).await;
-    let (ana, ws) = member(&kit, "ana").await;
+    let (ana, ws) = member(&kit, "ana");
     fakes.resolver.name(IMAP_HOST, &["127.0.0.1"]);
     fakes.resolver.name(SMTP_HOST, &["127.0.0.1"]);
     let plain_only = Script {
@@ -227,7 +227,7 @@ async fn no_password_is_sent_without_tls(db: PgPool) {
 #[sqlx::test(migrations = "../../../migrations")]
 async fn a_starttls_imap_server_and_a_tls_smtp_server_connect(db: PgPool) {
     let (kit, fakes) = testkit_imap::kit(db).await;
-    let (ana, ws) = member(&kit, "ana").await;
+    let (ana, ws) = member(&kit, "ana");
     fakes.resolver.name(IMAP_HOST, &["127.0.0.1"]);
     fakes.resolver.name(SMTP_HOST, &["127.0.0.1"]);
     // No `AUTH=PLAIN`: `LOGIN`, after STARTTLS.
@@ -261,7 +261,7 @@ async fn a_starttls_imap_server_and_a_tls_smtp_server_connect(db: PgPool) {
 #[sqlx::test(migrations = "../../../migrations")]
 async fn refusals_name_what_went_wrong(db: PgPool) {
     let (kit, fakes) = testkit_imap::kit(db).await;
-    let (ana, ws) = member(&kit, "ana").await;
+    let (ana, ws) = member(&kit, "ana");
     let (_imap, smtp, servers) = testkit_imap::mailbox(&fakes, "ana@bakery.example", "pw").await;
     let attempt = |servers: Servers, password: &'static str| {
         let kit = &kit;
@@ -330,7 +330,7 @@ async fn refusals_name_what_went_wrong(db: PgPool) {
 #[sqlx::test(migrations = "../../../migrations")]
 async fn a_native_providers_mailbox_is_connected_natively(db: PgPool) {
     let (kit, fakes) = testkit_imap::kit(db).await;
-    let (ana, ws) = member(&kit, "ana").await;
+    let (ana, ws) = member(&kit, "ana");
     let (_imap, _smtp, servers) = testkit_imap::mailbox(&fakes, "ana@gmail.com", "pw").await;
     let gmail = connect(&kit, &ana, ws, body("ana@gmail.com", "pw", &servers)).await;
     assert_eq!(gmail.status, StatusCode::BAD_REQUEST);
@@ -392,7 +392,7 @@ async fn only_a_recently_signed_in_member_on_an_instance_with_imap(db: PgPool) {
 #[sqlx::test(migrations = "../../../migrations")]
 async fn reconnecting_replaces_the_password(db: PgPool) {
     let (kit, fakes) = testkit_imap::kit(db).await;
-    let (ana, ws) = member(&kit, "ana").await;
+    let (ana, ws) = member(&kit, "ana");
     let (imap, smtp, servers) = testkit_imap::mailbox(&fakes, "ana@bakery.example", "old").await;
     let first = connect(&kit, &ana, ws, body("ana@bakery.example", "old", &servers)).await;
     assert_eq!(first.status, StatusCode::CREATED);
@@ -447,8 +447,8 @@ async fn a_mailbox_cannot_be_guessed_at(db: PgPool) {
     let (kit, fakes) = testkit_imap::kit(db).await;
     let (imap, _smtp, servers) = testkit_imap::mailbox(&fakes, "bob@example.net", "secret").await;
     // Five failed sign-ins for one address, from two workspaces.
-    let (ana, ws_a) = member(&kit, "ana").await;
-    let (cy, ws_c) = member(&kit, "cy").await;
+    let (ana, ws_a) = member(&kit, "ana");
+    let (cy, ws_c) = member(&kit, "cy");
     for (who, ws) in [
         (&ana, ws_a),
         (&cy, ws_c),
@@ -472,7 +472,7 @@ async fn a_mailbox_cannot_be_guessed_at(db: PgPool) {
 #[sqlx::test(migrations = "../../../migrations")]
 async fn a_password_moved_to_another_row_does_not_open(db: PgPool) {
     let (kit, fakes) = testkit_imap::kit(db).await;
-    let (ana, ws) = member(&kit, "ana").await;
+    let (ana, ws) = member(&kit, "ana");
     let (_imap, _smtp, servers) = testkit_imap::mailbox(&fakes, "ana@bakery.example", "pw-a").await;
     let a = connect(&kit, &ana, ws, body("ana@bakery.example", "pw-a", &servers)).await;
     assert_eq!(a.status, StatusCode::CREATED, "{:?}", a.json);
